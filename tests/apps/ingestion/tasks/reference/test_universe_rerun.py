@@ -187,3 +187,38 @@ def test_migrate_ids_after_a_rerun_maps_every_upgrade(backend: Backend) -> None:
     merged = store.table("events/dividend", D2)
     assert len(merged) == 16
     assert set(merged["instrument_id"]) == {f"EQ:BBG_{s}" for s in NAMES}
+
+
+def test_a_figi_that_flips_within_a_session_keeps_one_history_row_per_key(
+    backend: Backend,
+) -> None:
+    """2026-10-02: DFAC's vendor FIGI flipped A -> B -> A across same-session runs; the sixth
+    run reopened A's row next to its closed copy and failed on a duplicate key."""
+    store = Store(backend)
+    store.build(D1, at(1), ["AAPL", "DFAC"], figis("AAPL", "DFAC"))
+    flips = ["BBG_A", "BBG_B", "BBG_A", "BBG_B", "BBG_A", "BBG_A"]
+    for n, figi in enumerate(flips):
+        store.build(D2, at(5 + n), ["AAPL", "DFAC"], {"AAPL": "BBG_AAPL", "DFAC": figi})
+        history = store.table(HISTORY, D2)
+        assert not history.duplicated(["figi", "symbol", "valid_from"]).any()
+        dfac = history[history["symbol"].eq("DFAC")].set_index("figi")
+        open_rows = dfac[dfac["valid_to"].isna()]
+        assert list(open_rows.index) == [figi]  # one open row, the FIGI listed now
+    assert sorted(dfac.index) == ["BBG_A", "BBG_B", "BBG_DFAC"]
+    assert dfac.loc["BBG_DFAC", "valid_from"] == D1 and dfac.loc["BBG_DFAC", "valid_to"] == D2
+    assert dfac.loc["BBG_A", "valid_from"] == D2 and pd.isna(dfac.loc["BBG_A", "valid_to"])
+    assert dfac.loc["BBG_B", "valid_to"] == D2  # seen and superseded within the session
+    aapl = history[history["symbol"].eq("AAPL")]
+    assert len(aapl) == 1 and aapl["valid_from"].iloc[0] == D1
+
+
+def test_a_ticker_that_flips_back_within_a_session_reopens_its_row(backend: Backend) -> None:
+    store = Store(backend)
+    store.build(D1, at(1), ["OLDT"], {"OLDT": "BBG_X"})
+    store.build(D2, at(4), ["NEWT"], {"NEWT": "BBG_X"})  # ticker change
+    store.build(D2, at(5), ["OLDT"], {"OLDT": "BBG_X"})  # and back
+    store.build(D2, at(6), ["NEWT"], {"NEWT": "BBG_X"})  # and again
+    history = store.table(HISTORY, D2).set_index("symbol")
+    assert sorted(history.index) == ["NEWT", "OLDT"]
+    assert history.loc["OLDT", "valid_from"] == D1 and history.loc["OLDT", "valid_to"] == D2
+    assert history.loc["NEWT", "valid_from"] == D2 and pd.isna(history.loc["NEWT", "valid_to"])
