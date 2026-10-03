@@ -18,7 +18,7 @@ from algotrade_ingestion.tasks.universe_build import (
 )
 from tests import massive_fixture as mfx
 from tests import universe_fixture as fx
-from tests.ingest_helpers import task_ctx
+from tests.ingest_helpers import http_for, task_ctx
 
 D1 = date(2026, 10, 1)
 D2 = D1 + timedelta(days=1)
@@ -126,9 +126,9 @@ def test_universe_build_with_identifiers_and_a_rename() -> None:
             return next((v for k, v in files.items() if k in url), fx.spy([names[0][0]]))
 
         return UniverseSources(
-            NasdaqTraderSource(transport, lambda s: None, RetryPolicy(tries=1)),
-            SpyHoldingsSource(transport, lambda s: None),
-            MassiveTickers(transport, lambda s: None, min_interval_s=0),
+            NasdaqTraderSource(http_for(transport, RetryPolicy(tries=1))),
+            SpyHoldingsSource(http_for(transport)),
+            MassiveTickers(http_for(transport)),
         )
 
     backend = MemoryBackend()

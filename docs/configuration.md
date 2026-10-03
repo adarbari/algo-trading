@@ -97,8 +97,9 @@ all = [ { field = "instrument.is_leveraged", op = "eq", value = false } ]
 how stored unadjusted bars are adjusted for corporate actions when a backtest reads them.
 
 Ingestion settings are L3 too: `config/site/universe.toml` (coverage rules) and
-`config/site/sources.toml` (per-source `enabled`, pacing and workers, raw retention, and the
-`[quality]` thresholds of the nightly data-quality checks). Credentials never go there.
+`config/site/sources.toml` (per-vendor `enabled` and `min_interval_s` pacing, chain workers,
+`[http]` retry cap, circuit breaker and limiter directory, raw retention, and the `[quality]`
+thresholds of the nightly data-quality checks). Credentials never go there.
 
 ## Users
 

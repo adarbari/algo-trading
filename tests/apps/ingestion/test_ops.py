@@ -33,20 +33,24 @@ def test_sources_settings_defaults_and_overrides() -> None:
         "nasdaq_trader": "not a table",
     }
     s = load_sources(MemoryConfigStore({("site", "settings", "sources"): doc}))
-    assert (s.raw_retention_days, s.cboe_workers, s.earnings_enabled, s.earnings_days) == (
+    earnings = s.vendor("nasdaq_earnings")
+    assert (s.raw_retention_days, s.cboe_workers, earnings.enabled, s.earnings_days) == (
         30,
         8,
         False,
         20,
     )
-    assert (s.massive_min_interval_s, s.actions_window, s.max_universe_change) == (
+    assert (s.vendor("massive").min_interval_s, s.actions_window, s.max_universe_change) == (
         0.5,
         (-3, 10),
         0.2,
     )
-    assert (s.sec_enabled, s.sec_min_interval_s, s.sec_refresh_days) == (False, 0.5, 7)
+    sec = s.vendor("sec_edgar")
+    assert (sec.enabled, sec.min_interval_s, s.sec_refresh_days) == (False, 0.5, 7)
     assert s.staging_retention_days == 3
-    assert s.universe_enabled  # a malformed section falls back to defaults
+    assert s.vendor("nasdaq_trader").enabled  # a malformed section falls back to defaults
+    assert s.vendor("cboe").min_interval_s is None  # unset: the registry's default applies
+    assert (s.http_max_retry_s, s.http_breaker_failures) == (300.0, 10)
 
 
 def bars(day: date, n: int) -> pd.DataFrame:

@@ -8,6 +8,7 @@ Every stored row is keyed by these ids, never by a raw ticker. Code that has a v
 resolves it through ``data.resolver.SymbolResolver``; only ``equity_id`` builds ``EQ:`` ids.
 """
 
+import math
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
@@ -45,6 +46,17 @@ def key_of(instrument: str) -> str:
     if not sep or not key:
         raise ValueError(f"not an instrument id: {instrument!r}")
     return key
+
+
+def pad_cik(value: object) -> str | None:
+    """An SEC CIK in any form (``320193``, ``"0000320193"``, ``320193.0``) -> 10 digits, else
+    ``None``. Reference rows and SEC payloads carry CIKs in different forms; join on this."""
+    if value is None or (isinstance(value, float) and math.isnan(value)):
+        return None
+    text = str(value).strip()
+    if text.endswith(".0"):
+        text = text[:-2]
+    return text.zfill(10) if text.isdigit() and int(text) > 0 else None
 
 
 @dataclass(frozen=True, slots=True)

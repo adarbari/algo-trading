@@ -1,20 +1,29 @@
-"""In-memory backend for tests and experiments. Same semantics as the local backend."""
+"""In-memory backend for tests and experiments. Same semantics as the local backend.
 
+One process only, so thread locks stand in for the local backend's file locks: one around
+each partition's run index, and named locks for ``Backend.lock``.
+"""
+
+import threading
 from collections.abc import Sequence
 from datetime import date, datetime
 
 import pandas as pd
 
 from algotrade.storage.backends.selection import concat_frames, latest_run, select_instruments
+from algotrade.storage.locks import ThreadLock
 from algotrade.storage.runs import RunRecord, run_session
 
 
 class MemoryTables:
     def __init__(self) -> None:
         self._data: dict[tuple[str, date], dict[str, pd.DataFrame]] = {}
+        self._index_lock = threading.Lock()
 
     def write(self, table: str, session_date: date, run_id: str, frame: pd.DataFrame) -> None:
-        self._data.setdefault((table, session_date), {})[run_id] = frame.copy()
+        copy = frame.copy()
+        with self._index_lock:
+            self._data.setdefault((table, session_date), {})[run_id] = copy
 
     def read(
         self,
@@ -119,3 +128,10 @@ class MemoryBackend:
         self.raw = MemoryRaw()
         self.staging = MemoryStaging()
         self.runs = MemoryRuns()
+        self._locks: dict[str, ThreadLock] = {}
+        self._guard = threading.Lock()
+
+    def lock(self, name: str) -> ThreadLock:
+        """The same lock object for a name, for as long as this backend lives."""
+        with self._guard:
+            return self._locks.setdefault(name, ThreadLock())

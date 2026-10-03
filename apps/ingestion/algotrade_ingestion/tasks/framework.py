@@ -46,7 +46,8 @@ def utc_now() -> datetime:
 
 @dataclass
 class TaskContext:
-    """What a task runs against: storage, built sources (by name), settings and a clock."""
+    """What a task runs against: storage, built sources (by name), settings and a clock.
+    ``unavailable``: why each source the registry left out is missing (disabled, no key)."""
 
     reader: StoreReader
     writer: StoreWriter
@@ -55,6 +56,7 @@ class TaskContext:
     configs: ConfigStore | None = None
     clock: Callable[[], datetime] = utc_now
     user: str = SITE_USER
+    unavailable: Mapping[str, str] = field(default_factory=dict)
 
 
 class NoResponseError(LookupError):

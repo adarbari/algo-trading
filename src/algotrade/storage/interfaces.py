@@ -6,6 +6,7 @@ from typing import Protocol
 
 import pandas as pd
 
+from algotrade.storage.locks import Lock
 from algotrade.storage.runs import RunRecord
 
 
@@ -98,3 +99,8 @@ class Backend(Protocol):
 
     @property
     def runs(self) -> RunStore: ...
+
+    def lock(self, name: str) -> Lock:
+        """A named exclusive lock shared by everyone using this store (e.g. ``ingest``: one
+        writing ingestion run at a time). Local: a file lock; memory: a thread lock."""
+        ...

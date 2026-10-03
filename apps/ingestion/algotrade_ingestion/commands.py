@@ -1,147 +1,56 @@
-"""Implementations of ``algotrade-ingest`` commands and the vendor source factories.
+"""Implementations of ``algotrade-ingest`` commands.
 
-Task commands are generic: ``run_task_command`` builds the sources a registry task declares
-and runs it (``tasks/registry.py``). Nightly and screens run as jobs (``run_job``). Source
-factories are module-level so tests can replace them with fakes (no network in CI).
+Task commands are generic: ``run_task_command`` asks the source registry
+(``sources/registry.py``) for the sources a registry task declares and runs it
+(``tasks/registry.py``). Nightly and screens run as jobs (``run_job``). Tests replace sources
+through ``sources.registry.SOURCES`` (no network in CI).
 """
 
 import argparse
 import json
 import sys
-import time
 from collections.abc import Iterable, Mapping
+from datetime import timedelta
 from typing import Any
 
 from algotrade.config.user import UserContext
+from algotrade.core.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.services.jobs import JobRecord, JobStatus, LocalJobRunner
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.factory import open_config_store
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.env import massive_key, sec_contact
+from algotrade_ingestion.env import credential
 from algotrade_ingestion.pipeline import NIGHTLY, nightly_job
 from algotrade_ingestion.settings import SourcesSettings, load_sources
 from algotrade_ingestion.sources.base import Source
-from algotrade_ingestion.sources.cboe import CboeOptionsSource
-from algotrade_ingestion.sources.http import BROWSER_USER_AGENT, MinInterval, urllib_transport
-from algotrade_ingestion.sources.massive import (
-    MassiveCorporateActions,
-    MassiveDailyBars,
-    MassiveTickers,
-)
-from algotrade_ingestion.sources.nasdaq_earnings import NasdaqEarningsSource
-from algotrade_ingestion.sources.nasdaq_trader import NasdaqTraderSource
-from algotrade_ingestion.sources.sec_edgar import SecSubmissions, SecTickerMap, user_agent
-from algotrade_ingestion.sources.spy_holdings import SpyHoldingsSource
+from algotrade_ingestion.sources.registry import Built, build_sources
 from algotrade_ingestion.sources.synthetic.catalog import build_golden
 from algotrade_ingestion.sources.synthetic.files import GoldenFiles
 from algotrade_ingestion.tasks.framework import TaskContext, run_summary
 from algotrade_ingestion.tasks.registry import TASKS, Task, run_task, task
+
+# Job kinds this app runs under the ingest run lock: safe to recover at once (see cli.main).
+LOCKED_KINDS = ("nightly", "screen")
 
 
 def sources_settings(args: argparse.Namespace) -> SourcesSettings:
     return load_sources(open_config_store(getattr(args, "config_dir", None)))
 
 
-# ----------------------------------------------------------------------------- sources
-# Source construction stays here until the source registry (roadmap R4). Each factory returns
-# the sources of one vendor by name; ``required`` vendors raise on missing credentials,
-# optional ones (nightly) are left out when disabled in sources.toml or not configured.
+def sources_for(names: Iterable[str], settings: SourcesSettings) -> Built:
+    """The named sources from the registry (credentials from the environment)."""
+    return build_sources(settings, credential, names)
 
 
-def cboe_sources(settings: SourcesSettings, required: bool = True) -> dict[str, Source]:
-    return {"cboe": CboeOptionsSource(urllib_transport(), time.sleep)}
-
-
-def earnings_sources(settings: SourcesSettings, required: bool = True) -> dict[str, Source]:
-    if not required and not settings.earnings_enabled:
-        return {}
-    transport = urllib_transport(BROWSER_USER_AGENT)
-    source = NasdaqEarningsSource(transport, time.sleep, pause_s=settings.earnings_pause_s)
-    return {"nasdaq_earnings": source}
-
-
-def sec_sources(settings: SourcesSettings, required: bool = True) -> dict[str, Source]:
-    """SEC EDGAR sources sharing one rate limiter; nothing without a contact email."""
-    contact = sec_contact(required) if required or settings.sec_enabled else None
-    if contact is None:
-        return {}
-    transport = urllib_transport(user_agent(contact))
-    limiter = MinInterval(settings.sec_min_interval_s, time.sleep)
-    return {
-        "sec_tickers": SecTickerMap(transport, time.sleep, limiter=limiter),
-        "sec_submissions": SecSubmissions(transport, time.sleep, limiter=limiter),
-    }
-
-
-def massive_sources(settings: SourcesSettings, required: bool = True) -> dict[str, Source]:
-    """Bars, corporate actions and the ticker list, paced by ``[massive] min_interval_s``."""
-    key = massive_key(required) if required or settings.massive_enabled else None
-    if key is None:
-        return {}
-    transport = urllib_transport(headers={"Authorization": f"Bearer {key}"})
-    pace = settings.massive_min_interval_s
-    return {
-        "massive_bars": MassiveDailyBars(transport, time.sleep, min_interval_s=pace),
-        "massive_corporate_actions": MassiveCorporateActions(
-            transport, time.sleep, min_interval_s=pace
-        ),
-        "massive_tickers": MassiveTickers(transport, time.sleep, min_interval_s=pace),
-    }
-
-
-def universe_sources(settings: SourcesSettings, required: bool = True) -> dict[str, Source]:
-    if not required and not settings.universe_enabled:
-        return {}
-    transport = urllib_transport()
-    return {
-        "nasdaq_trader": NasdaqTraderSource(transport, time.sleep),
-        "spy_holdings": SpyHoldingsSource(transport, time.sleep),
-    }
-
-
-VENDOR = {
-    "cboe": "cboe",
-    "nasdaq_earnings": "earnings",
-    "sec_tickers": "sec",
-    "sec_submissions": "sec",
-    "massive_bars": "massive",
-    "massive_corporate_actions": "massive",
-    "massive_tickers": "massive",
-    "nasdaq_trader": "universe",
-    "spy_holdings": "universe",
-}
-
-
-def _vendor(vendor: str, settings: SourcesSettings, required: bool) -> dict[str, Source]:
-    factories = {
-        "cboe": cboe_sources,
-        "earnings": earnings_sources,
-        "sec": sec_sources,
-        "massive": massive_sources,
-        "universe": universe_sources,
-    }
-    return factories[vendor](settings, required)
-
-
-def build_sources(
-    names: Iterable[str], settings: SourcesSettings, required: bool = True
-) -> dict[str, Source]:
-    """The named sources (see ``VENDOR``); with ``required=False`` unavailable ones are left
-    out instead of raising."""
-    wanted = list(dict.fromkeys(names))
-    built: dict[str, Source] = {}
-    for vendor in dict.fromkeys(VENDOR[n] for n in wanted):
-        built.update(_vendor(vendor, settings, required))
-    return {n: built[n] for n in wanted if n in built}
-
-
-def task_sources(spec: Task, settings: SourcesSettings) -> dict[str, Source]:
-    """An explicit run: required sources must be configured, optional ones may be missing."""
-    return {
-        **build_sources(spec.optional_sources, settings, required=False),
-        **build_sources(spec.sources, settings, required=True),
-    }
+def task_sources(spec: Task, settings: SourcesSettings) -> Built:
+    """An explicit run: every required source must be available, else a clear error."""
+    built = sources_for((*spec.sources, *spec.optional_sources), settings)
+    missing = [s for s in spec.sources if s not in built.sources]
+    if missing:
+        reasons = sorted({built.skipped[s] for s in missing})
+        raise ConfigurationError(f"{spec.name} skipped: {'; '.join(reasons)}")
+    return built
 
 
 # ----------------------------------------------------------------------------- tasks
@@ -172,7 +81,8 @@ def run_task_command(
     """Run one registry task with the sources it declares; print its run summary."""
     spec = task(name)
     ctx = task_context(args, reader, writer)
-    ctx.sources = task_sources(spec, ctx.settings)
+    built = task_sources(spec, ctx.settings)
+    ctx.sources, ctx.unavailable = built.sources, built.skipped
     record = run_task(name, ctx, params)
     print_json(run_summary(record))
     return 0 if record.status == "complete" else 1
@@ -208,16 +118,21 @@ def run_job(
     names = [
         n for t in NIGHTLY if t in TASKS for n in (*task(t).sources, *task(t).optional_sources)
     ]
+    built = sources_for(names, settings)
     resources: dict[str, object] = {
         "reader": reader,
         "writer": writer,
         "configs": open_config_store(args.config_dir),
         "sources_settings": settings,
-        "sources": build_sources(names, settings, required=False),
+        "sources": built.sources,
+        "unavailable": built.skipped,
     }
     runner = LocalJobRunner(
         writer.runs_backend, {**LIBRARY_HANDLERS, "nightly": nightly_job}, resources
     )
+    # The caller holds the ingest run lock, so a queued/running job of these kinds was left
+    # by a crashed process: mark it failed now, or it would block this re-run.
+    runner.recover(timedelta(0), LOCKED_KINDS)
     try:
         return runner.wait(runner.submit(kind, params, UserContext(user), force=True))
     finally:

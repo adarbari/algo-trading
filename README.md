@@ -33,7 +33,11 @@ algotrade-ingest run <task> [--date D | --from D --to D]   # any registry task (
 ```
 
 Source switches, pacing, retention and quality thresholds live in
-[`config/site/sources.toml`](config/site/sources.toml). The nightly run ends with data-quality
+[`config/site/sources.toml`](config/site/sources.toml). Pacing per vendor is shared by every
+process on the machine (`var/run/limits/`), and every command that writes to the store takes
+its ingest lock: a second run started while one is going exits with code 3 (pass `--wait` to
+queue behind it instead). A disabled vendor or a missing key skips the tasks that need it,
+with the reason. The nightly run ends with data-quality
 checks (universe size, bar freshness and count, chain coverage, earnings present); any
 failure marks the run `PARTIAL`.
 

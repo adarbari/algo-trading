@@ -18,7 +18,7 @@ from algotrade_ingestion.tasks.option_chains import (
 )
 from algotrade_ingestion.tasks.universe import UniverseFile, import_universe
 from tests import cboe_fixture as fx
-from tests.ingest_helpers import task_ctx
+from tests.ingest_helpers import CountingLimiter, http_for, task_ctx
 from tests.storage_helpers import write_reference
 
 DAY = fx.SESSION
@@ -50,15 +50,20 @@ def universe(*symbols: str) -> list[Underlying]:
     return [Underlying(f"EQ:{s}", s) for s in symbols]
 
 
-def run(writer: StoreWriter, feed: FakeFeed, symbols: list[Underlying], **config: float):  # type: ignore[no-untyped-def]
-    source = CboeOptionsSource(feed, lambda s: None, NO_RETRY)
+def run(  # type: ignore[no-untyped-def]
+    writer: StoreWriter,
+    feed: FakeFeed,
+    symbols: list[Underlying],
+    limiter: CountingLimiter | None = None,
+    **config: float,
+):
+    source = CboeOptionsSource(http_for(feed, NO_RETRY, limiter))
     return ingest_option_chains(
         task_ctx(writer, clock=CLOCK),
         source,
         symbols,
         DAY,
         ChainJobConfig(**config),  # type: ignore[arg-type]
-        lambda s: None,
     )
 
 
@@ -98,8 +103,10 @@ def test_chain_job_records_every_status_and_publishes() -> None:
 def test_chain_job_resumes_and_retries(tmp_path: Path) -> None:
     writer = StoreWriter(LocalBackend(tmp_path))
     feed = FakeFeed({"A": fx.payload("A"), "B": fx.payload("B")}, fail_first={"B": 2})
-    first = run(writer, feed, universe("A", "B"), retry_pause_s=0)
+    limiter = CountingLimiter()
+    first = run(writer, feed, universe("A", "B"), limiter, retry_pause_s=7)
     assert first.status is RunStatus.PARTIAL
+    assert limiter.held == 7  # the retry pass waited out a shared cool-down first
     second = run(writer, feed, universe("A", "B"), retry_pause_s=0)
     assert second.run_id == first.run_id
     assert second.status is RunStatus.COMPLETE

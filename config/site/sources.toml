@@ -3,20 +3,32 @@
 raw_retention_days = 90          # raw vendor responses older than this are purged nightly
 staging_retention_days = 14      # scratch left by unfinished runs (no resume after this) is purged nightly
 
+# Each vendor section: `enabled` (off: its sources are not built and tasks needing them are
+# skipped) and `min_interval_s`, the spacing between requests to that vendor, shared by every
+# worker thread and every process on this machine (apps/ingestion/sources/limiter.py).
+
+[http]                           # every vendor request (sources/http.py)
+max_retry_s = 300                # give up on one request after retrying for this long
+breaker_failures = 10            # this many 403/5xx in a row from a vendor: fail its remaining items fast
+limits_dir = "var/run/limits"    # shared pacing state, one lock file per vendor (git-ignored)
+
 [cboe]                           # option chains (delayed feed), one request per underlying
 enabled = true
 workers = 4
+min_interval_s = 0.0             # unpaced today; the workers bound concurrency
 
 [nasdaq_trader]                  # universe: symbol directory + listed options
 enabled = true
+min_interval_s = 0.0
 
 [spy_holdings]                   # S&P 500 membership
 enabled = true
+min_interval_s = 0.0
 
 [nasdaq_earnings]                # earnings calendar
 enabled = true
 days = 60                        # forward window stored each night
-pause_s = 0.5                    # spacing between requests
+min_interval_s = 0.5             # spacing between requests
 
 [massive]                        # daily bars, splits, dividends, identifiers (needs the API key)
 enabled = true

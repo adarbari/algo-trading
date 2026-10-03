@@ -7,64 +7,33 @@
 
 SEC fair-access policy: a ``User-Agent`` naming the requester with a contact email (built by
 ``user_agent`` from ``ALGOTRADE_SEC_CONTACT``; never stored, logged or committed) and at most
-10 requests/second. Every request waits on a shared ``MinInterval`` (default 0.2 s). A 404 on
+10 requests/second. Every request waits on the shared ``sec`` limiter (``[sec_edgar]
+min_interval_s``, 0.2 s). A 404 on
 submissions means "no filings for this CIK" (``None``); 403 is an error (we may be blocked).
 """
 
 import json
-import math
 import re
 from typing import Any
 
 import pandas as pd
 
+from algotrade.core.fields import COMPANY_COLUMNS
+from algotrade.core.instruments import pad_cik
 from algotrade_ingestion.sources.base import FetchRequest, Normalized
-from algotrade_ingestion.sources.http import (
-    MinInterval,
-    RetryPolicy,
-    Sleep,
-    Transport,
-    get_with_retry,
-)
+from algotrade_ingestion.sources.http import Http
 from algotrade_ingestion.sources.sec_sic import sic_division, sic_sector
 
 SOURCE = "sec_edgar"
 TICKERS_URL = "https://www.sec.gov/files/company_tickers_exchange.json"
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
-DEFAULT_INTERVAL_S = 0.2
 TICKER_COLUMNS = ("cik", "sec_name", "symbol", "sec_exchange")
-COMPANY_COLUMNS = (
-    "cik",
-    "name",
-    "entity_type",
-    "sic",
-    "sic_description",
-    "sic_division",
-    "sector",
-    "industry",
-    "state_of_incorporation",
-    "fiscal_year_end",
-    "website",
-    "former_names",
-    "exchanges",
-    "tickers",
-)
 _PREFERRED = re.compile(r"^([A-Z]+)-P([A-Z]+)$")  # SEC "ABR-PD" == ACT "ABR$D"
 
 
 def user_agent(contact: str) -> str:
     """The SEC-required identification: who we are plus a contact email."""
     return f"algotrade-ingestion/0.1 {contact}"
-
-
-def pad_cik(value: object) -> str | None:
-    """Any CIK form (``320193``, ``"0000320193"``, ``320193.0``) -> 10 digits, else ``None``."""
-    if value is None or (isinstance(value, float) and math.isnan(value)):
-        return None
-    text = str(value).strip()
-    if text.endswith(".0"):
-        text = text[:-2]
-    return text.zfill(10) if text.isdigit() and int(text) > 0 else None
 
 
 def act_symbol(ticker: str) -> str:
@@ -137,20 +106,11 @@ class _Sec:
     name = SOURCE
     dataset = ""
 
-    def __init__(
-        self,
-        transport: Transport,
-        sleep: Sleep,
-        policy: RetryPolicy | None = None,
-        limiter: MinInterval | None = None,
-    ) -> None:
-        self._transport, self._sleep = transport, sleep
-        self._policy = policy or RetryPolicy(tries=4)
-        self._limiter = limiter or MinInterval(DEFAULT_INTERVAL_S, sleep)
+    def __init__(self, http: Http) -> None:
+        self._http = http
 
     def _get(self, url: str) -> bytes | None:
-        self._limiter.wait()
-        return get_with_retry(self._transport, url, self._policy, self._sleep)
+        return self._http.get(url)
 
 
 class SecTickerMap(_Sec):

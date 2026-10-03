@@ -3,14 +3,13 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from algotrade.core.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.env import load_dotenv, massive_key
+from algotrade_ingestion.env import credential, load_dotenv
 from algotrade_ingestion.sources.base import FetchRequest
-from algotrade_ingestion.sources.http import HttpError, MinInterval, RetryPolicy
+from algotrade_ingestion.sources.http import HttpError, RetryPolicy
 from algotrade_ingestion.sources.massive import (
     MassiveCorporateActions,
     MassiveDailyBars,
@@ -20,7 +19,7 @@ from algotrade_ingestion.sources.massive import (
 from algotrade_ingestion.tasks.bars import ingest_daily_bars, sessions_between
 from algotrade_ingestion.tasks.corporate_actions import ingest_corporate_actions
 from tests import massive_fixture as fx
-from tests.ingest_helpers import task_ctx
+from tests.ingest_helpers import http_for, task_ctx
 from tests.storage_helpers import write_reference
 
 D1, D2 = date(2026, 9, 30), date(2026, 10, 1)
@@ -48,21 +47,6 @@ def test_parse_grouped_maps_tickers_and_drops_bad_rows() -> None:
     assert (act_symbol("BRK.B"), act_symbol("KIMpL")) == ("BRK.B", "KIM$L")
 
 
-def test_min_interval_paces_requests() -> None:
-    now = {"t": 0.0}
-    slept: list[float] = []
-
-    def sleep(seconds: float) -> None:
-        slept.append(seconds)
-        now["t"] += seconds
-
-    pace = MinInterval(12.5, sleep, lambda: now["t"])
-    pace.wait()
-    now["t"] += 2.5
-    pace.wait()
-    assert slept == [10.0]
-
-
 def test_corporate_actions_follow_pagination() -> None:
     pages = {
         "first": fx.page(
@@ -79,7 +63,7 @@ def test_corporate_actions_follow_pagination() -> None:
         urls.append(url)
         return pages["next" if url.endswith("/next") else "first"]
 
-    source = MassiveCorporateActions(transport, lambda s: None, NO_RETRY, min_interval_s=0)
+    source = MassiveCorporateActions(http_for(transport, NO_RETRY))
     request = FetchRequest("splits:2026-09-01:2026-10-31")
     normalized = source.normalize(request, source.fetch(request) or b"")
     assert normalized is not None
@@ -108,9 +92,7 @@ def test_dividends_on_the_same_ex_date_are_summed() -> None:
             {"ticker": "", "ex_dividend_date": "2026-09-30", "cash_amount": 1.0},
         ]
     )
-    source = MassiveCorporateActions(
-        lambda url: payload, lambda s: None, NO_RETRY, min_interval_s=0
-    )
+    source = MassiveCorporateActions(http_for(lambda url: payload, NO_RETRY))
     request = FetchRequest("dividends:2026-09-01:2026-10-31")
     normalized = source.normalize(request, source.fetch(request) or b"")
     assert normalized is not None
@@ -131,7 +113,7 @@ def test_daily_bars_job_resumes_and_records_holidays() -> None:
 
     backend = MemoryBackend()
     writer, reader = StoreWriter(backend), StoreReader(backend)
-    source = MassiveDailyBars(transport, lambda s: None, NO_RETRY, min_interval_s=0)
+    source = MassiveDailyBars(http_for(transport, NO_RETRY))
     first = ingest_daily_bars(
         task_ctx(writer, reader, CLOCK), source, sessions_between(D1, date(2026, 10, 2))
     )
@@ -161,7 +143,7 @@ def test_corporate_actions_job_writes_snapshots_and_reports_failures() -> None:
     backend = MemoryBackend()
     writer, reader = StoreWriter(backend), StoreReader(backend)
     write_reference(writer, D1, {"NVDA": "EQ:BBG000BBJQV0"})
-    source = MassiveCorporateActions(transport, lambda s: None, NO_RETRY, min_interval_s=0)
+    source = MassiveCorporateActions(http_for(transport, NO_RETRY))
     record = ingest_corporate_actions(task_ctx(writer, reader, CLOCK), source, D2, D1, D2)
     assert record.status is RunStatus.PARTIAL
     assert (record.stats["events/split"], record.stats["unresolved"]) == (1, 0)
@@ -171,9 +153,7 @@ def test_corporate_actions_job_writes_snapshots_and_reports_failures() -> None:
 
 def test_daily_bars_resolve_through_the_reference_as_of_each_session() -> None:
     rows = [("META", 10, 11, 9, 10.5, 1000), ("FB", 10, 11, 9, 10.5, 1000)]
-    source = MassiveDailyBars(
-        lambda url: fx.grouped(D1, rows), lambda s: None, NO_RETRY, min_interval_s=0
-    )
+    source = MassiveDailyBars(http_for(lambda url: fx.grouped(D1, rows), NO_RETRY))
     backend = MemoryBackend()
     writer, reader = StoreWriter(backend), StoreReader(backend)
     write_reference(writer, D2, {"META": "EQ:BBG000MM2P62"})  # first snapshot after D1
@@ -192,11 +172,9 @@ def test_env_loading_and_missing_key(
     monkeypatch.delenv("ALGOTRADE_MASSIVE_API_KEY", raising=False)
     monkeypatch.delenv("OTHER", raising=False)
     load_dotenv(env)
-    assert massive_key() == "abc"
+    assert credential("ALGOTRADE_MASSIVE_API_KEY") == "abc"
     monkeypatch.setenv("ALGOTRADE_MASSIVE_API_KEY", "")
     load_dotenv(env)  # never overrides what is already set
-    assert massive_key(required=False) is None
-    with pytest.raises(ConfigurationError, match="ALGOTRADE_MASSIVE_API_KEY is not set"):
-        massive_key()
+    assert credential("ALGOTRADE_MASSIVE_API_KEY") is None  # empty counts as missing
     load_dotenv(tmp_path / "missing")  # type: ignore[operator]
     assert json.loads('{"ok": true}')["ok"]

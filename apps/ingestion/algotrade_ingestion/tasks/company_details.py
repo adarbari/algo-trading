@@ -16,11 +16,12 @@ from functools import partial
 
 import pandas as pd
 
+from algotrade.core.fields import COMPANY_COLUMNS
+from algotrade.core.instruments import pad_cik
 from algotrade.data import StoreReader
 from algotrade.data.reference import instruments, snapshot
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.sources.base import FetchRequest, Source
-from algotrade_ingestion.sources.sec_edgar import COMPANY_COLUMNS, pad_cik
 from algotrade_ingestion.tasks.framework import IngestRun, NoResponseError, TaskContext
 
 TASK = "company_details"

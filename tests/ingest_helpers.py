@@ -1,12 +1,18 @@
-"""Helpers for ingestion task tests: a ``TaskContext`` over a store with a fixed clock."""
+"""Helpers for ingestion tests: a ``TaskContext`` over a store with a fixed clock, and an
+``Http`` client around a fake transport (no network, no real sleeps, no shared limiter)."""
 
 from collections.abc import Callable, Mapping
+from dataclasses import replace
 from datetime import UTC, datetime
+
+import pytest
 
 from algotrade.data import StoreReader
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.settings import SourcesSettings
+from algotrade_ingestion.sources import registry
 from algotrade_ingestion.sources.base import Source
+from algotrade_ingestion.sources.http import Http, Pacer, RetryPolicy, Transport
 from algotrade_ingestion.tasks.framework import TaskContext
 
 FIXED = datetime(2026, 10, 2, 22, tzinfo=UTC)
@@ -22,3 +28,31 @@ def task_ctx(
     """A context over ``writer``'s backend (``reader`` defaults to the same store)."""
     reader = reader or StoreReader(writer._backend)
     return TaskContext(reader, writer, sources or {}, settings or SourcesSettings(), clock=clock)
+
+
+def http_for(
+    transport: Transport, policy: RetryPolicy | None = None, limiter: Pacer | None = None
+) -> Http:
+    """What the registry would hand a source, around a fake transport."""
+    return Http(transport, policy or RetryPolicy(), limiter, sleep=lambda s: None)
+
+
+class CountingLimiter:
+    """A ``Pacer`` that only counts: proves sources wait on the limiter they were given."""
+
+    def __init__(self) -> None:
+        self.waits, self.held = 0, 0.0
+
+    def wait(self) -> float:
+        self.waits += 1
+        return 0.0
+
+    def hold(self, seconds: float) -> None:
+        self.held += seconds
+
+
+def use_source(monkeypatch: pytest.MonkeyPatch, name: str, source: Source) -> None:
+    """Make the source registry hand out ``source`` as ``name`` (its availability rules —
+    section enabled, credential set — still apply)."""
+    spec = registry.SOURCES[name]
+    monkeypatch.setitem(registry.SOURCES, name, replace(spec, build=lambda http: source))

@@ -4,7 +4,7 @@
   module produces (``owner`` or ``also_written_by``), and every producing task module is in
   the registry;
 - every task is reachable from the CLI, by its own command and as ``run <task>``;
-- every source a task names is one the CLI knows how to build.
+- every source a task names is declared in the source registry.
 """
 
 import tomllib
@@ -13,8 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from algotrade_ingestion import cli, commands
+from algotrade_ingestion import cli
 from algotrade_ingestion.pipeline import NIGHTLY, SCREENS
+from algotrade_ingestion.sources.registry import SOURCES
 from algotrade_ingestion.tasks.registry import TASKS
 from tests.conftest import REPO_ROOT
 
@@ -67,7 +68,7 @@ def test_every_task_is_reachable_from_the_cli(name: str) -> None:
 
 def test_every_declared_source_can_be_built() -> None:
     names = {s for t in TASKS.values() for s in (*t.sources, *t.optional_sources)}
-    assert names <= set(commands.VENDOR), sorted(names - set(commands.VENDOR))
+    assert names <= set(SOURCES), sorted(names - set(SOURCES))
 
 
 def test_nightly_is_an_ordered_list_of_registry_tasks() -> None:

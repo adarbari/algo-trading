@@ -4,6 +4,7 @@ Phase 0 ships a local in-process runner. A queue-backed runner (phase 6) impleme
 same ``JobRunner`` protocol, so the CLIs and the future API do not change.
 """
 
+from algotrade.services.jobs.exclusive import INGEST_LOCK, RunLockedError, exclusive_run
 from algotrade.services.jobs.models import JobRecord, JobStatus, job_id_for
 from algotrade.services.jobs.runner import (
     JobContext,
@@ -14,6 +15,7 @@ from algotrade.services.jobs.runner import (
 )
 
 __all__ = [
+    "INGEST_LOCK",
     "JobContext",
     "JobHandler",
     "JobKind",
@@ -21,5 +23,7 @@ __all__ = [
     "JobRunner",
     "JobStatus",
     "LocalJobRunner",
+    "RunLockedError",
+    "exclusive_run",
     "job_id_for",
 ]

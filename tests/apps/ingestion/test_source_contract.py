@@ -29,13 +29,14 @@ from algotrade_ingestion.tasks.framework import stamp
 from tests import cboe_fixture as fx
 from tests import earnings_fixture, massive_fixture, sec_fixture, universe_fixture
 from tests.conftest import GOLDEN_DIR
+from tests.ingest_helpers import http_for
 
 type Adapter = tuple[Source, FetchRequest]
 
 
 def cboe() -> Adapter:
     payload = fx.payload("TEST")
-    source = CboeOptionsSource(lambda url: payload, lambda s: None, RetryPolicy(tries=1))
+    source = CboeOptionsSource(http_for(lambda url: payload, RetryPolicy(tries=1)))
     return source, FetchRequest("TEST", "EQ:TEST", fx.SESSION)
 
 
@@ -45,22 +46,22 @@ def golden() -> Adapter:
 
 def nasdaq_trader() -> Adapter:
     payload = universe_fixture.nasdaq([("AAPL", "Apple Inc. - Common Stock", "N", "N")])
-    return NasdaqTraderSource(lambda url: payload, lambda s: None), FetchRequest("nasdaqlisted")
+    return NasdaqTraderSource(http_for(lambda url: payload)), FetchRequest("nasdaqlisted")
 
 
 def spy_holdings() -> Adapter:
     payload = universe_fixture.spy(["AAPL"])
-    return SpyHoldingsSource(lambda url: payload, lambda s: None), FetchRequest("SPY")
+    return SpyHoldingsSource(http_for(lambda url: payload)), FetchRequest("SPY")
 
 
 def nasdaq_earnings() -> Adapter:
     payload = earnings_fixture.calendar([("AAPL", "time-after-hours")])
-    return NasdaqEarningsSource(lambda url: payload, lambda s: None), FetchRequest("2026-10-05")
+    return NasdaqEarningsSource(http_for(lambda url: payload)), FetchRequest("2026-10-05")
 
 
 def massive_bars() -> Adapter:
     payload = massive_fixture.grouped(fx.SESSION, [("AAPL", 10.0, 11.0, 9.0, 10.5, 1000.0)])
-    source = MassiveDailyBars(lambda url: payload, lambda s: None, min_interval_s=0)
+    source = MassiveDailyBars(http_for(lambda url: payload))
     return source, FetchRequest(fx.SESSION.isoformat())
 
 
@@ -68,7 +69,7 @@ def massive_actions() -> Adapter:
     payload = massive_fixture.page(
         [{"ticker": "NVDA", "execution_date": "2026-09-30", "split_from": 1, "split_to": 10}]
     )
-    source = MassiveCorporateActions(lambda url: payload, lambda s: None, min_interval_s=0)
+    source = MassiveCorporateActions(http_for(lambda url: payload))
     return source, FetchRequest("splits:2026-09-01:2026-10-31")
 
 
@@ -76,18 +77,18 @@ def massive_tickers() -> Adapter:
     payload = massive_fixture.page(
         [{"ticker": "AAPL", "type": "CS", "composite_figi": "BBG000B9XRY4"}]
     )
-    source = MassiveTickers(lambda url: payload, lambda s: None, min_interval_s=0)
+    source = MassiveTickers(http_for(lambda url: payload))
     return source, FetchRequest("active")
 
 
 def sec_tickers() -> Adapter:
     payload = sec_fixture.tickers([(320193, "Apple Inc.", "AAPL", "Nasdaq")])
-    return SecTickerMap(lambda url: payload, lambda s: None), FetchRequest("tickers")
+    return SecTickerMap(http_for(lambda url: payload)), FetchRequest("tickers")
 
 
 def sec_submissions() -> Adapter:
     payload = sec_fixture.submissions(320193, "Apple Inc.")
-    return SecSubmissions(lambda url: payload, lambda s: None), FetchRequest("320193")
+    return SecSubmissions(http_for(lambda url: payload)), FetchRequest("320193")
 
 
 ADAPTERS: dict[str, Callable[[], Adapter]] = {

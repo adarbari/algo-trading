@@ -13,7 +13,7 @@ from datetime import date, datetime
 import pandas as pd
 
 from algotrade_ingestion.sources.base import FetchRequest, Normalized
-from algotrade_ingestion.sources.http import RetryPolicy, Sleep, Transport, get_with_retry
+from algotrade_ingestion.sources.http import Http
 
 SOURCE = "ssga_spy"
 DATASET = "spy_holdings"
@@ -52,13 +52,11 @@ class SpyHoldingsSource:
     name = SOURCE
     dataset = DATASET
 
-    def __init__(
-        self, transport: Transport, sleep: Sleep, policy: RetryPolicy | None = None
-    ) -> None:
-        self._transport, self._sleep, self._policy = transport, sleep, policy or RetryPolicy()
+    def __init__(self, http: Http) -> None:
+        self._http = http
 
     def fetch(self, request: FetchRequest) -> bytes | None:
-        return get_with_retry(self._transport, URL, self._policy, self._sleep)
+        return self._http.get(URL)
 
     def normalize(self, request: FetchRequest, payload: bytes) -> Normalized | None:
         holdings, as_of, skipped = parse_holdings(payload)

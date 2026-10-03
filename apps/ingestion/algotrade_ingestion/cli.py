@@ -16,7 +16,9 @@
     algotrade-ingest golden build|verify|load [--golden-dir datasets/golden]
     algotrade-ingest run <task> [--date D | --from D --to D] [task flags]   (any registry task)
 
-Storage location comes from ALGOTRADE_DATA_URL (default file://./var/data).
+Storage location comes from ALGOTRADE_DATA_URL (default file://./var/data). Every command that
+writes to the store takes the store's ingest run lock: a second concurrent run exits with
+code 3 unless it was given ``--wait`` (then it queues behind the first).
 """
 
 import argparse
@@ -31,6 +33,7 @@ from algotrade.config.user import SITE_USER
 from algotrade.core.errors import AlgoTradeError
 from algotrade.data import StoreReader
 from algotrade.services.configs import default_user
+from algotrade.services.jobs import RunLockedError, exclusive_run
 from algotrade.storage.factory import open_backend
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.commands import golden, print_json, report, run_job, run_task_command
@@ -42,6 +45,20 @@ EXCHANGE_TZ = ZoneInfo("America/New_York")
 # Task commands kept under their own names (``algotrade-ingest bars ...``); every registry
 # task is also ``algotrade-ingest run <task>``. ``golden load`` runs the ``golden-load`` task.
 TASK_COMMANDS = tuple(name for name in TASKS if name != "golden-load")
+LOCKED_EXIT = 3  # another run holds the store's ingest lock
+
+
+def add_wait(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--wait", action="store_true", help="queue behind a running ingest instead of exiting 3"
+    )
+
+
+def writes(args: argparse.Namespace) -> bool:
+    """Whether the command writes to the store (and so takes the run lock)."""
+    if args.command == "schedule":
+        return False
+    return not (args.command == "golden" and args.action in ("build", "verify"))
 
 
 def last_session(now: datetime) -> date:
@@ -66,6 +83,7 @@ def add_task_arguments(parser: argparse.ArgumentParser, spec: Task) -> None:
                 default=param.default,
                 help=param.help,
             )
+    add_wait(parser)
     parser.set_defaults(task=spec.name)
 
 
@@ -75,6 +93,7 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
         s = sub.add_parser(name)
         s.add_argument("--date", type=date.fromisoformat)
         s.add_argument("--export-dir", type=Path)
+        add_wait(s)
         if name == "nightly":
             s.add_argument("--workers", type=int, help="chain workers (default: sources.toml)")
         else:
@@ -91,12 +110,14 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
     )
     g.add_argument("action", choices=["build", "verify", "load"])
     g.add_argument("--golden-dir", type=Path, default=Path("datasets/golden"))
+    add_wait(g)
     r = sub.add_parser(
         "purge-raw", help="delete raw vendor responses and unfinished-run scratch older than N days"
     )
     r.add_argument("--keep-days", type=int, default=90)
     r.add_argument("--staging-keep-days", type=int, default=14, help="unfinished-run scratch")
     r.add_argument("--date", type=date.fromisoformat, help="reference date (default: today)")
+    add_wait(r)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -177,7 +198,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     backend = open_backend()
     try:
-        return _dispatch(args, StoreReader(backend), StoreWriter(backend))
+        if not writes(args):
+            return _dispatch(args, StoreReader(backend), StoreWriter(backend))
+        with exclusive_run(backend, wait=args.wait):
+            return _dispatch(args, StoreReader(backend), StoreWriter(backend))
+    except RunLockedError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return LOCKED_EXIT
     except AlgoTradeError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2

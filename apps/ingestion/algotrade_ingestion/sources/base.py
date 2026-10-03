@@ -65,3 +65,20 @@ class WindowedSource(Source, Protocol):
     def window_requests(
         self, start: date, end: date, session: date
     ) -> list[tuple[str, FetchRequest]]: ...
+
+
+@runtime_checkable
+class DirectorySource(Source, Protocol):
+    """A symbol directory published as several files: ``listing_keys`` (request keys whose
+    parsed frames, keyed the same, are concatenated into all listings) and ``options_key``
+    (the parsed frame of symbols with listed options)."""
+
+    listing_keys: tuple[str, ...]
+    options_key: str
+
+
+@runtime_checkable
+class Throttled(Protocol):
+    """A source whose vendor can be asked to pause (all processes share the pause)."""
+
+    def cool_down(self, seconds: float) -> None: ...

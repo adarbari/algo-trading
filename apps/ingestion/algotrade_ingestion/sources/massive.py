@@ -7,9 +7,9 @@
 
 The API key travels in an ``Authorization`` header (set on the transport), never in URLs, so it
 cannot leak into logs or the raw store. Free tier: 5 requests/minute, so every request waits on
-a ``MinInterval`` (default 12.5 s). Bars are stored **unadjusted**; corporate actions are applied
-at read time (ADR 0016). Rows carry the vendor ``symbol`` (ACT style); the jobs resolve
-``instrument_id`` through the reference (ADR 0018).
+the shared ``massive`` limiter (``[massive] min_interval_s``, 12.5 s). Bars are stored
+**unadjusted**; corporate actions are applied at read time (ADR 0016). Rows carry the vendor
+``symbol`` (ACT style); the jobs resolve ``instrument_id`` through the reference (ADR 0018).
 """
 
 import json
@@ -20,15 +20,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from algotrade.storage.schemas import BAR_COLUMNS
 from algotrade_ingestion.sources.base import FetchRequest, Normalized
-from algotrade_ingestion.sources.http import (
-    MinInterval,
-    RetryPolicy,
-    Sleep,
-    Transport,
-    get_with_retry,
-)
+from algotrade_ingestion.sources.http import Http
 
 SOURCE = "massive"
 HOST = "https://api.massive.com"
@@ -38,7 +31,6 @@ TICKERS = HOST + "/v3/reference/tickers?market=stocks&active=true&limit=1000"
 DIVIDENDS = (
     HOST + "/stocks/v1/dividends?ex_dividend_date.gte={start}&ex_dividend_date.lte={end}&limit=5000"
 )
-FREE_TIER_INTERVAL_S = 12.5
 _PREFERRED = re.compile(r"^([A-Z]+)p([A-Z]*)$")  # Massive "KIMpL" == ACT "KIM$L"
 
 
@@ -56,7 +48,7 @@ def parse_grouped(day: date, payload: bytes) -> tuple[pd.DataFrame, int]:
     """-> (``bars/1d`` rows keyed by ``symbol``, invalid rows dropped). Empty on holidays."""
     results = json.loads(payload).get("results") or []
     frame = pd.DataFrame(results, columns=["T", "o", "h", "l", "c", "v", "vw", "t", "n"])
-    columns = ["symbol", *BAR_COLUMNS[1:], "vwap", "trades"]
+    columns = ["symbol", "ts", "open", "high", "low", "close", "volume", "vwap", "trades"]
     if frame.empty:
         return pd.DataFrame(columns=columns), 0
     bars = pd.DataFrame(
@@ -148,19 +140,11 @@ class _Massive:
     name = SOURCE
     dataset = "massive"
 
-    def __init__(
-        self,
-        transport: Transport,
-        sleep: Sleep,
-        policy: RetryPolicy | None = None,
-        min_interval_s: float = FREE_TIER_INTERVAL_S,
-    ) -> None:
-        self._transport, self._sleep, self._policy = transport, sleep, policy or RetryPolicy()
-        self._pace = MinInterval(min_interval_s, sleep)
+    def __init__(self, http: Http) -> None:
+        self._http = http
 
     def _get(self, url: str) -> bytes | None:
-        self._pace.wait()
-        return get_with_retry(self._transport, url, self._policy, self._sleep)
+        return self._http.get(url)
 
     def _paged(self, url: str) -> bytes | None:
         """Follow ``next_url`` and return one JSON document holding every page's results."""

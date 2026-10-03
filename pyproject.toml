@@ -225,6 +225,22 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
+name = "R3: ingestion tasks never import vendor modules (sources come from the registry)"
+type = "forbidden"
+source_modules = ["algotrade_ingestion.tasks"]
+forbidden_modules = [
+    "algotrade_ingestion.sources.cboe",
+    "algotrade_ingestion.sources.massive",
+    "algotrade_ingestion.sources.nasdaq_earnings",
+    "algotrade_ingestion.sources.nasdaq_trader",
+    "algotrade_ingestion.sources.sec_edgar",
+    "algotrade_ingestion.sources.spy_holdings",
+    "algotrade_ingestion.sources.registry",
+    "algotrade_ingestion.sources.http",
+    "algotrade_ingestion.sources.limiter",
+]
+
+[[tool.importlinter.contracts]]
 name = "Vendor HTTP lives only in ingestion sources (urllib.request: check_ownership.py)"
 type = "forbidden"
 source_modules = ["algotrade", "algotrade_backtest", "algotrade_ingestion.tasks"]

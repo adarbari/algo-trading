@@ -89,10 +89,21 @@ def test_missing_sources_and_session_fail_early() -> None:
         session_of({})
 
 
+def test_universe_build_needs_a_directory_source() -> None:
+    c = task_ctx(StoreWriter(MemoryBackend()), sources={"nasdaq_trader": 1, "spy_holdings": 2})
+    c.configs = MemoryConfigStore({})
+    with pytest.raises(TypeError, match="DirectorySource"):
+        run_task("universe-build", c, {"session": DAY})
+
+
 def test_nightly_skips_tasks_without_sources_or_by_rule() -> None:
     c = task_ctx(StoreWriter(MemoryBackend()), sources={"nasdaq_trader": 1, "spy_holdings": 2})
-    assert pipeline.skip_reason("bars", c) == ("skipped (not configured or disabled: massive_bars)")
-    assert pipeline.skip_reason("universe-build", c) == "skipped (csv_import)"  # no configs
+    assert pipeline.skip_reason("bars", c) == "skipped: massive_bars is not configured"
+    c.unavailable = {"massive_bars": "ALGOTRADE_MASSIVE_API_KEY is not set: add it"}
+    assert (
+        pipeline.skip_reason("bars", c) == "skipped: ALGOTRADE_MASSIVE_API_KEY is not set: add it"
+    )
+    assert pipeline.skip_reason("universe-build", c) == "skipped: csv_import mode"  # no configs
     c.configs = MemoryConfigStore({("site", "settings", "universe"): {"source": "nasdaq_trader"}})
     assert pipeline.skip_reason("universe-build", c) is None
     assert pipeline.skip_reason("features", c) is None

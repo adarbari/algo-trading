@@ -3,7 +3,7 @@
 import pytest
 
 from algotrade_ingestion.sources.base import FetchRequest
-from algotrade_ingestion.sources.http import HttpError, MinInterval, RetryPolicy
+from algotrade_ingestion.sources.http import HttpError, RetryPolicy
 from algotrade_ingestion.sources.sec_edgar import (
     SUBMISSIONS_URL,
     TICKERS_URL,
@@ -16,6 +16,7 @@ from algotrade_ingestion.sources.sec_edgar import (
     user_agent,
 )
 from algotrade_ingestion.sources.sec_sic import sic_division, sic_sector
+from tests.ingest_helpers import CountingLimiter, http_for
 from tests.sec_fixture import submissions, tickers
 
 
@@ -97,23 +98,21 @@ def test_sic_sectors(sic: str | None, sector: str | None, division: str | None) 
 
 def test_sources_pace_and_build_urls() -> None:
     urls: list[str] = []
-    waits: list[float] = []
-    clock = iter([0.0, 0.05, 0.2, 10.0])
-    limiter = MinInterval(0.2, waits.append, lambda: next(clock))
+    limiter = CountingLimiter()
 
     def transport(url: str) -> bytes:
         urls.append(url)
         return tickers([(1, "A", "A", "NYSE")]) if url == TICKERS_URL else submissions(1, "A")
 
-    ticker_map = SecTickerMap(transport, waits.append, limiter=limiter)
-    subs = SecSubmissions(transport, waits.append, limiter=limiter)
+    ticker_map = SecTickerMap(http_for(transport, limiter=limiter))
+    subs = SecSubmissions(http_for(transport, limiter=limiter))
     payload = ticker_map.fetch(FetchRequest("tickers"))
     assert payload is not None
     normalized = ticker_map.normalize(FetchRequest("tickers"), payload)
     assert normalized is not None and len(normalized.parsed["tickers"]) == 1
     assert subs.fetch(FetchRequest("1")) is not None
     assert urls == [TICKERS_URL, SUBMISSIONS_URL.format(cik="0000000001")]
-    assert waits == [pytest.approx(0.15)]  # the second request waited for the shared limiter
+    assert limiter.waits == 2  # both sources wait on the one shared limiter
     assert ticker_map.normalize(FetchRequest("tickers"), tickers([])) is None
     with pytest.raises(ValueError, match="not a CIK"):
         subs.fetch(FetchRequest("AAPL"))
@@ -123,9 +122,9 @@ def test_not_found_is_none_and_forbidden_is_an_error() -> None:
     def transport(url: str) -> bytes:
         raise HttpError(404 if url.endswith("CIK0000000404.json") else 403)
 
-    subs = SecSubmissions(transport, lambda s: None, RetryPolicy(tries=1), MinInterval(0))
+    subs = SecSubmissions(http_for(transport, RetryPolicy(tries=1)))
     assert subs.fetch(FetchRequest("404")) is None
     with pytest.raises(RuntimeError, match="giving up"):
         subs.fetch(FetchRequest("403"))
-    default = SecSubmissions(lambda url: b"{}", lambda s: None)  # default policy and limiter
+    default = SecSubmissions(http_for(lambda url: b"{}"))  # default policy and limiter
     assert default.fetch(FetchRequest("1")) == b"{}"

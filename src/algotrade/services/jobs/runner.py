@@ -2,7 +2,7 @@
 
 import concurrent.futures as cf
 import threading
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
@@ -102,10 +102,13 @@ class LocalJobRunner:
             future.result(timeout=timeout)
         return self.status(job_id)
 
-    def recover(self, stale_after: timedelta) -> list[str]:
-        """Mark jobs left queued/running by a crashed process as failed (re-submit to retry)."""
+    def recover(self, stale_after: timedelta, kinds: Sequence[str] | None = None) -> list[str]:
+        """Mark jobs left queued/running by a crashed process as failed (re-submit to retry).
+
+        ``kinds`` limits it to the kinds the caller is sure no other process is running (e.g.
+        under the ingest run lock, ``stale_after=0`` is safe for the kinds it guards)."""
         now, failed = self._clock(), []
-        for kind in self.kinds:
+        for kind in self.kinds if kinds is None else [k for k in kinds if k in self._kinds]:
             for run in self._runs.find(f"job:{kind}"):
                 record = JobRecord.from_run(run)
                 in_flight = record.job_id in self._futures

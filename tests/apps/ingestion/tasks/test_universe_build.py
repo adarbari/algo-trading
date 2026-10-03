@@ -17,7 +17,7 @@ from algotrade_ingestion.tasks.universe_build import (
     review_rows,
 )
 from tests import universe_fixture as fx
-from tests.ingest_helpers import task_ctx
+from tests.ingest_helpers import http_for, task_ctx
 
 D1 = date(2026, 10, 1)
 D2 = D1 + timedelta(days=1)
@@ -31,8 +31,8 @@ def sources(nasdaq: bytes, other: bytes, options: bytes, spy: bytes) -> Universe
         return next((v for k, v in files.items() if k in url), spy)
 
     return UniverseSources(
-        NasdaqTraderSource(transport, lambda s: None, RetryPolicy(tries=1)),
-        SpyHoldingsSource(transport, lambda s: None),
+        NasdaqTraderSource(http_for(transport, RetryPolicy(tries=1))),
+        SpyHoldingsSource(http_for(transport)),
     )
 
 
