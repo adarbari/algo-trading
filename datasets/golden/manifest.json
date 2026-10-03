@@ -1,0 +1,81 @@
+{
+  "datasets": {
+    "bear_trend": {
+      "description": "Persistent downtrend",
+      "tags": [
+        "trend",
+        "stress"
+      ],
+      "files": {
+        "BEAR": "70e3f6a69e8e3fa16e0e9ee42258073cecaa89405c8aba02bd582bd08ef377d6"
+      }
+    },
+    "bull_trend": {
+      "description": "Steady uptrend, moderate volatility",
+      "tags": [
+        "trend"
+      ],
+      "files": {
+        "BULL": "072d0841e255f5265131c0be89fa6798923d97dfbe5ba533b11f96b23097c3c2"
+      }
+    },
+    "crash_recovery": {
+      "description": "Calm rally, sharp crash, slow recovery",
+      "tags": [
+        "stress"
+      ],
+      "files": {
+        "CRSH": "55ef59f617bb0bcea12b564d74c9fff2ddbce05ce46b234eb39035ac27f9e46e"
+      }
+    },
+    "high_volatility": {
+      "description": "Small drift buried in very high volatility",
+      "tags": [
+        "stress"
+      ],
+      "files": {
+        "VOLX": "628556619a4d3b8ea2fa45439952f3ffaebfde52165270200acb413d3cf2ce56"
+      }
+    },
+    "multi_asset_correlated": {
+      "description": "Four correlated assets with mixed drifts",
+      "tags": [
+        "multi-asset"
+      ],
+      "files": {
+        "AAA": "41acc0a688ef409fdcd237acebba9504f51757bd107f3b352cfe7a6b3ab86c3b",
+        "BBB": "d52f13211ce6403af98a41268be81fa791c21ae30cf815cfb9848a0dd61f347c",
+        "CCC": "e4c80fcd1c50372b91945129b2795108eb82258afccf2772589fbd04069245dd",
+        "DDD": "ba196b9e75d536f9cea284303fa759c073bd066570a2956c450b53028edc1953"
+      }
+    },
+    "random_walk": {
+      "description": "Driftless random walk: no edge should be found here",
+      "tags": [
+        "null"
+      ],
+      "files": {
+        "WALK": "033a4eaa841b857a7d978c61edbc7deab5879f8b3f2df1802fc673e2bcb0064c"
+      }
+    },
+    "regime_switching": {
+      "description": "Alternating trending and choppy regimes",
+      "tags": [
+        "trend",
+        "regime"
+      ],
+      "files": {
+        "RGME": "c5f14d70cab44ec21f1ea1c4be07ece97fb58ed450666be008a842abb1fbcf23"
+      }
+    },
+    "sideways_mean_revert": {
+      "description": "Range-bound, strongly mean-reverting",
+      "tags": [
+        "mean-reversion"
+      ],
+      "files": {
+        "CHOP": "0521bb27e8fef0a82709ec026733a201dde09e254be5c29881e28de932b31e27"
+      }
+    }
+  }
+}

@@ -1,0 +1,121 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "algotrade"
+version = "0.1.0"
+description = "Algorithmic trading research, backtesting and execution"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.0",
+    "pandas>=2.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "hypothesis>=6.100",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "pandas-stubs>=2.2",
+    "import-linter>=2.0",
+    "pre-commit>=3.7",
+]
+
+[project.scripts]
+algotrade = "algotrade.cli.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/algotrade"]
+
+# ---------------------------------------------------------------- ruff
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "B", "UP", "N", "SIM", "C4", "PL", "RUF",
+    "DTZ",  # no naive datetimes - everything is UTC
+    "T20",  # no print() outside the CLI
+    "PTH",  # pathlib over os.path
+]
+ignore = ["PLR0913", "PLR0917", "PLR2004"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/algotrade/cli/**" = ["T20"]
+"scripts/**" = ["T20"]
+"tests/**" = ["PLR2004", "S101"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+# ---------------------------------------------------------------- mypy
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+packages = ["algotrade"]
+warn_unreachable = true
+
+# ---------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
+pythonpath = ["."]
+markers = [
+    "e2e: end-to-end tests that exercise the CLI against the golden datasets",
+    "slow: tests that take more than a few seconds",
+]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ["algotrade"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+skip_covered = true
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "@abstractmethod"]
+
+# ---------------------------------------------------------------- import-linter
+# These contracts ARE the architecture. See docs/architecture.md before changing them.
+[tool.importlinter]
+root_package = "algotrade"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Layered architecture: higher layers may import lower layers, never the reverse"
+type = "layers"
+layers = [
+    "algotrade.cli",
+    "algotrade.evaluation",
+    "algotrade.backtest",
+    "algotrade.strategies | algotrade.risk | algotrade.execution | algotrade.portfolio | algotrade.analytics | algotrade.data",
+    "algotrade.core",
+]
+
+[[tool.importlinter.contracts]]
+name = "Strategies are pure: they only see core (no data I/O, no brokers, no portfolio internals)"
+type = "forbidden"
+source_modules = ["algotrade.strategies"]
+forbidden_modules = [
+    "algotrade.data",
+    "algotrade.execution",
+    "algotrade.portfolio",
+    "algotrade.risk",
+    "algotrade.analytics",
+]
+
+[[tool.importlinter.contracts]]
+name = "Core is dependency-free domain code (no pandas, no I/O)"
+type = "forbidden"
+source_modules = ["algotrade.core"]
+forbidden_modules = ["pandas"]
+allow_indirect_imports = true
