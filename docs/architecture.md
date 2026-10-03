@@ -1,19 +1,23 @@
 # Architecture
 
-One architecture, described in two views:
+The canonical description of the system: what it is, the rules it follows, and what is built
+versus planned. Detail lives in companion docs:
 
-1. **System view**: apps, storage, libraries and the rules between them.
-2. **Code layout**: packages and the import boundaries CI enforces.
-
-The reasons behind each decision are in [docs/adr/](adr/README.md). The order of work is in
-[docs/roadmap.md](roadmap.md). Phase 0 (this layout) is specified in
-[docs/design/phase-0.md](design/phase-0.md).
+| Topic | Doc |
+|---|---|
+| The four data layers (L1–L4), tables, roll-ups, L1 columns | [data/layers.md](data/layers.md) |
+| Physical storage: grains, partitions, backends, contract tests | [data/storage.md](data/storage.md) |
+| Configs, selections and users (L3/L4) | [configuration.md](configuration.md) |
+| Instruments and the universe | [data/instruments.md](data/instruments.md) |
+| Vendors | [data/vendors.md](data/vendors.md) |
+| Screeners | [screeners/](screeners/README.md) |
+| UI design system | [ui/design-system.md](ui/design-system.md) |
+| Why each decision was made | [adr/](adr/README.md) |
+| Order of work and follow-ups | [roadmap.md](roadmap.md) |
 
 ---
 
 ## 1. System view
-
-### Apps and backend
 
 ```
  APPS (entry points: wiring, config, scheduling. Thin, little logic.)
@@ -26,9 +30,11 @@ The reasons behind each decision are in [docs/adr/](adr/README.md). The order of
         │ WRITES             │ READS                │ READS (+ submits jobs)
         ▼                    ▼                      ▼
  ┌─────────────────────────── storage (the data contract) ────────────────────────────┐
- │ L1 instruments/reference · L2 bars/<interval> · chains · events · rollups/* ·       │
- │ universe · catalog/* · results/* · run & job records       (+ L3/L4 config files)   │
+ │ L1 instruments/reference · rollups/instrument/*                                      │
+ │ L2 bars/<interval> · chains/* · events/<type> · rollups/daily/*                      │
+ │ universe · catalog/* · results/* · run and job records · raw/ (90-day retention)     │
  └──────────────────────────────────────────────────────────────────────────────────────┘
+   L3 config/site/*.toml (shared, via PR) · L4 config/users/<id>/*.toml (per user)
 
  SHARED LIBRARY (src/algotrade/), layered top to bottom:
    services/    use cases: jobs, configs, selection, screening, backtests, evaluation, exports
@@ -37,60 +43,163 @@ The reasons behind each decision are in [docs/adr/](adr/README.md). The order of
    features/    versioned rollup definitions          analytics/   metrics, reports
    storage/     schemas · stores per layer · readers / writers · backends/ · config store
    config/      typed configs, selections, users, layered resolution + hash
-   (quant/      pricing maths, Greeks, IV: phase 2)
+   (quant/      pricing maths, Greeks, IV: phase 2b)
    core/        instruments, value objects, MarketView / FeatureView, options, errors, time
 ```
 
-| Component | Status |
-|---|---|
-| `apps/ingestion`, `apps/backtest`, library layers above | built (phase 0 + options slice) |
-| `quant/`, `rollups/daily/*`, bars from Massive, earnings events | phases 1–2 |
-| `apps/api`, `apps/web` | phases 4–5 |
-| Job queue beyond the local runner, futures | phase 6 |
+### Build status
 
-### Non-negotiable rules
-
-| # | Rule | ADR |
+| Area | Built | Planned (phase) |
 |---|---|---|
-| 1 | Apps are separate processes in one repo. They **never import each other**; they share only libraries and storage. | [0004](adr/0004-apps-and-shared-libraries.md) |
-| 2 | **Only `apps/ingestion` writes** market and feature data. Everyone else reads. Vendor SDKs and credentials live only in ingestion. | [0005](adr/0005-ingestion-is-the-only-writer.md) |
-| 3 | Storage is organised by **data grain** behind repository interfaces. Parquet + DuckDB on local disk for now; backends can be swapped via config. | [0006](adr/0006-storage-grains-and-adapters.md) |
-| 4 | All market and feature data is **point-in-time**: every row records when it happened *and* when we learned it. | [0007](adr/0007-point-in-time-data.md) |
-| 5 | **Backtests only read from stores.** They never call a vendor. Missing data is an error that says which ingestion job to run. | [0008](adr/0008-backtests-read-only-from-stores.md) |
-| 6 | Everything is keyed by a generic **instrument** (stock, ETF, index, option, future, …), so adding futures needs no redesign. | [0009](adr/0009-generic-instrument-model.md) |
-| 7 | Long-running work (backtests from the UI, on-request pulls, nightly runs) is a **job** submitted through `services/`. | [0010](adr/0010-jobs-model.md) |
-| 8 | Strategies and screeners are **pure**: they see a `FeatureView` (or `MarketView`) only, never storage or vendors. | [0001](adr/0001-layered-architecture.md) |
-| 9 | Data comes from **several sources, free first**, each behind the same source interface. | [0012](adr/0012-data-vendors.md) |
-| 10 | The universe is **S&P 500 constituents + all Nasdaq-listed stocks + all ETFs (including leveraged and inverse)**, saved as a dated snapshot each day. | [0013](adr/0013-universe.md) |
-| 11 | The UI is built **design-system first**: screens use only design-system components. A missing component is added to the design system in a generic form first. | [0011](adr/0011-design-system-first-ui.md) |
-| 12 | Local first, hostable later: config from env vars, storage behind URLs, the API serves the web build. | [0004](adr/0004-apps-and-shared-libraries.md) |
-| 13 | The universe is everything we cover; **each strategy picks its subset with a `Selection`**, configured per site (L3) and per user (L4). Every run records the user and the resolved config hash. | [0015](adr/0015-configs-selections-users.md) |
-
-Detailed specs:
-[storage](data/storage.md) · [instruments & universe](data/instruments.md) ·
-[vendors](data/vendors.md) · [design system](ui/design-system.md)
-
-### Data flow
-
-```
-nightly (a job; later also intraday or on request)
-  ingestion: universe + reference snapshot → pull per source → raw/ (as received, 90-day retention)
-           → validate + normalise → reference / events / bars / chains
-           → rollups (versioned) → every scheduled config: select → screen → results/ + exports
-on request
-  api ──► services ──► reads results / features             (web UI)
-  api ──► services.jobs.submit(backtest) ──► engines.backtest ──► results/
-  backtest CLI ──► services ──► engines.backtest (reads stores only)
-```
+| Apps | `apps/ingestion`, `apps/backtest` | `apps/api` (4), `apps/web` (5) |
+| L1 | `instruments/reference` (from universe CSVs), `rollups/instrument/option_liquidity@v1` | Nasdaq Trader + SPY universe builder, company details, FIGI ids + `instruments/symbol_history`, `events/reference_change` (1); `price_stats`, `iv_history`, `earnings`, `liquidity_class`, `fundamentals` rollups (2b); a single `InstrumentView` reader (follow-up) |
+| L2 | `chains/*` (Cboe), `bars/1d` schema + reads (golden data) | Massive daily bars + split/dividend events, Nasdaq earnings events (1); intraday bars + `rollups/daily/*` (6) |
+| L3 | `defaults.toml`, `presets/selections/*`, `presets/strategies/*` | `universe.toml`, `sources.toml`, `overrides/leveraged_etfs.csv` (1); `rollups.toml` (2b) |
+| L4 | `strategies/`, `selections/` | `watchlists/`, `preferences.toml` (4–5); DB-backed `ConfigStore` (4) |
+| Jobs | local runner; `backtest`, `screen`, `nightly` | key by config hash (follow-up); queue-backed runner (6) |
+| Other | uv workspace, Parquet storage (local + memory backends) | DuckDB query engine and catalog; S3 backend for hosting (6); `quant/` (2b) |
 
 ---
 
-## 2. Code layout (enforced)
+## 2. Data layers
+
+Every piece of data or configuration belongs to exactly one layer
+([data/layers.md](data/layers.md), [ADR 0016](adr/0016-four-data-layers.md)):
+
+| Layer | What | Tables / files | Format | Written by |
+|---|---|---|---|---|
+| **L1 Instrument** | What each instrument *is* (facts) and what we *know* about it as of a date (derived) | `instruments/reference`, `rollups/instrument/<name>@vN`, read together as `InstrumentView(as_of)` | Parquet, one full snapshot per date | `apps/ingestion` |
+| **L2 Instrument × time** | Values over time and events | `bars/<interval>` (1m…1d, unadjusted), `chains/*`, `events/<type>`, `rollups/daily/<name>@vN` | Parquet, partitioned by session date | `apps/ingestion` |
+| **L3 Site config** | Shared choices: coverage, sources, rollup thresholds, defaults, presets, curated overrides | `config/site/*.toml`, `config/site/overrides/*.csv` | TOML / CSV, changed by PR | the repo |
+| **L4 User config** | One user's selections, strategy configs, watchlists, preferences | `config/users/<id>/*.toml` | TOML now, DB later | the user |
+
+L1 and L2 are global market data, written only by ingestion and point-in-time. L3 and L4 are
+configuration, resolved into a hashed `ResolvedConfig`. Below the layers sits plumbing (raw
+vendor responses, run and job records); above them sit outputs (results, per user).
+
+---
+
+## 3. Non-negotiable rules
+
+| # | Rule | ADR |
+|---|---|---|
+| 1 | Apps are separate processes and packages in one repo. They **never import each other**; they share only the library and storage. | [0004](adr/0004-apps-and-shared-libraries.md) |
+| 2 | **Only `apps/ingestion` writes** market and rollup data. Everyone else reads. Vendor SDKs and credentials live only in ingestion. | [0005](adr/0005-ingestion-is-the-only-writer.md) |
+| 3 | Storage is organised by **data grain and layer** behind repository interfaces. Parquet on local disk today (DuckDB-readable; a DuckDB query engine is planned); backends swap via `ALGOTRADE_DATA_URL`. | [0006](adr/0006-storage-grains-and-adapters.md), [0016](adr/0016-four-data-layers.md) |
+| 4 | All market and rollup data is **point-in-time**: every row records when it happened *and* when we learned it. | [0007](adr/0007-point-in-time-data.md) |
+| 5 | **Backtests only read from stores.** They never call a vendor. Missing data is an error that names the ingestion job to run. | [0008](adr/0008-backtests-read-only-from-stores.md) |
+| 6 | Everything is keyed by a generic **instrument** with a contract multiplier, so options and futures need no redesign. | [0009](adr/0009-generic-instrument-model.md) |
+| 7 | Long-running work (backtests, screens, nightly runs; later on-request pulls) is a **job** submitted through `services/jobs`. | [0010](adr/0010-jobs-model.md) |
+| 8 | Strategies and screeners are **pure**: they see a `MarketView` or `FeatureView` only, never storage or vendors. | [0001](adr/0001-layered-architecture.md) |
+| 9 | Data comes from **several sources, free first**, each behind the same source interface. | [0012](adr/0012-data-vendors.md), [0014](adr/0014-cboe-options-source.md) |
+| 10 | **The universe is coverage, not a filter:** every US-listed common stock, ADR and ETF (including leveraged and inverse), with S&P 500 membership as data, saved as a dated snapshot. Coverage is a site decision (`config/site/universe.toml`). **Each strategy picks its subset with a `Selection`** in a site (L3) or user (L4) config, resolved defaults < site < user < run; a user can narrow coverage but never widen it. Every run records the user and the config hash. | [0013](adr/0013-universe.md), [0015](adr/0015-configs-selections-users.md) |
+| 11 | The UI is built **design-system first**. | [0011](adr/0011-design-system-first-ui.md) |
+| 12 | Local first, hostable later: config from env vars, storage and configs behind URLs and protocols, the API serves the web build. | [0004](adr/0004-apps-and-shared-libraries.md) |
+
+---
+
+## 4. Configuration in one page
+
+Full reference: [configuration.md](configuration.md).
+
+- **L3 site** (`config/site/`): `defaults.toml`, shared `presets/selections` and
+  `presets/strategies`; planned `universe.toml`, `sources.toml`, `rollups.toml` and curated
+  `overrides/`.
+- **L4 user** (`config/users/<id>/`): `selections/` and `strategies/`; planned `watchlists/`
+  and `preferences.toml`.
+- **Resolution:** built-in defaults < L3 < L4 < run overrides. A user **narrows** a preset
+  (`selection_overrides`, AND-ed, so preset fixes still apply), **replaces** its selection, or
+  **extends** it under a new id.
+- **Selections** are typed rules over a field catalogue (`instrument.*`,
+  `rollup.<name>@vN.*`), evaluated with three-valued logic: missing data is UNKNOWN and never
+  passes. Each run stores a per-rule audit.
+- **Users** are a validated label today (`--user`); identity and auth arrive with the API.
+  Market data and rollups are global; configs, results and jobs are per user.
+
+---
+
+## 5. Data flow
+
+```
+nightly (the "nightly" job; later also intraday or on request)
+  universe import (monthly master CSVs today; Nasdaq Trader + SPY builder in phase 1)
+    → universe + instruments/reference snapshot
+  ingestion: pull per source → raw/ (as received, 90-day retention)
+           → validate + normalise → reference / events / bars / chains
+           → rollups (versioned)
+           → every config with schedule = "nightly" (site presets as user "site", then each
+             user's): select → screen → results/ + exports
+on request
+  backtest CLI / api → services.jobs.submit("backtest") → engines.backtest (reads stores only)
+  api → services → results / rollups                       (web UI, phase 4–5)
+```
+
+### Critical path: a configured backtest
+
+```
+algotrade-backtest --user U backtest --config sma_trend --start S --end E
+  → services.jobs.submit("backtest", {config, start, end}, user)          → job id
+  → services.configs.resolve_config("sma_trend", user)                    → ResolvedConfig (hash)
+  → services.selection.select(reader, cfg.selection, session=S)           → instruments + audit
+  → reader.bars("1d", S, E, instruments) + reader.instrument_terms(S)     → aligned series + multipliers
+  → engines.backtest.run_backtest(series, strategy(cfg.params), settings) → BacktestResult
+  → result_writer.write_result("backtests", …) + run record (user, config hash, dataset versions)
+```
+
+The last step is a **follow-up**: today the metrics and selection audit are stored on the job
+record only. Survivorship rule: the selection is evaluated as of the backtest's start date
+(re-evaluation at a `rebalance_selection` interval is planned, phase 2b), never with
+today's universe.
+
+### Critical path: a configured screen
+
+```
+select (as of session) → FeatureView of the screener's rollups for the selected instruments
+  → screener → one row per instrument with a Decision → coverage audit
+  → results/<screener> (user_id, config_id, config_hash) + run record + declared exports
+```
+
+Coverage statuses: `COMPLETE`, `PARTIAL` (below `min_coverage`), `UNIVERSE_INCOMPLETE`
+(universe older than `max_universe_age_days`), `EMPTY_SELECTION`. Only a `COMPLETE` run may
+report "no qualified candidates".
+
+---
+
+## 6. Jobs
+
+`services/jobs` ([ADR 0010](adr/0010-jobs-model.md)): `submit(kind, params, user)` → job id;
+`status`, `wait`. Job records are stored as run records, so they survive restarts and appear in
+audits. The local runner uses 2 threads.
+
+- **Idempotent:** identical work returns the existing job. The key is **(kind, config hash,
+  session)**, so editing a config and resubmitting runs again. Today the key is
+  (kind, params, user); moving to the config hash is a follow-up.
+- `force` re-runs a finished job (the CLIs use it); failed jobs re-run on resubmit; a queued or
+  running job is never duplicated.
+- `recover()` marks jobs abandoned by a crashed process as failed.
+- Handlers: the library provides `backtest` and `screen`; the ingestion app registers
+  `nightly`. A queue-backed runner (phase 6) implements the same protocol.
+
+---
+
+## 7. Consistency and concurrency
+
+- **Writers:** only ingestion writes market and rollup data. Partitions are written atomically
+  (temp file + rename); a run replaces only its own partition.
+- **Readers** pick, per partition, the latest run with `knowledge_ts ≤ as_of`. A reader racing
+  a writer sees either the old or the new run, never a mix.
+- **Configs** are resolved once per run and the hash is recorded; edits affect only later runs.
+- **Users:** results and jobs are namespaced by `user_id`; market data is shared and read-only
+  to everyone except ingestion.
+
+---
+
+## 8. Code layout (enforced)
 
 Three packages in a uv workspace: `algotrade` (the library), `algotrade-ingestion` and
-`algotrade-backtest`. Dependencies point **downwards only**, and siblings on the same row may
-not import each other. `import-linter` enforces this (`[tool.importlinter]` in
-`pyproject.toml`).
+`algotrade-backtest`, each declaring only its own dependencies, pinned by `uv.lock`.
+Dependencies point **downwards only**, and siblings on the same row may not import each other.
+`import-linter` enforces this (`[tool.importlinter]` in `pyproject.toml`).
 
 ```
 apps/ingestion (algotrade_ingestion) · apps/backtest (algotrade_backtest)   never import each other
@@ -111,45 +220,103 @@ Extra contracts:
 - strategies and screeners see only `core`
 - feature definitions and configs never touch storage
 - only `apps/ingestion` may import `storage.writers`
-- inside `engines/backtest`, risk (`limits`, `sizing`), execution (`simulated`) and accounting (`portfolio`) stay independent
+- inside `engines/backtest`, risk (`limits`, `sizing`), execution (`simulated`) and accounting
+  (`portfolio`) stay independent
 
 | Package | Responsibility | May import |
 |---|---|---|
-| `core/` | Value objects (`Order`, `Fill`, `PriceSeries`), `MarketView`, `FeatureView`, instruments, options, errors, time. | numpy only |
-| `config/` | L3/L4 configuration: typed `StrategyConfig` / `Selection` / `Rule`, field catalogue, layered resolution (defaults < site < user < run) and the config hash. Pure. Files live in `config/site` and `config/users/<id>`. | core |
-| `storage/` | Data contract: schemas, a `Protocol` per store, reader / writer / result-writer facades, `local` (Parquet) and `memory` backends. | core, pandas, pyarrow |
+| `core/` | Value objects (`Order`, `Fill`, `PriceSeries`), `Instrument`, `MarketView`, `FeatureView`, options, ids, errors, time. | numpy only |
+| `config/` | L3/L4 configuration: typed `StrategyConfig` / `Selection` / `Rule`, field catalogue, layered resolution and the config hash. Pure. | core |
+| `storage/` | Data contract: schemas, a `Protocol` per store, reader / writer / result-writer facades, `local` (Parquet) and `memory` backends, `ConfigStore`. | core, pandas, pyarrow |
 | `strategies/` → `trading/` | Backtest strategies: `MarketView` in, target weights out, plus their registry. | core |
 | `strategies/` → `screeners/` | Screener contract, shared `Decision` categories, `short_premium_liquidity`. | core |
-| `features/` | Pure, versioned rollup definitions (`option_liquidity@v1`) and their registry. | core |
+| `features/` | Pure, versioned rollup definitions (`option_liquidity@v1`) with declared output columns, and their registry. | core |
 | `analytics/` | Metrics and report formatting from equity curves + fills. | core |
-| `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. `selection/`: evaluates a selection with three-valued logic and a per-rule audit. | strategies, config, analytics, core |
-| `services/` | Use cases: `jobs` (submit / status / wait; local runner; library `backtest` and `screen` handlers), `configs` (resolve, scheduled), `selection` (L1 + rollup rows → selection), `backtests` (configured runs), universe + `FeatureView` loading, `market_data` (stored bars → aligned series), golden `datasets`, screening runs, legacy exports, `evaluation/` (strategy × golden dataset vs baseline). | everything below except `storage.writers` |
-| `apps/ingestion` | Sources (Cboe, HTTP with retries, synthetic/golden), jobs (universe, option chains, features, golden load), nightly pipeline, `algotrade-ingest`. | library |
-| `apps/backtest` | `algotrade-backtest` CLI (`algotrade` alias): datasets list, backtest (golden dataset or config, via jobs), evaluate, config validate/show. Reads only through storage (`--data-url`). | library |
+| `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. `selection/`: three-valued evaluation with a per-rule audit. | strategies, config, analytics, core |
+| `services/` | Use cases: `jobs`, `configs`, `selection`, `backtests`, `screening`, `market_data`, golden `datasets`, `exports`, `evaluation/`. | everything below except `storage.writers` |
+| `apps/ingestion` | Sources (Cboe, HTTP with retries, synthetic/golden), jobs (universe, option chains, rollups, golden load), nightly pipeline, `algotrade-ingest`. | library |
+| `apps/backtest` | `algotrade-backtest` (`algotrade` alias): datasets list, backtest (golden dataset or config, via jobs), evaluate, config validate/show. Reads only through storage. | library |
 
 ### One bar in the backtest engine
 
 ```
 open of bar t   : SimulatedBroker fills orders queued at t-1 (slippage, commission, buying power)
-                  -> Portfolio.apply_fill
+                  -> Portfolio.apply_fill (value = qty × price × multiplier)
 close of bar t  : Portfolio marked to market -> equity[t]
                   Strategy.on_bar(MarketView(data, cursor=t)) -> target weights | None
-                  risk.apply_limits -> risk.targets_to_orders -> Broker.submit
+                  apply_limits -> targets_to_orders -> Broker.submit
 ```
+
+---
+
+## 9. Failure modes
+
+| Component | Failure | Detection | Recovery | Impact |
+|---|---|---|---|---|
+| Config load | invalid TOML, unknown field, wrong type | `ConfigurationError` with file and field path | fix the file | the run refuses to start (fail closed) |
+| Selection | matches nothing | `EMPTY_SELECTION` | the audit shows which rule removed everything | no results, clearly labelled |
+| Selection | rollup missing for the session | values UNKNOWN, counted in the audit | run the rollup job | instruments excluded, never included |
+| Backtest data | bars missing for a range | `MissingDataError` naming the ingestion command | backfill | backtest refuses to run |
+| Vendor | blocked (403), rate-limited, down | per-ticker status; mass `NO_CHAIN` makes the run `PARTIAL` | retries, resumable job, next sweep | partial runs are labelled, never "complete" |
+| Golden fixture store | stale versus committed CSVs | checksum verification on load | `make golden-store` | CI fails loudly |
+| Packaging | lock drift | `uv lock --check` | `uv lock` + PR | CI fails |
+| Jobs | process exits mid-job | job left running | `recover()` marks it failed; resubmit | re-run needed |
+
+---
+
+## 10. Security and privacy
+
+- **Auth:** none yet. `--user` is a namespace, not an identity. Phase 4 maps authenticated users
+  to `user_id`, and services enforce per-user access to configs, results and jobs.
+- **PII:** none stored; user ids are opaque labels.
+- **Threats:** malicious configs (typed rules only, never code or SQL); path traversal (ids
+  restricted to `[a-z0-9_-]{1,64}`); secrets in configs (forbidden; credentials only from env;
+  a lint check is a follow-up); cross-user reads (namespaced now, enforced in phase 4).
+
+---
+
+## 11. Scale, targets and monitoring
+
+| Target | Value |
+|---|---|
+| Strategy baseline | identical within `rel_tol=1e-6, abs_tol=1e-9` on every change |
+| Test suite | ≤ 60 s locally and in CI |
+| Golden evaluation (3 strategies × 8 datasets) from the store | ≤ 5 s |
+| Selection, 10k instruments × 10 rules | ≤ 1 s |
+| Nightly options pipeline, ~4.2k underlyings | ≤ 25 min |
+| Config resolution | deterministic hash on every OS |
+| Code gates | no file > 1000 lines, coverage ≥ 90%, strict mypy, all import contracts |
+
+| Load item | Estimate |
+|---|---|
+| Daily bars | 10k instruments × 252 sessions ≈ 2.5M rows/yr ≈ 60–80 MB Parquet |
+| L1 reference snapshot | < 1 MB/day |
+| Option chains | ~1–1.5M rows/day; raw responses 1–3 GB/day before compression (90-day retention) |
+| Per-user nightly screens | ~1–3 s per config; 20 users × 5 configs ≈ 3–5 min |
+
+Single machine, stateless services over file storage. Shared work (ingestion, rollups) is
+O(universe); per-user work is O(users × configs). Monitoring lives in run records today:
+status per job, coverage per screen (alert below 98%), selection size per config (alert on a
+> 20% day-over-day change), nightly duration (alert above 40 min).
+
+## 12. Hosting
+
+Local (macOS) today: Python 3.12 via uv, storage at `ALGOTRADE_DATA_URL` (default
+`file://./var/data`), configs at `ALGOTRADE_CONFIG_DIR` (default `./config`). Hosting needs no
+redesign: an `s3://` storage backend, a DB-backed `ConfigStore` and a queue-backed job runner
+(phases 4–6).
 
 ---
 
 ## Rules of thumb
 
-- **One responsibility per module. 1000 lines is a hard ceiling; aim for about 300.** Split
-  by responsibility, not alphabetically.
-- **Strategies are pure.** If a strategy needs new inputs, add a feature and read it through
-  `FeatureView`. Never let a strategy open a file or call an API.
-- **Everything is UTC and timezone-aware.** The trading day is a separate `session_date`
-  column, taken from the instrument's exchange calendar (see ADR 0009).
+- **One responsibility per module. 1000 lines is a hard ceiling; aim for about 300.**
+- **Strategies are pure.** New inputs become rollups read through `FeatureView`; instrument
+  filtering is a selection's job, never strategy code.
+- **Everything is UTC and timezone-aware.** The trading day is a separate `session_date`.
 - **Fail loudly.** Bad data raises `DataValidationError`; bad config raises
-  `ConfigurationError`. Never silently fill, drop or default.
-- **Changing a boundary needs an ADR** in `docs/adr/` plus the matching `pyproject.toml` contract.
+  `ConfigurationError`; missing data is UNKNOWN or `MissingDataError`, never a default.
+- **Changing a boundary needs an ADR** plus the matching `pyproject.toml` contract.
 
 ## Adding things
 
@@ -157,8 +324,9 @@ close of bar t  : Portfolio marked to market -> equity[t]
 |---|---|
 | A data source / vendor | `.claude/skills/add-data-source` |
 | A dataset or new data grain | `.claude/skills/add-dataset` |
-| A feature | `.claude/skills/add-feature` |
+| A rollup (feature) | `.claude/skills/add-feature` |
 | A trading strategy | `.claude/skills/add-strategy` |
 | A screener | `.claude/skills/add-screener` |
+| A selection or strategy config | a TOML file in `config/site/presets/` (shared) or `config/users/<id>/` ([configuration.md](configuration.md)); check with `algotrade-backtest config validate <id>` |
 | A UI widget or screen | `.claude/skills/add-ui-component` |
 | An architectural decision | `.claude/skills/write-adr` |

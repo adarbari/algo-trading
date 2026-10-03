@@ -59,7 +59,7 @@ $ALGOTRADE_DATA_URL (default file://./var/data, git-ignored)
   runs/<run_id>.json                                     run records: audit + checkpoint
 ```
 
-Implemented tables (layers per [docs/design/phase-0.md](../design/phase-0.md)):
+Implemented tables (layers per [layers.md](layers.md)):
 L1 `instruments/reference`; L2 `bars/<interval>` (1d, 1h, 30m, 15m, 5m, 1m; OHLCV
 sanity-checked on write), `chains/underlying_quotes`, `chains/option_quotes`,
 `chains/status`, `events/<type>`; rollups `rollups/daily/*` and `rollups/instrument/*`
@@ -94,7 +94,8 @@ internal detail of the backend; nothing outside `storage/backends/` relies on it
 
 - **Parquet** (columnar, compressed, free, readable by every tool) for all normalized,
   feature and result data.
-- **DuckDB** (embedded, free, no server) as the query engine and the catalog. It reads
+- **DuckDB** (embedded, free, no server) as the query engine and the catalog: **planned, not
+  used yet** (tables are read with pyarrow today). It reads
   Parquet on local disk or in S3-compatible storage with the same SQL.
 - **Rough size:** end-of-day option chains for about 4k optionable underlyings are about
   1–1.5M rows a day, roughly 10–20 GB a year as Parquet. Daily bars for about 10k
@@ -110,7 +111,7 @@ storage/
   readers.py           read-only facade handed to backtest / api / engines
   writers.py           write facade. Only apps/ingestion may import this (import-linter).
   backends/
-    parquet_local.py   now: Parquet + DuckDB on the local filesystem
+    local.py           now: Parquet on the local filesystem (DuckDB-readable)
     (s3_parquet.py)    later: same files in S3-compatible object storage
     (postgres.py, clickhouse.py, ...)  only if ever needed
   factory.py           open_stores(url) picks the backend from ALGOTRADE_DATA_URL

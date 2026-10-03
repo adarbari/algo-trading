@@ -5,7 +5,8 @@ without writing an ADR. Read in this order:
 
 1. `docs/architecture.md`: target architecture + the rules enforced on today's code
 2. `docs/roadmap.md`: which phase we are in and the open decisions
-3. The spec for your area: `docs/data/storage.md`, `docs/data/instruments.md`,
+3. The spec for your area: `docs/data/layers.md`, `docs/configuration.md`,
+   `docs/data/storage.md`, `docs/data/instruments.md`,
    `docs/data/vendors.md`, `docs/ui/design-system.md`, `docs/screeners/`
 4. `docs/adr/README.md`: why things are the way they are
 
@@ -17,7 +18,7 @@ without writing an ADR. Read in this order:
 - **Only ingestion writes** market and feature data. Vendor SDKs and secrets live only in
   `apps/ingestion/sources/`. (ADR 0005)
 - **Storage by grain** (reference, event, bar(interval), chain, universe, feature, result)
-  behind `Protocol` interfaces. Parquet + DuckDB locally. No code outside
+  behind `Protocol` interfaces. Parquet locally (DuckDB planned). No code outside
   `storage/backends/` builds a path. (ADR 0006)
 - **Point-in-time**: rows carry `ts`, `session_date`, `knowledge_ts`, `source`,
   `run_id`. Features are `name@version`, precomputed nightly. (ADR 0007)

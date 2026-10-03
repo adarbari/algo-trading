@@ -1,27 +1,41 @@
 # Roadmap
 
 Each phase is one or more PRs, merged only with CI green. Update the status column as work
-lands.
+lands. The target state of every item is described in [architecture.md](architecture.md).
 
 | # | Phase | Delivers | Status |
 |---|---|---|---|
-| — | Harness | Layered library, tests, golden datasets, baseline, CI | done |
-| — | Decisions | Docs, ADRs 0004–0013, workflows | done |
-| 2a | Options liquidity slice | `storage/` (contract-tested local + memory backends), `apps/ingestion` (Cboe source, universe import, resumable chain job, features job, nightly pipeline, CLI), `option_liquidity@v1`, screener contract + `short_premium_liquidity`, screening engine with coverage audit, legacy CSV exports | done |
-| 0 | Restructure ([design](design/phase-0.md)) | Target layout; instrument ids + multipliers; storage-backed backtests and the four data layers; source interface; configs, selections and users; jobs; uv workspace. Baseline identical throughout. | done |
-| 1 | Ingestion: universe + bars (**next**) | Nasdaq Trader + SPY holdings universe snapshots, leveraged-ETF overrides, Massive daily bars, synthetic source, local nightly scheduler, data-quality checks | |
-| 2b | VRP scanner (after phase 1) | `docs/screeners/vrp-scanner.md`: daily bars (Massive) for HV20/HV30, 52-week range, moving averages and returns; `iv30` history from nightly Cboe snapshots (IV rank/percentile); earnings-calendar source; second-stage 8–15 delta put screener; `quant/` (our own IV and Greeks) | next |
-| 3 | Screening | `strategies/screeners/` (cash-secured puts / covered calls, IV rank, unusual activity, credit spreads), `engines/screening/`, results store, screener baseline | |
-| 4 | API | `services/` use cases, FastAPI read endpoints, jobs endpoints, TypeScript client generated from the API schema | |
+| — | Harness | Layered library, tests, golden datasets, baseline, CI, auto-merge | done |
+| — | Decisions | Docs, ADRs 0004–0017, workflows (skills) | done |
+| 0 | Restructure | Target layout; instrument ids + multipliers; storage-backed backtests and the four data layers; source interface; configs, selections and users; jobs; uv workspace. Baseline identical throughout. | done |
+| 1 | Ingestion: universe, reference, bars, events | Universe builder from Nasdaq Trader + SPY holdings (stocks, **ADRs**, ETFs incl. leveraged/inverse) writing `universe` + `instruments/reference` + `events/index_change`, driven by `config/site/universe.toml`; `config/site/overrides/leveraged_etfs.csv`; company details (SEC EDGAR, Massive ticker details); stable FIGI-based ids + `instruments/symbol_history`; `events/reference_change` from snapshot diffs; Massive daily bars (stored unadjusted) + split/dividend events + 2-year backfill; **Nasdaq earnings** → `events/earnings`; `config/site/sources.toml`; local nightly scheduler (launchd); data-quality checks; phase 0 follow-ups below | **next** |
+| 2a | Options liquidity slice | Cboe chains, `option_liquidity@v1`, `short_premium_liquidity`, screening engine with coverage audit, legacy CSV exports | done |
+| 2b | Quant + rollups | `quant/` (Black-Scholes, our own IV and Greeks, realised-vol estimators); rollups `price_stats@v1`, `iv_history@v1` (from nightly `iv30`), `earnings@v1`, `liquidity_class@v1` (+ `config/site/rollups.toml`), `fundamentals@v1`; `rebalance_selection` for backtests | |
+| 3 | Screeners | VRP scanner ([spec](screeners/vrp-scanner.md)) with its 8–15 delta second stage; cash-secured puts / covered calls, IV rank, unusual activity, credit spreads; a screener results baseline | |
+| 4 | API | FastAPI app over `services/`; authenticated users mapped to `user_id` with per-user access enforced in services; jobs endpoints; DB-backed `ConfigStore`; TypeScript client generated from the API schema | |
 | 5a | Design system | Tokens → **owner approves mockups** → components + catalogue → lint enforcement | |
-| 5b | Web app | Screener list, results table, contract detail, data freshness | |
-| 6 | Expansion | Backtests from the UI, on-request pulls, futures (IBKR), intraday bars, screener outcome tracking | |
+| 5b | Web app | Screener list, results table, contract detail, data freshness; L4 watchlists and preferences | |
+| 6 | Expansion | Backtests from the UI on a queue-backed job runner; on-request pulls; futures (IBKR); intraday bars + `rollups/daily/*`; S3 storage backend and hosting; screener outcome tracking | |
+
+## Phase 0 follow-ups (the architecture is the target; these close the gaps)
+
+| # | Item | Lands in |
+|---|---|---|
+| F1 | Configured backtests save results (`results/backtests`) and record dataset versions on the run | phase 1 |
+| F2 | `ALGOTRADE_USER` env var as the default for `--user` | phase 1 |
+| F3 | A single `InstrumentView` reader (reference + selected rollups, as of a date) | phase 1 |
+| F4 | Job idempotency keyed by (kind, config hash, session), so editing a config and resubmitting runs again | phase 1 |
+| F5 | Lint rejecting secret-like keys in config files | phase 1 |
+| F6 | DuckDB as the query engine and catalog (storage is Parquet read with pyarrow today) | when queries need it |
+| F7 | `rebalance_selection` (re-evaluate a backtest's selection at an interval) | phase 2b |
 
 ## Open decisions
 
-| Decision | Options | Default if not decided |
+| Decision | Options | Status |
 |---|---|---|
-| Earnings-calendar source | Nasdaq (unofficial), Finnhub free tier, paid | needed for phase 2b |
+| Earnings-calendar source | Nasdaq public calendar (free, no key, all US, tested) | **decided: Nasdaq**; cross-check source optional |
+| Massive API key | Free tier account | **owner action**: put it in `.env` as `ALGOTRADE_MASSIVE_API_KEY` |
 | Cboe terms | Confirm acceptable use of the delayed feed | owner to confirm |
-| Production job queue | Redis/RQ, Postgres-backed, cloud queue | Local runner until hosting |
-| Hosting target | VM + docker-compose, a container platform | Local only |
+| User identity scheme | Labels now; auth provider in phase 4 | decide in phase 4 |
+| Production job queue | Redis/RQ, Postgres-backed, cloud queue | local runner until hosting |
+| Hosting target | VM + docker-compose, a container platform | local only |
