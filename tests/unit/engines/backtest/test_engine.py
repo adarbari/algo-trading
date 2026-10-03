@@ -76,3 +76,13 @@ def test_rejects_too_little_data() -> None:
 def test_config_validation(kwargs: dict[str, float]) -> None:
     with pytest.raises(ConfigurationError):
         BacktestConfig(**kwargs)  # type: ignore[arg-type]
+
+
+def test_instruments_supply_multipliers() -> None:
+    from algotrade.core.instruments import AssetClass, Instrument  # noqa: PLC0415
+
+    data = {"TEST": series_from_closes([2, 2, 3, 4])}
+    option = {"TEST": Instrument("TEST", "TEST", AssetClass.OPTION, multiplier=100)}
+    result = run_backtest(data, BuyAndHold(), FREE, instruments=option)
+    assert result.fills[0].quantity == 5  # 1000 / (2 x 100)
+    np.testing.assert_allclose(result.equity, [1_000, 1_000, 1_500, 2_000])

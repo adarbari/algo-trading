@@ -26,8 +26,14 @@ class MarketView:
         self._cursor = cursor
 
     @property
-    def symbols(self) -> tuple[str, ...]:
+    def instruments(self) -> tuple[str, ...]:
+        """Instrument ids available in this view."""
         return tuple(self._series)
+
+    @property
+    def symbols(self) -> tuple[str, ...]:
+        """Deprecated alias of ``instruments`` (kept through phase 1)."""
+        return self.instruments
 
     @property
     def bar_index(self) -> int:
@@ -39,18 +45,20 @@ class MarketView:
         first = next(iter(self._series.values()))
         return to_utc_datetime(first.timestamps[self._cursor])
 
-    def history(self, symbol: str, field: str = "close", lookback: int | None = None) -> FloatArray:
+    def history(
+        self, instrument: str, field: str = "close", lookback: int | None = None
+    ) -> FloatArray:
         """Values of ``field`` up to and including the current bar (read-only view).
 
         ``lookback`` limits the result to the most recent N bars; fewer are returned if
         not enough history exists yet.
         """
-        arr = self._series[symbol].field(field)[: self._cursor + 1]
+        arr = self._series[instrument].field(field)[: self._cursor + 1]
         if lookback is not None:
             if lookback <= 0:
                 raise ValueError("lookback must be positive")
             arr = arr[-lookback:]
         return arr
 
-    def latest(self, symbol: str, field: str = "close") -> float:
-        return float(self._series[symbol].field(field)[self._cursor])
+    def latest(self, instrument: str, field: str = "close") -> float:
+        return float(self._series[instrument].field(field)[self._cursor])

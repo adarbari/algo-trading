@@ -25,7 +25,7 @@ class Strategy(ABC):
         """Decide target weights at the close of the current bar.
 
         Returning ``None`` means "no change". Returning a mapping means "rebalance to
-        exactly these weights"; symbols left out are closed.
+        exactly these weights"; instruments left out are closed.
         """
 
     def params(self) -> dict[str, float | int | str]:

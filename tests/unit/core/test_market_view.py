@@ -22,7 +22,8 @@ def test_history_lookback(view: MarketView) -> None:
 def test_latest_and_index(view: MarketView) -> None:
     assert view.latest("TEST") == 3
     assert view.bar_index == 2
-    assert view.symbols == ("TEST",)
+    assert view.instruments == ("TEST",)
+    assert view.symbols == view.instruments  # deprecated alias
     assert view.now.tzinfo is not None
 
 

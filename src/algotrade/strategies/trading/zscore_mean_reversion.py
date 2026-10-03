@@ -25,8 +25,8 @@ class ZScoreMeanReversion(Strategy):
     def warmup_bars(self) -> int:
         return self.lookback
 
-    def _zscore(self, view: MarketView, symbol: str) -> float:
-        window = view.history(symbol, lookback=self.lookback)
+    def _zscore(self, view: MarketView, instrument: str) -> float:
+        window = view.history(instrument, lookback=self.lookback)
         std = float(np.std(window, ddof=1))
         if std == 0:
             return 0.0
@@ -34,15 +34,15 @@ class ZScoreMeanReversion(Strategy):
 
     def on_bar(self, view: MarketView) -> TargetWeights | None:
         before = set(self._held)
-        for symbol in view.symbols:
-            z = self._zscore(view, symbol)
-            if symbol not in self._held and z <= -self.entry_z:
-                self._held.add(symbol)
-            elif symbol in self._held and z >= -self.exit_z:
-                self._held.discard(symbol)
+        for instrument in view.instruments:
+            z = self._zscore(view, instrument)
+            if instrument not in self._held and z <= -self.entry_z:
+                self._held.add(instrument)
+            elif instrument in self._held and z >= -self.exit_z:
+                self._held.discard(instrument)
         if self._held == before:
             return None
-        return dict.fromkeys(sorted(self._held), 1.0 / len(view.symbols))
+        return dict.fromkeys(sorted(self._held), 1.0 / len(view.instruments))
 
     def params(self) -> dict[str, float | int | str]:
         return {"lookback": self.lookback, "entry_z": self.entry_z, "exit_z": self.exit_z}

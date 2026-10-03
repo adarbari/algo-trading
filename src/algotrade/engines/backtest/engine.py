@@ -17,6 +17,7 @@ import numpy as np
 
 from algotrade.analytics.metrics import compute_metrics
 from algotrade.core.errors import ConfigurationError
+from algotrade.core.instruments import Instrument, multipliers
 from algotrade.core.market_view import MarketView
 from algotrade.core.series import PriceSeries
 from algotrade.core.time import to_utc_datetime
@@ -31,7 +32,7 @@ from algotrade.strategies.trading.base import Strategy
 
 def _check_aligned(data: Mapping[str, PriceSeries]) -> int:
     if not data:
-        raise ConfigurationError("backtest needs at least one symbol")
+        raise ConfigurationError("backtest needs at least one instrument")
     first = next(iter(data.values()))
     for s in data.values():
         if not np.array_equal(s.timestamps, first.timestamps):
@@ -40,15 +41,24 @@ def _check_aligned(data: Mapping[str, PriceSeries]) -> int:
 
 
 def run_backtest(
-    data: Mapping[str, PriceSeries], strategy: Strategy, config: BacktestConfig | None = None
+    data: Mapping[str, PriceSeries],
+    strategy: Strategy,
+    config: BacktestConfig | None = None,
+    instruments: Mapping[str, Instrument] | None = None,
 ) -> BacktestResult:
+    """Run ``strategy`` over aligned ``data`` keyed by instrument id.
+
+    ``instruments`` supplies contract terms (multipliers); instruments not listed are
+    treated as multiplier-1 equities.
+    """
     config = config or BacktestConfig()
+    contract_multipliers = multipliers((instruments or {}).values())
     n = _check_aligned(data)
     if n <= strategy.warmup_bars:
         raise ConfigurationError(f"{n} bars is not enough for warmup of {strategy.warmup_bars}")
 
     timestamps = next(iter(data.values())).timestamps
-    broker = SimulatedBroker(config.costs, config.lot_size)
+    broker = SimulatedBroker(config.costs, config.lot_size, contract_multipliers)
     portfolio = Portfolio(config.initial_cash)
     equity = np.empty(n)
     exposure = np.empty(n)
@@ -76,7 +86,13 @@ def run_backtest(
         limited = apply_limits(targets, config.limits)
         investable = max(0.0, equity[t]) * (1 - config.cash_buffer)
         orders = targets_to_orders(
-            limited, portfolio.positions, closes, investable, now, config.lot_size
+            limited,
+            portfolio.positions,
+            closes,
+            investable,
+            now,
+            config.lot_size,
+            contract_multipliers,
         )
         broker.submit(orders)
 

@@ -15,5 +15,5 @@ class BuyAndHold(Strategy):
         if self._invested:
             return None
         self._invested = True
-        weight = 1.0 / len(view.symbols)
-        return dict.fromkeys(view.symbols, weight)
+        weight = 1.0 / len(view.instruments)
+        return dict.fromkeys(view.instruments, weight)

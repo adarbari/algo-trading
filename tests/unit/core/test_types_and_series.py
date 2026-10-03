@@ -51,3 +51,14 @@ def test_to_utc_datetime() -> None:
 def test_data_validation_error_message() -> None:
     err = DataValidationError("file.csv", ["a", "b"])
     assert str(err) == "file.csv: a; b"
+
+
+def test_instrument_validation_and_multipliers() -> None:
+    from algotrade.core.instruments import AssetClass, Instrument, multipliers  # noqa: PLC0415
+
+    es = Instrument("FUT:ESZ6", "ESZ6", AssetClass.FUTURE, multiplier=50, tick_size=0.25)
+    assert multipliers([es]) == {"FUT:ESZ6": 50}
+    with pytest.raises(ValueError, match="multiplier"):
+        Instrument("X", "X", multiplier=0)
+    with pytest.raises(ValueError, match="tick_size"):
+        Instrument("X", "X", tick_size=0)

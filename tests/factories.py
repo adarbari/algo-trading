@@ -18,7 +18,7 @@ def series_from_closes(
     c = np.asarray(closes, dtype=np.float64)
     o = np.asarray(opens if opens is not None else closes, dtype=np.float64)
     return PriceSeries(
-        symbol=symbol,
+        instrument_id=symbol,
         timestamps=business_days("2024-01-01", len(c)),
         open=o,
         high=np.maximum(o, c) * 1.01,

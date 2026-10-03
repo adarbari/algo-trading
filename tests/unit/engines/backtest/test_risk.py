@@ -32,10 +32,17 @@ def test_sizing_buys_whole_shares() -> None:
 
 def test_sizing_closes_positions_not_in_targets_and_sells_first() -> None:
     orders = targets_to_orders({"B": 1.0}, {"A": 10.0}, {"A": 10.0, "B": 10.0}, 100.0, T0)
-    assert [(o.symbol, o.side) for o in orders] == [("A", Side.SELL), ("B", Side.BUY)]
+    assert [(o.instrument_id, o.side) for o in orders] == [("A", Side.SELL), ("B", Side.BUY)]
 
 
 def test_sizing_skips_tiny_changes_and_supports_lots() -> None:
     assert targets_to_orders({"A": 0.5}, {"A": 50.0}, {"A": 1.0}, 100.0, T0) == []
     orders = targets_to_orders({"A": 1.0}, {}, {"A": 1.0}, 250.0, T0, lot_size=100)
     assert orders[0].quantity == 200
+
+
+def test_sizing_respects_contract_multiplier() -> None:
+    # 10% of 100k into an option at $5 with multiplier 100 -> 10k / 500 per contract = 20
+    orders = targets_to_orders({"OPT:X": 0.1}, {}, {"OPT:X": 5.0}, 100_000.0, T0,
+                               multipliers={"OPT:X": 100.0})  # fmt: skip
+    assert orders[0].quantity == 20

@@ -6,6 +6,7 @@ Rules for this package:
 """
 
 from algotrade.core.errors import AlgoTradeError, DataValidationError
+from algotrade.core.instruments import Instrument
 from algotrade.core.market_view import MarketView
 from algotrade.core.series import PriceSeries
 from algotrade.core.types import Fill, Order, Side, TargetWeights
@@ -14,6 +15,7 @@ __all__ = [
     "AlgoTradeError",
     "DataValidationError",
     "Fill",
+    "Instrument",
     "MarketView",
     "Order",
     "PriceSeries",

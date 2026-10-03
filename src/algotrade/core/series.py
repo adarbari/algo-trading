@@ -13,9 +13,9 @@ FIELDS = ("open", "high", "low", "close", "volume")
 
 @dataclass(frozen=True, slots=True)
 class PriceSeries:
-    """OHLCV bars for one symbol. Arrays are made read-only on construction."""
+    """OHLCV bars for one instrument. Arrays are made read-only on construction."""
 
-    symbol: str
+    instrument_id: str
     timestamps: TimeArray
     open: FloatArray
     high: FloatArray
@@ -28,7 +28,7 @@ class PriceSeries:
         for name in FIELDS:
             arr = getattr(self, name)
             if len(arr) != n:
-                raise ValueError(f"{self.symbol}.{name} has {len(arr)} rows, expected {n}")
+                raise ValueError(f"{self.instrument_id}.{name} has {len(arr)} rows, expected {n}")
             arr.setflags(write=False)
         self.timestamps.setflags(write=False)
 

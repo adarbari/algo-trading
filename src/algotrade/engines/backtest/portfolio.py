@@ -1,4 +1,8 @@
-"""Cash and position bookkeeping. The single source of truth for what we own."""
+"""Cash and position bookkeeping. The single source of truth for what we own.
+
+Values always use ``quantity * price * multiplier``; each position's multiplier comes from
+the fills that opened it.
+"""
 
 from collections.abc import Mapping
 from types import MappingProxyType
@@ -14,6 +18,7 @@ class Portfolio:
             raise ValueError("initial_cash must be positive")
         self.cash = initial_cash
         self._positions: dict[str, float] = {}
+        self._multipliers: dict[str, float] = {}
         self.total_commission = 0.0
 
     @property
@@ -21,16 +26,20 @@ class Portfolio:
         return MappingProxyType(self._positions)
 
     def apply_fill(self, fill: Fill) -> None:
-        self.cash -= fill.signed_quantity * fill.price + fill.commission
+        self.cash -= fill.signed_quantity * fill.price * fill.multiplier + fill.commission
         self.total_commission += fill.commission
-        qty = self._positions.get(fill.symbol, 0.0) + fill.signed_quantity
+        self._multipliers[fill.instrument_id] = fill.multiplier
+        qty = self._positions.get(fill.instrument_id, 0.0) + fill.signed_quantity
         if abs(qty) < _EPSILON:
-            self._positions.pop(fill.symbol, None)
+            self._positions.pop(fill.instrument_id, None)
         else:
-            self._positions[fill.symbol] = qty
+            self._positions[fill.instrument_id] = qty
+
+    def _value(self, instrument: str, qty: float, prices: Mapping[str, float]) -> float:
+        return qty * prices[instrument] * self._multipliers.get(instrument, 1.0)
 
     def market_value(self, prices: Mapping[str, float]) -> float:
-        return sum(qty * prices[s] for s, qty in self._positions.items())
+        return sum(self._value(i, qty, prices) for i, qty in self._positions.items())
 
     def equity(self, prices: Mapping[str, float]) -> float:
         return self.cash + self.market_value(prices)
@@ -39,4 +48,5 @@ class Portfolio:
         equity = self.equity(prices)
         if equity <= 0:
             return float("inf")
-        return sum(abs(qty * prices[s]) for s, qty in self._positions.items()) / equity
+        gross = sum(abs(self._value(i, qty, prices)) for i, qty in self._positions.items())
+        return gross / equity
