@@ -93,13 +93,14 @@ jobs:
           path: .hypothesis
           key: hypothesis-${{ runner.os }}-py${{ matrix.python }}-${{ github.run_id }}
           restore-keys: hypothesis-${{ runner.os }}-py${{ matrix.python }}-
-      - name: Unit + architecture + property + integration + e2e (coverage gate 90%, one worker per CPU)
+      # Two jobs share the Mac's 10 cores: 5 workers each, not 10 each (docs/ci.md).
+      - name: Unit + architecture + property + integration + e2e (coverage gate 90%, 5 workers)
         if: needs.changes.outputs.python == 'true'
-        run: make test
+        run: make test WORKERS=5
       # A web-only change still answers to the layout rules (architecture/layout.toml [[web_dir]]).
       - name: Architecture only (the change is web-only)
         if: needs.changes.outputs.python != 'true'
-        run: .venv/bin/python -m pytest -q -n auto tests/architecture
+        run: .venv/bin/python -m pytest -q -n 5 tests/architecture
       - uses: actions/upload-artifact@v7
         if: matrix.python == '3.12' && needs.changes.outputs.python == 'true'
         with: { name: coverage, path: coverage.xml }

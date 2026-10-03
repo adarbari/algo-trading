@@ -10,7 +10,7 @@ running on the Mac.
 | CI: lint, types, boundaries, ownership, dupes, file length, strategy evaluation | Mac | |
 | CI: tests (py3.12 on PRs; 3.12 + 3.13 on main) | Mac | the bulk of the minutes |
 | CI: web (lint, types, unit, Storybook, e2e, screenshots) | Mac, inside the Playwright Linux image (Docker) | screenshot baselines are rendered in that image |
-| Auto-merge sweeps | Mac | runs after every CI run and every 30 minutes |
+| Auto-merge sweeps | Mac, its own `light` runner | runs after every CI run and every 30 minutes; never waits behind a CI job |
 | Nightly evaluation | Mac | |
 | Release (tags only) | GitHub, `ubuntu-latest` | rare; `make check` needs Node on Linux |
 
@@ -31,9 +31,16 @@ jobs (including the few-second `Changed areas`), so some wait for a free runner.
 
 ```bash
 scripts/mac_runner.sh install 2   # downloads the runner, registers 2, starts them as services
+scripts/mac_runner.sh install-light  # 1 more, label `light` only: auto-merge sweeps
 scripts/mac_runner.sh status      # name, online/offline, busy
 scripts/mac_runner.sh uninstall   # stop and deregister
 ```
+
+Two CI runners is the right number for a 10-core, 16 GB Mac: two overlapping jobs already use
+every core (tests run 5 workers each, `make test WORKERS=5`), and more would only swap. The
+`light` runner has no default labels, so CI jobs never land on it; it only runs the auto-merge
+sweep (a few GitHub API calls), so merging never queues behind a test run. Install it before
+anything else: without it, sweeps wait and nothing auto-merges.
 
 Run `install` from a normal login shell: each runner keeps that shell's `PATH` (for `make`,
 `gh`, `jq`). The services start at login. Jobs check out into
