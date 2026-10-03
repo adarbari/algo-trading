@@ -10,9 +10,10 @@ from algotrade.storage.backends.config_files import MemoryConfigStore
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.jobs.quality import run_quality
 from algotrade_ingestion.schedule import LABEL, nightly_plist
 from algotrade_ingestion.settings import SourcesSettings, load_sources
+from algotrade_ingestion.tasks.quality import run_quality
+from tests.ingest_helpers import task_ctx
 from tests.storage_helpers import stamped, universe_rows
 
 D1, D2 = date(2026, 10, 1), date(2026, 10, 2)
@@ -91,7 +92,7 @@ def seed(
 
 
 def checks(reader: StoreReader) -> dict[str, str]:
-    record = run_quality(reader, StoreWriter(MemoryBackend()), D2, SourcesSettings(), CLOCK)
+    record = run_quality(task_ctx(StoreWriter(MemoryBackend()), reader, CLOCK), D2)
     return {c["name"]: c["status"] for c in record.stats["checks"]}
 
 
@@ -111,7 +112,7 @@ def test_quality_passes_on_healthy_data() -> None:
 def test_quality_failures(args: tuple, check: str) -> None:  # type: ignore[type-arg]
     reader = seed(*args)
     assert checks(reader)[check] == "FAIL"
-    record = run_quality(reader, StoreWriter(MemoryBackend()), D2, SourcesSettings(), CLOCK)
+    record = run_quality(task_ctx(StoreWriter(MemoryBackend()), reader, CLOCK), D2)
     assert record.status is RunStatus.PARTIAL and check in record.stats["failed"]
 
 

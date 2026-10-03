@@ -6,18 +6,19 @@ from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.jobs.features import TABLE, compute_option_liquidity
-from algotrade_ingestion.jobs.option_chains import (
+from algotrade_ingestion.sources.cboe import URL, CboeOptionsSource
+from algotrade_ingestion.sources.http import HttpError, RetryPolicy
+from algotrade_ingestion.tasks.features import TABLE, compute_option_liquidity
+from algotrade_ingestion.tasks.option_chains import (
     OPTIONS,
     STATUS,
     ChainJobConfig,
     Underlying,
     ingest_option_chains,
 )
-from algotrade_ingestion.jobs.universe import UniverseFile, import_universe
-from algotrade_ingestion.sources.cboe import URL, CboeOptionsSource
-from algotrade_ingestion.sources.http import HttpError, RetryPolicy
+from algotrade_ingestion.tasks.universe import UniverseFile, import_universe
 from tests import cboe_fixture as fx
+from tests.ingest_helpers import task_ctx
 from tests.storage_helpers import write_reference
 
 DAY = fx.SESSION
@@ -52,12 +53,11 @@ def universe(*symbols: str) -> list[Underlying]:
 def run(writer: StoreWriter, feed: FakeFeed, symbols: list[Underlying], **config: float):  # type: ignore[no-untyped-def]
     source = CboeOptionsSource(feed, lambda s: None, NO_RETRY)
     return ingest_option_chains(
-        writer,
+        task_ctx(writer, clock=CLOCK),
         source,
         symbols,
         DAY,
         ChainJobConfig(**config),  # type: ignore[arg-type]
-        CLOCK,
         lambda s: None,
     )
 
@@ -111,7 +111,7 @@ def test_mass_no_chain_is_suspicious() -> None:
     writer = StoreWriter(MemoryBackend())
     record = run(writer, FakeFeed({"A": fx.payload("A")}), universe("A", "X", "Y"), retry_pause_s=0)
     assert record.status is RunStatus.PARTIAL
-    assert "returned no chain" in record.stats["warning"]
+    assert "returned no chain" in record.stats["partial"][0]
 
 
 def test_features_job_scores_liquidity() -> None:
@@ -122,7 +122,7 @@ def test_features_job_scores_liquidity() -> None:
         {"DEEP": deep, "THIN": fx.payload("THIN", options=fx.chain("THIN", spread=1.5, oi=3))}
     )
     run(writer, feed, universe("DEEP", "THIN", "GONE"), retry_pause_s=0)
-    record = compute_option_liquidity(reader, writer, DAY, clock=CLOCK)
+    record = compute_option_liquidity(task_ctx(writer, reader, CLOCK), DAY)
     assert record.stats["liq_status"] == {"OK": 2, "NO_CHAIN": 1}
     frame = reader.table(TABLE, DAY)
     assert frame is not None
@@ -145,12 +145,10 @@ def test_universe_import(tmp_path: Path) -> None:
     backend = MemoryBackend()
     write_reference(StoreWriter(backend), DAY, {"AAPL": "EQ:BBG000B9XRY4"})
     record = import_universe(
-        StoreWriter(backend),
-        StoreReader(backend),
+        task_ctx(StoreWriter(backend), StoreReader(backend), CLOCK),
         [UniverseFile(stocks, "STOCK"), UniverseFile(etfs, "ETF")],
         "2026-10",
         DAY,
-        CLOCK(),
     )
     assert record.stats["rows_loaded"] == 5
     assert record.stats["duplicates_removed"] == 1
@@ -173,10 +171,8 @@ def test_universe_import_requires_ticker(tmp_path: Path) -> None:
     with pytest.raises(DataValidationError, match="ticker"):
         backend = MemoryBackend()
         import_universe(
-            StoreWriter(backend),
-            StoreReader(backend),
+            task_ctx(StoreWriter(backend), StoreReader(backend), CLOCK),
             [UniverseFile(bad, "STOCK")],
             "v",
             DAY,
-            CLOCK(),
         )

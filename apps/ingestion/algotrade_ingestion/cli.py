@@ -7,13 +7,14 @@
     algotrade-ingest earnings [--date D] [--start D] [--days 60]
     algotrade-ingest bars [--date D | --from D --to D] [--force]   (needs a Massive API key)
     algotrade-ingest corporate-actions [--date D] [--from D --to D]
-    algotrade-ingest chains   [--date YYYY-MM-DD] [--workers 4] [--symbols SPY,AAPL]
+    algotrade-ingest chains   [--date YYYY-MM-DD] [--workers N] [--symbols SPY,AAPL]
     algotrade-ingest features [--date YYYY-MM-DD]
     algotrade-ingest screen   [--date YYYY-MM-DD] [--config ID] [--user U] [--export-dir out/]
     algotrade-ingest nightly  [--date YYYY-MM-DD] [--export-dir out/]
     algotrade-ingest purge-raw --keep-days 90 [--staging-keep-days 14]
     algotrade-ingest migrate-ids [--dry-run]   (symbol ids -> FIGI ids, append-only)
     algotrade-ingest golden build|verify|load [--golden-dir datasets/golden]
+    algotrade-ingest run <task> [--date D | --from D --to D] [task flags]   (any registry task)
 
 Storage location comes from ALGOTRADE_DATA_URL (default file://./var/data).
 """
@@ -23,37 +24,24 @@ import sys
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from algotrade.config.user import SITE_USER
 from algotrade.core.errors import AlgoTradeError
 from algotrade.data import StoreReader
-from algotrade.data.reference import resolver
 from algotrade.services.configs import default_user
 from algotrade.storage.factory import open_backend
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.commands import (
-    bars,
-    cboe_source,
-    company_details,
-    corporate_actions,
-    earnings,
-    golden,
-    migrate_ids,
-    print_json,
-    quality,
-    report,
-    run_job,
-    universe_build,
-)
+from algotrade_ingestion.commands import golden, print_json, report, run_job, run_task_command
 from algotrade_ingestion.env import load_dotenv
-from algotrade_ingestion.jobs.features import compute_option_liquidity
-from algotrade_ingestion.jobs.option_chains import ChainJobConfig, ingest_option_chains
-from algotrade_ingestion.jobs.universe import UniverseFile, import_universe
-from algotrade_ingestion.pipeline import universe_underlyings
 from algotrade_ingestion.schedule import LABEL, nightly_plist
+from algotrade_ingestion.tasks.registry import TASKS, Task
 
 EXCHANGE_TZ = ZoneInfo("America/New_York")
+# Task commands kept under their own names (``algotrade-ingest bars ...``); every registry
+# task is also ``algotrade-ingest run <task>``. ``golden load`` runs the ``golden-load`` task.
+TASK_COMMANDS = tuple(name for name in TASKS if name != "golden-load")
 
 
 def last_session(now: datetime) -> date:
@@ -64,18 +52,51 @@ def last_session(now: datetime) -> date:
     return day
 
 
-def _vendor_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
-    """Commands that pull one vendor dataset: company details and earnings."""
-    cd = sub.add_parser("company-details", help="company details from SEC EDGAR (incremental)")
-    cd.add_argument("--date", type=date.fromisoformat, help="session the snapshot belongs to")
-    cd.add_argument("--force", action="store_true", help="refetch every company")
-    cd.add_argument("--limit", type=int, help="fetch at most N companies this run")
-    ea = sub.add_parser("earnings", help="store the Nasdaq earnings calendar as events")
-    ea.add_argument("--date", type=date.fromisoformat, help="session the snapshot belongs to")
-    ea.add_argument(
-        "--start", type=date.fromisoformat, help="first calendar date (default: --date)"
+def add_task_arguments(parser: argparse.ArgumentParser, spec: Task) -> None:
+    """A task's parameters as flags (``dest`` = the parameter name)."""
+    for param in spec.params:
+        if param.kind is None:
+            parser.add_argument(*param.flags, dest=param.name, action="store_true", help=param.help)
+        else:
+            parser.add_argument(
+                *param.flags,
+                dest=param.name,
+                type=param.kind,
+                required=param.required,
+                default=param.default,
+                help=param.help,
+            )
+    parser.set_defaults(task=spec.name)
+
+
+def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
+    """Commands that run as jobs (screen, nightly) and admin commands."""
+    for name in ("screen", "nightly"):
+        s = sub.add_parser(name)
+        s.add_argument("--date", type=date.fromisoformat)
+        s.add_argument("--export-dir", type=Path)
+        if name == "nightly":
+            s.add_argument("--workers", type=int, help="chain workers (default: sources.toml)")
+        else:
+            s.add_argument("--config", default="short_premium_liquidity", help="config id")
+            s.add_argument("--user", help="config owner (default: $ALGOTRADE_USER or site)")
+    sc = sub.add_parser(
+        "schedule", help="write a launchd agent for the nightly job (not installed)"
     )
-    ea.add_argument("--days", type=int, help="calendar days (default: sources.toml, 60)")
+    sc.add_argument("--time", default="23:30", help="local time HH:MM on weekdays (default 23:30)")
+    sc.add_argument("--export-dir", type=Path, default=Path("out"))
+    sc.add_argument("--out", type=Path, default=Path("var") / f"{LABEL}.plist")
+    g = sub.add_parser(
+        "golden", help="golden test datasets: build CSVs, verify, load into the store"
+    )
+    g.add_argument("action", choices=["build", "verify", "load"])
+    g.add_argument("--golden-dir", type=Path, default=Path("datasets/golden"))
+    r = sub.add_parser(
+        "purge-raw", help="delete raw vendor responses and unfinished-run scratch older than N days"
+    )
+    r.add_argument("--keep-days", type=int, default=90)
+    r.add_argument("--staging-keep-days", type=int, default=14, help="unfinished-run scratch")
+    r.add_argument("--date", type=date.fromisoformat, help="reference date (default: today)")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -84,59 +105,13 @@ def _parser() -> argparse.ArgumentParser:
         "--config-dir", help="site/user configs (default: $ALGOTRADE_CONFIG_DIR or ./config)"
     )
     sub = p.add_subparsers(dest="command", required=True)
-    u = sub.add_parser("universe", help="import the monthly master universe CSVs")
-    u.add_argument("--stocks", type=Path, required=True)
-    u.add_argument("--etfs", type=Path)
-    u.add_argument("--version", required=True)
-    u.add_argument("--date", type=date.fromisoformat)
-    ub = sub.add_parser(
-        "universe-build", help="build the universe from Nasdaq Trader + SPY holdings"
-    )
-    ub.add_argument("--date", type=date.fromisoformat)
-    ub.add_argument("--review-out", type=Path, help="write leverage candidates to curate (CSV)")
-    _vendor_parsers(sub)
-    qa = sub.add_parser("quality", help="run the data-quality checks for a session")
-    qa.add_argument("--date", type=date.fromisoformat)
-    sc = sub.add_parser(
-        "schedule", help="write a launchd agent for the nightly job (not installed)"
-    )
-    sc.add_argument("--time", default="23:30", help="local time HH:MM on weekdays (default 23:30)")
-    sc.add_argument("--export-dir", type=Path, default=Path("out"))
-    sc.add_argument("--out", type=Path, default=Path("var") / f"{LABEL}.plist")
-    bb = sub.add_parser("bars", help="unadjusted daily bars from Massive (resumable backfill)")
-    bb.add_argument("--date", type=date.fromisoformat, help="single session (default: last)")
-    bb.add_argument("--from", dest="start", type=date.fromisoformat, help="backfill start")
-    bb.add_argument("--to", dest="end", type=date.fromisoformat, help="backfill end")
-    bb.add_argument("--force", action="store_true", help="re-fetch sessions already stored")
-    ca = sub.add_parser("corporate-actions", help="splits and dividends from Massive")
-    ca.add_argument("--date", type=date.fromisoformat)
-    ca.add_argument("--from", dest="start", type=date.fromisoformat, help="default: date - 7d")
-    ca.add_argument("--to", dest="end", type=date.fromisoformat, help="default: date + 30d")
-    for name in ("chains", "features", "screen", "nightly"):
-        s = sub.add_parser(name)
-        s.add_argument("--date", type=date.fromisoformat)
-        if name in ("chains", "nightly"):
-            s.add_argument("--workers", type=int, default=4)
-        if name == "chains":
-            s.add_argument("--symbols", help="comma-separated subset of the universe")
-        if name in ("screen", "nightly"):
-            s.add_argument("--export-dir", type=Path)
-        if name == "screen":
-            s.add_argument("--config", default="short_premium_liquidity", help="config id")
-            s.add_argument("--user", help="config owner (default: $ALGOTRADE_USER or site)")
-    g = sub.add_parser(
-        "golden", help="golden test datasets: build CSVs, verify, load into the store"
-    )
-    g.add_argument("action", choices=["build", "verify", "load"])
-    g.add_argument("--golden-dir", type=Path, default=Path("datasets/golden"))
-    mi = sub.add_parser("migrate-ids", help="rewrite stored ids per instruments/id_map (new runs)")
-    mi.add_argument("--dry-run", action="store_true", help="count what would change; write nothing")
-    r = sub.add_parser(
-        "purge-raw", help="delete raw vendor responses and unfinished-run scratch older than N days"
-    )
-    r.add_argument("--keep-days", type=int, default=90)
-    r.add_argument("--staging-keep-days", type=int, default=14, help="unfinished-run scratch")
-    r.add_argument("--date", type=date.fromisoformat, help="reference date (default: today)")
+    for name in TASK_COMMANDS:
+        add_task_arguments(sub.add_parser(name, help=TASKS[name].description), TASKS[name])
+    run = sub.add_parser("run", help="run any ingestion task: run <task> [--date | --from/--to]")
+    tasks = run.add_subparsers(dest="task_name", required=True)
+    for name, spec in TASKS.items():
+        add_task_arguments(tasks.add_parser(name, help=spec.description), spec)
+    _job_parsers(sub)
     return p
 
 
@@ -162,75 +137,38 @@ def write_schedule(args: argparse.Namespace) -> int:
     return 0
 
 
+def task_params(args: argparse.Namespace, session: date) -> dict[str, Any]:
+    """Parsed flags -> registry task parameters (``session`` defaults to the last session)."""
+    params = {p.name: getattr(args, p.name, None) for p in TASKS[args.task].params}
+    return {**params, "session": session}
+
+
 def _dispatch(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter) -> int:
-    if args.command == "golden":
-        return golden(args, writer)
     if args.command == "schedule":
         return write_schedule(args)
-    if args.command == "migrate-ids":
-        return migrate_ids(args, reader, writer)
     session = args.date if getattr(args, "date", None) else last_session(datetime.now(UTC))
-    direct = {
-        "universe-build": universe_build,
-        "company-details": company_details,
-        "earnings": earnings,
-        "bars": bars,
-        "corporate-actions": corporate_actions,
-        "quality": quality,
-    }
-    if args.command in direct:
-        return direct[args.command](args, reader, writer, session)
-    return _pipeline_command(args, reader, writer, session)
-
-
-def _pipeline_command(
-    args: argparse.Namespace, reader: StoreReader, writer: StoreWriter, session: date
-) -> int:
-    """universe import, chains, features, screen, nightly and purge-raw."""
-    if args.command == "universe":
-        files = [UniverseFile(args.stocks, "STOCK")] + (
-            [UniverseFile(args.etfs, "ETF")] if args.etfs else []
-        )
-        record = import_universe(writer, reader, files, args.version, session, datetime.now(UTC))
-        print_json(record.stats)
-    elif args.command == "chains":
-        underlyings = universe_underlyings(reader, session)
-        if args.symbols:
-            symbols = [s for s in args.symbols.split(",") if s.strip()]
-            wanted = set(resolver(reader, session).ids_for(symbols).values())
-            underlyings = [u for u in underlyings if u.instrument_id in wanted]
-        run = ingest_option_chains(
-            writer, cboe_source(), underlyings, session, ChainJobConfig(args.workers)
-        )
-        print_json({"run_id": run.run_id, "status": run.status, **run.stats})
-        return 0 if run.status == "complete" else 1
-    elif args.command == "features":
-        print_json(compute_option_liquidity(reader, writer, session).stats)
-    elif args.command == "screen":
-        job = run_job(
-            args,
-            reader,
-            writer,
-            "screen",
-            {
-                "config": args.config,
-                "session": session.isoformat(),
-                "export_dir": str(args.export_dir) if args.export_dir else None,
-            },
-            args.user or default_user(SITE_USER).user_id,
-        )
-        return report(job)
-    elif args.command == "nightly":
+    if args.command == "golden":
+        return golden(args, reader, writer)
+    if getattr(args, "task", None):
+        return run_task_command(args, reader, writer, args.task, task_params(args, session))
+    if args.command == "screen":
+        params = {
+            "config": args.config,
+            "session": session.isoformat(),
+            "export_dir": str(args.export_dir) if args.export_dir else None,
+        }
+        user = args.user or default_user(SITE_USER).user_id
+        return report(run_job(args, reader, writer, "screen", params, user))
+    if args.command == "nightly":
         params = {
             "session": session.isoformat(),
             "workers": args.workers,
             "export_dir": str(args.export_dir) if args.export_dir else None,
         }
         return report(run_job(args, reader, writer, "nightly", params, SITE_USER))
-    else:
-        removed = writer.raw.purge_before(session - timedelta(days=args.keep_days))
-        staged = writer.staging.purge_before(session - timedelta(days=args.staging_keep_days))
-        print_json({"raw_files_removed": removed, "staging_runs_removed": staged})
+    removed = writer.raw.purge_before(session - timedelta(days=args.keep_days))
+    staged = writer.staging.purge_before(session - timedelta(days=args.staging_keep_days))
+    print_json({"raw_files_removed": removed, "staging_runs_removed": staged})
     return 0
 
 

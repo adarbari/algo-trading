@@ -42,27 +42,25 @@ detect = [{ import = "algotrade.storage.readers" }]
 [[responsibility]]
 id = "run-records"
 description = "Create run ids and run records and decide COMPLETE / PARTIAL for a run"
-owner = ["src/algotrade/storage/runs.py", "src/algotrade/services/jobs/*"]
-target_owner = ["apps/ingestion/algotrade_ingestion/tasks/framework.py"]
-target_pr = 3
+owner = [
+    "src/algotrade/storage/runs.py",
+    "src/algotrade/services/jobs/*",
+    "apps/ingestion/algotrade_ingestion/tasks/framework.py",
+]
 section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
 detect = [{ call = "RunRecord" }, { call = "new_run_id" }, { attr = "RunStatus.PARTIAL" }]
 
 [[responsibility]]
 id = "raw-persistence"
 description = "Save vendor payloads as received to the raw store before parsing"
-owner = ["src/algotrade/storage/backends/*"]
-target_owner = ["apps/ingestion/algotrade_ingestion/tasks/framework.py"]
-target_pr = 3
+owner = ["src/algotrade/storage/backends/*", "apps/ingestion/algotrade_ingestion/tasks/framework.py"]
 section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
 detect = [{ call = "raw.put" }]
 
 [[responsibility]]
 id = "row-stamping"
 description = "Add the point-in-time columns (session_date, knowledge_ts, source, run_id) to stored rows"
-owner = ["apps/ingestion/algotrade_ingestion/jobs/common.py"]
-target_owner = ["apps/ingestion/algotrade_ingestion/tasks/framework.py"]
-target_pr = 3
+owner = ["apps/ingestion/algotrade_ingestion/tasks/framework.py"]
 section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
 detect = [{ call = "stamp" }]
 
@@ -72,23 +70,21 @@ description = "Turn vendor tickers into instrument ids (ADR 0018); build EQ: ids
 owner = [
     "src/algotrade/core/instruments.py",
     "src/algotrade/data/resolver.py",
-    "apps/ingestion/algotrade_ingestion/jobs/instrument_ids.py",
-    "apps/ingestion/algotrade_ingestion/jobs/common.py",
+    "apps/ingestion/algotrade_ingestion/tasks/instrument_ids.py",
+    "apps/ingestion/algotrade_ingestion/tasks/framework.py",
 ]
-target_owner = ["apps/ingestion/algotrade_ingestion/tasks/framework.py"]
-target_pr = 3
 section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
 detect = [{ call = "with_ids" }, { call = "equity_id" }, { string_prefix = "EQ:" }]
 
 [[responsibility]]
 id = "ingestion-step-dispatch"
-description = "Decide which ingestion steps run, in what order, with which defaults (CLI, nightly)"
-owner = ["apps/ingestion/algotrade_ingestion/pipeline.py"]
-target_owner = [
+description = "Decide which ingestion steps run, in what order, with which defaults (CLI, nightly): tasks are declared once in the registry; nightly is an ordered list of task names"
+owner = [
     "apps/ingestion/algotrade_ingestion/tasks/registry.py",
-    "apps/ingestion/algotrade_ingestion/workflows/*",
+    "apps/ingestion/algotrade_ingestion/pipeline.py",
 ]
-target_pr = 3
+target_owner = ["apps/ingestion/algotrade_ingestion/workflows/*"]
+target_pr = 5
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
 detect = [
     { call_regex = "(^|\\.)(ingest_[a-z_]+|build_universe|import_universe|run_quality|compute_option_liquidity|load_golden|run_migrate_ids)$" },
@@ -205,94 +201,85 @@ section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-
 detect = [{ call = "run_screener" }]
 
 # --------------------------------------------------------------------------- stored tables
-# Every stored table has exactly one producing owner (tests/architecture/test_ownership.py).
+# Every stored table has exactly one producing owner (tests/architecture/test_ownership.py),
+# and every ingestion task in tasks/registry.py declares exactly the tables its module produces.
 # `also_written_by` lists today's extra writers: each is restructure work, not precedent.
 
 [[table]]
 name = "universe"
-owner = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/universe_build.py"
 target_owner = "apps/ingestion/algotrade_ingestion/tasks/universe.py"
-also_written_by = ["apps/ingestion/algotrade_ingestion/jobs/universe.py"]
+also_written_by = ["apps/ingestion/algotrade_ingestion/tasks/universe.py"]
 
 [[table]]
 name = "instruments/reference"
-owner = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/universe_build.py"
 target_owner = "apps/ingestion/algotrade_ingestion/tasks/universe.py"
 also_written_by = [
-    "apps/ingestion/algotrade_ingestion/jobs/universe.py",
-    "apps/ingestion/algotrade_ingestion/jobs/golden.py",
+    "apps/ingestion/algotrade_ingestion/tasks/universe.py",
+    "apps/ingestion/algotrade_ingestion/tasks/golden.py",
 ]
 
 [[table]]
 name = "instruments/symbol_history"
-owner = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/universe_build.py"
 target_owner = "apps/ingestion/algotrade_ingestion/tasks/universe.py"
 
 [[table]]
 name = "instruments/id_map"
-owner = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/universe_build.py"
 target_owner = "apps/ingestion/algotrade_ingestion/tasks/universe.py"
 
 [[table]]
 name = "instruments/company"
-owner = "apps/ingestion/algotrade_ingestion/jobs/company_details.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/company_details.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/company_details.py"
 
 [[table]]
 name = "chains/underlying_quotes"
-owner = "apps/ingestion/algotrade_ingestion/jobs/option_chains.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/option_chains.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/option_chains.py"
 
 [[table]]
 name = "chains/option_quotes"
-owner = "apps/ingestion/algotrade_ingestion/jobs/option_chains.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/option_chains.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/option_chains.py"
 
 [[table]]
 name = "chains/status"
-owner = "apps/ingestion/algotrade_ingestion/jobs/option_chains.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/option_chains.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/option_chains.py"
 
 [[table]]
 name = "bars/1d"
-owner = "apps/ingestion/algotrade_ingestion/jobs/bars.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/bars.py"
-also_written_by = ["apps/ingestion/algotrade_ingestion/jobs/golden.py"]
+owner = "apps/ingestion/algotrade_ingestion/tasks/bars.py"
+also_written_by = ["apps/ingestion/algotrade_ingestion/tasks/golden.py"]
 
 [[table]]
 name = "events/split"
-owner = "apps/ingestion/algotrade_ingestion/jobs/bars.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/corporate_actions.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/corporate_actions.py"
 
 [[table]]
 name = "events/dividend"
-owner = "apps/ingestion/algotrade_ingestion/jobs/bars.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/corporate_actions.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/corporate_actions.py"
 
 [[table]]
 name = "events/earnings"
-owner = "apps/ingestion/algotrade_ingestion/jobs/earnings.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/earnings.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/earnings.py"
 
 [[table]]
 name = "events/reference_change"
-owner = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/universe_build.py"
 target_owner = "apps/ingestion/algotrade_ingestion/tasks/universe.py"
 
 [[table]]
 name = "events/index_change"
-owner = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/universe_build.py"
 target_owner = "apps/ingestion/algotrade_ingestion/tasks/universe.py"
 
 [[table]]
 name = "rollups/instrument/option_liquidity@v1"
-owner = "apps/ingestion/algotrade_ingestion/jobs/features.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/features.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/features.py"
 
 [[table]]
 name = "rollups/daily/*"
-owner = "apps/ingestion/algotrade_ingestion/jobs/features.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/features.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/features.py"
 note = "none produced yet (phase 6); rollups are computed only by the features task"
 
 [[table]]
@@ -302,11 +289,10 @@ note = "one results/<name> per screener (services/screening.py) or backtest outp
 
 [[table]]
 name = "catalog/golden_datasets"
-owner = "apps/ingestion/algotrade_ingestion/jobs/golden.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/golden.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/golden.py"
 
 # Every table may additionally be rewritten by the one-off id migration (ADR 0018):
-# apps/ingestion/algotrade_ingestion/jobs/migrate_ids.py (an admin command, not a producer).
+# apps/ingestion/algotrade_ingestion/tasks/migrate_ids.py (an admin command, not a producer).
 
 # --------------------------------------------------------------------------- pending contracts
 # Import-linter contracts that cannot hold until a restructure PR lands. Add each to

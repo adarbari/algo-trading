@@ -10,21 +10,20 @@ Each run writes a **full snapshot** for its session: one row per instrument in t
 - Funds and ETFs often have no submissions (404) or no CIK at all: counted, not failures.
 """
 
-from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
+from functools import partial
 
 import pandas as pd
 
 from algotrade.data import StoreReader
 from algotrade.data.reference import instruments, snapshot
-from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
-from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.jobs.common import stamp
+from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.sources.base import FetchRequest, Source
 from algotrade_ingestion.sources.sec_edgar import COMPANY_COLUMNS, pad_cik
+from algotrade_ingestion.tasks.framework import IngestRun, NoResponseError, TaskContext
 
-JOB = "company_details"
+TASK = "company_details"
 TABLE = "instruments/company"
 REFERENCE = "instruments/reference"
 
@@ -36,18 +35,25 @@ class CompanySources:
     refresh_days: int = 30
 
 
-def _ticker_map(source: Source, writer: StoreWriter, session: date, run_id: str) -> dict[str, str]:
-    """symbol -> CIK from the SEC ticker map (raw saved first)."""
-    request = FetchRequest("tickers", session_date=session)
-    payload = source.fetch(request)
-    if payload is None:
-        raise ValueError("SEC ticker map returned nothing")
-    writer.raw.put(source.name, source.dataset, session, run_id, "tickers", payload)
-    normalized = source.normalize(request, payload)
+def _ticker_map(run: IngestRun, source: Source, out: dict[str, str]) -> str:
+    """symbol -> CIK from the SEC ticker map, into ``out``."""
+    normalized = run.fetch(source, FetchRequest("tickers", session_date=run.session))
     if normalized is None:
         raise ValueError("SEC ticker map had no rows")
     frame = normalized.parsed["tickers"]
-    return dict(zip(frame["symbol"], frame["cik"], strict=True))
+    out.update(zip(frame["symbol"], frame["cik"], strict=True))
+    return f"OK: {len(frame)} tickers"
+
+
+def _submissions(run: IngestRun, source: Source, cik: str, fetched: list[pd.DataFrame]) -> str:
+    try:
+        normalized = run.fetch(source, FetchRequest(cik, session_date=run.session))
+    except NoResponseError:
+        return "NO_SUBMISSIONS"  # no filings under this CIK (common for funds)
+    if normalized is None:
+        return "EMPTY"
+    fetched.append(normalized.parsed["company"].assign(cik=cik, fetched_on=run.session))
+    return "OK"
 
 
 def assign_ciks(reference: pd.DataFrame, sec_map: dict[str, str]) -> pd.DataFrame:
@@ -94,72 +100,48 @@ def _previous(reader: StoreReader, session: date) -> pd.DataFrame | None:
 
 
 def ingest_company_details(
-    writer: StoreWriter,
-    reader: StoreReader,
+    ctx: TaskContext,
     sources: CompanySources,
     session: date,
     force: bool = False,
     limit: int | None = None,
-    clock: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> RunRecord:
-    now = clock()
-    run_id = new_run_id(JOB, session, now)
-    reference = instruments(reader, session)
-    failed: list[str] = []
-    try:
-        sec_map = _ticker_map(sources.tickers, writer, session, run_id)
-    except Exception as exc:  # reference CIKs still work without the map
-        failed.append(f"tickers: {exc}")
-        sec_map = {}
-    ids = assign_ciks(reference, sec_map)
-    known = ids[ids["cik"].notna()]
-    ciks = sorted(set(known["cik"]))
-    previous = _previous(reader, session)
-    due = due_ciks(ciks, previous, session, sources.refresh_days, force)
-    todo = due if limit is None else due[: max(limit, 0)]
-    fetched, not_found = [], 0
-    for cik in todo:
-        request = FetchRequest(cik, session_date=session)
-        try:
-            payload = sources.submissions.fetch(request)
-            if payload is None:
-                not_found += 1  # no filings under this CIK (common for funds)
-                continue
-            writer.raw.put(
-                sources.submissions.name, sources.submissions.dataset, session, run_id, cik, payload
-            )
-            normalized = sources.submissions.normalize(request, payload)
-            if normalized is not None:
-                fetched.append(normalized.parsed["company"].assign(cik=cik, fetched_on=session))
-        except Exception as exc:
-            failed.append(f"{cik}: {exc}")
-    details = _merge_details(previous, fetched)
-    rows = known.merge(details, on="cik", how="inner") if not details.empty else known.iloc[:0]
-    if not rows.empty:
-        rows = rows.sort_values("instrument_id").reset_index(drop=True)
-        rows = rows.astype(object).where(rows.notna(), None)
-        writer.write_table(
-            TABLE, session, run_id, stamp(rows, session, now, sources.submissions.name, run_id)
+    reference = instruments(ctx.reader, session)
+    with IngestRun(ctx, TASK, session) as run:
+        sec_map: dict[str, str] = {}  # reference CIKs still work without the map
+        run.attempt("tickers", partial(_ticker_map, run, sources.tickers, sec_map))
+        ids = assign_ciks(reference, sec_map)
+        known = ids[ids["cik"].notna()]
+        ciks = sorted(set(known["cik"]))
+        previous = _previous(ctx.reader, session)
+        due = due_ciks(ciks, previous, session, sources.refresh_days, force)
+        todo = due if limit is None else due[: max(limit, 0)]
+        fetched: list[pd.DataFrame] = []
+        for cik in todo:
+            run.attempt(cik, partial(_submissions, run, sources.submissions, cik, fetched))
+        details = _merge_details(previous, fetched)
+        rows = known.merge(details, on="cik", how="inner") if not details.empty else known.iloc[:0]
+        if not rows.empty:
+            rows = rows.sort_values("instrument_id").reset_index(drop=True)
+            rows = rows.astype(object).where(rows.notna(), None)
+            run.write(TABLE, rows, sources.submissions.name)
+        failed = run.failures()
+        run.stats.update(
+            instruments=len(ids),
+            cik_from_reference=int(ids["cik_source"].eq("reference").sum()),
+            cik_from_sec_map=int(ids["cik_source"].eq("sec_map").sum()),
+            no_cik=int(ids["cik"].isna().sum()),
+            ciks=len(ciks),
+            due=len(due),
+            requested=len(todo),
+            fetched=len(fetched),
+            no_submissions=run.counts().get("NO_SUBMISSIONS", 0),
+            deferred_by_limit=len(due) - len(todo),
+            failed=failed[:20],
+            failed_count=len(failed),
+            rows=len(rows),
         )
-    stats = {
-        "instruments": len(ids),
-        "cik_from_reference": int(ids["cik_source"].eq("reference").sum()),
-        "cik_from_sec_map": int(ids["cik_source"].eq("sec_map").sum()),
-        "no_cik": int(ids["cik"].isna().sum()),
-        "ciks": len(ciks),
-        "due": len(due),
-        "requested": len(todo),
-        "fetched": len(fetched),
-        "no_submissions": not_found,
-        "deferred_by_limit": len(due) - len(todo),
-        "failed": failed[:20],
-        "failed_count": len(failed),
-        "rows": len(rows),
-    }
-    status = RunStatus.PARTIAL if failed else RunStatus.COMPLETE
-    record = RunRecord(run_id, JOB, session, now, status, now, stats=stats)
-    writer.save_run(record)
-    return record
+    return run.record
 
 
 def _merge_details(previous: pd.DataFrame | None, fetched: list[pd.DataFrame]) -> pd.DataFrame:

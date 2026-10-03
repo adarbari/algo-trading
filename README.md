@@ -29,6 +29,7 @@ algotrade-ingest quality                        # data-quality checks for a sess
 algotrade-ingest schedule --time 23:30          # writes a launchd agent; prints install commands
 algotrade-ingest purge-raw --keep-days 90       # + unfinished-run scratch older than 14 days
 algotrade-ingest migrate-ids [--dry-run]        # symbol ids -> FIGI ids per instruments/id_map (new runs, ADR 0018)
+algotrade-ingest run <task> [--date D | --from D --to D]   # any registry task (tasks/registry.py), same flags
 ```
 
 Source switches, pacing, retention and quality thresholds live in
@@ -66,7 +67,7 @@ Each app declares only its own dependencies; `uv.lock` pins everything (`make lo
 
 ```
 apps/
-  ingestion/    algotrade-ingest: sources (Cboe, ...), jobs, nightly pipeline. Only writer of data.
+  ingestion/    algotrade-ingest: sources (Cboe, ...), tasks (IngestRun + registry), nightly. Only writer of data.
   backtest/     algotrade-backtest: datasets, backtest, evaluate
 src/algotrade/  shared library
   core/         domain types, MarketView, FeatureView, instruments (no pandas, no I/O)

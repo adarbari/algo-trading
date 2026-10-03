@@ -4,26 +4,6 @@
 # Never add entries by hand; extend the owner named in architecture/ownership.toml.
 
 [[violation]]
-responsibility = "id-resolution"
-file = "apps/ingestion/algotrade_ingestion/jobs/bars.py"
-count = 2
-
-[[violation]]
-responsibility = "id-resolution"
-file = "apps/ingestion/algotrade_ingestion/jobs/earnings.py"
-count = 1
-
-[[violation]]
-responsibility = "ingestion-step-dispatch"
-file = "apps/ingestion/algotrade_ingestion/cli.py"
-count = 3
-
-[[violation]]
-responsibility = "ingestion-step-dispatch"
-file = "apps/ingestion/algotrade_ingestion/commands.py"
-count = 8
-
-[[violation]]
 responsibility = "job-execution"
 file = "apps/backtest/algotrade_backtest/commands.py"
 count = 1
@@ -35,18 +15,13 @@ count = 1
 
 [[violation]]
 responsibility = "job-execution"
-file = "apps/ingestion/algotrade_ingestion/jobs/option_chains.py"
+file = "apps/ingestion/algotrade_ingestion/tasks/option_chains.py"
 count = 1
 
 [[violation]]
 responsibility = "rate-limiting"
 file = "apps/ingestion/algotrade_ingestion/commands.py"
-count = 13
-
-[[violation]]
-responsibility = "rate-limiting"
-file = "apps/ingestion/algotrade_ingestion/jobs/option_chains.py"
-count = 1
+count = 11
 
 [[violation]]
 responsibility = "rate-limiting"
@@ -59,119 +34,9 @@ file = "apps/ingestion/algotrade_ingestion/sources/sec_edgar.py"
 count = 1
 
 [[violation]]
-responsibility = "raw-persistence"
-file = "apps/ingestion/algotrade_ingestion/jobs/bars.py"
-count = 2
-
-[[violation]]
-responsibility = "raw-persistence"
-file = "apps/ingestion/algotrade_ingestion/jobs/company_details.py"
-count = 2
-
-[[violation]]
-responsibility = "raw-persistence"
-file = "apps/ingestion/algotrade_ingestion/jobs/earnings.py"
+responsibility = "rate-limiting"
+file = "apps/ingestion/algotrade_ingestion/tasks/option_chains.py"
 count = 1
-
-[[violation]]
-responsibility = "raw-persistence"
-file = "apps/ingestion/algotrade_ingestion/jobs/option_chains.py"
-count = 1
-
-[[violation]]
-responsibility = "raw-persistence"
-file = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
-count = 1
-
-[[violation]]
-responsibility = "row-stamping"
-file = "apps/ingestion/algotrade_ingestion/jobs/bars.py"
-count = 2
-
-[[violation]]
-responsibility = "row-stamping"
-file = "apps/ingestion/algotrade_ingestion/jobs/company_details.py"
-count = 1
-
-[[violation]]
-responsibility = "row-stamping"
-file = "apps/ingestion/algotrade_ingestion/jobs/earnings.py"
-count = 1
-
-[[violation]]
-responsibility = "row-stamping"
-file = "apps/ingestion/algotrade_ingestion/jobs/features.py"
-count = 1
-
-[[violation]]
-responsibility = "row-stamping"
-file = "apps/ingestion/algotrade_ingestion/jobs/golden.py"
-count = 3
-
-[[violation]]
-responsibility = "row-stamping"
-file = "apps/ingestion/algotrade_ingestion/jobs/option_chains.py"
-count = 2
-
-[[violation]]
-responsibility = "row-stamping"
-file = "apps/ingestion/algotrade_ingestion/jobs/universe.py"
-count = 2
-
-[[violation]]
-responsibility = "row-stamping"
-file = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
-count = 4
-
-[[violation]]
-responsibility = "run-records"
-file = "apps/ingestion/algotrade_ingestion/jobs/bars.py"
-count = 6
-
-[[violation]]
-responsibility = "run-records"
-file = "apps/ingestion/algotrade_ingestion/jobs/company_details.py"
-count = 3
-
-[[violation]]
-responsibility = "run-records"
-file = "apps/ingestion/algotrade_ingestion/jobs/earnings.py"
-count = 3
-
-[[violation]]
-responsibility = "run-records"
-file = "apps/ingestion/algotrade_ingestion/jobs/features.py"
-count = 2
-
-[[violation]]
-responsibility = "run-records"
-file = "apps/ingestion/algotrade_ingestion/jobs/golden.py"
-count = 2
-
-[[violation]]
-responsibility = "run-records"
-file = "apps/ingestion/algotrade_ingestion/jobs/migrate_ids.py"
-count = 3
-
-[[violation]]
-responsibility = "run-records"
-file = "apps/ingestion/algotrade_ingestion/jobs/option_chains.py"
-count = 3
-
-[[violation]]
-responsibility = "run-records"
-file = "apps/ingestion/algotrade_ingestion/jobs/quality.py"
-count = 3
-
-[[violation]]
-responsibility = "run-records"
-file = "apps/ingestion/algotrade_ingestion/jobs/universe.py"
-count = 2
-
-[[violation]]
-responsibility = "run-records"
-file = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
-count = 3
 
 [[violation]]
 responsibility = "run-records"
@@ -200,22 +65,17 @@ count = 2
 
 [[violation]]
 responsibility = "session-calendar"
-file = "apps/ingestion/algotrade_ingestion/jobs/bars.py"
+file = "apps/ingestion/algotrade_ingestion/tasks/bars.py"
 count = 1
 
 [[violation]]
 responsibility = "session-calendar"
-file = "apps/ingestion/algotrade_ingestion/jobs/earnings.py"
+file = "apps/ingestion/algotrade_ingestion/tasks/earnings.py"
 count = 1
 
 [[violation]]
 responsibility = "session-calendar"
 file = "src/algotrade/core/options.py"
-count = 1
-
-[[violation]]
-responsibility = "site-settings"
-file = "apps/ingestion/algotrade_ingestion/pipeline.py"
 count = 1
 
 [[violation]]
@@ -230,25 +90,15 @@ count = 9
 
 [[violation]]
 responsibility = "source-construction"
-file = "apps/ingestion/algotrade_ingestion/jobs/bars.py"
+file = "apps/ingestion/algotrade_ingestion/tasks/company_details.py"
 count = 1
 
 [[violation]]
 responsibility = "source-construction"
-file = "apps/ingestion/algotrade_ingestion/jobs/company_details.py"
-count = 1
-
-[[violation]]
-responsibility = "source-construction"
-file = "apps/ingestion/algotrade_ingestion/jobs/earnings.py"
-count = 1
-
-[[violation]]
-responsibility = "source-construction"
-file = "apps/ingestion/algotrade_ingestion/jobs/golden.py"
+file = "apps/ingestion/algotrade_ingestion/tasks/golden.py"
 count = 2
 
 [[violation]]
 responsibility = "source-construction"
-file = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
+file = "apps/ingestion/algotrade_ingestion/tasks/universe_build.py"
 count = 4

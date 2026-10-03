@@ -9,11 +9,6 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.env import load_dotenv, massive_key
-from algotrade_ingestion.jobs.bars import (
-    ingest_corporate_actions,
-    ingest_daily_bars,
-    sessions_between,
-)
 from algotrade_ingestion.sources.base import FetchRequest
 from algotrade_ingestion.sources.http import HttpError, MinInterval, RetryPolicy
 from algotrade_ingestion.sources.massive import (
@@ -22,7 +17,10 @@ from algotrade_ingestion.sources.massive import (
     act_symbol,
     parse_grouped,
 )
+from algotrade_ingestion.tasks.bars import ingest_daily_bars, sessions_between
+from algotrade_ingestion.tasks.corporate_actions import ingest_corporate_actions
 from tests import massive_fixture as fx
+from tests.ingest_helpers import task_ctx
 from tests.storage_helpers import write_reference
 
 D1, D2 = date(2026, 9, 30), date(2026, 10, 1)
@@ -135,7 +133,7 @@ def test_daily_bars_job_resumes_and_records_holidays() -> None:
     writer, reader = StoreWriter(backend), StoreReader(backend)
     source = MassiveDailyBars(transport, lambda s: None, NO_RETRY, min_interval_s=0)
     first = ingest_daily_bars(
-        writer, reader, source, sessions_between(D1, date(2026, 10, 2)), clock=CLOCK
+        task_ctx(writer, reader, CLOCK), source, sessions_between(D1, date(2026, 10, 2))
     )
     assert first.items == {
         "2026-09-30": "OK: 1 bars, 1 unresolved",  # no reference yet: symbol id
@@ -146,9 +144,9 @@ def test_daily_bars_job_resumes_and_records_holidays() -> None:
     assert first.status is RunStatus.PARTIAL
     assert reader.dates("bars/1d") == [D1]
     calls.clear()
-    second = ingest_daily_bars(writer, reader, source, [D1], clock=CLOCK)
+    second = ingest_daily_bars(task_ctx(writer, reader, CLOCK), source, [D1])
     assert second.items == {"2026-09-30": "STORED"} and calls == []  # resumed: nothing re-fetched
-    forced = ingest_daily_bars(writer, reader, source, [D1], force=True, clock=CLOCK)
+    forced = ingest_daily_bars(task_ctx(writer, reader, CLOCK), source, [D1], force=True)
     assert forced.items["2026-09-30"].startswith("OK") and len(calls) == 1
 
 
@@ -164,7 +162,7 @@ def test_corporate_actions_job_writes_snapshots_and_reports_failures() -> None:
     writer, reader = StoreWriter(backend), StoreReader(backend)
     write_reference(writer, D1, {"NVDA": "EQ:BBG000BBJQV0"})
     source = MassiveCorporateActions(transport, lambda s: None, NO_RETRY, min_interval_s=0)
-    record = ingest_corporate_actions(writer, reader, source, D2, D1, D2, clock=CLOCK)
+    record = ingest_corporate_actions(task_ctx(writer, reader, CLOCK), source, D2, D1, D2)
     assert record.status is RunStatus.PARTIAL
     assert (record.stats["events/split"], record.stats["unresolved"]) == (1, 0)
     splits = reader.table("events/split", D2)
@@ -179,7 +177,7 @@ def test_daily_bars_resolve_through_the_reference_as_of_each_session() -> None:
     backend = MemoryBackend()
     writer, reader = StoreWriter(backend), StoreReader(backend)
     write_reference(writer, D2, {"META": "EQ:BBG000MM2P62"})  # first snapshot after D1
-    record = ingest_daily_bars(writer, reader, source, [D1], clock=CLOCK)
+    record = ingest_daily_bars(task_ctx(writer, reader, CLOCK), source, [D1])
     assert record.items["2026-09-30"] == "OK: 2 bars, 1 unresolved"
     bars = reader.table("bars/1d", D1)
     assert bars is not None and list(bars["instrument_id"]) == ["EQ:BBG000MM2P62", "EQ:FB"]

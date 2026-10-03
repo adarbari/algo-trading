@@ -8,8 +8,9 @@ from algotrade.data import StoreReader
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.jobs.golden import load_golden
 from algotrade_ingestion.sources.synthetic.files import GoldenFiles
+from algotrade_ingestion.tasks.golden import load_golden
+from tests.ingest_helpers import task_ctx
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 GOLDEN_DIR = REPO_ROOT / "datasets" / "golden"
@@ -32,7 +33,7 @@ def golden_files() -> GoldenFiles:
 def golden_reader(golden_files: GoldenFiles) -> StoreReader:
     """The golden datasets loaded through the real ingestion job into an in-memory store."""
     backend = MemoryBackend()
-    load_golden(StoreWriter(backend), golden_files)
+    load_golden(task_ctx(StoreWriter(backend)), golden_files)
     return StoreReader(backend)
 
 
@@ -40,7 +41,7 @@ def golden_reader(golden_files: GoldenFiles) -> StoreReader:
 def golden_url(tmp_path_factory: pytest.TempPathFactory, golden_files: GoldenFiles) -> str:
     """A local (Parquet) fixture store with the golden datasets, for CLI tests."""
     root = tmp_path_factory.mktemp("golden-store")
-    load_golden(StoreWriter(LocalBackend(root)), golden_files)
+    load_golden(task_ctx(StoreWriter(LocalBackend(root))), golden_files)
     return f"file://{root}"
 
 

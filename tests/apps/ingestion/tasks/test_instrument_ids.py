@@ -8,18 +8,19 @@ from algotrade.data import StoreReader
 from algotrade.data.reference import resolver
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.jobs.instrument_ids import assign_ids, cumulative_map, rename_ids
-from algotrade_ingestion.jobs.universe_build import (
-    UniverseSettings,
-    UniverseSources,
-    build_universe,
-)
 from algotrade_ingestion.sources.http import RetryPolicy
 from algotrade_ingestion.sources.massive import MassiveTickers
 from algotrade_ingestion.sources.nasdaq_trader import NasdaqTraderSource
 from algotrade_ingestion.sources.spy_holdings import SpyHoldingsSource
+from algotrade_ingestion.tasks.instrument_ids import assign_ids, cumulative_map, rename_ids
+from algotrade_ingestion.tasks.universe_build import (
+    UniverseSettings,
+    UniverseSources,
+    build_universe,
+)
 from tests import massive_fixture as mfx
 from tests import universe_fixture as fx
+from tests.ingest_helpers import task_ctx
 
 D1 = date(2026, 10, 1)
 D2, D3 = D1 + timedelta(days=1), D1 + timedelta(days=2)
@@ -127,7 +128,7 @@ def test_universe_build_upgrades_ids_and_records_the_map() -> None:
     def build(day: date, tickers: list[dict[str, object]] | None, hour: int) -> dict:  # type: ignore[type-arg]
         clock = lambda: datetime(day.year, day.month, day.day, hour, tzinfo=UTC)  # noqa: E731
         return build_universe(
-            writer, reader, _sources(names, tickers), UniverseSettings(), day, clock
+            task_ctx(writer, reader, clock), _sources(names, tickers), UniverseSettings(), day
         ).stats
 
     build(D1, None, 22)  # no Massive key: symbol ids
@@ -154,9 +155,11 @@ def test_first_build_upgrades_an_earlier_run_of_the_same_session() -> None:
     writer, reader = StoreWriter(backend), StoreReader(backend)
     first = lambda: datetime(2026, 10, 1, 20, tzinfo=UTC)  # noqa: E731
     second = lambda: datetime(2026, 10, 1, 21, tzinfo=UTC)  # noqa: E731
-    build_universe(writer, reader, _sources(["AAPL"], None), UniverseSettings(), D1, first)
+    build_universe(
+        task_ctx(writer, reader, first), _sources(["AAPL"], None), UniverseSettings(), D1
+    )
     tickers = [{"ticker": "AAPL", "type": "CS", "composite_figi": "BBG1"}]
     stats = build_universe(
-        writer, reader, _sources(["AAPL"], tickers), UniverseSettings(), D1, second
+        task_ctx(writer, reader, second), _sources(["AAPL"], tickers), UniverseSettings(), D1
     ).stats
     assert stats["identifiers"]["ids_upgraded"] == 1

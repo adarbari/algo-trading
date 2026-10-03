@@ -12,8 +12,9 @@ from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.interfaces import Backend
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.jobs.instrument_ids import ID_MAP, ID_MAP_COLUMNS
-from algotrade_ingestion.jobs.migrate_ids import migrate_ids
+from algotrade_ingestion.tasks.instrument_ids import ID_MAP, ID_MAP_COLUMNS
+from algotrade_ingestion.tasks.migrate_ids import migrate_ids
+from tests.ingest_helpers import task_ctx
 from tests.storage_helpers import T0, stamped
 
 D1, D2 = date(2026, 9, 30), date(2026, 10, 1)
@@ -66,7 +67,7 @@ def test_migration_is_append_only_point_in_time_and_idempotent(backend: Backend)
     late = stamped([bar("EQ:AAPL", D2)], D2, "b2", UPGRADED + timedelta(minutes=5))
     writer.write_table("bars/1d", D2, "b2", late)
 
-    dry = migrate_ids(writer, reader, dry_run=True, clock=lambda: MIGRATED)
+    dry = migrate_ids(task_ctx(writer, reader, lambda: MIGRATED), dry_run=True)
     assert dry.stats["tables"] == {
         "bars/1d": {"partitions": 1, "rows": 1},
         "chains/option_quotes": {"partitions": 1, "rows": 1},
@@ -74,7 +75,7 @@ def test_migration_is_append_only_point_in_time_and_idempotent(backend: Backend)
     assert reader.runs("migrate_ids") == []  # a dry run writes nothing
     assert list(reader.table("bars/1d", D1)["instrument_id"]) == ["EQ:AAPL", "EQ:ZZZ"]  # type: ignore[index]
 
-    run = migrate_ids(writer, reader, clock=lambda: MIGRATED)
+    run = migrate_ids(task_ctx(writer, reader, lambda: MIGRATED))
     assert run.status == "complete" and run.stats["tables"] == dry.stats["tables"]
     bars = reader.table("bars/1d", D1)
     assert bars is not None and list(bars["instrument_id"]) == ["EQ:BBG1", "EQ:ZZZ"]
@@ -86,7 +87,7 @@ def test_migration_is_append_only_point_in_time_and_idempotent(backend: Backend)
     assert list(chains["instrument_id"]) == ["OPT:AAPL261231C00200000"]  # OCC ids stay
     assert list(reader.table("bars/1d", D2)["instrument_id"]) == ["EQ:AAPL"]  # type: ignore[index]
 
-    again = migrate_ids(writer, reader, clock=lambda: MIGRATED + timedelta(hours=1))
+    again = migrate_ids(task_ctx(writer, reader, lambda: MIGRATED + timedelta(hours=1)))
     assert again.stats["tables"] == {}
 
 
@@ -94,7 +95,7 @@ def test_nothing_to_do_without_an_id_map() -> None:
     backend = MemoryBackend()
     writer, reader = StoreWriter(backend), StoreReader(backend)
     writer.write_table("bars/1d", D1, "b1", stamped([bar("EQ:AAPL", D1)], D1, "b1"))
-    record = migrate_ids(writer, reader, clock=lambda: MIGRATED)
+    record = migrate_ids(task_ctx(writer, reader, lambda: MIGRATED))
     assert (record.stats["mapped_ids"], record.stats["tables"]) == (0, {})
 
 
@@ -104,7 +105,7 @@ def test_a_partition_holding_old_and_new_ids_is_reported_not_written() -> None:
     seed(writer)
     both = stamped([bar("EQ:AAPL", D2), bar("EQ:BBG1", D2)], D2, "b2", T0)
     writer.write_table("bars/1d", D2, "b2", both)
-    record = migrate_ids(writer, reader, clock=lambda: MIGRATED)
+    record = migrate_ids(task_ctx(writer, reader, lambda: MIGRATED))
     assert record.status == "partial" and record.stats["failed_count"] == 1
     assert "bars/1d 2026-10-01" in record.stats["failed"][0]
     assert list(reader.table("bars/1d", D2)["instrument_id"]) == ["EQ:AAPL", "EQ:BBG1"]  # type: ignore[index]

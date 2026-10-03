@@ -13,9 +13,10 @@ from algotrade.storage.backends.config_files import MemoryConfigStore
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.result_writer import ResultWriter
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.jobs.golden import load_golden
 from algotrade_ingestion.sources.synthetic.files import GoldenFiles
+from algotrade_ingestion.tasks.golden import load_golden
 from tests.conftest import GOLDEN_DIR
+from tests.ingest_helpers import task_ctx
 
 T0 = datetime(2026, 10, 3, tzinfo=UTC)  # the injected launch clock: backtests read as_of T0
 LOADED = datetime(2026, 10, 1, tzinfo=UTC)  # when the golden data was stored (before T0)
@@ -38,7 +39,7 @@ def bull_config(**extra: Any) -> dict[str, Any]:
 @pytest.fixture(scope="module")
 def backend() -> MemoryBackend:
     b = MemoryBackend()
-    load_golden(StoreWriter(b), GoldenFiles(GOLDEN_DIR), clock=lambda: LOADED)
+    load_golden(task_ctx(StoreWriter(b), clock=lambda: LOADED), GoldenFiles(GOLDEN_DIR))
     return b
 
 

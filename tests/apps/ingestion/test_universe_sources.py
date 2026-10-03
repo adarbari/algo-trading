@@ -2,11 +2,6 @@ from datetime import date
 
 import pytest
 
-from algotrade_ingestion.jobs.classify import (
-    DEFAULT_LEVERAGE_MARKERS,
-    leverage_flags,
-    security_type,
-)
 from algotrade_ingestion.sources.base import FetchRequest
 from algotrade_ingestion.sources.http import RetryPolicy
 from algotrade_ingestion.sources.nasdaq_trader import (
@@ -15,6 +10,11 @@ from algotrade_ingestion.sources.nasdaq_trader import (
     parse_option_underlyings,
 )
 from algotrade_ingestion.sources.spy_holdings import SpyHoldingsSource, parse_holdings
+from algotrade_ingestion.tasks.classify import (
+    DEFAULT_LEVERAGE_MARKERS,
+    leverage_flags,
+    security_type,
+)
 from tests import universe_fixture as fx
 
 

@@ -202,7 +202,7 @@ name = "Vendor sources are leaf adapters: no steps, pipeline, CLI, settings or u
 type = "forbidden"
 source_modules = ["algotrade_ingestion.sources"]
 forbidden_modules = [
-    "algotrade_ingestion.jobs",
+    "algotrade_ingestion.tasks",
     "algotrade_ingestion.pipeline",
     "algotrade_ingestion.commands",
     "algotrade_ingestion.cli",
@@ -216,7 +216,7 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "Ingestion steps never import their entry points (CLI, commands, nightly pipeline)"
 type = "forbidden"
-source_modules = ["algotrade_ingestion.jobs"]
+source_modules = ["algotrade_ingestion.tasks"]
 forbidden_modules = [
     "algotrade_ingestion.cli",
     "algotrade_ingestion.commands",
@@ -227,7 +227,7 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "Vendor HTTP lives only in ingestion sources (urllib.request: check_ownership.py)"
 type = "forbidden"
-source_modules = ["algotrade", "algotrade_backtest", "algotrade_ingestion.jobs"]
+source_modules = ["algotrade", "algotrade_backtest", "algotrade_ingestion.tasks"]
 forbidden_modules = ["http", "requests"]
 allow_indirect_imports = true
 

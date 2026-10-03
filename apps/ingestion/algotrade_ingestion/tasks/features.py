@@ -1,21 +1,21 @@
 """Compute nightly features from stored chains (currently ``option_liquidity@v1``)."""
 
-from collections.abc import Callable, Mapping
-from datetime import UTC, date, datetime
+from collections.abc import Mapping
+from datetime import date
 from typing import Any, cast
 
 import pandas as pd
 
-from algotrade.data import StoreReader
 from algotrade.data.chains import chain_status, option_quotes, underlying_quotes
 from algotrade.features import option_liquidity as liq
 from algotrade.features.registry import FEATURES
-from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
-from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.jobs.common import stamp
+from algotrade.storage.runs import RunRecord
+from algotrade_ingestion.tasks.framework import IngestRun, TaskContext
 
 TABLE = f"rollups/instrument/{liq.NAME}@v{liq.VERSION}"
 HINT = "algotrade-ingest chains --date {d}"
+TASK = "features-option_liquidity"
+SOURCE = "features"
 
 
 def liquidity_rows(
@@ -53,31 +53,21 @@ def liquidity_rows(
 
 
 def compute_option_liquidity(
-    reader: StoreReader,
-    writer: StoreWriter,
-    session_date: date,
-    params: liq.LiquidityParams | None = None,
-    clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+    ctx: TaskContext, session_date: date, params: liq.LiquidityParams | None = None
 ) -> RunRecord:
     assert TABLE in FEATURES
-    now = clock()
-    hint = HINT.format(d=session_date.isoformat())
-    status = chain_status(reader, session_date, hint=hint)
-    assert status is not None  # chain_status raises with a hint
-    frame = liquidity_rows(
-        status,
-        option_quotes(reader, session_date),
-        underlying_quotes(reader, session_date),
-        session_date,
-        params or liq.LiquidityParams(),
-    )
-    run_id = new_run_id("features-option_liquidity", session_date, now)
-    writer.write_table(
-        TABLE, session_date, run_id, stamp(frame, session_date, now, "features", run_id)
-    )
-    stats = {"rows": len(frame), "liq_status": frame["liq_status"].value_counts().to_dict()}
-    record = RunRecord(
-        run_id, "features-option_liquidity", session_date, now, RunStatus.COMPLETE, now, stats=stats
-    )
-    writer.save_run(record)
-    return record
+    reader = ctx.reader
+    with IngestRun(ctx, TASK, session_date) as run:
+        hint = HINT.format(d=session_date.isoformat())
+        status = chain_status(reader, session_date, hint=hint)
+        assert status is not None  # chain_status raises with a hint
+        frame = liquidity_rows(
+            status,
+            option_quotes(reader, session_date),
+            underlying_quotes(reader, session_date),
+            session_date,
+            params or liq.LiquidityParams(),
+        )
+        run.write(TABLE, frame, SOURCE)
+        run.stats.update(rows=len(frame), liq_status=frame["liq_status"].value_counts().to_dict())
+    return run.record

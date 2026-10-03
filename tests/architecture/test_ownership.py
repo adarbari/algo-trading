@@ -30,13 +30,12 @@ SITE_SETTINGS = sorted((REPO_ROOT / "config" / "site").glob("*.toml"))
 # Typed views of L3 settings: every field must be used by code, not only parsed.
 TYPED_SETTINGS = {
     "apps/ingestion/algotrade_ingestion/settings.py": "SourcesSettings",
-    "apps/ingestion/algotrade_ingestion/jobs/universe_build.py": "UniverseSettings",
+    "apps/ingestion/algotrade_ingestion/settings.py#universe": "UniverseSettings",
 }
 # Settings that are parsed but drive nothing today. This list may only shrink: wire the
 # setting up (docs/roadmap.md, track R) or delete it from config/site, then remove it here.
 KNOWN_UNREAD = {
     "SourcesSettings.cboe_enabled",  # chains always run; PR 5 makes nightly honour it
-    "SourcesSettings.cboe_workers",  # workers come from CLI/job params (default 4); PR 5
 }
 
 
@@ -146,7 +145,7 @@ def _code_names() -> tuple[set[str], Counter[str]]:
 def _typed_fields() -> list[str]:
     fields = []
     for rel, cls in TYPED_SETTINGS.items():
-        tree = ast.parse((REPO_ROOT / rel).read_text())
+        tree = ast.parse((REPO_ROOT / rel.partition("#")[0]).read_text())
         node = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == cls)
         fields += [
             f"{cls}.{s.target.id}"
