@@ -13,11 +13,11 @@ from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.sources.vendors.ibkr.gateway import GatewayConfig, IbkrMarketData
-from algotrade_ingestion.sources.vendors.ibkr.market_data import IbkrSource
 from algotrade_ingestion.tasks.derived.rollups import compute_rollups
 from algotrade_ingestion.tasks.verification.verify import TABLE, verify
 from algotrade_ingestion.workflows.nightly.steps import StepStatus, from_record
+from algotrade_sources.vendors.ibkr.gateway import GatewayConfig, IbkrMarketData
+from algotrade_sources.vendors.ibkr.market_data import IbkrSource
 from tests.helpers.fake_ib import Bar, FakeIB
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.rollup_store import (

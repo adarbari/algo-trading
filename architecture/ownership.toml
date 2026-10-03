@@ -45,7 +45,7 @@ allowed = [
     "src/algotrade/storage/tables/schemas.py",  # declares the table
     "apps/ingestion/algotrade_ingestion/tasks/market/rates.py",  # its one producer
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
-    "apps/ingestion/algotrade_ingestion/sources/vendors/treasury/*",  # the vendor's frame key
+    "libs/sources/algotrade_sources/vendors/treasury/*",  # the vendor's frame key
     "src/algotrade/features/rollups/iv30.py",  # names its input; the framework reads it through data.rates (ADR 0021 IV30)
 ]
 section = "docs/adr/0021-option-pricing-conventions.md#rates"
@@ -260,7 +260,7 @@ detect = [{ call = "crc32" }, { call = "slot_day" }]
 [[responsibility]]
 id = "vendor-http"
 description = "HTTP transport to vendors, auth headers, polite retries and backoff"
-owner = ["apps/ingestion/algotrade_ingestion/sources/framework/http.py"]
+owner = ["libs/sources/algotrade_sources/framework/http.py"]
 section = "docs/adr/0019-ownership-and-boundaries.md#r3-tasks-get-sources-from-the-registry"
 detect = [
     { import = "urllib.request" },
@@ -274,22 +274,22 @@ detect = [
 [[responsibility]]
 id = "rate-limiting"
 description = "Pace requests to a vendor: one limiter per key, shared across threads and processes (file lock under var/run/limits)"
-owner = ["apps/ingestion/algotrade_ingestion/sources/framework/limiter.py"]
-allowed = ["apps/ingestion/algotrade_ingestion/sources/framework/http.py"]  # retry backoff waits (Retry-After), not pacing
+owner = ["libs/sources/algotrade_sources/framework/limiter.py"]
+allowed = ["libs/sources/algotrade_sources/framework/http.py"]  # retry backoff waits (Retry-After), not pacing
 section = "docs/adr/0019-ownership-and-boundaries.md#r3-tasks-get-sources-from-the-registry"
 detect = [{ call = "MinInterval" }, { attr = "time.sleep" }]
 
 [[responsibility]]
 id = "source-construction"
 description = "Build vendor sources (transport, credentials, pacing, retries) from config/site/sources.toml, and fixture sources (the golden CSVs) from a directory: each source declared once in sources/framework/registry.py; vendor specifics stay in sources/"
-owner = ["apps/ingestion/algotrade_ingestion/sources/framework/registry.py"]
+owner = ["libs/sources/algotrade_sources/framework/registry.py"]
 allowed = [
-    "apps/ingestion/algotrade_ingestion/sources/*",  # vendor modules import their own helpers (http, base, sec_sic)
+    "libs/sources/algotrade_sources/*",  # vendor modules import their own helpers (http, base, sec_sic)
     "src/algotrade/features/rollups/dividends.py",  # the dividends@v1 rollup's name, not a source (ADR 0021 IV30)
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#r3-tasks-get-sources-from-the-registry"
 detect = [
-    { import = "algotrade_ingestion.sources", except = ["algotrade_ingestion.sources.framework.base", "algotrade_ingestion.sources.framework.registry"] },
+    { import = "algotrade_sources", except = ["algotrade_sources.framework.base", "algotrade_sources.framework.registry"] },
     { string = "nasdaqlisted" },
     { string = "otherlisted" },
     { string = "dividends" },
@@ -299,17 +299,17 @@ detect = [
 id = "session-sources"
 description = "Session-based sources (a stateful connection to a local gateway, e.g. IB Gateway): the SessionSource protocol (probe / open / close) and its one lifecycle (base.opened, always closed), built unconnected by the source registry (SessionSpec, SessionInputs) with their shared limiters"
 owner = [
-    "apps/ingestion/algotrade_ingestion/sources/framework/base.py",
-    "apps/ingestion/algotrade_ingestion/sources/framework/registry.py",
+    "libs/sources/algotrade_sources/framework/base.py",
+    "libs/sources/algotrade_sources/framework/registry.py",
 ]
-allowed = ["apps/ingestion/algotrade_ingestion/sources/vendors/ibkr/gateway.py"]  # its TCP probe of the gateway port
+allowed = ["libs/sources/algotrade_sources/vendors/ibkr/gateway.py"]  # its TCP probe of the gateway port
 section = "docs/adr/0026-live-verification-ibkr.md#session-sources"
 detect = [{ call = "SessionSpec" }, { call = "SessionInputs" }, { import = "socket" }]
 
 [[responsibility]]
 id = "broker-read-only"
-description = "The only code that talks to a broker API (ib_async), READ-ONLY market data: the IbkrMarketData facade guards the IB object (market-data calls only) and never sends an order, account or position request; tests/apps/ingestion/sources/vendors/ibkr/test_read_only_guard.py fails on any order / account API reference anywhere"
-owner = ["apps/ingestion/algotrade_ingestion/sources/vendors/ibkr/gateway.py"]
+description = "The only code that talks to a broker API (ib_async), READ-ONLY market data: the IbkrMarketData facade guards the IB object (market-data calls only) and never sends an order, account or position request; tests/libs/sources/vendors/ibkr/test_read_only_guard.py fails on any order / account API reference anywhere"
+owner = ["libs/sources/algotrade_sources/vendors/ibkr/gateway.py"]
 section = "docs/adr/0026-live-verification-ibkr.md#read-only-by-construction"
 detect = [{ import = "ib_async" }, { import = "ib_insync" }, { import = "ibapi" }]
 
@@ -373,7 +373,7 @@ detect = [{ call = "commit_run" }, { call = "abort_run" }, { call = "recover_run
 id = "locking"
 description = "Exclusive locks across threads and processes (flock): named store locks and the partition run-index lock (storage); the one-writer ingest run lock (services/jobs)"
 owner = ["src/algotrade/storage/locks.py", "src/algotrade/services/jobs/exclusive.py"]
-allowed = ["apps/ingestion/algotrade_ingestion/sources/framework/limiter.py"]  # sources never import storage (R4): the limiter flocks its own state file
+allowed = ["libs/sources/algotrade_sources/framework/limiter.py"]  # sources never import storage (R4): the limiter flocks its own state file
 section = "docs/adr/0019-ownership-and-boundaries.md#r2-storage-is-generic"
 detect = [{ import = "fcntl" }, { call = "flock" }]
 

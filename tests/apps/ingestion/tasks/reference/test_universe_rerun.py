@@ -20,10 +20,6 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.sources.framework.http import RetryPolicy
-from algotrade_ingestion.sources.vendors.massive.tickers import MassiveTickers
-from algotrade_ingestion.sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
-from algotrade_ingestion.sources.vendors.ssga.spy_holdings import SpyHoldingsSource
 from algotrade_ingestion.tasks.framework.run import IngestRun
 from algotrade_ingestion.tasks.maintenance.migrate_ids import load_id_map, migrate_ids
 from algotrade_ingestion.tasks.reference.instrument_ids import ID_MAP
@@ -35,6 +31,10 @@ from algotrade_ingestion.tasks.reference.universe_build import (
     build_universe,
     write_figi_review,
 )
+from algotrade_sources.framework.http import RetryPolicy
+from algotrade_sources.vendors.massive.tickers import MassiveTickers
+from algotrade_sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
+from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource
 from tests.helpers.ingest_fakes import http_for, task_ctx
 from tests.helpers.payloads import massive as mfx
 from tests.helpers.payloads import universe as fx

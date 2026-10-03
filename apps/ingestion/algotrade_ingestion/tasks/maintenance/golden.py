@@ -18,9 +18,9 @@ import pandas as pd
 from algotrade.core.model.instruments import AssetClass
 from algotrade.data.resolver import SymbolResolver
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.sources.framework.base import FetchRequest, FixtureSource
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_ingestion.tasks.reference.instrument_ids import assign_ids
+from algotrade_sources.framework.base import FetchRequest, FixtureSource
 
 TASK = "golden_load"
 SOURCE = "synthetic"  # the fixture source's registry name (``sources/registry.FIXTURES``)

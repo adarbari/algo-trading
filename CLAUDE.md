@@ -16,8 +16,12 @@ without writing an ADR. Read in this order:
 - **Four apps, one repo**: `apps/ingestion`, `apps/backtest`, `apps/api`, `apps/web`. Apps
   never import each other. They share libraries in `src/algotrade/` and talk through
   storage (and HTTP for web → api). (ADR 0004)
-- **Only ingestion writes** market and feature data. Vendor SDKs and secrets live only in
-  `apps/ingestion/sources/`. (ADR 0005)
+- **Only ingestion writes** market and feature data. (ADR 0005)
+- **Vendor sources are a shared package**: every vendor adapter, the source framework and the
+  vendor SDKs live in `libs/sources/algotrade_sources/` (uv workspace member
+  `algotrade-sources`). Ingestion uses it for batch pulls; the API may use it later for live,
+  read-only reads; backtests and the library never import it (import-linter). (ADR 0027,
+  amending ADR 0005)
 - **Storage by grain** (reference, event, bar(interval), chain, universe, feature, result)
   behind `Protocol` interfaces. Parquet locally (DuckDB planned). No code outside
   `storage/backends/` builds a path. (ADR 0006)
@@ -51,7 +55,7 @@ without writing an ADR. Read in this order:
   delayed feed (full universe, nightly); IBKR covers futures and cross-checks. We compute
   Greeks ourselves. (ADRs 0012, 0014)
 - **Broker access is read-only**: IBKR only through the market-data facade
-  `sources/vendors/ibkr/gateway.py`; no code may place, modify or cancel orders or touch
+  `algotrade_sources/vendors/ibkr/gateway.py`; no code may place, modify or cancel orders or touch
   account functions (ADR 0026, enforced by a fitness test and import-linter).
 - **Universe**: S&P 500 + all Nasdaq-listed stocks + all ETFs including leveraged and
   inverse, saved as daily snapshots. (ADR 0013)
@@ -79,7 +83,7 @@ only shrinks (`make dupes-update`).
 | Nightly summary report + notifications (desktop alert, daily summary email over SMTP) | `workflows/nightly/` (`records.py` inputs, `report.py` pure builder, `timing.py` run timing, `render.py` text/HTML, `notify.py` notifiers) |
 | Vendor HTTP, retries, circuit breaker; pacing; building sources (incl. the golden fixture source); vendor specifics | `sources/framework/http.py`; `sources/framework/limiter.py` (one per key, cross-process); `sources/framework/registry.py`; `sources/vendors/<vendor>/` |
 | Session sources (a stateful gateway connection: `SessionSource`, `opened`, `SessionSpec`) | `sources/framework/base.py`, `sources/framework/registry.py` |
-| Broker API, READ-ONLY (the only `ib_async` import; market data only, never orders / accounts) | `sources/vendors/ibkr/gateway.py` (ADR 0026; `tests/apps/ingestion/sources/vendors/ibkr/test_read_only_guard.py`) |
+| Broker API, READ-ONLY (the only `ib_async` import; market data only, never orders / accounts) | `sources/vendors/ibkr/gateway.py` (ADR 0026; `tests/libs/sources/vendors/ibkr/test_read_only_guard.py`) |
 | Live verification vs IBKR (sample, checks, tolerances, `verification/ibkr`) | `tasks/verification/` (graded by the quality check `verification`) |
 | Locks: named store locks, run-index lock; one ingest run at a time | `storage/locks.py`; `services/jobs/exclusive.py` |
 | A run's table writes publish atomically (pending until COMPLETE / PARTIAL commits them all; FAILED drops them; crash recovery) | `storage/backends/` (`local_index.py`: commit marker + sequence); driven by `IngestRun` and `ResultWriter.publishing` (ADR 0022) |
@@ -95,13 +99,14 @@ only shrinks (`make dupes-update`).
 ## Directory layout (ADR 0020; enforced by `tests/architecture/test_layout*.py`, `make layout`)
 
 One folder holds one kind of thing. `architecture/layout.toml` declares every directory under
-`src/`, `apps/`, `tests/`, `config/` and `docs/` with its purpose and rules; a new folder (or
+`src/`, `libs/`, `apps/`, `tests/`, `config/` and `docs/` with its purpose and rules; a new folder (or
 a file in an undeclared one) fails CI until it is declared there in the same PR. At most 10
 modules per code or test folder and 12 files per config / docs folder (split by kind; no
 exceptions); `make layout` lists folders at 8+ modules so the split is planned, not forced.
 Every `__init__.py` docstring says what the folder holds. No grab-bag module names (`utils`,
 `helpers`, `common`, `misc`, `shared`, ...: `[banned_module_names]`). Tests mirror their
-source (`tests/unit/<path>` = `src/algotrade/<path>`, `tests/apps/ingestion/<path>` =
+source (`tests/unit/<path>` = `src/algotrade/<path>`, `tests/libs/sources/<path>` =
+`libs/sources/algotrade_sources/<path>`, `tests/apps/ingestion/<path>` =
 `apps/ingestion/algotrade_ingestion/<path>`); shared test builders live in `tests/helpers/`
 (vendor payloads in `tests/helpers/payloads/`), recorded data in `tests/fixtures/`.
 
@@ -109,8 +114,8 @@ source (`tests/unit/<path>` = `src/algotrade/<path>`, `tests/apps/ingestion/<pat
 
 | Kind of code | Folder |
 |---|---|
-| Vendor adapter (fetch + normalise) | `apps/ingestion/.../sources/vendors/<vendor>/` (registered in `sources/framework/registry.py`) |
-| HTTP, pacing, source protocols | `apps/ingestion/.../sources/framework/` |
+| Vendor adapter (fetch + normalise) | `libs/sources/algotrade_sources/vendors/<vendor>/` (registered in `sources/framework/registry.py`) |
+| HTTP, pacing, source protocols | `libs/sources/algotrade_sources/framework/` |
 | Ingestion task | `apps/ingestion/.../tasks/<domain>/` (`reference`, `market`, `derived`, `maintenance`, `verification`) + `tasks/framework/registry.py` |
 | Comparing our data with a live source (verification check) | `apps/ingestion/.../tasks/verification/` (`checks.py`) |
 | Nightly step / ordering | `apps/ingestion/.../workflows/nightly/` |
@@ -144,8 +149,8 @@ docstring, and mirror it in tests. Never park code in a neighbouring folder
 `features/{framework,rollups,expressions}`, `strategies/{trading,screeners}`,
 `engines/{backtest,screening,selection}`, `analytics/`,
 `services/{backtests,screening,evaluation,jobs,explore}`. API app: `routes/`, `schemas/`.
-Ingestion app: `cli/`, `ops/`,
-`sources/{framework,vendors/<vendor>,fixtures}`, `tasks/{framework,<domain>}`,
+Vendor sources (`libs/sources/algotrade_sources/`): `framework/`, `vendors/<vendor>/`,
+`fixtures/`. Ingestion app: `cli/`, `ops/`, `tasks/{framework,<domain>}`,
 `workflows/nightly/`.
 
 ## Web UI (ADR 0025; `docs/ui/architecture.md`; enforced by ESLint, Stylelint, `make web-check`, `test_layout_web.py`)

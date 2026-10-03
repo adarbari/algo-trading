@@ -300,7 +300,7 @@ feature.drawdown_pct  expression float  (config/users/alice/features/momentum.to
 
 ## Vendor pacing
 
-One limiter per vendor key (`apps/ingestion/.../sources/framework/limiter.py`), shared by every
+One limiter per vendor key (`libs/sources/algotrade_sources/framework/limiter.py`), shared by every
 thread and process through its lock file under `[http] limits_dir`. Each section of
 `sources.toml` sets its bounds; `[http]` sets how every limiter adapts:
 

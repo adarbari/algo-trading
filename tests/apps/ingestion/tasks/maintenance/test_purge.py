@@ -11,9 +11,9 @@ from algotrade.config.site.settings import SourcesSettings
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.sources.framework.registry import RAW_SECTIONS
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.maintenance.purge import purge, raw_keep_days
+from algotrade_sources.framework.registry import RAW_SECTIONS
 from tests.helpers.ingest_fakes import task_ctx
 
 SESSION = date(2026, 10, 30)

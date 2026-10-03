@@ -9,10 +9,10 @@ from algotrade.data.rates import curve
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.sources.framework.http import HttpError, RetryPolicy
-from algotrade_ingestion.sources.vendors.treasury.par_yields import TreasuryParYields
 from algotrade_ingestion.tasks.framework.registry import run_task
 from algotrade_ingestion.tasks.market.rates import TABLE, ingest_rates
+from algotrade_sources.framework.http import HttpError, RetryPolicy
+from algotrade_sources.vendors.treasury.par_yields import TreasuryParYields
 from tests.helpers.ingest_fakes import http_for, task_ctx
 from tests.helpers.payloads import treasury as treasury_payloads
 

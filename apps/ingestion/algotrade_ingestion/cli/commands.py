@@ -27,18 +27,18 @@ from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.factory import open_config_store
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.sources.framework.base import Source
-from algotrade_ingestion.sources.framework.registry import (
-    RAW_SECTIONS,
-    Built,
-    build_sources,
-    fixture_source,
-)
 from algotrade_ingestion.tasks.framework.registry import TASKS, Task, run_task, task
 from algotrade_ingestion.tasks.framework.run import TaskContext, run_summary
 from algotrade_ingestion.workflows.nightly import notify
 from algotrade_ingestion.workflows.nightly.nightly import FINALLY, NIGHTLY, nightly_job
 from algotrade_ingestion.workflows.nightly.records import stored_summary
+from algotrade_sources.framework.base import Source
+from algotrade_sources.framework.registry import (
+    RAW_SECTIONS,
+    Built,
+    build_sources,
+    fixture_source,
+)
 
 # Job kinds this app runs under the ingest run lock: safe to recover at once (see cli.main).
 LOCKED_KINDS = ("nightly", "screen")

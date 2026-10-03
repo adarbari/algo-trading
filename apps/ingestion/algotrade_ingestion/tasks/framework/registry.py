@@ -20,11 +20,6 @@ from typing import Any
 from algotrade.config.site.settings import load_universe
 from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.sources.framework.base import (
-    DirectorySource,
-    FixtureSource,
-    SessionSource,
-)
 from algotrade_ingestion.tasks.derived import rollups
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.maintenance import (
@@ -48,6 +43,11 @@ from algotrade_ingestion.tasks.reference import (
     universe_import,
 )
 from algotrade_ingestion.tasks.verification import verify
+from algotrade_sources.framework.base import (
+    DirectorySource,
+    FixtureSource,
+    SessionSource,
+)
 
 type Params = Mapping[str, Any]
 GOLDEN_DIR = Path("datasets/golden")

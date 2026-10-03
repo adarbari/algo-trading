@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling>=1.32.4"]
+build-backend = "hatchling.build"
+
+# Vendor sources as a shared package (ADR 0027): every vendor adapter, the HTTP / pacing /
+# registry framework and the golden fixture source. Vendor SDKs are declared here and nowhere
+# else. Ingestion uses it for batch pulls; the API may use it for live, read-only reads later;
+# backtests can never import it (import-linter).
+[project]
+name = "algotrade-sources"
+version = "0.1.0"
+description = "Vendor sources: adapters, HTTP, pacing, the source registry, the golden fixture source"
+requires-python = ">=3.12"
+dependencies = [
+    "algotrade",
+    "openpyxl>=3.1",
+    "ib_async>=2.0",
+]
+
+[tool.uv.sources]
+algotrade = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["algotrade_sources"]

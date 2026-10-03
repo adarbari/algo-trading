@@ -28,7 +28,7 @@ REGISTRY = tomllib.loads((REPO_ROOT / "architecture" / "ownership.toml").read_te
 KNOWN = tomllib.loads((REPO_ROOT / "architecture" / "known_violations.toml").read_text())
 CODE_FILES = sorted(
     p
-    for top in ("src", "apps")
+    for top in ("src", "libs", "apps")
     for p in (REPO_ROOT / top).rglob("*.py")
     if not {".venv", "node_modules"} & set(p.parts)
 )

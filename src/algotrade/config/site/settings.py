@@ -90,7 +90,7 @@ PRICE_ADJUSTMENTS = ("none", "splits", "total_return")
 # every N sessions (``"21d"``). Interpreted by ``engines.selection.schedule``.
 REBALANCE_SELECTION = re.compile(r"^(none|monthly|weekly|[1-9][0-9]*d)$")
 # Per-vendor keys beyond ``enabled`` / ``min_interval_s`` (sections are config keys; the
-# vendor code that reads them stays in apps/ingestion/sources).
+# vendor code that reads them stays in libs/sources/algotrade_sources).
 VENDOR_KEYS = (
     "enabled",
     "min_interval_s",

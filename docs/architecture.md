@@ -355,14 +355,15 @@ Extra contracts:
 | `analytics/` | Metrics and report formatting from equity curves + fills. | core |
 | `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. `selection/`: three-valued evaluation with a per-rule audit; `schedule.py`, the rebalance sessions and the audit of each change. `backtest/universe.py`: the tradable set per bar (fixed, or from a rebalance schedule; exits on removal). | strategies, config, analytics, core |
 | `services/` | Use cases: `backtests/`, `screening/` (run + `exports`), `jobs/`, `evaluation/`; shared by several: `configs`, `selection`, golden `datasets`, `views` (FeatureView builder), `features` (expression features on read: only the stored columns they need). | everything below except `storage.tables.writers` and `storage.tables.readers` (through `data/`) |
-| `apps/ingestion` | `sources/` (`framework/`: protocols, HTTP with retries, pacing, the source registry; `vendors/<vendor>/`; `fixtures/`: synthetic/golden); `tasks/` (`framework/`: `IngestRun` in `run.py` and the task registry; one module per dataset in `reference/`, `market/`, `derived/`, `maintenance/`); nightly workflow (`workflows/nightly/`: ordered, isolated registry tasks, catch-up, screens as jobs, notification); `cli/` (`algotrade-ingest`); `ops/` (schedule). | library |
+| `libs/sources` (`algotrade_sources`, ADR 0027) | Vendor sources as a shared package: `framework/` (protocols, HTTP with retries, pacing, the source registry), `vendors/<vendor>/`, `fixtures/` (synthetic/golden). Vendor SDKs (`ib_async`, `openpyxl`) are declared here. Used by ingestion (batch); the API may use it later for live, read-only reads; backtests and the library never import it. | core, quant, `config.env` only (import-linter) |
+| `apps/ingestion` | Depends on `algotrade-sources`; `tasks/` (`framework/`: `IngestRun` in `run.py` and the task registry; one module per dataset in `reference/`, `market/`, `derived/`, `maintenance/`); nightly workflow (`workflows/nightly/`: ordered, isolated registry tasks, catch-up, screens as jobs, notification); `cli/` (`algotrade-ingest`); `ops/` (schedule). | library |
 | `apps/api` | `algotrade-api` (ADR 0024): `main.py` (app factory, CORS, error handlers), `routes/` (one router per area), `schemas/` (pydantic response models = the OpenAPI contract), `deps.py` (settings, store, user). Routes call one `services.explore` query each. | `services.explore`, `config`, `core` only (import-linter) |
 | `apps/backtest` | `algotrade-backtest` (`algotrade` alias): datasets list, backtest (golden dataset or config, via jobs), evaluate, config validate/show. Reads only through `data/`. | library |
 
 ### Directory layout (ADR 0020)
 
 One folder holds one kind of thing. `architecture/layout.toml` declares every directory under
-`src/` and `apps/` with a one-line purpose and the import-linter contracts that enforce its
+`src/`, `libs/` and `apps/` with a one-line purpose and the import-linter contracts that enforce its
 rule; `tests/architecture/test_layout.py` fails on a module in an undeclared directory, on a
 directory with more than 10 modules (no exceptions), on a contract name that does not exist,
 and on a package whose `__init__.py` has no docstring. The library:
@@ -398,16 +399,21 @@ Library folder rules (import-linter): every `core/*` package is pure; `core.mode
 `quant`; `quant` imports only numpy and `core` (no pandas, pyarrow, storage, data, config);
 `storage.configs` never imports `storage.tables` or `storage.backends` (and the reverse);
 pyarrow only in `storage.backends`; `config.site` never imports `config.strategy`; the
-`backtests` and `screening` use cases are independent. The ingestion app:
+`backtests` and `screening` use cases are independent. Vendor sources (ADR 0027):
+
+```
+libs/sources/algotrade_sources/
+  framework/      base.py, http.py, limiter.py, registry.py      non-vendor machinery
+  vendors/        cboe/, ibkr/, massive/, nasdaq/, sec/, ssga/, treasury/   one folder per vendor
+  fixtures/       the golden synthetic source
+```
+
+The ingestion app:
 
 ```
 apps/ingestion/algotrade_ingestion/
   cli/            main.py (argument parsing, console script), commands.py
   ops/            schedule.py (launchd plist for the nightly)
-  sources/
-    framework/    base.py, http.py, limiter.py, registry.py      non-vendor machinery
-    vendors/      cboe/, massive/, nasdaq/, sec/, ssga/, treasury/   one folder per vendor
-    fixtures/     the golden synthetic source
   tasks/
     framework/    run.py (IngestRun, TaskContext), registry.py   machinery
     reference/    universe_build, universe_import, classify, instrument_ids, reference_diff,
@@ -420,8 +426,11 @@ apps/ingestion/algotrade_ingestion/
 ```
 
 Folder rules (tests + import-linter): a vendor folder registers at least one source in
-`sources/framework/registry.py` and nothing else imports it; vendors never import each other,
-nor `tasks`, `workflows`, `cli` or `ops`; tasks never import `sources.vendors`. A module in
+`algotrade_sources/framework/registry.py` and nothing else imports it; vendors never import
+each other; `algotrade_sources` imports only `core`, `quant` and `config.env` (never storage,
+data, features, services, engines or any app); the library and `algotrade_backtest` never import
+`algotrade_sources`; only the IBKR facade imports `ib_async`; tasks never import
+`algotrade_sources.vendors` (sources come from the registry through `ctx.sources`). A module in
 `tasks/<domain>/` is a registered task or a helper imported only inside its domain (or by the
 task registry); `[[shared]]` names the reasoned exceptions (the ingestion id rule,
 `reference/instrument_ids.py`).

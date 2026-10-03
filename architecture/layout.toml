@@ -2,13 +2,13 @@
 # docs, with what it holds. One folder = one kind of thing. Where a new kind of code goes:
 # the "Where does this go" table in CLAUDE.md (Directory layout). If nothing fits, add a new
 # folder for the new kind and declare it here; never park code in a neighbouring folder.
-# Enforced by tests/architecture/test_layout.py (src/, apps/, module names) and
+# Enforced by tests/architecture/test_layout.py (src/, libs/, apps/, module names) and
 # tests/architecture/test_layout_buckets.py (tests/, config/, docs/):
 #
-#   - every module under src/ and apps/ lives in a directory declared here (a new folder or a
+#   - every module under src/, libs/ and apps/ lives in a directory declared here (a new folder or a
 #     stray file fails: declare the folder here with its purpose, in the same PR);
 #   - at most `max_modules` modules (excluding __init__.py; in tests/ also conftest.py) per
-#     directory, src/, apps/ and tests/ alike; split by kind instead. There are no exceptions
+#     directory, src/, libs/, apps/ and tests/ alike; split by kind instead. There are no exceptions
 #     (a fitness test keeps `[[exception]]` absent). `make layout` lists directories at
 #     `warn_modules` or more, so a split is planned before it is forced;
 #   - no module is named for a grab bag (`[banned_module_names]`): name it for what it does;
@@ -38,7 +38,7 @@ doc = "docs/adr/0020-directory-layout.md"
 max_modules = 10
 warn_modules = 8   # make layout: "approaching the limit, plan the split by kind"
 max_files = 12     # per config/ and docs/ folder
-source_registry = "apps/ingestion/algotrade_ingestion/sources/framework/registry.py"
+source_registry = "libs/sources/algotrade_sources/framework/registry.py"
 task_registry = "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py"
 
 [banned_module_names]
@@ -222,6 +222,38 @@ contracts = ["The job runner is generic: it knows no use case, engine or market-
 path = "apps/backtest/algotrade_backtest"
 purpose = "the backtest app: algotrade-backtest CLI and its command bodies"
 
+# --------------------------------------------------------------------------- vendor sources (libs/sources)
+# ADR 0027: vendor adapters are a shared workspace package, `algotrade_sources`. Ingestion uses
+# it for batch pulls; the API may use it later for live, read-only reads; backtests never.
+
+[[dir]]
+path = "libs/sources/algotrade_sources"
+purpose = "vendor sources: framework, vendors and fixtures (no modules of its own)"
+contracts = [
+    "Vendor sources are leaf adapters: they see only core, quant and config.env (ADR 0027)",
+    "The shared library never imports vendor sources (ADR 0027)",
+    "Backtests can never reach vendors (ADR 0008, ADR 0027)",
+]
+
+[[dir]]
+path = "libs/sources/algotrade_sources/framework"
+purpose = "non-vendor source machinery: protocols, HTTP, pacing, the source registry"
+contracts = ["Layout: only the source registry imports vendor folders"]
+
+[[dir]]
+path = "libs/sources/algotrade_sources/vendors"
+purpose = "one folder per data vendor (no modules of its own)"
+
+[[dir]]
+path = "libs/sources/algotrade_sources/vendors/*"
+purpose = "one vendor: fetch + normalise only; registered in framework/registry.py"
+kind = "vendor"
+contracts = ["Layout: vendors never import each other (one folder per vendor)"]
+
+[[dir]]
+path = "libs/sources/algotrade_sources/fixtures"
+purpose = "the golden synthetic fixture source (generators, catalogue, CSV files)"
+
 # --------------------------------------------------------------------------- api app (ADR 0024)
 
 [[dir]]
@@ -253,27 +285,6 @@ purpose = "algotrade-ingest: argument parsing (main) and command bodies (command
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/ops"
 purpose = "operating the app on a host: scheduling the nightly run"
-
-[[dir]]
-path = "apps/ingestion/algotrade_ingestion/sources"
-purpose = "sources: framework, vendors and fixtures (no modules of its own)"
-
-[[dir]]
-path = "apps/ingestion/algotrade_ingestion/sources/framework"
-purpose = "non-vendor source machinery: protocols, HTTP, pacing, the source registry"
-
-[[dir]]
-path = "apps/ingestion/algotrade_ingestion/sources/vendors"
-purpose = "one folder per data vendor (no modules of its own)"
-
-[[dir]]
-path = "apps/ingestion/algotrade_ingestion/sources/vendors/*"
-purpose = "one vendor: fetch + normalise only; registered in sources/framework/registry.py"
-kind = "vendor"
-
-[[dir]]
-path = "apps/ingestion/algotrade_ingestion/sources/fixtures"
-purpose = "the golden synthetic fixture source (generators, catalogue, CSV files)"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks"
@@ -564,6 +575,10 @@ tests = "tests/unit"
 source = "src/algotrade"
 
 [[test_mirror]]
+tests = "tests/libs/sources"
+source = "libs/sources/algotrade_sources"
+
+[[test_mirror]]
 tests = "tests/apps/ingestion"
 source = "apps/ingestion/algotrade_ingestion"
 
@@ -579,6 +594,11 @@ holds = "folders"
 [[test_dir]]
 path = "tests/apps"
 purpose = "app tests: one folder per app, mirroring the app package ([[test_mirror]])"
+holds = "folders"
+
+[[test_dir]]
+path = "tests/libs"
+purpose = "workspace library tests (libs/): one folder per package, mirroring it ([[test_mirror]])"
 holds = "folders"
 
 [[test_dir]]

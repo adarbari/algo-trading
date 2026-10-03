@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Early warning for the directory layout (ADR 0020, ``architecture/layout.toml``).
 
-Lists directories under src/, apps/ and tests/ (Python) and apps/web (TypeScript, ADR 0025) that
-hold ``warn_modules`` or more modules, so a split by kind is planned before the ``max_modules``
-limit forces it. Never fails: the limit itself is enforced by tests/architecture/test_layout*.py.
+Lists directories under src/, libs/, apps/ and tests/ (Python) and apps/web (TypeScript, ADR
+0025) that hold ``warn_modules`` or more modules, so a split by kind is planned before the
+``max_modules`` limit forces it. Never fails: the limit itself is enforced by
+tests/architecture/test_layout*.py.
 Usage: python scripts/layout_report.py
 """
 
@@ -23,7 +24,7 @@ WEB_NOT_MODULES = ("index.ts", "*.test.*", "*.spec.*", "*.stories.*", "*.d.ts")
 
 def module_counts() -> Counter[str]:
     counts: Counter[str] = Counter()
-    for top in ("src", "apps", "tests"):
+    for top in ("src", "libs", "apps", "tests"):
         for path in (ROOT / top).rglob("*.py"):
             if path.name not in NOT_COUNTED and not SKIPPED & set(path.parts):
                 counts[path.parent.relative_to(ROOT).as_posix()] += 1

@@ -10,7 +10,7 @@ Do not rewrite history. Use `.claude/skills/write-adr` to add one.
 | [0002](0002-fill-model.md) | Decide at close, fill at next open | accepted |
 | [0003](0003-golden-master-baseline.md) | Golden datasets and a golden-master results baseline | accepted |
 | [0004](0004-apps-and-shared-libraries.md) | Four apps, shared libraries, one repo | accepted |
-| [0005](0005-ingestion-is-the-only-writer.md) | Ingestion is the only writer of market and feature data | accepted |
+| [0005](0005-ingestion-is-the-only-writer.md) | Ingestion is the only writer of market and feature data | accepted, amended by 0027 |
 | [0006](0006-storage-grains-and-adapters.md) | Storage by data grain, Parquet (DuckDB-readable), swappable adapters | accepted |
 | [0007](0007-point-in-time-data.md) | Point-in-time data and versioned features (`as_of` is a version pin; one snapshot rule) | accepted, amended |
 | [0008](0008-backtests-read-only-from-stores.md) | Backtests read only from stores | accepted |
@@ -32,3 +32,4 @@ Do not rewrite history. Use `.claude/skills/write-adr` to add one.
 | [0024](0024-api.md) | API v1: a read-only FastAPI over `services.explore`; thin routes, pydantic schemas as the OpenAPI contract | accepted |
 | [0025](0025-frontend-architecture.md) | Frontend architecture: layered (app, pages, widgets, features, entities, shared), component-only web app; TRADER / ADMIN workspaces; enforced by ESLint, Stylelint, layout and design-system checks | accepted |
 | [0026](0026-live-verification-ibkr.md) | Live verification against IBKR, read-only by construction (facade, fitness test, gateway setting); session sources; the `verify` task, quality check and email section | accepted |
+| [0027](0027-vendor-sources-shared-package.md) | Vendor sources as a shared package (`libs/sources`, `algotrade_sources`): batch use by ingestion, live read-only use by the API later, never by backtests; amends 0005 | accepted |

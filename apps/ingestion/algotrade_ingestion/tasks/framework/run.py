@@ -45,7 +45,7 @@ from algotrade.data.resolver import SymbolResolver
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus, start_run
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.sources.framework.base import FetchRequest, Normalized, Source
+from algotrade_sources.framework.base import FetchRequest, Normalized, Source
 
 REFERENCE = "instruments/reference"
 FETCH_ERROR = "FETCH_ERROR"

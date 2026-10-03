@@ -17,8 +17,8 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.runs import RunRecord, start_run
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.sources.framework.base import FixtureSource
 from algotrade_ingestion.tasks.maintenance.golden import load_golden
+from algotrade_sources.framework.base import FixtureSource
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.rollup_store import chain_rows, write_chains, write_dividends, write_split
 from tests.helpers.stored_frames import stamped, universe_rows

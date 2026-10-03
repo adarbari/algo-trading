@@ -40,7 +40,7 @@ a genuine exception, write an ADR and list the module in `allowed` with the reas
    - an `__init__.py` whose docstring says what the folder holds;
    - if a boundary guards it (purity, independence, who may import it), an import-linter
      contract in `pyproject.toml`, named in the entry's `contracts`;
-   - the mirrored test folder (`tests/unit/<path>/` or `tests/apps/<app>/<path>/`, with an
+   - the mirrored test folder (`tests/unit/<path>/`, `tests/libs/sources/<path>/` or `tests/apps/<app>/<path>/`, with an
      `__init__.py`); a new non-mirrored test bucket (helpers, a contract suite) is a
      `[[test_dir]]`; a new config or docs folder a `[[config_dir]]` / `[[docs_dir]]`;
    - the "Where does this go?" row in `CLAUDE.md` if it is a new kind of code, and an

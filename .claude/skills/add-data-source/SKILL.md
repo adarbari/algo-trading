@@ -1,11 +1,16 @@
 ---
 name: add-data-source
-description: Add a new market data vendor or source adapter (e.g. IBKR, Massive, Schwab, Nasdaq Trader) to the ingestion app. Use whenever data must be pulled from a new external source.
+description: Add a new market data vendor or source adapter (e.g. IBKR, Massive, Schwab, Nasdaq Trader) to the vendor sources package (libs/sources, algotrade_sources). Use whenever data must be pulled from a new external source.
 ---
 
 # Add a data source
 
-Read first: `docs/data/vendors.md`, `docs/data/storage.md`, ADRs 0005, 0006, 0008 and 0012.
+Read first: `docs/data/vendors.md`, `docs/data/storage.md`, ADRs 0005, 0006, 0008, 0012 and 0027.
+
+Vendor code lives in the shared workspace package `libs/sources/algotrade_sources/` (ADR
+0027); `sources/...` paths below are relative to it. Its SDK dependencies go in
+`libs/sources/pyproject.toml` (then `uv lock`). It may import only `algotrade.core`,
+`algotrade.quant` and `algotrade.config.env` (import-linter); backtests never import it.
 
 **Ownership check (ADR 0019):** a source owns only fetch + normalise for its vendor. HTTP,
 retries, the retry cap and the circuit breaker belong to `sources/framework/http.py`; pacing belongs to
@@ -21,14 +26,15 @@ must pass with `architecture/known_violations.toml` still empty.
 
 0. **Where it goes:** look the kind up in the "Where does this go?" table (CLAUDE.md,
    Directory layout) and its folder in `architecture/layout.toml`. Here:
-   `sources/vendors/<vendor>/` (new folder, covered by the `sources/vendors/*` entry). If no
+   `libs/sources/algotrade_sources/vendors/<vendor>/` (new folder, covered by the
+   `libs/sources/algotrade_sources/vendors/*` entry). If no
    folder fits, add one for the new kind (`.claude/skills/add-responsibility`, step 3);
    never park code in a neighbouring folder. Tests go in the mirrored folder; run `make
    layout` and plan a split if the folder is at 8+ modules.
-1. **Location:** a new folder `apps/ingestion/algotrade_ingestion/sources/vendors/<vendor>/`
+1. **Location:** a new folder `libs/sources/algotrade_sources/vendors/<vendor>/`
    with an `__init__.py` docstring naming the vendor, and one module per dataset it serves
    (e.g. `bars.py`); shared auth / paging goes in `client.py` (see `vendors/massive/`). The
-   folder is covered by the `sources/vendors/*` entry in `architecture/layout.toml`
+   folder is covered by the `libs/sources/algotrade_sources/vendors/*` entry in `architecture/layout.toml`
    (`tests/architecture/test_layout.py`): it must register at least one source (step 5), only
    `sources/framework/registry.py` may import it, and vendors never import each other (an
    import-linter independence contract: add the new folder to it in `pyproject.toml`).
@@ -38,7 +44,7 @@ must pass with `architecture/known_violations.toml` still empty.
    storage table, without point-in-time columns). Its constructor takes one `Http` (tests:
    `tests.helpers.ingest_fakes.http_for(fake_transport)`). Rows keyed by a vendor ticker carry
    `symbol`; the task resolves `instrument_id` through the reference (ADR 0018). Register the adapter in
-   `tests/apps/ingestion/sources/test_source_contract.py::ADAPTERS` with a canned payload.
+   `tests/libs/sources/test_source_contract.py::ADAPTERS` with a canned payload.
 3. **Raw is saved for you:** tasks call `IngestRun.fetch(source, request)`, which saves the
    response as received under `raw/` before normalising. Normalisation must be re-runnable
    from raw alone. A source that needs several requests for one window (one per event kind)
@@ -58,7 +64,7 @@ must pass with `architecture/known_violations.toml` still empty.
    that reason.
 6. **Secrets:** only from environment variables (`ALGOTRADE_<VENDOR>_*`), named in the
    `SourceSpec` and read through `env.credential`. Add placeholders to `.env.example`.
-7. **Tests:** mirror the folder (`tests/apps/ingestion/sources/vendors/<vendor>/`). Save real
+7. **Tests:** mirror the folder (`tests/libs/sources/vendors/<vendor>/`). Save real
    responses as fixtures under `tests/fixtures/sources/<vendor>/` (strip account ids). Unit-test normalisation, error handling (429s, gateway down,
    partial responses) and symbol mapping. No network access in CI.
 8. **Data quality:** validation in `storage/tables/schemas.py` must pass. Add vendor-specific

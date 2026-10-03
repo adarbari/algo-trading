@@ -1,7 +1,8 @@
 """Fitness tests for the directory layout (ADR 0020, ``architecture/layout.toml``).
 
-- every Python module under ``src/`` and ``apps/`` lives in a declared directory;
-- no module (``src/``, ``apps/``, ``tests/``, ``scripts/``) has a grab-bag name such as ``utils``;
+- every Python module under ``src/``, ``libs/`` and ``apps/`` lives in a declared directory;
+- no module (``src/``, ``libs/``, ``apps/``, ``tests/``, ``scripts/``) has a grab-bag name such
+  as ``utils``;
 - at most ``max_modules`` modules per directory, with no exceptions;
 - the import-linter contracts a declaration names exist in ``pyproject.toml``;
 - every package has an ``__init__.py`` docstring saying what the folder holds;
@@ -22,8 +23,8 @@ from typing import Any
 
 import pytest
 
-from algotrade_ingestion.sources.framework.registry import SESSION_SOURCES, SOURCES
 from algotrade_ingestion.tasks.framework.registry import TASKS
+from algotrade_sources.framework.registry import SESSION_SOURCES, SOURCES
 from tests.conftest import REPO_ROOT
 
 LAYOUT_FILE = "architecture/layout.toml"
@@ -38,7 +39,13 @@ CONTRACTS = {
     ]
 }
 SHARED = {s["module"]: s for s in LAYOUT.get("shared", [])}
-PACKAGE_ROOTS = ("src", "apps/ingestion", "apps/backtest", "apps/api")  # directories on sys.path
+PACKAGE_ROOTS = (
+    "src",
+    "libs/sources",
+    "apps/ingestion",
+    "apps/backtest",
+    "apps/api",
+)  # directories on sys.path
 
 
 def _rel(path: Path) -> str:
@@ -48,7 +55,7 @@ def _rel(path: Path) -> str:
 def _modules() -> list[Path]:
     return sorted(
         p
-        for top in ("src", "apps")
+        for top in ("src", "libs", "apps")
         for p in (REPO_ROOT / top).rglob("*.py")
         if not {".venv", "node_modules", "__pycache__"} & set(p.parts)
     )
@@ -140,7 +147,7 @@ def test_no_module_has_a_grab_bag_name() -> None:
     banned = LAYOUT["banned_module_names"]
     modules = [
         p
-        for top in ("src", "apps", "tests", "scripts")
+        for top in ("src", "libs", "apps", "tests", "scripts")
         for p in (REPO_ROOT / top).rglob("*.py")
         if not {".venv", "node_modules", "__pycache__"} & set(p.parts)
     ]

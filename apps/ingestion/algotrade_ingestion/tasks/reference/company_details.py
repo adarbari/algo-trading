@@ -22,9 +22,9 @@ from algotrade.core.model.instruments import pad_cik
 from algotrade.data import StoreReader
 from algotrade.data.reference import instruments, snapshot
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.sources.framework.base import FetchRequest, Source
 from algotrade_ingestion.tasks.framework.run import IngestRun, NoResponseError, TaskContext
 from algotrade_ingestion.tasks.reference.refresh import due_keys
+from algotrade_sources.framework.base import FetchRequest, Source
 
 TASK = "company_details"
 TABLE = "instruments/company"

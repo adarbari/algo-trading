@@ -2,17 +2,16 @@
 requires = ["hatchling>=1.32.4"]
 build-backend = "hatchling.build"
 
-# The ingestion app: the only writer of market and feature data (ADR 0005).
-# Vendor SDKs, when needed, are declared here and nowhere else.
+# The ingestion app: the only writer of market and feature data (ADR 0005). Vendor adapters
+# and their SDKs live in the algotrade-sources package (libs/sources, ADR 0027).
 [project]
 name = "algotrade-ingestion"
 version = "0.1.0"
-description = "Data ingestion app: sources, nightly pipeline, golden datasets"
+description = "Data ingestion app: tasks, nightly pipeline, golden datasets"
 requires-python = ">=3.12"
 dependencies = [
     "algotrade",
-    "openpyxl>=3.1",
-    "ib_async>=2.0",
+    "algotrade-sources",
 ]
 
 [project.scripts]
@@ -20,6 +19,7 @@ algotrade-ingest = "algotrade_ingestion.cli.main:main"
 
 [tool.uv.sources]
 algotrade = { workspace = true }
+algotrade-sources = { workspace = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["algotrade_ingestion"]

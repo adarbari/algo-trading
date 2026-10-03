@@ -9,8 +9,8 @@ from algotrade.data.reference import instrument_terms, snapshot
 from algotrade.engines.backtest.engine import run_backtest
 from algotrade.services.datasets import list_datasets, load_datasets
 from algotrade.strategies.trading.registry import STRATEGIES, create_strategy
-from algotrade_ingestion.sources.fixtures.catalog import GOLDEN_DATASETS
-from algotrade_ingestion.sources.framework.base import FixtureSource
+from algotrade_sources.fixtures.catalog import GOLDEN_DATASETS
+from algotrade_sources.framework.base import FixtureSource
 
 DATASETS = sorted(s.name for s in GOLDEN_DATASETS)
 

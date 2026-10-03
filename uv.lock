@@ -19,6 +19,7 @@ members = [
     "algotrade-api",
     "algotrade-backtest",
     "algotrade-ingestion",
+    "algotrade-sources",
 ]
 
 [[package]]
@@ -48,6 +49,7 @@ dev = [
     { name = "algotrade-api" },
     { name = "algotrade-backtest" },
     { name = "algotrade-ingestion" },
+    { name = "algotrade-sources" },
     { name = "httpx2" },
     { name = "hypothesis" },
     { name = "import-linter" },
@@ -73,6 +75,7 @@ dev = [
     { name = "algotrade-api", editable = "apps/api" },
     { name = "algotrade-backtest", editable = "apps/backtest" },
     { name = "algotrade-ingestion", editable = "apps/ingestion" },
+    { name = "algotrade-sources", editable = "libs/sources" },
     { name = "httpx2", specifier = ">=2.13" },
     { name = "hypothesis", specifier = ">=6.168.3" },
     { name = "import-linter", specifier = ">=2.15" },
@@ -120,6 +123,21 @@ requires-dist = [{ name = "algotrade", editable = "." }]
 name = "algotrade-ingestion"
 version = "0.1.0"
 source = { editable = "apps/ingestion" }
+dependencies = [
+    { name = "algotrade" },
+    { name = "algotrade-sources" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "algotrade", editable = "." },
+    { name = "algotrade-sources", editable = "libs/sources" },
+]
+
+[[package]]
+name = "algotrade-sources"
+version = "0.1.0"
+source = { editable = "libs/sources" }
 dependencies = [
     { name = "algotrade" },
     { name = "ib-async" },

@@ -16,8 +16,8 @@ from algotrade.services.views import feature_view
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.sources.framework.registry import fixture_source
 from algotrade_ingestion.tasks.maintenance.golden import load_golden
+from algotrade_sources.framework.registry import fixture_source
 from tests.conftest import GOLDEN_DIR, REPO_ROOT
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.rollup_store import write_rows

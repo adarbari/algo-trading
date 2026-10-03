@@ -6,7 +6,7 @@ staging_retention_days = 14      # scratch left by unfinished runs (no resume af
 
 # Each vendor section: `enabled` (off: its sources are not built and tasks needing them are
 # skipped), its pacing, shared by every worker thread and every process on this machine
-# (apps/ingestion/sources/framework/limiter.py), and optionally `raw_retention_days`, which
+# (libs/sources/algotrade_sources/framework/limiter.py), and optionally `raw_retention_days`, which
 # overrides the global window for the raw responses of every source in that section.
 # Pacing is adaptive between `min_interval_s` (the floor: the fastest we ever go) and
 # `max_interval_s` (the ceiling; unset: 4 x the floor), starting each run at
