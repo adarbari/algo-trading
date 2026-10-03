@@ -37,7 +37,8 @@ scripts/mac_runner.sh uninstall   # stop and deregister
 ```
 
 Two CI runners is the right number for a 10-core, 16 GB Mac: two overlapping jobs already use
-every core (tests run 5 workers each, `make test WORKERS=5`), and more would only swap. The
+every core (Python tests run 5 workers, `make test WORKERS=5`; the web container sees 5 CPUs,
+`--cpuset-cpus=0-4`, so Vitest and Playwright size to 5), and more would only swap. The
 `light` runner has no default labels, so CI jobs never land on it; it only runs the auto-merge
 sweep (a few GitHub API calls), so merging never queues behind a test run. Install it before
 anything else: without it, sweeps wait and nothing auto-merges.
