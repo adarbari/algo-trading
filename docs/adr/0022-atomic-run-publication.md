@@ -29,8 +29,11 @@ snapshot came from an unfinished run and disagreed with the symbol history.
   refers to. A read captures `seq` before opening any index and ignores later entries
   (falling back to `prev`), so one read (`read`, `read_range`) never sees half a commit. A
   resumed run (same run id) writes its new version under a fresh file name, so the
-  committed version stays readable until the new one commits. Memory: the same, under one
-  lock.
+  committed version stays readable until the new one commits. Only one older version is
+  kept: when the same run commits twice while a read is in progress, the version the read
+  pinned is discarded (flagged `dropped`), so the read raises `StaleSnapshotError` and
+  starts again, whole, at a fresh `seq`; after three tries it reads under the commit lock
+  (`run_selection.pinned_read`). Memory: the same, under one lock.
 - **Crash recovery is deterministic.** A commit that reached its marker is completed by
   `recover_runs` (idempotent; every later commit or abort completes it first); until then
   no read sees it. A run that crashed before its marker is rolled back: at startup, under

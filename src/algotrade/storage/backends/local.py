@@ -56,7 +56,9 @@ from algotrade.storage.backends.local_index import (
 )
 from algotrade.storage.backends.run_selection import (
     RunEntry,
+    StaleSnapshotError,
     merge_rows,
+    pinned_read,
     run_mode,
     select_instruments,
     select_runs,
@@ -144,27 +146,22 @@ class LocalTables:
         ``columns``: only those (and the key / point-in-time columns) are decoded."""
         directory = self._dir(table, session_date)
         filters = [("instrument_id", "in", list(instruments))] if instruments is not None else None
-        for attempt in range(2):
-            entries = visible_entries(read_index(directory), upto)
-            own = self._own(table, session_date, own_run)
-            if own_run is not None and own is not None:
-                entries[own_run] = own
-            runs = select_runs(entries, as_of, run_mode(table))
-            if not runs:
-                return None
-            try:
-                parts = [
-                    _read_file(directory / run_file(run, entries[run]), filters, columns)
-                    for run in runs
-                ]
-            except FileNotFoundError:
-                if attempt:
-                    raise
-                upto = self.commits.published()  # a commit replaced a version mid-read
-                continue
-            data = concat(table, parts)
-            return merge_rows(table, data) if len(runs) > 1 else data
-        return None  # pragma: no cover - the loop returns or raises
+        entries = visible_entries(read_index(directory), upto)
+        own = self._own(table, session_date, own_run)
+        if own_run is not None and own is not None:
+            entries[own_run] = own
+        runs = select_runs(entries, as_of, run_mode(table))
+        if not runs:
+            return None
+        try:
+            parts = [
+                _read_file(directory / run_file(run, entries[run]), filters, columns)
+                for run in runs
+            ]
+        except FileNotFoundError as gone:  # a commit replaced the version and removed its file
+            raise StaleSnapshotError(f"{directory}: {gone.filename}") from gone
+        data = concat(table, parts)
+        return merge_rows(table, data) if len(runs) > 1 else data
 
     def read(
         self,
@@ -174,8 +171,11 @@ class LocalTables:
         instruments: Sequence[str] | None = None,
         own_run: str | None = None,
     ) -> pd.DataFrame | None:
-        upto = self.commits.published()
-        data = self._partition(table, session_date, as_of, instruments, own_run, upto)
+        data = pinned_read(
+            lambda upto: self._partition(table, session_date, as_of, instruments, own_run, upto),
+            self.commits.published,
+            self.commits.no_commits,
+        )
         return None if data is None else select_instruments(to_frame(data), instruments)
 
     def read_range(
@@ -188,14 +188,16 @@ class LocalTables:
         own_run: str | None = None,
         columns: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
-        upto = self.commits.published()  # one commit sequence for the whole range
-        parts = [
-            data
-            for d in self.dates(table, own_run)
-            if start <= d <= end
-            and (data := self._partition(table, d, as_of, instruments, own_run, upto, columns))
-            is not None
-        ]
+        def at(upto: int) -> list[pa.Table]:  # one commit sequence for the whole range
+            return [
+                data
+                for d in self.dates(table, own_run)
+                if start <= d <= end
+                and (data := self._partition(table, d, as_of, instruments, own_run, upto, columns))
+                is not None
+            ]
+
+        parts = pinned_read(at, self.commits.published, self.commits.no_commits)
         if not parts:
             return None
         frame = to_frame(concat(table, parts))

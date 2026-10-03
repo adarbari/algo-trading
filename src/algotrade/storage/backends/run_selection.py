@@ -19,9 +19,16 @@ what ``as_of`` is compared with) and ``seq`` (the store's commit sequence number
 sees the entries with ``seq`` at or below the sequence it captured when it started, so one
 read never sees half of a commit. Entries written before commits existed have neither and
 count from their ``knowledge_ts``.
+
+An entry keeps one older version of its run (``prev``), so a read whose captured sequence a
+later commit of the same run has passed still finds the version it pinned. When a run commits
+again before such a read reaches the partition, that version is discarded (``dropped`` on the
+oldest one kept): the read raises ``StaleSnapshotError`` and ``pinned_read`` runs it again, whole,
+at a fresh sequence, so a range read never mixes partitions of different commits.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, replace
 from datetime import datetime
 
@@ -34,6 +41,12 @@ from algotrade.storage.backends.arrow import table_spec
 from algotrade.storage.tables.schemas import table_key
 
 _ROW = "__row"
+OPTIMISTIC_TRIES = 3  # reads retried at a fresh sequence before one waits out the commits
+
+
+class StaleSnapshotError(Exception):
+    """The versions a read pinned were replaced and discarded while it ran; the read must
+    start again at a fresh commit sequence (``pinned_read`` does)."""
 
 
 @dataclass(frozen=True)
@@ -46,6 +59,7 @@ class RunEntry:
     seq: int | None = None  # commit sequence number; None: always committed (or own run)
     ref: str | None = None  # where the backend keeps this version's rows (None: default)
     prev: "RunEntry | None" = None  # the version this commit replaced (same run id)
+    dropped: bool = False  # an older version than this one existed and was discarded
 
     @property
     def visible_from(self) -> pd.Timestamp:
@@ -72,22 +86,46 @@ def committed(
     is never visible before its own rows were known."""
     if previous is not None and previous.seq == seq:  # re-applying the same commit
         return previous
-    old = None if previous is None else replace(previous, prev=None)
+    old = (
+        None
+        if previous is None
+        else replace(previous, prev=None, dropped=previous.prev is not None or previous.dropped)
+    )
     visible = max(pd.Timestamp(at), knowledge_ts)
     return RunEntry(knowledge_ts, restates, visible, seq, ref, old)
 
 
 def visible_entries(entries: Mapping[str, RunEntry], upto: int | None) -> dict[str, RunEntry]:
     """Each run's version a read that captured commit sequence ``upto`` sees: commits after
-    ``upto`` fall back to the version they replaced, or hide the run."""
+    ``upto`` fall back to the version they replaced, or hide a run first committed after
+    ``upto``. Raises ``StaleSnapshotError`` when the version ``upto`` saw was discarded."""
     out: dict[str, RunEntry] = {}
     for run, entry in entries.items():
         seen: RunEntry | None = entry
         while seen is not None and upto is not None and seen.seq is not None and seen.seq > upto:
+            if seen.prev is None and seen.dropped:
+                raise StaleSnapshotError(f"run {run}: the version at commit {upto} was replaced")
             seen = seen.prev
         if seen is not None:
             out[run] = seen
     return out
+
+
+def pinned_read[T](
+    read: Callable[[int], T],
+    published: Callable[[], int],
+    no_commits: Callable[[], AbstractContextManager[object]],
+) -> T:
+    """``read(upto)`` at one commit sequence, so it sees each commit whole or not at all.
+    A ``StaleSnapshotError`` restarts it at a fresh sequence; after ``OPTIMISTIC_TRIES`` it runs
+    holding ``no_commits`` (the lock commits take), where nothing can be replaced mid-read."""
+    for _ in range(OPTIMISTIC_TRIES):
+        try:
+            return read(published())
+        except StaleSnapshotError:
+            continue
+    with no_commits():
+        return read(published())
 
 
 def select_runs(entries: Mapping[str, RunEntry], as_of: datetime | None, mode: str) -> list[str]:
