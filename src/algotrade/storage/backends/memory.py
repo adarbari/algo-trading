@@ -6,7 +6,7 @@ from datetime import date, datetime
 import pandas as pd
 
 from algotrade.storage.backends.selection import concat_frames, latest_run, select_instruments
-from algotrade.storage.runs import RunRecord
+from algotrade.storage.runs import RunRecord, run_session
 
 
 class MemoryTables:
@@ -85,6 +85,12 @@ class MemoryStaging:
     def clear(self, run_id: str) -> None:
         for k in [k for k in self._data if k[0] == run_id]:
             del self._data[k]
+
+    def purge_before(self, cutoff: date) -> int:
+        old = {r for r, _ in self._data if (s := run_session(r)) is not None and s < cutoff}
+        for run_id in old:
+            self.clear(run_id)
+        return len(old)
 
 
 class MemoryRuns:

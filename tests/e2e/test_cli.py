@@ -71,6 +71,18 @@ def test_datasets_list(cli: Cli) -> None:
     assert "bull_trend" in cli("datasets", "list").stdout
 
 
+def test_data_url_comes_from_dotenv(
+    golden_url: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / ".env").write_text(f"ALGOTRADE_DATA_URL={golden_url}\n")
+    monkeypatch.delenv("ALGOTRADE_DATA_URL", raising=False)
+    monkeypatch.chdir(tmp_path)
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        assert main(["datasets", "list"]) == 0
+    assert "bull_trend" in out.getvalue()
+
+
 def test_evaluate_matches_committed_baseline(cli: Cli, tmp_path: Path) -> None:
     report = tmp_path / "scorecard.md"
     proc = cli("evaluate", "--report", str(report))

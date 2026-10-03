@@ -17,7 +17,8 @@ make evaluate                                   # every strategy x golden datase
 ## Nightly options pipeline
 
 ```bash
-export ALGOTRADE_DATA_URL=file://./var/data     # default; git-ignored
+# Storage location: set ALGOTRADE_DATA_URL in .env (default file://./var/data, git-ignored).
+# What each night adds: docs/data/nightly-footprint.md
 algotrade-ingest universe --stocks optionable_us_stock_universe.csv \
                           --etfs optionable_us_etf_universe.csv --version 2026-10
 algotrade-ingest universe-build --review-out leveraged_candidates.csv   # universe + reference
@@ -26,7 +27,7 @@ algotrade-ingest company-details [--force] [--limit N]   # SEC EDGAR company det
 algotrade-ingest nightly --export-dir out/      # universe -> company details -> earnings -> bars -> chains -> rollups -> screens
 algotrade-ingest quality                        # data-quality checks for a session
 algotrade-ingest schedule --time 23:30          # writes a launchd agent; prints install commands
-algotrade-ingest purge-raw --keep-days 90
+algotrade-ingest purge-raw --keep-days 90       # + unfinished-run scratch older than 14 days
 ```
 
 Source switches, pacing, retention and quality thresholds live in

@@ -90,6 +90,17 @@ def test_staging_store(backend: Backend) -> None:
     assert backend.staging.collect("r1", "chains/x") is None
 
 
+def test_staging_purge_keeps_recent_and_unrecognised_runs(backend: Backend) -> None:
+    old, recent = new_run_id("option_chains", D1, T0), new_run_id("option_chains", D2, T0)
+    for run_id in (old, recent, "r1"):
+        backend.staging.put(run_id, "chains/x", "A", pd.DataFrame({"v": [1]}))
+    assert backend.staging.purge_before(D2) == 1
+    assert backend.staging.keys(old, "chains/x") == []
+    assert backend.staging.keys(recent, "chains/x") == ["A"]
+    assert backend.staging.keys("r1", "chains/x") == ["A"]
+    assert backend.staging.purge_before(D2) == 0
+
+
 def test_run_store(backend: Backend) -> None:
     assert backend.runs.find("job") == []
     record = RunRecord(new_run_id("job", D1, T0), "job", D1, T0, items={"EQ:A": "OK"})

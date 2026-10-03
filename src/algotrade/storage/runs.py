@@ -1,6 +1,7 @@
 """Run records: the audit trail and checkpoint for every job (ADR 0010)."""
 
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
 from enum import StrEnum
@@ -53,3 +54,12 @@ class RunRecord:
 def new_run_id(job: str, session_date: date, now: datetime) -> str:
     """Sortable, filesystem-safe run id, e.g. ``option_chains-2026-10-02-20261003T010203Z``."""
     return f"{job}-{session_date.isoformat()}-{now.strftime('%Y%m%dT%H%M%SZ')}"
+
+
+_RUN_SESSION = re.compile(r"-(\d{4}-\d{2}-\d{2})-\d{8}T\d{6}Z$")
+
+
+def run_session(run_id: str) -> date | None:
+    """The session date encoded by ``new_run_id``; ``None`` for ids in any other form."""
+    match = _RUN_SESSION.search(run_id)
+    return date.fromisoformat(match.group(1)) if match else None

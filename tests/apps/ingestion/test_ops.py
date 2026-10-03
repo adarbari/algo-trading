@@ -23,6 +23,7 @@ def test_sources_settings_defaults_and_overrides() -> None:
     assert load_sources(MemoryConfigStore({})) == SourcesSettings()
     doc = {
         "raw_retention_days": 30,
+        "staging_retention_days": 3,
         "cboe": {"workers": 8},
         "nasdaq_earnings": {"enabled": False, "days": 20},
         "massive": {"min_interval_s": 0.5, "corporate_actions_window": [-3, 10]},
@@ -43,6 +44,7 @@ def test_sources_settings_defaults_and_overrides() -> None:
         0.2,
     )
     assert (s.sec_enabled, s.sec_min_interval_s, s.sec_refresh_days) == (False, 0.5, 7)
+    assert s.staging_retention_days == 3
     assert s.universe_enabled  # a malformed section falls back to defaults
 
 

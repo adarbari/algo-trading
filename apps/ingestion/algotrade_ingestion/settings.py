@@ -10,6 +10,7 @@ from algotrade.storage.config_store import ConfigStore
 @dataclass(frozen=True)
 class SourcesSettings:
     raw_retention_days: int = 90
+    staging_retention_days: int = 14
     cboe_enabled: bool = True
     cboe_workers: int = 4
     universe_enabled: bool = True
@@ -41,6 +42,7 @@ class SourcesSettings:
         d = cls()
         return cls(
             raw_retention_days=int(doc.get("raw_retention_days", d.raw_retention_days)),
+            staging_retention_days=int(doc.get("staging_retention_days", d.staging_retention_days)),
             cboe_enabled=bool(cboe.get("enabled", True)),
             cboe_workers=int(cboe.get("workers", d.cboe_workers)),
             universe_enabled=bool(section("nasdaq_trader").get("enabled", True)),

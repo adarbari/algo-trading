@@ -11,7 +11,7 @@
     algotrade-ingest features [--date YYYY-MM-DD]
     algotrade-ingest screen   [--date YYYY-MM-DD] [--config ID] [--user U] [--export-dir out/]
     algotrade-ingest nightly  [--date YYYY-MM-DD] [--export-dir out/]
-    algotrade-ingest purge-raw --keep-days 90
+    algotrade-ingest purge-raw --keep-days 90 [--staging-keep-days 14]
     algotrade-ingest golden build|verify|load [--golden-dir datasets/golden]
 
 Storage location comes from ALGOTRADE_DATA_URL (default file://./var/data).
@@ -126,8 +126,11 @@ def _parser() -> argparse.ArgumentParser:
     )
     g.add_argument("action", choices=["build", "verify", "load"])
     g.add_argument("--golden-dir", type=Path, default=Path("datasets/golden"))
-    r = sub.add_parser("purge-raw", help="delete raw vendor responses older than N days")
+    r = sub.add_parser(
+        "purge-raw", help="delete raw vendor responses and unfinished-run scratch older than N days"
+    )
     r.add_argument("--keep-days", type=int, default=90)
+    r.add_argument("--staging-keep-days", type=int, default=14, help="unfinished-run scratch")
     r.add_argument("--date", type=date.fromisoformat, help="reference date (default: today)")
     return p
 
@@ -217,7 +220,8 @@ def _pipeline_command(
         return report(run_job(args, reader, writer, "nightly", params, SITE_USER))
     else:
         removed = writer.raw.purge_before(session - timedelta(days=args.keep_days))
-        print_json({"raw_files_removed": removed})
+        staged = writer.staging.purge_before(session - timedelta(days=args.staging_keep_days))
+        print_json({"raw_files_removed": removed, "staging_runs_removed": staged})
     return 0
 
 

@@ -1,24 +1,14 @@
 """Local ``.env`` loading and vendor credentials (they only ever come from the environment)."""
 
 import os
-from pathlib import Path
 
 from algotrade.core.errors import ConfigurationError
+from algotrade.storage.dotenv import load_dotenv
+
+__all__ = ["load_dotenv", "massive_key", "sec_contact"]
 
 MASSIVE_KEY = "ALGOTRADE_MASSIVE_API_KEY"
 SEC_CONTACT = "ALGOTRADE_SEC_CONTACT"
-
-
-def load_dotenv(path: Path = Path(".env")) -> None:
-    """Load ``KEY=VALUE`` lines into the environment without overriding variables already set."""
-    if not path.exists():
-        return
-    for raw in path.read_text().splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
 def massive_key(required: bool = True) -> str | None:
