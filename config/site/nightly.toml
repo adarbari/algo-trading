@@ -13,7 +13,7 @@ desktop = true                   # macOS notification via osascript (darwin only
 summary_path = "var/logs/nightly-latest.json"   # every run's summary, relative to the working directory
 
 [notify.email]                   # the daily summary email (stats + failure deep dive), sent after every run
-enabled = false                  # true once ALGOTRADE_NOTIFY_EMAIL_TO / ALGOTRADE_SMTP_USER / ALGOTRADE_SMTP_PASSWORD are set (.env)
+enabled = true                   # needs ALGOTRADE_NOTIFY_EMAIL_TO / ALGOTRADE_SMTP_USER / ALGOTRADE_SMTP_PASSWORD are set (.env)
 smtp_host = "smtp.gmail.com"     # SMTP server (STARTTLS on 587; 465 uses implicit TLS)
 smtp_port = 587
 max_examples = 5                 # examples listed per failure group
