@@ -21,7 +21,7 @@ jobs:
     name: Lint, types, boundaries, file length
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
         with: { python-version: "3.12", enable-cache: true }
       - run: uv sync --all-packages --locked
@@ -39,7 +39,7 @@ jobs:
       matrix:
         python: ["3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
         with: { python-version: "${{ matrix.python }}", enable-cache: true }
       - run: uv sync --all-packages --locked
@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [quality]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
         with: { python-version: "3.12", enable-cache: true }
       - run: uv sync --all-packages --locked

@@ -30,7 +30,7 @@ jobs:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # default branch only; PR code is never checked out here
+      - uses: actions/checkout@v7 # default branch only; PR code is never checked out here
       - name: Merge every open PR that passed CI
         env:
           GH_TOKEN: ${{ github.token }}
