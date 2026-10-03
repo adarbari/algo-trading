@@ -7,17 +7,25 @@ running on the Mac.
 
 | Workflow / job | Runs on | Why |
 |---|---|---|
-| CI: lint, types, boundaries, ownership, dupes, file length | Mac | |
+| CI: lint, types, boundaries, ownership, dupes, file length, strategy evaluation | Mac | |
 | CI: tests (py3.12 on PRs; 3.12 + 3.13 on main) | Mac | the bulk of the minutes |
-| CI: strategy evaluation | Mac | |
 | CI: web (lint, types, unit, Storybook, e2e, screenshots) | Mac, inside the Playwright Linux image (Docker) | screenshot baselines are rendered in that image |
 | Auto-merge sweeps | Mac | runs after every CI run and every 30 minutes |
 | Nightly evaluation | Mac | |
 | Release (tags only) | GitHub, `ubuntu-latest` | rare; `make check` needs Node on Linux |
 
+A pull request runs only what its changes can break (the `Changed areas` job decides; skipped
+jobs count as passed for auto-merge). Every push to main runs everything.
+
+| Files changed | Lint + evaluation | Tests | Web |
+|---|---|---|---|
+| only `apps/web/**` | skipped | `tests/architecture` only (web layout rules) | yes |
+| none under `apps/web/` | yes | full suite | skipped |
+| both, or `.github/workflows/ci.yml` or `apps/api/openapi.json` | yes | full suite | yes |
+
 Jobs on the Mac wait (queued, not failed) while it is asleep or offline, and auto-merge
-waits with them. Each runner runs one job at a time; a PR runs four jobs, so with two
-runners two wait for a free one.
+waits with them. Each runner runs one job at a time; a PR touching both sides runs four
+jobs (including the few-second `Changed areas`), so some wait for a free runner.
 
 ## Setting up the runners (once)
 

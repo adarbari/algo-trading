@@ -17,8 +17,38 @@ env:
   HYPOTHESIS_PROFILE: ci
 
 jobs:
+  # Which side a pull request touches (docs/ci.md). main (push, post-merge re-test) runs all.
+  changes:
+    name: Changed areas
+    runs-on: [self-hosted, macOS, ARM64] # the owner's Mac (docs/ci.md): no Actions minutes
+    outputs:
+      python: ${{ steps.areas.outputs.python }}
+      web: ${{ steps.areas.outputs.web }}
+    steps:
+      - uses: actions/checkout@v7
+        with: { fetch-depth: 2 } # a PR checks out its merge commit: parent 1 is the base
+      - id: areas
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          python=false web=false
+          if [ "$EVENT" != pull_request ]; then python=true web=true; fi
+          while IFS= read -r f; do
+            case "$f" in
+              "") ;;
+              .github/workflows/ci.yml | apps/api/openapi.json) python=true web=true ;;
+              apps/web/*) web=true ;;
+              *) python=true ;;
+            esac
+          done < <(git diff --name-only HEAD^1 HEAD)
+          echo "python=$python web=$web"
+          echo "python=$python" >> "$GITHUB_OUTPUT"
+          echo "web=$web" >> "$GITHUB_OUTPUT"
+
   quality:
-    name: Lint, types, boundaries, ownership, duplicates, file length
+    name: Lint, types, boundaries, ownership, duplicates, file length, strategy evaluation
+    needs: [changes]
+    if: needs.changes.outputs.python == 'true'
     runs-on: [self-hosted, macOS, ARM64] # the owner's Mac (docs/ci.md): no Actions minutes
     steps:
       - uses: actions/checkout@v7
@@ -32,9 +62,19 @@ jobs:
       - run: make ownership
       - run: make dupes
       - run: make filelen
+      - run: make datasets-verify
+      - name: Run every strategy on every golden dataset vs the baseline
+        run: make evaluate
+      - name: Publish scorecard
+        if: always()
+        run: test -f scorecard.md && cat scorecard.md >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with: { name: scorecard, path: scorecard.md, if-no-files-found: ignore }
 
   test:
     name: Tests (py${{ matrix.python }})
+    needs: [changes]
     runs-on: [self-hosted, macOS, ARM64] # the owner's Mac (docs/ci.md): no Actions minutes
     strategy:
       fail-fast: false
@@ -48,37 +88,26 @@ jobs:
       - run: uv sync --all-packages --locked
       # Hypothesis keeps failing examples here and replays them first on the next run.
       - uses: actions/cache@v6
+        if: needs.changes.outputs.python == 'true'
         with:
           path: .hypothesis
           key: hypothesis-${{ runner.os }}-py${{ matrix.python }}-${{ github.run_id }}
           restore-keys: hypothesis-${{ runner.os }}-py${{ matrix.python }}-
       - name: Unit + architecture + property + integration + e2e (coverage gate 90%, one worker per CPU)
+        if: needs.changes.outputs.python == 'true'
         run: make test
+      # A web-only change still answers to the layout rules (architecture/layout.toml [[web_dir]]).
+      - name: Architecture only (the change is web-only)
+        if: needs.changes.outputs.python != 'true'
+        run: .venv/bin/python -m pytest -q -n auto tests/architecture
       - uses: actions/upload-artifact@v7
-        if: matrix.python == '3.12'
+        if: matrix.python == '3.12' && needs.changes.outputs.python == 'true'
         with: { name: coverage, path: coverage.xml }
-
-  evaluate:
-    name: Strategy evaluation vs baseline
-    runs-on: [self-hosted, macOS, ARM64] # the owner's Mac (docs/ci.md): no Actions minutes
-    steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v7
-        with: { python-version: "3.12", enable-cache: false } # uv's own cache persists on the Mac
-      - run: uv sync --all-packages --locked
-      - run: make datasets-verify
-      - name: Run every strategy on every golden dataset
-        id: eval
-        run: make evaluate
-      - name: Publish scorecard
-        if: always()
-        run: test -f scorecard.md && cat scorecard.md >> "$GITHUB_STEP_SUMMARY" || true
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with: { name: scorecard, path: scorecard.md, if-no-files-found: ignore }
 
   web:
     name: Web (lint, types, unit, design system, build, Storybook, e2e, screenshots)
+    needs: [changes]
+    if: needs.changes.outputs.web == 'true'
     runs-on: [self-hosted, macOS, ARM64] # the owner's Mac (docs/ci.md): no Actions minutes
     steps:
       - uses: actions/checkout@v7
