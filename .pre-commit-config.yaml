@@ -1,0 +1,41 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^datasets/
+      - id: end-of-file-fixer
+        exclude: ^datasets/
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: detect-private-key
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff
+        entry: .venv/bin/ruff check --fix
+        language: system
+        types: [python]
+      - id: ruff-format
+        name: ruff format
+        entry: .venv/bin/ruff format
+        language: system
+        types: [python]
+      - id: file-length
+        name: file length <= 1000 lines
+        entry: .venv/bin/python scripts/check_file_length.py
+        language: system
+        pass_filenames: true
+      - id: import-boundaries
+        name: import-linter (layer boundaries)
+        entry: .venv/bin/lint-imports
+        language: system
+        pass_filenames: false
+        types: [python]
+      - id: mypy
+        name: mypy
+        entry: .venv/bin/mypy
+        language: system
+        pass_filenames: false
+        types: [python]

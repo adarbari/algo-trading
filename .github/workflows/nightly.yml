@@ -1,0 +1,30 @@
+name: Nightly evaluation
+
+# Re-runs the full strategy scorecard and a much heavier property-test profile every night,
+# so slow-burning problems (flaky invariants, dependency drift) surface without a PR.
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - name: Install with latest allowed dependency versions
+        run: pip install --upgrade -e ".[dev]"
+      - run: make datasets-verify PY=python BIN=
+      - name: Property tests (1000 examples each)
+        run: make nightly PY=python BIN=
+      - name: Publish scorecard
+        if: always()
+        run: test -f scorecard.md && cat scorecard.md >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: nightly-scorecard, path: scorecard.md, if-no-files-found: ignore }
