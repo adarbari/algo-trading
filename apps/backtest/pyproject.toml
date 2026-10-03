@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+# The backtest app: research CLI. Reads data only through storage readers (ADR 0008).
+[project]
+name = "algotrade-backtest"
+version = "0.1.0"
+description = "Backtest app: golden datasets, configured backtests, strategy evaluation"
+requires-python = ">=3.12"
+dependencies = ["algotrade"]
+
+[project.scripts]
+algotrade-backtest = "algotrade_backtest.cli:main"
+algotrade = "algotrade_backtest.cli:main"  # alias kept through phase 1
+
+[tool.uv.sources]
+algotrade = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["algotrade_backtest"]

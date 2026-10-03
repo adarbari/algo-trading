@@ -13,16 +13,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.12", cache: pip }
-      - run: pip install -e ".[dev]" build
+      - uses: astral-sh/setup-uv@v6
+        with: { python-version: "3.12", enable-cache: true }
+      - run: uv sync --all-packages --locked
       - name: Full gate
-        run: make check PY=python BIN=
+        run: make check
       - name: Version must match tag
         run: |
-          version=$(python -c "import algotrade; print(algotrade.__version__)")
+          version=$(.venv/bin/python -c "import algotrade; print(algotrade.__version__)")
           test "v$version" = "${GITHUB_REF_NAME}" || { echo "tag ${GITHUB_REF_NAME} != v$version"; exit 1; }
-      - run: python -m build
+      - run: uv build --all-packages
       - uses: softprops/action-gh-release@v3
         with:
           files: dist/*

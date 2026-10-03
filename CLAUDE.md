@@ -51,6 +51,8 @@ without writing an ADR. Read in this order:
    `make datasets-build` / `make baseline`, and explain baseline diffs in the PR.
 7. **Strategies and screeners are deterministic** and must pass `tests/property`.
 8. Secrets come only from environment variables. Never commit credentials.
+   Dependencies go in the pyproject of the package that needs them (an app's own, not the
+   library's), then `uv lock`; commit `uv.lock`.
 9. Before finishing any change, run `make check`.
 10. **PRs auto-merge** (squash, branch deleted) once every CI check on the latest commit
     passes (`.github/workflows/auto-merge.yml`). Open work in progress as a draft, or label
@@ -68,7 +70,7 @@ without writing an ADR. Read in this order:
 | New UI widget or screen | `.claude/skills/add-ui-component` |
 | A decision that changes architecture | `.claude/skills/write-adr` |
 
-Commands: `make install`, `make check`, `make test`, `make evaluate`, `make baseline`.
+Commands (need `uv`): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make evaluate`, `make baseline`.
 Ingestion: `algotrade-ingest universe|chains|features|screen|nightly|purge-raw|golden` (see `README.md`).
 Configs: site presets in `config/site/` (reviewed via PR); user configs in `config/users/<id>/`
 (git-ignored). Check one with `algotrade-backtest [--user U] config validate|show <id>`.

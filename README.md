@@ -6,7 +6,8 @@ added quickly **without** the codebase or the results quietly rotting.
 ## Quickstart
 
 ```bash
-make install          # venv + dev deps + pre-commit hooks (Python 3.12+)
+brew install uv       # once: the package/workspace manager (https://docs.astral.sh/uv/)
+make install          # library + apps + dev tools into .venv from uv.lock, + pre-commit hooks
 make check            # everything CI runs: lint, types, boundaries, file length, tests, evaluation
 .venv/bin/algotrade-backtest --data-url file://datasets/golden/store datasets list   # after `make golden-store`
 .venv/bin/algotrade-backtest --data-url file://datasets/golden/store backtest --strategy sma_crossover --dataset bull_trend --param fast=10
@@ -38,6 +39,16 @@ interruption, and prints its audit. See [docs/screeners/](docs/screeners/README.
 | Coverage ≥ 90 %, strict mypy, ruff | CI |
 | Nightly heavy property tests + scorecard | `.github/workflows/nightly.yml` |
 | PRs merge themselves once every CI check passes (`no-automerge` label or draft to opt out) | `.github/workflows/auto-merge.yml` |
+
+## Packages (uv workspace)
+
+| Package | Path | Provides |
+|---|---|---|
+| `algotrade` | `src/algotrade` | the shared library |
+| `algotrade-ingestion` | `apps/ingestion` | `algotrade-ingest` (the only writer of data) |
+| `algotrade-backtest` | `apps/backtest` | `algotrade-backtest` (`algotrade` alias) |
+
+Each app declares only its own dependencies; `uv.lock` pins everything (`make lock-check`).
 
 ## Layout
 
