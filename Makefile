@@ -9,6 +9,7 @@ GOLDEN_URL ?= file://datasets/golden/store
         evaluate baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-visual
 
 UV ?= uv
+WORKERS ?= auto
 
 install:         ## library + every app + dev tools into .venv, exactly as locked
 	$(UV) sync --all-packages --locked
@@ -65,8 +66,8 @@ integration:
 e2e:
 	$(PY) -m pytest tests/e2e
 
-test:            ## everything, with the coverage gate
-	$(PY) -m pytest --cov --cov-report=term --cov-report=xml
+test:            ## everything, with the coverage gate, one worker per CPU (WORKERS=0 runs serially)
+	$(PY) -m pytest -n $(WORKERS) --cov --cov-report=term --cov-report=xml
 
 datasets-verify: ## committed golden CSVs match their checksums
 	$(BIN)algotrade-ingest golden verify

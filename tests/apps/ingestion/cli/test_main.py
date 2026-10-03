@@ -1,4 +1,4 @@
-"""End-to-end: the ingestion CLI against a local store, with a fake Cboe feed."""
+"""End-to-end: the ingestion CLI against a local store, with fake vendor feeds (no network)."""
 
 import csv
 import json
@@ -11,13 +11,20 @@ from algotrade_ingestion.sources.framework.http import RetryPolicy
 from algotrade_ingestion.sources.framework.registry import build_sources
 from algotrade_ingestion.sources.vendors.cboe.option_chains import CboeOptionsSource
 from algotrade_ingestion.sources.vendors.nasdaq.earnings import NasdaqEarningsSource
+from algotrade_ingestion.sources.vendors.treasury.par_yields import TreasuryParYields
 from tests.apps.ingestion.tasks.market.test_option_chains import FakeFeed
 from tests.conftest import REPO_ROOT
 from tests.helpers.ingest_fakes import http_for, use_source
 from tests.helpers.payloads import cboe as fx
+from tests.helpers.payloads import treasury as treasury_payloads
 
 pytestmark = pytest.mark.e2e
 DAY = fx.SESSION.isoformat()
+
+
+def treasury_feed(url: str) -> bytes:
+    """The nightly's rates step: the recorded 2025 curves, nothing published for other years."""
+    return treasury_payloads.payload(2025) if "/2025/" in url else b""
 
 
 @pytest.fixture
@@ -44,6 +51,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         }
     )
     use_source(monkeypatch, "cboe", CboeOptionsSource(http_for(feed, policy)))
+    use_source(monkeypatch, "treasury", TreasuryParYields(http_for(treasury_feed, policy)))
     (tmp_path / "stocks.csv").write_text(
         f"ticker,company_name,security_type,last_verified\nAAPL,Apple,COMMON_STOCK,{DAY}\n"
     )

@@ -3,6 +3,19 @@ updates:
   - package-ecosystem: uv
     directory: /
     schedule: { interval: weekly }
+  - package-ecosystem: npm
+    directory: /apps/web # npm workspaces: apps/web + its design-system package, one lockfile
+    schedule: { interval: weekly }
+    groups:
+      web-minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # ESLint stays on 9: eslint-plugin-jsx-a11y and eslint-plugin-react do not support 10 yet.
+      # Drop these once both plugins declare eslint 10 in their peer dependencies.
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@eslint/js"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
