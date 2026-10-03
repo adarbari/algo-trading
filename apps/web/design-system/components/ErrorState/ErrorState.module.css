@@ -1,0 +1,27 @@
+/* ErrorState: centred block, the title in the negative tone with its icon (never colour alone). */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: center;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: var(--space-8) var(--space-6);
+  text-align: center;
+}
+
+.root[data-compact] {
+  align-items: flex-start;
+  padding: var(--space-3) var(--density-cell-padding-x);
+  text-align: start;
+}
+
+.title {
+  display: inline-flex;
+  gap: var(--space-1-5);
+  align-items: center;
+}
+
+.action {
+  margin-block-start: var(--space-2);
+}

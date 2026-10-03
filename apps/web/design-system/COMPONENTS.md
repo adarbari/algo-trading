@@ -171,6 +171,21 @@ Source: `design-system/components/AppShell`
 | `skipLabel` | `string` | no | Text of the skip link that jumps past the top bar to the content. |
 | `children` | `ReactNode` | yes | The page. |
 
+### Banner
+
+Banner: a message across the top of a page or panel that stays until its cause is gone: `info` (a note), `warning` (partial data, a degraded source) or `negative` (a failed run). The tint, border and icon follow the status tokens, and the text always says the state (colour is never the only signal). `asOf` makes it the stale-data notice: "Stale data · as of 2 Oct 2026" in the warning tone. Optional actions and a dismiss button. A negative banner is announced as an alert, the others as a status.
+
+Source: `design-system/components/Banner`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `tone` | `BannerTone` | no | `info` (default), `warning` or `negative`; a stale-data banner defaults to `warning`. |
+| `title` | `ReactNode` | no | A short bold lead ("Partial run"). |
+| `children` | `ReactNode` | no | The message: what happened and what it means for this screen. |
+| `asOf` | `string \| Date` | no | The stale-data notice: the date (ISO day or Date) the data shown is as of. |
+| `actions` | `ReactNode` | no | Buttons or a link on the end ("View run", "Retry"). |
+| `onDismiss` | `() => void` | no | Adds a dismiss button. |
+
 ### BarList
 
 BarList: labelled rows, each with a bar scaled to a maximum and its value as text: a screener funnel (universe -> each hard criterion), coverage by fetch-priority tier, top sectors. `inline` puts label | bar | value on one line; `stacked` puts the label above the bar (long labels, narrow panels). Bars are decorative: each row reads as "label value".
@@ -211,9 +226,33 @@ Source: `design-system/components/Button`
 | `id` | `string` | no |  |
 | `children` | `ReactNode` | yes |  |
 
+### Chart
+
+Chart: THE time-series chart (price history, rebased comparisons, a feature over time), one wrapper around lightweight-charts, which stays inside this folder. Lines (or one area) in the series colours s1-s6, optionally rebased to 100 at the start of the window; event markers (ex-dividend, split, earnings) with a shape and letter each plus a key; an optional volume pane; a crosshair read-out with tabular values (formatValue). The caller owns the time window (`range`, usually a SegmentedControl passed as `toolbar`). Resizes with its container, redraws in the active theme's tokens when the theme changes, and has no animation (scroll / zoom off). Accessible: an image with a generated text summary, and a "View as table" switch that shows the same numbers in a DataTable. Loading, empty and error states.
+
+Source: `design-system/components/Chart`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | What the chart shows ("AAPL close", "AAPL, MSFT and NVDA"): the summary's first words. |
+| `series` | `readonly ChartSeries[]` | yes | One or more series (up to six; colours s1-s6 in order unless a series sets `tone`). |
+| `type` | `'line' \| 'area'` | no | `line` (default) or `area` (a single series only; flat tint, never a gradient). |
+| `range` | `ChartRange` | no | The time window, counted back from the latest point: 3M, 1Y, 2Y or All (default). |
+| `rebase` | `boolean` | no | Show each series as 100 x value / first value in the window (compare performance). |
+| `events` | `readonly ChartEvent[]` | no | Ex-dividend, split and earnings markers on the first series. |
+| `volume` | `readonly ChartPoint[]` | no | Daily volume in a pane under the price. |
+| `format` | `ValueFormat` | no | How values read on the axis, read-out and table (default currency; rebased: 1 decimal). |
+| `height` | `'sm' \| 'md' \| 'lg'` | no | Plot height: `sm` 160 px, `md` 240 px (default), `lg` 320 px. |
+| `toolbar` | `ReactNode` | no | Controls on the key's row (the caller's range SegmentedControl). |
+| `tableView` | `boolean` | no | Offer the "View as table" switch (default true). |
+| `status` | `'ready' \| 'loading' \| 'error'` | no | `ready` (default), `loading` or `error`. |
+| `errorMessage` | `ReactNode` | no |  |
+| `onRetry` | `() => void` | no |  |
+| `emptyMessage` | `ReactNode` | no | Shown when no series has points in the window. |
+
 ### Checkbox
 
-Checkbox: an on / off choice with its label (or a row-selection box whose label is for screen readers only: `hideLabel`). Supports the mixed state (`indeterminate`) for "select all" over a partial selection. The native checkbox in the accent colour: Space toggles it.
+Checkbox: an on / off choice with its label (or a row-selection box whose label is for screen readers only: `hideLabel`). Supports the mixed state (`indeterminate`) for "select all" over a partial selection. The native checkbox in the accent colour: Space toggles it. A `description` is announced as the box's description, not as part of its name.
 
 Source: `design-system/components/Checkbox`
 
@@ -225,7 +264,8 @@ Source: `design-system/components/Checkbox`
 | `checked` | `boolean` | no | Checked (controlled). |
 | `defaultChecked` | `boolean` | no | Initially checked (uncontrolled). |
 | `indeterminate` | `boolean` | no | The mixed state of a "select all" box over a partial selection. |
-| `onCheckedChange` | `(checked: boolean) => void` | no | Called with the new checked state. |
+| `onCheckedChange` | `(checked: boolean, event: ChangeEvent<HTMLInputElement>) => void` | no | Called with the new checked state (and the change event: Shift-click ranges read it). |
+| `excludeFromTabOrder` | `boolean` | no | Leave the box out of the Tab order (a row checkbox inside a keyboard-navigated grid). |
 | `disabled` | `boolean` | no |  |
 | `invalid` | `boolean` | no |  |
 | `name` | `string` | no |  |
@@ -306,6 +346,24 @@ Source: `design-system/components/DataTable`
 | `rowLines` | `1 \| 2` | no | Lines of text per row: 1 (default) or 2 (a symbol with its name underneath). |
 | `toolbar` | `ReactNode` | no | Toolbar content before the column picker (a count, filters). |
 
+### Dialog
+
+Dialog: a modal window for a short, focused task or a confirmation ("Delete screener?", "Save as…"). Controlled (`open` + `onOpenChange`). A title (its accessible name), an optional description, the body, and a footer of actions (the primary action last). Focus moves into the dialog (the first focusable element, or `initialFocus`), Tab stays inside, and focus returns to the opener on close; Escape, the close button and a click on the backdrop close it (`dismissible={false}` for a step that must be answered). Page scroll is locked behind it.
+
+Source: `design-system/components/Dialog`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Shown (controlled). |
+| `onOpenChange` | `(open: boolean) => void` | yes | Called with `false` on Escape, the close button or a backdrop click. |
+| `title` | `ReactNode` | yes | The heading and accessible name ("Delete screener?"). |
+| `description` | `ReactNode` | no | One line under the title; also the accessible description. |
+| `footer` | `ReactNode` | no | Actions, primary last: `<Button>Cancel</Button><Button variant="primary">Delete</Button>`. |
+| `size` | `'sm' \| 'md' \| 'lg'` | no | Width: `sm` (confirmations), `md` (default, a short form), `lg` (a table or a long form). |
+| `dismissible` | `boolean` | no | Escape and backdrop clicks close it (default true). |
+| `initialFocus` | `RefObject<HTMLElement \| null>` | no | The element focused on open; default the first focusable element. |
+| `children` | `ReactNode` | no |  |
+
 ### Disclosure
 
 Disclosure: a summary row (label + count) that expands to show detail: grouped issues ("Stale: 515"), a rule's explanation, an advanced section. The summary is a button with `aria-expanded` controlling the detail region. Controlled (`open` + `onOpenChange`) or uncontrolled (`defaultOpen`). `boxed` (default) draws the soft border of grouped issues.
@@ -322,6 +380,73 @@ Source: `design-system/components/Disclosure`
 | `onOpenChange` | `(open: boolean) => void` | no |  |
 | `variant` | `'boxed' \| 'plain'` | no | `boxed` (soft border, default) or `plain` (a row in a list that draws its own dividers). |
 | `children` | `ReactNode` | yes | The detail shown when open. |
+
+### Distribution
+
+Distribution: a histogram of one feature across the universe (the feature catalogue: how IV30 or ADV is spread), with optional quantile markers (p10, median, p90) and a highlighted value (the focused ticker, labelled under the axis). Bins are drawn as bars on a value axis (unequal widths allowed); marker lines carry their label as text, so colour is never the only key. Plain SVG. It is an image with a generated summary (count, range, the tallest bin, the markers). Loading, empty and error states use Skeleton, EmptyState and ErrorState.
+
+Source: `design-system/components/Distribution`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `bins` | `readonly DistributionBin[]` | yes |  |
+| `label` | `string` | yes | What is distributed ("IV30 across 1,840 tickers"): starts the accessible summary. |
+| `format` | `ValueFormat` | no | How bin edges and markers read (default a number). |
+| `markers` | `readonly DistributionMarker[]` | no | Quantile lines and highlighted values. |
+| `height` | `'sm' \| 'md'` | no | Plot height: `sm` 80 px or `md` 120 px (default). |
+| `status` | `'ready' \| 'loading' \| 'error'` | no | `ready` (default), `loading` or `error`. |
+| `errorMessage` | `ReactNode` | no |  |
+| `onRetry` | `() => void` | no |  |
+| `emptyMessage` | `ReactNode` | no | Shown when there are no values. |
+
+### Drawer
+
+Drawer: a side sheet over the page for detail that keeps the screen behind it in context (a ticker's detail from a table row, a run's log, filters on a phone). Modal like Dialog: focus moves in, stays inside, and returns to the opener; Escape, the close button and a backdrop click close it; page scroll is locked. Full height on the `end` (default) or `start` side; `sm` / `md` / `lg` widths, never wider than the screen.
+
+Source: `design-system/components/Drawer`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `open` | `boolean` | yes | Shown (controlled). |
+| `onOpenChange` | `(open: boolean) => void` | yes | Called with `false` on Escape, the close button or a backdrop click. |
+| `title` | `ReactNode` | yes | The heading and accessible name ("AAPL · Apple"). |
+| `description` | `ReactNode` | no | One line under the title; also the accessible description. |
+| `footer` | `ReactNode` | no | Actions pinned to the bottom of the sheet. |
+| `side` | `'start' \| 'end'` | no | The side it slides in from: `end` (default) or `start`. |
+| `size` | `'sm' \| 'md' \| 'lg'` | no | Width: `sm` (a sidebar), `md` (default), `lg`. |
+| `dismissible` | `boolean` | no | Escape and backdrop clicks close it (default true). |
+| `initialFocus` | `RefObject<HTMLElement \| null>` | no | The element focused on open; default the first focusable element. |
+| `children` | `ReactNode` | no |  |
+
+### EmptyState
+
+EmptyState: what to show when there is nothing to show yet: a short title saying what is missing, one line on why or what to do, and an optional action ("Add a criterion"). Calm and muted, never an illustration. `bordered` draws the dashed outline of a placeholder area (an empty board, a tab not built yet); `compact` fits inside a table or a small panel.
+
+Source: `design-system/components/EmptyState`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `ReactNode` | yes | What is missing ("No ideas for Mon 5 Oct"). |
+| `description` | `ReactNode` | no | Why, or what to do next. |
+| `action` | `ReactNode` | no | One action (a Button), or a couple. |
+| `icon` | `IconName` | no | A small glyph above the title (e.g. `search` for no matches, `filter`). |
+| `bordered` | `boolean` | no | Dashed placeholder outline (default false). |
+| `compact` | `boolean` | no | Less padding, left-aligned: inside tables and small panels. |
+
+### ErrorState
+
+ErrorState: something failed to load. Says what failed in plain words, optionally a detail line (an error code or the server's message, in mono) and a Retry button that shows a spinner while `retrying`. Announced as an alert. For a whole panel or section; a failed field uses Field's error text.
+
+Source: `design-system/components/ErrorState`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `ReactNode` | no | What failed, in plain words ("The preview could not run."). |
+| `message` | `ReactNode` | no | Why, or what to try. |
+| `detail` | `ReactNode` | no | Technical detail (status, error id) in mono. |
+| `onRetry` | `() => void` | no | Adds a Retry button. |
+| `retrying` | `boolean` | no | The retry is in flight: the button shows a spinner and ignores clicks. |
+| `compact` | `boolean` | no | Less padding, left-aligned: inside tables and small panels. |
 
 ### Field
 
@@ -430,6 +555,17 @@ Source: `design-system/components/Input`
 | `onClick` | `MouseEventHandler<HTMLInputElement> \| undefined` | no |  |
 | `ref` | `Ref<HTMLInputElement>` | no |  |
 
+### Kbd
+
+Kbd: a keyboard key or shortcut as it is pressed ("/", "Esc", "Ctrl + K"), in the mono face with a thin key outline. `keys` renders a chord: each key outlined, joined by "+". Use it in hints, tooltips and help text; it is text, not a control.
+
+Source: `design-system/components/Kbd`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `keys` | `readonly string[]` | yes | The keys of one shortcut, pressed together: `['Ctrl', 'K']`, `['/']`. |
+| `size` | `'sm' \| 'xs'` | no | `sm` (default, inline in body text) or `xs` (in captions and tooltips). |
+
 ### KeyValue
 
 KeyValue: a definition list for detail panels: a label column and a value column (`<dl>`), values tabular. Values are text or formatted with a ValueFormat (`$13.99B`, `+1.24%` with its up / down tone); an optional hint (a feature id, a unit, a rule) sits under the label. Loading shows placeholder values, an empty list shows the empty message.
@@ -518,6 +654,25 @@ Source: `design-system/components/Panel`
 | `flush` | `boolean` | no | No body padding (a table or grid that runs edge to edge). |
 | `children` | `ReactNode` | no | Body content when ready. |
 
+### Popover
+
+Popover: a panel anchored to a trigger, opened by a click (a column picker, a filter editor, a small menu of options). Non-modal by default: Escape or a click outside closes it and focus returns to the trigger; `trapFocus` keeps Tab inside while it is open. The trigger is the caller's control (usually a Button), rendered through `trigger(props)` so it gets the ref and the `aria-expanded` / `aria-controls` / `aria-haspopup` wiring. Positioned with Floating UI (flips and shifts to stay on screen, follows scrolling); rendered in a portal above the page.
+
+Source: `design-system/components/Popover`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `trigger` | `(props: PopoverTriggerProps) => ReactNode` | yes | Renders the trigger with the props it needs: `trigger={(p) => <Button {...p}>Columns</Button>}`. |
+| `label` | `string` | yes | Accessible name of the panel ("Columns", "Edit criterion"). |
+| `open` | `boolean` | no | Controlled open state (pair with `onOpenChange`). |
+| `defaultOpen` | `boolean` | no | Initial open state when uncontrolled. |
+| `onOpenChange` | `(open: boolean) => void` | no |  |
+| `placement` | `PopoverPlacement` | no | Side and alignment against the trigger; flips when there is no room. Default `bottom-start`. |
+| `width` | `'auto' \| 'wide'` | no | `auto` (content width, at least the popover token), `wide` (a sidebar-wide list). |
+| `padding` | `'default' \| 'none'` | no | Inner padding: `default` or `none` (a list that draws its own rows). |
+| `trapFocus` | `boolean` | no | Keep keyboard focus inside the panel while it is open (a small form). |
+| `children` | `ReactNode` | yes |  |
+
 ### SearchInput
 
 SearchInput: a search box (tickers, names, sectors) with a search icon, a clear button once there is text, and Escape to clear. Sunken (canvas-coloured) as in the mockups' top bar and ticker list. `loading` shows a spinner while results are being fetched. Named "Search" unless given a label or placed in a Field.
@@ -593,6 +748,38 @@ Source: `design-system/components/ShareBar`
 | `size` | `'sm' \| 'md'` | no | Bar thickness: `sm` 6 px (lists, default) or `md` 10 px (a headline bar). |
 | `loading` | `boolean` | no | Placeholder track while the value loads. |
 
+### Skeleton
+
+Skeleton: placeholder shapes in the track colour while content loads, laid out like the content to come so the page does not jump: `text` (lines, the last one shorter), `rect` (a chart or an image area) or `table` (rows of cells at the density's row height). A slow pulse, none under reduced motion. Announced once as busy with `label` ("Loading ideas…"); the shapes themselves are hidden from screen readers.
+
+Source: `design-system/components/Skeleton`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `variant` | `'text' \| 'rect' \| 'table'` | no | The shape: `text` lines (default), a `rect` block, or `table` rows. |
+| `lines` | `number` | no | Lines of text (default 3). |
+| `rows` | `number` | no | Rows (default 5) and columns (default 4) of a `table` skeleton. |
+| `columns` | `number` | no |  |
+| `height` | `'sm' \| 'md' \| 'lg'` | no | Height of a `rect`: `sm`, `md` (default, a chart) or `lg`. |
+| `label` | `string` | no | What is loading, for screen readers. |
+
+### Sparkline
+
+Sparkline: a tiny inline line of a series' recent shape for a table cell or a stat (30 days of closes, IV history). Plain SVG, no axes. Tone `auto` (default) draws it in the up / down colour by the change from first to last value; or a series colour `s1`-`s6`, `muted`. An optional dashed `baseline` (100 for a rebased series, 0 for a change) and a dot on the last value. It is an image with a generated summary ("IV30, 30 values: 21.2% to 24.4%, low 19.8%, high 25.1%"); missing values break the line. Fewer than two values show a muted dash.
+
+Source: `design-system/components/Sparkline`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `values` | `readonly (number \| null)[]` | yes | The values, oldest first; `null` is a gap. |
+| `label` | `string` | yes | What the line shows ("AAPL close, 30 days"): starts the accessible summary. |
+| `format` | `ValueFormat` | no | How values read in the summary (default a number with 2 decimals). |
+| `tone` | `SparklineTone` | no | `auto` (up / down by first-to-last change, default), `muted`, or a series `s1`-`s6`. |
+| `baseline` | `number` | no | A dashed reference value (100 when rebased, 0 for changes). |
+| `width` | `'sm' \| 'md' \| 'lg'` | no | Width: `sm` 64 px, `md` 96 px (default), `lg` 128 px; height follows the text line. |
+| `showLast` | `boolean` | no | Mark the last value with a dot. |
+| `loading` | `boolean` | no | Draw a placeholder while the values load. |
+
 ### StackedBar
 
 StackedBar: one bar split into toned segments that add up to a whole (option chains: OK, stale, no chain, errors), with a Legend of each segment's count underneath. The bar is an image whose accessible name lists every segment with its count and share; the legend repeats them as text, so colour is never the only key.
@@ -666,6 +853,34 @@ Source: `design-system/components/TickerTag`
 | `name` | `string` | no | Full name on hover ("Apple Inc."). |
 | `onRemove` | `() => void` | no | Adds a remove button named "Remove <symbol>" (plus `removeContext`). |
 | `removeContext` | `string` | no | Completes the remove button's name: "from compare" gives "Remove AAPL from compare". |
+
+### Toast
+
+Toast: a brief confirmation or failure after an action ("Screener saved", "Export failed"), shown in the corner and gone after a few seconds. Tone icon + text (colour is never the only signal), an optional action ("Undo", "View") and a dismiss button. Show toasts with `useToast()` under a `ToastProvider` (mounted once by the app); `Toast` itself is the presentational card the provider stacks. Negative toasts are announced as alerts and stay until dismissed by default; the others as a status. Lasting problems belong in a Banner.
+
+Source: `design-system/components/Toast`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `tone` | `ToastTone` | no | `info` (default), `positive` (done), `warning` or `negative` (failed). |
+| `title` | `ReactNode` | yes | What happened, in a few words ("Screener saved"). |
+| `description` | `ReactNode` | no | One more line of detail. |
+| `action` | `ToastAction` | no | One follow-up ("Undo", "View run"). |
+| `onDismiss` | `() => void` | no | Adds the dismiss button. |
+
+### Tooltip
+
+Tooltip: a short description of a control, shown on hover (after a delay) and immediately on keyboard focus; Escape hides it. The text is the trigger's accessible description: the trigger is rendered through `children(props)` and receives `aria-describedby`, so it must be focusable (a Button, IconButton, link). Never put essential information or interactive content in a tooltip. Positioned with Floating UI above the trigger (flips when there is no room); rendered in a portal.
+
+Source: `design-system/components/Tooltip`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `content` | `ReactNode` | yes | The tooltip text: one short sentence or a definition. |
+| `children` | `(props: TooltipTriggerProps) => ReactNode` | yes | Renders the focusable trigger: `(p) => <IconButton {...p} ... />`. |
+| `placement` | `'top' \| 'bottom' \| 'start' \| 'end'` | no | Side of the trigger; flips when there is no room. Default `top`. |
+| `delay` | `'default' \| 'none'` | no | Hover delay before showing: `default` (base motion x 4: 600 ms) or `none`. |
+| `defaultOpen` | `boolean` | no | Start open (stories and docs). |
 
 ### TopBar
 

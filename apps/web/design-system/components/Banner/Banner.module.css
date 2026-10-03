@@ -1,0 +1,47 @@
+/* Banner: a status-tinted strip with its border and icon; text in the default / secondary tones. */
+.banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2-5);
+  align-items: flex-start;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width-thin) solid var(--color-info-border);
+  border-radius: var(--radius-md);
+  background: var(--color-info-bg);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+}
+
+.banner[data-tone='warning'] {
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-bg);
+}
+
+.banner[data-tone='negative'] {
+  border-color: var(--color-negative-border);
+  background: var(--color-negative-bg);
+}
+
+.icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: var(--line-height-base);
+}
+
+.text {
+  display: flex;
+  flex: 1 1 var(--size-search);
+  flex-direction: column;
+  min-width: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}

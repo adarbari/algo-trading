@@ -6,6 +6,7 @@
  */
 import { useId, useState, type ReactNode } from 'react';
 
+import { Icon } from '../Icon';
 import styles from './Disclosure.module.css';
 
 export interface DisclosureProps {
@@ -52,9 +53,9 @@ export function Disclosure({
         aria-controls={`${id}-detail`}
         onClick={toggle}
       >
-        <svg className={styles.chevron} viewBox="0 0 12 12" aria-hidden="true" focusable="false">
-          <path d="M4 2.5 7.5 6 4 9.5" />
-        </svg>
+        <span className={styles.chevron}>
+          <Icon name="chevron-right" size="sm" tone="muted" />
+        </span>
         <span className={styles.label}>{label}</span>
         {count !== undefined && ' '}
         {count !== undefined && (

@@ -1,0 +1,77 @@
+/* Toast: a bordered card with a status-coloured edge; the viewport stacks them bottom-end. */
+.toast {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: calc(var(--size-sidebar) + var(--space-10));
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border);
+  border-inline-start: var(--border-width-thick) solid var(--color-info);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+}
+
+.toast[data-tone='positive'] {
+  border-inline-start-color: var(--color-positive);
+}
+
+.toast[data-tone='warning'] {
+  border-inline-start-color: var(--color-warning);
+}
+
+.toast[data-tone='negative'] {
+  border-inline-start-color: var(--color-negative);
+}
+
+.icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: var(--line-height-base);
+}
+
+.text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  padding-block: var(--space-0-5);
+}
+
+.viewport {
+  position: fixed;
+  inset-block-end: var(--space-4);
+  inset-inline-end: var(--space-4);
+  z-index: var(--z-toast);
+  max-width: calc(100% - var(--space-8));
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-end;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  animation: enter var(--duration-base) var(--easing-standard);
+}
+
+@keyframes enter {
+  from {
+    transform: translateY(var(--space-2));
+    opacity: 0;
+  }
+}

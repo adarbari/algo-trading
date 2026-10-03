@@ -199,15 +199,6 @@
   justify-content: flex-start;
 }
 
-/* TODO(design system PR 2): replaced by the Checkbox component. */
-.checkbox {
-  width: var(--space-3);
-  height: var(--space-3);
-  margin: 0;
-  accent-color: var(--color-accent);
-  cursor: pointer;
-}
-
 .placeholder {
   display: block;
   width: 60%;
@@ -240,59 +231,14 @@
   white-space: nowrap;
 }
 
-/* Column picker (toolbar button + panel). */
+/* Column picker (a Button opening a Popover with one Checkbox per column). */
 .picker {
-  position: relative;
   margin-inline-start: auto;
-}
-
-.pickerButton {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1-5);
-  height: var(--density-control-height);
-  padding: 0 var(--space-2-5);
-  border: var(--border-width-thin) solid var(--color-control);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font-family: var(--font-sans);
-  font-size: var(--font-size-sm);
-  line-height: var(--line-height-sm);
-  cursor: pointer;
-}
-
-.pickerButton[aria-expanded='true'] {
-  border-color: var(--color-accent-border);
-  background: var(--color-accent-soft);
-  color: var(--color-accent-strong);
 }
 
 .pickerCount {
   color: var(--color-muted);
   font-variant-numeric: tabular-nums;
-}
-
-.pickerButton[aria-expanded='true'] .pickerCount {
-  color: var(--color-accent-strong);
-}
-
-.pickerPanel {
-  position: absolute;
-  top: calc(100% + var(--space-1));
-  right: 0;
-  z-index: var(--z-dropdown);
-  overflow-y: auto;
-  width: calc(var(--size-sidebar) - var(--space-4));
-  max-height: calc(var(--size-sidebar) + var(--space-10));
-  padding: var(--space-1) 0;
-  border: var(--border-width-thin) solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-}
-
-.pickerPanel[hidden] {
-  display: none;
 }
 
 .pickerList {
@@ -302,29 +248,11 @@
 }
 
 .pickerItem {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  column-gap: var(--space-2);
-  align-items: center;
   padding: var(--space-1-5) var(--space-3);
 }
 
 .pickerItem + .pickerItem {
   border-top: var(--border-width-thin) solid var(--color-border-soft);
-}
-
-.pickerLabel {
-  color: var(--color-text);
-  font-size: var(--font-size-md);
-  line-height: var(--line-height-md);
-  cursor: pointer;
-}
-
-.pickerDescription {
-  grid-column: 2;
-  color: var(--color-muted);
-  font-size: var(--font-size-xs);
-  line-height: var(--line-height-xs);
 }
 
 .scroller:focus-visible .row[data-active] {

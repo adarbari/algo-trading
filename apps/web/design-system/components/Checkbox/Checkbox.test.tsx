@@ -14,8 +14,19 @@ describe('Checkbox', () => {
     expect(box).toBeChecked();
     await userEvent.keyboard(' ');
     expect(box).not.toBeChecked();
-    expect(onCheckedChange).toHaveBeenNthCalledWith(1, true);
-    expect(onCheckedChange).toHaveBeenNthCalledWith(2, false);
+    expect(onCheckedChange).toHaveBeenNthCalledWith(1, true, expect.anything());
+    expect(onCheckedChange).toHaveBeenNthCalledWith(2, false, expect.anything());
+  });
+
+  it('announces the description separately from the name', () => {
+    render(<Checkbox label="IV30" description="Our 30-day implied volatility" />);
+    const box = screen.getByRole('checkbox', { name: 'IV30' });
+    expect(box).toHaveAccessibleDescription('Our 30-day implied volatility');
+  });
+
+  it('can leave the tab order (a row box inside a keyboard grid)', () => {
+    render(<Checkbox label="Select AAPL" hideLabel excludeFromTabOrder />);
+    expect(screen.getByRole('checkbox')).toHaveAttribute('tabindex', '-1');
   });
 
   it('shows the mixed state', () => {

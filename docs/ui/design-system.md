@@ -207,9 +207,9 @@ Built from the approved Ideas, Screener, Explore and Ingestion mockups; props in
 | `Legend` | Swatches for status tones, `empty`, `accent`, `muted` and series `s1`-`s6` | Shapes: cell (tint + border), solid, line |
 | `KeyValue` | Definition list for detail panels (label column + tabular value, optional hint) | Formatted values carry their up / down tone |
 
-Charts come in design system PR 4. Where a data component needs a PR 2 control (Checkbox,
-Button, StatusBadge) before PR 2 has merged, it uses a minimal internal placeholder marked
-`TODO(design system PR 2)`, replaced when PR 2 lands.
+The data components use the PR 2 controls: DataTable's selection boxes and column picker are
+`Checkbox`es, the picker opens from a `Button` in a `Popover`; Disclosure's chevron is an
+`Icon`; decision cells are `StatusBadge`s (cell slot).
 
 ### Value formatting
 
@@ -220,6 +220,61 @@ place that decides how a value reads: `number` (`11,427`), `percent` (a fraction
 with an up / down tone). Missing values read as an em dash in the muted tone; negatives use the
 typographic minus. DataTable, KeyValue, StatStrip, StackedBar and BarList format through it, so
 screens never format numbers themselves.
+
+## Charts (design system PR 4)
+
+| Component | What it is | Notes |
+|---|---|---|
+| `Chart` | THE time-series chart: price history, rebased comparisons, a feature over time | One wrapper around **lightweight-charts** (TradingView, Apache-2.0; canvas, small, built for financial time series). `series` (id, label, points `{time: ISO day, value}`, tone `s1`-`s6` by position), `type` `line` / `area` (one series, flat tint: never a gradient), `range` `3M` / `1Y` / `2Y` / `All` (the caller's `SegmentedControl`, passed as `toolbar`; `CHART_RANGES`), `rebase` (100 x value / first value in the window, dashed 100 line), `events` (ex-dividend circle **D**, split square **S**, earnings arrow **E** on the first series, plus a key: shape and letter, never colour alone), `volume` (a second pane), `format` (axis, read-out and table through `formatValue`), `height` sm / md / lg, `status` loading / error (+ `onRetry`), `emptyMessage` |
+| `Sparkline` | Tiny inline line for a table cell or stat | Plain SVG, no library. Tone `auto` (up / down by first-to-last), `muted` or `s1`-`s6`; dashed `baseline`; `showLast`; gaps break the line; summary as its accessible name |
+| `Distribution` | Histogram of one feature across the universe (feature catalogue) | Plain SVG bars on a value axis (unequal bins allowed); `markers` (quantiles dashed, a highlighted value solid accent, each labelled in text); summary as its accessible name; loading / empty / error |
+
+**Chart behaviour.** Crosshair read-out (date, each series' value in tabular figures, volume,
+that day's events). Resizes with its container (`autoSize`, ResizeObserver). Colours and font
+are read from the tokens of the active theme (the canvas cannot use CSS variables) and the
+chart redraws when `data-theme` / `data-updown` or the system scheme changes. No animation:
+scroll, zoom and kinetic scrolling are off (the range control sets the window), so reduced
+motion needs nothing more. Accessible: the plot is `role="img"` named by a generated summary
+("AAPL close, 2 Oct 2025 to 2 Oct 2026; AAPL $… to $333.69 (+…%), low …, high …; events: 4
+ex-dividend, 4 earnings"), and **View as table** shows the same numbers in a DataTable.
+Screenshot stories use seeded data and wait for the canvas to paint (`data-ready`).
+
+**Boundary.** Only `design-system/components/Chart/` may import `lightweight-charts`, and inside
+it only `engine.ts` does (ESLint `no-restricted-imports` everywhere else; ownership entry
+`web-charting`). The library's attribution logo stays on (its licence asks for a link to
+TradingView; turning it off needs an attribution page instead).
+
+## Feedback (design system PR 4)
+
+| Component | Use | Notes |
+|---|---|---|
+| `Toast` + `ToastProvider` + `useToast()` | Brief result of an action ("Screener saved", "Export failed") | Mount `ToastProvider` once in `src/app/providers`; `useToast().show({ tone, title, description, action, duration })`. Bottom-end, at most three, 5 s (negative: until dismissed), paused on hover / focus; status (negative: alert) |
+| `Banner` | A lasting condition on a page or panel | `info` / `warning` / `negative` tint + border + icon; `asOf` makes it the stale-data notice ("Stale data · as of 1 Oct 2026", warning); actions, dismiss |
+| `EmptyState` | Nothing to show yet | Title, one line, an action; `bordered` dashed placeholder, `compact` inside tables |
+| `Skeleton` | Loading placeholders shaped like the content | `text` lines, `rect` (chart), `table` rows at the density row height; slow pulse, none under reduced motion; one busy status |
+| `ErrorState` | A section failed to load | Alert with message, mono detail, Retry (spinner while `retrying`) |
+
+## Overlays (design system PR 4)
+
+| Component | Use | Notes |
+|---|---|---|
+| `Tooltip` | A short description of a focusable control | Hover after a delay (600 ms), focus at once, Escape hides; the trigger gets `aria-describedby` through `children(props)` |
+| `Popover` | A panel anchored to a trigger, opened by click (column picker, filter editor) | `trigger(props)` wires ref, `aria-expanded` / `aria-controls` / `aria-haspopup`; non-modal dialog; Escape / outside click close and return focus; `trapFocus` optional; flips / shifts / fits the viewport |
+| `Dialog` | A short modal task or confirmation | Controlled; title = name, description; focus to the first control in the body, Tab trapped, focus returns to the opener; Escape / close / backdrop (unless `dismissible={false}`); scroll locked |
+| `Drawer` | Side sheet for detail in context | Same modal behaviour; `side` end / start; `size` sm / md / lg |
+| `Kbd` | A key or shortcut in text | `keys={['Ctrl', 'K']}` |
+
+**Why Floating UI.** Overlays are built on `@floating-ui/react` (MIT): positioning (flip,
+shift, size to the viewport, follows scrolling) plus its focus manager (modal trap, return
+focus, focus guards) and dismiss / hover / focus interactions, which are the hard, easily
+wrong accessibility parts. It is headless (no styles, no components), so the look stays in our
+CSS Modules and tokens; a small hand-written positioner would still need all of the focus
+logic. Heavy UI kits (MUI, Chakra, Mantine) were rejected: they bring their own styling
+systems. Only the design system imports it (ESLint bans it in `src/`). Overlays are portalled to
+`<body>` and layered with the `z-dropdown` / `z-modal` / `z-toast` / `z-tooltip` tokens;
+borders, never shadows; the modal backdrop is the canvas colour at partial opacity.
+
+With PR 4 the catalogue covers every v1 screen (Ideas, Screener builder, Explore, Ingestion).
 
 ## First component set
 
@@ -249,6 +304,7 @@ screens never format numbers themselves.
 | App code (`src/`) imports UI only from `@algotrade/ui` (root only) and renders no HTML elements, `className` or `style` | ESLint (`apps/web/lint-rules/`; ADR 0025 rules 2-3) |
 | No hex / rgb colours, gradients, shadows, inline styles or one-off sizes; tokens only | ESLint (app code) and Stylelint (design-system CSS) |
 | Every design-system component has its stories (all states), a unit test with axe and screenshots | `npm run ds:check`, `tests/architecture/test_layout_web.py` |
+| `lightweight-charts` only in `components/Chart`; `@floating-ui/react` only in the design system | ESLint `no-restricted-imports` (`apps/web/lint-rules/restrictions.js`) |
 | `COMPONENTS.md` and `tokens.css` are up to date | regenerated in CI (`npm run generated:check`); fails on diff |
 | Screenshot changes are reviewed; contrast holds in light and dark | Playwright visual suite over every story (screenshot diff + axe), Linux image |
 | 1000-line file limit also covers `.ts` / `.tsx` / `.css` | `scripts/check_file_length.py` |

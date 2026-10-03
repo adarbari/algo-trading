@@ -1,0 +1,160 @@
+/* Chart: key + tools row, then the canvas host at a token height, with the crosshair read-out. */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  font-family: var(--font-sans);
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  align-items: center;
+  min-width: 0;
+}
+
+.events {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  padding: 0;
+  color: var(--color-text-2);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-xs);
+  list-style: none;
+}
+
+.event {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.glyph {
+  width: var(--size-icon-sm);
+  height: var(--size-icon-sm);
+  fill: var(--color-text-2);
+}
+
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+.plot {
+  position: relative;
+  min-width: 0;
+}
+
+.plot[data-height='sm'] {
+  height: calc(var(--space-10) * 4);
+}
+
+.plot[data-height='md'] {
+  height: calc(var(--space-10) * 6);
+}
+
+.plot[data-height='lg'] {
+  height: var(--size-sidebar);
+}
+
+.canvas,
+.summary {
+  position: absolute;
+  inset: 0;
+}
+
+.summary {
+  z-index: var(--z-raised);
+  pointer-events: none;
+}
+
+.tooltip {
+  position: absolute;
+  inset-block-start: var(--space-1);
+  z-index: var(--z-raised);
+  box-sizing: border-box;
+  min-width: calc(var(--space-10) * 3);
+  padding: var(--space-1-5) var(--space-2);
+  border: var(--border-width-thin) solid var(--color-control);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-xs);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  transform: translateX(var(--space-3));
+}
+
+.tooltip[data-side='start'] {
+  transform: translateX(calc(-100% - var(--space-3)));
+}
+
+.tooltipDate {
+  margin-block-end: var(--space-0-5);
+  color: var(--color-muted);
+}
+
+.tooltipRow {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.tooltipSwatch {
+  flex: none;
+  width: var(--space-2-5);
+  height: var(--border-width-thick);
+  border-radius: var(--radius-sm);
+  background: var(--color-s1);
+}
+
+.tooltipSwatch[data-tone='s2'] {
+  background: var(--color-s2);
+}
+
+.tooltipSwatch[data-tone='s3'] {
+  background: var(--color-s3);
+}
+
+.tooltipSwatch[data-tone='s4'] {
+  background: var(--color-s4);
+}
+
+.tooltipSwatch[data-tone='s5'] {
+  background: var(--color-s5);
+}
+
+.tooltipSwatch[data-tone='s6'] {
+  background: var(--color-s6);
+}
+
+.tooltipLabel {
+  flex: 1;
+  color: var(--color-text-2);
+}
+
+.tooltipValue {
+  font-weight: var(--font-weight-medium);
+  text-align: end;
+}
+
+.tooltipEvent {
+  margin-block-start: var(--space-0-5);
+  color: var(--color-text-2);
+}

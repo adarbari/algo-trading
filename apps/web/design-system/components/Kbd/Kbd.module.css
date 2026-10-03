@@ -1,0 +1,30 @@
+/* Kbd: outlined keys in the mono face, on the row tint; a chord joins keys with a muted "+". */
+.chord {
+  display: inline-flex;
+  gap: var(--space-0-5);
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  white-space: nowrap;
+}
+
+.chord[data-size='xs'] {
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-xs);
+}
+
+.key {
+  min-width: var(--space-4);
+  padding: 0 var(--space-1);
+  border: var(--border-width-thin) solid var(--color-control);
+  border-radius: var(--radius-sm);
+  background: var(--color-row);
+  color: var(--color-text);
+  font: inherit;
+  text-align: center;
+}
+
+.plus {
+  color: var(--color-muted);
+}

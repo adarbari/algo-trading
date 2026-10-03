@@ -1,0 +1,12 @@
+/* Drawer widths (the panel itself is the shared Modal layer's, in Dialog.module.css). */
+.widthSm {
+  max-width: var(--size-sidebar);
+}
+
+.widthMd {
+  max-width: calc(var(--size-sidebar) * 1.5);
+}
+
+.widthLg {
+  max-width: calc(var(--size-sidebar) * 2);
+}

@@ -1,0 +1,131 @@
+/*
+ * Dialog and Drawer (the shared Modal layer): a dimmed backdrop, then a bordered panel. Borders,
+ * never shadows. The backdrop is the canvas colour at partial opacity (no raw colours).
+ */
+.overlay {
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+}
+
+.overlay[data-kind='drawer'] {
+  place-items: stretch end;
+  padding: 0;
+}
+
+.overlay[data-kind='drawer'][data-side='start'] {
+  place-items: stretch start;
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--color-bg);
+  opacity: 0.72;
+  animation: fade var(--duration-base) var(--easing-standard);
+}
+
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-height: 100%;
+  border: var(--border-width-thin) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  animation: fade var(--duration-base) var(--easing-standard);
+}
+
+.panel[data-kind='dialog'][data-size='sm'] {
+  max-width: calc(var(--size-sidebar) + var(--space-10));
+}
+
+.panel[data-kind='dialog'][data-size='md'] {
+  max-width: calc(var(--size-sidebar) * 1.6);
+}
+
+.panel[data-kind='dialog'][data-size='lg'] {
+  max-width: calc(var(--size-sidebar) * 2.5);
+}
+
+.panel[data-kind='drawer'] {
+  height: 100%;
+  border-block: 0;
+  border-radius: 0;
+}
+
+.panel[data-kind='drawer'][data-side='end'] {
+  border-inline-end: 0;
+  animation-name: slide-from-end;
+}
+
+.panel[data-kind='drawer'][data-side='start'] {
+  border-inline-start: 0;
+  animation-name: slide-from-start;
+}
+
+.panel:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-accent);
+  outline-offset: calc(var(--focus-ring-offset) * -1);
+}
+
+.header {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: var(--density-panel-padding-y) var(--density-panel-padding-x);
+  border-bottom: var(--border-width-thin) solid var(--color-border-soft);
+}
+
+.titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  min-width: 0;
+  padding-block-start: var(--space-1);
+}
+
+.body {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-3) var(--density-panel-padding-x);
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  padding: var(--density-panel-padding-y) var(--density-panel-padding-x);
+  border-top: var(--border-width-thin) solid var(--color-border-soft);
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes slide-from-end {
+  from {
+    transform: translateX(var(--space-6));
+    opacity: 0;
+  }
+}
+
+@keyframes slide-from-start {
+  from {
+    transform: translateX(calc(var(--space-6) * -1));
+    opacity: 0;
+  }
+}
