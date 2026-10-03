@@ -532,7 +532,7 @@ web (apps/web) ──HTTP/JSON──▶ routes/<area>.py ──one call──▶
 |---|---|
 | health | `/health`: storage kind, latest session, tables, versions |
 | explore | `/explore/tickers?date&<universe filters>&columns=<feature names>&sort=[-]<column>&page&size` (tickers × any catalogue columns, values through `InstrumentView`, columns validated against the catalogue); `/explore/compare?ids=a,b,c&features=` (one row per feature, one value per ticker); `/explore/compare/prices?ids&from&to&rebase=100&adjust` (closes on one date axis, rebased; `rebase=0`: raw) |
-| universe | `/universe?date&security_type&leveraged&sector&liquidity_class&q&page&size` |
+| universe | `/universe?date&security_type&leveraged&sector&liquidity_class&optionable&q&page&size` |
 | instruments | `/instruments/{id}` (id or ticker: reference + company + latest features); `.../bars?from&to&adjust=splits\|none\|total_return`; `.../events?from&to`; `.../features?names&from&to` |
 | chains | `/chains/{underlying_id}?date&expiry`: expiries, strikes, quotes with Cboe IV + Greeks, underlying quote, fetch status, our IV30 |
 | features | `/features` (catalogue: kind, dtype, description, null meaning, version, inputs); `/features/{name}/distribution?date` (count, nulls, quantiles, histogram or categories) |

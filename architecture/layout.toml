@@ -402,6 +402,14 @@ path = "apps/web/e2e"
 purpose = "Playwright end-to-end tests against the production build"
 
 [[web_dir]]
+path = "apps/web/e2e/fixtures"
+purpose = "API responses recorded from the real API for end-to-end route mocks, one folder per page"
+
+[[web_dir]]
+path = "apps/web/e2e/fixtures/*"
+purpose = "one page's recorded API responses (JSON), served by its e2e route mock"
+
+[[web_dir]]
 path = "apps/web/visual"
 purpose = "Playwright screenshot + axe suite over every design-system story, light and dark"
 
