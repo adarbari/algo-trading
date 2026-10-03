@@ -2,8 +2,8 @@
 
 from dataclasses import dataclass
 
-from algotrade.core.errors import ConfigurationError
-from algotrade.core.types import TargetWeights
+from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.types import TargetWeights
 
 
 @dataclass(frozen=True)

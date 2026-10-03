@@ -4,7 +4,7 @@ import math
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from algotrade.core.errors import AlgoTradeError
+from algotrade.core.model.errors import AlgoTradeError
 from algotrade.data import StoreReader
 from algotrade.engines.backtest.config import BacktestConfig
 from algotrade.engines.backtest.engine import run_backtest

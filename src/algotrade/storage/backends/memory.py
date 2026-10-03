@@ -12,7 +12,7 @@ from datetime import date, datetime
 import pandas as pd
 
 from algotrade.storage.backends.arrow import to_arrow, to_frame
-from algotrade.storage.backends.selection import concat_frames, latest_run, select_instruments
+from algotrade.storage.backends.run_selection import concat_frames, latest_run, select_instruments
 from algotrade.storage.locks import ThreadLock
 from algotrade.storage.runs import RunRecord, run_session
 

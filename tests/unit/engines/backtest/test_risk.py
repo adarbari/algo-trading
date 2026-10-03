@@ -1,7 +1,7 @@
 import pytest
 
-from algotrade.core.errors import ConfigurationError
-from algotrade.core.types import Side
+from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.types import Side
 from algotrade.engines.backtest.limits import RiskLimits, apply_limits
 from algotrade.engines.backtest.sizing import targets_to_orders
 from tests.factories import T0

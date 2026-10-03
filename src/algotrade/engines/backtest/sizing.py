@@ -4,7 +4,7 @@ import math
 from collections.abc import Mapping
 from datetime import datetime
 
-from algotrade.core.types import Order, Side, TargetWeights
+from algotrade.core.model.types import Order, Side, TargetWeights
 
 
 def targets_to_orders(

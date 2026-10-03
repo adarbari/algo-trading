@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from algotrade.core.errors import DataValidationError
-from algotrade.core.instruments import AssetClass
+from algotrade.core.model.errors import DataValidationError
+from algotrade.core.model.instruments import AssetClass
 from algotrade.data.resolver import SymbolResolver
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext

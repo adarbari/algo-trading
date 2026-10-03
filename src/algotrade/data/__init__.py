@@ -10,9 +10,9 @@ the domain rules on top:
 - ``chains``     option quotes, underlying quotes and chain status
 
 ``StoreReader`` is re-exported here because consumers hold one and hand it to these
-functions; they never import ``algotrade.storage.readers`` (import-linter contract R1).
+functions; they never import ``algotrade.storage.tables.readers`` (import-linter contract R1).
 """
 
-from algotrade.storage.readers import StoreReader
+from algotrade.storage.tables.readers import StoreReader
 
 __all__ = ["StoreReader"]

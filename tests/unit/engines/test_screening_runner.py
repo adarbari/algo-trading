@@ -2,8 +2,8 @@ from datetime import date
 
 import pytest
 
-from algotrade.core.errors import AlgoTradeError
-from algotrade.core.feature_view import FeatureView
+from algotrade.core.model.errors import AlgoTradeError
+from algotrade.core.views.feature_view import FeatureView
 from algotrade.engines.screening.runner import RunCoverage, run_screen
 from algotrade.strategies.screeners.base import Decision, Screener, ScreenRow
 

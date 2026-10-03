@@ -1,0 +1,192 @@
+"""Typed config objects parsed from plain dicts (TOML). Errors name the offending path."""
+
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from typing import Any
+
+from algotrade.config.user import validate_id
+from algotrade.core.model.errors import ConfigurationError
+
+OPS = frozenset(
+    {"eq", "ne", "in", "not_in", "gt", "gte", "lt", "lte", "between", "is_null", "not_null"}
+)
+NO_VALUE_OPS = frozenset({"is_null", "not_null"})
+KINDS = frozenset({"screener", "strategy"})
+SCHEDULES = frozenset({"nightly"})
+
+type Scalar = str | int | float | bool
+type RuleValue = Scalar | tuple[Scalar, ...] | None
+
+
+@dataclass(frozen=True)
+class Rule:
+    field: str
+    op: str
+    value: RuleValue = None
+
+    def describe(self) -> str:
+        return f"{self.field} {self.op}" + ("" if self.op in NO_VALUE_OPS else f" {self.value!r}")
+
+
+@dataclass(frozen=True)
+class Group:
+    """``all`` (AND), ``any`` (OR) or ``not`` over rules and nested groups."""
+
+    kind: str  # "all" | "any" | "not"
+    children: tuple["Rule | Group", ...]
+
+    def rules(self) -> list[Rule]:
+        out: list[Rule] = []
+        for child in self.children:
+            out.extend([child] if isinstance(child, Rule) else child.rules())
+        return out
+
+
+@dataclass(frozen=True)
+class Selection:
+    name: str
+    where: Group
+    max_instruments: int | None = None
+    order_by: str | None = None  # field; descending when max_instruments is set
+
+    def narrowed(self, extra: Group) -> "Selection":
+        """This selection AND ``extra`` (how a user narrows a shared preset)."""
+        return Selection(
+            self.name, Group("all", (self.where, extra)), self.max_instruments, self.order_by
+        )
+
+
+@dataclass(frozen=True)
+class StrategyConfig:
+    id: str
+    kind: str
+    impl: str
+    params: Mapping[str, Scalar] = field(default_factory=dict)
+    selection: str | Selection | None = None
+    selection_overrides: Group | None = None
+    schedule: str | None = None
+    exports: tuple[str, ...] = ()
+    settings: Mapping[str, Any] = field(default_factory=dict)  # screening / backtest overrides
+
+
+def _fail(path: str, message: str) -> ConfigurationError:
+    return ConfigurationError(f"{path}: {message}")
+
+
+def _scalar(value: Any, path: str) -> Scalar:
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    raise _fail(path, f"expected a string, number or boolean, got {type(value).__name__}")
+
+
+def parse_rule(raw: Mapping[str, Any], path: str) -> Rule:
+    unknown = set(raw) - {"field", "op", "value"}
+    if unknown:
+        raise _fail(path, f"unknown keys {sorted(unknown)}")
+    if not isinstance(raw.get("field"), str):
+        raise _fail(path, "rule needs a string 'field'")
+    op = raw.get("op")
+    if op not in OPS:
+        raise _fail(path, f"op must be one of {sorted(OPS)}, got {op!r}")
+    if op in NO_VALUE_OPS:
+        return Rule(raw["field"], op)
+    if "value" not in raw:
+        raise _fail(path, f"op {op!r} needs a 'value'")
+    value = raw["value"]
+    if op in ("in", "not_in", "between"):
+        if not isinstance(value, list) or not value:
+            raise _fail(path, f"op {op!r} needs a non-empty list")
+        if op == "between" and len(value) != 2:
+            raise _fail(path, "between needs [low, high]")
+        return Rule(raw["field"], op, tuple(_scalar(v, f"{path}.value") for v in value))
+    return Rule(raw["field"], op, _scalar(value, f"{path}.value"))
+
+
+def parse_group(raw: Mapping[str, Any], path: str) -> Group:
+    keys = [k for k in ("all", "any", "not") if k in raw]
+    if len(keys) != 1 or len(raw) != 1:
+        raise _fail(path, "a group has exactly one of 'all', 'any' or 'not'")
+    kind = keys[0]
+    items = raw[kind] if kind != "not" else [raw[kind]]
+    if not isinstance(items, list) or not items:
+        raise _fail(f"{path}.{kind}", "expected a non-empty list")
+    children: list[Rule | Group] = []
+    for i, item in enumerate(items):
+        child_path = f"{path}.{kind}[{i}]" if kind != "not" else f"{path}.not"
+        if not isinstance(item, Mapping):
+            raise _fail(child_path, "expected a table")
+        is_group = any(k in item for k in ("all", "any", "not"))
+        children.append(parse_group(item, child_path) if is_group else parse_rule(item, child_path))
+    return Group(kind, tuple(children))
+
+
+def parse_selection(raw: Mapping[str, Any], path: str) -> Selection:
+    unknown = set(raw) - {"name", "where", "max_instruments", "order_by"}
+    if unknown:
+        raise _fail(path, f"unknown keys {sorted(unknown)}")
+    name = validate_id("selection", str(raw.get("name", "")))
+    if not isinstance(raw.get("where"), Mapping):
+        raise _fail(path, "selection needs a 'where' group")
+    limit = raw.get("max_instruments")
+    if limit is not None and (not isinstance(limit, int) or limit <= 0):
+        raise _fail(f"{path}.max_instruments", "must be a positive integer")
+    order_by = raw.get("order_by")
+    if limit is not None and not isinstance(order_by, str):
+        raise _fail(path, "max_instruments needs an 'order_by' field")
+    return Selection(name, parse_group(raw["where"], f"{path}.where"), limit, order_by)
+
+
+def parse_strategy(raw: Mapping[str, Any], path: str) -> StrategyConfig:
+    allowed = {
+        "id",
+        "kind",
+        "impl",
+        "params",
+        "selection",
+        "selection_overrides",
+        "schedule",
+        "exports",
+        "screening",
+        "backtest",
+        "extends",
+    }
+    unknown = set(raw) - allowed
+    if unknown:
+        raise _fail(path, f"unknown keys {sorted(unknown)}")
+    cid = validate_id("config", str(raw.get("id", "")))
+    if raw.get("kind") not in KINDS:
+        raise _fail(f"{path}.kind", f"must be one of {sorted(KINDS)}")
+    if not isinstance(raw.get("impl"), str):
+        raise _fail(f"{path}.impl", "required: the registered strategy/screener name")
+    params = raw.get("params", {})
+    if not isinstance(params, Mapping):
+        raise _fail(f"{path}.params", "expected a table")
+    selection_raw = raw.get("selection")
+    selection: str | Selection | None
+    if isinstance(selection_raw, str) or selection_raw is None:
+        selection = selection_raw
+    elif isinstance(selection_raw, Mapping):
+        selection = parse_selection(selection_raw, f"{path}.selection")
+    else:
+        raise _fail(f"{path}.selection", "expected a preset name or a selection table")
+    overrides = raw.get("selection_overrides")
+    schedule = raw.get("schedule")
+    if schedule is not None and schedule not in SCHEDULES:
+        raise _fail(f"{path}.schedule", f"must be one of {sorted(SCHEDULES)}")
+    exports = raw.get("exports", [])
+    if not isinstance(exports, list) or not all(isinstance(e, str) for e in exports):
+        raise _fail(f"{path}.exports", "expected a list of export names")
+    settings = {k: raw[k] for k in ("screening", "backtest") if k in raw}
+    return StrategyConfig(
+        id=cid,
+        kind=raw["kind"],
+        impl=raw["impl"],
+        params={k: _scalar(v, f"{path}.params.{k}") for k, v in params.items()},
+        selection=selection,
+        selection_overrides=parse_group(overrides, f"{path}.selection_overrides")
+        if overrides
+        else None,
+        schedule=schedule,
+        exports=tuple(exports),
+        settings=settings,
+    )

@@ -6,8 +6,8 @@ from dataclasses import asdict, dataclass
 
 import numpy as np
 
-from algotrade.core.series import FloatArray
-from algotrade.core.types import Fill
+from algotrade.core.model.types import Fill
+from algotrade.core.views.series import FloatArray
 
 
 @dataclass(frozen=True)

@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any, cast
 
-from algotrade.core.options import OptionRight, standard_monthly_expiries
+from algotrade.core.model.options import OptionRight, standard_monthly_expiries
 
 NAME = "option_liquidity"
 VERSION = 1

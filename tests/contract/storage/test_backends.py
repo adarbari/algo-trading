@@ -8,14 +8,14 @@ import pandas as pd
 import pytest
 
 from algotrade.config.env import data_url
-from algotrade.core.errors import ConfigurationError, DataValidationError, MissingDataError
+from algotrade.core.model.errors import ConfigurationError, DataValidationError, MissingDataError
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.factory import open_backend
-from algotrade.storage.interfaces import Backend
-from algotrade.storage.readers import StoreReader
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
-from algotrade.storage.writers import StoreWriter
+from algotrade.storage.tables.interfaces import Backend
+from algotrade.storage.tables.readers import StoreReader
+from algotrade.storage.tables.writers import StoreWriter
 from tests.storage_helpers import T0, stamped, universe_rows
 
 D1, D2 = date(2026, 10, 1), date(2026, 10, 2)

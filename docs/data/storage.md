@@ -71,7 +71,7 @@ sanity-checked on write), `chains/underlying_quotes`, `chains/option_quotes`,
 (e.g. `rollups/instrument/option_liquidity@v1`); `universe`; `catalog/*`; `results/<name>`.
 ## Column types and schema version
 
-`storage/schemas.py` is the data contract. Every **fixed** table (`universe`,
+`storage/tables/schemas.py` is the data contract. Every **fixed** table (`universe`,
 `instruments/*`, `chains/*`, `bars/<interval>`) declares every column with an abstract type
 and nullability; open tables (`events/*`, `rollups/*`, `results/*`, `catalog/*`) declare the
 point-in-time columns and their keys (`instrument_id`, `ts` for events), and the producer
@@ -114,7 +114,7 @@ makes the statistics selective.
 ## Reading
 
 Consumers (services, engines, apps) read market data only through `algotrade.data`
-(ADR 0019 R1, an import-linter contract); `storage/readers.py` is the generic reader it
+(ADR 0019 R1, an import-linter contract); `storage/tables/readers.py` is the generic reader it
 builds on: `table`, `table_range` (date range, each partition resolved point-in-time),
 `dates`, `latest_date`, `runs` and `table_names` (every table with data; backends implement
 `TableStore.names()`). Storage holds no domain rules (R2).
@@ -167,16 +167,25 @@ internal detail of the backend; nothing outside `storage/backends/` relies on it
 
 ```
 storage/
-  interfaces.py        Protocols per grain: ReferenceStore, EventStore, BarStore, ChainStore,
+  tables/
+    interfaces.py      Protocols per grain: ReferenceStore, EventStore, BarStore, ChainStore,
                        UniverseStore, FeatureStore, ResultStore, Catalog
-  schemas.py           canonical column schemas, declared types + validation (the data contract)
-  readers.py           generic read-only facade (tables, ranges, dates, runs); domain reads are
+    schemas.py         canonical column schemas, declared types + validation (the data contract)
+    readers.py         generic read-only facade (tables, ranges, dates, runs); domain reads are
                        algotrade/data/ (reference, prices, events, chains, resolver)
-  writers.py           write facade. Only apps/ingestion may import this (import-linter).
+    writers.py         write facade. Only apps/ingestion may import this (import-linter).
+    result_writer.py   results/<name> + run records for screens and backtests
   backends/
     local.py           now: Parquet on the local filesystem (DuckDB-readable)
+    memory.py          in-memory backend for tests
+    arrow.py           casts to declared types, schema_version, row groups (the only pyarrow)
+    run_selection.py   latest-run / instrument selection shared by the backends
     (s3_parquet.py)    later: same files in S3-compatible object storage
     (postgres.py, clickhouse.py, ...)  only if ever needed
+  configs/             config documents only (never imports tables/ or backends/)
+    store.py           the ConfigStore protocol
+    files.py           file and memory config stores
+  runs.py, locks.py    run records; named locks
   factory.py           open_backend(url) picks the backend; the URL comes from
                        config/env.py (ALGOTRADE_DATA_URL), storage reads no environment
 ```

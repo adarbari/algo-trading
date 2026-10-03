@@ -15,7 +15,7 @@ from datetime import date
 
 import pandas as pd
 
-from algotrade.core.instruments import equity_id
+from algotrade.core.model.instruments import equity_id
 
 
 def _clean(symbol: object) -> str:

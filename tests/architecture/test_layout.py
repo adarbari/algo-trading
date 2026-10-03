@@ -1,7 +1,8 @@
 """Fitness tests for the directory layout (ADR 0020, ``architecture/layout.toml``).
 
 - every Python module under ``src/`` and ``apps/`` lives in a declared directory;
-- at most ``max_modules`` modules per directory (``[[exception]]`` entries only shrink);
+- at most ``max_modules`` modules per directory, with no exceptions;
+- the import-linter contracts a declaration names exist in ``pyproject.toml``;
 - every package has an ``__init__.py`` docstring saying what the folder holds;
 - vendor folders: each contributes a source to the source registry, and only the registry
   imports it;
@@ -26,7 +27,12 @@ LAYOUT_FILE = "architecture/layout.toml"
 LAYOUT: dict[str, Any] = tomllib.loads((REPO_ROOT / LAYOUT_FILE).read_text())
 HINT = f"declare it in {LAYOUT_FILE} (see .claude/skills/add-responsibility)"
 DIRS: list[dict[str, Any]] = LAYOUT["dir"]
-EXCEPTIONS = {e["path"]: e for e in LAYOUT.get("exception", [])}
+CONTRACTS = {
+    c["name"]
+    for c in tomllib.loads((REPO_ROOT / "pyproject.toml").read_text())["tool"]["importlinter"][
+        "contracts"
+    ]
+}
 SHARED = {s["module"]: s for s in LAYOUT.get("shared", [])}
 PACKAGE_ROOTS = ("src", "apps/ingestion", "apps/backtest")  # directories on sys.path
 
@@ -113,9 +119,11 @@ def test_layout_declarations_are_well_formed_and_not_stale() -> None:
     for decl in DIRS:
         assert decl.get("purpose"), f"{decl['path']}: needs a one-line purpose"
         assert decl.get("kind") in (None, "vendor", "task-domain"), decl
+        unknown = set(decl.get("contracts", [])) - CONTRACTS
+        assert not unknown, f"{decl['path']}: no import-linter contract named {sorted(unknown)}"
         unused = not any(_matches(d, decl["path"]) for d in CODE_DIRS)
         assert not unused, f"{decl['path']} holds no Python code: remove it from {LAYOUT_FILE}"
-    for entry in [*EXCEPTIONS.values(), *SHARED.values()]:
+    for entry in SHARED.values():
         assert entry.get("reason"), f"{entry}: needs a reason"
 
 
@@ -137,18 +145,13 @@ def _module_counts() -> dict[str, int]:
 
 def test_directories_hold_at_most_max_modules() -> None:
     limit = LAYOUT["max_modules"]
-    over = {d: n for d, n in _module_counts().items() if n > limit and d not in EXCEPTIONS}
+    over = {d: n for d, n in _module_counts().items() if n > limit}
     assert not over, f"more than {limit} modules (split the folder by kind, {HINT}): {over}"
 
 
-def test_layout_exceptions_only_shrink() -> None:
-    counts, limit = _module_counts(), LAYOUT["max_modules"]
-    for path, entry in EXCEPTIONS.items():
-        assert entry.get("until"), f"{path}: an exception needs `until`"
-        assert counts.get(path, 0) > limit, (
-            f"{path} has {counts.get(path, 0)} modules (limit {limit}): "
-            f"remove its [[exception]] from {LAYOUT_FILE}"
-        )
+def test_there_are_no_layout_exceptions() -> None:
+    """Layout PR B removed the last exception; oversized folders are split, never excused."""
+    assert "exception" not in LAYOUT, f"{LAYOUT_FILE} must have no [[exception]] (ADR 0020)"
 
 
 # ----------------------------------------------------------------------------- packages

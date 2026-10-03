@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from algotrade.core.series import FIELDS, align
+from algotrade.core.views.series import FIELDS, align
 from algotrade_ingestion.sources.fixtures.files import bar_problems
 from algotrade_ingestion.sources.fixtures.generators import (
     Regime,

@@ -7,12 +7,12 @@ storage never reads environment variables.
 from pathlib import Path
 from urllib.parse import urlparse
 
-from algotrade.core.errors import ConfigurationError
-from algotrade.storage.backends.config_files import FileConfigStore
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.config_store import ConfigStore
-from algotrade.storage.interfaces import Backend
+from algotrade.storage.configs.files import FileConfigStore
+from algotrade.storage.configs.store import ConfigStore
+from algotrade.storage.tables.interfaces import Backend
 
 
 def open_backend(url: str) -> Backend:

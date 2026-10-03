@@ -5,7 +5,7 @@ from algotrade.data import StoreReader
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
-from algotrade.storage.writers import StoreWriter
+from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.sources.framework.http import HttpError, RetryPolicy
 from algotrade_ingestion.sources.vendors.cboe.option_chains import URL, CboeOptionsSource
 from algotrade_ingestion.tasks.derived.features import TABLE, compute_option_liquidity
@@ -171,7 +171,7 @@ def test_universe_import(tmp_path: Path) -> None:
 def test_universe_import_requires_ticker(tmp_path: Path) -> None:
     import pytest  # noqa: PLC0415
 
-    from algotrade.core.errors import DataValidationError  # noqa: PLC0415
+    from algotrade.core.model.errors import DataValidationError  # noqa: PLC0415
 
     bad = tmp_path / "bad.csv"
     bad.write_text("symbol\nAAPL\n")

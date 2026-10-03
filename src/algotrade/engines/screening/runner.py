@@ -11,8 +11,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
-from algotrade.core.errors import AlgoTradeError
-from algotrade.core.feature_view import FeatureView
+from algotrade.core.model.errors import AlgoTradeError
+from algotrade.core.views.feature_view import FeatureView
 from algotrade.strategies.screeners.base import Decision, Screener, ScreenRow
 
 DEFAULT_MIN_COVERAGE = 0.98

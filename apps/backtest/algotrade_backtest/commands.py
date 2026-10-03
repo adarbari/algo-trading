@@ -6,9 +6,9 @@ import sys
 
 from algotrade.analytics.report import markdown_table
 from algotrade.config.env import config_dir, data_url
-from algotrade.config.resolve import ResolvedConfig
+from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.user import UserContext
-from algotrade.core.errors import ConfigurationError
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.engines.backtest.engine import run_backtest
 from algotrade.services.configs import default_user, resolve_config
@@ -18,7 +18,7 @@ from algotrade.services.evaluation.suite import run_suite, with_benchmark_excess
 from algotrade.services.jobs import JobStatus, run_job
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.factory import open_backend, open_config_store
-from algotrade.storage.result_writer import ResultWriter
+from algotrade.storage.tables.result_writer import ResultWriter
 from algotrade.strategies.trading.registry import create_strategy
 
 SCORECARD_COLUMNS = (

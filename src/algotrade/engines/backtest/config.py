@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 
-from algotrade.core.errors import ConfigurationError
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.engines.backtest.costs import CostModel
 from algotrade.engines.backtest.limits import RiskLimits
 

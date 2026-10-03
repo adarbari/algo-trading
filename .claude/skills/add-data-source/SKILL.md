@@ -16,7 +16,7 @@ ingest loop (`tasks/framework/run.py`, `IngestRun`). **Never pace, sleep or buil
 yourself**: the source takes one `Http` client and calls `http.get(url)`. Keep every vendor detail (file
 names, request keys, response fields) inside `sources/vendors/<vendor>/`; never import
 `algotrade.storage` (contract R4). New `sources.toml` keys are typed in
-`src/algotrade/config/settings.py`. Look these up in `architecture/ownership.toml`; `make ownership`
+`src/algotrade/config/site/settings.py`. Look these up in `architecture/ownership.toml`; `make ownership`
 must pass with `architecture/known_violations.toml` still empty.
 
 1. **Location:** a new folder `apps/ingestion/algotrade_ingestion/sources/vendors/<vendor>/`
@@ -55,7 +55,7 @@ must pass with `architecture/known_violations.toml` still empty.
 7. **Tests:** mirror the folder (`tests/apps/ingestion/sources/vendors/<vendor>/`). Save real
    responses as fixtures under `tests/fixtures/sources/<vendor>/` (strip account ids). Unit-test normalisation, error handling (429s, gateway down,
    partial responses) and symbol mapping. No network access in CI.
-8. **Data quality:** validation in `storage/schemas.py` must pass. Add vendor-specific
+8. **Data quality:** validation in `storage/tables/schemas.py` must pass. Add vendor-specific
    sanity checks (for example bid ≤ ask, open interest ≥ 0).
 9. **Docs:** update the table in `docs/data/vendors.md`. If the vendor changes a decision,
    write an ADR.

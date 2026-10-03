@@ -2,9 +2,9 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from algotrade.core.errors import DataValidationError
+from algotrade.core.model.errors import DataValidationError
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id, run_session
-from algotrade.storage.schemas import spec_for, validate_frame
+from algotrade.storage.tables.schemas import spec_for, validate_frame
 from tests.storage_helpers import stamped
 
 
@@ -43,7 +43,7 @@ def test_start_run_and_finish_decide_complete_or_partial() -> None:
 
 
 def test_column_types_are_checked() -> None:
-    from algotrade.storage.schemas import Column  # noqa: PLC0415
+    from algotrade.storage.tables.schemas import Column  # noqa: PLC0415
 
     with pytest.raises(ValueError, match="unknown column type"):
         Column("x", "decimal")

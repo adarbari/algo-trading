@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from algotrade.core.errors import ConfigurationError
-from algotrade.core.market_view import MarketView
-from algotrade.core.types import TargetWeights
+from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.types import TargetWeights
+from algotrade.core.views.market_view import MarketView
 from algotrade.engines.backtest.config import BacktestConfig
 from algotrade.engines.backtest.costs import CostModel
 from algotrade.engines.backtest.engine import run_backtest
@@ -79,7 +79,7 @@ def test_config_validation(kwargs: dict[str, float]) -> None:
 
 
 def test_instruments_supply_multipliers() -> None:
-    from algotrade.core.instruments import AssetClass, Instrument  # noqa: PLC0415
+    from algotrade.core.model.instruments import AssetClass, Instrument  # noqa: PLC0415
 
     data = {"TEST": series_from_closes([2, 2, 3, 4])}
     option = {"TEST": Instrument("TEST", "TEST", AssetClass.OPTION, multiplier=100)}

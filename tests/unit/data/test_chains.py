@@ -5,11 +5,11 @@ from datetime import date
 import pandas as pd
 import pytest
 
-from algotrade.core.errors import MissingDataError
+from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.chains import chain_status, option_quotes, underlying_quotes
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.writers import StoreWriter
+from algotrade.storage.tables.writers import StoreWriter
 from tests.storage_helpers import stamped
 
 DAY = date(2026, 10, 1)

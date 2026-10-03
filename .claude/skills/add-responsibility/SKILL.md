@@ -29,8 +29,11 @@ a genuine exception, write an ADR and list the module in `allowed` with the reas
    `src/` and `apps/` with its purpose (one kind of thing per folder, at most 10 modules).
    Put the module in the folder whose purpose fits; a new folder needs a `[[dir]]` entry
    with a one-line purpose and an `__init__.py` docstring in the same PR
-   (`tests/architecture/test_layout.py`, ADR 0020). Never add an `[[exception]]` for a new
-   oversized folder: split it by kind.
+   (`tests/architecture/test_layout.py`, ADR 0020); if an import-linter contract enforces
+   its rule, name it in `contracts`. There are no `[[exception]]` entries (a test keeps it
+   so): split an oversized folder by kind. Library kinds: `core/{model,time,views,validation}`,
+   `config/{site,strategy}`, `storage/{tables,backends,configs}`, a `services/<use case>/`
+   package per use case (helpers shared by several stay at `services/`).
 4. **New stored table:** add a `[[table]]` with exactly one producing `owner`.
 5. **Moving a responsibility:** move the code and make the new module the `owner` in the
    same PR (a `target_owner` may bridge a multi-PR move; remove it when done). Run
@@ -41,8 +44,8 @@ a genuine exception, write an ADR and list the module in `allowed` with the reas
    changes, write an ADR (`.claude/skills/write-adr`) and update `docs/architecture.md`
    section 13 and the Ownership table in `CLAUDE.md`.
 7. **Site settings:** a new key in `config/site/*.toml` gets a typed field in
-   `src/algotrade/config/settings.py` (the one loader, with validation and an error path) and
+   `src/algotrade/config/site/settings.py` (the one loader, with validation and an error path) and
    must drive code (`tests/architecture/test_ownership.py`). Environment variables are read
    only in `src/algotrade/config/env.py`. A new table column is declared with its type in
-   `src/algotrade/storage/schemas.py`.
+   `src/algotrade/storage/tables/schemas.py`.
 8. Run `make check`.

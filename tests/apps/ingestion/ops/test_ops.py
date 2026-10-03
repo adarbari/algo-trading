@@ -5,12 +5,12 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from algotrade.config.settings import SourcesSettings, load_sources
+from algotrade.config.site.settings import SourcesSettings, load_sources
 from algotrade.data import StoreReader
-from algotrade.storage.backends.config_files import MemoryConfigStore
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunStatus
-from algotrade.storage.writers import StoreWriter
+from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.ops.schedule import LABEL, nightly_plist
 from algotrade_ingestion.tasks.maintenance.quality import run_quality
 from tests.ingest_helpers import task_ctx

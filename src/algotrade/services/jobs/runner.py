@@ -8,9 +8,9 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
 from algotrade.config.user import UserContext
-from algotrade.core.errors import AlgoTradeError, ConfigurationError
+from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
 from algotrade.services.jobs.models import JobRecord, JobStatus, job_id_for
-from algotrade.storage.interfaces import RunStore
+from algotrade.storage.tables.interfaces import RunStore
 
 
 @dataclass(frozen=True)

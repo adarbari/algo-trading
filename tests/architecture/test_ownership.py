@@ -21,7 +21,7 @@ from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any
 
-from algotrade.storage import schemas
+from algotrade.storage.tables import schemas
 from tests.conftest import REPO_ROOT
 
 REGISTRY = tomllib.loads((REPO_ROOT / "architecture" / "ownership.toml").read_text())
@@ -31,7 +31,7 @@ CODE_FILES = sorted(
 )
 SITE_SETTINGS = sorted((REPO_ROOT / "config" / "site").glob("*.toml"))
 # Typed views of L3 settings (the one loader): every field must be used by code, not only parsed.
-TYPED_SETTINGS_FILE = "src/algotrade/config/settings.py"
+TYPED_SETTINGS_FILE = "src/algotrade/config/site/settings.py"
 TYPED_SETTINGS = (
     "SourcesSettings",
     "VendorSettings",

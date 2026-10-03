@@ -35,7 +35,7 @@ description = "Domain reads of market data (reference, InstrumentView, universe,
 owner = ["src/algotrade/data/*"]
 allowed = ["src/algotrade/storage/*"]  # the generic reader itself lives in storage
 section = "docs/adr/0019-ownership-and-boundaries.md#r1-only-data-reads-market-data"
-detect = [{ import = "algotrade.storage.readers" }]
+detect = [{ import = "algotrade.storage.tables.readers" }]
 
 # --------------------------------------------------------------------------- the ingest loop
 
@@ -68,7 +68,7 @@ detect = [{ call = "stamp" }]
 id = "id-resolution"
 description = "Turn vendor tickers into instrument ids (ADR 0018); build EQ: ids only through the id rule"
 owner = [
-    "src/algotrade/core/instruments.py",
+    "src/algotrade/core/model/instruments.py",
     "src/algotrade/data/resolver.py",
     "apps/ingestion/algotrade_ingestion/tasks/reference/instrument_ids.py",
     "apps/ingestion/algotrade_ingestion/tasks/framework/run.py",
@@ -160,9 +160,9 @@ detect = [{ import = "fcntl" }, { call = "flock" }]
 id = "site-settings"
 description = "Load and type L3 site settings (config/site/*.toml: sources, universe + overrides, nightly, defaults): one loader, frozen dataclasses; the store only reads files"
 owner = [
-    "src/algotrade/config/settings.py",
-    "src/algotrade/storage/config_store.py",
-    "src/algotrade/storage/backends/config_files.py",
+    "src/algotrade/config/site/settings.py",
+    "src/algotrade/storage/configs/store.py",
+    "src/algotrade/storage/configs/files.py",
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#settings-and-environment"
 detect = [
@@ -174,8 +174,8 @@ detect = [
 [[responsibility]]
 id = "session-calendar"
 description = "Which day is a trading session, in exchange time (weekends, holidays, early closes); the last closed session"
-owner = ["src/algotrade/core/calendar.py"]
-allowed = ["src/algotrade/core/time.py"]  # business_days: a plain weekday grid for synthetic golden data (no holidays by design)
+owner = ["src/algotrade/core/time/calendar.py"]
+allowed = ["src/algotrade/core/time/clock.py"]  # business_days: a plain weekday grid for synthetic golden data (no holidays by design)
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
 detect = [
     { call = "ZoneInfo", arg = "America/New_York" },
@@ -198,7 +198,7 @@ detect = [
 [[responsibility]]
 id = "screen-execution"
 description = "Run a configured screen (select, screen, audit, write results); nightly submits `screen` jobs (workflows/nightly/screens.py)"
-owner = ["src/algotrade/services/screening.py", "src/algotrade/services/jobs/handlers.py"]
+owner = ["src/algotrade/services/screening/run.py", "src/algotrade/services/jobs/handlers.py"]
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
 detect = [{ call = "run_screener" }]
 
@@ -286,8 +286,8 @@ note = "none produced yet (phase 6); rollups are computed only by the features t
 
 [[table]]
 name = "results/*"
-owner = "src/algotrade/storage/result_writer.py"
-note = "one results/<name> per screener (services/screening.py) or backtest output (services/backtests.py)"
+owner = "src/algotrade/storage/tables/result_writer.py"
+note = "one results/<name> per screener (services/screening/run.py) or backtest output (services/backtests/run.py)"
 
 [[table]]
 name = "catalog/golden_datasets"

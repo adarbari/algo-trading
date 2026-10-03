@@ -4,7 +4,7 @@ Reads ``option_liquidity@v1``. The original pipeline called a pass ``process_fur
 here that is ``Decision.QUALIFIED``. Missing or failed data is ``UNKNOWN`` (fail closed).
 """
 
-from algotrade.core.feature_view import FeatureView
+from algotrade.core.views.feature_view import FeatureView
 from algotrade.strategies.screeners.base import Decision, Screener, ScreenRow
 
 FEATURE = "rollups/instrument/option_liquidity@v1"

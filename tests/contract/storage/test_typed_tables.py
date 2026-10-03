@@ -1,4 +1,4 @@
-"""Typed tables (``storage/schemas.py``): every backend casts writes to the declared column
+"""Typed tables (``storage/tables/schemas.py``): every backend casts writes to the declared column
 types, rejects uncastable data and undeclared columns, and the local backend stamps the schema
 version, writes pruneable row groups and reads files written before the types existed."""
 
@@ -14,13 +14,13 @@ import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 import pytest
 
-from algotrade.core.errors import DataValidationError
+from algotrade.core.model.errors import DataValidationError
 from algotrade.storage.backends.arrow import ROW_GROUP_SIZE, TABLE_KEY, VERSION_KEY
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.interfaces import Backend
-from algotrade.storage.schemas import SCHEMA_VERSION, spec_for
-from algotrade.storage.writers import StoreWriter
+from algotrade.storage.tables.interfaces import Backend
+from algotrade.storage.tables.schemas import SCHEMA_VERSION, spec_for
+from algotrade.storage.tables.writers import StoreWriter
 from tests.storage_helpers import T0, stamped
 
 D1, D2 = date(2026, 10, 1), date(2026, 10, 2)

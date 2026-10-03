@@ -18,7 +18,7 @@ config/users/<user_id>/             L4: git-ignored locally; a DB behind ConfigS
 ```
 
 The location comes from `ALGOTRADE_CONFIG_DIR` (default `./config`) or `--config-dir`. Only
-`storage/backends/config_files.py` knows this layout; everything else uses the `ConfigStore`
+`storage/configs/files.py` knows this layout; everything else uses the `ConfigStore`
 protocol (`load(scope, kind, name)`, `names`, `users`).
 
 ## Objects (`src/algotrade/config/`, pure, no I/O)
@@ -101,7 +101,7 @@ how stored unadjusted bars are adjusted for corporate actions when a backtest re
 
 ## Site settings (typed, one loader)
 
-Every `config/site/*.toml` is loaded and validated by `src/algotrade/config/settings.py`
+Every `config/site/*.toml` is loaded and validated by `src/algotrade/config/site/settings.py`
 alone (ADR 0019 `site-settings`); apps receive frozen dataclasses, never dicts:
 
 | File | Type | Holds |

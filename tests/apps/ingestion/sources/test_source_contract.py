@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from algotrade.data.resolver import SymbolResolver
-from algotrade.storage.schemas import COMMON, spec_for, validate_frame
+from algotrade.storage.tables.schemas import COMMON, spec_for, validate_frame
 from algotrade_ingestion.sources.fixtures.files import GoldenFiles
 from algotrade_ingestion.sources.fixtures.source import GoldenCsvSource
 from algotrade_ingestion.sources.framework.base import FetchRequest, Source

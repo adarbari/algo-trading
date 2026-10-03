@@ -3,12 +3,12 @@
 from collections.abc import Mapping
 from typing import Any
 
-from algotrade.config.catalog import FieldCatalog
 from algotrade.config.env import user_id
-from algotrade.config.resolve import ResolvedConfig, resolve
+from algotrade.config.strategy.catalog import FieldCatalog
+from algotrade.config.strategy.resolve import ResolvedConfig, resolve
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.features.registry import FEATURES
-from algotrade.storage.config_store import ConfigStore
+from algotrade.storage.configs.store import ConfigStore
 
 
 def default_user(fallback: str) -> UserContext:

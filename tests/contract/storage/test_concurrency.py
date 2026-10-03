@@ -11,7 +11,7 @@ import pytest
 
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.interfaces import Backend
+from algotrade.storage.tables.interfaces import Backend
 from tests.storage_helpers import stamped
 
 DAY = date(2026, 10, 1)

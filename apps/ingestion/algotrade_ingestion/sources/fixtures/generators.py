@@ -10,8 +10,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from algotrade.core.series import FloatArray, PriceSeries, TimeArray
-from algotrade.core.time import business_days
+from algotrade.core.time.clock import business_days
+from algotrade.core.views.series import FloatArray, PriceSeries, TimeArray
 
 TRADING_DAYS = 252
 

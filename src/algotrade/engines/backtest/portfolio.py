@@ -7,7 +7,7 @@ the fills that opened it.
 from collections.abc import Mapping
 from types import MappingProxyType
 
-from algotrade.core.types import Fill
+from algotrade.core.model.types import Fill
 
 _EPSILON = 1e-9
 

@@ -14,11 +14,16 @@ from datetime import date, datetime, timedelta
 
 import pandas as pd
 
-from algotrade.core.errors import MissingDataError
-from algotrade.core.fields import COMPANY_TABLE, REFERENCE_TABLE, field_source, instrument_field
-from algotrade.core.instruments import AssetClass, Instrument
+from algotrade.core.model.errors import MissingDataError
+from algotrade.core.model.fields import (
+    COMPANY_TABLE,
+    REFERENCE_TABLE,
+    field_source,
+    instrument_field,
+)
+from algotrade.core.model.instruments import AssetClass, Instrument
 from algotrade.data.resolver import SymbolResolver
-from algotrade.storage.readers import StoreReader
+from algotrade.storage.tables.readers import StoreReader
 
 UNIVERSE_TABLE = "universe"
 UNIVERSE_HINT = "algotrade-ingest universe import --stocks <csv> --etfs <csv> --version <v>"

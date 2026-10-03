@@ -10,8 +10,8 @@ from datetime import date, datetime
 
 import pandas as pd
 
-from algotrade.core.errors import MissingDataError
-from algotrade.storage.readers import StoreReader
+from algotrade.core.model.errors import MissingDataError
+from algotrade.storage.tables.readers import StoreReader
 
 OPTION_QUOTES = "chains/option_quotes"
 UNDERLYING_QUOTES = "chains/underlying_quotes"

@@ -5,9 +5,9 @@ from datetime import UTC, datetime
 
 import numpy as np
 
-from algotrade.core.series import PriceSeries
-from algotrade.core.time import business_days
-from algotrade.core.types import Fill, Side
+from algotrade.core.model.types import Fill, Side
+from algotrade.core.time.clock import business_days
+from algotrade.core.views.series import PriceSeries
 
 T0 = datetime(2024, 1, 2, tzinfo=UTC)
 

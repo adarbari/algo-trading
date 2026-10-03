@@ -1,7 +1,7 @@
 """Equal-weight buy-and-hold: the benchmark every other strategy must beat."""
 
-from algotrade.core.market_view import MarketView
-from algotrade.core.types import TargetWeights
+from algotrade.core.model.types import TargetWeights
+from algotrade.core.views.market_view import MarketView
 from algotrade.strategies.trading.base import Strategy
 
 

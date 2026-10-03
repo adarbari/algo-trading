@@ -1,6 +1,6 @@
 import pytest
 
-from algotrade.core.types import Order, Side
+from algotrade.core.model.types import Order, Side
 from algotrade.engines.backtest.costs import CostModel
 from algotrade.engines.backtest.simulated import SimulatedBroker
 from tests.factories import T0

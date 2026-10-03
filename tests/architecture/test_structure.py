@@ -23,7 +23,7 @@ def test_file_length_limit() -> None:
 def test_every_layer_has_unit_tests() -> None:
     missing = [
         layer for layer in LAYERS
-        if layer != "cli" and not any((REPO_ROOT / "tests" / "unit" / layer).glob("test_*.py"))
+        if layer != "cli" and not any((REPO_ROOT / "tests" / "unit" / layer).rglob("test_*.py"))
     ]  # fmt: skip
     assert not missing, f"layers without unit tests: {missing}"
 
@@ -47,7 +47,7 @@ def test_every_module_has_a_docstring() -> None:
 # ADR 0018: equity ids come from the id rule (core) or the symbol resolver, never ad hoc.
 _ADHOC_ID = re.compile(r"""f?["']EQ:|AssetClass\.EQUITY\s*,|\bequity_id\(""")
 _ID_OWNERS = {
-    "src/algotrade/core/instruments.py",
+    "src/algotrade/core/model/instruments.py",
     "src/algotrade/data/resolver.py",
     "apps/ingestion/algotrade_ingestion/tasks/reference/instrument_ids.py",
 }
