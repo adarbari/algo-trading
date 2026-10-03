@@ -8,7 +8,8 @@ Every ingestion task runs inside one ``IngestRun``, which owns:
 - ticker -> instrument id resolution through ``algotrade.data`` (one resolver per reference
   snapshot, unresolved tickers counted);
 - point-in-time stamping (``session_date``, ``knowledge_ts``, ``source``, ``run_id``) and
-  validated writes (``write``, ``stage`` / ``publish`` for per-item scratch);
+  validated writes (``write``, ``stage`` / ``publish`` for per-item scratch,
+  ``stage_sessions`` / ``publish_sessions`` when an item's rows span many sessions);
 - the run status, decided in one place: any failed item or explicit ``partial`` -> PARTIAL;
   an exception escaping the ``with`` block -> FAILED, saved, then re-raised; an explicit
   ``failed`` (a workflow whose every step failed) -> FAILED; else COMPLETE;
@@ -351,6 +352,30 @@ class IngestRun:
         """Stamp one item's rows into run scratch; ``publish`` writes them as one partition."""
         self.writer.staging.put(self.run_id, table, key, self.stamped(frame, source))
 
+    def stage_sessions(self, table: str, key: str, frame: pd.DataFrame, source: str) -> None:
+        """Like ``stage``, for rows of several sessions (``frame`` carries a ``session_date``
+        per row, kept); ``publish_sessions`` writes one partition per session."""
+        days = list(frame["session_date"])
+        out = self.stamped(frame.drop(columns="session_date"), source)
+        out["session_date"] = days
+        self.writer.staging.put(self.run_id, table, key, out)
+
+    def publish_sessions(self, table: str, sort_by: str = "instrument_id") -> dict[date, int]:
+        """Write a staged table as one partition per ``session_date`` (``knowledge_ts`` =
+        publish time) -> rows per session."""
+        frame = self.writer.staging.collect(self.run_id, table)
+        if frame is None:
+            return {}
+        frame["session_date"] = pd.to_datetime(frame["session_date"]).dt.date
+        frame["knowledge_ts"] = pd.Timestamp(self.clock())
+        out: dict[date, int] = {}
+        for key, rows in frame.groupby("session_date", sort=True):
+            day = pd.Timestamp(str(key)).date()
+            part = rows.sort_values(sort_by, kind="stable").reset_index(drop=True)
+            self.writer.write_table(table, day, self.run_id, part, pending=True)
+            out[day] = len(part)
+        return out
+
     def publish(self, table: str, sort_by: str = "instrument_id") -> int:
         """Write a staged table as one partition (``knowledge_ts`` = publish time). The
         staging is dropped when the run finishes with nothing left to retry."""
@@ -395,6 +420,13 @@ def last_finished_session(writer: StoreWriter, task: str) -> date | None:
     finished = (RunStatus.COMPLETE, RunStatus.PARTIAL)
     done = [r.session_date for r in writer.runs_for(task) if r.status in finished]
     return max(done) if done else None
+
+
+def finished_runs(writer: StoreWriter, *tasks: str) -> list[RunRecord]:
+    """Every run of ``tasks`` that finished COMPLETE or PARTIAL (published), oldest first:
+    what earlier runs of a backfill spread over nights already did (their ``items``)."""
+    runs = [r for t in tasks for r in writer.runs_for(t) if r.status in PUBLISHED]
+    return sorted(runs, key=lambda r: (r.started_at, r.run_id))
 
 
 def run_summary(record: RunRecord) -> Mapping[str, Any]:

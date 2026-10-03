@@ -32,6 +32,7 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 | Company details (name, SIC, sector, state, fiscal year end) | SEC EDGAR submissions (free; contact email in the user agent) | Massive ticker details | Implemented, phase 1.7 |
 | Shares outstanding (market cap) | SEC EDGAR company facts (XBRL; free; same contact and pacing) | Massive ticker details (`share_class_shares_outstanding`) | Implemented, phase 2b.4 |
 | Daily stock and ETF bars (swing / momentum) | Massive (formerly Polygon) free tier: all US tickers, 2 years history, 5 calls/min; "grouped daily" = whole market in 1 call | Alpaca (free account), IBKR, Yahoo (unofficial, history backfill only) | |
+| IV history / IV rank (enrichment) | **IBKR** (ADR 0028): IB's daily 30-day IV and HV per underlying, years of history; personal-use licence | our IV30 history (from the Cboe chains), the fallback | Implemented: `ibkr_iv@v1`, `iv_rank` with `iv_rank_source` |
 | End-of-day option chains | **Cboe delayed-quotes feed** (ADR 0014): whole chain + Greeks + IV + OI and the underlying's `iv30` in one request per underlying; about 4.2k requests a night | IBKR for a focused list / cross-check; Schwab Trader API (free with account; Greeks; all expiries in one call; 120 req/min); Tradier (needs a brokerage account for Greeks); Alpaca (free indicative feed, history from 2024-02); Massive options (paid, from ~$29/mo; licensed fallback) | No free source covers end-of-day chains for the whole universe with history. **We build our own IV history from day one.** |
 | Futures (later) | **IBKR** (contracts, history, including recently expired) | Databento (pay-as-you-go history), Massive futures (paid), Yahoo/Stooq continuous (unofficial, unclear rolls) | |
 | Risk-free rates (option pricing) | **U.S. Treasury daily par yield curve** (official, free, no key; one CSV per year) | FRED (`DGS*`, needs a key), SOFR (overnight only) | Implemented, phase 2b.1 (ADR 0021) |
@@ -231,6 +232,44 @@ maintained fork of `ib_insync`). **Read-only by construction**, three layers:
 - **Config**: `config/site/sources.toml [ibkr]` (`enabled = false` until the owner sets it
   up), host / port / client id from `ALGOTRADE_IBKR_HOST` / `_PORT` / `_CLIENT_ID`; what is
   verified and the tolerances in `config/site/verification.toml` (configuration.md).
+
+### Enrichment: contract ids and IV history (implemented, read-only)
+
+[ADR 0028](../adr/0028-ibkr-enrichment-source.md). IBKR enriches our own data; nothing it
+gives replaces a free source, and what derives from it carries `licence = personal`
+(personal-use market data). Same facade, same allowlisted calls (no new IB call was needed):
+
+| Request (key) | IB call | Pacing | Table |
+|---|---|---|---|
+| `contracts__<SYM>+<SYM>...`: conid, primary exchange, security type, currency | `qualifyContracts` (one call per `contracts_batch` = 25) | `ibkr` (one slot per contract) | `instruments/ibkr_contracts` (task `ibkr-contracts`) |
+| `volhist__<SYM>__<CONID>__<from>`: IB's daily 30-day implied vol and historical vol from a date to the session | `reqHistoricalData` x 2 (`OPTION_IMPLIED_VOLATILITY`, `HISTORICAL_VOLATILITY`) | `ibkr` + `ibkr_historical` | `volatility/ibkr_iv30`, `source_kind = history` (task `ibkr-iv --from/--to`) |
+| `vols__<SYM>:<CONID>+...`: the IV and HV now | `reqMktData` generic ticks 106 + 104, `iv_batch` = 50 streams together, then `cancelMktData` | `ibkr` | `volatility/ibkr_iv30`, `source_kind = snapshot` (nightly `ibkr-iv`) |
+
+- **Contracts**: every instrument of the option-chain coverage; new and renamed names the
+  same night, the rest once per `contracts_refresh_days = 30` on a slot day by key (like the
+  SEC refreshes); a name IB does not know is `NOT_FOUND` (asked again next run). Full snapshot
+  per run. About 4.2k contracts in ~170 batches: a few minutes the first time.
+- **Pacing, measured 2026-10-03** (paper login, delayed data type 3): a two-year IV or HV
+  request answers in under a second; the wait is the limiter. IB's rules: no identical
+  request within 15 s, no 6+ for one contract and tick type within 2 s, at most 60 per 10
+  minutes (strict for bars of 30 s or less; daily bars are "soft"-throttled, at most 50 open).
+  We keep `historical_min_interval_s = 10` for every historical request, so a backfill costs
+  **2 requests x 10 s = 20 s per underlying: ~23 h for ~4.2k names** (AAPL + SPY took 33 s).
+  It is resumable per underlying (an underlying whose history an earlier finished run fetched
+  from the same start or earlier is skipped), `--limit N` caps a run, and the nightly
+  continues it for `iv_backfill_per_night = 100` names (~33 min). Lowering
+  `historical_min_interval_s` for daily bars would be allowed by IB but is the owner's call
+  after watching the `ibkr_historical` pacing stats.
+- **Nightly snapshot**: tick 106 (option implied vol of the underlying) works on delayed data
+  on a paper login (checked 2026-10-03: AAPL, SPY, MSFT answered within 1 s; HV can lag, so a
+  batch waits up to `stream_wait_s` for both). ~4.2k names in batches of 50: a few minutes.
+  The snapshot is written to the session; a later history backfill of that session replaces
+  it (runs merge per instrument, latest wins).
+- **Features**: `ibkr_iv@v1` (IV30 / HV30 and the 252-session rank, percentile and status on
+  IB's IV, the `iv_history@v2` rules); `iv_rank` / `iv_percentile` prefer it and fall back to
+  ours, `iv_rank_source` says which (`config/site/features/volatility.toml`).
+- **Gateway down or `[ibkr]` disabled**: both steps are SKIPPED with a WARN; `iv_rank` falls
+  back to ours, labelled `ours`.
 
 ## What IBKR gives us
 

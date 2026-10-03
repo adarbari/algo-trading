@@ -1,4 +1,5 @@
-"""Snapshot tables (reference, company, universe, id map): ONE rule for the snapshot read.
+"""Snapshot tables (reference, company, universe, id map, IBKR contracts): ONE rule for the
+snapshot read.
 
 ``snapshot(reader, table, on)`` is the latest partition on or before ``on``; when there is
 none it falls back to the EARLIEST partition and says so (``pre_snapshot``). Reading a date
@@ -26,6 +27,7 @@ from algotrade.data.resolver import SymbolResolver
 from algotrade.storage.tables.readers import StoreReader
 
 UNIVERSE_TABLE = "universe"
+IBKR_CONTRACTS = "instruments/ibkr_contracts"
 UNIVERSE_HINT = "algotrade-ingest universe import --stocks <csv> --etfs <csv> --version <v>"
 REFERENCE_HINT = "run the ingestion job that loads instrument reference data"
 
@@ -82,6 +84,18 @@ def instruments(
 ) -> pd.DataFrame:
     """The ``instruments/reference`` snapshot for ``on`` (see ``snapshot``)."""
     return read_snapshot(reader, REFERENCE_TABLE, on, REFERENCE_HINT, as_of, ids)[0]
+
+
+def ibkr_contracts(
+    reader: StoreReader, on: date, as_of: datetime | None = None
+) -> pd.DataFrame | None:
+    """The ``instruments/ibkr_contracts`` snapshot on or before ``on`` (IBKR conid and primary
+    exchange per instrument, ADR 0028); ``None`` when none was resolved by then (a later
+    snapshot never stands in: it would claim contracts not known on ``on``)."""
+    snap = snapshot(reader, IBKR_CONTRACTS, on)
+    if snap is None or snap.pre_snapshot:
+        return None
+    return reader.table(IBKR_CONTRACTS, snap.snapshot_date, as_of)
 
 
 def _present[T](value: object, default: T) -> T:

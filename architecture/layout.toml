@@ -296,12 +296,12 @@ purpose = "task machinery: the ingest run loop (IngestRun, TaskContext) and the 
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/reference"
-purpose = "reference-data tasks: universe, instrument ids, classification, history, companies, share counts, refresh scheduling"
+purpose = "reference-data tasks: universe, instrument ids, classification, history, companies, share counts, IBKR contract ids, refresh scheduling"
 kind = "task-domain"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/market"
-purpose = "market-data tasks: bars, corporate actions, earnings, option chains, Treasury rates"
+purpose = "market-data tasks: bars, corporate actions, earnings, option chains, Treasury rates, IBKR implied / historical vol"
 kind = "task-domain"
 
 [[dir]]
@@ -332,6 +332,10 @@ purpose = "the nightly workflow: sessions, steps, screens, the summary report an
 [[shared]]
 module = "apps/ingestion/algotrade_ingestion/tasks/reference/instrument_ids.py"
 reason = "the ingestion id rule (ADR 0018, `id-resolution`): golden and migrate-ids reuse it"
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/market/option_chains.py"
+reason = "the option-chain coverage (`select_underlyings`: every active optionable instrument) is the coverage IBKR contract resolution enriches (ADR 0028)"
 
 # --------------------------------------------------------------------------- web app (apps/web)
 # ADR 0025 (frontend architecture). Every directory under apps/web (build output and

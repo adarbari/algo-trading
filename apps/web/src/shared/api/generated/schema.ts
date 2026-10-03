@@ -726,6 +726,11 @@ export interface components {
              */
             kind: string;
             /**
+             * Licence
+             * @description open, or personal: derived from IBKR market data (personal-use licence); hidden from users other than the owner once there are any (ADR 0028)
+             */
+            licence: string;
+            /**
              * Name
              * @description the selection field (rollup.<group>@v<N>.<column>, ...)
              */

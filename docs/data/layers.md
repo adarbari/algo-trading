@@ -38,6 +38,9 @@ Two physical parts, always read together:
 | `instruments/reference` | **sourced facts**: identity, company, classification, contract terms | ticker, FIGI, company name, website, description, sector/industry, country, exchange, security type, ETF flags (leveraged, inverse, leverage, tracks), optionable, multiplier, tick size, listing status, listed/delisted dates | rarely | universe and reference ingestion jobs |
 | `rollups/instrument/<name>@vN` | **derived state** "as of D", computed from L2 | next earnings date + time + days to it, ADV (20d $), liquidity class ("highly liquid"), option liquidity tiers, market cap, 52-week high/low, HV20/30, IV30 and IV rank | nightly | the `rollups` task |
 
+- **Vendor contract ids**: `instruments/ibkr_contracts` (IBKR `conid`, primary exchange,
+  `resolved_at`; one full snapshot per run, ADR 0028), read through
+  `data.reference.ibkr_contracts` (on or before the date, never a later snapshot).
 - **Format and history:** Parquet, **one full snapshot per date** (≈10k rows, < 1 MB/day).
   Reading "as of D" returns the latest snapshot on or before D, so a 2025 backtest sees 2025's
   company names, listings and delistings. Validity ranges (`valid_from`/`valid_to`) are
@@ -68,6 +71,7 @@ Two physical parts, always read together:
 | `bars/<interval>` | instrument × bar start | `1d` (phase 1), `1h`/`5m`/`1m` later | OHLCV + VWAP, **unadjusted**; splits and dividends applied at read time from `events` |
 | `chains/option_quotes`, `chains/underlying_quotes`, `chains/status` | contract (or underlying) × snapshot | end of day | built (Cboe) |
 | `events/<type>` | instrument × event time | irregular | `earnings`, `split`, `dividend`, `reference_change`, `index_change` |
+| `volatility/ibkr_iv30` | instrument × session | daily | IBKR's 30-day implied vol of the underlying's options and 30-day historical vol (`iv30_ibkr`, `hv30_ibkr`, `source_kind` history / snapshot; ADR 0028). Merge runs (a backfill writes many sessions, the nightly one; latest run wins per instrument). Personal-use licence. Read through `data.volatility.ibkr_iv30` |
 | `rates/treasury` | curve date × tenor (`RATE:UST-<tenor>`) | daily (bond-market days) | U.S. Treasury par yield curve: `tenor`, `tenor_days`, `rate_par`, `rate_cont` (decimals; ADR 0021). One partition per curve date; read through `data.rates.curve(reader, on)` (latest on or before, earliest flagged) |
 | `rollups/daily/<name>@vN` | instrument × session | daily | rolls intraday bars up to a day: session OHLCV, VWAP, intraday range, opening gap |
 
@@ -88,7 +92,8 @@ nightly and stored point-in-time:
 ```
 bars/1m ──► rollups/daily/session_stats@v1 ──┐
 bars/1d ─────────────────────────────────────┼─► rollups/instrument/price_stats@v2   (52w hi/lo, MAs, HV, ADV)
-chains/* ────────────────────────────────────┼─► rollups/instrument/option_liquidity@v1, iv30@v1 ─► iv_history@v2
+chains/* ────────────────────────────────────┼─► rollups/instrument/option_liquidity@v1, iv30@v1 ─► iv_history@v2 ─┐
+volatility/ibkr_iv30 ────────────────────────┼─► rollups/instrument/ibkr_iv@v1 ──────────────────────────────────┴─► iv_rank (+ source)
 events/earnings ─────────────────────────────┴─► rollups/instrument/earnings@v1     (next date, days to it)
 ```
 

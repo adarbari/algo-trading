@@ -63,6 +63,9 @@ class FeatureInfo:
     categories: list[str] = field(default_factory=list)
     scope: str = "site"  # site, or user: one of the caller's own expression features
     owner: str | None = None  # the user who declared it (scope user)
+    # open, or personal: derived from a personal-use market-data licence (IBKR); the API will
+    # hide personal features from users other than the owner once there are any (ADR 0028)
+    licence: str = "open"
 
 
 def _group_info(name: str, dtype: str) -> FeatureInfo:
@@ -84,6 +87,7 @@ def _group_info(name: str, dtype: str) -> FeatureInfo:
         unit=found.unit or None,
         range=list(found.valid_range) if found.valid_range else None,
         categories=list(found.categories),
+        licence=found.licence,
     )
 
 
@@ -105,6 +109,7 @@ def _expression_info(fs: FeatureSet, name: str, dtype: str) -> FeatureInfo:
         categories=list(f.categories),
         scope=expression.scope,
         owner=expression.definition.owner,
+        licence=f.licence,
     )
 
 

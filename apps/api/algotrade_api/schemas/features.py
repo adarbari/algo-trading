@@ -23,6 +23,10 @@ class Feature(Schema):
     categories: list[str]
     scope: str = Field(description="site, or user: one of the caller's own expression features")
     owner: str | None = Field(description="the user who declared it (scope user)")
+    licence: str = Field(
+        description="open, or personal: derived from IBKR market data (personal-use licence); "
+        "hidden from users other than the owner once there are any (ADR 0028)"
+    )
 
 
 class Bin(Schema):

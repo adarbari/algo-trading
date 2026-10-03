@@ -22,6 +22,7 @@ def test_catalogue_lists_instrument_and_rollup_fields(client: TestClient) -> Non
     )  # fmt: skip
     assert label["categories"] == ["HIGH", "MEDIUM", "LOW", "UNKNOWN"] and label["inputs"]
     assert catalogue["feature.div_yield"]["source"] == "rollups/instrument/div_yield@v1"
+    assert hv20["licence"] == "open" and catalogue["instrument.sector"]["licence"] == "open"
 
 
 def test_catalogue_is_the_callers_site_plus_their_own_features(

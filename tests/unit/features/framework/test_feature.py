@@ -11,6 +11,7 @@ from algotrade.features.framework.feature import (
     feature_problems,
     in_range,
     is_feature_ref,
+    strictest,
 )
 from tests.helpers.rollup_store import features
 
@@ -46,6 +47,7 @@ def test_a_valid_feature_has_no_problems() -> None:
         ({"valid_range": (2, 1)}, "min > max"),
         ({"categories": ("A",)}, "categories need dtype str"),
         ({"inputs": ("close",)}, "neither"),
+        ({"licence": "public"}, "licence 'public' must be one of"),
     ],
 )
 def test_problems_are_named(changes: dict[str, Any], problem: str) -> None:
@@ -69,3 +71,9 @@ def test_a_group_owns_and_versions_its_features() -> None:
     a = group.feature("a")
     assert (a.group, a.version, a.key, a.field) == ("demo@v2", 2, "demo.a@v2", "rollup.demo@v2.a")
     assert dict(group.columns) == {"a": "float", "b": "int"}
+
+
+def test_licences_default_open_and_the_strictest_wins() -> None:
+    assert _feature().licence == "open"
+    assert strictest([]) == "open" and strictest(["open", "open"]) == "open"
+    assert strictest(["open", "personal"]) == "personal"

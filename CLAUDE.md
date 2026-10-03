@@ -53,7 +53,9 @@ without writing an ADR. Read in this order:
   below. (ADR 0025)
 - **Vendors**: free first, each behind the source interface. Option chains come from the Cboe
   delayed feed (full universe, nightly); IBKR covers futures and cross-checks. We compute
-  Greeks ourselves. (ADRs 0012, 0014)
+  Greeks ourselves. (ADRs 0012, 0014) IBKR also **enriches** (conids, IB's IV / HV history):
+  IV rank uses IBKR's where it has one, ours as the fallback, always labelled
+  (`iv_rank_source`); every IBKR-derived feature carries `licence = "personal"`. (ADR 0028)
 - **Broker access is read-only**: IBKR only through the market-data facade
   `algotrade_sources/vendors/ibkr/gateway.py`; no code may place, modify or cancel orders or touch
   account functions (ADR 0026, enforced by a fitness test and import-linter).
@@ -72,7 +74,7 @@ only shrinks (`make dupes-update`).
 
 | Responsibility | Owner |
 |---|---|
-| Which snapshot a read sees (on or before D, else earliest + `pre_snapshot`); domain reads of market data | `algotrade/data/` (`reference`, `prices`, `events`, `chains`, `rates`: the Treasury curve a date sees; `rollups`: stored rollup rows; `shares`: share counts by filing date); consumers never import `storage.tables.readers` |
+| Which snapshot a read sees (on or before D, else earliest + `pre_snapshot`); domain reads of market data | `algotrade/data/` (`reference` (+ IBKR conids), `prices`, `events`, `chains`, `rates`: the Treasury curve a date sees; `rollups`: stored rollup rows; `shares`: share counts by filing date; `volatility`: IBKR's IV / HV); consumers never import `storage.tables.readers` |
 | What a feature group reads (each input table's point-in-time read, by table name; other groups' rows) | `data/feature_inputs.py` (`load_input`; each read lives in its `data` owner); `features/` never imports storage or a domain reader |
 | Computing feature groups (rollups); feature definitions + the feature catalogue | `features/framework/` (`FeatureGroup`, `Feature`, runner), `features/rollups/<group>.py` (`FEATURES` + pure compute), `features/registry.py` (`GROUPS`, `FEATURES`, `feature(name)`, `SUPERSEDED`), `features/site.py` (the site `FeatureSet`: groups + expression features), `features/catalogue.py` → `docs/data/features.md`; stored only by `tasks/derived/rollups.py` |
 | Expression features: the formula language (parse, type check, evaluate); definitions from `config/site/features/*.toml`; computing them on read; retiring superseded group tables | `features/expressions/` (lexer, parser, checker, evaluator, functions; `definitions.py`, `feature_set.py`); typed by `config/site/settings.py` (`load_features`); read path `services/features.py` (`read_expressions`, column-pruned through `data.rollups.feature_rows`); `tasks/maintenance/retire_features.py` (`algotrade-ingest retire-features`) |
@@ -85,6 +87,7 @@ only shrinks (`make dupes-update`).
 | Session sources (a stateful gateway connection: `SessionSource`, `opened`, `SessionSpec`) | `sources/framework/base.py`, `sources/framework/registry.py` |
 | Broker API, READ-ONLY (the only `ib_async` import; market data only, never orders / accounts) | `sources/vendors/ibkr/gateway.py` (ADR 0026; `tests/libs/sources/vendors/ibkr/test_read_only_guard.py`) |
 | Live verification vs IBKR (sample, checks, tolerances, `verification/ibkr`) | `tasks/verification/` (graded by the quality check `verification`) |
+| IBKR enrichment, read-only: conids (`instruments/ibkr_contracts`), IB's IV / HV history backfill + nightly snapshot (`volatility/ibkr_iv30`) | `tasks/reference/ibkr_contracts.py`, `tasks/market/ibkr_iv.py`; reads `data.reference.ibkr_contracts`, `data/volatility.py`; features `features/rollups/ibkr_iv.py` (ADR 0028) |
 | Locks: named store locks, run-index lock; one ingest run at a time | `storage/locks.py`; `services/jobs/exclusive.py` |
 | A run's table writes publish atomically (pending until COMPLETE / PARTIAL commits them all; FAILED drops them; crash recovery) | `storage/backends/` (`local_index.py`: commit marker + sequence); driven by `IngestRun` and `ResultWriter.publishing` (ADR 0022) |
 | Running long work (threads, recovery), screens | `services/jobs/` (apps call `run_job`, never build a runner; fan-out: `as_completed`); screens: `services/screening/run.py`, submitted as `screen` jobs |
@@ -120,6 +123,7 @@ source (`tests/unit/<path>` = `src/algotrade/<path>`, `tests/libs/sources/<path>
 | Comparing our data with a live source (verification check) | `apps/ingestion/.../tasks/verification/` (`checks.py`) |
 | Nightly step / ordering | `apps/ingestion/.../workflows/nightly/` |
 | Feature (a documented column) in a feature group (rollup) | `src/algotrade/features/rollups/<group>.py` (`FEATURES` + pure compute; framework: `features/framework/`; then `make features-doc`) |
+| A feature derived from a personal-use source (IBKR) | its group in `features/rollups/` with `licence="personal"` on each `Feature`; expression features over it inherit the licence (ADR 0028) |
 | A formula over existing features (ratio, spread, label from thresholds) | `config/site/features/<theme>.toml` (an expression feature: no code; `make features-doc`) |
 | The expression language itself (a new function, operator or type) | `src/algotrade/features/expressions/` |
 | What a feature group reads from a table (feature input) | `src/algotrade/data/feature_inputs.py` (`INPUTS`) + the table's read in its `data/` owner |
@@ -215,7 +219,7 @@ the skill with the fix.
 
 Commands (need `uv`): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make layout`, `make evaluate`, `make baseline`, `make features-doc`.
 Web (need Node 24): `make web-install`, `make web-check` (part of `make check`), `make web-visual` (screenshots, Docker); in `apps/web`: `npm run dev|storybook|check|visual:update`.
-Ingestion: `algotrade-ingest universe|universe-build|company-details|shares|earnings|bars|rates|corporate-actions|chains|rollups|verify|screen|nightly|report|quality|schedule|purge-raw|retire-features|migrate-ids|golden`, or `algotrade-ingest run <task>` for any registry task (see `README.md`).
+Ingestion: `algotrade-ingest universe|universe-build|company-details|shares|earnings|bars|rates|corporate-actions|chains|rollups|verify|screen|nightly|report|quality|schedule|purge-raw|retire-features|migrate-ids|golden`, or `algotrade-ingest run <task>` for any registry task, e.g. `run ibkr-contracts`, `run ibkr-iv --from D1 --to D2 [--limit N]` (the resumable IBKR IV backfill; see `README.md`).
 API: `algotrade-api [--reload]` (read-only, 127.0.0.1:8000); after a route / schema change run
 `scripts/export_openapi.py` and commit `apps/api/openapi.json`.
 Configs: site presets in `config/site/` (reviewed via PR); user configs in `config/users/<id>/`

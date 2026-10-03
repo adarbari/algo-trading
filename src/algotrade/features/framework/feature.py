@@ -26,12 +26,17 @@ type and, later, UI and email labels (ADR 0023).
 - ``inputs``      what it is computed from: other features (``<group>.<column>@v<N>``, an
                   expression feature ``<name>@v<N>``) or raw fields (``<table>.<column>``,
                   e.g. ``bars/1d.close``)
+- ``licence``     who may see its values: ``open`` (our own computation from free data) or
+                  ``personal`` (derived from a personal-use market-data licence, e.g. IBKR's:
+                  shown to the owner only once there are other users; ADR 0028). An
+                  expression feature takes the most restrictive licence of its inputs
 - ``version``     the feature's definition version: a group feature's is its group's (a
                   group is re-versioned only when its stored columns change); an expression
                   feature's is its own
 """
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Literal
 
@@ -40,9 +45,11 @@ from algotrade.core.model.fields import FIELD_TYPES, NUMERIC_TYPES
 type Entity = Literal["instrument"]
 type Kind = Literal["window", "chain", "expression", "cross_section", "label"]
 type Range = tuple[float | None, float | None]
+type Licence = Literal["open", "personal"]
 
 ENTITIES = frozenset({"instrument"})
 KINDS = frozenset({"window", "chain", "expression", "cross_section", "label"})
+LICENCES = ("open", "personal")  # least to most restrictive
 UNITS = frozenset(
     {
         "decimal",  # a fraction: 0.25 is 25% (returns, vols, yields, rates, relative spreads)
@@ -79,6 +86,7 @@ class Feature:
     entity: Entity = "instrument"
     version: int = 0  # 0: the group's version (set when the group is declared)
     group: str = ""  # the owning group's key (set when declared); "": an expression feature
+    licence: Licence = "open"
 
     @property
     def key(self) -> str:
@@ -114,6 +122,8 @@ def feature_problems(feature: Feature) -> list[str]:
         problems.append(f"{f.name}: kind {f.kind!r} must be one of {sorted(KINDS)}")
     if f.entity not in ENTITIES:
         problems.append(f"{f.name}: entity {f.entity!r} must be one of {sorted(ENTITIES)}")
+    if f.licence not in LICENCES:
+        problems.append(f"{f.name}: licence {f.licence!r} must be one of {list(LICENCES)}")
     if not f.description.strip() or not f.null_meaning.strip():
         problems.append(f"{f.name}: describe it and say when it is null")
     if f.valid_range is not None:
@@ -128,6 +138,12 @@ def feature_problems(feature: Feature) -> list[str]:
     if bad:
         problems.append(f"{f.name}: inputs {bad} are neither <group>.<column>@vN nor table.column")
     return problems
+
+
+def strictest(licences: Iterable[str]) -> Licence:
+    """The most restrictive of ``licences`` (``open`` when there are none)."""
+    found = [LICENCES.index(x) for x in licences if x in LICENCES]
+    return "personal" if found and max(found) == 1 else "open"
 
 
 def in_range(feature: Feature, value: float) -> bool:

@@ -1,10 +1,11 @@
-"""Nightly and the live verification: ``verify`` runs after the screens for the latest session
-only, and is SKIPPED with a WARN (never FAILED) when ``[ibkr]`` is disabled or the gateway is
-not reachable; the email gets a "Verification vs IBKR" section."""
+"""Nightly and IBKR: ``verify`` runs after the screens for the latest session only;
+``ibkr-contracts`` and ``ibkr-iv`` run after the chains and before the rollups (latest session
+only); all are SKIPPED with a WARN (never FAILED) when ``[ibkr]`` is disabled or the gateway is
+not reachable; the email gets a "Verification vs IBKR" section and IBKR IV coverage."""
 
 from collections.abc import Mapping
 from dataclasses import replace
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any
 
 import pytest
@@ -24,6 +25,7 @@ from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.stored_frames import stamped, universe_rows
 
 D, BEFORE = date(2026, 10, 2), date(2026, 10, 1)
+IBKR_STEPS = ("verify", "ibkr-contracts", "ibkr-iv")
 
 
 def _complete(name: str) -> Any:
@@ -39,7 +41,7 @@ def _complete(name: str) -> Any:
 def others_fake(monkeypatch: pytest.MonkeyPatch) -> None:
     """Every nightly task but ``verify`` is a fake that completes."""
     for step in (*NIGHTLY, *FINALLY):
-        if step.name not in (SCREENS, "verify"):
+        if step.name not in (SCREENS, *IBKR_STEPS):
             spec = registry.TASKS[step.name]
             fake = replace(spec, run=_complete(step.name), sources=(), skip=None)
             monkeypatch.setitem(registry.TASKS, step.name, fake)
@@ -57,18 +59,26 @@ def test_verify_runs_after_screens_before_quality_latest_only() -> None:
     assert next(s for s in NIGHTLY if s.name == "verify").latest_only
 
 
+def test_ibkr_enrichment_runs_after_chains_before_rollups_latest_only() -> None:
+    names = [s.name for s in NIGHTLY]
+    chains, rollups = names.index("chains"), names.index("rollups")
+    assert chains < names.index("ibkr-contracts") < names.index("ibkr-iv") < rollups
+    assert all(s.latest_only for s in NIGHTLY if s.name.startswith("ibkr-"))
+
+
 @pytest.mark.usefixtures("others_fake")
 def test_disabled_ibkr_skips_verify_and_the_night_stays_complete() -> None:
     ctx = task_ctx(store())
     ctx = replace(ctx, unavailable={"ibkr": "[ibkr] is disabled in sources.toml"})
     summary = run_nightly(ctx, Plan([BEFORE, D]))
-    first, last = (r["steps"]["verify"] for r in summary["runs"])
-    assert first["status"] == "SKIPPED" and "latest closed session" in first["reason"]
-    assert last == {
-        "status": "SKIPPED",
-        "duration_s": 0.0,
-        "reason": "skipped: [ibkr] is disabled in sources.toml",
-    }
+    for name in IBKR_STEPS:
+        first, last = (r["steps"][name] for r in summary["runs"])
+        assert first["status"] == "SKIPPED" and "latest closed session" in first["reason"]
+        assert last == {
+            "status": "SKIPPED",
+            "duration_s": 0.0,
+            "reason": "skipped: [ibkr] is disabled in sources.toml",
+        }
     assert summary["status"] == "COMPLETE"
 
 
@@ -77,9 +87,11 @@ def test_an_unreachable_gateway_skips_verify_with_a_warn_and_a_hint() -> None:
     gateway = IbkrMarketData(GatewayConfig("127.0.0.1", 1, 1))  # nothing listens on port 1
     ctx = task_ctx(store(), sources={"ibkr": IbkrSource(gateway)})
     summary = run_nightly(ctx, Plan([D]))
-    verify = summary["runs"][0]["steps"]["verify"]
-    assert verify["status"] == "SKIPPED" and summary["status"] == "COMPLETE"
-    assert verify["reason"].startswith("skipped: WARN: IB Gateway not reachable on 127.0.0.1:1")
+    steps = summary["runs"][0]["steps"]
+    assert summary["status"] == "COMPLETE"
+    for name in IBKR_STEPS:
+        assert steps[name]["status"] == "SKIPPED", name
+        assert steps[name]["reason"].startswith("skipped: WARN: IB Gateway not reachable on 12")
     report = build_report(summary, {})
     [line] = report.verification
     assert line.status == "SKIPPED" and "not reachable" in line.note
@@ -113,3 +125,27 @@ def test_the_email_section_lists_counts_and_failing_examples() -> None:
     assert "RPGL close FAIL: ours 12.5 vs IBKR 12 (rel diff; worst session" in text
     assert "RPGL close FAIL" in html and "Verification vs IBKR" in html
     assert build_report(summary, {}) == report  # deterministic
+
+
+def test_the_email_shows_ibkr_iv_coverage_backfill_and_pacing() -> None:
+    result = {"underlyings": 4200, "with_contract": 4150, "with_iv": 3900, "coverage_pct": 92.9,
+              "backfilled": 100, "backfill_pending": 3100, "backfill_eta_h": 17.2,
+              "rows": 4000}  # fmt: skip
+    summary = {
+        "status": "COMPLETE",
+        "sessions": [D.isoformat()],
+        "runs": [{"session": D.isoformat(), "steps": {"ibkr-iv": {"status": "COMPLETE",
+                                                                  "duration_s": 2100.0,
+                                                                  "result": result}}}],
+        "steps": {},
+    }  # fmt: skip
+    record = RunRecord("ibkr_iv-x", "ibkr_iv", D, datetime(2026, 10, 2, 22, tzinfo=UTC))
+    record.stats = {"pacing": {"ibkr_historical": {"requests": 200, "limiter_wait_s": 1990.0},
+                               "ibkr": {"requests": 8800, "limiter_wait_s": 170.0}}}  # fmt: skip
+    report = build_report(summary, {(D.isoformat(), "ibkr-iv"): record})
+    [line] = [s for s in report.steps if s.step == "ibkr-iv"]
+    assert dict(line.counts) == {"underlyings": 4200, "with_iv": 3900, "coverage_pct": 92.9,
+                                 "backfilled": 100, "backfill_pending": 3100,
+                                 "backfill_eta_h": 17.2}  # fmt: skip
+    text = render_text(report)
+    assert "coverage_pct" in text and "ibkr_historical" in text

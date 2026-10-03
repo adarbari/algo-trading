@@ -35,6 +35,22 @@ KEY_COUNTS: Mapping[str, tuple[str, ...]] = {
     "rates": ("curves", "latest"),
     "corporate-actions": ("events/split", "events/dividend", "unresolved"),
     "chains": ("universe",),
+    "ibkr-contracts": (
+        "underlyings",
+        "resolved",
+        "coverage_pct",
+        "refreshed",
+        "not_found",
+        "deferred",
+    ),
+    "ibkr-iv": (
+        "underlyings",
+        "with_iv",
+        "coverage_pct",
+        "backfilled",
+        "backfill_pending",
+        "backfill_eta_h",
+    ),
     "purge-raw": ("raw_files_removed", "staging_runs_removed"),
 }
 COUNT_MAPS = ("statuses", "sessions", "years")  # result dicts of status -> count
@@ -329,8 +345,9 @@ HINTS: tuple[tuple[re.Pattern[str], str], ...] = tuple(
         ),
         (
             r"IB Gateway not reachable|\[ibkr\] is disabled",
-            "Verification vs IBKR skipped: start IB Gateway (Read-Only API ticked, port as in "
-            ".env ALGOTRADE_IBKR_PORT) and set [ibkr] enabled = true; README, Live verification.",
+            "IBKR steps (verify, ibkr-contracts, ibkr-iv) skipped: start IB Gateway (Read-Only "
+            "API ticked, port as in .env ALGOTRADE_IBKR_PORT) and set [ibkr] enabled = true; "
+            "README, Live verification. iv_rank falls back to ours (iv_rank_source = ours).",
         ),
         (
             r"^verification",

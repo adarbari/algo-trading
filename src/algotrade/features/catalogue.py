@@ -3,7 +3,7 @@
 ``render(features)`` is the content of ``docs/data/features.md`` (written by
 ``make features-doc`` from the repository's ``config/``; a fitness test keeps the committed
 file up to date). Per code group: its table, inputs and description; per feature: kind,
-type, unit, valid values (range or categories), description, when it is null, and what it
+type, unit, licence, valid values (range or categories), description, when it is null, and what it
 is computed from. Then the expression features by theme file (formula, and where it is
 stored when materialised) and the superseded group versions.
 """
@@ -30,9 +30,13 @@ says why a value can be missing. Valid values are a sanity range or a label's ca
 values outside a range are kept, never clipped, and are reported by the feature-quality
 checks (ADR 0023, step 7). Units: `decimal` is a fraction (0.25 = 25%), `pct_points` a
 quoted percentage (25 = 25%), `sessions` exchange sessions, `days` calendar days. Types:
-`float32` is a 32-bit float (about 7 significant digits).
+`float32` is a 32-bit float (about 7 significant digits). Licence: `open` (computed by us
+from free data) or `personal` (derived from IBKR market data, a personal-use licence: the API
+will show it to the owner only once there are other users;
+[ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
+restrictive licence of its inputs.
 """
-_COLUMNS = "| Feature | Kind | Type | Unit | Valid values | Description | Null when |"
+_COLUMNS = "| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when |"
 
 
 def _number(value: float) -> str:
@@ -57,8 +61,8 @@ def _cell(text: str) -> str:
 
 
 def _row(f: Feature, *extra: str) -> str:
-    cells = [f"`{f.name}`", f.kind, f.dtype, f.unit, valid_values(f), f.description,
-             f.null_meaning, *extra]  # fmt: skip
+    cells = [f"`{f.name}`", f.kind, f.dtype, f.unit, f.licence, valid_values(f),
+             f.description, f.null_meaning, *extra]  # fmt: skip
     return "| " + " | ".join(_cell(c) for c in cells) + " |"
 
 
@@ -70,7 +74,7 @@ def _group(g: FeatureGroup) -> list[str]:
         f"{g.description}. Stored as `{g.table}`; reads {inputs}.",
         "",
         f"{_COLUMNS} Inputs |",
-        "|---|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     lines += [_row(f, ", ".join(f"`{r}`" for r in f.inputs)) for f in g.features]
     return [*lines, ""]
@@ -96,7 +100,7 @@ def _expressions(fs: FeatureSet) -> list[str]:
             f"### `{theme}.toml`",
             "",
             f"{_COLUMNS} Formula | Stored |",
-            "|---|---|---|---|---|---|---|---|---|",
+            "|---|---|---|---|---|---|---|---|---|---|",
         ]
         for e in fs.expressions.values():
             if e.definition.theme == theme:

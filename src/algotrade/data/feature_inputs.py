@@ -24,6 +24,9 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        ``None`` when there is none
 - ``rates/treasury``   ``rates.curve_as_rows``: the curve the session sees (latest on or before;
                        ``curve_date`` and ``pre_snapshot`` added); ``None`` when none is stored
+- ``volatility/ibkr_iv30``
+                       ``volatility.ibkr_iv30``: IBKR's vols for the session plus ``lookback``
+                       earlier sessions; ``None`` when the session has no rows (no IBKR run)
 - ``rollups/instrument/<name>@v<N>``
                        another group's stored output (``rollups.rollup_rows``) for the session
                        plus ``lookback`` earlier sessions; ``None`` when the session has no
@@ -50,6 +53,7 @@ from algotrade.data.rates import curve_as_rows
 from algotrade.data.rollups import rollup_rows
 from algotrade.data.shares import TABLE as SHARES
 from algotrade.data.shares import share_facts
+from algotrade.data.volatility import IBKR_IV30, ibkr_iv30
 from algotrade.storage.tables.readers import StoreReader
 
 
@@ -160,6 +164,11 @@ def _events_by_date(table: str) -> Loader:
     return load
 
 
+def _ibkr_vols(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+    frame = ibkr_iv30(reader, sessions_before(sessions[0], lookback), sessions[-1])
+    return _Window(frame, _days(frame["session_date"]), need_session=True)
+
+
 def _group_rows(
     reader: StoreReader, table: str, sessions: Sequence[date], lookback: int, produced: Produced
 ) -> Loaded:
@@ -187,6 +196,7 @@ INPUTS: Mapping[str, Loader] = {
     "events/split": _events_by_date("events/split"),
     TREASURY: _partition(curve_as_rows),
     SHARES: _share_facts,
+    IBKR_IV30: _ibkr_vols,
 }
 
 
