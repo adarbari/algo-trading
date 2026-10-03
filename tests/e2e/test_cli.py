@@ -174,3 +174,30 @@ def test_user_config_backtest_reproduces_baseline(cli: Cli, tmp_path: Path) -> N
     assert "survivorship bias" in early.stderr
     assert cli(*args).returncode == 2  # --config needs --start/--end
     assert cli("backtest", "--dataset", "bull_trend").returncode == 2  # needs --strategy
+
+
+def test_config_validate_features_reports_each_user_feature(cli: Cli, tmp_path: Path) -> None:
+    (tmp_path / "site").symlink_to(REPO_ROOT / "config" / "site")
+    features = tmp_path / "users" / "tester" / "features"
+    features.mkdir(parents=True)
+    (features / "mine.toml").write_text(
+        '[gap]\nexpr = "price_stats.close / price_stats.sma_200 - 1"\ndtype = "float"\n'
+        'unit = "decimal"\ndescription = "d"\nnull_meaning = "n"\n'
+    )
+    args = ("--config-dir", str(tmp_path), "--user", "tester", "config", "validate-features")
+    ok = cli(*args)
+    assert ok.returncode == 0, ok.stderr
+    assert "tester: 1 user feature(s), all valid" in ok.stdout
+    assert "feature.gap  expression float  (config/users/tester/features/mine.toml [gap])" in (
+        ok.stdout
+    )
+    assert "inputs: price_stats.close@v2, price_stats.sma_200@v2" in ok.stdout
+    (features / "mine.toml").write_text(
+        (features / "mine.toml").read_text().replace("sma_200", "sma_201")
+    )
+    bad = cli(*args)
+    assert bad.returncode == 2
+    assert "mine.toml [gap] expr, line 1 col 21: price_stats@v2 has no feature 'sma_201'" in (
+        bad.stderr
+    )
+    assert cli("config", "show").returncode == 2  # show needs a config id

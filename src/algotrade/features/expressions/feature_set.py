@@ -15,6 +15,9 @@ session or a range: ``frame.join``), reading a materialised expression from its 
 computing every other one (virtual) in dependency order; ``stored_columns(names)`` says which
 group columns that needs, so a reader loads nothing else. ``moved_field`` maps a field of a
 superseded group (``rollup.price_stats@v1.pct_from_high_52w``) to where it lives now.
+
+``with_user(definitions)`` is a user's catalogue (ADR 0023 step 4): this set plus the user's
+expression features (``scope == "user"``), checked on top of the site's (never materialised).
 """
 
 from collections.abc import Mapping, Sequence
@@ -74,6 +77,17 @@ class FeatureSet:
         superseded: Mapping[str, Superseded] | None = None,
     ) -> "FeatureSet":
         return cls(groups, build_expressions(definitions, groups), superseded or {})
+
+    def with_user(self, definitions: Sequence[FeatureDefinition]) -> "FeatureSet":
+        """This set plus a user's expression features (virtual; they may name this set's
+        expressions but not take their names). ``self`` when there are none."""
+        if not definitions:
+            return self
+        stored = [d.where for d in definitions if d.owner is None or d.materialise]
+        if stored:
+            raise ConfigurationError(f"{stored[0]}: not a (virtual) user feature")
+        added = build_expressions(definitions, self.code, base=self.expressions)
+        return FeatureSet(self.code, {**self.expressions, **added}, self.superseded)
 
     # ------------------------------------------------------------------ lookups
     def feature(self, name: str) -> Feature | None:

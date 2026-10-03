@@ -19,7 +19,7 @@ from algotrade.data.reference import (
     instruments,
     load_universe,
 )
-from algotrade.services.configs import field_catalog
+from algotrade.services.configs import catalog_of
 from algotrade.services.explore.store import (
     NotFoundError,
     Page,
@@ -27,6 +27,7 @@ from algotrade.services.explore.store import (
     paginate,
     partition_for,
     records,
+    store_features,
 )
 from algotrade.services.features import field_view
 
@@ -94,7 +95,7 @@ def _universe(
     session = on or partition_for(store.reader, UNIVERSE_TABLE, None)
     universe = load_universe(store.reader, session)
     fields = list(dict.fromkeys([*VIEW_FIELDS, *columns]))
-    view = field_view(store.reader, session, fields)
+    view = field_view(store.reader, session, fields, features=store_features(store))
     frame = universe.frame.reindex(columns=[*BASE, "optionable"])
     frame["instrument_id"] = frame["instrument_id"].astype(str)
     extra = view.frame.reindex(columns=["instrument_id", *fields])
@@ -131,9 +132,10 @@ class TickerTable:
     page: Page[dict[str, Any]]  # TICKER_BASE + one key per requested column
 
 
-def checked_columns(columns: list[str]) -> list[str]:
-    """``columns`` without duplicates; ``ConfigurationError`` for a name not in the catalogue."""
-    catalogue = field_catalog()
+def checked_columns(store: ReadStore, columns: list[str]) -> list[str]:
+    """``columns`` without duplicates; ``ConfigurationError`` for a name not in the user's
+    catalogue (site + their own features)."""
+    catalogue = catalog_of(store_features(store))
     for name in columns:
         catalogue.check_field(name, "columns")
     return list(dict.fromkeys(columns))
@@ -159,7 +161,7 @@ def ticker_table(
 ) -> TickerTable:
     """The universe for ``on`` as tickers x ``columns`` (catalogue field names: reference,
     company, rollup and expression-feature values for the session), filtered, sorted."""
-    wanted = checked_columns(columns)
+    wanted = checked_columns(store, columns)
     frame, universe, missing = _universe(store, on, wanted)
     order = sort or "symbol"
     frame = _sorted(_filtered(frame, filters)[[*TICKER_BASE, *wanted]], order)

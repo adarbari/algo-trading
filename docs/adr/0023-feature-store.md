@@ -34,7 +34,7 @@ at other grains; they need one model of what a feature is.
   a pure compute) declaring its `FEATURES`; the stored types and column order come from them. The
   eight rollups are the first groups, with byte-identical output.
 - **Versioning.** Definitions are versioned per feature; a group is re-versioned only when its
-  stored columns change. Until group features can move between groups (track step 4) a group
+  stored columns change. Until group features can move between groups (track step 5) a group
   feature's version is its group's, and the declaration checks it; an expression feature has
   its own.
 - **One registry** (`features/registry.py`): `GROUPS` in dependency order, `FEATURES` by key, and
@@ -96,14 +96,37 @@ when its stored columns change; re-versioned groups store 32-bit floats.
   glitches or extreme names); values outside a `valid_range` are kept and reported by the
   feature-quality checks (step 7 of the track below).
 
+### Step 4: user expression features (L4)
+Owner-approved (2026-10-03). Users declare expression features in
+`config/users/<id>/features/<theme>.toml` ([configuration.md](../configuration.md#user-features)):
+
+- **Same schema, same loader**: `feature_definitions(docs, owner)` types them exactly like the
+  site's (secret-looking keys rejected); `materialise` is not allowed in v1: a user feature is
+  always virtual (a stored table per user feature would be per-user market data).
+- **Namespacing**: `feature.<name>` resolves in the user's catalogue (the site's plus their
+  own), like their selections and presets. A user feature may not shadow a site feature's
+  name (the error names both files), so a field means the same for everyone who sees it.
+  They are built on top of the built site set (`build_expressions(..., base=site)`;
+  `FeatureSet.with_user`): user formulas read stored features, site expressions and the user's
+  own; site formulas never see user ones, so a cycle can only run through user features.
+- **Catalogue and runs**: `services.features.catalogue(store, user)` is what the selection
+  catalogue, `GET /features` (`scope = "user"`, `owner`) and the Explore ticker table /
+  compare use for the caller (`ALGOTRADE_USER`); another user's features are never in it. A
+  resolved config carries the definitions of the user features its selection reads
+  (transitively, `ResolvedConfig.features`); they join its hash, and screens and backtests
+  evaluate the selection with them (`config_features`).
+- **Read-only API now**: write / edit endpoints come with the screener builder UI.
+  `algotrade-backtest config validate-features` checks a user's files and prints each
+  feature's type, inputs and a sample on the latest session.
+
 ### The track
 1. **Feature definitions + groups + catalogue** (done).
 2. **Inputs through `data/`** (done).
 3. **Expression features, virtual by default; slimmer float32 groups** (done; above).
-4. **Features by name for group features**: unique, group-independent names; copies become
+4. **User expression features** (L4, `config/users/<id>/features/*.toml`; done, above).
+5. **Features by name for group features**: unique, group-independent names; copies become
    references to the source feature; features can move between groups without a new name
    (expression features already have such names).
-5. **User expression features** (L4, `config/users/<id>/features/*.toml`), versioned per feature.
 6. **Cross-sections**: `cross_section` features (ranks, z-scores within the universe or a
    sector).
 7. **Quality**: nightly checks of null rates and `valid_range` per feature (out-of-range

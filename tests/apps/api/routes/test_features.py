@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -20,6 +22,27 @@ def test_catalogue_lists_instrument_and_rollup_fields(client: TestClient) -> Non
     )  # fmt: skip
     assert label["categories"] == ["HIGH", "MEDIUM", "LOW", "UNKNOWN"] and label["inputs"]
     assert catalogue["feature.div_yield"]["source"] == "rollups/instrument/div_yield@v1"
+
+
+def test_catalogue_is_the_callers_site_plus_their_own_features(
+    client: TestClient, user_client: Callable[[str], TestClient]
+) -> None:
+    site = {f["name"]: f for f in client.get("/features").json()}
+    assert (site["feature.liquidity_class"]["scope"], site["feature.liquidity_class"]["owner"]) == (
+        "site", None,
+    )  # fmt: skip
+    assert "feature.hv20_pct" not in site
+    alice = {f["name"]: f for f in user_client("alice").get("/features").json()}
+    mine = alice["feature.hv20_pct"]
+    assert (mine["scope"], mine["owner"], mine["source"], mine["inputs"]) == (
+        "user", "alice", "expression", ["price_stats.hv20@v2"],
+    )  # fmt: skip
+    assert set(alice) - set(site) == {"feature.hv20_pct"}
+    bob = user_client("bob")
+    assert "feature.hv20_pct" not in {f["name"] for f in bob.get("/features").json()}
+    assert bob.get("/features/feature.hv20_pct/distribution").status_code == 404
+    spread = user_client("alice").get("/features/feature.hv20_pct/distribution").json()
+    assert (spread["count"], spread["nulls"]) == (4, 1)
 
 
 def test_numeric_distribution(client: TestClient) -> None:

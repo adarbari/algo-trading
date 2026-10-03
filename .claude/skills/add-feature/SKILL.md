@@ -25,6 +25,17 @@ high_52w - 1`, a HIGH / LOW label from thresholds, `shares x close`.) Then it is
 3. `make features-doc`; tests: a case in `tests/unit/features/test_site.py` (values, nulls,
    categories). A bad formula fails at load naming the file, the feature and the position.
 
+**Site or user?** A formula one person wants for their own screens is a **user feature**:
+the same `[name]` entry in `config/users/<id>/features/<theme>.toml` (git-ignored; ADR 0023
+step 4). It is always virtual (`materialise` is rejected), visible only to that user
+(`feature.<name>` in their selections and configs, Explore columns, `GET /features` with
+`scope = "user"`), may read site features but never take a site feature's name, and its
+definition joins the hash of every config that reads it. Check it with
+`algotrade-backtest --user <id> config validate-features` (type, inputs, a sample on the
+latest session). Promote it to `config/site/features/` (a PR, with a test and
+`make features-doc`) when others need it, it must be stored, or a group reads it; give it
+the same name only after the user's copy is removed (a user feature cannot shadow a site one).
+
 Otherwise (it needs history, a chain, an input table, or maths that is not a formula over a
 row), it is a **column of a feature group**:
 

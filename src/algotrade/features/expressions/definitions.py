@@ -9,6 +9,11 @@ name (bound as literals, so a threshold is data, not code). Any problem fails th
 with the file, the feature and the position: an unknown or ambiguous name, an unused
 parameter, a cycle (named as a path), a type error, a result that does not fit the declared
 ``dtype``, or a label value outside the declared ``categories``.
+
+User features (ADR 0023 step 4) are built on top of the site's: ``build_expressions(user
+definitions, groups, base=site expressions)``. A user formula may name site expressions and
+the user's own; a site formula never sees a user's (it is built without them), so a cycle can
+only run through user features. A user feature may not take a site feature's name.
 """
 
 import re
@@ -58,6 +63,11 @@ class Expression:
     @property
     def materialise(self) -> bool:
         return self.definition.materialise
+
+    @property
+    def scope(self) -> str:
+        """``site`` or ``user`` (``definition.owner`` is the user)."""
+        return self.definition.scope
 
 
 def feature_type(dtype: str, categories: Sequence[str] = ()) -> Type:
@@ -173,25 +183,41 @@ def _feature(d: FeatureDefinition, inputs: tuple[str, ...]) -> Feature:
 
 
 def build_expressions(
-    definitions: Sequence[FeatureDefinition], groups: Mapping[str, FeatureGroup]
+    definitions: Sequence[FeatureDefinition],
+    groups: Mapping[str, FeatureGroup],
+    base: Mapping[str, Expression] | None = None,
 ) -> dict[str, Expression]:
     """Every definition as a checked ``Expression``, by name, in dependency order.
-    ``groups``: the registered feature groups by key (one version per group name)."""
+    ``groups``: the registered feature groups by key (one version per group name); ``base``:
+    expressions already built (the site's, under a user's), which formulas may name and
+    definitions may not redefine. Returns only the new expressions."""
     by_name = {g.name: g for g in groups.values()}
+    known = dict(base or {})
     defs: dict[str, FeatureDefinition] = {}
     for d in definitions:
+        if d.name in known:
+            other = known[d.name].definition.where
+            raise ExpressionError(
+                d.where, None, f"{d.name!r} shadows the site feature {other}; choose another name"
+            )
         if d.name in defs or d.name in by_name:
             raise ExpressionError(d.where, None, f"{d.name!r} is already a feature or group name")
         defs[d.name] = d
     for d in defs.values():
         _feature(d, ())  # dtype, unit, kind, range and categories, before any formula
-    taken = {**dict.fromkeys(by_name, "group"), **dict.fromkeys(defs, "feature")}
+    taken = {
+        **dict.fromkeys(by_name, "group"),
+        **dict.fromkeys(known, "feature"),
+        **dict.fromkeys(defs, "feature"),
+    }
     parsed = {name: _parse(d, taken) for name, d in defs.items()}
     uses = {
         n: tuple(sorted({r.name for r in p[1] if "." not in r.name})) for n, p in parsed.items()
     }
-    declared = {n: feature_type(d.dtype, d.categories) for n, d in defs.items()}
-    out: dict[str, Expression] = {}
+    declared = {
+        n: feature_type(e.feature.dtype, e.feature.categories) for n, e in known.items()
+    } | {n: feature_type(d.dtype, d.categories) for n, d in defs.items()}
+    out: dict[str, Expression] = dict(known)
     for name in _order(uses, {n: d.where for n, d in defs.items()}):
         d, (node, refs, exists) = defs[name], parsed[name]
         where = f"{d.where} expr"
@@ -204,7 +230,7 @@ def build_expressions(
         )
         feature = _feature(d, inputs)
         out[name] = Expression(feature, d, node, result, stored, uses[name], tuple(exists))
-    return out
+    return {n: e for n, e in out.items() if n in defs}
 
 
 def _fits(d: FeatureDefinition, result: Type) -> None:

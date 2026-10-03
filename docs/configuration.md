@@ -15,6 +15,7 @@ config/site/                        L3: reviewed via PR, versioned by git
 config/users/<user_id>/             L4: git-ignored locally; a DB behind ConfigStore later
   selections/<id>.toml
   strategies/<id>.toml
+  features/<theme>.toml             the user's expression features (always virtual)
 ```
 
 The location comes from `ALGOTRADE_CONFIG_DIR` (default `./config`) or `--config-dir`. Only
@@ -248,6 +249,55 @@ nothing is ever passed to Python `eval`.
 `services.features.read_expressions(reader, names, start, end)`. Only the stored columns a
 formula needs are read.
 
+### User features
+
+A user declares their own expression features in `config/users/<user_id>/features/<theme>.toml`
+(ADR 0023 step 4), with the same keys and language as the site's, typed by the same loader
+(unknown keys, missing keys and secret-looking keys fail with the file and feature). Example
+(`config/users/alice/features/momentum.toml`):
+
+```toml
+[drawdown_pct]
+expr = "pct_from_high_52w * 100"   # a site feature
+dtype = "float"
+unit = "pct_points"
+description = "How far the close is below its 52-week high, in percent"
+null_meaning = "pct_from_high_52w is null"
+
+[quiet_uptrend]
+expr = "price_stats.close > price_stats.sma_200 and price_stats.hv20 < max_vol and drawdown_pct > -10"
+params = { max_vol = 0.25 }
+dtype = "bool"
+unit = "flag"
+description = "Above the 200-day average, calm, within 10% of the high"
+null_meaning = "any input is null"
+```
+
+- **Always virtual**: `materialise` is not allowed (computed on read; ask for a site feature
+  when it must be stored or read by a group).
+- **Names**: selectable as `feature.<name>` by that user only: their selections, strategy and
+  screener configs, the Explore ticker table / compare columns and `GET /features` (listed
+  with `scope = "user"` and `owner`). Another user never sees them (an unknown field there).
+  A user feature may read stored features (`group.column`), site expression features and the
+  user's own; it may **not** take a site feature's name (the error names both definitions), so
+  `feature.<name>` means the same thing for everyone who sees it. A site feature never reads a
+  user feature, so a cycle can only run through the user's own features (its path is named).
+- **Hash**: a resolved config records the definitions of the user features its selection
+  reads (and the user features those read) in its hash (`features` in `config show`), so
+  editing one re-runs the config; adding or editing a feature it does not read changes
+  nothing. Site features are versioned instead (bump `version` with the formula).
+- **Check them**: `algotrade-backtest [--user U] config validate-features` loads and type
+  checks every user feature, then prints each one's type, inputs and a sample evaluation on
+  the latest session its inputs have:
+
+```text
+alice: 2 user feature(s), all valid
+
+feature.drawdown_pct  expression float  (config/users/alice/features/momentum.toml [drawdown_pct])
+  inputs: pct_from_high_52w@v1
+  2026-10-02: 9840/10215 instruments with a value; e.g. EQ:BBG000B9XRY4=-3.1, ...
+```
+
 ## Environment
 
 `src/algotrade/config/env.py` is the only code that reads environment variables. Entry points
@@ -279,6 +329,7 @@ are restricted to `[a-z0-9_-]`, so they are safe in paths.
 
 ```bash
 algotrade-backtest [--user U] config validate|show <id>
+algotrade-backtest [--user U] config validate-features    # the user's expression features
 algotrade-backtest [--user U] backtest --config <id> --start 2024-01-02 --end 2025-12-31
 algotrade-ingest   screen --config <id> --user U [--date D] [--export-dir out/]
 algotrade-ingest   nightly        # every config with schedule = "nightly": site presets + each user's

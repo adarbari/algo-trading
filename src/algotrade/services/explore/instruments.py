@@ -29,8 +29,9 @@ from algotrade.data.reference import (
     snapshot,
 )
 from algotrade.data.rollups import rollup_row, rollup_rows
+from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.registry import GROUPS
-from algotrade.services.configs import field_catalog
+from algotrade.services.configs import catalog_of
 from algotrade.services.explore.store import (
     BARS,
     NotFoundError,
@@ -39,8 +40,9 @@ from algotrade.services.explore.store import (
     partition_for,
     record,
     records,
+    store_features,
 )
-from algotrade.services.features import field_view, read_expressions, site_features
+from algotrade.services.features import field_view, read_expressions
 
 DEFAULT_SPAN = timedelta(days=365)
 EVENTS_PREFIX = "events/"
@@ -90,8 +92,9 @@ def instrument_detail(store: ReadStore, key: str, on: date | None = None) -> Ins
         features.update({rollup_field(rollup_key, c): v for c, v in values.items()})
     if sessions:  # expression features, on the latest session any group has for it
         latest = max(sessions.values())
-        names = list(site_features().expressions)
-        rows = read_expressions(store.reader, names, latest, instruments=[iid]).frame
+        fs = store_features(store)
+        names = list(fs.expressions)
+        rows = read_expressions(store.reader, names, latest, instruments=[iid], features=fs).frame
         if len(rows):
             values = record(rows.iloc[0], ["instrument_id", "session_date"])
             features.update({f"{FEATURE_FIELD_PREFIX}{n}": values.get(n) for n in names})
@@ -163,14 +166,14 @@ class FeatureSeries:
     items: list[dict[str, Any]]  # session_date + one key per feature name (null: UNKNOWN)
 
 
-def _rollup_fields(names: list[str] | None) -> dict[str, list[tuple[str, str]]]:
+def _rollup_fields(fs: FeatureSet, names: list[str] | None) -> dict[str, list[tuple[str, str]]]:
     """Rollup table -> [(field name, column)] (``""``: expression features, by name); every
     rollup column and expression feature when ``names`` is None."""
     wanted = names or [
         *(rollup_field(k, c) for k, r in GROUPS.items() for c in r.columns),
-        *(f"{FEATURE_FIELD_PREFIX}{n}" for n in site_features().expressions),
+        *(f"{FEATURE_FIELD_PREFIX}{n}" for n in fs.expressions),
     ]
-    known = field_catalog().fields
+    known = catalog_of(fs).fields
     tables: dict[str, list[tuple[str, str]]] = {}
     for name in wanted:
         if name not in known:
@@ -191,14 +194,17 @@ def instrument_features(
     """Feature values per session for ``start..end`` (the last year by default)."""
     iid, _ = resolve_key(store, key, end)
     first, last = _span(store, start, end)
-    tables = _rollup_fields(names)
+    fs = store_features(store)
+    tables = _rollup_fields(fs, names)
     by_day: dict[date, dict[str, Any]] = {}
     for table, fields in tables.items():
         if table:
             frame = rollup_rows(store.reader, table, first, last, instruments=[iid])
         else:
             computed = [column for _, column in fields]
-            frame = read_expressions(store.reader, computed, first, last, instruments=[iid]).frame
+            frame = read_expressions(
+                store.reader, computed, first, last, instruments=[iid], features=fs
+            ).frame
         if frame is None:
             continue
         for row in frame.to_dict("records"):
@@ -248,12 +254,13 @@ def compare_features(
     if session is None:
         raise NotFoundError("nothing stored")
     compared = _resolve_many(store, keys, session)
-    catalogue = field_catalog()
+    fs = store_features(store)
+    catalogue = catalog_of(fs)
     wanted = list(dict.fromkeys(names or catalogue.fields))
     for name in wanted:
         catalogue.check_field(name, "features")
     ids = [c.instrument_id for c in compared]
-    view = field_view(store.reader, session, wanted, ids=ids)
+    view = field_view(store.reader, session, wanted, ids=ids, features=fs)
     by_id = {str(r["instrument_id"]): record(r) for r in view.frame.to_dict("records")}
     rows = [
         {

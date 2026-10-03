@@ -24,6 +24,7 @@ from algotrade.data.prices import PriceData, load_price_data
 from algotrade.engines.backtest.universe import Schedule
 from algotrade.engines.selection.evaluate import SelectionResult
 from algotrade.engines.selection.schedule import Rebalance, diff, rebalance_sessions
+from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.selection import select
 
 ROLLUPS_HINT = "algotrade-ingest rollups --from <first rebalance session> --to <end>"
@@ -36,6 +37,7 @@ def evaluate_sessions(
     end: date,
     frequency: str,
     as_of: datetime,
+    features: FeatureSet | None = None,
 ) -> list[tuple[date, SelectionResult]]:
     """The selection on ``start`` and on every rebalance session up to ``end``.
 
@@ -43,7 +45,7 @@ def evaluate_sessions(
     select nothing and close every position."""
     out = []
     for session in rebalance_sessions(start, sessions_between(start, end), frequency):
-        result = select(reader, selection, session, as_of=as_of)
+        result = select(reader, selection, session, as_of=as_of, features=features)
         if session != start and result.missing_tables:
             table = result.missing_tables[0]
             raise MissingDataError(table, f"no rows for rebalance session {session}", ROLLUPS_HINT)
@@ -86,10 +88,12 @@ def load_rebalanced(
     end: date,
     settings: BacktestSettings,
     as_of: datetime,
+    features: FeatureSet | None = None,
 ) -> RebalancedData:
-    """Evaluate every rebalance session, then load prices once for the union selected."""
+    """Evaluate every rebalance session, then load prices once for the union selected.
+    ``features``: the catalogue the selection's ``feature.<name>`` fields come from."""
     evaluations = evaluate_sessions(
-        reader, selection, start, end, settings.rebalance_selection, as_of
+        reader, selection, start, end, settings.rebalance_selection, as_of, features
     )
     union = sorted({i for _, r in evaluations for i in r.instruments})
     data = load_price_data(

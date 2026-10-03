@@ -10,7 +10,8 @@ class ConfigStore(Protocol):
     def load(self, scope: str, kind: str, name: str) -> Mapping[str, Any] | None:
         """``scope`` is "site" or a user id; ``kind`` one of ``KINDS``. ``settings`` are site-only
         documents read by ingestion (``universe``, ``sources``, ``rollups``, ...); ``features``
-        are the site's expression-feature files (``site/features/<theme>.toml``)."""
+        are expression-feature files (``site/features/<theme>.toml``, or a user's
+        ``users/<id>/features/<theme>.toml``)."""
         ...
 
     def names(self, scope: str, kind: str) -> list[str]: ...

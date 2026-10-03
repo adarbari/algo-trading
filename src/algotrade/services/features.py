@@ -6,7 +6,9 @@ evaluates the expressions in dependency order (``FeatureSet.evaluate``); a mater
 is read from its table. The same path serves a session (selections, ``FeatureView``,
 ``field_view``: an ``InstrumentView`` of any catalogue fields) and a series over a date
 range. ``site_features()`` is the site's ``FeatureSet``, from the config store given
-(default: ``$ALGOTRADE_CONFIG_DIR`` or ./config).
+(default: ``$ALGOTRADE_CONFIG_DIR`` or ./config); ``catalogue(store, user)`` is a user's
+(site + ``config/users/<user>/features``, ADR 0023 step 4) and ``config_features(resolved)``
+the one a resolved config's selection is evaluated with (site + the user features it names).
 """
 
 from collections.abc import Sequence
@@ -18,12 +20,14 @@ from pathlib import Path
 import pandas as pd
 
 from algotrade.config.env import config_dir
+from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.core.model.fields import FEATURE_FIELD_PREFIX, is_feature_field
 from algotrade.data import StoreReader
 from algotrade.data.reference import InstrumentView, instrument_view
 from algotrade.data.rollups import feature_rows
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.site import site_features as build_site_features
+from algotrade.features.site import user_features, with_user_features
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.configs.store import ConfigStore
 
@@ -36,6 +40,67 @@ def _default_store(root: Path) -> FileConfigStore:
 def site_features(store: ConfigStore | None = None) -> FeatureSet:
     """The site's features: code groups + ``config/site/features/*.toml`` of ``store``."""
     return build_site_features(store if store is not None else _default_store(config_dir()))
+
+
+def site_store(store: ConfigStore | None) -> ConfigStore | None:
+    """``store`` when it declares site expression features, else ``None`` (the site default:
+    a store that holds only strategy configs, e.g. in tests, still sees the site's)."""
+    return store if store is not None and store.names("site", "features") else None
+
+
+def catalogue(store: ConfigStore | None = None, user: str | None = None) -> FeatureSet:
+    """The features ``user`` sees: the site's plus their own (from ``store``). Another user's
+    features are never in it."""
+    site = site_features(site_store(store))
+    if store is None or user is None:
+        return site
+    return user_features(store, user, site)
+
+
+def config_features(config: ResolvedConfig) -> FeatureSet:
+    """The site's features plus the user features ``config`` references (as resolved)."""
+    return with_user_features(site_features(), config.features)
+
+
+@dataclass(frozen=True)
+class FeatureCheck:
+    """One user feature, checked: its type, what it reads, and a sample evaluation on the
+    latest session its inputs have (``session`` ``None``: nothing stored yet)."""
+
+    name: str
+    where: str
+    dtype: str
+    kind: str
+    inputs: tuple[str, ...]
+    session: date | None = None
+    rows: int = 0
+    non_null: int = 0
+    sample: tuple[tuple[str, object], ...] = ()
+
+
+def check_user_features(
+    reader: StoreReader | None, store: ConfigStore, user: str, sample: int = 5
+) -> list[FeatureCheck]:
+    """Load, check and (with a ``reader``) evaluate each of ``user``'s features; a bad
+    definition fails the load with its file, feature and position."""
+    fs = catalogue(store, user)
+    out = []
+    for name, e in fs.expressions.items():
+        if e.scope != "user":
+            continue
+        f = e.feature
+        check = FeatureCheck(name, e.definition.where, f.dtype, f.kind, f.inputs)
+        tables = fs.stored_columns([name]) if reader is not None else {}
+        dates = [d for t in tables for d in reader.dates(t)] if reader is not None else []
+        if reader is not None and dates:
+            frame = read_expressions(reader, [name], max(dates), features=fs).frame
+            present = frame.dropna(subset=[name])
+            shown = tuple(zip(present["instrument_id"], present[name], strict=True))[:sample]
+            check = replace(
+                check, session=max(dates), rows=len(frame), non_null=len(present), sample=shown
+            )
+        out.append(check)
+    return out
 
 
 @dataclass(frozen=True)

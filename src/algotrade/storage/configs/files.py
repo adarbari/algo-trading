@@ -7,6 +7,7 @@ site/presets/strategies/<id>.toml          L3 shared strategy / screener configs
 site/presets/selections/<id>.toml          L3 shared selections
 users/<user>/strategies/<id>.toml          L4 (git-ignored locally)
 users/<user>/selections/<id>.toml
+users/<user>/features/<theme>.toml         L4 expression features (always virtual)
 """
 
 import csv
@@ -41,7 +42,7 @@ class FileConfigStore:
         return self.root / "users" / user / kind / f"{validate_id(kind, name)}.toml"
 
     def load(self, scope: str, kind: str, name: str) -> Mapping[str, Any] | None:
-        if kind in ("defaults", "settings", "features") and scope != SITE:
+        if kind in ("defaults", "settings") and scope != SITE:
             return None
         path = self._path(scope, kind, name)
         if not path.exists():
@@ -56,8 +57,6 @@ class FileConfigStore:
             if scope != SITE:
                 return []
             return sorted(p.stem for p in (self.root / SITE).glob("*.toml") if p.stem != "defaults")
-        if kind == "features" and scope != SITE:
-            return []
         if kind == "defaults":
             return ["defaults"] if scope == SITE and self._path(SITE, kind, "x").exists() else []
         directory = self._path(scope, kind, "x").parent

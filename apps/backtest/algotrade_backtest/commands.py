@@ -8,13 +8,14 @@ from algotrade.analytics.report import markdown_table
 from algotrade.config.env import config_dir, data_url
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.user import UserContext
-from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.engines.backtest.engine import run_backtest
 from algotrade.services.configs import default_user, resolve_config
 from algotrade.services.datasets import list_datasets, load_dataset
 from algotrade.services.evaluation.baseline import compare_to_baseline, load_baseline, save_baseline
 from algotrade.services.evaluation.suite import run_suite, with_benchmark_excess
+from algotrade.services.features import check_user_features
 from algotrade.services.jobs import JobStatus, run_job
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.factory import open_backend, open_config_store
@@ -70,7 +71,34 @@ def _resolved(args: argparse.Namespace, config_id: str) -> ResolvedConfig:
     return resolve_config(open_config_store(config_dir(args.config_dir)), config_id, _user(args))
 
 
+def cmd_validate_features(args: argparse.Namespace) -> int:
+    """Each of the user's expression features: type, inputs and a sample evaluation on the
+    latest session its inputs have (``config/users/<user>/features/*.toml``)."""
+    user = _user(args).user_id
+    store = open_config_store(config_dir(args.config_dir))
+    try:
+        reader: StoreReader | None = reader_for(args)
+    except AlgoTradeError as exc:
+        print(f"warning: no data to evaluate on ({exc})", file=sys.stderr)
+        reader = None
+    checks = check_user_features(reader, store, user)
+    print(f"{user}: {len(checks)} user feature(s), all valid")
+    for c in checks:
+        print(f"\nfeature.{c.name}  {c.kind} {c.dtype}  ({c.where})")
+        print(f"  inputs: {', '.join(c.inputs)}")
+        if c.session is None:
+            print("  sample: nothing stored for its inputs")
+            continue
+        shown = ", ".join(f"{i}={v!r}" for i, v in c.sample)
+        print(f"  {c.session}: {c.non_null}/{c.rows} instruments with a value; e.g. {shown}")
+    return 0
+
+
 def cmd_config(args: argparse.Namespace) -> int:
+    if args.action == "validate-features":
+        return cmd_validate_features(args)
+    if not args.config_id:
+        raise ConfigurationError(f"config {args.action} needs a config id")
     resolved = _resolved(args, args.config_id)
     if args.action == "validate":
         print(

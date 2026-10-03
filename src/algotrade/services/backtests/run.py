@@ -20,6 +20,7 @@ from algotrade.engines.backtest.universe import Schedule
 from algotrade.engines.selection.evaluate import SelectionResult
 from algotrade.engines.selection.schedule import Rebalance, turnover
 from algotrade.services.backtests.rebalance import load_rebalanced
+from algotrade.services.features import config_features
 from algotrade.services.selection import select
 from algotrade.storage.runs import start_run
 from algotrade.storage.tables.result_writer import ResultWriter
@@ -164,16 +165,17 @@ def run_configured_backtest(
         raise ConfigurationError(f"{config.config.id}: a backtest needs a selection")
     now = now or datetime.now(UTC)
     bt = config.backtest
+    features = config_features(config)  # site + the user features the selection names
     schedule: Schedule | None = None
     history: tuple[Rebalance, ...] = ()
     if bt.rebalance_selection == "none":
-        selected = select(reader, config.selection, start, as_of=now)
+        selected = select(reader, config.selection, start, as_of=now, features=features)
         _check_selected(config, selected, start)
         data = load_price_data(
             reader, selected.instruments, start, end, as_of=now, adjustment=bt.price_adjustment
         )
     else:
-        rebalanced = load_rebalanced(reader, config.selection, start, end, bt, now)
+        rebalanced = load_rebalanced(reader, config.selection, start, end, bt, now, features)
         history = rebalanced.rebalances
         selected = history[0].selection
         _check_selected(config, selected, start)

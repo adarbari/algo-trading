@@ -28,8 +28,9 @@ without writing an ADR. Read in this order:
   is generated (`make features-doc`). Features ask `data.feature_inputs` for inputs by table
   name. A formula over existing features is an **expression feature** in
   `config/site/features/<theme>.toml` (typed language, never Python `eval`), computed on read
-  unless `materialise = true`; selectable as `feature.<name>`. Re-versioned groups store
-  `float32`. (ADR 0023)
+  unless `materialise = true`; selectable as `feature.<name>`. Users add their own (always
+  virtual, never shadowing a site name) in `config/users/<id>/features/`. Re-versioned groups
+  store `float32`. (ADR 0023)
 - **Backtests only read stores.** They never fetch; missing data is an error. (ADR 0008)
 - **Generic instruments** keyed by `instrument_id` with `multiplier`, `parent_id` and
   `calendar`, so futures and options fit without redesign. (ADR 0009)
@@ -210,4 +211,5 @@ Ingestion: `algotrade-ingest universe|universe-build|company-details|shares|earn
 API: `algotrade-api [--reload]` (read-only, 127.0.0.1:8000); after a route / schema change run
 `scripts/export_openapi.py` and commit `apps/api/openapi.json`.
 Configs: site presets in `config/site/` (reviewed via PR); user configs in `config/users/<id>/`
-(git-ignored). Check one with `algotrade-backtest [--user U] config validate|show <id>`.
+(git-ignored). Check one with `algotrade-backtest [--user U] config validate|show <id>`; a
+user's expression features with `config validate-features`.

@@ -741,6 +741,18 @@
             "title": "Null Meaning",
             "type": "string"
           },
+          "owner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the user who declared it (scope user)",
+            "title": "Owner"
+          },
           "range": {
             "anyOf": [
               {
@@ -762,6 +774,11 @@
             ],
             "description": "plausible (min, max)",
             "title": "Range"
+          },
+          "scope": {
+            "description": "site, or user: one of the caller's own expression features",
+            "title": "Scope",
+            "type": "string"
           },
           "source": {
             "title": "Source",
@@ -803,7 +820,9 @@
           "inputs",
           "unit",
           "range",
-          "categories"
+          "categories",
+          "scope",
+          "owner"
         ],
         "title": "Feature",
         "type": "object"
@@ -3122,6 +3141,7 @@
     },
     "/features": {
       "get": {
+        "description": "The caller's catalogue: the site's fields plus their own expression features\n(``scope = \"user\"``; the user is ``ALGOTRADE_USER``).",
         "operationId": "catalogue_features_get",
         "responses": {
           "200": {

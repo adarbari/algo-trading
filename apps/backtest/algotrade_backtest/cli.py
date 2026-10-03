@@ -4,6 +4,7 @@ algotrade-backtest [--data-url URL] datasets list
 algotrade-backtest backtest --strategy sma_crossover --dataset bull_trend [--param fast=10]
 algotrade-backtest [--user U] backtest --config sma_trend --start 2020-01-01 --end 2022-12-31
 algotrade-backtest [--user U] config validate|show sma_trend
+algotrade-backtest [--user U] config validate-features   (the user's expression features)
 algotrade-backtest evaluate [--update-baseline] [--report scorecard.md]
 """
 
@@ -44,9 +45,11 @@ def build_parser() -> argparse.ArgumentParser:
     bt.add_argument("--start", type=date.fromisoformat)
     bt.add_argument("--end", type=date.fromisoformat)
 
-    cf = sub.add_parser("config", help="validate or show a resolved config")
-    cf.add_argument("action", choices=["validate", "show"])
-    cf.add_argument("config_id")
+    cf = sub.add_parser(
+        "config", help="validate or show a resolved config, or check the user's features"
+    )
+    cf.add_argument("action", choices=["validate", "show", "validate-features"])
+    cf.add_argument("config_id", nargs="?", help="strategy / screener config id")
 
     ev = sub.add_parser("evaluate", help="run every strategy on every dataset vs the baseline")
     ev.add_argument("--baseline", type=Path, default=DEFAULT_BASELINE)

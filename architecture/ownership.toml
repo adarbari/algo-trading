@@ -124,7 +124,7 @@ detect = [
 
 [[responsibility]]
 id = "feature-definitions"
-description = "Expression feature definitions: config/site/features/*.toml typed by the one settings loader, then resolved against the catalogue (names, params, dependency graph, cycles, dtype and categories) into Features; the site FeatureSet (code groups + expressions + materialised groups) is built once per config store"
+description = "Expression feature definitions: config/site/features/*.toml and config/users/<id>/features/*.toml typed by the one settings loader, then resolved against the catalogue (names, params, dependency graph, cycles, dtype and categories, no user feature shadowing a site one) into Features; the site FeatureSet (code groups + expressions + materialised groups) is built once per config store, a user's (site + their virtual features) by FeatureSet.with_user"
 owner = [
     "src/algotrade/config/site/settings.py",
     "src/algotrade/features/expressions/definitions.py",
@@ -134,6 +134,7 @@ owner = [
 section = "docs/adr/0023-feature-store.md#step-3-expression-features-virtual-by-default"
 detect = [
     { call = "load_features" },
+    { call = "load_user_features" },
     { call = "feature_definitions" },
     { call = "build_expressions" },
     { call = "FeatureSet" },

@@ -8,6 +8,7 @@ ADR 0019 ``site-settings``. Each file becomes a frozen dataclass that apps recei
     nightly.toml   -> NightlySettings
     rollups.toml   -> each rollup's params dataclass (declared by the rollup, typed here)
     features/<theme>.toml -> FeatureDefinition per expression feature (ADR 0023 step 3)
+    users/<id>/features/<theme>.toml -> the same, owned by a user (always virtual; step 4)
     defaults.toml  -> ScreeningSettings, BacktestSettings (layered per config by ``resolve``)
 
 Documents come from the config store, so this module does no I/O: ``load_*`` take anything
@@ -23,7 +24,8 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
-from algotrade.config.site.fields import Table
+from algotrade.config.site.fields import Table, reject_secrets
+from algotrade.config.user import SITE_USER
 from algotrade.core.model.errors import ConfigurationError
 
 type DocumentLoader = Callable[[str, str, str], Mapping[str, Any] | None]
@@ -464,7 +466,11 @@ class FeatureDefinition:
     parses, type checks and evaluates it. ``valid_range`` is ``[min, max]`` (``inf`` / ``-inf``:
     open); ``materialise`` stores it as ``rollups/instrument/<name>@v<version>`` (otherwise it
     is computed on read). The structure is typed here; the formula, dtype and unit are checked
-    against the feature catalogue when the features are built."""
+    against the feature catalogue when the features are built.
+
+    ``owner``: ``None`` for a site feature, else the user whose
+    ``config/users/<owner>/features/<theme>.toml`` declares it (a user feature is never
+    materialised)."""
 
     name: str
     theme: str
@@ -479,10 +485,33 @@ class FeatureDefinition:
     materialise: bool = False
     version: int = 1
     params: Mapping[str, ParamValue] = field(default_factory=dict)
+    owner: str | None = None
+
+    @property
+    def scope(self) -> str:
+        """``site`` or ``user``."""
+        return "site" if self.owner is None else "user"
 
     @property
     def where(self) -> str:
-        return f"config/site/features/{self.theme}.toml [{self.name}]"
+        return f"{features_dir(self.owner)}/{self.theme}.toml [{self.name}]"
+
+    def canonical(self) -> dict[str, Any]:
+        """What changes its values (for a config hash): formula, params, type and version."""
+        return {
+            "expr": " ".join(self.expr.split()),
+            "params": dict(sorted(self.params.items())),
+            "dtype": self.dtype,
+            "kind": self.kind,
+            "categories": list(self.categories),
+            "version": self.version,
+        }
+
+
+def features_dir(owner: str | None) -> str:
+    """Where a scope's expression features live (``config/site/features``,
+    ``config/users/<owner>/features``)."""
+    return "config/site/features" if owner is None else f"config/users/{owner}/features"
 
 
 def _bound(value: Any) -> float | None:
@@ -511,15 +540,24 @@ def _params(t: Table) -> dict[str, ParamValue]:
 
 
 def feature_definitions(
-    docs: Mapping[str, Mapping[str, Any] | None],
+    docs: Mapping[str, Mapping[str, Any] | None], owner: str | None = None
 ) -> tuple[FeatureDefinition, ...]:
-    """Every ``[<name>]`` of every ``features/<theme>.toml`` document, in file then key order."""
+    """Every ``[<name>]`` of every ``features/<theme>.toml`` document, in file then key order.
+    ``owner``: the user the documents belong to (``None``: the site). A user's documents may
+    not hold secrets or ``materialise`` (user features are always computed on read)."""
     out = []
     for theme, doc in sorted(docs.items()):
-        root = Table(doc, f"config/site/features/{theme}.toml")
+        root = Table(doc, f"{features_dir(owner)}/{theme}.toml")
+        if owner is not None and doc is not None:
+            reject_secrets(doc, root.where)
         for name in root.names():
             t = root.table(name, FEATURE_KEYS)
-            d = FeatureDefinition(name, theme, "", "", "", "", "")
+            if owner is not None and t.raw("materialise") is not None:
+                raise ConfigurationError(
+                    f"{t.where} materialise: a user feature is always virtual (computed on "
+                    "read); ask for a site feature to store it"
+                )
+            d = FeatureDefinition(name, theme, "", "", "", "", "", owner=owner)
             text = {
                 k: t.text(k, "") for k in ("expr", "dtype", "unit", "description", "null_meaning")
             }
@@ -805,6 +843,16 @@ def load_features(configs: SiteDocuments) -> tuple[FeatureDefinition, ...]:
     """The site's expression features (``config/site/features/*.toml``; none without files)."""
     names = configs.names("site", "features")
     return feature_definitions({n: configs.load("site", "features", n) for n in names})
+
+
+def load_user_features(configs: SiteDocuments, user: str) -> tuple[FeatureDefinition, ...]:
+    """``user``'s expression features (``config/users/<user>/features/*.toml``; none
+    without files; none for the ``site`` user). Typed exactly like the site's; see
+    ``feature_definitions``."""
+    if user == SITE_USER:
+        return ()
+    names = configs.names(user, "features")
+    return feature_definitions({n: configs.load(user, "features", n) for n in names}, user)
 
 
 def load_universe(configs: SiteDocuments) -> UniverseSettings:

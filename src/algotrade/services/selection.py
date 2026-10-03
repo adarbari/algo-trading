@@ -37,10 +37,16 @@ def selection_view(
 
 
 def select(
-    reader: StoreReader, selection: Selection, session: date, as_of: datetime | None = None
+    reader: StoreReader,
+    selection: Selection,
+    session: date,
+    as_of: datetime | None = None,
+    features: FeatureSet | None = None,
 ) -> SelectionResult:
-    """Point in time: the reference snapshot and rollups for ``session``, read ``as_of``."""
-    view, source = selection_view(reader, selection, session, as_of)
+    """Point in time: the reference snapshot and rollups for ``session``, read ``as_of``.
+    ``features``: the catalogue ``feature.<name>`` fields come from (default: the site's; a
+    user's config: ``services.features.config_features``)."""
+    view, source = selection_view(reader, selection, session, as_of, features)
     return replace(
         evaluate_selection(selection, view),
         missing_tables=source.missing,
