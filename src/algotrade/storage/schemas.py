@@ -66,6 +66,12 @@ SYMBOL_HISTORY = TableSpec(
     "reference",
     ("instrument_id", "ts", "figi", "symbol", "valid_from"),
 )
+# L1: company details from SEC EDGAR, per instrument (one full snapshot per date).
+INSTRUMENT_COMPANY = TableSpec(
+    "instruments/company",
+    "reference",
+    ("instrument_id", "symbol", "cik", "name", "sic", "sector", "fetched_on"),
+)
 # L2: OHLCV bars; the table name carries the interval, e.g. "bars/1d", "bars/5m".
 BAR_INTERVALS = frozenset({"1d", "1h", "30m", "15m", "5m", "1m"})
 BAR_COLUMNS = ("instrument_id", "ts", "open", "high", "low", "close", "volume")
@@ -79,6 +85,7 @@ KNOWN: dict[str, TableSpec] = {
         CHAIN_STATUS,
         INSTRUMENT_REFERENCE,
         SYMBOL_HISTORY,
+        INSTRUMENT_COMPANY,
     )
 }
 # Open-ended tables: the producing rollup, event source, catalogue or screener defines the

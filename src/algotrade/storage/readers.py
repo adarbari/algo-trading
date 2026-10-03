@@ -8,7 +8,12 @@ from datetime import date, datetime
 import pandas as pd
 
 from algotrade.core.errors import MissingDataError
-from algotrade.core.fields import REFERENCE_TABLE, field_source, instrument_field
+from algotrade.core.fields import (
+    COMPANY_TABLE,
+    REFERENCE_TABLE,
+    field_source,
+    instrument_field,
+)
 from algotrade.core.instruments import AssetClass, Instrument
 from algotrade.storage.interfaces import Backend
 from algotrade.storage.runs import RunRecord
@@ -115,6 +120,9 @@ class StoreReader:
     ) -> InstrumentView:
         """Reference snapshot on or before ``session`` joined with rollups *for* ``session``.
 
+        Company fields (``instrument.sector``…) come from the latest ``instruments/company``
+        snapshot on or before ``session``; without one they are ``missing`` (UNKNOWN).
+
         ``fields`` limits the columns (and the rollup tables read); ``None`` means every
         reference column and no rollups.
         """
@@ -128,7 +136,13 @@ class StoreReader:
         out = pd.DataFrame({"instrument_id": reference["instrument_id"].astype(str)})
         missing: list[str] = []
         for table, columns in wanted.items():
-            frame = reference if table == REFERENCE_TABLE else self.table(table, session, as_of)
+            if table == REFERENCE_TABLE:
+                frame: pd.DataFrame | None = reference
+            elif table == COMPANY_TABLE:  # a snapshot table, like the reference
+                company = self.latest_date(table, session)
+                frame = self.table(table, company, as_of) if company is not None else None
+            else:
+                frame = self.table(table, session, as_of)
             if frame is None:
                 missing.append(table)
                 continue

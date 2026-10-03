@@ -62,7 +62,7 @@ Fields come from a catalogue built from the code, so a typo or a type mismatch f
 
 | Field | Source table | Example |
 |---|---|---|
-| `instrument.<column>` | L1 `instruments/reference` | `instrument.security_type`, `instrument.is_leveraged` |
+| `instrument.<column>` | L1 `instruments/reference`; company columns from `instruments/company` | `instrument.security_type`, `instrument.is_leveraged`, `instrument.sector` |
 | `rollup.<name>@v<N>.<column>` | `rollups/instrument/<name>@v<N>` (columns declared on the rollup) | `rollup.option_liquidity@v1.put_tier` |
 
 Evaluation (`engines/selection/`) uses **three-valued logic**: a missing value is UNKNOWN,
