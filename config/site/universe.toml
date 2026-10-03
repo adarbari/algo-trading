@@ -1,0 +1,20 @@
+# L3 site setting: universe COVERAGE (what we ingest), not a filter. Strategies narrow it with
+# selections (config/site/presets/selections, config/users/<id>/selections).
+# Read by `algotrade-ingest universe-build` (and the nightly job when source = "nasdaq_trader").
+
+# "nasdaq_trader": build nightly from the Nasdaq Trader symbol directory + SPY holdings.
+# "csv_import":    keep the monthly master CSVs (`algotrade-ingest universe --stocks ...`).
+source = "nasdaq_trader"
+
+# Security types the universe covers. instruments/reference keeps every listed type.
+security_types = ["COMMON_STOCK", "ADR", "ETF"]
+exclude_test_issues = true
+
+# Always / never cover these symbols (ACT style, e.g. BRK.B).
+include_symbols = []
+exclude_symbols = []
+
+# Name markers that make an ETF a leverage/inverse *candidate* (UNKNOWN until it is curated in
+# overrides/leveraged_etfs.csv). ETFs without any marker are treated as unleveraged.
+leverage_markers = ['\b-?\d(\.\d)?x\b', '\bultra', '\bbull\b', '\bbear\b', '\binverse\b',
+                    '\bshort\b', '\bleveraged\b', '\bdaily\b']

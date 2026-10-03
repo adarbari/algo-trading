@@ -35,6 +35,11 @@ INSTRUMENT_FIELDS: Mapping[str, str] = {
     "status": "str",
     "listed_on": "date",
     "delisted_on": "date",
+    "first_seen": "date",
+    "round_lot": "float",
+    "is_test_issue": "bool",
+    "financial_status": "str",
+    "in_sp500": "bool",
 }
 
 

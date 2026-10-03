@@ -9,7 +9,10 @@ name = "algotrade-ingestion"
 version = "0.1.0"
 description = "Data ingestion app: sources, nightly pipeline, golden datasets"
 requires-python = ">=3.12"
-dependencies = ["algotrade"]
+dependencies = [
+    "algotrade",
+    "openpyxl>=3.1",
+]
 
 [project.scripts]
 algotrade-ingest = "algotrade_ingestion.cli:main"

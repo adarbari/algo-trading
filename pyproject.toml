@@ -75,7 +75,7 @@ packages = ["algotrade", "algotrade_ingestion", "algotrade_backtest"]
 warn_unreachable = true
 
 [[tool.mypy.overrides]]
-module = ["pyarrow", "pyarrow.*"]  # pyarrow ships no type stubs
+module = ["pyarrow", "pyarrow.*", "openpyxl", "openpyxl.*"]  # no type stubs shipped
 ignore_missing_imports = true
 
 # ---------------------------------------------------------------- pytest

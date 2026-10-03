@@ -52,9 +52,9 @@ versus planned. Detail lives in companion docs:
 | Area | Built | Planned (phase) |
 |---|---|---|
 | Apps | `apps/ingestion`, `apps/backtest` | `apps/api` (4), `apps/web` (5) |
-| L1 | `instruments/reference` (from universe CSVs), `rollups/instrument/option_liquidity@v1`, `InstrumentView` reader | Nasdaq Trader + SPY universe builder, company details, FIGI ids + `instruments/symbol_history`, `events/reference_change` (1); `price_stats`, `iv_history`, `earnings`, `liquidity_class`, `fundamentals` rollups (2b) |
+| L1 | `instruments/reference` from the Nasdaq Trader + SPY universe builder (or universe CSVs), `events/reference_change` + `events/index_change`, `rollups/instrument/option_liquidity@v1`, `InstrumentView` reader | company details, FIGI ids + `instruments/symbol_history` (1); `price_stats`, `iv_history`, `earnings`, `liquidity_class`, `fundamentals` rollups (2b) |
 | L2 | `chains/*` (Cboe), `bars/1d` schema + reads (golden data) | Massive daily bars + split/dividend events, Nasdaq earnings events (1); intraday bars + `rollups/daily/*` (6) |
-| L3 | `defaults.toml`, `presets/selections/*`, `presets/strategies/*` | `universe.toml`, `sources.toml`, `overrides/leveraged_etfs.csv` (1); `rollups.toml` (2b) |
+| L3 | `defaults.toml`, `universe.toml`, `overrides/leveraged_etfs.csv`, `presets/selections/*`, `presets/strategies/*` | `sources.toml` (1); `rollups.toml` (2b) |
 | L4 | `strategies/`, `selections/` | `watchlists/`, `preferences.toml` (4–5); DB-backed `ConfigStore` (4) |
 | Jobs | local runner keyed by config hash; `backtest`, `screen`, `nightly` | queue-backed runner (6) |
 | Other | uv workspace, Parquet storage (local + memory backends) | DuckDB query engine and catalog; S3 backend for hosting (6); `quant/` (2b) |
@@ -122,8 +122,9 @@ Full reference: [configuration.md](configuration.md).
 
 ```
 nightly (the "nightly" job; later also intraday or on request)
-  universe import (monthly master CSVs today; Nasdaq Trader + SPY builder in phase 1)
-    → universe + instruments/reference snapshot
+  universe build (Nasdaq Trader + SPY holdings, when universe.toml source = nasdaq_trader;
+                  otherwise the monthly master CSV import)
+    → instruments/reference (everything listed) + universe (coverage) + change events
   ingestion: pull per source → raw/ (as received, 90-day retention)
            → validate + normalise → reference / events / bars / chains
            → rollups (versioned)
