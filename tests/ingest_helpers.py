@@ -10,10 +10,10 @@ import pytest
 from algotrade.config.settings import SourcesSettings
 from algotrade.data import StoreReader
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.sources import registry
-from algotrade_ingestion.sources.base import Source
-from algotrade_ingestion.sources.http import Http, Pacer, RetryPolicy, Transport
-from algotrade_ingestion.tasks.framework import TaskContext
+from algotrade_ingestion.sources.framework import registry
+from algotrade_ingestion.sources.framework.base import Source
+from algotrade_ingestion.sources.framework.http import Http, Pacer, RetryPolicy, Transport
+from algotrade_ingestion.tasks.framework.run import TaskContext
 
 FIXED = datetime(2026, 10, 2, 22, tzinfo=UTC)
 

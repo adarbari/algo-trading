@@ -49,7 +49,7 @@ _ADHOC_ID = re.compile(r"""f?["']EQ:|AssetClass\.EQUITY\s*,|\bequity_id\(""")
 _ID_OWNERS = {
     "src/algotrade/core/instruments.py",
     "src/algotrade/data/resolver.py",
-    "apps/ingestion/algotrade_ingestion/tasks/instrument_ids.py",
+    "apps/ingestion/algotrade_ingestion/tasks/reference/instrument_ids.py",
 }
 
 

@@ -81,7 +81,7 @@ comes from the exchange calendar. Responsibilities: `ingestion-step-dispatch`,
 `job-execution`, `screen-execution`, `session-calendar`.
 
 ### The ingest loop is written once
-`tasks/framework.py` (`IngestRun`) owns run ids and records, the COMPLETE / PARTIAL
+`tasks/framework/run.py` (`IngestRun`) owns run ids and records, the COMPLETE / PARTIAL
 decision, raw persistence, id resolution and point-in-time stamping. Dataset modules declare
 what to fetch and how to compose tables. Responsibilities: `run-records`, `raw-persistence`,
 `row-stamping`, `id-resolution`.

@@ -10,7 +10,7 @@ returns a whole chain (quotes, OI, IV, Greeks) plus the underlying's `iv30` in o
 
 ## Decision
 - The Cboe delayed feed is the **primary source for option chains and per-underlying
-  `iv30`**, behind the standard source interface (`sources/cboe.py`). IBKR moves to futures,
+  `iv30`**, behind the standard source interface (`sources/vendors/cboe/option_chains.py`). IBKR moves to futures,
   cross-checks and execution.
 - Fail closed: only 404 means "no chain". 403 and 5xx are errors, and a run where more than
   25% of optionable names return no chain is PARTIAL.

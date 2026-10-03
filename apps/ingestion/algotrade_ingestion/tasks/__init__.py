@@ -1,1 +1,1 @@
-"""Ingestion jobs. Each is resumable, idempotent per (job, session date) and audited."""
+"""Ingestion tasks grouped by domain; the machinery that runs them lives in ``tasks/framework``."""

@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from algotrade_backtest.cli import main
-from algotrade_ingestion.cli import main as ingest_main
+from algotrade_ingestion.cli.main import main as ingest_main
 from tests.conftest import GOLDEN_DIR, REPO_ROOT
 
 pytestmark = pytest.mark.e2e

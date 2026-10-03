@@ -1,0 +1,185 @@
+"""Vendor HTTP (responsibility ``vendor-http``): transport, polite retries, a cap on total
+retry time per request and a circuit breaker per vendor.
+
+Sources fetch through one ``Http`` client each, built by ``sources/framework/registry.py``: the
+transport (headers carry credentials), the vendor's shared ``Limiter`` (every attempt waits
+on it), the ``RetryPolicy`` and the vendor's ``CircuitBreaker``. Tests build ``Http`` around
+a fake transport, so no test needs the network.
+"""
+
+import random
+import threading
+import time
+import urllib.error
+import urllib.request
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from typing import Protocol
+
+DEFAULT_USER_AGENT = "algotrade-ingestion/0.1 (+https://github.com/adarbari/algo-trading)"
+# api.nasdaq.com rejects non-browser user agents.
+BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) algotrade-ingestion/0.1"
+
+
+class HttpError(Exception):
+    def __init__(self, status: int, retry_after: float | None = None) -> None:
+        self.status = status
+        self.retry_after = retry_after
+        super().__init__(f"HTTP {status}")
+
+
+type Transport = Callable[[str], bytes]
+type Sleep = Callable[[float], None]
+
+
+def urllib_transport(
+    user_agent: str = DEFAULT_USER_AGENT,
+    timeout: float = 60.0,
+    headers: dict[str, str] | None = None,
+) -> Transport:
+    """``headers`` carry credentials (e.g. ``Authorization``) so keys never appear in URLs."""
+    all_headers = {"User-Agent": user_agent, **(headers or {})}
+
+    def get(url: str) -> bytes:
+        request = urllib.request.Request(url, headers=all_headers)
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                body: bytes = response.read()
+                return body
+        except urllib.error.HTTPError as exc:
+            header = exc.headers.get("Retry-After") if exc.headers else None
+            retry = float(header) if header and header.isdigit() else None
+            raise HttpError(exc.code, retry) from exc
+
+    return get
+
+
+@dataclass(frozen=True)
+class RetryPolicy:
+    tries: int = 7
+    base_delay: float = 1.5
+    max_delay: float = 60.0
+    # Only 404 means "no such chain". 403 may mean we are blocked, so it must surface as an
+    # error, never as "this ticker has no options" (fail closed).
+    give_up_statuses: frozenset[int] = frozenset({404})
+    max_total_s: float | None = None  # cap on time spent retrying one request
+
+
+class CircuitOpenError(RuntimeError):
+    """The vendor failed too many requests in a row this run; remaining items fail fast."""
+
+
+class CircuitBreaker:
+    """Opens after ``threshold`` consecutive 403 / 5xx responses from one vendor (a block or
+    an outage) and stays open for the rest of the run, so the remaining items fail at once
+    with a clear status instead of each burning its retries. ``threshold <= 0``: never opens."""
+
+    def __init__(self, name: str, threshold: int) -> None:
+        self.name, self.threshold = name, threshold
+        self._failures = 0
+        self._lock = threading.Lock()
+
+    @property
+    def open(self) -> bool:
+        return 0 < self.threshold <= self._failures
+
+    def check(self) -> None:
+        if self.open:
+            raise CircuitOpenError(
+                f"{self.name}: circuit open after {self._failures} consecutive 403/5xx "
+                "responses; skipping the rest of this run"
+            )
+
+    def record(self, status: int | None) -> None:
+        """One response: ``None`` = success, else the HTTP status."""
+        with self._lock:
+            if status is not None and (status == 403 or status >= 500):
+                self._failures += 1
+            else:
+                self._failures = 0
+
+
+class Pacer(Protocol):
+    def wait(self) -> float: ...
+
+    def hold(self, seconds: float) -> None: ...
+
+
+def get_with_retry(
+    transport: Transport,
+    url: str,
+    policy: RetryPolicy,
+    sleep: Sleep = time.sleep,
+    *,
+    limiter: Pacer | None = None,
+    breaker: CircuitBreaker | None = None,
+    clock: Callable[[], float] = time.monotonic,
+) -> bytes | None:
+    """Fetch ``url``. Returns ``None`` for give-up statuses (e.g. 404: no such chain).
+
+    Every attempt waits on ``limiter``. 429 honours Retry-After or backs off exponentially;
+    other failures back off linearly. Gives up after ``policy.tries`` attempts, or when the
+    next wait would pass ``policy.max_total_s``, or when ``breaker`` opens.
+    """
+    started = clock()
+    last_error: Exception | None = None
+    for attempt in range(policy.tries):
+        if breaker is not None:
+            breaker.check()
+        if limiter is not None:
+            limiter.wait()
+        try:
+            body = transport(url)
+        except HttpError as exc:
+            if breaker is not None:
+                breaker.record(None if exc.status in policy.give_up_statuses else exc.status)
+            if exc.status in policy.give_up_statuses:
+                return None
+            last_error = exc
+            delay = (
+                exc.retry_after or min(policy.max_delay, 5 * 2**attempt)
+                if exc.status == 429
+                else _linear(policy, attempt)
+            )
+        except (OSError, TimeoutError) as exc:
+            last_error, delay = exc, _linear(policy, attempt)
+        else:
+            if breaker is not None:
+                breaker.record(None)
+            return body
+        if attempt + 1 == policy.tries:
+            break
+        if policy.max_total_s is not None and clock() - started + delay > policy.max_total_s:
+            raise RuntimeError(f"giving up on {url} after {clock() - started:.0f}s: {last_error}")
+        sleep(delay)
+    raise RuntimeError(f"giving up on {url}: {last_error}")
+
+
+def _linear(policy: RetryPolicy, attempt: int) -> float:
+    return min(policy.max_delay, policy.base_delay * (attempt + 1) + random.uniform(0, 0.5))
+
+
+@dataclass
+class Http:
+    """What a source fetches through. Built by the registry; sources never pace themselves."""
+
+    transport: Transport
+    policy: RetryPolicy = field(default_factory=RetryPolicy)
+    limiter: Pacer | None = None
+    breaker: CircuitBreaker | None = None
+    sleep: Sleep = time.sleep
+
+    def get(self, url: str) -> bytes | None:
+        return get_with_retry(
+            self.transport,
+            url,
+            self.policy,
+            self.sleep,
+            limiter=self.limiter,
+            breaker=self.breaker,
+        )
+
+    def cool_down(self, seconds: float) -> None:
+        """Ask the vendor's limiter (shared across processes) to pause new requests."""
+        if self.limiter is not None:
+            self.limiter.hold(seconds)

@@ -6,12 +6,12 @@ limits and prices before relying on them.
 Every vendor sits behind the same source interface in `apps/ingestion/sources/`. Adding or
 swapping a vendor never touches storage, features, strategies or the UI.
 
-**Pacing is shared.** Each source is declared once in `sources/registry.py` with its
+**Pacing is shared.** Each source is declared once in `sources/framework/registry.py` with its
 `config/site/sources.toml` section and a limiter key (`cboe`, `nasdaqtrader`, `ssga`,
-`nasdaq`, `massive`, `sec`). One limiter per key (`sources/limiter.py`) spaces requests by the
+`nasdaq`, `massive`, `sec`). One limiter per key (`sources/framework/limiter.py`) spaces requests by the
 section's `min_interval_s` across every worker thread **and every process** on the machine
 (a lock file per key under `[http] limits_dir`, default `var/run/limits/`), so a backfill and
-the nightly run never exceed a vendor's limit together. Retries live in `sources/http.py`:
+the nightly run never exceed a vendor's limit together. Retries live in `sources/framework/http.py`:
 429 honours `Retry-After`, other failures back off, and one request gives up after
 `[http] max_retry_s`. After `[http] breaker_failures` consecutive 403/5xx from a vendor its
 circuit opens: the rest of the run's items for that vendor fail at once with
@@ -27,7 +27,7 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 | Daily stock and ETF bars (swing / momentum) | Massive (formerly Polygon) free tier: all US tickers, 2 years history, 5 calls/min; "grouped daily" = whole market in 1 call | Alpaca (free account), IBKR, Yahoo (unofficial, history backfill only) | |
 | End-of-day option chains | **Cboe delayed-quotes feed** (ADR 0014): whole chain + Greeks + IV + OI and the underlying's `iv30` in one request per underlying; about 4.2k requests a night | IBKR for a focused list / cross-check; Schwab Trader API (free with account; Greeks; all expiries in one call; 120 req/min); Tradier (needs a brokerage account for Greeks); Alpaca (free indicative feed, history from 2024-02); Massive options (paid, from ~$29/mo; licensed fallback) | No free source covers end-of-day chains for the whole universe with history. **We build our own IV history from day one.** |
 | Futures (later) | **IBKR** (contracts, history, including recently expired) | Databento (pay-as-you-go history), Massive futures (paid), Yahoo/Stooq continuous (unofficial, unclear rolls) | |
-| Synthetic | `sources/synthetic.py` (golden datasets) | — | Lets the whole pipeline run in CI with no account |
+| Synthetic | `sources/fixtures/` (golden datasets) | — | Lets the whole pipeline run in CI with no account |
 
 ## Cboe delayed-quotes feed (primary for options)
 
@@ -39,7 +39,7 @@ in about 0.3 s.
 |---|---|
 | Per underlying | price, OHLC, previous close, volume, `iv30` |
 
-Caveats, handled in `apps/ingestion/algotrade_ingestion/sources/cboe.py`:
+Caveats, handled in `apps/ingestion/algotrade_ingestion/sources/vendors/cboe/option_chains.py`:
 
 - **Not a licensed product.** It is the undocumented feed behind cboe.com and can change or
   disappear. Check Cboe's site terms; keep Massive or Schwab as the fallback.
@@ -104,7 +104,7 @@ common for funds) is counted as `no_submissions`, not a failure; 403 and 5xx are
 map; most ETFs have no CIK in that map and get no company row (UNKNOWN to selections).
 
 `sector` is a heuristic mapping of SIC code ranges to market sectors (Technology, Health Care,
-Financials, …; `sources/sec_sic.py`), falling back to one sector per SIC division;
+Financials, …; `sources/vendors/sec/sic.py`), falling back to one sector per SIC division;
 `industry` is the SEC's SIC description and `sic_division` the official division.
 
 ## What IBKR gives us

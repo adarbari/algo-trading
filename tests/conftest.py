@@ -8,9 +8,9 @@ from algotrade.data import StoreReader
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.sources.base import FixtureSource
-from algotrade_ingestion.sources.registry import fixture_source
-from algotrade_ingestion.tasks.golden import load_golden
+from algotrade_ingestion.sources.framework.base import FixtureSource
+from algotrade_ingestion.sources.framework.registry import fixture_source
+from algotrade_ingestion.tasks.maintenance.golden import load_golden
 from tests.ingest_helpers import task_ctx
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
