@@ -19,9 +19,9 @@ from algotrade_ingestion.tasks.reference.company_details import (
     due_ciks,
     ingest_company_details,
 )
-from tests.ingest_helpers import http_for, task_ctx
-from tests.sec_fixture import submissions, tickers
-from tests.storage_helpers import stamped
+from tests.helpers.ingest_fakes import http_for, task_ctx
+from tests.helpers.payloads.sec import submissions, tickers
+from tests.helpers.stored_frames import stamped
 
 DAY = date(2026, 10, 2)
 CLOCK = lambda: datetime(2026, 10, 2, 22, tzinfo=UTC)  # noqa: E731

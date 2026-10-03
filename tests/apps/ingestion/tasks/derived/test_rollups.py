@@ -10,8 +10,8 @@ import pytest
 from algotrade.features.registry import ROLLUPS
 from algotrade.storage.runs import RunStatus
 from algotrade_ingestion.tasks.derived.rollups import compute_rollups
-from tests.ingest_helpers import task_ctx
-from tests.rollup_helpers import (
+from tests.helpers.ingest_fakes import task_ctx
+from tests.helpers.rollup_store import (
     END,
     chain_rows,
     series,

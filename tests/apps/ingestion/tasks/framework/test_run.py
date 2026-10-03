@@ -20,8 +20,8 @@ from algotrade_ingestion.tasks.framework.run import (
     run_summary,
     stamp,
 )
-from tests.ingest_helpers import task_ctx
-from tests.storage_helpers import write_reference
+from tests.helpers.ingest_fakes import task_ctx
+from tests.helpers.stored_frames import write_reference
 
 DAY = date(2026, 10, 2)
 NOW = datetime(2026, 10, 2, 22, tzinfo=UTC)

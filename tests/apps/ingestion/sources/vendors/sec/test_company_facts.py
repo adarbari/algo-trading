@@ -16,7 +16,7 @@ from algotrade_ingestion.sources.vendors.sec.company_facts import (
     parse_company_facts,
 )
 from tests.conftest import REPO_ROOT
-from tests.ingest_helpers import http_for
+from tests.helpers.ingest_fakes import http_for
 
 FIXTURE = REPO_ROOT / "tests" / "fixtures" / "sources" / "sec" / "companyfacts_CIK0000320193.json"
 PAYLOAD = FIXTURE.read_bytes()

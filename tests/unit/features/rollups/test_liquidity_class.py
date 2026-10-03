@@ -9,7 +9,7 @@ import pytest
 
 from algotrade.features.rollups import liquidity_class as lc
 from algotrade.features.rollups.liquidity_class import LiquidityClassParams
-from tests.rollup_helpers import END
+from tests.helpers.rollup_store import END
 
 STATS = {  # id: (adv_usd_20d, close)
     "EQ:BIG": (500e6, 150.0),

@@ -14,8 +14,8 @@ from algotrade_ingestion.sources.vendors.treasury.par_yields import (
     parse_curve,
     tenor_of,
 )
-from tests import treasury_fixture
-from tests.ingest_helpers import CountingLimiter, http_for
+from tests.helpers.ingest_fakes import CountingLimiter, http_for
+from tests.helpers.payloads import treasury as treasury_payloads
 
 
 @pytest.mark.parametrize(
@@ -28,7 +28,7 @@ def test_headers_become_tenors(header: str, tenor: str) -> None:
 
 
 def test_parses_the_2025_format() -> None:
-    frame, unknown = parse_curve(treasury_fixture.payload(2025))
+    frame, unknown = parse_curve(treasury_payloads.payload(2025))
     assert unknown == 0
     days = pd.to_datetime(frame["ts"], utc=True).dt.date
     assert sorted(set(days)) == [
@@ -51,7 +51,7 @@ def test_parses_the_2025_format() -> None:
 
 
 def test_parses_older_columns_and_empty_years() -> None:
-    frame, _ = parse_curve(treasury_fixture.payload(2020))
+    frame, _ = parse_curve(treasury_payloads.payload(2020))
     assert "4M" not in set(frame["tenor"]) and "2M" in set(frame["tenor"])
     assert frame[frame["tenor"] == "30Y"]["rate_par"].tolist() == pytest.approx([0.0166, 0.0165])
     empty, _ = parse_curve(b"")
@@ -71,7 +71,7 @@ def test_source_fetches_one_year_per_request_through_the_limiter() -> None:
 
     def transport(url: str) -> bytes:
         urls.append(url)
-        return treasury_fixture.payload(2025)
+        return treasury_payloads.payload(2025)
 
     source = TreasuryParYields(http_for(transport, RetryPolicy(tries=1), limiter))
     request = FetchRequest("2025")

@@ -11,8 +11,8 @@ from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.sources.fixtures.files import GoldenFiles
 from algotrade_ingestion.sources.fixtures.source import GoldenCsvSource
 from algotrade_ingestion.tasks.maintenance.golden import load_golden
-from tests.factories import series_from_closes
-from tests.ingest_helpers import task_ctx
+from tests.helpers.domain_objects import series_from_closes
+from tests.helpers.ingest_fakes import task_ctx
 
 CLOCK = lambda: datetime(2026, 10, 3, tzinfo=UTC)  # noqa: E731
 

@@ -10,7 +10,7 @@ from algotrade.data.prices import frame_to_series, load_price_data
 from algotrade.services.datasets import list_datasets
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
-from tests.storage_helpers import stamped
+from tests.helpers.stored_frames import stamped
 
 D1, D2 = date(2026, 10, 1), date(2026, 10, 2)
 
@@ -85,7 +85,7 @@ def test_missing_catalogue() -> None:
 
 def test_session_bars_adjust_each_window_as_of_its_session() -> None:
     from algotrade.data.prices import session_bars  # noqa: PLC0415
-    from tests.rollup_helpers import store, write_bars, write_split  # noqa: PLC0415
+    from tests.helpers.rollup_store import store, write_bars, write_split  # noqa: PLC0415
 
     writer, reader = store()
     days = write_bars(writer, {"EQ:A": [100.0, 100.0, 50.0, 50.0], "EQ:B": [10.0] * 4})

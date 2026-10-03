@@ -1,6 +1,7 @@
 """Fitness tests for the directory layout (ADR 0020, ``architecture/layout.toml``).
 
 - every Python module under ``src/`` and ``apps/`` lives in a declared directory;
+- no module (``src/``, ``apps/``, ``tests/``, ``scripts/``) has a grab-bag name such as ``utils``;
 - at most ``max_modules`` modules per directory, with no exceptions;
 - the import-linter contracts a declaration names exist in ``pyproject.toml``;
 - every package has an ``__init__.py`` docstring saying what the folder holds;
@@ -8,6 +9,8 @@
   imports it;
 - task domains: a module is a registered task or a private helper, imported only within its
   domain folder or by the task registry (``[[shared]]`` lists the reasoned exceptions).
+
+``tests/``, ``config/`` and ``docs/`` folders: ``test_layout_buckets.py``.
 """
 
 import ast
@@ -25,7 +28,8 @@ from tests.conftest import REPO_ROOT
 
 LAYOUT_FILE = "architecture/layout.toml"
 LAYOUT: dict[str, Any] = tomllib.loads((REPO_ROOT / LAYOUT_FILE).read_text())
-HINT = f"declare it in {LAYOUT_FILE} (see .claude/skills/add-responsibility)"
+GUIDE = "CLAUDE.md 'Directory layout' (where does this go) and .claude/skills/add-responsibility"
+HINT = f"declare it in {LAYOUT_FILE} with a purpose; see {GUIDE}"
 DIRS: list[dict[str, Any]] = LAYOUT["dir"]
 CONTRACTS = {
     c["name"]
@@ -130,6 +134,21 @@ def test_layout_declarations_are_well_formed_and_not_stale() -> None:
 def test_every_module_lives_in_a_declared_directory() -> None:
     undeclared = sorted({_rel(p.parent) for p in MODULES if _declaration(_rel(p.parent)) is None})
     assert not undeclared, f"undeclared directories {undeclared}: {HINT}"
+
+
+def test_no_module_has_a_grab_bag_name() -> None:
+    banned = LAYOUT["banned_module_names"]
+    modules = [
+        p
+        for top in ("src", "apps", "tests", "scripts")
+        for p in (REPO_ROOT / top).rglob("*.py")
+        if not {".venv", "node_modules", "__pycache__"} & set(p.parts)
+    ]
+    found = sorted(_rel(p) for p in modules if p.stem in banned["names"])
+    assert not found, (
+        f"grab-bag module names {found}: {banned['reason']} "
+        f"([banned_module_names] in {LAYOUT_FILE}; {GUIDE})"
+    )
 
 
 # ----------------------------------------------------------------------------- size

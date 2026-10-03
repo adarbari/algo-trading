@@ -14,7 +14,7 @@ from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.result_writer import ResultWriter
-from tests.storage_helpers import T0, stamped
+from tests.helpers.stored_frames import T0, stamped
 
 D1, D2 = date(2026, 10, 1), date(2026, 10, 2)
 A, B = "rollups/instrument/a@v1", "rollups/instrument/b@v1"

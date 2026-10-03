@@ -5,7 +5,7 @@ import pytest
 from algotrade.core.model.errors import DataValidationError
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id, run_session
 from algotrade.storage.tables.schemas import TableSpec, spec_for, table_key, validate_frame
-from tests.storage_helpers import stamped
+from tests.helpers.stored_frames import stamped
 
 
 def test_run_record_json_round_trip() -> None:

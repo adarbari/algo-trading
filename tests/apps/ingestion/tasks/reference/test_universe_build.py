@@ -16,8 +16,8 @@ from algotrade_ingestion.tasks.reference.universe_build import (
     build_universe,
     review_rows,
 )
-from tests import universe_fixture as fx
-from tests.ingest_helpers import http_for, task_ctx
+from tests.helpers.ingest_fakes import http_for, task_ctx
+from tests.helpers.payloads import universe as fx
 
 D1 = date(2026, 10, 1)
 D2 = D1 + timedelta(days=1)

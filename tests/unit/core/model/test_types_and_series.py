@@ -7,7 +7,7 @@ from algotrade.core.model.errors import DataValidationError
 from algotrade.core.model.types import Order, Side
 from algotrade.core.time.clock import to_utc_datetime
 from algotrade.core.views.series import PriceSeries
-from tests.factories import T0, fill, series_from_closes
+from tests.helpers.domain_objects import T0, fill, series_from_closes
 
 
 def test_side_sign() -> None:

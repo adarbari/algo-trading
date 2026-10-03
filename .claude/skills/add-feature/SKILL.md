@@ -15,6 +15,12 @@ the definition is a pure compute module in `features/rollups/`; the `rollups` in
 Never read storage or `algotrade.data` inside a definition (import-linter enforces it), and
 never write a new task for a rollup. `make ownership` and `make dupes` must pass.
 
+0. **Where it goes:** look the kind up in the "Where does this go?" table (CLAUDE.md,
+   Directory layout) and its folder in `architecture/layout.toml`. Here:
+   `features/rollups/<name>.py`; a new input loader in `features/framework/`. If no folder
+   fits, add one for the new kind (`.claude/skills/add-responsibility`, step 3); never park
+   code in a neighbouring folder. Tests go in the mirrored folder; run `make layout` and
+   plan a split if the folder is at 8+ modules.
 1. **Declare it** in `src/algotrade/features/rollups/<name>.py` as `ROLLUP = Rollup(...)`:
    `name`, `version` (1), a description, `inputs` (`Input(table, lookback=sessions or
    lambda params: ..., required=True)`), `columns` (`{"col": "float" | "int" | "bool" | "str"
@@ -46,7 +52,7 @@ never write a new task for a rollup. `make ownership` and `make dupes` must pass
 6. **Changing an existing rollup's logic or a window named in a column?** Create
    `name@v2`; do not edit v1. Update dependents explicitly.
 7. **Tests** (`tests/unit/features/rollups/`): hand-computed values on a small stored series
-   (`tests/rollup_helpers.py`), missing history / gaps are null, a backfill equals the
+   (`tests/helpers/rollup_store.py`), missing history / gaps are null, a backfill equals the
    per-session compute, and anything adjustment-sensitive (splits) as of each session.
 8. **Docs:** the rollups table in `docs/data/layers.md` and the selectable fields in
    `docs/configuration.md`.

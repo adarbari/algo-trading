@@ -2,7 +2,7 @@ import pytest
 
 from algotrade.core.model.types import Fill, Side
 from algotrade.engines.backtest.portfolio import Portfolio
-from tests.factories import T0, fill
+from tests.helpers.domain_objects import T0, fill
 
 
 def test_buy_then_sell_round_trip() -> None:

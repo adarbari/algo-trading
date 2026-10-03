@@ -17,7 +17,7 @@ from algotrade.data.reference import (
 )
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
-from tests.storage_helpers import T0, stamped, universe_rows
+from tests.helpers.stored_frames import T0, stamped, universe_rows
 
 D1, D2 = date(2026, 10, 1), date(2026, 10, 2)
 REF = "instruments/reference"

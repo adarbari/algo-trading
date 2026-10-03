@@ -10,7 +10,7 @@ import pytest
 from algotrade.features.framework.runner import compute_in_memory, compute_one
 from algotrade.features.rollups import dividends, price_stats
 from algotrade.features.rollups.dividends import ROLLUP, DividendParams
-from tests.rollup_helpers import END, series, store, write_bars, write_dividends, write_split
+from tests.helpers.rollup_store import END, series, store, write_bars, write_dividends, write_split
 
 
 def _setup() -> tuple[object, list[date]]:

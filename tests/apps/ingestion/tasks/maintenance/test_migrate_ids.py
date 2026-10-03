@@ -14,8 +14,8 @@ from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.maintenance.migrate_ids import migrate_ids
 from algotrade_ingestion.tasks.reference.instrument_ids import ID_MAP, ID_MAP_COLUMNS
-from tests.ingest_helpers import task_ctx
-from tests.storage_helpers import T0, stamped
+from tests.helpers.ingest_fakes import task_ctx
+from tests.helpers.stored_frames import T0, stamped
 
 D1, D2 = date(2026, 9, 30), date(2026, 10, 1)
 UPGRADED = T0 + timedelta(hours=1)  # when the universe build recorded AAPL -> FIGI

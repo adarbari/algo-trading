@@ -1,28 +1,47 @@
-# Directory layout registry (ADR 0020): every directory that may hold Python code, with what
-# it holds. One folder = one kind of thing. Enforced by tests/architecture/test_layout.py:
+# Directory layout registry (ADR 0020): every directory that may hold code, tests, config or
+# docs, with what it holds. One folder = one kind of thing. Where a new kind of code goes:
+# the "Where does this go" table in CLAUDE.md (Directory layout). If nothing fits, add a new
+# folder for the new kind and declare it here; never park code in a neighbouring folder.
+# Enforced by tests/architecture/test_layout.py (src/, apps/, module names) and
+# tests/architecture/test_layout_buckets.py (tests/, config/, docs/):
 #
 #   - every module under src/ and apps/ lives in a directory declared here (a new folder or a
 #     stray file fails: declare the folder here with its purpose, in the same PR);
-#   - at most `max_modules` modules (excluding __init__.py) per directory; split by kind
-#     instead. There are no exceptions (a fitness test keeps `[[exception]]` absent);
+#   - at most `max_modules` modules (excluding __init__.py; in tests/ also conftest.py) per
+#     directory, src/, apps/ and tests/ alike; split by kind instead. There are no exceptions
+#     (a fitness test keeps `[[exception]]` absent). `make layout` lists directories at
+#     `warn_modules` or more, so a split is planned before it is forced;
+#   - no module is named for a grab bag (`[banned_module_names]`): name it for what it does;
 #   - every package has an __init__.py whose docstring says what the folder holds;
 #   - `kind = "vendor"`: one folder per vendor. It contributes at least one source to the
 #     source registry, and nothing outside the folder imports it except the registry;
 #   - `kind = "task-domain"`: registered tasks (tasks/framework/registry.py) or private
 #     helpers. A module is imported only within its own domain folder or by the task
-#     registry, unless it is listed in `[[shared]]` with the reason.
+#     registry, unless it is listed in `[[shared]]` with the reason;
+#   - tests mirror their source (`[[test_mirror]]`): every directory under a mirror root is a
+#     declared source directory that exists; every other test directory is a `[[test_dir]]`;
+#   - config/ and docs/ folders are declared (`[[config_dir]]`, `[[docs_dir]]`) and hold at
+#     most `max_files` files each (`kind = "log"`: an append-only numbered log, not capped).
 #
 #   path     a directory relative to the repo root; `*` matches one path segment
 #   purpose  one line: what belongs in it
 #   kind     optional: "vendor" or "task-domain" (rules above)
 #   contracts optional: import-linter contract names (pyproject.toml) enforcing the folder rule
+#   holds    [[test_dir]] only: "tests" (default), "folders" (no modules of its own) or "data"
+#            (recorded files, no Python)
 #
 # Adding a folder or moving a responsibility: .claude/skills/add-responsibility.
 
 doc = "docs/adr/0020-directory-layout.md"
 max_modules = 10
+warn_modules = 8   # make layout: "approaching the limit, plan the split by kind"
+max_files = 12     # per config/ and docs/ folder
 source_registry = "apps/ingestion/algotrade_ingestion/sources/framework/registry.py"
 task_registry = "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py"
+
+[banned_module_names]
+reason = "a grab-bag name hides unrelated code and invites more: name the module for what it does (pricing.py, not utils.py); a bucket of test builders is the tests/helpers/ folder, its modules named for what they build"
+names = ["utils", "util", "helpers", "common", "misc", "stuff", "tools", "lib", "shared"]
 
 # --------------------------------------------------------------------------- library (src/)
 # One folder = one kind of thing (Layout PR B). `contracts` name the import-linter contracts
@@ -263,3 +282,131 @@ purpose = "the nightly workflow: sessions, steps, screens, notifications"
 [[shared]]
 module = "apps/ingestion/algotrade_ingestion/tasks/reference/instrument_ids.py"
 reason = "the ingestion id rule (ADR 0018, `id-resolution`): golden and migrate-ids reuse it"
+
+# --------------------------------------------------------------------------- tests (tests/)
+# Test modules mirror their source: a directory under `tests` is the source directory at the
+# same relative path under `source` (it must exist and be declared above). Anything else in
+# tests/ is a declared bucket below.
+
+[[test_mirror]]
+tests = "tests/unit"
+source = "src/algotrade"
+
+[[test_mirror]]
+tests = "tests/apps/ingestion"
+source = "apps/ingestion/algotrade_ingestion"
+
+[[test_dir]]
+path = "tests"
+purpose = "the test root: conftest.py (shared pytest fixtures) only"
+holds = "folders"
+
+[[test_dir]]
+path = "tests/apps"
+purpose = "app tests: one folder per app, mirroring the app package ([[test_mirror]])"
+holds = "folders"
+
+[[test_dir]]
+path = "tests/helpers"
+purpose = "test builders and fakes shared across suites, one module per thing built (stored frames, ingest fakes, rollup stores, domain objects)"
+
+[[test_dir]]
+path = "tests/helpers/payloads"
+purpose = "synthetic payloads in a vendor's wire format, one module per vendor or feed"
+
+[[test_dir]]
+path = "tests/fixtures"
+purpose = "recorded data files used by tests (no Python)"
+holds = "data"
+
+[[test_dir]]
+path = "tests/fixtures/sources"
+purpose = "recorded vendor responses (real format, trimmed), one folder per vendor"
+holds = "data"
+
+[[test_dir]]
+path = "tests/fixtures/sources/*"
+purpose = "one vendor's recorded responses"
+holds = "data"
+
+[[test_dir]]
+path = "tests/architecture"
+purpose = "fitness tests: layout, ownership, structure, docs, registries"
+
+[[test_dir]]
+path = "tests/contract"
+purpose = "contract suites every implementation of a protocol must pass, one folder per protocol"
+holds = "folders"
+
+[[test_dir]]
+path = "tests/contract/storage"
+purpose = "the storage contract: every table backend passes it"
+
+[[test_dir]]
+path = "tests/property"
+purpose = "Hypothesis invariants across every registered strategy and screener"
+
+[[test_dir]]
+path = "tests/integration"
+purpose = "a real store and engine across every golden dataset"
+
+[[test_dir]]
+path = "tests/e2e"
+purpose = "the CLIs end to end against the committed golden datasets and baseline"
+
+# --------------------------------------------------------------------------- config (config/)
+# Every config/site/*.toml is loaded by the one settings loader (config/site/settings.py;
+# tests/architecture/test_layout_buckets.py) and every key in it is read by code
+# (tests/architecture/test_ownership.py::test_every_site_setting_key_is_read_by_code).
+
+[[config_dir]]
+path = "config"
+purpose = "configuration by layer: site/ (L3, reviewed via PR) and users/ (L4, local); no files of its own"
+
+[[config_dir]]
+path = "config/site"
+purpose = "L3 site settings: one <name>.toml per settings group, each loaded by config/site/settings.py"
+
+[[config_dir]]
+path = "config/site/presets"
+purpose = "site presets by kind (no files of its own)"
+
+[[config_dir]]
+path = "config/site/presets/selections"
+purpose = "named selection presets (typed Selection documents) strategies and screeners reuse"
+
+[[config_dir]]
+path = "config/site/presets/strategies"
+purpose = "strategy and screener presets: kind, impl, params, selection, schedule"
+
+[[config_dir]]
+path = "config/site/overrides"
+purpose = "curated CSV overrides read by the settings loader (e.g. leveraged_etfs.csv)"
+
+[[config_dir]]
+path = "config/users"
+purpose = "L4 user configs, one folder per user (git-ignored local state: not checked)"
+local = true
+
+# --------------------------------------------------------------------------- docs (docs/)
+
+[[docs_dir]]
+path = "docs"
+purpose = "cross-cutting docs: architecture, roadmap, configuration, testing, trading pitfalls"
+
+[[docs_dir]]
+path = "docs/adr"
+purpose = "architecture decision records: numbered, append-only (never moved or renumbered)"
+kind = "log"
+
+[[docs_dir]]
+path = "docs/data"
+purpose = "data specs: layers, storage, instruments, vendors, nightly footprint"
+
+[[docs_dir]]
+path = "docs/screeners"
+purpose = "one page per screener, and the screener index"
+
+[[docs_dir]]
+path = "docs/ui"
+purpose = "the UI design system"

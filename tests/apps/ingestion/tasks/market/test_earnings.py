@@ -8,9 +8,9 @@ from algotrade_ingestion.sources.framework.base import FetchRequest
 from algotrade_ingestion.sources.framework.http import HttpError, RetryPolicy
 from algotrade_ingestion.sources.vendors.nasdaq.earnings import NasdaqEarningsSource, parse_calendar
 from algotrade_ingestion.tasks.market.earnings import ingest_earnings, report_days
-from tests.earnings_fixture import calendar
-from tests.ingest_helpers import CountingLimiter, http_for, task_ctx
-from tests.storage_helpers import write_reference
+from tests.helpers.ingest_fakes import CountingLimiter, http_for, task_ctx
+from tests.helpers.payloads.nasdaq_earnings import calendar
+from tests.helpers.stored_frames import write_reference
 
 DAY = date(2026, 10, 2)  # a Friday
 CLOCK = lambda: datetime(2026, 10, 2, 22, tzinfo=UTC)  # noqa: E731

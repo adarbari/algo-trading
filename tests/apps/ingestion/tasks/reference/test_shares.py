@@ -14,8 +14,8 @@ from algotrade_ingestion.sources.framework.http import HttpError, RetryPolicy
 from algotrade_ingestion.sources.vendors.sec.company_facts import SecCompanyFacts
 from algotrade_ingestion.tasks.reference.shares import SharesSources, ingest_shares
 from tests.apps.ingestion.sources.vendors.sec.test_company_facts import PAYLOAD
-from tests.ingest_helpers import http_for, task_ctx
-from tests.storage_helpers import stamped
+from tests.helpers.ingest_fakes import http_for, task_ctx
+from tests.helpers.stored_frames import stamped
 
 DAY = date(2026, 10, 2)
 CLOCK = lambda: datetime(2026, 10, 2, 22, tzinfo=UTC)  # noqa: E731

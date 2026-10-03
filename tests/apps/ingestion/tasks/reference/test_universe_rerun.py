@@ -35,10 +35,10 @@ from algotrade_ingestion.tasks.reference.universe_build import (
     build_universe,
     write_figi_review,
 )
-from tests import massive_fixture as mfx
-from tests import universe_fixture as fx
-from tests.ingest_helpers import http_for, task_ctx
-from tests.storage_helpers import T0, stamped
+from tests.helpers.ingest_fakes import http_for, task_ctx
+from tests.helpers.payloads import massive as mfx
+from tests.helpers.payloads import universe as fx
+from tests.helpers.stored_frames import T0, stamped
 
 D1, D2, D3 = date(2026, 10, 1), date(2026, 10, 2), date(2026, 10, 5)
 CHANGES = "events/reference_change"

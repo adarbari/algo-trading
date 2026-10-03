@@ -16,9 +16,9 @@ from algotrade_ingestion.sources.vendors.massive.client import act_symbol
 from algotrade_ingestion.sources.vendors.massive.corporate_actions import MassiveCorporateActions
 from algotrade_ingestion.tasks.market.bars import ingest_daily_bars
 from algotrade_ingestion.tasks.market.corporate_actions import ingest_corporate_actions
-from tests import massive_fixture as fx
-from tests.ingest_helpers import http_for, task_ctx
-from tests.storage_helpers import write_reference
+from tests.helpers.ingest_fakes import http_for, task_ctx
+from tests.helpers.payloads import massive as fx
+from tests.helpers.stored_frames import write_reference
 
 D1, D2 = date(2026, 9, 30), date(2026, 10, 1)
 CLOCK = lambda: datetime(2026, 10, 2, 22, tzinfo=UTC)  # noqa: E731
