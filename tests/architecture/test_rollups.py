@@ -3,7 +3,8 @@
 - is a valid declaration with typed columns, defined in ``features/rollups/``;
 - has a ``config/site/rollups.toml`` section exactly when it takes parameters, and the file
   loads through the one settings loader;
-- reads only inputs the framework knows how to load (through ``algotrade.data``);
+- reads only inputs the framework knows how to load (through ``algotrade.data``), and the
+  rollups it reads are registered, acyclic and computed before it (registry order);
 - has exactly one producer, the ``rollups`` task, in ``architecture/ownership.toml``;
 - is reachable from the selection catalogue as ``rollup.<name>@v<N>.<column>``.
 """
@@ -16,7 +17,8 @@ import pytest
 from algotrade.config.site.settings import rollup_params
 from algotrade.core.model.fields import FIELD_TYPES
 from algotrade.features.framework.declaration import declaration_problems
-from algotrade.features.framework.inputs import LOADERS
+from algotrade.features.framework.graph import dependencies, dependency_order
+from algotrade.features.framework.inputs import has_loader
 from algotrade.features.registry import ROLLUPS
 from algotrade.services.configs import field_catalog
 from algotrade_ingestion.tasks.framework.registry import TASKS
@@ -53,8 +55,17 @@ def test_site_rollups_toml_loads() -> None:
 
 @pytest.mark.parametrize("key", sorted(ROLLUPS))
 def test_inputs_have_loaders(key: str) -> None:
-    missing = [i.table for i in ROLLUPS[key].inputs if i.table not in LOADERS]
+    missing = [i.table for i in ROLLUPS[key].inputs if not has_loader(i.table)]
     assert not missing, f"{key}: no loader in features/framework/inputs.py for {missing}"
+
+
+def test_dependency_graph_is_registered_acyclic_and_in_order() -> None:
+    order = list(ROLLUPS)
+    assert [r.key for r in dependency_order(ROLLUPS.values())] == order
+    for key, rollup in ROLLUPS.items():
+        for upstream in dependencies(rollup):
+            assert upstream in ROLLUPS, f"{key} reads unregistered {upstream}"
+            assert order.index(upstream) < order.index(key), f"{key} runs before {upstream}"
 
 
 @pytest.mark.parametrize("key", sorted(ROLLUPS))

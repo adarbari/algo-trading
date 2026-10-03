@@ -81,3 +81,104 @@ def write_earnings(
     ]
     run = f"earnings-{snapshot}"
     writer.write_table("events/earnings", snapshot, run, stamped(frame, snapshot, run))
+
+
+def write_dividends(
+    writer: StoreWriter, rows: Sequence[tuple[str, date, float, str]], stored: date = END
+) -> None:
+    """Dividends stored in one run on ``stored``: (instrument, ex-date, amount, type)."""
+    frame = [
+        {
+            "instrument_id": iid,
+            "symbol": iid[3:],
+            "ts": pd.Timestamp(ex_date, tz="UTC"),
+            "cash_amount": amount,
+            "distribution_type": kind,
+        }
+        for iid, ex_date, amount, kind in rows
+    ]
+    run = f"div-{stored}"
+    writer.write_table("events/dividend", stored, run, stamped(frame, stored, run))
+
+
+def write_curve(writer: StoreWriter, day: date, rate: float) -> None:
+    """A flat Treasury curve (continuous ``rate`` at every tenor) stored on ``day``."""
+    rows = [
+        {
+            "instrument_id": f"RATE:UST-{tenor}",
+            "ts": pd.Timestamp(day, tz="UTC"),
+            "tenor": tenor,
+            "tenor_days": days,
+            "rate_par": rate,
+            "rate_cont": rate,
+        }
+        for tenor, days in (("1M", 30), ("3M", 91), ("1Y", 365))
+    ]
+    writer.write_table("rates/treasury", day, f"rates-{day}", stamped(rows, day, f"rates-{day}"))
+
+
+def chain_rows(
+    underlying: str,
+    session: date,
+    spot: float,
+    vols: Mapping[date, float],
+    r: float,
+    q: float = 0.0,
+    strikes: Sequence[float] = tuple(range(80, 125, 5)),
+    spread: float = 0.02,
+    oi: float = 500.0,
+) -> list[dict[str, object]]:
+    """Option quotes priced by Black-Scholes with a flat vol per expiry: mid = model price,
+    bid / ask = mid -+ ``spread`` / 2 (floored at 0.01)."""
+    from algotrade.quant import black_scholes  # noqa: PLC0415
+
+    rows: list[dict[str, object]] = []
+    for expiry, sigma in vols.items():
+        t = (expiry - session).days / 365
+        for k in strikes:
+            for right in ("C", "P"):
+                mid = float(black_scholes.price(spot, k, t, r, q, sigma, right == "C"))
+                rows.append(
+                    {
+                        "instrument_id": f"OPT:{underlying}:{expiry}:{right}{k}",
+                        "underlying_id": underlying,
+                        "ts": pd.Timestamp(session, tz="UTC") + pd.Timedelta(hours=21),
+                        "expiry": expiry,
+                        "right": right,
+                        "strike": float(k),
+                        "bid": max(mid - spread / 2, 0.0),
+                        "ask": mid + spread / 2,
+                        "volume": 10.0,
+                        "open_interest": oi,
+                        "iv": sigma * 100,
+                        "delta": 0.5,
+                    }
+                )
+    return rows
+
+
+def write_chains(
+    writer: StoreWriter,
+    session: date,
+    options: Sequence[Mapping[str, object]],
+    spots: Mapping[str, float],
+    cboe_iv30: float = 25.0,
+) -> None:
+    run = f"chains-{session}"
+    if options:
+        writer.write_table(
+            "chains/option_quotes", session, run, stamped(list(options), session, run)
+        )
+    quotes = [
+        {
+            "instrument_id": iid,
+            "symbol": iid[3:],
+            "ts": pd.Timestamp(session, tz="UTC") + pd.Timedelta(hours=21),
+            "price": price,
+            "close": price,
+            "volume": 1e6,
+            "iv30": cboe_iv30,
+        }
+        for iid, price in spots.items()
+    ]
+    writer.write_table("chains/underlying_quotes", session, run, stamped(quotes, session, run))

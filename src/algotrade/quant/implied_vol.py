@@ -16,6 +16,9 @@ The solver is a safeguarded Newton iteration on price: the root is kept brackete
 is increasing in sigma), a Newton step is taken when it lands inside the bracket and the
 bracket keeps halving, otherwise the step bisects. Bisection alone reaches ``xtol`` within
 ~50 steps, so ``max_iter`` is a safety net. Prices match within ``tol * strike``.
+
+``interpolate_total_variance`` carries vols across expiries (linear in ``sigma^2 t``), the
+term-structure convention for a constant-maturity vol such as IV30 (ADR 0021).
 """
 
 from dataclasses import dataclass
@@ -153,3 +156,22 @@ def _solve(
         x[sl] = np.where(use_newton, newton, 0.5 * (a[sl] + b[sl]))
         active = sl[~done]
     return out, ok
+
+
+def interpolate_total_variance(
+    t_near: ArrayLike, iv_near: ArrayLike, t_far: ArrayLike, iv_far: ArrayLike, t: ArrayLike
+) -> Array:
+    """The vol at time ``t`` (years) between two expiries, linear in total variance
+    ``sigma^2 t`` (ADR 0021): ``w(t) = w1 + (w2 - w1) (t - t1) / (t2 - t1)`` and
+    ``sigma = sqrt(w / t)``.
+
+    Where ``t_near == t_far`` (one expiry) the near vol is returned unchanged (flat). Outside
+    ``[t_near, t_far]`` the line extends; a negative total variance is NaN."""
+    t1, v1, t2, v2, tt = np.broadcast_arrays(
+        *(np.asarray(a, dtype=np.float64) for a in (t_near, iv_near, t_far, iv_far, t))
+    )
+    w1, w2 = v1 * v1 * t1, v2 * v2 * t2
+    with np.errstate(divide="ignore", invalid="ignore"):
+        w = np.where(t2 > t1, w1 + (w2 - w1) * (tt - t1) / (t2 - t1), v1 * v1 * tt)
+        out = np.sqrt(np.where(w >= 0, w, np.nan) / tt)
+    return np.asarray(out, dtype=np.float64)

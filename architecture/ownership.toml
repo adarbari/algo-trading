@@ -46,6 +46,7 @@ allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/market/rates.py",  # its one producer
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
     "apps/ingestion/algotrade_ingestion/sources/vendors/treasury/*",  # the vendor's frame key
+    "src/algotrade/features/rollups/iv30.py",  # names its input; the framework reads it through data.rates (ADR 0021 IV30)
 ]
 section = "docs/adr/0021-option-pricing-conventions.md#rates"
 detect = [{ string = "rates/treasury" }]
@@ -173,7 +174,10 @@ detect = [{ call = "MinInterval" }, { attr = "time.sleep" }]
 id = "source-construction"
 description = "Build vendor sources (transport, credentials, pacing, retries) from config/site/sources.toml, and fixture sources (the golden CSVs) from a directory: each source declared once in sources/framework/registry.py; vendor specifics stay in sources/"
 owner = ["apps/ingestion/algotrade_ingestion/sources/framework/registry.py"]
-allowed = ["apps/ingestion/algotrade_ingestion/sources/*"]  # vendor modules import their own helpers (http, base, sec_sic)
+allowed = [
+    "apps/ingestion/algotrade_ingestion/sources/*",  # vendor modules import their own helpers (http, base, sec_sic)
+    "src/algotrade/features/rollups/dividends.py",  # the dividends@v1 rollup's name, not a source (ADR 0021 IV30)
+]
 section = "docs/adr/0019-ownership-and-boundaries.md#r3-tasks-get-sources-from-the-registry"
 detect = [
     { import = "algotrade_ingestion.sources", except = ["algotrade_ingestion.sources.framework.base", "algotrade_ingestion.sources.framework.registry"] },
@@ -346,6 +350,22 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
 name = "rollups/instrument/earnings@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
+name = "rollups/instrument/dividends@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
+name = "rollups/instrument/iv30@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
+name = "rollups/instrument/iv_history@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
+name = "rollups/instrument/liquidity_class@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
