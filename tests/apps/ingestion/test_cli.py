@@ -27,6 +27,15 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     )
     (tmp_path / "config" / "site" / "universe.toml").write_text('source = "csv_import"\n')
     monkeypatch.setenv("ALGOTRADE_CONFIG_DIR", str(tmp_path / "config"))
+    from algotrade_ingestion.sources.nasdaq_earnings import NasdaqEarningsSource  # noqa: PLC0415
+    from tests.earnings_fixture import calendar  # noqa: PLC0415
+
+    earnings = calendar([("AAPL", "time-after-hours")])
+    monkeypatch.setattr(
+        cli,
+        "_earnings_source",
+        lambda: NasdaqEarningsSource(lambda url: earnings, lambda s: None, RetryPolicy(tries=1)),
+    )
     feed = FakeFeed(
         {
             "AAPL": fx.payload("AAPL", options=fx.chain("AAPL", spread=0.02, oi=5000)),
