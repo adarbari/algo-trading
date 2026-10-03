@@ -8,7 +8,8 @@ sees them. ``commit_run`` makes every partition the run wrote visible at once:
    (``_txn/commits/<run>.json``, written atomically) with the next commit sequence number.
    This is the decision point: from here the commit is completed, never undone;
 2. each partition's index gets the run's entry (``seq``, ``visible_at``; the version it
-   replaces is kept as ``prev``), under that partition's index lock;
+   replaces is kept as ``prev``, older ones are dropped and flagged, see
+   ``run_selection.pinned_read``), under that partition's index lock;
 3. ``_txn/seq`` is set to the sequence number: the visibility point. A read captures
    ``seq`` before it opens any index and ignores entries above it, so it sees all of a
    commit or none of it (``run_selection.visible_entries``);
@@ -26,7 +27,8 @@ import os
 import secrets
 import tempfile
 import threading
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
+from contextlib import contextmanager
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -74,7 +76,7 @@ def run_file(run_id: str, entry: RunEntry) -> str:
 
 def _entry(value: str | dict[str, Any]) -> RunEntry:
     """An index value: ``knowledge_ts`` (a plain run) or a dict with ``knowledge_ts`` and
-    optional ``restates``, ``visible_at``, ``seq``, ``file`` and ``prev``."""
+    optional ``restates``, ``visible_at``, ``seq``, ``file``, ``prev`` and ``dropped``."""
     if isinstance(value, str):
         return RunEntry(pd.Timestamp(value))
     visible = value.get("visible_at")
@@ -85,6 +87,7 @@ def _entry(value: str | dict[str, Any]) -> RunEntry:
         int(value["seq"]) if value.get("seq") is not None else None,
         value.get("file"),
         _entry(value["prev"]) if value.get("prev") else None,
+        bool(value.get("dropped")),
     )
 
 
@@ -101,6 +104,8 @@ def _value(entry: RunEntry) -> str | dict[str, Any]:
         out["file"] = entry.ref
     if entry.prev is not None:
         out["prev"] = _value(entry.prev)
+    if entry.dropped:
+        out["dropped"] = True
     return out["knowledge_ts"] if len(out) == 1 else out
 
 
@@ -145,6 +150,13 @@ class Commits:
 
     def _commit_lock(self) -> FileLock:
         return FileLock(self.base / "commit.lock")
+
+    @contextmanager
+    def no_commits(self) -> Iterator[None]:
+        """Hold the commit lock: no commit, abort or recovery runs (and so nothing a read
+        pinned is replaced) until the block ends."""
+        with held(self._commit_lock()):
+            yield
 
     def published(self) -> int:
         """The highest commit sequence number whose entries every index already holds."""

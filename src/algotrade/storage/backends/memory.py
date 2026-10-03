@@ -25,6 +25,7 @@ from algotrade.storage.backends.run_selection import (
     committed,
     concat_frames,
     merge_rows,
+    pinned_read,
     run_mode,
     select_instruments,
     select_runs,
@@ -47,7 +48,7 @@ class MemoryTables:
         self._pending: dict[str, dict[Key, tuple[pd.DataFrame, bool]]] = {}
         self._touched: dict[str, datetime] = {}  # a pending run's last write (retention)
         self._seq = 0
-        self._index_lock = threading.Lock()
+        self._index_lock = threading.RLock()  # re-entered by a read that waits out commits
 
     def write(
         self,
@@ -147,7 +148,11 @@ class MemoryTables:
         instruments: Sequence[str] | None = None,
         own_run: str | None = None,
     ) -> pd.DataFrame | None:
-        return self._read(table, session_date, as_of, instruments, own_run, self._seq)
+        return pinned_read(
+            lambda upto: self._read(table, session_date, as_of, instruments, own_run, upto),
+            lambda: self._seq,
+            lambda: self._index_lock,
+        )
 
     def read_range(
         self,
@@ -159,13 +164,15 @@ class MemoryTables:
         own_run: str | None = None,
         columns: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
-        upto = self._seq  # one commit sequence for the whole range
-        days = [d for d in self.dates(table, own_run) if start <= d <= end]
-        frames = [
-            f
-            for d in days
-            if (f := self._read(table, d, as_of, instruments, own_run, upto)) is not None
-        ]
+        def at(upto: int) -> list[pd.DataFrame]:  # one commit sequence for the whole range
+            days = [d for d in self.dates(table, own_run) if start <= d <= end]
+            return [
+                f
+                for d in days
+                if (f := self._read(table, d, as_of, instruments, own_run, upto)) is not None
+            ]
+
+        frames = pinned_read(at, lambda: self._seq, lambda: self._index_lock)
         if columns is not None:
             frames = [f[[c for c in f.columns if c in keep_columns(columns)]] for f in frames]
         return concat_frames(frames)
