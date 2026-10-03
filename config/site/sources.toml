@@ -55,7 +55,7 @@ min_interval_s = 1.0             # official site, no published limit; stay polit
 lookback_days = 10               # nightly window: the last N calendar days (catches late publications)
 
 [ibkr]                           # IB Gateway, READ-ONLY market data for the nightly `verify` task
-enabled = false                  # off until the owner runs IB Gateway with "Read-Only API" ticked
+enabled = true                   # owner runs IB Gateway with "Read-Only API" ticked (verified 2026-10-03)
                                  # (README "Live verification"); host, port and client id come from
                                  # ALGOTRADE_IBKR_HOST / _PORT / _CLIENT_ID in .env
 min_interval_s = 0.02            # every API message: IBKR allows at most 50 messages/second

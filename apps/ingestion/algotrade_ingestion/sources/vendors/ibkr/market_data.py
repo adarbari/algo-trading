@@ -8,11 +8,11 @@ and ``normalize`` turns it back into frames (``Normalized.parsed``; nothing is s
 
 Request keys (``FetchRequest.session_date`` is the session verified):
 
-    bars/<SYMBOL>            daily TRADES bars (split-adjusted by IB), ``bar_sessions`` of them
-    iv/<SYMBOL>              daily OPTION_IMPLIED_VOLATILITY of the underlying
-    div/<SYMBOL>             IB dividends (tick 456) + the last close
-    option_params/<SYMBOL>   listed expirations and strikes
-    option/<SYMBOL>/<YYYY-MM-DD>/<C|P>/<strike>   one option snapshot
+    bars__<SYMBOL>           daily TRADES bars (split-adjusted by IB), ``bar_sessions`` of them
+    iv__<SYMBOL>             daily OPTION_IMPLIED_VOLATILITY of the underlying
+    div__<SYMBOL>            IB dividends (tick 456) + the last close
+    option_params__<SYMBOL>  listed expirations and strikes
+    option__<SYMBOL>__<YYYY-MM-DD>__<C|P>__<strike>   one option snapshot
 """
 
 import json
@@ -26,19 +26,21 @@ from algotrade_ingestion.sources.vendors.ibkr.gateway import IbkrMarketData
 
 SOURCE = "ibkr"
 KINDS = ("bars", "iv", "div", "option_params", "option")
+# Request keys double as raw storage keys, which may not contain "/" (storage/backends).
+SEP = "__"
 DEFAULT_SESSIONS = 260
 
 
 def parse_key(key: str) -> tuple[str, list[str]]:
-    kind, _, rest = key.partition("/")
-    parts = rest.split("/") if rest else []
+    kind, _, rest = key.partition(SEP)
+    parts = rest.split(SEP) if rest else []
     if kind not in KINDS or not parts or (kind == "option") != (len(parts) == 4):
         raise ValueError(f"unknown IBKR request key {key!r}; kinds: {', '.join(KINDS)}")
     return kind, parts
 
 
 def option_key(symbol: str, expiry: date, right: str, strike: float) -> str:
-    return f"option/{symbol}/{expiry.isoformat()}/{right}/{strike:g}"
+    return SEP.join(("option", symbol, expiry.isoformat(), right, f"{strike:g}"))
 
 
 def _frame(rows: list[dict[str, Any]]) -> pd.DataFrame:

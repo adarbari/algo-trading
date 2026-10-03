@@ -119,8 +119,8 @@ def test_matching_data_passes_every_check_and_saves_raw_json() -> None:
     assert len([k for k in graded if k[0].startswith("OPT:")]) == 4  # the ATM call and put
     assert record.stats["checks"]["PASS"] == len(graded) and record.stats["failing"] == []
     assert record.stats["sample"] == {"core": 1}
-    raw = writer.raw.get("ibkr", "market_data", END, record.run_id, "bars/A")
-    assert raw is not None and b'"key": "bars/A"' in raw
+    raw = writer.raw.get("ibkr", "market_data", END, record.run_id, "bars__A")
+    assert raw is not None and b'"key": "bars__A"' in raw
     assert fake.calls[-1] == "disconnect"  # the session is always closed
     assert "placeOrder" not in fake.calls and "IB.connect" not in fake.calls
 

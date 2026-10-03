@@ -335,7 +335,7 @@ class VerificationSettings:
     options_per_symbol: int = 2
     bar_sessions: int = 260  # IBKR daily bars requested (one year + the HV window)
     close_rel: float = 0.002  # split-adjusted closes
-    range_rel: float = 0.001  # daily highs / lows
+    range_rel: float = 0.005  # daily highs / lows (IBKR bars use a narrower trade set: ~0.3% wicks)
     hv_rel: float = 0.005  # hv20 vs close-to-close HV20 on IBKR closes
     high_52w_rel: float = 0.0005
     extreme_rel: float = 0.0005  # slack on the dividend-gap rule (52-week low)

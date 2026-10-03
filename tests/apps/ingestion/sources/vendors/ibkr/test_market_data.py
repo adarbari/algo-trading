@@ -55,9 +55,9 @@ def test_every_kind_round_trips_through_raw_json() -> None:
     src = source(ib)
     src.open()
     keys = {
-        "bars/AAPL": "bars",
-        "iv/AAPL": "iv",
-        "div/AAPL": "div",
+        "bars__AAPL": "bars",
+        "iv__AAPL": "iv",
+        "div__AAPL": "div",
         option_key("AAPL", date(2026, 11, 20), "C", 230.0): "option",
     }
     for key, kind in keys.items():
@@ -68,10 +68,10 @@ def test_every_kind_round_trips_through_raw_json() -> None:
         assert normalized is not None and normalized.tables == {}
         assert not normalized.parsed[kind].empty, key
     bars = src.normalize(
-        FetchRequest("bars/AAPL"), src.fetch(FetchRequest("bars/AAPL", None, SESSION)) or b""
+        FetchRequest("bars__AAPL"), src.fetch(FetchRequest("bars__AAPL", None, SESSION)) or b""
     )
     assert bars is not None and list(bars.parsed["bars"]["date"]) == [date(2026, 10, 1), SESSION]
-    request = FetchRequest("option_params/AAPL", "EQ:AAPL", SESSION)
+    request = FetchRequest("option_params__AAPL", "EQ:AAPL", SESSION)
     params = src.normalize(request, src.fetch(request) or b"")
     assert params is not None
     assert list(params.parsed["expirations"]["expiration"]) == [

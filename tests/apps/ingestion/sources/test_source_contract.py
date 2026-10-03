@@ -54,7 +54,7 @@ def ibkr() -> Adapter:
     gateway = IbkrMarketData(GatewayConfig("127.0.0.1", 4002, 1), ib_factory=lambda: fake)
     source = IbkrSource(gateway)
     source.open()  # a session source: tasks open it (base.opened)
-    return source, FetchRequest("bars/AAPL", "EQ:AAPL", fx.SESSION)
+    return source, FetchRequest("bars__AAPL", "EQ:AAPL", fx.SESSION)
 
 
 def golden() -> Adapter:
