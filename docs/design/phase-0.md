@@ -39,6 +39,8 @@ inputs a second time.
 | 7 | Per-user scope | (a) everything per user · (b) **market data and features global; configs, results and jobs per user** · (c) no users until hosting | **(b)** | Data is fact and is computed once; users differ only in what they select and how they score it |
 | 8 | Instrument keys in the backtest | (a) keep symbols · (b) **`instrument_id` everywhere + `multiplier` from reference data** | **(b)** | Options and futures backtests become possible (ADR 0009) |
 | 9 | Jobs | (a) call functions directly · (b) **`services/jobs` with a local in-process runner** · (c) Redis/RQ now | **(b)** | Same interface the UI will use in phase 6; no infrastructure yet |
+| 10 | Data model | (a) storage grains only (ADR 0006) · (b) **four layers: L1 instrument, L2 instrument × time (+ rollups), L3 site config, L4 user config** | **(b)**, owner-defined | One place for every datum; see [Data Layers](#data-layers) |
+| 11 | Instrument-level history | (a) validity ranges (`valid_from`/`valid_to`) · (b) **full snapshot per date** · (c) latest only | **(b)** | Simple and idempotent; point-in-time reads; diffs become `reference_change` events |
 
 ---
 
@@ -82,9 +84,9 @@ nightly options run of about 15–20 min projected for the full universe.
 ### Functional
 1. `apps/backtest` provides the current `algotrade` CLI (`datasets`, `backtest`, `evaluate`), now reading from a store.
 2. `apps/ingestion` gains a `golden` job that loads the committed golden CSVs into a fixture store through the `synthetic` source.
-3. Storage gains the `bars` grain (`interval=1d`) and `reference/instruments` tables, with contract tests on both backends.
+3. Storage implements the four data layers' market tables needed now (`bars/1d`, `instruments/reference`, `rollups/instrument/*`, `events/*` schema), with contract tests on both backends.
 4. A `Selection` can filter on reference fields (security type, exchange, ETF flags, optionable, status) and on any registered feature column, with `all`/`any`/`not` groups.
-5. Configs resolve as **built-in defaults < repo presets < user config < run-time overrides**, into an immutable `ResolvedConfig` with a SHA-256 hash.
+5. Configs resolve as **built-in defaults < L3 site config < L4 user config < run-time overrides**, into an immutable `ResolvedConfig` with a SHA-256 hash.
 6. Every screen and backtest run takes a `UserContext`; results and run records carry `user_id` and `config_hash`.
 7. `services.jobs.submit(kind, params, user)` returns a job id; `status` / `result` work with the local runner. The CLIs use it.
 
@@ -118,6 +120,131 @@ baseline gate proves nothing changed:
 The only new concepts are **Selection**, **Config** and **UserContext**. Everything else
 relocates existing code to the place the architecture already defines.
 
+## Data Layers
+
+All data and configuration lives in **four layers**. Each layer has one definition, one
+owner, one format and one way to read it. Everything in phases 0–6 fits one of them.
+
+```
+ ┌───────────────────────────────────────────────────────────────────────────────────────┐
+ │ L4  USER CONFIG   config/users/<user_id>/*.toml       per user · selections, strategy   │
+ │                   (ConfigStore; DB later)              configs, watchlists, preferences  │
+ ├───────────────────────────────────────────────────────────────────────────────────────┤
+ │ L3  SITE CONFIG   config/site/*.toml (+ overrides/*.csv)   shared · universe coverage,  │
+ │                   reviewed via PR, versioned by git        sources, defaults, presets    │
+ ╞═══════════════════════════════════════════════════════════════════════════════════════╡
+ │ L1  INSTRUMENT    instruments/reference         what each instrument IS (sourced facts) │
+ │                   rollups/instrument/<name>@vN   what we KNOW about it now (derived)     │
+ │                   → read together as InstrumentView(as_of=D)                           │
+ ├───────────────────────────────────────────────────────────────────────────────────────┤
+ │ L2  INSTRUMENT ×  bars/<interval>       OHLCV at 1m · 5m · 1h · 1d                      │
+ │     TIME          chains/*              option-chain snapshots (instrument × contract)  │
+ │                   events/<type>         earnings, splits, dividends, renames, index Δ   │
+ │                   rollups/daily/<name>@vN   intraday → one row per instrument per day   │
+ └───────────────────────────────────────────────────────────────────────────────────────┘
+   L1 and L2 are market data: global, written only by apps/ingestion, Parquet, point-in-time.
+   L3 and L4 are configuration: TOML, read by services, resolved into a hashed ResolvedConfig.
+   Below the layers sits plumbing (raw vendor responses, run records); above them sit
+   outputs (screen and backtest results, per user).
+```
+
+### L1: Instrument level (one row per instrument, as of a date)
+
+Two physical parts, always read together:
+
+| Part | Holds | Examples | Changes | Written by |
+|---|---|---|---|---|
+| `instruments/reference` | **sourced facts**: identity, company, classification, contract terms | ticker, FIGI, company name, website, description, sector/industry, country, exchange, security type, ETF flags (leveraged, inverse, leverage, tracks), optionable, multiplier, tick size, listing status, listed/delisted dates | rarely | universe and reference ingestion jobs |
+| `rollups/instrument/<name>@vN` | **derived state** "as of D", computed from L2 | next earnings date + time + days to it, ADV (20d $), liquidity class ("highly liquid"), option liquidity tiers, market cap, 52-week high/low, HV20/30, IV30 and IV rank | nightly | features/rollup jobs |
+
+- **Format and history:** Parquet, **one full snapshot per date** (≈10k rows, < 1 MB/day).
+  Reading "as of D" returns the latest snapshot on or before D, so a 2025 backtest sees
+  2025's company names, listings and delistings. Validity ranges (`valid_from`/`valid_to`)
+  are *derived* from snapshots if ever needed; they are not stored.
+- **Changes become events.** The nightly job diffs today's reference snapshot against the
+  previous one and writes `events/reference_change` rows (renames, delistings, type changes).
+- **Definitions live in site config.** A label such as "highly liquid" is a rollup whose
+  thresholds come from `config/site/rollups.toml`, so the definition is explicit,
+  versioned and auditable, never hard-coded.
+- **Not in L1:** option and futures *contracts*. There are 1M+ option series; their terms
+  (underlying, expiry, strike, right, standard/adjusted) live in the OSI symbol and on
+  each chain row in L2. Futures get `instruments/futures_contracts` when they arrive (phase 6).
+- **Stable id.** `instrument_id` is `EQ:<ticker>` in phase 0 (interim, as today). Phase 1
+  switches to an id that survives renames and ticker reuse (FB → META): the FIGI from
+  reference data, plus `instruments/symbol_history` mapping ticker → id over time. Every
+  table is already keyed by `instrument_id`, so this is a mapping change, not a schema change.
+
+### L2: Instrument × time (values)
+
+| Table | Grain (one row is…) | Interval | Notes |
+|---|---|---|---|
+| `bars/<interval>` | instrument × bar start | `1d` (phase 1), `1h`/`5m`/`1m` later | OHLCV + VWAP, **unadjusted**; splits and dividends applied at read time from `events` |
+| `chains/option_quotes`, `chains/underlying_quotes`, `chains/status` | contract (or underlying) × snapshot | end of day | already implemented (Cboe) |
+| `events/<type>` | instrument × event time | irregular | `earnings`, `split`, `dividend`, `reference_change`, `index_change` |
+| `rollups/daily/<name>@vN` | instrument × session | daily | rolls intraday bars up to a day: session OHLCV, VWAP, intraday range, opening gap |
+
+**Roll-up chain.** Each step is a versioned, pure definition (in `features/`), recomputed
+nightly and stored point-in-time:
+
+```
+bars/1m ──► rollups/daily/session_stats@v1 ──┐
+bars/1d ─────────────────────────────────────┼─► rollups/instrument/price_stats@v1   (52w hi/lo, MAs, HV, ADV)
+chains/* ────────────────────────────────────┼─► rollups/instrument/option_liquidity@v1, iv_history@v1
+events/earnings ─────────────────────────────┴─► rollups/instrument/earnings@v1     (next date, days to it)
+```
+
+- **Official daily bars win.** The vendor's `1d` bar (official close, including the closing
+  auction) is the source of truth. A daily bar rolled up from `1m` bars is a cross-check,
+  never a substitute.
+- **Today's `features/option_liquidity@v1` becomes `rollups/instrument/option_liquidity@v1`.**
+  The code package stays `features/`, because a feature is a rollup definition. Only the
+  table prefix changes.
+
+### L3: Site configuration (shared, reviewed)
+
+```
+config/site/
+  universe.toml          coverage: which instruments we ingest (all US-listed stocks, ADRs, ETFs incl.
+                         leveraged/inverse; test issues excluded). The UNIVERSE is coverage, not a filter.
+  sources.toml           enabled vendors, schedules, rate limits, raw retention days
+  rollups.toml           default parameters for rollups (e.g. liquidity-class thresholds)
+  defaults.toml          backtest defaults (cash, costs, risk limits), screening coverage threshold
+  presets/selections/*.toml    shared selections, e.g. liquid_optionable
+  presets/strategies/*.toml    shared strategy/screener configs, e.g. vrp_default
+  overrides/leveraged_etfs.csv curated reference corrections (leverage, inverse, tracks)
+```
+
+Owner: the repo (changes by PR, recorded by git commit). Read by ingestion (universe, sources,
+rollups) and services (defaults, presets).
+
+### L4: User configuration (per user)
+
+```
+config/users/<user_id>/          git-ignored locally; a DB behind ConfigStore later
+  selections/*.toml      the user's own subsets (narrow a preset, or replace it)
+  strategies/*.toml      strategy and screener configs: impl + params + selection + schedule + outputs
+  watchlists/*.toml      named instrument lists (a selection by explicit ids)
+  preferences.toml       export directory; later notifications and UI settings
+```
+
+**Resolution order:** built-in defaults < L3 site defaults and presets < L4 user config
+< run-time overrides, into one immutable `ResolvedConfig` whose SHA-256 hash is stored with
+every run. A user can select from the site universe but cannot widen it. Covering a new
+instrument is a site change (or, in phase 6, an on-request ingestion job).
+
+### Where does a new piece of data go?
+
+| Question | Layer / table |
+|---|---|
+| Is it a fact about what the instrument is, from a vendor? | L1 `instruments/reference` |
+| Is it a number derived from history, and true "as of" a day? | L1 `rollups/instrument/*` (or L2 `rollups/daily/*` if per session) |
+| Does it have a value per bar or per snapshot? | L2 `bars/*` or `chains/*` |
+| Did it *happen* at a point in time? | L2 `events/*` |
+| Is it a choice everyone shares? | L3 `config/site` |
+| Is it one user's choice? | L4 `config/users/<id>` |
+
+Full column lists: [Appendix C](#appendix-c).
+
 ---
 
 ## High-Level Design
@@ -145,8 +272,9 @@ src/algotrade/ pyproject.toml  (shared library; no vendor SDKs, no web framework
                options, types (Order, Fill keyed by instrument_id), time, errors
   config/      NEW. schema (StrategyConfig, Selection, Rule), resolve (layering + hash),
                catalog (selectable fields), user (UserContext). Pure: no I/O.
-  storage/     schemas (+ bars, reference/instruments), interfaces (+ BarStore view,
-               ConfigStore), readers, writers, result_writer, runs, backends/{local, memory}
+  storage/     schemas (+ bars, instruments/reference, rollups, events), interfaces (+ bar,
+               instrument and ConfigStore reads), readers, writers, result_writer, runs,
+               backends/{local, memory}
   features/    option_liquidity@v1, registry
   strategies/  trading/{base, buy_and_hold, sma_crossover, zscore_mean_reversion, registry}
                screeners/{base, short_premium_liquidity, registry}
@@ -156,8 +284,7 @@ src/algotrade/ pyproject.toml  (shared library; no vendor SDKs, no web framework
   analytics/   metrics, report
   services/    backtests, screening, evaluation (from evaluation/), selection, views,
                exports, configs (load + resolve via ConfigStore), jobs/{models, local_runner}
-config/        repo presets (reviewed): selections/*.toml, strategies/*.toml
-               users/<user_id>/... is git-ignored and local (ConfigStore file backend)
+config/        site/ (L3, reviewed via PR) and users/<user_id>/ (L4, git-ignored locally)
 ```
 
 Removed: `src/algotrade/{data, backtest, risk, execution, portfolio, evaluation, cli}`
@@ -190,9 +317,9 @@ Extra contracts:
 | Data | Store | Why | Rejected |
 |---|---|---|---|
 | Bars (1d now, intraday later) | `bars` table: Parquet partitioned by session date, sorted by `instrument_id` | Same backend as chains; DuckDB-readable; one schema for every interval | One file per ticker (too many files at 10k instruments); SQLite (row store, slow scans) |
-| Instrument reference | `reference/instruments` snapshot per date | Point-in-time (renames, delistings); feeds multipliers and selection fields | Columns on the universe table (mixes "what exists" with "what is selected") |
+| Instrument level (L1) | `instruments/reference` + `rollups/instrument/*`, one snapshot per date | Point-in-time (renames, delistings, changing earnings dates); one view for selections, the UI and multipliers | Validity-range rows (harder to write idempotently); columns on the universe table (mixes "what exists" with "what is selected") |
 | Golden fixtures | committed CSV → loaded by the `synthetic` source into `datasets/golden/store` (git-ignored, rebuilt by `make golden-store`) or a memory store in tests | Reviewable source data; production code path | Committed Parquet (binary diffs); keeping the CSV reader (second code path) |
-| Configs | `ConfigStore` protocol; file backend reads `config/presets` and `config/users/<id>` | Hand-editable now; the DB/API backend in phase 4 implements the same protocol | Configs in Parquet tables (awkward to edit); env vars (not structured) |
+| Configs (L3, L4) | `ConfigStore` protocol; file backend reads `config/site` and `config/users/<id>` | Hand-editable now; the DB/API backend in phase 4 implements the same protocol | Configs in Parquet tables (awkward to edit); env vars (not structured) |
 | Results, run records | existing tables + new `user_id`, `config_id`, `config_hash` columns | Namespacing without new stores | Separate store per user (duplicates market data) |
 
 No cache: everything is local disk, and the working set is small (see
@@ -238,7 +365,7 @@ algotrade-backtest backtest --config sma_trend --user local
   → services.configs.resolve("sma_trend", user)                      → ResolvedConfig (hash)
   → services.selection.select(reader, cfg.selection, session=start)  → instruments + audit
   → reader.bars(instruments, "1d", start, end, as_of)                → aligned PriceSeries (by instrument_id)
-  → reader.instruments(instruments, start)                           → multipliers
+  → reader.instruments(instruments, as_of=start)                     → InstrumentView (multipliers, flags)
   → engines.backtest.run(series, strategy(cfg.params), cfg.backtest) → BacktestResult
   → result_writer.write_result("backtests", ...) + RunRecord(user, config_hash, dataset versions)
 ```
@@ -264,17 +391,13 @@ universe.
 | volume, vwap | float64 | vwap nullable |
 | + common | | `knowledge_ts`, `source`, `run_id` |
 
-**`reference/instruments`** (grain reference). Key: (`instrument_id`, `valid_from`).
+**`instruments/reference`** (L1). One snapshot per date; key (`instrument_id`, `session_date`).
+Phase 0 ships the columns needed now (identity, classification, contract terms, ETF flags,
+status, optionable); company fields arrive with phase 1 sources. Full list:
+[Appendix C](#appendix-c).
 
-| Column | Notes |
-|---|---|
-| instrument_id, symbol, name, asset_class, security_type, exchange, currency | |
-| multiplier, tick_size | 1 / 0.01 for equities |
-| is_etf, is_leveraged, is_inverse, leverage, tracks | ETF flags (ADR 0013) |
-| optionable, status, listed_on, delisted_on, valid_from, valid_to | point-in-time validity |
-
-The **universe** table becomes "every instrument we cover on date D" (a membership
-snapshot). Filtering moves out of `load_universe` into selections.
+The **universe** table becomes "every instrument we cover on date D" (the coverage defined
+in `config/site/universe.toml`). Filtering moves out of `load_universe` into selections.
 
 **Config objects** (`config/schema.py`, frozen dataclasses):
 
@@ -290,15 +413,15 @@ UserContext    { user_id: str }   # phase 0: plain label from --user / ALGOTRADE
                                   # identity scheme deliberately deferred
 ```
 
-Example preset `config/presets/selections/liquid_optionable.toml`:
+Example site preset `config/site/presets/selections/liquid_optionable.toml`:
 
 ```toml
 name = "liquid_optionable"
 [where]
 all = [
-  { field = "reference.security_type", op = "in", value = ["COMMON_STOCK", "ADR", "ETF"] },
-  { field = "reference.status", op = "eq", value = "ACTIVE" },
-  { field = "reference.optionable", op = "eq", value = true },
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR", "ETF"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "instrument.optionable", op = "eq", value = true },
 ]
 ```
 
@@ -310,11 +433,12 @@ kind = "screener"
 impl = "short_premium_liquidity"
 selection = "liquid_optionable"          # preset by name...
 [selection_overrides]                    # ...narrowed by user rules (AND-ed)
-all = [ { field = "reference.is_leveraged", op = "eq", value = false } ]
+all = [ { field = "instrument.is_leveraged", op = "eq", value = false } ]
 ```
 
-**Field catalogue:** `reference.*` columns, plus `features.<table>.<column>` for every
-registered feature, with types. Unknown fields or type mismatches fail when the config
+**Field catalogue:** `instrument.<column>` for L1 reference columns, plus
+`rollup.<name>@vN.<column>` for every registered rollup (for example
+`rollup.option_liquidity@v1.put_tier`), with types. Unknown fields or type mismatches fail when the config
 loads, with the TOML path in the error.
 
 ### API Design (service interfaces; HTTP comes in phase 4)
@@ -363,7 +487,7 @@ Decision: screens run inside the ingestion pipeline (they only read data) but go
 preset, a selection naming that dataset's instruments → backtest each registered strategy
 → compare with `benchmarks/baseline.json`. Baseline keys stay `strategy@dataset`.
 
-**W3. A user creates a strategy subset:** add `config/users/<id>/strategies/x.toml` →
+**W3. A user creates a strategy subset:** add `config/users/<id>/strategies/x.toml` (L4) →
 `algotrade-backtest config validate x` → `… backtest --config x` or include it in the nightly
 run. In phase 4 the UI writes the same object through `ConfigStore`.
 
@@ -442,9 +566,9 @@ output, blocks the PR.
 |---|---|---|
 | 0.1 | **Moves only:** `strategies/*` → `strategies/trading/`; `backtest, risk, execution, portfolio` → `engines/backtest/`; `evaluation` → `services/evaluation`; import updates; old contracts replaced by target layers | baseline identical; contracts kept; no logic diff (`git diff -M` shows renames) |
 | 0.2 | **Instrument keys:** `Instrument` in core; `PriceSeries`, `MarketView`, `Order`, `Fill`, `Portfolio` keyed by `instrument_id`; `Portfolio` uses `multiplier`; `MarketView.symbols` kept as an alias | baseline identical; property tests pass; a multiplier test covers 100× options P&L |
-| 0.3 | **Storage-backed backtests:** `bars` + `reference/instruments` schemas, read APIs, contract tests; `synthetic` source + `golden` ingestion job; evaluation reads from the fixture store; delete `data/` | baseline identical; `make golden-store` reproducible; the CSV checksum test still passes |
+| 0.3 | **Storage-backed backtests and data layers:** `bars/1d`, `instruments/reference`, `rollups/*`, `events/*` schemas + `InstrumentView` read API, contract tests; `features/option_liquidity@v1` table renamed `rollups/instrument/option_liquidity@v1`; `synthetic` source + `golden` ingestion job; evaluation reads from the fixture store; delete `data/` | baseline identical; `make golden-store` reproducible; the CSV checksum test still passes |
 | 0.4 | **Source interface:** `sources/base.py` protocol; Cboe and synthetic implement it | ingestion tests unchanged |
-| 0.5 | **Config + selection + users:** `config/` package, field catalogue, evaluator with audit, `ConfigStore` file backend, presets reproducing today's "production" filter; screening takes `ResolvedConfig` + `UserContext`; results carry `user_id` and `config_hash` | liquidity screener output identical on the recorded fixture; selection property tests (rule order does not change the result; `not` is the complement) |
+| 0.5 | **Config + selection + users:** `config/` package, `config/site` (L3) and `config/users` (L4) layout, field catalogue, evaluator with audit, `ConfigStore` file backend, a site preset reproducing today's "production" filter; screening takes `ResolvedConfig` + `UserContext`; results carry `user_id` and `config_hash` | liquidity screener output identical on the recorded fixture; selection property tests (rule order does not change the result; `not` is the complement) |
 | 0.6 | **Jobs:** `services/jobs` models + local runner; both CLIs submit through it | same CLI output; idempotent re-submit test |
 | 0.7 | **uv workspace:** split into `algotrade`, `algotrade-ingestion`, `algotrade-backtest`; `uv.lock`; CI on `uv`; Makefile targets unchanged | CI green on 3.12 / 3.13; `uv lock --check` in CI |
 | 0.8 | **Docs:** ADR 0015 (configs, selections, users), ADR 0013 amended (universe = everything; strategies select), ADR 0014 amended (workspace done), `architecture.md` §2 removed (no more "current vs target") | doc consistency tests pass |
@@ -480,7 +604,9 @@ a single-user local system.
 |---|---|
 | Massive daily bars | a new `sources/massive.py` writing the `bars` table (0.3); backtests and features read it unchanged |
 | Earnings calendar (Nasdaq) | `events` grain + `sources/nasdaq_earnings.py`; selections can use `features.earnings.days_to_next` |
-| Universe builder (Nasdaq Trader + SPY) | writes `reference/instruments` + `universe`; strategies keep using selections |
+| Universe builder (Nasdaq Trader + SPY) | writes `instruments/reference` + `universe` (coverage per `config/site/universe.toml`) + `events/index_change`; strategies keep using selections |
+| Company details (website, description, sector) | `instruments/reference`; sources: SEC EDGAR (free, US filers) and Massive ticker details (rolling refresh) |
+| Stable instrument ids | FIGI-based `instrument_id` + `instruments/symbol_history` |
 | IV history | a feature over `chains/underlying_quotes.iv30` history; selectable like any feature |
 
 <a id="appendix-b"></a>
@@ -493,3 +619,31 @@ a single-user local system.
 | Reference snapshot | 10,000 rows × 20 columns daily | < 1 MB/day |
 | Selection eval | 10k rows × 10 vectorised predicates | ~10 ms |
 | Per-user nightly screens | 20 users × 5 configs × ~2 s | ≈ 3–5 min |
+
+<a id="appendix-c"></a>
+### Appendix C: Instrument-level (L1) columns
+
+**`instruments/reference`** (sourced facts; one snapshot per date)
+
+| Group | Columns | Source (phase) |
+|---|---|---|
+| Identity | `instrument_id`, `symbol`, `figi` (1), `cik` (1) | Nasdaq Trader (0/1), Massive / OpenFIGI (1) |
+| Company | `name`, `description` (1), `website` (1), `sector` (1), `industry` (1), `country` (1) | SEC EDGAR, Massive ticker details (1) |
+| Classification | `asset_class`, `security_type` (COMMON_STOCK, ADR, ETF, ETN, PREFERRED, WARRANT, UNIT, RIGHT, CEF), `exchange`, `currency` | Nasdaq Trader |
+| Contract terms | `multiplier`, `tick_size`, `round_lot` | derived per asset class |
+| ETF attributes | `is_etf`, `is_leveraged`, `is_inverse`, `leverage`, `tracks` | Nasdaq Trader ETF flag + `config/site/overrides/leveraged_etfs.csv` |
+| Options | `optionable` | Nasdaq Trader `options.txt` |
+| Status | `status`, `listed_on`, `delisted_on`, `is_test_issue` | Nasdaq Trader, Massive |
+| Lineage | `session_date`, `knowledge_ts`, `source`, `run_id` | ingestion |
+
+**`rollups/instrument/*`** (derived "as of D"; one table per rollup, versioned)
+
+| Rollup | Columns | Inputs | Phase |
+|---|---|---|---|
+| `option_liquidity@v1` | put/call tiers, target expiry, spreads, zone OI, chain OI | `chains/*` | done (renamed in 0.3) |
+| `price_stats@v1` | `close`, `sma_20/50/200`, `ret_20d/60d`, `high_52w`, `low_52w`, `pct_from_high/low`, `hv20`, `hv30`, `adv_usd_20d` | `bars/1d` + split events | 1–2 |
+| `liquidity_class@v1` | `liquidity_class` (HIGH/MEDIUM/LOW) with the thresholds used | `price_stats`, `option_liquidity`, `config/site/rollups.toml` | 2 |
+| `iv_history@v1` | `iv30`, `iv_rank_252d`, `iv_percentile_252d`, `history_days` (UNKNOWN below the minimum) | `chains/underlying_quotes` history | 2 |
+| `earnings@v1` | `next_earnings_date`, `earnings_time` (pre/post), `days_to_earnings`, `date_confirmed` | `events/earnings` | 1–2 |
+| `fundamentals@v1` | `market_cap`, `shares_outstanding` | Massive / EDGAR | 2 |
+
