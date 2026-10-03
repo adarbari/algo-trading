@@ -6,8 +6,8 @@ from datetime import UTC, datetime
 import numpy as np
 
 from algotrade.core.series import PriceSeries
+from algotrade.core.time import business_days
 from algotrade.core.types import Fill, Side
-from algotrade.data.synthetic import business_days
 
 T0 = datetime(2024, 1, 2, tzinfo=UTC)
 

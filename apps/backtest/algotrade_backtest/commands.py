@@ -5,11 +5,12 @@ import json
 
 from algotrade.analytics.report import markdown_table
 from algotrade.core.errors import ConfigurationError
-from algotrade.data.golden import build_golden
-from algotrade.data.store import DatasetStore
 from algotrade.engines.backtest.engine import run_backtest
+from algotrade.services.datasets import list_datasets, load_dataset
 from algotrade.services.evaluation.baseline import compare_to_baseline, load_baseline, save_baseline
 from algotrade.services.evaluation.suite import run_suite, with_benchmark_excess
+from algotrade.storage.factory import open_backend
+from algotrade.storage.readers import StoreReader
 from algotrade.strategies.trading.registry import create_strategy
 
 SCORECARD_COLUMNS = (
@@ -18,21 +19,14 @@ SCORECARD_COLUMNS = (
 )  # fmt: skip
 
 
+def reader_for(args: argparse.Namespace) -> StoreReader:
+    return StoreReader(open_backend(args.data_url))
+
+
 def cmd_datasets(args: argparse.Namespace) -> int:
-    store = DatasetStore(args.datasets_dir)
-    if args.action == "build":
-        for name in build_golden(store):
-            print(f"built {name}")
-        return 0
-    if args.action == "list":
-        for info in store.manifest().values():
-            print(f"{info.name:<26} {','.join(info.symbols):<18} {info.description}")
-        return 0
-    problems = store.verify()
-    for p in problems:
-        print(p)
-    print("datasets OK" if not problems else f"{len(problems)} problem(s)")
-    return 1 if problems else 0
+    for info in list_datasets(reader_for(args)).values():
+        print(f"{info.name:<26} {','.join(info.symbols):<18} {info.description}")
+    return 0
 
 
 def parse_params(pairs: list[str]) -> dict[str, float | int | str]:
@@ -54,9 +48,9 @@ def parse_params(pairs: list[str]) -> dict[str, float | int | str]:
 
 
 def cmd_backtest(args: argparse.Namespace) -> int:
-    data = DatasetStore(args.datasets_dir).load(args.dataset)
+    data, terms = load_dataset(reader_for(args), args.dataset)
     strategy = create_strategy(args.strategy, **parse_params(args.param))
-    result = run_backtest(data, strategy)
+    result = run_backtest(data, strategy, instruments=terms)
     print(
         json.dumps(
             {
@@ -72,7 +66,7 @@ def cmd_backtest(args: argparse.Namespace) -> int:
 
 
 def cmd_evaluate(args: argparse.Namespace) -> int:
-    rows = run_suite(DatasetStore(args.datasets_dir))
+    rows = run_suite(reader_for(args))
     table = markdown_table(with_benchmark_excess(rows), SCORECARD_COLUMNS)
     print(table)
     if args.report:

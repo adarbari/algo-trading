@@ -1,13 +1,14 @@
-"""Run the full strategy x dataset grid."""
+"""Run the full strategy x golden-dataset grid, reading data only from storage."""
 
 import math
 from collections.abc import Iterable
 from dataclasses import dataclass
 
 from algotrade.core.errors import AlgoTradeError
-from algotrade.data.store import DatasetStore
 from algotrade.engines.backtest.config import BacktestConfig
 from algotrade.engines.backtest.engine import run_backtest
+from algotrade.services.datasets import load_datasets
+from algotrade.storage.readers import StoreReader
 from algotrade.strategies.trading.registry import STRATEGIES, create_strategy
 
 BENCHMARK = "buy_and_hold"
@@ -25,16 +26,15 @@ class EvaluationRow:
 
 
 def run_suite(
-    store: DatasetStore,
+    reader: StoreReader,
     strategies: Iterable[str] | None = None,
     datasets: Iterable[str] | None = None,
     config: BacktestConfig | None = None,
 ) -> list[EvaluationRow]:
     rows: list[EvaluationRow] = []
-    for dataset in datasets or store.names():
-        data = store.load(dataset)
+    for dataset, (data, terms) in load_datasets(reader, datasets).items():
         for name in strategies or sorted(STRATEGIES):
-            result = run_backtest(data, create_strategy(name), config)
+            result = run_backtest(data, create_strategy(name), config, terms)
             metrics = result.metrics.as_dict()
             bad = [k for k, v in metrics.items() if not math.isfinite(v)]
             if bad:

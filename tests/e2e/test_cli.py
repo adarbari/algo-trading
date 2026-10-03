@@ -11,12 +11,14 @@ import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 
 from algotrade_backtest.cli import main
+from algotrade_ingestion.cli import main as ingest_main
 from tests.conftest import GOLDEN_DIR, REPO_ROOT
 
 pytestmark = pytest.mark.e2e
@@ -29,37 +31,47 @@ class Result:
     stderr: str
 
 
-def cli(*args: str) -> Result:
+type Cli = Callable[..., Result]
+
+
+def _run(entry: Callable[[list[str]], int], args: list[str]) -> Result:
     out, err = io.StringIO(), io.StringIO()
     cwd = Path.cwd()
     os.chdir(REPO_ROOT)
     try:
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-            code = main(list(args))
+            code = entry(args)
     finally:
         os.chdir(cwd)
     return Result(code, out.getvalue(), err.getvalue())
 
 
-def test_module_entry_point_runs_as_subprocess() -> None:
+@pytest.fixture
+def cli(golden_url: str) -> Cli:
+    """Run ``algotrade-backtest`` in-process against the golden fixture store."""
+    return lambda *args: _run(main, ["--data-url", golden_url, *args])
+
+
+def test_module_entry_point_runs_as_subprocess(golden_url: str) -> None:
     proc = subprocess.run(
-        [sys.executable, "-m", "algotrade_backtest", "datasets", "verify"],
+        [sys.executable, "-m", "algotrade_backtest", "--data-url", golden_url, "datasets", "list"],
         cwd=REPO_ROOT, capture_output=True, text=True, check=False,
     )  # fmt: skip
     assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "bull_trend" in proc.stdout
 
 
-def test_datasets_verify() -> None:
-    proc = cli("datasets", "verify")
+def test_golden_files_verify() -> None:
+    proc = _run(ingest_main, ["golden", "verify"])
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert "datasets OK" in proc.stdout
+    assert json.loads(proc.stdout)["ok"] is True
 
 
-def test_datasets_list() -> None:
+def test_datasets_list(cli: Cli) -> None:
     assert "bull_trend" in cli("datasets", "list").stdout
 
 
-def test_evaluate_matches_committed_baseline(tmp_path: Path) -> None:
+def test_evaluate_matches_committed_baseline(cli: Cli, tmp_path: Path) -> None:
     report = tmp_path / "scorecard.md"
     proc = cli("evaluate", "--report", str(report))
     assert proc.returncode == 0, proc.stdout + proc.stderr
@@ -67,7 +79,7 @@ def test_evaluate_matches_committed_baseline(tmp_path: Path) -> None:
     assert report.read_text().startswith("# Strategy scorecard")
 
 
-def test_backtest_outputs_json() -> None:
+def test_backtest_outputs_json(cli: Cli) -> None:
     proc = cli("backtest", "--strategy", "sma_crossover", "--dataset", "bull_trend",
                "--param", "fast=10", "--param", "slow=50")  # fmt: skip
     assert proc.returncode == 0, proc.stderr
@@ -76,25 +88,31 @@ def test_backtest_outputs_json() -> None:
     assert "sharpe" in payload["metrics"]
 
 
-def test_bad_input_returns_error_code() -> None:
+def test_bad_input_returns_error_code(cli: Cli, tmp_path: Path) -> None:
     proc = cli("backtest", "--strategy", "nope", "--dataset", "bull_trend")
     assert proc.returncode == 2
     assert "Unknown strategy" in proc.stderr
+    unknown = cli("backtest", "--strategy", "buy_and_hold", "--dataset", "nope")
+    assert unknown.returncode == 2
+    assert "unknown dataset" in unknown.stderr
+    empty = _run(main, ["--data-url", f"file://{tmp_path}", "datasets", "list"])
+    assert empty.returncode == 2
+    assert "make golden-store" in empty.stderr
     assert (
         cli("backtest", "--strategy", "buy_and_hold", "--dataset", "x", "--param", "bad").returncode
         == 2
     )
 
 
-def test_rebuilding_datasets_is_deterministic(tmp_path: Path) -> None:
+def test_rebuilding_golden_files_is_deterministic(tmp_path: Path) -> None:
     out = tmp_path / "golden"
-    assert cli("--datasets-dir", str(out), "datasets", "build").returncode == 0
+    assert _run(ingest_main, ["golden", "build", "--golden-dir", str(out)]).returncode == 0
     rebuilt = json.loads((out / "manifest.json").read_text())
     committed = json.loads((GOLDEN_DIR / "manifest.json").read_text())
     assert rebuilt == committed
 
 
-def test_evaluate_detects_drift_and_updates_baseline(tmp_path: Path) -> None:
+def test_evaluate_detects_drift_and_updates_baseline(cli: Cli, tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.json"
     shutil.copy(REPO_ROOT / "benchmarks" / "baseline.json", baseline)
     data = json.loads(baseline.read_text())

@@ -91,7 +91,7 @@ apps/ingestion (algotrade_ingestion) · apps/backtest (algotrade_backtest)   nev
         │
  strategies/ (trading · screeners) · features/ · analytics/
         │
-     storage/ · data/    (data/ is replaced by storage in step 0.3)
+     storage/
         │
       core/
 ```
@@ -105,16 +105,15 @@ Extra contracts:
 | Package | Responsibility | May import |
 |---|---|---|
 | `core/` | Value objects (`Order`, `Fill`, `PriceSeries`), `MarketView`, `FeatureView`, instruments, options, errors, time. | numpy only |
-| `data/` | Golden CSV dataset store, validation, alignment, synthetic generators (until step 0.3). | core, pandas |
 | `storage/` | Data contract: schemas, a `Protocol` per store, reader / writer / result-writer facades, `local` (Parquet) and `memory` backends. | core, pandas, pyarrow |
 | `strategies/` → `trading/` | Backtest strategies: `MarketView` in, target weights out, plus their registry. | core |
 | `strategies/` → `screeners/` | Screener contract, shared `Decision` categories, `short_premium_liquidity`. | core |
 | `features/` | Pure, versioned rollup definitions (`option_liquidity@v1`) and their registry. | core |
 | `analytics/` | Metrics and report formatting from equity curves + fills. | core |
 | `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. | strategies, analytics, core |
-| `services/` | Use cases: universe + `FeatureView` loading, screening runs, legacy exports, `evaluation/` (strategy × golden dataset vs baseline). | everything below except `storage.writers` |
-| `apps/ingestion` | Sources (Cboe, HTTP with retries), jobs (universe, option chains, features), nightly pipeline, `algotrade-ingest`. | library |
-| `apps/backtest` | `algotrade-backtest` CLI (`algotrade` alias): datasets, backtest, evaluate. | library |
+| `services/` | Use cases: universe + `FeatureView` loading, `market_data` (stored bars → aligned series), golden `datasets`, screening runs, legacy exports, `evaluation/` (strategy × golden dataset vs baseline). | everything below except `storage.writers` |
+| `apps/ingestion` | Sources (Cboe, HTTP with retries, synthetic/golden), jobs (universe, option chains, features, golden load), nightly pipeline, `algotrade-ingest`. | library |
+| `apps/backtest` | `algotrade-backtest` CLI (`algotrade` alias): datasets list, backtest, evaluate. Reads only through storage (`--data-url`). | library |
 
 ### One bar in the backtest engine
 

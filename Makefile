@@ -1,9 +1,11 @@
 # Every CI step is a make target, so "it passed locally" means "it will pass in CI".
 PY ?= .venv/bin/python
 BIN = $(dir $(PY))
+# Golden datasets live in their own fixture store, never in the production data store.
+GOLDEN_URL ?= file://datasets/golden/store
 
 .PHONY: install lint format typecheck arch filelen unit property integration e2e test \
-        evaluate baseline datasets-verify datasets-build check nightly
+        evaluate baseline datasets-verify datasets-build golden-store check nightly
 
 install:
 	python3.12 -m venv .venv
@@ -43,20 +45,24 @@ e2e:
 test:            ## everything, with the coverage gate
 	$(PY) -m pytest --cov --cov-report=term --cov-report=xml
 
-datasets-verify:
-	$(BIN)algotrade-backtest datasets verify
+datasets-verify: ## committed golden CSVs match their checksums
+	$(BIN)algotrade-ingest golden verify
 
-datasets-build:
-	$(BIN)algotrade-backtest datasets build
+datasets-build:  ## regenerate golden CSVs from the catalogue (then review + commit)
+	$(BIN)algotrade-ingest golden build
 
-evaluate:        ## strategy scorecard vs committed baseline
-	$(BIN)algotrade-backtest evaluate --report scorecard.md
+golden-store:    ## (re)load the golden CSVs into the fixture store
+	rm -rf datasets/golden/store
+	ALGOTRADE_DATA_URL=$(GOLDEN_URL) $(BIN)algotrade-ingest golden load
 
-baseline:        ## accept current results as the new baseline (review the diff!)
-	$(BIN)algotrade-backtest evaluate --update-baseline
+evaluate: golden-store  ## strategy scorecard vs committed baseline
+	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate --report scorecard.md
+
+baseline: golden-store  ## accept current results as the new baseline (review the diff!)
+	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate --update-baseline
 
 check: lint typecheck arch filelen datasets-verify test evaluate
 
 nightly:
 	HYPOTHESIS_PROFILE=nightly $(PY) -m pytest tests/property
-	$(BIN)algotrade-backtest evaluate --report scorecard.md
+	$(MAKE) evaluate
