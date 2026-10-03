@@ -5,7 +5,7 @@ from datetime import date
 import pandas as pd
 
 from algotrade.core.errors import ConfigurationError
-from algotrade.storage.interfaces import Backend
+from algotrade.storage.interfaces import Backend, RunStore
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.schemas import validate_frame
 
@@ -26,6 +26,11 @@ class ResultWriter:
 
     def load_run(self, run_id: str) -> RunRecord | None:
         return self._backend.runs.load(run_id)
+
+    @property
+    def runs_backend(self) -> RunStore:
+        """The run-record store (job records live here too)."""
+        return self._backend.runs
 
     def runs_for(self, job: str, session_date: date | None = None) -> list[RunRecord]:
         return self._backend.runs.find(job, session_date)

@@ -2,17 +2,19 @@
 
 import argparse
 import json
+import sys
 
 from algotrade.analytics.report import markdown_table
 from algotrade.config.resolve import ResolvedConfig
 from algotrade.config.user import UserContext
 from algotrade.core.errors import ConfigurationError
 from algotrade.engines.backtest.engine import run_backtest
-from algotrade.services.backtests import run_configured_backtest
 from algotrade.services.configs import resolve_config
 from algotrade.services.datasets import list_datasets, load_dataset
 from algotrade.services.evaluation.baseline import compare_to_baseline, load_baseline, save_baseline
 from algotrade.services.evaluation.suite import run_suite, with_benchmark_excess
+from algotrade.services.jobs import JobStatus, LocalJobRunner
+from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.readers import StoreReader
 from algotrade.strategies.trading.registry import create_strategy
@@ -80,25 +82,25 @@ def cmd_config(args: argparse.Namespace) -> int:
 
 
 def _config_backtest(args: argparse.Namespace) -> int:
+    """Configured backtests go through the jobs runner, exactly as the UI will submit them."""
     if args.start is None or args.end is None:
         raise ConfigurationError("--config needs --start and --end")
-    outcome = run_configured_backtest(
-        reader_for(args), _resolved(args, args.config), args.start, args.end
-    )
-    result = outcome.result
-    print(
-        json.dumps(
-            {
-                "config": outcome.config.config.id,
-                "config_hash": outcome.config.hash,
-                "user": args.user,
-                "selection": outcome.selection.as_dict(),
-                "metrics": result.metrics.as_dict(),
-            },
-            indent=2,
-            default=str,
-        )
-    )
+    backend = open_backend(args.data_url)
+    resources = {"reader": StoreReader(backend), "configs": open_config_store(args.config_dir)}
+    runner = LocalJobRunner(backend.runs, LIBRARY_HANDLERS, resources)
+    try:
+        params = {
+            "config": args.config,
+            "start": args.start.isoformat(),
+            "end": args.end.isoformat(),
+        }
+        job = runner.wait(runner.submit("backtest", params, UserContext(args.user), force=True))
+    finally:
+        runner.shutdown()
+    if job.status is JobStatus.FAILED:
+        print(f"error: {job.error}", file=sys.stderr)
+        return 2
+    print(json.dumps({"job_id": job.job_id, "user": job.user, **job.result}, indent=2, default=str))
     return 0
 
 

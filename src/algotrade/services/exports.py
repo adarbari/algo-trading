@@ -8,6 +8,8 @@ import csv
 from collections.abc import Mapping
 from pathlib import Path
 
+from algotrade.config.resolve import ResolvedConfig
+from algotrade.config.user import SITE_USER
 from algotrade.core.feature_view import FeatureValue
 from algotrade.core.instruments import symbol_of
 from algotrade.services.screening import ScreenOutcome
@@ -139,3 +141,15 @@ def write_legacy_exports(outcome: ScreenOutcome, out_dir: Path, version: str) ->
 
 # Export name (as listed in a config's ``exports``) -> writer(outcome, directory, version).
 EXPORTS = {"legacy_liquidity_csv": write_legacy_exports}
+
+
+def run_exports(
+    outcome: ScreenOutcome, config: ResolvedConfig, export_dir: Path
+) -> tuple[Path, ...]:
+    """The config's declared exports; site runs at the top level, users in a subfolder."""
+    user = config.user.user_id
+    target = export_dir if user == SITE_USER else export_dir / user
+    paths: list[Path] = []
+    for name in config.config.exports:
+        paths.extend(EXPORTS[name](outcome, target, outcome.session_date.isoformat()))
+    return tuple(paths)

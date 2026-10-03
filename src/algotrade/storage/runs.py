@@ -8,6 +8,7 @@ from typing import Any
 
 
 class RunStatus(StrEnum):
+    QUEUED = "queued"
     RUNNING = "running"
     COMPLETE = "complete"
     PARTIAL = "partial"
