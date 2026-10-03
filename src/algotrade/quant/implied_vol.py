@@ -4,7 +4,7 @@
 (NaN where there is none) and a status code per element saying why (``IVStatus``):
 
     OK               solved within [min_vol, max_vol]
-    BAD_INPUT        a non-finite input, spot / strike / t <= 0 or a negative price
+    BAD_INPUT        a non-finite input, spot / strike / t <= 0 or a price below ``-tol * strike``
     BELOW_INTRINSIC  price below the no-arbitrage lower bound (discounted forward intrinsic)
     AT_INTRINSIC     price equals that bound within ``tol``: no time value, so no vol
     ABOVE_MAX        price at or above the upper bound (spot e^{-qt} calls, strike e^{-rt} puts)
@@ -93,9 +93,12 @@ def implied_vol(
     finite = np.isfinite(p) & np.isfinite(s) & np.isfinite(k) & np.isfinite(tt)
     finite &= np.isfinite(rr) & np.isfinite(qq)
     with np.errstate(invalid="ignore"):
-        bad = ~finite | (s <= 0) | (k <= 0) | (tt <= 0) | (p < 0)
+        bad = ~finite | (s <= 0) | (k <= 0) | (tt <= 0)
+        atol = tol * np.where(bad, 1.0, k)
+        # A price is only negative beyond the tolerance: a model price of a far-OTM option
+        # can cancel to -0.0 or a negative subnormal, which is "no time value", not bad input.
+        bad |= p < -atol
     status[bad] = IVStatus.BAD_INPUT
-    atol = tol * np.where(bad, 1.0, k)
     with np.errstate(all="ignore"):
         lower, upper = bounds(s, k, tt, rr, qq, call)
         p_lo, _ = _model(np.full(p.shape, min_vol), s, k, tt, rr, qq, call)
