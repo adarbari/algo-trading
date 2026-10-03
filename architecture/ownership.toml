@@ -615,6 +615,13 @@ section = "docs/adr/0025-frontend-architecture.md#rule-3-component-only-ui"
 enforced_by = ["stylelint declaration-strict-value / color-no-hex / unit-disallowed-list", "npm run generated:check (tokens.css is fresh)"]
 
 [[web_responsibility]]
+id = "web-value-format"
+description = "How a displayed value reads: number, percent, compact currency, date, signed delta with its up / down tone, missing values"
+owner = ["apps/web/design-system/format/*"]
+section = "docs/ui/design-system.md#value-formatting"
+enforced_by = ["eslint boundaries (apps/web/lint-rules/layers.js: only components and the package entry import design-system/format)", "review: data components and screens format through formatValue from @algotrade/ui"]
+
+[[web_responsibility]]
 id = "web-http"
 description = "Talking HTTP to the API: the typed client, fetch, errors, query keys, the generated schema"
 owner = ["apps/web/src/shared/api/**"]

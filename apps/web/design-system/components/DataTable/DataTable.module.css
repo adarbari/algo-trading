@@ -1,0 +1,352 @@
+/*
+ * DataTable: an ARIA grid laid out with CSS grid. Every row (header and body) uses the same
+ * track list (--dt-columns, set by DataTable.tsx from the column widths below), so columns
+ * line up although body rows are absolutely positioned by the virtualizer. Rows have a fixed
+ * height per density (--density-row-height x --dt-row-lines); the header is sticky.
+ */
+.root {
+  /* Column width steps (minimums; columns share leftover width). */
+  --dt-w-select: calc(var(--space-8) + var(--space-2));
+  --dt-w-xs: calc(var(--space-10) + var(--space-8));
+  --dt-w-sm: calc(var(--space-10) * 2 + var(--space-2));
+  --dt-w-md: calc(var(--space-10) * 3);
+  --dt-w-lg: calc(var(--space-10) * 4.5);
+  --dt-w-xl: calc(var(--space-10) * 7);
+
+  /* A two-line row (symbol + name) adds one xs line; useRowHeight.ts mirrors this. */
+  --dt-row-height: calc(
+    var(--density-row-height) + (var(--dt-row-lines) - 1) * var(--line-height-xs)
+  );
+
+  display: flex;
+  position: relative;
+  flex-direction: column;
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1-5) var(--density-panel-padding-x);
+  border-bottom: var(--border-width-thin) solid var(--color-border-soft);
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.toolbarStart {
+  min-width: 0;
+}
+
+.scroller {
+  overflow: auto;
+  max-height: calc(
+    var(--density-row-height) + var(--dt-row-height) * var(--dt-visible-rows) +
+      var(--border-width-thin)
+  );
+  overscroll-behavior: contain;
+}
+
+.scroller:focus-visible {
+  outline-offset: calc(-1 * var(--focus-ring-width));
+}
+
+.canvas {
+  width: 100%;
+  min-width: var(--dt-min-width);
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  background: var(--color-surface);
+}
+
+.body {
+  position: relative;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: var(--dt-columns);
+  width: 100%;
+  height: var(--density-row-height);
+  border-bottom: var(--border-width-thin) solid var(--color-row);
+}
+
+.header .row {
+  border-bottom-color: var(--color-border-soft);
+}
+
+.row[data-virtual] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: var(--dt-row-height);
+  cursor: default;
+}
+
+.row[data-virtual]:hover {
+  background: var(--color-row);
+}
+
+.row[aria-selected='true'],
+.row[aria-selected='true']:hover {
+  background: var(--color-accent-soft);
+}
+
+.row[data-active] {
+  background: var(--color-row);
+}
+
+.headerCell,
+.cell,
+.selectCell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0 var(--density-cell-padding-x);
+}
+
+.headerCell[data-align='end'],
+.cell[data-align='end'] {
+  justify-content: flex-end;
+  text-align: end;
+}
+
+.headerCell {
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-xs);
+}
+
+.sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sortButton:hover,
+.sortButton[data-sorted] {
+  color: var(--color-text);
+}
+
+.headerText,
+.cellText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sortIcon {
+  flex: none;
+  width: var(--space-2);
+  height: var(--space-2-5);
+  fill: var(--color-control);
+}
+
+.sortButton[data-sorted='asc'] [data-part='up'],
+.sortButton[data-sorted='desc'] [data-part='down'] {
+  fill: var(--color-accent-strong);
+}
+
+.cell {
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.cell[data-mono] {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+.cell[data-tone='secondary'] {
+  color: var(--color-text-2);
+}
+
+.cell[data-tone='muted'] {
+  color: var(--color-muted);
+}
+
+.cell[data-tone='up'] {
+  color: var(--color-up);
+}
+
+.cell[data-tone='down'] {
+  color: var(--color-down);
+}
+
+.selectCell {
+  justify-content: flex-start;
+}
+
+/* TODO(design system PR 2): replaced by the Checkbox component. */
+.checkbox {
+  width: var(--space-3);
+  height: var(--space-3);
+  margin: 0;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.placeholder {
+  display: block;
+  width: 60%;
+  height: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-track);
+}
+
+.stateRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.stateCell {
+  padding: var(--space-6) var(--density-panel-padding-x);
+  color: var(--color-muted);
+  text-align: center;
+}
+
+.stateCell[data-alert] {
+  color: var(--color-negative);
+}
+
+.hidden {
+  position: absolute;
+  overflow: hidden;
+  width: var(--border-width-thin);
+  height: var(--border-width-thin);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Column picker (toolbar button + panel). */
+.picker {
+  position: relative;
+  margin-inline-start: auto;
+}
+
+.pickerButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  height: var(--density-control-height);
+  padding: 0 var(--space-2-5);
+  border: var(--border-width-thin) solid var(--color-control);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  cursor: pointer;
+}
+
+.pickerButton[aria-expanded='true'] {
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+}
+
+.pickerCount {
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pickerButton[aria-expanded='true'] .pickerCount {
+  color: var(--color-accent-strong);
+}
+
+.pickerPanel {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: var(--z-dropdown);
+  overflow-y: auto;
+  width: calc(var(--size-sidebar) - var(--space-4));
+  max-height: calc(var(--size-sidebar) + var(--space-10));
+  padding: var(--space-1) 0;
+  border: var(--border-width-thin) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.pickerPanel[hidden] {
+  display: none;
+}
+
+.pickerList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pickerItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-1-5) var(--space-3);
+}
+
+.pickerItem + .pickerItem {
+  border-top: var(--border-width-thin) solid var(--color-border-soft);
+}
+
+.pickerLabel {
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+  cursor: pointer;
+}
+
+.pickerDescription {
+  grid-column: 2;
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-xs);
+}
+
+.scroller:focus-visible .row[data-active] {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: calc(-1 * var(--focus-ring-width));
+}
+
+.headerCell:first-child,
+.cell:first-child,
+.selectCell:first-child {
+  padding-inline-start: var(--density-panel-padding-x);
+}
+
+.headerCell:last-child,
+.cell:last-child {
+  padding-inline-end: var(--density-panel-padding-x);
+}
+
+.headerCell[data-align='end'] .sortButton {
+  flex-direction: row-reverse;
+}
+
+.row[data-virtual] .cell {
+  padding-block: var(--density-cell-padding-y);
+}

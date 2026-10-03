@@ -1,0 +1,54 @@
+/* Legend: swatch + label + value, wrapped. Tones are data attributes set by Legend.tsx. */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-muted);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.legend[data-size='xs'] {
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-xs);
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+.value {
+  color: var(--color-text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.swatch {
+  flex: none;
+  width: var(--space-2-5);
+  height: var(--space-2-5);
+  border: var(--border-width-thin) solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--tone-fill);
+}
+
+.swatch[data-swatch='line'] {
+  height: var(--border-width-thick);
+  border: 0;
+  border-radius: 0;
+}
+
+.swatch[data-swatch='cell'] {
+  border-color: var(--tone-border);
+  background: var(--tone-tint);
+}
+
+.swatch[data-tone='empty'] {
+  border-color: var(--color-border);
+}

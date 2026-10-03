@@ -3,6 +3,13 @@
  * only from here; deep imports into the package are blocked by package.json `exports` and lint.
  */
 export * from './components';
+export {
+  formatValue,
+  isNumericFormat,
+  type FormattedValue,
+  type ValueFormat,
+  type ValueTone,
+} from './format';
 export * from './primitives';
 export { UiProvider, type Theme, type UiProviderProps, type UpDownPalette } from './theme';
 export type {

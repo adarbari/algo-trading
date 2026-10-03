@@ -1,0 +1,38 @@
+/* StackedBar: a track holding toned segments (width from --share, set by StackedBar.tsx). */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+  min-width: 0;
+  font-family: var(--font-sans);
+}
+
+.track {
+  display: flex;
+  overflow: hidden;
+  height: var(--space-2-5);
+  border-radius: var(--radius-sm);
+  background: var(--color-track);
+}
+
+.track[data-size='sm'] {
+  height: var(--space-1-5);
+}
+
+.segment {
+  flex: none;
+  width: var(--share);
+  height: 100%;
+  background: var(--tone-fill);
+}
+
+.message {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.message[data-tone='negative'] {
+  color: var(--color-negative);
+}

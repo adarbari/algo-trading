@@ -28,6 +28,8 @@ apps/web/
                           VisuallyHidden: how screens lay out and set text
     components/<Name>/    Name.tsx, Name.module.css, Name.stories.tsx, Name.test.tsx,
                           index.ts, __screenshots__/ (copy primitives/Text, the template)
+    format/               value formatters (number, percent, $13.99B, date, signed delta) used
+                          by the data components; exported from @algotrade/ui
     COMPONENTS.md         GENERATED inventory of every component and its props (do not hand-edit)
   src/                    the app in layers (app, pages, widgets, features, entities, shared):
                           imports UI only from @algotrade/ui. See architecture.md.
@@ -172,6 +174,35 @@ Weights: regular 400, medium 500, semibold 600 (headings).
 
 Panel (header, actions, loading / empty / error states) is a component on top of `Surface`
 (design system PR 2).
+
+## Data components (design system PR 3)
+
+Built from the approved Ideas, Screener, Explore and Ingestion mockups; props in `COMPONENTS.md`.
+
+| Component | What it is | Notes |
+|---|---|---|
+| `DataTable` | Generic data grid on TanStack Table v9 + TanStack Virtual (internal; no TanStack type is public) | Typed `DataTableColumn` (header, description, accessor, `format`, `cell` slot, width step, `grow`); single-column sort with `aria-sort` (numbers high-first on the first click, missing values always last); column picker fed by the caller's columns and descriptions; controlled selection (checkbox column, Shift-click ranges, select all); sticky header; virtual rows of a fixed height per density (`--density-row-height`, plus one `--line-height-xs` for two-line rows); ARIA grid with an active row (arrows, Page Up / Down, Home / End, Enter activates, Space selects); horizontal scroll under the sticky header when narrow; loading / empty / error rows |
+| `HeatGrid` | Rows x columns of status cells (complete, partial, failed, not collected) with value text | ARIA grid, roving focus (arrows, Home / End, Ctrl+Home / End), Enter / Space / click selects; accent outline on the selected cell; status legend |
+| `StatStrip` | A summary row of stats divided by borders inside one strip (never cards) | label, value (text or formatted), sub-line, tone; two then one column in narrow containers |
+| `ShareBar` / `StackedBar` / `BarList` | One share bar (a `meter`); one bar split into toned segments + legend; labelled rows of bars + values (funnel, tiers) | Colour is never the only key: values are text, the stacked bar's name lists every segment |
+| `Tabs` | Underline tabs (`tablist`) and the selected panel | Controlled; Left / Right / Home / End with automatic activation; counts; disabled tabs skipped |
+| `Disclosure` | Summary row (label + count) that expands to detail | Button with `aria-expanded`; controlled or uncontrolled; boxed or plain |
+| `Legend` | Swatches for status tones, `empty`, `accent`, `muted` and series `s1`-`s6` | Shapes: cell (tint + border), solid, line |
+| `KeyValue` | Definition list for detail panels (label column + tabular value, optional hint) | Formatted values carry their up / down tone |
+
+Charts come in design system PR 4. Where a data component needs a PR 2 control (Checkbox,
+Button, StatusBadge) before PR 2 has merged, it uses a minimal internal placeholder marked
+`TODO(design system PR 2)`, replaced when PR 2 lands.
+
+### Value formatting
+
+`formatValue(value, format)` (`design-system/format/`, exported from `@algotrade/ui`) is the one
+place that decides how a value reads: `number` (`11,427`), `percent` (a fraction: 0.721 ->
+`72.1%`), `currency` (`$333.69`), `currency-compact` (`$13.99B`, `$412M`), `compact`
+(`11.4K`), `date` (`2 Oct 2026`, `Fri 2 Oct`, ISO) and `delta` (`+1.24%`, `−3.4%`, `+3.2 pts`,
+with an up / down tone). Missing values read as an em dash in the muted tone; negatives use the
+typographic minus. DataTable, KeyValue, StatStrip, StackedBar and BarList format through it, so
+screens never format numbers themselves.
 
 ## First component set
 

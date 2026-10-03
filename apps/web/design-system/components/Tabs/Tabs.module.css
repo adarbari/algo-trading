@@ -1,0 +1,77 @@
+/* Tabs: underline tabs over a bottom border; the selected tab has the accent underline. */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--density-gap);
+  min-width: 0;
+}
+
+.list {
+  display: flex;
+  overflow-x: auto;
+  gap: var(--space-0-5);
+  border-bottom: var(--border-width-thin) solid var(--color-border);
+  scrollbar-width: none;
+}
+
+.tab {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1-5);
+  margin: 0 0 calc(-1 * var(--border-width-thin));
+  padding: var(--space-1-5) var(--space-3);
+  border: 0;
+  border-bottom: var(--border-width-thick) solid transparent;
+  background: transparent;
+  color: var(--color-text-2);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--easing-standard);
+}
+
+.tab:hover {
+  color: var(--color-text);
+}
+
+.tab[aria-selected='true'] {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.tab:focus-visible {
+  outline-offset: calc(-1 * var(--focus-ring-width));
+}
+
+.tab:disabled {
+  color: var(--color-muted);
+  cursor: not-allowed;
+}
+
+.count {
+  padding: 0 var(--space-1-5);
+  border-radius: var(--radius-md);
+  background: var(--color-row);
+  color: var(--color-text-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.panel {
+  min-width: 0;
+}
+
+.panel:focus-visible {
+  outline-offset: var(--focus-ring-offset);
+}
+
+.list[data-size='sm'] .tab {
+  padding: var(--space-1) var(--space-2-5);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}

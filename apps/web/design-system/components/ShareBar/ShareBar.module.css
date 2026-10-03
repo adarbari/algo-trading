@@ -1,0 +1,48 @@
+/* ShareBar: track + fill (width from --share, set by ShareBar.tsx) + the percentage. */
+.root {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-2);
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+}
+
+.label {
+  grid-column: 1 / -1;
+  color: var(--color-text-2);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.track {
+  overflow: hidden;
+  height: var(--space-1-5);
+  border-radius: var(--radius-sm);
+  background: var(--color-track);
+}
+
+.track[data-size='md'] {
+  height: var(--space-2-5);
+}
+
+.fill {
+  display: block;
+  width: var(--share);
+  height: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--tone-fill);
+}
+
+.value {
+  min-width: calc(var(--space-10) + var(--space-2));
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.value[data-missing] {
+  color: var(--color-muted);
+}

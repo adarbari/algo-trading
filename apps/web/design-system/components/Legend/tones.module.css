@@ -1,0 +1,88 @@
+/*
+ * Data tones shared by the data components (Legend, ShareBar, StackedBar, BarList, HeatGrid):
+ * an element with class `tone` and `data-tone` gets three custom properties, --tone-fill (solid
+ * marks), --tone-tint (tinted cells) and --tone-border, from the colour tokens.
+ */
+.tone[data-tone='positive'] {
+  --tone-fill: var(--color-positive);
+  --tone-tint: var(--color-positive-bg);
+  --tone-border: var(--color-positive-border);
+}
+
+.tone[data-tone='warning'] {
+  --tone-fill: var(--color-warning);
+  --tone-tint: var(--color-warning-bg);
+  --tone-border: var(--color-warning-border);
+}
+
+.tone[data-tone='negative'] {
+  --tone-fill: var(--color-negative);
+  --tone-tint: var(--color-negative-bg);
+  --tone-border: var(--color-negative-border);
+}
+
+.tone[data-tone='neutral'] {
+  --tone-fill: var(--color-neutral);
+  --tone-tint: var(--color-neutral-bg);
+  --tone-border: var(--color-neutral-border);
+}
+
+.tone[data-tone='info'] {
+  --tone-fill: var(--color-info);
+  --tone-tint: var(--color-info-bg);
+  --tone-border: var(--color-info-border);
+}
+
+.tone[data-tone='accent'] {
+  --tone-fill: var(--color-accent);
+  --tone-tint: var(--color-accent-soft);
+  --tone-border: var(--color-accent-border);
+}
+
+.tone[data-tone='muted'] {
+  --tone-fill: var(--color-muted);
+  --tone-tint: var(--color-row);
+  --tone-border: var(--color-control);
+}
+
+.tone[data-tone='empty'] {
+  --tone-fill: var(--color-empty);
+  --tone-tint: var(--color-empty);
+  --tone-border: var(--color-border);
+}
+
+.tone[data-tone='s1'] {
+  --tone-fill: var(--color-s1);
+  --tone-tint: var(--color-s1);
+  --tone-border: var(--color-s1);
+}
+
+.tone[data-tone='s2'] {
+  --tone-fill: var(--color-s2);
+  --tone-tint: var(--color-s2);
+  --tone-border: var(--color-s2);
+}
+
+.tone[data-tone='s3'] {
+  --tone-fill: var(--color-s3);
+  --tone-tint: var(--color-s3);
+  --tone-border: var(--color-s3);
+}
+
+.tone[data-tone='s4'] {
+  --tone-fill: var(--color-s4);
+  --tone-tint: var(--color-s4);
+  --tone-border: var(--color-s4);
+}
+
+.tone[data-tone='s5'] {
+  --tone-fill: var(--color-s5);
+  --tone-tint: var(--color-s5);
+  --tone-border: var(--color-s5);
+}
+
+.tone[data-tone='s6'] {
+  --tone-fill: var(--color-s6);
+  --tone-tint: var(--color-s6);
+  --tone-border: var(--color-s6);
+}

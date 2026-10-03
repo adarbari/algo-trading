@@ -1,0 +1,114 @@
+/*
+ * HeatGrid: a CSS grid (label column + --heat-columns status columns, set by HeatGrid.tsx);
+ * each row is a subgrid so ARIA rows wrap their cells. Cell colours come from tones.module.css.
+ */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  font-family: var(--font-sans);
+}
+
+.scroller {
+  overflow-x: auto;
+  padding: var(--space-0-5);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns:
+    minmax(calc(var(--size-label) - var(--space-8)), var(--size-label))
+    repeat(var(--heat-columns), minmax(calc(var(--space-10) + var(--space-3)), 1fr));
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+}
+
+.corner {
+  min-width: 0;
+}
+
+.hidden {
+  position: absolute;
+  overflow: hidden;
+  width: var(--border-width-thin);
+  height: var(--border-width-thin);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.columnHeader {
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-xs);
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowHeader {
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--density-control-height);
+  border: var(--border-width-thin) solid var(--tone-border);
+  border-radius: var(--radius-sm);
+  background: var(--tone-tint);
+  color: var(--tone-fill);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-xs);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.cell[data-tone='empty'] {
+  color: var(--color-muted);
+}
+
+.cell[data-loading] {
+  border-color: var(--color-border-soft);
+  background: var(--color-track);
+  cursor: default;
+}
+
+.cell:hover {
+  border-color: var(--color-accent-border);
+}
+
+.cell[aria-selected='true'] {
+  outline: var(--focus-ring-width) solid var(--color-accent);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.cell:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.message {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.message[data-tone='negative'] {
+  color: var(--color-negative);
+}
