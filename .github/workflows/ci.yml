@@ -45,7 +45,7 @@ jobs:
       - run: pip install -e ".[dev]"
       - name: Unit + architecture + property + integration + e2e (coverage gate 90%)
         run: make test PY=python BIN=
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: matrix.python == '3.12'
         with: { name: coverage, path: coverage.xml }
 
@@ -65,6 +65,6 @@ jobs:
       - name: Publish scorecard
         if: always()
         run: test -f scorecard.md && cat scorecard.md >> "$GITHUB_STEP_SUMMARY" || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with: { name: scorecard, path: scorecard.md, if-no-files-found: ignore }
