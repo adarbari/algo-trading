@@ -2,13 +2,11 @@
  * Download a run's items as CSV (key, code, status), built in the browser from the API's item
  * list. Confirms with a toast ("4,204 items saved"); a failure is a negative toast.
  */
-import { Button, formatValue, useToast } from '@algotrade/ui';
+import { Button, formatValue, saveTextFile, useToast } from '@algotrade/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { itemsCsv, itemsFileName, runItemsQuery } from '@/entities/run';
-
-import { saveTextFile } from '../lib/save-file';
 
 export interface DownloadItemsButtonProps {
   /** The run whose items are saved; none disables the button. */

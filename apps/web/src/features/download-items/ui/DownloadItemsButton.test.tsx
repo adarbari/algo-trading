@@ -1,18 +1,19 @@
-import { ToastProvider } from '@algotrade/ui';
+import { saveTextFile, ToastProvider } from '@algotrade/ui';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 import { api, TestQueryProvider } from '@/shared/api';
-
-import { saveTextFile } from '../lib/save-file';
 import { DownloadItemsButton } from './DownloadItemsButton';
 
 vi.mock('@/shared/api', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   api: { GET: vi.fn() },
 }));
-vi.mock('../lib/save-file', () => ({ saveTextFile: vi.fn() }));
+vi.mock('@algotrade/ui', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  saveTextFile: vi.fn(),
+}));
 
 function renderButton(runId: string | null) {
   return render(

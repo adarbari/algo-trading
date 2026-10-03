@@ -407,6 +407,10 @@ path = "apps/web/design-system/format"
 purpose = "value formatters shared by the data components (number, percent, compact currency, date, signed delta with up/down tone); exported from @algotrade/ui"
 
 [[web_dir]]
+path = "apps/web/design-system/files"
+purpose = "browser file helpers (save text the app built as a download); exported from @algotrade/ui"
+
+[[web_dir]]
 path = "apps/web/design-system/foundations"
 purpose = "Storybook foundation pages (Foundations/Tokens: colours with contrast, type, space, radius, density)"
 styles = true
