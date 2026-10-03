@@ -207,3 +207,17 @@ def test_first_build_upgrades_an_earlier_run_of_the_same_session() -> None:
         task_ctx(writer, reader, second), _sources(["AAPL"], tickers), UniverseSettings(), D1
     ).stats
     assert stats["identifiers"]["ids_upgraded"] == 1
+
+
+def test_rename_ids_follows_a_same_session_chain_in_recorded_order() -> None:
+    """DFAC on 2026-10-02: upgraded to A, moved to B, then the owner's override back to A."""
+    previous = pd.DataFrame({"instrument_id": ["EQ:DFAC", "EQ:KEEP"], "status": "ACTIVE"})
+    chain = pd.DataFrame({
+        "old_id": ["EQ:B", "EQ:DFAC", "EQ:A"], "new_id": ["EQ:A", "EQ:A", "EQ:B"],
+        "known_at": pd.to_datetime(["2026-10-03T16:23Z", "2026-10-03T05:05Z",
+                                    "2026-10-03T09:30Z"]),
+    })  # fmt: skip
+    renamed = rename_ids(previous, chain)
+    assert renamed is not None and renamed["instrument_id"].tolist() == ["EQ:A", "EQ:KEEP"]
+    halfway = rename_ids(previous, chain.iloc[1:])  # before the override: on B
+    assert halfway is not None and halfway["instrument_id"].tolist() == ["EQ:B", "EQ:KEEP"]

@@ -11,6 +11,7 @@ from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.sources.framework.base import FixtureSource
 from algotrade_ingestion.sources.framework.registry import fixture_source
 from algotrade_ingestion.tasks.maintenance.golden import load_golden
+from algotrade_ingestion.tasks.reference import reference_diff
 from tests.helpers.ingest_fakes import task_ctx
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -23,6 +24,13 @@ settings.register_profile(
     "nightly", max_examples=1000, deadline=None, suppress_health_check=[HealthCheck.too_slow]
 )
 settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "dev"))
+
+
+@pytest.fixture(autouse=True)
+def strict_reference_events(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A universe build that would write two ``events/reference_change`` rows under one key
+    fails the test instead of being deduplicated (production keeps one and counts it)."""
+    monkeypatch.setattr(reference_diff, "STRICT", True)
 
 
 @pytest.fixture(scope="session")

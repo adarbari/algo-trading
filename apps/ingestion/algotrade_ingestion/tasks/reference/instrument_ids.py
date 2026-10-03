@@ -247,12 +247,15 @@ def figi_review_rows(reference: pd.DataFrame) -> list[dict[str, str]]:
 
 
 def rename_ids(frame: pd.DataFrame | None, id_map: pd.DataFrame) -> pd.DataFrame | None:
-    """``frame`` with every ``old_id`` in ``id_map`` replaced by its ``new_id``. A reference
-    snapshot that then holds an id twice (an override moved a listing onto an id a delisted
-    row still carries) keeps the active row."""
+    """``frame`` with every ``old_id`` in ``id_map`` replaced by the id it ends up with. The
+    changes apply in the order they were recorded (``known_at``), so a chain within one
+    session (DFAC, 2026-10-02: ``EQ:DFAC -> A``, ``A -> B``, then the override ``B -> A``)
+    lands on its last id rather than stopping after one step. A reference snapshot that then
+    holds an id twice (an override moved a listing onto an id a delisted row still carries)
+    keeps the active row."""
     if frame is None or id_map.empty:
         return frame
-    mapping = dict(zip(id_map["old_id"], id_map["new_id"], strict=True))
+    mapping = _final_ids(id_map)
     renamed = frame.assign(instrument_id=frame["instrument_id"].replace(mapping))
     if "status" not in renamed.columns or not renamed["instrument_id"].duplicated().any():
         return renamed
@@ -260,6 +263,25 @@ def rename_ids(frame: pd.DataFrame | None, id_map: pd.DataFrame) -> pd.DataFrame
     order = first.sort_values(kind="stable").index
     kept = renamed.loc[order].drop_duplicates("instrument_id", keep="first")
     return kept.sort_index()
+
+
+def _final_ids(id_map: pd.DataFrame) -> dict[str, str]:
+    """old id -> the id it ends up with after every change, applied in ``known_at`` order
+    (unknown last, else map order)."""
+    ordered = id_map
+    if "known_at" in id_map.columns:
+        known = pd.to_datetime(id_map["known_at"], utc=True)
+        ordered = id_map.assign(_known=known).sort_values(
+            "_known", kind="stable", na_position="last"
+        )
+    final: dict[str, str] = {}  # an id at the start -> where it is now
+    holders: dict[str, set[str]] = {}  # an id now -> the starting ids it holds
+    for old, new in zip(ordered["old_id"].astype(str), ordered["new_id"].astype(str), strict=True):
+        moving = holders.pop(old, set()) | ({old} if old not in final else set())
+        for start in moving:
+            final[start] = new
+        holders.setdefault(new, set()).update(moving)
+    return {start: now for start, now in final.items() if start != now}
 
 
 def id_map_rows(upgrades: list[dict[str, str]], session: date) -> pd.DataFrame:
