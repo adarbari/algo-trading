@@ -1,5 +1,5 @@
 """One router per area: parse parameters, call ONE explore query, map it to a response
-schema. No business logic here (ADR 0025); ``ROUTERS`` is what ``main.create_app`` mounts."""
+schema. No business logic here (ADR 0024); ``ROUTERS`` is what ``main.create_app`` mounts."""
 
 from fastapi import APIRouter
 

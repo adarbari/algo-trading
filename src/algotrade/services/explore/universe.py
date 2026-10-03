@@ -33,7 +33,7 @@ from algotrade.services.explore.store import (
 
 REFERENCE = "instruments/reference"
 UNIVERSE_BUILD = "universe_build"  # the job that records the FIGI review list in its stats
-LIQUIDITY = rollup_field(liquidity_class.ROLLUP.key, "liquidity_class")
+LIQUIDITY = rollup_field(liquidity_class.GROUP.key, "liquidity_class")
 VIEW_FIELDS = {
     "instrument.is_leveraged": "is_leveraged",
     "instrument.is_inverse": "is_inverse",

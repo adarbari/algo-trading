@@ -3,7 +3,7 @@ cross-sectional distribution on a session.
 
 Fields are ``instrument.<column>`` (reference facts, company details) and
 ``rollup.<name>@v<N>.<column>`` (registered rollups, ``features.registry``). Unit and range
-are not declared by rollups yet: they stay null until the feature catalogue declares them.
+come from each feature's declaration (ADR 0023).
 """
 
 from dataclasses import dataclass, field
@@ -20,7 +20,7 @@ from algotrade.core.model.fields import (
 )
 from algotrade.data.reference import instrument_view
 from algotrade.data.rollups import rollup_rows
-from algotrade.features.registry import ROLLUPS
+from algotrade.features.registry import GROUPS, feature
 from algotrade.services.configs import field_catalog
 from algotrade.services.explore.store import NotFoundError, ReadStore, partition_for
 from algotrade.services.views import to_value
@@ -36,41 +36,50 @@ NUMERIC = frozenset({"float", "int"})
 
 @dataclass(frozen=True)
 class FeatureInfo:
-    name: str
-    kind: str  # "instrument" (reference / company fact) or "rollup"
+    name: str  # the selection field (rollup.<group>@v<N>.<column>, instrument.<column>)
+    kind: str  # instrument (reference / company fact), or the feature's kind (window, chain, ...)
     source: str  # the table it is read from
     dtype: str  # str | float | int | bool | date
     description: str
     null_meaning: str
     version: int | None = None
-    rollup: str | None = None  # <name>@v<N>
+    group: str | None = None  # the feature group <name>@v<N>
+    key: str | None = None  # the feature key <group>.<column>@v<N>
     inputs: list[str] = field(default_factory=list)
     unit: str | None = None
-    range: list[float] | None = None
+    range: list[float | None] | None = None  # plausible (min, max); values outside are kept
+    categories: list[str] = field(default_factory=list)
 
 
-def _rollup_info(name: str, dtype: str) -> FeatureInfo:
+def _group_info(name: str, dtype: str) -> FeatureInfo:
     table, _ = field_source(name)
-    rollup = ROLLUPS[table.removeprefix(ROLLUP_TABLE_PREFIX)]
+    found = feature(name)
+    if found is None:  # pragma: no cover - every catalogue field of a group is declared
+        raise NotFoundError(f"no feature metadata for {name!r}")
     return FeatureInfo(
         name=name,
-        kind="rollup",
+        kind=found.kind,
         source=table,
         dtype=dtype,
-        description=rollup.description,
-        null_meaning=NULL_MEANING,
-        version=rollup.version,
-        rollup=rollup.key,
-        inputs=[i.table for i in rollup.inputs],
+        description=found.description,
+        null_meaning=found.null_meaning,
+        version=found.version,
+        group=found.group,
+        key=found.key,
+        inputs=list(found.inputs) or [i.table for i in GROUPS[found.group].inputs],
+        unit=found.unit or None,
+        range=list(found.valid_range) if found.valid_range else None,
+        categories=list(found.categories),
     )
 
 
 def feature_catalogue() -> list[FeatureInfo]:
-    """Every selectable field, instrument facts first, then rollups in registry order."""
+    """Every selectable field, instrument facts first, then feature groups in registry order
+    (metadata from ``features.registry.feature``)."""
     out = []
     for name, dtype in field_catalog().fields.items():
         if name.startswith("rollup."):
-            out.append(_rollup_info(name, dtype))
+            out.append(_group_info(name, dtype))
             continue
         table, _ = field_source(name)
         kind = "company detail (SEC EDGAR)" if table == COMPANY_TABLE else "reference fact"

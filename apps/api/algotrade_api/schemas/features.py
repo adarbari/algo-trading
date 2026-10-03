@@ -8,17 +8,19 @@ from algotrade_api.schemas.health import Schema
 
 
 class Feature(Schema):
-    name: str
-    kind: str
+    name: str = Field(description="the selection field (rollup.<group>@v<N>.<column>, ...)")
+    kind: str = Field(description="instrument, or the feature's kind (window, chain, ...)")
     source: str
     dtype: str
     description: str
     null_meaning: str
     version: int | None
-    rollup: str | None
+    group: str | None
+    key: str | None = Field(description="the feature key <group>.<column>@v<N>")
     inputs: list[str]
     unit: str | None
-    range: list[float] | None
+    range: list[float | None] | None = Field(description="plausible (min, max)")
+    categories: list[str]
 
 
 class Bin(Schema):

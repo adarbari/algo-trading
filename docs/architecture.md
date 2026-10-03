@@ -52,7 +52,7 @@ versus planned. Detail lives in companion docs:
 
 | Area | Built | Planned (phase) |
 |---|---|---|
-| Apps | `apps/ingestion`, `apps/backtest`, `apps/api` v1 (read-only, ADR 0025) | API writes (submit jobs) (4), `apps/web` (5) |
+| Apps | `apps/ingestion`, `apps/backtest`, `apps/api` v1 (read-only, ADR 0024) | API writes (submit jobs) (4), `apps/web` (5) |
 | L1 | `instruments/reference` from the Nasdaq Trader + SPY universe builder (or universe CSVs) with FIGI / CIK and vendor security types (Massive), `instruments/symbol_history`, FIGI-based `instrument_id` + `instruments/id_map` + `SymbolResolver` (ADR 0018), company details (SEC EDGAR), `events/reference_change` (incl. `ticker_changed`, `id_changed`) + `events/index_change`, rollups `option_liquidity@v1`, `price_stats@v1`, `earnings@v1` (the rollup framework, 2b.2), `InstrumentView` reader | `iv_history`, `liquidity_class` rollups (2b.3); `fundamentals@v1` + `instruments/shares` from SEC company facts (2b.4) |
 | L2 | `chains/*` (Cboe), `events/earnings` (Nasdaq), `bars/1d` + `events/split` + `events/dividend` (Massive, unadjusted; adjusted at read time), `rates/treasury` (U.S. Treasury par yield curve), golden data | live Massive run awaits the API key (1); intraday bars + `rollups/daily/*` (6) |
 | L3 | `defaults.toml`, `universe.toml`, `sources.toml`, `nightly.toml`, `rollups.toml`, `overrides/leveraged_etfs.csv`, `presets/selections/*`, `presets/strategies/*` | |
@@ -347,7 +347,7 @@ Extra contracts:
 | `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. `selection/`: three-valued evaluation with a per-rule audit; `schedule.py`, the rebalance sessions and the audit of each change. `backtest/universe.py`: the tradable set per bar (fixed, or from a rebalance schedule; exits on removal). | strategies, config, analytics, core |
 | `services/` | Use cases: `backtests/`, `screening/` (run + `exports`), `jobs/`, `evaluation/`; shared by several: `configs`, `selection`, golden `datasets`, `views` (FeatureView builder). | everything below except `storage.tables.writers` and `storage.tables.readers` (through `data/`) |
 | `apps/ingestion` | `sources/` (`framework/`: protocols, HTTP with retries, pacing, the source registry; `vendors/<vendor>/`; `fixtures/`: synthetic/golden); `tasks/` (`framework/`: `IngestRun` in `run.py` and the task registry; one module per dataset in `reference/`, `market/`, `derived/`, `maintenance/`); nightly workflow (`workflows/nightly/`: ordered, isolated registry tasks, catch-up, screens as jobs, notification); `cli/` (`algotrade-ingest`); `ops/` (schedule). | library |
-| `apps/api` | `algotrade-api` (ADR 0025): `main.py` (app factory, CORS, error handlers), `routes/` (one router per area), `schemas/` (pydantic response models = the OpenAPI contract), `deps.py` (settings, store, user). Routes call one `services.explore` query each. | `services.explore`, `config`, `core` only (import-linter) |
+| `apps/api` | `algotrade-api` (ADR 0024): `main.py` (app factory, CORS, error handlers), `routes/` (one router per area), `schemas/` (pydantic response models = the OpenAPI contract), `deps.py` (settings, store, user). Routes call one `services.explore` query each. | `services.explore`, `config`, `core` only (import-linter) |
 | `apps/backtest` | `algotrade-backtest` (`algotrade` alias): datasets list, backtest (golden dataset or config, via jobs), evaluate, config validate/show. Reads only through `data/`. | library |
 
 ### Directory layout (ADR 0020)
@@ -494,7 +494,7 @@ nightly step, coverage per screen (alert below 98%), selection size per config (
 
 ## 12. API
 
-[ADR 0025](adr/0025-api.md). `apps/api` is the web app's only backend: a read-only FastAPI
+[ADR 0024](adr/0024-api.md). `apps/api` is the web app's only backend: a read-only FastAPI
 (`algotrade-api` → uvicorn on 127.0.0.1:8000, `--reload` for development) over
 `services/explore/`. It reads the store at `ALGOTRADE_DATA_URL` and the configs at
 `ALGOTRADE_CONFIG_DIR` for the single local user `ALGOTRADE_USER`.
@@ -562,7 +562,7 @@ doing it. The ratchet `architecture/known_violations.toml` is empty: any hit fai
 | table schemas: required columns, declared types, validation, how a table's runs combine (`TableSpec.runs`) | `storage/tables/schemas.py` |
 | which runs of a partition a read sees (`snapshot` / `merge`, restating runs; ADR 0007) | `storage/backends/run_selection.py` |
 | Parquet / Arrow I/O (casting to declared types, schema version, row groups) | `storage/backends/` (`arrow.py` shared by every backend) |
-| HTTP: routers, response schemas, CORS, error mapping, the ASGI server (ADR 0025) | `apps/api/algotrade_api/` |
+| HTTP: routers, response schemas, CORS, error mapping, the ASGI server (ADR 0024) | `apps/api/algotrade_api/` |
 | read-only queries pages show (which partition a `?date=` sees, pages, JSON-safe rows) | `services/explore/` |
 
 ### Typed settings and schemas (R6)

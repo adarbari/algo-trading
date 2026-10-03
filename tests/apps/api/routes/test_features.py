@@ -5,13 +5,14 @@ from fastapi.testclient import TestClient
 def test_catalogue_lists_instrument_and_rollup_fields(client: TestClient) -> None:
     catalogue = {f["name"]: f for f in client.get("/features").json()}
     hv20 = catalogue["rollup.price_stats@v1.hv20"]
-    assert (hv20["kind"], hv20["dtype"], hv20["version"], hv20["rollup"]) == (
-        "rollup",
+    assert (hv20["dtype"], hv20["version"], hv20["group"], hv20["key"]) == (
         "float",
         1,
         "price_stats@v1",
+        "price_stats.hv20@v1",
     )
-    assert "bars/1d" in hv20["inputs"]
+    assert hv20["kind"] != "instrument" and hv20["unit"] and hv20["null_meaning"]
+    assert hv20["inputs"]
     assert catalogue["instrument.sector"]["source"] == "instruments/company"
 
 

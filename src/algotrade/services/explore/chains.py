@@ -65,7 +65,7 @@ def option_chain(
     frame = frame.sort_values(["expiry", "strike", "right"], kind="stable")
     status = chain_status(store.reader, session, [iid])
     quote = underlying_quotes(store.reader, session, [iid])
-    ours = rollup_row(store.reader, iv30.ROLLUP.table, iid, session)
+    ours = rollup_row(store.reader, iv30.GROUP.table, iid, session)
     return OptionChain(
         underlying_id=iid,
         session=session,

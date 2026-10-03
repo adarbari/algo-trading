@@ -111,6 +111,12 @@ detect = [{ call = "Feature" }, { string = "docs/data/features.md" }]
 id = "feature-input-loading"
 description = "What a feature group reads, by table name: each input table's point-in-time read for features (from its data owner), slicing per session and lookback, other groups' stored rows with this run's rows winning; features never read storage or a domain reader"
 owner = ["src/algotrade/data/feature_inputs.py"]
+allowed = [
+    # ADR 0024: the API shows stored group rows (a feature's series, a distribution); a
+    # display read, never a feature input
+    "src/algotrade/services/explore/features.py",
+    "src/algotrade/services/explore/instruments.py",
+]
 section = "docs/adr/0023-feature-store.md#step-2-inputs-through-data"
 detect = [
     { call = "session_bars" },
@@ -353,27 +359,27 @@ owner = ["src/algotrade/services/screening/run.py", "src/algotrade/services/jobs
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
 detect = [{ call = "run_screener" }]
 
-# --------------------------------------------------------------------------- api (ADR 0025)
+# --------------------------------------------------------------------------- api (ADR 0024)
 
 [[responsibility]]
 id = "http-api"
 description = "Serve HTTP: FastAPI routers (one per area), response schemas, CORS, error mapping and the ASGI server; routes call one services.explore query each"
 owner = ["apps/api/algotrade_api/*"]
-section = "docs/adr/0025-api.md#http-layer"
+section = "docs/adr/0024-api.md#http-layer"
 detect = [{ import = "fastapi" }, { import = "starlette" }, { import = "uvicorn" }]
 
 [[responsibility]]
 id = "run-item-summary"
 description = "Summarise a run record's per-item statuses: status codes, which are fine, failed items grouped by a normalised reason (the nightly report and the API share it)"
 owner = ["src/algotrade/services/run_items.py"]
-section = "docs/adr/0025-api.md#explore-queries"
+section = "docs/adr/0024-api.md#explore-queries"
 detect = [{ string = "<date>" }, { string = "<url>" }]
 
 [[responsibility]]
 id = "explore-queries"
 description = "Read-only queries apps display (runs, universe, instruments, chains, features, screens, backtests, configs): which session a ?date= sees, pages, JSON-safe rows"
 owner = ["src/algotrade/services/explore/*"]
-section = "docs/adr/0025-api.md#explore-queries"
+section = "docs/adr/0024-api.md#explore-queries"
 detect = [{ call = "paginate" }, { call = "partition_for" }]
 
 # --------------------------------------------------------------------------- stored tables

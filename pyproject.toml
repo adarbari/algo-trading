@@ -246,10 +246,10 @@ source_modules = ["algotrade.core"]
 forbidden_modules = ["pandas"]
 allow_indirect_imports = true
 
-# ---- ADR 0025: the API is a thin, read-only HTTP layer over services.explore.
+# ---- ADR 0024: the API is a thin, read-only HTTP layer over services.explore.
 
 [[tool.importlinter.contracts]]
-name = "API: routes reach the library only through services.explore, config and core (ADR 0025)"
+name = "API: routes reach the library only through services.explore, config and core (ADR 0024)"
 type = "forbidden"
 source_modules = ["algotrade_api"]
 forbidden_modules = [
@@ -270,7 +270,7 @@ forbidden_modules = [
 allow_indirect_imports = true  # services.explore reads the stores on the API's behalf
 
 [[tool.importlinter.contracts]]
-name = "Explore queries are read-only: no writers, no jobs (ADR 0025)"
+name = "Explore queries are read-only: no writers, no jobs (ADR 0024)"
 type = "forbidden"
 source_modules = ["algotrade.services.explore"]
 forbidden_modules = [

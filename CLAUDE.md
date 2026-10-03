@@ -74,7 +74,7 @@ only shrinks (`make dupes-update`).
 | Site settings (`config/site/*.toml` → frozen dataclasses); environment variables + `.env` | `config/site/settings.py` (one loader); `config/env.py` (storage and sources receive values as parameters) |
 | Session / exchange calendar (holidays, early closes, last closed session) | `core/time/calendar.py`; never compute weekdays elsewhere |
 | Which runs of a partition a read sees (`snapshot`: latest; `merge`, all `events/*` + `instruments/id_map`, `instruments/symbol_history`: union, latest per key, from the latest restating run) | `storage/backends/run_selection.py`, per `TableSpec.runs` (ADR 0007) |
-| HTTP (FastAPI routers, response schemas, CORS, error mapping); read-only queries pages show | `apps/api/algotrade_api/` (routes call one query each); `services/explore/` (ADR 0025) |
+| HTTP (FastAPI routers, response schemas, CORS, error mapping); read-only queries pages show | `apps/api/algotrade_api/` (routes call one query each); `services/explore/` (ADR 0024) |
 | Table schemas (columns, declared types, validation); Parquet / Arrow I/O | `storage/tables/schemas.py`; `storage/backends/` (`arrow.py`: casts, `schema_version`, row groups) |
 | Each stored table | exactly one producing module (`[[table]]` in the registry) |
 | Which directory a module belongs in | `architecture/layout.toml` (see Directory layout below) |

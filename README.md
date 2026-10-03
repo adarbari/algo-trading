@@ -100,7 +100,7 @@ interruption, and prints its audit. See [docs/screeners/](docs/screeners/README.
 ## API
 
 A read-only HTTP API over everything above, the web app's only backend
-([ADR 0025](docs/adr/0025-api.md); endpoints in [architecture §12](docs/architecture.md#12-api)):
+([ADR 0024](docs/adr/0024-api.md); endpoints in [architecture §12](docs/architecture.md#12-api)):
 
 ```bash
 .venv/bin/algotrade-api            # http://127.0.0.1:8000 (docs at /docs, schema at /openapi.json)
@@ -132,7 +132,7 @@ route or schema run `.venv/bin/python scripts/export_openapi.py` and commit
 | `algotrade` | `src/algotrade` | the shared library |
 | `algotrade-ingestion` | `apps/ingestion` | `algotrade-ingest` (the only writer of data) |
 | `algotrade-backtest` | `apps/backtest` | `algotrade-backtest` (`algotrade` alias) |
-| `algotrade-api` | `apps/api` | `algotrade-api` (read-only FastAPI, ADR 0025) |
+| `algotrade-api` | `apps/api` | `algotrade-api` (read-only FastAPI, ADR 0024) |
 
 Each app declares only its own dependencies; `uv.lock` pins everything (`make lock-check`).
 

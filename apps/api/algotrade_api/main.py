@@ -29,7 +29,7 @@ def create_app(settings: ApiSettings, store: ReadStore | None = None) -> FastAPI
     app = FastAPI(
         title=TITLE,
         version=__version__,
-        description="Read-only API over the algotrade stores (ADR 0025).",
+        description="Read-only API over the algotrade stores (ADR 0024).",
     )
     app.state.store = store if store is not None else settings.open()
     app.add_middleware(

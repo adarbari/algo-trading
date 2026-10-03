@@ -5,7 +5,7 @@ description: Add or change an endpoint of the read-only API (apps/api): the expl
 
 # Add an API endpoint
 
-Read first: ADR 0025 (`docs/adr/0025-api.md`), `docs/architecture.md` section 12 (API) and an
+Read first: ADR 0024 (`docs/adr/0024-api.md`), `docs/architecture.md` section 12 (API) and an
 existing area end to end (`services/explore/screens.py` → `schemas/screens.py` →
 `routes/screens.py` → `tests/apps/api/routes/test_screens.py`). Admin-only endpoints go under
 the `/admin/` prefix (`routes/admin.py`) so role-gating can attach to it later.

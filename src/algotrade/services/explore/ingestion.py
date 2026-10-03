@@ -20,7 +20,7 @@ from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.data.chains import CHAIN_STATUS, OPTION_QUOTES
 from algotrade.data.reference import UNIVERSE_TABLE, load_universe, snapshot
-from algotrade.features.registry import ROLLUPS
+from algotrade.features.registry import GROUPS
 from algotrade.services.explore.runs import FailureGroup, RunDetail, failure_groups, run_detail
 from algotrade.services.explore.store import NotFoundError, ReadStore, latest_session
 
@@ -40,7 +40,7 @@ DATASETS: tuple[Dataset, ...] = (
     Dataset(UNIVERSE_TABLE, "universe_build", "snapshot"),
     Dataset("bars/1d", "daily_bars", "session"),
     Dataset(OPTION_QUOTES, "option_chains", "chains"),
-    *(Dataset(r.table, "rollups", "session") for r in ROLLUPS.values()),
+    *(Dataset(r.table, "rollups", "session") for r in GROUPS.values()),
 )
 BY_NAME = {d.name: d for d in DATASETS}
 

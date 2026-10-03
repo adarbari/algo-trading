@@ -23,7 +23,7 @@ from algotrade.data.reference import (
     snapshot,
 )
 from algotrade.data.rollups import rollup_row, rollup_rows
-from algotrade.features.registry import ROLLUPS
+from algotrade.features.registry import GROUPS
 from algotrade.services.configs import field_catalog
 from algotrade.services.explore.store import (
     BARS,
@@ -74,7 +74,7 @@ def instrument_detail(store: ReadStore, key: str, on: date | None = None) -> Ins
         company = None
     features: dict[str, Any] = {}
     sessions: dict[str, date] = {}
-    for rollup_key, rollup in ROLLUPS.items():
+    for rollup_key, rollup in GROUPS.items():
         found = rollup_row(store.reader, rollup.table, iid, on)
         if found is None:
             continue
@@ -150,7 +150,7 @@ class FeatureSeries:
 
 def _rollup_fields(names: list[str] | None) -> dict[str, list[tuple[str, str]]]:
     """Rollup table -> [(field name, column)]; every rollup column when ``names`` is None."""
-    wanted = names or [rollup_field(k, c) for k, r in ROLLUPS.items() for c in r.columns]
+    wanted = names or [rollup_field(k, c) for k, r in GROUPS.items() for c in r.columns]
     known = field_catalog().fields
     tables: dict[str, list[tuple[str, str]]] = {}
     for name in wanted:

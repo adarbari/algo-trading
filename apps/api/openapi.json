@@ -682,6 +682,13 @@
       },
       "Feature": {
         "properties": {
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
           "description": {
             "title": "Description",
             "type": "string"
@@ -690,6 +697,17 @@
             "title": "Dtype",
             "type": "string"
           },
+          "group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group"
+          },
           "inputs": {
             "items": {
               "type": "string"
@@ -697,11 +715,25 @@
             "title": "Inputs",
             "type": "array"
           },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the feature key <group>.<column>@v<N>",
+            "title": "Key"
+          },
           "kind": {
+            "description": "instrument, or the feature's kind (window, chain, ...)",
             "title": "Kind",
             "type": "string"
           },
           "name": {
+            "description": "the selection field (rollup.<group>@v<N>.<column>, ...)",
             "title": "Name",
             "type": "string"
           },
@@ -713,7 +745,14 @@
             "anyOf": [
               {
                 "items": {
-                  "type": "number"
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "type": "array"
               },
@@ -721,18 +760,8 @@
                 "type": "null"
               }
             ],
+            "description": "plausible (min, max)",
             "title": "Range"
-          },
-          "rollup": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rollup"
           },
           "source": {
             "title": "Source",
@@ -769,10 +798,12 @@
           "description",
           "null_meaning",
           "version",
-          "rollup",
+          "group",
+          "key",
           "inputs",
           "unit",
-          "range"
+          "range",
+          "categories"
         ],
         "title": "Feature",
         "type": "object"
@@ -2236,7 +2267,7 @@
     }
   },
   "info": {
-    "description": "Read-only API over the algotrade stores (ADR 0025).",
+    "description": "Read-only API over the algotrade stores (ADR 0024).",
     "title": "algotrade API",
     "version": "0.1.0"
   },
