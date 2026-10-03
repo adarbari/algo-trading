@@ -15,7 +15,8 @@ them. Shared signal maths belongs in one helper: `make dupes` must pass.
 1. **Location:** one module in `src/algotrade/strategies/trading/`. Subclass `Strategy`
    (`strategies/trading/base.py`): `warmup_bars`, `on_bar(view) -> target weights | None`,
    `params()`. The view is `core/views/market_view.py` (`MarketView`); weights and errors
-   come from `core/model/` (`types.py`, `errors.py`). Import nothing outside `core`.
+   come from `core/model/` (`types.py`, `errors.py`). Import nothing outside `core` and `quant` (pure pricing
+   maths, ADR 0021).
 2. **Pure and deterministic:** read only from the view you are given. No I/O, no clocks,
    no randomness without a seeded parameter. Needs a new input? Add a feature (`add-feature`).
 3. **Register it** with one line in `strategies/trading/registry.py`.

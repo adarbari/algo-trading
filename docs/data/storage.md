@@ -14,6 +14,7 @@ the grains below. A few others are needed for a trading system.
 | **reference** | an instrument, over a validity interval | symbol, name, exchange, asset class, ETF flag, leverage factor, underlying, multiplier, expiry, sector, listing and delisting dates | slowly; stored as history, never overwritten |
 | **event** | something that happened to an instrument at a point in time | splits, dividends, earnings dates, symbol changes, index adds and removes, futures first-notice and expiry dates | irregular |
 | **bar(interval)** | an instrument × a time bucket | `1d` = ticker-day OHLCV; `1h`, `5m`, `1m` = ticker-day-time | nightly (`1d`), intraday later |
+| **curve** | a curve date × a tenor | `rates/treasury`: the Treasury par yield curve, one partition per curve date (ADR 0021) | daily |
 | **chain snapshot** | a derivative contract × an observation time | end-of-day option chain: bid, ask, last, volume, open interest, IV, Greeks | nightly |
 | **tick** | a single trade or quote | trades, NBBO quotes | reserved; not planned on free data |
 | **universe** | an instrument × a date it belongs to a universe | "in S&P 500 on 2026-10-02", "optionable", "leveraged ETF" | daily snapshot |
@@ -67,7 +68,7 @@ Implemented tables (layers per [layers.md](layers.md)):
 L1 `instruments/reference`, `instruments/symbol_history`, `instruments/id_map` (symbol id →
 FIGI id upgrades, ADR 0018), `instruments/company`; L2 `bars/<interval>` (1d, 1h, 30m, 15m, 5m, 1m; OHLCV
 sanity-checked on write), `chains/underlying_quotes`, `chains/option_quotes`,
-`chains/status`, `events/<type>`; rollups `rollups/daily/*` and `rollups/instrument/*`
+`chains/status`, `events/<type>`, `rates/treasury` (one partition per curve date); rollups `rollups/daily/*` and `rollups/instrument/*`
 (e.g. `rollups/instrument/option_liquidity@v1`); `universe`; `catalog/*`; `results/<name>`.
 ## Column types and schema version
 

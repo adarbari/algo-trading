@@ -8,6 +8,7 @@ the domain rules on top:
 - ``prices``     bars plus split / dividend adjustment
 - ``events``     event tables read by EVENT date (not by the partition they were stored in)
 - ``chains``     option quotes, underlying quotes and chain status
+- ``rates``      the Treasury curve a date sees (risk-free rates for option pricing)
 
 ``StoreReader`` is re-exported here because consumers hold one and hand it to these
 functions; they never import ``algotrade.storage.tables.readers`` (import-linter contract R1).

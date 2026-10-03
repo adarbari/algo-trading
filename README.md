@@ -23,8 +23,9 @@ algotrade-ingest universe --stocks optionable_us_stock_universe.csv \
                           --etfs optionable_us_etf_universe.csv --version 2026-10
 algotrade-ingest universe-build --review-out leveraged_candidates.csv   # universe + reference; CSV = ETFs whose leverage is still UNKNOWN
 algotrade-ingest bars --from 2024-10-01 --to 2026-10-01   # 2-year backfill (needs ALGOTRADE_MASSIVE_API_KEY in .env)
+algotrade-ingest rates --from 2024-01-01 --to 2026-10-02   # Treasury par yield curve (one request per year; no key)
 algotrade-ingest company-details [--force] [--limit N]   # SEC EDGAR company details (needs ALGOTRADE_SEC_CONTACT in .env)
-algotrade-ingest nightly --export-dir out/      # catch up missed sessions; universe -> company details -> earnings -> bars -> chains -> rollups -> screen jobs -> quality -> purge
+algotrade-ingest nightly --export-dir out/      # catch up missed sessions; universe -> company details -> earnings -> bars -> rates -> corporate actions -> chains -> rollups -> screen jobs -> quality -> purge
 algotrade-ingest quality                        # data-quality checks for a session
 algotrade-ingest schedule --time 23:30          # writes a launchd agent; prints install commands
 algotrade-ingest purge-raw [--keep-days 90]     # + unfinished-run scratch older than 14 days (defaults: sources.toml)
@@ -108,8 +109,10 @@ src/algotrade/  shared library
   config/       site/ (L3 settings loader), strategy/ (configs, selections, resolution), env, user
   storage/      data contract: tables/ (schemas, readers/writers), backends/ (local + memory,
                 the only Parquet code), configs/ (config store), runs, locks
-  data/         the domain read API (reference, prices, events, chains)
-  strategies/   trading/ (backtest strategies) and screeners/: pure, see only core
+  quant/        pure numerics (numpy): Black-Scholes price + Greeks, implied vol, realised vol,
+                Treasury rate conventions (ADR 0021)
+  data/         the domain read API (reference, prices, events, chains, rates)
+  strategies/   trading/ (backtest strategies) and screeners/: pure, see only core and quant
   features/     versioned rollup definitions (e.g. option_liquidity@v1)
   analytics/    performance metrics, report formatting
   engines/      backtest/ (loop, risk limits, sizing, simulated broker, portfolio), screening/

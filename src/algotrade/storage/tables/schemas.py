@@ -184,6 +184,19 @@ INSTRUMENT_COMPANY = _fixed(
     *_strings("website", "former_names", "exchanges", "tickers"),
     "fetched_on date",
 )
+# L2: the Treasury par yield curve, one partition per curve date, one row per tenor
+# (``instrument_id`` = ``RATE:UST-<tenor>``). Rates are decimals; ADR 0021 has the conventions.
+TREASURY_RATES = _fixed(
+    "rates/treasury",
+    "curve",
+    ("instrument_id", "ts", "tenor", "tenor_days", "rate_par", "rate_cont"),
+    "instrument_id string!",
+    "ts timestamp_utc!",
+    "tenor string!",
+    "tenor_days int64!",
+    "rate_par float64!",
+    "rate_cont float64!",
+)
 # L2: OHLCV bars; the table name carries the interval, e.g. "bars/1d", "bars/5m".
 BAR_INTERVALS = frozenset({"1d", "1h", "30m", "15m", "5m", "1m"})
 BAR_COLUMNS = ("instrument_id", "ts", "open", "high", "low", "close", "volume")
@@ -205,6 +218,7 @@ KNOWN: dict[str, TableSpec] = {
         SYMBOL_HISTORY,
         ID_MAP,
         INSTRUMENT_COMPANY,
+        TREASURY_RATES,
     )
 }
 # Open-ended tables: the producing rollup, event source, catalogue or screener defines the

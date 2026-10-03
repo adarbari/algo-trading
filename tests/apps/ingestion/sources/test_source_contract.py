@@ -23,9 +23,10 @@ from algotrade_ingestion.sources.vendors.nasdaq.earnings import NasdaqEarningsSo
 from algotrade_ingestion.sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
 from algotrade_ingestion.sources.vendors.sec.edgar import SecSubmissions, SecTickerMap
 from algotrade_ingestion.sources.vendors.ssga.spy_holdings import SpyHoldingsSource
+from algotrade_ingestion.sources.vendors.treasury.par_yields import TreasuryParYields
 from algotrade_ingestion.tasks.framework.run import stamp
 from tests import cboe_fixture as fx
-from tests import earnings_fixture, massive_fixture, sec_fixture, universe_fixture
+from tests import earnings_fixture, massive_fixture, sec_fixture, treasury_fixture, universe_fixture
 from tests.conftest import GOLDEN_DIR
 from tests.ingest_helpers import http_for
 
@@ -89,7 +90,13 @@ def sec_submissions() -> Adapter:
     return SecSubmissions(http_for(lambda url: payload)), FetchRequest("320193")
 
 
+def treasury() -> Adapter:
+    payload = treasury_fixture.payload(2025)
+    return TreasuryParYields(http_for(lambda url: payload)), FetchRequest("2025")
+
+
 ADAPTERS: dict[str, Callable[[], Adapter]] = {
+    "treasury": treasury,
     "massive_tickers": massive_tickers,
     "sec_tickers": sec_tickers,
     "sec_submissions": sec_submissions,

@@ -8,7 +8,7 @@ swapping a vendor never touches storage, features, strategies or the UI.
 
 **Pacing is shared.** Each source is declared once in `sources/framework/registry.py` with its
 `config/site/sources.toml` section and a limiter key (`cboe`, `nasdaqtrader`, `ssga`,
-`nasdaq`, `massive`, `sec`). One limiter per key (`sources/framework/limiter.py`) spaces requests by the
+`nasdaq`, `massive`, `sec`, `treasury`). One limiter per key (`sources/framework/limiter.py`) spaces requests by the
 section's `min_interval_s` across every worker thread **and every process** on the machine
 (a lock file per key under `[http] limits_dir`, default `var/run/limits/`), so a backfill and
 the nightly run never exceed a vendor's limit together. Retries live in `sources/framework/http.py`:
@@ -27,6 +27,7 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 | Daily stock and ETF bars (swing / momentum) | Massive (formerly Polygon) free tier: all US tickers, 2 years history, 5 calls/min; "grouped daily" = whole market in 1 call | Alpaca (free account), IBKR, Yahoo (unofficial, history backfill only) | |
 | End-of-day option chains | **Cboe delayed-quotes feed** (ADR 0014): whole chain + Greeks + IV + OI and the underlying's `iv30` in one request per underlying; about 4.2k requests a night | IBKR for a focused list / cross-check; Schwab Trader API (free with account; Greeks; all expiries in one call; 120 req/min); Tradier (needs a brokerage account for Greeks); Alpaca (free indicative feed, history from 2024-02); Massive options (paid, from ~$29/mo; licensed fallback) | No free source covers end-of-day chains for the whole universe with history. **We build our own IV history from day one.** |
 | Futures (later) | **IBKR** (contracts, history, including recently expired) | Databento (pay-as-you-go history), Massive futures (paid), Yahoo/Stooq continuous (unofficial, unclear rolls) | |
+| Risk-free rates (option pricing) | **U.S. Treasury daily par yield curve** (official, free, no key; one CSV per year) | FRED (`DGS*`, needs a key), SOFR (overnight only) | Implemented, phase 2b.1 (ADR 0021) |
 | Synthetic | `sources/fixtures/` (golden datasets) | — | Lets the whole pipeline run in CI with no account |
 
 ## Cboe delayed-quotes feed (primary for options)
@@ -79,6 +80,23 @@ estimates; past dates add the reported EPS and surprise. `algotrade-ingest earni
 60-day forward window nightly in `events/earnings`, in the partition of the run's session, so
 date changes stay point-in-time; `--start` in the past backfills. About 2 minutes a night
 (requests spaced by `[nasdaq_earnings] min_interval_s`, 0.5 s).
+
+## U.S. Treasury par yield curve (implemented, phase 2b.1)
+
+`https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/<year>/all?type=daily_treasury_yield_curve&field_tdr_date_value=<year>&page&_format=csv`:
+official, free, no key (checked 2026-10-03: 200 OK, ~20 KB per year, the current year up to
+the latest business day; a year with nothing published returns an empty body). One row per
+date the bond market was open, newest first: `Date` (MM/DD/YYYY) then constant-maturity par
+yields in percent: `1 Mo`, `1.5 Month` (from Feb 2025), `2 Mo` (from Oct 2018), `3 Mo`,
+`4 Mo` (from Oct 2022), `6 Mo`, `1 Yr`, `2 Yr`, `3 Yr`, `5 Yr`, `7 Yr`, `10 Yr`, `20 Yr`,
+`30 Yr`. Missing cells (tenors not yet published) are left out, not stored as gaps.
+`sources/vendors/treasury/par_yields.py` turns each cell into a `rates/treasury` row (tenor,
+days, par yield and continuous rate as decimals; conventions in ADR 0021).
+`algotrade-ingest rates --from 2024-01-01 --to <date>` backfills with one request per year;
+nightly re-checks the last `[treasury] lookback_days` (10) and writes only curve dates not
+yet stored. Paced by `[treasury] min_interval_s` (1 s; no published limit). The curve is
+published after the close, and the bond market keeps its own holidays (Columbus Day,
+Veterans Day), so a session can lack its own curve: `data.rates.curve` uses the latest one.
 
 ## SEC EDGAR company details (implemented, phase 1.7)
 

@@ -85,6 +85,7 @@ VENDOR_EXTRAS = {
     "nasdaq_earnings": ("days",),
     "massive": ("corporate_actions_window",),
     "sec_edgar": ("refresh_days",),
+    "treasury": ("lookback_days",),
 }
 
 
@@ -117,6 +118,7 @@ class SourcesSettings:
     earnings_days: int = 60
     actions_window: tuple[int, int] = (-7, 30)
     sec_refresh_days: int = 30
+    treasury_lookback_days: int = 10
     http_max_retry_s: float = 300.0
     http_breaker_failures: int = 10
     limits_dir: str = "var/run/limits"
@@ -159,6 +161,9 @@ class SourcesSettings:
             actions_window=(window[0], window[1]),
             sec_refresh_days=_extra(vendors, "sec_edgar").integer(
                 "refresh_days", d.sec_refresh_days, 0
+            ),
+            treasury_lookback_days=_extra(vendors, "treasury").integer(
+                "lookback_days", d.treasury_lookback_days, 1
             ),
             http_max_retry_s=http.number("max_retry_s", d.http_max_retry_s, 0),
             http_breaker_failures=http.integer("breaker_failures", d.http_breaker_failures, 1),

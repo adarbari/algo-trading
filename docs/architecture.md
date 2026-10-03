@@ -32,7 +32,7 @@ versus planned. Detail lives in companion docs:
         ▼                    ▼                      ▼
  ┌─────────────────────────── storage (the data contract) ────────────────────────────┐
  │ L1 instruments/reference · rollups/instrument/*                                      │
- │ L2 bars/<interval> · chains/* · events/<type> · rollups/daily/*                      │
+ │ L2 bars/<interval> · chains/* · events/<type> · rates/treasury · rollups/daily/*     │
  │ universe · catalog/* · results/* · run and job records · raw/ (90-day retention)     │
  └──────────────────────────────────────────────────────────────────────────────────────┘
    L3 config/site/*.toml (shared, via PR) · L4 config/users/<id>/*.toml (per user)
@@ -44,7 +44,7 @@ versus planned. Detail lives in companion docs:
    features/    versioned rollup definitions          analytics/   metrics, reports
    storage/     tables/ (schemas, readers / writers) · backends/ · configs/ (config store) · runs, locks
    config/      site/ (L3 settings) · strategy/ (configs, selections, resolution + hash) · env, user
-   (quant/      pricing maths, Greeks, IV: phase 2b)
+   quant/       pure numerics: Black-Scholes price + Greeks, IV, realised vol, rate conventions
    core/        model/ (value objects, instruments, options, ids, errors) · time/ · views/ · validation/
 ```
 
@@ -54,11 +54,11 @@ versus planned. Detail lives in companion docs:
 |---|---|---|
 | Apps | `apps/ingestion`, `apps/backtest` | `apps/api` (4), `apps/web` (5) |
 | L1 | `instruments/reference` from the Nasdaq Trader + SPY universe builder (or universe CSVs) with FIGI / CIK and vendor security types (Massive), `instruments/symbol_history`, FIGI-based `instrument_id` + `instruments/id_map` + `SymbolResolver` (ADR 0018), company details (SEC EDGAR), `events/reference_change` (incl. `ticker_changed`, `id_changed`) + `events/index_change`, `rollups/instrument/option_liquidity@v1`, `InstrumentView` reader | `price_stats`, `iv_history`, `earnings`, `liquidity_class`, `fundamentals` rollups (2b) |
-| L2 | `chains/*` (Cboe), `events/earnings` (Nasdaq), `bars/1d` + `events/split` + `events/dividend` (Massive, unadjusted; adjusted at read time), golden data | live Massive run awaits the API key (1); intraday bars + `rollups/daily/*` (6) |
+| L2 | `chains/*` (Cboe), `events/earnings` (Nasdaq), `bars/1d` + `events/split` + `events/dividend` (Massive, unadjusted; adjusted at read time), `rates/treasury` (U.S. Treasury par yield curve), golden data | live Massive run awaits the API key (1); intraday bars + `rollups/daily/*` (6) |
 | L3 | `defaults.toml`, `universe.toml`, `overrides/leveraged_etfs.csv`, `presets/selections/*`, `presets/strategies/*` | `sources.toml` (1, done); `rollups.toml` (2b) |
 | L4 | `strategies/`, `selections/` | `watchlists/`, `preferences.toml` (4–5); DB-backed `ConfigStore` (4) |
 | Jobs | local runner keyed by config hash; `backtest`, `screen`, `nightly` | queue-backed runner (6) |
-| Other | uv workspace, Parquet storage (local + memory backends) | DuckDB query engine and catalog; S3 backend for hosting (6); `quant/` (2b) |
+| Other | uv workspace, Parquet storage (local + memory backends), `quant/` (ADR 0021) | DuckDB query engine and catalog; S3 backend for hosting (6) |
 
 ---
 
@@ -70,7 +70,7 @@ Every piece of data or configuration belongs to exactly one layer
 | Layer | What | Tables / files | Format | Written by |
 |---|---|---|---|---|
 | **L1 Instrument** | What each instrument *is* (facts) and what we *know* about it as of a date (derived) | `instruments/reference`, `rollups/instrument/<name>@vN`, read together as `InstrumentView(as_of)` | Parquet, one full snapshot per date | `apps/ingestion` |
-| **L2 Instrument × time** | Values over time and events | `bars/<interval>` (1m…1d, unadjusted), `chains/*`, `events/<type>`, `rollups/daily/<name>@vN` | Parquet, partitioned by session date | `apps/ingestion` |
+| **L2 Instrument × time** | Values over time and events | `bars/<interval>` (1m…1d, unadjusted), `chains/*`, `events/<type>`, `rates/treasury`, `rollups/daily/<name>@vN` | Parquet, partitioned by session date | `apps/ingestion` |
 | **L3 Site config** | Shared choices: coverage, sources, rollup thresholds, defaults, presets, curated overrides | `config/site/*.toml`, `config/site/overrides/*.csv` | TOML / CSV, changed by PR | the repo |
 | **L4 User config** | One user's selections, strategy configs, watchlists, preferences | `config/users/<id>/*.toml` | TOML now, DB later | the user |
 
@@ -196,7 +196,7 @@ audits. The local runner uses 2 threads.
 handler), `steps.py` (isolation, status rule), `sessions.py` (catch-up), `screens.py` (screen
 jobs), `notify.py` (summary + notification).
 
-- **Steps** (`NIGHTLY`): `universe-build`, `company-details`, `earnings`, `bars`,
+- **Steps** (`NIGHTLY`): `universe-build`, `company-details`, `earnings`, `bars`, `rates`,
   `corporate-actions`, `chains`, `features`, `screens`, `quality`; then `purge-raw` once
   (`FINALLY`). Each is a registry task (or the `screens` job step) run in isolation: an
   exception makes the step FAILED with its error and later steps still run. A step names its
@@ -287,9 +287,10 @@ Extra contracts:
 | `core/` | `model/`: value objects (`Order`, `Fill`), `Instrument`, options, field names, ids, errors. `time/`: exchange calendar, clock helpers. `views/`: `MarketView`, `FeatureView`, `PriceSeries` (what strategies see). `validation/`: OHLCV sanity. | numpy only |
 | `config/` | `site/`: L3 site settings loader. `strategy/`: typed `StrategyConfig` / `Selection` / `Rule`, field catalogue, layered resolution and the config hash. `env.py` (environment), `user.py` (L4 users). Pure. | core |
 | `storage/` | Generic data contract. `tables/`: schemas, a `Protocol` per store, the generic reader (tables, ranges, dates, runs) and writer / result-writer facades. `backends/`: `local` (Parquet) and `memory`. `configs/`: the `ConfigStore` and its file / memory stores (never imports `tables/` or `backends/`). `runs.py`, `locks.py`, `factory.py`. No domain rules. | core, pandas, pyarrow (backends only) |
-| `data/` | The domain read API, the only way consumers read market data: `reference` (one snapshot rule, instruments, terms, `InstrumentView`, universe, `SymbolResolver`), `prices` (bars + split / dividend adjustment), `events` (by event date), `chains` (filter by underlying). | storage, core |
-| `strategies/` → `trading/` | Backtest strategies: `MarketView` in, target weights out, plus their registry. | core |
-| `strategies/` → `screeners/` | Screener contract, shared `Decision` categories, `short_premium_liquidity`. | core |
+| `data/` | The domain read API, the only way consumers read market data: `reference` (one snapshot rule, instruments, terms, `InstrumentView`, universe, `SymbolResolver`), `prices` (bars + split / dividend adjustment), `events` (by event date), `chains` (filter by underlying), `rates` (the Treasury curve a date sees). | storage, quant, core |
+| `quant/` | Pure numerics (ADR 0021): `black_scholes` (European price + Greeks, continuous q and r), `implied_vol` (safeguarded Newton, NaN + status code on failure), `realized_vol` (close-to-close, Parkinson, Garman-Klass, Yang-Zhang; 252), `rates` (par → continuous, tenor days, curve interpolation). | numpy, core |
+| `strategies/` → `trading/` | Backtest strategies: `MarketView` in, target weights out, plus their registry. | core, quant |
+| `strategies/` → `screeners/` | Screener contract, shared `Decision` categories, `short_premium_liquidity`. | core, quant |
 | `features/` | Pure, versioned rollup definitions (`option_liquidity@v1`) with declared output columns, and their registry. | core |
 | `analytics/` | Metrics and report formatting from equity curves + fills. | core |
 | `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. `selection/`: three-valued evaluation with a per-rule audit. | strategies, config, analytics, core |
@@ -319,7 +320,8 @@ src/algotrade/
     tables/       interfaces, readers, writers, schemas, result_writer
     backends/     local, memory, arrow, run_selection        the only Parquet / Arrow code
     configs/      store.py (ConfigStore), files.py            config documents only
-  data/           reference, prices, events, chains, resolver
+  quant/          black_scholes, implied_vol, realized_vol, rates   pure numerics (numpy)
+  data/           reference, prices, events, chains, rates, resolver
   features/  strategies/{trading,screeners}/  engines/{backtest,screening,selection}/  analytics/
   services/       configs, datasets, selection, views         shared by several use cases
     backtests/    run.py
@@ -328,7 +330,8 @@ src/algotrade/
 ```
 
 Library folder rules (import-linter): every `core/*` package is pure; `core.model` and
-`core.time` never import `core.views` / `core.validation`; strategies see only `core`;
+`core.time` never import `core.views` / `core.validation`; strategies see only `core` and
+`quant`; `quant` imports only numpy and `core` (no pandas, pyarrow, storage, data, config);
 `storage.configs` never imports `storage.tables` or `storage.backends` (and the reverse);
 pyarrow only in `storage.backends`; `config.site` never imports `config.strategy`; the
 `backtests` and `screening` use cases are independent. The ingestion app:
@@ -339,13 +342,13 @@ apps/ingestion/algotrade_ingestion/
   ops/            schedule.py (launchd plist for the nightly)
   sources/
     framework/    base.py, http.py, limiter.py, registry.py      non-vendor machinery
-    vendors/      cboe/, massive/, nasdaq/, sec/, ssga/          one folder per vendor
+    vendors/      cboe/, massive/, nasdaq/, sec/, ssga/, treasury/   one folder per vendor
     fixtures/     the golden synthetic source
   tasks/
     framework/    run.py (IngestRun, TaskContext), registry.py   machinery
     reference/    universe_build, universe_import, classify, instrument_ids, reference_diff,
                   symbol_history, company_details
-    market/       bars, corporate_actions, earnings, option_chains
+    market/       bars, corporate_actions, earnings, option_chains, rates
     derived/      features
     maintenance/  quality, purge, migrate_ids, golden
   workflows/
@@ -449,6 +452,8 @@ doing it. The ratchet `architecture/known_violations.toml` is empty: any hit fai
 |---|---|
 | snapshot selection ("latest on or before D", else earliest + `pre_snapshot`) | `data/reference.py` |
 | market-data reads for consumers | `data/` |
+| which Treasury curve a date sees; rates for a time to expiry | `data/rates.py` |
+| option prices and Greeks; implied vol; realised vol; rate conventions (ADR 0021) | `quant/black_scholes.py`; `quant/implied_vol.py`; `quant/realized_vol.py`; `quant/rates.py` |
 | run ids, run records, COMPLETE / PARTIAL | `storage/runs.py` (`start_run`, `RunRecord.finish` for screens and backtests), `services/jobs/`, ingestion `tasks/framework/run.py` (`IngestRun`) |
 | raw persistence, row stamping, id resolution in ingestion | `tasks/framework/run.py` (`IngestRun`) |
 | which ingestion steps run, with which defaults | `tasks/framework/registry.py`; nightly order in `workflows/nightly/nightly.py` |
@@ -503,7 +508,7 @@ An ingestion **task** produces stored tables and one run record; a **job** is so
   them into flags) and `run(ctx, params)`. Defaults from settings are applied here, so
   `algotrade-ingest <task>`, `algotrade-ingest run <task>` and nightly cannot drift.
 - one module per dataset, grouped by domain (`market/`: `bars.py`, `corporate_actions.py`,
-  `earnings.py`, `option_chains.py`; `reference/`: `company_details.py`, `universe_build.py`,
+  `earnings.py`, `option_chains.py`, `rates.py`; `reference/`: `company_details.py`, `universe_build.py`,
   `universe_import.py`; `derived/`: `features.py`; `maintenance/`: `quality.py`, `purge.py`,
   `migrate_ids.py`, `golden.py`): only what to fetch, how to combine frames, task stats.
 

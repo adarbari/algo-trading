@@ -3,6 +3,7 @@
 - Equities and ETFs: ``EQ:<composite FIGI>`` (``EQ:BBG000B9XRY4``) when the FIGI is known,
   else the symbol id ``EQ:<SYMBOL>``. A FIGI id never changes, whatever the ticker does.
 - Options: ``OPT:<OCC symbol>`` (``OPT:SPY261231C00586000``).
+- Reference rates: ``RATE:<curve>-<tenor>`` (``RATE:UST-3M``, a Treasury par yield tenor).
 
 Every stored row is keyed by these ids, never by a raw ticker. Code that has a vendor ticker
 resolves it through ``data.resolver.SymbolResolver``; only ``equity_id`` builds ``EQ:`` ids.
@@ -19,6 +20,7 @@ class AssetClass(StrEnum):
     INDEX = "IDX"
     OPTION = "OPT"
     FUTURE = "FUT"
+    RATE = "RATE"  # a reference interest rate (one tenor of a yield curve), not tradable
 
 
 def instrument_id(asset_class: AssetClass, symbol: str) -> str:

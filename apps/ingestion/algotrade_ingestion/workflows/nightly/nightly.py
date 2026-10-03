@@ -4,7 +4,7 @@ For each session (``sessions.plan_sessions``; oldest first) the steps in ``NIGHT
 order through ``tasks/framework/registry.py``, each isolated (``steps.run_isolated``): a step that
 raises is FAILED and later steps still run, unless they name it in ``blocked_by``. Sources
 that only serve the current snapshot (universe files, SEC, Cboe chains) run only for the
-latest closed session; bars, corporate actions and earnings catch up. ``quality`` ends every
+latest closed session; bars, rates, corporate actions and earnings catch up. ``quality`` ends every
 session and the ``purge-raw`` task ends the run, whatever failed before. Each session gets
 a ``nightly`` run record (COMPLETE / PARTIAL / FAILED, per ``steps.overall``), which is how
 the next run knows where to resume.
@@ -56,6 +56,7 @@ NIGHTLY: tuple[Step, ...] = (
     Step("company-details", latest_only=True),
     Step("earnings"),
     Step("bars"),
+    Step("rates"),
     Step("corporate-actions"),
     Step("chains", requires=universe_exists, latest_only=True),
     Step("features", blocked_by=("chains",), requires=universe_exists, latest_only=True),

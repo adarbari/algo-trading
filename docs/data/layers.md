@@ -18,7 +18,8 @@ configuration (L3/L4) is in [../configuration.md](../configuration.md).
  │                   → read together as InstrumentView(as_of=D)                           │
  ├───────────────────────────────────────────────────────────────────────────────────────┤
  │ L2  INSTRUMENT ×  bars/<interval>       OHLCV at 1m · 5m · 1h · 1d                      │
- │     TIME          chains/*              option-chain snapshots (instrument × contract)  │
+ │     TIME          rates/treasury        Treasury par yield curve (risk-free rates)      │
+ │                   chains/*              option-chain snapshots (instrument × contract)  │
  │                   events/<type>         earnings, splits, dividends, renames, index Δ   │
  │                   rollups/daily/<name>@vN   intraday → one row per instrument per day   │
  └───────────────────────────────────────────────────────────────────────────────────────┘
@@ -67,6 +68,7 @@ Two physical parts, always read together:
 | `bars/<interval>` | instrument × bar start | `1d` (phase 1), `1h`/`5m`/`1m` later | OHLCV + VWAP, **unadjusted**; splits and dividends applied at read time from `events` |
 | `chains/option_quotes`, `chains/underlying_quotes`, `chains/status` | contract (or underlying) × snapshot | end of day | built (Cboe) |
 | `events/<type>` | instrument × event time | irregular | `earnings`, `split`, `dividend`, `reference_change`, `index_change` |
+| `rates/treasury` | curve date × tenor (`RATE:UST-<tenor>`) | daily (bond-market days) | U.S. Treasury par yield curve: `tenor`, `tenor_days`, `rate_par`, `rate_cont` (decimals; ADR 0021). One partition per curve date; read through `data.rates.curve(reader, on)` (latest on or before, earliest flagged) |
 | `rollups/daily/<name>@vN` | instrument × session | daily | rolls intraday bars up to a day: session OHLCV, VWAP, intraday range, opening gap |
 
 **`bars/<interval>` columns.** Key (`instrument_id`, `ts`) within an interval table.
