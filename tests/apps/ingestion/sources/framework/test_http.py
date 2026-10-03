@@ -1,6 +1,7 @@
 import gzip
 import io
 import urllib.error
+from dataclasses import replace
 from datetime import date
 from email.message import Message
 from unittest import mock
@@ -20,6 +21,7 @@ from algotrade_ingestion.sources.framework.http import (
 from algotrade_ingestion.sources.vendors.cboe.option_chains import (
     URL,
     CboeOptionsSource,
+    missing_chain,
     parse_chain,
 )
 from tests import cboe_fixture as fx
@@ -164,3 +166,27 @@ def test_cool_down_holds_the_shared_limiter() -> None:
     source.cool_down(30.0)
     assert limiter.held == 30.0
     Http(lambda url: b"").cool_down(5.0)  # no limiter: nothing to hold
+
+
+S3_MISSING = b'<?xml version="1.0" encoding="UTF-8"?>\n<Error><Code>AccessDenied</Code></Error>'
+
+
+def test_vendor_not_found_errors_return_none_and_do_not_trip_the_breaker() -> None:
+    policy = replace(FAST, not_found=missing_chain)
+    breaker = CircuitBreaker("cboe", 2)
+    missing = [HttpError(403, body=S3_MISSING)] * 5
+    http = Http(scripted(*missing, b"chain"), policy, breaker=breaker, sleep=lambda s: None)
+    assert [http.get("u") for _ in range(5)] == [None] * 5  # five missing chains in a row
+    assert not breaker.open
+    assert http.get("u") == b"chain"
+
+
+def test_a_block_is_still_an_error_even_with_a_not_found_rule() -> None:
+    policy = replace(FAST, tries=1, not_found=missing_chain)
+    breaker = CircuitBreaker("cboe", 2)
+    block = HttpError(403, body=b"<html>Attention Required! | Cloudflare</html>")
+    http = Http(scripted(block, block, b"never"), policy, breaker=breaker, sleep=lambda s: None)
+    for _ in range(2):
+        with pytest.raises(RuntimeError):
+            http.get("u")
+    assert breaker.open

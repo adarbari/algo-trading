@@ -23,9 +23,13 @@ BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) algotrade-
 
 
 class HttpError(Exception):
-    def __init__(self, status: int, retry_after: float | None = None) -> None:
+    """``body`` keeps the start of the error response (decompressed) so a source can tell a
+    missing object from a block (see ``RetryPolicy.not_found``)."""
+
+    def __init__(self, status: int, retry_after: float | None = None, body: bytes = b"") -> None:
         self.status = status
         self.retry_after = retry_after
+        self.body = body
         super().__init__(f"HTTP {status}")
 
 
@@ -53,9 +57,19 @@ def urllib_transport(
         except urllib.error.HTTPError as exc:
             header = exc.headers.get("Retry-After") if exc.headers else None
             retry = float(header) if header and header.isdigit() else None
-            raise HttpError(exc.code, retry) from exc
+            raise HttpError(exc.code, retry, _error_body(exc)) from exc
 
     return get
+
+
+def _error_body(exc: urllib.error.HTTPError) -> bytes:
+    try:
+        body = exc.read(4096)
+        if (exc.headers.get("Content-Encoding") or "").lower() == "gzip":
+            body = gzip.decompress(body)
+        return body[:1024]
+    except (OSError, EOFError):
+        return b""
 
 
 @dataclass(frozen=True)
@@ -67,6 +81,15 @@ class RetryPolicy:
     # error, never as "this ticker has no options" (fail closed).
     give_up_statuses: frozenset[int] = frozenset({404})
     max_total_s: float | None = None  # cap on time spent retrying one request
+    # A vendor-specific test for error responses that mean "no such object" (e.g. Cboe's CDN
+    # answers a missing chain with S3's 403 AccessDenied). Such a response returns None and
+    # does not count towards the circuit breaker. Anything it does not match stays an error.
+    not_found: Callable[[HttpError], bool] | None = None
+
+    def gives_up(self, exc: HttpError) -> bool:
+        return exc.status in self.give_up_statuses or (
+            self.not_found is not None and self.not_found(exc)
+        )
 
 
 class CircuitOpenError(RuntimeError):
@@ -135,9 +158,10 @@ def get_with_retry(
         try:
             body = transport(url)
         except HttpError as exc:
+            missing = policy.gives_up(exc)
             if breaker is not None:
-                breaker.record(None if exc.status in policy.give_up_statuses else exc.status)
-            if exc.status in policy.give_up_statuses:
+                breaker.record(None if missing else exc.status)
+            if missing:
                 return None
             last_error = exc
             delay = (

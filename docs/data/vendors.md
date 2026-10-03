@@ -48,8 +48,13 @@ Caveats, handled in `apps/ingestion/algotrade_ingestion/sources/vendors/cboe/opt
 - Delayed quotes. The snapshot is taken after the close, so it is valid for end-of-day use.
 - `open_interest` is OCC's figure as of the previous session.
 - Greeks and IV are Cboe's model values; ours (`quant/`) will cross-check them.
-- Be polite: 4 workers by default, Retry-After honoured on 429. **403 is an error, never
-  "no chain"**, and a run where more than 25% of optionable names return no chain is PARTIAL.
+- Be polite: paced at `[cboe] min_interval_s` (1.5 s, 2 workers), Retry-After honoured on 429.
+  The CDN serves chains from S3, so a symbol with **no published chain answers 403 with S3's
+  `AccessDenied` XML**: that one response is read as NO_CHAIN and does not count towards the
+  circuit breaker (`missing_chain` in the Cboe adapter). Any other 403 (e.g. a Cloudflare
+  block, which is HTML) stays an error, and a run where more than 25% of optionable names
+  return no chain is PARTIAL. (Found 2026-10-03: a run of missing symbols had tripped the
+  breaker and skipped 815 names, ~84% of which did have chains.)
 - Raw responses are about 1–3 GB/day across the universe, so raw retention is limited
   (ADR 0014, `algotrade-ingest purge-raw --keep-days 90`).
 
