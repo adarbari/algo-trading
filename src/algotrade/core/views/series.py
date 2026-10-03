@@ -64,3 +64,25 @@ def align(series: Mapping[str, PriceSeries]) -> dict[str, PriceSeries]:
             **{f: s.field(f)[mask].copy() for f in FIELDS},
         )
     return out
+
+
+def panel(series: Mapping[str, PriceSeries]) -> dict[str, PriceSeries]:
+    """Put every series on the UNION of their timestamps, NaN where an instrument has no bar.
+
+    For a changing tradable set (``rebalance_selection``), where ``align`` would drop every
+    session some instrument ever selected lacks. NaN is never filled: the engine treats an
+    instrument as tradable on a bar only when the bar exists (``engines.backtest.universe``).
+    """
+    if not series:
+        return {}
+    timeline = np.unique(np.concatenate([s.timestamps for s in series.values()]))
+    out: dict[str, PriceSeries] = {}
+    for instrument, s in series.items():
+        rows = np.searchsorted(timeline, s.timestamps)
+        fields = {}
+        for f in FIELDS:
+            values = np.full(len(timeline), np.nan)
+            values[rows] = s.field(f)
+            fields[f] = values
+        out[instrument] = PriceSeries(instrument, timeline.copy(), **fields)
+    return out

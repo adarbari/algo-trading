@@ -275,6 +275,21 @@ detect = [
 ]
 
 [[responsibility]]
+id = "selection-rebalancing"
+description = "Re-evaluate a backtest's selection over time (rebalance_selection): which sessions + the audit of each change (engines/selection/schedule.py), point-in-time evaluation through services.selection.select and one price load for the union (services/backtests/rebalance.py), the tradable set per bar and exits on removal (engines/backtest/universe.py, used by the engine loop)"
+owner = [
+    "src/algotrade/engines/selection/schedule.py",
+    "src/algotrade/services/backtests/rebalance.py",
+    "src/algotrade/engines/backtest/universe.py",
+    "src/algotrade/engines/backtest/engine.py",
+]
+section = "docs/configuration.md#rebalancing-selections"
+detect = [
+    { call = "rebalance_sessions" },
+    { call = "DynamicUniverse" },
+]
+
+[[responsibility]]
 id = "screen-execution"
 description = "Run a configured screen (select, screen, audit, write results); nightly submits `screen` jobs (workflows/nightly/screens.py)"
 owner = ["src/algotrade/services/screening/run.py", "src/algotrade/services/jobs/handlers.py"]

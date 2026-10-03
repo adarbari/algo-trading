@@ -76,6 +76,7 @@ class SelectionResult:
     truncated: int
     audit: tuple[RuleAudit, ...]
     missing_tables: tuple[str, ...] = ()  # rollups with no data for the session (UNKNOWN)
+    pre_snapshot: bool = False  # the reference snapshot is after the session (survivorship)
 
     @property
     def empty(self) -> bool:

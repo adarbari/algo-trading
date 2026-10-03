@@ -89,6 +89,33 @@ def test_hash_changes_with_anything_that_affects_results() -> None:
     assert len({base.hash, tweaked.hash, settings.hash}) == 3
 
 
+def test_rebalance_settings_are_in_the_hash_and_absent_by_default() -> None:
+    s = store()
+    base = resolve("scr", UserContext(SITE_USER), s.load)
+    assert "rebalance_selection" not in base.settings["backtest"]  # existing hashes unchanged
+    assert base.backtest.rebalance_selection == "none"
+    monthly = resolve(
+        "scr",
+        UserContext(SITE_USER),
+        s.load,
+        overrides={"backtest": {"rebalance_selection": "monthly"}},
+    )
+    lagged = resolve(
+        "scr",
+        UserContext(SITE_USER),
+        s.load,
+        overrides={"backtest": {"rebalance_selection": "monthly", "selection_lag_sessions": 2}},
+    )
+    assert len({base.hash, monthly.hash, lagged.hash}) == 3
+    with pytest.raises(ConfigurationError, match="rebalance_selection"):
+        resolve(
+            "scr",
+            UserContext(SITE_USER),
+            s.load,
+            overrides={"backtest": {"rebalance_selection": "yearly"}},
+        )
+
+
 def test_site_user_never_reads_user_documents() -> None:
     scopes: list[str] = []
     base = store()
