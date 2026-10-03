@@ -1,0 +1,24 @@
+/* Global base styles: font, colours and box sizing from tokens. Imported only by UiProvider. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--color-bg-canvas);
+  color: var(--color-fg-default);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-feature-settings: var(--font-features);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--line-height-md);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}

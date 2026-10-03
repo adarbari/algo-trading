@@ -509,5 +509,59 @@ note = "one results/<name> per screener (services/screening/run.py) or backtest 
 name = "catalog/golden_datasets"
 owner = "apps/ingestion/algotrade_ingestion/tasks/maintenance/golden.py"
 
+# --------------------------------------------------------------------------- web app (apps/web)
+# ADR 0025. TypeScript has no AST detect rules here: each web responsibility names the lint
+# rule or check that keeps it inside its owner (`enforced_by`); tests/architecture/
+# test_ownership.py checks the owners exist and the cited sections resolve.
+
+[[web_responsibility]]
+id = "web-styling"
+description = "Styling decisions and raw HTML/SVG elements: CSS (Modules), class names, inline styles, colours, sizes"
+owner = ["apps/web/design-system/**"]
+section = "docs/adr/0025-frontend-architecture.md#rule-3-component-only-ui"
+enforced_by = ["eslint no-restricted-syntax + no-restricted-imports (apps/web/lint-rules/restrictions.js)", "stylelint (apps/web/stylelint.config.js)", "tests/architecture/test_layout_web.py (stylesheets only in the design system)"]
+
+[[web_responsibility]]
+id = "web-tokens"
+description = "Design tokens (colour, type, space, shape, motion, density, z-index) and the generated tokens.css"
+owner = ["apps/web/design-system/tokens/*"]
+section = "docs/adr/0025-frontend-architecture.md#rule-3-component-only-ui"
+enforced_by = ["stylelint declaration-strict-value / color-no-hex / unit-disallowed-list", "npm run generated:check (tokens.css is fresh)"]
+
+[[web_responsibility]]
+id = "web-http"
+description = "Talking HTTP to the API: the typed client, fetch, errors, query keys, the generated schema"
+owner = ["apps/web/src/shared/api/**"]
+section = "docs/adr/0025-frontend-architecture.md#rule-4-only-sharedapi-talks-http"
+enforced_by = ["eslint no-restricted-globals / no-restricted-syntax / no-restricted-imports (apps/web/lint-rules/restrictions.js)", "npm run generated:check (schema matches the OpenAPI document)"]
+
+[[web_responsibility]]
+id = "web-data-access"
+description = "Server state: TanStack Query hooks over shared/api"
+owner = ["apps/web/src/entities/**", "apps/web/src/features/**", "apps/web/src/app/providers/*"]
+section = "docs/adr/0025-frontend-architecture.md#rule-4-only-sharedapi-talks-http"
+enforced_by = ["eslint no-restricted-imports: @tanstack/react-query banned in pages, widgets and shared/lib|config"]
+
+[[web_responsibility]]
+id = "web-routing"
+description = "URLs, route tree, route params, redirects, layout routes"
+owner = ["apps/web/src/app/**"]
+section = "docs/adr/0025-frontend-architecture.md#workspaces-and-routes"
+enforced_by = ["eslint no-restricted-imports: @tanstack/react-router only in src/app"]
+
+[[web_responsibility]]
+id = "web-workspace-access"
+description = "Who may enter a workspace (TRADER, ADMIN): the role-gating seam"
+owner = ["apps/web/src/app/workspaces/guard.ts"]
+section = "docs/adr/0025-frontend-architecture.md#workspaces-and-routes"
+enforced_by = ["review: every workspace layout route calls workspaceGuard in beforeLoad"]
+
+[[web_responsibility]]
+id = "web-env"
+description = "Build-time configuration (Vite env, VITE_*)"
+owner = ["apps/web/src/shared/config/*"]
+section = "docs/adr/0025-frontend-architecture.md#layers-and-folders"
+enforced_by = ["review (import.meta.env is read only in shared/config)"]
+
 # Every table may additionally be rewritten by the one-off id migration (ADR 0018):
 # apps/ingestion/algotrade_ingestion/tasks/maintenance/migrate_ids.py (an admin command, not a producer).

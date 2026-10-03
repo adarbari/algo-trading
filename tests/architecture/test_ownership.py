@@ -27,7 +27,10 @@ from tests.conftest import REPO_ROOT
 REGISTRY = tomllib.loads((REPO_ROOT / "architecture" / "ownership.toml").read_text())
 KNOWN = tomllib.loads((REPO_ROOT / "architecture" / "known_violations.toml").read_text())
 CODE_FILES = sorted(
-    p for top in ("src", "apps") for p in (REPO_ROOT / top).rglob("*.py") if ".venv" not in p.parts
+    p
+    for top in ("src", "apps")
+    for p in (REPO_ROOT / top).rglob("*.py")
+    if not {".venv", "node_modules"} & set(p.parts)
 )
 SITE_SETTINGS = sorted((REPO_ROOT / "config" / "site").glob("*.toml"))
 # Typed views of L3 settings (the one loader): every field must be used by code, not only parsed.
@@ -202,3 +205,21 @@ def test_ownership_ratchet_passes() -> None:
         check=False,
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+# ----------------------------------------------------------------------------- web app
+
+
+def test_web_responsibilities_name_existing_owners_and_sections() -> None:
+    """ADR 0025: web owners are enforced by lint, not AST rules; the registry stays honest."""
+    entries = REGISTRY.get("web_responsibility", [])
+    assert entries, "the web app's responsibilities are registered ([[web_responsibility]])"
+    ids = [e["id"] for e in entries] + [r["id"] for r in REGISTRY["responsibility"]]
+    assert len(ids) == len(set(ids)), "duplicate responsibility ids"
+    for entry in entries:
+        assert entry.get("enforced_by"), f"{entry['id']}: name the rule or check enforcing it"
+        for pattern in entry["owner"]:
+            base = pattern.split("*")[0].rstrip("/")
+            assert (REPO_ROOT / base).exists(), f"{entry['id']}: owner {pattern} does not exist"
+        doc, _, anchor = entry["section"].partition("#")
+        assert anchor in _slugs((REPO_ROOT / doc).read_text()), f"{entry['id']}: {entry['section']}"

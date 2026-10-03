@@ -7,7 +7,8 @@ without writing an ADR. Read in this order:
 2. `docs/roadmap.md`: which phase we are in and the open decisions
 3. The spec for your area: `docs/data/layers.md`, `docs/configuration.md`,
    `docs/data/storage.md`, `docs/data/instruments.md`,
-   `docs/data/vendors.md`, `docs/ui/design-system.md`, `docs/screeners/`
+   `docs/data/vendors.md`, `docs/ui/architecture.md`, `docs/ui/design-system.md`,
+   `docs/screeners/`
 4. `docs/adr/README.md`: why things are the way they are
 
 ## Settled decisions (summary)
@@ -40,7 +41,8 @@ without writing an ADR. Read in this order:
   config hash. Missing data never passes a selection. (ADR 0015)
 - **Design-system-first UI**: screens use only `@algotrade/ui`. Missing component? Add it
   to the design system generically first. Dense but calm; no gradients, emoji icons or
-  card-wrapped numbers. (ADR 0011)
+  card-wrapped numbers. (ADR 0011) The web app is layered and component-only: see Web UI
+  below. (ADR 0025)
 - **Vendors**: free first, each behind the source interface. Option chains come from the Cboe
   delayed feed (full universe, nightly); IBKR covers futures and cross-checks. We compute
   Greeks ourselves. (ADRs 0012, 0014)
@@ -114,6 +116,11 @@ source (`tests/unit/<path>` = `src/algotrade/<path>`, `tests/apps/ingestion/<pat
 | Site setting | `config/site/<group>.toml` + typed in `src/algotrade/config/site/settings.py` |
 | Tests | the mirrored `tests/unit/...` or `tests/apps/<app>/...` folder; builders `tests/helpers/`; cross-source checks `tests/reconciliation/` (recorded data `tests/fixtures/reconciliation/`) |
 | Docs | the `docs/` area folder (`data/`, `screeners/`, `ui/`); a decision: `docs/adr/` |
+| Web: token, styling, HTML, reusable visual component | `apps/web/design-system/{tokens,primitives/<Name>,components/<Name>}/` (`@algotrade/ui`) |
+| Web: route, workspace (TRADER / ADMIN), provider | `apps/web/src/app/{routes/<workspace>,workspaces,providers}/` |
+| Web: what one route shows / a page section | `apps/web/src/pages/<page>/` / `apps/web/src/widgets/<widget>/` |
+| Web: user action or flow with state / domain model + read hooks | `apps/web/src/features/<feature>/` / `apps/web/src/entities/<entity>/` |
+| Web: HTTP client, query keys / pure helper / env | `apps/web/src/shared/{api,lib/<kind>,config}/` |
 
 **If nothing fits, add a new folder for the new kind**: declare it in `architecture/layout.toml`
 with a purpose (+ `contracts` if an import-linter rule guards it), give it an `__init__.py`
@@ -126,6 +133,23 @@ docstring, and mirror it in tests. Never park code in a neighbouring folder
 Ingestion app: `cli/`, `ops/`,
 `sources/{framework,vendors/<vendor>,fixtures}`, `tasks/{framework,<domain>}`,
 `workflows/nightly/`.
+
+## Web UI (ADR 0025; `docs/ui/architecture.md`; enforced by ESLint, Stylelint, `make web-check`, `test_layout_web.py`)
+
+`apps/web` (Vite, React 19, TypeScript strict, TanStack Router + Query, Storybook, Vitest,
+Playwright; npm workspaces, lockfile `apps/web/package-lock.json`). **Every part of the UI is a
+component**: styling and raw HTML exist only in `apps/web/design-system/` (`@algotrade/ui`:
+tokens, primitives, components, each with stories for every state, a unit test with axe and
+light / dark screenshots). App code in `src/` is layered `app -> pages -> widgets -> features ->
+entities -> shared -> @algotrade/ui`: it imports only downward, other slices only through their
+`index.ts`, never a sibling slice; it renders no HTML elements and passes no `className` /
+`style`; no CSS files, colours or px outside the design system; only `src/shared/api` talks HTTP
+(client generated from the API's OpenAPI document), data through Query hooks in entities /
+features; only `src/app` routes. Two workspaces in a horizontal top bar: TRADER (Ideas,
+Screeners, Explore, Backtests) and ADMIN (Ingestion, Screener runs, Users & configs); role
+gating goes only in `src/app/workspaces/guard.ts`. Order (ADR 0011): tokens (DRAFT now) ->
+approved mockups -> components -> screens. Every folder is a `[[web_dir]]` in
+`architecture/layout.toml`. Lint messages name the rule and the skill with the fix.
 
 ## Code rules (enforced by CI; follow them up front)
 
@@ -161,12 +185,14 @@ Ingestion app: `cli/`, `ops/`,
 | New feature | `.claude/skills/add-feature` |
 | New trading strategy | `.claude/skills/add-strategy` |
 | New screener | `.claude/skills/add-screener` |
-| New UI widget or screen | `.claude/skills/add-ui-component` |
+| New UI component (design system) or visual element | `.claude/skills/add-ui-component` |
+| New web page, route or data hook | `.claude/skills/add-web-page` |
 | New responsibility, or moving one between modules | `.claude/skills/add-responsibility` |
 | New API endpoint | `.claude/skills/add-api-endpoint` |
 | A decision that changes architecture | `.claude/skills/write-adr` |
 
 Commands (need `uv`): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make layout`, `make evaluate`, `make baseline`, `make features-doc`.
+Web (need Node 24): `make web-install`, `make web-check` (part of `make check`), `make web-visual` (screenshots, Docker); in `apps/web`: `npm run dev|storybook|check|visual:update`.
 Ingestion: `algotrade-ingest universe|universe-build|company-details|shares|earnings|bars|rates|corporate-actions|chains|rollups|screen|nightly|report|quality|schedule|purge-raw|migrate-ids|golden`, or `algotrade-ingest run <task>` for any registry task (see `README.md`).
 API: `algotrade-api [--reload]` (read-only, 127.0.0.1:8000); after a route / schema change run
 `scripts/export_openapi.py` and commit `apps/api/openapi.json`.

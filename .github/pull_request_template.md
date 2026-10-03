@@ -19,6 +19,14 @@
 - [ ] No directory over 10 modules; folders in the `make layout` warning band considered (split planned or not needed)
 - [ ] Tests mirror the source folders; no grab-bag module names (`utils`, `helpers`, `common`, ...)
 
+## Web UI (ADR 0025; skip if `apps/web` is untouched)
+- [ ] Placed per `docs/ui/architecture.md` ("Where does it go?"); new folders declared as `[[web_dir]]` in `architecture/layout.toml`
+- [ ] Layers import only downward; other slices only via `index.ts`; no sibling-slice imports
+- [ ] No HTML elements, `className` / `style`, CSS, colours or px outside `design-system/`; only `src/shared/api` talks HTTP
+- [ ] New / changed design-system component: stories (Default, Loading, Empty, Error, Dense), test with axe, screenshots updated (`npm run visual:update`) and reviewed; `COMPONENTS.md` regenerated
+- [ ] API changes: `npm run api:generate` run and the generated schema committed
+- [ ] `make web-check` passes
+
 ## Checklist
 - [ ] `make check` passes locally
 - [ ] Fits the target architecture (`docs/architecture.md`) and existing ADRs, or a new ADR is included
@@ -26,7 +34,6 @@
 - [ ] No layer boundary changes (or `pyproject.toml` contracts + `docs/architecture.md` updated with an ADR)
 - [ ] Data: keyed by `instrument_id`, point-in-time columns present, no paths built outside `storage/backends/`
 - [ ] Backtests and screeners read only from stores (no vendor calls)
-- [ ] UI: only `@algotrade/ui` components used; new components added to the design system with story + test + snapshot
 - [ ] If `benchmarks/baseline.json` changed: the scorecard diff is explained below and is intended
 - [ ] New strategy? Registered, passes property tests, beats `buy_and_hold` somewhere meaningful (not only on `random_walk`)
 

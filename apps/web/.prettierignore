@@ -1,0 +1,10 @@
+node_modules
+dist
+storybook-static
+playwright-report
+test-results
+package-lock.json
+src/shared/api/generated
+design-system/tokens/tokens.css
+design-system/COMPONENTS.md
+*.md
