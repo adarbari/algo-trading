@@ -35,6 +35,8 @@ def test_the_committed_site_files_load() -> None:
     sources, nightly, universe = load_sources(store), load_nightly(store), load_universe(store)
     assert sources.vendor("massive").min_interval_s == 12.5 and sources.actions_window == (-7, 30)
     assert sources.vendor("cboe").enabled and sources.limits_dir == "var/run/limits"
+    assert sources.vendor("sec_edgar").raw_retention_days == 7
+    assert sources.vendor("cboe").raw_retention_days is None  # the global window
     assert nightly.max_catch_up == 5 and universe.source == "nasdaq_trader"
     defaults = site("defaults")
     assert BacktestSettings.parse(defaults["backtest"], "b") == BacktestSettings()
@@ -59,6 +61,8 @@ def test_missing_files_fall_back_to_defaults() -> None:
         ({"massive": {"corporate_actions_window": [1]}}, "a list of 2 integers"),
         ({"cboe": {"enabled": "yes"}}, r"\[cboe\] enabled: expected true or false"),
         ({"cboe": {"workers": 0}}, r"workers: expected an integer >= 1"),
+        ({"sec_edgar": {"raw_retention_days": 0}}, r"\[sec_edgar\] raw_retention_days: expected"),
+        ({"sec_edgar": {"raw_retention_days": 1.5}}, r"raw_retention_days: expected an integer"),
         ({"cboe": {"workers": True}}, r"workers: expected an integer"),
         ({"http": {"limits_dir": ""}}, "limits_dir: expected a non-empty string"),
         ({"http": 3}, "unknown keys"),

@@ -245,9 +245,14 @@ class LocalRaw:
         path = self._path(source, dataset, session_date, run_id, key)
         return gzip.decompress(path.read_bytes()) if path.exists() else None
 
-    def purge_before(self, cutoff: date) -> int:
+    def sources(self) -> list[str]:
+        found = self.root.glob("source=*") if self.root.exists() else []
+        return sorted(d.name.removeprefix("source=") for d in found if d.is_dir())
+
+    def purge_before(self, cutoff: date, source: str | None = None) -> int:
         removed = 0
-        for day in self.root.glob("source=*/dataset=*/date=*"):
+        pattern = f"source={safe(source)}" if source is not None else "source=*"
+        for day in self.root.glob(f"{pattern}/dataset=*/date=*"):
             if date.fromisoformat(day.name.removeprefix("date=")) < cutoff:
                 removed += sum(1 for _ in day.rglob("*.json.gz"))
                 shutil.rmtree(day)

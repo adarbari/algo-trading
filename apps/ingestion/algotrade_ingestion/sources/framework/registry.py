@@ -206,6 +206,31 @@ def build_sources(
     return built
 
 
+def raw_source(spec: SourceSpec) -> str:
+    """The name ``spec``'s source stores raw responses under: its class's ``name``
+    (``raw/source=<name>/...``), which several specs may share (the SEC sources)."""
+    name = getattr(spec.build, "name", None)
+    if not isinstance(name, str):
+        raise TypeError(f"source {spec.name!r}: its class declares no raw source name")
+    return name
+
+
+def raw_sections(specs: Mapping[str, SourceSpec] = SOURCES) -> dict[str, str]:
+    """raw source name -> the sources.toml section its specs read (one each, by design;
+    ``raw_retention_days`` there sets how long its raw responses are kept)."""
+    out: dict[str, str] = {}
+    for spec in specs.values():
+        name = raw_source(spec)
+        if out.setdefault(name, spec.section) != spec.section:
+            raise ValueError(f"raw source {name!r} is in sections {out[name]} and {spec.section}")
+    return out
+
+
+# Fixed at import from the declared source classes (tests that swap a spec's ``build`` for a
+# fake do not change where the real source stores its raw responses).
+RAW_SECTIONS: Mapping[str, str] = raw_sections()
+
+
 def limiter_keys(specs: Mapping[str, SourceSpec] = SOURCES) -> dict[str, set[str]]:
     """limiter key -> the sources.toml sections its sources read (one each, by design)."""
     out: dict[str, set[str]] = {}

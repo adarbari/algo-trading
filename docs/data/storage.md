@@ -43,7 +43,8 @@ Every market and feature row carries:
 
 ```
 raw/          as received from the vendor (JSON/CSV, gzip). Never modified. Kept for a retention
-              window (default 90 days, ADR 0014) so recent days can be replayed.
+              window per source (default 90 days, ADR 0014; SEC 7) so recent days can be
+              replayed. See "Retention" below.
 normalized/   validated, canonical schema, Parquet. What readers use.
 features/     derived values, versioned by name@version, Parquet.
 results/      screener and backtest outputs, keyed by run id, Parquet + a JSON run record.
@@ -62,12 +63,36 @@ $ALGOTRADE_DATA_URL (default file://./var/data, git-ignored)
                                                          (ADR 0022)
   raw/source=<s>/dataset=<d>/date=YYYY-MM-DD/run=<run_id>/<key>.json.gz
   staging/<run_id>/<table>/<key>.parquet                 per-item scratch for resumable jobs
-                                                         (cleared on completion; unfinished
-                                                         runs purged after 14 days)
+                                                         (dropped when the run finishes with
+                                                         nothing to retry; else purged after
+                                                         14 days)
   runs/<run_id>.json                                     run records: audit + checkpoint
 ```
 
 What each nightly run adds, table by table, with sizes: [nightly-footprint.md](nightly-footprint.md).
+
+### Retention
+
+Tables and run records are kept forever. The rest is removed by `purge-raw` (the nightly's
+last step; `apps/ingestion/.../tasks/maintenance/purge.py`) or, for staging, by the run itself:
+
+- **Raw, per source.** Each raw source (`raw/source=<s>/`) is kept for its `sources.toml`
+  section's `raw_retention_days`, else the global `raw_retention_days` (90). The source
+  registry maps raw source names to sections (`RAW_SECTIONS`: the raw name is the source
+  class's `name`, e.g. `sec_edgar` for submissions, company tickers and company facts, all in
+  `[sec_edgar]`, which keeps 7 days). Raw sources the registry does not know (fixtures) use
+  the global window; `purge-raw --keep-days N` applies N to every source. The run's stats list
+  `raw_files_removed_by_source` and `raw_keep_days`. Storage: `raw.sources()`,
+  `raw.purge_before(cutoff, source=...)`.
+- **Staging (the lifecycle).** A run stages per-item pieces (`IngestRun.stage`) and publishes
+  them as one partition. When the run finishes and its commit succeeds, `IngestRun` drops its
+  staging (`staging.clear(run_id)`) unless something is left for a resume to refetch:
+  COMPLETE, or PARTIAL with no `FETCH_ERROR` items (stale or missing chains only) -> dropped;
+  PARTIAL with `FETCH_ERROR` items -> kept, and the next run of the task for that session
+  resumes from it, refetches only those items, and drops it when it finishes; FAILED -> kept
+  for the same resume. What is never resumed is purged after `staging_retention_days` (14).
+- **Uncommitted table writes** a crashed run left (ADR 0022) are purged after
+  `staging_retention_days` too.
 
 Implemented tables (layers per [layers.md](layers.md)):
 L1 `instruments/reference`, `instruments/symbol_history`, `instruments/id_map` (symbol id →

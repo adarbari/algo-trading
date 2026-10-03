@@ -161,7 +161,7 @@ Checked live 2026-10-03 (closes of 2026-10-02): AAPL 14.594B shares (dei, as of 
 2026) → $4.17T / $4.14T; BRK.B STALE. Four requests took ~0.3 s each.
 
 **Backfill:** `algotrade-ingest shares` once (~6k CIKs at the 0.2 s `sec` pacing plus
-download: about 30 to 40 minutes, ~1 GB of gzip raw kept for `raw_retention_days`), then
+download: about 30 to 40 minutes, ~1 GB of gzip raw kept 7 days, `[sec_edgar] raw_retention_days`), then
 `algotrade-ingest rollups --from <first session> --to <last session> --only fundamentals@v1`.
 A crashed run resumes where it stopped (same session); `--limit N` splits it into chunks.
 

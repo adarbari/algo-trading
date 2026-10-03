@@ -26,7 +26,12 @@ from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.factory import open_config_store
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.sources.framework.base import Source
-from algotrade_ingestion.sources.framework.registry import Built, build_sources, fixture_source
+from algotrade_ingestion.sources.framework.registry import (
+    RAW_SECTIONS,
+    Built,
+    build_sources,
+    fixture_source,
+)
 from algotrade_ingestion.tasks.framework.registry import TASKS, Task, run_task, task
 from algotrade_ingestion.tasks.framework.run import TaskContext, run_summary
 from algotrade_ingestion.workflows.nightly.nightly import FINALLY, NIGHTLY, nightly_job
@@ -78,6 +83,7 @@ def task_context(
         sources or {},
         sources_settings(args),
         config_store(args),
+        raw_sections=RAW_SECTIONS,
     )
 
 
@@ -137,6 +143,7 @@ def run_job(
         "sources_settings": settings,
         "sources": built.sources,
         "unavailable": built.skipped,
+        "raw_sections": RAW_SECTIONS,
     }
     handlers: dict[str, JobKind | JobHandler] = {**LIBRARY_HANDLERS, "nightly": nightly_job}
     user_ctx = UserContext(user)

@@ -9,7 +9,8 @@ Behaviour carried over from the original liquidity_screen.py and made stricter:
 - raw responses are saved before parsing (``IngestRun.fetch``), so normalisation can be
   replayed.
 
-Per-ticker results are staged, then published as one partition per table and session.
+Per-ticker results are staged, then published as one partition per table and session. The
+staging is kept while FETCH_ERROR items remain (a re-run resumes from it), else dropped.
 """
 
 from collections.abc import Sequence
@@ -22,7 +23,7 @@ import pandas as pd
 from algotrade.data import StoreReader
 from algotrade.data.reference import load_universe, resolver
 from algotrade.services.jobs import as_completed
-from algotrade.storage.runs import RunRecord, RunStatus
+from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.sources.framework.base import FetchRequest, Source, Throttled
 from algotrade_ingestion.tasks.framework.run import IngestRun, NoResponseError, TaskContext
 
@@ -129,6 +130,4 @@ def ingest_option_chains(
         run.stats.update(universe=len(universe), statuses=counts)
         if no_chain_share > MAX_NO_CHAIN_SHARE:
             run.partial(f"{no_chain_share:.0%} of optionable names returned no chain")
-    if run.record.status is RunStatus.COMPLETE:
-        run.clear_staging()
-    return run.record
+    return run.record  # staging: dropped by IngestRun unless FETCH_ERROR items remain

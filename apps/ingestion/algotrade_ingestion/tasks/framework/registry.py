@@ -351,10 +351,15 @@ TASKS: dict[str, Task] = {
             purge,
             (),  # deletes raw files and scratch; produces no table
             _purge,
-            settings="sources.toml raw_retention_days, staging_retention_days",
+            settings="sources.toml raw_retention_days (+ per section), staging_retention_days",
             params=(
                 Param("session", ("--date",), date.fromisoformat, "reference date"),
-                Param("keep_days", ("--keep-days",), int, "raw files (default: sources.toml)"),
+                Param(
+                    "keep_days",
+                    ("--keep-days",),
+                    int,
+                    "raw files, every source (default: per source, sources.toml)",
+                ),
                 Param(
                     "staging_keep_days",
                     ("--staging-keep-days",),

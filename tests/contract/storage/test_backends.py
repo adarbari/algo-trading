@@ -78,6 +78,20 @@ def test_raw_store(backend: Backend) -> None:
     assert backend.raw.get("src", "ds", D2, "r2", "SPY") == b"{}"
 
 
+def test_raw_purge_per_source(backend: Backend) -> None:
+    assert backend.raw.sources() == []
+    for source in ("a", "b"):
+        backend.raw.put(source, "ds", D1, "r1", "SPY", b"{}")
+        backend.raw.put(source, "ds", D2, "r2", "SPY", b"{}")
+    assert backend.raw.sources() == ["a", "b"]
+    assert backend.raw.purge_before(D2, source="a") == 1
+    assert backend.raw.get("a", "ds", D1, "r1", "SPY") is None
+    assert backend.raw.get("a", "ds", D2, "r2", "SPY") == b"{}"
+    assert backend.raw.get("b", "ds", D1, "r1", "SPY") == b"{}"  # other sources untouched
+    assert backend.raw.purge_before(D2, source="missing") == 0
+    assert backend.raw.purge_before(D2) == 1  # every source: only b's old response is left
+
+
 def test_staging_store(backend: Backend) -> None:
     backend.staging.put("r1", "chains/x", "B", pd.DataFrame({"v": [2]}))
     backend.staging.put("r1", "chains/x", "A", pd.DataFrame({"v": [1]}))
@@ -89,6 +103,7 @@ def test_staging_store(backend: Backend) -> None:
     backend.staging.clear("r1")
     assert backend.staging.keys("r1", "chains/x") == []
     assert backend.staging.collect("r1", "chains/x") is None
+    backend.staging.clear("r1")  # nothing left: a no-op
 
 
 def test_staging_purge_keeps_recent_and_unrecognised_runs(backend: Backend) -> None:
