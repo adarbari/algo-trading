@@ -6,8 +6,17 @@ Writes, for the session:
   with ``status = DELISTED`` and ``delisted_on``, so history never silently disappears.
 - ``universe``: the **coverage** defined by ``config/site/universe.toml`` (types, test
   issues, include / exclude lists). Strategies narrow it further with selections.
-- ``events/reference_change`` and ``events/index_change`` from the previous snapshot.
+- ``events/reference_change`` and ``events/index_change`` from the previous session's
+  snapshot.
 - ``instruments/id_map`` when a symbol id becomes a FIGI id (ADR 0018, ``instrument_ids``).
+
+Cumulative state (ids, ``first_seen``, delistings carried, ``symbol_history``, ``id_map``)
+builds on the latest snapshot **known** at build time (``_known``): an earlier run of the same
+session when there is one, else the latest earlier session. A same-session re-run therefore
+keeps what the earlier run recorded (2026-10-03: a re-run that started from nothing wrote an
+id map of 3 upgrades that hid the 10,817 before it). Events compare against the previous
+session (``_previous``) with the session's upgrades applied, so a re-run emits the same rows
+under the same keys, which the merged event tables absorb.
 
 Leverage (``classify.leverage_flags``): a curated row in
 ``config/site/overrides/leveraged_etfs.csv`` wins, then the leverage the name states, then the
@@ -69,11 +78,10 @@ def build_reference(
     previous: pd.DataFrame | None,
     session: date,
     tickers: pd.DataFrame | None = None,
-    id_basis: pd.DataFrame | None = None,
 ) -> tuple[pd.DataFrame, int, Assigned]:
     """Every listing (+ carried-forward delistings); -> (reference, vendor-type
-    disagreements, id assignment). Ids build on ``previous``, else on ``id_basis`` (an
-    earlier run for the same session)."""
+    disagreements, id assignment). ``previous`` is the latest reference known (``_known``):
+    ids, ``first_seen`` and delistings build on it."""
     listings = listings.drop_duplicates("symbol", keep="first").reset_index(drop=True)
     ref = listings.assign(
         asset_class=AssetClass.EQUITY.value,
@@ -93,7 +101,7 @@ def build_reference(
         delisted_on=None,
     )
     ref, disagreements = apply_identifiers(ref, tickers)
-    assigned = assign_ids(ref, previous if previous is not None else id_basis, session)
+    assigned = assign_ids(ref, previous, session)
     ref, previous = assigned.reference, rename_ids(previous, assigned.upgrades)
     ref["is_etf"] = ref["is_etf"] | ref["security_type"].eq("ETF")
     ref = pd.concat([ref, leverage_flags(ref, settings)], axis=1)
@@ -168,11 +176,26 @@ def write_review(reader: StoreReader, session: date, path: Path) -> None:
         out.writerows(rows)
 
 
-def _before(reader: StoreReader, table: str, session: date) -> pd.DataFrame | None:
-    """The latest snapshot of ``table`` strictly before ``session``, so a re-run of a session
-    builds on the same history as its first run."""
+def _known(reader: StoreReader, table: str, session: date) -> pd.DataFrame | None:
+    """Cumulative state as known now: ``table`` for ``session`` itself when an earlier run
+    wrote it (a re-run builds on it), else the latest earlier session."""
+    days = [d for d in reader.dates(table) if d <= session]
+    return reader.table(table, days[-1]) if days else None
+
+
+def _previous(reader: StoreReader, table: str, session: date) -> pd.DataFrame | None:
+    """The latest snapshot of ``table`` strictly before ``session``: what events diff
+    against, so every run of a session emits the same changes."""
     days = [d for d in reader.dates(table) if d < session]
     return reader.table(table, days[-1]) if days else None
+
+
+def session_upgrades(id_map: pd.DataFrame, session: date) -> pd.DataFrame:
+    """The id map's upgrades effective on ``session``, from this run or an earlier one."""
+    if id_map.empty:
+        return id_map
+    effective = pd.to_datetime(id_map["effective"]).dt.date
+    return id_map[effective.eq(session)].reset_index(drop=True)
 
 
 def build_universe(
@@ -201,21 +224,20 @@ def _build(
     source: str,
 ) -> None:
     session = run.session
-    previous = _before(reader, REFERENCE, session)
     sp500 = set(parsed["sp500"]["symbol"])
     reference, disagreements, assigned = build_reference(
         listings,
         set(optionable["symbol"]),
         sp500,
         settings,
-        previous,
+        _known(reader, REFERENCE, session),
         session,
         parsed.get("tickers"),
-        reader.table(REFERENCE, session) if previous is None else None,
     )
-    history, ticker_changes = update_history(_before(reader, HISTORY, session), reference, session)
+    history, ticker_changes = update_history(_known(reader, HISTORY, session), reference, session)
     known_at = run.record.started_at
-    id_map = cumulative_map(_before(reader, ID_MAP, session), assigned.upgrades, known_at)
+    id_map = cumulative_map(_known(reader, ID_MAP, session), assigned.upgrades, known_at)
+    upgraded = session_upgrades(id_map, session)
     covered = reference[coverage(reference, settings)]
     universe = pd.DataFrame(
         {
@@ -233,11 +255,12 @@ def _build(
             "notes": "",
         }
     )
-    changes, index = diff_reference(rename_ids(previous, assigned.upgrades), reference, session)
+    previous = rename_ids(_previous(reader, REFERENCE, session), upgraded)
+    changes, index = diff_reference(previous, reference, session)
     extra = ticker_changes + [
         {"instrument_id": u.new_id, "symbol": u.symbol, "change": "id_changed",
          "old": u.old_id, "new": u.new_id}
-        for u in assigned.upgrades.itertuples()
+        for u in upgraded.itertuples()
     ]  # fmt: skip
     if extra:
         rows = pd.DataFrame(extra).assign(ts=pd.Timestamp(session, tz="UTC"))

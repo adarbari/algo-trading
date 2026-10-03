@@ -65,7 +65,7 @@ only shrinks (`make dupes-update`).
 | Running long work (threads, recovery), screens | `services/jobs/` (apps call `run_job`, never build a runner; fan-out: `as_completed`); screens: `services/screening/run.py`, submitted as `screen` jobs |
 | Site settings (`config/site/*.toml` → frozen dataclasses); environment variables + `.env` | `config/site/settings.py` (one loader); `config/env.py` (storage and sources receive values as parameters) |
 | Session / exchange calendar (holidays, early closes, last closed session) | `core/time/calendar.py`; never compute weekdays elsewhere |
-| Which runs of a partition a read sees (`snapshot`: latest; `merge`, all `events/*`: union, latest per key, from the latest restating run) | `storage/backends/run_selection.py`, per `TableSpec.runs` (ADR 0007) |
+| Which runs of a partition a read sees (`snapshot`: latest; `merge`, all `events/*` + `instruments/id_map`, `instruments/symbol_history`: union, latest per key, from the latest restating run) | `storage/backends/run_selection.py`, per `TableSpec.runs` (ADR 0007) |
 | Table schemas (columns, declared types, validation); Parquet / Arrow I/O | `storage/tables/schemas.py`; `storage/backends/` (`arrow.py`: casts, `schema_version`, row groups) |
 | Each stored table | exactly one producing module (`[[table]]` in the registry) |
 | Which directory a module belongs in | `architecture/layout.toml` (see Directory layout below) |
