@@ -251,11 +251,17 @@ def test_quality_and_schedule_commands(
     monkeypatch.chdir(env)
     code, written = call(capsys, "schedule", "--time", "22:15", "--out", str(env / "agent.plist"))
     assert code == 0 and written["weekdays_at"] == "22:15"
-    assert any(step.startswith("launchctl load") for step in written["install"])
-    assert (
-        plistlib.loads((env / "agent.plist").read_bytes())["StartCalendarInterval"][0]["Minute"]
-        == 15
+    assert written["install"][1].startswith("launchctl unload")  # replaces an installed agent
+    assert written["install"][-1].startswith("launchctl load")
+    assert written["optional_wake"]["command"] == "sudo pmset repeat wakeorpoweron MTWRF 14:55:00"
+    agent = plistlib.loads((env / "agent.plist").read_bytes())
+    assert agent["StartCalendarInterval"][0]["Minute"] == 15 and agent["StartInterval"] == 3600
+    code, written = call(
+        capsys, "schedule", "--watchdog-minutes", "0", "--out", str(env / "agent.plist")
     )
+    assert written["weekdays_at"] == "15:00" and written["watchdog_minutes"] is None
+    agent = plistlib.loads((env / "agent.plist").read_bytes())
+    assert agent["StartCalendarInterval"][0]["Hour"] == 15 and "StartInterval" not in agent
 
 
 def test_company_details_command(
@@ -339,3 +345,89 @@ def test_nightly_recovers_a_job_left_running_by_a_crashed_process(
     open_backend(data_url()).runs.save(stuck.to_run())
     _, result = call(capsys, "nightly", "--date", DAY, "--workers", "1")
     assert result["job_id"] == job_id and "earnings" in result["runs"][-1]["steps"]
+
+
+def nightly_records() -> list:  # type: ignore[type-arg]
+    from algotrade.config.env import data_url  # noqa: PLC0415
+    from algotrade.storage.factory import open_backend  # noqa: PLC0415
+
+    backend = open_backend(data_url())
+    return [*backend.runs.find("nightly"), *backend.runs.find("job:nightly")]
+
+
+def all_run_files(env: Path) -> set[str]:
+    return {p.name for p in (env / "data" / "runs").glob("*.json")}
+
+
+def scheduled_at(monkeypatch: pytest.MonkeyPatch, session: str) -> None:
+    """The last closed session the scheduled (no --date) nightly sees."""
+    from datetime import date  # noqa: PLC0415
+
+    monkeypatch.setattr(cli, "default_session", lambda args, now: date.fromisoformat(session))
+
+
+def no_notifications(monkeypatch: pytest.MonkeyPatch) -> None:
+    from algotrade_ingestion.workflows.nightly import nightly  # noqa: PLC0415
+
+    def boom(*args: object, **kwargs: object) -> None:
+        raise AssertionError("the no-op path must not notify")
+
+    monkeypatch.setattr(nightly, "report", boom)
+    monkeypatch.setattr(nightly, "default_notifier", boom)
+
+
+def test_scheduled_nightly_catches_up_then_is_a_quiet_no_op(
+    env: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import time  # noqa: PLC0415
+
+    from algotrade.core.time.calendar import previous_session  # noqa: PLC0415
+
+    before = previous_session(fx.SESSION).isoformat()
+    scheduled_at(monkeypatch, before)
+    code, first = call(capsys, "nightly", "--workers", "1")  # no earlier nightly: one session
+    assert code in (0, 1) and first["sessions"] == [before]
+    # The Mac was off over the next close: the next start catches the missed session up.
+    scheduled_at(monkeypatch, DAY)
+    code, caught_up = call(capsys, "nightly", "--workers", "1")
+    assert code in (0, 1) and caught_up["sessions"] == [DAY]
+    assert caught_up["catch_up"]["last_done"] == before
+    # Up to date: one line, exit 0, no run record of any kind, no notification, fast.
+    files = all_run_files(env)
+    no_notifications(monkeypatch)
+    started = time.perf_counter()
+    assert cli.main(["nightly", "--workers", "1"]) == 0
+    elapsed = time.perf_counter() - started
+    out = capsys.readouterr()
+    assert out.out == f"nothing to do: {DAY} already ingested\n" and out.err == ""
+    assert all_run_files(env) == files
+    assert elapsed < 1.0
+
+
+def test_force_reruns_the_last_session_when_up_to_date(
+    env: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scheduled_at(monkeypatch, DAY)
+    call(capsys, "nightly", "--workers", "1")
+    count = len(nightly_records())
+    code, forced = call(capsys, "nightly", "--force", "--workers", "1")
+    assert code in (0, 1) and forced["sessions"] == [DAY]
+    assert len(nightly_records()) > count  # a new run record for the same session
+
+
+def test_scheduled_nightly_while_locked_exits_quietly(
+    env: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from algotrade.config.env import data_url  # noqa: PLC0415
+    from algotrade.services.jobs import exclusive_run  # noqa: PLC0415
+    from algotrade.storage.factory import open_backend  # noqa: PLC0415
+
+    scheduled_at(monkeypatch, DAY)
+    no_notifications(monkeypatch)
+    with exclusive_run(open_backend(data_url())):  # e.g. the nightly started an hour ago
+        assert cli.main(["nightly"]) == cli.LOCKED_EXIT
+        out = capsys.readouterr()
+        assert out.out.startswith("busy: ") and out.err == ""
+        assert cli.main(["nightly", "--date", DAY]) == cli.LOCKED_EXIT  # explicit: an error
+        assert "pass --wait" in capsys.readouterr().err
+    assert nightly_records() == []
