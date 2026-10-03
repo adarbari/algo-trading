@@ -10,7 +10,7 @@ from ``config/site/verification.toml`` (the reconciliation suite's values, docs/
     high_52w             vs the highest IBKR high of the last 252 sessions (relative)
     low_52w              the dividend-gap rule: ours >= IBKR's and above it by at most div_ttm
                          (a dividend-adjusted low sits lower by up to the dividends since)
-    div_yield            dividends.div_yield vs IB's trailing 12 months / close (absolute)
+    div_yield            div_yield (materialised) vs IB's trailing 12 months / close (absolute)
     iv30, iv30_cboe      our iv30 and the Cboe feed's vs IB's implied vol (absolute)
     option_listed        our chain's contract is listed at IBKR (expiry and strike)
     option_mid           IB's mid within ``spread_band`` half-spreads of ours (absolute)
@@ -29,7 +29,7 @@ from algotrade.quant import realized_vol
 
 STATUSES = ("PASS", "WARN", "FAIL", "NA")
 YEAR_SESSIONS = 252
-MIN_YEAR_SESSIONS = 240  # as price_stats@v1: fewer bars and the 52-week range is unknown
+MIN_YEAR_SESSIONS = 240  # as price_stats@v2: fewer bars and the 52-week range is unknown
 HV_WINDOW = 20
 
 
@@ -151,12 +151,12 @@ def ibkr_hv20(closes: np.ndarray) -> float | None:
 def compare_stats(
     g: Grader, stats: pd.Series | None, theirs: pd.DataFrame, session: date, div_ttm: Any
 ) -> None:
-    """hv20, high_52w, low_52w from our ``price_stats@v1`` row vs IBKR's bars."""
+    """hv20, high_52w, low_52w from our ``price_stats@v2`` row vs IBKR's bars."""
     theirs = theirs[theirs["date"] <= session]
     ends_on_session = not theirs.empty and theirs["date"].iloc[-1] == session
     if stats is None:
         for check in ("hv20", "high_52w", "low_52w"):
-            g.na(check, "no price_stats@v1 row of ours for the session")
+            g.na(check, "no price_stats@v2 row of ours for the session")
         return
     if not ends_on_session:
         for check in ("hv20", "high_52w", "low_52w"):
