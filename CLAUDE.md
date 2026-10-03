@@ -71,27 +71,49 @@ only shrinks (`make dupes-update`).
 | Each stored table | exactly one producing module (`[[table]]` in the registry) |
 | Which directory a module belongs in | `architecture/layout.toml` (see Directory layout below) |
 
-## Directory layout (ADR 0020; enforced by `tests/architecture/test_layout.py`)
+## Directory layout (ADR 0020; enforced by `tests/architecture/test_layout*.py`, `make layout`)
 
 One folder holds one kind of thing. `architecture/layout.toml` declares every directory under
-`src/` and `apps/` with its purpose and rules; a new folder (or a module in an undeclared one)
-fails CI until it is declared there in the same PR. At most 10 modules per folder (split by
-kind; no exceptions), and every `__init__.py` docstring says what the folder holds. In the
-library `src/algotrade/`: `core/` (`model/` value objects, ids, errors; `time/` calendar and
-clock; `views/` the strategy-facing `MarketView` / `FeatureView` / `PriceSeries`;
-`validation/` OHLCV checks; all pure), `config/` (`site/` L3 settings loader; `strategy/`
-configs, selections, resolution, catalog; `env.py`, `user.py`), `storage/` (`tables/`
-schemas, protocols, readers / writers; `backends/` the only code that knows Parquet layout;
-`configs/` config documents only, never tables; `runs.py`, `locks.py`, `factory.py`),
-`quant/` (pure numerics: pricing, IV, realised vol, rates; numpy only), `data/`, `features/`,
-`strategies/`, `engines/`, `analytics/`, `services/` (`backtests/`,
-`screening/` use cases; `jobs/`, `evaluation/`; shared `configs`, `datasets`, `selection`,
-`views`). In `apps/ingestion/algotrade_ingestion/`: `cli/`, `ops/`;
-`sources/framework/` (protocols, HTTP, pacing, the source registry), `sources/vendors/<vendor>/`
-(one folder per vendor, imported only by the source registry; vendors never import each
-other), `sources/fixtures/` (golden synthetic source); `tasks/framework/` (`IngestRun`, the
-task registry), `tasks/<domain>/` (`reference`, `market`, `derived`, `maintenance`: registered
-tasks and helpers used only inside their domain); `workflows/nightly/`.
+`src/`, `apps/`, `tests/`, `config/` and `docs/` with its purpose and rules; a new folder (or
+a file in an undeclared one) fails CI until it is declared there in the same PR. At most 10
+modules per code or test folder and 12 files per config / docs folder (split by kind; no
+exceptions); `make layout` lists folders at 8+ modules so the split is planned, not forced.
+Every `__init__.py` docstring says what the folder holds. No grab-bag module names (`utils`,
+`helpers`, `common`, `misc`, `shared`, ...: `[banned_module_names]`). Tests mirror their
+source (`tests/unit/<path>` = `src/algotrade/<path>`, `tests/apps/ingestion/<path>` =
+`apps/ingestion/algotrade_ingestion/<path>`); shared test builders live in `tests/helpers/`
+(vendor payloads in `tests/helpers/payloads/`), recorded data in `tests/fixtures/`.
+
+**Where does this go?**
+
+| Kind of code | Folder |
+|---|---|
+| Vendor adapter (fetch + normalise) | `apps/ingestion/.../sources/vendors/<vendor>/` (registered in `sources/framework/registry.py`) |
+| HTTP, pacing, source protocols | `apps/ingestion/.../sources/framework/` |
+| Ingestion task | `apps/ingestion/.../tasks/<domain>/` (`reference`, `market`, `derived`, `maintenance`) + `tasks/framework/registry.py` |
+| Nightly step / ordering | `apps/ingestion/.../workflows/nightly/` |
+| Rollup (derived feature) | `src/algotrade/features/rollups/` (framework: `features/framework/`) |
+| Trading strategy / screener | `src/algotrade/strategies/trading/` / `strategies/screeners/` |
+| Numeric model (pricing, vol, rates) | `src/algotrade/quant/` |
+| Domain read of market data | `src/algotrade/data/` |
+| Domain value object, calendar, strategy view | `src/algotrade/core/{model,time,views}/` |
+| Use case (what an app or job runs) | `src/algotrade/services/<use-case>/`; long work as a job: `services/jobs/` |
+| Engine running strategies / screeners | `src/algotrade/engines/<engine>/` |
+| Table schema, store protocol / backend, config documents | `src/algotrade/storage/{tables,backends,configs}/` |
+| Site setting | `config/site/<group>.toml` + typed in `src/algotrade/config/site/settings.py` |
+| Tests | the mirrored `tests/unit/...` or `tests/apps/<app>/...` folder; builders `tests/helpers/` |
+| Docs | the `docs/` area folder (`data/`, `screeners/`, `ui/`); a decision: `docs/adr/` |
+
+**If nothing fits, add a new folder for the new kind**: declare it in `architecture/layout.toml`
+with a purpose (+ `contracts` if an import-linter rule guards it), give it an `__init__.py`
+docstring, and mirror it in tests. Never park code in a neighbouring folder
+(`.claude/skills/add-responsibility`). Library folders: `core/{model,time,views,validation}`
+(pure), `config/{site,strategy}`, `storage/{tables,backends,configs}`, `quant/`, `data/`,
+`features/{framework,rollups}`, `strategies/{trading,screeners}`,
+`engines/{backtest,screening,selection}`, `analytics/`,
+`services/{backtests,screening,evaluation,jobs}`. Ingestion app: `cli/`, `ops/`,
+`sources/{framework,vendors/<vendor>,fixtures}`, `tasks/{framework,<domain>}`,
+`workflows/nightly/`.
 
 ## Code rules (enforced by CI; follow them up front)
 
@@ -101,7 +123,8 @@ tasks and helpers used only inside their domain); `workflows/nightly/`.
    Check with `make arch`.
 2. **No file over 1000 lines** (aim for under 300). Split by responsibility. `make filelen`.
 3. **Every module starts with a docstring** stating its single responsibility.
-4. **Tests mirror src**: `src/algotrade/<layer>/x.py` → `tests/unit/<layer>/`. Coverage gate is
+4. **Tests mirror src**: `src/algotrade/<path>/x.py` → `tests/unit/<path>/` (apps:
+   `tests/apps/<app>/<path>/`; enforced by the layout tests). Coverage gate is
    90%. Storage backends must pass `tests/contract/storage/`. Vendor adapters are tested
    against recorded responses; CI never calls the network.
 5. **UTC, timezone-aware datetimes only.** `session_date` is the trading day. No `print`
@@ -130,7 +153,7 @@ tasks and helpers used only inside their domain); `workflows/nightly/`.
 | New responsibility, or moving one between modules | `.claude/skills/add-responsibility` |
 | A decision that changes architecture | `.claude/skills/write-adr` |
 
-Commands (need `uv`): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make evaluate`, `make baseline`.
+Commands (need `uv`): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make layout`, `make evaluate`, `make baseline`.
 Ingestion: `algotrade-ingest universe|universe-build|company-details|shares|earnings|bars|rates|corporate-actions|chains|rollups|screen|nightly|quality|schedule|purge-raw|migrate-ids|golden`, or `algotrade-ingest run <task>` for any registry task (see `README.md`).
 Configs: site presets in `config/site/` (reviewed via PR); user configs in `config/users/<id>/`
 (git-ignored). Check one with `algotrade-backtest [--user U] config validate|show <id>`.

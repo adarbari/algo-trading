@@ -20,7 +20,7 @@ from algotrade.features.framework.runner import (
 )
 from algotrade.features.registry import ROLLUPS
 from algotrade.storage.configs.files import MemoryConfigStore
-from tests.rollup_helpers import END, series, store, write_bars
+from tests.helpers.rollup_store import END, series, store, write_bars
 
 
 @dataclass(frozen=True)

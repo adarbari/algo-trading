@@ -15,7 +15,7 @@ from algotrade_ingestion.tasks.framework import registry
 from algotrade_ingestion.tasks.framework.registry import TASKS, run_task, session_of, task
 from algotrade_ingestion.tasks.market import bars, corporate_actions, earnings, option_chains
 from algotrade_ingestion.workflows.nightly import nightly as pipeline
-from tests.ingest_helpers import FIXED, task_ctx
+from tests.helpers.ingest_fakes import FIXED, task_ctx
 
 DAY = date(2026, 10, 2)
 

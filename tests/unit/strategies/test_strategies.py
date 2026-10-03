@@ -6,7 +6,7 @@ from algotrade.strategies.trading.buy_and_hold import BuyAndHold
 from algotrade.strategies.trading.registry import STRATEGIES, create_strategy
 from algotrade.strategies.trading.sma_crossover import SmaCrossover
 from algotrade.strategies.trading.zscore_mean_reversion import ZScoreMeanReversion
-from tests.factories import series_from_closes
+from tests.helpers.domain_objects import series_from_closes
 
 
 def views(closes: list[float]) -> list[MarketView]:

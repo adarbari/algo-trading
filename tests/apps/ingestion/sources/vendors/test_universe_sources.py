@@ -11,8 +11,8 @@ from algotrade_ingestion.sources.vendors.nasdaq.symbol_directory import (
 )
 from algotrade_ingestion.sources.vendors.ssga.spy_holdings import SpyHoldingsSource, parse_holdings
 from algotrade_ingestion.tasks.reference.classify import security_type
-from tests import universe_fixture as fx
-from tests.ingest_helpers import http_for
+from tests.helpers.ingest_fakes import http_for
+from tests.helpers.payloads import universe as fx
 
 
 def test_parse_listings_both_files() -> None:

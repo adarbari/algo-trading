@@ -70,3 +70,33 @@ with strategy configs, `storage/` mixed table contracts with config documents, a
   unchanged). Tests mirror the new folders (`tests/unit/core/model/`, ...). Imports name the
   new paths; callers of old module paths fail to import rather than silently resolving.
 - No `[[exception]]` remains in `architecture/layout.toml`.
+
+## Addendum (2026-10-03): layout rules extended to tests, config and docs; banned module names; early warning
+- **Tests follow the layout.** `[[test_mirror]]` maps `tests/unit` to `src/algotrade` and
+  `tests/apps/ingestion` to `apps/ingestion/algotrade_ingestion`: every directory under a
+  mirror root is a declared source directory that exists (a test folder for code that is not
+  there fails). Every other test directory is a declared `[[test_dir]]` bucket with a purpose
+  (`helpers/` builders and fakes, `helpers/payloads/` synthetic vendor payloads, `fixtures/`
+  recorded data, `architecture/`, `contract/<protocol>/`, `property/`, `integration/`,
+  `e2e/`); the test root holds only `conftest.py`. The 10-module limit applies to test
+  folders (`__init__.py` and `conftest.py` excluded). The ten loose `tests/*.py` helpers moved
+  into `tests/helpers/` (`domain_objects`, `stored_frames`, `ingest_fakes`, `rollup_store`)
+  and `tests/helpers/payloads/` (`cboe`, `massive`, `nasdaq_earnings`, `sec`, `treasury`,
+  `universe`).
+- **Config and docs are bucketed.** `[[config_dir]]` and `[[docs_dir]]` declare every folder
+  under `config/` and `docs/` with its purpose; an undeclared folder fails, and so does a
+  folder with more than `max_files` (12) files. `docs/adr` is `kind = "log"` (append-only and
+  never renumbered, so not capped); `config/users` is local, git-ignored state and not
+  walked. Every `config/site/*.toml` and `overrides/*` file must be loaded by the one settings
+  loader (`config/site/settings.py`); that every key in it is read stays in
+  `test_ownership.py`.
+- **No grab-bag module names.** `[banned_module_names]` (`utils`, `util`, `helpers`,
+  `common`, `misc`, `stuff`, `tools`, `lib`, `shared`) fails anywhere in `src/`, `apps/`,
+  `tests/` and `scripts/`: a module is named for what it does. `tests/helpers/` is a folder;
+  its modules are named for what they build.
+- **Early warning.** `make layout` (part of `make check`) runs the layout tests and lists
+  directories at `warn_modules` (8) or more modules without failing, so a split by kind is
+  planned before the limit forces it; the PR template asks for the list.
+- **Where does this go?** CLAUDE.md's Directory layout section has a kind-of-code → folder
+  table; when nothing fits, a new folder is added for the new kind (declared, docstring,
+  mirrored in tests), never parked in a neighbour. Every `add-*` skill starts with that step.

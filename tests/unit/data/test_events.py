@@ -8,7 +8,7 @@ from algotrade.data import StoreReader
 from algotrade.data.events import read_events
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
-from tests.storage_helpers import T0, stamped
+from tests.helpers.stored_frames import T0, stamped
 
 SPLIT_DAY, BACKFILLED_ON = date(2015, 6, 1), date(2026, 10, 2)
 

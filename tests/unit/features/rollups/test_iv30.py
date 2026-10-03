@@ -14,7 +14,7 @@ from algotrade.features.framework.runner import compute_in_memory, compute_one
 from algotrade.features.rollups import iv30
 from algotrade.features.rollups.iv30 import ROLLUP, Iv30Params, choose_expiries
 from algotrade.quant.implied_vol import interpolate_total_variance
-from tests.rollup_helpers import END, chain_rows, store, write_chains, write_curve
+from tests.helpers.rollup_store import END, chain_rows, store, write_chains, write_curve
 
 NEAR, FAR = date(2026, 10, 16), date(2026, 11, 20)  # 14 and 49 days; 11-20 is a monthly
 T = (14 / 365, 49 / 365)

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from algotrade.core.views.market_view import MarketView
-from tests.factories import series_from_closes
+from tests.helpers.domain_objects import series_from_closes
 
 
 @pytest.fixture

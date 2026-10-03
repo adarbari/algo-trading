@@ -22,8 +22,8 @@ from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.sources.framework.registry import fixture_source
 from algotrade_ingestion.tasks.maintenance.golden import load_golden
 from tests.conftest import GOLDEN_DIR
-from tests.ingest_helpers import task_ctx
-from tests.storage_helpers import stamped
+from tests.helpers.ingest_fakes import task_ctx
+from tests.helpers.stored_frames import stamped
 
 T0 = datetime(2026, 10, 3, tzinfo=UTC)
 LOADED = datetime(2026, 10, 1, tzinfo=UTC)

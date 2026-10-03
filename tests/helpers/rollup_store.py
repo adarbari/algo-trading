@@ -10,7 +10,7 @@ from algotrade.core.time.calendar import sessions_ending
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
-from tests.storage_helpers import stamped
+from tests.helpers.stored_frames import stamped
 
 END = date(2026, 10, 2)
 

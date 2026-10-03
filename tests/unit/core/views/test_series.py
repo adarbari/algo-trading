@@ -1,7 +1,7 @@
 import numpy as np
 
 from algotrade.core.views.series import PriceSeries, panel
-from tests.factories import series_from_closes
+from tests.helpers.domain_objects import series_from_closes
 
 
 def test_panel_keeps_every_timestamp_with_nan_gaps() -> None:

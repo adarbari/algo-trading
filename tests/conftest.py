@@ -11,7 +11,7 @@ from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.sources.framework.base import FixtureSource
 from algotrade_ingestion.sources.framework.registry import fixture_source
 from algotrade_ingestion.tasks.maintenance.golden import load_golden
-from tests.ingest_helpers import task_ctx
+from tests.helpers.ingest_fakes import task_ctx
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 GOLDEN_DIR = REPO_ROOT / "datasets" / "golden"

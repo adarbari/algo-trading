@@ -24,8 +24,8 @@ from algotrade_ingestion.sources.vendors.cboe.option_chains import (
     missing_chain,
     parse_chain,
 )
-from tests import cboe_fixture as fx
-from tests.ingest_helpers import CountingLimiter, http_for
+from tests.helpers.ingest_fakes import CountingLimiter, http_for
+from tests.helpers.payloads import cboe as fx
 
 FAST = RetryPolicy(tries=3, base_delay=0, max_delay=0)
 

@@ -19,6 +19,12 @@ names, request keys, response fields) inside `sources/vendors/<vendor>/`; never 
 `src/algotrade/config/site/settings.py`. Look these up in `architecture/ownership.toml`; `make ownership`
 must pass with `architecture/known_violations.toml` still empty.
 
+0. **Where it goes:** look the kind up in the "Where does this go?" table (CLAUDE.md,
+   Directory layout) and its folder in `architecture/layout.toml`. Here:
+   `sources/vendors/<vendor>/` (new folder, covered by the `sources/vendors/*` entry). If no
+   folder fits, add one for the new kind (`.claude/skills/add-responsibility`, step 3);
+   never park code in a neighbouring folder. Tests go in the mirrored folder; run `make
+   layout` and plan a split if the folder is at 8+ modules.
 1. **Location:** a new folder `apps/ingestion/algotrade_ingestion/sources/vendors/<vendor>/`
    with an `__init__.py` docstring naming the vendor, and one module per dataset it serves
    (e.g. `bars.py`); shared auth / paging goes in `client.py` (see `vendors/massive/`). The
@@ -30,7 +36,7 @@ must pass with `architecture/known_violations.toml` still empty.
    (raw, exactly as received; `None` only for a genuine "nothing there", never for errors)
    and `normalize(FetchRequest, bytes) -> Normalized | None` (canonical frames keyed by
    storage table, without point-in-time columns). Its constructor takes one `Http` (tests:
-   `tests.ingest_helpers.http_for(fake_transport)`). Rows keyed by a vendor ticker carry
+   `tests.helpers.ingest_fakes.http_for(fake_transport)`). Rows keyed by a vendor ticker carry
    `symbol`; the task resolves `instrument_id` through the reference (ADR 0018). Register the adapter in
    `tests/apps/ingestion/sources/test_source_contract.py::ADAPTERS` with a canned payload.
 3. **Raw is saved for you:** tasks call `IngestRun.fetch(source, request)`, which saves the

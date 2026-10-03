@@ -7,6 +7,12 @@ description: Add or change any UI widget, screen or visual element in apps/web. 
 
 Read first: `docs/ui/design-system.md` and ADR 0011.
 
+0. **Where it goes:** look the kind up in the "Where does this go?" table (CLAUDE.md,
+   Directory layout) and its folder in `architecture/layout.toml`. Here:
+   `apps/web/design-system/components/<Name>/`; screens in `apps/web/app/`. If no folder
+   fits, add one for the new kind (`.claude/skills/add-responsibility`, step 3); never park
+   code in a neighbouring folder. Tests go in the mirrored folder; run `make layout` and
+   plan a split if the folder is at 8+ modules.
 1. **Check the inventory:** read `apps/web/design-system/COMPONENTS.md`. Can an existing
    component, or a composition or configuration of components, do the job? Then use it
    and stop here.

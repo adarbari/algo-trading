@@ -11,10 +11,10 @@ from algotrade_ingestion.sources.framework.http import RetryPolicy
 from algotrade_ingestion.sources.framework.registry import build_sources
 from algotrade_ingestion.sources.vendors.cboe.option_chains import CboeOptionsSource
 from algotrade_ingestion.sources.vendors.nasdaq.earnings import NasdaqEarningsSource
-from tests import cboe_fixture as fx
 from tests.apps.ingestion.tasks.market.test_option_chains import FakeFeed
 from tests.conftest import REPO_ROOT
-from tests.ingest_helpers import http_for, use_source
+from tests.helpers.ingest_fakes import http_for, use_source
+from tests.helpers.payloads import cboe as fx
 
 pytestmark = pytest.mark.e2e
 DAY = fx.SESSION.isoformat()
@@ -30,7 +30,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (tmp_path / "config" / "site" / "universe.toml").write_text('source = "csv_import"\n')
     monkeypatch.setenv("ALGOTRADE_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.chdir(tmp_path)  # the nightly writes var/logs/nightly-latest.json here
-    from tests.earnings_fixture import calendar  # noqa: PLC0415
+    from tests.helpers.payloads.nasdaq_earnings import calendar  # noqa: PLC0415
 
     earnings = calendar([("AAPL", "time-after-hours")])
     policy = RetryPolicy(tries=1)
@@ -120,7 +120,7 @@ def test_rollups_only_iv30(env: Path, capsys: pytest.CaptureFixture[str]) -> Non
     from algotrade.storage.factory import open_backend  # noqa: PLC0415
     from algotrade.storage.tables.readers import StoreReader  # noqa: PLC0415
     from algotrade.storage.tables.writers import StoreWriter  # noqa: PLC0415
-    from tests.rollup_helpers import write_curve  # noqa: PLC0415
+    from tests.helpers.rollup_store import write_curve  # noqa: PLC0415
 
     call(capsys, "universe", "--stocks", str(env / "stocks.csv"), "--version", "v", "--date", DAY)
     call(capsys, "chains", "--date", DAY, "--symbols", "aapl")

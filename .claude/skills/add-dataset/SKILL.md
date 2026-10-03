@@ -16,6 +16,13 @@ ingest loop owner, `IngestRun` in `apps/ingestion/.../tasks/framework/run.py` (r
 save, stamping, id resolution), not a copy of it. New site settings for it are read by the
 settings owner and must drive code (a test checks).
 
+0. **Where it goes:** look the kind up in the "Where does this go?" table (CLAUDE.md,
+   Directory layout) and its folder in `architecture/layout.toml`. Here: schema in
+   `storage/tables/`, backends in `storage/backends/`, reads in `data/`, the task in
+   `tasks/<domain>/`. If no folder fits, add one for the new kind
+   (`.claude/skills/add-responsibility`, step 3); never park code in a neighbouring folder.
+   Tests go in the mirrored folder; run `make layout` and plan a split if the folder is at
+   8+ modules.
 1. **Pick the grain:** reference, event, bar(interval), chain snapshot, universe,
    cross-section, feature or result. New intervals of bars are **not** new datasets; add
    the `interval` value. Only create a new grain with an ADR.

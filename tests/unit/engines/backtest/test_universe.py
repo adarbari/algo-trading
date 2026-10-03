@@ -12,7 +12,7 @@ from algotrade.engines.backtest.costs import CostModel
 from algotrade.engines.backtest.engine import run_backtest
 from algotrade.engines.backtest.universe import DynamicUniverse
 from algotrade.strategies.trading.base import Strategy
-from tests.factories import series_from_closes
+from tests.helpers.domain_objects import series_from_closes
 
 FREE = BacktestConfig(initial_cash=1_000, costs=CostModel.free(), cash_buffer=0)
 

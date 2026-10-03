@@ -19,7 +19,7 @@ from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from tests.conftest import REPO_ROOT
-from tests.storage_helpers import T0, reference_rows, stamped, universe_rows
+from tests.helpers.stored_frames import T0, reference_rows, stamped, universe_rows
 
 SITE_CONFIGS = FileConfigStore(REPO_ROOT / "config")
 

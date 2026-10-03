@@ -12,7 +12,7 @@ from algotrade_ingestion.sources.fixtures.generators import (
     ou_closes,
     regime_closes,
 )
-from tests.factories import series_from_closes
+from tests.helpers.domain_objects import series_from_closes
 
 
 def test_business_days_skip_weekends() -> None:

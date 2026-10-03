@@ -23,9 +23,9 @@ from algotrade_ingestion.tasks.reference.universe_build import (
     UniverseSources,
     build_universe,
 )
-from tests import massive_fixture as mfx
-from tests import universe_fixture as fx
-from tests.ingest_helpers import http_for, task_ctx
+from tests.helpers.ingest_fakes import http_for, task_ctx
+from tests.helpers.payloads import massive as mfx
+from tests.helpers.payloads import universe as fx
 
 D1 = date(2026, 10, 1)
 D2, D3 = D1 + timedelta(days=1), D1 + timedelta(days=2)

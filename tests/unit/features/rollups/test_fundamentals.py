@@ -14,8 +14,8 @@ from algotrade.features.registry import catalogue_columns
 from algotrade.features.rollups import price_stats
 from algotrade.features.rollups.fundamentals import ROLLUP, FundamentalsParams, choose
 from algotrade.storage.tables.writers import StoreWriter
-from tests.rollup_helpers import END, series, store, write_bars, write_split
-from tests.storage_helpers import stamped
+from tests.helpers.rollup_store import END, series, store, write_bars, write_split
+from tests.helpers.stored_frames import stamped
 
 STORED = END + timedelta(days=1)  # a backfill stored after every session it serves
 

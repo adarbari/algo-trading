@@ -7,7 +7,7 @@ import pandas as pd
 
 from algotrade.features.framework.runner import compute_one, compute_sessions
 from algotrade.features.rollups import earnings
-from tests.rollup_helpers import store, write_earnings
+from tests.helpers.rollup_store import store, write_earnings
 
 ROLLUP = earnings.ROLLUP
 

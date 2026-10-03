@@ -13,8 +13,8 @@ from algotrade_ingestion.sources.framework.http import HttpError, RetryPolicy
 from algotrade_ingestion.sources.vendors.treasury.par_yields import TreasuryParYields
 from algotrade_ingestion.tasks.framework.registry import run_task
 from algotrade_ingestion.tasks.market.rates import TABLE, ingest_rates
-from tests import treasury_fixture
-from tests.ingest_helpers import http_for, task_ctx
+from tests.helpers.ingest_fakes import http_for, task_ctx
+from tests.helpers.payloads import treasury as treasury_payloads
 
 
 def _source(urls: list[str], fail_year: int | None = None) -> TreasuryParYields:
@@ -23,7 +23,7 @@ def _source(urls: list[str], fail_year: int | None = None) -> TreasuryParYields:
         if fail_year is not None and f"/{fail_year}/" in url:
             raise HttpError(500)
         if "/2025/" in url:
-            return treasury_fixture.payload(2025)
+            return treasury_payloads.payload(2025)
         return b""  # a year with nothing published yet
 
     return TreasuryParYields(http_for(transport, RetryPolicy(tries=1)))

@@ -5,7 +5,7 @@ BIN = $(dir $(PY))
 GOLDEN_URL ?= file://datasets/golden/store
 
 
-.PHONY: install lock-check lint format typecheck arch ownership ownership-update dupes dupes-update filelen unit property integration e2e test \
+.PHONY: install lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update filelen unit property integration e2e test \
         evaluate baseline datasets-verify datasets-build golden-store check nightly
 
 UV ?= uv
@@ -30,6 +30,10 @@ typecheck:
 
 arch:            ## dependency boundaries between layers
 	$(BIN)lint-imports
+
+layout:          ## directory layout fitness tests + early warning: folders at 8+ of 10 modules
+	$(PY) -m pytest -q tests/architecture/test_layout.py tests/architecture/test_layout_buckets.py
+	$(PY) scripts/layout_report.py
 
 ownership:       ## every responsibility done only by its owner (ADR 0019); ratchet only shrinks
 	$(PY) scripts/check_ownership.py --summary
@@ -77,7 +81,7 @@ evaluate: golden-store  ## strategy scorecard vs committed baseline
 baseline: golden-store  ## accept current results as the new baseline (review the diff!)
 	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate --update-baseline
 
-check: lock-check lint typecheck arch ownership dupes filelen datasets-verify test evaluate
+check: lock-check lint typecheck arch layout ownership dupes filelen datasets-verify test evaluate
 
 nightly:
 	HYPOTHESIS_PROFILE=nightly $(PY) -m pytest tests/property

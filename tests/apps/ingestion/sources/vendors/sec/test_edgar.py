@@ -16,8 +16,8 @@ from algotrade_ingestion.sources.vendors.sec.edgar import (
     user_agent,
 )
 from algotrade_ingestion.sources.vendors.sec.sic import sic_division, sic_sector
-from tests.ingest_helpers import CountingLimiter, http_for
-from tests.sec_fixture import submissions, tickers
+from tests.helpers.ingest_fakes import CountingLimiter, http_for
+from tests.helpers.payloads.sec import submissions, tickers
 
 
 def test_pad_cik_and_symbols() -> None:

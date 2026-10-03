@@ -16,7 +16,7 @@ from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.sources.framework.registry import fixture_source
 from algotrade_ingestion.tasks.maintenance.golden import load_golden
 from tests.conftest import GOLDEN_DIR
-from tests.ingest_helpers import task_ctx
+from tests.helpers.ingest_fakes import task_ctx
 
 T0 = datetime(2026, 10, 3, tzinfo=UTC)  # the injected launch clock: backtests read as_of T0
 LOADED = datetime(2026, 10, 1, tzinfo=UTC)  # when the golden data was stored (before T0)

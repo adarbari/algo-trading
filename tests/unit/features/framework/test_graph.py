@@ -10,7 +10,7 @@ from algotrade.features.framework import inputs
 from algotrade.features.framework.declaration import Input, Inputs, Rollup
 from algotrade.features.framework.graph import dependencies, dependency_order, dependents
 from algotrade.features.framework.runner import compute_in_memory, compute_one
-from tests.rollup_helpers import (
+from tests.helpers.rollup_store import (
     END,
     series,
     store,
@@ -19,7 +19,7 @@ from tests.rollup_helpers import (
     write_dividends,
     write_split,
 )
-from tests.storage_helpers import stamped
+from tests.helpers.stored_frames import stamped
 
 
 def passthrough(frames: Inputs, session: date, params: None) -> pd.DataFrame:

@@ -19,9 +19,9 @@ from algotrade_ingestion.tasks.market.option_chains import (
     ingest_option_chains,
 )
 from algotrade_ingestion.tasks.reference.universe_import import UniverseFile, import_universe
-from tests import cboe_fixture as fx
-from tests.ingest_helpers import CountingLimiter, http_for, task_ctx
-from tests.storage_helpers import write_reference
+from tests.helpers.ingest_fakes import CountingLimiter, http_for, task_ctx
+from tests.helpers.payloads import cboe as fx
+from tests.helpers.stored_frames import write_reference
 
 DAY = fx.SESSION
 CLOCK = lambda: datetime(2026, 10, 2, 22, 0, tzinfo=UTC)  # noqa: E731

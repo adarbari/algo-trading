@@ -16,7 +16,7 @@ from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
 from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.writers import StoreWriter
-from tests.storage_helpers import T0, stamped, universe_rows
+from tests.helpers.stored_frames import T0, stamped, universe_rows
 
 D1, D2 = date(2026, 10, 1), date(2026, 10, 2)
 TABLE = "rollups/instrument/demo@v1"

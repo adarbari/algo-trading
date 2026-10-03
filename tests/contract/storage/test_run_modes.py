@@ -16,7 +16,7 @@ from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.writers import StoreWriter
-from tests.storage_helpers import T0, stamped
+from tests.helpers.stored_frames import T0, stamped
 
 DAY = date(2026, 10, 2)
 DIVIDENDS = "events/dividend"

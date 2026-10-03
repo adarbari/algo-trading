@@ -3,7 +3,7 @@ import pytest
 
 from algotrade.analytics.metrics import compute_metrics, max_drawdown
 from algotrade.analytics.report import markdown_table
-from tests.factories import fill
+from tests.helpers.domain_objects import fill
 
 
 def test_max_drawdown() -> None:

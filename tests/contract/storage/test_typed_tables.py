@@ -21,7 +21,7 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.schemas import SCHEMA_VERSION, spec_for
 from algotrade.storage.tables.writers import StoreWriter
-from tests.storage_helpers import T0, stamped
+from tests.helpers.stored_frames import T0, stamped
 
 D1, D2 = date(2026, 10, 1), date(2026, 10, 2)
 

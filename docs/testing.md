@@ -2,11 +2,31 @@
 
 | Suite | Path | Purpose | Speed |
 |---|---|---|---|
-| Unit | `tests/unit/<layer>/` | One module at a time; mirrors `src/` layout. | ms |
-| Architecture | `tests/architecture/` | File-length limit, every layer tested + documented, module docstrings. | ms |
+| Unit | `tests/unit/<path>/` | One module at a time; mirrors `src/algotrade/<path>/`. | ms |
+| App | `tests/apps/<app>/<path>/` | App modules; mirrors `apps/<app>/<package>/<path>/`. | ms |
+| Contract | `tests/contract/<protocol>/` | Every implementation of a protocol (storage backends). | ms |
+| Architecture | `tests/architecture/` | Fitness tests: layout, ownership, file length, docstrings, docs. | ms |
 | Property | `tests/property/` | Hypothesis invariants across *all* registered strategies. | ~1s (`dev`), minutes (`nightly`) |
 | Integration | `tests/integration/` | Real data store + engine across every golden dataset. | ~1s |
 | End-to-end | `tests/e2e/` | The `algotrade-backtest` CLI against committed datasets and baseline. | seconds |
+
+## Test layout
+
+Tests follow the directory layout (ADR 0020, `architecture/layout.toml`, checked by
+`tests/architecture/test_layout_buckets.py`):
+
+- **Mirror the source.** A test for `src/algotrade/<path>/x.py` lives in `tests/unit/<path>/`;
+  for `apps/ingestion/algotrade_ingestion/<path>/x.py` in `tests/apps/ingestion/<path>/`
+  (`[[test_mirror]]`). A test folder whose source folder does not exist fails.
+- **Shared builders** live in `tests/helpers/`, one module per thing built
+  (`stored_frames`, `ingest_fakes`, `rollup_store`, `domain_objects`); synthetic payloads in
+  a vendor's wire format in `tests/helpers/payloads/<vendor>.py`. Never name a module
+  `helpers.py` or `utils.py`.
+- **Recorded data** (real format, trimmed) lives in `tests/fixtures/sources/<vendor>/`.
+- **Anything else** is a declared `[[test_dir]]` bucket with a purpose; `tests/` itself
+  holds only `conftest.py`.
+- At most 10 modules per test folder (`__init__.py`, `conftest.py` excluded): split by kind,
+  mirroring the source. `make layout` lists folders at 8+.
 
 Run everything with `make test` (enforces 90% branch coverage). Hypothesis profiles are
 chosen with `HYPOTHESIS_PROFILE=dev|ci|nightly`.

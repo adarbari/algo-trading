@@ -3,7 +3,7 @@ import pytest
 from algotrade.core.model.types import Order, Side
 from algotrade.engines.backtest.costs import CostModel
 from algotrade.engines.backtest.simulated import SimulatedBroker
-from tests.factories import T0
+from tests.helpers.domain_objects import T0
 
 
 def test_slippage_is_adverse() -> None:
