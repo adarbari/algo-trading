@@ -158,4 +158,180 @@ Source: `design-system/primitives/VisuallyHidden`
 
 ## Components
 
-None yet (built after the mockups are approved).
+### BarList
+
+BarList: labelled rows, each with a bar scaled to a maximum and its value as text: a screener funnel (universe -> each hard criterion), coverage by fetch-priority tier, top sectors. `inline` puts label | bar | value on one line; `stacked` puts the label above the bar (long labels, narrow panels). Bars are decorative: each row reads as "label value".
+
+Source: `design-system/components/BarList`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `readonly BarListItem[]` | yes |  |
+| `label` | `string` | yes | Accessible name of the list, e.g. "Funnel (hard criteria)". |
+| `max` | `number` | no | The value of a full-length bar (default: the largest value). A funnel passes its universe. |
+| `format` | `ValueFormat` | no | Format of the values (default grouped number). |
+| `layout` | `'inline' \| 'stacked'` | no | `inline` (label \| bar \| value) or `stacked` (label above bar, value at the end). |
+| `tone` | `DataTone` | no | Bar colour for every row (default `accent`). |
+| `loading` | `boolean` | no |  |
+| `error` | `ReactNode` | no | Replaces the rows with this message. |
+| `emptyMessage` | `ReactNode` | no |  |
+
+### DataTable
+
+DataTable: the generic data grid (screener results, ticker lists, quality checks). Typed columns (header, description, accessor, format, cell slot); single-column sorting with `aria-sort`; numbers right-aligned in tabular figures through the shared formatters (number, percent, `$13.99B`, date, signed delta with up / down tone); a column picker fed by the caller's columns and descriptions; controlled row selection (checkbox column, Shift-click ranges); a sticky header; virtual scrolling with fixed row heights per density (tens of thousands of rows); loading / empty / error states; keyboard navigation (arrows, Page Up / Down, Home / End move the active row, Enter activates it, Space selects it); horizontal scrolling on narrow widths. Built on TanStack Table + Virtual, which stay internal.
+
+Source: `design-system/components/DataTable`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `columns` | `readonly DataTableColumn<TRow>[]` | yes | Column definitions, in display order. |
+| `rows` | `readonly TRow[]` | yes |  |
+| `getRowId` | `(row: TRow) => string` | yes | Stable id of a row (selection and focus follow it through sorting). |
+| `label` | `string` | yes | Accessible name of the grid, e.g. "Preview results". |
+| `getRowLabel` | `(row: TRow) => string` | no | Short name of a row for its checkbox ("Select AAPL"); default the row id. |
+| `sort` | `DataTableSort \| null` | no | Controlled sort (pair with `onSortChange`); `null` = unsorted (input order). |
+| `defaultSort` | `DataTableSort \| null` | no | Initial sort when uncontrolled. |
+| `onSortChange` | `(sort: DataTableSort \| null) => void` | no |  |
+| `hiddenColumns` | `readonly string[]` | no | Controlled hidden column ids (pair with `onHiddenColumnsChange`). |
+| `defaultHiddenColumns` | `readonly string[]` | no | Initially hidden column ids when uncontrolled. |
+| `onHiddenColumnsChange` | `(hidden: string[]) => void` | no |  |
+| `columnPicker` | `boolean` | no | Show the "Columns" picker in the toolbar. |
+| `selectable` | `boolean` | no | Add the checkbox column. Selection is controlled: pass `selectedIds` and `onSelectionChange`. |
+| `selectedIds` | `readonly string[]` | no |  |
+| `onSelectionChange` | `(ids: string[]) => void` | no |  |
+| `onRowActivate` | `(row: TRow) => void` | no | Enter on the active row, or a click on a row. |
+| `status` | `'ready' \| 'loading' \| 'error'` | no | `ready` (default), `loading` (placeholder rows) or `error` (shows `errorMessage`). |
+| `errorMessage` | `ReactNode` | no |  |
+| `emptyMessage` | `ReactNode` | no | Shown when there are no rows. |
+| `visibleRows` | `number` | no | Height of the scrolling body in rows (default 12); fewer rows shrink the table. |
+| `rowLines` | `1 \| 2` | no | Lines of text per row: 1 (default) or 2 (a symbol with its name underneath). |
+| `toolbar` | `ReactNode` | no | Toolbar content before the column picker (a count, filters). |
+
+### Disclosure
+
+Disclosure: a summary row (label + count) that expands to show detail: grouped issues ("Stale: 515"), a rule's explanation, an advanced section. The summary is a button with `aria-expanded` controlling the detail region. Controlled (`open` + `onOpenChange`) or uncontrolled (`defaultOpen`). `boxed` (default) draws the soft border of grouped issues.
+
+Source: `design-system/components/Disclosure`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `ReactNode` | yes | The summary text. |
+| `count` | `ReactNode` | no | A count (or short value) at the end of the summary row. |
+| `countTone` | `'default' \| 'positive' \| 'warning' \| 'negative' \| 'muted'` | no | Colour of the count: default text, or a status. |
+| `open` | `boolean` | no | Controlled open state (pair with `onOpenChange`). |
+| `defaultOpen` | `boolean` | no | Initial open state when uncontrolled. |
+| `onOpenChange` | `(open: boolean) => void` | no |  |
+| `variant` | `'boxed' \| 'plain'` | no | `boxed` (soft border, default) or `plain` (a row in a list that draws its own dividers). |
+| `children` | `ReactNode` | yes | The detail shown when open. |
+
+### HeatGrid
+
+HeatGrid: a rows x columns grid of status cells, e.g. ingestion completeness (datasets x sessions). Each cell is complete / partial / failed / not collected, with optional value text (`99.7`); a header row names the columns, a header column names the rows, and a Legend explains the colours. One cell can be selected (accent outline) to drill in. An ARIA grid: arrow keys move between cells, Home / End to the row ends, Ctrl+Home / Ctrl+End to the corners, Enter or Space (or a click) selects; only one cell is in the Tab order.
+
+Source: `design-system/components/HeatGrid`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `rows` | `readonly HeatGridRow[]` | yes |  |
+| `columns` | `readonly HeatGridColumn[]` | yes |  |
+| `label` | `string` | yes | Accessible name of the grid, e.g. "Completeness by dataset and session". |
+| `rowHeader` | `string` | no | Header of the row-label column (visually hidden), e.g. "Dataset". |
+| `selected` | `HeatGridPosition \| null` | no | The selected cell (controlled), outlined in the accent. |
+| `onSelect` | `(position: HeatGridPosition) => void` | no | Called when a cell is clicked or chosen with Enter / Space. |
+| `statusLabels` | `Partial<Record<HeatStatus, string>>` | no | Words for each status in the legend and the cells' accessible names. |
+| `legend` | `boolean` | no | Show the status legend above the grid (default true). |
+| `loading` | `boolean` | no |  |
+| `error` | `ReactNode` | no | Replaces the grid with this message. |
+| `emptyMessage` | `ReactNode` | no |  |
+
+### KeyValue
+
+KeyValue: a definition list for detail panels: a label column and a value column (`<dl>`), values tabular. Values are text or formatted with a ValueFormat (`$13.99B`, `+1.24%` with its up / down tone); an optional hint (a feature id, a unit, a rule) sits under the label. Loading shows placeholder values, an empty list shows the empty message.
+
+Source: `design-system/components/KeyValue`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `readonly KeyValueItem[]` | yes |  |
+| `layout` | `'columns' \| 'stacked'` | no | `columns` (label beside value, the default) or `stacked` (label above value). |
+| `alignValues` | `'start' \| 'end'` | no | Align values to the end of the value column (numbers). |
+| `loading` | `boolean` | no | Show placeholders instead of values. |
+| `emptyMessage` | `ReactNode` | no | Shown when there are no items. |
+| `label` | `string` | no | Accessible name for the list. |
+
+### Legend
+
+Legend: the key to a chart, bar or grid. A wrapped row of swatches, each with its label and an optional value (`OK 3,624`). Swatches are status tones (`positive` ... `info`, `empty` for "not collected"), the data series `s1`-`s6`, `accent` or `muted`; colour is never the only key, so every swatch carries its label as text.
+
+Source: `design-system/components/Legend`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `readonly LegendItem[]` | yes |  |
+| `swatch` | `'cell' \| 'solid' \| 'line'` | no | Swatch shape: `cell` (tinted fill + border, matches HeatGrid cells), `solid` (bars and areas, the default) or `line` (chart lines). |
+| `label` | `string` | no | Accessible name of the list, e.g. "Status key". |
+| `size` | `'sm' \| 'xs'` | no | Text size: `sm` 12 px (default) or `xs` 11.5 px. |
+
+### ShareBar
+
+ShareBar: one horizontal bar showing a share of a whole (coverage 94.1%, completeness 86%), with the percentage as text beside it. Exposed as a meter (`role="meter"`) with the value as text, so the colour is never the only signal (an unknown or loading share is an image named "<label>: unknown"). Tone defaults to the accent.
+
+Source: `design-system/components/ShareBar`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `number \| null` | yes | The share as a fraction, 0 to 1 (clamped). `null` = unknown: empty track and an em dash. |
+| `label` | `string` | yes | Accessible name, e.g. "S&P 500 coverage". Shown above the bar with `showLabel`. |
+| `showLabel` | `boolean` | no | Show the label above the bar (otherwise it names the meter for screen readers only). |
+| `showValue` | `boolean` | no | Show the percentage after the bar (default true). |
+| `digits` | `number` | no | Fraction digits of the percentage (default 1). |
+| `tone` | `DataTone` | no | Fill colour (default `accent`). |
+| `size` | `'sm' \| 'md'` | no | Bar thickness: `sm` 6 px (lists, default) or `md` 10 px (a headline bar). |
+| `loading` | `boolean` | no | Placeholder track while the value loads. |
+
+### StackedBar
+
+StackedBar: one bar split into toned segments that add up to a whole (option chains: OK, stale, no chain, errors), with a Legend of each segment's count underneath. The bar is an image whose accessible name lists every segment with its count and share; the legend repeats them as text, so colour is never the only key.
+
+Source: `design-system/components/StackedBar`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `segments` | `readonly StackedBarSegment[]` | yes |  |
+| `label` | `string` | yes | What the bar measures, e.g. "Option chains, Fri 2 Oct". Names the image. |
+| `total` | `number` | no | The whole (default: the sum of the segments). A larger total leaves the rest as track. |
+| `format` | `ValueFormat` | no | Format of the counts in the legend and the accessible name (default grouped number). |
+| `showLegend` | `boolean` | no | Show the legend under the bar (default true). |
+| `size` | `'sm' \| 'md'` | no | Bar thickness: `md` 10 px (default) or `sm` 6 px. |
+| `loading` | `boolean` | no | Placeholder track while loading. |
+| `error` | `ReactNode` | no | Replaces the bar with this message. |
+| `emptyMessage` | `ReactNode` | no | Shown under an empty track when the total is zero. |
+
+### StatStrip
+
+StatStrip: a summary row of a few headline numbers (completeness, checks, run time, open issues), separated by thin borders inside one bordered strip, never as separate cards. Each stat has a label, a value (text or a formatted number, optionally toned) and a sub-line. The strip wraps to two columns, then one, in narrow containers. Loading shows placeholders.
+
+Source: `design-system/components/StatStrip`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `readonly StatItem[]` | yes |  |
+| `label` | `string` | yes | Accessible name of the strip, e.g. "Summary". |
+| `loading` | `boolean` | no | Show placeholders instead of values. |
+| `error` | `ReactNode` | no | Replaces the values with this message (the summary failed to load). |
+| `emptyMessage` | `ReactNode` | no | Shown when there are no items. |
+
+### Tabs
+
+Tabs: switches between views of the same subject (Compare, Chart, Options, ...). A `tablist` of underline tabs (the accent underline marks the selected one) and the selected view's panel. Controlled: the caller owns `value`. Keyboard: Left / Right (wrapping), Home / End move focus and select (automatic activation); only the selected tab is in the Tab order.
+
+Source: `design-system/components/Tabs`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `readonly TabItem[]` | yes |  |
+| `value` | `string` | yes | The selected tab id. |
+| `onChange` | `(id: string) => void` | yes |  |
+| `label` | `string` | yes | Accessible name of the tab list, e.g. "View". |
+| `children` | `ReactNode` | no | The selected tab's content, rendered in its tabpanel. Omit to render the tab list only. |
+| `size` | `'sm' \| 'md'` | no | Text size: `md` (default) or `sm` (dense toolbars). |

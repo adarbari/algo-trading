@@ -388,6 +388,10 @@ path = "apps/web/design-system/testing"
 purpose = "test support for design-system tests (axe assertion); never exported"
 
 [[web_dir]]
+path = "apps/web/design-system/format"
+purpose = "value formatters shared by the data components (number, percent, compact currency, date, signed delta with up/down tone); exported from @algotrade/ui"
+
+[[web_dir]]
 path = "apps/web/design-system/foundations"
 purpose = "Storybook foundation pages (Foundations/Tokens: colours with contrast, type, space, radius, density)"
 styles = true

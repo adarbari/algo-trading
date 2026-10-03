@@ -1,0 +1,89 @@
+/* BarList: label | track | value rows (inline), or label over track (stacked). */
+.list {
+  display: grid;
+  grid-template-columns: minmax(0, var(--size-label)) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-1-5) var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+}
+
+.row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+}
+
+.list[data-layout='stacked'] {
+  grid-template-columns: minmax(0, 1fr) auto;
+  row-gap: var(--space-1-5);
+}
+
+.label {
+  overflow: hidden;
+  color: var(--color-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track {
+  display: block;
+  height: var(--space-1-5);
+  border-radius: var(--radius-sm);
+  background: var(--color-track);
+}
+
+.fill {
+  display: block;
+  width: var(--share);
+  height: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--tone-fill);
+}
+
+.value {
+  min-width: calc(var(--space-10) + var(--space-4));
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.message {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.message[data-tone='negative'] {
+  color: var(--color-negative);
+}
+
+.list[data-layout='stacked'] .row {
+  grid-template-areas:
+    'label value'
+    'track value';
+  row-gap: var(--space-0-5);
+}
+
+.list[data-layout='stacked'] .label {
+  grid-area: label;
+  color: var(--color-text-2);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.list[data-layout='stacked'] .track {
+  grid-area: track;
+}
+
+.list[data-layout='stacked'] .value {
+  grid-area: value;
+  align-self: end;
+  font-weight: var(--font-weight-medium);
+}

@@ -1,0 +1,241 @@
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+
+import { expectNoA11yViolations } from '../../testing';
+import type { DataTableColumn } from './columns';
+import { DataTable, type DataTableProps } from './DataTable';
+import { makeUniverse, type TickerRow } from './storyData';
+
+const columns: DataTableColumn<TickerRow>[] = [
+  { id: 'symbol', header: 'Ticker', value: (r) => r.symbol, mono: true, hideable: false },
+  { id: 'close', header: 'Close', value: (r) => r.close, format: { kind: 'currency' } },
+  {
+    id: 'iv30',
+    header: 'IV30',
+    description: 'Our 30-day implied volatility',
+    value: (r) => r.iv30,
+    format: { kind: 'percent' },
+  },
+  {
+    id: 'fromHigh',
+    header: 'From high',
+    value: (r) => r.fromHigh,
+    format: { kind: 'delta', digits: 1 },
+  },
+  { id: 'adv', header: 'ADV', value: (r) => r.adv, format: { kind: 'currency-compact' } },
+];
+
+const rows = makeUniverse(5);
+
+function Table(props: Partial<DataTableProps<TickerRow>>) {
+  return (
+    <DataTable columns={columns} rows={rows} getRowId={(r) => r.id} label="Tickers" {...props} />
+  );
+}
+
+function Selectable(
+  props: Partial<DataTableProps<TickerRow>> & { onChange?: (ids: string[]) => void },
+) {
+  const { onChange, ...rest } = props;
+  const [selected, setSelected] = useState<string[]>([]);
+  return (
+    <Table
+      selectable
+      selectedIds={selected}
+      getRowLabel={(r) => r.symbol}
+      onSelectionChange={(ids) => {
+        setSelected(ids);
+        onChange?.(ids);
+      }}
+      {...rest}
+    />
+  );
+}
+
+/** The item at `index`, failing the test when it is missing. */
+function at<T>(items: readonly T[], index: number): T {
+  const item = items[index];
+  if (item === undefined) throw new Error(`no item at ${index}`);
+  return item;
+}
+
+const bodyRows = () =>
+  screen.getAllByRole('row').filter((row) => row.getAttribute('aria-rowindex') !== '1');
+const firstCells = () =>
+  bodyRows().map((row) => within(row).getAllByRole('gridcell')[0]?.textContent);
+
+// jsdom has no layout: give elements a size so the virtualizer has a viewport to fill.
+const sized = ['offsetHeight', 'offsetWidth'] as const;
+const originals = sized.map((key) => Object.getOwnPropertyDescriptor(HTMLElement.prototype, key));
+beforeAll(() => {
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+    configurable: true,
+    get: () => 400,
+  });
+  Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+    configurable: true,
+    get: () => 1000,
+  });
+});
+afterAll(() => {
+  sized.forEach((key, i) => {
+    const original = originals[i];
+    if (original) Object.defineProperty(HTMLElement.prototype, key, original);
+  });
+});
+
+describe('DataTable', () => {
+  it('renders an ARIA grid with headers and formatted, aligned cells', () => {
+    render(<Table />);
+    const grid = screen.getByRole('grid', { name: 'Tickers' });
+    expect(grid).toHaveAttribute('aria-rowcount', '6');
+    expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual([
+      'Ticker',
+      'Close',
+      'IV30Our 30-day implied volatility',
+      'From high',
+      'ADV',
+    ]);
+    const aapl = at(bodyRows(), 0);
+    const cells = within(aapl).getAllByRole('gridcell');
+    expect(cells.map((c) => c.textContent)).toEqual([
+      'AAPL',
+      '$333.69',
+      '24.4%',
+      '−3.4%',
+      '$13.99B',
+    ]);
+    expect(cells[1]).toHaveAttribute('data-align', 'end');
+    expect(cells[3]).toHaveAttribute('data-tone', 'down');
+  });
+
+  it('sorts on header click with aria-sort; numbers start high-first, text A-Z', async () => {
+    const onSortChange = vi.fn();
+    render(<Table onSortChange={onSortChange} />);
+    const user = userEvent.setup();
+    const closeHeader = screen.getByRole('columnheader', { name: /Close/ });
+    expect(closeHeader).toHaveAttribute('aria-sort', 'none');
+    await user.click(within(closeHeader).getByRole('button'));
+    expect(closeHeader).toHaveAttribute('aria-sort', 'descending');
+    expect(onSortChange).toHaveBeenLastCalledWith({ columnId: 'close', direction: 'desc' });
+    expect(firstCells()).toEqual(['SPY', 'QQQ', 'MSFT', 'AAPL', 'NVDA']);
+    await user.click(within(closeHeader).getByRole('button'));
+    expect(closeHeader).toHaveAttribute('aria-sort', 'ascending');
+    expect(firstCells()).toEqual(['NVDA', 'AAPL', 'MSFT', 'QQQ', 'SPY']);
+    const ticker = screen.getByRole('columnheader', { name: /Ticker/ });
+    await user.click(within(ticker).getByRole('button'));
+    expect(ticker).toHaveAttribute('aria-sort', 'ascending');
+    expect(closeHeader).toHaveAttribute('aria-sort', 'none');
+    expect(firstCells()).toEqual(['AAPL', 'MSFT', 'NVDA', 'QQQ', 'SPY']);
+  });
+
+  it('keeps missing values last in both directions', async () => {
+    const withGap = [...rows, { ...at(rows, 0), id: 'NOIV', symbol: 'NOIV', iv30: null }];
+    render(<Table rows={withGap} defaultSort={{ columnId: 'iv30', direction: 'desc' }} />);
+    expect(firstCells().at(-1)).toBe('NOIV');
+    await userEvent
+      .setup()
+      .click(within(screen.getByRole('columnheader', { name: /IV30/ })).getByRole('button'));
+    expect(firstCells().at(-1)).toBe('NOIV');
+  });
+
+  it('follows a controlled sort', () => {
+    render(<Table sort={{ columnId: 'adv', direction: 'asc' }} />);
+    expect(firstCells()).toEqual(['MSFT', 'AAPL', 'QQQ', 'NVDA', 'SPY']);
+  });
+
+  it('selects rows with checkboxes, Shift-click ranges and select-all (controlled)', async () => {
+    const onChange = vi.fn();
+    render(<Selectable onChange={onChange} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('checkbox', { name: 'Select AAPL' }));
+    expect(onChange).toHaveBeenLastCalledWith(['AAPL']);
+    expect(bodyRows()[0]).toHaveAttribute('aria-selected', 'true');
+    await user.keyboard('{Shift>}');
+    await user.click(screen.getByRole('checkbox', { name: 'Select NVDA' }));
+    await user.keyboard('{/Shift}');
+    expect([...(onChange.mock.lastCall?.[0] as string[])].sort()).toEqual(['AAPL', 'MSFT', 'NVDA']);
+    const all = screen.getByRole('checkbox', { name: 'Select all rows' });
+    expect((all as HTMLInputElement).indeterminate).toBe(true);
+    await user.click(all);
+    expect(onChange.mock.lastCall?.[0] as string[]).toHaveLength(5);
+    expect(all).toBeChecked();
+  });
+
+  it('moves the active row with the keyboard; Enter activates, Space selects', async () => {
+    const onRowActivate = vi.fn();
+    const onChange = vi.fn();
+    render(<Selectable onRowActivate={onRowActivate} onChange={onChange} />);
+    const user = userEvent.setup();
+    const grid = screen.getByRole('grid');
+    await user.tab();
+    expect(grid).toHaveFocus();
+    expect(grid.getAttribute('aria-activedescendant')).toBe(at(bodyRows(), 0).id);
+    await user.keyboard('{ArrowDown}{ArrowDown}');
+    expect(grid.getAttribute('aria-activedescendant')).toBe(at(bodyRows(), 2).id);
+    await user.keyboard('{Enter}');
+    expect(onRowActivate).toHaveBeenLastCalledWith(expect.objectContaining({ symbol: 'NVDA' }));
+    await user.keyboard(' ');
+    expect(onChange).toHaveBeenLastCalledWith(['NVDA']);
+    await user.keyboard('{End}');
+    expect(grid.getAttribute('aria-activedescendant')).toBe(at(bodyRows(), 4).id);
+    await user.keyboard('{Home}');
+    expect(grid.getAttribute('aria-activedescendant')).toBe(at(bodyRows(), 0).id);
+    await user.click(at(within(at(bodyRows(), 1)).getAllByRole('gridcell'), 1));
+    expect(onRowActivate).toHaveBeenLastCalledWith(expect.objectContaining({ symbol: 'MSFT' }));
+  });
+
+  it('hides and shows columns from the picker, with descriptions', async () => {
+    const onHidden = vi.fn();
+    render(<Table columnPicker defaultHiddenColumns={['adv']} onHiddenColumnsChange={onHidden} />);
+    const user = userEvent.setup();
+    expect(screen.queryByRole('columnheader', { name: 'ADV' })).toBeNull();
+    const button = screen.getByRole('button', { name: /Columns/ });
+    expect(button).toHaveTextContent('4 of 5');
+    await user.click(button);
+    const panel = screen.getByRole('group', { name: 'Show columns' });
+    const iv = within(panel).getByRole('checkbox', { name: 'IV30' });
+    expect(iv).toHaveAccessibleDescription('Our 30-day implied volatility');
+    expect(within(panel).getByRole('checkbox', { name: 'Ticker' })).toBeDisabled();
+    await user.click(within(panel).getByRole('checkbox', { name: 'ADV' }));
+    expect(onHidden).toHaveBeenLastCalledWith([]);
+    expect(screen.getByRole('columnheader', { name: 'ADV' })).toBeInTheDocument();
+    await user.click(iv);
+    expect(onHidden).toHaveBeenLastCalledWith(['iv30']);
+    await user.keyboard('{Escape}');
+    expect(panel).not.toBeVisible();
+    expect(button).toHaveFocus();
+  });
+
+  it('renders cell slots with the row, raw and formatted value', () => {
+    const slot = vi.fn(({ formatted }: { formatted: { text: string } }) => (
+      <b>{formatted.text}!</b>
+    ));
+    render(<Table columns={[{ ...at(columns, 1), cell: slot }]} rows={rows.slice(0, 1)} />);
+    expect(screen.getByText('$333.69!')).toBeInTheDocument();
+    expect(slot).toHaveBeenCalledWith(expect.objectContaining({ row: rows[0], value: 333.69 }));
+  });
+
+  it('shows loading placeholders, the empty message and errors', () => {
+    const { rerender } = render(<Table status="loading" />);
+    expect(screen.getByRole('grid')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByText('AAPL')).toBeNull();
+    rerender(<Table rows={[]} emptyMessage="No names pass" />);
+    expect(screen.getByRole('gridcell', { name: 'No names pass' })).toBeInTheDocument();
+    rerender(<Table status="error" errorMessage="Preview failed" />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Preview failed');
+  });
+
+  it('virtualises large row sets: renders a window, not every row', () => {
+    render(<Table rows={makeUniverse(11_427)} visibleRows={12} />);
+    expect(screen.getByRole('grid')).toHaveAttribute('aria-rowcount', '11428');
+    expect(bodyRows().length).toBeLessThan(40);
+  });
+
+  it('has no accessibility violations', async () => {
+    const { container } = render(<Selectable columnPicker />);
+    await expectNoA11yViolations(container);
+  });
+});

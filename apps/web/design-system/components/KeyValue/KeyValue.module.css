@@ -1,0 +1,96 @@
+/* KeyValue: label column + value column, tabular values. Variants are data attributes. */
+.list {
+  display: grid;
+  grid-template-columns: fit-content(calc(var(--size-label) * 2)) minmax(0, 1fr);
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+}
+
+.row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  column-gap: var(--space-3);
+  padding: var(--density-cell-padding-y) 0;
+  border-bottom: var(--border-width-thin) solid var(--color-border-soft);
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.list[data-layout='stacked'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.list[data-layout='stacked'] .row {
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: var(--space-0-5);
+}
+
+.term {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  color: var(--color-text-2);
+}
+
+.hint {
+  overflow: hidden;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.value {
+  min-width: 0;
+  margin: 0;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.list[data-align='end'] .value {
+  text-align: end;
+}
+
+.list[data-layout='stacked'] .value {
+  text-align: start;
+}
+
+.value[data-mono] {
+  font-family: var(--font-mono);
+}
+
+.value[data-tone='up'] {
+  color: var(--color-up);
+}
+
+.value[data-tone='down'] {
+  color: var(--color-down);
+}
+
+.value[data-tone='muted'] {
+  color: var(--color-muted);
+}
+
+.placeholder {
+  display: inline-block;
+  width: var(--space-10);
+  height: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-track);
+  vertical-align: middle;
+}
+
+.empty {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}

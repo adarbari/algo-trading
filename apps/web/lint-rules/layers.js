@@ -19,6 +19,7 @@ export const elements = [
   { type: 'ds-tokens', pattern: 'design-system/tokens' },
   { type: 'ds-theme', pattern: 'design-system/theme' },
   { type: 'ds-testing', pattern: 'design-system/testing' },
+  { type: 'ds-format', pattern: 'design-system/format' },
   { type: 'ds-foundations', pattern: 'design-system/foundations' },
   { type: 'ds-primitive', pattern: 'design-system/primitives/*', capture: ['name'] },
   { type: 'ds-component', pattern: 'design-system/components/*', capture: ['name'] },
@@ -91,7 +92,7 @@ const policies = [
     allow: {
       to: [
         { element: { type: 'ds-entry' } },
-        ...['ds-primitive', 'ds-component', 'ds-theme', 'ds-tokens'].map(index),
+        ...['ds-primitive', 'ds-component', 'ds-theme', 'ds-tokens', 'ds-format'].map(index),
       ],
     },
   },
@@ -101,7 +102,7 @@ const policies = [
       to: [
         { element: { type, captured: { name: '{{from.element.captured.name}}' } } },
         index('ds-primitive'),
-        ...(type === 'ds-component' ? [index('ds-component')] : []),
+        ...(type === 'ds-component' ? [index('ds-component'), index('ds-format')] : []),
         index('ds-tokens'),
         index('ds-testing'),
       ],
@@ -114,6 +115,8 @@ const policies = [
   },
   { from: { element: { type: 'ds-tokens' } }, allow: { to: { element: { type: 'ds-tokens' } } } },
   { from: { element: { type: 'ds-testing' } }, allow: { to: { element: { type: 'ds-testing' } } } },
+  // Value formatters: pure functions, used by the data components and exported by the entry.
+  { from: { element: { type: 'ds-format' } }, allow: { to: { element: { type: 'ds-format' } } } },
   // Storybook foundation pages (the tokens page) document tokens using primitives.
   {
     from: { element: { type: 'ds-foundations' } },
