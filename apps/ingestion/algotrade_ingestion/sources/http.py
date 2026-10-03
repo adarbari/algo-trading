@@ -8,6 +8,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 DEFAULT_USER_AGENT = "algotrade-ingestion/0.1 (+https://github.com/adarbari/algo-trading)"
+# api.nasdaq.com rejects non-browser user agents.
+BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) algotrade-ingestion/0.1"
 
 
 class HttpError(Exception):

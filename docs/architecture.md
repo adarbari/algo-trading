@@ -53,7 +53,7 @@ versus planned. Detail lives in companion docs:
 |---|---|---|
 | Apps | `apps/ingestion`, `apps/backtest` | `apps/api` (4), `apps/web` (5) |
 | L1 | `instruments/reference` from the Nasdaq Trader + SPY universe builder (or universe CSVs), `events/reference_change` + `events/index_change`, `rollups/instrument/option_liquidity@v1`, `InstrumentView` reader | company details, FIGI ids + `instruments/symbol_history` (1); `price_stats`, `iv_history`, `earnings`, `liquidity_class`, `fundamentals` rollups (2b) |
-| L2 | `chains/*` (Cboe), `bars/1d` schema + reads (golden data) | Massive daily bars + split/dividend events, Nasdaq earnings events (1); intraday bars + `rollups/daily/*` (6) |
+| L2 | `chains/*` (Cboe), `events/earnings` (Nasdaq), `bars/1d` schema + reads (golden data) | Massive daily bars + split/dividend events (1); intraday bars + `rollups/daily/*` (6) |
 | L3 | `defaults.toml`, `universe.toml`, `overrides/leveraged_etfs.csv`, `presets/selections/*`, `presets/strategies/*` | `sources.toml` (1); `rollups.toml` (2b) |
 | L4 | `strategies/`, `selections/` | `watchlists/`, `preferences.toml` (4–5); DB-backed `ConfigStore` (4) |
 | Jobs | local runner keyed by config hash; `backtest`, `screen`, `nightly` | queue-backed runner (6) |

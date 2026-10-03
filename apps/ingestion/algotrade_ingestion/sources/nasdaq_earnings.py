@@ -1,0 +1,113 @@
+"""Nasdaq public earnings calendar: every US company reporting on a date.
+
+``https://api.nasdaq.com/api/calendar/earnings?date=YYYY-MM-DD`` (unofficial, free, no key;
+see docs/data/vendors.md). Future dates carry the EPS forecast and number of estimates; past
+dates also carry the reported EPS and the surprise. Weekends and holidays return no rows,
+which is a valid answer, not an error.
+"""
+
+import json
+import math
+from datetime import date
+from typing import Any
+
+import pandas as pd
+
+from algotrade.core.instruments import AssetClass, instrument_id
+from algotrade_ingestion.sources.base import FetchRequest, Normalized
+from algotrade_ingestion.sources.http import RetryPolicy, Sleep, Transport, get_with_retry
+
+SOURCE = "nasdaq_earnings"
+DATASET = "earnings_calendar"
+TABLE = "events/earnings"
+URL = "https://api.nasdaq.com/api/calendar/earnings?date={date}"
+TIMES = {
+    "time-pre-market": "pre_market",
+    "time-after-hours": "after_hours",
+    "time-not-supplied": "unknown",
+}
+COLUMNS = (
+    "instrument_id",
+    "ts",
+    "symbol",
+    "earnings_date",
+    "time",
+    "fiscal_quarter",
+    "eps_forecast",
+    "estimates",
+    "eps_reported",
+    "surprise_pct",
+    "reported",
+)
+
+
+def _money(value: Any) -> float | None:
+    text = (
+        str(value or "")
+        .replace("$", "")
+        .replace(",", "")
+        .replace("(", "-")
+        .replace(")", "")
+        .strip()
+    )
+    try:
+        number = float(text)
+    except ValueError:
+        return None
+    return None if math.isnan(number) else number
+
+
+def parse_calendar(day: date, payload: bytes) -> pd.DataFrame:
+    """One row per company reporting on ``day`` (``COLUMNS``); empty for no reports."""
+    doc = json.loads(payload)
+    rows = ((doc.get("data") or {}).get("rows")) or []
+    records = []
+    for r in rows:
+        symbol = str(r.get("symbol") or "").strip().upper()
+        if not symbol:
+            continue
+        reported = _money(r.get("eps"))
+        records.append(
+            {
+                "instrument_id": instrument_id(AssetClass.EQUITY, symbol),
+                "ts": pd.Timestamp(day, tz="UTC"),
+                "symbol": symbol,
+                "earnings_date": day,
+                "time": TIMES.get(str(r.get("time")), "unknown"),
+                "fiscal_quarter": r.get("fiscalQuarterEnding") or None,
+                "eps_forecast": _money(r.get("epsForecast")),
+                "estimates": _money(r.get("noOfEsts")),
+                "eps_reported": reported,
+                "surprise_pct": _money(r.get("surprise")),
+                "reported": reported is not None,
+            }
+        )
+    return pd.DataFrame(records, columns=list(COLUMNS))
+
+
+class NasdaqEarningsSource:
+    """Implements ``sources.base.Source``. Request key: an ISO date."""
+
+    name = SOURCE
+    dataset = DATASET
+
+    def __init__(
+        self,
+        transport: Transport,
+        sleep: Sleep,
+        policy: RetryPolicy | None = None,
+        pause_s: float = 0.5,
+    ) -> None:
+        self._transport, self._sleep, self._policy = transport, sleep, policy or RetryPolicy()
+        self._pause_s = pause_s  # be polite: one request per date, spaced out
+
+    def fetch(self, request: FetchRequest) -> bytes | None:
+        day = date.fromisoformat(request.key)
+        self._sleep(self._pause_s)
+        return get_with_retry(
+            self._transport, URL.format(date=day.isoformat()), self._policy, self._sleep
+        )
+
+    def normalize(self, request: FetchRequest, payload: bytes) -> Normalized | None:
+        day = date.fromisoformat(request.key)
+        return Normalized(session_date=day, tables={TABLE: parse_calendar(day, payload)})

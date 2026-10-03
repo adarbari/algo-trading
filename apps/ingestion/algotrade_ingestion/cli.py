@@ -3,6 +3,7 @@
     algotrade-ingest universe --stocks optionable_us_stock_universe.csv \\
                               --etfs optionable_us_etf_universe.csv --version 2026-10
     algotrade-ingest universe-build [--date YYYY-MM-DD] [--review-out leveraged_candidates.csv]
+    algotrade-ingest earnings [--date D] [--start D] [--days 60]
     algotrade-ingest chains   [--date YYYY-MM-DD] [--workers 4] [--symbols SPY,AAPL]
     algotrade-ingest features [--date YYYY-MM-DD]
     algotrade-ingest screen   [--date YYYY-MM-DD] [--config ID] [--user U] [--export-dir out/]
@@ -31,6 +32,7 @@ from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.readers import StoreReader
 from algotrade.storage.writers import StoreWriter
+from algotrade_ingestion.jobs.earnings import ingest_earnings
 from algotrade_ingestion.jobs.features import compute_option_liquidity
 from algotrade_ingestion.jobs.golden import load_golden
 from algotrade_ingestion.jobs.option_chains import ChainJobConfig, ingest_option_chains
@@ -38,7 +40,8 @@ from algotrade_ingestion.jobs.universe import UniverseFile, import_universe
 from algotrade_ingestion.jobs.universe_build import UniverseSources, build_universe, review_rows
 from algotrade_ingestion.pipeline import nightly_job, universe_settings, universe_underlyings
 from algotrade_ingestion.sources.cboe import CboeOptionsSource
-from algotrade_ingestion.sources.http import urllib_transport
+from algotrade_ingestion.sources.http import BROWSER_USER_AGENT, urllib_transport
+from algotrade_ingestion.sources.nasdaq_earnings import NasdaqEarningsSource
 from algotrade_ingestion.sources.nasdaq_trader import NasdaqTraderSource
 from algotrade_ingestion.sources.spy_holdings import SpyHoldingsSource
 from algotrade_ingestion.sources.synthetic.catalog import build_golden
@@ -71,6 +74,12 @@ def _parser() -> argparse.ArgumentParser:
     )
     ub.add_argument("--date", type=date.fromisoformat)
     ub.add_argument("--review-out", type=Path, help="write leverage candidates to curate (CSV)")
+    ea = sub.add_parser("earnings", help="store the Nasdaq earnings calendar as events")
+    ea.add_argument("--date", type=date.fromisoformat, help="session the snapshot belongs to")
+    ea.add_argument(
+        "--start", type=date.fromisoformat, help="first calendar date (default: --date)"
+    )
+    ea.add_argument("--days", type=int, default=60, help="calendar days to fetch (default 60)")
     for name in ("chains", "features", "screen", "nightly"):
         s = sub.add_parser(name)
         s.add_argument("--date", type=date.fromisoformat)
@@ -96,6 +105,18 @@ def _parser() -> argparse.ArgumentParser:
 
 def _source() -> CboeOptionsSource:
     return CboeOptionsSource(urllib_transport(), time.sleep)
+
+
+def _earnings_source() -> NasdaqEarningsSource:
+    return NasdaqEarningsSource(urllib_transport(BROWSER_USER_AGENT), time.sleep)
+
+
+def _earnings(
+    args: argparse.Namespace, reader: StoreReader, writer: StoreWriter, session: date
+) -> int:
+    record = ingest_earnings(writer, _earnings_source(), session, args.start, args.days)
+    _print({"run_id": record.run_id, "status": record.status, **record.stats})
+    return 0 if record.status == "complete" else 1
 
 
 def _universe_sources() -> UniverseSources:
@@ -154,6 +175,7 @@ def _run_job(
         "writer": writer,
         "source": _source(),
         "universe_sources": _universe_sources(),
+        "earnings_source": _earnings_source(),
         "configs": open_config_store(args.config_dir),
     }
     runner = LocalJobRunner(
@@ -177,8 +199,9 @@ def _dispatch(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter
     if args.command == "golden":
         return _golden(args, writer)
     session = args.date if getattr(args, "date", None) else last_session(datetime.now(UTC))
-    if args.command == "universe-build":
-        return _universe_build(args, reader, writer, session)
+    direct = {"universe-build": _universe_build, "earnings": _earnings}
+    if args.command in direct:
+        return direct[args.command](args, reader, writer, session)
     if args.command == "universe":
         files = [UniverseFile(args.stocks, "STOCK")] + (
             [UniverseFile(args.etfs, "ETF")] if args.etfs else []

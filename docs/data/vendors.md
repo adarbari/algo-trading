@@ -39,6 +39,15 @@ Caveats, handled in `apps/ingestion/algotrade_ingestion/sources/cboe.py`:
 - Raw responses are about 1–3 GB/day across the universe, so raw retention is limited
   (ADR 0014, `algotrade-ingest purge-raw --keep-days 90`).
 
+## Nasdaq earnings calendar (implemented, phase 1.3)
+
+`https://api.nasdaq.com/api/calendar/earnings?date=YYYY-MM-DD`: free, no key, unofficial
+(browser user agent required). One request per date returns every company reporting that day
+with timing (pre-market / after hours / not supplied), the EPS forecast and number of
+estimates; past dates add the reported EPS and surprise. `algotrade-ingest earnings` stores a
+60-day forward window nightly in `events/earnings`, in the partition of the run's session, so
+date changes stay point-in-time; `--start` in the past backfills. About 2 minutes a night.
+
 ## What IBKR gives us
 
 **Good for:**

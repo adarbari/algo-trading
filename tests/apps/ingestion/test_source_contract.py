@@ -14,12 +14,13 @@ from algotrade_ingestion.jobs.common import stamp
 from algotrade_ingestion.sources.base import FetchRequest, Source
 from algotrade_ingestion.sources.cboe import CboeOptionsSource
 from algotrade_ingestion.sources.http import RetryPolicy
+from algotrade_ingestion.sources.nasdaq_earnings import NasdaqEarningsSource
 from algotrade_ingestion.sources.nasdaq_trader import NasdaqTraderSource
 from algotrade_ingestion.sources.spy_holdings import SpyHoldingsSource
 from algotrade_ingestion.sources.synthetic.files import GoldenFiles
 from algotrade_ingestion.sources.synthetic.source import GoldenCsvSource
 from tests import cboe_fixture as fx
-from tests import universe_fixture
+from tests import earnings_fixture, universe_fixture
 from tests.conftest import GOLDEN_DIR
 
 type Adapter = tuple[Source, FetchRequest]
@@ -45,7 +46,13 @@ def spy_holdings() -> Adapter:
     return SpyHoldingsSource(lambda url: payload, lambda s: None), FetchRequest("SPY")
 
 
+def nasdaq_earnings() -> Adapter:
+    payload = earnings_fixture.calendar([("AAPL", "time-after-hours")])
+    return NasdaqEarningsSource(lambda url: payload, lambda s: None), FetchRequest("2026-10-05")
+
+
 ADAPTERS: dict[str, Callable[[], Adapter]] = {
+    "nasdaq_earnings": nasdaq_earnings,
     "cboe": cboe,
     "golden": golden,
     "nasdaq_trader": nasdaq_trader,
