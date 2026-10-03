@@ -1,6 +1,8 @@
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from algotrade.data import StoreReader
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
@@ -100,18 +102,39 @@ def test_chain_job_records_every_status_and_publishes() -> None:
     assert backend.raw.get("cboe_delayed", "option_chain", DAY, record.run_id, "GOOD") is not None
 
 
-def test_chain_job_resumes_and_retries(tmp_path: Path) -> None:
-    writer = StoreWriter(LocalBackend(tmp_path))
+@pytest.fixture(params=["memory", "local"])
+def backend(request: pytest.FixtureRequest, tmp_path: Path) -> MemoryBackend | LocalBackend:
+    return MemoryBackend() if request.param == "memory" else LocalBackend(tmp_path)
+
+
+def test_chain_job_resumes_and_retries(backend: MemoryBackend | LocalBackend) -> None:
+    writer = StoreWriter(backend)
     feed = FakeFeed({"A": fx.payload("A"), "B": fx.payload("B")}, fail_first={"B": 2})
     limiter = CountingLimiter()
     first = run(writer, feed, universe("A", "B"), limiter, retry_pause_s=7)
     assert first.status is RunStatus.PARTIAL
     assert limiter.held == 7  # the retry pass waited out a shared cool-down first
+    assert writer.staging.keys(first.run_id, OPTIONS) == ["A"]  # FETCH_ERROR left: kept
     second = run(writer, feed, universe("A", "B"), retry_pause_s=0)
     assert second.run_id == first.run_id
     assert second.status is RunStatus.COMPLETE
     assert feed.calls.count("A") == 1  # finished tickers are not fetched again
-    assert StoreReader(LocalBackend(tmp_path)).table(OPTIONS, DAY) is not None
+    options = StoreReader(backend).table(OPTIONS, DAY)
+    assert options is not None and set(options["underlying_id"]) == {"EQ:A", "EQ:B"}
+    assert writer.staging.keys(second.run_id, OPTIONS) == []  # resume completed: dropped
+
+
+def test_finished_chain_runs_drop_their_staging(backend: MemoryBackend | LocalBackend) -> None:
+    writer = StoreWriter(backend)
+    done = run(writer, FakeFeed({"A": fx.payload("A")}), universe("A"), retry_pause_s=0)
+    assert done.status is RunStatus.COMPLETE
+    assert writer.staging.keys(done.run_id, OPTIONS) == []
+    assert StoreReader(backend).table(OPTIONS, DAY) is not None
+    # PARTIAL with nothing a resume would refetch (no FETCH_ERROR): dropped too
+    stale = {"A": fx.payload("A"), "OLD": fx.payload("OLD", session=DAY - timedelta(days=1))}
+    partial = run(writer, FakeFeed(stale), universe("A", "OLD"), retry_pause_s=0)
+    assert partial.status is RunStatus.PARTIAL
+    assert writer.staging.keys(partial.run_id, OPTIONS) == []
 
 
 def test_mass_no_chain_is_suspicious() -> None:
@@ -174,8 +197,6 @@ def test_universe_import(tmp_path: Path) -> None:
 
 
 def test_universe_import_requires_ticker(tmp_path: Path) -> None:
-    import pytest  # noqa: PLC0415
-
     from algotrade.core.model.errors import DataValidationError  # noqa: PLC0415
 
     bad = tmp_path / "bad.csv"

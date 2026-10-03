@@ -197,8 +197,8 @@ def nightly_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]
     """Job handler for the nightly workflow. params: ``session`` (the last closed session),
     ``catch_up`` (also run sessions missed since the last nightly), ``export_dir``,
     ``workers``. Resources: ``reader``, ``writer``, ``configs``, ``sources`` (by name),
-    ``sources_settings``, ``unavailable`` (source -> why it was not built), optional
-    ``notifier``."""
+    ``sources_settings``, ``unavailable`` (source -> why it was not built), ``raw_sections``
+    (raw source -> sources.toml section, for retention), optional ``notifier``."""
     r = ctx.resources
     task_ctx = TaskContext(
         r["reader"],
@@ -208,6 +208,7 @@ def nightly_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]
         r["configs"],
         user=ctx.user.user_id,
         unavailable=r.get("unavailable", {}),
+        raw_sections=r.get("raw_sections", {}),
     )
     settings = load_nightly(r["configs"])
     session = date.fromisoformat(params["session"])

@@ -15,7 +15,14 @@ import pytest
 from algotrade.config.site.settings import SourcesSettings
 from algotrade_ingestion.sources.framework import registry
 from algotrade_ingestion.sources.framework.http import Http
-from algotrade_ingestion.sources.framework.registry import SOURCES, build_sources, limiter_keys
+from algotrade_ingestion.sources.framework.registry import (
+    RAW_SECTIONS,
+    SOURCES,
+    build_sources,
+    limiter_keys,
+    raw_sections,
+    raw_source,
+)
 from tests.conftest import REPO_ROOT
 
 SITE_SOURCES = tomllib.loads((REPO_ROOT / "config" / "site" / "sources.toml").read_text())
@@ -74,6 +81,17 @@ def test_every_source_has_a_sources_toml_section_and_a_limiter_key() -> None:
         assert spec.limiter, f"{name}: no limiter key"
     shared = {k: v for k, v in limiter_keys().items() if len(v) > 1}
     assert not shared, f"sources sharing a limiter key must read one section: {shared}"
+
+
+def test_raw_source_names_map_to_one_section_each() -> None:
+    sections = raw_sections()
+    assert sections == RAW_SECTIONS
+    assert sections["sec_edgar"] == "sec_edgar"  # submissions, company_tickers, companyfacts
+    assert sections["cboe_delayed"] == "cboe" and sections["massive"] == "massive"
+    assert set(sections) == {raw_source(spec) for spec in SOURCES.values()}
+    clash = {"a": replace(SOURCES["cboe"], name="a"), "b": replace(SOURCES["cboe"], section="x")}
+    with pytest.raises(ValueError, match="cboe_delayed"):
+        raw_sections(clash)
 
 
 def test_no_vendor_module_sleeps_or_paces_itself() -> None:

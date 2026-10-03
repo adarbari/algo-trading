@@ -84,7 +84,7 @@ PRICE_ADJUSTMENTS = ("none", "splits", "total_return")
 REBALANCE_SELECTION = re.compile(r"^(none|monthly|weekly|[1-9][0-9]*d)$")
 # Per-vendor keys beyond ``enabled`` / ``min_interval_s`` (sections are config keys; the
 # vendor code that reads them stays in apps/ingestion/sources).
-VENDOR_KEYS = ("enabled", "min_interval_s")
+VENDOR_KEYS = ("enabled", "min_interval_s", "raw_retention_days")
 VENDOR_EXTRAS = {
     "cboe": ("workers",),
     "nasdaq_earnings": ("days",),
@@ -107,11 +107,13 @@ class SiteDocuments(Protocol):
 
 @dataclass(frozen=True)
 class VendorSettings:
-    """One vendor section of ``sources.toml``: on/off and its pacing (``None``: the
-    registry's default for that source)."""
+    """One vendor section of ``sources.toml``: on/off, its pacing (``None``: the registry's
+    default for that source) and how long its raw responses are kept (``None``: the global
+    ``raw_retention_days``)."""
 
     enabled: bool = True
     min_interval_s: float | None = None
+    raw_retention_days: int | None = None
 
 
 @dataclass(frozen=True)
@@ -187,7 +189,13 @@ def _vendor(section: Table) -> VendorSettings:
     return VendorSettings(
         enabled=section.boolean("enabled", True),
         min_interval_s=section.number("min_interval_s", None, 0),
+        raw_retention_days=_optional_integer(section, "raw_retention_days", 1),
     )
+
+
+def _optional_integer(section: Table, key: str, minimum: int) -> int | None:
+    """``key`` as an integer >= ``minimum``, or ``None`` when the section does not set it."""
+    return None if section.raw(key) is None else section.integer(key, minimum, minimum)
 
 
 def _extra(vendors: Mapping[str, Table], name: str) -> Table:

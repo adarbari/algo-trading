@@ -139,7 +139,7 @@ def test_staging_publish_and_rewrite() -> None:
         run.stage(EVENTS, "A", pd.DataFrame([{**rows[0], "instrument_id": "EQ:A"}]), "fake")
         assert run.publish(EVENTS) == 2
         assert run.publish("events/split") == 0  # nothing staged
-        run.clear_staging()
+    assert writer.staging.keys(run.run_id, EVENTS) == []  # complete: staging dropped
     stored = reader.table(EVENTS, DAY)
     assert stored is not None and list(stored["instrument_id"]) == ["EQ:A", "EQ:B"]
     with IngestRun(task_ctx(writer, reader, lambda: later), "fix", DAY) as fix:
@@ -147,6 +147,34 @@ def test_staging_publish_and_rewrite() -> None:
     again = reader.table(EVENTS, DAY)
     assert again is not None and set(again["run_id"]) == {fix.run_id}
     assert set(again["source"]) == {"fake"}  # only knowledge_ts and run_id change
+
+
+@pytest.mark.parametrize("kind", ["memory", "local"])
+def test_staging_is_kept_while_a_resume_needs_it(kind: str, tmp_path: Path) -> None:
+    backend = MemoryBackend() if kind == "memory" else LocalBackend(tmp_path)
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    ctx = task_ctx(writer, reader, lambda: NOW)
+    row = pd.DataFrame([{"instrument_id": "EQ:A", "ts": pd.Timestamp(DAY, tz="UTC")}])
+    with pytest.raises(RuntimeError), IngestRun(ctx, "demo", DAY, resume=True) as crashed:
+        crashed.stage(EVENTS, "A", row, "fake")
+        crashed.record_item("a", "OK")
+        raise RuntimeError("vendor down")
+    assert crashed.record.status is RunStatus.FAILED
+    assert writer.staging.keys(crashed.run_id, EVENTS) == ["A"]  # FAILED: kept
+    with IngestRun(ctx, "demo", DAY, resume=True) as retry:
+        retry.stage(EVENTS, "B", row.assign(instrument_id="EQ:B"), "fake")
+        retry.fail("b", "timeout")
+        assert retry.retryable() == ["b"]
+        assert retry.publish(EVENTS) == 2  # the crashed run's scratch is still there
+    assert retry.run_id == crashed.run_id and retry.record.status is RunStatus.PARTIAL
+    assert writer.staging.keys(retry.run_id, EVENTS) == ["A", "B"]  # FETCH_ERROR left: kept
+    with IngestRun(ctx, "demo", DAY, resume=True) as last:
+        last.record_item("b", "OK")
+        assert last.publish(EVENTS) == 2
+    assert last.run_id == crashed.run_id and last.record.status is RunStatus.COMPLETE
+    assert writer.staging.keys(last.run_id, EVENTS) == []  # nothing left to retry: dropped
+    stored = reader.table(EVENTS, DAY)
+    assert stored is not None and sorted(stored["instrument_id"]) == ["EQ:A", "EQ:B"]
 
 
 def test_unsaved_runs_write_no_record() -> None:

@@ -81,6 +81,8 @@ def test_nightly_pipeline_end_to_end(env: Path, capsys: pytest.CaptureFixture[st
     assert screens[0]["decisions"] == {"QUALIFIED": 1, "LIQUIDITY_RISK": 1}
     assert screens[0]["universe_pre_snapshot"] is False
     assert all("duration_s" in s for s in steps.values())
+    purged = nightly["steps"]["purge-raw"]["result"]
+    assert purged["raw_keep_days"]["cboe_delayed"] == 90  # per-source windows
     latest = json.loads((env / "var" / "logs" / "nightly-latest.json").read_text())
     assert latest["status"] == "COMPLETE" and latest["sessions"] == [DAY]
     with (env / "out" / f"short_premium_candidates_{DAY}.csv").open() as fh:
@@ -111,6 +113,7 @@ def test_individual_steps_and_purge(env: Path, capsys: pytest.CaptureFixture[str
     assert audit["coverage"] == "COMPLETE"
     code, purged = call(capsys, "purge-raw", "--keep-days", "0", "--date", "2026-10-03")
     assert (purged["raw_files_removed"], purged["staging_runs_removed"]) == (1, 0)
+    assert purged["raw_files_removed_by_source"] == {"cboe_delayed": 1}
 
 
 def test_rollups_only_iv30(env: Path, capsys: pytest.CaptureFixture[str]) -> None:

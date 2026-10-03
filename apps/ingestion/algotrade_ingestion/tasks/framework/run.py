@@ -17,7 +17,11 @@ Every ingestion task runs inside one ``IngestRun``, which owns:
   time; reads pinned at ``as_of`` see the run from its commit time), a FAILED run drops
   them. ``run.reader`` also sees the run's own pending writes. ``recover_unpublished``
   (CLI start, under the ingest lock) completes interrupted commits and drops what crashed
-  runs left.
+  runs left;
+- the run's staging (per-item scratch): dropped right after a successful commit when nothing
+  is left for a resume to refetch (COMPLETE, or PARTIAL without ``RETRYABLE`` items); kept
+  otherwise (retryable items, FAILED runs) so a resume can publish it, until
+  ``staging_retention_days`` (``purge-raw``).
 
 Tasks keep only their own logic: what to fetch, how to combine frames, task-specific stats.
 """
@@ -43,8 +47,9 @@ from algotrade_ingestion.sources.framework.base import FetchRequest, Normalized,
 
 REFERENCE = "instruments/reference"
 FETCH_ERROR = "FETCH_ERROR"
-# Item statuses that make a run PARTIAL. ``FETCH_ERROR`` items are retried on resume.
+# Item statuses that make a run PARTIAL. ``RETRYABLE`` items are refetched on resume.
 FAILURES = (FETCH_ERROR, "STALE_DATA", "FAILED")
+RETRYABLE = (FETCH_ERROR,)
 # Run statuses whose table writes are published (ADR 0022); FAILED publishes nothing.
 PUBLISHED = (RunStatus.COMPLETE, RunStatus.PARTIAL)
 
@@ -56,7 +61,9 @@ def utc_now() -> datetime:
 @dataclass
 class TaskContext:
     """What a task runs against: storage, built sources (by name), settings and a clock.
-    ``unavailable``: why each source the registry left out is missing (disabled, no key)."""
+    ``unavailable``: why each source the registry left out is missing (disabled, no key).
+    ``raw_sections``: raw source name -> its ``sources.toml`` section (the source registry's
+    ``RAW_SECTIONS``, passed in by the entry point: tasks never import the registry)."""
 
     reader: StoreReader
     writer: StoreWriter
@@ -66,6 +73,7 @@ class TaskContext:
     clock: Callable[[], datetime] = utc_now
     user: str = SITE_USER
     unavailable: Mapping[str, str] = field(default_factory=dict)
+    raw_sections: Mapping[str, str] = field(default_factory=dict)
 
 
 class NoResponseError(LookupError):
@@ -130,7 +138,7 @@ class IngestRun:
         if not unfinished:
             return None
         record = unfinished[-1]
-        record.items = {k: v for k, v in record.items.items() if status_label(v) != FETCH_ERROR}
+        record.items = {k: v for k, v in record.items.items() if status_label(v) not in RETRYABLE}
         record.status, record.finished_at = RunStatus.RUNNING, None
         return record
 
@@ -184,6 +192,20 @@ class IngestRun:
             self.record.status = RunStatus.FAILED
             self.stats["error"] = f"commit failed: {type(exc).__name__}: {exc}"
             raise
+        if not self.retryable():
+            self._drop_staging()
+
+    def retryable(self) -> list[str]:
+        """Items a resume would refetch (``RETRYABLE`` statuses), in item order."""
+        return [k for k, v in self.items.items() if status_label(v) in RETRYABLE]
+
+    def _drop_staging(self) -> None:
+        """Nothing left to resume: the scratch is spent. Failing to delete it never fails a
+        committed run; retention removes it later."""
+        try:
+            self.writer.staging.clear(self.run_id)
+        except OSError as exc:
+            self.stats["staging_kept"] = f"{type(exc).__name__}: {exc}"
 
     def checkpoint(self) -> None:
         """Save the record so far (resumable runs, long backfills)."""
@@ -297,7 +319,8 @@ class IngestRun:
         self.writer.staging.put(self.run_id, table, key, self.stamped(frame, source))
 
     def publish(self, table: str, sort_by: str = "instrument_id") -> int:
-        """Write a staged table as one partition (``knowledge_ts`` = publish time)."""
+        """Write a staged table as one partition (``knowledge_ts`` = publish time). The
+        staging is dropped when the run finishes with nothing left to retry."""
         frame = self.writer.staging.collect(self.run_id, table)
         if frame is None:
             return 0
@@ -305,9 +328,6 @@ class IngestRun:
         frame["knowledge_ts"] = pd.Timestamp(self.clock())
         self.writer.write_table(table, self.session, self.run_id, frame, pending=True)
         return len(frame)
-
-    def clear_staging(self) -> None:
-        self.writer.staging.clear(self.run_id)
 
 
 def recover_unpublished(writer: StoreWriter, now: datetime) -> dict[str, list[str]]:

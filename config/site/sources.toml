@@ -1,11 +1,14 @@
 # L3 site setting: data sources used by apps/ingestion. Credentials never go here (use .env).
 
 raw_retention_days = 90          # raw vendor responses older than this are purged nightly
+                                 # (a vendor section may set its own raw_retention_days)
 staging_retention_days = 14      # scratch left by unfinished runs (no resume after this) is purged nightly
 
 # Each vendor section: `enabled` (off: its sources are not built and tasks needing them are
-# skipped) and `min_interval_s`, the spacing between requests to that vendor, shared by every
-# worker thread and every process on this machine (apps/ingestion/sources/framework/limiter.py).
+# skipped), `min_interval_s`, the spacing between requests to that vendor, shared by every
+# worker thread and every process on this machine (apps/ingestion/sources/framework/limiter.py),
+# and optionally `raw_retention_days`, which overrides the global window for the raw responses
+# of every source in that section.
 
 [http]                           # every vendor request (sources/framework/http.py)
 max_retry_s = 300                # give up on one request after retrying for this long
@@ -40,6 +43,8 @@ corporate_actions_window = [-7, 30]   # days around the session
 [sec_edgar]                      # company details + share counts (needs ALGOTRADE_SEC_CONTACT in .env)
 enabled = true
 min_interval_s = 0.2             # SEC fair access allows 10 requests/second; stay well below
+raw_retention_days = 7           # submissions, company_tickers, companyfacts: ~0.5 GB a night
+                                 # and never replayed past a few days (tables keep the data)
 refresh_days = 30                # refetch a company's details once per this many days
 facts_refresh_days = 30          # refetch a company's share counts (company facts) once per this
                                  # many days; both spread over the window by CIK

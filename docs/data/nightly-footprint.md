@@ -18,8 +18,8 @@ There are four areas, and only the backend (`storage/backends/`) knows these pat
 |---|---|---|---|
 | Tables | `tables/<table>/date=<session>/run=<run_id>.parquet` | Parquet, zstd, rows sorted by `instrument_id`, written atomically | forever (point-in-time history) |
 | Table index | `tables/<table>/date=<session>/_runs.json` | JSON `{run_id: knowledge_ts}` so readers pick the run known at `as_of` | forever |
-| Raw | `raw/source=<s>/dataset=<d>/date=<session>/run=<run_id>/<key>.json.gz` | the vendor's bytes exactly as received, gzipped (the name says `.json.gz` even for text and xlsx payloads) | `raw_retention_days` (90) |
-| Staging | `staging/<run_id>/<table>/<key>.parquet` | per-ticker Parquet pieces of the chain job | cleared when the run completes; unfinished runs purged after `staging_retention_days` (14) |
+| Raw | `raw/source=<s>/dataset=<d>/date=<session>/run=<run_id>/<key>.json.gz` | the vendor's bytes exactly as received, gzipped (the name says `.json.gz` even for text and xlsx payloads) | per source: its section's `raw_retention_days` (`sec_edgar`: 7), else the global `raw_retention_days` (90) |
+| Staging | `staging/<run_id>/<table>/<key>.parquet` | per-ticker Parquet pieces of the chain job | dropped when the run finishes with nothing left to retry (COMPLETE, or PARTIAL without FETCH_ERROR items); otherwise kept for a resume and purged after `staging_retention_days` (14) |
 | Run records | `runs/<run_id>.json` | JSON: job, status, per-item statuses, stats | forever (the audit trail every row's `run_id` points to) |
 
 Equity and ETF ids are `EQ:<composite FIGI>` when known, else `EQ:<symbol>` (ADR 0018).
@@ -61,7 +61,7 @@ reads to one file each.
 
 Screener CSV exports go to `--export-dir` (outside the store) and are not counted here.
 
-## Raw responses saved each night (purged after 90 days)
+## Raw responses saved each night (purged after 90 days; SEC after 7)
 
 | Source / dataset | Files per night | Size per night (gzipped) |
 |---|---|---|
@@ -70,18 +70,24 @@ Screener CSV exports go to `--export-dir` (outside the store) and are not counte
 | `ssga_spy` / spy_holdings | 1 | ~55 KB |
 | `massive` / tickers, grouped_daily, corporate_actions | 1 + 1 + 2 | ~0.9 MB (grouped daily 0.3, tickers 0.25, corporate-action window ~0.35) |
 | `nasdaq_earnings` / earnings_calendar | 60 (one per calendar day ahead) | ~0.25 MB |
-| `sec_edgar` / company_tickers + submissions | 1 + the CIKs due a refresh (about 1/30 of companies a night) | ~7 MB (~36 KB per submission × ~200 a night) |
+| `sec_edgar` / company_tickers + submissions + companyfacts | 1 + the CIKs due a refresh (about 1/30 of companies a night, each for submissions and company facts) | ~30 MB (~36 KB per submission and ~115 KB per company-facts file, measured on the 2026-10-02 full load: 6,280 + 6,032 files, 116 + 690 MB), kept 7 days |
 
-**About 105 MB of raw responses per night**, 85% of it Cboe chains. With 90-day retention
-(about 62–64 sessions) that settles at **about 6.7 GB** and stops growing. To shrink it, shorten `raw_retention_days`, or skip saving the
-Nasdaq `options` file (only its ~4.2k distinct underlyings are used).
+**About 125 MB of raw responses per night**, ~70% of it Cboe chains. Retention is per source
+(`raw_retention_days` in a `sources.toml` vendor section overrides the global 90 days): the
+SEC responses (submissions, company tickers, company facts) are kept 7 days (~5 sessions,
+~0.15 GB), everything else 90 days (about 62–64 sessions, ~6 GB, Cboe ~5.7 GB of it). The raw
+area settles at **about 6 GB** and stops growing. To shrink it further, give `[cboe]` its own
+`raw_retention_days`, or skip saving the Nasdaq `options` file (only its ~4.2k distinct
+underlyings are used).
 
 ## Run records and scratch
 
 - `runs/`: about 10 JSON files a night (one per step, plus each screener). The chain run
   lists a status for every underlying, so it is the largest at about 200 KB *est.*
-- `staging/`: empty after a complete chain run. A partial run keeps its pieces (up to the
-  size of that night's option quotes) so a re-run can resume, until `staging_retention_days`.
+- `staging/`: empty after every chain run that finishes with nothing to retry (COMPLETE, or
+  PARTIAL from stale or missing chains only). A run with FETCH_ERROR items, or a FAILED run,
+  keeps its pieces (up to the size of that night's option quotes) so a re-run can resume;
+  the resume drops them when it finishes, else `staging_retention_days` does.
 
 ## One-off loads
 
@@ -89,7 +95,7 @@ Nasdaq `options` file (only its ~4.2k distinct underlyings are used).
 |---|---|---|
 | 2-year bars backfill (~500 sessions) | ~210 MB | ~150 MB; partitions are dated by the bar's session, so the next nightly purge removes them |
 | Corporate actions backfill (26 months) | ~1.2 MB (113k dividends, 3.3k splits) | ~7.6 MB, purged after 90 days |
-| First SEC company load (~6k CIKs) | ~0.3 MB | ~215 MB, purged after 90 days |
+| First SEC company load (~6k CIKs) | ~0.3 MB | ~215 MB, purged after 7 days |
 | `migrate-ids` (ADR 0018) | rewrites each migrated partition as a new run beside the old one: ~15 MB for 33 sessions of bars plus the event backfills | none |
 
 Running `migrate-ids` after the full backfill would duplicate every bars partition (~0.2 GB),
@@ -100,18 +106,18 @@ so migrate before backfilling, as was done here.
 | | Per night | Steady state / growth |
 |---|---|---|
 | Tables | ~58 MB | +14.6 GB a year |
-| Raw | ~105 MB | ~6.7 GB rolling (90 days) |
+| Raw | ~125 MB | ~6 GB rolling (90 days; SEC 7 days) |
 | Runs | ~0.5 MB | +0.1 GB a year |
 
 Tables are never deleted (point-in-time history), so the store has no ceiling: it grows by
-about 14.6 GB a year on top of a raw area that levels off at about 6.7 GB.
+about 14.6 GB a year on top of a raw area that levels off at about 6 GB.
 
 | After | Tables | Raw | Total |
 |---|---|---|---|
 | Backfill only (no chains yet) | ~0.25 GB | ~0.4 GB briefly, then <0.1 GB | **~0.3 GB** |
-| 1 year of nightly runs | ~15 GB | ~6.7 GB | **~22 GB** |
-| 3 years | ~44 GB | ~6.7 GB | **~51 GB** |
-| 5 years | ~73 GB | ~6.7 GB | **~80 GB** |
+| 1 year of nightly runs | ~15 GB | ~6 GB | **~21 GB** |
+| 3 years | ~44 GB | ~6 GB | **~50 GB** |
+| 5 years | ~73 GB | ~6 GB | **~79 GB** |
 
 The only lever that matters is option quotes (~14 GB a year). Ways to cap it, if needed:
 keep only expiries within N days or strikes within a delta band, or move older partitions to

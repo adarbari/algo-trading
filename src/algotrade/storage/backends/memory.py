@@ -186,8 +186,11 @@ class MemoryRaw:
     ) -> bytes | None:
         return self._data.get((source, dataset, session_date, run_id, key))
 
-    def purge_before(self, cutoff: date) -> int:
-        old = [k for k in self._data if k[2] < cutoff]
+    def sources(self) -> list[str]:
+        return sorted({k[0] for k in self._data})
+
+    def purge_before(self, cutoff: date, source: str | None = None) -> int:
+        old = [k for k in self._data if k[2] < cutoff and source in (None, k[0])]
         for k in old:
             del self._data[k]
         return len(old)

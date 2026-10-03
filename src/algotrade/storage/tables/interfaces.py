@@ -100,7 +100,14 @@ class RawStore(Protocol):
         self, source: str, dataset: str, session_date: date, run_id: str, key: str
     ) -> bytes | None: ...
 
-    def purge_before(self, cutoff: date) -> int: ...
+    def sources(self) -> list[str]:
+        """Every source with stored responses, sorted."""
+        ...
+
+    def purge_before(self, cutoff: date, source: str | None = None) -> int:
+        """Delete responses for sessions before ``cutoff`` (only ``source``'s when given).
+        Returns the number of responses removed."""
+        ...
 
 
 class StagingStore(Protocol):
@@ -112,12 +119,15 @@ class StagingStore(Protocol):
 
     def collect(self, run_id: str, table: str) -> pd.DataFrame | None: ...
 
-    def clear(self, run_id: str) -> None: ...
+    def clear(self, run_id: str) -> None:
+        """Drop one run's scratch (no-op when it has none)."""
+        ...
 
     def purge_before(self, cutoff: date) -> int:
         """Drop scratch of runs whose session (from the run id) is before ``cutoff``.
 
-        Finished runs clear their own scratch; this removes what unfinished runs left behind.
+        Finished runs drop their own scratch (``IngestRun``, when nothing is left to retry);
+        this removes what unfinished runs left behind.
         Ids not made by ``new_run_id`` are kept. Returns the number of runs removed."""
         ...
 
