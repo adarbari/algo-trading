@@ -11,7 +11,9 @@ import sys
 from pathlib import Path
 
 MAX_LINES = 1000
-CHECKED_SUFFIXES = {".py", ".md", ".toml", ".yml", ".yaml", ".cfg", ".sh"}
+CHECKED_SUFFIXES = {
+    ".py", ".md", ".toml", ".yml", ".yaml", ".cfg", ".sh", ".ts", ".tsx", ".js", ".jsx", ".css",
+}  # fmt: skip
 
 
 def tracked_files() -> list[Path]:

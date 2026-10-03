@@ -1,17 +1,69 @@
 # Working in this repo (for humans and AI agents)
 
-Read `docs/architecture.md` first. These rules are enforced by CI, so follow them up front:
+This file is the entry point. The decisions below are **settled**; do not re-open them
+without writing an ADR. Read in this order:
 
-1. **Respect layers.** `strategies/` imports only `algotrade.core`. `core/` imports no other
-   `algotrade` package and no pandas. Check with `make arch`.
-2. **No file over 1000 lines** (aim for under 300). Split by responsibility. Check with `make filelen`.
+1. `docs/architecture.md`: target architecture + the rules enforced on today's code
+2. `docs/roadmap.md`: which phase we are in and the open decisions
+3. The spec for your area: `docs/data/storage.md`, `docs/data/instruments.md`,
+   `docs/data/vendors.md`, `docs/ui/design-system.md`, `docs/screeners/`
+4. `docs/adr/README.md`: why things are the way they are
+
+## Settled decisions (summary)
+
+- **Four apps, one repo**: `apps/ingestion`, `apps/backtest`, `apps/api`, `apps/web`. Apps
+  never import each other. They share libraries in `src/algotrade/` and talk through
+  storage (and HTTP for web → api). (ADR 0004)
+- **Only ingestion writes** market and feature data. Vendor SDKs and secrets live only in
+  `apps/ingestion/sources/`. (ADR 0005)
+- **Storage by grain** (reference, event, bar(interval), chain, universe, feature, result)
+  behind `Protocol` interfaces. Parquet + DuckDB locally. No code outside
+  `storage/backends/` builds a path. (ADR 0006)
+- **Point-in-time**: rows carry `ts`, `session_date`, `knowledge_ts`, `source`,
+  `run_id`. Features are `name@version`, precomputed nightly. (ADR 0007)
+- **Backtests only read stores.** They never fetch; missing data is an error. (ADR 0008)
+- **Generic instruments** keyed by `instrument_id` with `multiplier`, `parent_id` and
+  `calendar`, so futures and options fit without redesign. (ADR 0009)
+- **Long-running work is a job** via `services/jobs` (backtests from the UI, on-request
+  pulls). (ADR 0010)
+- **Design-system-first UI**: screens use only `@algotrade/ui`. Missing component? Add it
+  to the design system generically first. Dense but calm; no gradients, emoji icons or
+  card-wrapped numbers. (ADR 0011)
+- **Vendors**: free first, each behind the source interface. Option chains come from the Cboe
+  delayed feed (full universe, nightly); IBKR covers futures and cross-checks. We compute
+  Greeks ourselves. (ADRs 0012, 0014)
+- **Universe**: S&P 500 + all Nasdaq-listed stocks + all ETFs including leveraged and
+  inverse, saved as daily snapshots. (ADR 0013)
+
+## Code rules (enforced by CI; follow them up front)
+
+1. **Respect layers.** Strategies and screeners import only `core` (plus `FeatureView` /
+   `quant` once they exist). `core/` imports no other `algotrade` package and no pandas.
+   Check with `make arch`.
+2. **No file over 1000 lines** (aim for under 300). Split by responsibility. `make filelen`.
 3. **Every module starts with a docstring** stating its single responsibility.
-4. **Tests mirror src**: code in `src/algotrade/<layer>/x.py` is tested in
-   `tests/unit/<layer>/`. Coverage gate is 90%.
-5. **UTC, timezone-aware datetimes only.** No `print` outside `cli/`.
+4. **Tests mirror src**: `src/algotrade/<layer>/x.py` → `tests/unit/<layer>/`. Coverage gate is
+   90%. Storage backends must pass `tests/contract/storage/`. Vendor adapters are tested
+   against recorded responses; CI never calls the network.
+5. **UTC, timezone-aware datetimes only.** `session_date` is the trading day. No `print`
+   outside CLI/app entry points.
 6. **Never hand-edit** `datasets/golden/*` or `benchmarks/baseline.json`. Use
    `make datasets-build` / `make baseline`, and explain baseline diffs in the PR.
-7. **Strategies must be deterministic** and pass `tests/property` (look-ahead, accounting, long-only).
-8. Before finishing any change run `make check`.
+7. **Strategies and screeners are deterministic** and must pass `tests/property`.
+8. Secrets come only from environment variables. Never commit credentials.
+9. Before finishing any change, run `make check`.
+
+## Workflows: use the matching skill
+
+| Task | Skill |
+|---|---|
+| New vendor / data source | `.claude/skills/add-data-source` |
+| New dataset or data grain | `.claude/skills/add-dataset` |
+| New feature | `.claude/skills/add-feature` |
+| New trading strategy | `.claude/skills/add-strategy` |
+| New screener | `.claude/skills/add-screener` |
+| New UI widget or screen | `.claude/skills/add-ui-component` |
+| A decision that changes architecture | `.claude/skills/write-adr` |
 
 Commands: `make install`, `make check`, `make test`, `make evaluate`, `make baseline`.
+Ingestion: `algotrade-ingest universe|chains|features|screen|nightly|purge-raw` (see `README.md`).

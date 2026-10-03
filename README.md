@@ -13,6 +13,19 @@ make check            # everything CI runs: lint, types, boundaries, file length
 .venv/bin/algotrade evaluate --report scorecard.md
 ```
 
+## Nightly options pipeline
+
+```bash
+export ALGOTRADE_DATA_URL=file://./var/data     # default; git-ignored
+algotrade-ingest universe --stocks optionable_us_stock_universe.csv \
+                          --etfs optionable_us_etf_universe.csv --version 2026-10
+algotrade-ingest nightly --export-dir out/      # chains -> option_liquidity@v1 -> screen -> CSVs
+algotrade-ingest purge-raw --keep-days 90
+```
+
+Each step can also run on its own (`chains`, `features`, `screen`), resumes after
+interruption, and prints its audit. See [docs/screeners/](docs/screeners/README.md).
+
 ## What's in the box
 
 | Guardrail | Enforced by |

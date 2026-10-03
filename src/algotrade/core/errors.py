@@ -16,3 +16,11 @@ class DataValidationError(AlgoTradeError):
 
 class ConfigurationError(AlgoTradeError):
     """A strategy, backtest or evaluation was configured incorrectly."""
+
+
+class MissingDataError(AlgoTradeError):
+    """Requested data is not in the store. Backtests and screens never fetch (ADR 0008)."""
+
+    def __init__(self, dataset: str, detail: str, hint: str) -> None:
+        self.dataset = dataset
+        super().__init__(f"{dataset}: {detail}. To fill it: {hint}")
