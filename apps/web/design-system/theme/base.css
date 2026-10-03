@@ -8,13 +8,13 @@
 html,
 body {
   margin: 0;
-  background: var(--color-bg-canvas);
-  color: var(--color-fg-default);
+  background: var(--color-bg);
+  color: var(--color-text);
   font-family: var(--font-sans);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-base);
   font-feature-settings: var(--font-features);
   font-variant-numeric: tabular-nums;
-  line-height: var(--line-height-md);
+  line-height: var(--line-height-base);
   -webkit-font-smoothing: antialiased;
 }
 

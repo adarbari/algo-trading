@@ -8,9 +8,87 @@ Import everything from `@algotrade/ui`.
 
 ## Primitives
 
+### Box
+
+Box: a semantic block (section, header, main, nav, footer, aside, div) with token padding. The neutral building block for page regions; colour and borders are Surface's job, flow layout is Stack's and Grid's.
+
+Source: `design-system/primitives/Box`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `(Pick< AriaAttributes, 'aria-label' \| 'aria-labelledby' \| 'aria-busy' \| 'aria-live' >)` | `inherited` | no |  |
+| `as` | `BoxElement` | no | The semantic element rendered (landmarks). |
+| `padding` | `Space` | no | Padding on all sides, a step of the 4 px scale. |
+| `paddingX` | `Space` | no | Horizontal padding (overrides `padding` inline). |
+| `paddingY` | `Space` | no | Vertical padding (overrides `padding` block). |
+| `width` | `'auto' \| 'page'` | no | `page`: full width up to the page maximum, centred. |
+| `grow` | `boolean` | no | Grow to fill the parent Stack's main axis. |
+| `id` | `string` | no | Target of an `aria-labelledby` elsewhere. |
+| `children` | `ReactNode` | no |  |
+
+### Divider
+
+Divider: a 1 px rule between groups. Horizontal is an `<hr>`; vertical (between toolbar groups) is a separator that stretches to the row's height. `soft` for rules inside a panel.
+
+Source: `design-system/primitives/Divider`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `orientation` | `'horizontal' \| 'vertical'` | no | `horizontal` (an hr between stacked groups) or `vertical` (between items in a row). |
+| `tone` | `'default' \| 'soft'` | no | `default` (panel borders) or `soft` (inside a panel). |
+| `decorative` | `boolean` | no | Purely visual: hidden from assistive technology. |
+
+### Grid
+
+Grid: two-dimensional layout. Columns are a count (equal tracks) or a named template token (`label-value`, `main-aside`, `sidebar-start`, `sidebar-end`); `collapse` drops to one column when the grid's own width is under a breakpoint token (a container query, so it works in a side panel as well as on a page).
+
+Source: `design-system/primitives/Grid`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `(Pick< AriaAttributes, 'aria-label' \| 'aria-labelledby' \| 'aria-busy' >)` | `inherited` | no |  |
+| `columns` | `GridColumns` | no | A column count, or a template token (`label-value`: fixed label + value; `main-aside`: 3 : 2). |
+| `gap` | `Space` | no | Space between cells, a step of the 4 px scale. |
+| `rowGap` | `Space` | no | Space between rows when it differs from `gap`. |
+| `align` | `'start' \| 'center' \| 'stretch' \| 'baseline'` | no | Cell alignment on the block axis. |
+| `collapse` | `'none' \| Breakpoint` | no | One column when the grid is narrower than this breakpoint (sm 480, md 720, lg 960 px). |
+| `as` | `GridElement` | no | The semantic element of the grid itself. |
+| `children` | `ReactNode` | no |  |
+
+### Heading
+
+Heading: section titles h1-h4. The level is the document outline; the size follows it (h1 page title 18 px, h2-h3 panel heading 13 px, h4 12 px, all semibold) unless `size` overrides it. Working screens never use centred or oversized marketing headers.
+
+Source: `design-system/primitives/Heading`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `level` | `HeadingLevel` | yes | Outline level: h1 once per page, h2 per panel. |
+| `size` | `Extract<FontSize, 'sm' \| 'base' \| 'lg' \| 'xl' \| '2xl' \| '3xl'>` | no | Override the size the level implies. |
+| `tone` | `'default' \| 'muted'` | no |  |
+| `truncate` | `boolean` | no | Single line with an ellipsis when too long. |
+| `id` | `string` | no | Target of a section's `aria-labelledby`. |
+| `children` | `ReactNode` | no |  |
+
+### Mono
+
+Mono: IBM Plex Mono for tickers, contract symbols, ids, hashes and code. `code` marks it up as code; otherwise a span. Size, weight and tone as Text.
+
+Source: `design-system/primitives/Mono`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `size` | `FontSize` | no |  |
+| `weight` | `Extract<FontWeight, 'regular' \| 'medium'>` | no |  |
+| `tone` | `Extract<TextTone, 'default' \| 'secondary' \| 'muted' \| 'accent' \| 'inherit'>` | no |  |
+| `code` | `boolean` | no | Render as `<code>` (source, config keys) instead of a span (symbols). |
+| `truncate` | `boolean` | no | Single line with an ellipsis when too long. |
+| `title` | `string` | no |  |
+| `children` | `ReactNode` | no |  |
+
 ### Stack
 
-Stack: the layout primitive. Lays children out in a row or column with a token gap. Screens lay out only through primitives (ADR 0025), so semantics (`as`) and spacing are props here.
+Stack: one-dimensional flow layout. Lays children out in a row or column with a token gap; `wrap` turns a row into a cluster (chips, toolbars). Screens lay out only through primitives (ADR 0025), so semantics (`as`) and spacing are props here; padding is Box's job.
 
 Source: `design-system/primitives/Stack`
 
@@ -18,31 +96,65 @@ Source: `design-system/primitives/Stack`
 |---|---|---|---|
 | `(Pick< AriaAttributes, 'aria-label' \| 'aria-labelledby' \| 'aria-busy' >)` | `inherited` | no |  |
 | `direction` | `'row' \| 'column'` | no | Main axis. |
-| `gap` | `StackGap` | no | Space between children, a step of the 4 px scale. |
-| `padding` | `StackGap` | no | Inner padding, a step of the 4 px scale. |
-| `align` | `'start' \| 'center' \| 'end' \| 'stretch' \| 'baseline'` | no |  |
-| `justify` | `'start' \| 'center' \| 'end' \| 'between'` | no |  |
-| `wrap` | `boolean` | no |  |
+| `gap` | `Space` | no | Space between children, a step of the 4 px scale. |
+| `align` | `'start' \| 'center' \| 'end' \| 'stretch' \| 'baseline'` | no | Cross-axis alignment. |
+| `justify` | `'start' \| 'center' \| 'end' \| 'between'` | no | Main-axis distribution. |
+| `wrap` | `boolean` | no | Wrap onto new lines when out of room (a cluster). |
 | `grow` | `boolean` | no | Grow to fill the parent stack's main axis. |
 | `as` | `StackElement` | no | The semantic element rendered (landmarks and lists). |
 | `children` | `ReactNode` | no |  |
 
+### Surface
+
+Surface: a background, a crisp 1 px border and a radius from tokens (never a shadow). The base of panels, bars and wells; Panel (header, actions, states) builds on it. Padding as Box.
+
+Source: `design-system/primitives/Surface`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `(Pick< AriaAttributes, 'aria-label' \| 'aria-labelledby' \| 'aria-busy' >)` | `inherited` | no |  |
+| `as` | `SurfaceElement` | no |  |
+| `tone` | `SurfaceTone` | no | Background: `surface` (panels), `row` (wells, hover), `bg` (canvas), `accent` (selected). |
+| `border` | `SurfaceBorder` | no | Which sides carry the 1 px border. |
+| `borderTone` | `'default' \| 'soft' \| 'control' \| 'accent'` | no | Border colour: `default`, `soft` (inner dividers), `control`, `accent` (selected). |
+| `radius` | `Radius` | no | sm 3 px (bars), md 4 px (controls), lg 6 px (panels). |
+| `padding` | `Space` | no |  |
+| `paddingX` | `Space` | no |  |
+| `paddingY` | `Space` | no |  |
+| `grow` | `boolean` | no | Grow to fill the parent Stack's main axis. |
+| `clip` | `boolean` | no | Clip children to the rounded corners. |
+| `id` | `string` | no |  |
+| `children` | `ReactNode` | no |  |
+
 ### Text
 
-Text: the typography primitive and the TEMPLATE for every design-system component (folder = Name.tsx + Name.module.css + Name.stories.tsx + Name.test.tsx + index.ts + __screenshots__). All text on a screen goes through it; size, weight and colour come only from tokens.
+Text: the typography primitive and the TEMPLATE for every design-system component (folder = Name.tsx + Name.module.css + Name.stories.tsx + Name.test.tsx + index.ts + __screenshots__). All running text on a screen goes through it (headings: Heading; codes: Mono); size, weight and colour come only from tokens. Numbers are always tabular.
 
 Source: `design-system/primitives/Text`
 
 | Prop | Type | Required | Description |
 |---|---|---|---|
-| `variant` | `TextVariant` | no | Typographic role; sets size, line height and weight. |
-| `tone` | `TextTone` | no |  |
-| `weight` | `'regular' \| 'medium' \| 'semibold'` | no |  |
+| `size` | `FontSize` | no | Type-scale step: xs 11.5, sm 12, md 12.5, base 13 (default), lg 14, xl 16, 2xl 18, 3xl 22 px. |
+| `weight` | `FontWeight` | no |  |
+| `tone` | `TextTone` | no | Colour role: `secondary` / `muted` for de-emphasis, status tones, `up` / `down` for price moves. |
 | `mono` | `boolean` | no | Monospace (symbols, codes, ids). |
-| `numeric` | `boolean` | no | Right-aligned tabular figures for numeric columns. |
+| `numeric` | `boolean` | no | A number in a column: right-aligned, tabular figures. |
 | `truncate` | `boolean` | no | Single line with an ellipsis when too long. |
-| `as` | `TextElement` | no | The semantic element; defaults to h1/h2 for title/heading, p for body, span otherwise. |
+| `as` | `TextElement` | no | The semantic element (`p` for paragraphs; `span` default). |
+| `title` | `string` | no | Tooltip / full value for truncated text or abbreviations. |
 | `children` | `ReactNode` | no |  |
+
+### VisuallyHidden
+
+VisuallyHidden: content for screen readers only (a label for an icon-only control, the meaning of a colour, a table caption). Never hides content that sighted users need.
+
+Source: `design-system/primitives/VisuallyHidden`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `as` | `'span' \| 'div'` | no | `span` (inline, default) or `div` (block content such as a caption). |
+| `id` | `string` | no | Target of an `aria-labelledby` / `aria-describedby`. |
+| `children` | `ReactNode` | yes |  |
 
 ## Components
 

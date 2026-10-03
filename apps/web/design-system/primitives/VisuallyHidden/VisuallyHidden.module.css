@@ -1,0 +1,12 @@
+/* VisuallyHidden: removed from layout, kept in the accessibility tree. */
+.visuallyHidden {
+  position: absolute;
+  overflow: hidden;
+  width: var(--border-width-thin);
+  height: var(--border-width-thin);
+  margin: calc(-1 * var(--border-width-thin));
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

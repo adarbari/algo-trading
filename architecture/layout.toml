@@ -375,7 +375,7 @@ styles = true
 
 [[web_dir]]
 path = "apps/web/design-system/tokens"
-purpose = "typed design tokens (DRAFT) and the generated tokens.css (npm run tokens)"
+purpose = "typed design tokens (FINAL, approved mockups 2026-10-03), the contrast check and the generated tokens.css (npm run tokens)"
 styles = true
 
 [[web_dir]]
@@ -388,13 +388,23 @@ path = "apps/web/design-system/testing"
 purpose = "test support for design-system tests (axe assertion); never exported"
 
 [[web_dir]]
+path = "apps/web/design-system/foundations"
+purpose = "Storybook foundation pages (Foundations/Tokens: colours with contrast, type, space, radius, density)"
+styles = true
+
+[[web_dir]]
+path = "apps/web/design-system/foundations/__screenshots__"
+purpose = "the foundation pages' screenshot baselines, one per story and theme"
+kind = "screenshots"
+
+[[web_dir]]
 path = "apps/web/design-system/primitives"
 purpose = "layout and typography primitives, one folder each (index.ts re-exports them)"
 kind = "layer"
 
 [[web_dir]]
 path = "apps/web/design-system/primitives/*"
-purpose = "one primitive (Stack, Text, ...); Text is the template every component copies"
+purpose = "one primitive (Box, Surface, Stack, Grid, Text, Heading, Mono, Divider, VisuallyHidden); Text is the template every component copies"
 kind = "component"
 styles = true
 
@@ -405,7 +415,7 @@ kind = "screenshots"
 
 [[web_dir]]
 path = "apps/web/design-system/components"
-purpose = "design-system components, one folder each (empty until the mockups are approved)"
+purpose = "design-system components, one folder each (built on the primitives; design system PR 2 onwards)"
 kind = "layer"
 
 [[web_dir]]

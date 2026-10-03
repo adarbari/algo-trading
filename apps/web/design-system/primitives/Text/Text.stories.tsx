@@ -28,16 +28,31 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-export const Variants: Story = {
+export const Sizes: Story = {
   render: () => (
-    <Stack gap={2}>
-      <Text variant="title">Title: screener results</Text>
-      <Text variant="heading">Heading: contract detail</Text>
-      <Text variant="body">
-        Body: the nightly run finished at 06:12 UTC with 4 812 instruments.
+    <Stack gap={1}>
+      <Text size="xs">xs 11.5: column header, legend</Text>
+      <Text size="sm">sm 12: caption, metadata</Text>
+      <Text size="md">md 12.5: table cell</Text>
+      <Text size="base">base 13: body (default)</Text>
+      <Text size="lg">lg 14: emphasis</Text>
+      <Text size="xl">xl 16: section lead</Text>
+      <Text size="2xl" weight="medium">
+        2xl 18: summary figure
       </Text>
-      <Text variant="label">Label: expiry</Text>
-      <Text variant="caption">Caption: delayed 15 minutes</Text>
+      <Text size="3xl" weight="medium">
+        3xl 22: hero figure
+      </Text>
+    </Stack>
+  ),
+};
+
+export const Weights: Story = {
+  render: () => (
+    <Stack direction="row" gap={4}>
+      <Text weight="regular">Regular 400</Text>
+      <Text weight="medium">Medium 500</Text>
+      <Text weight="semibold">Semibold 600</Text>
     </Stack>
   ),
 };
@@ -45,14 +60,20 @@ export const Variants: Story = {
 export const Tones: Story = {
   render: () => (
     <Stack gap={1}>
-      <Text tone="default">default</Text>
-      <Text tone="muted">muted</Text>
-      <Text tone="accent">accent</Text>
-      <Text tone="positive">positive</Text>
-      <Text tone="negative">negative</Text>
-      <Text tone="warning">warning</Text>
-      <Text tone="up">+1.24%</Text>
-      <Text tone="down">-0.87%</Text>
+      <Text tone="default">default: primary text</Text>
+      <Text tone="secondary">secondary: inactive nav, legend values</Text>
+      <Text tone="muted">muted: captions, units</Text>
+      <Text tone="accent">accent: a link</Text>
+      <Text tone="positive">positive: 5 checks pass</Text>
+      <Text tone="warning">warning: stale chains 12.3%</Text>
+      <Text tone="negative">negative: fetch failed</Text>
+      <Text tone="info">info: delayed 15 minutes</Text>
+      <Text tone="up" numeric>
+        +1.24%
+      </Text>
+      <Text tone="down" numeric>
+        -0.87%
+      </Text>
     </Stack>
   ),
 };
@@ -65,7 +86,7 @@ export const Dense: Story = {
   render: () => (
     <Stack gap={0}>
       {['1,024.50', '98.07', '12.30', '0.45'].map((value) => (
-        <Text key={value} variant="caption" numeric mono>
+        <Text key={value} size="md" numeric>
           {value}
         </Text>
       ))}

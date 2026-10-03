@@ -1,0 +1,63 @@
+/* Heading: semibold section titles from tokens. Data attributes set by Heading.tsx. */
+.heading {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-weight: var(--font-weight-semibold);
+  font-feature-settings: var(--font-features);
+  font-variant-numeric: tabular-nums;
+}
+
+.heading[data-size='xs'] {
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-xs);
+}
+
+.heading[data-size='sm'] {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.heading[data-size='md'] {
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+}
+
+.heading[data-size='base'] {
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+}
+
+.heading[data-size='lg'] {
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-lg);
+}
+
+.heading[data-size='xl'] {
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-xl);
+}
+
+.heading[data-size='2xl'] {
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-height-2xl);
+}
+
+.heading[data-size='3xl'] {
+  font-size: var(--font-size-3xl);
+  line-height: var(--line-height-3xl);
+}
+
+.heading[data-tone='default'] {
+  color: var(--color-text);
+}
+
+.heading[data-tone='muted'] {
+  color: var(--color-muted);
+}
+
+.heading[data-truncate] {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

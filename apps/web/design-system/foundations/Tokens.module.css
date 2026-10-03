@@ -1,0 +1,46 @@
+/* The Storybook tokens page (Tokens.stories.tsx): swatches and samples drawn from tokens. */
+.table {
+  border-collapse: collapse;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+}
+
+.cell,
+.head {
+  padding: var(--density-cell-padding-y) var(--density-cell-padding-x);
+  border-bottom: var(--border-width-thin) solid var(--color-border-soft);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.head {
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.swatch {
+  display: block;
+  width: var(--space-10);
+  height: var(--space-5);
+  border: var(--border-width-thin) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--swatch);
+}
+
+.bar {
+  display: block;
+  width: var(--bar);
+  height: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+}
+
+.radius {
+  display: block;
+  width: var(--space-10);
+  height: var(--space-8);
+  border: var(--border-width-thin) solid var(--color-control);
+  border-radius: var(--radius);
+  background: var(--color-row);
+}

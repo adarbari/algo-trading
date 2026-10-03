@@ -1,9 +1,16 @@
 /**
  * The design-system root: loads fonts, tokens and base styles, and applies theme, density and
  * the up/down palette to the document. Wrap the app (and every story) in it exactly once.
+ *
+ * Fonts are self-hosted from @fontsource (IBM Plex Sans 400/500/600, IBM Plex Mono 400/500,
+ * Latin subset only): bundled by Vite, so no third-party request, no layout shift waiting on a
+ * CDN, identical glyphs in CI screenshots and offline.
  */
-import '@fontsource-variable/inter';
-import '@fontsource-variable/jetbrains-mono';
+import '@fontsource/ibm-plex-sans/latin-400.css';
+import '@fontsource/ibm-plex-sans/latin-500.css';
+import '@fontsource/ibm-plex-sans/latin-600.css';
+import '@fontsource/ibm-plex-mono/latin-400.css';
+import '@fontsource/ibm-plex-mono/latin-500.css';
 import '../tokens/tokens.css';
 import './base.css';
 
@@ -11,34 +18,31 @@ import { useEffect, type ReactNode } from 'react';
 
 import type { DensityName } from '../tokens';
 
-export type Theme = 'light' | 'dark' | 'system';
+/** `dark` is the default (dark-first); `system` follows `prefers-color-scheme`. */
+export type Theme = 'dark' | 'light' | 'system';
 export type UpDownPalette = 'standard' | 'cvd';
 
 export interface UiProviderProps {
-  /** `system` follows `prefers-color-scheme`. */
+  /** Colour theme; dark by default, `system` follows the OS. */
   theme?: Theme;
+  /** `compact` (default, data screens) or `comfortable`. */
   density?: DensityName;
   /** `cvd`: colour-blind-safe up/down (blue/orange) instead of green/red. */
   upDown?: UpDownPalette;
   children: ReactNode;
 }
 
-function setAttribute(name: string, value: string | undefined): void {
-  const root = document.documentElement;
-  if (value === undefined) root.removeAttribute(name);
-  else root.setAttribute(name, value);
-}
-
 export function UiProvider({
-  theme = 'system',
+  theme = 'dark',
   density = 'compact',
   upDown = 'standard',
   children,
 }: UiProviderProps) {
   useEffect(() => {
-    setAttribute('data-theme', theme === 'system' ? undefined : theme);
-    setAttribute('data-density', density);
-    setAttribute('data-updown', upDown);
+    const root = document.documentElement;
+    root.setAttribute('data-theme', theme);
+    root.setAttribute('data-density', density);
+    root.setAttribute('data-updown', upDown);
   }, [theme, density, upDown]);
   return children;
 }

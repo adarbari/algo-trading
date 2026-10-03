@@ -1,0 +1,81 @@
+/* Mono: monospace from tokens. Data attributes set by Mono.tsx. */
+.mono {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.mono[data-size='xs'] {
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-xs);
+}
+
+.mono[data-size='sm'] {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.mono[data-size='md'] {
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+}
+
+.mono[data-size='base'] {
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+}
+
+.mono[data-size='lg'] {
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-lg);
+}
+
+.mono[data-size='xl'] {
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-xl);
+}
+
+.mono[data-size='2xl'] {
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-height-2xl);
+}
+
+.mono[data-size='3xl'] {
+  font-size: var(--font-size-3xl);
+  line-height: var(--line-height-3xl);
+}
+
+.mono[data-weight='regular'] {
+  font-weight: var(--font-weight-regular);
+}
+
+.mono[data-weight='medium'] {
+  font-weight: var(--font-weight-medium);
+}
+
+.mono[data-tone='default'] {
+  color: var(--color-text);
+}
+
+.mono[data-tone='secondary'] {
+  color: var(--color-text-2);
+}
+
+.mono[data-tone='muted'] {
+  color: var(--color-muted);
+}
+
+.mono[data-tone='accent'] {
+  color: var(--color-accent);
+}
+
+.mono[data-tone='inherit'] {
+  color: inherit;
+}
+
+.mono[data-truncate] {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

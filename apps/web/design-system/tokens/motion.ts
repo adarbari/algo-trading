@@ -1,5 +1,5 @@
 /**
- * Motion tokens (DRAFT, ADR 0011): 100-150 ms, no bouncing. Durations drop to 0 under
+ * Motion tokens: FINAL (ADR 0011). 100-150 ms, no bouncing. Durations drop to 0 under
  * `prefers-reduced-motion: reduce` (see css.ts).
  */
 

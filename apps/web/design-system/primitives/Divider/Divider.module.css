@@ -1,0 +1,20 @@
+/* Divider: a 1 px token-coloured rule. Data attributes set by Divider.tsx. */
+.divider {
+  flex: none;
+  margin: 0;
+  border: 0 solid var(--color-border);
+}
+
+.divider[data-orientation='horizontal'] {
+  align-self: stretch;
+  border-top-width: var(--border-width-thin);
+}
+
+.divider[data-orientation='vertical'] {
+  align-self: stretch;
+  border-inline-start-width: var(--border-width-thin);
+}
+
+.divider[data-tone='soft'] {
+  border-color: var(--color-border-soft);
+}

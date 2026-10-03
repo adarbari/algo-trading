@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
+import { Mono } from '../Mono';
 import { Text } from '../Text';
 import { Stack } from './Stack';
 
@@ -10,11 +11,7 @@ const meta = {
   component: Stack,
   args: {
     gap: 2,
-    children: items.map((symbol) => (
-      <Text key={symbol} mono>
-        {symbol}
-      </Text>
-    )),
+    children: items.map((symbol) => <Mono key={symbol}>{symbol}</Mono>),
   },
   parameters: {
     states: {
@@ -38,13 +35,24 @@ export const Between: Story = {
     direction: 'row',
     justify: 'between',
     children: [
-      <Text key="l" variant="label">
+      <Text key="l" tone="muted">
         Expiry
       </Text>,
       <Text key="r" numeric>
         2026-10-16
       </Text>,
     ],
+  },
+};
+
+export const Cluster: Story = {
+  args: {
+    direction: 'row',
+    wrap: true,
+    gap: 3,
+    children: [...items, 'QQQ', 'IWM', 'TLT', 'GLD', 'USO', 'XLE'].map((s) => (
+      <Mono key={s}>{s}</Mono>
+    )),
   },
 };
 

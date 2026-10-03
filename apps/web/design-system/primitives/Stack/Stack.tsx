@@ -1,12 +1,13 @@
 /**
- * Stack: the layout primitive. Lays children out in a row or column with a token gap. Screens
- * lay out only through primitives (ADR 0025), so semantics (`as`) and spacing are props here.
+ * Stack: one-dimensional flow layout. Lays children out in a row or column with a token gap;
+ * `wrap` turns a row into a cluster (chips, toolbars). Screens lay out only through primitives
+ * (ADR 0025), so semantics (`as`) and spacing are props here; padding is Box's job.
  */
 import type { AriaAttributes, ReactNode } from 'react';
 
+import type { Space } from '../../tokens';
 import styles from './Stack.module.css';
 
-export type StackGap = 0 | 1 | 2 | 3 | 4 | 6 | 8;
 export type StackElement =
   'div' | 'section' | 'header' | 'footer' | 'main' | 'nav' | 'aside' | 'ul' | 'ol' | 'li';
 
@@ -17,11 +18,12 @@ export interface StackProps extends Pick<
   /** Main axis. */
   direction?: 'row' | 'column';
   /** Space between children, a step of the 4 px scale. */
-  gap?: StackGap;
-  /** Inner padding, a step of the 4 px scale. */
-  padding?: StackGap;
+  gap?: Space;
+  /** Cross-axis alignment. */
   align?: 'start' | 'center' | 'end' | 'stretch' | 'baseline';
+  /** Main-axis distribution. */
   justify?: 'start' | 'center' | 'end' | 'between';
+  /** Wrap onto new lines when out of room (a cluster). */
   wrap?: boolean;
   /** Grow to fill the parent stack's main axis. */
   grow?: boolean;
@@ -33,7 +35,6 @@ export interface StackProps extends Pick<
 export function Stack({
   direction = 'column',
   gap = 2,
-  padding = 0,
   align = 'stretch',
   justify = 'start',
   wrap = false,
@@ -47,7 +48,6 @@ export function Stack({
       className={styles.stack}
       data-direction={direction}
       data-gap={gap}
-      data-padding={padding}
       data-align={align}
       data-justify={justify}
       data-wrap={wrap || undefined}
