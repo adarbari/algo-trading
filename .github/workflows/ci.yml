@@ -19,11 +19,11 @@ env:
 jobs:
   quality:
     name: Lint, types, boundaries, ownership, duplicates, file length
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64] # the owner's Mac (docs/ci.md): no Actions minutes
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
-        with: { python-version: "3.12", enable-cache: true }
+        with: { python-version: "3.12", enable-cache: false } # uv's own cache persists on the Mac
       - run: uv sync --all-packages --locked
       - run: make lock-check
       - run: make lint
@@ -35,7 +35,7 @@ jobs:
 
   test:
     name: Tests (py${{ matrix.python }})
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64] # the owner's Mac (docs/ci.md): no Actions minutes
     strategy:
       fail-fast: false
       matrix:
@@ -44,11 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
-        with: { python-version: "${{ matrix.python }}", enable-cache: true }
-      - uses: actions/cache@v6
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-py${{ matrix.python }}-${{ hashFiles('uv.lock') }}
+        with: { python-version: "${{ matrix.python }}", enable-cache: false } # uv's own cache persists on the Mac
       - run: uv sync --all-packages --locked
       # Hypothesis keeps failing examples here and replays them first on the next run.
       - uses: actions/cache@v6
@@ -64,12 +60,11 @@ jobs:
 
   evaluate:
     name: Strategy evaluation vs baseline
-    runs-on: ubuntu-latest
-    needs: [quality]
+    runs-on: [self-hosted, macOS, ARM64] # the owner's Mac (docs/ci.md): no Actions minutes
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
-        with: { python-version: "3.12", enable-cache: true }
+        with: { python-version: "3.12", enable-cache: false } # uv's own cache persists on the Mac
       - run: uv sync --all-packages --locked
       - run: make datasets-verify
       - name: Run every strategy on every golden dataset
@@ -84,37 +79,31 @@ jobs:
 
   web:
     name: Web (lint, types, unit, design system, build, Storybook, e2e, screenshots)
-    runs-on: ubuntu-latest
-    # The official Playwright image: browsers and fonts identical to the screenshot baselines
-    # (apps/web/scripts/in-playwright-docker.sh uses the same image locally). Its tag must
-    # match @playwright/test in apps/web/package-lock.json (checked below).
-    container:
-      image: mcr.microsoft.com/playwright:v1.63.0-noble
-      options: --ipc=host
-    defaults:
-      run:
-        working-directory: apps/web
-    env:
-      CI: "1"
+    runs-on: [self-hosted, macOS, ARM64] # the owner's Mac (docs/ci.md): no Actions minutes
     steps:
       - uses: actions/checkout@v7
-      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - uses: actions/cache@v6
-        with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('apps/web/package-lock.json') }}
-          restore-keys: npm-${{ runner.os }}-
-      - run: npm ci --no-fund --no-audit
-      - name: No high or critical advisories in shipped dependencies (dev tooling is reported, not gated)
-        run: npm audit --omit=dev --audit-level=high && { npm audit --audit-level=high || true; }
-      - name: Playwright image matches the locked @playwright/test
+      # Everything runs in the official Playwright image (Linux, browsers and fonts identical
+      # to the screenshot baselines; apps/web/scripts/in-playwright-docker.sh is the same
+      # locally), tagged by the locked @playwright/test, so the two cannot drift. node_modules
+      # and the npm cache live in Docker volumes per runner: fast, and concurrent jobs on the
+      # same Mac never share them.
+      - name: npm audit, generated files fresh, ds:check, lint, types, unit, build, Storybook, e2e, screenshots + axe
+        env:
+          VOLUMES: algotrade-web-${{ runner.name }}
         run: |
-          locked=$(node -p "require('@playwright/test/package.json').version")
-          test "$locked" = "1.63.0" || { echo "bump the web job's container image to v$locked-noble"; exit 1; }
-      - name: Generated files fresh, ds:check, lint, types, unit, build, Storybook, e2e
-        run: npm run check
-      - name: Screenshots + axe (light and dark) over every design-system story
-        run: npm run visual
+          version=$(jq -r '.packages["node_modules/@playwright/test"].version' apps/web/package-lock.json)
+          docker run --rm --init --ipc=host -e CI=1 \
+            -v "$PWD":/work -w /work/apps/web \
+            -v "$VOLUMES-node-modules":/work/apps/web/node_modules \
+            -v "$VOLUMES-npm-cache":/root/.npm \
+            "mcr.microsoft.com/playwright:v$version-noble" \
+            bash -euo pipefail -c '
+              git config --global --add safe.directory /work
+              npm ci --no-fund --no-audit
+              # high/critical advisories in shipped dependencies fail; dev tooling is reported
+              npm audit --omit=dev --audit-level=high && { npm audit --audit-level=high || true; }
+              npm run check
+              npm run visual -- --fully-parallel  # one story per worker, not one file per worker'
       - uses: actions/upload-artifact@v7
         if: failure()
         with: { name: playwright-report, path: "apps/web/playwright-report\napps/web/test-results", if-no-files-found: ignore }

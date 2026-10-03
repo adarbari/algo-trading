@@ -190,7 +190,8 @@ the skill with the fix.
 9. Before finishing any change, run `make check`.
 10. **PRs auto-merge** (squash, branch deleted) once every CI check on the latest commit
     passes (`.github/workflows/auto-merge.yml`). Open work in progress as a draft, or label
-    it `no-automerge`, to keep it open for review.
+    it `no-automerge`, to keep it open for review. CI's Python jobs run on the owner's Mac
+    (self-hosted runners; they queue while it sleeps): see `docs/ci.md`.
 
 ## Workflows: use the matching skill
 
