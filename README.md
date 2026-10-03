@@ -22,7 +22,8 @@ algotrade-ingest universe --stocks optionable_us_stock_universe.csv \
                           --etfs optionable_us_etf_universe.csv --version 2026-10
 algotrade-ingest universe-build --review-out leveraged_candidates.csv   # universe + reference
 algotrade-ingest bars --from 2024-10-01 --to 2026-10-01   # 2-year backfill (needs ALGOTRADE_MASSIVE_API_KEY in .env)
-algotrade-ingest nightly --export-dir out/      # universe -> earnings -> bars -> chains -> rollups -> screens
+algotrade-ingest company-details [--force] [--limit N]   # SEC EDGAR company details (needs ALGOTRADE_SEC_CONTACT in .env)
+algotrade-ingest nightly --export-dir out/      # universe -> company details -> earnings -> bars -> chains -> rollups -> screens
 algotrade-ingest quality                        # data-quality checks for a session
 algotrade-ingest schedule --time 23:30          # writes a launchd agent; prints install commands
 algotrade-ingest purge-raw --keep-days 90

@@ -1,7 +1,8 @@
 """Which fields a selection may reference, their types, and which table each comes from.
 
 Field names:
-- ``instrument.<column>``          L1 reference facts (``instruments/reference``)
+- ``instrument.<column>``          L1 reference facts (``instruments/reference``; company
+                                   fields such as ``sector`` from ``instruments/company``)
 - ``rollup.<name>@v<N>.<column>``  a registered rollup (``rollups/instrument/<name>@v<N>``)
 """
 
@@ -40,6 +41,15 @@ INSTRUMENT_FIELDS: Mapping[str, str] = {
     "is_test_issue": "bool",
     "financial_status": "str",
     "in_sp500": "bool",
+    # SEC EDGAR company details (instruments/company)
+    "sic": "str",
+    "sic_description": "str",
+    "sic_division": "str",
+    "sector": "str",
+    "industry": "str",
+    "state_of_incorporation": "str",
+    "fiscal_year_end": "str",
+    "website": "str",
 }
 
 

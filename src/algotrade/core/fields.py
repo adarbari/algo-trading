@@ -1,13 +1,28 @@
 """Field names for instrument-level data, shared by configs (selections) and storage (views).
 
-- ``instrument.<column>``          L1 reference facts (``instruments/reference``)
+- ``instrument.<column>``          L1 reference facts (``instruments/reference``); company
+                                   columns (``COMPANY_FIELDS``) come from ``instruments/company``
 - ``rollup.<name>@v<N>.<column>``  a rollup (``rollups/instrument/<name>@v<N>``)
 """
 
 from algotrade.core.errors import ConfigurationError
 
 REFERENCE_TABLE = "instruments/reference"
+COMPANY_TABLE = "instruments/company"
 ROLLUP_TABLE_PREFIX = "rollups/instrument/"
+# instrument.<column> fields read from the SEC company table rather than the reference.
+COMPANY_FIELDS = frozenset(
+    {
+        "sic",
+        "sic_description",
+        "sic_division",
+        "sector",
+        "industry",
+        "state_of_incorporation",
+        "fiscal_year_end",
+        "website",
+    }
+)
 
 
 def instrument_field(column: str) -> str:
@@ -23,7 +38,7 @@ def field_source(field_name: str) -> tuple[str, str]:
     """``(table, column)`` a field is read from."""
     head, _, rest = field_name.partition(".")
     if head == "instrument" and rest:
-        return REFERENCE_TABLE, rest
+        return (COMPANY_TABLE if rest in COMPANY_FIELDS else REFERENCE_TABLE), rest
     if head == "rollup" and "." in rest:
         rollup, _, column = rest.rpartition(".")
         return f"{ROLLUP_TABLE_PREFIX}{rollup}", column

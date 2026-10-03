@@ -27,6 +27,7 @@ def test_sources_settings_defaults_and_overrides() -> None:
         "nasdaq_earnings": {"enabled": False, "days": 20},
         "massive": {"min_interval_s": 0.5, "corporate_actions_window": [-3, 10]},
         "quality": {"max_universe_change": 0.2},
+        "sec_edgar": {"enabled": False, "min_interval_s": 0.5, "refresh_days": 7},
         "nasdaq_trader": "not a table",
     }
     s = load_sources(MemoryConfigStore({("site", "settings", "sources"): doc}))
@@ -41,6 +42,7 @@ def test_sources_settings_defaults_and_overrides() -> None:
         (-3, 10),
         0.2,
     )
+    assert (s.sec_enabled, s.sec_min_interval_s, s.sec_refresh_days) == (False, 0.5, 7)
     assert s.universe_enabled  # a malformed section falls back to defaults
 
 

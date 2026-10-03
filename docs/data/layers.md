@@ -129,7 +129,7 @@ Resolution order and the narrow/replace rules are in [../configuration.md](../co
 
 | Question | Layer / table |
 |---|---|
-| Is it a fact about what the instrument is, from a vendor? | L1 `instruments/reference` |
+| Is it a fact about what the instrument is, from a vendor? | L1 `instruments/reference` (company filings facts: `instruments/company`) |
 | Is it a number derived from history, and true "as of" a day? | L1 `rollups/instrument/*` (or L2 `rollups/daily/*` if per session) |
 | Does it have a value per bar or per snapshot? | L2 `bars/*` or `chains/*` |
 | Did it *happen* at a point in time? | L2 `events/*` |
@@ -143,13 +143,29 @@ Resolution order and the narrow/replace rules are in [../configuration.md](../co
 | Group | Columns | Source |
 |---|---|---|
 | Identity | `instrument_id`, `symbol`, `figi` (1), `cik` (1) | Nasdaq Trader, universe CSVs; Massive / OpenFIGI (1) |
-| Company | `name`, `description` (1), `website` (1), `sector` (1), `industry` (1), `country` (1) | SEC EDGAR, Massive ticker details (1) |
+| Company | `name`, `description` (1), `country` (1); SIC, `sector`, `industry`, website… live in `instruments/company` (below) | Nasdaq Trader; SEC EDGAR, Massive ticker details (1) |
 | Classification | `asset_class`, `security_type` (COMMON_STOCK, ADR, ETF, ETN, PREFERRED, WARRANT, UNIT, RIGHT, CEF), `exchange`, `currency` | Nasdaq Trader, universe CSVs |
 | Contract terms | `multiplier`, `tick_size`, `round_lot` | derived per asset class |
 | ETF attributes | `is_etf`, `is_leveraged`, `is_inverse`, `leverage`, `tracks` | ETF flag + `config/site/overrides/leveraged_etfs.csv`; **unknown for an ETF unless supplied** (fail closed) |
 | Options | `optionable` | Nasdaq Trader `options.txt`, universe CSVs |
 | Status | `status`, `listed_on`, `delisted_on`, `is_test_issue` | Nasdaq Trader, Massive |
 | Lineage | `session_date`, `knowledge_ts`, `source`, `run_id` | ingestion |
+
+**`instruments/company`** (SEC EDGAR, phase 1.7; one full snapshot per date, one row per
+instrument whose company is known; `algotrade-ingest company-details`)
+
+| Columns | Notes |
+|---|---|
+| `instrument_id`, `symbol`, `cik`, `cik_source` | CIK from the reference (`reference`) or the SEC ticker map (`sec_map`) |
+| `name`, `entity_type`, `former_names`, `exchanges`, `tickers` | as filed with the SEC |
+| `sic`, `sic_description`, `sic_division`, `sector`, `industry` | `sector`: SIC ranges → market sector (heuristic); `industry` = SIC description |
+| `state_of_incorporation`, `fiscal_year_end` (MMDD), `website` | `website` is blank for most filers |
+| `fetched_on` | when SEC was last asked; drives the `refresh_days` refresh |
+
+Selections read the company columns as `instrument.<column>` (`instrument.sector`,
+`instrument.industry`, `instrument.sic`, `instrument.sic_division`, `instrument.website`,
+`instrument.state_of_incorporation`, `instrument.fiscal_year_end`) from the latest snapshot on
+or before the session; with no snapshot they are UNKNOWN. ETFs and funds usually have none.
 
 **`rollups/instrument/*`** (derived "as of D"; one table per rollup, versioned)
 

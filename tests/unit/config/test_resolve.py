@@ -169,6 +169,7 @@ def test_catalog_validates_fields_and_types() -> None:
 
 def test_field_source_and_catalog_types() -> None:
     assert field_source("instrument.symbol") == ("instruments/reference", "symbol")
+    assert field_source("instrument.sector") == ("instruments/company", "sector")
     assert field_source("rollup.option_liquidity@v1.put_tier") == (
         "rollups/instrument/option_liquidity@v1",
         "put_tier",

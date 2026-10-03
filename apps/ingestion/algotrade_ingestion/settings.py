@@ -19,6 +19,9 @@ class SourcesSettings:
     massive_enabled: bool = True
     massive_min_interval_s: float = 12.5
     actions_window: tuple[int, int] = (-7, 30)
+    sec_enabled: bool = True
+    sec_min_interval_s: float = 0.2
+    sec_refresh_days: int = 30
     max_bar_count_drop: float = 0.10
     max_universe_change: float = 0.05
     min_chain_coverage: float = 0.95
@@ -31,8 +34,8 @@ class SourcesSettings:
             value = doc.get(name, {})
             return value if isinstance(value, Mapping) else {}
 
-        cboe, earnings, massive, quality = (
-            section(n) for n in ("cboe", "nasdaq_earnings", "massive", "quality")
+        cboe, earnings, massive, quality, sec = (
+            section(n) for n in ("cboe", "nasdaq_earnings", "massive", "quality", "sec_edgar")
         )
         window = massive.get("corporate_actions_window", list(cls.actions_window))
         d = cls()
@@ -47,6 +50,9 @@ class SourcesSettings:
             massive_enabled=bool(massive.get("enabled", True)),
             massive_min_interval_s=float(massive.get("min_interval_s", d.massive_min_interval_s)),
             actions_window=(int(window[0]), int(window[1])),
+            sec_enabled=bool(sec.get("enabled", True)),
+            sec_min_interval_s=float(sec.get("min_interval_s", d.sec_min_interval_s)),
+            sec_refresh_days=int(sec.get("refresh_days", d.sec_refresh_days)),
             max_bar_count_drop=float(quality.get("max_bar_count_drop", d.max_bar_count_drop)),
             max_universe_change=float(quality.get("max_universe_change", d.max_universe_change)),
             min_chain_coverage=float(quality.get("min_chain_coverage", d.min_chain_coverage)),

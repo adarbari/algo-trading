@@ -163,3 +163,32 @@ def test_quality_and_schedule_commands(
         plistlib.loads((env / "agent.plist").read_bytes())["StartCalendarInterval"][0]["Minute"]
         == 15
     )
+
+
+def test_company_details_command(
+    env: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from algotrade_ingestion.settings import SourcesSettings  # noqa: PLC0415
+    from tests.apps.ingestion.test_company_details import FakeSec, sources  # noqa: PLC0415
+
+    call(capsys, "universe", "--stocks", str(env / "stocks.csv"), "--version", "v", "--date", DAY)
+    assert cli.main(["company-details", "--date", DAY]) == 2  # no contact email configured
+    assert "ALGOTRADE_SEC_CONTACT" in capsys.readouterr().err
+    assert commands.company_sources(SourcesSettings(), required=False) is None
+    monkeypatch.setenv("ALGOTRADE_SEC_CONTACT", "ops@example.org")
+    real = commands.company_sources(SourcesSettings())
+    assert real is not None and real.refresh_days == 30  # built without touching the network
+    feed = FakeSec()
+    monkeypatch.setattr(commands, "company_sources", lambda *_, **__: sources(feed))
+    code, result = call(capsys, "company-details", "--date", DAY, "--limit", "5")
+    assert (code, result["rows"], result["cik_from_sec_map"]) == (0, 1, 1)  # AAPL via the map
+    _, nightly = call(capsys, "nightly", "--date", DAY, "--workers", "1")
+    assert nightly["company_details"]["requested"] == 0  # already fresh: no requests
+
+
+def test_nightly_skips_company_details_without_contact(
+    env: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    call(capsys, "universe", "--stocks", str(env / "stocks.csv"), "--version", "v", "--date", DAY)
+    _, nightly = call(capsys, "nightly", "--date", DAY, "--workers", "1")
+    assert nightly["company_details"].startswith("skipped")

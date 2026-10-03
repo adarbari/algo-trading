@@ -3,6 +3,7 @@
     algotrade-ingest universe --stocks optionable_us_stock_universe.csv \\
                               --etfs optionable_us_etf_universe.csv --version 2026-10
     algotrade-ingest universe-build [--date YYYY-MM-DD] [--review-out leveraged_candidates.csv]
+    algotrade-ingest company-details [--date D] [--force] [--limit N]   (SEC EDGAR)
     algotrade-ingest earnings [--date D] [--start D] [--days 60]
     algotrade-ingest bars [--date D | --from D --to D] [--force]   (needs a Massive API key)
     algotrade-ingest corporate-actions [--date D] [--from D --to D]
@@ -32,6 +33,7 @@ from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.commands import (
     bars,
     cboe_source,
+    company_details,
     corporate_actions,
     earnings,
     golden,
@@ -59,6 +61,20 @@ def last_session(now: datetime) -> date:
     return day
 
 
+def _vendor_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> None:
+    """Commands that pull one vendor dataset: company details and earnings."""
+    cd = sub.add_parser("company-details", help="company details from SEC EDGAR (incremental)")
+    cd.add_argument("--date", type=date.fromisoformat, help="session the snapshot belongs to")
+    cd.add_argument("--force", action="store_true", help="refetch every company")
+    cd.add_argument("--limit", type=int, help="fetch at most N companies this run")
+    ea = sub.add_parser("earnings", help="store the Nasdaq earnings calendar as events")
+    ea.add_argument("--date", type=date.fromisoformat, help="session the snapshot belongs to")
+    ea.add_argument(
+        "--start", type=date.fromisoformat, help="first calendar date (default: --date)"
+    )
+    ea.add_argument("--days", type=int, help="calendar days (default: sources.toml, 60)")
+
+
 def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="algotrade-ingest", description=__doc__.splitlines()[0])
     p.add_argument(
@@ -75,12 +91,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     ub.add_argument("--date", type=date.fromisoformat)
     ub.add_argument("--review-out", type=Path, help="write leverage candidates to curate (CSV)")
-    ea = sub.add_parser("earnings", help="store the Nasdaq earnings calendar as events")
-    ea.add_argument("--date", type=date.fromisoformat, help="session the snapshot belongs to")
-    ea.add_argument(
-        "--start", type=date.fromisoformat, help="first calendar date (default: --date)"
-    )
-    ea.add_argument("--days", type=int, help="calendar days (default: sources.toml, 60)")
+    _vendor_parsers(sub)
     qa = sub.add_parser("quality", help="run the data-quality checks for a session")
     qa.add_argument("--date", type=date.fromisoformat)
     sc = sub.add_parser(
@@ -151,6 +162,7 @@ def _dispatch(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter
     session = args.date if getattr(args, "date", None) else last_session(datetime.now(UTC))
     direct = {
         "universe-build": universe_build,
+        "company-details": company_details,
         "earnings": earnings,
         "bars": bars,
         "corporate-actions": corporate_actions,

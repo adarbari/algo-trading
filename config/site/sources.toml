@@ -22,6 +22,11 @@ enabled = true
 min_interval_s = 12.5            # free tier: 5 requests/minute
 corporate_actions_window = [-7, 30]   # days around the session
 
+[sec_edgar]                      # company details (needs ALGOTRADE_SEC_CONTACT in .env)
+enabled = true
+min_interval_s = 0.2             # SEC fair access allows 10 requests/second; stay well below
+refresh_days = 30                # refetch a company's details after this many days
+
 [quality]                        # data-quality thresholds for the nightly checks
 max_bar_count_drop = 0.10        # FAIL if today's bar count falls >10% vs the previous session
 max_universe_change = 0.05       # FAIL on a >5% day-over-day change in coverage

@@ -21,11 +21,12 @@ from algotrade_ingestion.sources.massive import (
 )
 from algotrade_ingestion.sources.nasdaq_earnings import NasdaqEarningsSource
 from algotrade_ingestion.sources.nasdaq_trader import NasdaqTraderSource
+from algotrade_ingestion.sources.sec_edgar import SecSubmissions, SecTickerMap
 from algotrade_ingestion.sources.spy_holdings import SpyHoldingsSource
 from algotrade_ingestion.sources.synthetic.files import GoldenFiles
 from algotrade_ingestion.sources.synthetic.source import GoldenCsvSource
 from tests import cboe_fixture as fx
-from tests import earnings_fixture, massive_fixture, universe_fixture
+from tests import earnings_fixture, massive_fixture, sec_fixture, universe_fixture
 from tests.conftest import GOLDEN_DIR
 
 type Adapter = tuple[Source, FetchRequest]
@@ -78,8 +79,20 @@ def massive_tickers() -> Adapter:
     return source, FetchRequest("active")
 
 
+def sec_tickers() -> Adapter:
+    payload = sec_fixture.tickers([(320193, "Apple Inc.", "AAPL", "Nasdaq")])
+    return SecTickerMap(lambda url: payload, lambda s: None), FetchRequest("tickers")
+
+
+def sec_submissions() -> Adapter:
+    payload = sec_fixture.submissions(320193, "Apple Inc.")
+    return SecSubmissions(lambda url: payload, lambda s: None), FetchRequest("320193")
+
+
 ADAPTERS: dict[str, Callable[[], Adapter]] = {
     "massive_tickers": massive_tickers,
+    "sec_tickers": sec_tickers,
+    "sec_submissions": sec_submissions,
     "massive_bars": massive_bars,
     "massive_actions": massive_actions,
     "nasdaq_earnings": nasdaq_earnings,

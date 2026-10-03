@@ -12,6 +12,7 @@ swapping a vendor never touches storage, features, strategies or the UI.
 |---|---|---|---|
 | Ticker universe | Nasdaq Trader symbol directory (`nasdaqlisted.txt`, `otherlisted.txt`, `options.txt`) | — | Official, free, updated daily |
 | S&P 500 membership | SPY daily holdings file (State Street) | — | Membership changes become events |
+| Company details (name, SIC, sector, state, fiscal year end) | SEC EDGAR submissions (free; contact email in the user agent) | Massive ticker details | Implemented, phase 1.7 |
 | Daily stock and ETF bars (swing / momentum) | Massive (formerly Polygon) free tier: all US tickers, 2 years history, 5 calls/min; "grouped daily" = whole market in 1 call | Alpaca (free account), IBKR, Yahoo (unofficial, history backfill only) | |
 | End-of-day option chains | **Cboe delayed-quotes feed** (ADR 0014): whole chain + Greeks + IV + OI and the underlying's `iv30` in one request per underlying; about 4.2k requests a night | IBKR for a focused list / cross-check; Schwab Trader API (free with account; Greeks; all expiries in one call; 120 req/min); Tradier (needs a brokerage account for Greeks); Alpaca (free indicative feed, history from 2024-02); Massive options (paid, from ~$29/mo; licensed fallback) | No free source covers end-of-day chains for the whole universe with history. **We build our own IV history from day one.** |
 | Futures (later) | **IBKR** (contracts, history, including recently expired) | Databento (pay-as-you-go history), Massive futures (paid), Yahoo/Stooq continuous (unofficial, unclear rolls) | |
@@ -65,6 +66,32 @@ with timing (pre-market / after hours / not supplied), the EPS forecast and numb
 estimates; past dates add the reported EPS and surprise. `algotrade-ingest earnings` stores a
 60-day forward window nightly in `events/earnings`, in the partition of the run's session, so
 date changes stay point-in-time; `--start` in the past backfills. About 2 minutes a night.
+
+## SEC EDGAR company details (implemented, phase 1.7)
+
+| Data | Endpoint | Used for |
+|---|---|---|
+| CIK ↔ ticker ↔ exchange | `https://www.sec.gov/files/company_tickers_exchange.json` (one request) | CIK when the reference has none |
+| One company | `https://data.sec.gov/submissions/CIK##########.json` | name, SIC code + description, state of incorporation, fiscal year end, website, former names, exchanges |
+
+Free, no key. SEC's [fair-access policy](https://www.sec.gov/os/accessing-edgar-data) requires
+a `User-Agent` naming the requester with a contact email and allows at most 10 requests/second.
+The email comes only from `ALGOTRADE_SEC_CONTACT` in `.env`; it is never stored, logged or
+committed. Requests are spaced 0.2 s apart (`[sec_edgar] min_interval_s`).
+
+`algotrade-ingest company-details [--date D] [--force] [--limit N]` (and the nightly step after
+the universe build, skipped unless `[sec_edgar] enabled` and the contact are set) writes a full
+`instruments/company` snapshot per session. The CIK comes from the reference (Massive, phase
+1.5) or, when missing, from the SEC ticker map (`BRK-B` → `BRK.B`, `ABR-PD` → `ABR$D`).
+Incremental: only CIKs never stored or fetched more than `refresh_days` (30) ago are requested,
+so the first run makes ~6k requests (~25 min) and a nightly run a handful. 404 (no filings,
+common for funds) is counted as `no_submissions`, not a failure; 403 and 5xx are failures
+(run PARTIAL). Checked 2026-10-02: 13,295 reference rows, 6,055 distinct CIKs from the SEC
+map; most ETFs have no CIK in that map and get no company row (UNKNOWN to selections).
+
+`sector` is a heuristic mapping of SIC code ranges to market sectors (Technology, Health Care,
+Financials, …; `sources/sec_sic.py`), falling back to one sector per SIC division;
+`industry` is the SEC's SIC description and `sic_division` the official division.
 
 ## What IBKR gives us
 
