@@ -56,11 +56,11 @@ describe('FeaturePicker', () => {
     render(<FeaturePicker label="Columns" chosen={['feature.my_ratio']} onChange={onChange} />);
     await user.click(screen.getByRole('button', { name: 'Columns' }));
     const dialog = screen.getByRole('dialog', { name: 'Columns' });
-    expect(screen.getByText('My ratio · personal')).toBeInTheDocument();
+    expect(screen.getByText('My ratio · yours')).toBeInTheDocument();
     await user.type(screen.getByRole('combobox'), 'market');
     await user.keyboard('{ArrowDown}{Enter}');
     expect(onChange).toHaveBeenLastCalledWith(['feature.my_ratio', 'feature.market_cap']);
-    await user.click(screen.getByRole('button', { name: 'Remove My ratio · personal' }));
+    await user.click(screen.getByRole('button', { name: 'Remove My ratio · yours' }));
     expect(onChange).toHaveBeenLastCalledWith([]);
     await expectNoA11yViolations(dialog);
   });

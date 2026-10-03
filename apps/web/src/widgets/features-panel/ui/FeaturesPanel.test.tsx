@@ -68,6 +68,7 @@ beforeEach(() => {
         unit: 'ratio',
         description: 'My ratio',
         scope: 'user',
+        licence: 'personal',
         owner: 'bob',
       },
     ]),
@@ -112,7 +113,7 @@ describe('FeaturesPanel', () => {
     expect(
       within(grid).getByRole('img', { name: /AAPL IV30 \(ours\), 3 sessions/ }),
     ).toBeInTheDocument();
-    expect(within(grid).getByText('My ratio · personal')).toBeInTheDocument();
+    expect(within(grid).getByText('My ratio · yours · personal licence')).toBeInTheDocument();
     expect(rows.at(-1)).toHaveTextContent('Technology');
     expect(screen.getByText('Choose a feature')).toBeInTheDocument();
     await expectNoA11yViolations(container);

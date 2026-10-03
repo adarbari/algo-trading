@@ -17,7 +17,7 @@ import {
   featureFormat,
   featureTitle,
   isNumericFeature,
-  isPersonal,
+  featureMarks,
   unitLabel,
   type CatalogueFeature,
 } from '@/entities/feature';
@@ -72,8 +72,7 @@ export function featureColumns(symbol: string): DataTableColumn<FeatureRow>[] {
       cell: ({ row }) => (
         <Stack gap={0}>
           <Text truncate title={row.title}>
-            {row.title}
-            {isPersonal(row.feature) ? ' · personal' : ''}
+            {[row.title, ...featureMarks(row.feature)].join(' · ')}
           </Text>
           <Mono size="xs" tone="muted" truncate title={row.feature.name}>
             {row.feature.name}
