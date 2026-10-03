@@ -5,7 +5,7 @@
 | Unit | `tests/unit/<path>/` | One module at a time; mirrors `src/algotrade/<path>/`. | ms |
 | App | `tests/apps/<app>/<path>/` | App modules; mirrors `apps/<app>/<package>/<path>/`. | ms |
 | Contract | `tests/contract/<protocol>/` | Every implementation of a protocol (storage backends). | ms |
-| Architecture | `tests/architecture/` | Fitness tests: layout, ownership, file length, docstrings, docs. | ms |
+| Architecture | `tests/architecture/` | Fitness tests: layout, ownership, file length, docstrings, docs. The read-only broker guard (no order / account API of `ib_async` anywhere, only the IBKR facade imports it; ADR 0026) is a fitness test kept with the vendor: `tests/apps/ingestion/sources/vendors/ibkr/test_read_only_guard.py`. | ms |
 | Property | `tests/property/` | Hypothesis invariants across *all* registered strategies. | ~1s (`dev`), minutes (`nightly`) |
 | Integration | `tests/integration/` | Real data store + engine across every golden dataset. | ~1s |
 | Reconciliation | `tests/reconciliation/` | Our features recomputed from recorded raw inputs vs another source's recorded values (marker `reconciliation`). | ms |

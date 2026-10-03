@@ -54,6 +54,19 @@ enabled = true
 min_interval_s = 1.0             # official site, no published limit; stay polite
 lookback_days = 10               # nightly window: the last N calendar days (catches late publications)
 
+[ibkr]                           # IB Gateway, READ-ONLY market data for the nightly `verify` task
+enabled = false                  # off until the owner runs IB Gateway with "Read-Only API" ticked
+                                 # (README "Live verification"); host, port and client id come from
+                                 # ALGOTRADE_IBKR_HOST / _PORT / _CLIENT_ID in .env
+min_interval_s = 0.02            # every API message: IBKR allows at most 50 messages/second
+historical_min_interval_s = 10.0 # every historical-data request as well: at most 60 per 10 minutes,
+                                 # and >= 10 s between identical requests (pacing violations)
+market_data_type = 3             # 1 live (needs a market data subscription), 3 delayed (free)
+connect_timeout_s = 10           # the API handshake with the gateway
+request_timeout_s = 60           # one historical-data request
+stream_wait_s = 4                # how long a streamed tick (IB dividends, tick 456) may take
+raw_retention_days = 30          # raw IBKR responses (JSON) kept for replays of a verification
+
 [quality]                        # data-quality thresholds for the nightly checks
 max_bar_count_drop = 0.10        # FAIL if today's bar count falls >10% vs the previous session
 max_universe_change = 0.05       # FAIL on a >5% day-over-day change in coverage
@@ -61,3 +74,4 @@ max_chain_fetch_failures = 0.05  # FAIL if over 5% of optionable names failed to
                                  # incl. an open circuit, or never attempted)
 max_chain_stale_share = 0.20     # WARN if over 20% of chains are STALE_DATA (the feed served an
                                  # older session; screens treat those names as UNKNOWN)
+max_verify_failures = 0.10       # verification vs IBKR: FAIL if over 10% of checks FAIL (any FAIL: WARN)

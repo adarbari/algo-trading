@@ -79,7 +79,11 @@ def step_status(status: RunStatus) -> StepStatus:
 
 
 def from_record(record: RunRecord) -> Outcome:
-    """A registry task's run record as a step outcome."""
+    """A registry task's run record as a step outcome. A task that could not run for a
+    reason outside our data (``stats["skipped"]``, e.g. its gateway is down) is SKIPPED."""
+    skipped = record.stats.get("skipped")
+    if skipped:
+        return Outcome(StepStatus.SKIPPED, record.stats, reason=f"skipped: {skipped}")
     return Outcome(step_status(record.status), record.stats)
 
 

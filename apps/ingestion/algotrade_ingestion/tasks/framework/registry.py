@@ -20,7 +20,11 @@ from typing import Any
 from algotrade.config.site.settings import load_universe
 from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.sources.framework.base import DirectorySource, FixtureSource
+from algotrade_ingestion.sources.framework.base import (
+    DirectorySource,
+    FixtureSource,
+    SessionSource,
+)
 from algotrade_ingestion.tasks.derived import rollups
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.maintenance import golden, migrate_ids, purge, quality
@@ -37,6 +41,7 @@ from algotrade_ingestion.tasks.reference import (
     universe_build,
     universe_import,
 )
+from algotrade_ingestion.tasks.verification import verify
 
 type Params = Mapping[str, Any]
 GOLDEN_DIR = Path("datasets/golden")
@@ -177,6 +182,18 @@ def _chains(ctx: TaskContext, p: Params) -> RunRecord:
 def _rollups(ctx: TaskContext, p: Params) -> RunRecord:
     only = [k.strip() for k in str(p.get("only") or "").split(",") if k.strip()]
     return rollups.compute_rollups(ctx, session_of(p), p.get("start"), p.get("end"), only)
+
+
+def _verify(ctx: TaskContext, p: Params) -> RunRecord:
+    symbols = [s.strip() for s in str(p.get("symbols") or "").split(",") if s.strip()]
+    return verify.verify(ctx, session_of(p), symbols)
+
+
+def _gateway_down(ctx: TaskContext) -> str | None:
+    """Workflows skip ``verify`` (with a WARN) when nothing listens on the gateway port."""
+    source = ctx.sources.get("ibkr")
+    reason = source.probe() if isinstance(source, SessionSource) else None
+    return f"skipped: WARN: {reason}" if reason else None
 
 
 def _quality(ctx: TaskContext, p: Params) -> RunRecord:
@@ -347,6 +364,20 @@ TASKS: dict[str, Task] = {
                 TO,
                 Param("only", ("--only",), str, "comma-separated rollups, e.g. price_stats@v1"),
             ),
+        ),
+        Task(
+            "verify",
+            "compare the session's stored values with IBKR (IB Gateway, read-only market data)",
+            verify,
+            (verify.TABLE,),
+            _verify,
+            sources=("ibkr",),
+            settings="verification.toml + sources.toml [ibkr]",
+            params=(
+                SESSION,
+                Param("symbols", ("--symbols",), str, "comma-separated tickers (default: sample)"),
+            ),
+            skip=_gateway_down,
         ),
         Task(
             "quality",

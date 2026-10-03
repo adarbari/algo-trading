@@ -2,7 +2,8 @@
 
 ADR 0019 ``site-settings``. Each file becomes a frozen dataclass that apps receive as is:
 
-    sources.toml   -> SourcesSettings   (vendors, [http], [quality], retention)
+    sources.toml   -> SourcesSettings   (vendors, [http], [quality], retention; [ibkr])
+    verification.toml -> VerificationSettings (live verification vs IBKR)
     universe.toml  -> UniverseSettings  (+ overrides/leveraged_etfs.csv, overrides/figi.csv)
     nightly.toml   -> NightlySettings
     rollups.toml   -> each rollup's params dataclass (declared by the rollup, typed here)
@@ -94,7 +95,19 @@ VENDOR_EXTRAS = {
     "massive": ("corporate_actions_window",),
     "sec_edgar": ("refresh_days", "facts_refresh_days"),
     "treasury": ("lookback_days",),
+    "ibkr": (
+        "historical_min_interval_s",
+        "market_data_type",
+        "connect_timeout_s",
+        "request_timeout_s",
+        "stream_wait_s",
+    ),
 }
+# Vendors that stay off unless their section says ``enabled = true`` (a missing section or key
+# means disabled): IBKR needs the owner's gateway, set up read-only (ADR 0026).
+OFF_BY_DEFAULT = ("ibkr",)
+# IB market data types: 1 live (needs a subscription), 3 delayed (free, 15-20 minutes).
+IBKR_MARKET_DATA_TYPES = (1, 2, 3, 4)
 
 
 class SiteDocuments(Protocol):
@@ -120,6 +133,21 @@ class VendorSettings:
 
 
 @dataclass(frozen=True)
+class IbkrSettings:
+    """``[ibkr]`` beyond ``enabled`` / ``min_interval_s`` (the IB Gateway session; host, port
+    and client id come from the environment, ``config/env.py``). Pacing follows IBKR's rules:
+    every message waits ``min_interval_s`` (50 messages/s), every historical-data request also
+    waits ``historical_min_interval_s`` (60 requests per 10 minutes, and >= 10 s between
+    identical requests)."""
+
+    historical_min_interval_s: float = 10.0
+    market_data_type: int = 3  # 1 live, 3 delayed
+    connect_timeout_s: float = 10.0
+    request_timeout_s: float = 60.0
+    stream_wait_s: float = 4.0  # how long a streamed tick (dividends) may take to arrive
+
+
+@dataclass(frozen=True)
 class SourcesSettings:
     raw_retention_days: int = 90
     staging_retention_days: int = 14
@@ -137,10 +165,12 @@ class SourcesSettings:
     max_universe_change: float = 0.05
     max_chain_fetch_failures: float = 0.05
     max_chain_stale_share: float = 0.20
+    max_verify_failures: float = 0.10
+    ibkr: IbkrSettings = IbkrSettings()
 
     def vendor(self, section: str) -> VendorSettings:
         """``[section]`` of sources.toml (defaults when the section is missing)."""
-        return self.vendors.get(section, VendorSettings())
+        return self.vendors.get(section, VendorSettings(enabled=section not in OFF_BY_DEFAULT))
 
     @classmethod
     def from_document(
@@ -158,6 +188,7 @@ class SourcesSettings:
                 "max_universe_change",
                 "max_chain_fetch_failures",
                 "max_chain_stale_share",
+                "max_verify_failures",
             ],
         )
         vendors = {
@@ -173,7 +204,7 @@ class SourcesSettings:
             staging_retention_days=root.integer(
                 "staging_retention_days", d.staging_retention_days, 1
             ),
-            vendors={name: _vendor(t) for name, t in vendors.items()},
+            vendors={name: _vendor(t, name not in OFF_BY_DEFAULT) for name, t in vendors.items()},
             cboe_workers=_extra(vendors, "cboe").integer("workers", d.cboe_workers, 1),
             earnings_days=_extra(vendors, "nasdaq_earnings").integer("days", d.earnings_days, 1),
             actions_window=(window[0], window[1]),
@@ -197,12 +228,33 @@ class SourcesSettings:
             max_chain_stale_share=quality.fraction(
                 "max_chain_stale_share", d.max_chain_stale_share
             ),
+            max_verify_failures=quality.fraction("max_verify_failures", d.max_verify_failures),
+            ibkr=_ibkr(_extra(vendors, "ibkr")),
         )
 
 
-def _vendor(section: Table) -> VendorSettings:
+def _ibkr(section: Table) -> IbkrSettings:
+    d = IbkrSettings()
+    kind = section.integer("market_data_type", d.market_data_type, 1)
+    if kind not in IBKR_MARKET_DATA_TYPES:
+        raise ConfigurationError(
+            f"{section.where} market_data_type: expected 1 (live), 2 (frozen), 3 (delayed) "
+            f"or 4 (delayed frozen), got {kind}"
+        )
+    return IbkrSettings(
+        historical_min_interval_s=section.number(
+            "historical_min_interval_s", d.historical_min_interval_s, 0
+        ),
+        market_data_type=kind,
+        connect_timeout_s=section.number("connect_timeout_s", d.connect_timeout_s, 0),
+        request_timeout_s=section.number("request_timeout_s", d.request_timeout_s, 0),
+        stream_wait_s=section.number("stream_wait_s", d.stream_wait_s, 0),
+    )
+
+
+def _vendor(section: Table, enabled: bool = True) -> VendorSettings:
     return VendorSettings(
-        enabled=section.boolean("enabled", True),
+        enabled=section.boolean("enabled", enabled),
         min_interval_s=section.number("min_interval_s", None, 0),
         raw_retention_days=_optional_integer(section, "raw_retention_days", 1),
     )
@@ -258,6 +310,81 @@ class NightlySettings:
             smtp_host=email.text("smtp_host", d.smtp_host),
             smtp_port=email.integer("smtp_port", d.smtp_port, 1),
             email_max_examples=email.integer("max_examples", d.email_max_examples, 0),
+        )
+
+
+# ----------------------------------------------------------------------------- verification.toml
+
+DEFAULT_CORE = ("AAPL", "SPY", "QQQ", "IWM", "KO", "TQQQ", "TSM", "NVO", "JNJ", "RPGL")
+
+
+@dataclass(frozen=True)
+class VerificationSettings:
+    """``config/site/verification.toml``: the nightly live verification against IBKR (which
+    instruments, how many rotating, the tolerances of each check). Defaults reuse the
+    reconciliation suite's tolerances (``docs/testing.md``)."""
+
+    core_symbols: tuple[str, ...] = DEFAULT_CORE
+    rotating: int = 10  # extra instruments per session, chosen by a hash of the session
+    option_symbols: tuple[str, ...] = ("AAPL", "SPY")  # names whose option quotes are checked
+    options_per_symbol: int = 2
+    bar_sessions: int = 260  # IBKR daily bars requested (one year + the HV window)
+    close_rel: float = 0.002  # split-adjusted closes
+    range_rel: float = 0.001  # daily highs / lows
+    hv_rel: float = 0.005  # hv20 vs close-to-close HV20 on IBKR closes
+    high_52w_rel: float = 0.0005
+    extreme_rel: float = 0.0005  # slack on the dividend-gap rule (52-week low)
+    yield_abs: float = 0.0005  # dividend yield, decimal
+    iv_abs: float = 0.025  # implied vol, decimal (2.5 vol points)
+    spread_band: float = 1.0  # option mids may differ by this many half-spreads
+    max_missing_sessions: int = 0  # IBKR sessions in the window without our bar
+    warn_multiple: float = 2.0  # over tolerance but within this multiple: WARN, beyond: FAIL
+
+    @classmethod
+    def from_document(
+        cls, doc: Mapping[str, Any] | None, where: str = "verification.toml"
+    ) -> "VerificationSettings":
+        d = cls()
+        root = Table(doc, where)
+        root.only(["sample", "tolerances"])
+        sample = root.table(
+            "sample",
+            ["core_symbols", "rotating", "option_symbols", "options_per_symbol", "bar_sessions"],
+        )
+        tol = root.table(
+            "tolerances",
+            [
+                "close_rel",
+                "range_rel",
+                "hv_rel",
+                "high_52w_rel",
+                "extreme_rel",
+                "yield_abs",
+                "iv_abs",
+                "spread_band",
+                "max_missing_sessions",
+                "warn_multiple",
+            ],
+        )
+        warn = tol.number("warn_multiple", d.warn_multiple, 1)
+        return cls(
+            core_symbols=tuple(s.upper() for s in sample.strings("core_symbols", d.core_symbols)),
+            rotating=sample.integer("rotating", d.rotating, 0),
+            option_symbols=tuple(
+                s.upper() for s in sample.strings("option_symbols", d.option_symbols)
+            ),
+            options_per_symbol=sample.integer("options_per_symbol", d.options_per_symbol, 0),
+            bar_sessions=sample.integer("bar_sessions", d.bar_sessions, 30),
+            close_rel=tol.number("close_rel", d.close_rel, 0),
+            range_rel=tol.number("range_rel", d.range_rel, 0),
+            hv_rel=tol.number("hv_rel", d.hv_rel, 0),
+            high_52w_rel=tol.number("high_52w_rel", d.high_52w_rel, 0),
+            extreme_rel=tol.number("extreme_rel", d.extreme_rel, 0),
+            yield_abs=tol.number("yield_abs", d.yield_abs, 0),
+            iv_abs=tol.number("iv_abs", d.iv_abs, 0),
+            spread_band=tol.number("spread_band", d.spread_band, 0),
+            max_missing_sessions=tol.integer("max_missing_sessions", d.max_missing_sessions, 0),
+            warn_multiple=warn,
         )
 
 
@@ -553,6 +680,10 @@ def load_sources(configs: SiteDocuments) -> SourcesSettings:
 
 def load_nightly(configs: SiteDocuments) -> NightlySettings:
     return NightlySettings.from_document(site_document(configs.load, "nightly"))
+
+
+def load_verification(configs: SiteDocuments) -> VerificationSettings:
+    return VerificationSettings.from_document(site_document(configs.load, "verification"))
 
 
 def load_rollups(

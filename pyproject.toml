@@ -312,12 +312,21 @@ name = "Layout: vendors never import each other (one folder per vendor)"
 type = "independence"
 modules = [
     "algotrade_ingestion.sources.vendors.cboe",
+    "algotrade_ingestion.sources.vendors.ibkr",
     "algotrade_ingestion.sources.vendors.massive",
     "algotrade_ingestion.sources.vendors.nasdaq",
     "algotrade_ingestion.sources.vendors.sec",
     "algotrade_ingestion.sources.vendors.ssga",
     "algotrade_ingestion.sources.vendors.treasury",
 ]
+
+[[tool.importlinter.contracts]]
+name = "Broker API: only the read-only IBKR facade imports ib_async (ADR 0026)"
+type = "forbidden"
+source_modules = ["algotrade", "algotrade_ingestion", "algotrade_backtest"]
+forbidden_modules = ["ib_async"]
+ignore_imports = ["algotrade_ingestion.sources.vendors.ibkr.gateway -> ib_async"]
+allow_indirect_imports = true  # the registry builds the facade; nothing else touches ib_async
 
 [[tool.importlinter.contracts]]
 name = "Layout: vendors never import tasks, workflows, the CLI or ops"

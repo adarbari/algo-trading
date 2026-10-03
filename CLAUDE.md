@@ -46,6 +46,9 @@ without writing an ADR. Read in this order:
 - **Vendors**: free first, each behind the source interface. Option chains come from the Cboe
   delayed feed (full universe, nightly); IBKR covers futures and cross-checks. We compute
   Greeks ourselves. (ADRs 0012, 0014)
+- **Broker access is read-only**: IBKR only through the market-data facade
+  `sources/vendors/ibkr/gateway.py`; no code may place, modify or cancel orders or touch
+  account functions (ADR 0026, enforced by a fitness test and import-linter).
 - **Universe**: S&P 500 + all Nasdaq-listed stocks + all ETFs including leveraged and
   inverse, saved as daily snapshots. (ADR 0013)
 
@@ -70,6 +73,9 @@ only shrinks (`make dupes-update`).
 | Which ingestion steps run, with which defaults | `tasks/framework/registry.py`; nightly order, isolation, catch-up: `workflows/nightly/nightly.py` |
 | Nightly summary report + notifications (desktop alert, daily summary email over SMTP) | `workflows/nightly/` (`records.py` inputs, `report.py` pure builder, `timing.py` run timing, `render.py` text/HTML, `notify.py` notifiers) |
 | Vendor HTTP, retries, circuit breaker; pacing; building sources (incl. the golden fixture source); vendor specifics | `sources/framework/http.py`; `sources/framework/limiter.py` (one per key, cross-process); `sources/framework/registry.py`; `sources/vendors/<vendor>/` |
+| Session sources (a stateful gateway connection: `SessionSource`, `opened`, `SessionSpec`) | `sources/framework/base.py`, `sources/framework/registry.py` |
+| Broker API, READ-ONLY (the only `ib_async` import; market data only, never orders / accounts) | `sources/vendors/ibkr/gateway.py` (ADR 0026; `tests/apps/ingestion/sources/vendors/ibkr/test_read_only_guard.py`) |
+| Live verification vs IBKR (sample, checks, tolerances, `verification/ibkr`) | `tasks/verification/` (graded by the quality check `verification`) |
 | Locks: named store locks, run-index lock; one ingest run at a time | `storage/locks.py`; `services/jobs/exclusive.py` |
 | A run's table writes publish atomically (pending until COMPLETE / PARTIAL commits them all; FAILED drops them; crash recovery) | `storage/backends/` (`local_index.py`: commit marker + sequence); driven by `IngestRun` and `ResultWriter.publishing` (ADR 0022) |
 | Running long work (threads, recovery), screens | `services/jobs/` (apps call `run_job`, never build a runner; fan-out: `as_completed`); screens: `services/screening/run.py`, submitted as `screen` jobs |
@@ -100,7 +106,8 @@ source (`tests/unit/<path>` = `src/algotrade/<path>`, `tests/apps/ingestion/<pat
 |---|---|
 | Vendor adapter (fetch + normalise) | `apps/ingestion/.../sources/vendors/<vendor>/` (registered in `sources/framework/registry.py`) |
 | HTTP, pacing, source protocols | `apps/ingestion/.../sources/framework/` |
-| Ingestion task | `apps/ingestion/.../tasks/<domain>/` (`reference`, `market`, `derived`, `maintenance`) + `tasks/framework/registry.py` |
+| Ingestion task | `apps/ingestion/.../tasks/<domain>/` (`reference`, `market`, `derived`, `maintenance`, `verification`) + `tasks/framework/registry.py` |
+| Comparing our data with a live source (verification check) | `apps/ingestion/.../tasks/verification/` (`checks.py`) |
 | Nightly step / ordering | `apps/ingestion/.../workflows/nightly/` |
 | Feature (a documented column) in a feature group (rollup) | `src/algotrade/features/rollups/<group>.py` (`FEATURES` + pure compute; framework: `features/framework/`; then `make features-doc`) |
 | What a feature group reads from a table (feature input) | `src/algotrade/data/feature_inputs.py` (`INPUTS`) + the table's read in its `data/` owner |
@@ -193,7 +200,7 @@ approved mockups -> components -> screens. Every folder is a `[[web_dir]]` in
 
 Commands (need `uv`): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make layout`, `make evaluate`, `make baseline`, `make features-doc`.
 Web (need Node 24): `make web-install`, `make web-check` (part of `make check`), `make web-visual` (screenshots, Docker); in `apps/web`: `npm run dev|storybook|check|visual:update`.
-Ingestion: `algotrade-ingest universe|universe-build|company-details|shares|earnings|bars|rates|corporate-actions|chains|rollups|screen|nightly|report|quality|schedule|purge-raw|migrate-ids|golden`, or `algotrade-ingest run <task>` for any registry task (see `README.md`).
+Ingestion: `algotrade-ingest universe|universe-build|company-details|shares|earnings|bars|rates|corporate-actions|chains|rollups|verify|screen|nightly|report|quality|schedule|purge-raw|migrate-ids|golden`, or `algotrade-ingest run <task>` for any registry task (see `README.md`).
 API: `algotrade-api [--reload]` (read-only, 127.0.0.1:8000); after a route / schema change run
 `scripts/export_openapi.py` and commit `apps/api/openapi.json`.
 Configs: site presets in `config/site/` (reviewed via PR); user configs in `config/users/<id>/`

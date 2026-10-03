@@ -44,6 +44,8 @@ TYPED_SETTINGS = (
     "BacktestSettings",
     "CostSettings",
     "LimitSettings",
+    "IbkrSettings",
+    "VerificationSettings",
 )
 # Settings that are parsed but drive nothing today. This list may only shrink: wire the
 # setting up (docs/roadmap.md, track R) or delete it from config/site, then remove it here.

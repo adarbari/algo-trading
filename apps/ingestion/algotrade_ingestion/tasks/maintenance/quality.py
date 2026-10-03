@@ -136,11 +136,48 @@ def check_earnings(reader: StoreReader, session: date, s: SourcesSettings) -> li
     return [Check("earnings_present", "PASS", f"{rows} upcoming earnings rows")]
 
 
+VERIFICATION = "verification/ibkr"
+GRADED = ("PASS", "WARN", "FAIL")  # NA checks (either side without a value) are not graded
+
+
+def check_verification(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:
+    """The live verification vs IBKR (``verify``): FAIL above ``max_verify_failures`` of the
+    graded checks failing, WARN on any FAIL. Nothing when ``[ibkr]`` is disabled."""
+    if not s.vendor("ibkr").enabled:
+        return []
+    frame = reader.table(VERIFICATION, session)
+    if frame is None or frame.empty:
+        return [
+            Check(
+                "verification",
+                "WARN",
+                f"no verification vs IBKR for {session} (IB Gateway not reachable?)",
+            )
+        ]
+    counts = frame["status"].astype(str).value_counts()
+    graded = sum(int(counts.get(k, 0)) for k in GRADED)
+    failed = int(counts.get("FAIL", 0))
+    share = failed / graded if graded else 0.0
+    status = "FAIL" if share > s.max_verify_failures else "WARN" if failed else "PASS"
+    breakdown = ", ".join(f"{k} {int(counts.get(k, 0))}" for k in (*GRADED, "NA"))
+    names = frame.loc[frame["status"] == "FAIL", "symbol"].astype(str).unique()[:5]
+    worst = f"; failing: {', '.join(names)}" if failed else ""
+    return [
+        Check(
+            "verification",
+            status,
+            f"{share:.1%} of {graded} graded checks failed vs IBKR "
+            f"(max {s.max_verify_failures:.0%}); {breakdown}{worst}",
+        )
+    ]
+
+
 CHECKS: tuple[Callable[[StoreReader, date, SourcesSettings], list[Check]], ...] = (
     check_universe,
     check_bars,
     check_chains,
     check_earnings,
+    check_verification,
 )
 
 

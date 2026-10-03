@@ -256,6 +256,20 @@ TREASURY_RATES = _fixed(
     "rate_par float64!",
     "rate_cont float64!",
 )
+# Live verification (ADR 0026): our values vs another source's, one row per instrument and
+# check for a session. ``status`` is PASS / WARN / FAIL / NA; ``diff`` is in the check's
+# tolerance unit (relative or absolute, per ``note``).
+VERIFICATION_IBKR = _fixed(
+    "verification/ibkr",
+    "verification",
+    ("instrument_id", "symbol", "check", "status"),
+    "instrument_id string!",
+    *_strings("symbol", "note"),
+    "check string!",
+    "status string!",
+    *_floats("ours", "theirs", "diff", "tolerance"),
+    key=("instrument_id", "check"),
+)
 # L2: OHLCV bars; the table name carries the interval, e.g. "bars/1d", "bars/5m".
 BAR_INTERVALS = frozenset({"1d", "1h", "30m", "15m", "5m", "1m"})
 BAR_COLUMNS = ("instrument_id", "ts", "open", "high", "low", "close", "volume")
@@ -279,6 +293,7 @@ KNOWN: dict[str, TableSpec] = {
         INSTRUMENT_COMPANY,
         INSTRUMENT_SHARES,
         TREASURY_RATES,
+        VERIFICATION_IBKR,
     )
 }
 # Open-ended tables: the producing rollup, event source, catalogue or screener defines the
