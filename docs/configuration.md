@@ -122,5 +122,8 @@ All of these run as **jobs** (see [architecture.md](architecture.md#jobs)).
 | Item | Status |
 |---|---|
 | `rebalance_selection`: re-evaluate a backtest's selection at an interval | phase 2b |
+
+`[backtest] price_adjustment` (`none` / `splits` / `total_return`, default `splits`) chooses
+how stored unadjusted bars are adjusted for corporate actions when a backtest reads them.
 | L4 `watchlists/` and `preferences.toml` | phase 4–5 |
 | Database-backed `ConfigStore` written by the UI | phase 4 |

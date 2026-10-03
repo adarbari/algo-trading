@@ -39,6 +39,24 @@ Caveats, handled in `apps/ingestion/algotrade_ingestion/sources/cboe.py`:
 - Raw responses are about 1–3 GB/day across the universe, so raw retention is limited
   (ADR 0014, `algotrade-ingest purge-raw --keep-days 90`).
 
+## Massive daily bars and corporate actions (implemented, phase 1.4)
+
+Host `https://api.massive.com`; the key (`ALGOTRADE_MASSIVE_API_KEY` in `.env`) is sent as an
+`Authorization: Bearer` header, never in URLs, raw files or logs.
+
+| Data | Endpoint | Stored as |
+|---|---|---|
+| Daily bars, whole market per request | `/v2/aggs/grouped/locale/us/market/stocks/{date}?adjusted=false` | `bars/1d`, **unadjusted**; invalid rows dropped and counted |
+| Splits | `/stocks/v1/splits` (date window, paginated) | `events/split` (ratio = split_to / split_from) |
+| Dividends | `/stocks/v1/dividends` (date window, paginated) | `events/dividend` (same ex-date amounts summed) |
+
+Free tier: 5 requests/minute, so requests are spaced 12.5 s apart. `algotrade-ingest bars
+--from 2024-10-01 --to 2026-10-01` backfills two years (~500 requests, ~1h45m) and resumes
+where it stopped; nightly fetches the session's bars and a corporate-action window (-7 to +30
+days). Massive preferred tickers (`KIMpL`) are mapped to the universe's ACT style (`KIM$L`).
+Prices are adjusted at read time (`none`, `splits`, `total_return`; setting
+`[backtest] price_adjustment`).
+
 ## Nasdaq earnings calendar (implemented, phase 1.3)
 
 `https://api.nasdaq.com/api/calendar/earnings?date=YYYY-MM-DD`: free, no key, unofficial

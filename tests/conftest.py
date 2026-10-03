@@ -42,3 +42,9 @@ def golden_url(tmp_path_factory: pytest.TempPathFactory, golden_files: GoldenFil
     root = tmp_path_factory.mktemp("golden-store")
     load_golden(StoreWriter(LocalBackend(root)), golden_files)
     return f"file://{root}"
+
+
+@pytest.fixture(autouse=True)
+def _no_live_vendor_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests never reach live vendors, even if a developer's .env holds real keys."""
+    monkeypatch.setenv("ALGOTRADE_MASSIVE_API_KEY", "")

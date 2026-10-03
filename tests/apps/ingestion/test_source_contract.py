@@ -14,13 +14,14 @@ from algotrade_ingestion.jobs.common import stamp
 from algotrade_ingestion.sources.base import FetchRequest, Source
 from algotrade_ingestion.sources.cboe import CboeOptionsSource
 from algotrade_ingestion.sources.http import RetryPolicy
+from algotrade_ingestion.sources.massive import MassiveCorporateActions, MassiveDailyBars
 from algotrade_ingestion.sources.nasdaq_earnings import NasdaqEarningsSource
 from algotrade_ingestion.sources.nasdaq_trader import NasdaqTraderSource
 from algotrade_ingestion.sources.spy_holdings import SpyHoldingsSource
 from algotrade_ingestion.sources.synthetic.files import GoldenFiles
 from algotrade_ingestion.sources.synthetic.source import GoldenCsvSource
 from tests import cboe_fixture as fx
-from tests import earnings_fixture, universe_fixture
+from tests import earnings_fixture, massive_fixture, universe_fixture
 from tests.conftest import GOLDEN_DIR
 
 type Adapter = tuple[Source, FetchRequest]
@@ -51,7 +52,23 @@ def nasdaq_earnings() -> Adapter:
     return NasdaqEarningsSource(lambda url: payload, lambda s: None), FetchRequest("2026-10-05")
 
 
+def massive_bars() -> Adapter:
+    payload = massive_fixture.grouped(fx.SESSION, [("AAPL", 10.0, 11.0, 9.0, 10.5, 1000.0)])
+    source = MassiveDailyBars(lambda url: payload, lambda s: None, min_interval_s=0)
+    return source, FetchRequest(fx.SESSION.isoformat())
+
+
+def massive_actions() -> Adapter:
+    payload = massive_fixture.page(
+        [{"ticker": "NVDA", "execution_date": "2026-09-30", "split_from": 1, "split_to": 10}]
+    )
+    source = MassiveCorporateActions(lambda url: payload, lambda s: None, min_interval_s=0)
+    return source, FetchRequest("splits:2026-09-01:2026-10-31")
+
+
 ADAPTERS: dict[str, Callable[[], Adapter]] = {
+    "massive_bars": massive_bars,
+    "massive_actions": massive_actions,
     "nasdaq_earnings": nasdaq_earnings,
     "cboe": cboe,
     "golden": golden,

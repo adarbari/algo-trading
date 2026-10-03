@@ -34,6 +34,7 @@ BUILTIN_DEFAULTS: Mapping[str, Any] = {
         "cash_buffer": 0.01,
         "lot_size": 1.0,
         "periods_per_year": 252,
+        "price_adjustment": "splits",
         "costs": {"commission_bps": 1.0, "min_commission": 0.0, "slippage_bps": 5.0},
         "limits": {"max_position_weight": 1.0, "max_gross_exposure": 1.0, "allow_short": False},
     },

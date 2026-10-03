@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from algotrade_ingestion import cli
+from algotrade_ingestion import cli, commands
 from algotrade_ingestion.sources.cboe import CboeOptionsSource
 from algotrade_ingestion.sources.http import RetryPolicy
 from tests import cboe_fixture as fx
@@ -32,8 +32,8 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
     earnings = calendar([("AAPL", "time-after-hours")])
     monkeypatch.setattr(
-        cli,
-        "_earnings_source",
+        commands,
+        "earnings_source",
         lambda: NasdaqEarningsSource(lambda url: earnings, lambda s: None, RetryPolicy(tries=1)),
     )
     feed = FakeFeed(
@@ -43,7 +43,9 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         }
     )
     monkeypatch.setattr(
-        cli, "_source", lambda: CboeOptionsSource(feed, lambda s: None, RetryPolicy(tries=1))
+        commands,
+        "cboe_source",
+        lambda: CboeOptionsSource(feed, lambda s: None, RetryPolicy(tries=1)),
     )
     (tmp_path / "stocks.csv").write_text(
         f"ticker,company_name,security_type,last_verified\nAAPL,Apple,COMMON_STOCK,{DAY}\n"

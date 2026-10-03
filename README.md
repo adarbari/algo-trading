@@ -21,7 +21,8 @@ export ALGOTRADE_DATA_URL=file://./var/data     # default; git-ignored
 algotrade-ingest universe --stocks optionable_us_stock_universe.csv \
                           --etfs optionable_us_etf_universe.csv --version 2026-10
 algotrade-ingest universe-build --review-out leveraged_candidates.csv   # universe + reference
-algotrade-ingest nightly --export-dir out/      # universe -> chains -> rollups -> screens -> CSVs
+algotrade-ingest bars --from 2024-10-01 --to 2026-10-01   # 2-year backfill (needs ALGOTRADE_MASSIVE_API_KEY in .env)
+algotrade-ingest nightly --export-dir out/      # universe -> earnings -> bars -> chains -> rollups -> screens
 algotrade-ingest purge-raw --keep-days 90
 ```
 

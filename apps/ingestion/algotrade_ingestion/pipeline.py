@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +15,7 @@ from algotrade.storage.config_store import ConfigStore
 from algotrade.storage.readers import StoreReader
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.writers import StoreWriter
+from algotrade_ingestion.jobs.bars import ingest_corporate_actions, ingest_daily_bars
 from algotrade_ingestion.jobs.earnings import ingest_earnings
 from algotrade_ingestion.jobs.features import compute_option_liquidity
 from algotrade_ingestion.jobs.option_chains import (
@@ -34,6 +35,8 @@ from algotrade_ingestion.sources.base import Source
 class NightlyResult:
     universe: RunRecord | None
     earnings: RunRecord | None
+    bars: RunRecord | None
+    actions: RunRecord | None
     chains: RunRecord
     features: RunRecord
     screens: tuple[ScreenOutcome, ...]
@@ -65,12 +68,19 @@ def run_nightly(
     chain_config: ChainJobConfig | None = None,
     universe_sources: UniverseSources | None = None,
     earnings_source: Source | None = None,
+    bars_source: Source | None = None,
+    actions_source: Source | None = None,
 ) -> NightlyResult:
     universe = None
     mode, settings = universe_settings(configs)
     if mode == "nasdaq_trader" and universe_sources is not None:
         universe = build_universe(writer, reader, universe_sources, settings, session_date)
     earnings = ingest_earnings(writer, earnings_source, session_date) if earnings_source else None
+    bars = ingest_daily_bars(writer, reader, bars_source, [session_date]) if bars_source else None
+    actions = None
+    if actions_source is not None:
+        window = (session_date - timedelta(7), session_date + timedelta(30))
+        actions = ingest_corporate_actions(writer, actions_source, session_date, *window)
     chains = ingest_option_chains(
         writer, source, universe_underlyings(reader, session_date), session_date, chain_config
     )
@@ -84,7 +94,9 @@ def run_nightly(
         screens.append(outcome)
         if export_dir is not None:
             exports.extend(run_exports(outcome, config, export_dir))
-    return NightlyResult(universe, earnings, chains, features, tuple(screens), tuple(exports))
+    return NightlyResult(
+        universe, earnings, bars, actions, chains, features, tuple(screens), tuple(exports)
+    )
 
 
 def nightly_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
@@ -102,9 +114,12 @@ def nightly_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]
         ChainJobConfig(int(params.get("workers", 4))),
         r.get("universe_sources"),
         r.get("earnings_source"),
+        r.get("bars_source"),
+        r.get("actions_source"),
     )
     universe_partial = result.universe is not None and result.universe.status != "complete"
-    earnings_partial = result.earnings is not None and result.earnings.status != "complete"
+    optional = (result.earnings, result.bars, result.actions)
+    earnings_partial = any(r is not None and r.status != "complete" for r in optional)
     partial = (
         universe_partial
         or earnings_partial
@@ -114,6 +129,8 @@ def nightly_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]
     return {
         "universe": result.universe.stats if result.universe else "skipped (csv_import)",
         "earnings": result.earnings.stats if result.earnings else "skipped",
+        "bars": result.bars.stats if result.bars else "skipped (no ALGOTRADE_MASSIVE_API_KEY)",
+        "corporate_actions": result.actions.stats if result.actions else "skipped",
         "chains": result.chains.stats,
         "features": result.features.stats,
         "screens": [s.audit for s in result.screens],
