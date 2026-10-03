@@ -158,6 +158,19 @@ Source: `design-system/primitives/VisuallyHidden`
 
 ## Components
 
+### AppShell
+
+AppShell: the frame of every screen: a skip link, the TopBar, and the main content region. `page` layout centres content up to the page width (1600 px) with page padding and a gap between sections; `full` gives the page the whole width with no padding (split views such as Explore). Padding tightens at phone width.
+
+Source: `design-system/components/AppShell`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `topBar` | `ReactNode` | yes | The bar across the top (TopBar). |
+| `layout` | `'page' \| 'full'` | no | `page` (centred, max page width, padded; default) or `full` (edge to edge). |
+| `skipLabel` | `string` | no | Text of the skip link that jumps past the top bar to the content. |
+| `children` | `ReactNode` | yes | The page. |
+
 ### BarList
 
 BarList: labelled rows, each with a bar scaled to a maximum and its value as text: a screener funnel (universe -> each hard criterion), coverage by fetch-priority tier, top sectors. `inline` puts label | bar | value on one line; `stacked` puts the label above the bar (long labels, narrow panels). Bars are decorative: each row reads as "label value".
@@ -175,6 +188,92 @@ Source: `design-system/components/BarList`
 | `loading` | `boolean` | no |  |
 | `error` | `ReactNode` | no | Replaces the rows with this message. |
 | `emptyMessage` | `ReactNode` | no |  |
+
+### Button
+
+Button: an action. `primary` (the one main action of a view: solid accent), `secondary` (the default: bordered), `ghost` (quiet, in toolbars and rows) and `dashed` (add something: "+ Add criterion"). Height follows the density's control height; `sm` is the small inline size (panel headers, chips row). `loading` keeps the label, shows a spinner, and blocks clicks.
+
+Source: `design-system/components/Button`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `(Pick< AriaAttributes, \| 'aria-label' \| 'aria-describedby' \| 'aria-expanded' \| 'aria-controls' \| 'aria-haspopup' \| 'aria-pressed' >)` | `inherited` | no |  |
+| `variant` | `ButtonVariant` | no | Visual weight: `primary` once per view, `secondary` (default), `ghost`, `dashed` (add). |
+| `size` | `'sm' \| 'md'` | no | `md` (density control height, default) or `sm` (compact inline). |
+| `icon` | `IconName` | no | An icon before the label (e.g. `plus` for add, `refresh` for re-run). |
+| `iconEnd` | `IconName` | no | An icon after the label (e.g. `chevron-down` for a menu, `external` for a link out). |
+| `loading` | `boolean` | no | Busy: shows a spinner in place of the icon, sets aria-busy and ignores clicks. |
+| `disabled` | `boolean` | no |  |
+| `type` | `'button' \| 'submit' \| 'reset'` | no | Form role; `button` by default so it never submits by accident. |
+| `fullWidth` | `boolean` | no | Stretch to the container's width (stacked forms on phones). |
+| `onClick` | `MouseEventHandler<HTMLButtonElement>` | no |  |
+| `ref` | `Ref<HTMLButtonElement>` | no |  |
+| `id` | `string` | no |  |
+| `children` | `ReactNode` | yes |  |
+
+### Checkbox
+
+Checkbox: an on / off choice with its label (or a row-selection box whose label is for screen readers only: `hideLabel`). Supports the mixed state (`indeterminate`) for "select all" over a partial selection. The native checkbox in the accent colour: Space toggles it.
+
+Source: `design-system/components/Checkbox`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | What is chosen ("Select AAPL", "Include leveraged ETFs"). |
+| `description` | `ReactNode` | no | Secondary text under the label. |
+| `hideLabel` | `boolean` | no | Keep the label for screen readers only (row selection in a table). |
+| `checked` | `boolean` | no | Checked (controlled). |
+| `defaultChecked` | `boolean` | no | Initially checked (uncontrolled). |
+| `indeterminate` | `boolean` | no | The mixed state of a "select all" box over a partial selection. |
+| `onCheckedChange` | `(checked: boolean) => void` | no | Called with the new checked state. |
+| `disabled` | `boolean` | no |  |
+| `invalid` | `boolean` | no |  |
+| `name` | `string` | no |  |
+| `value` | `string` | no |  |
+| `id` | `string` | no |  |
+
+### Chip
+
+Chip: a compact label for a filter or a choice. Static (a tag), a filter chip that toggles (`onSelectedChange`: a pressed / not-pressed button, selected in the accent tint), removable (`onRemove`: an × button named "Remove <label>"), or the dashed "add" chip (`variant="dashed"` with `onClick`: "+ Filter"). Several in a wrapping Stack form a filter bar.
+
+Source: `design-system/components/Chip`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | The text ("Near 52w high", "Liquidity: High"). |
+| `selected` | `boolean` | no | Selected (controlled): a filter that is on. |
+| `defaultSelected` | `boolean` | no | Initially selected (uncontrolled). |
+| `onSelectedChange` | `(selected: boolean) => void` | no | Makes the chip a toggle button; called with the new selected state. |
+| `onClick` | `MouseEventHandler<HTMLButtonElement>` | no | Makes the chip an action button (the dashed "add" chip opens a picker). |
+| `onRemove` | `() => void` | no | Adds a remove button named "Remove <label>". |
+| `variant` | `'default' \| 'dashed'` | no | `default` or `dashed` (add something). |
+| `icon` | `IconName` | no | A leading icon (`plus` on the add chip, `filter`). |
+| `disabled` | `boolean` | no |  |
+
+### Combobox
+
+Combobox: choose one value from a long or searchable list by typing (the feature picker). Each option shows a label (mono for feature names), an optional kind badge ("formula") and a secondary description, grouped under headings. Filters locally, or asynchronously: pass `filter="none"`, fetch on `onInputChange`, and set `options` and `loading`. Keyboard per the ARIA combobox pattern: ArrowDown / ArrowUp open and move, Enter selects, Escape closes, Tab leaves; the active option is announced through aria-activedescendant.
+
+Source: `design-system/components/Combobox`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `options` | `readonly ComboboxOption[]` | yes | The options (all of them, or the caller's async results with `filter="none"`). |
+| `value` | `string \| null` | no | The selected value (controlled); null is none. |
+| `defaultValue` | `string \| null` | no | The initially selected value (uncontrolled). |
+| `onValueChange` | `(value: string \| null, option: ComboboxOption \| null) => void` | no | Called with the chosen value and its option. |
+| `onInputChange` | `(query: string) => void` | no | Called with the typed query (fetch async options here). |
+| `filter` | `'contains' \| 'none'` | no | `contains` (default): match label, description and badge locally; `none`: options are already filtered. |
+| `loading` | `boolean` | no | Options are being fetched. |
+| `error` | `string` | no | Options failed to load: the message shown in the list. |
+| `emptyMessage` | `string` | no | Shown when nothing matches. |
+| `placeholder` | `string` | no |  |
+| `'aria-label'` | `string` | no | Accessible name outside a Field. |
+| `mono` | `boolean` | no | Option labels and the text in monospace (feature names, symbols). |
+| `size` | `'sm' \| 'md'` | no | `md` (default) or `sm` (table rows). |
+| `invalid` | `boolean` | no |  |
+| `disabled` | `boolean` | no |  |
+| `name` | `string` | no |  |
 
 ### DataTable
 
@@ -224,6 +323,24 @@ Source: `design-system/components/Disclosure`
 | `variant` | `'boxed' \| 'plain'` | no | `boxed` (soft border, default) or `plain` (a row in a list that draws its own dividers). |
 | `children` | `ReactNode` | yes | The detail shown when open. |
 
+### Field
+
+Field: a form control's label, hint and error, wired for screen readers. Wrap one Input, SearchInput, NumberInput, Select or Combobox: the control picks up the field's id (so the label names it), `aria-describedby` (hint, then error), `aria-invalid` and `required` without any props. `inline` puts the label in a fixed column beside the control (settings forms).
+
+Source: `design-system/components/Field`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `label` | `string` | yes | What the control is for ("Threshold", "Universe"). |
+| `hint` | `ReactNode` | no | Short help under the control (units, format, what it affects). |
+| `error` | `string \| undefined` | no | The validation message; marks the control invalid and is announced with it. |
+| `required` | `boolean` | no | Marks the control required (an asterisk on the label, `required` on the control). |
+| `disabled` | `boolean` | no | Disables the control inside. |
+| `layout` | `'stack' \| 'inline'` | no | `stack` (label above, default) or `inline` (label column beside the control). |
+| `hideLabel` | `boolean` | no | Keep the label for screen readers only (a control whose purpose is obvious in context). |
+| `id` | `string` | no | The control's id, if the caller needs it (generated otherwise). |
+| `children` | `ReactNode` | yes | Exactly one design-system control. |
+
 ### HeatGrid
 
 HeatGrid: a rows x columns grid of status cells, e.g. ingestion completeness (datasets x sessions). Each cell is complete / partial / failed / not collected, with optional value text (`99.7`); a header row names the columns, a header column names the rows, and a Legend explains the colours. One cell can be selected (accent outline) to drill in. An ARIA grid: arrow keys move between cells, Home / End to the row ends, Ctrl+Home / Ctrl+End to the corners, Enter or Space (or a click) selects; only one cell is in the Tab order.
@@ -243,6 +360,75 @@ Source: `design-system/components/HeatGrid`
 | `loading` | `boolean` | no |  |
 | `error` | `ReactNode` | no | Replaces the grid with this message. |
 | `emptyMessage` | `ReactNode` | no |  |
+
+### Icon
+
+Icon: the design system's small stroke icon set (16 px grid, 1.5 px stroke, round caps), drawn in `currentColor` so it takes the colour of the text around it. Decorative by default (hidden from screen readers); give `label` when the icon alone carries meaning. No emoji, no icon fonts. `spinner` with `spin` is the loading indicator.
+
+Source: `design-system/components/Icon`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `name` | `IconName` | yes | Which icon: close, plus, minus, search, chevron-*, check, alert, info, external, drag-handle, refresh, filter, columns, spinner. |
+| `size` | `'sm' \| 'md' \| 'lg'` | no | sm 12, md 14 (default), lg 16 px. |
+| `tone` | `IconTone` | no | Colour role; `inherit` (default) follows the surrounding text. |
+| `label` | `string` | no | Accessible name when the icon alone carries meaning; omit for decorative icons. |
+| `spin` | `boolean` | no | Rotate continuously (the `spinner` loading indicator); still under reduced motion. |
+
+### IconButton
+
+IconButton: a square, icon-only action (remove a row, clear a search, open a menu). `label` is required: it is the accessible name and the hover tooltip. Quiet (`ghost`) by default, as in the mockups' remove-criterion button; `secondary` adds the control border.
+
+Source: `design-system/components/IconButton`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `(Pick< AriaAttributes, 'aria-expanded' \| 'aria-controls' \| 'aria-haspopup' \| 'aria-pressed' \| 'aria-describedby' >)` | `inherited` | no |  |
+| `icon` | `IconName` | yes | The glyph. |
+| `label` | `string` | yes | What the button does ("Remove criterion"): the accessible name and the tooltip. |
+| `variant` | `'ghost' \| 'secondary'` | no | `ghost` (default: no border until hover) or `secondary` (bordered). |
+| `size` | `'sm' \| 'md'` | no | `md` (density control height, default) or `sm` (inside chips and inputs). |
+| `disabled` | `boolean` | no |  |
+| `onClick` | `MouseEventHandler<HTMLButtonElement>` | no |  |
+| `tabIndex` | `0 \| -1` | no | -1 keeps it out of the tab order (a control reachable another way, e.g. Escape). |
+| `ref` | `Ref<HTMLButtonElement>` | no |  |
+
+### Input
+
+Input: a single-line text box at the density's control height, with optional `start` / `end` adornments (an icon, a unit, a clear button). Inside a Field it is labelled, described and marked invalid automatically; outside one, give `aria-label`. SearchInput, NumberInput and Combobox are built on it.
+
+Source: `design-system/components/Input`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `(Pick< AriaAttributes, \| 'aria-label' \| 'aria-labelledby' \| 'aria-describedby' \| 'aria-expanded' \| 'aria-controls' \| 'aria-activedescendant' \| 'aria-autocomplete' \| 'aria-valuemin' \| 'aria-valuemax' \| 'aria-valuenow' \| 'aria-valuetext' >)` | `inherited` | no |  |
+| `value` | `string \| undefined` | no | The text (controlled). |
+| `defaultValue` | `string \| undefined` | no | The initial text (uncontrolled). |
+| `onValueChange` | `((value: string) => void) \| undefined` | no | Called with the new text on every edit. |
+| `placeholder` | `string \| undefined` | no |  |
+| `type` | `'text' \| 'search' \| 'email' \| 'url' \| 'tel' \| 'password'` | no | `text` (default), `search`, `email`, `url`, `tel` or `password`. |
+| `inputMode` | `'text' \| 'decimal' \| 'numeric' \| 'search' \| 'email' \| 'url'` | no | Virtual keyboard hint (`decimal` for numbers). |
+| `role` | `'combobox' \| 'spinbutton'` | no | Widget role for composite controls built on Input (Combobox, NumberInput). |
+| `start` | `ReactNode` | no | Content before the text (an icon or a prefix such as `$`). |
+| `end` | `ReactNode` | no | Content after the text (a unit such as `%`, a clear button, a chevron). |
+| `align` | `'start' \| 'end'` | no | Text alignment: `end` for numbers. |
+| `mono` | `boolean` | no | Monospace text (symbols, feature names, formulas). |
+| `size` | `'sm' \| 'md'` | no | `md` (density control height, default) or `sm` (inside table rows). |
+| `width` | `'auto' \| 'full'` | no | `auto` (its natural width) or `full` (fill the container, default). |
+| `sunken` | `boolean` | no | Canvas-coloured background (search boxes on a surface, per the mockups). |
+| `invalid` | `boolean` | no | Shows the invalid state (a Field with an error sets this). |
+| `disabled` | `boolean` | no |  |
+| `readOnly` | `boolean` | no |  |
+| `required` | `boolean` | no |  |
+| `name` | `string` | no |  |
+| `id` | `string` | no |  |
+| `autoComplete` | `string` | no |  |
+| `spellCheck` | `boolean` | no |  |
+| `onKeyDown` | `KeyboardEventHandler<HTMLInputElement> \| undefined` | no |  |
+| `onFocus` | `FocusEventHandler<HTMLInputElement> \| undefined` | no |  |
+| `onBlur` | `FocusEventHandler<HTMLInputElement> \| undefined` | no |  |
+| `onClick` | `MouseEventHandler<HTMLInputElement> \| undefined` | no |  |
+| `ref` | `Ref<HTMLInputElement>` | no |  |
 
 ### KeyValue
 
@@ -271,6 +457,124 @@ Source: `design-system/components/Legend`
 | `swatch` | `'cell' \| 'solid' \| 'line'` | no | Swatch shape: `cell` (tinted fill + border, matches HeatGrid cells), `solid` (bars and areas, the default) or `line` (chart lines). |
 | `label` | `string` | no | Accessible name of the list, e.g. "Status key". |
 | `size` | `'sm' \| 'xs'` | no | Text size: `sm` 12 px (default) or `xs` 11.5 px. |
+
+### NavTabs
+
+NavTabs: a workspace's section links in the top bar (Ideas, Screeners, Explore, ...), the current one marked with `aria-current="page"` and the accent tint. Router-agnostic: links are plain anchors unless `renderLink` renders the app's router link with the given props (the design system never imports the router). For switching views inside a page use Tabs.
+
+Source: `design-system/components/NavTabs`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `readonly NavItem[]` | yes | The sections, in order. |
+| `activeHref` | `string` | no | The `href` of the current section. |
+| `'aria-label'` | `string` | yes | The navigation landmark's name ("Trader sections"). |
+| `renderLink` | `(link: NavLinkRenderProps) => ReactNode` | no | Renders one link (e.g. the router's Link); a plain anchor by default. |
+
+### NumberInput
+
+NumberInput: a number with an optional unit (`%`, `pts`, `×`) or prefix (`$`), right-aligned in tabular figures. Typing is free (so "1.2" can pass through "1."); the value is parsed, clamped to `min` / `max` and reported on blur or Enter. ArrowUp / ArrowDown step by `step` (Shift: ×10). A spinbutton for screen readers. Empty is `null`, never 0.
+
+Source: `design-system/components/NumberInput`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `number \| null` | no | The number (controlled); `null` is empty. |
+| `defaultValue` | `number \| null` | no | The initial number (uncontrolled). |
+| `onValueChange` | `(value: number \| null) => void` | no | Called with the parsed, clamped number (or null) on commit: blur, Enter or a step. |
+| `min` | `number` | no | Lowest allowed value. |
+| `max` | `number` | no | Highest allowed value. |
+| `step` | `number` | no | Arrow-key step; 1 by default. |
+| `precision` | `number` | no | Decimal places shown after commit (the step's by default). |
+| `suffix` | `string` | no | A unit after the number ("%", "pts", "sessions"). |
+| `prefix` | `string` | no | A prefix before the number ("$"). |
+| `placeholder` | `string` | no |  |
+| `'aria-label'` | `string` | no | Accessible name outside a Field. |
+| `size` | `'sm' \| 'md'` | no | `md` (default) or `sm` (table rows). |
+| `width` | `'full' \| 'auto'` | no | `full` (default) or `auto` (its natural width, in a row of controls). |
+| `invalid` | `boolean` | no |  |
+| `disabled` | `boolean` | no |  |
+| `readOnly` | `boolean` | no |  |
+| `name` | `string` | no |  |
+
+### Panel
+
+Panel: a bordered section of a screen, built on Surface. A header (title as a heading, optional description, actions on the end: chips, buttons, a legend), a body, and an optional footer note. `state` swaps the body for a calm loading, empty or error message (with Retry), so every panel handles the four data states the same way. `flush` drops body padding for tables.
+
+Source: `design-system/components/Panel`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `title` | `ReactNode` | yes | The panel's heading ("Criteria", "Top ideas · across all your screeners"). |
+| `description` | `ReactNode` | no | Short context beside the title (muted). |
+| `actions` | `ReactNode` | no | Controls on the header's end: chips, small buttons, a legend. |
+| `footer` | `ReactNode` | no | A muted note under the body (sources, caveats). |
+| `state` | `PanelState` | no | `ready` (default) shows children; `loading`, `empty` and `error` show a message instead. |
+| `loadingLabel` | `string` | no | What loads ("Loading ideas…"). |
+| `emptyMessage` | `ReactNode` | no | Shown when `state="empty"`: what is missing and what to do. |
+| `errorMessage` | `ReactNode` | no | Shown when `state="error"`: what failed. |
+| `onRetry` | `() => void` | no | Adds a Retry button to the error state. |
+| `headingLevel` | `2 \| 3` | no | Heading level in the page outline; 2 by default. |
+| `flush` | `boolean` | no | No body padding (a table or grid that runs edge to edge). |
+| `children` | `ReactNode` | no | Body content when ready. |
+
+### SearchInput
+
+SearchInput: a search box (tickers, names, sectors) with a search icon, a clear button once there is text, and Escape to clear. Sunken (canvas-coloured) as in the mockups' top bar and ticker list. `loading` shows a spinner while results are being fetched. Named "Search" unless given a label or placed in a Field.
+
+Source: `design-system/components/SearchInput`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `string` | no | The query (controlled). |
+| `defaultValue` | `string` | no | The initial query (uncontrolled). |
+| `onValueChange` | `(value: string) => void` | no | Called with the query on every edit and with '' when cleared. |
+| `onSubmit` | `(value: string) => void` | no | Called on Enter with the current query. |
+| `placeholder` | `string` | no |  |
+| `'aria-label'` | `string` | no | Accessible name; "Search" by default (ignored inside a Field, whose label names it). |
+| `loading` | `boolean` | no | Results are being fetched. |
+| `width` | `'full' \| 'fixed'` | no | `full` (default) or `fixed` (the top bar's compact search width). |
+| `size` | `'sm' \| 'md'` | no | `md` (default) or `sm`. |
+| `disabled` | `boolean` | no |  |
+| `name` | `string` | no |  |
+
+### SegmentedControl
+
+SegmentedControl: pick exactly one of a few options shown side by side (Hard / Soft, Simple / Pro, 3M / 1Y / 2Y, the workspace switch). A radio group: Tab enters at the selected option, arrow keys (and Home / End) move and select, the selection is shown by an inverted fill, not colour alone. For navigation between pages use NavTabs; for many options, Select.
+
+Source: `design-system/components/SegmentedControl`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `options` | `readonly SegmentedOption<V>[]` | yes | The choices, in display order (2-5 short labels). |
+| `value` | `V` | no | The selected value (controlled). |
+| `defaultValue` | `V` | no | The initially selected value (uncontrolled); defaults to the first option. |
+| `onValueChange` | `(value: V) => void` | no | Called with the newly selected value. |
+| `'aria-label'` | `string` | yes | The group's accessible name ("Workspace", "Criterion mode"); required: the options alone do not say what is chosen. |
+| `size` | `'sm' \| 'md'` | no | `sm` (in table rows: Hard / Soft) or `md` (default: top bar, toolbars). |
+| `disabled` | `boolean` | no |  |
+
+### Select
+
+Select: pick one value from a short, known list (expiry, sort order, preset). The native select, styled with tokens: full keyboard, screen-reader and mobile support for free. For long or searchable lists with descriptions use Combobox; for 2-4 visible options, SegmentedControl.
+
+Source: `design-system/components/Select`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `options` | `readonly SelectOption[]` | yes | The choices, in display order. |
+| `value` | `string` | no | The selected value (controlled). |
+| `defaultValue` | `string` | no | The initial value (uncontrolled). |
+| `onValueChange` | `(value: string) => void` | no | Called with the chosen value. |
+| `placeholder` | `string` | no | A first, unselectable prompt ("Choose an expiry"); selected while no value is set. |
+| `'aria-label'` | `string` | no | Accessible name outside a Field. |
+| `size` | `'sm' \| 'md'` | no | `md` (default) or `sm`. |
+| `width` | `'full' \| 'auto'` | no | `full` (default) or `auto`. |
+| `invalid` | `boolean` | no |  |
+| `disabled` | `boolean` | no |  |
+| `required` | `boolean` | no |  |
+| `name` | `string` | no |  |
+| `id` | `string` | no |  |
 
 ### ShareBar
 
@@ -321,6 +625,19 @@ Source: `design-system/components/StatStrip`
 | `error` | `ReactNode` | no | Replaces the values with this message (the summary failed to load). |
 | `emptyMessage` | `ReactNode` | no | Shown when there are no items. |
 
+### StatusBadge
+
+StatusBadge: a short, tinted label for a state: a decision (QUALIFIED, WATCH, EVENT_RISK), a check result (PASS, WARN, FAIL), a run state (COMPLETE, PARTIAL). The text always says the state; colour only reinforces it. Tones map to the status tokens; `accent` is the one accent hue (WATCH, selected). Not interactive: a filter is a Chip.
+
+Source: `design-system/components/StatusBadge`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `tone` | `StatusTone` | no | positive (complete, pass), warning (partial, stale), negative (failed), neutral (draft, unknown), info (notes), accent (watch, selected). |
+| `icon` | `IconName` | no | An optional leading icon (check, alert, info). |
+| `title` | `string` | no | Full explanation on hover ("Earnings in 6 sessions"). |
+| `children` | `ReactNode` | yes | The state, in words. |
+
 ### Tabs
 
 Tabs: switches between views of the same subject (Compare, Chart, Options, ...). A `tablist` of underline tabs (the accent underline marks the selected one) and the selected view's panel. Controlled: the caller owns `value`. Keyboard: Left / Right (wrapping), Home / End move focus and select (automatic activation); only the selected tab is in the Tab order.
@@ -335,3 +652,43 @@ Source: `design-system/components/Tabs`
 | `label` | `string` | yes | Accessible name of the tab list, e.g. "View". |
 | `children` | `ReactNode` | no | The selected tab's content, rendered in its tabpanel. Omit to render the tab list only. |
 | `size` | `'sm' \| 'md'` | no | Text size: `md` (default) or `sm` (dense toolbars). |
+
+### TickerTag
+
+TickerTag: a ticker symbol in mono, keyed to its chart series (s1-s6: border and swatch in the series colour) so a compare list, a chart legend and a side-by-side table read as one. The symbol itself stays in the text colour: series colours meet 3:1 for graphics, not 4.5:1 for text. Optionally removable ("Remove AAPL from compare").
+
+Source: `design-system/components/TickerTag`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `symbol` | `string` | yes | The ticker ("AAPL"). |
+| `series` | `Series` | no | The entity's series slot (assigned in fixed order, never re-ranked); none = neutral. |
+| `name` | `string` | no | Full name on hover ("Apple Inc."). |
+| `onRemove` | `() => void` | no | Adds a remove button named "Remove <symbol>" (plus `removeContext`). |
+| `removeContext` | `string` | no | Completes the remove button's name: "from compare" gives "Remove AAPL from compare". |
+
+### TopBar
+
+TopBar: the horizontal bar across the top of every screen (the banner landmark): brand, the workspace switch, the workspace's NavTabs, and an end slot pushed to the far side (a search box, "As of Fri 2 Oct", the latest-run note). Slots wrap onto new lines at phone width.
+
+Source: `design-system/components/TopBar`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `brand` | `ReactNode` | yes | The product mark (e.g. `<Mono weight="medium">algotrade</Mono>`). |
+| `workspace` | `ReactNode` | no | The workspace switch (WorkspaceSwitch). |
+| `nav` | `ReactNode` | no | The workspace's section links (NavTabs). |
+| `end` | `ReactNode` | no | Content at the far end: a SearchInput, an as-of date, a status note. |
+
+### WorkspaceSwitch
+
+WorkspaceSwitch: the top bar's switch between workspaces (Trader / Admin), a SegmentedControl named "Workspace". Selecting a workspace calls `onValueChange`; the app navigates (the design system knows no routes). Role gating stays in the app: pass only the workspaces the user may enter.
+
+Source: `design-system/components/WorkspaceSwitch`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `workspaces` | `readonly SegmentedOption<V>[]` | yes | The workspaces the user may enter, in order (e.g. Trader, Admin). |
+| `value` | `V` | yes | The current workspace. |
+| `onValueChange` | `(value: V) => void` | yes | Called with the chosen workspace; the app navigates to its home. |
+| `label` | `string` | no | Accessible name of the switch; "Workspace" by default. |

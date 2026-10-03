@@ -1,0 +1,74 @@
+/* Chip: a bordered pill-less tag (radius md); selected in the accent tint; dashed to add. */
+.chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  max-width: 100%;
+  border: var(--border-width-thin) solid var(--color-control);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-2);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  transition-duration: var(--duration-fast);
+  transition-property: background-color, border-color, color;
+  transition-timing-function: var(--easing-standard);
+}
+
+.chip[data-selected] {
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-strong);
+}
+
+.chip[data-variant='dashed'] {
+  border-style: dashed;
+  color: var(--color-muted);
+}
+
+.chip[data-disabled] {
+  color: var(--color-muted);
+}
+
+.main {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+  padding-block: var(--space-0-5);
+  padding-inline: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.main[data-interactive] {
+  cursor: pointer;
+}
+
+.main[data-interactive]:hover {
+  color: var(--color-text);
+}
+
+.main[data-interactive]:disabled {
+  color: var(--color-muted);
+  cursor: not-allowed;
+}
+
+.chip[data-selected] .main[data-interactive]:hover {
+  color: var(--color-accent-strong);
+}
+
+.chip[data-removable] .main {
+  padding-inline-end: var(--space-0-5);
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

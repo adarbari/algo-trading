@@ -1,0 +1,77 @@
+/* Icon: stroke icons sized from tokens, coloured by currentColor or a tone. */
+.icon {
+  display: inline-block;
+  flex: none;
+  vertical-align: middle;
+}
+
+.icon[data-size='sm'] {
+  width: var(--size-icon-sm);
+  height: var(--size-icon-sm);
+}
+
+.icon[data-size='md'] {
+  width: var(--size-icon-md);
+  height: var(--size-icon-md);
+}
+
+.icon[data-size='lg'] {
+  width: var(--size-icon-lg);
+  height: var(--size-icon-lg);
+}
+
+.icon[data-icon='drag-handle'] {
+  stroke-width: 2.5;
+}
+
+.icon [data-track] {
+  opacity: 0.3;
+}
+
+.icon[data-tone='inherit'] {
+  color: inherit;
+}
+
+.icon[data-tone='muted'] {
+  color: var(--color-muted);
+}
+
+.icon[data-tone='secondary'] {
+  color: var(--color-text-2);
+}
+
+.icon[data-tone='accent'] {
+  color: var(--color-accent);
+}
+
+.icon[data-tone='positive'] {
+  color: var(--color-positive);
+}
+
+.icon[data-tone='warning'] {
+  color: var(--color-warning);
+}
+
+.icon[data-tone='negative'] {
+  color: var(--color-negative);
+}
+
+.icon[data-tone='info'] {
+  color: var(--color-info);
+}
+
+.icon[data-spin] {
+  animation: spin calc(var(--duration-base) * 6) linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon[data-spin] {
+    animation: none;
+  }
+}

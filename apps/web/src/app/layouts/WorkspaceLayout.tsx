@@ -1,45 +1,47 @@
 /**
- * A workspace's layout route: the horizontal top bar (product, workspace switch, the
- * workspace's sections) above the page. Placeholder rendering with primitives only: the real
- * TopBar, WorkspaceSwitch and NavLink are design-system components (design system PR 2), then
- * composed here.
+ * A workspace's layout route: the app shell with the horizontal top bar (product, workspace
+ * switch, the workspace's sections) above the page. Composition only: AppShell, TopBar,
+ * WorkspaceSwitch and NavTabs come from the design system; this file supplies the router's
+ * current path, its Link and navigation (the design system knows no routes).
  */
-import { Box, Mono, Stack, Surface, Text } from '@algotrade/ui';
-import { Outlet } from '@tanstack/react-router';
+import { AppShell, Mono, NavTabs, TopBar, WorkspaceSwitch } from '@algotrade/ui';
+import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 
-import { WORKSPACES, type Workspace } from '../workspaces';
+import { WORKSPACES, type Workspace, type WorkspaceId } from '../workspaces';
+
+const WORKSPACE_OPTIONS = WORKSPACES.map((w) => ({ value: w.id, label: w.label }));
 
 export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const navigate = useNavigate();
+  const enter = (id: WorkspaceId) => {
+    const home = WORKSPACES.find((w) => w.id === id)?.sections[0]?.path;
+    if (home) void navigate({ to: home });
+  };
   return (
-    <Stack gap={0}>
-      <Surface as="header" border="bottom" radius="none" paddingX={5} paddingY={2.5}>
-        <Stack direction="row" align="center" gap={4} wrap>
-          <Mono weight="medium">algotrade</Mono>
-          <Stack direction="row" gap={2} aria-label="Workspace">
-            {WORKSPACES.map((w) => (
-              <Text
-                key={w.id}
-                weight="medium"
-                tone={w.id === workspace.id ? 'default' : 'secondary'}
-              >
-                {w.label}
-              </Text>
-            ))}
-          </Stack>
-          <Stack as="nav" direction="row" gap={4} aria-label={`${workspace.label} sections`}>
-            {workspace.sections.map((s) => (
-              <Text key={s.path} tone="secondary">
-                {s.label}
-              </Text>
-            ))}
-          </Stack>
-        </Stack>
-      </Surface>
-      <Box as="main" width="page" paddingX={6} paddingY={5}>
-        <Stack gap={4}>
-          <Outlet />
-        </Stack>
-      </Box>
-    </Stack>
+    <AppShell
+      topBar={
+        <TopBar
+          brand={<Mono weight="medium">algotrade</Mono>}
+          workspace={
+            <WorkspaceSwitch
+              workspaces={WORKSPACE_OPTIONS}
+              value={workspace.id}
+              onValueChange={enter}
+            />
+          }
+          nav={
+            <NavTabs
+              aria-label={`${workspace.label} sections`}
+              items={workspace.sections.map((s) => ({ href: s.path, label: s.label }))}
+              activeHref={pathname}
+              renderLink={({ href, ...link }) => <Link to={href} {...link} />}
+            />
+          }
+        />
+      }
+    >
+      <Outlet />
+    </AppShell>
   );
 }

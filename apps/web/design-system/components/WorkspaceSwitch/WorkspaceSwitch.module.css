@@ -1,0 +1,5 @@
+/* WorkspaceSwitch: sits in the top bar's flow; the look is SegmentedControl's. */
+.workspaceSwitch {
+  display: inline-flex;
+  flex: none;
+}

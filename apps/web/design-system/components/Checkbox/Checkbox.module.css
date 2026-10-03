@@ -1,0 +1,41 @@
+/* Checkbox: the native box in the accent colour, sized from the icon token, label beside it. */
+.checkbox {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.checkbox[data-hide-label] {
+  align-items: center;
+}
+
+.checkbox[data-disabled] {
+  cursor: not-allowed;
+}
+
+.box {
+  flex: none;
+  width: var(--size-icon-md);
+  height: var(--size-icon-md);
+  margin: 0;
+  margin-block-start: calc((var(--line-height-base) - var(--size-icon-md)) / 2);
+  accent-color: var(--color-accent);
+  cursor: inherit;
+}
+
+.checkbox[data-hide-label] .box {
+  margin-block-start: 0;
+}
+
+.box[aria-invalid='true'] {
+  outline: var(--border-width-thin) solid var(--color-negative);
+  outline-offset: var(--border-width-thin);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}

@@ -1,0 +1,13 @@
+/* NumberInput: a width wrapper; the box and tabular figures come from Input. */
+.numberInput {
+  display: flex;
+  min-width: 0;
+}
+
+.numberInput[data-width='full'] {
+  width: 100%;
+}
+
+.numberInput[data-width='auto'] {
+  width: auto;
+}

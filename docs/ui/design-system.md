@@ -149,7 +149,7 @@ Weights: regular 400, medium 500, semibold 600 (headings).
 | Group | Tokens |
 |---|---|
 | Space (`--space-n`, n x 4 px) | 0, 0.5 (2), 1 (4), 1.5 (6), 2 (8), 2.5 (10), 3 (12), 4 (16), 5 (20), 6 (24), 8 (32), 10 (40) |
-| Size | `label` 140, `sidebar` 320, `page` 1600 px (max page width) |
+| Size | `label` 140, `sidebar` 320, `page` 1600 px (max page width); `icon-sm` / `icon-md` / `icon-lg` 12 / 14 / 16; `popover` 280 (min list width); `search` 220 (top-bar search) |
 | Breakpoints (Grid `collapse`, container width) | sm 480, md 720, lg 960 px |
 | Radius | none 0, sm 3 (bars, tracks), md 4 (controls, chips), lg 6 (panels) |
 | Border | thin 1 px (all surfaces), thick 2 px; focus ring 2 px solid accent, offset 1 px |
@@ -172,8 +172,25 @@ Weights: regular 400, medium 500, semibold 600 (headings).
 | `Divider` | `orientation`, `tone` (default, soft), `decorative` |
 | `VisuallyHidden` | `as` (span, div), `id` |
 
-Panel (header, actions, loading / empty / error states) is a component on top of `Surface`
-(design system PR 2).
+## Components (design system PR 2: shell, controls, labels, surfaces)
+
+Full props in the generated `apps/web/design-system/COMPONENTS.md`. All follow the mockups'
+measures (1 px borders, radius 4 controls / 6 panels, inverted selection in segmented
+controls, accent tint for the current nav item and selected chips) and size from the density
+tokens.
+
+| Group | Components |
+|---|---|
+| Shell & navigation | `AppShell` (skip link, top bar, `main`; `page` or `full` layout), `TopBar` (brand, workspace, nav, end slots; wraps on phones), `NavTabs` (router-agnostic via `renderLink`, `aria-current`), `WorkspaceSwitch` (a SegmentedControl named "Workspace") |
+| Actions & inputs | `Button` (primary, secondary, ghost, dashed; sm / md; icons; loading), `IconButton` (label required), `SegmentedControl` (radio group, arrow keys), `Checkbox` (mixed state, hidden label), `Input` (adornments), `SearchInput` (clear, Escape, loading), `NumberInput` (units, min / max / step, spinbutton), `Select` (native), `Combobox` (descriptions, kind badges, groups, async, ARIA combobox keyboard), `Field` (label, hint, error wired to the control) |
+| Labels | `StatusBadge` (positive, warning, negative, neutral, info, accent), `Chip` (static, toggle, removable, dashed add), `TickerTag` (series s1-s6) |
+| Surfaces | `Panel` (on Surface: title, description, actions, footer; loading / empty / error states with Retry; `flush` body), `Icon` (stroke set: close, plus, minus, search, chevrons, check, alert, info, external, drag-handle, refresh, filter, columns, spinner) |
+
+Deviation from the mockups: the Explore compare chips colour the symbol text in the series
+colour; `TickerTag` keeps the symbol in `text` and shows the series as border and swatch,
+because series colours are validated for 3:1 graphic contrast, not 4.5:1 text (s4 / s6 in
+dark, s6 in light would fail AA as text). The mockups' dashed-border grey (`#3a3f48`) is the
+`control` token.
 
 ## Data components (design system PR 3)
 

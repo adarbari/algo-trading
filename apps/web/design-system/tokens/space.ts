@@ -44,4 +44,12 @@ export const size = {
   sidebar: 320,
   /** The widest a working page grows (mockups: 1600). */
   page: 1600,
+  /** Icons (stroke set, 16 px grid): small (in badges, chips), default (mockups: 14), large. */
+  'icon-sm': 12,
+  'icon-md': 14,
+  'icon-lg': 16,
+  /** A popover list (combobox options) at its narrowest. */
+  popover: 280,
+  /** A search box in the top bar (mockups: 220). */
+  search: 220,
 } as const;

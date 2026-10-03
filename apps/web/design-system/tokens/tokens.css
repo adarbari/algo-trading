@@ -38,6 +38,11 @@
   --size-label: 140px;
   --size-sidebar: 320px;
   --size-page: 1600px;
+  --size-icon-sm: 12px;
+  --size-icon-md: 14px;
+  --size-icon-lg: 16px;
+  --size-popover: 280px;
+  --size-search: 220px;
   --radius-none: 0;
   --radius-sm: 3px;
   --radius-md: 4px;
