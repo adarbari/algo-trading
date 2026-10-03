@@ -114,26 +114,36 @@ jobs:
       - uses: actions/checkout@v7
       # Everything runs in the official Playwright image (Linux, browsers and fonts identical
       # to the screenshot baselines; apps/web/scripts/in-playwright-docker.sh is the same
-      # locally), tagged by the locked @playwright/test, so the two cannot drift. node_modules
-      # and the npm cache live in Docker volumes per runner: fast, and concurrent jobs on the
-      # same Mac never share them.
+      # locally), tagged by the locked @playwright/test, so the two cannot drift.
+      # The checkout is mounted read-only and cloned inside the container, so nothing Docker
+      # owns ever sits in the runner's workspace (a volume mounted there blocked the next
+      # checkout's cleanup). node_modules and the npm cache are Docker volumes per runner, and
+      # the container is named per runner: one left by a cancelled job is removed first.
       - name: npm audit, generated files fresh, ds:check, lint, types, unit, build, Storybook, e2e, screenshots + axe
         env:
-          VOLUMES: algotrade-web-${{ runner.name }}
+          NAME: algotrade-web-${{ runner.name }}
+          OUT: ${{ runner.temp }}/web-reports
         run: |
+          docker rm -f "$NAME" >/dev/null 2>&1 || true
+          rm -rf "$OUT" && mkdir -p "$OUT"
           version=$(jq -r '.packages["node_modules/@playwright/test"].version' apps/web/package-lock.json)
-          docker run --rm --init --ipc=host -e CI=1 \
-            -v "$PWD":/work -w /work/apps/web \
-            -v "$VOLUMES-node-modules":/work/apps/web/node_modules \
-            -v "$VOLUMES-npm-cache":/root/.npm \
+          docker run --rm --init --ipc=host -e CI=1 --name "$NAME" \
+            -v "$PWD":/src:ro -v "$OUT":/out \
+            -v "$NAME-node-modules":/work/apps/web/node_modules \
+            -v "$NAME-npm-cache":/root/.npm \
             "mcr.microsoft.com/playwright:v$version-noble" \
             bash -euo pipefail -c '
-              git config --global --add safe.directory /work
+              git config --global --add safe.directory "*"
+              git clone -q /src /tmp/repo && cp -a /tmp/repo/. /work/ && cd /work/apps/web
+              trap "cp -r playwright-report test-results /out/ 2>/dev/null || true" EXIT
               npm ci --no-fund --no-audit
               # high/critical advisories in shipped dependencies fail; dev tooling is reported
               npm audit --omit=dev --audit-level=high && { npm audit --audit-level=high || true; }
               npm run check
               npm run visual -- --fully-parallel  # one story per worker, not one file per worker'
+      - name: Remove the container if the job was cancelled or failed mid-run
+        if: always()
+        run: docker rm -f "algotrade-web-${{ runner.name }}" >/dev/null 2>&1 || true
       - uses: actions/upload-artifact@v7
         if: failure()
-        with: { name: playwright-report, path: "apps/web/playwright-report\napps/web/test-results", if-no-files-found: ignore }
+        with: { name: playwright-report, path: "${{ runner.temp }}/web-reports", if-no-files-found: ignore }
