@@ -1,5 +1,6 @@
 """Typed reads of one TOML table for ``config/site/settings.py``: defaults, types, ranges, and an
-error that names the file, section and key (``sources.toml [http] max_retry_s: ...``)."""
+error that names the file, section and key (``sources.toml [http] max_retry_s: ...``); and
+``reject_secrets``: no config document (site or user) may hold a credential."""
 
 from collections.abc import Iterable, Mapping
 from typing import Any, overload
@@ -114,3 +115,30 @@ def _is_int(value: object) -> bool:
 
 def _is_number(value: object) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+SECRET_MARKERS = (
+    "secret",
+    "password",
+    "passwd",
+    "token",
+    "api_key",
+    "apikey",
+    "credential",
+    "private_key",
+)
+
+
+def reject_secrets(document: Mapping[str, Any], path: str) -> None:
+    """Configs never hold credentials (they come only from environment variables)."""
+    for key, value in document.items():
+        if any(marker in str(key).lower() for marker in SECRET_MARKERS):
+            raise ConfigurationError(
+                f"{path}.{key}: looks like a secret; put credentials in environment variables"
+            )
+        if isinstance(value, Mapping):
+            reject_secrets(value, f"{path}.{key}")
+        elif isinstance(value, list):
+            for i, item in enumerate(value):
+                if isinstance(item, Mapping):
+                    reject_secrets(item, f"{path}.{key}[{i}]")

@@ -26,7 +26,11 @@ without writing an ADR. Read in this order:
 - **Feature store**: every stored feature column is a declared `Feature` (kind, dtype, unit,
   description, null meaning, range) in a `FeatureGroup`; the catalogue `docs/data/features.md`
   is generated (`make features-doc`). Features ask `data.feature_inputs` for inputs by table
-  name. (ADR 0023)
+  name. A formula over existing features is an **expression feature** in
+  `config/site/features/<theme>.toml` (typed language, never Python `eval`), computed on read
+  unless `materialise = true`; selectable as `feature.<name>`. Users add their own (always
+  virtual, never shadowing a site name) in `config/users/<id>/features/`. Re-versioned groups
+  store `float32`. (ADR 0023)
 - **Backtests only read stores.** They never fetch; missing data is an error. (ADR 0008)
 - **Generic instruments** keyed by `instrument_id` with `multiplier`, `parent_id` and
   `calendar`, so futures and options fit without redesign. (ADR 0009)
@@ -66,7 +70,8 @@ only shrinks (`make dupes-update`).
 |---|---|
 | Which snapshot a read sees (on or before D, else earliest + `pre_snapshot`); domain reads of market data | `algotrade/data/` (`reference`, `prices`, `events`, `chains`, `rates`: the Treasury curve a date sees; `rollups`: stored rollup rows; `shares`: share counts by filing date); consumers never import `storage.tables.readers` |
 | What a feature group reads (each input table's point-in-time read, by table name; other groups' rows) | `data/feature_inputs.py` (`load_input`; each read lives in its `data` owner); `features/` never imports storage or a domain reader |
-| Computing feature groups (rollups); feature definitions + the feature catalogue | `features/framework/` (`FeatureGroup`, `Feature`, runner), `features/rollups/<group>.py` (`FEATURES` + pure compute), `features/registry.py` (`GROUPS`, `FEATURES`, `feature(name)`), `features/catalogue.py` → `docs/data/features.md`; stored only by `tasks/derived/rollups.py` |
+| Computing feature groups (rollups); feature definitions + the feature catalogue | `features/framework/` (`FeatureGroup`, `Feature`, runner), `features/rollups/<group>.py` (`FEATURES` + pure compute), `features/registry.py` (`GROUPS`, `FEATURES`, `feature(name)`, `SUPERSEDED`), `features/site.py` (the site `FeatureSet`: groups + expression features), `features/catalogue.py` → `docs/data/features.md`; stored only by `tasks/derived/rollups.py` |
+| Expression features: the formula language (parse, type check, evaluate); definitions from `config/site/features/*.toml`; computing them on read; retiring superseded group tables | `features/expressions/` (lexer, parser, checker, evaluator, functions; `definitions.py`, `feature_set.py`); typed by `config/site/settings.py` (`load_features`); read path `services/features.py` (`read_expressions`, column-pruned through `data.rollups.feature_rows`); `tasks/maintenance/retire_features.py` (`algotrade-ingest retire-features`) |
 | Option prices + Greeks; implied vol (NaN + status code); realised vol; rate conventions (par → continuous, curve) | `algotrade/quant/` (`black_scholes`, `implied_vol`, `realized_vol`, `rates`): pure numpy, conventions in ADR 0021 |
 | Run ids, run records, COMPLETE / PARTIAL | `storage/runs.py` (`start_run` + `RunRecord.finish` in services), `services/jobs/`; in ingestion `tasks/framework/run.py` (`IngestRun`): never write the loop in a task |
 | Raw save; stamping; ticker → id in ingestion | `tasks/framework/run.py` (`IngestRun`) |
@@ -110,6 +115,8 @@ source (`tests/unit/<path>` = `src/algotrade/<path>`, `tests/apps/ingestion/<pat
 | Comparing our data with a live source (verification check) | `apps/ingestion/.../tasks/verification/` (`checks.py`) |
 | Nightly step / ordering | `apps/ingestion/.../workflows/nightly/` |
 | Feature (a documented column) in a feature group (rollup) | `src/algotrade/features/rollups/<group>.py` (`FEATURES` + pure compute; framework: `features/framework/`; then `make features-doc`) |
+| A formula over existing features (ratio, spread, label from thresholds) | `config/site/features/<theme>.toml` (an expression feature: no code; `make features-doc`) |
+| The expression language itself (a new function, operator or type) | `src/algotrade/features/expressions/` |
 | What a feature group reads from a table (feature input) | `src/algotrade/data/feature_inputs.py` (`INPUTS`) + the table's read in its `data/` owner |
 | Trading strategy / screener | `src/algotrade/strategies/trading/` / `strategies/screeners/` |
 | Numeric model (pricing, vol, rates) | `src/algotrade/quant/` |
@@ -134,7 +141,7 @@ with a purpose (+ `contracts` if an import-linter rule guards it), give it an `_
 docstring, and mirror it in tests. Never park code in a neighbouring folder
 (`.claude/skills/add-responsibility`). Library folders: `core/{model,time,views,validation}`
 (pure), `config/{site,strategy}`, `storage/{tables,backends,configs}`, `quant/`, `data/`,
-`features/{framework,rollups}`, `strategies/{trading,screeners}`,
+`features/{framework,rollups,expressions}`, `strategies/{trading,screeners}`,
 `engines/{backtest,screening,selection}`, `analytics/`,
 `services/{backtests,screening,evaluation,jobs,explore}`. API app: `routes/`, `schemas/`.
 Ingestion app: `cli/`, `ops/`,
@@ -189,7 +196,7 @@ approved mockups -> components -> screens. Every folder is a `[[web_dir]]` in
 |---|---|
 | New vendor / data source | `.claude/skills/add-data-source` |
 | New dataset or data grain | `.claude/skills/add-dataset` |
-| New feature | `.claude/skills/add-feature` |
+| New feature (a stored column, or a formula over features: TOML) | `.claude/skills/add-feature` |
 | New trading strategy | `.claude/skills/add-strategy` |
 | New screener | `.claude/skills/add-screener` |
 | New UI component (design system) or visual element | `.claude/skills/add-ui-component` |
@@ -200,8 +207,9 @@ approved mockups -> components -> screens. Every folder is a `[[web_dir]]` in
 
 Commands (need `uv`): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make layout`, `make evaluate`, `make baseline`, `make features-doc`.
 Web (need Node 24): `make web-install`, `make web-check` (part of `make check`), `make web-visual` (screenshots, Docker); in `apps/web`: `npm run dev|storybook|check|visual:update`.
-Ingestion: `algotrade-ingest universe|universe-build|company-details|shares|earnings|bars|rates|corporate-actions|chains|rollups|verify|screen|nightly|report|quality|schedule|purge-raw|migrate-ids|golden`, or `algotrade-ingest run <task>` for any registry task (see `README.md`).
+Ingestion: `algotrade-ingest universe|universe-build|company-details|shares|earnings|bars|rates|corporate-actions|chains|rollups|verify|screen|nightly|report|quality|schedule|purge-raw|retire-features|migrate-ids|golden`, or `algotrade-ingest run <task>` for any registry task (see `README.md`).
 API: `algotrade-api [--reload]` (read-only, 127.0.0.1:8000); after a route / schema change run
 `scripts/export_openapi.py` and commit `apps/api/openapi.json`.
 Configs: site presets in `config/site/` (reviewed via PR); user configs in `config/users/<id>/`
-(git-ignored). Check one with `algotrade-backtest [--user U] config validate|show <id>`.
+(git-ignored). Check one with `algotrade-backtest [--user U] config validate|show <id>`; a
+user's expression features with `config validate-features`.

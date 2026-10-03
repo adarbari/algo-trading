@@ -1,8 +1,9 @@
 """``iv30@v1``: our own 30-calendar-day at-the-money implied volatility (ADR 0021, IV30).
 
 Inputs: the session's ``chains/option_quotes`` and ``chains/underlying_quotes``, the Treasury
-curve the session sees (``rates/treasury``) and ``dividends@v1`` (``div_yield``; a missing
-yield prices with ``q = 0``). One row per underlying with a chain or an underlying quote.
+curve the session sees (``rates/treasury``) and ``div_yield@v1`` (the expression feature
+``div_yield``, materialised; a missing yield prices with ``q = 0``). One row per underlying
+with a chain or an underlying quote.
 
 Method, per underlying (all thresholds are ``Iv30Params``, ``rollups.toml ["iv30@v1"]``):
 
@@ -54,7 +55,7 @@ VERSION = 1
 OPTIONS = "chains/option_quotes"
 UNDERLYINGS = "chains/underlying_quotes"
 RATES = "rates/treasury"
-DIVIDENDS = "rollups/instrument/dividends@v1"
+DIVIDENDS = "rollups/instrument/div_yield@v1"  # the materialised expression feature
 # Expiry-level failures, most informative last: an underlying reports the worst it reached.
 FAILURES = ("NO_QUOTES", "WIDE_SPREADS", "ILLIQUID", "IV_FAILED")
 
@@ -73,7 +74,7 @@ FEATURES = (
         "expiries around 30 days, interpolated in total variance (ADR 0021)",
         "iv30_status is neither OK nor SINGLE_EXPIRY (the status says why)", "chain",
         valid_range=(0, 5),
-        inputs=(*_QUOTES, _SPOT, f"{RATES}.rate_cont", "dividends.div_yield@v1"),
+        inputs=(*_QUOTES, _SPOT, f"{RATES}.rate_cont", "div_yield@v1"),
     ),
     Feature(
         "iv30_cboe", "float", "decimal", "The feed's 30-day implied volatility, as a decimal",
@@ -116,9 +117,9 @@ FEATURES = (
     ),
     Feature(
         "div_yield", "float", "decimal",
-        "The dividend yield q used for the forward, as read from dividends@v1",
-        "dividends@v1 has no yield for it (UNKNOWN; priced with q = 0)", "expression",
-        valid_range=(0, 1), inputs=("dividends.div_yield@v1",),
+        "The dividend yield q used for the forward, as read from div_yield@v1",
+        "div_yield@v1 has no yield for it (UNKNOWN; priced with q = 0)", "expression",
+        valid_range=(0, 1), inputs=("div_yield@v1",),
     ),
     Feature(
         "n_quotes_used", "int", "count",

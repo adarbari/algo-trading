@@ -2,10 +2,11 @@
 
 Our side is recomputed here from the RAW recorded inputs (unadjusted ``bars/1d``, split and
 dividend events) with production code: ``data.prices.adjust_bars`` ("splits"), the
-``price_stats@v1`` and ``dividends@v1`` groups' ``compute`` (through their ``FeatureGroup``)
-and ``quant.realized_vol``. ``iv30`` is the value we stored that night (recomputing it needs
-the full option chains). Fixtures and their meaning: ``tests/fixtures/reconciliation/
-ibkr_2026-10-02/README.md``; what this proves and the tolerances: ``docs/testing.md``.
+``price_stats@v2`` and ``dividends@v2`` groups' ``compute`` (through their ``FeatureGroup``),
+the site's ``div_yield`` expression feature and ``quant.realized_vol``. ``iv30`` is the value
+we stored that night (recomputing it needs the full option chains). Fixtures and their
+meaning: ``tests/fixtures/reconciliation/ibkr_2026-10-02/README.md``; what this proves and the
+tolerances: ``docs/testing.md``.
 """
 
 import json
@@ -20,11 +21,14 @@ import pytest
 
 from algotrade.data.prices import adjust_bars
 from algotrade.features.rollups import dividends, price_stats
+from algotrade.features.site import site_features
 from algotrade.quant import realized_vol
+from algotrade.storage.configs.files import FileConfigStore
 
 pytestmark = pytest.mark.reconciliation
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "reconciliation" / "ibkr_2026-10-02"
+CONFIG = Path(__file__).resolve().parents[2] / "config"
 SESSION = date(2026, 10, 2)
 TICKERS = ("AAPL", "SPY", "KO", "TQQQ", "TSM", "RPGL")
 
@@ -80,7 +84,15 @@ def divs(stats: pd.DataFrame) -> pd.DataFrame:
         dividends.DIVIDENDS: _events("our_dividend_events.csv"),
         dividends.SPLITS: _events("our_split_events.csv"),
     }
-    return group.compute(inputs, SESSION, group.params).set_index("instrument_id")
+    out = group.compute(inputs, SESSION, group.params)
+    frames = {
+        dividends.PRICE_STATS: stats.reset_index().assign(session_date=SESSION),
+        dividends.GROUP.table: out.assign(session_date=SESSION),
+    }
+    yields = site_features(FileConfigStore(CONFIG)).evaluate(frames, ["div_yield"], ["div_yield"])
+    return out.merge(yields[["instrument_id", "div_yield"]], on="instrument_id").set_index(
+        "instrument_id"
+    )
 
 
 def _ours_on_ibkr_dates(adjusted: pd.DataFrame, ibkr: dict[str, Any], ticker: str) -> pd.DataFrame:

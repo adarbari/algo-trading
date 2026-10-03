@@ -29,8 +29,8 @@ T0 = datetime(2026, 10, 3, tzinfo=UTC)
 LOADED = datetime(2026, 10, 1, tzinfo=UTC)
 START, END = date(2020, 1, 1), date(2020, 6, 30)
 FLIP = date(2020, 4, 1)  # BULL is liquid before, BEAR from here on; CHOP always
-ADV = "rollup.price_stats@v1.adv_usd_20d"
-TABLE = "rollups/instrument/price_stats@v1"
+ADV = "rollup.price_stats@v2.adv_usd_20d"
+TABLE = "rollups/instrument/price_stats@v2"
 APR_2 = date(2020, 4, 2)  # the bar after the April evaluation (lag 1)
 
 

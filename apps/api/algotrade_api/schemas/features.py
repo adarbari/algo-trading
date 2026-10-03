@@ -21,6 +21,8 @@ class Feature(Schema):
     unit: str | None
     range: list[float | None] | None = Field(description="plausible (min, max)")
     categories: list[str]
+    scope: str = Field(description="site, or user: one of the caller's own expression features")
+    owner: str | None = Field(description="the user who declared it (scope user)")
 
 
 class Bin(Schema):

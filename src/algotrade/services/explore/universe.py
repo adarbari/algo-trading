@@ -2,7 +2,8 @@
 columns for Explore), and the owner's review lists (FIGI, leverage).
 
 A universe row is the coverage snapshot (``universe``) joined with reference facts, company
-sector / industry and the liquidity class rollup for the same session (``InstrumentView``).
+sector / industry and the liquidity class (an expression feature) for the same session
+(``services.features.field_view``).
 """
 
 from dataclasses import dataclass
@@ -12,16 +13,13 @@ from typing import Any
 import pandas as pd
 
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.core.model.fields import rollup_field
 from algotrade.data.reference import (
     UNIVERSE_TABLE,
     Universe,
-    instrument_view,
     instruments,
     load_universe,
 )
-from algotrade.features.rollups import liquidity_class
-from algotrade.services.configs import field_catalog
+from algotrade.services.configs import catalog_of
 from algotrade.services.explore.store import (
     NotFoundError,
     Page,
@@ -29,11 +27,13 @@ from algotrade.services.explore.store import (
     paginate,
     partition_for,
     records,
+    store_features,
 )
+from algotrade.services.features import field_view
 
 REFERENCE = "instruments/reference"
 UNIVERSE_BUILD = "universe_build"  # the job that records the FIGI review list in its stats
-LIQUIDITY = rollup_field(liquidity_class.GROUP.key, "liquidity_class")
+LIQUIDITY = "feature.liquidity_class"
 VIEW_FIELDS = {
     "instrument.is_leveraged": "is_leveraged",
     "instrument.is_inverse": "is_inverse",
@@ -95,7 +95,7 @@ def _universe(
     session = on or partition_for(store.reader, UNIVERSE_TABLE, None)
     universe = load_universe(store.reader, session)
     fields = list(dict.fromkeys([*VIEW_FIELDS, *columns]))
-    view = instrument_view(store.reader, session, fields)
+    view = field_view(store.reader, session, fields, features=store_features(store))
     frame = universe.frame.reindex(columns=[*BASE, "optionable"])
     frame["instrument_id"] = frame["instrument_id"].astype(str)
     extra = view.frame.reindex(columns=["instrument_id", *fields])
@@ -132,9 +132,10 @@ class TickerTable:
     page: Page[dict[str, Any]]  # TICKER_BASE + one key per requested column
 
 
-def checked_columns(columns: list[str]) -> list[str]:
-    """``columns`` without duplicates; ``ConfigurationError`` for a name not in the catalogue."""
-    catalogue = field_catalog()
+def checked_columns(store: ReadStore, columns: list[str]) -> list[str]:
+    """``columns`` without duplicates; ``ConfigurationError`` for a name not in the user's
+    catalogue (site + their own features)."""
+    catalogue = catalog_of(store_features(store))
     for name in columns:
         catalogue.check_field(name, "columns")
     return list(dict.fromkeys(columns))
@@ -159,8 +160,8 @@ def ticker_table(
     size: int,
 ) -> TickerTable:
     """The universe for ``on`` as tickers x ``columns`` (catalogue field names: reference,
-    company and rollup values for the session through ``InstrumentView``), filtered, sorted."""
-    wanted = checked_columns(columns)
+    company, rollup and expression-feature values for the session), filtered, sorted."""
+    wanted = checked_columns(store, columns)
     frame, universe, missing = _universe(store, on, wanted)
     order = sort or "symbol"
     frame = _sorted(_filtered(frame, filters)[[*TICKER_BASE, *wanted]], order)

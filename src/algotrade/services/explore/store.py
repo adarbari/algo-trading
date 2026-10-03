@@ -15,6 +15,8 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.errors import AlgoTradeError
 from algotrade.data import StoreReader
 from algotrade.data.reference import snapshot
+from algotrade.features.expressions.feature_set import FeatureSet
+from algotrade.services.features import catalogue
 from algotrade.services.views import to_value
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.factory import open_backend, open_config_store
@@ -42,6 +44,12 @@ class ReadStore:
 def open_store(data_url: str, config_dir: str | Path, user: UserContext) -> ReadStore:
     """The store at ``data_url`` and the configs under ``config_dir``, for ``user``."""
     return store_over(open_backend(data_url), open_config_store(config_dir), user, data_url)
+
+
+def store_features(store: ReadStore) -> FeatureSet:
+    """The features ``store.user`` sees: the site's plus their own (``config/users/<id>/
+    features``; ADR 0023 step 4). Read on each call, so an edited user file shows up."""
+    return catalogue(store.configs, store.user.user_id)
 
 
 def store_over(

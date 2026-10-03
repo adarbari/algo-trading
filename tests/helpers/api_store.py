@@ -62,15 +62,30 @@ def _reference(writer: StoreWriter) -> None:
     _write(writer, "universe", universe_rows(SYMBOLS))
 
 
+# Option liquidity on END: (status, put tier, call tier, chain OI, chain volume). With $200M
+# ADV and a close above $10 the liquidity class (an expression feature) is AAA and BULL HIGH,
+# BBB MEDIUM (tier B), CCC LOW (no usable options).
+OPTIONS = {
+    "AAA": ("OK", "A", "A", 100_000, 10_000),
+    "BBB": ("OK", "B", "A", 10_000, 100),
+    "BULL": ("OK", "A", "A", 100_000, 10_000),
+    "CCC": ("OK", "D", "D", 0, 0),
+}
+
+
 def _rollups(writer: StoreWriter) -> None:
     for day, close in ((PREVIOUS, 99.0), (END, 101.0)):
-        rows = [{"instrument_id": f"EQ:{s}", "close": close + i, "hv20": 0.2 + i / 100}
-                for i, s in enumerate(SYMBOLS)]  # fmt: skip
+        rows = [{"instrument_id": f"EQ:{s}", "close": close + i, "hv20": 0.2 + i / 100,
+                 "adv_usd_20d": 200e6} for i, s in enumerate(SYMBOLS)]  # fmt: skip
         rows[-1]["hv20"] = None
-        _write(writer, "rollups/instrument/price_stats@v1", rows, day)
-    classes = {"AAA": "A", "BBB": "B", "BULL": "A", "CCC": "D"}
-    _write(writer, "rollups/instrument/liquidity_class@v1", [
-        {"instrument_id": f"EQ:{s}", "liquidity_class": c} for s, c in classes.items()
+        frame = stamped(rows, day, f"price_stats-{day}").astype(
+            {"close": "float32", "hv20": "float32", "adv_usd_20d": "float32"}
+        )
+        writer.write_table("rollups/instrument/price_stats@v2", day, f"ps-{day}", frame)
+    columns = ("liq_status", "put_tier", "call_tier", "chain_oi", "chain_volume")
+    _write(writer, "rollups/instrument/option_liquidity@v1", [
+        {"instrument_id": f"EQ:{s}", **dict(zip(columns, v, strict=True))}
+        for s, v in OPTIONS.items()
     ])  # fmt: skip
     _write(writer, "rollups/instrument/iv30@v1", [{"instrument_id": "EQ:AAA", "iv30": 0.24}])
 

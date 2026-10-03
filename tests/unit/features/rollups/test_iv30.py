@@ -149,4 +149,4 @@ def test_through_the_framework_with_stored_inputs() -> None:
     write_curve(writer, END, 0.05)
     out = compute_in_memory(reader, [GROUP], [END])[GROUP.key][0].frame
     assert out is not None and out["iv30"].iloc[0] == pytest.approx(0.25, abs=1e-6)
-    assert pd.isna(out["div_yield"].iloc[0])  # no dividends@v1 stored: q = 0
+    assert pd.isna(out["div_yield"].iloc[0])  # no div_yield@v1 stored: q = 0

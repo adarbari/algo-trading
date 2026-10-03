@@ -3,15 +3,25 @@
 Order (later wins): built-in defaults < L3 site (defaults, preset) < L4 user < run overrides.
 A user config either *narrows* a preset (``selection_overrides``: AND-ed with the preset's
 rules, so preset improvements still apply) or *replaces* it (its own ``selection``).
+
+``ResolvedConfig.features``: the user expression features the selection references (with the
+user features those read), so editing one changes the hash (``with_features``; ADR 0023
+step 4). Site features are versioned instead: a changed site formula bumps its version.
 """
 
 import hashlib
 import json
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
-from algotrade.config.site.settings import BacktestSettings, ScreeningSettings, site_defaults
+from algotrade.config.site.fields import reject_secrets
+from algotrade.config.site.settings import (
+    BacktestSettings,
+    FeatureDefinition,
+    ScreeningSettings,
+    site_defaults,
+)
 from algotrade.config.strategy.catalog import FieldCatalog
 from algotrade.config.strategy.schema import (
     Group,
@@ -40,33 +50,6 @@ BUILTIN_DEFAULTS: Mapping[str, Any] = {
         "limits": {"max_position_weight": 1.0, "max_gross_exposure": 1.0, "allow_short": False},
     },
 }
-
-
-SECRET_MARKERS = (
-    "secret",
-    "password",
-    "passwd",
-    "token",
-    "api_key",
-    "apikey",
-    "credential",
-    "private_key",
-)
-
-
-def reject_secrets(document: Mapping[str, Any], path: str) -> None:
-    """Configs never hold credentials (they come only from environment variables)."""
-    for key, value in document.items():
-        if any(marker in str(key).lower() for marker in SECRET_MARKERS):
-            raise ConfigurationError(
-                f"{path}.{key}: looks like a secret; put credentials in environment variables"
-            )
-        if isinstance(value, Mapping):
-            reject_secrets(value, f"{path}.{key}")
-        elif isinstance(value, list):
-            for i, item in enumerate(value):
-                if isinstance(item, Mapping):
-                    reject_secrets(item, f"{path}.{key}[{i}]")
 
 
 def _checked(load: DocumentLoader) -> DocumentLoader:
@@ -116,6 +99,7 @@ class ResolvedConfig:
     user: UserContext
     layers: tuple[str, ...] = ()
     hash: str = field(default="")
+    features: tuple[FeatureDefinition, ...] = ()  # referenced user features, dependency order
 
     @property
     def screening(self) -> ScreeningSettings:
@@ -141,7 +125,12 @@ class ResolvedConfig:
             "schedule": c.schedule,
             "exports": list(c.exports),
             "settings": self.settings,
-        }
+        } | ({"features": {d.name: d.canonical() for d in self.features}} if self.features else {})
+
+    def with_features(self, features: tuple[FeatureDefinition, ...]) -> "ResolvedConfig":
+        """This config reading these user features (they join the hash)."""
+        out = replace(self, features=features)
+        return replace(out, hash=fingerprint(out.canonical()))
 
 
 def fingerprint(payload: Mapping[str, Any]) -> str:

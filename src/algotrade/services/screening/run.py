@@ -10,6 +10,7 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.data.reference import Universe, load_universe
 from algotrade.engines.screening.runner import RunCoverage, ScreenRun, run_screen
+from algotrade.services.features import config_features
 from algotrade.services.selection import select
 from algotrade.services.views import feature_view
 from algotrade.storage.runs import start_run
@@ -77,7 +78,7 @@ def run_screener(
     screening = config.screening
     screener = create_screener(config.config.impl, **dict(config.config.params))
     universe = load_universe(reader, session_date)
-    selected = select(reader, config.selection, session_date)
+    selected = select(reader, config.selection, session_date, features=config_features(config))
     view = feature_view(reader, screener.requires, session_date, selected.instruments)
     run = run_screen(screener, view, list(selected.instruments), screening.min_coverage)
     if selected.empty:

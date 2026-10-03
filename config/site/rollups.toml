@@ -2,7 +2,8 @@
 # named by its key; each key is a scalar field of the rollup's params dataclass, typed and
 # validated by config/site/settings.py (rollup_params). A missing key keeps the default; an
 # unknown section or key fails. Rollups without parameters (earnings@v1) have no section.
-# Changing a value changes the definition's output: record why in the PR.
+# Changing a value changes the definition's output: record why in the PR. Expression
+# features (and their params, e.g. the liquidity thresholds) live in features/*.toml.
 
 ["option_liquidity@v1"]
 dte_target = 35       # target expiry: the standard monthly closest to this many days
@@ -15,12 +16,12 @@ pick_hi = 0.40
 zone_lo = 0.15        # zone open interest / volume: zone_lo <= |delta| <= zone_hi
 zone_hi = 0.40
 
-["price_stats@v1"]
+["price_stats@v2"]
 year_sessions = 252      # the 52-week window, in exchange sessions
 min_year_sessions = 240  # bars needed in that window for high_52w / low_52w (else null)
 periods_per_year = 252   # realised-vol annualisation
 
-["dividends@v1"]
+["dividends@v2"]
 min_history_days = 240   # bars among the last 252 sessions before "no dividend" means 0 (else null)
 include_special = false  # count distributions typed "special" in the trailing 12 months
 
@@ -32,23 +33,11 @@ max_spread_pct = 0.35    # a quote is used only if (ask - bid) / mid <= this
 min_open_interest = 10   # ... and open interest >= this
 min_volume = 1           # ... or volume >= this
 
-["iv_history@v1"]
+["iv_history@v2"]
 window = 252             # sessions for a FULL rank (today included)
 min_provisional = 60     # sessions with an IV before the rank is shown (PROVISIONAL)
 source = "ours"          # "ours" (iv30@v1.iv30) or "cboe" (iv30@v1.iv30_cboe)
 
-["liquidity_class@v1"]
-high_min_adv_usd = 100_000_000.0  # 20-session average dollar volume
-high_min_price = 10.0
-high_option_tiers = "A"           # the worse of the put / call tier must be one of these
-high_min_chain_oi = 50_000
-high_min_chain_volume = 5_000
-medium_min_adv_usd = 10_000_000.0
-medium_min_price = 5.0
-medium_option_tiers = "A,B"       # "" = no option requirement
-medium_min_chain_oi = 5_000
-medium_min_chain_volume = 0       # 0 = no requirement
-
-["fundamentals@v1"]
+["fundamentals@v2"]
 stale_days = 400         # shares whose period ended longer ago than this are STALE (no market cap);
                          # 10-Q filers report every ~3 months, 20-F filers once a year

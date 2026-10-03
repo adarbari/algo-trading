@@ -1,5 +1,6 @@
-"""``iv_history@v1``: rank and percentile over the window, UNKNOWN / PROVISIONAL / FULL
-thresholds, gaps, the Cboe source option, and IV minus HV from ``price_stats@v1``."""
+"""``iv_history@v2``: rank and percentile over the window, UNKNOWN / PROVISIONAL / FULL
+thresholds, gaps and the Cboe source option (IV minus HV is an expression feature:
+``tests/unit/features/test_site.py``)."""
 
 from dataclasses import replace
 
@@ -45,7 +46,7 @@ def _write(writer: object, table: str, day: object, rows: list[dict[str, object]
     writer.write_table(table, day, f"r-{day}", stamped(rows, day, f"r-{day}"))  # type: ignore[attr-defined]
 
 
-def test_reads_a_year_of_stored_iv30_and_the_session_hv30() -> None:
+def test_reads_a_year_of_stored_iv30() -> None:
     writer, reader = store()
     days = sessions_ending(END, 70)
     for i, day in enumerate(days[5:]):  # 65 sessions, rising; a gap at days[30]
@@ -63,15 +64,8 @@ def test_reads_a_year_of_stored_iv30_and_the_session_hv30() -> None:
     )
     assert (a["history_days"], a["rank_status"]) == (64, "PROVISIONAL")
     assert (a["iv_rank_252d"], a["iv_percentile_252d"]) == (1.0, 1.0)
-    assert pd.isna(a["iv_hv_spread"])  # no price_stats@v1 stored
     assert (new["history_days"], new["rank_status"]) == (1, "UNKNOWN")
     assert pd.isna(new["iv_rank_252d"])
-    _write(
-        writer, "rollups/instrument/price_stats@v1", END, [{"instrument_id": "EQ:A", "hv30": 0.2}]
-    )
-    a = compute_one(reader, GROUP, END).frame.set_index("instrument_id").loc["EQ:A"]  # type: ignore[union-attr]
-    assert a["iv_hv_spread"] == pytest.approx(a["iv30"] - 0.2)
-    assert a["iv_hv_ratio"] == pytest.approx(a["iv30"] / 0.2)
     cboe = compute_one(reader, GROUP, END, IvHistoryParams(source="cboe")).frame
     row = cboe.set_index("instrument_id").loc["EQ:A"]  # type: ignore[union-attr]
     assert row["iv30"] == pytest.approx(0.9 - 64 / 1000) and row["iv_rank_252d"] == 0.0

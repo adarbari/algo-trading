@@ -52,9 +52,11 @@ class StoreReader:
         end: date,
         as_of: datetime | None = None,
         instruments: Sequence[str] | None = None,
+        columns: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
+        """``columns``: only these (+ ``instrument_id`` and the point-in-time columns)."""
         tables = self._backend.tables
-        return tables.read_range(table, start, end, as_of, instruments, self.own_run)
+        return tables.read_range(table, start, end, as_of, instruments, self.own_run, columns)
 
     def table_names(self) -> list[str]:
         return self._backend.tables.names(self.own_run)

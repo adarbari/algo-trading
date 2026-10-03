@@ -9,8 +9,10 @@
     algotrade-ingest bars [--date D | --from D --to D] [--force]   (needs a Massive API key)
     algotrade-ingest corporate-actions [--date D] [--from D --to D]
     algotrade-ingest chains   [--date YYYY-MM-DD] [--workers N] [--symbols SPY,AAPL]
-    algotrade-ingest rollups  [--date D | --from D --to D] [--only price_stats@v1,earnings@v1]
+    algotrade-ingest rollups  [--date D | --from D --to D] [--only price_stats@v2,earnings@v1]
                               (alias: features)
+    algotrade-ingest retire-features --group price_stats@v1 [--dry-run]
+                              (delete a superseded group's tables once its replacement covers them)
     algotrade-ingest screen   [--date YYYY-MM-DD] [--config ID] [--user U] [--export-dir out/]
     algotrade-ingest nightly  [--date YYYY-MM-DD] [--export-dir out/] [--force]
                               (no --date: catch up; a quiet no-op when up to date)

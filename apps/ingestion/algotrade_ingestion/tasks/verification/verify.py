@@ -43,9 +43,9 @@ from algotrade_ingestion.tasks.verification import checks, sample
 TASK = "verify_ibkr"
 TABLE = "verification/ibkr"
 SOURCE = "ibkr"
-PRICE_STATS = "rollups/instrument/price_stats@v1"
+PRICE_STATS = "rollups/instrument/price_stats@v2"
 IV30 = "rollups/instrument/iv30@v1"
-DIVIDENDS = "rollups/instrument/dividends@v1"
+DIVIDENDS = "rollups/instrument/div_yield@v1"  # the materialised expression feature
 TARGET_DAYS, MIN_DAYS = 30, 7  # option expiry nearest 30 calendar days, at least a week out
 MAX_EXAMPLES = 10
 
@@ -55,7 +55,7 @@ class Ours:
     """What we stored for the sample on the session."""
 
     bars: dict[str, pd.DataFrame]  # id -> date, high, low, close (split-adjusted as of session)
-    stats: pd.DataFrame | None  # price_stats@v1, indexed by instrument_id
+    stats: pd.DataFrame | None  # price_stats@v2, indexed by instrument_id
     iv30: pd.DataFrame | None
     dividends: pd.DataFrame | None
 

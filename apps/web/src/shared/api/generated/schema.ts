@@ -246,7 +246,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Catalogue */
+        /**
+         * Catalogue
+         * @description The caller's catalogue: the site's fields plus their own expression features
+         *     (``scope = "user"``; the user is ``ALGOTRADE_USER``).
+         */
         get: operations["catalogue_features_get"];
         put?: never;
         post?: never;
@@ -729,10 +733,20 @@ export interface components {
             /** Null Meaning */
             null_meaning: string;
             /**
+             * Owner
+             * @description the user who declared it (scope user)
+             */
+            owner: string | null;
+            /**
              * Range
              * @description plausible (min, max)
              */
             range: (number | null)[] | null;
+            /**
+             * Scope
+             * @description site, or user: one of the caller's own expression features
+             */
+            scope: string;
             /** Source */
             source: string;
             /** Unit */

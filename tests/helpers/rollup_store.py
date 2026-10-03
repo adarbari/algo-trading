@@ -185,6 +185,14 @@ def write_chains(
     writer.write_table("chains/underlying_quotes", session, run, stamped(quotes, session, run))
 
 
+def write_rows(
+    writer: StoreWriter, table: str, day: date, rows: Sequence[Mapping[str, object]]
+) -> None:
+    """Stored rows of a group table (e.g. a rollup's output) for one session."""
+    run = f"{table.rsplit('/', 1)[-1]}-{day}"
+    writer.write_table(table, day, run, stamped([dict(r) for r in rows], day, run))
+
+
 def features(columns: Mapping[str, str]) -> tuple[Feature, ...]:
     """Placeholder feature declarations for test groups: ``{"col": "float"}``."""
     return tuple(Feature(c, t, "text", f"test {c}", "test") for c, t in columns.items())

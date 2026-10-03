@@ -1,0 +1,37 @@
+# Expression features over price_stats (L3, reviewed via PR; ADR 0023 step 3). Each [name] is
+# one feature: a formula over stored features (group.column), other expression features (by
+# name) and its own params. Computed on read unless materialise = true. The language and the
+# keys: docs/configuration.md "Expression features". Changing a formula: bump its version.
+
+[pct_from_high_52w]
+expr = "price_stats.close / price_stats.high_52w - 1"
+dtype = "float"
+unit = "decimal"
+description = "Close / 52-week high - 1 (at or below 0)"
+null_meaning = "price_stats high_52w is null (fewer than 240 bars in the last 252 sessions), or no price_stats row"
+valid_range = [-1, 0]
+version = 1
+
+[pct_from_low_52w]
+expr = "price_stats.close / price_stats.low_52w - 1"
+dtype = "float"
+unit = "decimal"
+description = "Close / 52-week low - 1 (at or above 0)"
+null_meaning = "price_stats low_52w is null (fewer than 240 bars in the last 252 sessions), or no price_stats row"
+valid_range = [0, inf]
+version = 1
+
+[near_52w]
+kind = "label"
+expr = '''
+if(pct_from_high_52w >= -within and pct_from_low_52w <= within, "BOTH",
+   if(pct_from_high_52w >= -within, "HIGH",
+      if(pct_from_low_52w <= within, "LOW", "NONE")))
+'''
+params = { within = 0.10 }  # within 10% of the 52-week high / low
+dtype = "str"
+unit = "category"
+categories = ["HIGH", "LOW", "BOTH", "NONE"]
+description = "Where the close sits in its 52-week range: HIGH within 10% (params.within) of the high, LOW within 10% of the low, BOTH (a narrow range), else NONE"
+null_meaning = "the 52-week high or low is unknown (pct_from_high_52w or pct_from_low_52w is null)"
+version = 1

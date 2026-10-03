@@ -3,13 +3,15 @@
 from collections.abc import Mapping
 from typing import Any, Protocol
 
-KINDS = ("defaults", "strategies", "selections", "settings")
+KINDS = ("defaults", "strategies", "selections", "settings", "features")
 
 
 class ConfigStore(Protocol):
     def load(self, scope: str, kind: str, name: str) -> Mapping[str, Any] | None:
         """``scope`` is "site" or a user id; ``kind`` one of ``KINDS``. ``settings`` are site-only
-        documents read by ingestion (``universe``, later ``sources`` and ``rollups``)."""
+        documents read by ingestion (``universe``, ``sources``, ``rollups``, ...); ``features``
+        are expression-feature files (``site/features/<theme>.toml``, or a user's
+        ``users/<id>/features/<theme>.toml``)."""
         ...
 
     def names(self, scope: str, kind: str) -> list[str]: ...

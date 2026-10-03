@@ -1,8 +1,8 @@
-"""``iv_history@v1``: IV rank and percentile over a year of ``iv30@v1``, and the IV - HV spread.
+"""``iv_history@v2``: IV rank and percentile over a year of ``iv30@v1``.
 
 Inputs: ``iv30@v1`` for the session and the ``window - 1`` sessions before it (our own IV30 by
-default; ``source = "cboe"`` uses the feed's), and ``price_stats@v1`` (``hv30``) for the
-session. One row per instrument with an ``iv30@v1`` row on the session.
+default; ``source = "cboe"`` uses the feed's). One row per instrument with an ``iv30@v1`` row
+on the session.
 
     iv30                 the session's IV30 (from ``source``)
     iv_rank_252d         (iv30 - min) / (max - min) over the window's IVs, today included;
@@ -11,13 +11,15 @@ session. One row per instrument with an ``iv30@v1`` row on the session.
     history_days         sessions of the window with an IV (today included)
     rank_status          UNKNOWN (history_days < min_provisional; rank and percentile null),
                          PROVISIONAL (< window), FULL
-    iv_hv_spread         iv30 - hv30 (the variance risk premium's raw input, decimals)
-    iv_hv_ratio          iv30 / hv30
 
 Windows are exchange sessions (``core.time.calendar``); a session without an IV is a gap,
 counted out of ``history_days``, not filled. ``window`` and ``min_provisional`` are in
-``rollups.toml ["iv_history@v1"]`` (owner decision: provisional after 60 sessions, full after
+``rollups.toml ["iv_history@v2"]`` (owner decision: provisional after 60 sessions, full after
 252); the column names carry 252, so a different full window is a new version.
+
+v2 (ADR 0023 step 3) stores the floats as 32-bit and drops ``iv_hv_spread`` / ``iv_hv_ratio``
+(and with them the ``price_stats`` input): they are expression features
+(``config/site/features/volatility.toml``), computed on read.
 """
 
 from dataclasses import dataclass
@@ -31,9 +33,8 @@ from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs
 from algotrade.features.framework.feature import Feature
 
 NAME = "iv_history"
-VERSION = 1
+VERSION = 2
 IV30 = "rollups/instrument/iv30@v1"
-PRICE_STATS = "rollups/instrument/price_stats@v1"
 SOURCES = {"ours": "iv30", "cboe": "iv30_cboe"}
 
 _IV = "iv30.iv30@v1"
@@ -41,18 +42,18 @@ _UNKNOWN = "rank_status is UNKNOWN (fewer than 60 sessions with an IV), or there
 
 FEATURES = (
     Feature(
-        "iv30", "float", "decimal",
+        "iv30", "float32", "decimal",
         "The session's IV30 from iv30@v1 (ours; the feed's with source = cboe)",
         "iv30@v1 has no IV for the session (its iv30_status says why)", "expression",
         valid_range=(0, 5), inputs=(_IV, "iv30.iv30_cboe@v1"),
     ),
     Feature(
-        "iv_rank_252d", "float", "decimal",
+        "iv_rank_252d", "float32", "decimal",
         "IV rank: (iv30 - min) / (max - min) over the last 252 sessions' IVs, today included",
         f"{_UNKNOWN}; or every IV in the window is equal", valid_range=(0, 1), inputs=(_IV,),
     ),
     Feature(
-        "iv_percentile_252d", "float", "decimal",
+        "iv_percentile_252d", "float32", "decimal",
         "IV percentile: the share of the window's earlier IVs strictly below today's",
         f"{_UNKNOWN}; or no earlier IV", valid_range=(0, 1), inputs=(_IV,),
     ),
@@ -65,17 +66,6 @@ FEATURES = (
         "rank_status", "str", "category",
         "UNKNOWN below 60 sessions with an IV (no rank), PROVISIONAL below 252, FULL from 252",
         "never", "label", categories=("UNKNOWN", "PROVISIONAL", "FULL"), inputs=(_IV,),
-    ),
-    Feature(
-        "iv_hv_spread", "float", "decimal",
-        "iv30 - hv30 (price_stats@v1): the variance risk premium's raw input",
-        "iv30 or hv30 is null", "expression", valid_range=(-5, 5),
-        inputs=("iv_history.iv30@v1", "price_stats.hv30@v1"),
-    ),
-    Feature(
-        "iv_hv_ratio", "float", "ratio", "iv30 / hv30 (price_stats@v1)",
-        "iv30 or hv30 is null, or hv30 is 0", "expression", valid_range=(0, None),
-        inputs=("iv_history.iv30@v1", "price_stats.hv30@v1"),
     ),
 )  # fmt: skip
 COLUMNS = column_types(FEATURES)
@@ -134,27 +124,14 @@ def compute(inputs: Inputs, session: date, p: IvHistoryParams) -> pd.DataFrame:
         .reindex(index=days, columns=ids)
         .to_numpy(dtype=float)
     )
-    out = pd.DataFrame({"instrument_id": ids, **history(matrix, p)})
-    stats = inputs.get(PRICE_STATS)
-    hv = pd.Series(np.nan, index=ids)
-    if stats is not None:
-        today = stats[stats["session_date"] == session]
-        hv = today.set_index(today["instrument_id"].astype(str))["hv30"].astype(float).reindex(ids)
-    hv_values = hv.to_numpy(dtype=float)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        out["iv_hv_spread"] = out["iv30"].to_numpy() - hv_values
-        out["iv_hv_ratio"] = np.where(hv_values > 0, out["iv30"].to_numpy() / hv_values, np.nan)
-    return out
+    return pd.DataFrame({"instrument_id": ids, **history(matrix, p)})
 
 
 GROUP = FeatureGroup(
     NAME,
     VERSION,
-    "IV30 rank and percentile over 252 sessions (provisional after 60) and IV minus HV30",
-    (
-        Input(IV30, lookback=lambda p: p.window - 1),
-        Input(PRICE_STATS, required=False),
-    ),
+    "IV30 rank and percentile over 252 sessions (provisional after 60)",
+    (Input(IV30, lookback=lambda p: p.window - 1),),
     FEATURES,
     compute,
     IvHistoryParams(),

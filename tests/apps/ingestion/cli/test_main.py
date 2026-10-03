@@ -144,7 +144,7 @@ def test_individual_steps_and_purge(env: Path, capsys: pytest.CaptureFixture[str
     assert (code, dry["dry_run"], dry["mapped_ids"], dry["tables"]) == (0, True, 0, {})
     code, features = call(capsys, "features", "--date", DAY)  # the pre-2b.2 name, an alias
     assert (code, features["option_liquidity@v1"]["rows"]) == (0, 1)
-    assert features["price_stats@v1"]["no_input_sessions"] == [DAY]  # no bars stored
+    assert features["price_stats@v2"]["no_input_sessions"] == [DAY]  # no bars stored
     code, again = call(capsys, "run", "rollups", "--date", DAY)  # the generic form
     assert (code, again["option_liquidity@v1"]["rows"], again["status"]) == (0, 1, "complete")
     code, only = call(
@@ -155,9 +155,16 @@ def test_individual_steps_and_purge(env: Path, capsys: pytest.CaptureFixture[str
         1,
         2,
     )
-    assert "price_stats@v1" not in only
+    assert "price_stats@v2" not in only
     code, audit = call(capsys, "screen", "--date", DAY, "--export-dir", str(env / "out"))
     assert audit["coverage"] == "COMPLETE"
+    code, retire = call(capsys, "retire-features", "--group", "price_stats@v1", "--dry-run")
+    assert (code, retire["sessions"], retire["dry_run"], retire["status"]) == (
+        0,
+        0,
+        True,
+        "complete",
+    )
     code, purged = call(capsys, "purge-raw", "--keep-days", "0", "--date", "2026-10-03")
     assert (purged["raw_files_removed"], purged["staging_runs_removed"]) == (1, 0)
     assert purged["raw_files_removed_by_source"] == {"cboe_delayed": 1}

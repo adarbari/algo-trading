@@ -15,6 +15,7 @@ config/site/                        L3: reviewed via PR, versioned by git
 config/users/<user_id>/             L4: git-ignored locally; a DB behind ConfigStore later
   selections/<id>.toml
   strategies/<id>.toml
+  features/<theme>.toml             the user's expression features (always virtual)
 ```
 
 The location comes from `ALGOTRADE_CONFIG_DIR` (default `./config`) or `--config-dir`. Only
@@ -66,7 +67,8 @@ Fields come from a catalogue built from the code, so a typo or a type mismatch f
 | Field | Source table | Example |
 |---|---|---|
 | `instrument.<column>` | L1 `instruments/reference`; company columns from `instruments/company` | `instrument.security_type`, `instrument.is_leveraged`, `instrument.sector` |
-| `rollup.<name>@v<N>.<column>` | `rollups/instrument/<name>@v<N>` (each column a declared feature of the group, `features/registry.py`) | `rollup.option_liquidity@v1.put_tier`, `rollup.price_stats@v1.hv30`, `rollup.price_stats@v1.adv_usd_20d`, `rollup.earnings@v1.days_to_earnings`, `rollup.fundamentals@v1.market_cap` |
+| `rollup.<name>@v<N>.<column>` | `rollups/instrument/<name>@v<N>` (each column a declared feature of the group, `features/registry.py`) | `rollup.option_liquidity@v1.put_tier`, `rollup.price_stats@v2.hv30`, `rollup.price_stats@v2.adv_usd_20d`, `rollup.earnings@v1.days_to_earnings`, `rollup.fundamentals@v2.market_cap_status` |
+| `feature.<name>` | an expression feature (`config/site/features/*.toml`, [below](#expression-features)), computed on read from the stored features it names | `feature.liquidity_class`, `feature.near_52w`, `feature.market_cap`, `feature.iv_hv_spread` |
 
 Selectable rollup fields today ([data/layers.md](data/layers.md#rollups-as-built) has the rules;
 [data/features.md](data/features.md) gives each one's meaning, unit, valid values and when it is null):
@@ -74,14 +76,30 @@ Selectable rollup fields today ([data/layers.md](data/layers.md#rollups-as-built
 | Rollup | Fields (type) |
 |---|---|
 | `option_liquidity@v1` | `liq_status`, `put_tier`, `call_tier` (str); `short_put_ok`, `short_call_ok` (bool); `chain_oi`, `chain_volume`, `target_dte`, `expiries_within_60d` (int); `underlying_price`, `iv30`, spreads… (float); `target_expiry`, `chain_asof` (date) |
-| `price_stats@v1` | `close`, `sma_20`, `sma_50`, `sma_200`, `ret_20d`, `ret_60d`, `high_52w`, `low_52w`, `pct_from_high_52w`, `pct_from_low_52w`, `hv20`, `hv30`, `hv20_yz`, `adv_usd_20d` (float); `history_days` (int) |
+| `price_stats@v2` | `close`, `sma_20`, `sma_50`, `sma_200`, `ret_20d`, `ret_60d`, `high_52w`, `low_52w`, `hv20`, `hv30`, `hv20_yz`, `adv_usd_20d` (float32); `history_days` (int) |
 | `earnings@v1` | `next_earnings_date`, `last_earnings_date` (date); `earnings_time` (str: pre / post / unknown); `days_to_earnings` (int); `date_confirmed` (bool, null today) |
-| `dividends@v1` | `div_ttm`, `div_yield` (float); `div_count_ttm` (int); `last_ex_date` (date) |
+| `dividends@v2` | `div_ttm` (float32); `div_count_ttm` (int); `last_ex_date` (date) |
 | `iv30@v1` | `iv30`, `iv30_cboe`, `atm_strike_near`, `spot`, `rate`, `div_yield` (float); `iv30_status` (str); `near_expiry`, `far_expiry` (date); `n_quotes_used` (int) |
-| `iv_history@v1` | `iv30`, `iv_rank_252d`, `iv_percentile_252d`, `iv_hv_spread`, `iv_hv_ratio` (float); `history_days` (int); `rank_status` (str: UNKNOWN / PROVISIONAL / FULL) |
-| `liquidity_class@v1` | `liquidity_class` (str: HIGH / MEDIUM / LOW / UNKNOWN), `option_tier`, `rule_hash` (str); `adv_usd_20d`, `close` (float); `chain_oi` (int) |
+| `iv_history@v2` | `iv30`, `iv_rank_252d`, `iv_percentile_252d` (float32); `history_days` (int); `rank_status` (str: UNKNOWN / PROVISIONAL / FULL) |
+| `fundamentals@v2` | `shares_outstanding` (float32); `shares_as_of`, `shares_filed` (date); `shares_source`, `market_cap_status` (str) |
 
-A rollup with no row for an instrument, or no partition for the session, is UNKNOWN: e.g.
+Expression features (`feature.<name>`): `liquidity_class` (str: HIGH / MEDIUM / LOW /
+UNKNOWN), `option_tier` (str: A-D), `option_chain_known`, `liquidity_high`,
+`liquidity_medium` (bool), `option_chain_oi`, `option_chain_volume` (int), `div_yield`
+(float32, materialised), `market_cap`, `pct_from_high_52w`, `pct_from_low_52w`,
+`iv_hv_spread`, `iv_hv_ratio` (float), `near_52w` (str: HIGH / LOW / BOTH / NONE).
+
+**Superseded fields.** ADR 0023 step 3 replaced `price_stats@v1`, `dividends@v1`,
+`fundamentals@v1`, `iv_history@v1` and `liquidity_class@v1`. A selection naming one of their
+fields fails at load with the field that replaced it, e.g.
+`rollup.price_stats@v1.pct_from_high_52w` -> `feature.pct_from_high_52w`,
+`rollup.price_stats@v1.hv30` -> `rollup.price_stats@v2.hv30`,
+`rollup.liquidity_class@v1.liquidity_class` -> `feature.liquidity_class`,
+`rollup.liquidity_class@v1.chain_oi` -> `feature.option_chain_oi` (`rule_hash` is retired: the
+thresholds are the expression's params). Site presets reference none of them.
+
+A rollup with no row for an instrument, or no partition for the session, is UNKNOWN (so is an
+expression feature computed from it, unless its formula handles the null): e.g.
 `{ field = "rollup.earnings@v1.days_to_earnings", op = "gt", value = 5 }` never selects an
 instrument whose next earnings date is unknown.
 
@@ -175,13 +193,110 @@ alone (ADR 0019 `site-settings`); apps receive frozen dataclasses, never dicts:
 | `verification.toml` | `VerificationSettings` | the live verification vs IBKR: `[sample]` `core_symbols` (always verified), `rotating` (more per session, by a hash of the session), `option_symbols` + `options_per_symbol` (option quotes compared with our chain), `bar_sessions` (IBKR daily bars per name); `[tolerances]` `close_rel`, `range_rel`, `hv_rel`, `high_52w_rel`, `extreme_rel` (52-week low, the dividend-gap rule), `yield_abs`, `iv_abs`, `spread_band` (option mids, in half-spreads), `max_missing_sessions`, `warn_multiple` (over tolerance by at most this factor: WARN; beyond: FAIL). Defaults are the reconciliation suite's tolerances (testing.md) |
 | `universe.toml` (+ `overrides/leveraged_etfs.csv`, `overrides/figi.csv`) | `UniverseSettings` | coverage mode (`nasdaq_trader` / `csv_import`), security types, include / exclude symbols, leverage rules (markers, conventions, patterns, inverse markers, exclusions; regexes are compiled and `leverage_patterns` need a `(?P<n>...)` group); `figi_overrides` from `figi.csv` (columns `symbol`, `figi`, `note`; a composite FIGI or blank for "no FIGI, symbol id"; a malformed FIGI, an unknown column, or a symbol or FIGI listed twice fails with its line; see [instruments.md](data/instruments.md#figi-based-instrument-ids-implemented-phase-18)) |
 | `nightly.toml` | `NightlySettings` | `[sessions]` settle margin and catch-up cap, `[alerts]` nightly duration, `[notify]` notifications on/off, the desktop notification and the summary file path; `[notify.email]` the daily summary email (`enabled`, `smtp_host`, `smtp_port`, `max_examples`) |
-| `rollups.toml` | each rollup's own params dataclass (`rollup_params` / `load_rollups`) | one `["<name>@v<N>"]` section per rollup that takes parameters; each scalar field of its params dataclass (bool, int, float, str) is a key typed by its default, and the dataclass validates ranges (`price_stats@v1`: `year_sessions`, `min_year_sessions`, `periods_per_year`; `option_liquidity@v1`: DTE window, delta bands; `dividends@v1`: `min_history_days`, `include_special`; `iv30@v1`: `target_days`, `min_days`, `max_days`, `max_spread_pct`, `min_open_interest`, `min_volume`; `iv_history@v1`: `window`, `min_provisional`, `source` (`ours` / `cboe`); `liquidity_class@v1`: `high_` / `medium_` `min_adv_usd`, `min_price`, `option_tiers` (comma list, worse of put / call; `""` none), `min_chain_oi`, `min_chain_volume` (0 none)). A rollup without parameters has no section (a fitness test checks both ways) |
+| `rollups.toml` | each rollup's own params dataclass (`rollup_params` / `load_rollups`) | one `["<name>@v<N>"]` section per rollup that takes parameters; each scalar field of its params dataclass (bool, int, float, str) is a key typed by its default, and the dataclass validates ranges (`price_stats@v2`: `year_sessions`, `min_year_sessions`, `periods_per_year`; `option_liquidity@v1`: DTE window, delta bands; `dividends@v2`: `min_history_days`, `include_special`; `iv30@v1`: `target_days`, `min_days`, `max_days`, `max_spread_pct`, `min_open_interest`, `min_volume`; `iv_history@v2`: `window`, `min_provisional`, `source` (`ours` / `cboe`); `fundamentals@v2`: `stale_days`). A rollup without parameters has no section (a fitness test checks both ways) |
+| `features/<theme>.toml` | `FeatureDefinition` per `[name]` (`feature_definitions` / `load_features`) | the site's expression features ([below](#expression-features)); the formula, dtype, unit and categories are then checked against the feature catalogue (`features/expressions/definitions.py`) |
 
 A missing file or key falls back to the dataclass default. Anything else is an error that
 names the file, section and key: unknown keys (a typo is never silently ignored), wrong
 types (`enabled = "yes"`), out-of-range values (`workers = 0`, a fraction above 1, a
 negative interval) and invalid leverage-marker regexes. Every key must also drive code
 (`tests/architecture/test_ownership.py`). Credentials never go in these files.
+
+## Expression features
+
+A formula over existing features is a TOML entry, not code (ADR 0023 step 3). Each
+`config/site/features/<theme>.toml` (one per theme: `price`, `volatility`, `fundamentals`,
+`liquidity`) holds one `[name]` per feature:
+
+| Key | Meaning |
+|---|---|
+| `expr` | the formula (below); TOML multi-line strings and `#` comments are fine |
+| `dtype` | `float`, `float32`, `int`, `bool`, `str` or `date`; the formula's type must fit it |
+| `unit` | as for stored features (`decimal`, `ratio`, `usd`, `category`, `flag`, ...) |
+| `description`, `null_meaning` | what it is, and when it is null (UNKNOWN) |
+| `kind` | `expression` (default) or `label` (a status / tier / class: needs `categories`) |
+| `valid_range` | `[min, max]` (`inf` / `-inf` open): a sanity flag, values are never clipped |
+| `categories` | a label's closed set; a string the formula can produce must be in it |
+| `params` | named constants the formula uses by name (`{ within = 0.10 }`); unused ones fail |
+| `materialise` | `true`: stored as `rollups/instrument/<name>@v<version>` by the `rollups` task (needed when a group reads it, e.g. `div_yield` for `iv30@v1`); default `false`: computed on read |
+| `version` | the definition's version (default 1): bump it when the formula changes |
+
+**Language.** Literals: numbers (`10`, `0.25`, `1e6`, `100_000`), strings (`"HIGH"`),
+`true`, `false`, `null`. Names: `group.column` is a stored feature of the registered group
+version (`price_stats.hv30` is `price_stats@v2`'s), a bare name is another expression
+feature or one of the feature's `params`. Operators, lowest precedence first: `or`, `and`,
+`not`, comparisons `< <= > >= == !=` (one per term), `+ -`, `* /`, unary `-`. Functions:
+`if(cond, a, b)`, `abs`, `sqrt`, `log` (natural), `min(a, b, ...)`, `max(a, b, ...)` (numbers
+or strings), `clip(x, lo, hi)`, `coalesce(a, b, ...)`, `is_null(x)`, `one_of(x, "A", "B")`,
+`exists(group)`. Types are checked at load: arithmetic takes numbers, `and` / `or` / `not` and
+`if` conditions take bools, `==` compares like with like (never `null`: use `is_null`), and a
+string compared with a label must be one of its categories.
+
+**Nulls.** Null is UNKNOWN and propagates: `null + 1`, `null > 1` and `f(null)` are null;
+`and` / `or` are three-valued (`false and null` is false, `true or null` is true);
+`if(null, a, b)` is null; division by zero, `log` of a value <= 0, `sqrt` of a negative and
+non-finite results are null. `exists(option_liquidity)` is true when the instrument has a row
+in the group for the session, false when the group has rows that session but not for it,
+null when the group has none at all (not computed: unknown, not "absent").
+
+**Errors** name the file, the feature and the position, e.g.
+`config/site/features/price.toml [near_52w] expr, line 2 col 4: unknown name 'pct_from_hi'`.
+A cycle between expression features names its path. Formulas are parsed by our own code;
+nothing is ever passed to Python `eval`.
+
+**Reading them.** Selections use `feature.<name>`; screeners get them in `FeatureView`
+(`services.views.feature_view(..., expressions=[...])`); a series over a date range is
+`services.features.read_expressions(reader, names, start, end)`. Only the stored columns a
+formula needs are read.
+
+### User features
+
+A user declares their own expression features in `config/users/<user_id>/features/<theme>.toml`
+(ADR 0023 step 4), with the same keys and language as the site's, typed by the same loader
+(unknown keys, missing keys and secret-looking keys fail with the file and feature). Example
+(`config/users/alice/features/momentum.toml`):
+
+```toml
+[drawdown_pct]
+expr = "pct_from_high_52w * 100"   # a site feature
+dtype = "float"
+unit = "pct_points"
+description = "How far the close is below its 52-week high, in percent"
+null_meaning = "pct_from_high_52w is null"
+
+[quiet_uptrend]
+expr = "price_stats.close > price_stats.sma_200 and price_stats.hv20 < max_vol and drawdown_pct > -10"
+params = { max_vol = 0.25 }
+dtype = "bool"
+unit = "flag"
+description = "Above the 200-day average, calm, within 10% of the high"
+null_meaning = "any input is null"
+```
+
+- **Always virtual**: `materialise` is not allowed (computed on read; ask for a site feature
+  when it must be stored or read by a group).
+- **Names**: selectable as `feature.<name>` by that user only: their selections, strategy and
+  screener configs, the Explore ticker table / compare columns and `GET /features` (listed
+  with `scope = "user"` and `owner`). Another user never sees them (an unknown field there).
+  A user feature may read stored features (`group.column`), site expression features and the
+  user's own; it may **not** take a site feature's name (the error names both definitions), so
+  `feature.<name>` means the same thing for everyone who sees it. A site feature never reads a
+  user feature, so a cycle can only run through the user's own features (its path is named).
+- **Hash**: a resolved config records the definitions of the user features its selection
+  reads (and the user features those read) in its hash (`features` in `config show`), so
+  editing one re-runs the config; adding or editing a feature it does not read changes
+  nothing. Site features are versioned instead (bump `version` with the formula).
+- **Check them**: `algotrade-backtest [--user U] config validate-features` loads and type
+  checks every user feature, then prints each one's type, inputs and a sample evaluation on
+  the latest session its inputs have:
+
+```text
+alice: 2 user feature(s), all valid
+
+feature.drawdown_pct  expression float  (config/users/alice/features/momentum.toml [drawdown_pct])
+  inputs: pct_from_high_52w@v1
+  2026-10-02: 9840/10215 instruments with a value; e.g. EQ:BBG000B9XRY4=-3.1, ...
+```
 
 ## Environment
 
@@ -214,6 +329,7 @@ are restricted to `[a-z0-9_-]`, so they are safe in paths.
 
 ```bash
 algotrade-backtest [--user U] config validate|show <id>
+algotrade-backtest [--user U] config validate-features    # the user's expression features
 algotrade-backtest [--user U] backtest --config <id> --start 2024-01-02 --end 2025-12-31
 algotrade-ingest   screen --config <id> --user U [--date D] [--export-dir out/]
 algotrade-ingest   nightly        # every config with schedule = "nightly": site presets + each user's

@@ -17,9 +17,9 @@ def test_completeness_grid(client: TestClient) -> None:
     chains = cells[("chains/option_quotes", "2022-11-23")]
     assert (chains["status"], chains["present"], chains["expected"]) == ("PARTIAL", 1, 4)
     assert cells[("chains/option_quotes", "2022-11-22")]["status"] == "MISSING"
-    stats = cells[("rollups/instrument/price_stats@v1", "2022-11-23")]
+    stats = cells[("rollups/instrument/price_stats@v2", "2022-11-23")]
     assert (stats["status"], stats["expected"]) == ("COMPLETE", 4)
-    assert cells[("rollups/instrument/price_stats@v1", "2022-11-21")]["status"] == "MISSING"
+    assert cells[("rollups/instrument/price_stats@v2", "2022-11-21")]["status"] == "MISSING"
     reference = cells[("instruments/reference", "2022-11-22")]
     assert (reference["status"], reference["basis"]) == ("CARRIED", "snapshot of 2020-01-01")
     assert cells[("universe", "2022-11-22")]["status"] == "MISSING"

@@ -95,6 +95,17 @@ class FeatureGroup:
         return next(f for f in self.features if f.name == column)
 
 
+@dataclass(frozen=True)
+class Superseded:
+    """A group version replaced in ADR 0023 step 3. ``by``: the group whose stored sessions
+    must cover the old table's before it is retired (and where its columns live, unless an
+    expression feature of the same name took one); ``fields``: other moves (old column ->
+    new field; ``""``: retired without a replacement)."""
+
+    by: str
+    fields: Mapping[str, str] = field(default_factory=dict)
+
+
 def declaration_problems(group: FeatureGroup) -> list[str]:
     """Why a declaration is invalid (empty: valid)."""
     problems = []

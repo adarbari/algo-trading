@@ -1,0 +1,20 @@
+# Expression features comparing implied and realised volatility (L3; ADR 0023 step 3).
+# Language and keys: docs/configuration.md "Expression features".
+
+[iv_hv_spread]
+expr = "iv_history.iv30 - price_stats.hv30"
+dtype = "float"
+unit = "decimal"
+description = "IV30 minus HV30 (iv_history, price_stats): the variance risk premium's raw input"
+null_meaning = "iv30 or hv30 is null (no IV for the session, or a gap in the last 31 sessions)"
+valid_range = [-5, 5]
+version = 1
+
+[iv_hv_ratio]
+expr = "if(price_stats.hv30 > 0, iv_history.iv30 / price_stats.hv30, null)"
+dtype = "float"
+unit = "ratio"
+description = "IV30 / HV30 (iv_history, price_stats)"
+null_meaning = "iv30 or hv30 is null, or hv30 is 0"
+valid_range = [0, inf]
+version = 1

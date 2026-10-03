@@ -13,8 +13,10 @@ router = APIRouter(prefix="/features", tags=["features"])
 
 
 @router.get("")
-def catalogue() -> list[Feature]:
-    return [Feature.model_validate(f) for f in features.feature_catalogue()]
+def catalogue(store: Store) -> list[Feature]:
+    """The caller's catalogue: the site's fields plus their own expression features
+    (``scope = "user"``; the user is ``ALGOTRADE_USER``)."""
+    return [Feature.model_validate(f) for f in features.feature_catalogue(store)]
 
 
 @router.get("/{name}/distribution")

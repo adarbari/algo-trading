@@ -1,5 +1,6 @@
-"""``price_stats@v1`` against hand-computed values on small stored series, including split
-adjustment as of each session, missing history and gaps (null, never zero)."""
+"""``price_stats@v2`` against hand-computed values on small stored series (32-bit floats:
+``F32`` relative tolerance), including split adjustment as of each session, missing history
+and gaps (null, never zero)."""
 
 import math
 import statistics
@@ -15,6 +16,7 @@ from tests.helpers.rollup_store import END, series, store, write_bars, write_spl
 
 P = ps.PriceStatsParams()
 GROUP = ps.GROUP
+F32 = 2e-7  # float32 keeps about 7 significant digits
 
 
 def row(frame: pd.DataFrame | None, iid: str) -> dict[str, object]:
@@ -30,15 +32,13 @@ def test_full_history_by_hand() -> None:
     out = row(compute_one(reader, GROUP, END).frame, "EQ:A")
     assert out["close"] == pytest.approx(c[-1])
     for n in (20, 50, 200):
-        assert out[f"sma_{n}"] == pytest.approx(c[-n:].mean(), rel=1e-12)
+        assert out[f"sma_{n}"] == pytest.approx(c[-n:].mean(), rel=F32)
     assert out["ret_20d"] == pytest.approx(c[-1] / c[-21] - 1)
     assert out["ret_60d"] == pytest.approx(c[-1] / c[-61] - 1)
     opens = np.r_[c[0], c[:-1]]
     highs, lows = np.maximum(opens, c) * 1.01, np.minimum(opens, c) * 0.99
     assert out["high_52w"] == pytest.approx(highs[-252:].max())
     assert out["low_52w"] == pytest.approx(lows[-252:].min())
-    assert out["pct_from_high_52w"] == pytest.approx(c[-1] / highs[-252:].max() - 1)
-    assert out["pct_from_low_52w"] == pytest.approx(c[-1] / lows[-252:].min() - 1)
     for n in (20, 30):
         returns = [math.log(c[i] / c[i - 1]) for i in range(len(c) - n, len(c))]
         assert out[f"hv{n}"] == pytest.approx(statistics.stdev(returns) * math.sqrt(252))
@@ -57,7 +57,7 @@ def test_missing_history_and_gaps_are_null_not_zero() -> None:
     frame = compute_one(reader, GROUP, END).frame
     new, gap = row(frame, "EQ:NEW"), row(frame, "EQ:GAP")
     assert new["history_days"] == 30 and new["sma_20"] > 0 and new["hv20"] > 0
-    for column in ("sma_50", "sma_200", "ret_60d", "hv30", "high_52w", "pct_from_low_52w"):
+    for column in ("sma_50", "sma_200", "ret_60d", "hv30", "high_52w", "low_52w"):
         assert pd.isna(new[column]), column
     assert pd.isna(gap["sma_20"]) and pd.isna(gap["hv20"]) and pd.isna(gap["ret_20d"])
     assert gap["history_days"] == 251 and gap["high_52w"] > 0  # 251 >= min_year_sessions
@@ -96,10 +96,10 @@ def test_split_adjusted_as_of_each_session() -> None:
     assert row(before, "EQ:S") == row(before, "EQ:P")
     plain, split = row(after, "EQ:P"), row(after, "EQ:S")
     for column in ("close", "sma_20", "sma_200", "high_52w", "low_52w"):
-        assert split[column] == pytest.approx(plain[column] / 2, rel=1e-12), column
-    for column in ("ret_20d", "ret_60d", "hv20", "hv30", "hv20_yz", "pct_from_high_52w"):
-        assert split[column] == pytest.approx(plain[column], rel=1e-9), column
-    assert split["adv_usd_20d"] == pytest.approx(plain["adv_usd_20d"], rel=1e-12)
+        assert split[column] == pytest.approx(plain[column] / 2, rel=F32), column
+    for column in ("ret_20d", "ret_60d", "hv20", "hv30", "hv20_yz"):
+        assert split[column] == pytest.approx(plain[column], rel=F32), column
+    assert split["adv_usd_20d"] == pytest.approx(plain["adv_usd_20d"], rel=F32)
 
 
 def test_params_shorten_the_year_and_validate() -> None:
@@ -130,4 +130,4 @@ def test_columns_are_typed_as_declared() -> None:
     assert frame is not None
     assert list(frame.columns) == ["instrument_id", *ps.COLUMNS]
     assert str(frame["history_days"].dtype) == "int64[pyarrow]"
-    assert frame["sma_50"].dtype == np.float64
+    assert frame["sma_50"].dtype == np.float32  # v2 stores 32-bit floats

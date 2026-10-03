@@ -29,12 +29,19 @@ import shutil
 from collections.abc import Sequence
 from datetime import date, datetime
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from algotrade.storage.backends.arrow import concat, parquet_bytes, to_arrow, to_frame
+from algotrade.storage.backends.arrow import (
+    concat,
+    keep_columns,
+    parquet_bytes,
+    to_arrow,
+    to_frame,
+)
 from algotrade.storage.backends.local_index import (
     INDEX,
     Commits,
@@ -130,9 +137,11 @@ class LocalTables:
         instruments: Sequence[str] | None,
         own_run: str | None,
         upto: int,
+        columns: Sequence[str] | None = None,
     ) -> pa.Table | None:
         """The partition as a read at ``as_of`` sees it (``run_selection``), conformed.
-        ``upto``: the commit sequence the read captured before opening any index."""
+        ``upto``: the commit sequence the read captured before opening any index.
+        ``columns``: only those (and the key / point-in-time columns) are decoded."""
         directory = self._dir(table, session_date)
         filters = [("instrument_id", "in", list(instruments))] if instruments is not None else None
         for attempt in range(2):
@@ -145,7 +154,7 @@ class LocalTables:
                 return None
             try:
                 parts = [
-                    pq.read_table(directory / run_file(run, entries[run]), filters=filters)
+                    _read_file(directory / run_file(run, entries[run]), filters, columns)
                     for run in runs
                 ]
             except FileNotFoundError:
@@ -177,13 +186,15 @@ class LocalTables:
         as_of: datetime | None = None,
         instruments: Sequence[str] | None = None,
         own_run: str | None = None,
+        columns: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
         upto = self.commits.published()  # one commit sequence for the whole range
         parts = [
             data
             for d in self.dates(table, own_run)
             if start <= d <= end
-            and (data := self._partition(table, d, as_of, instruments, own_run, upto)) is not None
+            and (data := self._partition(table, d, as_of, instruments, own_run, upto, columns))
+            is not None
         ]
         if not parts:
             return None
@@ -217,6 +228,28 @@ class LocalTables:
     @staticmethod
     def _index(directory: Path) -> dict[str, RunEntry]:
         return read_index(directory)
+
+    def size(self, table: str) -> int:
+        base = self.root / table
+        return sum(p.stat().st_size for p in base.rglob("*") if p.is_file()) if base.exists() else 0
+
+    def drop(self, table: str) -> int:
+        base = self.root / table
+        days = sorted(base.glob("date=*")) if base.exists() else []
+        for day in days:
+            with held(index_lock(day)):  # no write or commit is mid-way in the partition
+                (day / INDEX).unlink(missing_ok=True)  # unindexed first: readers see nothing
+            shutil.rmtree(day)
+        shutil.rmtree(base, ignore_errors=True)
+        return len(days)
+
+
+def _read_file(path: Path, filters: list[Any] | None, columns: Sequence[str] | None) -> pa.Table:
+    if columns is None:
+        return pq.read_table(path, filters=filters)
+    keep = keep_columns(columns)
+    present = [c for c in pq.read_schema(path).names if c in keep]
+    return pq.read_table(path, filters=filters, columns=present)
 
 
 class LocalRaw:

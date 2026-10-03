@@ -1,8 +1,10 @@
+from collections.abc import Callable
+
 import pytest
 from fastapi.testclient import TestClient
 
-HV20 = "rollup.price_stats@v1.hv20"
-CLOSE = "rollup.price_stats@v1.close"
+HV20 = "rollup.price_stats@v2.hv20"
+CLOSE = "rollup.price_stats@v2.close"
 
 
 def test_ticker_table_with_requested_columns(client: TestClient) -> None:
@@ -15,6 +17,33 @@ def test_ticker_table_with_requested_columns(client: TestClient) -> None:
     assert rows[0][HV20] == pytest.approx(0.22)
     assert set(rows[0]) == {"instrument_id", "symbol", "company_name", "security_type",
                             HV20, "instrument.sector"}  # fmt: skip
+
+
+def test_ticker_table_with_expression_features(client: TestClient) -> None:
+    params = {"columns": "feature.liquidity_class", "sort": "feature.liquidity_class"}
+    rows = client.get("/explore/tickers", params=params).json()["page"]["items"]
+    assert [(r["symbol"], r["feature.liquidity_class"]) for r in rows] == [
+        ("AAA", "HIGH"), ("BULL", "HIGH"), ("CCC", "LOW"), ("BBB", "MEDIUM"),
+    ]  # fmt: skip
+    tiers = {"ids": "AAA,CCC", "features": "feature.option_tier"}
+    compare = client.get("/explore/compare", params=tiers)
+    assert compare.json()["rows"][0]["values"] == {"EQ:AAA": "A", "EQ:CCC": "D"}
+
+
+def test_ticker_table_and_compare_take_the_users_features(
+    user_client: Callable[[str], TestClient],
+) -> None:
+    params = {"columns": "feature.hv20_pct", "sort": "-feature.hv20_pct"}
+    rows = user_client("alice").get("/explore/tickers", params=params).json()["page"]["items"]
+    assert [(r["symbol"], r["feature.hv20_pct"]) for r in rows] == [
+        ("BULL", pytest.approx(22.0)), ("BBB", pytest.approx(21.0)),
+        ("AAA", pytest.approx(20.0)), ("CCC", None),
+    ]  # fmt: skip
+    compare = {"ids": "AAA", "features": "feature.hv20_pct"}
+    body = user_client("alice").get("/explore/compare", params=compare).json()
+    assert body["rows"][0]["values"]["EQ:AAA"] == pytest.approx(20.0)
+    assert user_client("bob").get("/explore/tickers", params=params).status_code == 400
+    assert user_client("bob").get("/explore/compare", params=compare).status_code == 400
 
 
 def test_ticker_table_filters_pages_and_defaults(client: TestClient) -> None:

@@ -1,10 +1,13 @@
 """TOML config files. Layout under the config root (``ALGOTRADE_CONFIG_DIR``, default ./config)::
 
 site/defaults.toml                         L3 defaults (screening, backtest)
+site/<name>.toml                           L3 site settings (kind ``settings``)
+site/features/<theme>.toml                 L3 expression features (kind ``features``)
 site/presets/strategies/<id>.toml          L3 shared strategy / screener configs
 site/presets/selections/<id>.toml          L3 shared selections
 users/<user>/strategies/<id>.toml          L4 (git-ignored locally)
 users/<user>/selections/<id>.toml
+users/<user>/features/<theme>.toml         L4 expression features (always virtual)
 """
 
 import csv
@@ -32,6 +35,8 @@ class FileConfigStore:
                 return self.root / SITE / "defaults.toml"
             if kind == "settings":
                 return self.root / SITE / f"{validate_id(kind, name)}.toml"
+            if kind == "features":
+                return self.root / SITE / "features" / f"{validate_id(kind, name)}.toml"
             return self.root / SITE / "presets" / kind / f"{validate_id(kind, name)}.toml"
         user = validate_id("user", scope)
         return self.root / "users" / user / kind / f"{validate_id(kind, name)}.toml"

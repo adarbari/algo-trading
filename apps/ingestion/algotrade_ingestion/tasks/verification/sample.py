@@ -3,7 +3,7 @@
 1. ``core_symbols`` (``verification.toml``): always, in that order;
 2. every instrument with a split, a dividend, a symbol change or a name / id change whose
    event date is the session (where a stored value is most likely to break);
-3. ``rotating`` more, chosen from the instruments with a ``price_stats@v1`` row that session
+3. ``rotating`` more, chosen from the instruments with a ``price_stats@v2`` row that session
    by a hash of (session, instrument id): the same session always picks the same names, and
    over many sessions every name gets its turn.
 
