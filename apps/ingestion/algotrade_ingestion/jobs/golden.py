@@ -18,21 +18,27 @@ from algotrade.core.instruments import AssetClass, instrument_id
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.common import stamp
+from algotrade_ingestion.sources.base import FetchRequest
 from algotrade_ingestion.sources.synthetic.files import GoldenFiles
+from algotrade_ingestion.sources.synthetic.source import BARS_TABLE, GoldenCsvSource
 
 JOB = "golden_load"
-SOURCE = "synthetic"
+SOURCE = GoldenCsvSource.name
 CATALOG = "catalog/golden_datasets"
 
 
 def _collect(files: GoldenFiles) -> tuple[pd.DataFrame, pd.DataFrame]:
+    source = GoldenCsvSource(files)
     bars, catalog = [], []
     for ds in files.manifest().values():
         for symbol in ds.symbols:
             iid = instrument_id(AssetClass.EQUITY, symbol)
-            frame = files.read(ds.name, symbol)
-            frame.insert(0, "instrument_id", iid)
-            bars.append(frame)
+            request = FetchRequest(f"{ds.name}/{symbol}", iid)
+            payload = source.fetch(request)
+            normalized = source.normalize(request, payload) if payload is not None else None
+            if normalized is None:
+                raise ValueError(f"golden file missing or empty: {request.key}")
+            bars.append(normalized.tables[BARS_TABLE])
             catalog.append({"instrument_id": iid, "symbol": symbol, "dataset": ds.name,
                             "description": ds.description, "tags": ",".join(ds.tags)})  # fmt: skip
     return pd.concat(bars, ignore_index=True), pd.DataFrame(catalog)

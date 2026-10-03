@@ -16,7 +16,7 @@ from algotrade_ingestion.jobs.option_chains import (
     Underlying,
     ingest_option_chains,
 )
-from algotrade_ingestion.sources.cboe import CboeOptionsSource
+from algotrade_ingestion.sources.base import Source
 
 NIGHTLY_SCREENERS = ("short_premium_liquidity",)
 
@@ -37,7 +37,7 @@ def universe_underlyings(reader: StoreReader, session_date: date) -> list[Underl
 def run_nightly(
     reader: StoreReader,
     writer: StoreWriter,
-    source: CboeOptionsSource,
+    source: Source,
     session_date: date,
     export_dir: Path | None = None,
     config: ChainJobConfig | None = None,

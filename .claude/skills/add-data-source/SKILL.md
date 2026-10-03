@@ -10,9 +10,12 @@ Read first: `docs/data/vendors.md`, `docs/data/storage.md`, ADRs 0005, 0006, 000
 1. **Location:** `apps/ingestion/sources/<vendor>.py`, one module per vendor. If it grows past
    about 300 lines, split it into a package (`client.py`, `mapping.py`, `limits.py`). Nothing
    outside `apps/ingestion` may import it.
-2. **Implement the source interface:** `fetch(dataset, instruments, period) -> RawBatch` and
-   `normalize(RawBatch) -> canonical frames` for the grain(s) it supplies. Map vendor symbols
-   to `instrument_id` via the reference store; never key data by raw ticker.
+2. **Implement `sources/base.py` `Source`:** `name`, `dataset`, `fetch(FetchRequest) -> bytes | None`
+   (raw, exactly as received; `None` only for a genuine "nothing there", never for errors)
+   and `normalize(FetchRequest, bytes) -> Normalized | None` (canonical frames keyed by
+   storage table, without point-in-time columns). Map vendor symbols to `instrument_id`
+   via the reference store; never key data by raw ticker. Register the adapter in
+   `tests/apps/ingestion/test_source_contract.py::ADAPTERS` with a canned payload.
 3. **Save raw first:** store the response as received under `raw/` before normalising.
    Normalisation must be re-runnable from raw alone.
 4. **Limits:** add a rate limiter matching the vendor's documented limits (IBKR: at most

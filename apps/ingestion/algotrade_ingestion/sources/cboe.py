@@ -21,11 +21,14 @@ import pandas as pd
 
 from algotrade.core.instruments import AssetClass, instrument_id
 from algotrade.core.options import is_standard_root, parse_osi
+from algotrade_ingestion.sources.base import FetchRequest, Normalized
 from algotrade_ingestion.sources.http import RetryPolicy, Sleep, Transport, get_with_retry
 
 SOURCE = "cboe_delayed"
 DATASET = "option_chain"
 URL = "https://cdn-api.cboe.com/api/global/delayed_quotes/options/{symbol}.json"
+UNDERLYINGS_TABLE = "chains/underlying_quotes"
+OPTIONS_TABLE = "chains/option_quotes"
 _QUOTE_FIELDS = (
     "bid",
     "ask",
@@ -53,6 +56,11 @@ class ParsedChain:
 
 
 class CboeOptionsSource:
+    """Implements ``sources.base.Source``. Request key = Cboe symbol (``_SPX`` for indexes)."""
+
+    name = SOURCE
+    dataset = DATASET
+
     def __init__(
         self, transport: Transport, sleep: Sleep, policy: RetryPolicy | None = None
     ) -> None:
@@ -60,8 +68,21 @@ class CboeOptionsSource:
         self._sleep = sleep
         self._policy = policy or RetryPolicy()
 
-    def fetch(self, symbol: str) -> bytes | None:
-        return get_with_retry(self._transport, URL.format(symbol=symbol), self._policy, self._sleep)
+    def fetch(self, request: FetchRequest) -> bytes | None:
+        url = URL.format(symbol=request.key)
+        return get_with_retry(self._transport, url, self._policy, self._sleep)
+
+    def normalize(self, request: FetchRequest, payload: bytes) -> Normalized | None:
+        if request.instrument_id is None:
+            raise ValueError("Cboe requests need the underlying's instrument_id")
+        parsed = parse_chain(request.key, request.instrument_id, payload)
+        if parsed is None:
+            return None
+        return Normalized(
+            session_date=parsed.session_date,
+            tables={UNDERLYINGS_TABLE: parsed.underlying, OPTIONS_TABLE: parsed.options},
+            notes={"nonstandard_series": parsed.nonstandard_series},
+        )
 
 
 def _float(value: Any) -> float | None:

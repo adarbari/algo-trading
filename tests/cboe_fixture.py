@@ -6,7 +6,7 @@ Field names match the real feed as observed on 2026-10-02.
 import json
 import math
 from collections.abc import Sequence
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 SESSION = date(2026, 10, 2)
 # Oct-16 (monthly, 14 DTE), Oct-23 weekly, Nov-20 (monthly, 49 DTE), Nov-06 weekly (35 DTE)
@@ -123,3 +123,6 @@ def payload(
         },
     }
     return json.dumps(doc).encode()
+
+
+CLOCK_TS = datetime(2026, 10, 2, 22, 0, tzinfo=UTC)
