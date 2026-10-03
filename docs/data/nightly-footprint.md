@@ -20,6 +20,7 @@ There are four areas, and only the backend (`storage/backends/`) knows these pat
 | Staging | `staging/<run_id>/<table>/<key>.parquet` | per-ticker Parquet pieces of the chain job | cleared when the run completes; unfinished runs purged after `staging_retention_days` (14) |
 | Run records | `runs/<run_id>.json` | JSON: job, status, per-item statuses, stats | forever (the audit trail every row's `run_id` points to) |
 
+Equity and ETF ids are `EQ:<composite FIGI>` when known, else `EQ:<symbol>` (ADR 0018).
 Every table row also carries `session_date`, `knowledge_ts`, `source` and `run_id`
 (ADR 0007). Re-running a session adds another `run=` file beside the first one and does not
 replace it. Readers take the latest run, and the earlier file stays as history.
@@ -34,7 +35,8 @@ features → screens → quality → purge.
 | universe build | `instruments/reference` | every listed security, plus carried-forward delistings (full snapshot) | ~13.3k, grows with delistings | ~1 MB *est.* | `symbol`, `name`, `exchange`, `security_type`, `security_type_source`, `is_etf`, `is_test_issue`, `optionable`, `in_sp500`, `status`, `first_seen`, `delisted_on`, `figi`, `share_class_figi`, `cik`, `is_leveraged`, `is_inverse`, `leverage`, `tracks`, `leverage_source`, `multiplier`, `tick_size`, `currency` |
 | | `universe` | a covered instrument (full snapshot) | ~10–11k *est.* | ~0.3 MB *est.* | `symbol`, `company_name`, `security_type`, `asset_class`, `exchange`, `status`, `optionable`, `universe_version`, `last_verified` |
 | | `instruments/symbol_history` | a FIGI × symbol validity interval (full history every night) | ~11k, grows slowly | ~0.5 MB *est.* | `figi`, `symbol`, `valid_from`, `valid_to` |
-| | `events/reference_change` | an add / remove / rename / type, optionable, exchange or ticker change | usually 0–50 | tiny; skipped when empty | `change`, `old`, `new`, `ts` |
+| | `instruments/id_map` | a symbol id → FIGI id upgrade (cumulative, full map every night; ADR 0018) | grows as instruments gain FIGIs | tiny | `old_id`, `new_id`, `symbol`, `effective`, `known_at` |
+| | `events/reference_change` | an add / remove / rename / type, optionable, exchange, ticker or id change | usually 0–50 | tiny; skipped when empty | `change`, `old`, `new`, `ts` |
 | | `events/index_change` | an S&P 500 add or remove | usually 0 | tiny; skipped when empty | `change`, `old`, `new`, `ts` |
 | company details | `instruments/company` | an instrument with a known company (full snapshot) | ~6–8k *est.* | ~1 MB *est.* | `cik`, `name`, `entity_type`, `sic`, `sic_description`, `sector`, `industry`, `state_of_incorporation`, `fiscal_year_end`, `website`, `fetched_on`, … |
 | earnings | `events/earnings` | a company × report date in the next 60 days | a few thousand *est.* | ~0.2 MB *est.* | `earnings_date`, `time`, `fiscal_quarter`, `eps_forecast`, `estimates`, `eps_reported`, `surprise_pct` |
@@ -47,7 +49,7 @@ features → screens → quality → purge.
 | screens | `results/<screener>` | an instrument the screener evaluated | up to ~4.2k per screener | small | defined by the screener |
 
 **About 60 MB of tables per night, which is about 15 GB a year** (252 sessions). Option quotes
-are over 90% of that. Reference, universe, symbol history and company are full snapshots every
+are over 90% of that. Reference, universe, symbol history, id map and company are full snapshots every
 night, so they repeat mostly unchanged rows. That costs about 3 MB a night (under 1 GB a year)
 and keeps "as of D" reads to one file each.
 

@@ -88,6 +88,8 @@ def test_individual_steps_and_purge(env: Path, capsys: pytest.CaptureFixture[str
     call(capsys, "universe", "--stocks", str(env / "stocks.csv"), "--version", "v", "--date", DAY)
     code, chains = call(capsys, "chains", "--date", DAY, "--symbols", "aapl")
     assert (code, chains["universe"], chains["status"]) == (0, 1, "complete")
+    code, dry = call(capsys, "migrate-ids", "--dry-run")
+    assert (code, dry["dry_run"], dry["mapped_ids"], dry["tables"]) == (0, True, 0, {})
     code, features = call(capsys, "features", "--date", DAY)
     assert features["liq_status"] == {"OK": 1}
     code, audit = call(capsys, "screen", "--date", DAY, "--export-dir", str(env / "out"))

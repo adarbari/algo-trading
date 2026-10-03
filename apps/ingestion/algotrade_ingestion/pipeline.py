@@ -91,7 +91,9 @@ def run_nightly(
         company = ingest_company_details(writer, reader, company_sources, session_date)
     earnings = None
     if earnings_source is not None:
-        earnings = ingest_earnings(writer, earnings_source, session_date, days=s.earnings_days)
+        earnings = ingest_earnings(
+            writer, reader, earnings_source, session_date, days=s.earnings_days
+        )
     bars = ingest_daily_bars(writer, reader, bars_source, [session_date]) if bars_source else None
     actions = None
     if actions_source is not None:
@@ -99,7 +101,7 @@ def run_nightly(
             session_date + timedelta(s.actions_window[0]),
             session_date + timedelta(s.actions_window[1]),
         )
-        actions = ingest_corporate_actions(writer, actions_source, session_date, *window)
+        actions = ingest_corporate_actions(writer, reader, actions_source, session_date, *window)
     chains = ingest_option_chains(
         writer, source, universe_underlyings(reader, session_date), session_date, chain_config
     )

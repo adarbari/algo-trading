@@ -12,6 +12,7 @@
     algotrade-ingest screen   [--date YYYY-MM-DD] [--config ID] [--user U] [--export-dir out/]
     algotrade-ingest nightly  [--date YYYY-MM-DD] [--export-dir out/]
     algotrade-ingest purge-raw --keep-days 90 [--staging-keep-days 14]
+    algotrade-ingest migrate-ids [--dry-run]   (symbol ids -> FIGI ids, append-only)
     algotrade-ingest golden build|verify|load [--golden-dir datasets/golden]
 
 Storage location comes from ALGOTRADE_DATA_URL (default file://./var/data).
@@ -37,6 +38,7 @@ from algotrade_ingestion.commands import (
     corporate_actions,
     earnings,
     golden,
+    migrate_ids,
     print_json,
     quality,
     report,
@@ -126,6 +128,8 @@ def _parser() -> argparse.ArgumentParser:
     )
     g.add_argument("action", choices=["build", "verify", "load"])
     g.add_argument("--golden-dir", type=Path, default=Path("datasets/golden"))
+    mi = sub.add_parser("migrate-ids", help="rewrite stored ids per instruments/id_map (new runs)")
+    mi.add_argument("--dry-run", action="store_true", help="count what would change; write nothing")
     r = sub.add_parser(
         "purge-raw", help="delete raw vendor responses and unfinished-run scratch older than N days"
     )
@@ -162,6 +166,8 @@ def _dispatch(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter
         return golden(args, writer)
     if args.command == "schedule":
         return write_schedule(args)
+    if args.command == "migrate-ids":
+        return migrate_ids(args, reader, writer)
     session = args.date if getattr(args, "date", None) else last_session(datetime.now(UTC))
     direct = {
         "universe-build": universe_build,
@@ -184,12 +190,14 @@ def _pipeline_command(
         files = [UniverseFile(args.stocks, "STOCK")] + (
             [UniverseFile(args.etfs, "ETF")] if args.etfs else []
         )
-        print_json(import_universe(writer, files, args.version, session, datetime.now(UTC)).stats)
+        record = import_universe(writer, reader, files, args.version, session, datetime.now(UTC))
+        print_json(record.stats)
     elif args.command == "chains":
         underlyings = universe_underlyings(reader, session)
         if args.symbols:
-            wanted = {s.strip().upper() for s in args.symbols.split(",")}
-            underlyings = [u for u in underlyings if u.symbol in wanted]
+            symbols = [s for s in args.symbols.split(",") if s.strip()]
+            wanted = set(reader.resolver(session).ids_for(symbols).values())
+            underlyings = [u for u in underlyings if u.instrument_id in wanted]
         run = ingest_option_chains(
             writer, cboe_source(), underlyings, session, ChainJobConfig(args.workers)
         )

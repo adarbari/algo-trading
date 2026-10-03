@@ -8,8 +8,8 @@ reuse. Each universe build carries the history forward:
 - FIGI no longer listed       -> close its row
 - new FIGI                    -> open a row
 
-This is the groundwork for FIGI-based instrument ids (roadmap); today instrument ids are
-still ``EQ:<symbol>``.
+``instrument_id`` is the instrument's id in the reference (``EQ:<FIGI>``, ADR 0018); rows of
+FIGIs no longer listed keep the id they had.
 """
 
 from datetime import date
@@ -25,6 +25,7 @@ def update_history(
     """-> (full history as of ``session``, ``ticker_changed`` reference-change rows)."""
     active = reference[reference["status"].eq("ACTIVE") & reference["figi"].notna()]
     current = dict(zip(active["figi"], active["symbol"], strict=True))
+    ids = dict(zip(active["figi"], active["instrument_id"], strict=True))
     rows: list[dict[str, object]] = []
     changes: list[dict[str, object]] = []
     seen: set[str] = set()
@@ -32,6 +33,7 @@ def update_history(
         for r in previous.to_dict("records"):
             row = {c: r.get(c) for c in COLUMNS}
             figi = str(row["figi"])
+            row["instrument_id"] = ids.get(figi, row["instrument_id"])
             still_open = row["valid_to"] is None or pd.isna(row["valid_to"])
             if still_open:
                 seen.add(figi)
@@ -41,25 +43,27 @@ def update_history(
                     if symbol is not None:
                         changes.append(
                             {
-                                "instrument_id": f"EQ:{symbol}",
+                                "instrument_id": ids[figi],
                                 "symbol": symbol,
                                 "change": "ticker_changed",
                                 "old": row["symbol"],
                                 "new": symbol,
                             }
                         )
-                        rows.append(_open(figi, symbol, session))
+                        rows.append(_open(ids[figi], figi, symbol, session))
             rows.append(row)
     rows.extend(
-        _open(figi, symbol, session) for figi, symbol in current.items() if figi not in seen
+        _open(ids[figi], figi, symbol, session)
+        for figi, symbol in current.items()
+        if figi not in seen
     )
     history = pd.DataFrame(rows, columns=COLUMNS)
     return history.sort_values(["figi", "valid_from"]).reset_index(drop=True), changes
 
 
-def _open(figi: str, symbol: str, session: date) -> dict[str, object]:
+def _open(instrument: str, figi: str, symbol: str, session: date) -> dict[str, object]:
     return {
-        "instrument_id": f"EQ:{symbol}",
+        "instrument_id": instrument,
         "ts": pd.Timestamp(session, tz="UTC"),
         "figi": figi,
         "symbol": symbol,

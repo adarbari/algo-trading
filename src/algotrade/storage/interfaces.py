@@ -40,6 +40,10 @@ class TableStore(Protocol):
 
     def dates(self, table: str) -> list[date]: ...
 
+    def names(self) -> list[str]:
+        """Every table with at least one partition, sorted."""
+        ...
+
 
 class RawStore(Protocol):
     """Vendor responses exactly as received (ADR 0006), kept for a retention window."""

@@ -46,6 +46,9 @@ class MemoryTables:
     def dates(self, table: str) -> list[date]:
         return sorted(d for (t, d) in self._data if t == table)
 
+    def names(self) -> list[str]:
+        return sorted({t for (t, _) in self._data})
+
 
 class MemoryRaw:
     def __init__(self) -> None:

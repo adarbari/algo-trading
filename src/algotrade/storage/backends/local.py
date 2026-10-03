@@ -107,6 +107,13 @@ class LocalTables:
             if p.name.startswith("date=") and (p / _INDEX).exists()
         )
 
+    def names(self) -> list[str]:
+        if not self.root.exists():
+            return []
+        found = {p.parent.parent.relative_to(self.root).as_posix()
+                 for p in self.root.glob(f"**/date=*/{_INDEX}")}  # fmt: skip
+        return sorted(found)
+
     @staticmethod
     def _index(directory: Path) -> dict[str, str]:
         path = directory / _INDEX

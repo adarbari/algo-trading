@@ -9,6 +9,7 @@ from algotrade_ingestion.sources.base import FetchRequest
 from algotrade_ingestion.sources.http import HttpError, RetryPolicy
 from algotrade_ingestion.sources.nasdaq_earnings import NasdaqEarningsSource, parse_calendar
 from tests.earnings_fixture import calendar
+from tests.storage_helpers import write_reference
 
 DAY = date(2026, 10, 2)  # a Friday
 CLOCK = lambda: datetime(2026, 10, 2, 22, tzinfo=UTC)  # noqa: E731
@@ -22,7 +23,7 @@ def test_parse_forecast_and_reported_rows() -> None:
         ),
     )
     assert list(upcoming["time"]) == ["after_hours", "pre_market", "unknown"]
-    assert list(upcoming["instrument_id"]) == ["EQ:AAPL", "EQ:MSFT", "EQ:ODD"]
+    assert list(upcoming["symbol"]) == ["AAPL", "MSFT", "ODD"]  # the job resolves ids
     assert upcoming["eps_forecast"].tolist() == [1.2, 1.2, 1.2]
     assert not upcoming["reported"].any()
     past = parse_calendar(DAY, calendar([("LOSS", "time-pre-market")], reported=True))
@@ -64,18 +65,25 @@ def test_job_writes_snapshot_and_reports_failed_dates() -> None:
         return calendar([])
 
     backend = MemoryBackend()
+    write_reference(StoreWriter(backend), DAY, {"AAPL": "EQ:BBG000B9XRY4"})
     source = NasdaqEarningsSource(transport, lambda s: None, RetryPolicy(tries=1))
-    record = ingest_earnings(StoreWriter(backend), source, DAY, days=5, clock=CLOCK)
+    reader = StoreReader(backend)
+    record = ingest_earnings(StoreWriter(backend), reader, source, DAY, days=5, clock=CLOCK)
     assert record.status is RunStatus.PARTIAL
     assert record.stats["dates_failed"][0].startswith("2026-10-06")
     assert (record.stats["rows"], record.stats["companies"]) == (2, 2)
     events = StoreReader(backend).table("events/earnings", DAY)  # the run's session partition
     assert events is not None
     assert set(events["earnings_date"]) == {date(2026, 10, 5)}
+    assert set(events["instrument_id"]) == {"EQ:BBG000B9XRY4", "EQ:MSFT"}  # MSFT: no reference
+    assert record.stats["unresolved"] == 1
     assert backend.raw.get("nasdaq_earnings", "earnings_calendar", DAY, record.run_id, "2026-10-05")
 
 
 def test_quiet_window_is_complete_with_no_rows() -> None:
     source = NasdaqEarningsSource(lambda url: calendar([]), lambda s: None, RetryPolicy(tries=1))
-    record = ingest_earnings(StoreWriter(MemoryBackend()), source, DAY, days=2, clock=CLOCK)
+    backend = MemoryBackend()
+    record = ingest_earnings(
+        StoreWriter(backend), StoreReader(backend), source, DAY, days=2, clock=CLOCK
+    )
     assert (record.status, record.stats["rows"]) == (RunStatus.COMPLETE, 0)

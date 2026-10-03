@@ -28,6 +28,7 @@ algotrade-ingest nightly --export-dir out/      # universe -> company details ->
 algotrade-ingest quality                        # data-quality checks for a session
 algotrade-ingest schedule --time 23:30          # writes a launchd agent; prints install commands
 algotrade-ingest purge-raw --keep-days 90       # + unfinished-run scratch older than 14 days
+algotrade-ingest migrate-ids [--dry-run]        # symbol ids -> FIGI ids per instruments/id_map (new runs, ADR 0018)
 ```
 
 Source switches, pacing, retention and quality thresholds live in
