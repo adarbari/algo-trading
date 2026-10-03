@@ -14,7 +14,55 @@ exclude_test_issues = true
 include_symbols = []
 exclude_symbols = []
 
-# Name markers that make an ETF a leverage/inverse *candidate* (UNKNOWN until it is curated in
-# overrides/leveraged_etfs.csv). ETFs without any marker are treated as unleveraged.
+# Leverage of an ETF (docs/data/instruments.md "Flagging leveraged and inverse ETFs"), in order:
+#   1. a curated row in overrides/leveraged_etfs.csv            -> leverage_source "override"
+#   2. the leverage the name states (leverage_conventions, then
+#      leverage_patterns; sign from a minus or inverse_markers)  -> "name_parsed"
+#   3. no leverage_markers left once leverage_exclusions phrases
+#      are blanked out                                          -> unleveraged, "name_rule"
+#   4. anything else                                            -> UNKNOWN, "needs_review"
+#      (listed in the review file; curate it in the overrides file)
+# Every pattern is a regular expression matched case-insensitively against the name.
+
+# Words that make an ETF a leverage / inverse candidate. An ETF without any is unleveraged.
 leverage_markers = ['\b-?\d(\.\d)?x\b', '\bultra', '\bbull\b', '\bbear\b', '\binverse\b',
                     '\bshort\b', '\bleveraged\b', '\bdaily\b']
+
+# Fund-family conventions with a fixed leverage; first match wins (UltraPro Short before UltraPro).
+leverage_conventions = [
+    { pattern = '^(ProShares\s+)?UltraPro\s+Short\b', leverage = -3 },  # UltraPro Short Dow30
+    { pattern = '^(ProShares\s+)?UltraPro\b', leverage = 3 },            # ProShares UltraPro QQQ
+    { pattern = '^ProShares\s+UltraShort\b', leverage = -2 },            # ProShares UltraShort Gold
+    { pattern = '^ProShares\s+Ultra\b', leverage = 2 },                  # ProShares Ultra Silver
+    { pattern = '^ProShares\s+Short\b', leverage = -1 },                 # ProShares Short Dow30
+]
+
+# A stated multiple: the named group `n` is the number, next to a direction word or "Daily".
+leverage_patterns = [
+    '(?<![\w.])(?P<n>-?\d(?:\.\d+)?)x\s+(long|short|bull|bear|inverse|leveraged|daily|target)\b',  # "2X Short", "3x Leveraged", "2x Daily"
+    '\b(long|short|bull|bear|inverse|leveraged|daily|target)\s+(?<![\w.])(?P<n>-?\d(?:\.\d+)?)x\b',  # "Bull 3X", "Daily 2X", "Daily Target 2X"
+    '^(?<![\w.])(?P<n>-?\d(?:\.\d+)?)x\s',  # "2x Bitcoin ETF"
+    '(?<![\w.])(?P<n>-?\d(?:\.\d+)?)x\s+ET[FN]s?$',  # "Volatility Shares Trust XRP 2X ETF"
+    '(?<![\w.])(?P<n>-?\d(?:\.\d+)?)\s+(inverse\s+)?leveraged\b',  # "-3 Inverse Leveraged ETNs"
+]
+# A parsed multiple is negative when the name (exclusion phrases blanked) has one of these.
+inverse_markers = ['\bshort\b', '\bbear\b', '\binverse\b']
+
+# Phrases that use a marker word without meaning leverage (bond maturities, buffers, option
+# income, long/short equity). A name with a marker left after blanking them still needs review,
+# e.g. "Inverse VIX Short-Term Futures ETNs" or "YieldMax Short TSLA Option Income Strategy".
+leverage_exclusions = [
+    '\b(ultra[- ]?)?short[- ](term|duration|maturity|horizon)\b',
+    '\bultra[- ]?short\s+(bond|income|treasury|t-bill|muni\w*|fixed|government|investment|tax)',
+    '\bshort\s+(muni\w*|high yield muni|bond|treasury)',
+    '\b(ultra\s+)?buffer\b',
+    '\b(daily\s+)?putwrite\b',
+    '\b(ultra\s+)?option income\b',
+    '\bcovered call\b',
+    '\bpremium income\b',
+    '\bdaily income\b',
+    '\blong[/ -]short\b',
+    '\bleveraged loans?\b',
+    '\bultra dividend\b',
+    '\bultra[- ]small\b',
+]

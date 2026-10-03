@@ -24,8 +24,10 @@ from algotrade.core.model.errors import ConfigurationError
 
 type DocumentLoader = Callable[[str, str, str], Mapping[str, Any] | None]
 
-# A leveraged / inverse ETF always says so in its name. Absence of these markers is what lets
-# a plain ETF be marked not leveraged; presence without a curated override means UNKNOWN.
+# Leverage rules (docs/data/instruments.md "Flagging leveraged and inverse ETFs"); every
+# pattern is matched case-insensitively against the security name. A leveraged / inverse ETF
+# always says so in its name: absence of these markers is what lets a plain ETF be marked not
+# leveraged; presence without a curated override, a parsed leverage or an exclusion means UNKNOWN.
 DEFAULT_LEVERAGE_MARKERS = (
     r"\b-?\d(\.\d)?x\b",
     r"\bultra",
@@ -35,6 +37,43 @@ DEFAULT_LEVERAGE_MARKERS = (
     r"\bshort\b",
     r"\bleveraged\b",
     r"\bdaily\b",
+)
+# Fund-family naming conventions with a fixed leverage; the first match wins.
+DEFAULT_LEVERAGE_CONVENTIONS: tuple[tuple[str, float], ...] = (
+    (r"^(ProShares\s+)?UltraPro\s+Short\b", -3.0),
+    (r"^(ProShares\s+)?UltraPro\b", 3.0),
+    (r"^ProShares\s+UltraShort\b", -2.0),
+    (r"^ProShares\s+Ultra\b", 2.0),
+    (r"^ProShares\s+Short\b", -1.0),
+)
+# A stated multiple: group ``n`` is the number; the sign comes from a minus or an inverse marker.
+_N = r"(?<![\w.])(?P<n>-?\d(?:\.\d+)?)"
+_WORDS = r"(long|short|bull|bear|inverse|leveraged|daily|target)"
+DEFAULT_LEVERAGE_PATTERNS = (
+    rf"{_N}x\s+{_WORDS}\b",  # "2X Short", "3x Leveraged", "2x Daily"
+    rf"\b{_WORDS}\s+{_N}x\b",  # "Bull 3X", "Daily 2X", "Daily Target 2X"
+    rf"^{_N}x\s",  # "2x Bitcoin ETF"
+    rf"{_N}x\s+ET[FN]s?$",  # "XRP 2X ETF"
+    rf"{_N}\s+(inverse\s+)?leveraged\b",  # "-3 Inverse Leveraged ETNs"
+)
+DEFAULT_INVERSE_MARKERS = (r"\bshort\b", r"\bbear\b", r"\binverse\b")
+# Phrases that use a marker word without meaning leverage. They are blanked out before the
+# markers are checked again: a name with no marker left is unleveraged, one with a marker left
+# (e.g. "Inverse VIX Short-Term Futures") still needs review.
+DEFAULT_LEVERAGE_EXCLUSIONS = (
+    r"\b(ultra[- ]?)?short[- ](term|duration|maturity|horizon)\b",
+    r"\bultra[- ]?short\s+(bond|income|treasury|t-bill|muni\w*|fixed|government|investment|tax)",
+    r"\bshort\s+(muni\w*|high yield muni|bond|treasury)",
+    r"\b(ultra\s+)?buffer\b",
+    r"\b(daily\s+)?putwrite\b",
+    r"\b(ultra\s+)?option income\b",
+    r"\bcovered call\b",
+    r"\bpremium income\b",
+    r"\bdaily income\b",
+    r"\blong[/ -]short\b",
+    r"\bleveraged loans?\b",
+    r"\bultra dividend\b",
+    r"\bultra[- ]small\b",
 )
 UNIVERSE_SOURCES = ("nasdaq_trader", "csv_import")
 PRICE_ADJUSTMENTS = ("none", "splits", "total_return")
@@ -190,6 +229,10 @@ class UniverseSettings:
     include_symbols: frozenset[str] = frozenset()
     exclude_symbols: frozenset[str] = frozenset()
     leverage_markers: tuple[str, ...] = DEFAULT_LEVERAGE_MARKERS
+    leverage_conventions: tuple[tuple[str, float], ...] = DEFAULT_LEVERAGE_CONVENTIONS
+    leverage_patterns: tuple[str, ...] = DEFAULT_LEVERAGE_PATTERNS
+    inverse_markers: tuple[str, ...] = DEFAULT_INVERSE_MARKERS
+    leverage_exclusions: tuple[str, ...] = DEFAULT_LEVERAGE_EXCLUSIONS
     overrides: tuple[Mapping[str, str], ...] = field(default=())
 
     @classmethod
@@ -209,23 +252,72 @@ class UniverseSettings:
                 "include_symbols",
                 "exclude_symbols",
                 "leverage_markers",
+                "leverage_conventions",
+                "leverage_patterns",
+                "inverse_markers",
+                "leverage_exclusions",
             ]
         )
-        markers = root.strings("leverage_markers", d.leverage_markers)
-        for i, marker in enumerate(markers):
-            try:
-                re.compile(marker)
-            except re.error as exc:
-                raise ConfigurationError(f"{where} leverage_markers[{i}]: {exc}") from exc
+        patterns = _regexes(root, "leverage_patterns", d.leverage_patterns)
+        for i, pattern in enumerate(patterns):
+            if "n" not in re.compile(pattern).groupindex:
+                raise ConfigurationError(
+                    f"{where} leverage_patterns[{i}]: needs a named group (?P<n>...)"
+                )
         return cls(
             source=root.choice("source", d.source, UNIVERSE_SOURCES),
             security_types=root.strings("security_types", d.security_types),
             exclude_test_issues=root.boolean("exclude_test_issues", d.exclude_test_issues),
             include_symbols=frozenset(s.upper() for s in root.strings("include_symbols", ())),
             exclude_symbols=frozenset(s.upper() for s in root.strings("exclude_symbols", ())),
-            leverage_markers=markers,
+            leverage_markers=_regexes(root, "leverage_markers", d.leverage_markers),
+            leverage_conventions=_conventions(root, d.leverage_conventions),
+            leverage_patterns=patterns,
+            inverse_markers=_regexes(root, "inverse_markers", d.inverse_markers),
+            leverage_exclusions=_regexes(root, "leverage_exclusions", d.leverage_exclusions),
             overrides=tuple(overrides),
         )
+
+
+def _regexes(root: Table, key: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    """A list of regular expressions; one that does not compile fails with its index."""
+    values = root.strings(key, default)
+    for i, value in enumerate(values):
+        try:
+            re.compile(value)
+        except re.error as exc:
+            raise ConfigurationError(f"{root.where} {key}[{i}]: {exc}") from exc
+    return values
+
+
+def _conventions(
+    root: Table, default: tuple[tuple[str, float], ...]
+) -> tuple[tuple[str, float], ...]:
+    """``leverage_conventions = [{pattern = '...', leverage = -2}, ...]`` (order kept)."""
+    key = "leverage_conventions"
+    value = root.raw(key)
+    if value is None:
+        return default
+    if not isinstance(value, list):
+        raise ConfigurationError(f"{root.where} {key}: expected a list of tables, got {value!r}")
+    out = []
+    for i, entry in enumerate(value):
+        if not isinstance(entry, Mapping) or set(entry) != {"pattern", "leverage"}:
+            raise ConfigurationError(
+                f"{root.where} {key}[{i}]: expected {{pattern = '...', leverage = N}}, "
+                f"got {entry!r}"
+            )
+        item = Table(entry, f"{root.where} {key}[{i}]")
+        pattern = item.text("pattern", "")
+        try:
+            re.compile(pattern)
+        except re.error as exc:
+            raise ConfigurationError(f"{item.where} pattern: {exc}") from exc
+        leverage = item.number("leverage", 0.0)
+        if leverage == 0:
+            raise ConfigurationError(f"{item.where} leverage: expected a non-zero number")
+        out.append((pattern, leverage))
+    return tuple(out)
 
 
 # ----------------------------------------------------------------------------- defaults.toml

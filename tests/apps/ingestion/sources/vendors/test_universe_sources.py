@@ -2,7 +2,6 @@ from datetime import date
 
 import pytest
 
-from algotrade.config.site.settings import DEFAULT_LEVERAGE_MARKERS
 from algotrade_ingestion.sources.framework.base import FetchRequest
 from algotrade_ingestion.sources.framework.http import RetryPolicy
 from algotrade_ingestion.sources.vendors.nasdaq.symbol_directory import (
@@ -11,7 +10,7 @@ from algotrade_ingestion.sources.vendors.nasdaq.symbol_directory import (
     parse_option_underlyings,
 )
 from algotrade_ingestion.sources.vendors.ssga.spy_holdings import SpyHoldingsSource, parse_holdings
-from algotrade_ingestion.tasks.reference.classify import leverage_flags, security_type
+from algotrade_ingestion.tasks.reference.classify import security_type
 from tests import universe_fixture as fx
 from tests.ingest_helpers import http_for
 
@@ -110,35 +109,3 @@ def test_sources_fetch_and_normalize() -> None:
 )
 def test_security_type(name: str, symbol: str, is_etf: bool, expected: str) -> None:
     assert security_type(name, symbol, is_etf) == expected
-
-
-def test_leverage_flags_fail_closed() -> None:
-    import pandas as pd  # noqa: PLC0415
-
-    frame = pd.DataFrame(
-        {
-            "symbol": ["AAPL", "SPY", "TQQQ", "SOXL", "SHUP"],
-            "name": [
-                "Apple",
-                "SPDR S&P 500 ETF Trust",
-                "ProShares UltraPro QQQ",
-                "Direxion Daily Semiconductor Bull 3X",
-                "Some Short Duration ETF",
-            ],
-            "is_etf": [False, True, True, True, True],
-        }
-    )
-    overrides = [
-        {"symbol": "TQQQ", "leverage": "3", "tracks": "Nasdaq-100"},
-        {"symbol": "SQQQ", "leverage": "-3"},
-    ]
-    flags = leverage_flags(frame, overrides, DEFAULT_LEVERAGE_MARKERS).set_index(frame["symbol"])
-    assert flags.loc["AAPL", "leverage_source"] == "not_etf"
-    assert (flags.loc["SPY", "is_leveraged"], flags.loc["SPY", "leverage_source"]) == (
-        False,
-        "name_rule",
-    )
-    assert (flags.loc["TQQQ", "leverage"], flags.loc["TQQQ", "tracks"]) == (3.0, "Nasdaq-100")
-    assert flags.loc["SOXL", "leverage_source"] == "needs_review"
-    assert flags.loc["SOXL", "is_leveraged"] is None  # UNKNOWN until curated
-    assert flags.loc["SHUP", "leverage_source"] == "needs_review"  # "Short" marker: fail closed

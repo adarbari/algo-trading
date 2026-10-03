@@ -94,3 +94,44 @@ def test_run_defaults_are_typed_with_nested_paths() -> None:
         BacktestSettings.parse({"price_adjustment": "dividends"}, "cfg [backtest]")
     with pytest.raises(ConfigurationError, match="max_universe_age_days"):
         ScreeningSettings.parse({"max_universe_age_days": 1.5}, "cfg [screening]")
+
+
+@pytest.mark.parametrize(
+    ("doc", "message"),
+    [
+        ({"leverage_patterns": [r"(\d)x"]}, r"leverage_patterns\[0\]: needs a named group"),
+        ({"leverage_patterns": [r"(?P<n>"]}, r"leverage_patterns\[0\]"),
+        ({"leverage_exclusions": ["ok", "[bad"]}, r"leverage_exclusions\[1\]"),
+        ({"inverse_markers": "short"}, "inverse_markers: expected a list of strings"),
+        ({"leverage_conventions": {"pattern": "x"}}, "expected a list of tables"),
+        ({"leverage_conventions": [{"pattern": "x"}]}, r"leverage_conventions\[0\]: expected"),
+        (
+            {"leverage_conventions": [{"pattern": "(", "leverage": 2}]},
+            r"leverage_conventions\[0\] pattern",
+        ),
+        (
+            {"leverage_conventions": [{"pattern": "x", "leverage": 0}]},
+            "leverage: expected a non-zero number",
+        ),
+        (
+            {"leverage_conventions": [{"pattern": "x", "leverage": "2"}]},
+            "leverage: expected a number",
+        ),
+    ],
+)
+def test_leverage_rule_errors_name_the_key(doc: dict[str, Any], message: str) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        UniverseSettings.from_documents(doc)
+
+
+def test_leverage_rules_load_in_order() -> None:
+    doc = {
+        "leverage_conventions": [
+            {"pattern": "^A Ultra Short", "leverage": -2},
+            {"pattern": "^A Ultra", "leverage": 2.5},
+        ],
+        "leverage_patterns": [r"(?P<n>\d)x"],
+    }
+    settings = UniverseSettings.from_documents(doc)
+    assert settings.leverage_conventions == (("^A Ultra Short", -2.0), ("^A Ultra", 2.5))
+    assert settings.leverage_patterns == (r"(?P<n>\d)x",)
