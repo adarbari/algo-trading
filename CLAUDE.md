@@ -52,6 +52,9 @@ without writing an ADR. Read in this order:
 7. **Strategies and screeners are deterministic** and must pass `tests/property`.
 8. Secrets come only from environment variables. Never commit credentials.
 9. Before finishing any change, run `make check`.
+10. **PRs auto-merge** (squash, branch deleted) once every CI check on the latest commit
+    passes (`.github/workflows/auto-merge.yml`). Open work in progress as a draft, or label
+    it `no-automerge`, to keep it open for review.
 
 ## Workflows: use the matching skill
 
