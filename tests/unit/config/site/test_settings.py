@@ -81,7 +81,13 @@ def test_nightly_and_universe_errors_name_the_key() -> None:
     with pytest.raises(ConfigurationError, match=r"nightly.toml \[sessions\] max_catch_up"):
         NightlySettings.from_document({"sessions": {"max_catch_up": 0}})
     with pytest.raises(ConfigurationError, match=r"\[notify\]: unknown keys"):
+        NightlySettings.from_document({"notify": {"slack": "x"}})
+    with pytest.raises(ConfigurationError, match=r"\[notify\] email: expected a table"):
         NightlySettings.from_document({"notify": {"email": "x"}})
+    with pytest.raises(
+        ConfigurationError, match=r"\[notify.email\] smtp_port: expected an integer"
+    ):
+        NightlySettings.from_document({"notify": {"email": {"smtp_port": 0}}})
     with pytest.raises(ConfigurationError, match="source: expected one of"):
         UniverseSettings.from_documents({"source": "ftp"})
     with pytest.raises(ConfigurationError, match="security_types: expected a list of strings"):

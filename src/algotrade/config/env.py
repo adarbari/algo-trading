@@ -14,6 +14,11 @@ DEFAULT_DATA_URL = "file://./var/data"
 CONFIG_DIR = "ALGOTRADE_CONFIG_DIR"
 DEFAULT_CONFIG_DIR = "config"
 USER = "ALGOTRADE_USER"
+# The nightly summary email (workflows/nightly/notify.py): personal data stays out of the repo.
+NOTIFY_EMAIL_TO = "ALGOTRADE_NOTIFY_EMAIL_TO"  # comma-separated recipients
+NOTIFY_EMAIL_FROM = "ALGOTRADE_NOTIFY_EMAIL_FROM"  # default: the first recipient
+SMTP_USER = "ALGOTRADE_SMTP_USER"
+SMTP_PASSWORD = "ALGOTRADE_SMTP_PASSWORD"  # Gmail: an app password, never the account password
 
 __all__ = ["config_dir", "credential", "data_url", "load_dotenv", "user_id"]
 

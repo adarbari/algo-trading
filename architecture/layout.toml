@@ -275,7 +275,7 @@ purpose = "workflows: ordered, isolated runs of registry tasks (no modules of it
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/workflows/nightly"
-purpose = "the nightly workflow: sessions, steps, screens, notifications"
+purpose = "the nightly workflow: sessions, steps, screens, the summary report and notifications"
 
 # --------------------------------------------------------------------------- shared helpers
 

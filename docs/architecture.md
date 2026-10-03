@@ -196,7 +196,8 @@ audits. The local runner uses 2 threads.
 
 `apps/ingestion/algotrade_ingestion/workflows/`: `nightly.py` (the steps and the job
 handler), `steps.py` (isolation, status rule), `sessions.py` (catch-up), `screens.py` (screen
-jobs), `notify.py` (summary + notification).
+jobs), `notify.py` (summary file + notifiers), `records.py` / `report.py` / `timing.py` / `render.py`
+(the summary email).
 
 - **Steps** (`NIGHTLY`): `universe-build`, `company-details`, `earnings`, `bars`, `rates`,
   `corporate-actions`, `chains`, `rollups`, `screens`, `quality`; then `purge-raw` once
@@ -229,10 +230,48 @@ jobs), `notify.py` (summary + notification).
   exports are that job's output. The screen audit records `universe_pre_snapshot`
   (survivorship).
 - **Notification** (`notify.py`): every run writes its summary to
-  `var/logs/nightly-latest.json`; when the status is not COMPLETE a `Notifier` is called
-  (default: a macOS notification through `osascript`, never in tests). A run longer than
-  `max_duration_minutes` (40) is recorded as a `nightly_duration` WARN. All in
-  `config/site/nightly.toml` (`[notify] enabled = false` turns notification off).
+  `var/logs/nightly-latest.json`, then hands a `Notice` to the `Notifier` (one interface;
+  `notify(notice)` returns a warning instead of raising). The macOS notifier (`osascript`,
+  never in tests) alerts only when the status is not COMPLETE; the email notifier sends the
+  summary email after every run (below). A run longer than `max_duration_minutes` is
+  recorded as a `nightly_duration` WARN. All in `config/site/nightly.toml` (`[notify]
+  enabled = false` turns every notification off).
+
+### Nightly summary email
+
+After every nightly (COMPLETE or not) the owner gets one email: subject
+`[algotrade] 2026-10-02 nightly: PARTIAL · chains 3,624 OK · 5 steps with failures`, a plain-text
+and an HTML part (inline styles only, no images or external assets).
+
+- **Inputs** (`records.py`, read-only): the run summary plus, per step, the registry task's run
+  record that step produced (the latest record of that task for the session that finished inside
+  the nightly's window). Its per-item statuses (`OK`, `STALE_DATA: chain is for ...`,
+  `FETCH_ERROR: ...`) are the deep dive's raw material.
+- **Report** (`report.py`, pure): header (sessions, status, start / end, duration, warnings);
+  statistics per step (status, duration, per-item status counts, key counts: rows, fetched /
+  failed, rollup rows, screens); **failure deep dive**: step errors, failed items grouped by
+  normalised reason (ids, URLs, dates and numbers stripped) with counts and up to
+  `max_examples` examples each (instrument ids labelled with tickers), quality checks that did
+  not pass with their detail, screen coverage gaps (UNKNOWN by reason); short "what to do" hints
+  for known failure kinds (circuit open, HTTP 401/403/429, STALE_DATA, NO_CHAIN, duplicate
+  keys, ...). Informational statuses (`NO_FACTS`, `EMPTY`, `NO_SESSION`, `NO_INPUT`) are counted,
+  not listed as failures.
+- **Run timing** (`timing.py`, pure; times in America/Los_Angeles and UTC): total duration vs
+  `[alerts] max_duration_minutes`, sessions (catch-up, dropped); per step (per session) start,
+  end, duration, share of the run, items processed and throughput (chains underlyings, earnings
+  dates, shares CIKs, bars sessions, rollup rows), sub-step timings (each rollup's `seconds`),
+  and the trend against the previous nightly and the median of the last 7 (steps over 50 %
+  slower flagged; the slowest step highlighted). Steps run one after another, so a step's start
+  is the run start plus the steps before it. Not shown yet: run-lock wait and time spent in the
+  vendor rate limiter / retries (the limiter returns its wait per request, but nothing sums it
+  into run stats).
+- **Delivery** (`notify.EmailNotifier`): stdlib `smtplib`, STARTTLS on 587 (465: implicit TLS),
+  30 s timeout. `[notify.email]` in `nightly.toml` enables it and names the server; recipients,
+  sender and SMTP login come only from the environment (`config/env.py`). Missing variables, an
+  SMTP error, or a report that cannot be built become a `notify` WARN in the run summary (and the
+  summary file); the nightly never fails for its email, and credentials are never logged.
+- **Re-render / re-send**: `algotrade-ingest report --date D [--out f.html] [--send]` rebuilds the
+  same report for a past session from the stored run records.
 
 ---
 
@@ -474,6 +513,7 @@ doing it. The ratchet `architecture/known_violations.toml` is empty: any hit fai
 | run ids, run records, COMPLETE / PARTIAL | `storage/runs.py` (`start_run`, `RunRecord.finish` for screens and backtests), `services/jobs/`, ingestion `tasks/framework/run.py` (`IngestRun`) |
 | raw persistence, row stamping, id resolution in ingestion | `tasks/framework/run.py` (`IngestRun`) |
 | which ingestion steps run, with which defaults | `tasks/framework/registry.py`; nightly order in `workflows/nightly/nightly.py` |
+| the nightly summary report and its delivery (desktop alert, summary email over SMTP) | `workflows/nightly/` (`records.py`, `report.py`, `timing.py`, `render.py`, `notify.py`) |
 | vendor HTTP, retries, retry cap, circuit breaker | `sources/framework/http.py` |
 | rate limiting | `sources/framework/limiter.py`, one per key, shared across threads and processes |
 | source construction (vendors and the golden fixture source) | `sources/framework/registry.py` (vendor specifics stay in `sources/vendors/<vendor>/`) |

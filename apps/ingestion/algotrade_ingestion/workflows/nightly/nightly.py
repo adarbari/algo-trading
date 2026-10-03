@@ -7,9 +7,10 @@ that only serve the current snapshot (universe files, SEC, Cboe chains) run only
 latest closed session; bars, rates, corporate actions, earnings and rollups catch up (rollups
 after the data they read; one whose input a session lacks, e.g. option liquidity without that
 session's chains, reports ``no_input``). ``quality`` ends every
-session and the ``purge-raw`` task ends the run, whatever failed before. Each session gets
-a ``nightly`` run record (COMPLETE / PARTIAL / FAILED, per ``steps.overall``), which is how
-the next run knows where to resume.
+session and the ``purge-raw`` task ends the run, whatever failed before; then
+``notify.report`` writes the summary file and sends the notifications (the summary email every
+night). Each session gets a ``nightly`` run record (COMPLETE / PARTIAL / FAILED, per
+``steps.overall``), which is how the next run knows where to resume.
 """
 
 from collections.abc import Mapping
@@ -157,7 +158,7 @@ def run_nightly(
     workers: int | None = None,
 ) -> dict[str, Any]:
     """Every planned session, then ``FINALLY``. -> the run summary (status, per-session
-    steps with status and duration, catch-up, warnings)."""
+    steps with status and duration, start / finish, catch-up, warnings)."""
     settings = settings or NightlySettings()
     started = ctx.clock()
     runs = [run_session(ctx, s, s == plan.latest, screens, workers) for s in plan.sessions]
@@ -168,7 +169,8 @@ def run_nightly(
             final[step.name] = run_step(step, ctx, reference, {}, screens)
     statuses = [StepStatus(s["status"]) for r in runs for s in r["steps"].values()]
     status = overall([*statuses, *(r.status for r in final.values())])
-    minutes = _minutes(started, ctx.clock())
+    finished = ctx.clock()
+    minutes = _minutes(started, finished)
     warnings = []
     if minutes > settings.max_duration_minutes:
         warnings.append(
@@ -188,6 +190,8 @@ def run_nightly(
         },
         "runs": runs,
         "steps": {name: r.as_dict() for name, r in final.items()},
+        "started_at": started.isoformat(),
+        "finished_at": finished.isoformat(),
         "duration_s": round(minutes * 60, 3),
         "warnings": warnings,
     }
@@ -221,5 +225,5 @@ def nightly_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]
     workers = int(params["workers"]) if params.get("workers") else None
     summary = run_nightly(task_ctx, plan, settings, screens, workers)
     notifier: Notifier = r.get("notifier") or default_notifier(settings)
-    report(summary, settings, notifier)
+    summary = report(summary, settings, notifier, task_ctx.reader)
     return {**summary, "_partial": summary["status"] != Status.COMPLETE}

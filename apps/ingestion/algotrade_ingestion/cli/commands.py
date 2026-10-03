@@ -8,14 +8,16 @@ through ``sources.registry.SOURCES`` (no network in CI).
 """
 
 import argparse
+import dataclasses
 import json
 import sys
 from collections.abc import Iterable, Mapping
+from datetime import date
 from pathlib import Path
 from typing import Any
 
 from algotrade.config.env import config_dir, credential
-from algotrade.config.site.settings import SourcesSettings, load_sources
+from algotrade.config.site.settings import SourcesSettings, load_nightly, load_sources
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
@@ -34,7 +36,9 @@ from algotrade_ingestion.sources.framework.registry import (
 )
 from algotrade_ingestion.tasks.framework.registry import TASKS, Task, run_task, task
 from algotrade_ingestion.tasks.framework.run import TaskContext, run_summary
+from algotrade_ingestion.workflows.nightly import notify
 from algotrade_ingestion.workflows.nightly.nightly import FINALLY, NIGHTLY, nightly_job
+from algotrade_ingestion.workflows.nightly.records import stored_summary
 
 # Job kinds this app runs under the ingest run lock: safe to recover at once (see cli.main).
 LOCKED_KINDS = ("nightly", "screen")
@@ -160,3 +164,31 @@ def report(job: JobRecord) -> int:
     if job.result.get("status") == "FAILED":  # a workflow none of whose steps succeeded
         return 2
     return 0 if job.status is JobStatus.COMPLETE else 1
+
+
+def nightly_report(args: argparse.Namespace, reader: StoreReader, session: date) -> int:
+    """``report``: the nightly summary for a past session from its stored run records, as
+    text (stdout), as HTML (``--out``) and, with ``--send``, by email (read-only)."""
+    settings = load_nightly(config_store(args))
+    summary = stored_summary(reader, session, [s.name for s in NIGHTLY])
+    if summary is None:
+        print(f"error: no nightly run record for {session}", file=sys.stderr)
+        return 2
+    examples = args.max_examples if args.max_examples is not None else settings.email_max_examples
+    note, problem = notify.notice(
+        summary, reader, dataclasses.replace(settings, email_max_examples=examples)
+    )
+    if problem:
+        print(f"error: {problem}", file=sys.stderr)
+        return 2
+    if args.out:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(note.html)
+    print(note.text, end="")
+    if args.send:
+        sender = notify.EmailNotifier(notify.email_config(settings))
+        if warning := sender.notify(note):
+            print(f"warning: {warning}", file=sys.stderr)
+            return 1
+        print("email sent", file=sys.stderr)
+    return 0

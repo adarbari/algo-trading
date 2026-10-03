@@ -13,6 +13,8 @@
                               (alias: features)
     algotrade-ingest screen   [--date YYYY-MM-DD] [--config ID] [--user U] [--export-dir out/]
     algotrade-ingest nightly  [--date YYYY-MM-DD] [--export-dir out/]   (no --date: catch up)
+    algotrade-ingest report   [--date D] [--out report.html] [--send] [--max-examples N]
+                              (the nightly summary email for a past session; read-only)
     algotrade-ingest purge-raw [--keep-days 90] [--staging-keep-days 14]
     algotrade-ingest migrate-ids [--dry-run]   (symbol ids -> FIGI ids, append-only)
     algotrade-ingest golden build|verify|load [--golden-dir datasets/golden]
@@ -47,6 +49,7 @@ from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.cli.commands import (
     config_store,
     golden,
+    nightly_report,
     print_json,
     report,
     run_job,
@@ -72,7 +75,7 @@ def add_wait(parser: argparse.ArgumentParser) -> None:
 
 def writes(args: argparse.Namespace) -> bool:
     """Whether the command writes to the store (and so takes the run lock)."""
-    if args.command == "schedule":
+    if args.command in ("schedule", "report"):
         return False
     return not (args.command == "golden" and args.action in ("build", "verify"))
 
@@ -119,6 +122,13 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
     sc.add_argument("--time", default="23:30", help="local time HH:MM on weekdays (default 23:30)")
     sc.add_argument("--export-dir", type=Path, default=Path("out"))
     sc.add_argument("--out", type=Path, default=Path("var") / f"{LABEL}.plist")
+    r = sub.add_parser(
+        "report", help="render (and --send) the nightly summary email for a past session"
+    )
+    r.add_argument("--date", type=date.fromisoformat, help="session (default: last session)")
+    r.add_argument("--out", type=Path, help="also write the HTML version to this file")
+    r.add_argument("--send", action="store_true", help="email it ([notify.email] + .env)")
+    r.add_argument("--max-examples", type=int, help="examples per failure group")
     g = sub.add_parser(
         "golden", help="golden test datasets: build CSVs, verify, load into the store"
     )
@@ -179,6 +189,8 @@ def _dispatch(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter
     session = explicit or default_session(args, datetime.now(UTC))
     if args.command == "golden":
         return golden(args, reader, writer)
+    if args.command == "report":
+        return nightly_report(args, reader, session)
     if getattr(args, "task", None):
         return run_task_command(args, reader, writer, args.task, task_params(args, session))
     if args.command == "screen":

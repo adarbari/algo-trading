@@ -230,6 +230,11 @@ class NightlySettings:
     notify_enabled: bool = True
     notify_desktop: bool = True
     summary_path: str = "var/logs/nightly-latest.json"
+    # [notify.email]: the daily summary email (addresses + credentials: config/env.py only)
+    email_enabled: bool = False
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    email_max_examples: int = 5
 
     @classmethod
     def from_document(
@@ -240,7 +245,8 @@ class NightlySettings:
         root.only(["sessions", "alerts", "notify"])
         sessions = root.table("sessions", ["settle_minutes", "max_catch_up"])
         alerts = root.table("alerts", ["max_duration_minutes"])
-        notify = root.table("notify", ["enabled", "desktop", "summary_path"])
+        notify = root.table("notify", ["enabled", "desktop", "summary_path", "email"])
+        email = notify.table("email", ["enabled", "smtp_host", "smtp_port", "max_examples"])
         return cls(
             settle_minutes=sessions.integer("settle_minutes", d.settle_minutes, 0),
             max_catch_up=sessions.integer("max_catch_up", d.max_catch_up, 1),
@@ -248,6 +254,10 @@ class NightlySettings:
             notify_enabled=notify.boolean("enabled", d.notify_enabled),
             notify_desktop=notify.boolean("desktop", d.notify_desktop),
             summary_path=notify.text("summary_path", d.summary_path),
+            email_enabled=email.boolean("enabled", d.email_enabled),
+            smtp_host=email.text("smtp_host", d.smtp_host),
+            smtp_port=email.integer("smtp_port", d.smtp_port, 1),
+            email_max_examples=email.integer("max_examples", d.email_max_examples, 0),
         )
 
 

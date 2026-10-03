@@ -29,6 +29,7 @@ from algotrade_ingestion.workflows.nightly.nightly import (
     run_nightly,
     run_session,
 )
+from algotrade_ingestion.workflows.nightly.notify import Notice
 from algotrade_ingestion.workflows.nightly.sessions import Plan, last_done, plan_sessions
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.stored_frames import stamped, universe_rows
@@ -247,11 +248,18 @@ def _configs(tmp_path: Path, **notify: object) -> MemoryConfigStore:
 
 
 class FakeNotifier:
-    def __init__(self) -> None:
-        self.sent: list[tuple[str, str]] = []
+    def __init__(self, warning: str | None = None) -> None:
+        self.notices: list[Notice] = []
+        self.warning = warning
 
-    def notify(self, title: str, message: str) -> None:
-        self.sent.append((title, message))
+    @property
+    def sent(self) -> list[tuple[str, str]]:
+        """What a desktop notifier would show: alerts only (not COMPLETE runs)."""
+        return [(n.title, n.message) for n in self.notices if n.alert]
+
+    def notify(self, notice: Notice) -> str | None:
+        self.notices.append(notice)
+        return self.warning
 
 
 def test_screens_are_submitted_as_jobs(
@@ -305,6 +313,45 @@ def test_notifies_on_non_complete_and_always_writes_the_summary(
     assert notifier.sent == [("algotrade nightly", f"PARTIAL ({D}): bars failed")]
     summary = json.loads((tmp_path / "logs" / "latest.json").read_text())
     assert summary["status"] == "PARTIAL" and summary["sessions"] == [D.isoformat()]
+    # The notice carries the full report (the email body): subject, text and HTML.
+    (note,) = notifier.notices
+    assert note.subject == f"[algotrade] {D} nightly: PARTIAL · 1 steps with failures"
+    assert "bars FAILED: RuntimeError: bars broke" in note.text
+    assert note.html.startswith("<!doctype html>") and "bars broke" in note.html
+    assert summary["started_at"] <= summary["finished_at"]
+
+
+def test_delivery_problems_are_warnings_never_failures(
+    fake: Callable[..., Calls], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fake()
+    monkeypatch.setattr(screens_module, "scheduled", _scheduled())
+    notifier = FakeNotifier(warning="email not configured: set ALGOTRADE_NOTIFY_EMAIL_TO")
+    runner, _ = _runner(store(), _configs(tmp_path), notifier)
+    job = runner.run("nightly", {"session": D.isoformat()}, UserContext(SITE_USER))
+    runner.shutdown()
+    assert job.result["status"] == "COMPLETE" and job.status is RunStatus.COMPLETE
+    warning = {"check": "notify", "status": "WARN", "detail": notifier.warning}
+    assert job.result["warnings"] == [warning]
+    written = json.loads((tmp_path / "logs" / "latest.json").read_text())
+    assert written["warnings"] == [warning]
+    assert [n.status for n in notifier.notices] == ["COMPLETE"]  # the email goes every night
+
+
+class BrokenNotifier:
+    def notify(self, notice: Notice) -> str | None:
+        raise OSError("boom")
+
+
+def test_a_raising_notifier_is_a_warning(
+    fake: Callable[..., Calls], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fake()
+    monkeypatch.setattr(screens_module, "scheduled", _scheduled())
+    runner, _ = _runner(store(), _configs(tmp_path), BrokenNotifier())
+    job = runner.run("nightly", {"session": D.isoformat()}, UserContext(SITE_USER))
+    runner.shutdown()
+    assert job.result["warnings"][0]["detail"] == "notifier failed: OSError: boom"
 
 
 def test_complete_runs_and_disabled_notification_stay_quiet(
@@ -321,7 +368,8 @@ def test_complete_runs_and_disabled_notification_stay_quiet(
     runner2.run("nightly", {"session": D.isoformat()}, UserContext(SITE_USER))
     runner.shutdown()
     runner2.shutdown()
-    assert quiet.sent == [] and disabled.sent == []
+    assert quiet.sent == [] and disabled.notices == []
+    assert [n.status for n in quiet.notices] == ["COMPLETE"]
     assert json.loads((tmp_path / "logs" / "latest.json").read_text())["status"] == "PARTIAL"
 
 
@@ -335,3 +383,19 @@ def test_nightly_settings() -> None:
     s = load_nightly(MemoryConfigStore({("site", "settings", "nightly"): doc}))
     assert (s.settle_minutes, s.max_catch_up, s.max_duration_minutes) == (10, 2, 20.0)
     assert (s.notify_enabled, s.notify_desktop, s.summary_path) == (False, False, "x.json")
+    assert (s.email_enabled, s.smtp_host, s.smtp_port, s.email_max_examples) == (
+        False,
+        "smtp.gmail.com",
+        587,
+        5,
+    )
+    email = {"enabled": True, "smtp_host": "mail.test", "smtp_port": 465, "max_examples": 2}
+    s = load_nightly(
+        MemoryConfigStore({("site", "settings", "nightly"): {"notify": {"email": email}}})
+    )
+    assert (s.email_enabled, s.smtp_host, s.smtp_port, s.email_max_examples) == (
+        True,
+        "mail.test",
+        465,
+        2,
+    )

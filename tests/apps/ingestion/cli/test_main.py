@@ -87,6 +87,53 @@ def test_nightly_pipeline_end_to_end(env: Path, capsys: pytest.CaptureFixture[st
     assert latest["status"] == "COMPLETE" and latest["sessions"] == [DAY]
     with (env / "out" / f"short_premium_candidates_{DAY}.csv").open() as fh:
         assert [r["ticker"] for r in csv.DictReader(fh)] == ["AAPL"]
+    # The nightly summary email, re-rendered from the stored run records (read-only).
+    code = cli.main(["report", "--date", DAY, "--out", str(env / "r.html")])
+    text = capsys.readouterr().out
+    assert code == 0 and text.startswith(f"[algotrade] {DAY} nightly: COMPLETE")
+    assert "chains 2 OK · 0 failures" in text and "FAILURE DEEP DIVE" in text
+    assert (env / "r.html").read_text().startswith("<!doctype html>")
+
+
+def test_report_command_errors_and_send(
+    env: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert cli.main(["report", "--date", DAY]) == 2
+    assert "no nightly run record" in capsys.readouterr().err
+    assert call(capsys, "nightly", "--date", DAY, "--workers", "1")[0] in (0, 1)
+    for name in ("ALGOTRADE_NOTIFY_EMAIL_TO", "ALGOTRADE_SMTP_USER", "ALGOTRADE_SMTP_PASSWORD"):
+        monkeypatch.delenv(name, raising=False)
+    assert cli.main(["report", "--date", DAY, "--send", "--max-examples", "1"]) == 1
+    assert "email not configured" in capsys.readouterr().err
+    sent: list[object] = []
+
+    class FakeSMTP:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        def __enter__(self) -> "FakeSMTP":
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            pass
+
+        def starttls(self, context: object = None) -> None:
+            pass
+
+        def login(self, user: str, password: str) -> None:
+            pass
+
+        def send_message(self, msg: object) -> None:
+            sent.append(msg)
+
+    import smtplib  # noqa: PLC0415
+
+    monkeypatch.setattr(smtplib, "SMTP", FakeSMTP)
+    monkeypatch.setenv("ALGOTRADE_NOTIFY_EMAIL_TO", "owner@example.com")
+    monkeypatch.setenv("ALGOTRADE_SMTP_USER", "owner@example.com")
+    monkeypatch.setenv("ALGOTRADE_SMTP_PASSWORD", "test-app-password")
+    assert cli.main(["report", "--date", DAY, "--send"]) == 0
+    assert "email sent" in capsys.readouterr().err and len(sent) == 1
 
 
 def test_individual_steps_and_purge(env: Path, capsys: pytest.CaptureFixture[str]) -> None:

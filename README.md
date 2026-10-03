@@ -30,6 +30,7 @@ algotrade-ingest shares [--force] [--limit N]   # shares outstanding from SEC co
 algotrade-ingest rollups --from 2024-10-03 --to 2026-10-02   # backfill rollups (price_stats, earnings, option_liquidity) per session
 algotrade-ingest rollups [--date D] [--only price_stats@v1]    # one session (alias: features); config/site/rollups.toml
 algotrade-ingest nightly --export-dir out/      # catch up missed sessions; universe -> company details -> shares -> earnings -> bars -> rates -> corporate actions -> chains -> rollups -> screen jobs -> quality -> purge
+algotrade-ingest report --date D [--out r.html] [--send]   # the nightly summary email for a past session (read-only)
 algotrade-ingest quality                        # data-quality checks for a session
 algotrade-ingest schedule --time 23:30          # writes a launchd agent; prints install commands
 algotrade-ingest purge-raw [--keep-days 90]     # raw per source (SEC 7 days) + unfinished-run scratch older than 14 days (defaults: sources.toml)
@@ -61,10 +62,37 @@ settings in [`config/site/nightly.toml`](config/site/nightly.toml)):
   FAILED (nothing succeeded); each step reports its status and duration.
 - **Screens run as `screen` jobs**, one per scheduled config, exports included.
 - **When it is not COMPLETE** you get a macOS notification; every run's summary is written to
-  `var/logs/nightly-latest.json`. A run over 40 minutes is recorded as a warning.
+  `var/logs/nightly-latest.json`. A long run (`[alerts] max_duration_minutes`) is recorded as a
+  warning.
+- **Every night you get a summary email** (once set up, below): high-level statistics per step
+  (status, duration, items OK / failed, rows written, rollups, screen decisions and coverage,
+  quality checks), run timing (start / end in Pacific and UTC, per-step duration, share,
+  throughput, sub-steps, trend vs the previous run and the 7-run median, slow steps flagged,
+  the duration alert) and a failure deep dive (failed items grouped by reason, a few examples each,
+  failed checks, screen coverage gaps, short "what to do" hints).
 - **Scheduling:** `algotrade-ingest schedule` writes a launchd agent (weekdays, `RunAtLoad`
   false). A run missed while the Mac sleeps starts on wake, which is safe because of the
   calendar and catch-up.
+
+### Setting up the nightly summary email
+
+1. In your Google Account: **Security → 2-Step Verification → App passwords**, create an app
+   password (2-Step Verification must be on). Other providers: their SMTP host and login.
+2. In `.env` (never committed; see [`.env.example`](.env.example)):
+   ```
+   ALGOTRADE_NOTIFY_EMAIL_TO=you@gmail.com          # comma-separated for several
+   ALGOTRADE_NOTIFY_EMAIL_FROM=                     # optional; default: the first recipient
+   ALGOTRADE_SMTP_USER=you@gmail.com
+   ALGOTRADE_SMTP_PASSWORD=<the 16-character app password>
+   ```
+3. In [`config/site/nightly.toml`](config/site/nightly.toml) set `[notify.email] enabled = true`
+   (`smtp_host` / `smtp_port` default to Gmail, `smtp.gmail.com:587` with STARTTLS;
+   `max_examples` is the number of examples per failure group).
+4. Test it on a past night: `algotrade-ingest report --date 2026-10-02 --send` (add
+   `--out r.html` to look at the HTML first).
+
+A missing variable or an SMTP error never fails the nightly: it is recorded as a `notify` WARN
+in the run summary (`var/logs/nightly-latest.json`).
 
 Each step can also run on its own (`chains`, `rollups`, `screen`), resumes after
 interruption, and prints its audit. See [docs/screeners/](docs/screeners/README.md).
