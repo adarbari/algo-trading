@@ -1,22 +1,23 @@
 # CI: where checks run, and running them locally
 
 The repo is private, and GitHub bills private repos per minute of hosted runners. So the
-Python jobs run on the owner's Mac as **self-hosted runners** (free), and only what needs
-Linux runs on GitHub.
+CI jobs run on the owner's Mac as **self-hosted runners** (free); only releases run on GitHub.
+The web job runs inside the official Playwright Linux image through Docker, so Docker must be
+running on the Mac.
 
 | Workflow / job | Runs on | Why |
 |---|---|---|
 | CI: lint, types, boundaries, ownership, dupes, file length | Mac | |
 | CI: tests (py3.12 on PRs; 3.12 + 3.13 on main) | Mac | the bulk of the minutes |
 | CI: strategy evaluation | Mac | |
-| CI: web (lint, types, unit, Storybook, e2e, screenshots) | GitHub, `ubuntu-latest` | the Playwright Linux container; screenshot baselines are rendered on Linux |
+| CI: web (lint, types, unit, Storybook, e2e, screenshots) | Mac, inside the Playwright Linux image (Docker) | screenshot baselines are rendered in that image |
 | Auto-merge sweeps | Mac | runs after every CI run and every 30 minutes |
 | Nightly evaluation | Mac | |
 | Release (tags only) | GitHub, `ubuntu-latest` | rare; `make check` needs Node on Linux |
 
 Jobs on the Mac wait (queued, not failed) while it is asleep or offline, and auto-merge
-waits with them. Two runners let two jobs run at once; a PR runs three Mac jobs, so the
-third starts when one finishes.
+waits with them. Each runner runs one job at a time; a PR runs four jobs, so with two
+runners two wait for a free one.
 
 ## Setting up the runners (once)
 
