@@ -29,10 +29,10 @@ algotrade-ingest company-details [--force] [--limit N]   # SEC EDGAR company det
 algotrade-ingest shares [--force] [--limit N]   # shares outstanding from SEC company facts (first run ~6k CIKs, ~30-40 min)
 algotrade-ingest rollups --from 2024-10-03 --to 2026-10-02   # backfill rollups (price_stats, earnings, option_liquidity) per session
 algotrade-ingest rollups [--date D] [--only price_stats@v1]    # one session (alias: features); config/site/rollups.toml
-algotrade-ingest nightly --export-dir out/      # catch up missed sessions; universe -> company details -> shares -> earnings -> bars -> rates -> corporate actions -> chains -> rollups -> screen jobs -> quality -> purge
+algotrade-ingest nightly --export-dir out/      # catch up missed sessions (a quiet no-op when up to date; --force re-runs); universe -> company details -> shares -> earnings -> bars -> rates -> corporate actions -> chains -> rollups -> screen jobs -> quality -> purge
 algotrade-ingest report --date D [--out r.html] [--send]   # the nightly summary email for a past session (read-only)
 algotrade-ingest quality                        # data-quality checks for a session
-algotrade-ingest schedule --time 23:30          # writes a launchd agent; prints install commands
+algotrade-ingest schedule                       # writes a launchd agent (weekdays 15:00, at login, hourly); prints install commands
 algotrade-ingest purge-raw [--keep-days 90]     # raw per source (SEC 7 days) + unfinished-run scratch older than 14 days (defaults: sources.toml)
 algotrade-ingest migrate-ids [--dry-run]        # symbol ids -> FIGI ids per instruments/id_map (new runs, ADR 0018)
 algotrade-ingest run <task> [--date D | --from D --to D]   # any registry task (tasks/framework/registry.py), same flags
@@ -70,9 +70,51 @@ settings in [`config/site/nightly.toml`](config/site/nightly.toml)):
   throughput, sub-steps, trend vs the previous run and the 7-run median, slow steps flagged,
   the duration alert) and a failure deep dive (failed items grouped by reason, a few examples each,
   failed checks, screen coverage gaps, short "what to do" hints).
-- **Scheduling:** `algotrade-ingest schedule` writes a launchd agent (weekdays, `RunAtLoad`
-  false). A run missed while the Mac sleeps starts on wake, which is safe because of the
-  calendar and catch-up.
+- **Scheduling:** see [Scheduling the nightly](#scheduling-the-nightly) below.
+
+### Scheduling the nightly
+
+`algotrade-ingest schedule [--time 15:00] [--watchdog-minutes 60] [--export-dir out]` writes
+`var/com.algotrade.nightly.plist` (it never installs it). The agent runs
+`algotrade-ingest nightly --export-dir out/` (no `--date`):
+
+- **weekdays at 15:00 local time** (Pacific: the US close is 13:00 PT, a session counts as
+  closed at close + `settle_minutes`, so 15:00 leaves margin);
+- **at login / boot** (`RunAtLoad`): a Mac that was off at 15:00 catches up when it is on;
+- **every hour** (`StartInterval`, `--watchdog-minutes`, 0 turns it off): heals anything else
+  that was missed. A 15:00 missed while the Mac sleeps also fires on wake.
+
+Repeated starts are cheap and quiet. When every session up to the last closed one already has
+a COMPLETE / PARTIAL nightly, `nightly` prints `nothing to do: <session> already ingested` and
+exits 0 without a run record, an email or a notification. While a nightly (or any ingest) is
+still running it prints `busy: ...` and exits 3, again without notifying (launchd also never
+starts a second copy of the agent). Otherwise it catches up every missed session (at most 5).
+Until today's close + settle has passed, the last closed session is the previous one, so a
+login at 10:00 PT runs yesterday's nightly if it is missing and is a no-op otherwise. A watchdog
+or login start can begin the nightly as early as close + settle (13:30 PT), before 15:00.
+`algotrade-ingest nightly --force` runs anyway (the last closed session again).
+
+Catch-up has one limit: Cboe serves only the current option-chain snapshot, so a missed
+session's chains can be fetched only until the next session opens (09:30 New York, 06:30 PT).
+A nightly that runs later still catches up bars, rates, corporate actions, earnings and
+rollups, but the missed session has no chains (and no chain-based screens).
+
+Install, or replace an installed agent (the plist's paths are absolute, so run `schedule`
+from the checkout the agent should use):
+
+```bash
+algotrade-ingest schedule                     # writes var/com.algotrade.nightly.plist
+mkdir -p var/logs
+launchctl unload ~/Library/LaunchAgents/com.algotrade.nightly.plist 2>/dev/null || true
+cp var/com.algotrade.nightly.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.algotrade.nightly.plist
+launchctl list | grep com.algotrade.nightly   # loaded; RunAtLoad starts a run (or a no-op) now
+```
+
+Logs go to `var/logs/nightly.log` and `var/logs/nightly.err.log`. Optional: to have the Mac
+wake (or power on) before the run on weekdays, run `sudo pmset repeat wakeorpoweron MTWRF
+14:55:00` yourself (`pmset -g sched` shows it, `sudo pmset repeat cancel` removes it). Without
+it, a Mac asleep or off at 15:00 runs the nightly as soon as it wakes or you log in.
 
 ### Setting up the nightly summary email
 

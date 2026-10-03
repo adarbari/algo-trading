@@ -226,7 +226,14 @@ jobs), `notify.py` (summary file + notifiers), `records.py` / `report.py` / `tim
   is retried next time. Bars, corporate actions, earnings and rollups catch up; sources that
   only serve the current snapshot (universe files, SEC, Cboe chains) and screens run only for
   the latest session. Chains still check that the Cboe snapshot's
-  session matches (`STALE_DATA` otherwise). `--date D` runs exactly D.
+  session matches (`STALE_DATA` otherwise), so a missed session's chains can be fetched only
+  until the next session opens. `--date D` runs exactly D.
+- **Quiet when up to date** (`cli/main.py`): the scheduled form (no `--date`, no `--force`)
+  first reads the `nightly` run records, before taking the lock; when every session up to the
+  last closed one is COMPLETE / PARTIAL it prints `nothing to do: <session> already ingested`
+  and exits 0 (no run or job record, no summary file, no notification). If the lock is held
+  (a nightly still running) it prints `busy: ...` and exits 3, without notifying. `--force`
+  runs anyway: the missed sessions, or the last closed session again when none are missing.
 - **Screens are jobs**: one `screen` job per scheduled screener config, for its owner;
   exports are that job's output. The screen audit records `universe_pre_snapshot`
   (survivorship).
@@ -485,8 +492,12 @@ universe) FAIL `chains_fetch`, because the night's data is missing; **stale chai
 (`STALE_DATA`: the feed served an older session) above `max_chain_stale_share` (20%) only WARN
 `chains_stale`, because screens already treat those names as UNKNOWN. Both details report the
 OK / STALE_DATA / NO_CHAIN / NO_STANDARD_SERIES counts. It is scheduled
-locally by a launchd agent (`algotrade-ingest schedule`; `RunAtLoad` false, a run missed while
-asleep starts on wake, which is safe because of `last_closed_session` and catch-up). A run that
+locally by a launchd agent (`algotrade-ingest schedule`, `ops/schedule.py`): weekdays at 15:00
+local (Pacific; close 13:00 PT), `RunAtLoad` (login / boot, for a Mac that was off) and an
+hourly `StartInterval` watchdog. Every start runs `nightly` without `--date`: a no-op when up to
+date, otherwise catch-up, which is safe at any hour because of `last_closed_session` (before
+close + settle the previous session is the latest). The owner may add a weekday wake with
+`sudo pmset repeat wakeorpoweron MTWRF 14:55:00`; the code never runs it. A run that
 is not COMPLETE triggers a desktop notification; every run's summary is in
 `var/logs/nightly-latest.json`. Monitoring lives in run records today: status per job and per
 nightly step, coverage per screen (alert below 98%), selection size per config (alert on a

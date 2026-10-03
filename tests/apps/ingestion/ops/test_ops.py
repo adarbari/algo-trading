@@ -168,7 +168,7 @@ def test_quality_on_an_empty_store() -> None:
 
 
 def test_nightly_plist() -> None:
-    plist = plistlib.loads(nightly_plist(Path("/repo"), 23, 30, Path("/repo/out")))
+    plist = plistlib.loads(nightly_plist(Path("/repo"), 15, 0, Path("/repo/out")))
     assert plist["Label"] == LABEL
     assert plist["ProgramArguments"] == [
         "/repo/.venv/bin/algotrade-ingest",
@@ -177,7 +177,16 @@ def test_nightly_plist() -> None:
         "/repo/out",
     ]
     assert [d["Weekday"] for d in plist["StartCalendarInterval"]] == [1, 2, 3, 4, 5]
-    assert plist["StartCalendarInterval"][0]["Hour"] == 23
-    assert plist["RunAtLoad"] is False  # a missed run starts on wake; catch-up makes it safe
+    assert {(d["Hour"], d["Minute"]) for d in plist["StartCalendarInterval"]} == {(15, 0)}
+    assert plist["RunAtLoad"] is True  # login / boot catches up what was missed while off
+    assert plist["StartInterval"] == 3600  # hourly watchdog; repeats are quiet no-ops
+    assert plist["WorkingDirectory"] == "/repo"
+    assert plist["StandardOutPath"] == "/repo/var/logs/nightly.log"
+    assert plist["StandardErrorPath"] == "/repo/var/logs/nightly.err.log"
+    custom = plistlib.loads(nightly_plist(Path("/repo"), 15, 0, watchdog_s=900))
+    assert custom["StartInterval"] == 900 and custom["ProgramArguments"][-1] == "nightly"
+    assert "StartInterval" not in plistlib.loads(nightly_plist(Path("/repo"), 15, 0, watchdog_s=0))
     with pytest.raises(ValueError, match="invalid time"):
         nightly_plist(Path("/repo"), 25, 0)
+    with pytest.raises(ValueError, match="invalid watchdog"):
+        nightly_plist(Path("/repo"), 15, 0, watchdog_s=-1)

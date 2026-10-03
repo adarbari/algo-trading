@@ -12,7 +12,8 @@
     algotrade-ingest rollups  [--date D | --from D --to D] [--only price_stats@v1,earnings@v1]
                               (alias: features)
     algotrade-ingest screen   [--date YYYY-MM-DD] [--config ID] [--user U] [--export-dir out/]
-    algotrade-ingest nightly  [--date YYYY-MM-DD] [--export-dir out/]   (no --date: catch up)
+    algotrade-ingest nightly  [--date YYYY-MM-DD] [--export-dir out/] [--force]
+                              (no --date: catch up; a quiet no-op when up to date)
     algotrade-ingest report   [--date D] [--out report.html] [--send] [--max-examples N]
                               (the nightly summary email for a past session; read-only)
     algotrade-ingest purge-raw [--keep-days 90] [--staging-keep-days 14]
@@ -27,6 +28,13 @@ sessions missed since the last nightly. Storage location comes from ALGOTRADE_DA
 (default file://./var/data). Every command that writes to the store takes the store's ingest
 run lock: a second concurrent run exits with code 3 unless it was given ``--wait`` (then it
 queues behind the first).
+
+``nightly`` without ``--date`` is what the launchd agent runs (``schedule``: weekdays at
+15:00, at login and hourly), so it must be cheap to repeat: when every session up to the last
+closed one already has a COMPLETE / PARTIAL nightly it prints ``nothing to do: <session>
+already ingested`` and exits 0 without taking the lock, writing a run record or notifying;
+while another ingest run holds the lock it prints one line and exits 3, also without
+notifying. ``--force`` runs anyway (the last closed session again when nothing is missing).
 """
 
 import argparse
@@ -55,9 +63,16 @@ from algotrade_ingestion.cli.commands import (
     run_job,
     run_task_command,
 )
-from algotrade_ingestion.ops.schedule import LABEL, nightly_plist
+from algotrade_ingestion.ops.schedule import (
+    DEFAULT_TIME,
+    DEFAULT_WATCHDOG_MINUTES,
+    LABEL,
+    WAKE_COMMAND,
+    nightly_plist,
+)
 from algotrade_ingestion.tasks.framework.registry import TASKS, Task
 from algotrade_ingestion.tasks.framework.run import recover_unpublished
+from algotrade_ingestion.workflows.nightly.sessions import last_done
 
 # Task commands kept under their own names (``algotrade-ingest bars ...``); every registry
 # task is also ``algotrade-ingest run <task>``. ``golden load`` runs the ``golden-load`` task.
@@ -84,6 +99,25 @@ def default_session(args: argparse.Namespace, now: datetime) -> date:
     """The last closed exchange session at ``now`` (settle margin from nightly.toml)."""
     settings = load_nightly(config_store(args))
     return last_closed_session(now, timedelta(minutes=settings.settle_minutes))
+
+
+def scheduled_nightly(args: argparse.Namespace) -> bool:
+    """``nightly`` with neither ``--date`` nor ``--force``: the scheduled catch-up, which is a
+    no-op when there is nothing to ingest."""
+    return args.command == "nightly" and args.date is None and not args.force
+
+
+def ingested_through(args: argparse.Namespace, writer: StoreWriter, now: datetime) -> date | None:
+    """The last closed session when every session up to it has a COMPLETE / PARTIAL nightly
+    (nothing to catch up), else ``None``. Reads run records only: fast, writes nothing."""
+    session = default_session(args, now)
+    done = last_done(writer)
+    return session if done is not None and done >= session else None
+
+
+def nothing_to_do(session: date) -> int:
+    print(f"nothing to do: {session} already ingested")
+    return 0
 
 
 def add_task_arguments(parser: argparse.ArgumentParser, spec: Task) -> None:
@@ -113,13 +147,29 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
         add_wait(s)
         if name == "nightly":
             s.add_argument("--workers", type=int, help="chain workers (default: sources.toml)")
+            s.add_argument(
+                "--force",
+                action="store_true",
+                help="run even when every closed session is already ingested",
+            )
         else:
             s.add_argument("--config", default="short_premium_liquidity", help="config id")
             s.add_argument("--user", help="config owner (default: $ALGOTRADE_USER or site)")
     sc = sub.add_parser(
         "schedule", help="write a launchd agent for the nightly job (not installed)"
     )
-    sc.add_argument("--time", default="23:30", help="local time HH:MM on weekdays (default 23:30)")
+    sc.add_argument(
+        "--time",
+        default=DEFAULT_TIME,
+        help=f"local time HH:MM on weekdays (default {DEFAULT_TIME}, for Pacific time)",
+    )
+    sc.add_argument(
+        "--watchdog-minutes",
+        type=int,
+        default=DEFAULT_WATCHDOG_MINUTES,
+        help=f"also start every N minutes to heal missed runs; 0: off "
+        f"(default {DEFAULT_WATCHDOG_MINUTES})",
+    )
     sc.add_argument("--export-dir", type=Path, default=Path("out"))
     sc.add_argument("--out", type=Path, default=Path("var") / f"{LABEL}.plist")
     r = sub.add_parser(
@@ -159,18 +209,28 @@ def write_schedule(args: argparse.Namespace) -> int:
     repo = Path.cwd().resolve()
     export_dir = (repo / args.export_dir) if not args.export_dir.is_absolute() else args.export_dir
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_bytes(nightly_plist(repo, hour, minute, export_dir))
+    watchdog_s = args.watchdog_minutes * 60
+    args.out.write_bytes(nightly_plist(repo, hour, minute, export_dir, watchdog_s))
     target = Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
     print_json(
         {
             "written": str(args.out),
             "weekdays_at": args.time,
+            "run_at_load": True,
+            "watchdog_minutes": args.watchdog_minutes or None,
+            # Replaces an installed agent too (unloading one that is not loaded only warns).
             "install": [
                 f"mkdir -p {repo / 'var' / 'logs'}",
+                f"launchctl unload {target} 2>/dev/null || true",
                 f"cp {args.out.resolve()} {target}",
                 f"launchctl load {target}",
             ],
             "uninstall": [f"launchctl unload {target}", f"rm {target}"],
+            "optional_wake": {
+                "command": WAKE_COMMAND,
+                "note": "run it yourself (needs sudo): wakes or powers on the Mac on weekdays "
+                "before the run; `sudo pmset repeat cancel` removes it",
+            },
         }
     )
     return 0
@@ -201,9 +261,21 @@ def _dispatch(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter
         }
         user = args.user or default_user(SITE_USER).user_id
         return report(run_job(args, reader, writer, "screen", params, user))
+    return nightly(args, reader, writer, session, explicit is None)
+
+
+def nightly(
+    args: argparse.Namespace, reader: StoreReader, writer: StoreWriter, session: date, auto: bool
+) -> int:
+    """The nightly job; ``auto`` (no ``--date``): catch up, a no-op unless ``--force``."""
+    through = ingested_through(args, writer, datetime.now(UTC)) if auto else None
+    if through is not None and not args.force:
+        return nothing_to_do(through)  # finished by another run since main() checked
     params = {
         "session": session.isoformat(),
-        "catch_up": explicit is None,  # no --date: also the sessions missed since the last run
+        # No --date: also the sessions missed since the last run. --force when nothing is
+        # missing: the last closed session again.
+        "catch_up": auto and through is None,
         "workers": args.workers,
         "export_dir": str(args.export_dir) if args.export_dir else None,
     }
@@ -217,12 +289,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if not writes(args):
             return _dispatch(args, StoreReader(backend), StoreWriter(backend))
+        if scheduled_nightly(args):  # before the lock: a no-op must not wait or write
+            through = ingested_through(args, StoreWriter(backend), datetime.now(UTC))
+            if through is not None:
+                return nothing_to_do(through)
         with exclusive_run(backend, wait=args.wait):
             writer = StoreWriter(backend)
             recover_unpublished(writer, datetime.now(UTC))  # no ingest run is in flight now
             return _dispatch(args, StoreReader(backend), writer)
     except RunLockedError as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        if scheduled_nightly(args):  # e.g. the nightly itself is still running: not an error
+            print("busy: another ingest run holds the lock; a later start catches up")
+        else:
+            print(f"error: {exc}", file=sys.stderr)
         return LOCKED_EXIT
     except AlgoTradeError as exc:
         print(f"error: {exc}", file=sys.stderr)

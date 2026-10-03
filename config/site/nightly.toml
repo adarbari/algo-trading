@@ -1,7 +1,9 @@
 # L3 site setting: how the nightly workflow runs (apps/ingestion/workflows/nightly/nightly.py).
 
 [sessions]                       # which exchange sessions a nightly run ingests (core/time/calendar.py)
-settle_minutes = 30              # a session counts as closed this long after its close (16:00 / 13:00 New York)
+settle_minutes = 30              # a session counts as closed this long after its close (16:00 / 13:00 New York);
+                                 # the launchd agent (`algotrade-ingest schedule`) runs at 15:00 PT, at login and hourly,
+                                 # so a start at or after close + settle may begin the nightly before 15:00
 max_catch_up = 5                 # after missed nights, ingest at most this many sessions (the latest ones)
 
 [alerts]
