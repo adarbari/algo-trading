@@ -130,7 +130,7 @@ def test_missing_inputs_raise_with_hint() -> None:
     with pytest.raises(MissingDataError, match="universe import"):
         run_screener(reader, writer, preset(), DAY)
     seeded_reader, seeded_writer = seeded()
-    with pytest.raises(MissingDataError, match="ingest features"):
+    with pytest.raises(MissingDataError, match="ingest rollups"):
         run_screener(seeded_reader, seeded_writer, preset(), DAY + timedelta(days=1))
 
 

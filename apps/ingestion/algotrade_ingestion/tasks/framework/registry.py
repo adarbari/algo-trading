@@ -21,7 +21,7 @@ from algotrade.config.site.settings import load_universe
 from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.sources.framework.base import DirectorySource, FixtureSource
-from algotrade_ingestion.tasks.derived import features
+from algotrade_ingestion.tasks.derived import rollups
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.maintenance import golden, migrate_ids, purge, quality
 from algotrade_ingestion.tasks.market import (
@@ -157,8 +157,9 @@ def _chains(ctx: TaskContext, p: Params) -> RunRecord:
     )
 
 
-def _features(ctx: TaskContext, p: Params) -> RunRecord:
-    return features.compute_option_liquidity(ctx, session_of(p))
+def _rollups(ctx: TaskContext, p: Params) -> RunRecord:
+    only = [k.strip() for k in str(p.get("only") or "").split(",") if k.strip()]
+    return rollups.compute_rollups(ctx, session_of(p), p.get("start"), p.get("end"), only)
 
 
 def _quality(ctx: TaskContext, p: Params) -> RunRecord:
@@ -296,12 +297,18 @@ TASKS: dict[str, Task] = {
             ),
         ),
         Task(
-            "features",
-            "compute nightly features (option_liquidity@v1)",
-            features,
-            (features.TABLE,),
-            _features,
-            params=(SESSION,),
+            "rollups",
+            "compute rollups for a session or backfill a range (--from/--to)",
+            rollups,
+            rollups.TABLES,
+            _rollups,
+            settings="rollups.toml",
+            params=(
+                SESSION,
+                FROM,
+                TO,
+                Param("only", ("--only",), str, "comma-separated rollups, e.g. price_stats@v1"),
+            ),
         ),
         Task(
             "quality",

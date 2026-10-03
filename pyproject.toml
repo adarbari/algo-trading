@@ -113,7 +113,8 @@ type = "layers"
 layers = [
     "algotrade.services",
     "algotrade.engines",
-    "algotrade.strategies | algotrade.features | algotrade.analytics | algotrade.data",
+    "algotrade.strategies | algotrade.features | algotrade.analytics",
+    "algotrade.data",
     "algotrade.storage | algotrade.config | algotrade.quant",
     "algotrade.core",
 ]
@@ -168,10 +169,38 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
-name = "Feature definitions and configs are pure: no storage I/O"
+name = "Configs are pure: no storage I/O"
 type = "forbidden"
-source_modules = ["algotrade.features", "algotrade.config"]
+source_modules = ["algotrade.config"]
 forbidden_modules = ["algotrade.storage"]
+
+[[tool.importlinter.contracts]]
+name = "Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"
+type = "forbidden"
+source_modules = [
+    "algotrade.features.rollups",
+    "algotrade.features.registry",
+    "algotrade.features.framework.declaration",
+    "algotrade.features.framework.columns",
+]
+forbidden_modules = [
+    "algotrade.storage",
+    "algotrade.data",
+    "algotrade.config",
+    "algotrade.services",
+    "algotrade.engines",
+    "algotrade.strategies",
+    "algotrade.analytics",
+    "algotrade.features.framework.inputs",
+    "algotrade.features.framework.runner",
+]
+
+[[tool.importlinter.contracts]]
+name = "The rollup framework reads market data only through algotrade.data (never storage)"
+type = "forbidden"
+source_modules = ["algotrade.features.framework"]
+forbidden_modules = ["algotrade.storage", "algotrade.services", "algotrade.engines"]
+allow_indirect_imports = true  # algotrade.data hands the generic reader on
 
 [[tool.importlinter.contracts]]
 name = "Only the ingestion app writes market and feature data (ADR 0005)"

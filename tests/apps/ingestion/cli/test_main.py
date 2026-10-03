@@ -93,10 +93,20 @@ def test_individual_steps_and_purge(env: Path, capsys: pytest.CaptureFixture[str
     assert (code, chains["universe"], chains["status"]) == (0, 1, "complete")
     code, dry = call(capsys, "migrate-ids", "--dry-run")
     assert (code, dry["dry_run"], dry["mapped_ids"], dry["tables"]) == (0, True, 0, {})
-    code, features = call(capsys, "features", "--date", DAY)
-    assert features["liq_status"] == {"OK": 1}
-    code, again = call(capsys, "run", "features", "--date", DAY)  # the generic form
-    assert (code, again["liq_status"], again["status"]) == (0, {"OK": 1}, "complete")
+    code, features = call(capsys, "features", "--date", DAY)  # the pre-2b.2 name, an alias
+    assert (code, features["option_liquidity@v1"]["rows"]) == (0, 1)
+    assert features["price_stats@v1"]["no_input_sessions"] == [DAY]  # no bars stored
+    code, again = call(capsys, "run", "rollups", "--date", DAY)  # the generic form
+    assert (code, again["option_liquidity@v1"]["rows"], again["status"]) == (0, 1, "complete")
+    code, only = call(
+        capsys, "rollups", "--from", "2026-09-30", "--to", DAY, "--only", "option_liquidity@v1"
+    )
+    assert only["range"] == ["2026-09-30", DAY, 3]
+    assert (only["option_liquidity@v1"]["sessions"], only["option_liquidity@v1"]["no_input"]) == (
+        1,
+        2,
+    )
+    assert "price_stats@v1" not in only
     code, audit = call(capsys, "screen", "--date", DAY, "--export-dir", str(env / "out"))
     assert audit["coverage"] == "COMPLETE"
     code, purged = call(capsys, "purge-raw", "--keep-days", "0", "--date", "2026-10-03")

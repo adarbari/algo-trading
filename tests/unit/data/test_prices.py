@@ -81,3 +81,20 @@ def test_frame_to_series_timestamps_are_naive_utc() -> None:
 def test_missing_catalogue() -> None:
     with pytest.raises(MissingDataError, match="golden"):
         list_datasets(StoreReader(MemoryBackend()))
+
+
+def test_session_bars_adjust_each_window_as_of_its_session() -> None:
+    from algotrade.data.prices import session_bars  # noqa: PLC0415
+    from tests.rollup_helpers import store, write_bars, write_split  # noqa: PLC0415
+
+    writer, reader = store()
+    days = write_bars(writer, {"EQ:A": [100.0, 100.0, 50.0, 50.0], "EQ:B": [10.0] * 4})
+    write_split(writer, "EQ:A", days[2], 2.0, stored=days[-1])
+    loaded = session_bars(reader, days[0], days[-1])
+    before = loaded.window(days[0], days[1])  # the split had not happened yet
+    assert list(before.loc[before["instrument_id"] == "EQ:A", "close"]) == [100.0, 100.0]
+    after = loaded.window(days[0], days[-1])
+    a = after[after["instrument_id"] == "EQ:A"]
+    assert list(a["close"]) == [50.0] * 4 and list(a["volume"]) == [2000.0, 2000.0, 1000.0, 1000.0]
+    assert list(after.loc[after["instrument_id"] == "EQ:B", "close"]) == [10.0] * 4
+    assert loaded.window(days[2], days[2])["session_date"].tolist() == [days[2]] * 2

@@ -29,8 +29,8 @@ replace it. Readers take the latest run, and the earlier file stays as history.
 
 ## Tables written each night
 
-Nightly order: universe → company details → earnings → bars → corporate actions → chains →
-features → screens → quality → purge.
+Nightly order: universe → company details → earnings → bars → rates → corporate actions →
+chains → rollups → screens → quality → purge.
 
 | Step | Table | One row is | Rows / night | Parquet / night | Main columns (beyond the common four) |
 |---|---|---|---|---|---|
@@ -47,7 +47,9 @@ features → screens → quality → purge.
 | chains | **`chains/option_quotes`** | an option contract × session | **~1.5M** | **~55 MB** (measured 37 B/row) | `underlying_id`, `ts`, `root`, `expiry`, `right`, `strike`, `last`, `bid`, `ask`, `bid_size`, `ask_size`, `volume`, `open_interest`, `iv`, `delta`, `gamma`, `vega`, `theta`, `rho`, `theo` |
 | | `chains/underlying_quotes` | an underlying × session | ~4.2k | ~0.3 MB *est.* | `price`, `open`, `high`, `low`, `close`, `prev_close`, `volume`, `iv30` |
 | | `chains/status` | every universe underlying, fetched or not | ~4.2k | tiny | `status` (OK, NO_CHAIN, NO_STANDARD_SERIES, STALE_DATA, FETCH_ERROR) |
-| features | `rollups/instrument/option_liquidity@v1` | an underlying × session | ~4.2k | ~0.3 MB *est.* | `liq_status`, `put_tier`, `call_tier`, `chain_oi`, `chain_volume`, `expiries_within_60d`, `underlying_price`, `iv30`, … |
+| rollups | `rollups/instrument/option_liquidity@v1` | an underlying × session | ~4.2k | ~0.3 MB *est.* | `liq_status`, `put_tier`, `call_tier`, `chain_oi`, `chain_volume`, `expiries_within_60d`, `underlying_price`, `iv30`, … |
+| | `rollups/instrument/price_stats@v1` | an instrument with a bar that session | ~12.6k (measured 2026-10-02) | ~1 MB *est.* | `close`, `sma_20/50/200`, `ret_20d/60d`, `high_52w`, `low_52w`, `pct_from_high/low_52w`, `hv20`, `hv30`, `hv20_yz`, `adv_usd_20d`, `history_days` |
+| | `rollups/instrument/earnings@v1` | an instrument with a known next / last report | ~4.4k | ~0.05 MB *est.* | `next_earnings_date`, `earnings_time`, `days_to_earnings`, `date_confirmed`, `last_earnings_date` |
 | screens | `results/<screener>` | an instrument the screener evaluated | up to ~4.2k per screener | small | defined by the screener |
 
 **About 58 MB of tables per night, which is about 14.6 GB a year** (252 sessions). Option

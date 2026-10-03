@@ -4,7 +4,9 @@ For each session (``sessions.plan_sessions``; oldest first) the steps in ``NIGHT
 order through ``tasks/framework/registry.py``, each isolated (``steps.run_isolated``): a step that
 raises is FAILED and later steps still run, unless they name it in ``blocked_by``. Sources
 that only serve the current snapshot (universe files, SEC, Cboe chains) run only for the
-latest closed session; bars, rates, corporate actions and earnings catch up. ``quality`` ends every
+latest closed session; bars, rates, corporate actions, earnings and rollups catch up (rollups
+after the data they read; one whose input a session lacks, e.g. option liquidity without that
+session's chains, reports ``no_input``). ``quality`` ends every
 session and the ``purge-raw`` task ends the run, whatever failed before. Each session gets
 a ``nightly`` run record (COMPLETE / PARTIAL / FAILED, per ``steps.overall``), which is how
 the next run knows where to resume.
@@ -45,7 +47,7 @@ LATEST_ONLY = "latest closed session only (the source serves the current snapsho
 
 
 def universe_exists(ctx: TaskContext, session: date) -> str | None:
-    """Chains, features and screens need a universe snapshot (not today's build passing)."""
+    """Chains and screens need a universe snapshot (not today's build passing)."""
     if snapshot(ctx.reader, "universe", session) is None:
         return f"no universe snapshot for {session}"
     return None
@@ -59,8 +61,9 @@ NIGHTLY: tuple[Step, ...] = (
     Step("rates"),
     Step("corporate-actions"),
     Step("chains", requires=universe_exists, latest_only=True),
-    Step("features", blocked_by=("chains",), requires=universe_exists, latest_only=True),
-    Step(SCREENS, blocked_by=("features",), requires=universe_exists, latest_only=True),
+    # Every session (catch-up too): a rollup whose input is missing reports no_input.
+    Step("rollups"),
+    Step(SCREENS, blocked_by=("chains", "rollups"), requires=universe_exists, latest_only=True),
     Step("quality"),  # always last in a session
 )
 FINALLY: tuple[Step, ...] = (Step(PURGE),)  # once, after every session

@@ -8,6 +8,9 @@ Corporate actions are applied here, at read time (ADR 0016), from ``events/split
                     split is not a price jump; the default for backtests
 - ``total_return``: splits, plus earlier bars scaled by ``1 - dividend / previous close`` at
                     each ex-date, so returns include dividends
+
+``session_bars`` serves rollups: one load for a range of sessions, then each session's
+lookback window split-adjusted as of that session (never by a later split).
 """
 
 from collections.abc import Sequence
@@ -63,6 +66,18 @@ ADJUSTMENTS = ("none", "splits", "total_return")
 _PRICES = ["open", "high", "low", "close"]
 
 
+def _utc_ns(values: pd.Series) -> np.ndarray:
+    """Timestamps as naive UTC ``datetime64[ns]`` (fast comparisons, no Timestamp objects)."""
+    return pd.to_datetime(values, utc=True).dt.tz_convert(None).to_numpy(dtype="datetime64[ns]")
+
+
+def _rows_of(ids: pd.Series, wanted: Sequence[str]) -> dict[str, np.ndarray]:
+    """Row positions (ascending) of each wanted instrument; hashing, not a scan per event."""
+    selected = np.flatnonzero(ids.isin(list(wanted)).to_numpy())
+    sub = ids.to_numpy(dtype=str)[selected]
+    return {iid: selected[sub == iid] for iid in set(wanted)}
+
+
 def adjust_bars(
     bars: pd.DataFrame, splits: pd.DataFrame, dividends: pd.DataFrame, mode: str
 ) -> pd.DataFrame:
@@ -72,27 +87,27 @@ def adjust_bars(
     if mode == "none" or bars.empty:
         return bars
     out = bars.copy()
-    ids = out["instrument_id"].to_numpy(dtype=str)
-    ts = pd.to_datetime(out["ts"], utc=True).to_numpy()
-    close = out["close"].to_numpy(dtype=float)
+    ids = out["instrument_id"].astype(str)
+    ts = _utc_ns(out["ts"])
+    close = out["close"].to_numpy(dtype=float).copy()
     price_factor = np.ones(len(out))
     volume_factor = np.ones(len(out))
     if not splits.empty:
         split_ids = splits["instrument_id"].to_numpy(dtype=str)
-        split_ts = pd.to_datetime(splits["ts"], utc=True).to_numpy()
+        rows = _rows_of(ids, list(split_ids))
         for iid, when, ratio in zip(
-            split_ids, split_ts, splits["ratio"].to_numpy(dtype=float), strict=True
+            split_ids, _utc_ns(splits["ts"]), splits["ratio"].to_numpy(dtype=float), strict=True
         ):
-            before = (ids == iid) & (ts < when)
+            before = rows[iid][ts[rows[iid]] < when]
             price_factor[before] /= ratio
             volume_factor[before] *= ratio
     if mode == "total_return" and not dividends.empty:
         div_ids = dividends["instrument_id"].to_numpy(dtype=str)
-        div_ts = pd.to_datetime(dividends["ts"], utc=True).to_numpy()
+        rows = _rows_of(ids, list(div_ids))
         amounts = dividends["cash_amount"].to_numpy(dtype=float)
-        for iid, when, amount in zip(div_ids, div_ts, amounts, strict=True):
-            before = (ids == iid) & (ts < when)
-            if before.any():
+        for iid, when, amount in zip(div_ids, _utc_ns(dividends["ts"]), amounts, strict=True):
+            before = rows[iid][ts[rows[iid]] < when]
+            if len(before):
                 previous_close = close[before][-1]  # unadjusted basis, as the cash amount is
                 if previous_close > amount:
                     price_factor[before] *= 1 - amount / previous_close
@@ -145,3 +160,73 @@ def load_price_data(
         )
     terms = instrument_terms(reader, start, instruments, as_of)
     return PriceData(align(frame_to_series(frame)), terms, versions, snapshot)
+
+
+# ---------------------------------------------------------------------- per-session windows
+_WINDOW_COLUMNS = ["instrument_id", "session_date", "open", "high", "low", "close", "volume"]
+
+
+@dataclass(frozen=True)
+class SessionBars:
+    """Daily bars for a range of sessions, split-adjusted ONCE (to the range end), that hand
+    out any session's lookback window in that session's share terms.
+
+    A bar's split-adjusted price as of session D is its raw price divided by the ratios of the
+    splits with ex-date in (bar, D]. The frame is adjusted for every split up to the range end,
+    so ``window`` multiplies back the ratios of the splits after D: a later split never leaks
+    into an earlier session's values (point in time), and one load serves a whole backfill.
+    """
+
+    frame: pd.DataFrame  # _WINDOW_COLUMNS, sorted by (session_date, instrument_id)
+    splits: pd.DataFrame  # instrument_id, ex_date (date), ratio
+    _days: np.ndarray  # frame session dates as datetime64[D], for slicing
+    _rows: dict[str, np.ndarray]  # frame row positions of each instrument with a split
+
+    def window(self, first: date, session: date) -> pd.DataFrame:
+        """Bars with ``first <= session_date <= session``, adjusted as of ``session``."""
+        lo = int(np.searchsorted(self._days, np.datetime64(first, "D"), side="left"))
+        hi = int(np.searchsorted(self._days, np.datetime64(session, "D"), side="right"))
+        out = self.frame.iloc[lo:hi]
+        later = self.splits[self.splits["ex_date"] > session]
+        if later.empty or out.empty:
+            return out
+        factor = np.ones(hi - lo)
+        for iid, ratio in later.groupby("instrument_id")["ratio"].prod().items():
+            rows = self._rows[str(iid)]
+            factor[rows[(rows >= lo) & (rows < hi)] - lo] *= ratio
+        out = out.copy()
+        out[_PRICES] = out[_PRICES].to_numpy() * factor[:, None]
+        out["volume"] = out["volume"].to_numpy() / factor
+        return out
+
+
+def session_bars(
+    reader: StoreReader,
+    start: date,
+    end: date,
+    instruments: Sequence[str] | None = None,
+    as_of: datetime | None = None,
+) -> SessionBars:
+    """Daily bars for ``start..end`` (split events in the range applied) as ``SessionBars``.
+
+    Raises ``MissingDataError`` when no bars are stored in the range."""
+    frame = bars(reader, "1d", start, end, instruments, as_of)
+    splits = read_events(reader, "events/split", start, end, instruments, as_of).frame
+    no_dividends = pd.DataFrame(columns=["instrument_id", "ts", "cash_amount"])
+    frame = adjust_bars(frame, splits, no_dividends, "splits")[_WINDOW_COLUMNS]
+    frame = frame.sort_values(["session_date", "instrument_id"], kind="stable")
+    frame = frame.reset_index(drop=True)
+    table = pd.DataFrame(
+        {
+            "instrument_id": splits["instrument_id"].astype(str) if len(splits) else [],
+            "ex_date": pd.to_datetime(splits["ts"], utc=True).dt.date if len(splits) else [],
+            "ratio": splits["ratio"].astype(float) if len(splits) else [],
+        }
+    )
+    days = pd.to_datetime(frame["session_date"]).to_numpy(dtype="datetime64[D]")
+    return SessionBars(
+        frame,
+        table,
+        days,
+        _rows_of(frame["instrument_id"].astype(str), list(table["instrument_id"])),
+    )

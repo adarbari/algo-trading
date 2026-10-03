@@ -137,6 +137,25 @@ def sessions_between(start: date, end: date) -> list[date]:
     ]
 
 
+def sessions_ending(day: date, n: int) -> list[date]:
+    """The ``n`` sessions ending at ``day`` (its last session on or before it), oldest first."""
+    if n < 1:
+        raise ValueError(f"n must be >= 1, got {n}")
+    last = day if is_session(day) else previous_session(day)
+    out = [last]
+    while len(out) < n:
+        out.append(previous_session(out[-1]))
+    return out[::-1]
+
+
+def sessions_to(start: date, end: date) -> int:
+    """How many sessions after ``start`` up to and including ``end`` (0 when ``end <= start``):
+    the trading days until an event on ``end``, seen from ``start``."""
+    if end <= start:
+        return 0
+    return len(sessions_between(start + timedelta(1), end))
+
+
 def exchange_date(now: datetime) -> date:
     """The calendar date in New York at ``now`` (an aware datetime)."""
     return now.astimezone(EXCHANGE_TZ).date()

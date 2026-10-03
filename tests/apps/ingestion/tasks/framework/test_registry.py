@@ -101,7 +101,7 @@ def test_nightly_skips_tasks_without_sources_or_by_rule() -> None:
     assert pipeline.skip_reason("universe-build", c) == "skipped: csv_import mode"  # no configs
     c.configs = MemoryConfigStore({("site", "settings", "universe"): {"source": "nasdaq_trader"}})
     assert pipeline.skip_reason("universe-build", c) is None
-    assert pipeline.skip_reason("features", c) is None
+    assert pipeline.skip_reason("rollups", c) is None
 
 
 def test_every_task_declares_a_description_and_sessions_where_needed() -> None:

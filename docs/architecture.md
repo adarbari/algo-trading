@@ -41,7 +41,7 @@ versus planned. Detail lives in companion docs:
    services/    use cases: backtests/ · screening/ (+ exports) · jobs/ · evaluation/ · configs, selection
    engines/     backtest/ · screening/ · selection/
    strategies/  trading/ (backtests) · screeners/. Pure: MarketView / FeatureView in, decisions out.
-   features/    versioned rollup definitions          analytics/   metrics, reports
+   features/    rollups: framework/ · rollups/ · registry  analytics/   metrics, reports
    storage/     tables/ (schemas, readers / writers) · backends/ · configs/ (config store) · runs, locks
    config/      site/ (L3 settings) · strategy/ (configs, selections, resolution + hash) · env, user
    quant/       pure numerics: Black-Scholes price + Greeks, IV, realised vol, rate conventions
@@ -53,9 +53,9 @@ versus planned. Detail lives in companion docs:
 | Area | Built | Planned (phase) |
 |---|---|---|
 | Apps | `apps/ingestion`, `apps/backtest` | `apps/api` (4), `apps/web` (5) |
-| L1 | `instruments/reference` from the Nasdaq Trader + SPY universe builder (or universe CSVs) with FIGI / CIK and vendor security types (Massive), `instruments/symbol_history`, FIGI-based `instrument_id` + `instruments/id_map` + `SymbolResolver` (ADR 0018), company details (SEC EDGAR), `events/reference_change` (incl. `ticker_changed`, `id_changed`) + `events/index_change`, `rollups/instrument/option_liquidity@v1`, `InstrumentView` reader | `price_stats`, `iv_history`, `earnings`, `liquidity_class`, `fundamentals` rollups (2b) |
+| L1 | `instruments/reference` from the Nasdaq Trader + SPY universe builder (or universe CSVs) with FIGI / CIK and vendor security types (Massive), `instruments/symbol_history`, FIGI-based `instrument_id` + `instruments/id_map` + `SymbolResolver` (ADR 0018), company details (SEC EDGAR), `events/reference_change` (incl. `ticker_changed`, `id_changed`) + `events/index_change`, rollups `option_liquidity@v1`, `price_stats@v1`, `earnings@v1` (the rollup framework, 2b.2), `InstrumentView` reader | `iv_history`, `liquidity_class`, `fundamentals` rollups (2b) |
 | L2 | `chains/*` (Cboe), `events/earnings` (Nasdaq), `bars/1d` + `events/split` + `events/dividend` (Massive, unadjusted; adjusted at read time), `rates/treasury` (U.S. Treasury par yield curve), golden data | live Massive run awaits the API key (1); intraday bars + `rollups/daily/*` (6) |
-| L3 | `defaults.toml`, `universe.toml`, `overrides/leveraged_etfs.csv`, `presets/selections/*`, `presets/strategies/*` | `sources.toml` (1, done); `rollups.toml` (2b) |
+| L3 | `defaults.toml`, `universe.toml`, `sources.toml`, `nightly.toml`, `rollups.toml`, `overrides/leveraged_etfs.csv`, `presets/selections/*`, `presets/strategies/*` | |
 | L4 | `strategies/`, `selections/` | `watchlists/`, `preferences.toml` (4–5); DB-backed `ConfigStore` (4) |
 | Jobs | local runner keyed by config hash; `backtest`, `screen`, `nightly` | queue-backed runner (6) |
 | Other | uv workspace, Parquet storage (local + memory backends), `quant/` (ADR 0021) | DuckDB query engine and catalog; S3 backend for hosting (6) |
@@ -197,11 +197,12 @@ handler), `steps.py` (isolation, status rule), `sessions.py` (catch-up), `screen
 jobs), `notify.py` (summary + notification).
 
 - **Steps** (`NIGHTLY`): `universe-build`, `company-details`, `earnings`, `bars`, `rates`,
-  `corporate-actions`, `chains`, `features`, `screens`, `quality`; then `purge-raw` once
+  `corporate-actions`, `chains`, `rollups`, `screens`, `quality`; then `purge-raw` once
   (`FINALLY`). Each is a registry task (or the `screens` job step) run in isolation: an
   exception makes the step FAILED with its error and later steps still run. A step names its
-  hard dependencies (`features` on `chains`, `screens` on `features`): when one FAILED it is
-  BLOCKED. Data preconditions are separate: `chains`, `features` and `screens` need a universe
+  hard dependencies (`screens` on `chains` and `rollups`): when one FAILED it is BLOCKED.
+  `rollups` runs for every session and reports a rollup whose input the session lacks as
+  `no_input`. Data preconditions are separate: `chains` and `screens` need a universe
   snapshot to exist, not today's build to succeed. Missing sources → SKIPPED with the reason.
   `quality` ends every session and `purge-raw` ends the run, whatever failed before. Every
   step records its status and duration.
@@ -218,9 +219,9 @@ jobs), `notify.py` (summary + notification).
 - **Catch-up** (`sessions.py`): without `--date`, the nightly runs every session after the
   last COMPLETE / PARTIAL nightly up to the last closed session, oldest first, capped at the
   latest `max_catch_up` (5; older ones are reported as `catch_up.dropped`). A FAILED nightly
-  is retried next time. Bars, corporate actions and earnings catch up; sources that only serve
-  the current snapshot (universe files, SEC, Cboe chains) and what depends on them (features,
-  screens) run only for the latest session. Chains still check that the Cboe snapshot's
+  is retried next time. Bars, corporate actions, earnings and rollups catch up; sources that
+  only serve the current snapshot (universe files, SEC, Cboe chains) and screens run only for
+  the latest session. Chains still check that the Cboe snapshot's
   session matches (`STALE_DATA` otherwise). `--date D` runs exactly D.
 - **Screens are jobs**: one `screen` job per scheduled screener config, for its owner;
   exports are that job's output. The screen audit records `universe_pre_snapshot`
@@ -270,7 +271,9 @@ apps/ingestion (algotrade_ingestion) · apps/backtest (algotrade_backtest)   nev
         │
  strategies/ (trading · screeners) · features/ · analytics/
         │
-     storage/ · config/
+     data/               the domain read API (features' framework reads through it)
+        │
+     storage/ · config/ · quant/
         │
       core/
 ```
@@ -291,7 +294,7 @@ Extra contracts:
 | `quant/` | Pure numerics (ADR 0021): `black_scholes` (European price + Greeks, continuous q and r), `implied_vol` (safeguarded Newton, NaN + status code on failure), `realized_vol` (close-to-close, Parkinson, Garman-Klass, Yang-Zhang; 252), `rates` (par → continuous, tenor days, curve interpolation). | numpy, core |
 | `strategies/` → `trading/` | Backtest strategies: `MarketView` in, target weights out, plus their registry. | core, quant |
 | `strategies/` → `screeners/` | Screener contract, shared `Decision` categories, `short_premium_liquidity`. | core, quant |
-| `features/` | Pure, versioned rollup definitions (`option_liquidity@v1`) with declared output columns, and their registry. | core |
+| `features/` | Rollups (2b.2): `framework/` (the `Rollup` declaration: inputs + lookback, params from `rollups.toml`, typed columns; inputs loaded through `data`; the per-session runner, point in time, chunked backfills), `rollups/` (pure definitions: `option_liquidity`, `price_stats`, `earnings` @v1; only core, quant, numpy, pandas), `registry.py` (the selection catalogue and the `rollups` task are built from it). | data (framework only), config.site, quant, core |
 | `analytics/` | Metrics and report formatting from equity curves + fills. | core |
 | `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. `selection/`: three-valued evaluation with a per-rule audit. | strategies, config, analytics, core |
 | `services/` | Use cases: `backtests/`, `screening/` (run + `exports`), `jobs/`, `evaluation/`; shared by several: `configs`, `selection`, golden `datasets`, `views` (FeatureView builder). | everything below except `storage.tables.writers` and `storage.tables.readers` (through `data/`) |
@@ -322,7 +325,8 @@ src/algotrade/
     configs/      store.py (ConfigStore), files.py            config documents only
   quant/          black_scholes, implied_vol, realized_vol, rates   pure numerics (numpy)
   data/           reference, prices, events, chains, rates, resolver
-  features/  strategies/{trading,screeners}/  engines/{backtest,screening,selection}/  analytics/
+  features/       framework/ (declaration, columns, inputs, runner), rollups/, registry
+  strategies/{trading,screeners}/  engines/{backtest,screening,selection}/  analytics/
   services/       configs, datasets, selection, views         shared by several use cases
     backtests/    run.py
     screening/    run.py, exports.py
@@ -349,7 +353,7 @@ apps/ingestion/algotrade_ingestion/
     reference/    universe_build, universe_import, classify, instrument_ids, reference_diff,
                   symbol_history, company_details
     market/       bars, corporate_actions, earnings, option_chains, rates
-    derived/      features
+    derived/      rollups
     maintenance/  quality, purge, migrate_ids, golden
   workflows/
     nightly/      nightly, steps, sessions, screens, notify
@@ -509,7 +513,7 @@ An ingestion **task** produces stored tables and one run record; a **job** is so
   `algotrade-ingest <task>`, `algotrade-ingest run <task>` and nightly cannot drift.
 - one module per dataset, grouped by domain (`market/`: `bars.py`, `corporate_actions.py`,
   `earnings.py`, `option_chains.py`, `rates.py`; `reference/`: `company_details.py`, `universe_build.py`,
-  `universe_import.py`; `derived/`: `features.py`; `maintenance/`: `quality.py`, `purge.py`,
+  `universe_import.py`; `derived/`: `rollups.py`; `maintenance/`: `quality.py`, `purge.py`,
   `migrate_ids.py`, `golden.py`): only what to fetch, how to combine frames, task stats.
 
 Sources are built by the source registry (`sources/framework/registry.py`, R4): each declared once with

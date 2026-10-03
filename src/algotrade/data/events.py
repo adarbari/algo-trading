@@ -51,3 +51,19 @@ def read_events(
     )
     frame = frame.sort_values(["instrument_id", "ts"], kind="stable").reset_index(drop=True)
     return Events(frame, sorted(map(str, frame["run_id"].unique())))
+
+
+def stored_events(
+    reader: StoreReader, table: str, through: date, as_of: datetime | None = None
+) -> pd.DataFrame:
+    """Every stored row of ``table`` from partitions on or before ``through``, as stored.
+
+    Unlike ``read_events`` nothing is merged: each row keeps the ``session_date`` of the run
+    that stored it, so a consumer can tell what was known on each session (e.g. the earnings
+    calendar as of D: the snapshots stored on or before D). Empty when nothing is stored."""
+    frame = reader.table_range(table, ALL_TIME[0], through, as_of)
+    if frame is None:
+        return pd.DataFrame(columns=["instrument_id", "ts", "session_date"])
+    return frame.sort_values(["session_date", "instrument_id", "ts"], kind="stable").reset_index(
+        drop=True
+    )
