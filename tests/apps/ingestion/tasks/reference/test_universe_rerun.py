@@ -17,12 +17,14 @@ import pytest
 from algotrade.data import StoreReader
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.sources.framework.http import RetryPolicy
 from algotrade_ingestion.sources.vendors.massive.tickers import MassiveTickers
 from algotrade_ingestion.sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
 from algotrade_ingestion.sources.vendors.ssga.spy_holdings import SpyHoldingsSource
+from algotrade_ingestion.tasks.framework.run import IngestRun
 from algotrade_ingestion.tasks.maintenance.migrate_ids import load_id_map, migrate_ids
 from algotrade_ingestion.tasks.reference.instrument_ids import ID_MAP
 from algotrade_ingestion.tasks.reference.universe_build import (
@@ -222,3 +224,35 @@ def test_a_ticker_that_flips_back_within_a_session_reopens_its_row(backend: Back
     assert sorted(history.index) == ["NEWT", "OLDT"]
     assert history.loc["OLDT", "valid_from"] == D1 and history.loc["OLDT", "valid_to"] == D2
     assert history.loc["NEWT", "valid_from"] == D2 and pd.isna(history.loc["NEWT", "valid_to"])
+
+
+def test_a_build_failing_at_symbol_history_leaves_the_previous_snapshot(
+    backend: Backend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """2026-10-02: a build wrote reference and universe, then failed at symbol_history; the
+    two tables stayed live and disagreed with history. A run now publishes all or nothing."""
+    store = Store(backend)
+    store.build(D2, at(4), ["AAPL", "KO"], figis("AAPL", "KO"))
+    before = {t: store.table(t, D2) for t in (REFERENCE, "universe", HISTORY)}
+    real = IngestRun.write
+
+    def failing(run: IngestRun, table: str, *args: Any, **kwargs: Any) -> None:
+        if table == HISTORY:
+            raise OSError("symbol_history write failed")
+        real(run, table, *args, **kwargs)
+
+    monkeypatch.setattr(IngestRun, "write", failing)
+    with pytest.raises(OSError):
+        store.build(D2, at(9), ["AAPL", "KO", "DFAC"], figis("AAPL", "KO", "DFAC"))
+    for table, frame in before.items():
+        pd.testing.assert_frame_equal(store.table(table, D2), frame)
+    assert backend.tables.pending_runs() == []
+    (failed,) = [r for r in store.reader.runs("universe_build", D2) if r.started_at == at(9)]
+    assert failed.status is RunStatus.FAILED
+    monkeypatch.setattr(IngestRun, "write", real)
+    store.build(D2, at(10), ["AAPL", "KO", "DFAC"], figis("AAPL", "KO", "DFAC"))
+    reference = store.table(REFERENCE, D2).set_index("symbol")
+    history = store.table(HISTORY, D2)
+    assert "DFAC" in reference.index
+    dfac = history[history["instrument_id"].eq(reference.loc["DFAC", "instrument_id"])]
+    assert list(dfac["symbol"]) == ["DFAC"]

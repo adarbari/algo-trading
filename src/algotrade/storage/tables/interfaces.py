@@ -19,6 +19,13 @@ class TableStore(Protocol):
     table gives the latest run known at ``as_of``; a ``merge`` table (events) the union of
     the runs known at ``as_of``, the latest run's row winning per table key, starting from
     the latest run written with ``restates=True`` (a rewrite of the whole partition).
+
+    **Atomic runs (ADR 0022).** A write with ``pending=True`` is not visible until
+    ``commit_run(run_id, at)``, which makes every partition the run wrote visible at once
+    (``at``: what ``as_of`` compares with); ``abort_run`` drops them. A single read never
+    sees part of a commit. ``own_run`` lets the writing run read its own pending writes.
+    A store crashed mid-commit is completed by ``recover_runs`` (and by the next commit);
+    a run that crashed before committing stays invisible until aborted.
     """
 
     def write(
@@ -28,7 +35,29 @@ class TableStore(Protocol):
         run_id: str,
         frame: pd.DataFrame,
         restates: bool = False,
+        pending: bool = False,
     ) -> None: ...
+
+    def commit_run(self, run_id: str, at: datetime) -> int:
+        """Publish every pending write of ``run_id`` at once; -> partitions published."""
+        ...
+
+    def abort_run(self, run_id: str) -> int:
+        """Drop the pending writes of ``run_id`` (and their files); -> partitions dropped."""
+        ...
+
+    def pending_runs(self) -> list[str]:
+        """Runs with pending writes, committed by nobody yet."""
+        ...
+
+    def recover_runs(self) -> list[str]:
+        """Complete commits a crash interrupted; -> their run ids. Idempotent."""
+        ...
+
+    def purge_pending_before(self, cutoff: datetime) -> int:
+        """Abort pending runs whose last pending write was before ``cutoff`` (retention for
+        runs that crashed); -> the number of runs aborted."""
+        ...
 
     def read(
         self,
@@ -36,6 +65,7 @@ class TableStore(Protocol):
         session_date: date,
         as_of: datetime | None = None,
         instruments: Sequence[str] | None = None,
+        own_run: str | None = None,
     ) -> pd.DataFrame | None: ...
 
     def read_range(
@@ -45,15 +75,16 @@ class TableStore(Protocol):
         end: date,
         as_of: datetime | None = None,
         instruments: Sequence[str] | None = None,
+        own_run: str | None = None,
     ) -> pd.DataFrame | None:
         """All partitions with ``start <= session_date <= end``, each resolved point-in-time
         exactly as ``read`` would (runs merged per partition, not across partitions),
-        concatenated in date order. ``None`` if none exist."""
+        concatenated in date order, all as of one commit. ``None`` if none exist."""
         ...
 
-    def dates(self, table: str) -> list[date]: ...
+    def dates(self, table: str, own_run: str | None = None) -> list[date]: ...
 
-    def names(self) -> list[str]:
+    def names(self, own_run: str | None = None) -> list[str]:
         """Every table with at least one partition, sorted."""
         ...
 

@@ -242,6 +242,11 @@ jobs), `notify.py` (summary + notification).
   temp file in its directory and renamed into place; a run replaces only its own partition.
   The per-partition run index (`_runs.json`) is updated under a file lock, so two runs writing
   the same partition at once (threads or processes) are both indexed (contract-tested).
+- **A run publishes all its tables at once** (ADR 0022): `IngestRun` writes pending and
+  commits every table when the run finishes COMPLETE or PARTIAL; a FAILED run publishes
+  nothing. A read never sees half a commit. A crash mid-commit is completed, and a crashed
+  run's pending writes dropped, when the next writing command starts (under the ingest
+  lock); retention (`purge-raw`) drops pending writes nobody claimed.
 - **One ingest run at a time per store:** every writing `algotrade-ingest` command takes the
   store's `ingest` lock (`Backend.lock`; local: `locks/ingest.lock` under the data root). A
   second run exits with code 3, or queues with `--wait`. Holding it, the CLI marks `nightly` /

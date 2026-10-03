@@ -50,7 +50,7 @@ def ingest_rates(
         for year in range(start.year, end.year + 1):
             run.attempt(str(year), partial(_one_year, run, source, year, (start, end), stored))
             run.checkpoint()
-        in_window = [d for d in ctx.reader.dates(TABLE) if start <= d <= end]
+        in_window = [d for d in run.reader.dates(TABLE) if start <= d <= end]
         run.stats.update(
             window=[start.isoformat(), end.isoformat()],
             curves=len(in_window),

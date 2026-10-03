@@ -40,7 +40,7 @@ def _indexed_runs(backend: Backend) -> set[str]:
         index = backend.tables._index(directory)
         assert not list(directory.glob("*.tmp")), "temp files left behind"
         return set(index)
-    return set(backend.tables._data[(TABLE, DAY)])  # type: ignore[attr-defined]
+    return set(backend.tables._partitions[(TABLE, DAY)])  # type: ignore[attr-defined]
 
 
 def test_concurrent_threads_writing_one_partition_are_all_indexed(backend: Backend) -> None:

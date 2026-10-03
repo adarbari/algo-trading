@@ -1,11 +1,14 @@
 """``IngestRun``: raw save, id resolution, stamping, status rules and the failure path."""
 
 from datetime import UTC, date, datetime
+from pathlib import Path
 
 import pandas as pd
 import pytest
 
 from algotrade.data import StoreReader
+from algotrade.storage.backends import local_index
+from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
@@ -13,6 +16,7 @@ from algotrade_ingestion.sources.framework.base import FetchRequest, Normalized
 from algotrade_ingestion.tasks.framework.run import (
     IngestRun,
     NoResponseError,
+    recover_unpublished,
     run_summary,
     stamp,
 )
@@ -164,3 +168,86 @@ def test_resolvers_are_cached_per_reference_snapshot() -> None:
 def test_stamp_adds_point_in_time_columns() -> None:
     out = stamp(pd.DataFrame({"x": [1]}), DAY, NOW, "src", "r1")
     assert list(out.columns) == ["x", "session_date", "knowledge_ts", "source", "run_id"]
+
+
+# ---------------------------------------------------------------------- atomic publication
+
+A, B = "rollups/instrument/a@v1", "rollups/instrument/b@v1"
+
+
+def _rows(value: float) -> pd.DataFrame:
+    return pd.DataFrame({"instrument_id": ["EQ:A"], "value": [value]})
+
+
+def test_a_run_publishes_every_table_when_it_finishes() -> None:
+    writer, reader, backend = store()
+    with IngestRun(task_ctx(writer, reader, lambda: NOW), "demo", DAY) as run:
+        run.write(A, _rows(1.0), "test")
+        run.write(B, _rows(2.0), "test")
+        assert reader.table(A, DAY) is None  # not before the run finishes
+        own = run.reader.table(A, DAY)  # the run reads what it wrote
+        assert own is not None and list(own["value"]) == [1.0]
+        assert writer.load_run(run.run_id).status is RunStatus.RUNNING  # type: ignore[union-attr]
+    assert reader.table(A, DAY) is not None and reader.table(B, DAY) is not None
+    assert backend.tables.pending_runs() == []
+
+
+def test_a_failed_run_publishes_nothing() -> None:
+    writer, reader, backend = store()
+    ctx = task_ctx(writer, reader, lambda: NOW)
+    with pytest.raises(RuntimeError), IngestRun(ctx, "demo", DAY) as run:
+        run.write(A, _rows(1.0), "test")
+        raise RuntimeError("table b failed")
+    assert reader.table(A, DAY) is None and reader.dates(A) == []
+    assert backend.tables.pending_runs() == []
+    assert writer.load_run(run.run_id).status is RunStatus.FAILED  # type: ignore[union-attr]
+    with IngestRun(task_ctx(writer, reader, lambda: NOW), "explicit", DAY) as run:
+        run.write(A, _rows(1.0), "test")
+        run.failed("every step failed")
+    assert reader.table(A, DAY) is None
+
+
+def test_a_partial_run_still_publishes() -> None:
+    writer, reader, _ = store()
+    with IngestRun(task_ctx(writer, reader, lambda: NOW), "demo", DAY) as run:
+        run.write(A, _rows(1.0), "test")
+        run.partial("one source missing")
+    assert run.record.status is RunStatus.PARTIAL and reader.table(A, DAY) is not None
+
+
+def test_recovery_drops_what_a_crashed_run_wrote() -> None:
+    writer, reader, backend = store()
+    crashed = IngestRun(task_ctx(writer, reader, lambda: NOW), "demo", DAY).__enter__()
+    crashed.write(A, _rows(1.0), "test")  # the process dies here: no __exit__
+    backend.tables.write(B, DAY, "service-run", stamp(_rows(2.0), DAY, NOW, "t", "s"), pending=True)
+    assert recover_unpublished(writer, NOW) == {"completed": [], "dropped": [crashed.run_id]}
+    assert backend.tables.pending_runs() == ["service-run"]  # no record: left to retention
+    assert reader.table(A, DAY) is None
+
+
+def test_recovery_completes_a_commit_a_crash_interrupted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend = LocalBackend(tmp_path / "data")
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    real = local_index.write_index
+
+    def crash(directory: Path, entries: dict[str, object]) -> None:
+        raise OSError("power cut")
+
+    ctx = task_ctx(writer, reader, lambda: NOW)
+    with pytest.raises(OSError), IngestRun(ctx, "demo", DAY) as run:
+        run.write(A, _rows(1.0), "test")
+        run.write(B, _rows(2.0), "test")
+        monkeypatch.setattr(local_index, "write_index", crash)
+    monkeypatch.setattr(local_index, "write_index", real)
+    record = writer.load_run(run.run_id)
+    assert record is not None and record.status is RunStatus.FAILED
+    assert "commit failed" in record.stats["error"]
+    assert reader.table(A, DAY) is None
+    restarted = StoreWriter(LocalBackend(tmp_path / "data"))
+    assert recover_unpublished(restarted, NOW) == {"completed": [run.run_id], "dropped": []}
+    assert reader.table(A, DAY) is not None and reader.table(B, DAY) is not None
+    record = restarted.load_run(run.run_id)
+    assert record is not None and record.status is RunStatus.PARTIAL
+    assert "recovered" in record.stats

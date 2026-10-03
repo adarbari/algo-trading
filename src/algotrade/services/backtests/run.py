@@ -188,9 +188,10 @@ def run_configured_backtest(
     user = config.user.user_id
     record = start_run(f"backtest-{config.config.id}-{user}", end, now)
     run_id = record.run_id
-    for name, frame in _result_frames(outcome, end, run_id, now).items():
-        if not frame.empty:
-            writer.write_result(name, end, run_id, frame)
+    with writer.publishing(run_id, now):  # every result table visible at once (ADR 0022)
+        for name, frame in _result_frames(outcome, end, run_id, now).items():
+            if not frame.empty:
+                writer.write_result(name, end, run_id, frame, pending=True)
     stats = {
         "user": user,
         "config_id": config.config.id,

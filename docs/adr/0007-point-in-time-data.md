@@ -2,7 +2,7 @@
 
 **Status:** accepted (2026-10-02); amended 2026-10-02 (restructure R2: what `as_of` means,
 the snapshot rule, events by event date); amended 2026-10-03 (how runs combine: event runs
-merge)
+merge); amended 2026-10-03 (a run is visible from its commit, ADR 0022)
 
 ## Context
 Vendors revise data, index membership changes, and feature logic evolves. Without
@@ -52,6 +52,10 @@ return the combined view and every backend agrees (`tests/contract/storage/`).
   from it, so rows it replaced (e.g. old symbol ids) are not resurrected. Reads pinned
   before it still see the old union. The flag lives in the partition's run index; plain
   runs keep the original index format.
+- **Runs publish atomically** ([ADR 0022](0022-atomic-run-publication.md)): a run's
+  writes become visible together when it finishes COMPLETE or PARTIAL, and a read pinned
+  at `as_of` sees a run from its commit time (`visible_at`), not from its rows'
+  `knowledge_ts`. A FAILED run publishes nothing.
 - **No deletes yet.** Under `merge`, a later run that no longer contains an event (a
   cancelled dividend, a rescheduled earnings date within one session) does not remove it;
   a later row for the same key does replace it. Tombstones (an explicit "withdrawn" row)

@@ -62,6 +62,7 @@ only shrinks (`make dupes-update`).
 | Which ingestion steps run, with which defaults | `tasks/framework/registry.py`; nightly order, isolation, catch-up: `workflows/nightly/nightly.py` |
 | Vendor HTTP, retries, circuit breaker; pacing; building sources (incl. the golden fixture source); vendor specifics | `sources/framework/http.py`; `sources/framework/limiter.py` (one per key, cross-process); `sources/framework/registry.py`; `sources/vendors/<vendor>/` |
 | Locks: named store locks, run-index lock; one ingest run at a time | `storage/locks.py`; `services/jobs/exclusive.py` |
+| A run's table writes publish atomically (pending until COMPLETE / PARTIAL commits them all; FAILED drops them; crash recovery) | `storage/backends/` (`local_index.py`: commit marker + sequence); driven by `IngestRun` and `ResultWriter.publishing` (ADR 0022) |
 | Running long work (threads, recovery), screens | `services/jobs/` (apps call `run_job`, never build a runner; fan-out: `as_completed`); screens: `services/screening/run.py`, submitted as `screen` jobs |
 | Site settings (`config/site/*.toml` → frozen dataclasses); environment variables + `.env` | `config/site/settings.py` (one loader); `config/env.py` (storage and sources receive values as parameters) |
 | Session / exchange calendar (holidays, early closes, last closed session) | `core/time/calendar.py`; never compute weekdays elsewhere |
