@@ -1,7 +1,7 @@
 """End-to-end: drive the CLI exactly as CI and humans do, against the committed data.
 
 Most tests call ``main()`` in-process (fast, and counted in coverage); one test runs the
-real ``python -m algotrade.cli`` subprocess to prove the packaging/entry point works.
+real ``python -m algotrade_backtest`` subprocess to prove the packaging/entry point works.
 """
 
 import contextlib
@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from algotrade.cli.main import main
+from algotrade_backtest.cli import main
 from tests.conftest import GOLDEN_DIR, REPO_ROOT
 
 pytestmark = pytest.mark.e2e
@@ -43,7 +43,7 @@ def cli(*args: str) -> Result:
 
 def test_module_entry_point_runs_as_subprocess() -> None:
     proc = subprocess.run(
-        [sys.executable, "-m", "algotrade.cli", "datasets", "verify"],
+        [sys.executable, "-m", "algotrade_backtest", "datasets", "verify"],
         cwd=REPO_ROOT, capture_output=True, text=True, check=False,
     )  # fmt: skip
     assert proc.returncode == 0, proc.stdout + proc.stderr

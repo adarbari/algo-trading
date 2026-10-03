@@ -76,49 +76,45 @@ on request
 
 ## 2. Current code layout (enforced today)
 
-New code (storage, features, screening, services and the ingestion app) already follows
-the target architecture. The original backtest packages move into it in roadmap phase 0.
-Dependencies point **downwards only**, and siblings on the same row may not import each
-other. `import-linter` enforces this (`[tool.importlinter]` in `pyproject.toml`).
+Phase 0 is in progress (see [docs/design/phase-0.md](design/phase-0.md)). The library
+already uses the target layers. Dependencies point **downwards only**, and siblings on the
+same row may not import each other. `import-linter` enforces this (`[tool.importlinter]` in
+`pyproject.toml`).
 
 ```
-apps/ingestion (algotrade_ingestion)      separate top-level package; only writer
-        │ imports libraries, never the reverse
+apps/ingestion (algotrade_ingestion) · apps/backtest (algotrade_backtest)   never import each other
+        │ import the library, never the reverse
         ▼
-            cli/
-              │
-     services/ · evaluation/
-              │
-     engines/ · backtest/
-              │
- strategies/ (+ screeners/) · risk/ · execution/ · portfolio/ · analytics/ · features/
-              │
-       storage/ · data/
-              │
-            core/
+     services/           use cases: screening, evaluation, views, exports
+        │
+     engines/            backtest/ · screening/   (independent of each other)
+        │
+ strategies/ (trading · screeners) · features/ · analytics/
+        │
+     storage/ · data/    (data/ is replaced by storage in step 0.3)
+        │
+      core/
 ```
 
-Extra contracts: strategies and screeners see only `core`; feature definitions never
-touch storage; only `apps/ingestion` may import `storage.writers`; libraries never import apps.
+Extra contracts:
+- strategies and screeners see only `core`
+- feature definitions never touch storage
+- only `apps/ingestion` may import `storage.writers`
+- inside `engines/backtest`, risk (`limits`, `sizing`), execution (`simulated`) and accounting (`portfolio`) stay independent
 
-| Package | Responsibility | May import | Target home |
-|---|---|---|---|
-| `core/` | Value objects (`Order`, `Fill`, `PriceSeries`), `MarketView`, errors, time helpers. | numpy only | `core/` |
-| `data/` | The **only** code that reads or writes data files. Validation, alignment, synthetic generators, golden catalogue. | core, pandas | `storage/` + `apps/ingestion` |
-| `strategies/` | Pure decision logic: `MarketView` in, target weights out. No I/O, no sizing, no orders. | core | `strategies/trading/` |
-| `risk/` | Clip target weights to limits; convert weights to orders. | core | `engines/backtest/` |
-| `execution/` | `Broker` protocol, `CostModel`, `SimulatedBroker`. Live brokers (IBKR) go here later. | core | `engines/backtest/` + broker adapters |
-| `portfolio/` | Cash, positions, equity. The single source of truth for holdings. | core | `engines/backtest/` |
-| `analytics/` | Metrics and report formatting from equity curves + fills. | core | `analytics/` |
-| `backtest/` | The engine loop wiring the layers above. Owns the timing model. | everything below | `engines/backtest/` |
-| `evaluation/` | Runs every strategy on every golden dataset and compares to the baseline. | backtest and below | `services/` |
-| `cli/` | Argument parsing and printing. The only place `print` is allowed. | everything | `apps/backtest` |
-| `storage/` | Data contract: schemas, `Protocol` per store, reader / writer / result-writer facades, `local` (Parquet) and `memory` backends. | core, pandas, pyarrow | `storage/` |
-| `features/` | Pure, versioned feature definitions (`option_liquidity@v1`) and their registry. | core | `features/` |
-| `engines/` | `screening/`: runs a screener over a universe and audits coverage (COMPLETE / PARTIAL / UNIVERSE_INCOMPLETE). | strategies, core | `engines/` |
-| `services/` | Use cases: load the point-in-time universe and `FeatureView`, run and save screens, legacy CSV exports. | everything below except `storage.writers` | `services/` |
-| `strategies/screeners/` | Screener contract, shared `Decision` categories, `short_premium_liquidity`. | core | `strategies/screeners/` |
-| `apps/ingestion` | Sources (`cboe`, HTTP with retries), jobs (universe import, option chains, features), nightly pipeline, `algotrade-ingest` CLI. | libraries | `apps/ingestion` |
+| Package | Responsibility | May import |
+|---|---|---|
+| `core/` | Value objects (`Order`, `Fill`, `PriceSeries`), `MarketView`, `FeatureView`, instruments, options, errors, time. | numpy only |
+| `data/` | Golden CSV dataset store, validation, alignment, synthetic generators (until step 0.3). | core, pandas |
+| `storage/` | Data contract: schemas, a `Protocol` per store, reader / writer / result-writer facades, `local` (Parquet) and `memory` backends. | core, pandas, pyarrow |
+| `strategies/` → `trading/` | Backtest strategies: `MarketView` in, target weights out, plus their registry. | core |
+| `strategies/` → `screeners/` | Screener contract, shared `Decision` categories, `short_premium_liquidity`. | core |
+| `features/` | Pure, versioned rollup definitions (`option_liquidity@v1`) and their registry. | core |
+| `analytics/` | Metrics and report formatting from equity curves + fills. | core |
+| `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. | strategies, analytics, core |
+| `services/` | Use cases: universe + `FeatureView` loading, screening runs, legacy exports, `evaluation/` (strategy × golden dataset vs baseline). | everything below except `storage.writers` |
+| `apps/ingestion` | Sources (Cboe, HTTP with retries), jobs (universe, option chains, features), nightly pipeline, `algotrade-ingest`. | library |
+| `apps/backtest` | `algotrade-backtest` CLI (`algotrade` alias): datasets, backtest, evaluate. | library |
 
 ### One bar in the backtest engine
 

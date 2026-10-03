@@ -1,11 +1,4 @@
-"""Trading strategies.
+"""Pure decision logic. ``trading/`` holds backtest strategies, ``screeners/`` holds screeners.
 
-A strategy is a pure decision function: given a ``MarketView`` (data up to *now*), it
-returns target portfolio weights, or ``None`` to leave the portfolio unchanged. It never
-places orders, sizes positions or touches I/O; the backtest engine and risk layer do that.
+Both see only ``core`` views (``MarketView`` / ``FeatureView``); neither does I/O.
 """
-
-from algotrade.strategies.base import Strategy
-from algotrade.strategies.registry import STRATEGIES, create_strategy
-
-__all__ = ["STRATEGIES", "Strategy", "create_strategy"]

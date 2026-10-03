@@ -4,10 +4,10 @@ import math
 
 import pytest
 
-from algotrade.backtest.engine import run_backtest
 from algotrade.data.golden import GOLDEN_DATASETS
 from algotrade.data.store import DatasetStore
-from algotrade.strategies.registry import STRATEGIES, create_strategy
+from algotrade.engines.backtest.engine import run_backtest
+from algotrade.strategies.trading.registry import STRATEGIES, create_strategy
 
 
 def test_golden_checksums_match(golden_store: DatasetStore) -> None:

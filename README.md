@@ -8,9 +8,9 @@ added quickly **without** the codebase or the results quietly rotting.
 ```bash
 make install          # venv + dev deps + pre-commit hooks (Python 3.12+)
 make check            # everything CI runs: lint, types, boundaries, file length, tests, evaluation
-.venv/bin/algotrade datasets list
-.venv/bin/algotrade backtest --strategy sma_crossover --dataset bull_trend --param fast=10
-.venv/bin/algotrade evaluate --report scorecard.md
+.venv/bin/algotrade-backtest datasets list
+.venv/bin/algotrade-backtest backtest --strategy sma_crossover --dataset bull_trend --param fast=10
+.venv/bin/algotrade-backtest evaluate --report scorecard.md
 ```
 
 ## Nightly options pipeline
@@ -34,7 +34,7 @@ interruption, and prints its audit. See [docs/screeners/](docs/screeners/README.
 | No file over 1000 lines | `scripts/check_file_length.py`, CI + pre-commit + architecture test |
 | Strategies cannot see the future | `MarketView` API + property test that rewrites future bars |
 | Orders fill at the *next* open with slippage, commission and buying-power limits | `execution/simulated.py` |
-| Every strategy × every golden dataset, every PR | `algotrade evaluate` vs `benchmarks/baseline.json` |
+| Every strategy × every golden dataset, every PR | `algotrade-backtest evaluate` vs `benchmarks/baseline.json` |
 | Coverage ≥ 90 %, strict mypy, ruff | CI |
 | Nightly heavy property tests + scorecard | `.github/workflows/nightly.yml` |
 | PRs merge themselves once every CI check passes (`no-automerge` label or draft to opt out) | `.github/workflows/auto-merge.yml` |
@@ -42,22 +42,25 @@ interruption, and prints its audit. See [docs/screeners/](docs/screeners/README.
 ## Layout
 
 ```
-src/algotrade/
-  core/         domain types, MarketView (no pandas, no I/O, imports nothing internal)
-  data/         loading, validation, alignment, synthetic + golden datasets
-  strategies/   pure decision logic -> target weights (imports only core)
-  risk/         limits + weights -> orders
-  execution/    broker protocol, cost model, simulated broker
-  portfolio/    cash/positions accounting
+apps/
+  ingestion/    algotrade-ingest: sources (Cboe, ...), jobs, nightly pipeline. Only writer of data.
+  backtest/     algotrade-backtest: datasets, backtest, evaluate
+src/algotrade/  shared library
+  core/         domain types, MarketView, FeatureView, instruments (no pandas, no I/O)
+  storage/      data contract: schemas, stores, readers/writers, local + memory backends
+  data/         golden CSV datasets, validation, synthetic generators (replaced by storage in 0.3)
+  strategies/   trading/ (backtest strategies) and screeners/: pure, see only core
+  features/     versioned rollup definitions (e.g. option_liquidity@v1)
   analytics/    performance metrics, report formatting
-  backtest/     the engine wiring the above together
-  evaluation/   strategy x dataset suite, regression baseline
-  cli/          `algotrade` command
+  engines/      backtest/ (loop, risk limits, sizing, simulated broker, portfolio), screening/
+  services/     use cases: screening, evaluation, views, exports
 tests/
   unit/<layer>/ mirrors src; fast, isolated
+  contract/     one suite every storage backend must pass
+  apps/         ingestion app tests (fake vendor feeds, no network)
   property/     hypothesis invariants (no look-ahead, accounting identity, no shorts)
   integration/  real data + engine stack across the golden set
-  e2e/          the CLI, end to end, against committed data + baseline
+  e2e/          the CLIs, end to end, against committed data + baseline
   architecture/ structural rules (file length, docs, test mirroring)
 datasets/golden/   committed, checksummed synthetic market regimes
 benchmarks/        baseline.json: golden-master results
