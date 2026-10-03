@@ -8,7 +8,8 @@
     algotrade-ingest bars [--date D | --from D --to D] [--force]   (needs a Massive API key)
     algotrade-ingest corporate-actions [--date D] [--from D --to D]
     algotrade-ingest chains   [--date YYYY-MM-DD] [--workers N] [--symbols SPY,AAPL]
-    algotrade-ingest features [--date YYYY-MM-DD]
+    algotrade-ingest rollups  [--date D | --from D --to D] [--only price_stats@v1,earnings@v1]
+                              (alias: features)
     algotrade-ingest screen   [--date YYYY-MM-DD] [--config ID] [--user U] [--export-dir out/]
     algotrade-ingest nightly  [--date YYYY-MM-DD] [--export-dir out/]   (no --date: catch up)
     algotrade-ingest purge-raw [--keep-days 90] [--staging-keep-days 14]
@@ -56,6 +57,8 @@ from algotrade_ingestion.tasks.framework.registry import TASKS, Task
 # Task commands kept under their own names (``algotrade-ingest bars ...``); every registry
 # task is also ``algotrade-ingest run <task>``. ``golden load`` runs the ``golden-load`` task.
 TASK_COMMANDS = tuple(name for name in TASKS if name != "golden-load")
+# Former command names kept working: ``features`` computed option_liquidity before 2b.2.
+ALIASES = {"rollups": ["features"]}
 LOCKED_EXIT = 3  # another run holds the store's ingest lock
 
 
@@ -129,7 +132,8 @@ def _parser() -> argparse.ArgumentParser:
     )
     sub = p.add_subparsers(dest="command", required=True)
     for name in TASK_COMMANDS:
-        add_task_arguments(sub.add_parser(name, help=TASKS[name].description), TASKS[name])
+        parser = sub.add_parser(name, aliases=ALIASES.get(name, []), help=TASKS[name].description)
+        add_task_arguments(parser, TASKS[name])
     run = sub.add_parser("run", help="run any ingestion task: run <task> [--date | --from/--to]")
     tasks = run.add_subparsers(dest="task_name", required=True)
     for name, spec in TASKS.items():

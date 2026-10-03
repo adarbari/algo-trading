@@ -7,7 +7,7 @@ from algotrade.config.env import user_id
 from algotrade.config.strategy.catalog import FieldCatalog
 from algotrade.config.strategy.resolve import ResolvedConfig, resolve
 from algotrade.config.user import SITE_USER, UserContext
-from algotrade.features.registry import FEATURES
+from algotrade.features.registry import catalogue_columns
 from algotrade.storage.configs.store import ConfigStore
 
 
@@ -18,7 +18,7 @@ def default_user(fallback: str) -> UserContext:
 
 def field_catalog() -> FieldCatalog:
     """Every field a selection may reference: L1 instrument columns + registered rollups."""
-    return FieldCatalog.build({spec.key: spec.columns for spec in FEATURES.values()})
+    return FieldCatalog.build(catalogue_columns())
 
 
 def resolve_config(

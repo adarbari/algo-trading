@@ -8,7 +8,7 @@ from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.sources.framework.http import HttpError, RetryPolicy
 from algotrade_ingestion.sources.vendors.cboe.option_chains import URL, CboeOptionsSource
-from algotrade_ingestion.tasks.derived.features import TABLE, compute_option_liquidity
+from algotrade_ingestion.tasks.derived.rollups import compute_rollups
 from algotrade_ingestion.tasks.market.option_chains import (
     OPTIONS,
     STATUS,
@@ -121,7 +121,10 @@ def test_mass_no_chain_is_suspicious() -> None:
     assert "returned no chain" in record.stats["partial"][0]
 
 
-def test_features_job_scores_liquidity() -> None:
+TABLE = "rollups/instrument/option_liquidity@v1"
+
+
+def test_rollups_task_scores_liquidity() -> None:
     backend = MemoryBackend()
     writer, reader = StoreWriter(backend), StoreReader(backend)
     deep = fx.payload("DEEP", options=fx.chain("DEEP", spread=0.02, oi=5000))
@@ -129,10 +132,12 @@ def test_features_job_scores_liquidity() -> None:
         {"DEEP": deep, "THIN": fx.payload("THIN", options=fx.chain("THIN", spread=1.5, oi=3))}
     )
     run(writer, feed, universe("DEEP", "THIN", "GONE"), retry_pause_s=0)
-    record = compute_option_liquidity(task_ctx(writer, reader, CLOCK), DAY)
-    assert record.stats["liq_status"] == {"OK": 2, "NO_CHAIN": 1}
+    ctx = task_ctx(writer, reader, CLOCK)
+    record = compute_rollups(ctx, DAY, only=["option_liquidity@v1"])
+    assert record.items == {"option_liquidity@v1": "OK: 1 sessions, 3 rows"}
     frame = reader.table(TABLE, DAY)
     assert frame is not None
+    assert frame["liq_status"].value_counts().to_dict() == {"OK": 2, "NO_CHAIN": 1}
     rows = frame.set_index("instrument_id")
     assert rows.loc["EQ:DEEP", "put_tier"] == "A"
     assert rows.loc["EQ:THIN", "put_tier"] == "D"

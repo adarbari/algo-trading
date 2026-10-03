@@ -10,6 +10,8 @@ from algotrade.core.model.errors import ConfigurationError
 REFERENCE_TABLE = "instruments/reference"
 COMPANY_TABLE = "instruments/company"
 ROLLUP_TABLE_PREFIX = "rollups/instrument/"
+# The value types a field (an instrument column or a declared rollup column) may have.
+FIELD_TYPES = frozenset({"str", "float", "int", "bool", "date"})
 # ``instruments/company`` columns, in order, as the company source produces them.
 COMPANY_COLUMNS = (
     "cik",

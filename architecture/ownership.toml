@@ -80,6 +80,20 @@ owner = ["src/algotrade/quant/rates.py"]
 section = "docs/adr/0021-option-pricing-conventions.md#rates"
 detect = [{ call = "log1p" }, { call = "interp" }]
 
+# --------------------------------------------------------------------------- rollups
+
+[[responsibility]]
+id = "rollup-computation"
+description = "Compute rollups: the Rollup declaration (inputs + lookback, params from rollups.toml, typed columns), loading inputs through algotrade.data, point in time per session, backfills; definitions are pure compute modules, stored only by the rollups task"
+owner = [
+    "src/algotrade/features/framework/*",
+    "src/algotrade/features/registry.py",
+    "src/algotrade/features/rollups/*",
+    "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py",
+]
+section = "docs/data/layers.md#rollups-as-built"
+detect = [{ call = "compute_sessions" }, { call = "compute_one" }, { call = "Rollup" }]
+
 # --------------------------------------------------------------------------- the ingest loop
 
 [[responsibility]]
@@ -324,12 +338,20 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/market/rates.py"
 
 [[table]]
 name = "rollups/instrument/option_liquidity@v1"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/features.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
+name = "rollups/instrument/price_stats@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
+name = "rollups/instrument/earnings@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
 name = "rollups/daily/*"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/features.py"
-note = "none produced yet (phase 6); rollups are computed only by the features task"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "none produced yet (phase 6); rollups are computed only by the rollups task"
 
 [[table]]
 name = "results/*"

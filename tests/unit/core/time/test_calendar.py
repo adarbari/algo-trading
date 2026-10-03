@@ -154,3 +154,20 @@ def test_settle_margin_is_configurable() -> None:
     now = datetime(2026, 10, 2, 20, 5, tzinfo=UTC)
     assert last_closed_session(now, timedelta(0)) == date(2026, 10, 2)
     assert last_closed_session(now, timedelta(minutes=10)) == date(2026, 10, 1)
+
+
+def test_sessions_ending_and_sessions_to() -> None:
+    from algotrade.core.time.calendar import sessions_ending, sessions_to  # noqa: PLC0415
+
+    assert sessions_ending(date(2026, 11, 30), 4) == [
+        date(2026, 11, 24),
+        date(2026, 11, 25),
+        date(2026, 11, 27),  # Thanksgiving (26th) skipped
+        date(2026, 11, 30),
+    ]
+    assert sessions_ending(date(2026, 10, 4), 1) == [date(2026, 10, 2)]  # a Sunday
+    with pytest.raises(ValueError, match="n must be"):
+        sessions_ending(date(2026, 10, 2), 0)
+    assert sessions_to(date(2026, 11, 25), date(2026, 11, 30)) == 2
+    assert sessions_to(date(2026, 11, 25), date(2026, 11, 25)) == 0
+    assert sessions_to(date(2026, 11, 25), date(2026, 11, 1)) == 0

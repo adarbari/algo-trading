@@ -64,7 +64,7 @@ purpose = "pure sanity checks on domain values (OHLCV bar rules)"
 [[dir]]
 path = "src/algotrade/config"
 purpose = "configuration, split by kind; env.py (the one environment reader) and user.py (L4 users)"
-contracts = ["Feature definitions and configs are pure: no storage I/O"]
+contracts = ["Configs are pure: no storage I/O"]
 
 [[dir]]
 path = "src/algotrade/config/site"
@@ -112,7 +112,17 @@ purpose = "the domain read API: the only way consumers read market data (R1)"
 
 [[dir]]
 path = "src/algotrade/features"
-purpose = "pure, versioned feature (rollup) definitions and their registry"
+purpose = "versioned rollups: the framework, the definitions and their registry (registry.py)"
+
+[[dir]]
+path = "src/algotrade/features/framework"
+purpose = "the rollup framework: declaration, column typing, input loading (through data), per-session runner"
+contracts = ["The rollup framework reads market data only through algotrade.data (never storage)"]
+
+[[dir]]
+path = "src/algotrade/features/rollups"
+purpose = "rollup definitions: one module per rollup, a pure compute + its ROLLUP declaration"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
 path = "src/algotrade/analytics"
@@ -232,7 +242,7 @@ kind = "task-domain"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/derived"
-purpose = "derived-data tasks: features and rollups from stored data"
+purpose = "derived-data tasks: the rollups task (every registered rollup, per session or a backfill)"
 kind = "task-domain"
 
 [[dir]]

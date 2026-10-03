@@ -25,6 +25,8 @@ algotrade-ingest universe-build --review-out leveraged_candidates.csv   # univer
 algotrade-ingest bars --from 2024-10-01 --to 2026-10-01   # 2-year backfill (needs ALGOTRADE_MASSIVE_API_KEY in .env)
 algotrade-ingest rates --from 2024-01-01 --to 2026-10-02   # Treasury par yield curve (one request per year; no key)
 algotrade-ingest company-details [--force] [--limit N]   # SEC EDGAR company details (needs ALGOTRADE_SEC_CONTACT in .env)
+algotrade-ingest rollups --from 2024-10-03 --to 2026-10-02   # backfill rollups (price_stats, earnings, option_liquidity) per session
+algotrade-ingest rollups [--date D] [--only price_stats@v1]    # one session (alias: features); config/site/rollups.toml
 algotrade-ingest nightly --export-dir out/      # catch up missed sessions; universe -> company details -> earnings -> bars -> rates -> corporate actions -> chains -> rollups -> screen jobs -> quality -> purge
 algotrade-ingest quality                        # data-quality checks for a session
 algotrade-ingest schedule --time 23:30          # writes a launchd agent; prints install commands
@@ -47,9 +49,9 @@ settings in [`config/site/nightly.toml`](config/site/nightly.toml)):
   every command uses the last *closed* session (close + 30 min), so a run started during
   market hours never stores intraday chains as end of day.
 - **Catch-up:** the nightly runs every session missed since the last COMPLETE / PARTIAL
-  nightly (at most 5). Bars, corporate actions and earnings catch up; chains (Cboe serves only
-  the current snapshot), the universe build, company details, features and screens run for
-  the latest session only. `--date D` runs exactly D.
+  nightly (at most 5). Bars, corporate actions and earnings catch up; rollups catch up too (a
+  rollup whose input a session lacks reports `no_input`); chains (Cboe serves only the current
+  snapshot), the universe build, company details and screens run for the latest session only. `--date D` runs exactly D.
 - **Isolated steps:** a failing step is recorded as FAILED and the next steps still run (a
   step that needs it is BLOCKED); data-quality checks (universe size, bar freshness and count,
   chain coverage, earnings present) end each session and the raw purge ends the run. The run
@@ -62,7 +64,7 @@ settings in [`config/site/nightly.toml`](config/site/nightly.toml)):
   false). A run missed while the Mac sleeps starts on wake, which is safe because of the
   calendar and catch-up.
 
-Each step can also run on its own (`chains`, `features`, `screen`), resumes after
+Each step can also run on its own (`chains`, `rollups`, `screen`), resumes after
 interruption, and prints its audit. See [docs/screeners/](docs/screeners/README.md).
 
 ## What's in the box
@@ -113,7 +115,8 @@ src/algotrade/  shared library
                 Treasury rate conventions (ADR 0021)
   data/         the domain read API (reference, prices, events, chains, rates)
   strategies/   trading/ (backtest strategies) and screeners/: pure, see only core and quant
-  features/     versioned rollup definitions (e.g. option_liquidity@v1)
+  features/     rollups: framework/ (declaration, typed columns, inputs via data, runner),
+                rollups/ (option_liquidity, price_stats, earnings @v1), registry
   analytics/    performance metrics, report formatting
   engines/      backtest/ (loop, risk limits, sizing, simulated broker, portfolio), screening/
   services/     use cases: backtests/, screening/ (+ exports), jobs/, evaluation/; shared helpers

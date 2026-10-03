@@ -1,0 +1,21 @@
+# Rollup parameters (L3, reviewed via PR). One section per rollup that takes parameters,
+# named by its key; each key is a scalar field of the rollup's params dataclass, typed and
+# validated by config/site/settings.py (rollup_params). A missing key keeps the default; an
+# unknown section or key fails. Rollups without parameters (earnings@v1) have no section.
+# Changing a value changes the definition's output: record why in the PR.
+
+["option_liquidity@v1"]
+dte_target = 35       # target expiry: the standard monthly closest to this many days
+dte_min = 21          # ... within [dte_min, dte_max]
+dte_max = 60
+dte_fallback = 14     # else any expiry at least this far out
+delta_target = 0.30   # short strike fallback: closest |delta| to this
+pick_lo = 0.20        # short strike: tightest spread with pick_lo <= |delta| <= pick_hi
+pick_hi = 0.40
+zone_lo = 0.15        # zone open interest / volume: zone_lo <= |delta| <= zone_hi
+zone_hi = 0.40
+
+["price_stats@v1"]
+year_sessions = 252      # the 52-week window, in exchange sessions
+min_year_sessions = 240  # bars needed in that window for high_52w / low_52w (else null)
+periods_per_year = 252   # realised-vol annualisation

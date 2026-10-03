@@ -36,7 +36,7 @@ def feature_view(
     rows: dict[str, dict[str, FeatureValue]] = {i: {} for i in instruments}
     for table in tables:
         frame = reader.require(
-            table, session_date, f"algotrade-ingest features --date {session_date}", as_of
+            table, session_date, f"algotrade-ingest rollups --date {session_date}", as_of
         )
         columns = [c for c in frame.columns if c not in (*COMMON, "instrument_id")]
         for record in frame.to_dict("records"):

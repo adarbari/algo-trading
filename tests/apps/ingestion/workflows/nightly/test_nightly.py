@@ -95,7 +95,7 @@ def test_a_failing_step_does_not_stop_later_steps(fake: Callable[..., Calls]) ->
     steps = steps_of(summary)
     assert steps["earnings"]["status"] == "FAILED"
     assert steps["earnings"]["error"] == "RuntimeError: earnings broke"
-    assert [s for s in ("bars", "corporate-actions", "chains", "features", "quality") if
+    assert [s for s in ("bars", "corporate-actions", "chains", "rollups", "quality") if
             steps[s]["status"] != "COMPLETE"] == []  # fmt: skip
     assert summary["status"] == "PARTIAL" and summary["steps"]["purge-raw"]["status"] == "COMPLETE"
     assert [n for n, _ in calls.calls][-2:] == ["quality", "purge-raw"]
@@ -108,13 +108,14 @@ def test_hard_dependencies_block_and_quality_and_purge_always_run(
     writer = store()
     summary = run_nightly(task_ctx(writer), Plan([D]))
     steps = steps_of(summary)
-    assert steps["features"] == {
+    # Rollups still run (price stats and earnings need no chains); screens need both.
+    assert steps["rollups"]["status"] == "COMPLETE" and calls.sessions("rollups") == [D]
+    assert steps["screens"] == {
         "status": "BLOCKED",
         "duration_s": 0.0,
         "reason": "chains failed",
     }
-    assert steps["screens"]["status"] == "BLOCKED"
-    assert calls.sessions("features") == [] and calls.sessions("quality") == [D]
+    assert calls.sessions("quality") == [D]
     assert calls.sessions("purge-raw") == [D]
     record = writer.runs_for("nightly", D)[-1]
     assert record.status is RunStatus.PARTIAL and record.items["chains"] == "FAILED"

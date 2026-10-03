@@ -66,7 +66,19 @@ Fields come from a catalogue built from the code, so a typo or a type mismatch f
 | Field | Source table | Example |
 |---|---|---|
 | `instrument.<column>` | L1 `instruments/reference`; company columns from `instruments/company` | `instrument.security_type`, `instrument.is_leveraged`, `instrument.sector` |
-| `rollup.<name>@v<N>.<column>` | `rollups/instrument/<name>@v<N>` (columns declared on the rollup) | `rollup.option_liquidity@v1.put_tier` |
+| `rollup.<name>@v<N>.<column>` | `rollups/instrument/<name>@v<N>` (columns and types declared on the rollup, `features/registry.py`) | `rollup.option_liquidity@v1.put_tier`, `rollup.price_stats@v1.hv30`, `rollup.price_stats@v1.adv_usd_20d`, `rollup.earnings@v1.days_to_earnings` |
+
+Selectable rollup fields today ([data/layers.md](data/layers.md#rollups-as-built) has the rules):
+
+| Rollup | Fields (type) |
+|---|---|
+| `option_liquidity@v1` | `liq_status`, `put_tier`, `call_tier` (str); `short_put_ok`, `short_call_ok` (bool); `chain_oi`, `chain_volume`, `target_dte`, `expiries_within_60d` (int); `underlying_price`, `iv30`, spreads… (float); `target_expiry`, `chain_asof` (date) |
+| `price_stats@v1` | `close`, `sma_20`, `sma_50`, `sma_200`, `ret_20d`, `ret_60d`, `high_52w`, `low_52w`, `pct_from_high_52w`, `pct_from_low_52w`, `hv20`, `hv30`, `hv20_yz`, `adv_usd_20d` (float); `history_days` (int) |
+| `earnings@v1` | `next_earnings_date`, `last_earnings_date` (date); `earnings_time` (str: pre / post / unknown); `days_to_earnings` (int); `date_confirmed` (bool, null today) |
+
+A rollup with no row for an instrument, or no partition for the session, is UNKNOWN: e.g.
+`{ field = "rollup.earnings@v1.days_to_earnings", op = "gt", value = 5 }` never selects an
+instrument whose next earnings date is unknown.
 
 Evaluation (`engines/selection/`) uses **three-valued logic**: a missing value is UNKNOWN,
 UNKNOWN propagates through `all`/`any`/`not`, and only TRUE selects. Missing data therefore
@@ -110,6 +122,7 @@ alone (ADR 0019 `site-settings`); apps receive frozen dataclasses, never dicts:
 | `sources.toml` | `SourcesSettings` (`VendorSettings` per section) | per-vendor `enabled` and `min_interval_s` pacing, chain workers, earnings days, corporate-actions window, SEC refresh days; `[http]` retry cap, circuit breaker and limiter directory; raw and staging retention; `[quality]` thresholds of the nightly data-quality checks |
 | `universe.toml` (+ `overrides/leveraged_etfs.csv`) | `UniverseSettings` | coverage mode (`nasdaq_trader` / `csv_import`), security types, include / exclude symbols, leverage rules (markers, conventions, patterns, inverse markers, exclusions; regexes are compiled and `leverage_patterns` need a `(?P<n>...)` group) |
 | `nightly.toml` | `NightlySettings` | `[sessions]` settle margin and catch-up cap, `[alerts]` nightly duration, `[notify]` desktop notification and the summary file path |
+| `rollups.toml` | each rollup's own params dataclass (`rollup_params` / `load_rollups`) | one `["<name>@v<N>"]` section per rollup that takes parameters; each scalar field of its params dataclass (bool, int, float, str) is a key typed by its default, and the dataclass validates ranges (`price_stats@v1`: `year_sessions`, `min_year_sessions`, `periods_per_year`; `option_liquidity@v1`: DTE window, delta bands). A rollup without parameters has no section (a fitness test checks both ways) |
 
 A missing file or key falls back to the dataclass default. Anything else is an error that
 names the file, section and key: unknown keys (a typo is never silently ignored), wrong

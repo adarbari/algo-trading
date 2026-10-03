@@ -36,7 +36,7 @@ Two physical parts, always read together:
 | Part | Holds | Examples | Changes | Written by |
 |---|---|---|---|---|
 | `instruments/reference` | **sourced facts**: identity, company, classification, contract terms | ticker, FIGI, company name, website, description, sector/industry, country, exchange, security type, ETF flags (leveraged, inverse, leverage, tracks), optionable, multiplier, tick size, listing status, listed/delisted dates | rarely | universe and reference ingestion jobs |
-| `rollups/instrument/<name>@vN` | **derived state** "as of D", computed from L2 | next earnings date + time + days to it, ADV (20d $), liquidity class ("highly liquid"), option liquidity tiers, market cap, 52-week high/low, HV20/30, IV30 and IV rank | nightly | rollup (features) jobs |
+| `rollups/instrument/<name>@vN` | **derived state** "as of D", computed from L2 | next earnings date + time + days to it, ADV (20d $), liquidity class ("highly liquid"), option liquidity tiers, market cap, 52-week high/low, HV20/30, IV30 and IV rank | nightly | the `rollups` task |
 
 - **Format and history:** Parquet, **one full snapshot per date** (≈10k rows, < 1 MB/day).
   Reading "as of D" returns the latest snapshot on or before D, so a 2025 backtest sees 2025's
@@ -95,7 +95,8 @@ events/earnings ─────────────────────�
 - **Official daily bars win.** The vendor's `1d` bar (official close, including the closing
   auction) is the source of truth. A daily bar rolled up from `1m` bars is a cross-check,
   never a substitute.
-- The code package is `features/`: a feature is a rollup definition.
+- The code package is `features/`: a feature is a rollup definition
+  ([Rollups as built](#rollups-as-built)).
 
 ## L3: Site configuration (shared, reviewed)
 
@@ -113,8 +114,8 @@ config/site/
 
 Owner: the repo (changes by PR, recorded by git commit). Read by ingestion (universe, sources,
 rollups) and services (defaults, presets). Built today: `defaults.toml`, `universe.toml`,
-`overrides/leveraged_etfs.csv` and the presets; `sources.toml` and `rollups.toml` arrive with
-the phases that read them (see [roadmap](../roadmap.md)).
+`sources.toml`, `nightly.toml`, `rollups.toml` ([Rollups as built](#rollups-as-built)),
+`overrides/leveraged_etfs.csv` and the presets.
 
 ## L4: User configuration (per user)
 
@@ -171,13 +172,51 @@ Selections read the company columns as `instrument.<column>` (`instrument.sector
 `instrument.state_of_incorporation`, `instrument.fiscal_year_end`) from the latest snapshot on
 or before the session; with no snapshot they are UNKNOWN. ETFs and funds usually have none.
 
-**`rollups/instrument/*`** (derived "as of D"; one table per rollup, versioned)
+## Rollups as built
 
-| Rollup | Columns | Inputs | Phase |
+A rollup is a versioned, pure definition, `<name>@v<N>`, stored as
+`rollups/instrument/<name>@v<N>` with one row per instrument per session (phase 2b.2).
+
+- **Declaration** (`features/framework/declaration.py`, `Rollup`): name, version, inputs (each
+  a table plus a lookback in exchange sessions, required or optional), params (a frozen
+  dataclass of defaults, or none), output columns with their field types, and a pure
+  `compute(inputs, session, params) -> frame`. Definitions live in `features/rollups/<name>.py`
+  and import only `core`, `quant`, numpy and pandas (import-linter); the registry is
+  `features/registry.py`.
+- **Inputs** are read by the framework (`features/framework/inputs.py`) through
+  `algotrade.data`, never storage, once per chunk of up to 126 sessions. `compute` sees only
+  rows on or before its session (point in time; a runner guard asserts it). A required input
+  with nothing for a session means no row and `no_input` in the run stats, not a failure.
+- **Types** come from the declaration: the framework casts the output to the declared types
+  (`features/framework/columns.py`) before the task stores it, so stored types, the selection
+  catalogue (`rollup.<name>@v<N>.<column>`) and the `[[table]]` producers all derive from it.
+- **Params** come from `config/site/rollups.toml` (one `["<name>@v<N>"]` section per rollup
+  with parameters), typed by the one settings loader (`config/site/settings.py`).
+- **Computed by** the `rollups` ingestion task: `algotrade-ingest rollups [--date D | --from D
+  --to D] [--only price_stats@v1,...]` (alias `features`). A backfill computes each session
+  exactly as the nightly run would have. Nightly runs it for every session it ingests, after
+  earnings, bars, corporate actions and chains.
+
+| Rollup | Columns | Inputs | Status |
 |---|---|---|---|
-| `option_liquidity@v1` | put/call tiers, target expiry, spreads, zone OI, chain OI | `chains/*` | built |
-| `price_stats@v1` | `close`, `sma_20/50/200`, `ret_20d/60d`, `high_52w`, `low_52w`, `pct_from_high/low`, `hv20`, `hv30`, `adv_usd_20d` | `bars/1d` + split events | 2b |
+| `option_liquidity@v1` | `liq_status`, put/call tiers, target expiry + DTE, short strike, spreads, zone OI / volume, chain OI / volume, `underlying_price`, `iv30`, `stock_volume`, `chain_asof` (date) | the session's `chains/status` (required), `chains/option_quotes`, `chains/underlying_quotes` | built |
+| `price_stats@v1` | `close`, `sma_20/50/200`, `ret_20d/60d`, `high_52w`, `low_52w`, `pct_from_high_52w`, `pct_from_low_52w`, `hv20`, `hv30` (close-to-close), `hv20_yz` (Yang-Zhang), `adv_usd_20d`, `history_days` | `bars/1d` split-adjusted as of the session (not total return), 252 sessions back | built |
+| `earnings@v1` | `next_earnings_date`, `earnings_time` (pre / post / unknown), `days_to_earnings` (sessions), `date_confirmed` (null: the source does not say), `last_earnings_date` | every `events/earnings` snapshot stored on or before the session | built |
 | `liquidity_class@v1` | `liquidity_class` (HIGH/MEDIUM/LOW) with the thresholds used | `price_stats`, `option_liquidity`, `config/site/rollups.toml` | 2b |
 | `iv_history@v1` | `iv30`, `iv_rank_252d`, `iv_percentile_252d`, `history_days` (UNKNOWN below the minimum) | `chains/underlying_quotes` history | 2b |
-| `earnings@v1` | `next_earnings_date`, `earnings_time` (pre/post), `days_to_earnings`, `date_confirmed` | `events/earnings` | 2b |
 | `fundamentals@v1` | `market_cap`, `shares_outstanding` | Massive / EDGAR | 2b |
+
+**`price_stats@v1` rules.** Windows are exchange sessions, not "the instrument's last n bars":
+a session without a bar is a gap, and a statistic is null (UNKNOWN), never zero or computed
+over a shorter window, unless every session of its window has a bar. The 52-week high / low
+(daily highs / lows) need `min_year_sessions` (240) bars among the last `year_sessions` (252).
+Prices are split-adjusted as of the session: a later split never changes an earlier row.
+Returns and volatilities are scale-free; `adv_usd_20d` is close x volume, split-invariant.
+The windows named in the columns are the v1 definition (changing one is a v2).
+
+**`earnings@v1` rules.** The earnings task stores, each session, the calendar for the days
+ahead. For each report date the authority is the latest snapshot on or before the session
+whose range covers it (from its session, or its earliest row, to its latest row): a date a
+later snapshot no longer lists was moved or cancelled. `days_to_earnings` is 0 on the report
+day and counts sessions (`core/time/calendar.py`). Sessions before the first stored snapshot
+have no row (UNKNOWN); a backfill does not invent what was not stored then.

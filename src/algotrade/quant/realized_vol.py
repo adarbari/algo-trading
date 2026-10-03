@@ -1,9 +1,11 @@
 """Realised (historical) volatility estimators over a rolling window, annualised (ADR 0021).
 
-Each function takes aligned 1-d price arrays (one value per session, oldest first) and a
-``window`` of ``n`` observations, and returns an array of the same length: the annualised
+Each function takes aligned price arrays (one value per session, oldest first, on axis 0) and
+a ``window`` of ``n`` observations, and returns an array of the same shape: the annualised
 volatility of the window ENDING at each session (point in time: no later data is used), NaN
-until the window is full. Annualisation multiplies the per-session variance by
+until the window is full. A 2-d array holds one series per column (sessions x instruments),
+so a whole universe is one call. NaN marks a missing observation: every window that
+contains one is NaN (never a shorter window). Annualisation multiplies the per-session variance by
 ``periods_per_year`` (252 trading sessions, the convention used throughout the project).
 
     close_to_close  sample stdev of log close-to-close returns (n returns, n + 1 closes)
@@ -13,7 +15,7 @@ until the window is full. Annualisation multiplies the per-session variance by
                     k = 0.34 / (1.34 + (n + 1) / (n - 1))                  (n bars + 1 close)
 
 Range estimators ignore drift and assume continuous trading; Yang-Zhang handles opening
-jumps and drift. Prices must be positive; ``ValueError`` otherwise.
+jumps and drift. Prices must be positive (or NaN: missing); ``ValueError`` otherwise.
 """
 
 import math
@@ -30,10 +32,10 @@ _LN2 = math.log(2.0)
 
 def _prices(*series: npt.ArrayLike) -> list[Array]:
     arrays = [np.asarray(s, dtype=np.float64) for s in series]
-    if any(a.ndim != 1 for a in arrays) or len({a.shape for a in arrays}) != 1:
-        raise ValueError("price series must be 1-d arrays of equal length")
-    if any(not np.all(a > 0) for a in arrays):
-        raise ValueError("prices must be positive and finite")
+    if any(a.ndim not in (1, 2) for a in arrays) or len({a.shape for a in arrays}) != 1:
+        raise ValueError("price series must be 1-d or 2-d arrays of equal length (shape)")
+    if any(not np.all((a > 0) | np.isnan(a)) for a in arrays):
+        raise ValueError("prices must be positive (NaN: missing)")
     return arrays
 
 
@@ -45,17 +47,18 @@ def _check_window(window: int, minimum: int) -> None:
 def _rolling_mean(values: Array, window: int, offset: int) -> Array:
     """Mean over each window of ``values``, placed so that ``out[i]`` covers data up to
     session ``i`` (``offset``: how many sessions ``values`` lags the price arrays by)."""
-    out = np.full(values.shape[0] + offset, np.nan)
+    out = np.full((values.shape[0] + offset, *values.shape[1:]), np.nan)
     if values.shape[0] >= window:
-        out[offset + window - 1 :] = sliding_window_view(values, window).mean(axis=1)
+        out[offset + window - 1 :] = sliding_window_view(values, window, axis=0).mean(axis=-1)
     return out
 
 
 def _rolling_var(values: Array, window: int, offset: int) -> Array:
     """Sample variance (ddof=1) over each window, aligned like ``_rolling_mean``."""
-    out = np.full(values.shape[0] + offset, np.nan)
+    out = np.full((values.shape[0] + offset, *values.shape[1:]), np.nan)
     if values.shape[0] >= window:
-        out[offset + window - 1 :] = sliding_window_view(values, window).var(axis=1, ddof=1)
+        windows = sliding_window_view(values, window, axis=0)
+        out[offset + window - 1 :] = windows.var(axis=-1, ddof=1)
     return out
 
 
@@ -69,7 +72,7 @@ def close_to_close(
     """Annualised sample stdev of the last ``window`` log close-to-close returns."""
     _check_window(window, 2)
     (c,) = _prices(close)
-    returns = np.diff(np.log(c))
+    returns = np.diff(np.log(c), axis=0)
     return _annualise(_rolling_var(returns, window, 1), periods_per_year)
 
 

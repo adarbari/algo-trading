@@ -1,1 +1,1 @@
-"""Derived-data tasks: features and rollups computed from stored market data."""
+"""Derived-data tasks: rollups computed from stored market data (``rollups``)."""

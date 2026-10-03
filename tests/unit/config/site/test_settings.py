@@ -135,3 +135,51 @@ def test_leverage_rules_load_in_order() -> None:
     settings = UniverseSettings.from_documents(doc)
     assert settings.leverage_conventions == (("^A Ultra Short", -2.0), ("^A Ultra", 2.5))
     assert settings.leverage_patterns == (r"(?P<n>\d)x",)
+
+
+# ----------------------------------------------------------------------------- rollups.toml
+
+
+def test_rollup_params_typed_from_the_declared_defaults() -> None:
+    from dataclasses import dataclass  # noqa: PLC0415
+
+    from algotrade.config.site.settings import load_rollups, rollup_params  # noqa: PLC0415
+
+    @dataclass(frozen=True)
+    class Params:
+        n: int = 5
+        x: float = 0.5
+        on: bool = True
+        label: str = "a"
+        fixed: tuple[int, ...] = (1, 2)  # not scalar: not a key
+
+        def __post_init__(self) -> None:
+            if self.n > 100:
+                raise ValueError("n too big")
+
+    declared = {"r@v1": Params(), "plain@v1": None}
+    doc = {"r@v1": {"n": 7, "x": 1, "on": False, "label": "b"}}
+    out = rollup_params(doc, declared)
+    assert out == {"r@v1": Params(7, 1.0, False, "b"), "plain@v1": None}
+    assert rollup_params(None, declared)["r@v1"] == Params()
+    for bad, problem in (
+        ({"other@v1": {}}, "unknown keys"),
+        ({"plain@v1": {}}, "unknown keys"),
+        ({"r@v1": {"fixed": [1]}}, "unknown keys"),
+        ({"r@v1": {"n": "7"}}, "expected an integer"),
+        ({"r@v1": {"n": 101}}, r"rollups.toml \[r@v1\]: n too big"),
+    ):
+        with pytest.raises(ConfigurationError, match=problem):
+            rollup_params(bad, declared)
+    store = MemoryConfigStore({("site", "settings", "rollups"): doc})
+    assert load_rollups(store, declared)["r@v1"].n == 7
+
+
+def test_site_rollups_toml_loads_for_every_registered_rollup() -> None:
+    from algotrade.config.site.settings import rollup_params  # noqa: PLC0415
+    from algotrade.features.registry import ROLLUPS  # noqa: PLC0415
+
+    doc = tomllib.loads((SITE / "rollups.toml").read_text())
+    params = rollup_params(doc, {k: r.params for k, r in ROLLUPS.items()})
+    assert params["option_liquidity@v1"] == ROLLUPS["option_liquidity@v1"].params  # defaults
+    assert params["price_stats@v1"] == ROLLUPS["price_stats@v1"].params

@@ -5,6 +5,7 @@ ADR 0019 ``site-settings``. Each file becomes a frozen dataclass that apps recei
     sources.toml   -> SourcesSettings   (vendors, [http], [quality], retention)
     universe.toml  -> UniverseSettings  (+ overrides/leveraged_etfs.csv)
     nightly.toml   -> NightlySettings
+    rollups.toml   -> each rollup's params dataclass (declared by the rollup, typed here)
     defaults.toml  -> ScreeningSettings, BacktestSettings (layered per config by ``resolve``)
 
 Documents come from the config store, so this module does no I/O: ``load_*`` take anything
@@ -14,6 +15,7 @@ e.g. ``sources.toml [massive] min_interval_s: expected a number >= 0, got 'fast'
 types live in the library (not the app that reads them) so the one loader can check every key.
 """
 
+import dataclasses
 import re
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
@@ -219,6 +221,51 @@ class NightlySettings:
         )
 
 
+# ----------------------------------------------------------------------------- rollups.toml
+_SCALARS = (bool, int, float, str)
+
+
+def rollup_params(
+    doc: Mapping[str, Any] | None, declared: Mapping[str, Any | None], where: str = "rollups.toml"
+) -> dict[str, Any | None]:
+    """``rollups.toml``: one ``["<name>@v<N>"]`` section per rollup with parameters.
+
+    ``declared`` maps each rollup to its params dataclass instance holding the defaults
+    (``None``: the rollup takes no parameters, so a section for it is an error). Each scalar
+    field (bool, int, float, str) is a key typed by its default; other fields (e.g. tier
+    tables) are fixed by the definition. A params ``__post_init__`` that raises ``ValueError``
+    fails with the section's path."""
+    root = Table(doc, where)
+    root.only([k for k, v in declared.items() if v is not None])
+    out: dict[str, Any | None] = {}
+    for key, defaults in declared.items():
+        if defaults is None:
+            out[key] = None
+            continue
+        keys = [
+            f.name
+            for f in dataclasses.fields(defaults)
+            if type(getattr(defaults, f.name)) in _SCALARS
+        ]
+        section = root.table(key, keys)
+        values = {name: _typed(section, name, getattr(defaults, name)) for name in keys}
+        try:
+            out[key] = dataclasses.replace(defaults, **values)
+        except ValueError as exc:
+            raise ConfigurationError(f"{section.where}: {exc}") from exc
+    return out
+
+
+def _typed(section: Table, key: str, default: Any) -> Any:
+    if isinstance(default, bool):
+        return section.boolean(key, default)
+    if isinstance(default, int):
+        return section.integer(key, default, 0)
+    if isinstance(default, float):
+        return section.number(key, default)
+    return section.text(key, default)
+
+
 # ----------------------------------------------------------------------------- universe.toml
 
 
@@ -419,6 +466,13 @@ def load_sources(configs: SiteDocuments) -> SourcesSettings:
 
 def load_nightly(configs: SiteDocuments) -> NightlySettings:
     return NightlySettings.from_document(site_document(configs.load, "nightly"))
+
+
+def load_rollups(
+    configs: SiteDocuments, declared: Mapping[str, Any | None]
+) -> dict[str, Any | None]:
+    """Each declared rollup's params from ``rollups.toml`` (defaults when missing)."""
+    return rollup_params(site_document(configs.load, "rollups"), declared)
 
 
 def load_universe(configs: SiteDocuments) -> UniverseSettings:

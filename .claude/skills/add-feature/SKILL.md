@@ -1,32 +1,48 @@
 ---
 name: add-feature
-description: Add a computed feature (indicator, IV rank, yield, momentum score) to the feature library and nightly pipeline. Use whenever strategies or screeners need a new derived input.
+description: Add a computed feature (a rollup: indicator, IV rank, yield, momentum score) to the rollup framework and the nightly pipeline. Use whenever strategies or screeners need a new derived input.
 ---
 
-# Add a feature
+# Add a feature (a rollup)
 
-Read first: ADR 0007 and `docs/data/storage.md` (feature grain).
+Read first: ADR 0007, `docs/data/layers.md` ("Rollups as built") and an existing rollup
+(`src/algotrade/features/rollups/price_stats.py`).
 
-**Ownership check (ADR 0019):** the computation is pure and lives in `features/`; the
-nightly task that stores it is the single producer of its `rollups/...` table (add a
-`[[table]]` entry to `architecture/ownership.toml`). Read inputs through the market-data
-read owner, never storage directly or a new snapshot rule. `make ownership` and
-`make dupes` must pass.
+**Ownership check (ADR 0019, `rollup-computation`):** the framework
+(`features/framework/`) loads inputs, keeps each session point in time and types the output;
+the definition is a pure compute module in `features/rollups/`; the `rollups` ingestion task
+(`tasks/derived/rollups.py`) is the single producer of every `rollups/instrument/...` table.
+Never read storage or `algotrade.data` inside a definition (import-linter enforces it), and
+never write a new task for a rollup. `make ownership` and `make dupes` must pass.
 
-1. **Define it** in `src/algotrade/features/<name>.py` (like `option_liquidity.py`) as `name@v1`, with
-   declared inputs (datasets and lookback), output type and grain (per instrument or per
-   market).
-2. **Pure computation:** inputs in, values out. No I/O. Use only data known as of each
-   `ts` (no look-ahead). Pricing maths belongs in `quant/`, not in the feature:
-   `quant.black_scholes` (price, Greeks), `quant.implied_vol` (IV + status codes),
-   `quant.realized_vol` (close-to-close, Parkinson, Garman-Klass, Yang-Zhang) and
-   `quant.rates` (with `data.rates.curve` for the risk-free rate); conventions are ADR 0021.
-3. **Register it** in `src/algotrade/features/registry.py`, so the nightly pipeline and
-   `FeatureView` (`core/views/feature_view.py`) pick it up.
-4. **Changing an existing feature's logic?** Create `name@v2`; do not edit v1. Update
-   dependents explicitly.
-5. **Tests:** known-value unit tests, plus a property test that truncating future data
-   does not change past values. If it uses option maths, extend the `quant` tests
-   (`tests/unit/quant/`, `tests/property/test_quant.py`; for example put-call parity).
-6. **Baseline:** if strategies or screeners use it, run `make baseline` and explain the diff.
-7. Run `make check`.
+1. **Declare it** in `src/algotrade/features/rollups/<name>.py` as `ROLLUP = Rollup(...)`:
+   `name`, `version` (1), a description, `inputs` (`Input(table, lookback=sessions or
+   lambda params: ..., required=True)`), `columns` (`{"col": "float" | "int" | "bool" | "str"
+   | "date"}`), the pure `compute(inputs, session, params) -> frame` (``instrument_id`` + the
+   declared columns), and `params` (a frozen dataclass of defaults, validated in
+   `__post_init__`; `None` if it takes none).
+2. **Inputs** must have a loader in `features/framework/inputs.py` (`bars/1d` split-adjusted
+   as of each session, `events/earnings` snapshots, `chains/*` partitions). A new input table
+   gets a loader there that reads through `algotrade.data` (extend the data owner if needed).
+   `compute` receives only rows on or before its session; missing history is null
+   (UNKNOWN), never zero.
+3. **Pure computation:** pricing and volatility maths belong in `quant/`
+   (`black_scholes`, `implied_vol`, `realized_vol` (1-d or sessions x instruments),
+   `rates`; ADR 0021), sessions in `core/time/calendar.py`.
+4. **Register it** in `src/algotrade/features/registry.py` (`ROLLUPS`). That alone makes it
+   computed by the `rollups` task (nightly and `algotrade-ingest rollups --from/--to`) and
+   selectable as `rollup.<name>@v1.<column>`.
+5. **Harness, same PR:** a `[[table]]` entry for `rollups/instrument/<name>@v1` owned by
+   `tasks/derived/rollups.py` in `architecture/ownership.toml`; a `["<name>@v1"]` section in
+   `config/site/rollups.toml` if it has params (every key must drive code);
+   `tests/architecture/test_rollups.py` checks all of this.
+6. **Changing an existing rollup's logic or a window named in a column?** Create
+   `name@v2`; do not edit v1. Update dependents explicitly.
+7. **Tests** (`tests/unit/features/rollups/`): hand-computed values on a small stored series
+   (`tests/rollup_helpers.py`), missing history / gaps are null, a backfill equals the
+   per-session compute, and anything adjustment-sensitive (splits) as of each session.
+8. **Docs:** the rollups table in `docs/data/layers.md` and the selectable fields in
+   `docs/configuration.md`.
+9. **Baseline:** if strategies or screeners use it, run `make baseline` and explain the diff.
+10. Run `make check`; after merge, backfill with `algotrade-ingest rollups --from D --to D
+    --only <name>@v1`.

@@ -93,3 +93,25 @@ def test_short_series_and_bad_inputs() -> None:
         rv.parkinson(HIGH, LOW[:-1], 2)
     with pytest.raises(ValueError, match="positive"):
         rv.parkinson(HIGH, np.array([1.0, 0.0, 1, 1, 1, 1]), 2)
+
+
+def test_two_dimensional_input_is_one_series_per_column() -> None:
+    other = CLOSE[::-1].copy()
+    matrix = np.column_stack([CLOSE, other])
+    both = rv.close_to_close(matrix, N)
+    assert both.shape == matrix.shape
+    np.testing.assert_allclose(both[:, 0], rv.close_to_close(CLOSE, N), equal_nan=True)
+    np.testing.assert_allclose(both[:, 1], rv.close_to_close(other, N), equal_nan=True)
+    ohlc = [np.column_stack([a, a]) for a in (OPEN, HIGH, LOW, CLOSE)]
+    yz = rv.yang_zhang(*ohlc, N)
+    np.testing.assert_allclose(yz[:, 1], rv.yang_zhang(OPEN, HIGH, LOW, CLOSE, N), equal_nan=True)
+
+
+def test_nan_is_a_missing_observation() -> None:
+    gapped = CLOSE.copy()
+    gapped[3] = np.nan
+    out = rv.close_to_close(gapped, 2)
+    assert np.isnan(out[3:]).all()  # every window touching session 3 (closes i-2..i) is NaN
+    assert not np.isnan(out[2])
+    with pytest.raises(ValueError, match="1-d or 2-d"):
+        rv.close_to_close(np.ones((2, 2, 2)), 2)

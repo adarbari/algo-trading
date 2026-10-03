@@ -15,6 +15,11 @@ Per side (puts and calls scored separately):
   short strike  = tightest relative spread with pick_lo <= |delta| <= pick_hi (ties: higher OI);
                   fallback the two-sided quote closest to ``delta_target``
   zone          = all strikes in the target expiry with zone_lo <= |delta| <= zone_hi
+
+Inputs: the session's ``chains/status`` (required: one row per underlying fetched),
+``chains/option_quotes`` and ``chains/underlying_quotes``. Parameters: the scalar fields of
+``LiquidityParams`` in ``config/site/rollups.toml ["option_liquidity@v1"]``; the tier table is
+part of the v1 definition.
 """
 
 import math
@@ -23,7 +28,10 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any, cast
 
+import pandas as pd
+
 from algotrade.core.model.options import OptionRight, standard_monthly_expiries
+from algotrade.features.framework.declaration import Input, Inputs, Rollup
 
 NAME = "option_liquidity"
 VERSION = 1
@@ -225,3 +233,65 @@ def assess(contracts: list[Contract], session: date, p: LiquidityParams) -> dict
     row["short_put_ok"] = row["put_tier"] in p.ok_tiers
     row["short_call_ok"] = row["call_tier"] in p.ok_tiers
     return row
+
+
+def liquidity_rows(
+    status: pd.DataFrame,
+    options: pd.DataFrame | None,
+    underlyings: pd.DataFrame | None,
+    session: date,
+    params: LiquidityParams,
+) -> pd.DataFrame:
+    """One row per underlying in ``status``; failed fetches keep their status as ``liq_status``."""
+    chains = dict(tuple(options.groupby("underlying_id"))) if options is not None else {}
+    quotes = underlyings.set_index("instrument_id") if underlyings is not None else pd.DataFrame()
+    rows = []
+    for record in status.to_dict("records"):
+        iid, fetch_status = record["instrument_id"], str(record["status"])
+        if fetch_status not in ("OK", "NO_STANDARD_SERIES"):
+            row = {"liq_status": fetch_status, "put_tier": "D", "call_tier": "D"}
+        else:
+            frame = chains.get(iid)
+            contracts = (
+                contracts_from_rows(cast(list[Mapping[str, Any]], frame.to_dict("records")))
+                if frame is not None
+                else []
+            )
+            row = assess(contracts, session, params)
+        if iid in quotes.index:
+            q = quotes.loc[iid]
+            row.update(
+                underlying_price=q["price"],
+                iv30=q["iv30"],
+                chain_asof=q["ts"],
+                stock_volume=q["volume"],
+            )
+        rows.append({"instrument_id": iid, **row})
+    return pd.DataFrame(rows) if rows else pd.DataFrame(columns=["instrument_id"])
+
+
+def compute(inputs: Inputs, session: date, params: LiquidityParams) -> pd.DataFrame:
+    status = inputs["chains/status"]
+    assert status is not None  # required input
+    return liquidity_rows(
+        status,
+        inputs.get("chains/option_quotes"),
+        inputs.get("chains/underlying_quotes"),
+        session,
+        params,
+    )
+
+
+ROLLUP = Rollup(
+    NAME,
+    VERSION,
+    "Short-premium tradeability tiers (A-D) for puts and calls at the target expiry",
+    (
+        Input("chains/status"),
+        Input("chains/option_quotes", required=False),
+        Input("chains/underlying_quotes", required=False),
+    ),
+    COLUMNS,
+    compute,
+    LiquidityParams(),
+)

@@ -1,9 +1,11 @@
-"""Feature definitions: pure computations from stored data to versioned features (ADR 0007).
+"""Features: versioned rollups computed from stored data (ADR 0007).
 
-Definitions never read or write storage. The ingestion pipeline feeds them data and
-stores their output as rollups under ``rollups/instrument/<name>@v<version>``.
+- ``framework/``  the ``Rollup`` declaration, column typing, input loading (through
+                  ``algotrade.data``) and the per-session runner
+- ``rollups/``    the definitions: pure ``compute(inputs, session, params) -> frame``
+- ``registry``    every rollup by key (``<name>@v<N>``); the selection catalogue, the
+                  ``rollups`` ingestion task and the fitness tests are built from it
+
+Definitions never read or write storage. The ``rollups`` ingestion task stores their output
+as ``rollups/instrument/<name>@v<N>``, one partition per session.
 """
-
-from algotrade.features.registry import FEATURES, FeatureSpec
-
-__all__ = ["FEATURES", "FeatureSpec"]

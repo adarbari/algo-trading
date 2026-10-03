@@ -11,11 +11,9 @@ from dataclasses import dataclass
 
 from algotrade.config.strategy.schema import NO_VALUE_OPS, Group, Rule
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.core.model.fields import REFERENCE_TABLE, field_source
+from algotrade.core.model.fields import FIELD_TYPES, REFERENCE_TABLE, field_source
 
 __all__ = ["FIELD_TYPES", "INSTRUMENT_FIELDS", "REFERENCE_TABLE", "FieldCatalog", "field_source"]
-
-FIELD_TYPES = frozenset({"str", "float", "int", "bool", "date"})
 
 INSTRUMENT_FIELDS: Mapping[str, str] = {
     "instrument_id": "str",
