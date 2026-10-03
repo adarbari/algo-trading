@@ -1,0 +1,210 @@
+"""Snapshot tables (reference, company, universe, id map): ONE rule for the snapshot read.
+
+``snapshot(reader, table, on)`` is the latest partition on or before ``on``; when there is
+none it falls back to the EARLIEST partition and says so (``pre_snapshot``). Reading a date
+before the first snapshot therefore works, but uses a list of instruments taken later:
+survivorship bias, which backtests record (ADR 0007, ADR 0019 R1). Everything here that
+reads a snapshot table goes through ``snapshot``.
+"""
+
+import math
+from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+
+import pandas as pd
+
+from algotrade.core.errors import MissingDataError
+from algotrade.core.fields import COMPANY_TABLE, REFERENCE_TABLE, field_source, instrument_field
+from algotrade.core.instruments import AssetClass, Instrument
+from algotrade.data.resolver import SymbolResolver
+from algotrade.storage.readers import StoreReader
+
+UNIVERSE_TABLE = "universe"
+UNIVERSE_HINT = "algotrade-ingest universe import --stocks <csv> --etfs <csv> --version <v>"
+REFERENCE_HINT = "run the ingestion job that loads instrument reference data"
+
+
+@dataclass(frozen=True)
+class Snapshot:
+    """The partition of a snapshot table that a read for ``on`` uses."""
+
+    table: str
+    snapshot_date: date
+    on: date | None  # the date asked for; None = the latest snapshot
+
+    @property
+    def pre_snapshot(self) -> bool:
+        """True when ``on`` is before the first snapshot and a later one stands in."""
+        return self.on is not None and self.snapshot_date > self.on
+
+
+def snapshot(reader: StoreReader, table: str, on: date | None = None) -> Snapshot | None:
+    """Latest snapshot on or before ``on`` (any, when ``on`` is None), else the earliest.
+
+    ``None`` only when the table has no partition at all."""
+    dates = reader.dates(table)
+    if not dates:
+        return None
+    before = [d for d in dates if on is None or d <= on]
+    return Snapshot(table, before[-1] if before else dates[0], on)
+
+
+def read_snapshot(
+    reader: StoreReader,
+    table: str,
+    on: date | None,
+    hint: str,
+    as_of: datetime | None = None,
+    instruments: Sequence[str] | None = None,
+) -> tuple[pd.DataFrame, Snapshot]:
+    """The rows of ``snapshot(table, on)``; ``MissingDataError`` when there is none."""
+    snap = snapshot(reader, table, on)
+    if snap is None:
+        raise MissingDataError(table, "no snapshot stored" + (f" (for {on})" if on else ""), hint)
+    frame = reader.table(table, snap.snapshot_date, as_of, instruments)
+    if frame is None:
+        raise MissingDataError(table, f"snapshot {snap.snapshot_date} not known at {as_of}", hint)
+    return frame, snap
+
+
+# ---------------------------------------------------------------------- instruments (L1)
+def instruments(
+    reader: StoreReader,
+    on: date,
+    ids: Sequence[str] | None = None,
+    as_of: datetime | None = None,
+) -> pd.DataFrame:
+    """The ``instruments/reference`` snapshot for ``on`` (see ``snapshot``)."""
+    return read_snapshot(reader, REFERENCE_TABLE, on, REFERENCE_HINT, as_of, ids)[0]
+
+
+def _present[T](value: object, default: T) -> T:
+    """``default`` when a column is absent, None or NaN (Parquet fills gaps with NaN)."""
+    if value is None or (isinstance(value, float) and math.isnan(value)):
+        return default
+    return value  # type: ignore[return-value]
+
+
+def instrument_terms(
+    reader: StoreReader,
+    on: date,
+    ids: Sequence[str] | None = None,
+    as_of: datetime | None = None,
+) -> dict[str, Instrument]:
+    """Contract terms (multiplier, tick size, asset class) for engines."""
+    frame = instruments(reader, on, ids, as_of)
+    return {
+        str(r.instrument_id): Instrument(
+            instrument_id=str(r.instrument_id),
+            symbol=str(r.symbol),
+            asset_class=AssetClass(str(r.asset_class)),
+            multiplier=float(r.multiplier),  # type: ignore[arg-type]
+            currency=str(_present(getattr(r, "currency", None), "USD")),
+            tick_size=float(_present(getattr(r, "tick_size", None), 0.01)),
+        )
+        for r in frame.itertuples(index=False)
+    }
+
+
+def resolver(reader: StoreReader, on: date, as_of: datetime | None = None) -> SymbolResolver:
+    """Symbol -> instrument id for ``on`` (ADR 0018). Empty store: symbol ids."""
+    snap = snapshot(reader, REFERENCE_TABLE, on)
+    if snap is None:
+        return SymbolResolver()
+    frame = reader.table(REFERENCE_TABLE, snap.snapshot_date, as_of)
+    return SymbolResolver.from_reference(frame, snap.snapshot_date)
+
+
+@dataclass(frozen=True)
+class InstrumentView:
+    """L1 for one date: reference facts + rollups, one row per instrument (ADR 0016).
+
+    Columns are field names (``instrument.<col>``, ``rollup.<name>@vN.<col>``) plus
+    ``instrument_id``. A rollup with no partition for ``session`` is listed in ``missing``
+    and its fields are absent, which selections treat as UNKNOWN (never as a pass).
+    ``pre_snapshot``: the reference came from a snapshot after ``session`` (survivorship).
+    """
+
+    session: date
+    reference_snapshot: date
+    frame: pd.DataFrame
+    missing: tuple[str, ...]
+    pre_snapshot: bool = False
+
+
+def instrument_view(
+    reader: StoreReader,
+    session: date,
+    fields: Sequence[str] | None = None,
+    ids: Sequence[str] | None = None,
+    as_of: datetime | None = None,
+) -> InstrumentView:
+    """Reference snapshot for ``session`` joined with rollups *for* ``session``.
+
+    Company fields (``instrument.sector``…) come from the ``instruments/company`` snapshot
+    for ``session`` (same rule); without one they are ``missing`` (UNKNOWN). ``fields``
+    limits the columns (and the rollup tables read); ``None`` means every reference column
+    and no rollups.
+    """
+    reference, ref = read_snapshot(reader, REFERENCE_TABLE, session, REFERENCE_HINT, as_of, ids)
+    wanted: dict[str, list[tuple[str, str]]] = {}
+    for name in fields if fields is not None else [instrument_field(str(c)) for c in reference]:
+        table, column = field_source(name)
+        wanted.setdefault(table, []).append((name, column))
+    out = pd.DataFrame({"instrument_id": reference["instrument_id"].astype(str)})
+    missing: list[str] = []
+    for table, columns in wanted.items():
+        if table == REFERENCE_TABLE:
+            frame: pd.DataFrame | None = reference
+        elif table == COMPANY_TABLE:  # a snapshot table, like the reference
+            company = snapshot(reader, table, session)
+            frame = reader.table(table, company.snapshot_date, as_of) if company else None
+        else:
+            frame = reader.table(table, session, as_of)
+        if frame is None:
+            missing.append(table)
+            continue
+        # Build the joined columns by name so the join key itself is never renamed.
+        picked = pd.DataFrame({"instrument_id": frame["instrument_id"].astype(str)})
+        for name, column in columns:
+            if column in frame.columns:
+                picked[name] = frame[column].to_numpy()
+        out = out.merge(picked, on="instrument_id", how="left")
+    return InstrumentView(session, ref.snapshot_date, out, tuple(sorted(missing)), ref.pre_snapshot)
+
+
+# ---------------------------------------------------------------------- universe
+@dataclass(frozen=True)
+class Universe:
+    snapshot_date: date
+    frame: pd.DataFrame  # every covered instrument; strategies narrow it with selections
+    rows_loaded: int
+    version: str
+    last_verified: date | None
+    pre_snapshot: bool = False  # the snapshot is after the session asked for (survivorship)
+
+    @property
+    def instruments(self) -> list[str]:
+        return list(self.frame["instrument_id"])
+
+    def is_stale(self, session_date: date, max_age_days: int) -> bool:
+        reference = self.last_verified or self.snapshot_date
+        return session_date - reference > timedelta(days=max_age_days)
+
+
+def load_universe(
+    reader: StoreReader, session_date: date, as_of: datetime | None = None
+) -> Universe:
+    frame, snap = read_snapshot(reader, UNIVERSE_TABLE, session_date, UNIVERSE_HINT, as_of)
+    raw_verified = frame["last_verified"] if "last_verified" in frame else pd.Series(dtype=str)
+    verified = pd.to_datetime(raw_verified, errors="coerce").dropna()
+    return Universe(
+        snapshot_date=snap.snapshot_date,
+        frame=frame.reset_index(drop=True),
+        rows_loaded=len(frame),
+        version=str(frame["universe_version"].iloc[0]) if len(frame) else "",
+        # Oldest verification date: the conservative reading when rows disagree (fail closed).
+        last_verified=verified.min().date() if len(verified) else None,
+        pre_snapshot=snap.pre_snapshot,
+    )

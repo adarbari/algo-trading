@@ -1,7 +1,7 @@
-"""Turn stored (unadjusted) bars into the aligned ``PriceSeries`` engines consume.
+"""Bars: read stored (unadjusted) bars and turn them into the aligned ``PriceSeries`` engines use.
 
 Corporate actions are applied here, at read time (ADR 0016), from ``events/split`` and
-``events/dividend``:
+``events/dividend`` read by event date (``data.events``):
 
 - ``none``:         prices as traded
 - ``splits``:       earlier bars divided by each later split ratio (volume multiplied), so a
@@ -17,10 +17,33 @@ from datetime import date, datetime
 import numpy as np
 import pandas as pd
 
-from algotrade.core.errors import ConfigurationError
+from algotrade.core.errors import ConfigurationError, MissingDataError
+from algotrade.core.fields import REFERENCE_TABLE
 from algotrade.core.instruments import Instrument
 from algotrade.core.series import FIELDS, PriceSeries, align
+from algotrade.data.events import read_events
+from algotrade.data.reference import REFERENCE_HINT, Snapshot, instrument_terms, read_snapshot
 from algotrade.storage.readers import StoreReader
+
+
+def bars(
+    reader: StoreReader,
+    interval: str,
+    start: date,
+    end: date,
+    instruments: Sequence[str] | None = None,
+    as_of: datetime | None = None,
+) -> pd.DataFrame:
+    """Bars for ``start <= session_date <= end``, sorted by (instrument_id, ts).
+
+    Raises ``MissingDataError`` when nothing is stored; backtests never fetch (ADR 0008).
+    """
+    table = f"bars/{interval}"
+    frame = reader.table_range(table, start, end, as_of, instruments)
+    if frame is None:
+        hint = f"run the ingestion job that loads {table} for {start}..{end}"
+        raise MissingDataError(table, f"no bars between {start} and {end}", hint)
+    return frame.sort_values(["instrument_id", "ts"], kind="stable").reset_index(drop=True)
 
 
 def frame_to_series(bars: pd.DataFrame) -> dict[str, PriceSeries]:
@@ -38,19 +61,6 @@ def frame_to_series(bars: pd.DataFrame) -> dict[str, PriceSeries]:
 
 ADJUSTMENTS = ("none", "splits", "total_return")
 _PRICES = ["open", "high", "low", "close"]
-_ALL_TIME = date(1900, 1, 1)
-
-
-def _events(
-    reader: StoreReader, table: str, instruments: Sequence[str], end: date, as_of: datetime | None
-) -> tuple[pd.DataFrame, list[str]]:
-    """Every event known up to ``end`` (union of snapshots, latest knowledge per event)."""
-    frame = reader.table_range(table, _ALL_TIME, end, as_of, instruments)
-    if frame is None or frame.empty:
-        return pd.DataFrame(columns=["instrument_id", "ts"]), []
-    runs = sorted(map(str, frame["run_id"].unique()))
-    frame = frame.sort_values("knowledge_ts").drop_duplicates(["instrument_id", "ts"], keep="last")
-    return frame.reset_index(drop=True), runs
 
 
 def adjust_bars(
@@ -98,6 +108,7 @@ class PriceData:
     series: dict[str, PriceSeries]
     terms: dict[str, Instrument]
     versions: dict[str, list[str]]  # table -> run ids read (for reproducibility)
+    reference: Snapshot  # the reference snapshot used; pre_snapshot = survivorship bias
 
 
 def load_price_data(
@@ -109,23 +120,28 @@ def load_price_data(
     as_of: datetime | None = None,
     adjustment: str = "splits",
 ) -> PriceData:
-    """Aligned, corporate-action-adjusted series plus contract terms (as of ``start``)."""
-    bars = reader.bars(interval, start, end, instruments, as_of)
-    reference = reader.instruments(start, instruments, as_of)
+    """Aligned, corporate-action-adjusted series plus contract terms (as of ``start``).
+
+    Splits and dividends are those whose event date falls in ``start..end``, wherever
+    they were stored (``data.events``)."""
+    frame = bars(reader, interval, start, end, instruments, as_of)
+    reference, snapshot = read_snapshot(
+        reader, REFERENCE_TABLE, start, REFERENCE_HINT, as_of, instruments
+    )
     versions = {
-        f"bars/{interval}": sorted(map(str, bars["run_id"].unique())),
-        "instruments/reference": sorted(map(str, reference["run_id"].unique())),
+        f"bars/{interval}": sorted(map(str, frame["run_id"].unique())),
+        REFERENCE_TABLE: sorted(map(str, reference["run_id"].unique())),
     }
     if adjustment != "none":
-        splits, split_runs = _events(reader, "events/split", instruments, end, as_of)
-        dividends, dividend_runs = _events(reader, "events/dividend", instruments, end, as_of)
-        bars = adjust_bars(bars, splits, dividends, adjustment)
+        splits = read_events(reader, "events/split", start, end, instruments, as_of)
+        dividends = read_events(reader, "events/dividend", start, end, instruments, as_of)
+        frame = adjust_bars(frame, splits.frame, dividends.frame, adjustment)
         versions.update(
             {
-                k: v
-                for k, v in (("events/split", split_runs), ("events/dividend", dividend_runs))
-                if v
+                k: e.runs
+                for k, e in (("events/split", splits), ("events/dividend", dividends))
+                if e.runs
             }
         )
-    terms = reader.instrument_terms(start, instruments)
-    return PriceData(align(frame_to_series(bars)), terms, versions)
+    terms = instrument_terms(reader, start, instruments, as_of)
+    return PriceData(align(frame_to_series(frame)), terms, versions, snapshot)

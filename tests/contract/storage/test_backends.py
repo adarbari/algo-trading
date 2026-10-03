@@ -180,16 +180,16 @@ def test_read_range_resolves_each_partition_point_in_time(backend: Backend) -> N
         day = D1 + timedelta(days=offset)
         writer.write_table("bars/1d", day, "r1", stamped(bar_rows(day, close), day, "r1", T0))
     writer.write_table("bars/1d", D2, "r2", stamped(bar_rows(D2, 99.0), D2, "r2", later))
-    bars = reader.bars("1d", D1, D1 + timedelta(days=2))
+    bars = reader.table_range("bars/1d", D1, D1 + timedelta(days=2))
+    assert bars is not None
     assert list(bars[bars.instrument_id == "EQ:A"]["close"]) == [10.0, 99.0, 12.0]
-    as_of = reader.bars("1d", D1, D1 + timedelta(days=2), ["EQ:B"], as_of=T0)
+    as_of = reader.table_range("bars/1d", D1, D1 + timedelta(days=2), T0, ["EQ:B"])
+    assert as_of is not None
     assert list(as_of["close"]) == [10.0, 11.0, 12.0]
     assert set(as_of["instrument_id"]) == {"EQ:B"}
     assert (
         backend.tables.read_range("bars/1d", D1 - timedelta(days=9), D1 - timedelta(days=1)) is None
     )
-    with pytest.raises(MissingDataError, match="no bars"):
-        reader.bars("5m", D1, D2)
 
 
 def test_bar_validation(backend: Backend) -> None:
@@ -208,40 +208,6 @@ def test_bar_validation(backend: Backend) -> None:
         writer.write_table("bars/2d", D1, "r1", bad)
 
 
-def test_instrument_reference_snapshots(backend: Backend) -> None:
-    writer, reader = StoreWriter(backend), StoreReader(backend)
-    ref = [
-        {
-            "instrument_id": "EQ:A",
-            "symbol": "A",
-            "asset_class": "EQ",
-            "security_type": "COMMON_STOCK",
-            "multiplier": 1.0,
-            "status": "ACTIVE",
-        },
-        {
-            "instrument_id": "FUT:ESZ6",
-            "symbol": "ESZ6",
-            "asset_class": "FUT",
-            "security_type": "FUTURE",
-            "multiplier": 50.0,
-            "status": "ACTIVE",
-            "tick_size": 0.25,
-        },
-    ]
-    writer.write_table("instruments/reference", D1, "r1", stamped(ref, D1, "r1"))
-    renamed = [{**ref[0], "symbol": "A2"}]
-    writer.write_table("instruments/reference", D2, "r2", stamped(renamed, D2, "r2"))
-    assert list(reader.instruments(D1)["symbol"]) == ["A", "ESZ6"]
-    assert list(reader.instruments(D2 + timedelta(days=5))["symbol"]) == ["A2"]
-    terms = reader.instrument_terms(D1)
-    assert terms["FUT:ESZ6"].multiplier == 50.0
-    assert terms["FUT:ESZ6"].tick_size == 0.25
-    assert terms["EQ:A"].tick_size == 0.01
-    with pytest.raises(MissingDataError, match="no snapshot"):
-        reader.instruments(D1 - timedelta(days=1))
-
-
 def test_open_ended_table_prefixes(backend: Backend) -> None:
     writer = StoreWriter(backend)
     event = stamped(
@@ -255,36 +221,6 @@ def test_open_ended_table_prefixes(backend: Backend) -> None:
     )
     with pytest.raises(DataValidationError, match="unknown table"):
         writer.write_table("rollups/instrument/", D1, "r1", event)
-
-
-def test_instrument_view_joins_reference_and_session_rollups(backend: Backend) -> None:
-    writer, reader = StoreWriter(backend), StoreReader(backend)
-    ref = [
-        {
-            "instrument_id": i,
-            "symbol": i[3:],
-            "asset_class": "EQ",
-            "security_type": "ETF",
-            "multiplier": 1.0,
-            "status": "ACTIVE",
-        }
-        for i in ("EQ:A", "EQ:B")
-    ]
-    writer.write_table("instruments/reference", D1, "r1", stamped(ref, D1, "r1"))
-    liq = [{"instrument_id": "EQ:A", "put_tier": "A"}]
-    writer.write_table("rollups/instrument/liq@v1", D2, "r2", stamped(liq, D2, "r2"))
-    fields = ["instrument.symbol", "rollup.liq@v1.put_tier", "rollup.other@v1.x"]
-    view = reader.instrument_view(D2, fields)
-    assert view.reference_snapshot == D1
-    assert view.missing == ("rollups/instrument/other@v1",)
-    rows = view.frame.set_index("instrument_id")
-    assert rows.loc["EQ:A", "rollup.liq@v1.put_tier"] == "A"
-    assert pd.isna(rows.loc["EQ:B", "rollup.liq@v1.put_tier"])
-    everything = reader.instrument_view(D2)
-    assert {"instrument.symbol", "instrument.multiplier"} <= set(everything.frame.columns)
-    assert reader.instrument_view(D1, ["rollup.liq@v1.put_tier"]).missing == (
-        "rollups/instrument/liq@v1",
-    )  # a rollup is read for the session only, never stale
 
 
 def test_events_allow_several_kinds_of_change_per_day(backend: Backend) -> None:
@@ -305,28 +241,3 @@ def test_table_names_list_every_written_table(backend: Backend) -> None:
     backend.tables.write(TABLE, D1, "r1", stamped(rows({"EQ:A": 1.0}), D1, "r1"))
     backend.tables.write("bars/1d", D2, "r1", stamped(rows({"EQ:A": 1.0}), D2, "r1"))
     assert StoreReader(backend).table_names() == ["bars/1d", TABLE]
-
-
-def test_resolver_uses_the_reference_as_of_the_session(backend: Backend) -> None:
-    writer, reader = StoreWriter(backend), StoreReader(backend)
-    assert reader.resolver(D1).id_for("aapl") == "EQ:AAPL"  # no reference yet: symbol ids
-    ref = {"asset_class": "EQ", "security_type": "COMMON_STOCK", "multiplier": 1.0}
-    day1 = [
-        {**ref, "instrument_id": "EQ:BBG1", "symbol": "FB", "status": "ACTIVE"},
-        {**ref, "instrument_id": "EQ:OLDCO", "symbol": "OLDCO", "status": "DELISTED"},
-    ]
-    day2 = [
-        {**ref, "instrument_id": "EQ:BBG1", "symbol": "META", "status": "ACTIVE"},
-        {**ref, "instrument_id": "EQ:OLDCO", "symbol": "FB", "status": "DELISTED"},
-    ]
-    writer.write_table("instruments/reference", D1, "r1", stamped(day1, D1, "r1"))
-    writer.write_table("instruments/reference", D2, "r2", stamped(day2, D2, "r2"))
-    assert reader.resolver(D1).id_for("FB") == "EQ:BBG1"
-    assert reader.resolver(D1 - timedelta(days=30)).snapshot == D1  # backfill: earliest
-    later = reader.resolver(D2 + timedelta(days=3))
-    assert later.snapshot == D2
-    assert later.id_for("META") == "EQ:BBG1"
-    assert later.id_for("FB") == "EQ:OLDCO"  # only a delisted row has it now
-    assert later.symbol_for("EQ:BBG1") == "META"
-    frame, unknown = later.resolve(pd.DataFrame({"symbol": ["meta", "NEW"], "x": [1, 2]}))
-    assert list(frame["instrument_id"]) == ["EQ:BBG1", "EQ:NEW"] and unknown == 1

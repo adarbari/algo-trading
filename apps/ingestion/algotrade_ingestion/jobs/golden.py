@@ -17,7 +17,7 @@ from datetime import UTC, date, datetime
 import pandas as pd
 
 from algotrade.core.instruments import AssetClass
-from algotrade.storage.resolver import SymbolResolver
+from algotrade.data.resolver import SymbolResolver
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.common import stamp

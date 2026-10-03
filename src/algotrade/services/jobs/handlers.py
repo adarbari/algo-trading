@@ -1,7 +1,7 @@
 """Job kinds the library provides. Apps add their own (e.g. ingestion's ``nightly``).
 
-Resources expected in ``JobContext.resources``: ``reader`` (StoreReader), ``configs``
-(ConfigStore) and, to save results, ``writer`` (ResultWriter).
+Resources expected in ``JobContext.resources``: ``reader`` (``algotrade.data.StoreReader``),
+``configs`` (ConfigStore) and, to save results, ``writer`` (ResultWriter).
 
 Identity: a backtest or screen job is the same job when the *resolved config* (its hash),
 the dates and the user are the same, so editing a config and resubmitting runs again.
@@ -52,7 +52,7 @@ def backtest_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any
         "config_hash": config.hash,
         "run_id": outcome.run_id,
         "selection": outcome.selection.as_dict(),
-        "data_versions": outcome.versions,
+        **outcome.data_stats(),
         "metrics": outcome.result.metrics.as_dict(),
     }
 

@@ -167,5 +167,10 @@ def test_user_config_backtest_reproduces_baseline(cli: Cli, tmp_path: Path) -> N
     assert payload["metrics"]["total_return"] == pytest.approx(expected, rel=1e-9)
     assert payload["selection"]["selected"] == 1
     assert payload["user"] == "tester"
+    assert payload["survivorship_bias"] is False and payload["as_of"]  # the version pin
+    early = cli(*args, "--start", "2019-12-02", "--end", "2022-12-31")  # before the reference
+    assert early.returncode == 0, early.stderr
+    assert json.loads(early.stdout)["survivorship_bias"] is True
+    assert "survivorship bias" in early.stderr
     assert cli(*args).returncode == 2  # --config needs --start/--end
     assert cli("backtest", "--dataset", "bull_trend").returncode == 2  # needs --strategy

@@ -7,10 +7,10 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from algotrade.data import StoreReader
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.interfaces import Backend
-from algotrade.storage.readers import StoreReader
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.instrument_ids import ID_MAP, ID_MAP_COLUMNS
 from algotrade_ingestion.jobs.migrate_ids import migrate_ids

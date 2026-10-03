@@ -7,8 +7,9 @@ from datetime import date
 from algotrade.core.errors import MissingDataError
 from algotrade.core.instruments import Instrument
 from algotrade.core.series import PriceSeries, align
-from algotrade.services.market_data import frame_to_series
-from algotrade.storage.readers import StoreReader
+from algotrade.data import StoreReader
+from algotrade.data.prices import bars, frame_to_series
+from algotrade.data.reference import instrument_terms, read_snapshot, snapshot
 
 CATALOG = "catalog/golden_datasets"
 HINT = "make golden-store (algotrade-ingest golden load into the fixture store)"
@@ -25,10 +26,7 @@ class DatasetInfo:
 
 
 def list_datasets(reader: StoreReader) -> dict[str, DatasetInfo]:
-    snapshot = reader.latest_date(CATALOG)
-    if snapshot is None:
-        raise MissingDataError(CATALOG, "no golden catalogue in this store", HINT)
-    frame = reader.require(CATALOG, snapshot, HINT)
+    frame, _ = read_snapshot(reader, CATALOG, None, HINT)  # the latest catalogue
     out: dict[str, DatasetInfo] = {}
     for name, group in frame.groupby("dataset", sort=True):
         rows = group.sort_values("instrument_id")
@@ -53,14 +51,15 @@ def load_datasets(
         raise MissingDataError(
             CATALOG, f"unknown dataset(s) {unknown}; have {sorted(catalogue)}", HINT
         )
-    snapshot = reader.latest_date(CATALOG)
-    assert snapshot is not None
+    catalog = snapshot(reader, CATALOG)
+    assert catalog is not None  # list_datasets raised otherwise
+    first = catalog.snapshot_date
     instruments = sorted({i for n in wanted for i in catalogue[n].instruments})
-    bars = frame_to_series(reader.bars("1d", snapshot, FAR_FUTURE, instruments))
-    terms = reader.instrument_terms(snapshot, instruments)
+    series = frame_to_series(bars(reader, "1d", first, FAR_FUTURE, instruments))
+    terms = instrument_terms(reader, first, instruments)
     return {
         n: (
-            align({i: bars[i] for i in catalogue[n].instruments}),
+            align({i: series[i] for i in catalogue[n].instruments}),
             {i: terms[i] for i in catalogue[n].instruments},
         )
         for n in wanted

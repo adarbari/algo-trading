@@ -2,7 +2,7 @@
 
 Every job or service that holds a ticker (a vendor payload, a CLI flag, a config list) turns
 it into an id here, so the id scheme lives in one place. Build one with
-``StoreReader.resolver(session)``.
+``algotrade.data.reference.resolver(reader, session)``.
 
 - Active rows win over delisted ones (a reused ticker belongs to the listing trading today).
 - A symbol the snapshot does not know falls back to its symbol id (``EQ:<SYMBOL>``); callers

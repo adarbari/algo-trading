@@ -69,10 +69,23 @@ FIGI id upgrades, ADR 0018), `instruments/company`; L2 `bars/<interval>` (1d, 1h
 sanity-checked on write), `chains/underlying_quotes`, `chains/option_quotes`,
 `chains/status`, `events/<type>`; rollups `rollups/daily/*` and `rollups/instrument/*`
 (e.g. `rollups/instrument/option_liquidity@v1`); `universe`; `catalog/*`; `results/<name>`.
-Readers: `table`, `table_range` (date range, each partition resolved point-in-time),
-`bars`, `instruments` (latest snapshot on or before a date), `instrument_terms`,
-`resolver` (symbol → id as of a date) and `table_names` (every table with data; backends
-implement `TableStore.names()`).
+## Reading
+
+Consumers (services, engines, apps) read market data only through `algotrade.data`
+(ADR 0019 R1, an import-linter contract); `storage/readers.py` is the generic reader it
+builds on: `table`, `table_range` (date range, each partition resolved point-in-time),
+`dates`, `latest_date`, `runs` and `table_names` (every table with data; backends implement
+`TableStore.names()`). Storage holds no domain rules (R2).
+
+| Module | Reads | Rule |
+|---|---|---|
+| `data/reference.py` | `instruments`, `instrument_terms`, `instrument_view` (`InstrumentView`), `load_universe`, `resolver` | **one snapshot rule**, `snapshot(reader, table, on)`: the latest snapshot on or before `on`, else the earliest, with `pre_snapshot = True` (survivorship bias: a later instrument list). Used for reference, company, universe and id map |
+| `data/prices.py` | `bars`, `load_price_data` (+ `adjust_bars`) | bars by session date; splits / dividends applied at read time |
+| `data/events.py` | `read_events` | by **event date** (`ts`) from any partition, latest `knowledge_ts` per event key |
+| `data/chains.py` | `option_quotes` (filter by `underlying_ids`), `underlying_quotes`, `chain_status` | one session's chain snapshot |
+
+Every read takes `as_of`, a **version pin** (ADR 0007): the latest run known at `as_of`.
+Backtests pass their launch time and record it with the run ids read.
 
 ## Target physical layout (as more grains arrive)
 
@@ -115,8 +128,8 @@ storage/
   interfaces.py        Protocols per grain: ReferenceStore, EventStore, BarStore, ChainStore,
                        UniverseStore, FeatureStore, ResultStore, Catalog
   schemas.py           canonical column schemas + validation (the data contract)
-  readers.py           read-only facade handed to backtest / api / engines
-  resolver.py          SymbolResolver: ticker -> instrument_id from a reference snapshot (ADR 0018)
+  readers.py           generic read-only facade (tables, ranges, dates, runs); domain reads are
+                       algotrade/data/ (reference, prices, events, chains, resolver)
   writers.py           write facade. Only apps/ingestion may import this (import-linter).
   backends/
     local.py           now: Parquet on the local filesystem (DuckDB-readable)

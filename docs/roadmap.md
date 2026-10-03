@@ -26,7 +26,7 @@ Baseline identical throughout.
 | # | Delivers | Status |
 |---|---|---|
 | R1 | Ownership registry, shrink-only ratchets (`make ownership`, `make dupes`), fitness tests, ADR 0019 | **done** |
-| R2 | `algotrade/data/` read layer + one snapshot rule (`reference`, `prices`, `events`, `chains`); fixes backtests before the first snapshot and reads events by event date; contracts R1, R2 | |
+| R2 | `algotrade/data/` read layer + one snapshot rule (`reference`, `prices`, `events`, `chains`); fixes backtests before the first snapshot (flagged `survivorship_bias`) and reads events by event date; backtests pin `as_of` = launch time (ADR 0007 amended); contracts R1, R2 | **done** |
 | R3 | `IngestRun` (the ingest loop, written once) + task registry (`jobs/` → `tasks/`); CLI and nightly dispatch through the registry | |
 | R4 | Source registry from `sources.toml` + shared cross-process rate limiter + run lock + index lock; contract R3 | |
 | R5 | Nightly workflow: isolated tasks, exchange calendar, screens submitted as `screen` jobs, failure notification; `cboe.enabled` / `cboe.workers` honoured; contract R5 | |

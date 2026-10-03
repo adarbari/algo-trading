@@ -7,11 +7,11 @@ import pytest
 
 from algotrade.config.user import UserContext
 from algotrade.core.errors import AlgoTradeError, ConfigurationError
+from algotrade.data import StoreReader
 from algotrade.services.jobs import JobContext, JobRecord, JobStatus, LocalJobRunner, job_id_for
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.backends.config_files import MemoryConfigStore
 from algotrade.storage.backends.memory import MemoryRuns
-from algotrade.storage.readers import StoreReader
 
 T0 = datetime(2026, 10, 3, 12, 0, tzinfo=UTC)
 USER = UserContext("alice")

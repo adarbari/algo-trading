@@ -4,8 +4,9 @@ from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
 
+from algotrade.data import StoreReader
+from algotrade.data.reference import resolver
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.readers import StoreReader
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.instrument_ids import assign_ids, cumulative_map, rename_ids
 from algotrade_ingestion.jobs.universe_build import (
@@ -144,7 +145,7 @@ def test_universe_build_upgrades_ids_and_records_the_map() -> None:
     assert len(reader.table("instruments/id_map", D2)) == 1  # type: ignore[arg-type]
     stats = build(D3, None, 22)  # the key is gone again: the FIGI id stays
     assert stats["identifiers"]["ids_carried"] == 1
-    assert reader.resolver(D3).id_for("AAPL") == "EQ:BBG1"
+    assert resolver(reader, D3).id_for("AAPL") == "EQ:BBG1"
     assert reader.table("instruments/id_map", D3) is not None  # the full map, every snapshot
 
 

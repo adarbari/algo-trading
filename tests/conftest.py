@@ -4,9 +4,9 @@ from pathlib import Path
 import pytest
 from hypothesis import HealthCheck, settings
 
+from algotrade.data import StoreReader
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.readers import StoreReader
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.golden import load_golden
 from algotrade_ingestion.sources.synthetic.files import GoldenFiles

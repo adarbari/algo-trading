@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from algotrade.storage.resolver import SymbolResolver
+from algotrade.data.resolver import SymbolResolver
 from algotrade.storage.schemas import COMMON, validate_frame
 from algotrade_ingestion.jobs.common import stamp, with_ids
 from algotrade_ingestion.sources.base import FetchRequest, Source

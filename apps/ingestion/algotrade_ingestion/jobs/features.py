@@ -6,13 +6,13 @@ from typing import Any, cast
 
 import pandas as pd
 
+from algotrade.data import StoreReader
+from algotrade.data.chains import chain_status, option_quotes, underlying_quotes
 from algotrade.features import option_liquidity as liq
 from algotrade.features.registry import FEATURES
-from algotrade.storage.readers import StoreReader
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.common import stamp
-from algotrade_ingestion.jobs.option_chains import OPTIONS, STATUS, UNDERLYINGS
 
 TABLE = f"rollups/instrument/{liq.NAME}@v{liq.VERSION}"
 HINT = "algotrade-ingest chains --date {d}"
@@ -62,11 +62,12 @@ def compute_option_liquidity(
     assert TABLE in FEATURES
     now = clock()
     hint = HINT.format(d=session_date.isoformat())
-    status = reader.require(STATUS, session_date, hint)
+    status = chain_status(reader, session_date, hint=hint)
+    assert status is not None  # chain_status raises with a hint
     frame = liquidity_rows(
         status,
-        reader.table(OPTIONS, session_date),
-        reader.table(UNDERLYINGS, session_date),
+        option_quotes(reader, session_date),
+        underlying_quotes(reader, session_date),
         session_date,
         params or liq.LiquidityParams(),
     )

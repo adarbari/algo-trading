@@ -16,7 +16,8 @@ from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
 
-from algotrade.storage.readers import StoreReader
+from algotrade.data import StoreReader
+from algotrade.data.reference import instruments, snapshot
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.common import stamp
@@ -86,8 +87,10 @@ def due_ciks(
 
 
 def _previous(reader: StoreReader, session: date) -> pd.DataFrame | None:
-    snapshot = reader.latest_date(TABLE, session)
-    return reader.table(TABLE, snapshot) if snapshot is not None else None
+    snap = snapshot(reader, TABLE, session)
+    if snap is None or snap.pre_snapshot:  # never reuse details fetched after ``session``
+        return None
+    return reader.table(TABLE, snap.snapshot_date)
 
 
 def ingest_company_details(
@@ -101,7 +104,7 @@ def ingest_company_details(
 ) -> RunRecord:
     now = clock()
     run_id = new_run_id(JOB, session, now)
-    reference = reader.instruments(session)
+    reference = instruments(reader, session)
     failed: list[str] = []
     try:
         sec_map = _ticker_map(sources.tickers, writer, session, run_id)

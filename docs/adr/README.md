@@ -12,7 +12,7 @@ Do not rewrite history. Use `.claude/skills/write-adr` to add one.
 | [0004](0004-apps-and-shared-libraries.md) | Four apps, shared libraries, one repo | accepted |
 | [0005](0005-ingestion-is-the-only-writer.md) | Ingestion is the only writer of market and feature data | accepted |
 | [0006](0006-storage-grains-and-adapters.md) | Storage by data grain, Parquet (DuckDB-readable), swappable adapters | accepted |
-| [0007](0007-point-in-time-data.md) | Point-in-time data and versioned features | accepted |
+| [0007](0007-point-in-time-data.md) | Point-in-time data and versioned features (`as_of` is a version pin; one snapshot rule) | accepted, amended |
 | [0008](0008-backtests-read-only-from-stores.md) | Backtests read only from stores | accepted |
 | [0009](0009-generic-instrument-model.md) | Generic instrument model (futures-ready) | accepted |
 | [0010](0010-jobs-model.md) | Long-running work is a job | accepted |

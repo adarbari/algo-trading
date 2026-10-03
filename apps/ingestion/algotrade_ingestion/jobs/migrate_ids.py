@@ -14,7 +14,8 @@ from datetime import UTC, datetime
 import pandas as pd
 
 from algotrade.core.errors import DataValidationError
-from algotrade.storage.readers import StoreReader
+from algotrade.data import StoreReader
+from algotrade.data.reference import snapshot
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.instrument_ids import ID_MAP
@@ -26,8 +27,8 @@ type IdMap = Mapping[str, list[tuple[pd.Timestamp, str]]]  # old id -> [(known_a
 
 
 def load_id_map(reader: StoreReader) -> IdMap:
-    day = reader.latest_date(ID_MAP)
-    frame = reader.table(ID_MAP, day) if day is not None else None
+    latest = snapshot(reader, ID_MAP)  # the map is cumulative: the latest has every upgrade
+    frame = reader.table(ID_MAP, latest.snapshot_date) if latest is not None else None
     out: dict[str, list[tuple[pd.Timestamp, str]]] = {}
     if frame is None:
         return out

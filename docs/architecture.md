@@ -231,15 +231,16 @@ Extra contracts:
 |---|---|---|
 | `core/` | Value objects (`Order`, `Fill`, `PriceSeries`), `Instrument`, `MarketView`, `FeatureView`, options, ids, errors, time. | numpy only |
 | `config/` | L3/L4 configuration: typed `StrategyConfig` / `Selection` / `Rule`, field catalogue, layered resolution and the config hash. Pure. | core |
-| `storage/` | Data contract: schemas, a `Protocol` per store, reader / writer / result-writer facades, `local` (Parquet) and `memory` backends, `ConfigStore`. | core, pandas, pyarrow |
+| `storage/` | Generic data contract: schemas, a `Protocol` per store, the generic reader (tables, ranges, dates, runs) and writer / result-writer facades, `local` (Parquet) and `memory` backends, `ConfigStore`. No domain rules. | core, pandas, pyarrow |
+| `data/` | The domain read API, the only way consumers read market data: `reference` (one snapshot rule, instruments, terms, `InstrumentView`, universe, `SymbolResolver`), `prices` (bars + split / dividend adjustment), `events` (by event date), `chains` (filter by underlying). | storage, core |
 | `strategies/` → `trading/` | Backtest strategies: `MarketView` in, target weights out, plus their registry. | core |
 | `strategies/` → `screeners/` | Screener contract, shared `Decision` categories, `short_premium_liquidity`. | core |
 | `features/` | Pure, versioned rollup definitions (`option_liquidity@v1`) with declared output columns, and their registry. | core |
 | `analytics/` | Metrics and report formatting from equity curves + fills. | core |
 | `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. `selection/`: three-valued evaluation with a per-rule audit. | strategies, config, analytics, core |
-| `services/` | Use cases: `jobs`, `configs`, `selection`, `backtests`, `screening`, `market_data`, golden `datasets`, `exports`, `evaluation/`. | everything below except `storage.writers` |
+| `services/` | Use cases: `jobs`, `configs`, `selection`, `backtests`, `screening`, golden `datasets`, `exports`, `evaluation/`. | everything below except `storage.writers` and `storage.readers` (through `data/`) |
 | `apps/ingestion` | Sources (Cboe, HTTP with retries, synthetic/golden), jobs (universe, option chains, rollups, golden load), nightly pipeline, `algotrade-ingest`. | library |
-| `apps/backtest` | `algotrade-backtest` (`algotrade` alias): datasets list, backtest (golden dataset or config, via jobs), evaluate, config validate/show. Reads only through storage. | library |
+| `apps/backtest` | `algotrade-backtest` (`algotrade` alias): datasets list, backtest (golden dataset or config, via jobs), evaluate, config validate/show. Reads only through `data/`. | library |
 
 ### One bar in the backtest engine
 
@@ -324,8 +325,8 @@ truth, with the AST patterns `scripts/check_ownership.py` uses to flag anyone el
 
 | Responsibility | Owner today | Target owner (PR) |
 |---|---|---|
-| snapshot selection ("latest on or before D") | `storage/readers.py` | `data/reference.py` (R2) |
-| market-data reads for consumers | `storage/` | `data/` (R2) |
+| snapshot selection ("latest on or before D", else earliest + `pre_snapshot`) | `data/reference.py` | same (done in R2) |
+| market-data reads for consumers | `data/` | same (done in R2) |
 | run ids, run records, COMPLETE / PARTIAL | `storage/runs.py`, `services/jobs/` | ingestion `tasks/framework.py` (R3) |
 | raw persistence, row stamping, id resolution in ingestion | `jobs/common.py`, storage backends | `tasks/framework.py` (R3) |
 | which ingestion steps run, with which defaults | `pipeline.py` | `tasks/registry.py`, `workflows/` (R3) |

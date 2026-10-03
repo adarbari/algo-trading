@@ -8,6 +8,7 @@ from algotrade.analytics.report import markdown_table
 from algotrade.config.resolve import ResolvedConfig
 from algotrade.config.user import UserContext
 from algotrade.core.errors import ConfigurationError
+from algotrade.data import StoreReader
 from algotrade.engines.backtest.engine import run_backtest
 from algotrade.services.configs import default_user, resolve_config
 from algotrade.services.datasets import list_datasets, load_dataset
@@ -16,7 +17,6 @@ from algotrade.services.evaluation.suite import run_suite, with_benchmark_excess
 from algotrade.services.jobs import JobStatus, LocalJobRunner
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.factory import open_backend, open_config_store
-from algotrade.storage.readers import StoreReader
 from algotrade.storage.result_writer import ResultWriter
 from algotrade.strategies.trading.registry import create_strategy
 
@@ -109,6 +109,13 @@ def _config_backtest(args: argparse.Namespace) -> int:
     if job.status is JobStatus.FAILED:
         print(f"error: {job.error}", file=sys.stderr)
         return 2
+    if job.result.get("survivorship_bias"):
+        print(
+            f"warning: --start {args.start} is before the first instrument reference snapshot "
+            f"({job.result['reference_snapshot']}); the selection used a later list of "
+            "instruments, so results carry survivorship bias",
+            file=sys.stderr,
+        )
     print(json.dumps({"job_id": job.job_id, "user": job.user, **job.result}, indent=2, default=str))
     return 0
 

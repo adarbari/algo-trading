@@ -4,10 +4,11 @@ import pandas as pd
 import pytest
 
 from algotrade.core.errors import MissingDataError
+from algotrade.data import StoreReader
+from algotrade.data.prices import bars as read_bars
+from algotrade.data.prices import frame_to_series, load_price_data
 from algotrade.services.datasets import list_datasets
-from algotrade.services.market_data import frame_to_series, load_price_data
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.readers import StoreReader
 from algotrade.storage.writers import StoreWriter
 from tests.storage_helpers import stamped
 
@@ -59,6 +60,16 @@ def test_load_price_data_aligns_and_returns_terms() -> None:
     assert list(data.series["EQ:A"].close) == [2.0]  # aligned to the common session
     assert set(data.terms) == {"EQ:A", "EQ:B"}
     assert data.versions == {"bars/1d": ["r1", "r2"], "instruments/reference": ["ref"]}
+    assert (data.reference.snapshot_date, data.reference.pre_snapshot) == (D1, False)
+
+
+def test_bars_are_sorted_and_missing_bars_are_an_error() -> None:
+    backend = MemoryBackend()
+    StoreWriter(backend).write_table("bars/1d", D2, "r2", bars(D2, {"EQ:B": 9.0, "EQ:A": 2.0}))
+    frame = read_bars(StoreReader(backend), "1d", D1, D2)
+    assert list(frame["instrument_id"]) == ["EQ:A", "EQ:B"]
+    with pytest.raises(MissingDataError, match="no bars"):
+        read_bars(StoreReader(backend), "5m", D1, D2)
 
 
 def test_frame_to_series_timestamps_are_naive_utc() -> None:

@@ -2,8 +2,8 @@ from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
 
+from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.readers import StoreReader
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.symbol_history import update_history
 from algotrade_ingestion.jobs.universe_build import (

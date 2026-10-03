@@ -53,9 +53,10 @@ Two physical parts, always read together:
   `EQ:<composite FIGI>` when the FIGI is known (it survives renames and ticker reuse:
   FB → META), else `EQ:<ticker>`. `instruments/symbol_history` maps ticker → id over time and
   `instruments/id_map` records symbol-id → FIGI-id upgrades. Tickers become ids only through
-  `SymbolResolver` (`StoreReader.resolver(session)`).
-- **InstrumentView** (`StoreReader.instrument_view(session, fields)`) returns reference facts
-  (latest snapshot on or before the session) joined with rollups **for** the session, one row
+  `SymbolResolver` (`data.reference.resolver(reader, session)`).
+- **InstrumentView** (`data.reference.instrument_view(reader, session, fields)`) returns
+  reference facts (latest snapshot on or before the session, else the earliest, flagged
+  `pre_snapshot`) joined with rollups **for** the session, one row
   per instrument, columns named by field. A rollup with no data for the session is listed in
   `missing`, and its fields are UNKNOWN to selections (never stale values).
 

@@ -7,14 +7,15 @@ import pytest
 from algotrade.config.resolve import ResolvedConfig
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.errors import ConfigurationError, MissingDataError
+from algotrade.data import StoreReader
+from algotrade.data.reference import load_universe
 from algotrade.engines.screening.runner import RunCoverage
 from algotrade.services.configs import resolve_config
 from algotrade.services.exports import LEGACY_COLUMNS, write_legacy_exports
 from algotrade.services.screening import run_screener
-from algotrade.services.views import load_universe, to_value
+from algotrade.services.views import to_value
 from algotrade.storage.backends.config_files import FileConfigStore
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.readers import StoreReader
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.writers import StoreWriter
 from tests.conftest import REPO_ROOT

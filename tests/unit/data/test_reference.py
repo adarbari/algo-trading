@@ -1,0 +1,144 @@
+"""The one snapshot rule and the reference reads built on it (``algotrade.data.reference``)."""
+
+from datetime import date, timedelta
+
+import pandas as pd
+import pytest
+
+from algotrade.core.errors import MissingDataError
+from algotrade.data import StoreReader
+from algotrade.data.reference import (
+    instrument_terms,
+    instrument_view,
+    instruments,
+    load_universe,
+    resolver,
+    snapshot,
+)
+from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.writers import StoreWriter
+from tests.storage_helpers import T0, stamped, universe_rows
+
+D1, D2 = date(2026, 10, 1), date(2026, 10, 2)
+REF = "instruments/reference"
+
+
+def reference(symbols: dict[str, str], **extra: object) -> list[dict[str, object]]:
+    return [
+        {
+            "instrument_id": iid,
+            "symbol": symbol,
+            "asset_class": "EQ",
+            "security_type": "COMMON_STOCK",
+            "multiplier": 1.0,
+            "status": "ACTIVE",
+            **extra,
+        }
+        for symbol, iid in symbols.items()
+    ]
+
+
+def store() -> tuple[StoreWriter, StoreReader]:
+    backend = MemoryBackend()
+    return StoreWriter(backend), StoreReader(backend)
+
+
+def test_snapshot_is_on_or_before_else_the_earliest() -> None:
+    writer, reader = store()
+    assert snapshot(reader, REF, D1) is None  # nothing stored at all
+    writer.write_table(REF, D1, "r1", stamped(reference({"A": "EQ:A"}), D1, "r1"))
+    writer.write_table(REF, D2, "r2", stamped(reference({"A": "EQ:A"}), D2, "r2"))
+    on = snapshot(reader, REF, D1)
+    assert on is not None and (on.snapshot_date, on.pre_snapshot) == (D1, False)
+    after = snapshot(reader, REF, D2 + timedelta(days=9))
+    assert after is not None and (after.snapshot_date, after.pre_snapshot) == (D2, False)
+    early = snapshot(reader, REF, D1 - timedelta(days=30))
+    assert early is not None and (early.snapshot_date, early.pre_snapshot) == (D1, True)
+    latest = snapshot(reader, REF)
+    assert latest is not None and (latest.snapshot_date, latest.pre_snapshot) == (D2, False)
+
+
+def test_instruments_and_terms_follow_the_rule() -> None:
+    writer, reader = store()
+    with pytest.raises(MissingDataError, match="no snapshot stored"):
+        instruments(reader, D1)
+    rows = [
+        *reference({"A": "EQ:A"}),
+        {
+            "instrument_id": "FUT:ESZ6",
+            "symbol": "ESZ6",
+            "asset_class": "FUT",
+            "security_type": "FUTURE",
+            "multiplier": 50.0,
+            "status": "ACTIVE",
+            "tick_size": 0.25,
+        },
+    ]
+    writer.write_table(REF, D1, "r1", stamped(rows, D1, "r1"))
+    writer.write_table(REF, D2, "r2", stamped(reference({"A2": "EQ:A"}), D2, "r2"))
+    assert list(instruments(reader, D1)["symbol"]) == ["A", "ESZ6"]
+    assert list(instruments(reader, D2 + timedelta(days=5))["symbol"]) == ["A2"]
+    assert list(instruments(reader, D1 - timedelta(days=1))["symbol"]) == ["A", "ESZ6"]
+    terms = instrument_terms(reader, D1)
+    assert terms["FUT:ESZ6"].multiplier == 50.0
+    assert terms["FUT:ESZ6"].tick_size == 0.25
+    assert terms["EQ:A"].tick_size == 0.01
+    with pytest.raises(MissingDataError, match="not known at"):  # the version pin
+        instruments(reader, D1, as_of=T0 - timedelta(days=1))
+
+
+def test_instrument_view_joins_reference_and_session_rollups() -> None:
+    writer, reader = store()
+    writer.write_table(REF, D1, "r1", stamped(reference({"A": "EQ:A", "B": "EQ:B"}), D1, "r1"))
+    liq = [{"instrument_id": "EQ:A", "put_tier": "A"}]
+    writer.write_table("rollups/instrument/liq@v1", D2, "r2", stamped(liq, D2, "r2"))
+    fields = ["instrument.symbol", "rollup.liq@v1.put_tier", "rollup.other@v1.x"]
+    view = instrument_view(reader, D2, fields)
+    assert (view.reference_snapshot, view.pre_snapshot) == (D1, False)
+    assert view.missing == ("rollups/instrument/other@v1",)
+    rows = view.frame.set_index("instrument_id")
+    assert rows.loc["EQ:A", "rollup.liq@v1.put_tier"] == "A"
+    assert pd.isna(rows.loc["EQ:B", "rollup.liq@v1.put_tier"])
+    everything = instrument_view(reader, D2)
+    assert {"instrument.symbol", "instrument.multiplier"} <= set(everything.frame.columns)
+    assert instrument_view(reader, D1, ["rollup.liq@v1.put_tier"]).missing == (
+        "rollups/instrument/liq@v1",
+    )  # a rollup is read for the session only, never stale
+
+
+def test_instrument_view_before_the_first_snapshot_flags_survivorship() -> None:
+    writer, reader = store()
+    writer.write_table(REF, D2, "r2", stamped(reference({"A": "EQ:A"}), D2, "r2"))
+    view = instrument_view(reader, D1, ["instrument.symbol"])
+    assert (view.reference_snapshot, view.pre_snapshot) == (D2, True)
+    assert list(view.frame["instrument_id"]) == ["EQ:A"]
+
+
+def test_universe_uses_the_same_rule() -> None:
+    writer, reader = store()
+    with pytest.raises(MissingDataError, match="universe import"):
+        load_universe(reader, D1)
+    writer.write_table("universe", D2, "u", stamped(universe_rows(["AAPL"]), D2, "u"))
+    early = load_universe(reader, D1)
+    assert (early.snapshot_date, early.pre_snapshot) == (D2, True)
+    on_time = load_universe(reader, D2 + timedelta(days=1))
+    assert (on_time.snapshot_date, on_time.pre_snapshot) == (D2, False)
+    assert on_time.instruments == ["EQ:AAPL"]
+
+
+def test_resolver_uses_the_reference_as_of_the_session() -> None:
+    writer, reader = store()
+    assert resolver(reader, D1).id_for("aapl") == "EQ:AAPL"  # no reference yet: symbol ids
+    day1 = reference({"FB": "EQ:BBG1"}) + reference({"OLDCO": "EQ:OLDCO"}, status="DELISTED")
+    day2 = reference({"META": "EQ:BBG1"}) + reference({"FB": "EQ:OLDCO"}, status="DELISTED")
+    writer.write_table(REF, D1, "r1", stamped(day1, D1, "r1"))
+    writer.write_table(REF, D2, "r2", stamped(day2, D2, "r2"))
+    assert resolver(reader, D1).id_for("FB") == "EQ:BBG1"
+    assert resolver(reader, D1 - timedelta(days=30)).snapshot == D1  # backfill: earliest
+    later = resolver(reader, D2 + timedelta(days=3))
+    assert later.snapshot == D2
+    assert later.id_for("META") == "EQ:BBG1"
+    assert later.id_for("FB") == "EQ:OLDCO"  # only a delisted row has it now
+    assert later.symbol_for("EQ:BBG1") == "META"
+    frame, unknown = later.resolve(pd.DataFrame({"symbol": ["meta", "NEW"], "x": [1, 2]}))
+    assert list(frame["instrument_id"]) == ["EQ:BBG1", "EQ:NEW"] and unknown == 1

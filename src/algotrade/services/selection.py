@@ -5,9 +5,10 @@ from datetime import date, datetime
 
 from algotrade.config.schema import Selection
 from algotrade.core.feature_view import FeatureValue, FeatureView
+from algotrade.data import StoreReader
+from algotrade.data.reference import instrument_view
 from algotrade.engines.selection.evaluate import SelectionResult, evaluate_selection
 from algotrade.services.views import to_value
-from algotrade.storage.readers import StoreReader
 
 
 def selection_view(
@@ -18,7 +19,7 @@ def selection_view(
     fields = {r.field for r in selection.where.rules()}
     if selection.order_by:
         fields.add(selection.order_by)
-    view = reader.instrument_view(session, sorted(fields), as_of=as_of)
+    view = instrument_view(reader, session, sorted(fields), as_of=as_of)
     columns = [c for c in view.frame.columns if c != "instrument_id"]
     rows: dict[str, dict[str, FeatureValue]] = {}
     for record in view.frame.to_dict("records"):

@@ -112,7 +112,7 @@ type = "layers"
 layers = [
     "algotrade.services",
     "algotrade.engines",
-    "algotrade.strategies | algotrade.features | algotrade.analytics",
+    "algotrade.strategies | algotrade.features | algotrade.analytics | algotrade.data",
     "algotrade.storage | algotrade.config",
     "algotrade.core",
 ]
@@ -142,6 +142,7 @@ type = "forbidden"
 source_modules = ["algotrade.strategies"]
 forbidden_modules = [
     "algotrade.storage",
+    "algotrade.data",
     "algotrade.features",
     "algotrade.engines",
     "algotrade.services",
@@ -191,7 +192,7 @@ forbidden_modules = [
     "algotrade.storage.backends",
     "algotrade.storage.factory",
     "algotrade.storage.runs",
-    "algotrade.storage.resolver",
+    "algotrade.data",
     "algotrade.storage.result_writer",
     "algotrade.storage.config_store",
 ]
@@ -255,6 +256,20 @@ forbidden_modules = [
     "algotrade.services.backtests",
     "algotrade.services.screening",
     "algotrade.engines",
+    "algotrade.data",
     "algotrade.storage.readers",
     "algotrade.storage.writers",
 ]
+
+[[tool.importlinter.contracts]]
+name = "R1: only algotrade.data reads market data (consumers never import storage.readers)"
+type = "forbidden"
+source_modules = ["algotrade.services", "algotrade.engines", "algotrade_backtest", "algotrade_ingestion"]
+forbidden_modules = ["algotrade.storage.readers"]
+allow_indirect_imports = true  # through algotrade.data, which hands the reader on
+
+[[tool.importlinter.contracts]]
+name = "R2: storage is generic (no domain read helpers: readers move to algotrade.data)"
+type = "forbidden"
+source_modules = ["algotrade.storage"]
+forbidden_modules = ["algotrade.core.fields", "algotrade.core.feature_view", "algotrade.data"]
