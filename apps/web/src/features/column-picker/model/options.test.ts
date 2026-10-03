@@ -20,6 +20,7 @@ const feature = (patch: Partial<CatalogueFeature>): CatalogueFeature => ({
   categories: [],
   scope: 'site',
   owner: null,
+  licence: 'open',
   ...patch,
 });
 
@@ -46,6 +47,7 @@ describe('feature options', () => {
         owner: 'bob',
         unit: 'ratio',
         description: 'Mine',
+        licence: 'personal',
       }),
     ];
     expect(featureOptions(catalogue, ['rollup.iv30@v1.iv30'])).toEqual([
@@ -60,7 +62,7 @@ describe('feature options', () => {
         value: 'feature.my_ratio',
         label: 'feature.my_ratio',
         description: 'My ratio: Mine (ratio · expression)',
-        badge: 'yours · personal',
+        badge: 'expression · yours · personal licence',
         group: 'Your features',
       },
     ]);

@@ -7,7 +7,7 @@
 import { Button, Chip, Combobox, Field, Popover, Stack, Text, type IconName } from '@algotrade/ui';
 import { useMemo } from 'react';
 
-import { byName, featureLabel, isPersonal, useFeatureCatalogue } from '@/entities/feature';
+import { byName, featureLabel, featureMarks, useFeatureCatalogue } from '@/entities/feature';
 
 import { featureOptions } from '../model/options';
 
@@ -61,11 +61,11 @@ export function FeaturePicker({ label, icon = 'columns', chosen, onChange }: Fea
           <Stack direction="row" gap={1} wrap>
             {chosen.map((name) => {
               const feature = known.get(name);
-              const personal = feature ? isPersonal(feature) : false;
+              const marks = feature ? featureMarks(feature) : [];
               return (
                 <Chip
                   key={name}
-                  label={`${featureLabel(name)}${personal ? ' · personal' : ''}`}
+                  label={[featureLabel(name), ...marks].join(' · ')}
                   onRemove={() => {
                     onChange(chosen.filter((c) => c !== name));
                   }}

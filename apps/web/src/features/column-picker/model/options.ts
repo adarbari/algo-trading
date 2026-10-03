@@ -4,7 +4,7 @@ import type { ComboboxOption } from '@algotrade/ui';
 import {
   featureGroup,
   featureTitle,
-  isPersonal,
+  featureMarks,
   unitLabel,
   type CatalogueFeature,
 } from '@/entities/feature';
@@ -27,7 +27,7 @@ export function featureOptions(
         value: f.name,
         label: f.name,
         description: `${featureTitle(f.name)}: ${f.description}${meta ? ` (${meta})` : ''}`,
-        badge: isPersonal(f) ? 'yours · personal' : f.kind,
+        badge: [f.kind, ...featureMarks(f)].join(' · '),
         group: featureGroup(f),
       };
     });

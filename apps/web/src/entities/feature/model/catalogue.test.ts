@@ -4,9 +4,11 @@ import {
   displayValue,
   featureFormat,
   featureGroup,
+  featureMarks,
   featureLabel,
   featureTitle,
   isNumericFeature,
+  isOwn,
   isPersonal,
   unitLabel,
   type CatalogueFeature,
@@ -29,6 +31,7 @@ const feature = (patch: Partial<CatalogueFeature>): CatalogueFeature => ({
   categories: [],
   scope: 'site',
   owner: null,
+  licence: 'open',
   ...patch,
 });
 
@@ -50,9 +53,14 @@ describe('feature catalogue', () => {
     expect(featureTitle('instrument.sector')).toBe('Sector');
   });
 
-  it("groups and marks the user's own features as personal", () => {
+  it("groups and marks the user's own and personal-licence features", () => {
     const mine = feature({ scope: 'user', owner: 'bob', group: null, name: 'feature.my_ratio' });
-    expect(isPersonal(mine)).toBe(true);
+    expect(isOwn(mine)).toBe(true);
+    expect(isPersonal(mine)).toBe(false);
+    const ibkr = feature({ licence: 'personal' });
+    expect(isPersonal(ibkr)).toBe(true);
+    expect(featureMarks({ ...mine, licence: 'personal' })).toEqual(['yours', 'personal licence']);
+    expect(featureMarks(feature({}))).toEqual([]);
     expect(featureGroup(mine)).toBe('Your features');
     expect(featureGroup(feature({}))).toBe('iv30@v1');
     expect(featureGroup(feature({ group: null, name: 'instrument.sector' }))).toBe('Instrument');

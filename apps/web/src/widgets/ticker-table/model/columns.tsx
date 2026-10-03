@@ -10,6 +10,7 @@ import {
   displayValue,
   featureFormat,
   featureLabel,
+  featureMarks,
   isPersonal,
   unitLabel,
   type CatalogueFeature,
@@ -36,8 +37,9 @@ const tickerColumn: DataTableColumn<TickerRow> = {
 function describe(name: string, feature: CatalogueFeature | undefined): string {
   if (!feature) return name;
   const unit = unitLabel(feature.unit);
-  const personal = isPersonal(feature) ? ' Your own feature (personal).' : '';
-  return `${feature.description}${unit ? ` Unit: ${unit}.` : ''}${personal} (${name})`;
+  const marks = featureMarks(feature);
+  const marked = marks.length > 0 ? ` (${marks.join(', ')})` : '';
+  return `${feature.description}${unit ? ` Unit: ${unit}.` : ''}${marked} [${name}]`;
 }
 
 export function tickerColumns(
@@ -50,7 +52,7 @@ export function tickerColumns(
       const feature = catalogue.get(name);
       return {
         id: name,
-        header: featureLabel(name),
+        header: feature && isPersonal(feature) ? `${featureLabel(name)} (P)` : featureLabel(name),
         description: describe(name, feature),
         value: (row) => displayValue(row.values[name]),
         format: featureFormat(feature),

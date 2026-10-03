@@ -67,9 +67,25 @@ export function featureGroup(feature: CatalogueFeature): string {
   return 'Expression features';
 }
 
-/** A user's own feature (scope `user`): personal, never shared with other users. */
-export function isPersonal(feature: CatalogueFeature): boolean {
+/** A user's own feature (scope `user`): declared in their config, never shared. */
+export function isOwn(feature: CatalogueFeature): boolean {
   return feature.scope === 'user';
+}
+
+/**
+ * Derived from personal-use licensed market data (IBKR; ADR 0028): its values are shown to
+ * the owner only, never shared or published.
+ */
+export function isPersonal(feature: CatalogueFeature): boolean {
+  return feature.licence === 'personal';
+}
+
+/** The marks a feature carries in lists: "yours", "personal licence". */
+export function featureMarks(feature: CatalogueFeature): string[] {
+  return [
+    ...(isOwn(feature) ? ['yours'] : []),
+    ...(isPersonal(feature) ? ['personal licence'] : []),
+  ];
 }
 
 const BY_UNIT: Readonly<Record<string, ValueFormat>> = {
