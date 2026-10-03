@@ -4,4 +4,24 @@
  */
 export const queryKeys = {
   health: () => ['health'] as const,
+  explore: {
+    tickers: (query: Readonly<Record<string, unknown>>) => ['explore', 'tickers', query] as const,
+    compare: (ids: readonly string[], features: readonly string[]) =>
+      ['explore', 'compare', ids, features] as const,
+    prices: (ids: readonly string[], from: string | null) =>
+      ['explore', 'prices', ids, from] as const,
+  },
+  instruments: {
+    detail: (id: string) => ['instruments', id] as const,
+    bars: (id: string, from: string | null) => ['instruments', id, 'bars', from] as const,
+    events: (id: string) => ['instruments', id, 'events'] as const,
+    features: (id: string, from: string) => ['instruments', id, 'features', from] as const,
+  },
+  chains: {
+    chain: (id: string, expiry: string | null) => ['chains', id, expiry] as const,
+  },
+  features: {
+    catalogue: () => ['features'] as const,
+    distribution: (name: string) => ['features', name, 'distribution'] as const,
+  },
 } as const;

@@ -53,9 +53,10 @@ def universe_filter(
     sector: str | None = None,
     liquidity_class: str | None = None,
     q: Annotated[str | None, Query(description="symbol or company name contains")] = None,
+    optionable: Annotated[bool | None, Query(description="has listed options")] = None,
 ) -> UniverseFilter:
     """The universe filters ``/universe`` and ``/explore/tickers`` share."""
-    return UniverseFilter(security_type, leveraged, sector, liquidity_class, q)
+    return UniverseFilter(security_type, leveraged, sector, liquidity_class, q, optionable)
 
 
 Filters = Annotated[UniverseFilter, Depends(universe_filter)]

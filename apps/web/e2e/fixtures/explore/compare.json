@@ -1,0 +1,101 @@
+{
+  "session": "2026-10-02",
+  "instruments": [
+    {
+      "instrument_id": "EQ:BBG000B9XRY4",
+      "symbol": "AAPL"
+    },
+    {
+      "instrument_id": "EQ:BBG000BPH459",
+      "symbol": "MSFT"
+    },
+    {
+      "instrument_id": "EQ:BBG000BBJQV0",
+      "symbol": "NVDA"
+    }
+  ],
+  "missing": [],
+  "rows": [
+    {
+      "feature": "rollup.price_stats@v2.close",
+      "dtype": "float32",
+      "values": {
+        "EQ:BBG000B9XRY4": 333.69000244140625,
+        "EQ:BBG000BPH459": 517.530029296875,
+        "EQ:BBG000BBJQV0": 233.9499969482422
+      }
+    },
+    {
+      "feature": "rollup.iv30@v1.iv30",
+      "dtype": "float",
+      "values": {
+        "EQ:BBG000B9XRY4": 0.24420201425105806,
+        "EQ:BBG000BPH459": 0.2936465371271506,
+        "EQ:BBG000BBJQV0": 0.32849249483120724
+      }
+    },
+    {
+      "feature": "rollup.price_stats@v2.hv30",
+      "dtype": "float32",
+      "values": {
+        "EQ:BBG000B9XRY4": 0.2116633653640747,
+        "EQ:BBG000BPH459": 0.2180858999490738,
+        "EQ:BBG000BBJQV0": 0.38595741987228394
+      }
+    },
+    {
+      "feature": "feature.iv_hv_spread",
+      "dtype": "float",
+      "values": {
+        "EQ:BBG000B9XRY4": 0.032538652420043945,
+        "EQ:BBG000BPH459": 0.07556064426898956,
+        "EQ:BBG000BBJQV0": -0.057464927434921265
+      }
+    },
+    {
+      "feature": "feature.pct_from_high_52w",
+      "dtype": "float",
+      "values": {
+        "EQ:BBG000B9XRY4": -0.033734852667009596,
+        "EQ:BBG000BPH459": -0.06535784028214708,
+        "EQ:BBG000BBJQV0": -0.01652096794140545
+      }
+    },
+    {
+      "feature": "rollup.price_stats@v2.adv_usd_20d",
+      "dtype": "float32",
+      "values": {
+        "EQ:BBG000B9XRY4": 13988558848.0,
+        "EQ:BBG000BPH459": 10682575872.0,
+        "EQ:BBG000BBJQV0": 24638226432.0
+      }
+    },
+    {
+      "feature": "feature.market_cap",
+      "dtype": "float",
+      "values": {
+        "EQ:BBG000B9XRY4": 4869931991864.5625,
+        "EQ:BBG000BPH459": 3842942898157.125,
+        "EQ:BBG000BBJQV0": 5638194866561.4375
+      }
+    },
+    {
+      "feature": "feature.div_yield",
+      "dtype": "float32",
+      "values": {
+        "EQ:BBG000B9XRY4": 0.003176600905135274,
+        "EQ:BBG000BPH459": 0.007033408619463444,
+        "EQ:BBG000BBJQV0": 0.0022226970177143812
+      }
+    },
+    {
+      "feature": "rollup.earnings@v1.days_to_earnings",
+      "dtype": "int",
+      "values": {
+        "EQ:BBG000B9XRY4": 19,
+        "EQ:BBG000BPH459": 23,
+        "EQ:BBG000BBJQV0": 33
+      }
+    }
+  ]
+}

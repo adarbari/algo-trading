@@ -6,6 +6,8 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
+import { mockExploreApi } from './explore-api';
+
 function collectErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -56,6 +58,7 @@ for (const theme of ['dark', 'light'] as const) {
 
 test('the top bar switches workspace and section', async ({ page }) => {
   const errors = collectErrors(page);
+  await mockExploreApi(page);
   await page.goto('/ideas');
   await expect(page.getByRole('link', { name: 'Ideas' })).toHaveAttribute('aria-current', 'page');
   await page.getByRole('link', { name: 'Explore' }).click();

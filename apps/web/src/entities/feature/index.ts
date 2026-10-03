@@ -1,0 +1,21 @@
+/** Entity: the feature catalogue (definitions, units, formats) and feature distributions. */
+export { useFeatureCatalogue, useFeatureDistribution } from './api/hooks';
+export {
+  byName,
+  displayValue,
+  featureColumn,
+  featureFormat,
+  featureGroup,
+  featureLabel,
+  featureTitle,
+  isNumericFeature,
+  isPersonal,
+  unitLabel,
+  type CatalogueFeature,
+} from './model/catalogue';
+export {
+  distributionBins,
+  distributionCategories,
+  distributionMarkers,
+  type FeatureDistribution,
+} from './model/distribution';

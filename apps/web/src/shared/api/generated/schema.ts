@@ -1686,6 +1686,8 @@ export interface operations {
                 date?: string | null;
                 leveraged?: boolean | null;
                 liquidity_class?: string | null;
+                /** @description has listed options */
+                optionable?: boolean | null;
                 page?: number;
                 /** @description symbol or company name contains */
                 q?: string | null;
@@ -1995,6 +1997,8 @@ export interface operations {
                 date?: string | null;
                 leveraged?: boolean | null;
                 liquidity_class?: string | null;
+                /** @description has listed options */
+                optionable?: boolean | null;
                 page?: number;
                 /** @description symbol or company name contains */
                 q?: string | null;
