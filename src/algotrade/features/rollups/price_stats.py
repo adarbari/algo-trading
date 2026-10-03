@@ -12,9 +12,14 @@ window, unless every session of its window has a bar; the 52-week high / low nee
     close               the session's close
     sma_20/50/200       mean close over the last 20 / 50 / 200 sessions
     ret_20d/60d         close / close 20 (60) sessions earlier - 1
-    high_52w, low_52w   highest high / lowest low over the last ``year_sessions`` sessions
+    high_52w, low_52w   highest high / lowest low over the last ``year_sessions`` sessions, on
+                        split-adjusted prices, NOT dividend-adjusted (decided 2026-10-03 after
+                        the IBKR comparison: IBKR's 52-week range is dividend-adjusted, so on a
+                        payer its values sit below ours by up to the dividends since the bar)
     pct_from_high_52w   close / high_52w - 1 (<= 0);  pct_from_low_52w: close / low_52w - 1
-    hv20, hv30          close-to-close realised vol (``quant.realized_vol``), annualised
+    hv20, hv30          close-to-close realised vol (``quant.realized_vol``): sample stdev
+                        of the last 20 / 30 log returns x sqrt(252) (IBKR's own HV uses another
+                        estimator and differs)
     hv20_yz             Yang-Zhang realised vol over 20 sessions
     adv_usd_20d         mean of close x volume over 20 sessions (split-invariant)
     history_days        sessions with a bar among the last ``year_sessions``
@@ -76,13 +81,15 @@ FEATURES = (
     ),
     Feature(
         "high_52w", "float", "usd_per_share",
-        "Highest daily high over the last 52 weeks (252 sessions)",
+        "Highest daily high over the last 52 weeks (252 sessions), split-adjusted (not "
+        "dividend-adjusted)",
         "fewer than min_year_sessions (240) bars among the last year_sessions (252)",
         valid_range=(0, None), inputs=(HIGH,),
     ),
     Feature(
         "low_52w", "float", "usd_per_share",
-        "Lowest daily low over the last 52 weeks (252 sessions)",
+        "Lowest daily low over the last 52 weeks (252 sessions), split-adjusted (not "
+        "dividend-adjusted)",
         "fewer than min_year_sessions (240) bars among the last year_sessions (252)",
         valid_range=(0, None), inputs=(LOW,),
     ),
@@ -99,7 +106,8 @@ FEATURES = (
     *(
         Feature(
             f"hv{n}", "float", "decimal",
-            f"Close-to-close realised volatility over {n} sessions, annualised (252)",
+            f"Close-to-close realised volatility: sample stdev of the last {n} log returns "
+            "x sqrt(252)",
             _gap(n + 1), valid_range=(0, 5), inputs=(CLOSE,),
         )
         for n in HV_WINDOWS

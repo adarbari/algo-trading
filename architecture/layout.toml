@@ -334,6 +334,16 @@ purpose = "one vendor's recorded responses"
 holds = "data"
 
 [[test_dir]]
+path = "tests/fixtures/reconciliation"
+purpose = "recorded cross-source comparisons, one folder per source and session (both sides' recorded values)"
+holds = "data"
+
+[[test_dir]]
+path = "tests/fixtures/reconciliation/*"
+purpose = "one recorded comparison: the other source's values, our raw inputs, a README with provenance"
+holds = "data"
+
+[[test_dir]]
 path = "tests/architecture"
 purpose = "fitness tests: layout, ownership, structure, docs, registries"
 
@@ -353,6 +363,10 @@ purpose = "Hypothesis invariants across every registered strategy and screener"
 [[test_dir]]
 path = "tests/integration"
 purpose = "a real store and engine across every golden dataset"
+
+[[test_dir]]
+path = "tests/reconciliation"
+purpose = "cross-source reconciliation: our features recomputed from recorded raw inputs vs another source's recorded values (marker reconciliation)"
 
 [[test_dir]]
 path = "tests/e2e"
