@@ -21,7 +21,7 @@ make evaluate                                   # every strategy x golden datase
 # What each night adds: docs/data/nightly-footprint.md
 algotrade-ingest universe --stocks optionable_us_stock_universe.csv \
                           --etfs optionable_us_etf_universe.csv --version 2026-10
-algotrade-ingest universe-build --review-out leveraged_candidates.csv   # universe + reference
+algotrade-ingest universe-build --review-out leveraged_candidates.csv   # universe + reference; CSV = ETFs whose leverage is still UNKNOWN
 algotrade-ingest bars --from 2024-10-01 --to 2026-10-01   # 2-year backfill (needs ALGOTRADE_MASSIVE_API_KEY in .env)
 algotrade-ingest company-details [--force] [--limit N]   # SEC EDGAR company details (needs ALGOTRADE_SEC_CONTACT in .env)
 algotrade-ingest nightly --export-dir out/      # catch up missed sessions; universe -> company details -> earnings -> bars -> chains -> rollups -> screen jobs -> quality -> purge

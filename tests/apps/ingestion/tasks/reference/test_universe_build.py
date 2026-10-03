@@ -51,6 +51,8 @@ DAY1 = sources(
             ("SPY", "SPDR S&P 500 ETF Trust", "P", "Y"),
             ("ABR$D", "Arbor Preferred Stock", "N", "N"),
             ("SOXL", "Direxion Daily Semiconductor Bull 3X ETF", "P", "Y"),
+            ("SCHO", "Schwab Short-Term U.S. Treasury ETF", "P", "Y"),
+            ("HDGE", "Ranger Equity Bear Bear ETF", "P", "Y"),
         ]
     ),
     fx.options(["AAPL", "SPY", "TQQQ"]),
@@ -71,6 +73,8 @@ DAY2 = sources(
             ("SPY", "SPDR S&P 500 ETF Trust", "P", "Y"),
             ("ABR$D", "Arbor Preferred Stock", "N", "N"),
             ("SOXL", "Direxion Daily Semiconductor Bull 3X ETF", "P", "Y"),
+            ("SCHO", "Schwab Short-Term U.S. Treasury ETF", "P", "Y"),
+            ("HDGE", "Ranger Equity Bear Bear ETF", "P", "Y"),
         ]
     ),
     fx.options(["AAPL", "SPY", "TQQQ", "BRK.B"]),
@@ -92,13 +96,18 @@ def test_two_days_of_universe_builds() -> None:
     assert ref1.loc["ABR$D", "security_type"] == "PREFERRED"
     assert bool(ref1.loc["AAPL", "optionable"]) and bool(ref1.loc["BRK.B", "in_sp500"])
     universe1 = set(reader.table("universe", D1)["symbol"])  # type: ignore[index]
-    assert universe1 == {"AAPL", "BRK.B", "GONE", "SOXL", "TQQQ"}  # no test issue, preferred or SPY
+    # no test issue, preferred or SPY
+    assert universe1 == {"AAPL", "BRK.B", "GONE", "SOXL", "TQQQ", "SCHO", "HDGE"}
     assert first.stats["leverage"] == {
+        "override": 1,  # TQQQ
+        "name_parsed": 1,  # SOXL: "Bull 3X"
+        "name_rule": 2,  # SPY (no marker), SCHO ("Short-Term" excluded)
+        "needs_review": 1,  # HDGE: "Bear", no stated leverage
         "not_etf": 5,
-        "name_rule": 1,
-        "needs_review": 1,
-        "override": 1,
     }
+    assert ref1.loc["SOXL", "leverage"] == 3.0 and ref1.loc["SOXL", "leverage_source"] == (
+        "name_parsed"
+    )
 
     second = build_universe(task_ctx(writer, reader, CLOCK), DAY2, SETTINGS, D2)
     ref2 = reader.table("instruments/reference", D2).set_index("symbol")  # type: ignore[union-attr]
@@ -118,12 +127,7 @@ def test_two_days_of_universe_builds() -> None:
     assert "GONE" not in set(reader.table("universe", D2)["symbol"])  # type: ignore[index]
     rows = review_rows(reader.table("instruments/reference", D2))  # type: ignore[arg-type]
     assert rows == [
-        {
-            "symbol": "SOXL",
-            "leverage": "3",
-            "tracks": "",
-            "notes": "Direxion Daily Semiconductor Bull 3X ETF",
-        }
+        {"symbol": "HDGE", "leverage": "", "tracks": "", "notes": "Ranger Equity Bear Bear ETF"}
     ]
 
 
@@ -153,18 +157,20 @@ def test_universe_settings_from_site_config() -> None:
     assert load_universe(MemoryConfigStore({})).source == "csv_import"
 
 
-def test_review_row_sign_for_inverse_names() -> None:
+def test_review_rows_list_only_active_unknown_leverage() -> None:
     import pandas as pd  # noqa: PLC0415
 
     frame = pd.DataFrame(
         {
-            "symbol": ["SQQQ", "NOX"],
-            "name": ["ProShares UltraPro Short QQQ 3x", "Ultra Fund"],
-            "leverage_source": "needs_review",
-            "status": "ACTIVE",
+            "symbol": ["HDGE", "OLD", "SOXL"],
+            "name": ["Ranger Equity Bear Bear ETF", "Old Bear Fund", "Direxion Bull 3X"],
+            "leverage_source": ["needs_review", "needs_review", "name_parsed"],
+            "status": ["ACTIVE", "DELISTED", "ACTIVE"],
         }
     )
-    assert [r["leverage"] for r in review_rows(frame)] == ["-3", ""]
+    assert review_rows(frame) == [
+        {"symbol": "HDGE", "leverage": "", "tracks": "", "notes": "Ranger Equity Bear Bear ETF"}
+    ]
 
 
 def test_an_empty_listing_file_fails_closed() -> None:

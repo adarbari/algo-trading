@@ -19,3 +19,7 @@ SOXL,3,ICE Semiconductor,Direxion Daily Semiconductor Bull 3X
 SOXS,-3,ICE Semiconductor,Direxion Daily Semiconductor Bear 3X
 TMF,3,ICE US Treasury 20+ Year,Direxion Daily 20+ Year Treasury Bull 3X
 TMV,-3,ICE US Treasury 20+ Year,Direxion Daily 20+ Year Treasury Bear 3X
+# The name convention ("ProShares Ultra" = 2, "ProShares Short" = -1) is wrong for these two:
+# ProShares cut them to 1.5x and -0.5x in 2018.
+UVXY,1.5,S&P 500 VIX Short-Term Futures,ProShares Ultra VIX Short-Term Futures ETF
+SVXY,-0.5,S&P 500 VIX Short-Term Futures,ProShares Short VIX Short-Term Futures ETF

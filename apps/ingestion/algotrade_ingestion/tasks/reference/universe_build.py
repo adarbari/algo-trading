@@ -9,12 +9,12 @@ Writes, for the session:
 - ``events/reference_change`` and ``events/index_change`` from the previous snapshot.
 - ``instruments/id_map`` when a symbol id becomes a FIGI id (ADR 0018, ``instrument_ids``).
 
-Leverage: ETFs whose names carry a leverage marker stay UNKNOWN unless curated in
-``config/site/overrides/leveraged_etfs.csv``; ``review_rows`` lists them for curation.
+Leverage (``classify.leverage_flags``): a curated row in
+``config/site/overrides/leveraged_etfs.csv`` wins, then the leverage the name states, then the
+name rules of ``universe.toml``; ETFs still UNKNOWN are listed by ``review_rows`` for curation.
 """
 
 import csv
-import re
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -28,6 +28,7 @@ from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.sources.framework.base import DirectorySource, FetchRequest, Source
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_ingestion.tasks.reference.classify import (
+    LEVERAGE_SOURCES,
     leverage_flags,
     security_type,
 )
@@ -44,7 +45,6 @@ from algotrade_ingestion.tasks.reference.symbol_history import update_history
 TASK = "universe_build"
 HISTORY = "instruments/symbol_history"
 REFERENCE = "instruments/reference"
-_SUGGESTED = re.compile(r"(-?\d(?:\.\d)?)\s*x\b", re.I)
 
 
 @dataclass(frozen=True)
@@ -96,9 +96,7 @@ def build_reference(
     assigned = assign_ids(ref, previous if previous is not None else id_basis, session)
     ref, previous = assigned.reference, rename_ids(previous, assigned.upgrades)
     ref["is_etf"] = ref["is_etf"] | ref["security_type"].eq("ETF")
-    ref = pd.concat(
-        [ref, leverage_flags(ref, settings.overrides, settings.leverage_markers)], axis=1
-    )
+    ref = pd.concat([ref, leverage_flags(ref, settings)], axis=1)
     if previous is not None and not previous.empty:
         seen = previous.set_index("instrument_id")
         if "first_seen" in seen.columns:
@@ -148,19 +146,15 @@ def coverage(reference: pd.DataFrame, settings: UniverseSettings) -> pd.Series:
 
 
 def review_rows(reference: pd.DataFrame) -> list[dict[str, str]]:
-    """Leverage candidates to curate, in ``leveraged_etfs.csv`` format (leverage suggested)."""
+    """UNKNOWN leverage to curate, in ``leveraged_etfs.csv`` format. The name states no
+    leverage the rules can parse, so ``leverage`` is left for the curator."""
     pending = reference[
         reference["leverage_source"].eq("needs_review") & reference["status"].eq("ACTIVE")
     ]
-    rows = []
-    for symbol, name in zip(pending["symbol"], pending["name"], strict=True):
-        match = _SUGGESTED.search(str(name))
-        suggested = match.group(1) if match else ""
-        inverse = re.search(r"\b(bear|short|inverse)\b", str(name), re.I)
-        if suggested and inverse and not suggested.startswith("-"):
-            suggested = f"-{suggested}"
-        rows.append({"symbol": symbol, "leverage": suggested, "tracks": "", "notes": str(name)})
-    return rows
+    return [
+        {"symbol": symbol, "leverage": "", "tracks": "", "notes": str(name)}
+        for symbol, name in zip(pending["symbol"], pending["name"], strict=True)
+    ]
 
 
 def write_review(reader: StoreReader, session: date, path: Path) -> None:
@@ -269,7 +263,9 @@ def _build(
         "optionable_covered": int(universe["optionable"].sum()),
         "sp500_members": len(sp500),
         "sp500_unmatched": unmatched,
-        "leverage": reference["leverage_source"].value_counts().to_dict(),
+        "leverage": {
+            s: int(reference["leverage_source"].eq(s).sum()) for s in LEVERAGE_SOURCES
+        },
         "identifiers": {
             "with_figi": int(reference["figi"].notna().sum()),
             **assigned.stats,

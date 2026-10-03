@@ -108,7 +108,7 @@ alone (ADR 0019 `site-settings`); apps receive frozen dataclasses, never dicts:
 |---|---|---|
 | `defaults.toml` | `ScreeningSettings`, `BacktestSettings` (`CostSettings`, `LimitSettings`) | run defaults, layered per config |
 | `sources.toml` | `SourcesSettings` (`VendorSettings` per section) | per-vendor `enabled` and `min_interval_s` pacing, chain workers, earnings days, corporate-actions window, SEC refresh days; `[http]` retry cap, circuit breaker and limiter directory; raw and staging retention; `[quality]` thresholds of the nightly data-quality checks |
-| `universe.toml` (+ `overrides/leveraged_etfs.csv`) | `UniverseSettings` | coverage mode (`nasdaq_trader` / `csv_import`), security types, include / exclude symbols, leverage markers |
+| `universe.toml` (+ `overrides/leveraged_etfs.csv`) | `UniverseSettings` | coverage mode (`nasdaq_trader` / `csv_import`), security types, include / exclude symbols, leverage rules (markers, conventions, patterns, inverse markers, exclusions; regexes are compiled and `leverage_patterns` need a `(?P<n>...)` group) |
 | `nightly.toml` | `NightlySettings` | `[sessions]` settle margin and catch-up cap, `[alerts]` nightly duration, `[notify]` desktop notification and the summary file path |
 
 A missing file or key falls back to the dataclass default. Anything else is an error that

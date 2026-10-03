@@ -51,11 +51,35 @@ universe *as it was*, which avoids survivorship bias.
 
 ### Flagging leveraged and inverse ETFs
 
-There is no free official flag. Use these, in order:
+There is no free official flag. Each ETF's `leverage` (signed: negative = inverse) and
+`leverage_source` are resolved in this order (`tasks/reference/classify.py`, rules in
+`config/site/universe.toml`, all patterns case-insensitive on the security name):
 
-1. a curated override file in the repo (`reference/leveraged_etfs.csv`: symbol, leverage, tracks), and
-2. name heuristics as a *suggestion only* ("2X", "3X", "Ultra", "UltraPro", "Bull", "Bear",
-   "Inverse", "Short", "-1X"), reported for review and never applied automatically.
+1. **Curated override** (`config/site/overrides/leveraged_etfs.csv`: symbol, leverage, tracks)
+   wins → `override`. Use it when the name is wrong or silent (e.g. UVXY is 1.5x and SVXY
+   -0.5x although "ProShares Ultra" / "ProShares Short" say 2 and -1).
+2. **Leverage stated in the name** → `name_parsed` (KNOWN, not reviewed):
+   - fund-family conventions (`leverage_conventions`, first match wins): "ProShares Ultra X"
+     = 2, "ProShares UltraShort X" = -2, "(ProShares) UltraPro X" = 3, "(ProShares) UltraPro
+     Short X" = -3, "ProShares Short X" = -1;
+   - a stated multiple (`leverage_patterns`): a number with x next to a direction word or
+     "Daily" ("Bull 3X", "2X Short", "2x Daily", "Daily Target 2X"), a name that starts with
+     one ("2x Bitcoin ETF") or ends "2X ETF", or "N (Inverse) Leveraged" ("-3 Inverse
+     Leveraged ETNs"). The sign is negative when the number is, or when the name has an
+     `inverse_markers` word (Short, Bear, Inverse) outside the exclusion phrases below.
+3. **Exclusions** (`leverage_exclusions`): phrases that use a marker word without meaning
+   leverage (short / ultra-short duration, term and maturity bonds, "Short Muni", "Ultra
+   Buffer", "PutWrite", "Option Income", "Covered Call", "Premium Income", "Daily Income",
+   "Long/Short", "Leveraged Loan") are blanked out. If no leverage marker is left the ETF is
+   unleveraged → `name_rule`. A marker that remains ("Inverse VIX Short-Term Futures")
+   still needs review.
+4. **No marker** (`leverage_markers`: Nx, Ultra, Bull, Bear, Inverse, Short, Leveraged,
+   Daily) → unleveraged, `name_rule`.
+5. **Anything else** → UNKNOWN (`needs_review`: `is_leveraged`, `is_inverse`, `leverage` all
+   null) and listed in the review file. Fails closed.
+
+Non-ETFs are `not_etf` (unleveraged). On the 2026-10-02 listings these rules took the review
+file from 958 names to 21 (770 `name_parsed`, 165 excluded, 2 VIX overrides).
 
 Leveraged ETFs reset daily, so long-horizon returns drift away from leverage × index
 return (volatility decay). The feature library must expose `leverage` and `is_inverse` so
@@ -80,10 +104,10 @@ job when `config/site/universe.toml` has `source = "nasdaq_trader"`):
    changed) and `events/index_change` (S&P 500 adds and removes). S&P members that match no
    listing make the run PARTIAL.
 
-Leverage: non-ETFs are unleveraged; curated rows in `config/site/overrides/leveraged_etfs.csv`
-win; an ETF without a leverage marker in its name is unleveraged; an ETF with a marker and no
-curated row is **UNKNOWN** and listed in the review file with the leverage its name suggests
-(2026-10-02: 957 candidates). Curate by moving reviewed rows into the overrides file.
+Leverage: resolved as in "Flagging leveraged and inverse ETFs" above (override → name parsed
+→ exclusions → no marker → `needs_review`); the run stats count each `leverage_source`.
+`--review-out` writes the ETFs still UNKNOWN (2026-10-02: 21) with an empty `leverage` for
+the curator. Curate by checking the issuer's factsheet and adding the row to the overrides file.
 
 
 ## Identifiers and vendor types (implemented, phase 1.5)
