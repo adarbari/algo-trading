@@ -16,6 +16,7 @@ from algotrade.core.fields import (
 )
 from algotrade.core.instruments import AssetClass, Instrument
 from algotrade.storage.interfaces import Backend
+from algotrade.storage.resolver import SymbolResolver
 from algotrade.storage.runs import RunRecord
 
 
@@ -170,6 +171,22 @@ class StoreReader:
             )
             for r in frame.itertuples(index=False)
         }
+
+    def reference_snapshot(self, on: date) -> date | None:
+        """The reference snapshot that resolves symbols for ``on``: the latest on or before
+        it, else the earliest (a backfill before the first snapshot; ids are identity)."""
+        dates = self.dates(REFERENCE_TABLE)
+        before = [d for d in dates if d <= on]
+        return before[-1] if before else (dates[0] if dates else None)
+
+    def resolver(self, on: date, as_of: datetime | None = None) -> SymbolResolver:
+        """Symbol -> instrument id as of ``on`` (ADR 0018). Empty store: symbol ids."""
+        snapshot = self.reference_snapshot(on)
+        frame = self.table(REFERENCE_TABLE, snapshot, as_of) if snapshot is not None else None
+        return SymbolResolver.from_reference(frame, snapshot)
+
+    def table_names(self) -> list[str]:
+        return self._backend.tables.names()
 
     def dates(self, table: str) -> list[date]:
         return self._backend.tables.dates(table)

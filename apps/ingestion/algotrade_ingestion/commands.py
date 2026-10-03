@@ -26,6 +26,7 @@ from algotrade_ingestion.jobs.bars import (
 from algotrade_ingestion.jobs.company_details import CompanySources, ingest_company_details
 from algotrade_ingestion.jobs.earnings import ingest_earnings
 from algotrade_ingestion.jobs.golden import load_golden
+from algotrade_ingestion.jobs.migrate_ids import migrate_ids as run_migrate_ids
 from algotrade_ingestion.jobs.quality import run_quality
 from algotrade_ingestion.jobs.universe_build import UniverseSources, build_universe, review_rows
 from algotrade_ingestion.pipeline import nightly_job, universe_settings
@@ -68,7 +69,12 @@ def earnings(
 ) -> int:
     settings = sources_settings(args)
     record = ingest_earnings(
-        writer, earnings_source(settings), session, args.start, args.days or settings.earnings_days
+        writer,
+        reader,
+        earnings_source(settings),
+        session,
+        args.start,
+        args.days or settings.earnings_days,
     )
     print_json({"run_id": record.run_id, "status": record.status, **record.stats})
     return 0 if record.status == "complete" else 1
@@ -143,7 +149,7 @@ def corporate_actions(
 ) -> int:
     start, end = args.start or session - timedelta(7), args.end or session + timedelta(30)
     source = MassiveCorporateActions(massive_transport(), time.sleep)
-    record = ingest_corporate_actions(writer, source, session, start, end)
+    record = ingest_corporate_actions(writer, reader, source, session, start, end)
     print_json({"run_id": record.run_id, "status": record.status, **record.stats})
     return 0 if record.status == "complete" else 1
 
@@ -172,6 +178,12 @@ def universe_build(
             out.writeheader()
             out.writerows(rows)
         record.stats["review_out"] = str(args.review_out)
+    print_json({"run_id": record.run_id, "status": record.status, **record.stats})
+    return 0 if record.status == "complete" else 1
+
+
+def migrate_ids(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter) -> int:
+    record = run_migrate_ids(writer, reader, dry_run=args.dry_run)
     print_json({"run_id": record.run_id, "status": record.status, **record.stats})
     return 0 if record.status == "complete" else 1
 

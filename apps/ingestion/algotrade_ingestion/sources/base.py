@@ -37,7 +37,9 @@ class Normalized:
     """
 
     session_date: date | None
-    tables: Mapping[str, pd.DataFrame]  # storage-ready: validated against storage schemas
+    # Storage-ready, except that tables keyed by a vendor ticker carry ``symbol`` instead of
+    # ``instrument_id``: the job resolves ids through the reference (ADR 0018).
+    tables: Mapping[str, pd.DataFrame]
     notes: Mapping[str, int] = field(default_factory=dict)  # e.g. {"nonstandard_series": 3}
     # Intermediate frames a job composes into storage tables (e.g. listings + option
     # underlyings + index members -> instruments/reference). Not stored as-is.

@@ -3,7 +3,8 @@
 Each run fetches a window of calendar dates and writes them all into the partition of the
 *run's* session date: "on session D we knew these companies would report on these dates".
 Dates change (companies confirm or move them), so each night's snapshot is kept and readers
-choose by session. Past windows (``start`` in the past) backfill reported results.
+choose by session. Past windows (``start`` in the past) backfill reported results. Symbols
+resolve to ids through the reference as of the session (ADR 0018).
 """
 
 from collections.abc import Callable
@@ -12,9 +13,10 @@ from datetime import UTC, date, datetime, timedelta
 import numpy as np
 import pandas as pd
 
+from algotrade.storage.readers import StoreReader
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.jobs.common import stamp
+from algotrade_ingestion.jobs.common import stamp, with_ids
 from algotrade_ingestion.sources.base import FetchRequest, Source
 from algotrade_ingestion.sources.nasdaq_earnings import TABLE
 
@@ -28,6 +30,7 @@ def weekdays(start: date, days: int) -> list[date]:
 
 def ingest_earnings(
     writer: StoreWriter,
+    reader: StoreReader,
     source: Source,
     session: date,
     start: date | None = None,
@@ -50,7 +53,9 @@ def ingest_earnings(
         except Exception as exc:
             failed.append(f"{day.isoformat()}: {exc}")
     rows = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    unresolved = 0
     if not rows.empty:
+        rows, unresolved = with_ids(rows, reader.resolver(session))
         rows = rows.drop_duplicates(subset=["instrument_id", "ts"], keep="last")
         rows = (
             rows.replace({np.nan: None}).sort_values(["ts", "instrument_id"]).reset_index(drop=True)
@@ -62,6 +67,7 @@ def ingest_earnings(
         "rows": len(rows),
         "companies": int(rows["symbol"].nunique()) if len(rows) else 0,
         "reported": int(rows["reported"].sum()) if len(rows) else 0,
+        "unresolved": unresolved,
     }
     record = RunRecord(
         run_id,

@@ -9,8 +9,9 @@ from pathlib import Path
 
 import pytest
 
+from algotrade.storage.resolver import SymbolResolver
 from algotrade.storage.schemas import COMMON, validate_frame
-from algotrade_ingestion.jobs.common import stamp
+from algotrade_ingestion.jobs.common import stamp, with_ids
 from algotrade_ingestion.sources.base import FetchRequest, Source
 from algotrade_ingestion.sources.cboe import CboeOptionsSource
 from algotrade_ingestion.sources.http import RetryPolicy
@@ -122,14 +123,25 @@ def test_normalized_tables_satisfy_storage_schemas(adapter: Adapter) -> None:
     assert normalized is not None and (normalized.tables or normalized.parsed)
     for table, frame in normalized.tables.items():
         assert not any(c in frame.columns for c in COMMON), "jobs add point-in-time columns"
+        # Vendor-ticker tables carry ``symbol``; the job resolves ids (ADR 0018).
+        assert "instrument_id" in frame.columns or "symbol" in frame.columns
+        resolved, _ = with_ids(frame, SymbolResolver())
         session = normalized.session_date or fx.SESSION
-        validate_frame(table, stamp(frame, session, fx.CLOCK_TS, source.name, "run-1"))
+        validate_frame(table, stamp(resolved, session, fx.CLOCK_TS, source.name, "run-1"))
 
 
 def test_missing_key_is_none_not_an_error(tmp_path: Path) -> None:
     source = GoldenCsvSource(GoldenFiles(tmp_path))
     assert source.fetch(FetchRequest("nope/NOPE")) is None
     assert source.fetch(FetchRequest("no-symbol")) is None
+
+
+def test_golden_requires_instrument_id() -> None:
+    source, request = golden()
+    payload = source.fetch(request)
+    assert payload is not None
+    with pytest.raises(ValueError, match="instrument_id"):
+        source.normalize(FetchRequest(request.key), payload)
 
 
 def test_cboe_requires_instrument_id() -> None:

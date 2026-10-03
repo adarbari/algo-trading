@@ -287,3 +287,35 @@ def test_events_allow_several_kinds_of_change_per_day(backend: Backend) -> None:
         StoreWriter(backend).write_table(
             "events/reference_change", D1, "r1", stamped(rows[:1] * 2, D1, "r1")
         )
+
+
+def test_table_names_list_every_written_table(backend: Backend) -> None:
+    assert backend.tables.names() == []
+    backend.tables.write(TABLE, D1, "r1", stamped(rows({"EQ:A": 1.0}), D1, "r1"))
+    backend.tables.write("bars/1d", D2, "r1", stamped(rows({"EQ:A": 1.0}), D2, "r1"))
+    assert StoreReader(backend).table_names() == ["bars/1d", TABLE]
+
+
+def test_resolver_uses_the_reference_as_of_the_session(backend: Backend) -> None:
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    assert reader.resolver(D1).id_for("aapl") == "EQ:AAPL"  # no reference yet: symbol ids
+    ref = {"asset_class": "EQ", "security_type": "COMMON_STOCK", "multiplier": 1.0}
+    day1 = [
+        {**ref, "instrument_id": "EQ:BBG1", "symbol": "FB", "status": "ACTIVE"},
+        {**ref, "instrument_id": "EQ:OLDCO", "symbol": "OLDCO", "status": "DELISTED"},
+    ]
+    day2 = [
+        {**ref, "instrument_id": "EQ:BBG1", "symbol": "META", "status": "ACTIVE"},
+        {**ref, "instrument_id": "EQ:OLDCO", "symbol": "FB", "status": "DELISTED"},
+    ]
+    writer.write_table("instruments/reference", D1, "r1", stamped(day1, D1, "r1"))
+    writer.write_table("instruments/reference", D2, "r2", stamped(day2, D2, "r2"))
+    assert reader.resolver(D1).id_for("FB") == "EQ:BBG1"
+    assert reader.resolver(D1 - timedelta(days=30)).snapshot == D1  # backfill: earliest
+    later = reader.resolver(D2 + timedelta(days=3))
+    assert later.snapshot == D2
+    assert later.id_for("META") == "EQ:BBG1"
+    assert later.id_for("FB") == "EQ:OLDCO"  # only a delisted row has it now
+    assert later.symbol_for("EQ:BBG1") == "META"
+    frame, unknown = later.resolve(pd.DataFrame({"symbol": ["meta", "NEW"], "x": [1, 2]}))
+    assert list(frame["instrument_id"]) == ["EQ:BBG1", "EQ:NEW"] and unknown == 1

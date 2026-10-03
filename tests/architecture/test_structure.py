@@ -1,6 +1,7 @@
 """Structural rules the codebase must keep. These complement import-linter contracts."""
 
 import ast
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -41,6 +42,29 @@ def test_every_module_has_a_docstring() -> None:
         if ast.get_docstring(ast.parse(path.read_text())) is None:
             missing.append(str(path.relative_to(REPO_ROOT)))
     assert not missing, f"modules need a docstring explaining their responsibility: {missing}"
+
+
+# ADR 0018: equity ids come from the id rule (core) or the symbol resolver, never ad hoc.
+_ADHOC_ID = re.compile(r"""f?["']EQ:|AssetClass\.EQUITY\s*,|\bequity_id\(""")
+_ID_OWNERS = {
+    "src/algotrade/core/instruments.py",
+    "src/algotrade/storage/resolver.py",
+    "apps/ingestion/algotrade_ingestion/jobs/instrument_ids.py",
+}
+
+
+def test_equity_ids_are_built_only_by_the_id_rule_and_resolver() -> None:
+    offenders = []
+    for root in (REPO_ROOT / "src", REPO_ROOT / "apps"):
+        for path in root.rglob("*.py"):
+            rel = path.relative_to(REPO_ROOT).as_posix()
+            if rel in _ID_OWNERS or ".venv" in rel:
+                continue
+            code = [
+                line for line in path.read_text().splitlines() if not line.lstrip().startswith("#")
+            ]
+            offenders += [f"{rel}: {line.strip()}" for line in code if _ADHOC_ID.search(line)]
+    assert not offenders, f"resolve symbols with SymbolResolver (ADR 0018): {offenders}"
 
 
 def test_scripts_flag_long_files(tmp_path: Path) -> None:

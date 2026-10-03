@@ -3,7 +3,8 @@
 ``https://api.nasdaq.com/api/calendar/earnings?date=YYYY-MM-DD`` (unofficial, free, no key;
 see docs/data/vendors.md). Future dates carry the EPS forecast and number of estimates; past
 dates also carry the reported EPS and the surprise. Weekends and holidays return no rows,
-which is a valid answer, not an error.
+which is a valid answer, not an error. Rows carry ``symbol``; the job resolves
+``instrument_id`` through the reference (ADR 0018).
 """
 
 import json
@@ -13,7 +14,6 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.core.instruments import AssetClass, instrument_id
 from algotrade_ingestion.sources.base import FetchRequest, Normalized
 from algotrade_ingestion.sources.http import RetryPolicy, Sleep, Transport, get_with_retry
 
@@ -27,9 +27,8 @@ TIMES = {
     "time-not-supplied": "unknown",
 }
 COLUMNS = (
-    "instrument_id",
-    "ts",
     "symbol",
+    "ts",
     "earnings_date",
     "time",
     "fiscal_quarter",
@@ -69,9 +68,8 @@ def parse_calendar(day: date, payload: bytes) -> pd.DataFrame:
         reported = _money(r.get("eps"))
         records.append(
             {
-                "instrument_id": instrument_id(AssetClass.EQUITY, symbol),
-                "ts": pd.Timestamp(day, tz="UTC"),
                 "symbol": symbol,
+                "ts": pd.Timestamp(day, tz="UTC"),
                 "earnings_date": day,
                 "time": TIMES.get(str(r.get("time")), "unknown"),
                 "fiscal_quarter": r.get("fiscalQuarterEnding") or None,

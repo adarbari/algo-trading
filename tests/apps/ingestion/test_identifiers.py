@@ -79,6 +79,7 @@ def test_symbol_history_tracks_ticker_changes() -> None:
     day1 = pd.DataFrame(
         {"symbol": ["FB", "AAPL", "OLD"], "figi": ["F_META", "F_AAPL", "F_OLD"], "status": "ACTIVE"}
     )
+    day1["instrument_id"] = "EQ:" + day1["figi"]
     history1, changes1 = update_history(None, day1, D1)
     assert changes1 == [] and history1["valid_to"].isna().all()
     day2 = pd.DataFrame(
@@ -88,10 +89,11 @@ def test_symbol_history_tracks_ticker_changes() -> None:
             "status": "ACTIVE",
         }
     )
+    day2["instrument_id"] = "EQ:" + day2["figi"]
     history2, changes2 = update_history(history1, day2, D2)
     assert changes2 == [
         {
-            "instrument_id": "EQ:META",
+            "instrument_id": "EQ:F_META",  # the id survives the ticker change
             "symbol": "META",
             "change": "ticker_changed",
             "old": "FB",
@@ -106,6 +108,7 @@ def test_symbol_history_tracks_ticker_changes() -> None:
     assert rows[("F_OLD", "OLD")]["valid_to"] == D2
     assert pd.isna(rows[("F_AAPL", "AAPL")]["valid_to"])
     assert ("F_NEW", "NEW") in rows
+    assert rows[("F_META", "FB")]["instrument_id"] == rows[("F_META", "META")]["instrument_id"]
 
 
 def test_universe_build_with_identifiers_and_a_rename() -> None:
@@ -157,4 +160,9 @@ def test_universe_build_with_identifiers_and_a_rename() -> None:
     assert history is not None and set(history["symbol"]) == {"FB", "META", "AAPL"}
     reference = reader.table("instruments/reference", D2).set_index("symbol")  # type: ignore[union-attr]
     assert reference.loc["META", "figi"] == "F_META"
+    assert reference.loc["META", "instrument_id"] == "EQ:F_META"  # same id as FB on D1
+    assert "FB" not in reference.index  # a rename, not a delisting
+    assert reference.loc["ZZZ", "instrument_id"] == "EQ:ZZZ"  # no FIGI: symbol id
+    assert second.stats["identifiers"]["ids_by_figi"] == 2
+    assert second.stats["identifiers"]["ids_by_symbol"] == 1
     assert reference.loc["ZZZ", "security_type_source"] == "name_rule"  # not in the vendor list

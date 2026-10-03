@@ -60,12 +60,15 @@ $ALGOTRADE_DATA_URL (default file://./var/data, git-ignored)
 ```
 
 Implemented tables (layers per [layers.md](layers.md)):
-L1 `instruments/reference`; L2 `bars/<interval>` (1d, 1h, 30m, 15m, 5m, 1m; OHLCV
+L1 `instruments/reference`, `instruments/symbol_history`, `instruments/id_map` (symbol id →
+FIGI id upgrades, ADR 0018), `instruments/company`; L2 `bars/<interval>` (1d, 1h, 30m, 15m, 5m, 1m; OHLCV
 sanity-checked on write), `chains/underlying_quotes`, `chains/option_quotes`,
 `chains/status`, `events/<type>`; rollups `rollups/daily/*` and `rollups/instrument/*`
 (e.g. `rollups/instrument/option_liquidity@v1`); `universe`; `catalog/*`; `results/<name>`.
 Readers: `table`, `table_range` (date range, each partition resolved point-in-time),
-`bars`, `instruments` (latest snapshot on or before a date) and `instrument_terms`.
+`bars`, `instruments` (latest snapshot on or before a date), `instrument_terms`,
+`resolver` (symbol → id as of a date) and `table_names` (every table with data; backends
+implement `TableStore.names()`).
 
 ## Target physical layout (as more grains arrive)
 
@@ -109,6 +112,7 @@ storage/
                        UniverseStore, FeatureStore, ResultStore, Catalog
   schemas.py           canonical column schemas + validation (the data contract)
   readers.py           read-only facade handed to backtest / api / engines
+  resolver.py          SymbolResolver: ticker -> instrument_id from a reference snapshot (ADR 0018)
   writers.py           write facade. Only apps/ingestion may import this (import-linter).
   backends/
     local.py           now: Parquet on the local filesystem (DuckDB-readable)

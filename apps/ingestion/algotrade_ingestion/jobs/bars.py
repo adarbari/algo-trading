@@ -6,15 +6,19 @@ be interrupted and resumed. Holidays return no rows and are recorded, not treate
 
 ``ingest_corporate_actions``: splits and dividends in a date window, stored as point-in-time
 snapshots in ``events/split`` and ``events/dividend`` (partition = the run's session).
+
+Vendor tickers become ids through the reference as of each session (ADR 0018); tickers the
+reference does not know keep symbol ids and are counted as ``unresolved``.
 """
 
 from collections.abc import Callable, Sequence
 from datetime import UTC, date, datetime, timedelta
 
 from algotrade.storage.readers import StoreReader
+from algotrade.storage.resolver import SymbolResolver
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.jobs.common import stamp
+from algotrade_ingestion.jobs.common import stamp, with_ids
 from algotrade_ingestion.sources.base import FetchRequest, Source
 
 BARS = "bars/1d"
@@ -31,7 +35,12 @@ def sessions_between(start: date, end: date) -> list[date]:
 
 
 def _one_session(
-    writer: StoreWriter, source: Source, day: date, run: RunRecord, clock: Callable[[], datetime]
+    writer: StoreWriter,
+    source: Source,
+    day: date,
+    run: RunRecord,
+    clock: Callable[[], datetime],
+    resolver: SymbolResolver,
 ) -> str:
     request = FetchRequest(day.isoformat(), session_date=day)
     payload = source.fetch(request)
@@ -42,10 +51,15 @@ def _one_session(
     bars = normalized.tables[BARS] if normalized else None
     if bars is None or bars.empty:
         return "NO_SESSION"
+    bars, unknown = with_ids(bars, resolver, keep_symbol=False)
+    bars = bars.drop_duplicates("instrument_id", keep="last").sort_values("instrument_id")
     now = clock()
     writer.write_table(BARS, day, run.run_id, stamp(bars, day, now, source.name, run.run_id))
     invalid = normalized.notes.get("invalid_rows", 0) if normalized else 0
-    return f"OK: {len(bars)} bars" + (f", {invalid} invalid dropped" if invalid else "")
+    notes = (f", {invalid} invalid dropped" if invalid else "") + (
+        f", {unknown} unresolved" if unknown else ""
+    )
+    return f"OK: {len(bars)} bars{notes}"
 
 
 def ingest_daily_bars(
@@ -60,12 +74,17 @@ def ingest_daily_bars(
     last = max(sessions)
     run = RunRecord(new_run_id("daily_bars", last, now), "daily_bars", last, now)
     stored = set(reader.dates(BARS))
+    resolvers: dict[date | None, SymbolResolver] = {}  # one per reference snapshot
     for i, day in enumerate(sorted(sessions), start=1):
         if day in stored and not force:
             run.items[day.isoformat()] = "STORED"
             continue
         try:
-            run.items[day.isoformat()] = _one_session(writer, source, day, run, clock)
+            snapshot = reader.reference_snapshot(day)
+            if snapshot not in resolvers:
+                resolvers[snapshot] = reader.resolver(day)
+            resolver = resolvers[snapshot]
+            run.items[day.isoformat()] = _one_session(writer, source, day, run, clock, resolver)
         except Exception as exc:
             run.items[day.isoformat()] = f"FETCH_ERROR: {exc}"
         if i % CHECKPOINT_EVERY == 0:
@@ -81,6 +100,7 @@ def ingest_daily_bars(
 
 def ingest_corporate_actions(
     writer: StoreWriter,
+    reader: StoreReader,
     source: Source,
     session: date,
     start: date,
@@ -91,6 +111,8 @@ def ingest_corporate_actions(
     run_id = new_run_id("corporate_actions", session, now)
     stats: dict[str, object] = {"window": [start.isoformat(), end.isoformat()]}
     failed = []
+    resolver = reader.resolver(session)
+    unresolved = 0
     for kind in ("splits", "dividends"):
         request = FetchRequest(
             f"{kind}:{start.isoformat()}:{end.isoformat()}", session_date=session
@@ -101,7 +123,9 @@ def ingest_corporate_actions(
                 raise ValueError("no response")
             writer.raw.put(source.name, source.dataset, session, run_id, kind, payload)
             normalized = source.normalize(request, payload)
-            for table, frame in normalized.tables.items() if normalized else []:
+            for table, raw in normalized.tables.items() if normalized else []:
+                frame, unknown = with_ids(raw, resolver)
+                unresolved += unknown
                 stats[table] = len(frame)
                 if not frame.empty:
                     writer.write_table(
@@ -109,7 +133,7 @@ def ingest_corporate_actions(
                     )
         except Exception as exc:
             failed.append(f"{kind}: {exc}")
-    stats["failed"] = failed
+    stats["failed"], stats["unresolved"] = failed, unresolved
     record = RunRecord(
         run_id,
         "corporate_actions",

@@ -23,6 +23,7 @@ from algotrade_ingestion.sources.massive import (
     parse_grouped,
 )
 from tests import massive_fixture as fx
+from tests.storage_helpers import write_reference
 
 D1, D2 = date(2026, 9, 30), date(2026, 10, 1)
 CLOCK = lambda: datetime(2026, 10, 2, 22, tzinfo=UTC)  # noqa: E731
@@ -42,7 +43,7 @@ def test_parse_grouped_maps_tickers_and_drops_bad_rows() -> None:
             ],
         ),
     )
-    assert list(bars["instrument_id"]) == ["EQ:AAPL", "EQ:KIM$L"]
+    assert list(bars["symbol"]) == ["AAPL", "KIM$L"]  # ids are resolved by the job
     assert invalid == 2
     assert str(bars["ts"].dt.tz) == "UTC"
     assert parse_grouped(D1, fx.grouped(D1, []))[0].empty  # holiday
@@ -137,7 +138,7 @@ def test_daily_bars_job_resumes_and_records_holidays() -> None:
         writer, reader, source, sessions_between(D1, date(2026, 10, 2)), clock=CLOCK
     )
     assert first.items == {
-        "2026-09-30": "OK: 1 bars",
+        "2026-09-30": "OK: 1 bars, 1 unresolved",  # no reference yet: symbol id
         "2026-10-01": "NO_SESSION",
         "2026-10-02": first.items["2026-10-02"],
     }
@@ -160,11 +161,29 @@ def test_corporate_actions_job_writes_snapshots_and_reports_failures() -> None:
         )
 
     backend = MemoryBackend()
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    write_reference(writer, D1, {"NVDA": "EQ:BBG000BBJQV0"})
     source = MassiveCorporateActions(transport, lambda s: None, NO_RETRY, min_interval_s=0)
-    record = ingest_corporate_actions(StoreWriter(backend), source, D2, D1, D2, clock=CLOCK)
+    record = ingest_corporate_actions(writer, reader, source, D2, D1, D2, clock=CLOCK)
     assert record.status is RunStatus.PARTIAL
-    assert record.stats["events/split"] == 1
-    assert StoreReader(backend).table("events/split", D2) is not None
+    assert (record.stats["events/split"], record.stats["unresolved"]) == (1, 0)
+    splits = reader.table("events/split", D2)
+    assert splits is not None and list(splits["instrument_id"]) == ["EQ:BBG000BBJQV0"]
+
+
+def test_daily_bars_resolve_through_the_reference_as_of_each_session() -> None:
+    rows = [("META", 10, 11, 9, 10.5, 1000), ("FB", 10, 11, 9, 10.5, 1000)]
+    source = MassiveDailyBars(
+        lambda url: fx.grouped(D1, rows), lambda s: None, NO_RETRY, min_interval_s=0
+    )
+    backend = MemoryBackend()
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    write_reference(writer, D2, {"META": "EQ:BBG000MM2P62"})  # first snapshot after D1
+    record = ingest_daily_bars(writer, reader, source, [D1], clock=CLOCK)
+    assert record.items["2026-09-30"] == "OK: 2 bars, 1 unresolved"
+    bars = reader.table("bars/1d", D1)
+    assert bars is not None and list(bars["instrument_id"]) == ["EQ:BBG000MM2P62", "EQ:FB"]
+    assert "symbol" not in bars.columns  # the bar schema is unchanged
 
 
 def test_env_loading_and_missing_key(
