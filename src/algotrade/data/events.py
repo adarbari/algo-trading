@@ -67,3 +67,17 @@ def stored_events(
     return frame.sort_values(["session_date", "instrument_id", "ts"], kind="stable").reset_index(
         drop=True
     )
+
+
+def events_by_event_date(
+    reader: StoreReader, table: str, start: date, end: date, as_of: datetime | None = None
+) -> pd.DataFrame:
+    """``read_events`` for ``start..end`` with an ``event_date`` column (the UTC date of
+    ``ts``), sorted by (``event_date``, ``instrument_id``). The stored partition date is
+    dropped: it says when we learned of the event, not when it happened. Never a later event
+    (a declared future ex-date stays out until its date)."""
+    frame = read_events(reader, table, start, end, as_of=as_of).frame
+    frame = frame.drop(columns=[c for c in ("session_date",) if c in frame.columns])
+    frame = frame.assign(event_date=pd.to_datetime(frame["ts"], utc=True).dt.date)
+    frame = frame.sort_values(["event_date", "instrument_id"], kind="stable")
+    return frame.reset_index(drop=True)

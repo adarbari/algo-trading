@@ -7,7 +7,7 @@ from datetime import date
 import pandas as pd
 import pytest
 
-from algotrade.features.registry import ROLLUPS
+from algotrade.features.registry import GROUPS
 from algotrade.storage.runs import RunStatus
 from algotrade_ingestion.tasks.derived.rollups import compute_rollups
 from tests.helpers.ingest_fakes import task_ctx
@@ -66,8 +66,8 @@ def test_a_failed_rollup_blocks_its_dependents(monkeypatch: pytest.MonkeyPatch) 
     def boom(*args: object) -> pd.DataFrame:
         raise RuntimeError("boom")
 
-    broken = dataclasses.replace(ROLLUPS["price_stats@v1"], compute=boom)
-    monkeypatch.setitem(ROLLUPS, "price_stats@v1", broken)
+    broken = dataclasses.replace(GROUPS["price_stats@v1"], compute=boom)
+    monkeypatch.setitem(GROUPS, "price_stats@v1", broken)
     record = compute_rollups(task_ctx(writer, reader), END)  # type: ignore[arg-type]
     assert record.status is RunStatus.PARTIAL
     assert record.items["price_stats@v1"] == "FETCH_ERROR: boom"

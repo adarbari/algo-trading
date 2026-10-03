@@ -27,7 +27,8 @@ import numpy as np
 import pandas as pd
 
 from algotrade.core.time.calendar import sessions_ending
-from algotrade.features.framework.declaration import Input, Inputs, Rollup
+from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
+from algotrade.features.framework.feature import Feature
 
 NAME = "iv_history"
 VERSION = 1
@@ -35,15 +36,49 @@ IV30 = "rollups/instrument/iv30@v1"
 PRICE_STATS = "rollups/instrument/price_stats@v1"
 SOURCES = {"ours": "iv30", "cboe": "iv30_cboe"}
 
-COLUMNS: dict[str, str] = {
-    "iv30": "float",
-    "iv_rank_252d": "float",
-    "iv_percentile_252d": "float",
-    "history_days": "int",
-    "rank_status": "str",
-    "iv_hv_spread": "float",
-    "iv_hv_ratio": "float",
-}
+_IV = "iv30.iv30@v1"
+_UNKNOWN = "rank_status is UNKNOWN (fewer than 60 sessions with an IV), or there is no IV today"
+
+FEATURES = (
+    Feature(
+        "iv30", "float", "decimal",
+        "The session's IV30 from iv30@v1 (ours; the feed's with source = cboe)",
+        "iv30@v1 has no IV for the session (its iv30_status says why)", "expression",
+        valid_range=(0, 5), inputs=(_IV, "iv30.iv30_cboe@v1"),
+    ),
+    Feature(
+        "iv_rank_252d", "float", "decimal",
+        "IV rank: (iv30 - min) / (max - min) over the last 252 sessions' IVs, today included",
+        f"{_UNKNOWN}; or every IV in the window is equal", valid_range=(0, 1), inputs=(_IV,),
+    ),
+    Feature(
+        "iv_percentile_252d", "float", "decimal",
+        "IV percentile: the share of the window's earlier IVs strictly below today's",
+        f"{_UNKNOWN}; or no earlier IV", valid_range=(0, 1), inputs=(_IV,),
+    ),
+    Feature(
+        "history_days", "int", "sessions",
+        "Sessions of the 252-session window with an IV, today included (gaps are not filled)",
+        "never", valid_range=(0, None), inputs=(_IV,),
+    ),
+    Feature(
+        "rank_status", "str", "category",
+        "UNKNOWN below 60 sessions with an IV (no rank), PROVISIONAL below 252, FULL from 252",
+        "never", "label", categories=("UNKNOWN", "PROVISIONAL", "FULL"), inputs=(_IV,),
+    ),
+    Feature(
+        "iv_hv_spread", "float", "decimal",
+        "iv30 - hv30 (price_stats@v1): the variance risk premium's raw input",
+        "iv30 or hv30 is null", "expression", valid_range=(-5, 5),
+        inputs=("iv_history.iv30@v1", "price_stats.hv30@v1"),
+    ),
+    Feature(
+        "iv_hv_ratio", "float", "ratio", "iv30 / hv30 (price_stats@v1)",
+        "iv30 or hv30 is null, or hv30 is 0", "expression", valid_range=(0, None),
+        inputs=("iv_history.iv30@v1", "price_stats.hv30@v1"),
+    ),
+)  # fmt: skip
+COLUMNS = column_types(FEATURES)
 
 
 @dataclass(frozen=True)
@@ -112,7 +147,7 @@ def compute(inputs: Inputs, session: date, p: IvHistoryParams) -> pd.DataFrame:
     return out
 
 
-ROLLUP = Rollup(
+GROUP = FeatureGroup(
     NAME,
     VERSION,
     "IV30 rank and percentile over 252 sessions (provisional after 60) and IV minus HV30",
@@ -120,7 +155,7 @@ ROLLUP = Rollup(
         Input(IV30, lookback=lambda p: p.window - 1),
         Input(PRICE_STATS, required=False),
     ),
-    COLUMNS,
+    FEATURES,
     compute,
     IvHistoryParams(),
 )

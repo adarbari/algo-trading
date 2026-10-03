@@ -32,7 +32,8 @@ import numpy.typing as npt
 import pandas as pd
 
 from algotrade.core.time.calendar import sessions_ending
-from algotrade.features.framework.declaration import Input, Inputs, Rollup
+from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
+from algotrade.features.framework.feature import Feature
 from algotrade.quant import realized_vol
 
 type Matrix = npt.NDArray[np.float64]
@@ -46,19 +47,80 @@ HV_WINDOWS = (20, 30)
 YZ_WINDOW = 20
 ADV_WINDOW = 20
 
-COLUMNS: dict[str, str] = {
-    "close": "float",
-    **{f"sma_{n}": "float" for n in SMA_WINDOWS},
-    **{f"ret_{n}d": "float" for n in RETURN_WINDOWS},
-    "high_52w": "float",
-    "low_52w": "float",
-    "pct_from_high_52w": "float",
-    "pct_from_low_52w": "float",
-    **{f"hv{n}": "float" for n in HV_WINDOWS},
-    f"hv{YZ_WINDOW}_yz": "float",
-    f"adv_usd_{ADV_WINDOW}d": "float",
-    "history_days": "int",
-}
+CLOSE, HIGH, LOW, OPEN, VOLUME = (f"{BARS}.{c}" for c in ("close", "high", "low", "open", "volume"))
+
+
+def _gap(n: int) -> str:
+    return f"a session among the last {n} has no bar (a gap), or the history is shorter"
+
+
+FEATURES = (
+    Feature(
+        "close", "float", "usd_per_share", "The session's close, split-adjusted as of the session",
+        "never: a row exists only for an instrument with a bar on the session",
+        valid_range=(0, None), inputs=(CLOSE,),
+    ),
+    *(
+        Feature(
+            f"sma_{n}", "float", "usd_per_share", f"Mean close over the last {n} sessions",
+            _gap(n), valid_range=(0, None), inputs=(CLOSE,),
+        )
+        for n in SMA_WINDOWS
+    ),
+    *(
+        Feature(
+            f"ret_{n}d", "float", "decimal", f"Close / close {n} sessions earlier - 1",
+            _gap(n + 1), valid_range=(-1, None), inputs=(CLOSE,),
+        )
+        for n in RETURN_WINDOWS
+    ),
+    Feature(
+        "high_52w", "float", "usd_per_share",
+        "Highest daily high over the last 52 weeks (252 sessions)",
+        "fewer than min_year_sessions (240) bars among the last year_sessions (252)",
+        valid_range=(0, None), inputs=(HIGH,),
+    ),
+    Feature(
+        "low_52w", "float", "usd_per_share",
+        "Lowest daily low over the last 52 weeks (252 sessions)",
+        "fewer than min_year_sessions (240) bars among the last year_sessions (252)",
+        valid_range=(0, None), inputs=(LOW,),
+    ),
+    Feature(
+        "pct_from_high_52w", "float", "decimal", "Close / 52-week high - 1 (at or below 0)",
+        "high_52w is null", "expression", valid_range=(-1, 0),
+        inputs=("price_stats.close@v1", "price_stats.high_52w@v1"),
+    ),
+    Feature(
+        "pct_from_low_52w", "float", "decimal", "Close / 52-week low - 1 (at or above 0)",
+        "low_52w is null", "expression", valid_range=(0, None),
+        inputs=("price_stats.close@v1", "price_stats.low_52w@v1"),
+    ),
+    *(
+        Feature(
+            f"hv{n}", "float", "decimal",
+            f"Close-to-close realised volatility over {n} sessions, annualised (252)",
+            _gap(n + 1), valid_range=(0, 5), inputs=(CLOSE,),
+        )
+        for n in HV_WINDOWS
+    ),
+    Feature(
+        f"hv{YZ_WINDOW}_yz", "float", "decimal",
+        f"Yang-Zhang realised volatility over {YZ_WINDOW} sessions, annualised (252)",
+        _gap(YZ_WINDOW + 1), valid_range=(0, 5), inputs=(OPEN, HIGH, LOW, CLOSE),
+    ),
+    Feature(
+        f"adv_usd_{ADV_WINDOW}d", "float", "usd",
+        f"Mean daily dollar volume (close x volume) over {ADV_WINDOW} sessions",
+        _gap(ADV_WINDOW), valid_range=(0, None), inputs=(CLOSE, VOLUME),
+    ),
+    Feature(
+        "history_days", "int", "sessions",
+        "Sessions with a bar among the last year_sessions (252), the session included",
+        "never", valid_range=(1, None), inputs=(CLOSE,),
+    ),
+)  # fmt: skip
+COLUMNS = column_types(FEATURES)
 
 
 @dataclass(frozen=True)
@@ -162,12 +224,12 @@ def compute(inputs: Inputs, session: date, p: PriceStatsParams) -> pd.DataFrame:
     return frame
 
 
-ROLLUP = Rollup(
+GROUP = FeatureGroup(
     NAME,
     VERSION,
     "Close, moving averages, returns, 52-week range, realised vol and dollar volume",
     (Input(BARS, lookback=lookback),),
-    COLUMNS,
+    FEATURES,
     compute,
     PriceStatsParams(),
 )

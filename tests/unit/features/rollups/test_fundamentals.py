@@ -12,7 +12,7 @@ from algotrade.core.model.fields import field_source
 from algotrade.features.framework.runner import compute_in_memory
 from algotrade.features.registry import catalogue_columns
 from algotrade.features.rollups import price_stats
-from algotrade.features.rollups.fundamentals import ROLLUP, FundamentalsParams, choose
+from algotrade.features.rollups.fundamentals import GROUP, FundamentalsParams, choose
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.rollup_store import END, series, store, write_bars, write_split
 from tests.helpers.stored_frames import stamped
@@ -63,9 +63,9 @@ def _setup() -> tuple[object, list[date]]:
 
 
 def _rows(reader: object, sessions: list[date], params: FundamentalsParams | None = None):  # type: ignore[no-untyped-def]
-    by_key = {ROLLUP.key: params} if params else None
-    out = compute_in_memory(reader, [price_stats.ROLLUP, ROLLUP], sessions, by_key)  # type: ignore[arg-type]
-    return {r.session: r.frame.set_index("instrument_id") for r in out[ROLLUP.key]}
+    by_key = {GROUP.key: params} if params else None
+    out = compute_in_memory(reader, [price_stats.GROUP, GROUP], sessions, by_key)  # type: ignore[arg-type]
+    return {r.session: r.frame.set_index("instrument_id") for r in out[GROUP.key]}
 
 
 def test_statuses_and_market_cap() -> None:

@@ -9,7 +9,7 @@ import pytest
 
 from algotrade.features.framework.runner import compute_in_memory, compute_one
 from algotrade.features.rollups import dividends, price_stats
-from algotrade.features.rollups.dividends import ROLLUP, DividendParams
+from algotrade.features.rollups.dividends import GROUP, DividendParams
 from tests.helpers.rollup_store import END, series, store, write_bars, write_dividends, write_split
 
 
@@ -35,9 +35,9 @@ def _setup() -> tuple[object, list[date]]:
 
 
 def _rows(reader: object, params: DividendParams | None = None) -> pd.DataFrame:
-    params_by_key = {ROLLUP.key: params} if params else None
-    out = compute_in_memory(reader, [price_stats.ROLLUP, ROLLUP], [END], params_by_key)  # type: ignore[arg-type]
-    frame = out[ROLLUP.key][0].frame
+    params_by_key = {GROUP.key: params} if params else None
+    out = compute_in_memory(reader, [price_stats.GROUP, GROUP], [END], params_by_key)  # type: ignore[arg-type]
+    frame = out[GROUP.key][0].frame
     assert frame is not None
     return frame.set_index("instrument_id")
 
@@ -70,7 +70,7 @@ def test_zero_needs_a_year_of_history_and_a_payer_is_always_known() -> None:
 
 def test_reads_stored_price_stats_and_needs_them() -> None:
     reader, _ = _setup()
-    assert compute_one(reader, ROLLUP, END).no_input == (
+    assert compute_one(reader, GROUP, END).no_input == (
         f"no rollups/instrument/price_stats@v1 for {END}"
     )
 

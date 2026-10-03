@@ -9,7 +9,7 @@ import pytest
 
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.framework.runner import compute_one
-from algotrade.features.rollups.iv_history import ROLLUP, IvHistoryParams, history
+from algotrade.features.rollups.iv_history import GROUP, IvHistoryParams, history
 from tests.helpers.rollup_store import END, store
 from tests.helpers.stored_frames import stamped
 
@@ -54,8 +54,8 @@ def test_reads_a_year_of_stored_iv30_and_the_session_hv30() -> None:
         rows = [{"instrument_id": "EQ:A", "iv30": 0.2 + i / 1000, "iv30_cboe": 0.9 - i / 1000}]
         rows.append({"instrument_id": "EQ:NEW", "iv30": 0.5 if day == END else None})
         _write(writer, "rollups/instrument/iv30@v1", day, rows)
-    assert compute_one(reader, ROLLUP, days[0]).no_input  # no iv30 that session
-    out = compute_one(reader, ROLLUP, END).frame
+    assert compute_one(reader, GROUP, days[0]).no_input  # no iv30 that session
+    out = compute_one(reader, GROUP, END).frame
     assert out is not None
     a, new = (
         out.set_index("instrument_id").loc["EQ:A"],
@@ -69,9 +69,9 @@ def test_reads_a_year_of_stored_iv30_and_the_session_hv30() -> None:
     _write(
         writer, "rollups/instrument/price_stats@v1", END, [{"instrument_id": "EQ:A", "hv30": 0.2}]
     )
-    a = compute_one(reader, ROLLUP, END).frame.set_index("instrument_id").loc["EQ:A"]  # type: ignore[union-attr]
+    a = compute_one(reader, GROUP, END).frame.set_index("instrument_id").loc["EQ:A"]  # type: ignore[union-attr]
     assert a["iv_hv_spread"] == pytest.approx(a["iv30"] - 0.2)
     assert a["iv_hv_ratio"] == pytest.approx(a["iv30"] / 0.2)
-    cboe = compute_one(reader, ROLLUP, END, IvHistoryParams(source="cboe")).frame
+    cboe = compute_one(reader, GROUP, END, IvHistoryParams(source="cboe")).frame
     row = cboe.set_index("instrument_id").loc["EQ:A"]  # type: ignore[union-attr]
     assert row["iv30"] == pytest.approx(0.9 - 64 / 1000) and row["iv_rank_252d"] == 0.0

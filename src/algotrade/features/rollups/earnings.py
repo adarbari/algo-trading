@@ -26,20 +26,45 @@ import numpy as np
 import pandas as pd
 
 from algotrade.core.time.calendar import sessions_to
-from algotrade.features.framework.declaration import Input, Inputs, Rollup
+from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
+from algotrade.features.framework.feature import Feature
 
 NAME = "earnings"
 VERSION = 1
 EVENTS = "events/earnings"
 TIMES = {"pre_market": "pre", "after_hours": "post"}
 
-COLUMNS: dict[str, str] = {
-    "next_earnings_date": "date",
-    "earnings_time": "str",
-    "days_to_earnings": "int",
-    "date_confirmed": "bool",
-    "last_earnings_date": "date",
-}
+_REPORT = f"{EVENTS}.ts"
+_NO_NEXT = "no report date on or after the session in the calendars stored by then"
+
+FEATURES = (
+    Feature(
+        "next_earnings_date", "date", "date",
+        "The first report date on or after the session, as known on the session",
+        f"{_NO_NEXT} (the row exists for a last date)", inputs=(_REPORT,),
+    ),
+    Feature(
+        "earnings_time", "str", "category",
+        "When the next report is due: pre (before the open), post (after the close), unknown",
+        _NO_NEXT, "label", categories=("pre", "post", "unknown"), inputs=(f"{EVENTS}.time",),
+    ),
+    Feature(
+        "days_to_earnings", "int", "sessions",
+        "Exchange sessions after the session up to the next report date (0: reports today)",
+        _NO_NEXT, valid_range=(0, None), inputs=(_REPORT,),
+    ),
+    Feature(
+        "date_confirmed", "bool", "flag", "Whether the source confirmed the next report date",
+        f"the source does not say (the Nasdaq calendar never does), or {_NO_NEXT}",
+        inputs=(f"{EVENTS}.date_confirmed",),
+    ),
+    Feature(
+        "last_earnings_date", "date", "date", "The latest report date before the session",
+        "no earlier report date in the calendars stored by then (they start with the first "
+        "stored snapshot; a backfill does not invent history)", inputs=(_REPORT,),
+    ),
+)  # fmt: skip
+COLUMNS = column_types(FEATURES)
 
 
 def valid_events(stored: pd.DataFrame) -> pd.DataFrame:
@@ -99,11 +124,11 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     return out.sort_values("instrument_id", kind="stable").reset_index(drop=True)
 
 
-ROLLUP = Rollup(
+GROUP = FeatureGroup(
     NAME,
     VERSION,
     "Next and last earnings dates, report time and sessions to the next report",
     (Input(EVENTS),),
-    COLUMNS,
+    FEATURES,
     compute,
 )

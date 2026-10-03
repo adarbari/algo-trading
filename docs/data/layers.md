@@ -188,20 +188,25 @@ or before the session; with no snapshot they are UNKNOWN. ETFs and funds usually
 
 ## Rollups as built
 
-A rollup is a versioned, pure definition, `<name>@v<N>`, stored as
-`rollups/instrument/<name>@v<N>` with one row per instrument per session (phase 2b.2).
+A rollup is a **feature group** (ADR 0023): a versioned, pure definition, `<name>@v<N>`, stored
+as `rollups/instrument/<name>@v<N>` with one row per instrument per session (phase 2b.2). Each
+stored column is a **feature** with a kind, type, unit, description, null meaning and valid
+range; every feature is listed in the generated **[feature catalogue](features.md)**
+(`make features-doc`).
 
-- **Declaration** (`features/framework/declaration.py`, `Rollup`): name, version, inputs (each
-  a table plus a lookback in exchange sessions, required or optional), params (a frozen
-  dataclass of defaults, or none), output columns with their field types, and a pure
-  `compute(inputs, session, params) -> frame`. Definitions live in `features/rollups/<name>.py`
+- **Declaration** (`features/framework/declaration.py`, `FeatureGroup`): name, version, inputs
+  (each a table plus a lookback in exchange sessions, required or optional), params (a frozen
+  dataclass of defaults, or none), its `FEATURES` (`features/framework/feature.py`: one
+  `Feature` per output column, in stored order), and a pure
+  `compute(inputs, session, params) -> frame`. Groups live in `features/rollups/<name>.py`
   and import only `core`, `quant`, numpy and pandas (import-linter); the registry is
-  `features/registry.py`.
-- **Inputs** are read by the framework (`features/framework/inputs.py`) through
-  `algotrade.data`, never storage, once per chunk of up to 126 sessions. `compute` sees only
-  rows on or before its session (point in time; a runner guard asserts it). A required input
-  with nothing for a session means no row and `no_input` in the run stats, not a failure.
-- **Types** come from the declaration: the framework casts the output to the declared types
+  `features/registry.py` (`GROUPS`, `FEATURES`, `feature(name)` for descriptions and units).
+- **Inputs** are asked of `algotrade.data` by table name (`data/feature_inputs.py`,
+  `load_input`; each table's read lives in its `data` owner), never storage or a domain reader,
+  once per chunk of up to 126 sessions. `compute` sees only rows on or before its session
+  (point in time; a runner guard asserts it). A required input with nothing for a session
+  means no row and `no_input` in the run stats, not a failure.
+- **Types** come from the features: the framework casts the output to the declared types
   (`features/framework/columns.py`) before the task stores it, so stored types, the selection
   catalogue (`rollup.<name>@v<N>.<column>`) and the `[[table]]` producers all derive from it.
 - **Params** come from `config/site/rollups.toml` (one `["<name>@v<N>"]` section per rollup
@@ -220,7 +225,9 @@ A rollup is a versioned, pure definition, `<name>@v<N>`, stored as
   earnings, bars, corporate actions, rates and chains. `--only` computes just the named
   rollups; their dependencies are read from the store.
 
-| Rollup | Columns | Inputs | Status |
+Per-column meanings, units, ranges and null meanings: [features.md](features.md).
+
+| Group | Columns | Inputs | Status |
 |---|---|---|---|
 | `option_liquidity@v1` | `liq_status`, put/call tiers, target expiry + DTE, short strike, spreads, zone OI / volume, chain OI / volume, `underlying_price`, `iv30`, `stock_volume`, `chain_asof` (date) | the session's `chains/status` (required), `chains/option_quotes`, `chains/underlying_quotes` | built |
 | `price_stats@v1` | `close`, `sma_20/50/200`, `ret_20d/60d`, `high_52w`, `low_52w`, `pct_from_high_52w`, `pct_from_low_52w`, `hv20`, `hv30` (close-to-close), `hv20_yz` (Yang-Zhang), `adv_usd_20d`, `history_days` | `bars/1d` split-adjusted as of the session (not total return), 252 sessions back | built |

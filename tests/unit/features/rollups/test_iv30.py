@@ -12,7 +12,7 @@ import pytest
 
 from algotrade.features.framework.runner import compute_in_memory, compute_one
 from algotrade.features.rollups import iv30
-from algotrade.features.rollups.iv30 import ROLLUP, Iv30Params, choose_expiries
+from algotrade.features.rollups.iv30 import GROUP, Iv30Params, choose_expiries
 from algotrade.quant.implied_vol import interpolate_total_variance
 from tests.helpers.rollup_store import END, chain_rows, store, write_chains, write_curve
 
@@ -145,8 +145,8 @@ def test_through_the_framework_with_stored_inputs() -> None:
     writer, reader = store()
     rows = chain_rows("EQ:A", END, 100.0, {NEAR: 0.25, FAR: 0.25}, 0.05)
     write_chains(writer, END, rows, {"EQ:A": 100.0})
-    assert compute_one(reader, ROLLUP, END).no_input == f"no rates/treasury for {END}"
+    assert compute_one(reader, GROUP, END).no_input == f"no rates/treasury for {END}"
     write_curve(writer, END, 0.05)
-    out = compute_in_memory(reader, [ROLLUP], [END])[ROLLUP.key][0].frame
+    out = compute_in_memory(reader, [GROUP], [END])[GROUP.key][0].frame
     assert out is not None and out["iv30"].iloc[0] == pytest.approx(0.25, abs=1e-6)
     assert pd.isna(out["div_yield"].iloc[0])  # no dividends@v1 stored: q = 0

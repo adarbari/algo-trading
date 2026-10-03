@@ -27,7 +27,8 @@ from datetime import date, timedelta
 import numpy as np
 import pandas as pd
 
-from algotrade.features.framework.declaration import Input, Inputs, Rollup
+from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
+from algotrade.features.framework.feature import Feature
 
 NAME = "dividends"
 VERSION = 1
@@ -37,12 +38,36 @@ PRICE_STATS = "rollups/instrument/price_stats@v1"
 WINDOW_DAYS = 365
 LOOKBACK = 260  # sessions of events loaded: more than 365 calendar days
 
-COLUMNS: dict[str, str] = {
-    "div_ttm": "float",
-    "div_yield": "float",
-    "div_count_ttm": "int",
-    "last_ex_date": "date",
-}
+_UNKNOWN = (
+    "no dividend in the window and fewer than min_history_days (240) bars among the last 252 "
+    "sessions (too new, or bars do not cover the window, to call it a non-payer)"
+)
+_DIVS = ("events/dividend.cash_amount", "events/dividend.ts", "events/split.ratio")
+
+FEATURES = (
+    Feature(
+        "div_ttm", "float", "usd_per_share",
+        "Cash dividends with ex-date in the last 365 days, split-adjusted to the session's "
+        "share terms (specials excluded); 0 for a known non-payer",
+        _UNKNOWN, valid_range=(0, None), inputs=_DIVS,
+    ),
+    Feature(
+        "div_yield", "float", "decimal",
+        "Trailing dividend yield: div_ttm / close; the continuous q in option pricing",
+        f"{_UNKNOWN}; or the close is not positive", "expression", valid_range=(0, 1),
+        inputs=("dividends.div_ttm@v1", "price_stats.close@v1"),
+    ),
+    Feature(
+        "div_count_ttm", "int", "count", "Ex-dates in the last 365 days",
+        _UNKNOWN, valid_range=(0, None), inputs=("events/dividend.ts",),
+    ),
+    Feature(
+        "last_ex_date", "date", "date", "The latest ex-date in the last 365 days",
+        "no ex-date in the window (a non-payer, or unknown as for div_ttm)",
+        inputs=("events/dividend.ts",),
+    ),
+)  # fmt: skip
+COLUMNS = column_types(FEATURES)
 
 
 @dataclass(frozen=True)
@@ -118,7 +143,7 @@ def compute(inputs: Inputs, session: date, p: DividendParams) -> pd.DataFrame:
     return out[["instrument_id", *COLUMNS]].reset_index(drop=True)
 
 
-ROLLUP = Rollup(
+GROUP = FeatureGroup(
     NAME,
     VERSION,
     "Trailing-12-month cash dividends (split-adjusted to the session) and dividend yield",
@@ -127,7 +152,7 @@ ROLLUP = Rollup(
         Input(DIVIDENDS, lookback=LOOKBACK, required=False),
         Input(SPLITS, lookback=LOOKBACK, required=False),
     ),
-    COLUMNS,
+    FEATURES,
     compute,
     DividendParams(),
 )

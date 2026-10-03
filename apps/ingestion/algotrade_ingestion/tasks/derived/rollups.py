@@ -23,10 +23,10 @@ from functools import partial
 from typing import Any
 
 from algotrade.core.time.calendar import sessions_between
-from algotrade.features.framework.declaration import Rollup
+from algotrade.features.framework.declaration import FeatureGroup
 from algotrade.features.framework.graph import dependents
 from algotrade.features.framework.runner import by_key, compute_sessions, rollup_params
-from algotrade.features.registry import ROLLUPS
+from algotrade.features.registry import GROUPS
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import (
     FAILURES,
@@ -37,11 +37,13 @@ from algotrade_ingestion.tasks.framework.run import (
 
 TASK = "rollups"
 SOURCE = "rollups"
-TABLES = tuple(r.table for r in ROLLUPS.values())
+TABLES = tuple(r.table for r in GROUPS.values())
 SHOWN = 5  # no-input sessions listed per rollup in the run stats
 
 
-def _one(run: IngestRun, rollup: Rollup, sessions: Sequence[date], params: Any, named: bool) -> str:
+def _one(
+    run: IngestRun, rollup: FeatureGroup, sessions: Sequence[date], params: Any, named: bool
+) -> str:
     started = time.monotonic()
     rows, written, no_input = 0, 0, []
     for result in compute_sessions(run.reader, rollup, sessions, params):
@@ -75,8 +77,8 @@ def compute_rollups(
     sessions = sessions_between(start, end or session) if start else [session]
     if not sessions:
         raise ValueError(f"no exchange session in {start}..{end or session}")
-    rollups = by_key(ROLLUPS, only)
-    params = rollup_params(ctx.configs, list(ROLLUPS.values()))  # validates the whole file
+    rollups = by_key(GROUPS, only)
+    params = rollup_params(ctx.configs, list(GROUPS.values()))  # validates the whole file
     with IngestRun(ctx, TASK, sessions[-1]) as run:
         run.stats["range"] = [sessions[0].isoformat(), sessions[-1].isoformat(), len(sessions)]
         blocked: dict[str, str] = {}

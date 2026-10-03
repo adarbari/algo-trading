@@ -8,6 +8,7 @@ import pandas as pd
 
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.data import StoreReader
+from algotrade.features.framework.feature import Feature
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import stamped
@@ -182,3 +183,8 @@ def write_chains(
         for iid, price in spots.items()
     ]
     writer.write_table("chains/underlying_quotes", session, run, stamped(quotes, session, run))
+
+
+def features(columns: Mapping[str, str]) -> tuple[Feature, ...]:
+    """Placeholder feature declarations for test groups: ``{"col": "float"}``."""
+    return tuple(Feature(c, t, "text", f"test {c}", "test") for c, t in columns.items())

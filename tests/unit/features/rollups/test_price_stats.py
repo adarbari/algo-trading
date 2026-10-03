@@ -14,7 +14,7 @@ from algotrade.features.rollups import price_stats as ps
 from tests.helpers.rollup_store import END, series, store, write_bars, write_split
 
 P = ps.PriceStatsParams()
-ROLLUP = ps.ROLLUP
+GROUP = ps.GROUP
 
 
 def row(frame: pd.DataFrame | None, iid: str) -> dict[str, object]:
@@ -27,7 +27,7 @@ def test_full_history_by_hand() -> None:
     c = series(260)
     volume = np.linspace(1000, 2000, 260)
     write_bars(writer, {"EQ:A": c}, volume={"EQ:A": volume})
-    out = row(compute_one(reader, ROLLUP, END).frame, "EQ:A")
+    out = row(compute_one(reader, GROUP, END).frame, "EQ:A")
     assert out["close"] == pytest.approx(c[-1])
     for n in (20, 50, 200):
         assert out[f"sma_{n}"] == pytest.approx(c[-n:].mean(), rel=1e-12)
@@ -54,7 +54,7 @@ def test_missing_history_and_gaps_are_null_not_zero() -> None:
         {"EQ:NEW": series(30, seed=2), "EQ:GAP": series(260, seed=3)},
         skip={"EQ:GAP": [250]},  # no bar 10 sessions before the end
     )
-    frame = compute_one(reader, ROLLUP, END).frame
+    frame = compute_one(reader, GROUP, END).frame
     new, gap = row(frame, "EQ:NEW"), row(frame, "EQ:GAP")
     assert new["history_days"] == 30 and new["sma_20"] > 0 and new["hv20"] > 0
     for column in ("sma_50", "sma_200", "ret_60d", "hv30", "high_52w", "pct_from_low_52w"):
@@ -66,7 +66,7 @@ def test_missing_history_and_gaps_are_null_not_zero() -> None:
 def test_only_instruments_with_a_bar_on_the_session() -> None:
     writer, reader = store()
     write_bars(writer, {"EQ:A": series(40), "EQ:B": series(40, seed=5)}, skip={"EQ:B": [39]})
-    frame = compute_one(reader, ROLLUP, END).frame
+    frame = compute_one(reader, GROUP, END).frame
     assert frame is not None and list(frame["instrument_id"]) == ["EQ:A"]
 
 
@@ -91,7 +91,7 @@ def test_split_adjusted_as_of_each_session() -> None:
         opens={"EQ:P": opens, "EQ:S": split_opens},
     )
     write_split(writer, "EQ:S", days[-5], 2.0, stored=END)
-    results = list(compute_sessions(reader, ROLLUP, days[-8:]))
+    results = list(compute_sessions(reader, GROUP, days[-8:]))
     before, after = results[0].frame, results[-1].frame
     assert row(before, "EQ:S") == row(before, "EQ:P")
     plain, split = row(after, "EQ:P"), row(after, "EQ:S")
@@ -106,7 +106,7 @@ def test_params_shorten_the_year_and_validate() -> None:
     writer, reader = store()
     write_bars(writer, {"EQ:A": series(60)})
     short = replace(P, year_sessions=50, min_year_sessions=50)
-    out = row(compute_one(reader, ROLLUP, END, short).frame, "EQ:A")
+    out = row(compute_one(reader, GROUP, END, short).frame, "EQ:A")
     assert out["history_days"] == 50 and out["high_52w"] > 0
     assert ps.lookback(short) == 199  # sma_200 is still the longest window
     with pytest.raises(ValueError, match="year_sessions"):
@@ -119,14 +119,14 @@ def test_params_shorten_the_year_and_validate() -> None:
 
 def test_no_bars_for_the_session_is_no_input() -> None:
     _, reader = store()
-    result = compute_one(reader, ROLLUP, END)
+    result = compute_one(reader, GROUP, END)
     assert result.frame is None and result.no_input == f"no bars/1d for {END}"
 
 
 def test_columns_are_typed_as_declared() -> None:
     writer, reader = store()
     write_bars(writer, {"EQ:A": series(30)})
-    frame = compute_one(reader, ROLLUP, END).frame
+    frame = compute_one(reader, GROUP, END).frame
     assert frame is not None
     assert list(frame.columns) == ["instrument_id", *ps.COLUMNS]
     assert str(frame["history_days"].dtype) == "int64[pyarrow]"

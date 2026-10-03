@@ -6,7 +6,7 @@ GOLDEN_URL ?= file://datasets/golden/store
 
 
 .PHONY: install lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update filelen unit property integration e2e test \
-        evaluate baseline datasets-verify datasets-build golden-store check nightly
+        evaluate baseline datasets-verify datasets-build golden-store check nightly features-doc
 
 UV ?= uv
 
@@ -46,6 +46,9 @@ dupes:           ## no new copy-pasted code in src/ and apps/ (pylint duplicate-
 
 dupes-update:    ## after removing duplicates: lower architecture/dupes_baseline.txt
 	$(PY) scripts/check_dupes.py --update
+
+features-doc:    ## regenerate the feature catalogue docs/data/features.md from the registry
+	$(PY) scripts/features_doc.py
 
 filelen:         ## no file over 1000 lines
 	$(PY) scripts/check_file_length.py

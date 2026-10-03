@@ -11,6 +11,8 @@ the domain rules on top:
 - ``rates``      the Treasury curve a date sees (risk-free rates for option pricing)
 - ``rollups``    stored rollup rows over a range of sessions (a rollup reading another)
 - ``shares``     share counts from SEC company facts, point in time by filing date
+- ``feature_inputs``  what a feature group reads, by table name (``load_input``): each
+                 table's point-in-time read for features, from the owners above
 
 ``StoreReader`` is re-exported here because consumers hold one and hand it to these
 functions; they never import ``algotrade.storage.tables.readers`` (import-linter contract R1).

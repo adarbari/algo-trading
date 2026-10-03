@@ -22,6 +22,10 @@ without writing an ADR. Read in this order:
   `storage/backends/` builds a path. (ADR 0006)
 - **Point-in-time**: rows carry `ts`, `session_date`, `knowledge_ts`, `source`,
   `run_id`. Features are `name@version`, precomputed nightly. (ADR 0007)
+- **Feature store**: every stored feature column is a declared `Feature` (kind, dtype, unit,
+  description, null meaning, range) in a `FeatureGroup`; the catalogue `docs/data/features.md`
+  is generated (`make features-doc`). Features ask `data.feature_inputs` for inputs by table
+  name. (ADR 0023)
 - **Backtests only read stores.** They never fetch; missing data is an error. (ADR 0008)
 - **Generic instruments** keyed by `instrument_id` with `multiplier`, `parent_id` and
   `calendar`, so futures and options fit without redesign. (ADR 0009)
@@ -56,6 +60,8 @@ only shrinks (`make dupes-update`).
 | Responsibility | Owner |
 |---|---|
 | Which snapshot a read sees (on or before D, else earliest + `pre_snapshot`); domain reads of market data | `algotrade/data/` (`reference`, `prices`, `events`, `chains`, `rates`: the Treasury curve a date sees; `rollups`: stored rollup rows; `shares`: share counts by filing date); consumers never import `storage.tables.readers` |
+| What a feature group reads (each input table's point-in-time read, by table name; other groups' rows) | `data/feature_inputs.py` (`load_input`; each read lives in its `data` owner); `features/` never imports storage or a domain reader |
+| Computing feature groups (rollups); feature definitions + the feature catalogue | `features/framework/` (`FeatureGroup`, `Feature`, runner), `features/rollups/<group>.py` (`FEATURES` + pure compute), `features/registry.py` (`GROUPS`, `FEATURES`, `feature(name)`), `features/catalogue.py` → `docs/data/features.md`; stored only by `tasks/derived/rollups.py` |
 | Option prices + Greeks; implied vol (NaN + status code); realised vol; rate conventions (par → continuous, curve) | `algotrade/quant/` (`black_scholes`, `implied_vol`, `realized_vol`, `rates`): pure numpy, conventions in ADR 0021 |
 | Run ids, run records, COMPLETE / PARTIAL | `storage/runs.py` (`start_run` + `RunRecord.finish` in services), `services/jobs/`; in ingestion `tasks/framework/run.py` (`IngestRun`): never write the loop in a task |
 | Raw save; stamping; ticker → id in ingestion | `tasks/framework/run.py` (`IngestRun`) |
@@ -93,7 +99,8 @@ source (`tests/unit/<path>` = `src/algotrade/<path>`, `tests/apps/ingestion/<pat
 | HTTP, pacing, source protocols | `apps/ingestion/.../sources/framework/` |
 | Ingestion task | `apps/ingestion/.../tasks/<domain>/` (`reference`, `market`, `derived`, `maintenance`) + `tasks/framework/registry.py` |
 | Nightly step / ordering | `apps/ingestion/.../workflows/nightly/` |
-| Rollup (derived feature) | `src/algotrade/features/rollups/` (framework: `features/framework/`) |
+| Feature (a documented column) in a feature group (rollup) | `src/algotrade/features/rollups/<group>.py` (`FEATURES` + pure compute; framework: `features/framework/`; then `make features-doc`) |
+| What a feature group reads from a table (feature input) | `src/algotrade/data/feature_inputs.py` (`INPUTS`) + the table's read in its `data/` owner |
 | Trading strategy / screener | `src/algotrade/strategies/trading/` / `strategies/screeners/` |
 | Numeric model (pricing, vol, rates) | `src/algotrade/quant/` |
 | Domain read of market data | `src/algotrade/data/` |
@@ -154,7 +161,7 @@ docstring, and mirror it in tests. Never park code in a neighbouring folder
 | New responsibility, or moving one between modules | `.claude/skills/add-responsibility` |
 | A decision that changes architecture | `.claude/skills/write-adr` |
 
-Commands (need `uv`): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make layout`, `make evaluate`, `make baseline`.
+Commands (need `uv`): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make layout`, `make evaluate`, `make baseline`, `make features-doc`.
 Ingestion: `algotrade-ingest universe|universe-build|company-details|shares|earnings|bars|rates|corporate-actions|chains|rollups|screen|nightly|report|quality|schedule|purge-raw|migrate-ids|golden`, or `algotrade-ingest run <task>` for any registry task (see `README.md`).
 Configs: site presets in `config/site/` (reviewed via PR); user configs in `config/users/<id>/`
 (git-ignored). Check one with `algotrade-backtest [--user U] config validate|show <id>`.
