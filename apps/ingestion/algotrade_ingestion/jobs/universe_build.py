@@ -22,7 +22,7 @@ from typing import Any
 import pandas as pd
 
 from algotrade.core.instruments import AssetClass
-from algotrade.storage.readers import StoreReader
+from algotrade.data import StoreReader
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.classify import (

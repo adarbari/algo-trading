@@ -8,7 +8,9 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime
 
-from algotrade.storage.readers import StoreReader
+from algotrade.data import StoreReader
+from algotrade.data.chains import chain_status
+from algotrade.data.reference import snapshot
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.settings import SourcesSettings
@@ -30,13 +32,19 @@ def _rows(reader: StoreReader, table: str, day: date | None) -> int | None:
     return None if frame is None else len(frame)
 
 
+def _latest(reader: StoreReader, table: str, session: date) -> date | None:
+    """The partition a read for ``session`` sees; ``None`` if every one is after it."""
+    snap = snapshot(reader, table, session)
+    return None if snap is None or snap.pre_snapshot else snap.snapshot_date
+
+
 def _previous(reader: StoreReader, table: str, session: date) -> date | None:
     dates = [d for d in reader.dates(table) if d < session]
     return dates[-1] if dates else None
 
 
 def check_bars(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:
-    latest = reader.latest_date("bars/1d", session)
+    latest = _latest(reader, "bars/1d", session)
     if latest is None:
         return [Check("bars_present", "WARN", "no bars stored yet (backfill not run)")]
     checks = [
@@ -64,7 +72,7 @@ def check_bars(reader: StoreReader, session: date, s: SourcesSettings) -> list[C
 
 
 def check_universe(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:
-    latest = reader.latest_date("universe", session)
+    latest = _latest(reader, "universe", session)
     if latest is None:
         return [Check("universe_present", "FAIL", "no universe snapshot")]
     today, before = (
@@ -88,7 +96,7 @@ def check_universe(reader: StoreReader, session: date, s: SourcesSettings) -> li
 
 
 def check_chains(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:
-    status_frame = reader.table("chains/status", session)
+    status_frame = chain_status(reader, session)
     if status_frame is None or status_frame.empty:
         return [Check("chains_present", "WARN", f"no option chains for {session}")]
     ok = status_frame["status"].isin(["OK", "NO_STANDARD_SERIES"]).mean()
@@ -103,7 +111,7 @@ def check_chains(reader: StoreReader, session: date, s: SourcesSettings) -> list
 
 
 def check_earnings(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:
-    rows = _rows(reader, "events/earnings", reader.latest_date("events/earnings", session))
+    rows = _rows(reader, "events/earnings", _latest(reader, "events/earnings", session))
     if not rows:
         return [Check("earnings_present", "WARN", "no earnings calendar stored")]
     return [Check("earnings_present", "PASS", f"{rows} upcoming earnings rows")]

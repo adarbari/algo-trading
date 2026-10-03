@@ -26,7 +26,7 @@ without writing an ADR. Read in this order:
 - **Generic instruments** keyed by `instrument_id` with `multiplier`, `parent_id` and
   `calendar`, so futures and options fit without redesign. (ADR 0009)
 - **FIGI ids**: equities/ETFs are `EQ:<composite FIGI>` (symbol id without one). Turn a
-  ticker into an id only through `SymbolResolver` (`StoreReader.resolver(date)`); never
+  ticker into an id only through `SymbolResolver` (`data.reference.resolver(reader, date)`); never
   build `EQ:` strings. (ADR 0018)
 - **Long-running work is a job** via `services/jobs` (backtests, screens, nightly; the UI and
   on-request pulls later). (ADR 0010)
@@ -53,7 +53,7 @@ add to them; when you fix a violation, lower them (`make ownership-update`, `mak
 
 | Responsibility | Owner today → target (roadmap track R) |
 |---|---|
-| Latest snapshot on or before D; domain reads of market data | `storage/readers.py` → `algotrade/data/` |
+| Which snapshot a read sees (on or before D, else earliest + `pre_snapshot`); domain reads of market data | `algotrade/data/` (`reference`, `prices`, `events`, `chains`); consumers never import `storage.readers` |
 | Run ids, run records, COMPLETE / PARTIAL; raw save; stamping; ticker → id in ingestion | `storage/runs.py`, `jobs/common.py` → `tasks/framework.py` (`IngestRun`) |
 | Which ingestion steps run, with which defaults | `pipeline.py` → task registry + `workflows/` |
 | Vendor HTTP, retries, rate limiting; building sources; vendor specifics | `sources/http.py`, `sources/` → + `sources/registry.py`, shared limiter |

@@ -118,7 +118,7 @@ Decision record: [ADR 0018](../adr/0018-figi-instrument-ids.md).
   delisted. Build stats: `identifiers.ids_by_figi`, `ids_by_symbol`, `ids_carried`,
   `ids_upgraded`, `figi_conflicts` (two listings with one FIGI: the holder keeps it).
 - **One resolver.** `SymbolResolver` maps symbol → id from the reference snapshot on or before
-  a date (`StoreReader.resolver(D)`; before the first snapshot, the earliest one). Active rows
+  a date (`data.reference.resolver(reader, D)`; before the first snapshot, the earliest one). Active rows
   win a reused ticker. Vendor adapters (Massive bars/splits/dividends, Nasdaq earnings) emit
   `symbol`; jobs resolve ids and count `unresolved` symbols, which keep symbol ids. CLI flags
   (`chains --symbols`), `universe.toml` include/exclude lists and exports stay symbol-based.

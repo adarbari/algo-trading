@@ -9,15 +9,15 @@ import pandas as pd
 
 from algotrade.config.resolve import ResolvedConfig
 from algotrade.core.errors import ConfigurationError
+from algotrade.data import StoreReader
+from algotrade.data.prices import load_price_data
 from algotrade.engines.backtest.config import BacktestConfig
 from algotrade.engines.backtest.costs import CostModel
 from algotrade.engines.backtest.engine import run_backtest
 from algotrade.engines.backtest.limits import RiskLimits
 from algotrade.engines.backtest.result import BacktestResult
 from algotrade.engines.selection.evaluate import SelectionResult
-from algotrade.services.market_data import load_price_data
 from algotrade.services.selection import select
-from algotrade.storage.readers import StoreReader
 from algotrade.storage.result_writer import ResultWriter
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
 from algotrade.strategies.trading.registry import create_strategy
@@ -44,7 +44,19 @@ class BacktestOutcome:
     selection: SelectionResult
     result: BacktestResult
     versions: dict[str, list[str]]
+    as_of: datetime  # data version pin: stored data as known at launch (ADR 0007)
+    reference_snapshot: date  # the instruments/reference snapshot used for ``start``
+    survivorship_bias: bool  # ``start`` is before the first reference snapshot
     run_id: str | None = None  # set when results were saved
+
+    def data_stats(self) -> dict[str, Any]:
+        """What a run must record to be reproduced: the version pin and the data read."""
+        return {
+            "as_of": self.as_of.isoformat(),
+            "data_versions": self.versions,
+            "reference_snapshot": self.reference_snapshot.isoformat(),
+            "survivorship_bias": self.survivorship_bias,
+        }
 
 
 def _result_frames(
@@ -97,7 +109,11 @@ def run_configured_backtest(
     writer: ResultWriter | None = None,
     now: datetime | None = None,
 ) -> BacktestOutcome:
-    """Selection is evaluated as of ``start`` (no survivorship from today's universe).
+    """Selection is evaluated on ``start`` (no survivorship from today's universe, unless
+    ``start`` is before the first reference snapshot: then ``survivorship_bias`` is set).
+
+    Data is read as stored at launch: ``as_of = now`` pins the version (ADR 0007), so a
+    rerun with the same ``now`` reads the same rows even after later ingestion runs.
 
     With a ``writer``, the equity curve and fills are saved as ``results/backtest_equity`` and
     ``results/backtest_fills`` (partitioned by ``end``), and a run record stores the metrics,
@@ -107,17 +123,27 @@ def run_configured_backtest(
         raise ConfigurationError(f"{config.config.id} is a {config.config.kind}, not a strategy")
     if config.selection is None:
         raise ConfigurationError(f"{config.config.id}: a backtest needs a selection")
-    selected = select(reader, config.selection, start)
+    now = now or datetime.now(UTC)
+    selected = select(reader, config.selection, start, as_of=now)
     if selected.empty:
         raise ConfigurationError(f"{config.config.id}: selection matched no instruments on {start}")
     adjustment = str(config.settings["backtest"].get("price_adjustment", "splits"))
-    data = load_price_data(reader, selected.instruments, start, end, adjustment=adjustment)
+    data = load_price_data(
+        reader, selected.instruments, start, end, as_of=now, adjustment=adjustment
+    )
     strategy = create_strategy(config.config.impl, **dict(config.config.params))
     result = run_backtest(data.series, strategy, backtest_settings(config.settings), data.terms)
-    outcome = BacktestOutcome(config, selected, result, data.versions)
+    outcome = BacktestOutcome(
+        config,
+        selected,
+        result,
+        data.versions,
+        now,
+        data.reference.snapshot_date,
+        data.reference.pre_snapshot,
+    )
     if writer is None:
         return outcome
-    now = now or datetime.now(UTC)
     user = config.user.user_id
     job = f"backtest-{config.config.id}-{user}"
     run_id = new_run_id(job, end, now)
@@ -133,7 +159,7 @@ def run_configured_backtest(
         "end": end.isoformat(),
         "selection": selected.as_dict(),
         "metrics": result.metrics.as_dict(),
-        "data_versions": data.versions,
+        **outcome.data_stats(),
     }
     writer.save_run(RunRecord(run_id, job, end, now, RunStatus.COMPLETE, now, stats=stats))
     return replace(outcome, run_id=run_id)

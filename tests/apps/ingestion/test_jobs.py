@@ -1,9 +1,9 @@
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
+from algotrade.data import StoreReader
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.readers import StoreReader
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.features import TABLE, compute_option_liquidity

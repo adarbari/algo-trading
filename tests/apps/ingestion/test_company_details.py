@@ -6,8 +6,9 @@ import pandas as pd
 import pytest
 
 from algotrade.core.errors import MissingDataError
+from algotrade.data import StoreReader
+from algotrade.data.reference import instrument_view
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.readers import StoreReader
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.company_details import (
@@ -192,12 +193,13 @@ def test_instrument_view_exposes_company_fields() -> None:
     writer, reader = store()
     nxt = DAY + timedelta(days=1)
     ingest_company_details(writer, reader, sources(FakeSec()), nxt, clock=CLOCK)
-    view = reader.instrument_view(
-        nxt + timedelta(days=3), ["instrument.symbol", "instrument.sector"]
+    view = instrument_view(
+        reader, nxt + timedelta(days=3), ["instrument.symbol", "instrument.sector"]
     )
     assert view.missing == ()
     sectors = view.frame.set_index("instrument_id")["instrument.sector"]
     assert sectors["EQ:AAPL"] == "Technology"
     assert pd.isna(sectors["EQ:SPY"])  # no submissions: UNKNOWN to selections
-    before = reader.instrument_view(DAY, ["instrument.sector"])
-    assert before.missing == ("instruments/company",)
+    before = instrument_view(reader, DAY, ["instrument.sector"])
+    assert before.missing == ()  # before the first company snapshot: the earliest (one rule)
+    assert before.frame.set_index("instrument_id")["instrument.sector"]["EQ:AAPL"] == "Technology"

@@ -4,9 +4,9 @@ import pandas as pd
 import pytest
 
 from algotrade.core.errors import ConfigurationError
-from algotrade.services.market_data import adjust_bars, load_price_data
+from algotrade.data import StoreReader
+from algotrade.data.prices import adjust_bars, load_price_data
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.readers import StoreReader
 from algotrade.storage.writers import StoreWriter
 from tests.storage_helpers import stamped
 
@@ -89,3 +89,33 @@ def test_load_price_data_applies_stored_events_and_records_versions() -> None:
         StoreReader(backend), ["EQ:A"], DAYS[0], DAYS[2], adjustment="none"
     )
     assert raw_prices.series["EQ:A"].close.tolist() == [100, 100, 50]
+
+
+def test_split_backfilled_into_a_later_partition_adjusts_an_earlier_backtest() -> None:
+    """Regression: corporate actions backfilled today (partition 2026-10-02) must adjust a
+    backtest that ends before that date; they used to be filtered out by partition date."""
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    raw = bars([100, 100, 50])
+    for day in DAYS:
+        part = raw[raw["ts"].dt.date == day]
+        writer.write_table(
+            "bars/1d", day, f"b{day.day}", stamped(part.to_dict("records"), day, f"b{day.day}")
+        )
+    ref = [
+        {
+            "instrument_id": "EQ:A",
+            "symbol": "A",
+            "asset_class": "EQ",
+            "security_type": "COMMON_STOCK",
+            "multiplier": 1.0,
+            "status": "ACTIVE",
+        }
+    ]
+    writer.write_table("instruments/reference", DAYS[0], "ref", stamped(ref, DAYS[0], "ref"))
+    backfill = date(2026, 10, 2)
+    split = [{"instrument_id": "EQ:A", "ts": pd.Timestamp(DAYS[2], tz="UTC"), "ratio": 2.0}]
+    writer.write_table("events/split", backfill, "ca", stamped(split, backfill, "ca"))
+    data = load_price_data(StoreReader(backend), ["EQ:A"], DAYS[0], DAYS[2])
+    assert data.series["EQ:A"].close.tolist() == [50, 50, 50]
+    assert data.versions["events/split"] == ["ca"]

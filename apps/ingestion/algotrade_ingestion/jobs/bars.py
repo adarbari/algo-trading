@@ -14,8 +14,11 @@ reference does not know keep symbol ids and are counted as ``unresolved``.
 from collections.abc import Callable, Sequence
 from datetime import UTC, date, datetime, timedelta
 
-from algotrade.storage.readers import StoreReader
-from algotrade.storage.resolver import SymbolResolver
+from algotrade.core.fields import REFERENCE_TABLE
+from algotrade.data import StoreReader
+from algotrade.data.reference import resolver as reference_resolver
+from algotrade.data.reference import snapshot
+from algotrade.data.resolver import SymbolResolver
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.common import stamp, with_ids
@@ -80,10 +83,11 @@ def ingest_daily_bars(
             run.items[day.isoformat()] = "STORED"
             continue
         try:
-            snapshot = reader.reference_snapshot(day)
-            if snapshot not in resolvers:
-                resolvers[snapshot] = reader.resolver(day)
-            resolver = resolvers[snapshot]
+            snap = snapshot(reader, REFERENCE_TABLE, day)
+            key = snap.snapshot_date if snap else None
+            if key not in resolvers:
+                resolvers[key] = reference_resolver(reader, day)
+            resolver = resolvers[key]
             run.items[day.isoformat()] = _one_session(writer, source, day, run, clock, resolver)
         except Exception as exc:
             run.items[day.isoformat()] = f"FETCH_ERROR: {exc}"
@@ -111,7 +115,7 @@ def ingest_corporate_actions(
     run_id = new_run_id("corporate_actions", session, now)
     stats: dict[str, object] = {"window": [start.isoformat(), end.isoformat()]}
     failed = []
-    resolver = reader.resolver(session)
+    resolver = reference_resolver(reader, session)
     unresolved = 0
     for kind in ("splits", "dividends"):
         request = FetchRequest(

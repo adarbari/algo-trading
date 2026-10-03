@@ -4,7 +4,7 @@ from datetime import date, datetime
 
 import pandas as pd
 
-from algotrade.storage.resolver import SymbolResolver
+from algotrade.data.resolver import SymbolResolver
 
 
 def stamp(

@@ -5,9 +5,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from algotrade.data import StoreReader
 from algotrade.storage.backends.config_files import MemoryConfigStore
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.readers import StoreReader
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.quality import run_quality

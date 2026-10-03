@@ -24,19 +24,16 @@ doc = "docs/adr/0019-ownership-and-boundaries.md"
 
 [[responsibility]]
 id = "snapshot-selection"
-description = "Pick the snapshot a reader sees: the latest partition on or before a date, with one fallback rule"
-owner = ["src/algotrade/storage/readers.py"]
-target_owner = ["src/algotrade/data/reference.py"]
-target_pr = 2
+description = "Pick the snapshot a reader sees: the latest partition on or before a date, else the earliest (pre_snapshot)"
+owner = ["src/algotrade/data/reference.py"]
 section = "docs/adr/0019-ownership-and-boundaries.md#r1-only-data-reads-market-data"
 detect = [{ call = "latest_date" }]
 
 [[responsibility]]
 id = "market-data-reads"
 description = "Domain reads of market data (reference, InstrumentView, universe, bars + adjustments, events, chains) for consumers"
-owner = ["src/algotrade/storage/*"]
-target_owner = ["src/algotrade/data/*"]
-target_pr = 2
+owner = ["src/algotrade/data/*"]
+allowed = ["src/algotrade/storage/*"]  # the generic reader itself lives in storage
 section = "docs/adr/0019-ownership-and-boundaries.md#r1-only-data-reads-market-data"
 detect = [{ import = "algotrade.storage.readers" }]
 
@@ -74,11 +71,11 @@ id = "id-resolution"
 description = "Turn vendor tickers into instrument ids (ADR 0018); build EQ: ids only through the id rule"
 owner = [
     "src/algotrade/core/instruments.py",
-    "src/algotrade/storage/resolver.py",
+    "src/algotrade/data/resolver.py",
     "apps/ingestion/algotrade_ingestion/jobs/instrument_ids.py",
     "apps/ingestion/algotrade_ingestion/jobs/common.py",
 ]
-target_owner = ["src/algotrade/data/reference.py", "apps/ingestion/algotrade_ingestion/tasks/framework.py"]
+target_owner = ["apps/ingestion/algotrade_ingestion/tasks/framework.py"]
 target_pr = 3
 section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
 detect = [{ call = "with_ids" }, { call = "equity_id" }, { string_prefix = "EQ:" }]
@@ -314,18 +311,6 @@ target_owner = "apps/ingestion/algotrade_ingestion/tasks/golden.py"
 # --------------------------------------------------------------------------- pending contracts
 # Import-linter contracts that cannot hold until a restructure PR lands. Add each to
 # pyproject.toml in the PR named here (and delete it from this list).
-
-[[pending_contract]]
-name = "R1: only algotrade.data reads market data (consumers never import storage.readers)"
-source_modules = ["algotrade.services", "algotrade.engines", "algotrade_backtest", "algotrade_ingestion"]
-forbidden_modules = ["algotrade.storage.readers"]
-enabled_by_pr = 2
-
-[[pending_contract]]
-name = "R2: storage is generic (no domain read helpers: readers move to algotrade.data)"
-source_modules = ["algotrade.storage"]
-forbidden_modules = ["algotrade.core.fields", "algotrade.core.feature_view"]
-enabled_by_pr = 2
 
 [[pending_contract]]
 name = "R3: ingestion tasks never import vendor modules (sources come from the registry)"

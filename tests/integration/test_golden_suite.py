@@ -4,9 +4,10 @@ import math
 
 import pytest
 
+from algotrade.data import StoreReader
+from algotrade.data.reference import instrument_terms, snapshot
 from algotrade.engines.backtest.engine import run_backtest
 from algotrade.services.datasets import list_datasets, load_datasets
-from algotrade.storage.readers import StoreReader
 from algotrade.strategies.trading.registry import STRATEGIES, create_strategy
 from algotrade_ingestion.sources.synthetic.catalog import GOLDEN_DATASETS
 from algotrade_ingestion.sources.synthetic.files import GoldenFiles
@@ -23,7 +24,9 @@ def test_store_catalogue_matches_definitions(golden_reader: StoreReader) -> None
 
 
 def test_reference_data_loaded(golden_reader: StoreReader) -> None:
-    terms = golden_reader.instrument_terms(golden_reader.latest_date("instruments/reference"))  # type: ignore[arg-type]
+    snap = snapshot(golden_reader, "instruments/reference")
+    assert snap is not None and not snap.pre_snapshot
+    terms = instrument_terms(golden_reader, snap.snapshot_date)
     assert len(terms) == 11
     assert all(t.multiplier == 1.0 for t in terms.values())
 

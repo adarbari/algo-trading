@@ -13,7 +13,8 @@ from datetime import UTC, date, datetime, timedelta
 import numpy as np
 import pandas as pd
 
-from algotrade.storage.readers import StoreReader
+from algotrade.data import StoreReader
+from algotrade.data.reference import resolver
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.common import stamp, with_ids
@@ -55,7 +56,7 @@ def ingest_earnings(
     rows = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
     unresolved = 0
     if not rows.empty:
-        rows, unresolved = with_ids(rows, reader.resolver(session))
+        rows, unresolved = with_ids(rows, resolver(reader, session))
         rows = rows.drop_duplicates(subset=["instrument_id", "ts"], keep="last")
         rows = (
             rows.replace({np.nan: None}).sort_values(["ts", "instrument_id"]).reset_index(drop=True)

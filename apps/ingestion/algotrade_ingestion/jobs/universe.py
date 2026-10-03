@@ -17,8 +17,9 @@ import pandas as pd
 
 from algotrade.core.errors import DataValidationError
 from algotrade.core.instruments import AssetClass
-from algotrade.storage.readers import StoreReader
-from algotrade.storage.resolver import SymbolResolver
+from algotrade.data import StoreReader
+from algotrade.data.reference import resolver as reference_resolver
+from algotrade.data.resolver import SymbolResolver
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.common import stamp
@@ -119,7 +120,7 @@ def import_universe(
     snapshot: date,
     now: datetime,
 ) -> RunRecord:
-    resolver = reader.resolver(snapshot)
+    resolver = reference_resolver(reader, snapshot)
     rows = [r for spec in files for r in read_rows(spec, version, resolver)]
     frame = pd.DataFrame(rows)
     before = len(frame)

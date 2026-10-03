@@ -23,8 +23,9 @@ CSV import), so changing the scheme meant changing every one of them.
   writes `instruments/id_map` (`instrument_id` = new id, `old_id`, `new_id`, `symbol`,
   `effective`; cumulative, one full map per snapshot) and an `id_changed`
   `events/reference_change` row. The old id is not reported as a delisting.
-- **One resolver.** `SymbolResolver` (`storage/resolver.py`) maps symbol -> id from an
-  `instruments/reference` snapshot: `StoreReader.resolver(D)` uses the latest snapshot on
+- **One resolver.** `SymbolResolver` (`data/resolver.py`, moved from `storage/` in R2) maps
+  symbol -> id from an `instruments/reference` snapshot: `data.reference.resolver(reader, D)`
+  uses the latest snapshot on
   or before D, else the earliest one (backfills before the first snapshot; ids are identity,
   not market knowledge). Active rows win over delisted ones; unknown symbols fall back to
   symbol ids and are counted. Vendor adapters emit `symbol`; jobs resolve `instrument_id`.

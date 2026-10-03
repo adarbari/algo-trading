@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from algotrade.storage.resolver import SymbolResolver
+from algotrade.data.resolver import SymbolResolver
 
 
 def test_active_listing_wins_a_reused_ticker() -> None:

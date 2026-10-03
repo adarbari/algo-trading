@@ -39,101 +39,6 @@ file = "apps/ingestion/algotrade_ingestion/jobs/option_chains.py"
 count = 1
 
 [[violation]]
-responsibility = "market-data-reads"
-file = "apps/backtest/algotrade_backtest/commands.py"
-count = 1
-
-[[violation]]
-responsibility = "market-data-reads"
-file = "apps/ingestion/algotrade_ingestion/cli.py"
-count = 1
-
-[[violation]]
-responsibility = "market-data-reads"
-file = "apps/ingestion/algotrade_ingestion/commands.py"
-count = 1
-
-[[violation]]
-responsibility = "market-data-reads"
-file = "apps/ingestion/algotrade_ingestion/jobs/bars.py"
-count = 1
-
-[[violation]]
-responsibility = "market-data-reads"
-file = "apps/ingestion/algotrade_ingestion/jobs/company_details.py"
-count = 1
-
-[[violation]]
-responsibility = "market-data-reads"
-file = "apps/ingestion/algotrade_ingestion/jobs/earnings.py"
-count = 1
-
-[[violation]]
-responsibility = "market-data-reads"
-file = "apps/ingestion/algotrade_ingestion/jobs/features.py"
-count = 1
-
-[[violation]]
-responsibility = "market-data-reads"
-file = "apps/ingestion/algotrade_ingestion/jobs/migrate_ids.py"
-count = 1
-
-[[violation]]
-responsibility = "market-data-reads"
-file = "apps/ingestion/algotrade_ingestion/jobs/quality.py"
-count = 1
-
-[[violation]]
-responsibility = "market-data-reads"
-file = "apps/ingestion/algotrade_ingestion/jobs/universe.py"
-count = 1
-
-[[violation]]
-responsibility = "market-data-reads"
-file = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
-count = 1
-
-[[violation]]
-responsibility = "market-data-reads"
-file = "apps/ingestion/algotrade_ingestion/pipeline.py"
-count = 1
-
-[[violation]]
-responsibility = "market-data-reads"
-file = "src/algotrade/services/backtests.py"
-count = 1
-
-[[violation]]
-responsibility = "market-data-reads"
-file = "src/algotrade/services/datasets.py"
-count = 1
-
-[[violation]]
-responsibility = "market-data-reads"
-file = "src/algotrade/services/evaluation/suite.py"
-count = 1
-
-[[violation]]
-responsibility = "market-data-reads"
-file = "src/algotrade/services/market_data.py"
-count = 1
-
-[[violation]]
-responsibility = "market-data-reads"
-file = "src/algotrade/services/screening.py"
-count = 1
-
-[[violation]]
-responsibility = "market-data-reads"
-file = "src/algotrade/services/selection.py"
-count = 1
-
-[[violation]]
-responsibility = "market-data-reads"
-file = "src/algotrade/services/views.py"
-count = 1
-
-[[violation]]
 responsibility = "rate-limiting"
 file = "apps/ingestion/algotrade_ingestion/commands.py"
 count = 13
@@ -316,31 +221,6 @@ count = 1
 [[violation]]
 responsibility = "site-settings"
 file = "apps/ingestion/algotrade_ingestion/settings.py"
-count = 1
-
-[[violation]]
-responsibility = "snapshot-selection"
-file = "apps/ingestion/algotrade_ingestion/jobs/company_details.py"
-count = 1
-
-[[violation]]
-responsibility = "snapshot-selection"
-file = "apps/ingestion/algotrade_ingestion/jobs/migrate_ids.py"
-count = 1
-
-[[violation]]
-responsibility = "snapshot-selection"
-file = "apps/ingestion/algotrade_ingestion/jobs/quality.py"
-count = 3
-
-[[violation]]
-responsibility = "snapshot-selection"
-file = "src/algotrade/services/datasets.py"
-count = 2
-
-[[violation]]
-responsibility = "snapshot-selection"
-file = "src/algotrade/services/views.py"
 count = 1
 
 [[violation]]

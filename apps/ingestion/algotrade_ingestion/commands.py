@@ -12,10 +12,10 @@ import time
 from datetime import date, timedelta
 
 from algotrade.config.user import UserContext
+from algotrade.data import StoreReader
 from algotrade.services.jobs import JobRecord, JobStatus, LocalJobRunner
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.factory import open_config_store
-from algotrade.storage.readers import StoreReader
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.env import massive_key, sec_contact
 from algotrade_ingestion.jobs.bars import (

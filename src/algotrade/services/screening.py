@@ -7,10 +7,11 @@ import pandas as pd
 
 from algotrade.config.resolve import ResolvedConfig
 from algotrade.core.errors import ConfigurationError
+from algotrade.data import StoreReader
+from algotrade.data.reference import Universe, load_universe
 from algotrade.engines.screening.runner import RunCoverage, ScreenRun, run_screen
 from algotrade.services.selection import select
-from algotrade.services.views import Universe, feature_view, load_universe
-from algotrade.storage.readers import StoreReader
+from algotrade.services.views import feature_view
 from algotrade.storage.result_writer import ResultWriter
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
 from algotrade.strategies.screeners.registry import create_screener

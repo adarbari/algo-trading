@@ -48,7 +48,7 @@ def test_every_module_has_a_docstring() -> None:
 _ADHOC_ID = re.compile(r"""f?["']EQ:|AssetClass\.EQUITY\s*,|\bequity_id\(""")
 _ID_OWNERS = {
     "src/algotrade/core/instruments.py",
-    "src/algotrade/storage/resolver.py",
+    "src/algotrade/data/resolver.py",
     "apps/ingestion/algotrade_ingestion/jobs/instrument_ids.py",
 }
 

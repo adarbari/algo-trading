@@ -5,7 +5,7 @@
 - Options: ``OPT:<OCC symbol>`` (``OPT:SPY261231C00586000``).
 
 Every stored row is keyed by these ids, never by a raw ticker. Code that has a vendor ticker
-resolves it through ``storage.resolver.SymbolResolver``; only ``equity_id`` builds ``EQ:`` ids.
+resolves it through ``data.resolver.SymbolResolver``; only ``equity_id`` builds ``EQ:`` ids.
 """
 
 from collections.abc import Iterable

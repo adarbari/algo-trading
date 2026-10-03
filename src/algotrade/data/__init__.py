@@ -1,0 +1,18 @@
+"""The domain read API: the only way services, engines and apps read market data (ADR 0019 R1).
+
+Every function takes the generic ``StoreReader`` (partitions, ranges, run records) and adds
+the domain rules on top:
+
+- ``reference``  one snapshot rule (``snapshot``), instruments and contract terms,
+                 ``InstrumentView``, the universe and the ``SymbolResolver``
+- ``prices``     bars plus split / dividend adjustment
+- ``events``     event tables read by EVENT date (not by the partition they were stored in)
+- ``chains``     option quotes, underlying quotes and chain status
+
+``StoreReader`` is re-exported here because consumers hold one and hand it to these
+functions; they never import ``algotrade.storage.readers`` (import-linter contract R1).
+"""
+
+from algotrade.storage.readers import StoreReader
+
+__all__ = ["StoreReader"]

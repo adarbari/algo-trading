@@ -1,7 +1,7 @@
 from datetime import UTC, date, datetime
 
+from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.readers import StoreReader
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.earnings import ingest_earnings, weekdays

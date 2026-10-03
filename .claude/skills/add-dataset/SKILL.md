@@ -9,8 +9,9 @@ Read first: `docs/data/storage.md`, `docs/data/instruments.md`, ADRs 0006, 0007 
 
 **Ownership check (ADR 0019):** add a `[[table]]` entry with exactly **one** producing
 module to `architecture/ownership.toml` (a test enforces it). Reading it for consumers goes
-through the market-data read owner (`storage/readers.py` → `algotrade/data/`, R2), with the
-one snapshot rule; never add another `latest_date(` call site. Writing it goes through the
+through the market-data read owner (`algotrade/data/`: add a function to `reference`,
+`prices`, `events` or `chains`), with the one snapshot rule (`data.reference.snapshot`);
+never add another `latest_date(` call site. Writing it goes through the
 ingest loop owner (run records, raw save, stamping, id resolution), not a copy of it. New
 site settings for it are read by the settings owner and must drive code (a test checks).
 

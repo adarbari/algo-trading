@@ -27,9 +27,10 @@ from zoneinfo import ZoneInfo
 
 from algotrade.config.user import SITE_USER
 from algotrade.core.errors import AlgoTradeError
+from algotrade.data import StoreReader
+from algotrade.data.reference import resolver
 from algotrade.services.configs import default_user
 from algotrade.storage.factory import open_backend
-from algotrade.storage.readers import StoreReader
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.commands import (
     bars,
@@ -196,7 +197,7 @@ def _pipeline_command(
         underlyings = universe_underlyings(reader, session)
         if args.symbols:
             symbols = [s for s in args.symbols.split(",") if s.strip()]
-            wanted = set(reader.resolver(session).ids_for(symbols).values())
+            wanted = set(resolver(reader, session).ids_for(symbols).values())
             underlyings = [u for u in underlyings if u.instrument_id in wanted]
         run = ingest_option_chains(
             writer, cboe_source(), underlyings, session, ChainJobConfig(args.workers)

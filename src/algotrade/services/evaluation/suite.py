@@ -5,10 +5,10 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from algotrade.core.errors import AlgoTradeError
+from algotrade.data import StoreReader
 from algotrade.engines.backtest.config import BacktestConfig
 from algotrade.engines.backtest.engine import run_backtest
 from algotrade.services.datasets import load_datasets
-from algotrade.storage.readers import StoreReader
 from algotrade.strategies.trading.registry import STRATEGIES, create_strategy
 
 BENCHMARK = "buy_and_hold"
