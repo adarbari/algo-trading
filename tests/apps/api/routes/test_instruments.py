@@ -7,8 +7,11 @@ def test_detail_by_id_or_ticker(client: TestClient) -> None:
     assert by_id == by_ticker
     assert by_id["reference"]["symbol"] == "AAA"
     assert by_id["company"]["sector"] == "Technology"
-    assert by_id["features"]["rollup.price_stats@v1.close"] == 101.0
+    assert by_id["features"]["rollup.price_stats@v2.close"] == 101.0
     assert by_id["feature_sessions"]["iv30@v1"] == "2022-11-23"
+    assert by_id["features"]["feature.liquidity_class"] == "HIGH"
+    assert by_id["features"]["feature.option_tier"] == "A"
+    assert by_id["feature_sessions"]["expressions"] == "2022-11-23"
 
 
 def test_detail_without_company_and_unknown_instrument(client: TestClient) -> None:
@@ -44,13 +47,17 @@ def test_events_across_tables(client: TestClient) -> None:
 
 
 def test_feature_series(client: TestClient) -> None:
-    names = "rollup.price_stats@v1.close,rollup.price_stats@v1.hv20"
+    names = "rollup.price_stats@v2.close,rollup.price_stats@v2.hv20"
     body = client.get("/instruments/AAA/features", params={"names": names}).json()
     assert body["names"] == names.split(",")
     assert [i["session_date"] for i in body["items"]] == ["2022-11-22", "2022-11-23"]
-    assert body["items"][1]["rollup.price_stats@v1.close"] == 101.0
+    assert body["items"][1]["rollup.price_stats@v2.close"] == 101.0
     every = client.get("/instruments/AAA/features").json()
-    assert len(every["names"]) > 20
+    assert len(every["names"]) > 20 and "feature.liquidity_class" in every["names"]
+    label = client.get("/instruments/BBB/features", params={"names": "feature.liquidity_class"})
+    assert [i["feature.liquidity_class"] for i in label.json()["items"]] == ["UNKNOWN", "MEDIUM"]
+    ratio = client.get("/instruments/BBB/features", params={"names": "feature.iv_hv_ratio"})
+    assert [i["feature.iv_hv_ratio"] for i in ratio.json()["items"]] == [None, None]  # no IV
 
 
 def test_feature_series_rejects_unknown_or_reference_fields(client: TestClient) -> None:

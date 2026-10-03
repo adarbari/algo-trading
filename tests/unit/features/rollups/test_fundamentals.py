@@ -1,4 +1,4 @@
-"""``fundamentals@v1``: point in time by filing date, cover count vs weighted fallback,
+"""``fundamentals@v2``: point in time by filing date, cover count vs weighted fallback,
 amendments, splits after the count, statuses (OK / NO_SHARES / STALE / NO_PRICE), and the
 selectable catalogue fields."""
 
@@ -13,7 +13,10 @@ from algotrade.features.framework.runner import compute_in_memory
 from algotrade.features.registry import catalogue_columns
 from algotrade.features.rollups import price_stats
 from algotrade.features.rollups.fundamentals import GROUP, FundamentalsParams, choose
+from algotrade.features.site import site_features
+from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.tables.writers import StoreWriter
+from tests.conftest import REPO_ROOT
 from tests.helpers.rollup_store import END, series, store, write_bars, write_split
 from tests.helpers.stored_frames import stamped
 
@@ -68,14 +71,26 @@ def _rows(reader: object, sessions: list[date], params: FundamentalsParams | Non
     return {r.session: r.frame.set_index("instrument_id") for r in out[GROUP.key]}
 
 
+def _market_cap(reader: object) -> pd.Series:
+    """The ``market_cap`` expression feature over this session's computed groups."""
+    out = compute_in_memory(reader, [price_stats.GROUP, GROUP], [END])  # type: ignore[arg-type]
+    frames = {
+        g.table: out[g.key][0].frame.assign(session_date=END)  # type: ignore[union-attr]
+        for g in (price_stats.GROUP, GROUP)
+    }
+    fs = site_features(FileConfigStore(REPO_ROOT / "config"))
+    return fs.evaluate(frames, ["market_cap"]).set_index("instrument_id")["market_cap"]
+
+
 def test_statuses_and_market_cap() -> None:
     reader, _ = _setup()
     rows = _rows(reader, [END])[END]
+    rows["market_cap"] = _market_cap(reader)
     a = rows.loc["EQ:A"]
     close_a = series(60, 0)[-1]
     assert a["market_cap_status"] == "OK" and a["shares_source"] == "dei"
     assert a["shares_outstanding"] == pytest.approx(2200.0)  # 1100 x the 2:1 split after it
-    assert a["market_cap"] == pytest.approx(2200.0 * close_a)
+    assert a["market_cap"] == pytest.approx(2200.0 * close_a, rel=1e-6)
     assert (a["shares_as_of"], a["shares_filed"]) == (
         END - timedelta(days=12),
         END - timedelta(days=10),
@@ -131,9 +146,10 @@ def test_choose_prefers_the_cover_count_while_it_is_still_filed() -> None:
 def test_params_validate_and_catalogue_fields() -> None:
     with pytest.raises(ValueError, match="stale_days"):
         replace(FundamentalsParams(), stale_days=0)
-    columns = catalogue_columns()["fundamentals@v1"]
-    assert columns["market_cap"] == "float" and columns["market_cap_status"] == "str"
-    assert field_source("rollup.fundamentals@v1.market_cap") == (
-        "rollups/instrument/fundamentals@v1",
-        "market_cap",
+    columns = catalogue_columns()["fundamentals@v2"]
+    assert columns["shares_outstanding"] == "float32" and columns["market_cap_status"] == "str"
+    assert "market_cap" not in columns  # an expression feature since v2
+    assert field_source("rollup.fundamentals@v2.market_cap_status") == (
+        "rollups/instrument/fundamentals@v2",
+        "market_cap_status",
     )

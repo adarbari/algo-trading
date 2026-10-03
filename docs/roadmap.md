@@ -42,18 +42,19 @@ contract is enforced, and a fitness test keeps it so (new exceptions need an ADR
 
 ## Feature store (FS): features as named, documented columns (ADR 0023)
 
-Pure refactors for stored data unless a step says otherwise: tables, columns and versions stay
-the same. The catalogue of every feature is [data/features.md](data/features.md).
+Pure refactors for stored data unless a step says otherwise (FS3 re-versions four groups). The
+catalogue of every feature is [data/features.md](data/features.md).
 
 | # | Delivers | Status |
 |---|---|---|
 | FS1 | Per-feature definitions (`Feature`: entity, kind, dtype, unit, description, null meaning, valid range, categories, inputs, version) declared in feature groups (`FeatureGroup`, the eight rollups, byte-identical output); one registry (`GROUPS`, `FEATURES`, `feature(name)` lookups); generated catalogue `docs/data/features.md` (`make features-doc`) with fitness tests | **done** |
 | FS2 | Inputs through `data/`: features ask `data.feature_inputs` by table name (each table's read in its owner; generic stored-group reader); `features/` never imports storage or a domain reader (import-linter); ownership `feature-input-loading` | **done** |
-| FS3 | Features by name: unique group-independent names, copies become references, selections and `FeatureView` can name a feature directly | next |
-| FS4 | Expression features in config: typed expressions over features in `config/site/features.toml`, then per user (L4) | next |
-| FS5 | Virtual by default: expression features computed at read time; materialised only when needed | later |
-| FS6 | Feature quality (null rates, `valid_range` checks in nightly) and `cross_section` features | later |
-| FS7 | New grains (`market`, `contract`, `sector`) when a feature needs one | later |
+| FS3 | Expression features, virtual by default (owner decisions: TOML definitions, `materialise = true` opt-in, per-feature versions, float32 when re-versioning): a typed formula language (`features/expressions/`, never Python `eval`), `config/site/features/*.toml` through the one settings loader, `feature.<name>` selection fields and `FeatureView` columns computed on read from only the stored columns needed, materialised expressions stored by the `rollups` task (`div_yield@v1`, read by `iv30@v1`); liquidity class, `div_yield`, `market_cap`, `pct_from_high/low_52w`, `iv_hv_spread/ratio` moved to expressions, new `near_52w`; `price_stats@v2`, `dividends@v2`, `fundamentals@v2`, `iv_history@v2` with float32 columns (`liquidity_class@v1` dropped); `algotrade-ingest retire-features`. Exact on real data (116k rows, 10 sessions: every class and tier identical; numbers within float32 rounding). **Owner action:** `algotrade-ingest rollups --from 2024-10-03 --to <last session>` (backfills the v2 groups and `div_yield@v1`), then `retire-features --group <name>@v1 --dry-run` and without `--dry-run` for `price_stats`, `dividends`, `fundamentals`, `iv_history`, `liquidity_class` | **done** |
+| FS4 | Features by name for group features: unique group-independent names, copies become references | next |
+| FS5 | User expression features (L4, `config/users/<id>/features/*.toml`) | next |
+| FS6 | `cross_section` features (ranks, z-scores within the universe or a sector) | later |
+| FS7 | Feature quality: null rates and `valid_range` checks in nightly (out-of-range values reported, never clipped) | later |
+| FS8 | New grains (`market`, `contract`, `sector`) when a feature needs one | later |
 
 ## Phase 0 follow-ups (the architecture is the target; these close the gaps)
 

@@ -1,7 +1,7 @@
-"""``fundamentals@v1``: shares outstanding and market capitalisation.
+"""``fundamentals@v2``: shares outstanding and the market-cap status.
 
 Inputs: ``instruments/shares`` (SEC company facts; every fact FILED on or before the session,
-point in time by filing date), the session's ``price_stats@v1`` close, and ``events/split``
+point in time by filing date), the session's ``price_stats@v2`` close, and ``events/split``
 by event date. One row per instrument with a close or a share count on the session.
 
 Which count (per instrument, among facts filed on or before the session):
@@ -25,9 +25,13 @@ it for splits before they file).
     shares_as_of        its period end (the cover date, or the end of the averaged period)
     shares_filed        the filing date that made it public
     shares_source       dei / weighted_basic
-    market_cap          shares_outstanding x close (null unless OK)
     market_cap_status   OK / NO_SHARES (no fact: ETFs, funds, no CIK) / STALE (period end more
                         than ``stale_days`` before the session) / NO_PRICE (no close)
+
+v2 (ADR 0023 step 3) stores ``shares_outstanding`` as a 32-bit float and drops
+``market_cap``: it is the expression feature ``market_cap`` (``shares_outstanding x close``
+when the status is OK; ``config/site/features/fundamentals.toml``), computed on read. The
+status stays here: it needs the count's period end against the session date.
 """
 
 from dataclasses import dataclass
@@ -40,9 +44,9 @@ from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs
 from algotrade.features.framework.feature import Feature
 
 NAME = "fundamentals"
-VERSION = 1
+VERSION = 2
 SHARES = "instruments/shares"
-PRICE_STATS = "rollups/instrument/price_stats@v1"
+PRICE_STATS = "rollups/instrument/price_stats@v2"
 SPLITS = "events/split"
 DEI, WEIGHTED = "dei", "weighted_basic"
 
@@ -51,7 +55,7 @@ _FACTS = (f"{SHARES}.shares", f"{SHARES}.concept", f"{SHARES}.filed", f"{SHARES}
 
 FEATURES = (
     Feature(
-        "shares_outstanding", "float", "shares",
+        "shares_outstanding", "float32", "shares",
         "Shares outstanding (company total of every class), split-adjusted to the session: "
         "the latest cover-page count (dei) while the company tags it, else the latest "
         "weighted average basic",
@@ -72,17 +76,11 @@ FEATURES = (
         _NO_SHARES, "label", categories=(DEI, WEIGHTED), inputs=(f"{SHARES}.concept",),
     ),
     Feature(
-        "market_cap", "float", "usd",
-        "shares_outstanding x close (the company total times this class's close)",
-        "market_cap_status is not OK", "expression", valid_range=(0, None),
-        inputs=("fundamentals.shares_outstanding@v1", "price_stats.close@v1"),
-    ),
-    Feature(
         "market_cap_status", "str", "category",
         "OK; NO_SHARES (no count); STALE (period end more than stale_days, 400, before the "
         "session; the count is still shown); NO_PRICE (no close)",
         "never", "label", categories=("OK", "NO_SHARES", "STALE", "NO_PRICE"),
-        inputs=("fundamentals.shares_outstanding@v1", "price_stats.close@v1"),
+        inputs=("fundamentals.shares_outstanding@v2", "price_stats.close@v2"),
     ),
 )  # fmt: skip
 COLUMNS = column_types(FEATURES)
@@ -162,7 +160,6 @@ def compute(inputs: Inputs, session: date, p: FundamentalsParams) -> pd.DataFram
             "shares_as_of": out["period_end"].to_numpy(),
             "shares_filed": out["filed"].to_numpy(),
             "shares_source": out["concept"].to_numpy(),
-            "market_cap": np.where(status == "OK", shares * close, np.nan),
             "market_cap_status": status,
         }
     )
@@ -171,7 +168,7 @@ def compute(inputs: Inputs, session: date, p: FundamentalsParams) -> pd.DataFram
 GROUP = FeatureGroup(
     NAME,
     VERSION,
-    "Shares outstanding (SEC company facts, point in time by filing date) and market cap",
+    "Shares outstanding (SEC company facts, point in time by filing date) and its status",
     (
         Input(PRICE_STATS),
         Input(SHARES, required=False),

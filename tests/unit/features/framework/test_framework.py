@@ -181,9 +181,9 @@ def test_params_and_selection() -> None:
     defaults = rollup_params(None, rollups)
     assert defaults["earnings@v1"] is None
     configs = MemoryConfigStore(
-        {("site", "settings", "rollups"): {"price_stats@v1": {"year_sessions": 260}}}
+        {("site", "settings", "rollups"): {"price_stats@v2": {"year_sessions": 260}}}
     )
-    assert rollup_params(configs, rollups)["price_stats@v1"].year_sessions == 260
+    assert rollup_params(configs, rollups)["price_stats@v2"].year_sessions == 260
     assert [r.key for r in by_key(GROUPS, ["earnings@v1"])] == ["earnings@v1"]
     assert len(by_key(GROUPS, [])) == len(GROUPS)
     with pytest.raises(KeyError, match="unknown rollups"):

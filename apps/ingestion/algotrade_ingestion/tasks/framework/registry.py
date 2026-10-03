@@ -27,7 +27,13 @@ from algotrade_ingestion.sources.framework.base import (
 )
 from algotrade_ingestion.tasks.derived import rollups
 from algotrade_ingestion.tasks.framework.run import TaskContext
-from algotrade_ingestion.tasks.maintenance import golden, migrate_ids, purge, quality
+from algotrade_ingestion.tasks.maintenance import (
+    golden,
+    migrate_ids,
+    purge,
+    quality,
+    retire_features,
+)
 from algotrade_ingestion.tasks.market import (
     bars,
     corporate_actions,
@@ -208,6 +214,10 @@ def _migrate_ids(ctx: TaskContext, p: Params) -> RunRecord:
     return migrate_ids.migrate_ids(ctx, dry_run=bool(p.get("dry_run")))
 
 
+def _retire_features(ctx: TaskContext, p: Params) -> RunRecord:
+    return retire_features.retire(ctx, session_of(p), str(p["group"]), bool(p.get("dry_run")))
+
+
 def _golden_load(ctx: TaskContext, p: Params) -> RunRecord:
     # ``golden_dir`` chose the directory when the registry built the fixture source.
     source = ctx.sources["synthetic"]
@@ -362,7 +372,7 @@ TASKS: dict[str, Task] = {
                 SESSION,
                 FROM,
                 TO,
-                Param("only", ("--only",), str, "comma-separated rollups, e.g. price_stats@v1"),
+                Param("only", ("--only",), str, "comma-separated rollups, e.g. price_stats@v2"),
             ),
         ),
         Task(
@@ -418,6 +428,24 @@ TASKS: dict[str, Task] = {
             (),  # rewrites any table as a new run; produces none
             _migrate_ids,
             params=(Param("dry_run", ("--dry-run",), None, "count only; write nothing"),),
+        ),
+        Task(
+            "retire-features",
+            "delete a superseded feature group's tables once its replacement covers them",
+            retire_features,
+            (),  # deletes a superseded table; produces none
+            _retire_features,
+            params=(
+                Param("session", ("--date",), date.fromisoformat, "run date (default: last)"),
+                Param(
+                    "group",
+                    ("--group",),
+                    str,
+                    "superseded group, e.g. price_stats@v1",
+                    required=True,
+                ),
+                Param("dry_run", ("--dry-run",), None, "report sessions and sizes only"),
+            ),
         ),
         Task(
             "golden-load",

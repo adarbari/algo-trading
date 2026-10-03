@@ -154,7 +154,7 @@ stores new facts in `instruments/shares` (docs/data/layers.md). The CIK comes fr
 class-specific counts, so every instrument of a CIK (GOOGL and GOOG) gets the company total.
 Most multi-class issuers no longer tag the cover count, so they fall back to the weighted
 average; Berkshire's last facts are from 2015 (class A equivalents), so BRK.A / BRK.B are
-`STALE` in `fundamentals@v1`, not wrong.
+`STALE` in `fundamentals@v2`, not wrong.
 
 Checked live 2026-10-03 (closes of 2026-10-02): AAPL 14.594B shares (dei, as of 2026-07-17)
 → $4.87T; KO 4.302B (dei, 2026-04-28) → $368.5B; GOOGL / GOOG 12.151B (weighted basic, Q2
@@ -162,7 +162,7 @@ Checked live 2026-10-03 (closes of 2026-10-02): AAPL 14.594B shares (dei, as of 
 
 **Backfill:** `algotrade-ingest shares` once (~6k CIKs at the 0.2 s `sec` pacing plus
 download: about 30 to 40 minutes, ~1 GB of gzip raw kept 7 days, `[sec_edgar] raw_retention_days`), then
-`algotrade-ingest rollups --from <first session> --to <last session> --only fundamentals@v1`.
+`algotrade-ingest rollups --from <first session> --to <last session> --only fundamentals@v2`.
 A crashed run resumes where it stopped (same session); `--limit N` splits it into chunks.
 
 ### Refreshes spread over the window

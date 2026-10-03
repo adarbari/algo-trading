@@ -2,7 +2,8 @@
 columns for Explore), and the owner's review lists (FIGI, leverage).
 
 A universe row is the coverage snapshot (``universe``) joined with reference facts, company
-sector / industry and the liquidity class rollup for the same session (``InstrumentView``).
+sector / industry and the liquidity class (an expression feature) for the same session
+(``services.features.field_view``).
 """
 
 from dataclasses import dataclass
@@ -12,15 +13,12 @@ from typing import Any
 import pandas as pd
 
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.core.model.fields import rollup_field
 from algotrade.data.reference import (
     UNIVERSE_TABLE,
     Universe,
-    instrument_view,
     instruments,
     load_universe,
 )
-from algotrade.features.rollups import liquidity_class
 from algotrade.services.configs import field_catalog
 from algotrade.services.explore.store import (
     NotFoundError,
@@ -30,10 +28,11 @@ from algotrade.services.explore.store import (
     partition_for,
     records,
 )
+from algotrade.services.features import field_view
 
 REFERENCE = "instruments/reference"
 UNIVERSE_BUILD = "universe_build"  # the job that records the FIGI review list in its stats
-LIQUIDITY = rollup_field(liquidity_class.GROUP.key, "liquidity_class")
+LIQUIDITY = "feature.liquidity_class"
 VIEW_FIELDS = {
     "instrument.is_leveraged": "is_leveraged",
     "instrument.is_inverse": "is_inverse",
@@ -95,7 +94,7 @@ def _universe(
     session = on or partition_for(store.reader, UNIVERSE_TABLE, None)
     universe = load_universe(store.reader, session)
     fields = list(dict.fromkeys([*VIEW_FIELDS, *columns]))
-    view = instrument_view(store.reader, session, fields)
+    view = field_view(store.reader, session, fields)
     frame = universe.frame.reindex(columns=[*BASE, "optionable"])
     frame["instrument_id"] = frame["instrument_id"].astype(str)
     extra = view.frame.reindex(columns=["instrument_id", *fields])
@@ -159,7 +158,7 @@ def ticker_table(
     size: int,
 ) -> TickerTable:
     """The universe for ``on`` as tickers x ``columns`` (catalogue field names: reference,
-    company and rollup values for the session through ``InstrumentView``), filtered, sorted."""
+    company, rollup and expression-feature values for the session), filtered, sorted."""
     wanted = checked_columns(columns)
     frame, universe, missing = _universe(store, on, wanted)
     order = sort or "symbol"

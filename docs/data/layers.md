@@ -87,16 +87,18 @@ nightly and stored point-in-time:
 
 ```
 bars/1m ──► rollups/daily/session_stats@v1 ──┐
-bars/1d ─────────────────────────────────────┼─► rollups/instrument/price_stats@v1   (52w hi/lo, MAs, HV, ADV)
-chains/* ────────────────────────────────────┼─► rollups/instrument/option_liquidity@v1, iv30@v1 ─► iv_history@v1
+bars/1d ─────────────────────────────────────┼─► rollups/instrument/price_stats@v2   (52w hi/lo, MAs, HV, ADV)
+chains/* ────────────────────────────────────┼─► rollups/instrument/option_liquidity@v1, iv30@v1 ─► iv_history@v2
 events/earnings ─────────────────────────────┴─► rollups/instrument/earnings@v1     (next date, days to it)
 ```
 
 - **Official daily bars win.** The vendor's `1d` bar (official close, including the closing
   auction) is the source of truth. A daily bar rolled up from `1m` bars is a cross-check,
   never a substitute.
-- The code package is `features/`: a feature is a rollup definition
-  ([Rollups as built](#rollups-as-built)).
+- The code package is `features/`: a feature is a column of a rollup definition
+  ([Rollups as built](#rollups-as-built)), or an expression feature: a formula over stored
+  features in `config/site/features/*.toml`, computed on read unless materialised
+  ([configuration.md](../configuration.md#expression-features), ADR 0023 step 3).
 
 ## L3: Site configuration (shared, reviewed)
 
@@ -220,37 +222,43 @@ range; every feature is listed in the generated **[feature catalogue](features.m
   failed item each). `compute_in_memory` evaluates a chain without writing: each rollup reads
   the frames the earlier ones produced in memory (`produced`), which win over stored rows.
 - **Computed by** the `rollups` ingestion task: `algotrade-ingest rollups [--date D | --from D
-  --to D] [--only price_stats@v1,...]` (alias `features`). A backfill computes each session
+  --to D] [--only price_stats@v2,...]` (alias `features`). A backfill computes each session
   exactly as the nightly run would have. Nightly runs it for every session it ingests, after
   earnings, bars, corporate actions, rates and chains. `--only` computes just the named
   rollups; their dependencies are read from the store.
 
-Per-column meanings, units, ranges and null meanings: [features.md](features.md).
+Per-column meanings, units, ranges and null meanings: [features.md](features.md). Floats of
+the v2 groups are stored as 32-bit (`float32`). Columns computed from other columns are
+expression features (`feature.<name>`): `pct_from_high_52w`, `pct_from_low_52w`, `near_52w`,
+`div_yield` (materialised as `rollups/instrument/div_yield@v1`: `iv30@v1` reads it),
+`market_cap`, `iv_hv_spread`, `iv_hv_ratio`, and the liquidity class (`liquidity_class`,
+`option_tier`, ...; the former `liquidity_class@v1` group). The v1 tables they replaced stay
+readable until `algotrade-ingest retire-features --group <name>@v1` deletes them.
 
 | Group | Columns | Inputs | Status |
 |---|---|---|---|
 | `option_liquidity@v1` | `liq_status`, put/call tiers, target expiry + DTE, short strike, spreads, zone OI / volume, chain OI / volume, `underlying_price`, `iv30`, `stock_volume`, `chain_asof` (date) | the session's `chains/status` (required), `chains/option_quotes`, `chains/underlying_quotes` | built |
-| `price_stats@v1` | `close`, `sma_20/50/200`, `ret_20d/60d`, `high_52w`, `low_52w`, `pct_from_high_52w`, `pct_from_low_52w`, `hv20`, `hv30` (close-to-close), `hv20_yz` (Yang-Zhang), `adv_usd_20d`, `history_days` | `bars/1d` split-adjusted as of the session (not total return), 252 sessions back | built |
+| `price_stats@v2` | `close`, `sma_20/50/200`, `ret_20d/60d`, `high_52w`, `low_52w`, `hv20`, `hv30` (close-to-close), `hv20_yz` (Yang-Zhang), `adv_usd_20d`, `history_days` | `bars/1d` split-adjusted as of the session (not total return), 252 sessions back | built |
 | `earnings@v1` | `next_earnings_date`, `earnings_time` (pre / post / unknown), `days_to_earnings` (sessions), `date_confirmed` (null: the source does not say), `last_earnings_date` | every `events/earnings` snapshot stored on or before the session | built |
-| `dividends@v1` | `div_ttm`, `div_yield`, `div_count_ttm`, `last_ex_date` | `events/dividend`, `events/split` (by event date), `price_stats@v1` | built |
-| `iv30@v1` | `iv30` (ours), `iv30_cboe`, `iv30_status`, `near_expiry`, `far_expiry`, `atm_strike_near`, `spot`, `rate`, `div_yield`, `n_quotes_used` | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `dividends@v1` | built |
-| `iv_history@v1` | `iv30`, `iv_rank_252d`, `iv_percentile_252d`, `history_days`, `rank_status` (UNKNOWN / PROVISIONAL / FULL), `iv_hv_spread`, `iv_hv_ratio` | `iv30@v1` over 252 sessions, `price_stats@v1` | built |
-| `liquidity_class@v1` | `liquidity_class` (HIGH / MEDIUM / LOW / UNKNOWN), `adv_usd_20d`, `close`, `option_tier`, `chain_oi`, `rule_hash` | `price_stats@v1`, `option_liquidity@v1`, thresholds in `config/site/rollups.toml` | built |
-| `fundamentals@v1` | `shares_outstanding`, `shares_as_of`, `shares_filed`, `shares_source` (dei / weighted_basic), `market_cap`, `market_cap_status` (OK / NO_SHARES / STALE / NO_PRICE) | `instruments/shares` (filed on or before the session), `price_stats@v1` close, `events/split`; `stale_days` in `config/site/rollups.toml` | built |
+| `dividends@v2` | `div_ttm`, `div_count_ttm`, `last_ex_date` | `events/dividend`, `events/split` (by event date), `price_stats@v2` | built |
+| `div_yield@v1` | `div_yield` (the materialised expression feature) | `dividends@v2`, `price_stats@v2` | built |
+| `iv30@v1` | `iv30` (ours), `iv30_cboe`, `iv30_status`, `near_expiry`, `far_expiry`, `atm_strike_near`, `spot`, `rate`, `div_yield`, `n_quotes_used` | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `div_yield@v1` | built |
+| `iv_history@v2` | `iv30`, `iv_rank_252d`, `iv_percentile_252d`, `history_days`, `rank_status` (UNKNOWN / PROVISIONAL / FULL) | `iv30@v1` over 252 sessions | built |
+| `fundamentals@v2` | `shares_outstanding`, `shares_as_of`, `shares_filed`, `shares_source` (dei / weighted_basic), `market_cap_status` (OK / NO_SHARES / STALE / NO_PRICE) | `instruments/shares` (filed on or before the session), `price_stats@v2` close, `events/split`; `stale_days` in `config/site/rollups.toml` | built |
 
-**`fundamentals@v1` rules.** Among facts FILED on or before the session: the latest cover
+**`fundamentals@v2` rules.** Among facts FILED on or before the session: the latest cover
 count (`dei`; latest filed, then latest period end, so an amendment wins) while the company
 still tags it (its latest `dei` filing is no older than its latest weighted average), else the
 latest filing's weighted average basic. Splits after the count multiply it (after
 `period_end` for a cover count, after `filed` for a weighted average, which filers restate).
-`market_cap = shares_outstanding x close` only when `OK`; `NO_SHARES` (ETFs, funds, no CIK:
+The expression feature `market_cap = shares_outstanding x close` only when `OK`; `NO_SHARES` (ETFs, funds, no CIK:
 null, not an error), `STALE` (period end more than `stale_days`, 400, before the session;
 the count is still shown) and `NO_PRICE` have a null market cap. Counts are company totals,
 so a class's market cap is the total times its own close (fine for GOOGL / GOOG, wrong for
 classes at very different prices, such as BRK.A / BRK.B). One row per instrument with a
-`price_stats@v1` row or a share count.
+`price_stats@v2` row or a share count.
 
-**`price_stats@v1` rules.** Windows are exchange sessions, not "the instrument's last n bars":
+**`price_stats@v2` rules.** Windows are exchange sessions, not "the instrument's last n bars":
 a session without a bar is a gap, and a statistic is null (UNKNOWN), never zero or computed
 over a shorter window, unless every session of its window has a bar. The 52-week high / low
 (daily highs / lows) need `min_year_sessions` (240) bars among the last `year_sessions` (252).
@@ -262,11 +270,12 @@ it sits below ours by up to the dividends paid since the extreme; we keep the tr
 basis). `hv20` / `hv30` are close-to-close: the sample stdev of the last 20 / 30 log returns
 x sqrt(252); IBKR's own historical volatility uses another estimator and differs. Both are
 checked against recorded IBKR data by the reconciliation suite (`docs/testing.md`).
-The windows named in the columns are the v1 definition (changing one is a v2).
+The windows named in the columns are part of the definition (changing one is a new version).
 
-**`dividends@v1` rules.** `div_ttm` sums cash dividends with ex-date in (session - 365 days,
+**`dividends@v2` rules.** `div_ttm` sums cash dividends with ex-date in (session - 365 days,
 session], each divided by the ratio of every split after its ex-date up to the session, so it
-is in the same share terms as the session's close; `div_yield = div_ttm / close`. Distributions
+is in the same share terms as the session's close; the expression feature
+`div_yield = div_ttm / close` (null unless the close is positive). Distributions
 typed `special` are left out by default. No dividend in the window is 0 only with at least
 `min_history_days` (240) bars among the last 252 sessions; otherwise every column is null.
 A future (declared) ex-date never counts.
@@ -280,20 +289,22 @@ to 30 days. `iv30_status` says why a value is missing (`NO_SPOT`, `NO_CHAIN`, `N
 `NO_QUOTES`, `WIDE_SPREADS`, `ILLIQUID`, `IV_FAILED`); `SINGLE_EXPIRY` (one usable expiry,
 flat vol) still has a value. `iv30_cboe` is the feed's percentage as a decimal.
 
-**`iv_history@v1` rules.** Over the last 252 sessions (today included) of `iv30@v1.iv30`
+**`iv_history@v2` rules.** Over the last 252 sessions (today included) of `iv30@v1.iv30`
 (`source = "cboe"` switches to the feed's): rank `(iv - min) / (max - min)` (null when flat),
 percentile = share of earlier IVs strictly below today's, `history_days` = sessions with an IV.
 `rank_status` is UNKNOWN below 60 sessions (rank and percentile null), PROVISIONAL below 252,
 FULL from 252 (owner decision). History starts with the first stored chain: nothing is
-back-filled from before chains were collected. `iv_hv_spread = iv30 - hv30` and
-`iv_hv_ratio = iv30 / hv30` (`price_stats@v1`) are the variance-risk-premium inputs.
+back-filled from before chains were collected. The expression features
+`iv_hv_spread = iv30 - hv30` and `iv_hv_ratio = iv30 / hv30` (`price_stats@v2`) are the
+variance-risk-premium inputs.
 
-**`liquidity_class@v1` rules.** HIGH when every HIGH threshold holds (ADV, close, the worse
-of the put / call option tier, chain open interest and volume), else MEDIUM when every MEDIUM
-one does, else LOW. A threshold that cannot be checked (null ADV; no `option_liquidity@v1`
-for the session; a failed chain fetch) is unknown, and the class is UNKNOWN unless it is
-decided without it (three-valued logic). An instrument not in the session's chain run has no
-options. `rule_hash` is the first 12 hex characters of the SHA-256 of the thresholds.
+**Liquidity class (expression features, `config/site/features/liquidity.toml`).** HIGH when
+every HIGH threshold holds (ADV, close, the worse of the put / call option tier, chain open
+interest and volume), else MEDIUM when every MEDIUM one does, else LOW. A threshold that cannot
+be checked (null ADV; no `option_liquidity@v1` for the session; a failed chain fetch) is
+unknown, and the class is UNKNOWN unless it is decided without it (three-valued logic). An
+instrument not in the session's chain run has no options. The thresholds are the params of
+`liquidity_high` / `liquidity_medium`; a change to one is a new feature version.
 
 **`earnings@v1` rules.** The earnings task stores, each session, the calendar for the days
 ahead. For each report date the authority is the latest snapshot on or before the session

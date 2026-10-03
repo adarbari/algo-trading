@@ -76,16 +76,29 @@ class TableStore(Protocol):
         as_of: datetime | None = None,
         instruments: Sequence[str] | None = None,
         own_run: str | None = None,
+        columns: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
         """All partitions with ``start <= session_date <= end``, each resolved point-in-time
         exactly as ``read`` would (runs merged per partition, not across partitions),
-        concatenated in date order, all as of one commit. ``None`` if none exist."""
+        concatenated in date order, all as of one commit. ``None`` if none exist.
+        ``columns``: read only these (a partition without one has none) plus
+        ``instrument_id`` and the point-in-time columns."""
         ...
 
     def dates(self, table: str, own_run: str | None = None) -> list[date]: ...
 
     def names(self, own_run: str | None = None) -> list[str]:
         """Every table with at least one partition, sorted."""
+        ...
+
+    def size(self, table: str) -> int:
+        """Bytes the table's committed partitions take in the store (every run kept)."""
+        ...
+
+    def drop(self, table: str) -> int:
+        """Delete every committed partition of ``table`` (every run): an admin operation for
+        retiring a superseded table (``retire-features``), never part of a run. -> partitions
+        deleted."""
         ...
 
 

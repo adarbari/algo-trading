@@ -1,9 +1,10 @@
 """The feature catalogue (every field a selection or a page can show) and one feature's
 cross-sectional distribution on a session.
 
-Fields are ``instrument.<column>`` (reference facts, company details) and
-``rollup.<name>@v<N>.<column>`` (registered rollups, ``features.registry``). Unit and range
-come from each feature's declaration (ADR 0023).
+Fields are ``instrument.<column>`` (reference facts, company details),
+``rollup.<name>@v<N>.<column>`` (registered rollups, ``features.registry``) and
+``feature.<name>`` (expression features, computed on read). Unit and range come from each
+feature's declaration (ADR 0023).
 """
 
 from dataclasses import dataclass, field
@@ -14,15 +15,19 @@ import pandas as pd
 
 from algotrade.core.model.fields import (
     COMPANY_TABLE,
+    FEATURE_FIELD_PREFIX,
+    NUMERIC_TYPES,
     REFERENCE_TABLE,
     ROLLUP_TABLE_PREFIX,
     field_source,
+    is_feature_field,
 )
 from algotrade.data.reference import instrument_view
 from algotrade.data.rollups import rollup_rows
 from algotrade.features.registry import GROUPS, feature
 from algotrade.services.configs import field_catalog
 from algotrade.services.explore.store import NotFoundError, ReadStore, partition_for
+from algotrade.services.features import read_expressions, site_features
 from algotrade.services.views import to_value
 
 NULL_MEANING = (
@@ -31,14 +36,14 @@ NULL_MEANING = (
 QUANTILES = (0.0, 0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99, 1.0)
 BINS = 20
 TOP_CATEGORIES = 25
-NUMERIC = frozenset({"float", "int"})
+NUMERIC = NUMERIC_TYPES
 
 
 @dataclass(frozen=True)
 class FeatureInfo:
-    name: str  # the selection field (rollup.<group>@v<N>.<column>, instrument.<column>)
+    name: str  # the selection field (rollup.<group>@v<N>.<column>, feature.<name>, instrument.*)
     kind: str  # instrument (reference / company fact), or the feature's kind (window, chain, ...)
-    source: str  # the table it is read from
+    source: str  # the table it is read from ("expression": computed on read)
     dtype: str  # str | float | int | bool | date
     description: str
     null_meaning: str
@@ -73,6 +78,26 @@ def _group_info(name: str, dtype: str) -> FeatureInfo:
     )
 
 
+def _expression_info(name: str, dtype: str) -> FeatureInfo:
+    fs = site_features()
+    expression = fs.expressions[name.removeprefix(FEATURE_FIELD_PREFIX)]
+    f = expression.feature
+    return FeatureInfo(
+        name=name,
+        kind=f.kind,
+        source=fs.table(f.name) if expression.materialise else "expression",
+        dtype=dtype,
+        description=f.description,
+        null_meaning=f.null_meaning,
+        version=f.version,
+        key=f.key,
+        inputs=list(f.inputs),
+        unit=f.unit or None,
+        range=list(f.valid_range) if f.valid_range else None,
+        categories=list(f.categories),
+    )
+
+
 def feature_catalogue() -> list[FeatureInfo]:
     """Every selectable field, instrument facts first, then feature groups in registry order
     (metadata from ``features.registry.feature``)."""
@@ -80,6 +105,9 @@ def feature_catalogue() -> list[FeatureInfo]:
     for name, dtype in field_catalog().fields.items():
         if name.startswith("rollup."):
             out.append(_group_info(name, dtype))
+            continue
+        if is_feature_field(name):
+            out.append(_expression_info(name, dtype))
             continue
         table, _ = field_source(name)
         kind = "company detail (SEC EDGAR)" if table == COMPANY_TABLE else "reference fact"
@@ -113,7 +141,22 @@ class Distribution:
     categories: list[Category]  # other features: the most frequent values
 
 
+def _expression_values(store: ReadStore, name: str, on: date | None) -> tuple[pd.Series, date]:
+    """An expression feature on the latest session on or before ``on`` that any table it
+    reads has (tables without that session make it null: UNKNOWN)."""
+    expression = name.removeprefix(FEATURE_FIELD_PREFIX)
+    tables = site_features().stored_columns([expression])
+    stored = [d for t in tables for d in store.reader.dates(t) if on is None or d <= on]
+    if not stored:
+        raise NotFoundError(f"{name}: no values stored on or before {on}")
+    session = max(stored)
+    frame = read_expressions(store.reader, [expression], session).frame
+    return frame[expression], session
+
+
 def _values(store: ReadStore, name: str, on: date | None) -> tuple[pd.Series, date]:
+    if is_feature_field(name):
+        return _expression_values(store, name, on)
     table, column = field_source(name)
     if table.startswith(ROLLUP_TABLE_PREFIX):
         session = partition_for(store.reader, table, on)

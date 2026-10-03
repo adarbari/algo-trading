@@ -8,6 +8,7 @@ from algotrade.config.strategy.catalog import FieldCatalog
 from algotrade.config.strategy.resolve import ResolvedConfig, resolve
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.features.registry import catalogue_columns
+from algotrade.services.features import site_features
 from algotrade.storage.configs.store import ConfigStore
 
 
@@ -16,9 +17,12 @@ def default_user(fallback: str) -> UserContext:
     return UserContext(user_id(fallback))
 
 
-def field_catalog() -> FieldCatalog:
-    """Every field a selection may reference: L1 instrument columns + registered rollups."""
-    return FieldCatalog.build(catalogue_columns())
+def field_catalog(store: ConfigStore | None = None) -> FieldCatalog:
+    """Every field a selection may reference: L1 instrument columns, registered rollups and
+    the site's expression features (``store``'s, default: the site config directory)."""
+    fs = site_features(store)
+    expressions = {n: e.feature.dtype for n, e in fs.expressions.items()}
+    return FieldCatalog.build(catalogue_columns(), expressions, fs.moved_field)
 
 
 def resolve_config(
@@ -27,7 +31,13 @@ def resolve_config(
     user: UserContext,
     overrides: Mapping[str, Any] | None = None,
 ) -> ResolvedConfig:
-    return resolve(config_id, user, store.load, overrides, field_catalog())
+    return resolve(config_id, user, store.load, overrides, field_catalog(_features_store(store)))
+
+
+def _features_store(store: ConfigStore) -> ConfigStore | None:
+    """``store`` when it declares expression features, else the site default (a store that
+    holds only strategy configs, e.g. in tests, still sees the site's features)."""
+    return store if store.names("site", "features") else None
 
 
 def scheduled(store: ConfigStore, schedule: str = "nightly") -> list[ResolvedConfig]:

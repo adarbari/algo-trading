@@ -1,10 +1,12 @@
 """The ``Feature`` declaration: one named, typed, documented column of a feature group.
 
 A feature is what a selection, a screener or a report reads: ``<group>.<column>@v<N>``
-(selectable as ``rollup.<group>@v<N>.<column>``). Its metadata is declared next to the
-compute that produces it (``features/rollups/<group>.py``) and drives the generated feature
-catalogue (``docs/data/features.md``), the stored column type and, later, UI and email
-labels (ADR 0023).
+(selectable as ``rollup.<group>@v<N>.<column>``), or a site expression feature
+``<name>@v<N>`` with no group (``config/site/features/*.toml``; selectable as
+``feature.<name>``, computed on read unless materialised: ``features.expressions``). Its
+metadata is declared next to the compute that produces it (``features/rollups/<group>.py``)
+and drives the generated feature catalogue (``docs/data/features.md``), the stored column
+type and, later, UI and email labels (ADR 0023).
 
 - ``entity``      what one row describes: ``instrument`` today (``market``, ``contract``,
                   ``sector`` are reserved for when a feature needs that grain)
@@ -21,17 +23,19 @@ labels (ADR 0023).
 - ``valid_range`` plausible ``(min, max)`` (``None``: open); values outside are kept, not
                   clipped: a range is a sanity bound for checks, not a filter
 - ``categories``  the closed set of values of a label (empty: open, e.g. a free-text status)
-- ``inputs``      what it is computed from: other features (``<group>.<column>@v<N>``) or
-                  raw fields (``<table>.<column>``, e.g. ``bars/1d.close``)
-- ``version``     the feature's definition version; equal to its group's for now (a group is
-                  re-versioned only when its stored columns change)
+- ``inputs``      what it is computed from: other features (``<group>.<column>@v<N>``, an
+                  expression feature ``<name>@v<N>``) or raw fields (``<table>.<column>``,
+                  e.g. ``bars/1d.close``)
+- ``version``     the feature's definition version: a group feature's is its group's (a
+                  group is re-versioned only when its stored columns change); an expression
+                  feature's is its own
 """
 
 import re
 from dataclasses import dataclass
 from typing import Literal
 
-from algotrade.core.model.fields import FIELD_TYPES
+from algotrade.core.model.fields import FIELD_TYPES, NUMERIC_TYPES
 
 type Entity = Literal["instrument"]
 type Kind = Literal["window", "chain", "expression", "cross_section", "label"]
@@ -57,7 +61,7 @@ UNITS = frozenset(
     }
 )
 _NAME = re.compile(r"^[a-z][a-z0-9_]*$")
-_FEATURE_REF = re.compile(r"^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*@v[1-9][0-9]*$")
+_FEATURE_REF = re.compile(r"^([a-z][a-z0-9_]*\.)?[a-z][a-z0-9_]*@v[1-9][0-9]*$")
 _RAW_REF = re.compile(r"^[a-z0-9_/]+\.[a-z][a-z0-9_]*$")
 
 
@@ -74,21 +78,25 @@ class Feature:
     inputs: tuple[str, ...] = ()
     entity: Entity = "instrument"
     version: int = 0  # 0: the group's version (set when the group is declared)
-    group: str = ""  # the owning group's key (set when the group is declared)
+    group: str = ""  # the owning group's key (set when declared); "": an expression feature
 
     @property
     def key(self) -> str:
-        """``<group>.<column>@v<N>``: columns repeat across groups, so the name is qualified."""
+        """``<group>.<column>@v<N>`` (columns repeat across groups, so the name is
+        qualified), or ``<name>@v<N>`` for an expression feature (names are unique)."""
+        if not self.group:
+            return f"{self.name}@v{self.version}"
         return f"{self.group.partition('@')[0]}.{self.name}@v{self.version}"
 
     @property
     def field(self) -> str:
-        """The selection field name: ``rollup.<group>@v<N>.<column>``."""
-        return f"rollup.{self.group}.{self.name}"
+        """The selection field: ``rollup.<group>@v<N>.<column>`` or ``feature.<name>``."""
+        return f"rollup.{self.group}.{self.name}" if self.group else f"feature.{self.name}"
 
 
 def is_feature_ref(ref: str) -> bool:
-    """``<group>.<column>@v<N>`` (otherwise a raw field ``<table>.<column>``)."""
+    """``<group>.<column>@v<N>`` or ``<name>@v<N>`` (otherwise a raw field
+    ``<table>.<column>``)."""
     return bool(_FEATURE_REF.match(ref))
 
 
@@ -110,7 +118,7 @@ def feature_problems(feature: Feature) -> list[str]:
         problems.append(f"{f.name}: describe it and say when it is null")
     if f.valid_range is not None:
         lo, hi = f.valid_range
-        if f.dtype not in ("float", "int"):
+        if f.dtype not in NUMERIC_TYPES:
             problems.append(f"{f.name}: a valid_range needs a numeric dtype")
         elif lo is not None and hi is not None and lo > hi:
             problems.append(f"{f.name}: valid_range min > max")
