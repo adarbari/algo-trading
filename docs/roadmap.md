@@ -8,7 +8,7 @@ lands. The target state of every item is described in [architecture.md](architec
 | — | Harness | Layered library, tests, golden datasets, baseline, CI, auto-merge | done |
 | — | Decisions | Docs, ADRs 0004–0017, workflows (skills) | done |
 | 0 | Restructure | Target layout; instrument ids + multipliers; storage-backed backtests and the four data layers; source interface; configs, selections and users; jobs; uv workspace. Baseline identical throughout. | done |
-| 1 | Ingestion: universe, reference, bars, events | **Done (1.1–1.3):** phase 0 follow-ups F1–F5; Nasdaq earnings → `events/earnings` (nightly 60-day calendar snapshot, past-date backfill); Massive daily bars (unadjusted) + splits/dividends with read-time adjustment, resumable backfill; FIGI / CIK / vendor security types from Massive, `instruments/symbol_history` and `ticker_changed` events; universe builder from Nasdaq Trader + SPY holdings (stocks, ADRs, ETFs incl. leveraged/inverse) driven by `config/site/universe.toml`, leveraged-ETF overrides + review file, `events/reference_change` and `events/index_change`. **Remaining:** company details (SEC EDGAR; needs a contact email for SEC's user-agent policy); switching `instrument_id` to FIGI-based ids (the history table is in place); the 2-year bars backfill (once the key is set); `config/site/sources.toml`; local nightly scheduler (launchd); data-quality checks | **in progress** |
+| 1 | Ingestion: universe, reference, bars, events | **Done (1.1–1.6):** phase 0 follow-ups F1–F5; Nasdaq earnings → `events/earnings` (nightly 60-day calendar snapshot, past-date backfill); Massive daily bars (unadjusted) + splits/dividends with read-time adjustment, resumable backfill; FIGI / CIK / vendor security types from Massive, `instruments/symbol_history` and `ticker_changed` events; universe builder from Nasdaq Trader + SPY holdings (stocks, ADRs, ETFs incl. leveraged/inverse) driven by `config/site/universe.toml`, leveraged-ETF overrides + review file, `events/reference_change` and `events/index_change`; `config/site/sources.toml`; nightly data-quality checks; local launchd scheduler (`algotrade-ingest schedule`). **Remaining:** company details (SEC EDGAR; needs a contact email for SEC's user-agent policy); switching `instrument_id` to FIGI-based ids (the history table is in place) | **nearly done** |
 | 2a | Options liquidity slice | Cboe chains, `option_liquidity@v1`, `short_premium_liquidity`, screening engine with coverage audit, legacy CSV exports | done |
 | 2b | Quant + rollups | `quant/` (Black-Scholes, our own IV and Greeks, realised-vol estimators); rollups `price_stats@v1`, `iv_history@v1` (from nightly `iv30`), `earnings@v1`, `liquidity_class@v1` (+ `config/site/rollups.toml`), `fundamentals@v1`; `rebalance_selection` for backtests | |
 | 3 | Screeners | VRP scanner ([spec](screeners/vrp-scanner.md)) with its 8–15 delta second stage; cash-secured puts / covered calls, IV rank, unusual activity, credit spreads; a screener results baseline | |
@@ -34,7 +34,9 @@ lands. The target state of every item is described in [architecture.md](architec
 | Decision | Options | Status |
 |---|---|---|
 | Earnings-calendar source | Nasdaq public calendar (free, no key, all US, tested) | **decided: Nasdaq**; cross-check source optional |
-| Massive API key | Free tier account | **owner action**: put it in `.env` as `ALGOTRADE_MASSIVE_API_KEY` |
+| Massive API key | Free tier account | **done** (in `.env`; rotate it, it was shared in chat) |
+| SEC EDGAR contact | A contact email in the user agent (SEC policy) | **owner to provide** |
+| FIGI-based `instrument_id` | Keep symbol ids, or migrate to FIGI ids | **owner to decide** |
 | Cboe terms | Confirm acceptable use of the delayed feed | owner to confirm |
 | User identity scheme | Labels now; auth provider in phase 4 | decide in phase 4 |
 | Production job queue | Redis/RQ, Postgres-backed, cloud queue | local runner until hosting |

@@ -54,7 +54,7 @@ versus planned. Detail lives in companion docs:
 | Apps | `apps/ingestion`, `apps/backtest` | `apps/api` (4), `apps/web` (5) |
 | L1 | `instruments/reference` from the Nasdaq Trader + SPY universe builder (or universe CSVs) with FIGI / CIK and vendor security types (Massive), `instruments/symbol_history`, `events/reference_change` (incl. `ticker_changed`) + `events/index_change`, `rollups/instrument/option_liquidity@v1`, `InstrumentView` reader | company details (SEC EDGAR), FIGI-based `instrument_id` (1); `price_stats`, `iv_history`, `earnings`, `liquidity_class`, `fundamentals` rollups (2b) |
 | L2 | `chains/*` (Cboe), `events/earnings` (Nasdaq), `bars/1d` + `events/split` + `events/dividend` (Massive, unadjusted; adjusted at read time), golden data | live Massive run awaits the API key (1); intraday bars + `rollups/daily/*` (6) |
-| L3 | `defaults.toml`, `universe.toml`, `overrides/leveraged_etfs.csv`, `presets/selections/*`, `presets/strategies/*` | `sources.toml` (1); `rollups.toml` (2b) |
+| L3 | `defaults.toml`, `universe.toml`, `overrides/leveraged_etfs.csv`, `presets/selections/*`, `presets/strategies/*` | `sources.toml` (1, done); `rollups.toml` (2b) |
 | L4 | `strategies/`, `selections/` | `watchlists/`, `preferences.toml` (4–5); DB-backed `ConfigStore` (4) |
 | Jobs | local runner keyed by config hash; `backtest`, `screen`, `nightly` | queue-backed runner (6) |
 | Other | uv workspace, Parquet storage (local + memory backends) | DuckDB query engine and catalog; S3 backend for hosting (6); `quant/` (2b) |
@@ -297,7 +297,10 @@ close of bar t  : Portfolio marked to market -> equity[t]
 | Per-user nightly screens | ~1–3 s per config; 20 users × 5 configs ≈ 3–5 min |
 
 Single machine, stateless services over file storage. Shared work (ingestion, rollups) is
-O(universe); per-user work is O(users × configs). Monitoring lives in run records today:
+O(universe); per-user work is O(users × configs). The nightly run ends with a `quality` run
+(universe size change, bar freshness and count drop, chain coverage, earnings present;
+thresholds in `config/site/sources.toml`); any FAIL marks the nightly `PARTIAL`. It is scheduled
+locally by a launchd agent (`algotrade-ingest schedule`). Monitoring lives in run records today:
 status per job, coverage per screen (alert below 98%), selection size per config (alert on a
 > 20% day-over-day change), nightly duration (alert above 40 min).
 

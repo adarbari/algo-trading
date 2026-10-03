@@ -93,6 +93,13 @@ schedule = "nightly"
 all = [ { field = "instrument.is_leveraged", op = "eq", value = false } ]
 ```
 
+`[backtest] price_adjustment` (`none` / `splits` / `total_return`, default `splits`) chooses
+how stored unadjusted bars are adjusted for corporate actions when a backtest reads them.
+
+Ingestion settings are L3 too: `config/site/universe.toml` (coverage rules) and
+`config/site/sources.toml` (per-source `enabled`, pacing and workers, raw retention, and the
+`[quality]` thresholds of the nightly data-quality checks). Credentials never go there.
+
 ## Users
 
 Phase 0 identity is a **label for namespacing, not authentication**: `--user` on both CLIs,
@@ -122,8 +129,5 @@ All of these run as **jobs** (see [architecture.md](architecture.md#jobs)).
 | Item | Status |
 |---|---|
 | `rebalance_selection`: re-evaluate a backtest's selection at an interval | phase 2b |
-
-`[backtest] price_adjustment` (`none` / `splits` / `total_return`, default `splits`) chooses
-how stored unadjusted bars are adjusted for corporate actions when a backtest reads them.
 | L4 `watchlists/` and `preferences.toml` | phase 4–5 |
 | Database-backed `ConfigStore` written by the UI | phase 4 |
