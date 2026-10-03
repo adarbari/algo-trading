@@ -208,6 +208,17 @@ detect = [
 ]
 
 [[responsibility]]
+id = "run-selection"
+description = "Which runs of a partition a read at as_of sees, per the table's run mode (TableSpec.runs): snapshot = the latest run; merge (events) = the union from the latest restating run on, the latest run's row per table key"
+owner = ["src/algotrade/storage/backends/run_selection.py"]
+allowed = [
+    "src/algotrade/storage/backends/local.py",  # applies the selection to its _runs.json index
+    "src/algotrade/storage/backends/memory.py",  # applies the selection to its in-memory runs
+]
+section = "docs/adr/0007-point-in-time-data.md#how-runs-combine"
+detect = [{ call = "select_runs" }, { call = "merge_rows" }, { call = "RunEntry" }]
+
+[[responsibility]]
 id = "locking"
 description = "Exclusive locks across threads and processes (flock): named store locks and the partition run-index lock (storage); the one-writer ingest run lock (services/jobs)"
 owner = ["src/algotrade/storage/locks.py", "src/algotrade/services/jobs/exclusive.py"]

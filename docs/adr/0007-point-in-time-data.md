@@ -1,7 +1,8 @@
 # ADR 0007: Point-in-time data and versioned features
 
 **Status:** accepted (2026-10-02); amended 2026-10-02 (restructure R2: what `as_of` means,
-the snapshot rule, events by event date)
+the snapshot rule, events by event date); amended 2026-10-03 (how runs combine: event runs
+merge)
 
 ## Context
 Vendors revise data, index membership changes, and feature logic evolves. Without
@@ -28,6 +29,31 @@ point-in-time data, backtests silently use information that was not available at
   is a later refinement; until then a backtest sees every split and dividend in its window
   as stored at launch.
 - Corrections are appended with a later `knowledge_ts`, never overwritten.
+
+### How runs combine
+
+A partition (`table`, `session_date`) can hold several runs. Each table declares how they
+combine (`TableSpec.runs` in `storage/tables/schemas.py`); storage applies it
+(`storage/backends/run_selection.py`, the one owner), so `table` / `table_range` already
+return the combined view and every backend agrees (`tests/contract/storage/`).
+
+- **`snapshot`**: every run is the partition's full contents, so the latest run known at
+  `as_of` replaces the others. Reference, company, id map, universe, bars (a re-fetched
+  session replaces the earlier fetch), chains, rates, rollups, catalogues and results.
+- **`merge`**: every run is a window or an increment, so a read unions all runs known at
+  `as_of` and, per table key (`instrument_id`, `ts`, + `change`), the latest run's row
+  wins. All `events/*` tables: the corporate-actions backfill (26 months) and the nightly
+  -7..+30-day window land in the same session's partition, and picking one run hid the
+  backfill (2026-10-03: AAPL / KO showed no trailing dividends).
+- **Restating runs.** A run written with `restates=True` (`IngestRun.rewrite`, used by
+  `migrate_ids`) holds the whole merged view as of its write; reads at or after it start
+  from it, so rows it replaced (e.g. old symbol ids) are not resurrected. Reads pinned
+  before it still see the old union. The flag lives in the partition's run index; plain
+  runs keep the original index format.
+- **No deletes yet.** Under `merge`, a later run that no longer contains an event (a
+  cancelled dividend, a rescheduled earnings date within one session) does not remove it;
+  a later row for the same key does replace it. Tombstones (an explicit "withdrawn" row)
+  are future work, alongside true "known at the time" for events.
 - Features are named `name@version`. Changing logic means a new version; old versions
   stay readable until explicitly retired.
 - Features are **precomputed nightly** by ingestion. The pipeline takes a period

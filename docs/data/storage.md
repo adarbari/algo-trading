@@ -54,7 +54,9 @@ catalog       run log, dataset and schema versions, data-quality checks (a DuckD
 
 ```
 $ALGOTRADE_DATA_URL (default file://./var/data, git-ignored)
-  tables/<table>/date=YYYY-MM-DD/run=<run_id>.parquet   + _runs.json (knowledge_ts per run)
+  tables/<table>/date=YYYY-MM-DD/run=<run_id>.parquet   + _runs.json (knowledge_ts per run;
+                                                         {knowledge_ts, restates} for a
+                                                         restating run)
   raw/source=<s>/dataset=<d>/date=YYYY-MM-DD/run=<run_id>/<key>.json.gz
   staging/<run_id>/<table>/<key>.parquet                 per-item scratch for resumable jobs
                                                          (cleared on completion; unfinished
@@ -124,11 +126,37 @@ builds on: `table`, `table_range` (date range, each partition resolved point-in-
 |---|---|---|
 | `data/reference.py` | `instruments`, `instrument_terms`, `instrument_view` (`InstrumentView`), `load_universe`, `resolver` | **one snapshot rule**, `snapshot(reader, table, on)`: the latest snapshot on or before `on`, else the earliest, with `pre_snapshot = True` (survivorship bias: a later instrument list). Used for reference, company, universe and id map |
 | `data/prices.py` | `bars`, `load_price_data` (+ `adjust_bars`) | bars by session date; splits / dividends applied at read time |
-| `data/events.py` | `read_events` | by **event date** (`ts`) from any partition, latest `knowledge_ts` per event key |
+| `data/events.py` | `read_events` | by **event date** (`ts`) from any partition (each partition's runs already merged), latest `knowledge_ts` per event key |
 | `data/chains.py` | `option_quotes` (filter by `underlying_ids`), `underlying_quotes`, `chain_status` | one session's chain snapshot |
 
-Every read takes `as_of`, a **version pin** (ADR 0007): the latest run known at `as_of`.
+Every read takes `as_of`, a **version pin** (ADR 0007): only runs known at `as_of` count.
 Backtests pass their launch time and record it with the run ids read.
+
+## How runs combine
+
+A partition (`table`, `session_date`) can hold several runs (a backfill, then nightly runs
+into the same session, a `migrate_ids` rewrite). Each table declares in its `TableSpec`
+(`runs`, `storage/tables/schemas.py`) how they combine, and the backends apply it through
+`storage/backends/run_selection.py` (the one owner; ADR 0007 "How runs combine"), so
+`table` and `table_range` return the combined view on every backend:
+
+| Mode | Tables | A read at `as_of` sees |
+|---|---|---|
+| `snapshot` | `universe`, `instruments/*`, `bars/<interval>` (a re-fetch replaces the session), `chains/*`, `rates/treasury`, `rollups/*`, `catalog/*`, `results/*` | the one run with the latest `knowledge_ts` <= `as_of` (ties: run id) |
+| `merge` | `events/*` (`dividend`, `split`, `earnings`, `reference_change`, `index_change`, …) | the union of every run with `knowledge_ts` <= `as_of`, from the latest **restating** run on; per table key (`instrument_id`, `ts`, + `change`) the latest run's row wins |
+
+- **Restating runs**: `StoreWriter.write_table(..., restates=True)` (used by
+  `IngestRun.rewrite`, i.e. `migrate_ids`) says the frame is the whole partition as read
+  now. The local backend records it in `_runs.json` as `{"knowledge_ts": …, "restates":
+  true}` (plain runs keep `run -> knowledge_ts`); snapshot tables ignore it. `migrate_ids`
+  rewrites a merge partition as the full remapped union (an old-id row landing on a key a
+  new-id row already holds yields to the later-known row), so old-id rows are not
+  resurrected; reads pinned before the rewrite still see the old union.
+- **No deletes**: a later merge run that lacks an event does not remove it (a cancelled
+  dividend, an earnings date rescheduled within one session); a later row for the same key
+  replaces it. Tombstones are future work (ADR 0007).
+- Runs merge **within** a partition; `data/events.py` still filters by event date and keeps
+  the latest `knowledge_ts` per event key **across** partitions.
 
 ## Target physical layout (as more grains arrive)
 
@@ -179,8 +207,9 @@ storage/
   backends/
     local.py           now: Parquet on the local filesystem (DuckDB-readable)
     memory.py          in-memory backend for tests
-    arrow.py           casts to declared types, schema_version, row groups (the only pyarrow)
-    run_selection.py   latest-run / instrument selection shared by the backends
+    arrow.py           casts to declared types, schema_version, row groups
+    run_selection.py   which runs a read sees (snapshot / merge, restating runs), merging
+                       rows per table key, instrument selection: shared by the backends
     (s3_parquet.py)    later: same files in S3-compatible object storage
     (postgres.py, clickhouse.py, ...)  only if ever needed
   configs/             config documents only (never imports tables/ or backends/)

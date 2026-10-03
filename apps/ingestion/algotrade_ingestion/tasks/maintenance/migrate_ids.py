@@ -6,6 +6,11 @@ as a **new run** with a later ``knowledge_ts``. Old runs are never touched, so r
 before the migration still see the old ids. A row is mapped only if it was known before the
 upgrade was recorded (``known_at``); later rows under the same symbol id belong to whatever
 listing holds that symbol now. Re-running maps nothing (idempotent).
+
+Merge tables (events, ``TableSpec.runs``) read as the union of their runs, so the rewrite is
+the whole remapped union, written as a **restating** run (``IngestRun.rewrite``): reads after
+it start from it, and the old-id rows of the runs before it are not resurrected. Where an
+old-id row and a new-id row of a merge table land on the same key, the later-known one wins.
 """
 
 from collections.abc import Mapping
@@ -17,6 +22,7 @@ from algotrade.core.model.errors import DataValidationError
 from algotrade.data import StoreReader
 from algotrade.data.reference import snapshot
 from algotrade.storage.runs import RunRecord
+from algotrade.storage.tables.schemas import spec_for, table_key
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_ingestion.tasks.reference.instrument_ids import ID_MAP
 
@@ -77,7 +83,7 @@ def migrate_ids(ctx: TaskContext, dry_run: bool = False) -> RunRecord:
                 counts["partitions"] += 1
                 counts["rows"] += rows
                 if not dry_run:
-                    _rewrite(run, table, day, out)
+                    _rewrite(run, table, day, _latest_per_key(table, out))
         failed = run.failures()
         run.stats.update(
             dry_run=dry_run,
@@ -87,6 +93,16 @@ def migrate_ids(ctx: TaskContext, dry_run: bool = False) -> RunRecord:
             failed_count=len(failed),
         )
     return run.record
+
+
+def _latest_per_key(table: str, frame: pd.DataFrame) -> pd.DataFrame:
+    """Merge tables: an old-id row mapped onto a key a new-id row already holds yields to the
+    later-known row. Snapshot tables are left alone (such a clash is reported, not hidden)."""
+    spec = spec_for(table)
+    if spec.runs != "merge":
+        return frame
+    ordered = frame.sort_values("knowledge_ts", kind="stable")
+    return ordered.drop_duplicates(table_key(spec, frame.columns), keep="last").sort_index()
 
 
 def _rewrite(run: IngestRun, table: str, day: date, frame: pd.DataFrame) -> None:

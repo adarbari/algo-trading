@@ -45,6 +45,12 @@ contract is enforced, and a fitness test keeps it so (new exceptions need an ADR
 | F6 | DuckDB as the query engine and catalog (storage is Parquet read with pyarrow today) | when queries need it |
 | F7 | `rebalance_selection` (re-evaluate a backtest's selection at an interval) | phase 2b |
 
+## Fixes
+
+| Date | Fix | Owner action |
+|---|---|---|
+| 2026-10-03 | **Event runs merge.** A later window run in the same session (nightly corporate actions, -7..+30 days) hid the 26-month backfill in `events/dividend` / `events/split` / `events/earnings` (AAPL / KO showed no trailing dividends), because reads picked one run per partition. Tables now declare how runs combine (`TableSpec.runs`: `snapshot` or `merge`); `events/*` merge (union, latest run per key); `migrate_ids` rewrites merge partitions as restating runs so old ids stay gone (ADR 0007 "How runs combine", [storage.md](data/storage.md#how-runs-combine)) | re-run `algotrade-ingest migrate-ids` once a full `instruments/id_map` is stored (see the PR), to restate the 2026-10-02 event partitions without their old-id rows |
+
 ## Open decisions
 
 | Decision | Options | Status |

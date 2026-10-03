@@ -470,7 +470,8 @@ doing it. The ratchet `architecture/known_violations.toml` is empty: any hit fai
 | screen execution | `services/screening/run.py`, submitted as `screen` jobs (nightly: `workflows/nightly/screens.py`) |
 | site settings: `config/site/*.toml` → typed objects | `config/site/settings.py` (the store only reads files) |
 | environment variables and `.env` | `config/env.py` (the storage factory receives the URL) |
-| table schemas: required columns, declared types, validation | `storage/tables/schemas.py` |
+| table schemas: required columns, declared types, validation, how a table's runs combine (`TableSpec.runs`) | `storage/tables/schemas.py` |
+| which runs of a partition a read sees (`snapshot` / `merge`, restating runs; ADR 0007) | `storage/backends/run_selection.py` |
 | Parquet / Arrow I/O (casting to declared types, schema version, row groups) | `storage/backends/` (`arrow.py` shared by every backend) |
 
 ### Typed settings and schemas (R6)

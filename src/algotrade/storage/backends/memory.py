@@ -11,8 +11,15 @@ from datetime import date, datetime
 
 import pandas as pd
 
-from algotrade.storage.backends.arrow import to_arrow, to_frame
-from algotrade.storage.backends.run_selection import concat_frames, latest_run, select_instruments
+from algotrade.storage.backends.arrow import concat, to_arrow, to_frame
+from algotrade.storage.backends.run_selection import (
+    RunEntry,
+    concat_frames,
+    merge_rows,
+    run_mode,
+    select_instruments,
+    select_runs,
+)
 from algotrade.storage.locks import ThreadLock
 from algotrade.storage.runs import RunRecord, run_session
 
@@ -20,12 +27,24 @@ from algotrade.storage.runs import RunRecord, run_session
 class MemoryTables:
     def __init__(self) -> None:
         self._data: dict[tuple[str, date], dict[str, pd.DataFrame]] = {}
+        self._restating: set[tuple[str, date, str]] = set()
         self._index_lock = threading.Lock()
 
-    def write(self, table: str, session_date: date, run_id: str, frame: pd.DataFrame) -> None:
+    def write(
+        self,
+        table: str,
+        session_date: date,
+        run_id: str,
+        frame: pd.DataFrame,
+        restates: bool = False,
+    ) -> None:
         copy = to_frame(to_arrow(table, frame))  # stored as the local backend would type it
         with self._index_lock:
             self._data.setdefault((table, session_date), {})[run_id] = copy
+            if restates:
+                self._restating.add((table, session_date, run_id))
+            else:
+                self._restating.discard((table, session_date, run_id))
 
     def read(
         self,
@@ -34,12 +53,19 @@ class MemoryTables:
         as_of: datetime | None = None,
         instruments: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
-        runs = self._data.get((table, session_date), {})
-        known = {r: f["knowledge_ts"].max() for r, f in runs.items() if not f.empty}
-        chosen = latest_run(known, as_of)
-        if chosen is None:
+        stored = self._data.get((table, session_date), {})
+        entries = {
+            run: RunEntry(f["knowledge_ts"].max(), (table, session_date, run) in self._restating)
+            for run, f in stored.items()
+            if not f.empty
+        }
+        runs = select_runs(entries, as_of, run_mode(table))
+        if not runs:
             return None
-        return select_instruments(runs[chosen].copy(), instruments)
+        if len(runs) == 1:
+            return select_instruments(stored[runs[0]].copy(), instruments)
+        parts = [to_arrow(table, select_instruments(stored[r], instruments)) for r in runs]
+        return to_frame(merge_rows(table, concat(table, parts)))
 
     def read_range(
         self,
