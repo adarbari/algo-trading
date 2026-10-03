@@ -267,7 +267,7 @@ def test_ibkr_and_verification_settings() -> None:
     )
 
     sources = SourcesSettings.from_document(site("sources"))
-    assert not sources.vendor("ibkr").enabled and sources.vendor("ibkr").raw_retention_days == 30
+    assert sources.vendor("ibkr").enabled and sources.vendor("ibkr").raw_retention_days == 30
     assert (sources.ibkr.market_data_type, sources.ibkr.stream_wait_s) == (3, 4.0)
     assert (sources.ibkr.connect_timeout_s, sources.ibkr.request_timeout_s) == (10.0, 60.0)
     assert sources.max_verify_failures == 0.10

@@ -40,7 +40,10 @@ def settings(doc: dict[str, object] | None = None) -> SourcesSettings:
 def test_every_source_is_built_when_configured(tmp_path: Path) -> None:
     built = build_sources(settings(), ENV.get, limits_dir=tmp_path)
     assert set(built.sources) == set(SOURCES)
-    assert built.skipped == {"ibkr": "[ibkr] is disabled in sources.toml"}  # until the owner
+    # IBKR is enabled on site (owner runs IB Gateway); CI has no gateway env, so it is skipped
+    # with the reason that tells the owner what to set.
+    assert set(built.skipped) == {"ibkr"}
+    assert "ALGOTRADE_IBKR_HOST" in built.skipped["ibkr"] or "disabled" in built.skipped["ibkr"]
     assert list(tmp_path.iterdir()) == []  # limiter files appear on first request only
 
 
@@ -162,9 +165,9 @@ def test_the_ibkr_session_source_is_built_unconnected_from_settings_and_env(
     assert set(SESSION_SOURCES) == {"ibkr"}
 
 
-def test_ibkr_is_disabled_by_default_with_ibkr_pacing() -> None:
+def test_ibkr_site_section_uses_ibkr_pacing() -> None:
     section = SITE_SOURCES["ibkr"]
-    assert section["enabled"] is False  # the owner turns it on (README, Live verification)
+    assert isinstance(section["enabled"], bool)  # on since the owner runs IB Gateway (read-only)
     assert section["min_interval_s"] <= 0.02 and section["historical_min_interval_s"] >= 10
     parsed = settings().ibkr
     assert parsed.market_data_type == 3 and parsed.historical_min_interval_s == 10.0

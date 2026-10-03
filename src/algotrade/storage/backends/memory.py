@@ -19,6 +19,7 @@ from algotrade.storage.backends.arrow import (
     to_arrow,
     to_frame,
 )
+from algotrade.storage.backends.local_index import safe
 from algotrade.storage.backends.run_selection import (
     RunEntry,
     committed,
@@ -201,7 +202,7 @@ class MemoryRaw:
     def put(
         self, source: str, dataset: str, session_date: date, run_id: str, key: str, payload: bytes
     ) -> None:
-        self._data[(source, dataset, session_date, run_id, key)] = payload
+        self._data[(source, dataset, session_date, run_id, safe(key))] = payload
 
     def get(
         self, source: str, dataset: str, session_date: date, run_id: str, key: str
@@ -223,7 +224,7 @@ class MemoryStaging:
         self._data: dict[tuple[str, str], dict[str, pd.DataFrame]] = {}
 
     def put(self, run_id: str, table: str, key: str, frame: pd.DataFrame) -> None:
-        self._data.setdefault((run_id, table), {})[key] = frame.copy()
+        self._data.setdefault((run_id, table), {})[safe(key)] = frame.copy()
 
     def keys(self, run_id: str, table: str) -> list[str]:
         return sorted(self._data.get((run_id, table), {}))

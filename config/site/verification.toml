@@ -15,7 +15,8 @@ bar_sessions = 260               # IBKR daily bars requested per name (52 weeks 
 
 [tolerances]
 close_rel = 0.002                # split-adjusted closes, worst session in the window (relative)
-range_rel = 0.001                # daily highs / lows (relative)
+range_rel = 0.005                # daily highs / lows (relative); IBKR bars use a narrower trade set than
+                                 # consolidated Massive bars, so one-off wicks differ ~0.3% (2026-10-03)
 hv_rel = 0.005                   # price_stats.hv20 vs close-to-close HV20 on IBKR closes (relative)
 high_52w_rel = 0.0005            # 52-week high (split-only basis, relative)
 extreme_rel = 0.0005             # 52-week low: ours >= IBKR, the gap at most div_ttm (slack, relative)

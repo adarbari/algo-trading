@@ -104,15 +104,15 @@ def verify_one(
 ) -> list[checks.Row]:
     sym, iid, session = pick.symbol, pick.instrument_id, run.session
     g = checks.Grader(iid, sym, s)
-    bars = _parsed(run, source, f"bars/{sym}", iid, "bars")
+    bars = _parsed(run, source, f"bars__{sym}", iid, "bars")
     empty = pd.DataFrame(columns=["date", "high", "low", "close"])
     checks.compare_bars(g, ours.bars.get(iid, empty), bars, session)
     divs = ours.row(ours.dividends, iid)
     div_ttm = divs.get("div_ttm") if divs is not None else None
     checks.compare_stats(g, ours.row(ours.stats, iid), bars, session, div_ttm)
-    dividends = _parsed(run, source, f"div/{sym}", iid, "div")
+    dividends = _parsed(run, source, f"div__{sym}", iid, "div")
     checks.compare_yield(g, divs.get("div_yield") if divs is not None else None, dividends)
-    iv = _parsed(run, source, f"iv/{sym}", iid, "iv")
+    iv = _parsed(run, source, f"iv__{sym}", iid, "iv")
     checks.compare_iv(g, ours.row(ours.iv30, iid), iv, session)
     return g.rows
 
@@ -144,14 +144,14 @@ def verify_options(
         g = checks.Grader(iid, sym, s)
         g.na("option_mid", "no stored option chain for the session")
         return g.rows
-    params = run.fetch(source, FetchRequest(f"option_params/{sym}", iid, run.session))
+    params = run.fetch(source, FetchRequest(f"option_params__{sym}", iid, run.session))
     expirations = set(params.parsed["expirations"]["expiration"]) if params else set()
     strikes = set(params.parsed["strikes"]["strike"]) if params else set()
     rows: list[checks.Row] = []
     for contract in ours.to_dict("records"):
         expiry, strike = pd.Timestamp(contract["expiry"]).date(), float(contract["strike"])
         listed = (expiry in expirations and strike in strikes) if params else None
-        key = f"option/{sym}/{expiry.isoformat()}/{contract['right']}/{strike:g}"
+        key = f"option__{sym}__{expiry.isoformat()}__{contract['right']}__{strike:g}"
         quote = _parsed(run, source, key, str(contract["instrument_id"]), "option")
         g = checks.Grader(str(contract["instrument_id"]), sym, s)
         checks.compare_option(g, pd.Series(contract), listed, quote)
