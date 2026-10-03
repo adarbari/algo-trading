@@ -1,5 +1,8 @@
 ## What & why
 
+<!-- This PR merges automatically once every CI check passes. Mark it as a draft or add
+     the `no-automerge` label to keep it open for review. -->
+
 ## Checklist
 - [ ] `make check` passes locally
 - [ ] Fits the target architecture (`docs/architecture.md`) and existing ADRs, or a new ADR is included

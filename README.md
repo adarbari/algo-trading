@@ -37,6 +37,7 @@ interruption, and prints its audit. See [docs/screeners/](docs/screeners/README.
 | Every strategy × every golden dataset, every PR | `algotrade evaluate` vs `benchmarks/baseline.json` |
 | Coverage ≥ 90 %, strict mypy, ruff | CI |
 | Nightly heavy property tests + scorecard | `.github/workflows/nightly.yml` |
+| PRs merge themselves once every CI check passes (`no-automerge` label or draft to opt out) | `.github/workflows/auto-merge.yml` |
 
 ## Layout
 
