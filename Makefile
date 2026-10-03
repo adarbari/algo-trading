@@ -4,14 +4,18 @@ BIN = $(dir $(PY))
 # Golden datasets live in their own fixture store, never in the production data store.
 GOLDEN_URL ?= file://datasets/golden/store
 
-.PHONY: install lint format typecheck arch filelen unit property integration e2e test \
+
+.PHONY: install lock-check lint format typecheck arch filelen unit property integration e2e test \
         evaluate baseline datasets-verify datasets-build golden-store check nightly
 
-install:
-	python3.12 -m venv .venv
-	$(PY) -m pip install --upgrade pip
-	$(PY) -m pip install -e ".[dev]"
+UV ?= uv
+
+install:         ## library + every app + dev tools into .venv, exactly as locked
+	$(UV) sync --all-packages --locked
 	$(BIN)pre-commit install
+
+lock-check:      ## uv.lock matches every pyproject.toml in the workspace
+	$(UV) lock --check
 
 lint:
 	$(BIN)ruff check src apps tests scripts
@@ -61,7 +65,7 @@ evaluate: golden-store  ## strategy scorecard vs committed baseline
 baseline: golden-store  ## accept current results as the new baseline (review the diff!)
 	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate --update-baseline
 
-check: lint typecheck arch filelen datasets-verify test evaluate
+check: lock-check lint typecheck arch filelen datasets-verify test evaluate
 
 nightly:
 	HYPOTHESIS_PROFILE=nightly $(PY) -m pytest tests/property

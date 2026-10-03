@@ -14,7 +14,6 @@ permissions:
   contents: read
 
 env:
-  PY: python
   HYPOTHESIS_PROFILE: ci
 
 jobs:
@@ -23,13 +22,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.12", cache: pip }
-      - run: pip install -e ".[dev]"
-      - run: make lint PY=python BIN=
-      - run: make typecheck PY=python BIN=
-      - run: make arch PY=python BIN=
-      - run: make filelen PY=python BIN=
+      - uses: astral-sh/setup-uv@v6
+        with: { python-version: "3.12", enable-cache: true }
+      - run: uv sync --all-packages --locked
+      - run: make lock-check
+      - run: make lint
+      - run: make typecheck
+      - run: make arch
+      - run: make filelen
 
   test:
     name: Tests (py${{ matrix.python }})
@@ -40,11 +40,11 @@ jobs:
         python: ["3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "${{ matrix.python }}", cache: pip }
-      - run: pip install -e ".[dev]"
+      - uses: astral-sh/setup-uv@v6
+        with: { python-version: "${{ matrix.python }}", enable-cache: true }
+      - run: uv sync --all-packages --locked
       - name: Unit + architecture + property + integration + e2e (coverage gate 90%)
-        run: make test PY=python BIN=
+        run: make test
       - uses: actions/upload-artifact@v7
         if: matrix.python == '3.12'
         with: { name: coverage, path: coverage.xml }
@@ -55,13 +55,13 @@ jobs:
     needs: [quality]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.12", cache: pip }
-      - run: pip install -e ".[dev]"
-      - run: make datasets-verify PY=python BIN=
+      - uses: astral-sh/setup-uv@v6
+        with: { python-version: "3.12", enable-cache: true }
+      - run: uv sync --all-packages --locked
+      - run: make datasets-verify
       - name: Run every strategy on every golden dataset
         id: eval
-        run: make evaluate PY=python BIN=
+        run: make evaluate
       - name: Publish scorecard
         if: always()
         run: test -f scorecard.md && cat scorecard.md >> "$GITHUB_STEP_SUMMARY" || true

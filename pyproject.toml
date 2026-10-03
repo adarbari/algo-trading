@@ -2,10 +2,13 @@
 requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
+# The shared library. Apps are separate packages in the uv workspace below (ADR 0004):
+# each declares only the dependencies it needs, so vendor SDKs stay in apps/ingestion and
+# web frameworks will stay in apps/api.
 [project]
 name = "algotrade"
 version = "0.1.0"
-description = "Algorithmic trading research, backtesting and execution"
+description = "Algorithmic trading research, backtesting and execution (shared library)"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
@@ -15,8 +18,20 @@ dependencies = [
     "pyarrow>=16",
 ]
 
-[project.optional-dependencies]
+[tool.hatch.build.targets.wheel]
+packages = ["src/algotrade"]
+
+[tool.uv.workspace]
+members = ["apps/ingestion", "apps/backtest"]
+
+[tool.uv.sources]
+algotrade-ingestion = { workspace = true }
+algotrade-backtest = { workspace = true }
+
+[dependency-groups]
 dev = [
+    "algotrade-ingestion",
+    "algotrade-backtest",
     "pytest>=8.0",
     "pytest-cov>=7.1.0",
     "hypothesis>=6.168.3",
@@ -26,15 +41,6 @@ dev = [
     "import-linter>=2.15",
     "pre-commit>=3.7",
 ]
-
-[project.scripts]
-algotrade-backtest = "algotrade_backtest.cli:main"
-algotrade = "algotrade_backtest.cli:main"  # alias kept through phase 1
-algotrade-ingest = "algotrade_ingestion.cli:main"
-
-# Apps are separate top-level packages in this one distribution for now (ADR 0004 / 0014).
-[tool.hatch.build.targets.wheel]
-packages = ["src/algotrade", "apps/ingestion/algotrade_ingestion", "apps/backtest/algotrade_backtest"]
 
 # ---------------------------------------------------------------- ruff
 [tool.ruff]

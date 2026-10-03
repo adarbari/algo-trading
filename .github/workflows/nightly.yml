@@ -15,13 +15,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.12", cache: pip }
-      - name: Install with latest allowed dependency versions
-        run: pip install --upgrade -e ".[dev]"
-      - run: make datasets-verify PY=python BIN=
+      - uses: astral-sh/setup-uv@v6
+        with: { python-version: "3.12", enable-cache: true }
+      - name: Install with the latest allowed dependency versions (catches upstream breakage)
+        run: uv sync --all-packages --upgrade
+      - run: make datasets-verify
       - name: Property tests (1000 examples each)
-        run: make nightly PY=python BIN=
+        run: make nightly
       - name: Publish scorecard
         if: always()
         run: test -f scorecard.md && cat scorecard.md >> "$GITHUB_STEP_SUMMARY" || true
