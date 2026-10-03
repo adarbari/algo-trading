@@ -13,6 +13,14 @@ Request keys (``FetchRequest.session_date`` is the session verified):
     div__<SYMBOL>            IB dividends (tick 456) + the last close
     option_params__<SYMBOL>  listed expirations and strikes
     option__<SYMBOL>__<YYYY-MM-DD>__<C|P>__<strike>   one option snapshot
+    contracts__<SYM>+<SYM>...  IB stock contracts (conid, primary exchange), qualified together
+    volhist__<SYMBOL>__<CONID>__<YYYY-MM-DD>   daily IB implied vol (30-day, of the underlying's
+                             options) and historical vol (30-day) from that date to the session
+    vols__<SYM>:<CONID>+...  the underlyings' implied and historical vol now (ticks 106, 104);
+                             ``<CONID>`` may be empty (looked up)
+
+Batch keys (``contracts``, ``vols``) can be long: tasks pass a short ``raw_key`` to
+``IngestRun.fetch``; the payload names every symbol, so it normalises on its own.
 """
 
 import json
@@ -22,10 +30,15 @@ from typing import Any
 import pandas as pd
 
 from algotrade_sources.framework.base import FetchRequest, Normalized
-from algotrade_sources.vendors.ibkr.gateway import IbkrMarketData
+from algotrade_sources.vendors.ibkr.gateway import VOL_HISTORIES, IbkrMarketData
 
 SOURCE = "ibkr"
-KINDS = ("bars", "iv", "div", "option_params", "option")
+# Request kind -> number of ``SEP``-separated parts after it.
+ARITY = {"bars": 1, "iv": 1, "div": 1, "option_params": 1, "option": 4, "contracts": 1,
+         "volhist": 3, "vols": 1}  # fmt: skip
+KINDS = tuple(ARITY)
+BATCH = "+"  # joins the symbols of a batch key
+VOL_COLUMNS = ("iv30_ibkr", "hv30_ibkr")
 # Request keys double as raw storage keys, which may not contain "/" (storage/backends).
 SEP = "__"
 DEFAULT_SESSIONS = 260
@@ -34,13 +47,34 @@ DEFAULT_SESSIONS = 260
 def parse_key(key: str) -> tuple[str, list[str]]:
     kind, _, rest = key.partition(SEP)
     parts = rest.split(SEP) if rest else []
-    if kind not in KINDS or not parts or (kind == "option") != (len(parts) == 4):
+    if kind not in ARITY or len(parts) != ARITY[kind] or not parts[0]:
         raise ValueError(f"unknown IBKR request key {key!r}; kinds: {', '.join(KINDS)}")
     return kind, parts
 
 
 def option_key(symbol: str, expiry: date, right: str, strike: float) -> str:
     return SEP.join(("option", symbol, expiry.isoformat(), right, f"{strike:g}"))
+
+
+def _conids(part: str) -> dict[str, int | None]:
+    out: dict[str, int | None] = {}
+    for item in part.split(BATCH):
+        symbol, _, conid = item.partition(":")
+        out[symbol] = int(conid) if conid else None
+    return out
+
+
+def _vol_history(data: dict[str, list[dict[str, Any]]]) -> pd.DataFrame:
+    """IB's two daily series -> date, iv30_ibkr, hv30_ibkr (outer join on the date)."""
+    frames = [
+        pd.DataFrame(data.get(what, []), columns=["date", "close"])
+        .rename(columns={"close": column})
+        .set_index("date")
+        for what, column in zip(VOL_HISTORIES, VOL_COLUMNS, strict=True)
+    ]
+    out = frames[0].join(frames[1], how="outer").reset_index()
+    out["date"] = pd.to_datetime(out["date"]).dt.date
+    return out.sort_values("date").reset_index(drop=True)
 
 
 def _frame(rows: list[dict[str, Any]]) -> pd.DataFrame:
@@ -89,6 +123,13 @@ class IbkrSource:
             answer = self.gateway.dividends(symbol)
         elif kind == "option_params":
             answer = self.gateway.option_params(symbol)
+        elif kind == "contracts":
+            answer = self.gateway.stock_contracts(symbol.split(BATCH))
+        elif kind == "volhist":
+            conid, start = int(parts[1]) if parts[1] else None, date.fromisoformat(parts[2])
+            answer = self.gateway.volatility_history(symbol, start, end, conid)
+        elif kind == "vols":
+            answer = self.gateway.underlying_vols(_conids(symbol))
         else:
             expiry, right, strike = date.fromisoformat(parts[1]), parts[2], float(parts[3])
             answer = self.gateway.option_quote(symbol, expiry, strike, right)
@@ -106,6 +147,17 @@ class IbkrSource:
                 "expirations": pd.DataFrame({"expiration": expirations}),
                 "strikes": pd.DataFrame({"strike": strikes}),
             }
+        elif kind == "contracts":
+            rows = [{"symbol": k, **(v or {"conid": None})} for k, v in data.items()]
+            parsed = {kind: pd.DataFrame(rows)}
+        elif kind == "volhist":
+            parsed = {kind: _vol_history(data)}
+        elif kind == "vols":
+            rows = [
+                {"symbol": k, "listed": v["listed"], "iv30_ibkr": v["iv"], "hv30_ibkr": v["hv"]}
+                for k, v in data.items()
+            ]
+            parsed = {kind: pd.DataFrame(rows)}
         elif kind in ("bars", "iv"):
             parsed = {kind: _frame(data)}
         else:

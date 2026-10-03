@@ -18,3 +18,38 @@ description = "IV30 / HV30 (iv_history, price_stats)"
 null_meaning = "iv30 or hv30 is null, or hv30 is 0"
 valid_range = [0, inf]
 version = 1
+
+# IV rank with a labelled fallback (owner decision 2026-10-03, ADR 0028): IBKR's rank where it
+# has one (ibkr_iv, a year of IB's own IV history), else ours (iv_history, from Cboe chains);
+# iv_rank_source always says which. Reading ibkr_iv makes these personal-licence features.
+
+[iv_rank]
+expr = "coalesce(ibkr_iv.iv_rank_252d_ibkr, iv_history.iv_rank_252d)"
+dtype = "float"
+unit = "decimal"
+description = "IV rank over 252 sessions: IBKR's (ibkr_iv) where it has one, else ours (iv_history); iv_rank_source says which"
+null_meaning = "neither has a rank: both rank statuses are UNKNOWN (under 60 sessions of IV), there is no IV today, or every IV in the window is equal"
+valid_range = [0, 1]
+version = 1
+
+[iv_percentile]
+expr = "coalesce(ibkr_iv.iv_percentile_252d_ibkr, iv_history.iv_percentile_252d)"
+dtype = "float"
+unit = "decimal"
+description = "IV percentile over 252 sessions: IBKR's (ibkr_iv) where it has one, else ours (iv_history); iv_rank_source says which"
+null_meaning = "neither has a percentile: both rank statuses are UNKNOWN, there is no IV today, or no earlier IV"
+valid_range = [0, 1]
+version = 1
+
+[iv_rank_source]
+kind = "label"
+expr = '''
+if(not is_null(ibkr_iv.iv_rank_252d_ibkr), "ibkr",
+   if(not is_null(iv_history.iv_rank_252d), "ours", null))
+'''
+dtype = "str"
+unit = "category"
+categories = ["ibkr", "ours"]
+description = "Where iv_rank and iv_percentile came from: ibkr (IBKR's IV history) or ours (iv_history, from Cboe chains)"
+null_meaning = "iv_rank is null (neither source has a rank)"
+version = 1

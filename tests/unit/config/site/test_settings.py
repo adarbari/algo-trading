@@ -293,6 +293,9 @@ def test_ibkr_and_verification_settings() -> None:
     assert sources.vendor("ibkr").enabled and sources.vendor("ibkr").raw_retention_days == 30
     assert (sources.ibkr.market_data_type, sources.ibkr.stream_wait_s) == (3, 4.0)
     assert (sources.ibkr.connect_timeout_s, sources.ibkr.request_timeout_s) == (10.0, 60.0)
+    ibkr = sources.ibkr
+    assert (ibkr.contracts_refresh_days, ibkr.contracts_batch, ibkr.iv_batch) == (30, 25, 50)
+    assert (ibkr.iv_history_days, ibkr.iv_backfill_per_night) == (730, 100)
     assert sources.max_verify_failures == 0.10
     store = MemoryConfigStore({("site", "settings", "verification"): site("verification")})
     verification = load_verification(store)
@@ -309,6 +312,7 @@ def test_ibkr_and_verification_settings() -> None:
     ("doc", "message"),
     [
         ({"ibkr": {"market_data_type": 5}}, r"\[ibkr\] market_data_type: expected 1 \(live\)"),
+        ({"ibkr": {"iv_batch": 0}}, r"\[ibkr\] iv_batch: expected an integer >= 1"),
         ({"ibkr": {"host": "x"}}, r"\[ibkr\]: unknown keys \['host'\]"),  # host comes from .env
         ({"ibkr": {"max_interval_s": 1}}, r"\[ibkr\]: unknown keys \['max_interval_s'\]"),  # fixed
         ({"quality": {"max_verify_failures": 2}}, "a fraction between 0 and 1"),

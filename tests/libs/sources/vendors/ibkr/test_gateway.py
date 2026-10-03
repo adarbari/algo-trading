@@ -155,3 +155,54 @@ def test_reachable_checks_the_port_without_the_api() -> None:
 
 def test_ib_symbols() -> None:
     assert ib_symbol("BRK.B") == "BRK B" and ib_symbol("AAPL") == "AAPL"
+
+
+def test_enrichment_calls_are_market_data_only_and_paced() -> None:
+    """ADR 0028: contracts, IV / HV history and the vol snapshot use only allowlisted calls;
+    order and account calls stay blocked on the same session."""
+    fake = FakeIB(
+        bars={"AAPL": BARS},
+        iv={"AAPL": BARS},
+        hv={"AAPL": BARS[-1:]},
+        vols={"AAPL": (0.31, 0.25), "SPY": (0.12, float("nan"))},
+    )
+    gw, general, historical = gateway(fake, stream_wait_s=0.01)
+    gw.connect()
+    found = gw.stock_contracts(["AAPL", "SPY", "ZZZZ"])
+    assert found["AAPL"] == {"conid": 1004, "primary_exchange": "NASDAQ", "sec_type": "STK",
+                             "currency": "USD"}  # fmt: skip
+    assert found["ZZZZ"] is None
+    assert fake.calls.count("qualifyContracts") == 1  # one call for the batch
+    assert general.waits == 2 + 3  # the handshake + market data type, then one per contract
+    hist = gw.volatility_history("AAPL", date(2026, 10, 2), SESSION, conid=1004)
+    assert hist["OPTION_IMPLIED_VOLATILITY"] == [{"date": "2026-10-02", "close": 11.0}]
+    assert hist["HISTORICAL_VOLATILITY"] == [{"date": "2026-10-02", "close": 11.0}]
+    assert historical.waits == 2 and [r["durationStr"] for r in fake.requests] == ["1 D"] * 2
+    gw.volatility_history("MSFT", date(2024, 10, 2), SESSION, conid=272093)  # no lookup
+    assert fake.requests[-1]["durationStr"] == "3 Y" and fake.requests[-1]["symbol"] == "MSFT"
+    vols = gw.underlying_vols({"AAPL": 1004, "SPY": None, "ZZZZ": None})
+    assert vols == {
+        "AAPL": {"listed": True, "iv": 0.31, "hv": 0.25},
+        "SPY": {"listed": True, "iv": 0.12, "hv": None},
+        "ZZZZ": {"listed": False, "iv": None, "hv": None},
+    }
+    assert fake.calls.count("reqMktData 104,106") == 2 and fake.calls.count("cancelMktData") == 2
+    for name in ("placeOrder", "reqPositions", "accountValues", "reqAccountUpdates"):
+        with pytest.raises(ReadOnlyViolationError, match=name):
+            getattr(gw.ib, name)
+    assert set(gw.calls) <= MARKET_DATA_CALLS | CLIENT_CALLS
+    assert not set(FORBIDDEN) & set(fake.calls)
+
+
+def test_vol_streams_are_cancelled_even_when_waiting_fails() -> None:
+    fake = FakeIB(vols={"AAPL": (0.3, 0.2)})
+
+    def broken(timeout: float = 0) -> bool:
+        raise RuntimeError("socket closed")
+
+    fake.waitOnUpdate = broken  # type: ignore[method-assign]
+    gw, _, _ = gateway(fake)
+    gw.connect()
+    with pytest.raises(RuntimeError):
+        gw.underlying_vols({"AAPL": None})
+    assert fake.calls.count("cancelMktData") == 1

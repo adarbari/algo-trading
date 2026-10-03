@@ -37,7 +37,9 @@ def test_render_lists_every_group_feature_expression_and_superseded_group() -> N
     stored = sum(len(g.features) for g in GROUPS.values())
     assert f"{stored} stored features in {len(GROUPS)} groups" in text
     assert f"{len(fs.expressions)} expression features" in text
-    assert "| `hv30` | window | float32 | decimal | 0 .. 5 |" in text
+    assert "| `hv30` | window | float32 | decimal | open | 0 .. 5 |" in text
+    assert "| `iv_rank_252d_ibkr` | window | float32 | decimal | personal | 0 .. 1 |" in text
+    assert "| `iv_rank_source` | label | str | category | personal | ibkr, ours |" in text
     assert "### `liquidity.toml`" in text and "| `near_52w` | label | str |" in text
     assert "`rollups/instrument/div_yield@v1` |" in text and "(within = 0.1)" in text
     assert "| `liquidity_class@v1` | `price_stats@v2` + expression features; `chain_oi`" in text

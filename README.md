@@ -171,6 +171,29 @@ never fails because of it.
 
 What is verified and the tolerances: [`config/site/verification.toml`](config/site/verification.toml).
 
+### IBKR enrichment: contract ids and IV history (ADR 0028)
+
+With the gateway set up, the nightly also resolves IBKR contract ids for new optionable names
+(`ibkr-contracts`; every name again once a month, spread over the month) and snapshots every
+underlying's IBKR implied and historical vol after the chains (`ibkr-iv`), which feed the
+`ibkr_iv@v1` features and `iv_rank` (IBKR's rank where it has one, else ours; `iv_rank_source`
+says which). Everything derived from IBKR is tagged `licence = personal`. Owner commands:
+
+```bash
+# once: contract ids for the whole optionable universe (~4.2k names, a few minutes)
+.venv/bin/algotrade-ingest run ibkr-contracts --date <last session>
+# the IV / HV history backfill: 2 requests per underlying at the historical pace (10 s each),
+# ~20 s per name, ~23 h for all ~4.2k. Resumable: re-run the same command to continue;
+# --limit N caps a run (e.g. --limit 1500 = ~8 h overnight), --symbols A,B for a few names
+.venv/bin/algotrade-ingest run ibkr-iv --from <2 years ago> --to <last session> --limit 1500
+# then the features for that session
+.venv/bin/algotrade-ingest run rollups --date <last session> --only ibkr_iv@v1
+```
+
+The nightly step continues the backfill on its own, `[ibkr] iv_backfill_per_night = 100`
+names a night (~33 min), so new names fill in without a command; the email's `ibkr-iv` line
+shows coverage, names still pending and the estimated hours left.
+
 ## API
 
 A read-only HTTP API over everything above, the web app's only backend

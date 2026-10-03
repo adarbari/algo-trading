@@ -28,6 +28,7 @@ from algotrade.features.rollups import (
     dividends,
     earnings,
     fundamentals,
+    ibkr_iv,
     iv30,
     iv_history,
     option_liquidity,
@@ -44,6 +45,7 @@ GROUPS: dict[str, FeatureGroup] = {
             dividends.GROUP,
             iv30.GROUP,
             iv_history.GROUP,
+            ibkr_iv.GROUP,
             fundamentals.GROUP,
         ),
         stored_ok=True,  # iv30@v1 reads the materialised div_yield@v1 (FeatureSet orders it)

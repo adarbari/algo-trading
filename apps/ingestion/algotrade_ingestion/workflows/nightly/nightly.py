@@ -6,8 +6,10 @@ raises is FAILED and later steps still run, unless they name it in ``blocked_by`
 that only serve the current snapshot (universe files, SEC, Cboe chains) run only for the
 latest closed session; bars, rates, corporate actions, earnings and rollups catch up (rollups
 after the data they read; one whose input a session lacks, e.g. option liquidity without that
-session's chains, reports ``no_input``). ``verify`` compares the latest session with IBKR
-(read-only; skipped when the gateway is down). ``quality`` ends every
+session's chains, reports ``no_input``). ``ibkr-contracts`` and ``ibkr-iv`` enrich the latest
+session from IBKR before the rollups (conids, the IV snapshot, a capped history backfill);
+``verify`` compares the latest session with IBKR (all read-only; skipped when the gateway is
+down). ``quality`` ends every
 session and the ``purge-raw`` task ends the run, whatever failed before; then
 ``notify.report`` writes the summary file and sends the notifications (the summary email every
 night). Each session gets a ``nightly`` run record (COMPLETE / PARTIAL / FAILED, per
@@ -64,6 +66,11 @@ NIGHTLY: tuple[Step, ...] = (
     Step("rates"),
     Step("corporate-actions"),
     Step("chains", requires=universe_exists, latest_only=True),
+    # IBKR enrichment (ADR 0028), read-only, SKIPPED with a WARN when [ibkr] is disabled or IB
+    # Gateway is not reachable: conids for new optionable names (and the monthly refresh),
+    # then the session's IV snapshot (+ a capped history backfill) for ibkr_iv@v1.
+    Step("ibkr-contracts", requires=universe_exists, latest_only=True),
+    Step("ibkr-iv", requires=universe_exists, latest_only=True),
     # Every session (catch-up too): a rollup whose input is missing reports no_input.
     Step("rollups"),
     Step(SCREENS, blocked_by=("chains", "rollups"), requires=universe_exists, latest_only=True),

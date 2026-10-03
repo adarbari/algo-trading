@@ -243,6 +243,32 @@ INSTRUMENT_SHARES = _fixed(
     runs="merge",
     key=("instrument_id", "concept", "period_end", "filed"),
 )
+# L1: each instrument's IBKR stock contract (ADR 0028): conid and primary exchange from IB's
+# contract lookup, one full snapshot per run (rows not refreshed are carried forward).
+IBKR_CONTRACTS = _fixed(
+    "instruments/ibkr_contracts",
+    "reference",
+    ("instrument_id", "symbol", "conid", "resolved_at"),
+    "instrument_id string!",
+    "symbol string!",
+    "conid int64!",
+    *_strings("primary_exchange", "sec_type", "currency"),
+    "resolved_at date!",
+)
+# L2: IBKR's 30-day implied and historical vol of each underlying, one partition per session
+# (ADR 0028). Runs merge per instrument (a backfill writes many sessions, the nightly one):
+# the latest run's row wins. ``source_kind``: ``history`` (IB's daily bar) or ``snapshot``
+# (the streamed value after the close). Licence: personal use (IBKR market data).
+IBKR_IV30 = _fixed(
+    "volatility/ibkr_iv30",
+    "volatility",
+    ("instrument_id", "iv30_ibkr", "source_kind"),
+    "instrument_id string!",
+    "symbol string",
+    *_floats("iv30_ibkr", "hv30_ibkr"),
+    "source_kind string!",
+    runs="merge",
+)
 # L2: the Treasury par yield curve, one partition per curve date, one row per tenor
 # (``instrument_id`` = ``RATE:UST-<tenor>``). Rates are decimals; ADR 0021 has the conventions.
 TREASURY_RATES = _fixed(
@@ -294,6 +320,8 @@ KNOWN: dict[str, TableSpec] = {
         INSTRUMENT_SHARES,
         TREASURY_RATES,
         VERIFICATION_IBKR,
+        IBKR_CONTRACTS,
+        IBKR_IV30,
     )
 }
 # Open-ended tables: the producing rollup, event source, catalogue or screener defines the

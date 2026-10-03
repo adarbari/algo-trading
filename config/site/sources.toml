@@ -68,7 +68,7 @@ enabled = true
 min_interval_s = 1.0             # official site, no published limit; stay polite
 lookback_days = 10               # nightly window: the last N calendar days (catches late publications)
 
-[ibkr]                           # IB Gateway, READ-ONLY market data for the nightly `verify` task
+[ibkr]                           # IB Gateway, READ-ONLY market data: `verify`, `ibkr-contracts`, `ibkr-iv`
 enabled = true                   # owner runs IB Gateway with "Read-Only API" ticked (verified 2026-10-03)
                                  # (README "Live verification"); host, port and client id come from
                                  # ALGOTRADE_IBKR_HOST / _PORT / _CLIENT_ID in .env
@@ -78,7 +78,18 @@ historical_min_interval_s = 10.0 # every historical-data request as well: at mos
 market_data_type = 3             # 1 live (needs a market data subscription), 3 delayed (free)
 connect_timeout_s = 10           # the API handshake with the gateway
 request_timeout_s = 60           # one historical-data request
-stream_wait_s = 4                # how long a streamed tick (IB dividends, tick 456) may take
+stream_wait_s = 4                # how long a streamed tick (IB dividends, tick 456; IV ticks 104/106)
+                                 # may take
+# IBKR enrichment (ADR 0028): conids, IB's IV history, the nightly IV snapshot (`ibkr-contracts`,
+# `ibkr-iv`). A backfill is one historical request per kind (IV, HV) per underlying, paced by
+# historical_min_interval_s: ~4.2k optionable names x 2 x 10 s = ~23 h, so it is resumable
+# and spread over nights (iv_backfill_per_night) or run by hand (docs/data/vendors.md, IBKR).
+contracts_refresh_days = 30      # re-resolve each conid once a month (slot day by key); new names at once
+contracts_batch = 25             # contracts qualified per request (each one paced as a message)
+iv_batch = 50                    # IV streams open together (paper accounts have ~100 market-data lines)
+iv_history_days = 730            # calendar days of IV history a backfill fetches (2 years)
+iv_backfill_per_night = 100      # underlyings without IV history the nightly backfills (0: off;
+                                 # 100 x 2 requests x 10 s = ~33 min a night)
 raw_retention_days = 30          # raw IBKR responses (JSON) kept for replays of a verification
 
 [quality]                        # data-quality thresholds for the nightly checks

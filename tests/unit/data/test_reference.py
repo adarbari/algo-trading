@@ -8,6 +8,8 @@ import pytest
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.reference import (
+    IBKR_CONTRACTS,
+    ibkr_contracts,
     instrument_terms,
     instrument_view,
     instruments,
@@ -142,3 +144,13 @@ def test_resolver_uses_the_reference_as_of_the_session() -> None:
     assert later.symbol_for("EQ:BBG1") == "META"
     frame, unknown = later.resolve(pd.DataFrame({"symbol": ["meta", "NEW"], "x": [1, 2]}))
     assert list(frame["instrument_id"]) == ["EQ:BBG1", "EQ:NEW"] and unknown == 1
+
+
+def test_ibkr_contracts_are_the_snapshot_on_or_before_never_a_later_one() -> None:
+    writer, reader = store()
+    assert ibkr_contracts(reader, D2) is None
+    rows = [{"instrument_id": "EQ:A", "symbol": "A", "conid": 265598, "resolved_at": D2}]
+    writer.write_table(IBKR_CONTRACTS, D2, "c", stamped(rows, D2, "c"))
+    found = ibkr_contracts(reader, D2 + timedelta(days=3))
+    assert found is not None and list(found["conid"]) == [265598]
+    assert ibkr_contracts(reader, D1) is None  # resolved later: not known on D1

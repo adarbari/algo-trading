@@ -1,5 +1,6 @@
 """Expression features from their site definitions: parsed, parameters bound, names resolved,
-the dependency graph checked and every formula type checked against the catalogue.
+the dependency graph checked and every formula type checked against the catalogue. Each
+takes the most restrictive licence of the features it reads (``Feature.licence``).
 
 ``build_expressions(definitions, groups)`` returns each ``Expression`` by name in dependency
 order (an expression after the expressions it reads). A formula names stored features as
@@ -37,7 +38,7 @@ from algotrade.features.expressions.nodes import (
 )
 from algotrade.features.expressions.parser import parse_formula
 from algotrade.features.framework.declaration import FeatureGroup
-from algotrade.features.framework.feature import Feature, feature_problems
+from algotrade.features.framework.feature import Feature, Licence, feature_problems, strictest
 
 _NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 
@@ -169,10 +170,11 @@ def _order(uses: Mapping[str, tuple[str, ...]], where: Mapping[str, str]) -> lis
     return done
 
 
-def _feature(d: FeatureDefinition, inputs: tuple[str, ...]) -> Feature:
+def _feature(d: FeatureDefinition, inputs: tuple[str, ...], licence: Licence = "open") -> Feature:
     f = Feature(
         d.name, d.dtype, d.unit, d.description, d.null_meaning, d.kind,  # type: ignore[arg-type]
         valid_range=d.valid_range, categories=d.categories, inputs=inputs, version=d.version,
+        licence=licence,
     )  # fmt: skip
     problems = feature_problems(f)
     if d.kind == "label" and not d.categories:
@@ -228,7 +230,9 @@ def build_expressions(
             [f"{s}@v{by_name[s.partition('.')[0]].version}" for s in stored]
             + [out[u].feature.key for u in uses[name]]
         )
-        feature = _feature(d, inputs)
+        licences = [by_name[r.partition(".")[0]].feature(r.partition(".")[2]).licence
+                    for r in stored] + [out[u].feature.licence for u in uses[name]]  # fmt: skip
+        feature = _feature(d, inputs, strictest(licences))
         out[name] = Expression(feature, d, node, result, stored, uses[name], tuple(exists))
     return {n: e for n, e in out.items() if n in defs}
 

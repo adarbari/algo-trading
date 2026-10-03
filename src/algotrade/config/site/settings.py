@@ -114,6 +114,11 @@ VENDOR_EXTRAS = {
         "connect_timeout_s",
         "request_timeout_s",
         "stream_wait_s",
+        "contracts_refresh_days",
+        "contracts_batch",
+        "iv_batch",
+        "iv_history_days",
+        "iv_backfill_per_night",
     ),
 }
 # Vendors that stay off unless their section says ``enabled = true`` (a missing section or key
@@ -166,6 +171,12 @@ class IbkrSettings:
     connect_timeout_s: float = 10.0
     request_timeout_s: float = 60.0
     stream_wait_s: float = 4.0  # how long a streamed tick (dividends) may take to arrive
+    # IBKR enrichment (ADR 0028): contract ids, IB's IV history and the nightly IV snapshot
+    contracts_refresh_days: int = 30  # re-resolve each conid once per window (spread by key)
+    contracts_batch: int = 25  # contracts qualified per request
+    iv_batch: int = 50  # IV streams open together (under the account's market-data lines)
+    iv_history_days: int = 730  # calendar days of IV history a backfill fetches per underlying
+    iv_backfill_per_night: int = 100  # underlyings without IV history the nightly backfills
 
 
 @dataclass(frozen=True)
@@ -297,6 +308,13 @@ def _ibkr(section: Table) -> IbkrSettings:
         connect_timeout_s=section.number("connect_timeout_s", d.connect_timeout_s, 0),
         request_timeout_s=section.number("request_timeout_s", d.request_timeout_s, 0),
         stream_wait_s=section.number("stream_wait_s", d.stream_wait_s, 0),
+        contracts_refresh_days=section.integer(
+            "contracts_refresh_days", d.contracts_refresh_days, 0
+        ),
+        contracts_batch=section.integer("contracts_batch", d.contracts_batch, 1),
+        iv_batch=section.integer("iv_batch", d.iv_batch, 1),
+        iv_history_days=section.integer("iv_history_days", d.iv_history_days, 1),
+        iv_backfill_per_night=section.integer("iv_backfill_per_night", d.iv_backfill_per_night, 0),
     )
 
 

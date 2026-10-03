@@ -1,8 +1,10 @@
 """The IB Gateway facade, READ-ONLY: the only module that imports ``ib_async`` (ADR 0026).
 
-``IbkrMarketData`` exposes market data and nothing else: daily bars, the implied-volatility
-history of an underlying, IB dividends (generic tick 456), option chain parameters and option
-quote snapshots. Each returns plain JSON-able values; no ``ib_async`` object leaves this module.
+``IbkrMarketData`` exposes market data and nothing else: stock contract lookup (conid,
+primary exchange), daily bars, the implied- and historical-volatility history of an underlying,
+a streamed snapshot of the underlying's option implied vol and historical vol (generic ticks
+106 and 104), IB dividends (generic tick 456), option chain parameters and option quote
+snapshots. Each returns plain JSON-able values; no ``ib_async`` object leaves this module.
 
 Read-only by construction (ADR 0026), three layers:
 
@@ -55,6 +57,8 @@ MARKET_DATA_CALLS = frozenset(
 )
 CLIENT_CALLS = frozenset({"connect", "isReady"})  # the API handshake only
 DIVIDEND_TICKS = "456"  # IB dividends: past 12 months, next 12 months, next date and amount
+VOL_TICKS = "104,106"  # the underlying's historical vol (104) and option implied vol (106)
+VOL_HISTORIES = ("OPTION_IMPLIED_VOLATILITY", "HISTORICAL_VOLATILITY")
 EASTERN = "US/Eastern"  # IB's time zone name for an end date's 23:59:59
 
 
@@ -182,13 +186,38 @@ class IbkrMarketData:
         self.general.wait()
         return getattr(self.ib, name)(*args, **kwargs)
 
-    def _stock(self, symbol: str) -> Any:
+    def _stock(self, symbol: str, conid: int | None = None) -> Any:
+        """The SMART stock contract of ``symbol``: built from a known ``conid`` (no lookup),
+        else qualified once per session."""
+        if symbol not in self._contracts and conid:
+            self._contracts[symbol] = Stock(ib_symbol(symbol), "SMART", "USD", conId=conid)
         if symbol not in self._contracts:
             found = self._call("qualifyContracts", Stock(ib_symbol(symbol), "SMART", "USD"))
             if not found or found[0] is None:
                 raise LookupError(f"IBKR has no stock contract for {symbol}")
             self._contracts[symbol] = found[0]
         return self._contracts[symbol]
+
+    def stock_contracts(self, symbols: list[str]) -> dict[str, dict[str, Any] | None]:
+        """IB's SMART stock contract per symbol (``None``: IB has none), qualified together in
+        one ``qualifyContracts`` call (paced one ``general`` slot per contract)."""
+        wanted = [Stock(ib_symbol(s), "SMART", "USD") for s in symbols]
+        for _ in wanted[1:]:
+            self.general.wait()
+        found = self._call("qualifyContracts", *wanted) if wanted else []
+        out: dict[str, dict[str, Any] | None] = {}
+        for symbol, c in zip(symbols, [*found, *[None] * len(symbols)], strict=False):
+            if c is None or not getattr(c, "conId", 0):
+                out[symbol] = None
+                continue
+            self._contracts[symbol] = c
+            out[symbol] = {
+                "conid": int(c.conId),
+                "primary_exchange": str(c.primaryExchange or "") or None,
+                "sec_type": str(c.secType or "STK"),
+                "currency": str(c.currency or "USD"),
+            }
+        return out
 
     # ------------------------------------------------------------------ market data
 
@@ -225,6 +254,53 @@ class IbkrMarketData:
     def implied_volatility(self, symbol: str, end: date) -> list[dict[str, Any]]:
         """Daily OPTION_IMPLIED_VOLATILITY bars of the underlying (30-day IV) up to ``end``."""
         return self._history(self._stock(symbol), end, "10 D", "OPTION_IMPLIED_VOLATILITY")
+
+    def volatility_history(
+        self, symbol: str, start: date, end: date, conid: int | None = None
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Daily OPTION_IMPLIED_VOLATILITY and HISTORICAL_VOLATILITY closes of the underlying
+        (annualised 30-day vols, IB's) from ``start`` to ``end``: one request per kind."""
+        contract = self._stock(symbol, conid)
+        days = (end - start).days + 1
+        duration = f"{days} D" if days <= 365 else f"{math.ceil(days / 365)} Y"
+        out: dict[str, list[dict[str, Any]]] = {}
+        for what in VOL_HISTORIES:
+            bars = self._history(contract, end, duration, what)
+            out[what] = [
+                {"date": b["date"], "close": b["close"]}
+                for b in bars
+                if b["date"] >= start.isoformat()
+            ]
+        return out
+
+    def underlying_vols(self, symbols: dict[str, int | None]) -> dict[str, dict[str, Any]]:
+        """The underlyings' option implied vol (tick 106) and historical vol (tick 104) now:
+        one stream each (``symbol -> conid``, ``None``: look it up), all open together, read
+        once every one has both vols or ``stream_wait_s`` passed, then cancelled."""
+        streams: dict[str, tuple[Any, Any]] = {}
+        out: dict[str, dict[str, Any]] = {}
+        try:
+            for symbol, conid in symbols.items():
+                try:
+                    contract = self._stock(symbol, conid)
+                except LookupError:
+                    out[symbol] = {"listed": False, "iv": None, "hv": None}
+                    continue
+                ticker = self._call("reqMktData", contract, VOL_TICKS, False, False)
+                streams[symbol] = (contract, ticker)
+            deadline = self.clock() + self.config.stream_wait_s
+            while (left := deadline - self.clock()) > 0 and any(
+                _price(t.impliedVolatility) is None or _price(t.histVolatility) is None
+                for _, t in streams.values()
+            ):
+                self.ib.waitOnUpdate(timeout=left)
+        finally:
+            for contract, _ in streams.values():
+                self._call("cancelMktData", contract)
+        for symbol, (_, ticker) in streams.items():
+            iv, hv = _price(ticker.impliedVolatility), _price(ticker.histVolatility)
+            out[symbol] = {"listed": True, "iv": iv, "hv": hv}
+        return out
 
     def dividends(self, symbol: str) -> dict[str, Any]:
         """IB dividends (tick 456) and the last close, streamed for at most ``stream_wait_s``."""

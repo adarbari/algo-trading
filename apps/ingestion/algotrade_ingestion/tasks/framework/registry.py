@@ -33,11 +33,13 @@ from algotrade_ingestion.tasks.market import (
     bars,
     corporate_actions,
     earnings,
+    ibkr_iv,
     option_chains,
     rates,
 )
 from algotrade_ingestion.tasks.reference import (
     company_details,
+    ibkr_contracts,
     shares,
     universe_build,
     universe_import,
@@ -195,12 +197,36 @@ def _rollups(ctx: TaskContext, p: Params) -> RunRecord:
 
 
 def _verify(ctx: TaskContext, p: Params) -> RunRecord:
-    symbols = [s.strip() for s in str(p.get("symbols") or "").split(",") if s.strip()]
-    return verify.verify(ctx, session_of(p), symbols)
+    return verify.verify(ctx, session_of(p), _symbols(p))
+
+
+def _symbols(p: Params) -> list[str]:
+    return [s.strip() for s in str(p.get("symbols") or "").split(",") if s.strip()]
+
+
+def _ibkr(ctx: TaskContext) -> SessionSource:
+    source = ctx.sources["ibkr"]
+    if not isinstance(source, SessionSource):
+        raise TypeError("ibkr must be a SessionSource (IB Gateway)")
+    return source
+
+
+def _ibkr_contracts(ctx: TaskContext, p: Params) -> RunRecord:
+    return ibkr_contracts.resolve_contracts(
+        ctx, _ibkr(ctx), session_of(p), _symbols(p), bool(p.get("force")), p.get("limit")
+    )
+
+
+def _ibkr_iv(ctx: TaskContext, p: Params) -> RunRecord:
+    if p.get("start"):
+        end = p.get("end") or session_of(p)
+        source = _ibkr(ctx)
+        return ibkr_iv.backfill_ivs(ctx, source, p["start"], end, _symbols(p), p.get("limit"))
+    return ibkr_iv.nightly_ivs(ctx, _ibkr(ctx), session_of(p), _symbols(p))
 
 
 def _gateway_down(ctx: TaskContext) -> str | None:
-    """Workflows skip ``verify`` (with a WARN) when nothing listens on the gateway port."""
+    """Workflows skip the IBKR tasks (with a WARN) when nothing listens on the gateway port."""
     source = ctx.sources.get("ibkr")
     reason = source.probe() if isinstance(source, SessionSource) else None
     return f"skipped: WARN: {reason}" if reason else None
@@ -390,6 +416,40 @@ TASKS: dict[str, Task] = {
             params=(
                 SESSION,
                 Param("symbols", ("--symbols",), str, "comma-separated tickers (default: sample)"),
+            ),
+            skip=_gateway_down,
+        ),
+        Task(
+            "ibkr-contracts",
+            "IBKR contract ids (conid) of the optionable universe: new names, then monthly",
+            ibkr_contracts,
+            (ibkr_contracts.TABLE,),
+            _ibkr_contracts,
+            sources=("ibkr",),
+            settings="sources.toml [ibkr] contracts_refresh_days, contracts_batch",
+            params=(
+                SESSION,
+                Param("symbols", ("--symbols",), str, "comma-separated tickers (resolved now)"),
+                Param("force", ("--force",), None, "re-resolve every contract"),
+                Param("limit", ("--limit",), int, "resolve at most N contracts this run"),
+            ),
+            skip=_gateway_down,
+        ),
+        Task(
+            "ibkr-iv",
+            "IBKR implied / historical vol: nightly snapshot, or a resumable history backfill "
+            "(--from/--to)",
+            ibkr_iv,
+            (ibkr_iv.TABLE,),
+            _ibkr_iv,
+            sources=("ibkr",),
+            settings="sources.toml [ibkr] iv_batch, iv_history_days, iv_backfill_per_night",
+            params=(
+                SESSION,
+                FROM,
+                TO,
+                Param("symbols", ("--symbols",), str, "comma-separated tickers"),
+                Param("limit", ("--limit",), int, "backfill at most N underlyings this run"),
             ),
             skip=_gateway_down,
         ),

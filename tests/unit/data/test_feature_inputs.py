@@ -1,6 +1,6 @@
 """Feature inputs asked of ``algotrade.data`` by table name: each table's point-in-time read
 (bars, earnings snapshots, chain partitions, events by event date, the Treasury curve, share
-facts) and other groups' stored rows, with this run's rows winning."""
+facts, IBKR vols) and other groups' stored rows, with this run's rows winning."""
 
 from datetime import date, timedelta
 
@@ -96,3 +96,24 @@ def test_share_facts_are_seen_from_their_filing_date() -> None:
     seen = loaded.at(END, 0)
     assert seen is not None and list(seen["shares"]) == [10.0]  # the later filing is not seen
     assert loaded.at(early - timedelta(days=1), 0) is None
+
+
+def test_ibkr_vols_are_the_session_and_earlier_rows_merged_per_instrument() -> None:
+    """``volatility/ibkr_iv30`` (``data.volatility.ibkr_iv30``): runs merge per instrument
+    (a later history run replaces a snapshot); ``None`` without a row on the session."""
+    writer, reader = store()
+    days = [END - timedelta(days=d) for d in (3, 2, 1)] + [END]
+    table = "volatility/ibkr_iv30"
+    for i, day in enumerate(days[:-1]):
+        rows = [{"instrument_id": "EQ:A", "iv30_ibkr": 0.2 + i / 100, "hv30_ibkr": 0.1,
+                 "source_kind": "history"}]  # fmt: skip
+        writer.write_table(table, day, "h", stamped(rows, day, "h"))
+    snap = [{"instrument_id": "EQ:A", "iv30_ibkr": 0.5, "hv30_ibkr": None,
+             "source_kind": "snapshot"}]  # fmt: skip
+    writer.write_table(table, days[2], "s", stamped(snap, days[2], "s"))
+    loaded = inputs.load_input(reader, table, [days[2]], 2)
+    window = loaded.at(days[2], 2)
+    assert window is not None
+    assert list(window["iv30_ibkr"]) == pytest.approx([0.2, 0.21, 0.5])  # the later run wins
+    assert list(window["source_kind"]) == ["history", "history", "snapshot"]
+    assert inputs.load_input(reader, table, [END], 3).at(END, 3) is None  # nothing on END

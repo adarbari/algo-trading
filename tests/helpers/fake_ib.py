@@ -34,9 +34,10 @@ class FakeClient:
 
 @dataclass
 class FakeIB:
-    """Canned answers by symbol: ``bars`` / ``iv`` (daily bars), ``dividends`` (past 12
-    months, close), ``expirations`` / ``strikes`` and ``quotes`` ((expiry, strike, right) ->
-    (bid, ask)). Unknown symbols do not qualify."""
+    """Canned answers by symbol: ``bars`` / ``iv`` / ``hv`` (daily bars), ``dividends`` (past
+    12 months, close), ``vols`` (the streamed implied and historical vol), ``expirations`` /
+    ``strikes`` and ``quotes`` ((expiry, strike, right) -> (bid, ask)). Unknown symbols do not
+    qualify."""
 
     bars: Mapping[str, Sequence[Bar]] = field(default_factory=dict)
     iv: Mapping[str, Sequence[Bar]] = field(default_factory=dict)
@@ -44,6 +45,8 @@ class FakeIB:
     expirations: Sequence[str] = ()
     strikes: Sequence[float] = ()
     quotes: Mapping[tuple[str, float, str], tuple[float, float]] = field(default_factory=dict)
+    hv: Mapping[str, Sequence[Bar]] = field(default_factory=dict)  # HISTORICAL_VOLATILITY
+    vols: Mapping[str, tuple[float, float]] = field(default_factory=dict)  # ticks 106, 104
     connect_error: Exception | None = None
     calls: list[str] = field(default_factory=list)
     requests: list[dict[str, Any]] = field(default_factory=list)
@@ -61,19 +64,22 @@ class FakeIB:
         self.calls.append("qualifyContracts")
         out = []
         for c in contracts:
-            known = c.symbol in self.bars or c.symbol in self.dividends
+            known = c.symbol in self.bars or c.symbol in self.dividends or c.symbol in self.vols
             if getattr(c, "secType", "") == "OPT":
                 key = (c.lastTradeDateOrContractMonth, float(c.strike), c.right)
                 known = key in self.quotes
             if known:
                 c.conId = 1000 + len(c.symbol)
+                c.primaryExchange = "NASDAQ"
             out.append(c if known else None)
         return out
 
     def reqHistoricalData(self, contract: Any, **kwargs: Any) -> list[Any]:  # noqa: N802
         self.calls.append("reqHistoricalData")
         self.requests.append({"symbol": contract.symbol, **kwargs})
-        table = self.iv if kwargs["whatToShow"] == "OPTION_IMPLIED_VOLATILITY" else self.bars
+        table = {"OPTION_IMPLIED_VOLATILITY": self.iv, "HISTORICAL_VOLATILITY": self.hv}.get(
+            kwargs["whatToShow"], self.bars
+        )
         return [
             SimpleNamespace(date=d, open=o, high=h, low=lo, close=c, volume=v)
             for d, o, h, lo, c, v in table.get(contract.symbol, ())
@@ -82,13 +88,19 @@ class FakeIB:
     def reqMktData(self, contract: Any, ticks: str, snapshot: bool, regulatory: bool) -> Any:  # noqa: N802
         self.calls.append(f"reqMktData {ticks}")
         past, close = self.dividends.get(contract.symbol, (None, float("nan")))
-        ticker = SimpleNamespace(dividends=None, close=close, _past=past)
+        nan = float("nan")
+        ticker = SimpleNamespace(
+            dividends=None, close=close, _past=past, impliedVolatility=nan, histVolatility=nan,
+            _vols=self.vols.get(contract.symbol),
+        )  # fmt: skip
         self._streams.append(ticker)
         return ticker
 
     def waitOnUpdate(self, timeout: float = 0) -> bool:  # noqa: N802
         self.calls.append("waitOnUpdate")
         for t in self._streams:
+            if t._vols is not None:
+                t.impliedVolatility, t.histVolatility = t._vols
             if t._past is not None:
                 t.dividends = SimpleNamespace(
                     past12Months=t._past, next12Months=t._past, nextDate=None, nextAmount=None

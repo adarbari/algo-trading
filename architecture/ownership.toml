@@ -31,7 +31,7 @@ detect = [{ call = "latest_date" }]
 
 [[responsibility]]
 id = "market-data-reads"
-description = "Domain reads of market data (reference, InstrumentView, universe, bars + adjustments, events, chains, rates) for consumers"
+description = "Domain reads of market data (reference, InstrumentView, universe, bars + adjustments, events, chains, rates, IBKR vols) for consumers"
 owner = ["src/algotrade/data/*"]
 allowed = ["src/algotrade/storage/*"]  # the generic reader itself lives in storage
 section = "docs/adr/0019-ownership-and-boundaries.md#r1-only-data-reads-market-data"
@@ -325,6 +325,22 @@ section = "docs/adr/0026-live-verification-ibkr.md#the-verify-task"
 detect = [{ string = "verification/ibkr" }, { call = "compare_bars" }, { call = "Grader" }]
 
 [[responsibility]]
+id = "ibkr-enrichment"
+description = "IBKR as an enrichment source, read-only (ADR 0028): conids of the optionable universe (instruments/ibkr_contracts) and IB's implied / historical vol per underlying (volatility/ibkr_iv30: history backfill + nightly snapshot), each read through algotrade.data; features derived from them carry licence = personal"
+owner = [
+    "apps/ingestion/algotrade_ingestion/tasks/reference/ibkr_contracts.py",
+    "apps/ingestion/algotrade_ingestion/tasks/market/ibkr_iv.py",
+    "src/algotrade/data/volatility.py",
+]
+allowed = [
+    "src/algotrade/storage/tables/schemas.py",  # declares the tables
+    "src/algotrade/data/reference.py",  # the conid snapshot read (one snapshot rule)
+    "src/algotrade/features/rollups/ibkr_iv.py",  # names its input; read through data.feature_inputs
+]
+section = "docs/adr/0028-ibkr-enrichment-source.md#decision"
+detect = [{ string = "instruments/ibkr_contracts" }, { string = "volatility/ibkr_iv30" }]
+
+[[responsibility]]
 id = "secrets-env"
 description = "Read environment variables and the local .env: credentials, the data URL, the config directory, the default user (callers receive values as parameters)"
 owner = ["src/algotrade/config/env.py"]
@@ -578,6 +594,11 @@ name = "rollups/instrument/iv_history@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
+name = "rollups/instrument/ibkr_iv@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "derived from IBKR market data: personal-use licence (ADR 0028)"
+
+[[table]]
 name = "rollups/daily/*"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "none produced yet (phase 6); rollups are computed only by the rollups task"
@@ -586,6 +607,14 @@ note = "none produced yet (phase 6); rollups are computed only by the rollups ta
 name = "results/*"
 owner = "src/algotrade/storage/tables/result_writer.py"
 note = "one results/<name> per screener (services/screening/run.py) or backtest output (services/backtests/run.py)"
+
+[[table]]
+name = "instruments/ibkr_contracts"
+owner = "apps/ingestion/algotrade_ingestion/tasks/reference/ibkr_contracts.py"
+
+[[table]]
+name = "volatility/ibkr_iv30"
+owner = "apps/ingestion/algotrade_ingestion/tasks/market/ibkr_iv.py"
 
 [[table]]
 name = "verification/ibkr"
