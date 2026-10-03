@@ -1,6 +1,6 @@
 # ADR 0014: Cboe delayed feed for option chains; limited raw retention
 
-**Status:** accepted (2026-10-02). Amends [0012](0012-data-vendors.md) and [0006](0006-storage-grains-and-adapters.md).
+**Status:** accepted (2026-10-02). The packaging note below is done: phase 0.7 split the apps into a uv workspace. Amends [0012](0012-data-vendors.md) and [0006](0006-storage-grains-and-adapters.md).
 
 ## Context
 IBKR cannot pull end-of-day chains for about 4.2k underlyings a night: historical

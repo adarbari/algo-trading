@@ -21,4 +21,8 @@ Read first: ADRs 0007 and 0008, and `docs/data/storage.md` (feature and result g
    (`make baseline`).
 7. **UI:** columns and formats are declared on the screener, so the generic `DataTable`
    renders it without any screen-specific code.
-8. Run `make check`.
+8. **Config:** add a site preset in `config/site/presets/strategies/<id>.toml` (`kind =
+   "screener"`, `impl`, `params`, a `selection` preset or inline selection; `schedule =
+   "nightly"` if it should run every night). Never filter instruments inside the screener
+   itself; that is the selection's job. Check it with `algotrade-backtest config validate <id>`.
+9. Run `make check`.

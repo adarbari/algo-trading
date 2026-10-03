@@ -4,7 +4,7 @@
 |---|---|
 | Author | Claude Code, drafted for @adarbari |
 | Reviewers | @adarbari |
-| Status | **In Review** (approve by merging this PR; it is labelled `no-automerge`) |
+| Status | **Implemented** (PRs #18–#19, #21–#26; approved 2026-10-03) |
 | Created | 2026-10-03 |
 | Last Updated | 2026-10-03 (open questions resolved) |
 

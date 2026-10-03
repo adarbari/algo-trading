@@ -1,6 +1,6 @@
 # ADR 0013: The universe
 
-**Status:** accepted (2026-10-02). Detail: [docs/data/instruments.md](../data/instruments.md).
+**Status:** accepted (2026-10-02); amended by [0015](0015-configs-selections-users.md): the universe is coverage, and strategies select from it. Detail: [docs/data/instruments.md](../data/instruments.md).
 
 ## Context
 We want to cover options trading, swing/momentum trading and, later, futures across a broad
