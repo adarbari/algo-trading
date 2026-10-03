@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with: { python-version: "3.12", cache: pip }
       - run: pip install -e ".[dev]"
       - run: make lint PY=python BIN=
@@ -40,7 +40,7 @@ jobs:
         python: ["3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with: { python-version: "${{ matrix.python }}", cache: pip }
       - run: pip install -e ".[dev]"
       - name: Unit + architecture + property + integration + e2e (coverage gate 90%)
@@ -55,7 +55,7 @@ jobs:
     needs: [quality]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with: { python-version: "3.12", cache: pip }
       - run: pip install -e ".[dev]"
       - run: make datasets-verify PY=python BIN=
