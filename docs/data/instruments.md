@@ -60,3 +60,27 @@ There is no free official flag. Use these, in order:
 Leveraged ETFs reset daily, so long-horizon returns drift away from leverage × index
 return (volatility decay). The feature library must expose `leverage` and `is_inverse` so
 strategies and screeners can account for it.
+
+
+## Universe build (implemented, phase 1.2)
+
+`algotrade-ingest universe-build [--date D] [--review-out candidates.csv]` (and the nightly
+job when `config/site/universe.toml` has `source = "nasdaq_trader"`):
+
+1. Fetches `nasdaqlisted`, `otherlisted`, `options` (Nasdaq Trader) and SPY holdings
+   (State Street); raw responses are kept for 90 days.
+2. Classifies every listing: `COMMON_STOCK` (incl. partnership units), `ADR`, `ETF`, `ETN`,
+   `PREFERRED`, `WARRANT`, `UNIT`, `RIGHT`, `NOTE`, from the name, the ACT symbol and the ETF flag.
+3. Writes **all** listings to `instruments/reference` with `optionable`, `in_sp500`,
+   `first_seen` and leverage flags. Instruments no longer listed stay as `DELISTED` with
+   `delisted_on`.
+4. Writes the **coverage** (`security_types`, test issues, include/exclude lists in
+   `universe.toml`) to `universe`.
+5. Writes `events/reference_change` (added, removed, renamed, type / optionable / exchange
+   changed) and `events/index_change` (S&P 500 adds and removes). S&P members that match no
+   listing make the run PARTIAL.
+
+Leverage: non-ETFs are unleveraged; curated rows in `config/site/overrides/leveraged_etfs.csv`
+win; an ETF without a leverage marker in its name is unleveraged; an ETF with a marker and no
+curated row is **UNKNOWN** and listed in the review file with the leverage its name suggests
+(2026-10-02: 957 candidates). Curate by moving reviewed rows into the overrides file.

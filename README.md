@@ -20,7 +20,8 @@ make evaluate                                   # every strategy x golden datase
 export ALGOTRADE_DATA_URL=file://./var/data     # default; git-ignored
 algotrade-ingest universe --stocks optionable_us_stock_universe.csv \
                           --etfs optionable_us_etf_universe.csv --version 2026-10
-algotrade-ingest nightly --export-dir out/      # chains -> option_liquidity@v1 -> screen -> CSVs
+algotrade-ingest universe-build --review-out leveraged_candidates.csv   # universe + reference
+algotrade-ingest nightly --export-dir out/      # universe -> chains -> rollups -> screens -> CSVs
 algotrade-ingest purge-raw --keep-days 90
 ```
 

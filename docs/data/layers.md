@@ -108,8 +108,9 @@ config/site/
 ```
 
 Owner: the repo (changes by PR, recorded by git commit). Read by ingestion (universe, sources,
-rollups) and services (defaults, presets). Built today: `defaults.toml` and the presets; the
-other files arrive with the phases that read them (see [roadmap](../roadmap.md)).
+rollups) and services (defaults, presets). Built today: `defaults.toml`, `universe.toml`,
+`overrides/leveraged_etfs.csv` and the presets; `sources.toml` and `rollups.toml` arrive with
+the phases that read them (see [roadmap](../roadmap.md)).
 
 ## L4: User configuration (per user)
 
