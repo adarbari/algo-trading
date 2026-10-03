@@ -21,16 +21,18 @@ from algotrade_ingestion.sources.vendors.massive.corporate_actions import Massiv
 from algotrade_ingestion.sources.vendors.massive.tickers import MassiveTickers
 from algotrade_ingestion.sources.vendors.nasdaq.earnings import NasdaqEarningsSource
 from algotrade_ingestion.sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
+from algotrade_ingestion.sources.vendors.sec.company_facts import SecCompanyFacts
 from algotrade_ingestion.sources.vendors.sec.edgar import SecSubmissions, SecTickerMap
 from algotrade_ingestion.sources.vendors.ssga.spy_holdings import SpyHoldingsSource
 from algotrade_ingestion.sources.vendors.treasury.par_yields import TreasuryParYields
 from algotrade_ingestion.tasks.framework.run import stamp
 from tests import cboe_fixture as fx
 from tests import earnings_fixture, massive_fixture, sec_fixture, treasury_fixture, universe_fixture
-from tests.conftest import GOLDEN_DIR
+from tests.conftest import GOLDEN_DIR, REPO_ROOT
 from tests.ingest_helpers import http_for
 
 type Adapter = tuple[Source, FetchRequest]
+FIXTURES = REPO_ROOT / "tests" / "fixtures" / "sources"
 
 
 def cboe() -> Adapter:
@@ -90,6 +92,11 @@ def sec_submissions() -> Adapter:
     return SecSubmissions(http_for(lambda url: payload)), FetchRequest("320193")
 
 
+def sec_company_facts() -> Adapter:
+    payload = (FIXTURES / "sec" / "companyfacts_CIK0000320193.json").read_bytes()
+    return SecCompanyFacts(http_for(lambda url: payload)), FetchRequest("320193")
+
+
 def treasury() -> Adapter:
     payload = treasury_fixture.payload(2025)
     return TreasuryParYields(http_for(lambda url: payload)), FetchRequest("2025")
@@ -100,6 +107,7 @@ ADAPTERS: dict[str, Callable[[], Adapter]] = {
     "massive_tickers": massive_tickers,
     "sec_tickers": sec_tickers,
     "sec_submissions": sec_submissions,
+    "sec_company_facts": sec_company_facts,
     "massive_bars": massive_bars,
     "massive_actions": massive_actions,
     "nasdaq_earnings": nasdaq_earnings,

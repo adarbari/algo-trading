@@ -218,6 +218,27 @@ INSTRUMENT_COMPANY = _fixed(
     *_strings("website", "former_names", "exchanges", "tickers"),
     "fetched_on date",
 )
+# L1: share counts from SEC company facts, per instrument (every class of a CIK gets the
+# CIK's facts). Runs are increments (new facts + a ``checked`` marker per fetched CIK), so
+# they merge; a fact is identified by (instrument, concept, period end, filed date).
+INSTRUMENT_SHARES = _fixed(
+    "instruments/shares",
+    "reference",
+    ("instrument_id", "cik", "concept", "fetched_on"),
+    "instrument_id string!",
+    *_strings("symbol", "tag", "form", "accn", "fp"),
+    "cik string!",
+    "concept string!",
+    "period_start date",
+    "period_end date",
+    "filed date",
+    "fy int64",
+    "shares float64",
+    "class_values int64",
+    "fetched_on date!",
+    runs="merge",
+    key=("instrument_id", "concept", "period_end", "filed"),
+)
 # L2: the Treasury par yield curve, one partition per curve date, one row per tenor
 # (``instrument_id`` = ``RATE:UST-<tenor>``). Rates are decimals; ADR 0021 has the conventions.
 TREASURY_RATES = _fixed(
@@ -252,6 +273,7 @@ KNOWN: dict[str, TableSpec] = {
         SYMBOL_HISTORY,
         ID_MAP,
         INSTRUMENT_COMPANY,
+        INSTRUMENT_SHARES,
         TREASURY_RATES,
     )
 }

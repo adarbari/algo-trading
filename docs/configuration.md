@@ -66,7 +66,7 @@ Fields come from a catalogue built from the code, so a typo or a type mismatch f
 | Field | Source table | Example |
 |---|---|---|
 | `instrument.<column>` | L1 `instruments/reference`; company columns from `instruments/company` | `instrument.security_type`, `instrument.is_leveraged`, `instrument.sector` |
-| `rollup.<name>@v<N>.<column>` | `rollups/instrument/<name>@v<N>` (columns and types declared on the rollup, `features/registry.py`) | `rollup.option_liquidity@v1.put_tier`, `rollup.price_stats@v1.hv30`, `rollup.price_stats@v1.adv_usd_20d`, `rollup.earnings@v1.days_to_earnings` |
+| `rollup.<name>@v<N>.<column>` | `rollups/instrument/<name>@v<N>` (columns and types declared on the rollup, `features/registry.py`) | `rollup.option_liquidity@v1.put_tier`, `rollup.price_stats@v1.hv30`, `rollup.price_stats@v1.adv_usd_20d`, `rollup.earnings@v1.days_to_earnings`, `rollup.fundamentals@v1.market_cap` |
 
 Selectable rollup fields today ([data/layers.md](data/layers.md#rollups-as-built) has the rules):
 
@@ -123,7 +123,7 @@ alone (ADR 0019 `site-settings`); apps receive frozen dataclasses, never dicts:
 | File | Type | Holds |
 |---|---|---|
 | `defaults.toml` | `ScreeningSettings`, `BacktestSettings` (`CostSettings`, `LimitSettings`) | run defaults, layered per config |
-| `sources.toml` | `SourcesSettings` (`VendorSettings` per section) | per-vendor `enabled` and `min_interval_s` pacing, chain workers, earnings days, corporate-actions window, SEC refresh days; `[http]` retry cap, circuit breaker and limiter directory; raw and staging retention; `[quality]` thresholds of the nightly data-quality checks |
+| `sources.toml` | `SourcesSettings` (`VendorSettings` per section) | per-vendor `enabled` and `min_interval_s` pacing, chain workers, earnings days, corporate-actions window, SEC refresh days (`[sec_edgar] refresh_days` company details, `facts_refresh_days` share counts; spread over the window by CIK); `[http]` retry cap, circuit breaker and limiter directory; raw and staging retention; `[quality]` thresholds of the nightly data-quality checks |
 | `universe.toml` (+ `overrides/leveraged_etfs.csv`) | `UniverseSettings` | coverage mode (`nasdaq_trader` / `csv_import`), security types, include / exclude symbols, leverage rules (markers, conventions, patterns, inverse markers, exclusions; regexes are compiled and `leverage_patterns` need a `(?P<n>...)` group) |
 | `nightly.toml` | `NightlySettings` | `[sessions]` settle margin and catch-up cap, `[alerts]` nightly duration, `[notify]` desktop notification and the summary file path |
 | `rollups.toml` | each rollup's own params dataclass (`rollup_params` / `load_rollups`) | one `["<name>@v<N>"]` section per rollup that takes parameters; each scalar field of its params dataclass (bool, int, float, str) is a key typed by its default, and the dataclass validates ranges (`price_stats@v1`: `year_sessions`, `min_year_sessions`, `periods_per_year`; `option_liquidity@v1`: DTE window, delta bands; `dividends@v1`: `min_history_days`, `include_special`; `iv30@v1`: `target_days`, `min_days`, `max_days`, `max_spread_pct`, `min_open_interest`, `min_volume`; `iv_history@v1`: `window`, `min_provisional`, `source` (`ours` / `cboe`); `liquidity_class@v1`: `high_` / `medium_` `min_adv_usd`, `min_price`, `option_tiers` (comma list, worse of put / call; `""` none), `min_chain_oi`, `min_chain_volume` (0 none)). A rollup without parameters has no section (a fitness test checks both ways) |

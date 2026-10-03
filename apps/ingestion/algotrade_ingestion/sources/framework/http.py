@@ -7,6 +7,7 @@ on it), the ``RetryPolicy`` and the vendor's ``CircuitBreaker``. Tests build ``H
 a fake transport, so no test needs the network.
 """
 
+import gzip
 import random
 import threading
 import time
@@ -37,15 +38,18 @@ def urllib_transport(
     timeout: float = 60.0,
     headers: dict[str, str] | None = None,
 ) -> Transport:
-    """``headers`` carry credentials (e.g. ``Authorization``) so keys never appear in URLs."""
-    all_headers = {"User-Agent": user_agent, **(headers or {})}
+    """``headers`` carry credentials (e.g. ``Authorization``) so keys never appear in URLs.
+    Responses may come gzip-compressed (SEC company facts: ~10x smaller); bodies are returned
+    decompressed, as the vendor sent them before encoding."""
+    all_headers = {"User-Agent": user_agent, "Accept-Encoding": "gzip", **(headers or {})}
 
     def get(url: str) -> bytes:
         request = urllib.request.Request(url, headers=all_headers)
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 body: bytes = response.read()
-                return body
+                encoding = (response.headers.get("Content-Encoding") or "").lower()
+                return gzip.decompress(body) if encoding == "gzip" else body
         except urllib.error.HTTPError as exc:
             header = exc.headers.get("Retry-After") if exc.headers else None
             retry = float(header) if header and header.isdigit() else None

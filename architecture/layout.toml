@@ -232,7 +232,7 @@ purpose = "task machinery: the ingest run loop (IngestRun, TaskContext) and the 
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/reference"
-purpose = "reference-data tasks: universe, instrument ids, classification, history, companies"
+purpose = "reference-data tasks: universe, instrument ids, classification, history, companies, share counts, refresh scheduling"
 kind = "task-domain"
 
 [[dir]]

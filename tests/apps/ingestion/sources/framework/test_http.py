@@ -1,3 +1,4 @@
+import gzip
 import io
 import urllib.error
 from datetime import date
@@ -68,6 +69,16 @@ def test_urllib_transport_maps_http_errors() -> None:
     response.__enter__.return_value.read.return_value = b"body"
     with mock.patch("urllib.request.urlopen", return_value=response):
         assert urllib_transport()("https://example.com") == b"body"
+
+
+def test_urllib_transport_asks_for_gzip_and_decompresses() -> None:
+    response = mock.MagicMock()
+    inner = response.__enter__.return_value
+    inner.read.return_value = gzip.compress(b'{"cik": 1}')
+    inner.headers = {"Content-Encoding": "gzip"}
+    with mock.patch("urllib.request.urlopen", return_value=response) as opened:
+        assert urllib_transport()("https://example.com") == b'{"cik": 1}'
+    assert opened.call_args.args[0].get_header("Accept-encoding") == "gzip"
 
 
 def test_source_builds_url() -> None:

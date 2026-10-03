@@ -4,14 +4,15 @@ Each run writes a **full snapshot** for its session: one row per instrument in t
 ``instruments/reference`` whose company is known, so "as of D" reads stay point-in-time.
 
 - CIK: the reference's (Massive, phase 1.5) when present, else the SEC ticker map.
-- Incremental: submissions are fetched only for CIKs not yet stored or fetched more than
-  ``refresh_days`` before the session (``force`` refetches all; ``limit`` caps a run). Every
-  other CIK carries its previous details forward, so a nightly run makes few requests.
+- Incremental: submissions are fetched only for CIKs not yet stored or past their refresh
+  slot (``tasks/reference/refresh.py``: once per ``refresh_days``, spread over the window by
+  CIK; ``force`` refetches all; ``limit`` caps a run). Every other CIK carries its previous
+  details forward, so a nightly run makes few requests.
 - Funds and ETFs often have no submissions (404) or no CIK at all: counted, not failures.
 """
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 from functools import partial
 
 import pandas as pd
@@ -23,6 +24,7 @@ from algotrade.data.reference import instruments, snapshot
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.sources.framework.base import FetchRequest, Source
 from algotrade_ingestion.tasks.framework.run import IngestRun, NoResponseError, TaskContext
+from algotrade_ingestion.tasks.reference.refresh import due_keys
 
 TASK = "company_details"
 TABLE = "instruments/company"
@@ -81,16 +83,12 @@ def assign_ciks(reference: pd.DataFrame, sec_map: dict[str, str]) -> pd.DataFram
 def due_ciks(
     ciks: list[str], previous: pd.DataFrame | None, session: date, refresh_days: int, force: bool
 ) -> list[str]:
-    """CIKs to fetch: never stored first, then the stalest; all of them with ``force``."""
-    if force or previous is None or previous.empty:
-        return sorted(ciks)
-    on = pd.to_datetime(previous["fetched_on"]).dt.date
-    fetched = on.groupby(previous["cik"]).max()
-    cutoff = session - timedelta(days=refresh_days)
-    new = sorted(c for c in ciks if c not in fetched.index)
-    stale = sorted((c for c in ciks if c in fetched.index and fetched[c] <= cutoff),
-                   key=lambda c: (fetched[c], c))  # fmt: skip
-    return new + stale
+    """CIKs to fetch (``refresh.due_keys``): never stored first, then the stalest due."""
+    fetched: dict[str, date] = {}
+    if previous is not None and not previous.empty:
+        on = pd.to_datetime(previous["fetched_on"]).dt.date
+        fetched = {str(k): v for k, v in on.groupby(previous["cik"]).max().items()}
+    return due_keys(ciks, fetched, session, refresh_days, force)
 
 
 def _previous(reader: StoreReader, session: date) -> pd.DataFrame | None:

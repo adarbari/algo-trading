@@ -167,6 +167,20 @@ instrument whose company is known; `algotrade-ingest company-details`)
 | `state_of_incorporation`, `fiscal_year_end` (MMDD), `website` | `website` is blank for most filers |
 | `fetched_on` | when SEC was last asked; drives the `refresh_days` refresh |
 
+**`instruments/shares`** (SEC company facts, phase 2b.4; increments merged across runs, one row
+per instrument, concept, period end and filing date; `algotrade-ingest shares`)
+
+| Columns | Notes |
+|---|---|
+| `instrument_id`, `symbol`, `cik` | every instrument of a CIK gets the CIK's facts (company totals; companyfacts has no class-specific counts) |
+| `concept`, `tag` | `dei` (cover-page shares outstanding), `weighted_basic` (weighted average basic), or `checked`: a marker that the CIK was fetched on `fetched_on` (no shares; keeps funds without facts from being refetched nightly) |
+| `period_start`, `period_end`, `filed`, `form`, `accn`, `fy`, `fp` | as filed; `filed` is the point-in-time date |
+| `shares`, `class_values` | the count; `class_values` > 1 when several class values of one filing were summed |
+| `fetched_on` | when SEC was last asked; drives `facts_refresh_days` |
+
+Reads (`data.shares`) union every partition and keep the latest stored version per key. A fact
+counts from its `filed` date, whichever partition stored it, so a backfill serves history.
+
 Selections read the company columns as `instrument.<column>` (`instrument.sector`,
 `instrument.industry`, `instrument.sic`, `instrument.sic_division`, `instrument.website`,
 `instrument.state_of_incorporation`, `instrument.fiscal_year_end`) from the latest snapshot on
@@ -215,7 +229,19 @@ A rollup is a versioned, pure definition, `<name>@v<N>`, stored as
 | `iv30@v1` | `iv30` (ours), `iv30_cboe`, `iv30_status`, `near_expiry`, `far_expiry`, `atm_strike_near`, `spot`, `rate`, `div_yield`, `n_quotes_used` | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `dividends@v1` | built |
 | `iv_history@v1` | `iv30`, `iv_rank_252d`, `iv_percentile_252d`, `history_days`, `rank_status` (UNKNOWN / PROVISIONAL / FULL), `iv_hv_spread`, `iv_hv_ratio` | `iv30@v1` over 252 sessions, `price_stats@v1` | built |
 | `liquidity_class@v1` | `liquidity_class` (HIGH / MEDIUM / LOW / UNKNOWN), `adv_usd_20d`, `close`, `option_tier`, `chain_oi`, `rule_hash` | `price_stats@v1`, `option_liquidity@v1`, thresholds in `config/site/rollups.toml` | built |
-| `fundamentals@v1` | `market_cap`, `shares_outstanding` | Massive / EDGAR | 2b |
+| `fundamentals@v1` | `shares_outstanding`, `shares_as_of`, `shares_filed`, `shares_source` (dei / weighted_basic), `market_cap`, `market_cap_status` (OK / NO_SHARES / STALE / NO_PRICE) | `instruments/shares` (filed on or before the session), `price_stats@v1` close, `events/split`; `stale_days` in `config/site/rollups.toml` | built |
+
+**`fundamentals@v1` rules.** Among facts FILED on or before the session: the latest cover
+count (`dei`; latest filed, then latest period end, so an amendment wins) while the company
+still tags it (its latest `dei` filing is no older than its latest weighted average), else the
+latest filing's weighted average basic. Splits after the count multiply it (after
+`period_end` for a cover count, after `filed` for a weighted average, which filers restate).
+`market_cap = shares_outstanding x close` only when `OK`; `NO_SHARES` (ETFs, funds, no CIK:
+null, not an error), `STALE` (period end more than `stale_days`, 400, before the session;
+the count is still shown) and `NO_PRICE` have a null market cap. Counts are company totals,
+so a class's market cap is the total times its own close (fine for GOOGL / GOOG, wrong for
+classes at very different prices, such as BRK.A / BRK.B). One row per instrument with a
+`price_stats@v1` row or a share count.
 
 **`price_stats@v1` rules.** Windows are exchange sessions, not "the instrument's last n bars":
 a session without a bar is a gap, and a statistic is null (UNKNOWN), never zero or computed

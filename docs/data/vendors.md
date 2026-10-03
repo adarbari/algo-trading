@@ -24,6 +24,7 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 | Ticker universe | Nasdaq Trader symbol directory (`nasdaqlisted.txt`, `otherlisted.txt`, `options.txt`) | — | Official, free, updated daily |
 | S&P 500 membership | SPY daily holdings file (State Street) | — | Membership changes become events |
 | Company details (name, SIC, sector, state, fiscal year end) | SEC EDGAR submissions (free; contact email in the user agent) | Massive ticker details | Implemented, phase 1.7 |
+| Shares outstanding (market cap) | SEC EDGAR company facts (XBRL; free; same contact and pacing) | Massive ticker details (`share_class_shares_outstanding`) | Implemented, phase 2b.4 |
 | Daily stock and ETF bars (swing / momentum) | Massive (formerly Polygon) free tier: all US tickers, 2 years history, 5 calls/min; "grouped daily" = whole market in 1 call | Alpaca (free account), IBKR, Yahoo (unofficial, history backfill only) | |
 | End-of-day option chains | **Cboe delayed-quotes feed** (ADR 0014): whole chain + Greeks + IV + OI and the underlying's `iv30` in one request per underlying; about 4.2k requests a night | IBKR for a focused list / cross-check; Schwab Trader API (free with account; Greeks; all expiries in one call; 120 req/min); Tradier (needs a brokerage account for Greeks); Alpaca (free indicative feed, history from 2024-02); Massive options (paid, from ~$29/mo; licensed fallback) | No free source covers end-of-day chains for the whole universe with history. **We build our own IV history from day one.** |
 | Futures (later) | **IBKR** (contracts, history, including recently expired) | Databento (pay-as-you-go history), Massive futures (paid), Yahoo/Stooq continuous (unofficial, unclear rolls) | |
@@ -115,8 +116,9 @@ ticker map and submissions).
 the universe build, skipped unless `[sec_edgar] enabled` and the contact are set) writes a full
 `instruments/company` snapshot per session. The CIK comes from the reference (Massive, phase
 1.5) or, when missing, from the SEC ticker map (`BRK-B` → `BRK.B`, `ABR-PD` → `ABR$D`).
-Incremental: only CIKs never stored or fetched more than `refresh_days` (30) ago are requested,
-so the first run makes ~6k requests (~25 min) and a nightly run a handful. 404 (no filings,
+Incremental: only CIKs never stored or past their refresh slot (once per `refresh_days`, 30,
+[spread over the window](#refreshes-spread-over-the-window)) are requested, so the first run
+makes ~6k requests (~25 min) and a nightly run about 1/30 of them. 404 (no filings,
 common for funds) is counted as `no_submissions`, not a failure; 403 and 5xx are failures
 (run PARTIAL). Checked 2026-10-02: 13,295 reference rows, 6,055 distinct CIKs from the SEC
 map; most ETFs have no CIK in that map and get no company row (UNKNOWN to selections).
@@ -124,6 +126,48 @@ map; most ETFs have no CIK in that map and get no company row (UNKNOWN to select
 `sector` is a heuristic mapping of SIC code ranges to market sectors (Technology, Health Care,
 Financials, …; `sources/vendors/sec/sic.py`), falling back to one sector per SIC division;
 `industry` is the SEC's SIC description and `sic_division` the official division.
+
+## SEC EDGAR company facts (implemented, phase 2b.4)
+
+`https://data.sec.gov/api/xbrl/companyfacts/CIK##########.json`: every non-dimensional XBRL
+fact a company has filed (up to ~5 MB; requested gzip-compressed, ~10x smaller). Same contact
+`User-Agent`, `sec` limiter and `[sec_edgar]` section as the other SEC sources
+(`sources/vendors/sec/company_facts.py`, source `sec_company_facts`). We keep two concepts:
+
+| Concept | Short name | Kept per filing |
+|---|---|---|
+| `dei:EntityCommonStockSharesOutstanding` (cover page, as of a date just before filing) | `dei` | each value; several values for one date are classes (companyfacts drops the class labels) and are summed, `class_values` counts them |
+| `us-gaap:WeightedAverageNumberOfSharesOutstandingBasic` | `weighted_basic` | the filing's current period: latest period end, then the shortest span (comparatives and year-to-date dropped) |
+
+Every row keeps `filed` (point in time), `period_end`, `form` and `accn`; amendments (10-K/A)
+are their own rows with a later `filed`. Zero counts are dropped; a 404 (no XBRL facts, most
+funds) is `NO_FACTS`, not a failure.
+
+`algotrade-ingest shares [--date D] [--force] [--limit N]` (nightly after company details)
+stores new facts in `instruments/shares` (docs/data/layers.md). The CIK comes from the latest
+`instruments/company` snapshot, else the reference. **Classes:** companyfacts has no
+class-specific counts, so every instrument of a CIK (GOOGL and GOOG) gets the company total.
+Most multi-class issuers no longer tag the cover count, so they fall back to the weighted
+average; Berkshire's last facts are from 2015 (class A equivalents), so BRK.A / BRK.B are
+`STALE` in `fundamentals@v1`, not wrong.
+
+Checked live 2026-10-03 (closes of 2026-10-02): AAPL 14.594B shares (dei, as of 2026-07-17)
+→ $4.87T; KO 4.302B (dei, 2026-04-28) → $368.5B; GOOGL / GOOG 12.151B (weighted basic, Q2
+2026) → $4.17T / $4.14T; BRK.B STALE. Four requests took ~0.3 s each.
+
+**Backfill:** `algotrade-ingest shares` once (~6k CIKs at the 0.2 s `sec` pacing plus
+download: about 30 to 40 minutes, ~1 GB of gzip raw kept for `raw_retention_days`), then
+`algotrade-ingest rollups --from <first session> --to <last session> --only fundamentals@v1`.
+A crashed run resumes where it stopped (same session); `--limit N` splits it into chunks.
+
+### Refreshes spread over the window
+
+Incremental SEC tasks (`company-details`, `shares`) refetch a CIK once per refresh window
+(`[sec_edgar] refresh_days`, `facts_refresh_days`; 30 days), on the CIK's own slot day
+(`crc32(CIK) % window`; `tasks/reference/refresh.py`). After a one-night backfill the CIKs
+come due spread evenly over the next 30 nights (~200 a night) instead of all on night 30; a
+slot day without a run is picked up by the next run. New CIKs always come first, then the
+stalest, so `--limit` works through a backlog oldest first; `--force` refetches all.
 
 ## What IBKR gives us
 
