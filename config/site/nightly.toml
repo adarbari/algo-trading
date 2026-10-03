@@ -7,7 +7,7 @@ settle_minutes = 30              # a session counts as closed this long after it
 max_catch_up = 5                 # after missed nights, ingest at most this many sessions (the latest ones)
 
 [alerts]
-max_duration_minutes = 150       # a nightly run longer than this is recorded as a WARN (paced Cboe chains take ~105 min)
+max_duration_minutes = 150       # a nightly run longer than this is recorded as a WARN (paced Cboe chains take ~75 min)
 
 [notify]                         # after every run (desktop: only when the status is not COMPLETE)
 enabled = true                   # false: no desktop notification and no email (the summary file is still written)

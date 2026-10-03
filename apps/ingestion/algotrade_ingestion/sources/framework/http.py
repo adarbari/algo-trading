@@ -15,7 +15,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import Literal, Protocol
 
 DEFAULT_USER_AGENT = "algotrade-ingestion/0.1 (+https://github.com/adarbari/algo-trading)"
 # api.nasdaq.com rejects non-browser user agents.
@@ -127,9 +127,21 @@ class CircuitBreaker:
 
 
 class Pacer(Protocol):
+    """A vendor limiter (``sources/framework/limiter.py``) as a fixed pace: wait for a slot,
+    or hold every process (session sources such as IB Gateway use only this)."""
+
     def wait(self) -> float: ...
 
     def hold(self, seconds: float) -> None: ...
+
+
+class AdaptivePacer(Pacer, Protocol):
+    """What HTTP fetches use: every attempt waits on the limiter and reports how it went, so
+    the pace adapts (Retry-After holds, back-off, error-rate slowdown, recovery)."""
+
+    def throttled(self, seconds: float) -> None: ...
+
+    def record(self, outcome: Literal["ok", "missing", "error"]) -> None: ...
 
 
 def get_with_retry(
@@ -138,15 +150,17 @@ def get_with_retry(
     policy: RetryPolicy,
     sleep: Sleep = time.sleep,
     *,
-    limiter: Pacer | None = None,
+    limiter: AdaptivePacer | None = None,
     breaker: CircuitBreaker | None = None,
     clock: Callable[[], float] = time.monotonic,
 ) -> bytes | None:
     """Fetch ``url``. Returns ``None`` for give-up statuses (e.g. 404: no such chain).
 
-    Every attempt waits on ``limiter``. 429 honours Retry-After or backs off exponentially;
-    other failures back off linearly. Gives up after ``policy.tries`` attempts, or when the
-    next wait would pass ``policy.max_total_s``, or when ``breaker`` opens.
+    Every attempt waits on ``limiter`` and reports its outcome to it. A 429 waits out
+    Retry-After (or an exponential back-off): through ``limiter.throttled`` when there is a
+    limiter, so every thread and process holds, else by sleeping here. Other failures back off
+    linearly. Gives up after ``policy.tries`` attempts, or when the next wait would pass
+    ``policy.max_total_s``, or when ``breaker`` opens.
     """
     started = clock()
     last_error: Exception | None = None
@@ -155,6 +169,7 @@ def get_with_retry(
             breaker.check()
         if limiter is not None:
             limiter.wait()
+        pause = True  # sleep here before the next attempt (False: the limiter holds instead)
         try:
             body = transport(url)
         except HttpError as exc:
@@ -162,25 +177,46 @@ def get_with_retry(
             if breaker is not None:
                 breaker.record(None if missing else exc.status)
             if missing:
+                _report(limiter, "missing")
                 return None
             last_error = exc
-            delay = (
-                exc.retry_after or min(policy.max_delay, 5 * 2**attempt)
-                if exc.status == 429
-                else _linear(policy, attempt)
-            )
+            delay, pause = _backoff(exc, policy, attempt, limiter)
         except (OSError, TimeoutError) as exc:
             last_error, delay = exc, _linear(policy, attempt)
+            _report(limiter, "error")
         else:
             if breaker is not None:
                 breaker.record(None)
+            _report(limiter, "ok")
             return body
         if attempt + 1 == policy.tries:
             break
         if policy.max_total_s is not None and clock() - started + delay > policy.max_total_s:
             raise RuntimeError(f"giving up on {url} after {clock() - started:.0f}s: {last_error}")
-        sleep(delay)
+        if pause:
+            sleep(delay)
     raise RuntimeError(f"giving up on {url}: {last_error}")
+
+
+def _backoff(
+    exc: HttpError, policy: RetryPolicy, attempt: int, limiter: AdaptivePacer | None
+) -> tuple[float, bool]:
+    """(delay before the next attempt, whether to sleep it here). A 429 waits out Retry-After
+    (else an exponential back-off) through the limiter, which holds every process; other
+    errors back off linearly here."""
+    if exc.status != 429:
+        _report(limiter, "error")
+        return _linear(policy, attempt), True
+    delay = exc.retry_after or min(policy.max_delay, 5 * 2**attempt)
+    if limiter is None:
+        return delay, True
+    limiter.throttled(delay)
+    return delay, False
+
+
+def _report(limiter: AdaptivePacer | None, outcome: Literal["ok", "missing", "error"]) -> None:
+    if limiter is not None:
+        limiter.record(outcome)
 
 
 def _linear(policy: RetryPolicy, attempt: int) -> float:
@@ -193,7 +229,7 @@ class Http:
 
     transport: Transport
     policy: RetryPolicy = field(default_factory=RetryPolicy)
-    limiter: Pacer | None = None
+    limiter: AdaptivePacer | None = None
     breaker: CircuitBreaker | None = None
     sleep: Sleep = time.sleep
 

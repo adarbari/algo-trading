@@ -1,6 +1,7 @@
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from algotrade.data import StoreReader
@@ -9,6 +10,7 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.sources.framework.http import HttpError, RetryPolicy
+from algotrade_ingestion.sources.framework.limiter import Limiter, Pacing
 from algotrade_ingestion.sources.vendors.cboe.option_chains import URL, CboeOptionsSource
 from algotrade_ingestion.tasks.derived.rollups import compute_rollups
 from algotrade_ingestion.tasks.market.option_chains import (
@@ -17,11 +19,12 @@ from algotrade_ingestion.tasks.market.option_chains import (
     ChainJobConfig,
     Underlying,
     ingest_option_chains,
+    prioritise,
 )
 from algotrade_ingestion.tasks.reference.universe_import import UniverseFile, import_universe
 from tests.helpers.ingest_fakes import CountingLimiter, http_for, task_ctx
 from tests.helpers.payloads import cboe as fx
-from tests.helpers.stored_frames import write_reference
+from tests.helpers.stored_frames import stamped, write_reference
 
 DAY = fx.SESSION
 CLOCK = lambda: datetime(2026, 10, 2, 22, 0, tzinfo=UTC)  # noqa: E731
@@ -209,3 +212,75 @@ def test_universe_import_requires_ticker(tmp_path: Path) -> None:
             "v",
             DAY,
         )
+
+
+PRICE_STATS = "rollups/instrument/price_stats@v2"
+OPTION_LIQ = "rollups/instrument/option_liquidity@v1"
+
+
+def _rows(day: date, run_id: str, rows: list[dict[str, object]]) -> pd.DataFrame:
+    return stamped(rows, day, run_id)
+
+
+def test_prioritise_orders_by_priority_sp500_liquidity_then_alphabetically() -> None:
+    backend = MemoryBackend()
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    symbols = ["AAA", "BBB", "MSFT", "AAPL", "QQQ", "SPY", "LOWX", "HIGH1", "HIGH2", "MED", "UNK"]
+    reference = [
+        {"instrument_id": f"EQ:{s}", "symbol": s, "asset_class": "EQ", "multiplier": 1.0,
+         "security_type": "ETF" if s in ("SPY", "QQQ") else "COMMON_STOCK", "status": "ACTIVE",
+         "in_sp500": s in ("MSFT", "AAPL")}
+        for s in symbols
+    ]  # fmt: skip
+    writer.write_table("instruments/reference", DAY, "ref", _rows(DAY, "ref", reference))
+    big, ok = {"adv_usd_20d": 2e8, "close": 50.0}, {"liq_status": "OK"}
+    tier_a = {**ok, "put_tier": "A", "call_tier": "A", "chain_volume": 9000}
+    tier_b = {**ok, "put_tier": "B", "call_tier": "B", "chain_volume": 100}
+    rows = {  # symbol -> (price_stats@v2 row, option_liquidity@v1 row)
+        "HIGH1": (big, {**tier_a, "chain_oi": 60_000}),
+        "HIGH2": (big, {**tier_a, "chain_oi": 90_000}),
+        "MED": ({"adv_usd_20d": 2e7, "close": 20.0}, {**tier_b, "chain_oi": 6_000}),
+        "LOWX": ({"adv_usd_20d": 1e6, "close": 3.0}, {**ok, "put_tier": "D", "chain_oi": 1}),
+        "UNK": (big, {"liq_status": "FETCH_ERROR"}),  # the fetch failed: UNKNOWN
+        "MSFT": (big, {**tier_a, "chain_oi": 60_000}),  # HIGH
+        "AAPL": ({"adv_usd_20d": 2e7, "close": 20.0}, {**tier_b, "chain_oi": 6_000}),  # MEDIUM
+    }
+    yesterday = DAY - timedelta(days=1)
+    prices = [{"instrument_id": f"EQ:{s}", **p} for s, (p, _) in rows.items()]
+    options = [{"instrument_id": f"EQ:{s}", **o} for s, (_, o) in rows.items()]
+    writer.write_table(PRICE_STATS, yesterday, "r1", _rows(yesterday, "r1", prices))
+    writer.write_table(OPTION_LIQ, yesterday, "r1", _rows(yesterday, "r1", options))
+    later = DAY + timedelta(days=1)  # after the session: never used
+    aaa = [{"instrument_id": "EQ:AAA", **big}]
+    writer.write_table(PRICE_STATS, later, "r2", _rows(later, "r2", aaa))
+    ordered, tiers = prioritise(reader, DAY, universe(*symbols), ["spy", "QQQ", "NOPE"])
+    assert [u.symbol for u in ordered] == [
+        "SPY", "QQQ",  # configured priority, in its order
+        "MSFT", "AAPL",  # S&P 500 by liquidity class
+        "HIGH2", "HIGH1", "MED", "LOWX", "UNK",  # class, then chain OI descending
+        "AAA", "BBB",  # the rest, alphabetically
+    ]  # fmt: skip
+    assert tiers == {"priority": 4, "liquidity": 5, "rest": 2}
+    # an empty store: everything alphabetical, except the configured priority
+    bare, tiers = prioritise(StoreReader(MemoryBackend()), DAY, universe("B", "A", "SPY"), ["SPY"])
+    assert [u.symbol for u in bare] == ["SPY", "A", "B"]
+    assert tiers == {"priority": 1, "liquidity": 0, "rest": 2}
+
+
+def test_chain_run_fetches_in_priority_order_and_records_tiers_and_pacing(
+    tmp_path: Path,
+) -> None:
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    feed = FakeFeed({"SPY": fx.payload("SPY"), "B": fx.payload("B")})
+    limiter = Limiter("cboe", Pacing(0.0), tmp_path)
+    source = CboeOptionsSource(http_for(feed, NO_RETRY, limiter))
+    ctx = task_ctx(writer, clock=CLOCK)
+    ctx.pacing = {"cboe": limiter, "idle": Limiter("idle", 0.0, tmp_path)}
+    config = ChainJobConfig(workers=1, retry_pause_s=0, priority_symbols=("SPY",))
+    record = ingest_option_chains(ctx, source, universe("B", "A", "SPY"), DAY, config)
+    assert feed.calls == ["SPY", "A", "B"]
+    assert record.stats["order_tiers"] == {"priority": 1, "liquidity": 0, "rest": 2}
+    pacing = record.stats["pacing"]
+    assert set(pacing) == {"cboe"}  # keys that sent no request are left out
+    assert pacing["cboe"]["requests"] == 3 and pacing["cboe"]["errors"] == 0  # A: 404, missing

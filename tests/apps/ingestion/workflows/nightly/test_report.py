@@ -166,3 +166,30 @@ def test_run_timing_section() -> None:
     assert "Run timing (America/Los_Angeles)" in html and "background:#fff8c5" in html
     over = build_report(fx.summary(), fx.records(), None, 5, (), 600)
     assert "OVER the alert threshold" in render_text(over)
+
+
+def test_vendor_pacing_per_step_in_run_timing() -> None:
+    records = fx.records()
+    chains = records[(fx.D.isoformat(), "chains")]
+    chains.stats["pacing"] = {
+        "cboe": {
+            "requests": 4210,
+            "throttled_429": 3,
+            "retry_after_wait_s": 150.0,
+            "limiter_wait_s": 4400.0,
+            "error_rate_slowdowns": 1,
+            "interval_min_s": 1.05,
+            "interval_max_s": 2.363,
+            "interval_final_s": 1.1,
+        },
+        "bad": "not a mapping",
+    }
+    report = build_report(fx.summary(), records, LABELS)
+    assert [(p.step, p.key, p.requests) for p in report.pacing] == [("chains", "cboe", 4210)]
+    line = (
+        "chains / cboe: 4,210 requests, 3 x 429 (Retry-After 2m 30s), rate-limit wait "
+        "1h 13m, 1 error-rate slowdown(s), interval 1.05-2.363s (final 1.1s)"
+    )
+    assert line in render_text(report)
+    assert "Vendor pacing" in render_html(report)
+    assert build_report(fx.summary(), fx.records()).pacing == ()

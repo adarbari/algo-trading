@@ -91,9 +91,19 @@ PRICE_ADJUSTMENTS = ("none", "splits", "total_return")
 REBALANCE_SELECTION = re.compile(r"^(none|monthly|weekly|[1-9][0-9]*d)$")
 # Per-vendor keys beyond ``enabled`` / ``min_interval_s`` (sections are config keys; the
 # vendor code that reads them stays in apps/ingestion/sources).
-VENDOR_KEYS = ("enabled", "min_interval_s", "raw_retention_days")
+VENDOR_KEYS = (
+    "enabled",
+    "min_interval_s",
+    "max_interval_s",
+    "start_interval_s",
+    "raw_retention_days",
+)
+# Sections whose sources pace at a fixed min_interval_s (session sources, e.g. IB Gateway:
+# no HTTP responses to adapt to), so the adaptive keys are not accepted there.
+FIXED_PACE = ("ibkr",)
+ADAPTIVE_KEYS = ("max_interval_s", "start_interval_s")
 VENDOR_EXTRAS = {
-    "cboe": ("workers",),
+    "cboe": ("workers", "priority_symbols"),
     "nasdaq_earnings": ("days",),
     "massive": ("corporate_actions_window",),
     "sec_edgar": ("refresh_days", "facts_refresh_days"),
@@ -128,12 +138,18 @@ class SiteDocuments(Protocol):
 
 @dataclass(frozen=True)
 class VendorSettings:
-    """One vendor section of ``sources.toml``: on/off, its pacing (``None``: the registry's
-    default for that source) and how long its raw responses are kept (``None``: the global
-    ``raw_retention_days``)."""
+    """One vendor section of ``sources.toml``: on/off, its pacing and how long its raw
+    responses are kept (``None``: the global ``raw_retention_days``).
+
+    Pacing (sources/framework/limiter.py): ``min_interval_s`` is the floor, the fastest the
+    adaptive limiter ever goes (``None``: the registry's default for that source);
+    ``max_interval_s`` the ceiling it backs off to (``None``: 4 x the floor);
+    ``start_interval_s`` where each run starts (``None``: the floor)."""
 
     enabled: bool = True
     min_interval_s: float | None = None
+    max_interval_s: float | None = None
+    start_interval_s: float | None = None
     raw_retention_days: int | None = None
 
 
@@ -158,6 +174,7 @@ class SourcesSettings:
     staging_retention_days: int = 14
     vendors: Mapping[str, VendorSettings] = field(default_factory=dict)  # by section name
     cboe_workers: int = 4
+    cboe_priority_symbols: tuple[str, ...] = ()  # fetched first (with S&P 500 members)
     earnings_days: int = 60
     actions_window: tuple[int, int] = (-7, 30)
     sec_refresh_days: int = 30
@@ -166,6 +183,12 @@ class SourcesSettings:
     http_max_retry_s: float = 300.0
     http_breaker_failures: int = 10
     limits_dir: str = "var/run/limits"
+    # Adaptive pacing, every vendor (sources/framework/limiter.py ``Pacing``)
+    http_backoff_factor: float = 1.5
+    http_speedup_factor: float = 1.05
+    http_speedup_after: int = 100
+    http_error_window: int = 50
+    http_max_error_rate: float = 0.10
     max_bar_count_drop: float = 0.10
     max_universe_change: float = 0.05
     max_chain_fetch_failures: float = 0.05
@@ -185,7 +208,19 @@ class SourcesSettings:
         root = Table(doc, where)
         sections = [k for k in root.names() if isinstance(root.raw(k), Mapping)]
         root.only(["raw_retention_days", "staging_retention_days", *sections])
-        http = root.table("http", ["max_retry_s", "breaker_failures", "limits_dir"])
+        http = root.table(
+            "http",
+            [
+                "max_retry_s",
+                "breaker_failures",
+                "limits_dir",
+                "backoff_factor",
+                "speedup_factor",
+                "speedup_after",
+                "error_window",
+                "max_error_rate",
+            ],
+        )
         quality = root.table(
             "quality",
             [
@@ -197,7 +232,7 @@ class SourcesSettings:
             ],
         )
         vendors = {
-            name: root.table(name, [*VENDOR_KEYS, *VENDOR_EXTRAS.get(name, ())])
+            name: root.table(name, [*_vendor_keys(name), *VENDOR_EXTRAS.get(name, ())])
             for name in sections
             if name not in ("http", "quality")
         }
@@ -211,6 +246,9 @@ class SourcesSettings:
             ),
             vendors={name: _vendor(t, name not in OFF_BY_DEFAULT) for name, t in vendors.items()},
             cboe_workers=_extra(vendors, "cboe").integer("workers", d.cboe_workers, 1),
+            cboe_priority_symbols=tuple(
+                s.upper() for s in _extra(vendors, "cboe").strings("priority_symbols", ())
+            ),
             earnings_days=_extra(vendors, "nasdaq_earnings").integer("days", d.earnings_days, 1),
             actions_window=(window[0], window[1]),
             sec_refresh_days=_extra(vendors, "sec_edgar").integer(
@@ -225,6 +263,11 @@ class SourcesSettings:
             http_max_retry_s=http.number("max_retry_s", d.http_max_retry_s, 0),
             http_breaker_failures=http.integer("breaker_failures", d.http_breaker_failures, 1),
             limits_dir=http.text("limits_dir", d.limits_dir),
+            http_backoff_factor=http.number("backoff_factor", d.http_backoff_factor, 1),
+            http_speedup_factor=http.number("speedup_factor", d.http_speedup_factor, 1),
+            http_speedup_after=http.integer("speedup_after", d.http_speedup_after, 1),
+            http_error_window=http.integer("error_window", d.http_error_window, 1),
+            http_max_error_rate=http.fraction("max_error_rate", d.http_max_error_rate),
             max_bar_count_drop=quality.fraction("max_bar_count_drop", d.max_bar_count_drop),
             max_universe_change=quality.fraction("max_universe_change", d.max_universe_change),
             max_chain_fetch_failures=quality.fraction(
@@ -257,10 +300,32 @@ def _ibkr(section: Table) -> IbkrSettings:
     )
 
 
+def _vendor_keys(section: str) -> tuple[str, ...]:
+    if section in FIXED_PACE:
+        return tuple(k for k in VENDOR_KEYS if k not in ADAPTIVE_KEYS)
+    return VENDOR_KEYS
+
+
 def _vendor(section: Table, enabled: bool = True) -> VendorSettings:
+    floor = section.number("min_interval_s", None, 0)
+    ceiling = section.number("max_interval_s", None, 0)
+    start = section.number("start_interval_s", None, 0)
+    if floor is not None and ceiling is not None and ceiling < floor:
+        raise ConfigurationError(
+            f"{section.where} max_interval_s: expected >= min_interval_s ({floor}), got {ceiling}"
+        )
+    if start is not None and (
+        (floor is not None and start < floor) or (ceiling is not None and start > ceiling)
+    ):
+        raise ConfigurationError(
+            f"{section.where} start_interval_s: expected between min_interval_s and "
+            f"max_interval_s, got {start}"
+        )
     return VendorSettings(
         enabled=section.boolean("enabled", enabled),
-        min_interval_s=section.number("min_interval_s", None, 0),
+        min_interval_s=floor,
+        max_interval_s=ceiling,
+        start_interval_s=start,
         raw_retention_days=_optional_integer(section, "raw_retention_days", 1),
     )
 

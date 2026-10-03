@@ -8,11 +8,17 @@ swapping a vendor never touches storage, features, strategies or the UI.
 
 **Pacing is shared.** Each source is declared once in `sources/framework/registry.py` with its
 `config/site/sources.toml` section and a limiter key (`cboe`, `nasdaqtrader`, `ssga`,
-`nasdaq`, `massive`, `sec`, `treasury`, `ibkr`, `ibkr_historical`). One limiter per key (`sources/framework/limiter.py`) spaces requests by the
-section's `min_interval_s` across every worker thread **and every process** on the machine
-(a lock file per key under `[http] limits_dir`, default `var/run/limits/`), so a backfill and
-the nightly run never exceed a vendor's limit together. Retries live in `sources/framework/http.py`:
-429 honours `Retry-After`, other failures back off, and one request gives up after
+`nasdaq`, `massive`, `sec`, `treasury`, `ibkr`, `ibkr_historical`). One limiter per key (`sources/framework/limiter.py`)
+spaces requests across every worker thread **and every process** on the machine (a lock file
+per key under `[http] limits_dir`, default `var/run/limits/`), so a backfill and the nightly
+run never exceed a vendor's limit together. The pace is **adaptive** between the section's
+`min_interval_s` (floor) and `max_interval_s` (ceiling): a 429 holds every process for its
+`Retry-After` and multiplies the interval by `[http] backoff_factor`; more than
+`max_error_rate` errors over the last `error_window` responses slows it down the same way;
+`speedup_after` clean responses in a row speed it up by `speedup_factor`, never below the
+floor (see [configuration.md](../configuration.md#vendor-pacing)). The IB Gateway session
+source (`ibkr`, `ibkr_historical`) is not HTTP and keeps a fixed `min_interval_s`. Retries live in
+`sources/framework/http.py`: other failures back off, and one request gives up after
 `[http] max_retry_s`. After `[http] breaker_failures` consecutive 403/5xx from a vendor its
 circuit opens: the rest of the run's items for that vendor fail at once with
 `FETCH_ERROR: <key>: circuit open ...` (run PARTIAL) instead of each burning its retries.
@@ -48,7 +54,17 @@ Caveats, handled in `apps/ingestion/algotrade_ingestion/sources/vendors/cboe/opt
 - Delayed quotes. The snapshot is taken after the close, so it is valid for end-of-day use.
 - `open_interest` is OCC's figure as of the previous session.
 - Greeks and IV are Cboe's model values; ours (`quant/`) will cross-check them.
-- Be polite: paced at `[cboe] min_interval_s` (1.5 s, 2 workers), Retry-After honoured on 429.
+- **Rate limit (measured 2026-10-03, `cdn-api.cboe.com`, our User-Agent):** Cloudflare allows
+  about **60 requests per rolling minute**. 1 request/s for 60 s: all 200 (p50 latency 0.45 s);
+  2/s: HTTP 429 with body `error code: 1015` after ~13 s; 1.2/s: 429 at request 69 (57 s).
+  The 429 carries `Retry-After` of ~47–60 s and the ban lifts after about a minute. We pace
+  at `[cboe] min_interval_s = 1.05` (~57/min, just under the limit; 2 workers share the one
+  limiter), backing off up to `max_interval_s = 5.0` on 429s or errors and recovering after
+  clean streaks: **~75 min for the ~4.2k-underlying universe** (was 1.5 s, ~105 min).
+- Fetch order: the configured `[cboe] priority_symbols` (SPY, QQQ, IWM, sector ETFs, VIX
+  ETPs...) and S&P 500 members first, then by the latest `liquidity_class@v1` (HIGH, MEDIUM,
+  LOW, UNKNOWN) and chain open interest, then the rest alphabetically, so a run cut short
+  still has the names that matter (`chains` run stats: `order_tiers`).
   The CDN serves chains from S3, so a symbol with **no published chain answers 403 with S3's
   `AccessDenied` XML**: that one response is read as NO_CHAIN and does not count towards the
   circuit breaker (`missing_chain` in the Cboe adapter). Any other 403 (e.g. a Cloudflare

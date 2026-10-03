@@ -32,6 +32,11 @@ replace it. Readers take the latest run, and the earlier file stays as history.
 Nightly order: universe → company details → earnings → bars → rates → corporate actions →
 chains → rollups → screens → quality → purge.
 
+**Duration: about 80 minutes**, almost all of it the chains step: ~4.2k Cboe requests paced at
+~57 per minute (`[cboe] min_interval_s = 1.05`, just under Cboe's ~60 per rolling minute) take
+~75 minutes, plus back-off if Cboe answers 429. The most important underlyings are fetched
+first (S&P 500 and `priority_symbols`, then by liquidity class and chain open interest).
+
 | Step | Table | One row is | Rows / night | Parquet / night | Main columns (beyond the common four) |
 |---|---|---|---|---|---|
 | universe build | `instruments/reference` | every listed security, plus carried-forward delistings (full snapshot) | ~13.3k, grows with delistings | ~0.57 MB (43 B/row) | `symbol`, `name`, `exchange`, `security_type`, `security_type_source`, `is_etf`, `is_test_issue`, `optionable`, `in_sp500`, `status`, `first_seen`, `delisted_on`, `figi`, `share_class_figi`, `cik`, `is_leveraged`, `is_inverse`, `leverage`, `tracks`, `leverage_source`, `multiplier`, `tick_size`, `currency` |

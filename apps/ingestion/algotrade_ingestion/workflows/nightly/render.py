@@ -133,6 +133,27 @@ def _substeps(report: Report) -> list[str]:
     ]
 
 
+def _pacing(report: Report) -> list[str]:
+    """One line per vendor limiter and step: requests, 429s, time waited, interval range."""
+    multi = len(report.sessions) > 1
+    out = []
+    for p in report.pacing:
+        name = f"{p.session} {p.step}" if multi and p.session else p.step
+        text = (
+            f"{name} / {p.key}: {p.requests:,} requests, {p.throttled_429} x 429 "
+            f"(Retry-After {duration(p.retry_after_wait_s)}), "
+            f"rate-limit wait {duration(p.limiter_wait_s)}"
+        )
+        if p.error_rate_slowdowns:
+            text += f", {p.error_rate_slowdowns} error-rate slowdown(s)"
+        if p.interval_min_s is not None and p.interval_max_s is not None:
+            text += f", interval {p.interval_min_s:g}-{p.interval_max_s:g}s"
+            if p.interval_final_s is not None:
+                text += f" (final {p.interval_final_s:g}s)"
+        out.append(text)
+    return out
+
+
 def _pairs(pairs: Iterable[tuple[str, Any]]) -> str:
     return ", ".join(f"{k} {_num(v)}" for k, v in pairs)
 
@@ -234,6 +255,9 @@ def _text_timing(report: Report) -> list[str]:
     subs = _substeps(report)
     if subs:
         out += ["", "Sub-steps", *(f"  {s}" for s in subs)]
+    pacing = _pacing(report)
+    if pacing:
+        out += ["", "Vendor pacing", *(f"  {s}" for s in pacing)]
     return out
 
 
@@ -323,10 +347,11 @@ def render_html(report: Report) -> str:
             _html_table(["", ""], [[k, v] for k, v in _timing_overall(report)]),
             _html_table(TIMING_HEAD, _timing_rows(report), 5, _slowest(report)),
         ]
-        subs = _substeps(report)
-        if subs:
-            items = "".join(f"<li>{escape(s)}</li>" for s in subs)
-            parts.append(f'<ul style="font-size:13px;margin:0 0 12px 0">{items}</ul>')
+        for title, lines in (("Sub-steps", _substeps(report)), ("Vendor pacing", _pacing(report))):
+            if lines:
+                items = "".join(f"<li>{escape(s)}</li>" for s in lines)
+                parts.append(h3.format(title))
+                parts.append(f'<ul style="font-size:13px;margin:0 0 12px 0">{items}</ul>')
     if report.screens:
         rows = [
             [

@@ -1,9 +1,10 @@
 """The source registry: every vendor source declared ONCE (ADR 0019 R3, ``source-construction``).
 
 A ``SourceSpec`` names the source (``ctx.sources[name]`` in tasks), its ``config/site/
-sources.toml`` section (``enabled``, ``min_interval_s``), the environment variable it needs
-(if any) and how that becomes request headers, its limiter key and default pacing, its retry
-policy and the class that builds it from an ``Http`` client.
+sources.toml`` section (``enabled``, ``min_interval_s`` / ``max_interval_s`` /
+``start_interval_s``), the environment variable it needs (if any) and how that becomes
+request headers, its limiter key and default pacing floor, its retry policy and the class that
+builds it from an ``Http`` client.
 
 Session sources (IB Gateway) hold a stateful connection, not HTTP: a ``SessionSpec`` names
 the source, its section, its limiter keys and default pacing, the environment variables it
@@ -14,9 +15,11 @@ Fixture sources (the synthetic golden CSVs) are not vendors: ``FIXTURES`` builds
 directory, with no transport, pacing or ``sources.toml`` section (``fixture_source``).
 
 ``build_sources(settings, env)`` builds every available source: one ``Limiter`` per limiter
-key (shared across threads and processes, ``sources/framework/limiter.py``) and one
-``CircuitBreaker`` per key. A source whose section is disabled or whose variable is missing is
-left out, with the reason in ``Built.skipped``; tasks that need it are skipped with that reason.
+key (adaptive ``Pacing`` from the section and ``[http]``, shared across threads and processes,
+``sources/framework/limiter.py``) and one ``CircuitBreaker`` per key; ``Built.limiters``
+lets the entry point hand them to ``TaskContext.pacing`` (pacing stats per run). A source
+whose section is disabled or whose variable is missing is left out, with the reason in
+``Built.skipped``; tasks that need it are skipped with that reason.
 """
 
 from collections.abc import Callable, Iterable, Mapping
@@ -25,6 +28,7 @@ from pathlib import Path
 from typing import Protocol
 
 from algotrade.config import env as env_names
+from algotrade.core.model.errors import ConfigurationError
 from algotrade_ingestion.sources.fixtures.source import golden_source
 from algotrade_ingestion.sources.framework.base import FixtureSource, Source
 from algotrade_ingestion.sources.framework.http import (
@@ -35,7 +39,7 @@ from algotrade_ingestion.sources.framework.http import (
     RetryPolicy,
     urllib_transport,
 )
-from algotrade_ingestion.sources.framework.limiter import Limiter
+from algotrade_ingestion.sources.framework.limiter import Limiter, Pacing
 from algotrade_ingestion.sources.vendors.cboe.option_chains import CboeOptionsSource, missing_chain
 from algotrade_ingestion.sources.vendors.ibkr.gateway import GatewayConfig, IbkrMarketData
 from algotrade_ingestion.sources.vendors.ibkr.market_data import IbkrSource
@@ -60,6 +64,12 @@ class VendorConfig(Protocol):
 
     @property
     def min_interval_s(self) -> float | None: ...
+
+    @property
+    def max_interval_s(self) -> float | None: ...
+
+    @property
+    def start_interval_s(self) -> float | None: ...
 
 
 class IbkrOptions(Protocol):
@@ -96,6 +106,21 @@ class RegistrySettings(Protocol):
     @property
     def ibkr(self) -> IbkrOptions: ...
 
+    @property
+    def http_backoff_factor(self) -> float: ...
+
+    @property
+    def http_speedup_factor(self) -> float: ...
+
+    @property
+    def http_speedup_after(self) -> int: ...
+
+    @property
+    def http_error_window(self) -> int: ...
+
+    @property
+    def http_max_error_rate(self) -> float: ...
+
     def vendor(self, section: str) -> VendorConfig: ...
 
 
@@ -109,7 +134,7 @@ class SourceSpec:
     section: str  # config/site/sources.toml section: enabled, min_interval_s
     limiter: str  # one shared limiter (and circuit breaker) per key
     build: Callable[[Http], Source]
-    min_interval_s: float = 0.0  # default when the section does not set min_interval_s
+    min_interval_s: float = 0.0  # default floor when the section does not set min_interval_s
     env_var: str | None = None  # required credential or contact
     env_hint: str = "add it to .env"
     headers: Callable[[str | None], dict[str, str]] = _no_headers  # from the env value
@@ -246,6 +271,7 @@ class Built:
 
     sources: dict[str, Source] = field(default_factory=dict)
     skipped: dict[str, str] = field(default_factory=dict)
+    limiters: dict[str, Limiter] = field(default_factory=dict)  # by limiter key
 
 
 def unavailable(spec: SourceSpec | SessionSpec, settings: RegistrySettings, env: Env) -> str | None:
@@ -259,8 +285,34 @@ def unavailable(spec: SourceSpec | SessionSpec, settings: RegistrySettings, env:
 
 
 def interval(spec: SourceSpec | SessionSpec, settings: RegistrySettings) -> float:
+    """The pacing floor: the section's ``min_interval_s``, else the spec's default."""
     configured = settings.vendor(spec.section).min_interval_s
     return spec.min_interval_s if configured is None else configured
+
+
+DEFAULT_CEILING = 4.0  # max_interval_s when a section does not set it: 4 x the floor
+
+
+def pacing(spec: SourceSpec, settings: RegistrySettings) -> Pacing:
+    """The key's adaptive pacing: floor / ceiling / start from its section, the rest from
+    ``[http]``. A ceiling or start that does not fit the floor fails with the section."""
+    vendor, floor = settings.vendor(spec.section), interval(spec, settings)
+    ceiling = (
+        vendor.max_interval_s if vendor.max_interval_s is not None else DEFAULT_CEILING * floor
+    )
+    try:
+        return Pacing(
+            min_interval_s=floor,
+            max_interval_s=ceiling,
+            start_interval_s=vendor.start_interval_s,
+            backoff_factor=settings.http_backoff_factor,
+            speedup_factor=settings.http_speedup_factor,
+            speedup_after=settings.http_speedup_after,
+            error_window=settings.http_error_window,
+            max_error_rate=settings.http_max_error_rate,
+        )
+    except ValueError as exc:
+        raise ConfigurationError(f"sources.toml [{spec.section}]: {exc}") from exc
 
 
 def build_sources(
@@ -274,13 +326,13 @@ def build_sources(
     fixture source reads ``fixture_dir``. Unknown names raise ``KeyError``."""
     wanted = list(dict.fromkeys([*SOURCES, *SESSION_SOURCES] if names is None else names))
     directory = limits_dir or Path(settings.limits_dir)
-    limiters: dict[str, Limiter] = {}
     breakers: dict[str, CircuitBreaker] = {}
     built = Built()
+    limiters = built.limiters
 
-    def limiter(key: str, seconds: float) -> Limiter:
+    def limiter(key: str, pace: Pacing | float) -> Limiter:
         if key not in limiters:
-            limiters[key] = Limiter(key, seconds, directory)
+            limiters[key] = Limiter(key, pace, directory)
         return limiters[key]
 
     for name in wanted:
@@ -303,7 +355,7 @@ def build_sources(
             continue
         key = spec.limiter
         if key not in breakers:
-            limiter(key, interval(spec, settings))
+            limiter(key, pacing(spec, settings))
             breakers[key] = CircuitBreaker(key, settings.http_breaker_failures)
         secret = env(spec.env_var) if spec.env_var else None
         http = Http(

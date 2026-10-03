@@ -299,7 +299,8 @@ and an HTML part (inline styles only, no images or external assets).
   second run exits with code 3, or queues with `--wait`. Holding it, the CLI marks `nightly` /
   `screen` jobs left running by a crashed process as failed (`JobRunner.recover`), so they
   never block a re-run.
-- **Vendor pacing** is shared across processes too (`sources/framework/limiter.py`, `var/run/limits/`).
+- **Vendor pacing** is shared across processes too (`sources/framework/limiter.py`, `var/run/limits/`),
+  and adaptive: Retry-After holds, back-off on 429s and error bursts, slow recovery to the floor.
 - **Readers** pick, per partition, the latest run with `knowledge_ts ≤ as_of`. A reader racing
   a writer sees either the old or the new run, never a mix.
 - **Configs** are resolved once per run and the hash is recorded; edits affect only later runs.
@@ -471,7 +472,7 @@ close of bar t  : Portfolio marked to market -> equity[t]
 | Test suite | ≤ 60 s locally and in CI |
 | Golden evaluation (3 strategies × 8 datasets) from the store | ≤ 5 s |
 | Selection, 10k instruments × 10 rules | ≤ 1 s |
-| Nightly options pipeline, ~4.2k underlyings | ~2 h, dominated by paced Cboe chains at 40 requests/min (WARN recorded above 150 min) |
+| Nightly options pipeline, ~4.2k underlyings | ~80 min, dominated by Cboe chains paced at ~57 requests/min (~75 min; Cboe allows ~60/min) (WARN recorded above 150 min) |
 | Config resolution | deterministic hash on every OS |
 | Code gates | no file > 1000 lines, coverage ≥ 90%, strict mypy, all import contracts |
 
