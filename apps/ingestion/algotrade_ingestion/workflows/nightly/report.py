@@ -15,14 +15,10 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Any
 
+from algotrade.services.run_items import failed_items, normalise, status_code
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.workflows.nightly.timing import StepTiming, step_timings
 
-# Item statuses that are not failures: stored, or "nothing to fetch" outcomes counted in stats.
-FINE = frozenset(
-    {"OK", "STORED", "PASS", "COMPLETE", "SKIPPED", "NO_SESSION", "EMPTY", "NO_FACTS"}
-    | {"NO_SHARE_FACTS", "NO_INPUT"}
-)
 BAD_STEPS = ("FAILED", "PARTIAL", "BLOCKED")
 # Key counts per step (result keys); other steps show their top-level numbers.
 KEY_COUNTS: Mapping[str, tuple[str, ...]] = {
@@ -37,9 +33,6 @@ KEY_COUNTS: Mapping[str, tuple[str, ...]] = {
 }
 COUNT_MAPS = ("statuses", "sessions", "years")  # result dicts of status -> count
 MAX_GENERIC = 6
-_URL = re.compile(r"https?://\S+")
-_DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
-_NUMBER = re.compile(r"\b\d+(\.\d+)?\b")
 
 
 @dataclass(frozen=True)
@@ -128,18 +121,6 @@ class Report:
         return " · ".join(parts)
 
 
-def normalise(message: str, key: str = "") -> str:
-    """A failure reason without the specifics that make every item's message different."""
-    text = message.replace(key, "<id>") if key else message
-    text = _URL.sub("<url>", text)
-    text = _DATE.sub("<date>", text)
-    return _NUMBER.sub("<n>", text).strip()
-
-
-def _code(status: str) -> str:
-    return status.split(":", 1)[0].strip()
-
-
 def _counts(name: str, result: Any) -> tuple[tuple[str, Any], ...]:
     if not isinstance(result, Mapping):
         return ()
@@ -160,7 +141,7 @@ def _counts(name: str, result: Any) -> tuple[tuple[str, Any], ...]:
 
 def _items(record: RunRecord | None, result: Any) -> tuple[tuple[str, int], ...]:
     if record is not None and record.items:
-        return tuple(Counter(_code(v) for v in record.items.values()).most_common())
+        return tuple(Counter(status_code(v) for v in record.items.values()).most_common())
     if isinstance(result, Mapping):
         for key in COUNT_MAPS:
             value = result.get(key)
@@ -177,15 +158,15 @@ def _groups(
     labels: Mapping[str, str],
     max_examples: int,
 ) -> list[FailureGroup]:
-    grouped: dict[str, list[Example]] = {}
-    for key, status in sorted(record.items.items()):
-        if _code(status) in FINE:
-            continue
-        reason = normalise(status, key)
-        grouped.setdefault(reason, []).append(Example(key, status, labels.get(key)))
     return [
-        FailureGroup(session, step, reason, len(examples), tuple(examples[:max_examples]))
-        for reason, examples in sorted(grouped.items(), key=lambda kv: (-len(kv[1]), kv[0]))
+        FailureGroup(
+            session,
+            step,
+            reason,
+            len(items),
+            tuple(Example(k, s, labels.get(k)) for k, s in items[:max_examples]),
+        )
+        for reason, items in failed_items(record.items)
     ]
 
 

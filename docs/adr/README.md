@@ -29,3 +29,4 @@ Do not rewrite history. Use `.claude/skills/write-adr` to add one.
 | [0021](0021-option-pricing-conventions.md) | Option pricing conventions: BSM, calendar/365 time, Treasury rates, IV failure codes; IV30 method, dividend yield, IV rank (2b.3 addendum) | accepted |
 | [0022](0022-atomic-run-publication.md) | A run's table writes publish atomically: pending until COMPLETE / PARTIAL commits them all, FAILED publishes nothing; `as_of` sees a run from its commit | accepted |
 | [0023](0023-feature-store.md) | Feature store: per-feature definitions (kind, dtype, unit, null meaning, range) in feature groups, a generated catalogue, inputs asked of `data/` by table name; steps 3-7 (features by name, expressions in config, virtual by default, quality, new grains) recorded | accepted (steps 1-2 implemented) |
+| [0024](0024-api.md) | API v1: a read-only FastAPI over `services.explore`; thin routes, pydantic schemas as the OpenAPI contract | accepted |

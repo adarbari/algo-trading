@@ -22,16 +22,19 @@ dependencies = [
 packages = ["src/algotrade"]
 
 [tool.uv.workspace]
-members = ["apps/ingestion", "apps/backtest"]
+members = ["apps/ingestion", "apps/backtest", "apps/api"]
 
 [tool.uv.sources]
 algotrade-ingestion = { workspace = true }
 algotrade-backtest = { workspace = true }
+algotrade-api = { workspace = true }
 
 [dependency-groups]
 dev = [
     "algotrade-ingestion",
     "algotrade-backtest",
+    "algotrade-api",
+    "httpx2>=2.13",  # the FastAPI / Starlette TestClient transport (tests only)
     "pytest>=8.0",
     "pytest-cov>=7.1.0",
     "hypothesis>=6.168.3",
@@ -47,7 +50,7 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-src = ["src", "apps/ingestion", "apps/backtest", "tests", "scripts"]
+src = ["src", "apps/ingestion", "apps/backtest", "apps/api", "tests", "scripts"]
 
 [tool.ruff.lint]
 select = [
@@ -72,8 +75,8 @@ max-complexity = 10
 [tool.mypy]
 python_version = "3.12"
 strict = true
-mypy_path = ["src", "apps/ingestion", "apps/backtest"]
-packages = ["algotrade", "algotrade_ingestion", "algotrade_backtest"]
+mypy_path = ["src", "apps/ingestion", "apps/backtest", "apps/api"]
+packages = ["algotrade", "algotrade_ingestion", "algotrade_backtest", "algotrade_api"]
 warn_unreachable = true
 
 [[tool.mypy.overrides]]
@@ -92,7 +95,7 @@ markers = [
 filterwarnings = ["error"]
 
 [tool.coverage.run]
-source = ["algotrade", "algotrade_ingestion", "algotrade_backtest"]
+source = ["algotrade", "algotrade_ingestion", "algotrade_backtest", "algotrade_api"]
 branch = true
 
 [tool.coverage.report]
@@ -104,7 +107,7 @@ exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "@abstractmeth
 # ---------------------------------------------------------------- import-linter
 # These contracts ARE the architecture. See docs/architecture.md before changing them.
 [tool.importlinter]
-root_packages = ["algotrade", "algotrade_ingestion", "algotrade_backtest"]
+root_packages = ["algotrade", "algotrade_ingestion", "algotrade_backtest", "algotrade_api"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
@@ -222,19 +225,19 @@ allow_indirect_imports = true  # data.feature_inputs calls the owners
 [[tool.importlinter.contracts]]
 name = "Only the ingestion app writes market and feature data (ADR 0005)"
 type = "forbidden"
-source_modules = ["algotrade", "algotrade_backtest"]
+source_modules = ["algotrade", "algotrade_backtest", "algotrade_api"]
 forbidden_modules = ["algotrade.storage.tables.writers"]
 
 [[tool.importlinter.contracts]]
 name = "Shared libraries never import apps (ADR 0004)"
 type = "forbidden"
 source_modules = ["algotrade"]
-forbidden_modules = ["algotrade_ingestion", "algotrade_backtest"]
+forbidden_modules = ["algotrade_ingestion", "algotrade_backtest", "algotrade_api"]
 
 [[tool.importlinter.contracts]]
 name = "Apps never import each other (ADR 0004)"
 type = "independence"
-modules = ["algotrade_ingestion", "algotrade_backtest"]
+modules = ["algotrade_ingestion", "algotrade_backtest", "algotrade_api"]
 
 [[tool.importlinter.contracts]]
 name = "Core is dependency-free domain code (no pandas, no I/O)"
@@ -242,6 +245,40 @@ type = "forbidden"
 source_modules = ["algotrade.core"]
 forbidden_modules = ["pandas"]
 allow_indirect_imports = true
+
+# ---- ADR 0024: the API is a thin, read-only HTTP layer over services.explore.
+
+[[tool.importlinter.contracts]]
+name = "API: routes reach the library only through services.explore, config and core (ADR 0024)"
+type = "forbidden"
+source_modules = ["algotrade_api"]
+forbidden_modules = [
+    "algotrade.storage",
+    "algotrade.data",
+    "algotrade.engines",
+    "algotrade.features",
+    "algotrade.strategies",
+    "algotrade.quant",
+    "algotrade.analytics",
+    "algotrade.services.jobs",
+    "algotrade.services.backtests",
+    "algotrade.services.screening",
+    "algotrade.services.evaluation",
+    "pandas",
+    "numpy",
+]
+allow_indirect_imports = true  # services.explore reads the stores on the API's behalf
+
+[[tool.importlinter.contracts]]
+name = "Explore queries are read-only: no writers, no jobs (ADR 0024)"
+type = "forbidden"
+source_modules = ["algotrade.services.explore"]
+forbidden_modules = [
+    "algotrade.storage.tables.writers",
+    "algotrade.storage.tables.result_writer",
+    "algotrade.services.jobs",
+]
+allow_indirect_imports = true  # the backtest / screen use cases' naming helpers sit beside their writers
 
 # ---- ADR 0019: ownership and boundaries. Every contract the restructure planned is enabled
 # (no `pending_contract` remains in architecture/ownership.toml; a fitness test keeps it so).

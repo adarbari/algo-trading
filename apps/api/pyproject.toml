@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling>=1.32.4"]
+build-backend = "hatchling.build"
+
+# The API app: a read-only HTTP wrapper over algotrade.services (ADR 0004, ADR 0024).
+# Web framework dependencies live here and nowhere else.
+[project]
+name = "algotrade-api"
+version = "0.1.0"
+description = "API app: read-only FastAPI over the services layer, the web app's only backend"
+requires-python = ">=3.12"
+dependencies = [
+    "algotrade",
+    "fastapi>=0.115",
+    "pydantic>=2.7",
+    "uvicorn>=0.30",
+]
+
+[project.scripts]
+algotrade-api = "algotrade_api.cli:main"
+
+[tool.uv.sources]
+algotrade = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["algotrade_api"]

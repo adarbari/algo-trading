@@ -97,6 +97,21 @@ in the run summary (`var/logs/nightly-latest.json`).
 Each step can also run on its own (`chains`, `rollups`, `screen`), resumes after
 interruption, and prints its audit. See [docs/screeners/](docs/screeners/README.md).
 
+## API
+
+A read-only HTTP API over everything above, the web app's only backend
+([ADR 0024](docs/adr/0024-api.md); endpoints in [architecture §12](docs/architecture.md#12-api)):
+
+```bash
+.venv/bin/algotrade-api            # http://127.0.0.1:8000 (docs at /docs, schema at /openapi.json)
+.venv/bin/algotrade-api --reload   # development: restart on code changes
+```
+
+It reads the store at `ALGOTRADE_DATA_URL` and the configs at `ALGOTRADE_CONFIG_DIR` (both from
+`.env`) as the user `ALGOTRADE_USER` (default `local`), and never writes. After changing a
+route or schema run `.venv/bin/python scripts/export_openapi.py` and commit
+`apps/api/openapi.json` (CI fails when it is stale); the web client is generated from it.
+
 ## What's in the box
 
 | Guardrail | Enforced by |
@@ -117,6 +132,7 @@ interruption, and prints its audit. See [docs/screeners/](docs/screeners/README.
 | `algotrade` | `src/algotrade` | the shared library |
 | `algotrade-ingestion` | `apps/ingestion` | `algotrade-ingest` (the only writer of data) |
 | `algotrade-backtest` | `apps/backtest` | `algotrade-backtest` (`algotrade` alias) |
+| `algotrade-api` | `apps/api` | `algotrade-api` (read-only FastAPI, ADR 0024) |
 
 Each app declares only its own dependencies; `uv.lock` pins everything (`make lock-check`).
 
@@ -135,6 +151,8 @@ apps/
     tasks/        framework/ (IngestRun, registry), reference/, market/, derived/, maintenance/
     workflows/    nightly/
   backtest/     algotrade-backtest: datasets, backtest, evaluate
+  api/          algotrade-api: read-only FastAPI. main (app factory), routes/ (one router per
+                area), schemas/ (response models = openapi.json), deps
 src/algotrade/  shared library
   core/         pure domain code (no pandas, no I/O): model/ (types, instruments, ids, errors),
                 time/ (calendar, clock), views/ (MarketView, FeatureView, series), validation/
@@ -149,11 +167,12 @@ src/algotrade/  shared library
                 rollups/ (option_liquidity, price_stats, earnings @v1), registry
   analytics/    performance metrics, report formatting
   engines/      backtest/ (loop, risk limits, sizing, simulated broker, portfolio), screening/
-  services/     use cases: backtests/, screening/ (+ exports), jobs/, evaluation/; shared helpers
+  services/     use cases: backtests/, screening/ (+ exports), jobs/, evaluation/, explore/
+                (read-only queries the API serves); shared helpers
 tests/
   unit/<layer>/ mirrors src; fast, isolated
   contract/     one suite every storage backend must pass
-  apps/         ingestion app tests (fake vendor feeds, no network)
+  apps/         app tests: ingestion (fake vendor feeds, no network), api (TestClient)
   property/     hypothesis invariants (no look-ahead, accounting identity, no shorts)
   integration/  real data + engine stack across the golden set
   e2e/          the CLIs, end to end, against committed data + baseline

@@ -17,6 +17,11 @@ from algotrade.storage.tables.result_writer import ResultWriter
 from algotrade.strategies.screeners.registry import create_screener
 
 
+def run_job_name(config_id: str, user: str) -> str:
+    """The run-record ``job`` of a screen of ``config_id`` for ``user``."""
+    return f"screen-{config_id}-{user}"
+
+
 @dataclass(frozen=True)
 class ScreenOutcome:
     run_id: str
@@ -82,7 +87,7 @@ def run_screener(
     ):
         run = _with_coverage(run, RunCoverage.UNIVERSE_INCOMPLETE)
     user = config.user.user_id
-    record = start_run(f"screen-{config.config.id}-{user}", session_date, now)
+    record = start_run(run_job_name(config.config.id, user), session_date, now)
     run_id = record.run_id
     audit = {
         **run.audit(),

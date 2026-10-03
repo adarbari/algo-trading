@@ -183,7 +183,7 @@ purpose = "the selection engine: evaluate a Selection with a per-rule audit"
 
 [[dir]]
 path = "src/algotrade/services"
-purpose = "use cases (the backend's interface for apps); shared helpers: configs, datasets, selection, views"
+purpose = "use cases (the backend's interface for apps); shared helpers: configs, datasets, selection, views, run_items"
 
 [[dir]]
 path = "src/algotrade/services/backtests"
@@ -200,6 +200,11 @@ path = "src/algotrade/services/evaluation"
 purpose = "use case: evaluate every strategy on every golden dataset against the baseline"
 
 [[dir]]
+path = "src/algotrade/services/explore"
+purpose = "read-only queries for apps that show data (the API): one module per area, plain dataclasses out"
+contracts = ["Explore queries are read-only: no writers, no jobs (ADR 0024)"]
+
+[[dir]]
 path = "src/algotrade/services/jobs"
 purpose = "long-running work as jobs: runner, models, handlers, exclusive runs"
 contracts = ["The job runner is generic: it knows no use case, engine or market-data reader"]
@@ -209,6 +214,24 @@ contracts = ["The job runner is generic: it knows no use case, engine or market-
 [[dir]]
 path = "apps/backtest/algotrade_backtest"
 purpose = "the backtest app: algotrade-backtest CLI and its command bodies"
+
+# --------------------------------------------------------------------------- api app (ADR 0024)
+
+[[dir]]
+path = "apps/api/algotrade_api"
+purpose = "the API app: app factory (main), dependencies (deps), the ASGI app and the algotrade-api CLI"
+contracts = [
+    "API: routes reach the library only through services.explore, config and core (ADR 0024)",
+    "Apps never import each other (ADR 0004)",
+]
+
+[[dir]]
+path = "apps/api/algotrade_api/routes"
+purpose = "one FastAPI router per area: parse parameters, call one explore query, map it to a schema"
+
+[[dir]]
+path = "apps/api/algotrade_api/schemas"
+purpose = "pydantic response models per area: the public contract (OpenAPI -> the web client)"
 
 # --------------------------------------------------------------------------- ingestion app
 
@@ -299,6 +322,10 @@ source = "src/algotrade"
 [[test_mirror]]
 tests = "tests/apps/ingestion"
 source = "apps/ingestion/algotrade_ingestion"
+
+[[test_mirror]]
+tests = "tests/apps/api"
+source = "apps/api/algotrade_api"
 
 [[test_dir]]
 path = "tests"

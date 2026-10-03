@@ -9,7 +9,7 @@ import pandas as pd
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.interfaces import Backend, RunStore
-from algotrade.storage.tables.schemas import validate_frame
+from algotrade.storage.tables.schemas import result_table, validate_frame
 
 
 class ResultWriter:
@@ -25,7 +25,7 @@ class ResultWriter:
         pending: bool = False,
     ) -> None:
         """``pending``: visible only once ``commit_run`` (or ``publishing``) commits the run."""
-        table = f"results/{name}"
+        table = result_table(name)
         if "/" in name:
             raise ConfigurationError(f"result name must not contain '/': {name!r}")
         validate_frame(table, frame)

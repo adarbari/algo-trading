@@ -70,3 +70,7 @@ class StoreReader:
 
     def runs(self, job: str, session_date: date | None = None) -> list[RunRecord]:
         return self._backend.runs.find(job, session_date)
+
+    def run(self, run_id: str) -> RunRecord | None:
+        """One run record by id (``None`` when there is none)."""
+        return self._backend.runs.load(run_id)

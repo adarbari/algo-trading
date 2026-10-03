@@ -26,6 +26,13 @@ from algotrade.storage.tables.result_writer import ResultWriter
 from algotrade.strategies.trading.registry import create_strategy
 
 PORTFOLIO = "PORTFOLIO"  # instrument_id for portfolio-level result rows (the equity curve)
+EQUITY = "backtest_equity"  # results/<name> tables a saved backtest writes
+FILLS = "backtest_fills"
+
+
+def run_job_name(config_id: str, user: str) -> str:
+    """The run-record ``job`` of a saved backtest of ``config_id`` for ``user``."""
+    return f"backtest-{config_id}-{user}"
 
 
 def backtest_settings(bt: BacktestSettings) -> BacktestConfig:
@@ -111,7 +118,7 @@ def _result_frames(
         columns=["instrument_id", "ts", "side", "quantity", "price", "commission", "multiplier"],
     )
     out = {}
-    for name, base in (("backtest_equity", equity), ("backtest_fills", fills)):
+    for name, base in ((EQUITY, equity), (FILLS, fills)):
         frame = base.assign(
             user_id=c.user.user_id,
             config_id=c.config.id,
@@ -186,7 +193,7 @@ def run_configured_backtest(
     if writer is None:
         return outcome
     user = config.user.user_id
-    record = start_run(f"backtest-{config.config.id}-{user}", end, now)
+    record = start_run(run_job_name(config.config.id, user), end, now)
     run_id = record.run_id
     with writer.publishing(run_id, now):  # every result table visible at once (ADR 0022)
         for name, frame in _result_frames(outcome, end, run_id, now).items():

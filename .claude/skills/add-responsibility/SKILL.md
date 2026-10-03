@@ -17,7 +17,7 @@ a genuine exception, write an ADR and list the module in `allowed` with the reas
 0. **Where it goes:** this skill is also the place for "nothing fits, I need a new folder":
    step 3 covers the new kind end to end.
 1. **Is it already owned?** Search `architecture/ownership.toml` (ids, descriptions, detect
-   rules) and the table in `docs/architecture.md` section 13. If an owner exists, extend
+   rules) and the table in `docs/architecture.md` section 14. If an owner exists, extend
    that module and stop here: never write a second implementation, even a small one.
 2. **New responsibility:** add a `[[responsibility]]` with `id` (kebab-case), one-line
    `description`, `owner` (the one module, or a package glob), optional `target_owner` while
@@ -57,7 +57,7 @@ a genuine exception, write an ADR and list the module in `allowed` with the reas
    as an import-linter contract (`make arch`), never as a pending entry.
 6. **Boundary change?** If the new owner crosses a layer or app boundary, or a rule R1-R5
    changes, write an ADR (`.claude/skills/write-adr`) and update `docs/architecture.md`
-   section 13 and the Ownership table in `CLAUDE.md`.
+   section 14 and the Ownership table in `CLAUDE.md`.
 7. **Site settings:** a new key in `config/site/*.toml` gets a typed field in
    `src/algotrade/config/site/settings.py` (the one loader, with validation and an error path) and
    must drive code (`tests/architecture/test_ownership.py`). Environment variables are read
