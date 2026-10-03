@@ -220,10 +220,23 @@ description = "Which runs of a partition a read at as_of sees, per the table's r
 owner = ["src/algotrade/storage/backends/run_selection.py"]
 allowed = [
     "src/algotrade/storage/backends/local.py",  # applies the selection to its _runs.json index
+    "src/algotrade/storage/backends/local_index.py",  # parses _runs.json entries into RunEntry
     "src/algotrade/storage/backends/memory.py",  # applies the selection to its in-memory runs
 ]
 section = "docs/adr/0007-point-in-time-data.md#how-runs-combine"
 detect = [{ call = "select_runs" }, { call = "merge_rows" }, { call = "RunEntry" }]
+
+[[responsibility]]
+id = "run-publish"
+description = "Atomic publication of a run's table writes (ADR 0022): pending writes, one commit for every table at once (or abort), commit sequence for readers, crash recovery; driven by IngestRun for ingestion and ResultWriter.publishing for services"
+owner = [
+    "src/algotrade/storage/backends/*",
+    "src/algotrade/storage/tables/writers.py",
+    "src/algotrade/storage/tables/result_writer.py",
+    "apps/ingestion/algotrade_ingestion/tasks/framework/run.py",
+]
+section = "docs/adr/0022-atomic-run-publication.md#decision"
+detect = [{ call = "commit_run" }, { call = "abort_run" }, { call = "recover_runs" }]
 
 [[responsibility]]
 id = "locking"

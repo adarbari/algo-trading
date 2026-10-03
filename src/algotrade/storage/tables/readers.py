@@ -16,8 +16,16 @@ from algotrade.storage.tables.interfaces import Backend
 
 
 class StoreReader:
-    def __init__(self, backend: Backend) -> None:
+    """``own_run``: also see that run's pending writes (the run reading what it wrote before
+    it commits, ADR 0022); ``None`` (the default) sees committed data only."""
+
+    def __init__(self, backend: Backend, own_run: str | None = None) -> None:
         self._backend = backend
+        self.own_run = own_run
+
+    def including(self, run_id: str) -> "StoreReader":
+        """This reader, also seeing ``run_id``'s pending writes."""
+        return StoreReader(self._backend, run_id)
 
     def table(
         self,
@@ -26,7 +34,7 @@ class StoreReader:
         as_of: datetime | None = None,
         instruments: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
-        return self._backend.tables.read(table, session_date, as_of, instruments)
+        return self._backend.tables.read(table, session_date, as_of, instruments, self.own_run)
 
     def require(
         self, table: str, session_date: date, hint: str, as_of: datetime | None = None
@@ -45,13 +53,14 @@ class StoreReader:
         as_of: datetime | None = None,
         instruments: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
-        return self._backend.tables.read_range(table, start, end, as_of, instruments)
+        tables = self._backend.tables
+        return tables.read_range(table, start, end, as_of, instruments, self.own_run)
 
     def table_names(self) -> list[str]:
-        return self._backend.tables.names()
+        return self._backend.tables.names(self.own_run)
 
     def dates(self, table: str) -> list[date]:
-        return self._backend.tables.dates(table)
+        return self._backend.tables.dates(table, self.own_run)
 
     def latest_date(self, table: str, on_or_before: date | None = None) -> date | None:
         """The last partition date (on or before a date). Picking the snapshot a reader

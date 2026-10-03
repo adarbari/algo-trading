@@ -3,12 +3,15 @@
 Layout under the root directory (an internal detail; nothing else may rely on it)::
 
     tables/<table>/date=YYYY-MM-DD/run=<run_id>.parquet   (+ _runs.json knowledge index:
-                                                           run -> knowledge_ts, or
-                                                           {knowledge_ts, restates} for a
-                                                           restating run; .runs.lock
-                                                           guarding it)
+                                                           run -> knowledge_ts, or a dict
+                                                           with restates / visible_at /
+                                                           seq / file / prev; .runs.lock
+                                                           guarding it; a resumed run's
+                                                           new version: run=<id>~<hex>)
                                                           typed per storage/tables/schemas.py,
                                                           ~64k-row groups + page index
+    tables/_txn/pending/<run_id>.jsonl                    a run's writes not yet committed
+    tables/_txn/commits/<run_id>.json, seq, commit.lock   commits (local_index.py, ADR 0022)
     raw/source=<s>/dataset=<d>/date=YYYY-MM-DD/run=<run_id>/<key>.json.gz
     staging/<run_id>/<table>/<key>.parquet
     runs/<run_id>.json
@@ -17,14 +20,12 @@ Layout under the root directory (an internal detail; nothing else may rely on it
 Every file is written to a unique temp file in its directory and renamed into place, so
 concurrent writers never share a temp file and readers never see half a file. The
 ``_runs.json`` read-modify-write is serialised by a file lock, so two runs writing the same
-partition at once (threads or processes) are both indexed.
+partition at once (threads or processes) are both indexed. A ``pending`` write is indexed
+only when its run commits, in every partition at once (``local_index.py``).
 """
 
 import gzip
-import json
-import os
 import shutil
-import tempfile
 from collections.abc import Sequence
 from datetime import date, datetime
 from pathlib import Path
@@ -34,37 +35,28 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from algotrade.storage.backends.arrow import concat, parquet_bytes, to_arrow, to_frame
+from algotrade.storage.backends.local_index import (
+    INDEX,
+    Commits,
+    atomic_write,
+    default_file,
+    drop_unreferenced,
+    index_lock,
+    read_index,
+    run_file,
+    safe,
+    write_index,
+)
 from algotrade.storage.backends.run_selection import (
     RunEntry,
     merge_rows,
     run_mode,
     select_instruments,
     select_runs,
+    visible_entries,
 )
 from algotrade.storage.locks import FileLock, held
 from algotrade.storage.runs import RunRecord, run_session
-
-_INDEX = "_runs.json"
-_INDEX_LOCK = ".runs.lock"
-
-
-def _atomic_write(path: Path, data: bytes) -> None:
-    """Write via a unique temp file in the same directory, then rename into place."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
-    try:
-        with os.fdopen(fd, "wb") as fh:
-            fh.write(data)
-        Path(name).replace(path)
-    except BaseException:
-        Path(name).unlink(missing_ok=True)
-        raise
-
-
-def _safe(key: str) -> str:
-    if not key or "/" in key or key.startswith("."):
-        raise ValueError(f"invalid storage key {key!r}")
-    return key
 
 
 def _parquet_bytes(frame: pd.DataFrame) -> bytes:
@@ -74,6 +66,7 @@ def _parquet_bytes(frame: pd.DataFrame) -> bytes:
 class LocalTables:
     def __init__(self, root: Path) -> None:
         self.root = root / "tables"
+        self.commits = Commits(self.root)
 
     def _dir(self, table: str, session_date: date) -> Path:
         return self.root / table / f"date={session_date.isoformat()}"
@@ -85,17 +78,49 @@ class LocalTables:
         run_id: str,
         frame: pd.DataFrame,
         restates: bool = False,
+        pending: bool = False,
     ) -> None:
         directory = self._dir(table, session_date)
         data = parquet_bytes(to_arrow(table, frame))
-        _atomic_write(directory / f"run={_safe(run_id)}.parquet", data)
-        with held(FileLock(directory / _INDEX_LOCK)):
-            index = self._index(directory)
-            if not frame.empty:
-                known = pd.Timestamp(frame["knowledge_ts"].max()).isoformat()
-                # A plain run keeps the original format (run -> knowledge_ts).
-                index[run_id] = {"knowledge_ts": known, "restates": True} if restates else known
-            _atomic_write(directory / _INDEX, json.dumps(index, indent=2, sort_keys=True).encode())
+        known = None if frame.empty else pd.Timestamp(frame["knowledge_ts"].max()).isoformat()
+        if pending:
+            file = self.commits.stage(table, session_date, safe(run_id), known, restates)
+            if file is not None:
+                atomic_write(directory / file, data)
+            return
+        if known is not None:
+            atomic_write(directory / default_file(safe(run_id)), data)
+        with held(index_lock(directory)):
+            index = read_index(directory)
+            if known is not None:
+                index[run_id] = RunEntry(pd.Timestamp(known), restates)
+            write_index(directory, index)
+        drop_unreferenced(directory, run_id)
+
+    def commit_run(self, run_id: str, at: datetime) -> int:
+        return self.commits.commit_run(run_id, at)
+
+    def abort_run(self, run_id: str) -> int:
+        return self.commits.abort_run(run_id)
+
+    def pending_runs(self) -> list[str]:
+        return self.commits.pending_runs()
+
+    def recover_runs(self) -> list[str]:
+        return self.commits.recover()
+
+    def purge_pending_before(self, cutoff: datetime) -> int:
+        return self.commits.purge_pending_before(cutoff)
+
+    def _own(self, table: str, session_date: date, own_run: str | None) -> RunEntry | None:
+        """The entry of ``own_run``'s pending write to the partition, if it wrote rows."""
+        if own_run is None:
+            return None
+        item = self.commits.pending_item(own_run, table, session_date)
+        if item is None or item["knowledge_ts"] is None:
+            return None
+        known = pd.Timestamp(item["knowledge_ts"])
+        return RunEntry(known, bool(item["restates"]), ref=item["file"])
 
     def _partition(
         self,
@@ -103,17 +128,34 @@ class LocalTables:
         session_date: date,
         as_of: datetime | None,
         instruments: Sequence[str] | None,
+        own_run: str | None,
+        upto: int,
     ) -> pa.Table | None:
-        """The partition as a read at ``as_of`` sees it (``run_selection``), conformed."""
+        """The partition as a read at ``as_of`` sees it (``run_selection``), conformed.
+        ``upto``: the commit sequence the read captured before opening any index."""
         directory = self._dir(table, session_date)
-        entries = {run: _entry(value) for run, value in self._index(directory).items()}
-        runs = select_runs(entries, as_of, run_mode(table))
-        if not runs:
-            return None
         filters = [("instrument_id", "in", list(instruments))] if instruments is not None else None
-        parts = [pq.read_table(directory / f"run={run}.parquet", filters=filters) for run in runs]
-        data = concat(table, parts)
-        return merge_rows(table, data) if len(runs) > 1 else data
+        for attempt in range(2):
+            entries = visible_entries(read_index(directory), upto)
+            own = self._own(table, session_date, own_run)
+            if own_run is not None and own is not None:
+                entries[own_run] = own
+            runs = select_runs(entries, as_of, run_mode(table))
+            if not runs:
+                return None
+            try:
+                parts = [
+                    pq.read_table(directory / run_file(run, entries[run]), filters=filters)
+                    for run in runs
+                ]
+            except FileNotFoundError:
+                if attempt:
+                    raise
+                upto = self.commits.published()  # a commit replaced a version mid-read
+                continue
+            data = concat(table, parts)
+            return merge_rows(table, data) if len(runs) > 1 else data
+        return None  # pragma: no cover - the loop returns or raises
 
     def read(
         self,
@@ -121,8 +163,10 @@ class LocalTables:
         session_date: date,
         as_of: datetime | None = None,
         instruments: Sequence[str] | None = None,
+        own_run: str | None = None,
     ) -> pd.DataFrame | None:
-        data = self._partition(table, session_date, as_of, instruments)
+        upto = self.commits.published()
+        data = self._partition(table, session_date, as_of, instruments, own_run, upto)
         return None if data is None else select_instruments(to_frame(data), instruments)
 
     def read_range(
@@ -132,49 +176,47 @@ class LocalTables:
         end: date,
         as_of: datetime | None = None,
         instruments: Sequence[str] | None = None,
+        own_run: str | None = None,
     ) -> pd.DataFrame | None:
+        upto = self.commits.published()  # one commit sequence for the whole range
         parts = [
             data
-            for d in self.dates(table)
+            for d in self.dates(table, own_run)
             if start <= d <= end
-            and (data := self._partition(table, d, as_of, instruments)) is not None
+            and (data := self._partition(table, d, as_of, instruments, own_run, upto)) is not None
         ]
         if not parts:
             return None
         frame = to_frame(concat(table, parts))
         return None if frame.empty else frame.reset_index(drop=True)
 
-    def dates(self, table: str) -> list[date]:
-        base = self.root / table
-        if not base.exists():
-            return []
-        return sorted(
-            date.fromisoformat(p.name.removeprefix("date="))
-            for p in base.iterdir()
-            if p.name.startswith("date=") and (p / _INDEX).exists()
-        )
+    def _own_partitions(self, own_run: str | None) -> set[tuple[str, date]]:
+        if own_run is None:
+            return set()
+        items = self.commits.journal(own_run).values()
+        return {(i["table"], date.fromisoformat(i["date"])) for i in items}
 
-    def names(self) -> list[str]:
-        if not self.root.exists():
-            return []
-        found = {p.parent.parent.relative_to(self.root).as_posix()
-                 for p in self.root.glob(f"**/date=*/{_INDEX}")}  # fmt: skip
+    def dates(self, table: str, own_run: str | None = None) -> list[date]:
+        base = self.root / table
+        found = {d for t, d in self._own_partitions(own_run) if t == table}
+        if base.exists():
+            found |= {
+                date.fromisoformat(p.name.removeprefix("date="))
+                for p in base.iterdir()
+                if p.name.startswith("date=") and (p / INDEX).exists()
+            }
+        return sorted(found)
+
+    def names(self, own_run: str | None = None) -> list[str]:
+        found = {t for t, _ in self._own_partitions(own_run)}
+        if self.root.exists():
+            found |= {p.parent.parent.relative_to(self.root).as_posix()
+                      for p in self.root.glob(f"**/date=*/{INDEX}")}  # fmt: skip
         return sorted(found)
 
     @staticmethod
-    def _index(directory: Path) -> dict[str, str | dict[str, object]]:
-        path = directory / _INDEX
-        loaded: dict[str, str | dict[str, object]] = (
-            json.loads(path.read_text()) if path.exists() else {}
-        )
-        return loaded
-
-
-def _entry(value: str | dict[str, object]) -> RunEntry:
-    """An index value: ``knowledge_ts`` (a plain run) or ``{knowledge_ts, restates}``."""
-    if isinstance(value, str):
-        return RunEntry(pd.Timestamp(value))
-    return RunEntry(pd.Timestamp(str(value["knowledge_ts"])), bool(value.get("restates")))
+    def _index(directory: Path) -> dict[str, RunEntry]:
+        return read_index(directory)
 
 
 class LocalRaw:
@@ -187,15 +229,15 @@ class LocalRaw:
             / f"source={source}"
             / f"dataset={dataset}"
             / f"date={session_date.isoformat()}"
-            / f"run={_safe(run_id)}"
-            / f"{_safe(key)}.json.gz"
+            / f"run={safe(run_id)}"
+            / f"{safe(key)}.json.gz"
         )
 
     def put(
         self, source: str, dataset: str, session_date: date, run_id: str, key: str, payload: bytes
     ) -> None:
         path = self._path(source, dataset, session_date, run_id, key)
-        _atomic_write(path, gzip.compress(payload, mtime=0))
+        atomic_write(path, gzip.compress(payload, mtime=0))
 
     def get(
         self, source: str, dataset: str, session_date: date, run_id: str, key: str
@@ -217,8 +259,8 @@ class LocalStaging:
         self.root = root / "staging"
 
     def put(self, run_id: str, table: str, key: str, frame: pd.DataFrame) -> None:
-        _atomic_write(
-            self.root / _safe(run_id) / table / f"{_safe(key)}.parquet", _parquet_bytes(frame)
+        atomic_write(
+            self.root / safe(run_id) / table / f"{safe(key)}.parquet", _parquet_bytes(frame)
         )
 
     def keys(self, run_id: str, table: str) -> list[str]:
@@ -232,7 +274,7 @@ class LocalStaging:
         return pd.concat(parts, ignore_index=True) if parts else None
 
     def clear(self, run_id: str) -> None:
-        shutil.rmtree(self.root / _safe(run_id), ignore_errors=True)
+        shutil.rmtree(self.root / safe(run_id), ignore_errors=True)
 
     def purge_before(self, cutoff: date) -> int:
         old = [
@@ -250,10 +292,10 @@ class LocalRuns:
         self.root = root / "runs"
 
     def save(self, record: RunRecord) -> None:
-        _atomic_write(self.root / f"{_safe(record.run_id)}.json", record.to_json().encode())
+        atomic_write(self.root / f"{safe(record.run_id)}.json", record.to_json().encode())
 
     def load(self, run_id: str) -> RunRecord | None:
-        path = self.root / f"{_safe(run_id)}.json"
+        path = self.root / f"{safe(run_id)}.json"
         return RunRecord.from_json(path.read_text()) if path.exists() else None
 
     def find(self, job: str, session_date: date | None = None) -> list[RunRecord]:
@@ -274,4 +316,4 @@ class LocalBackend:
 
     def lock(self, name: str) -> FileLock:
         """A lock shared by every process using this data root (``locks/<name>.lock``)."""
-        return FileLock(self.root / "locks" / f"{_safe(name)}.lock")
+        return FileLock(self.root / "locks" / f"{safe(name)}.lock")

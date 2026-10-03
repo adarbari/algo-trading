@@ -53,6 +53,7 @@ from algotrade_ingestion.cli.commands import (
 )
 from algotrade_ingestion.ops.schedule import LABEL, nightly_plist
 from algotrade_ingestion.tasks.framework.registry import TASKS, Task
+from algotrade_ingestion.tasks.framework.run import recover_unpublished
 
 # Task commands kept under their own names (``algotrade-ingest bars ...``); every registry
 # task is also ``algotrade-ingest run <task>``. ``golden load`` runs the ``golden-load`` task.
@@ -204,7 +205,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not writes(args):
             return _dispatch(args, StoreReader(backend), StoreWriter(backend))
         with exclusive_run(backend, wait=args.wait):
-            return _dispatch(args, StoreReader(backend), StoreWriter(backend))
+            writer = StoreWriter(backend)
+            recover_unpublished(writer, datetime.now(UTC))  # no ingest run is in flight now
+            return _dispatch(args, StoreReader(backend), writer)
     except RunLockedError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return LOCKED_EXIT

@@ -11,7 +11,13 @@ Every ingestion task runs inside one ``IngestRun``, which owns:
   validated writes (``write``, ``stage`` / ``publish`` for per-item scratch);
 - the run status, decided in one place: any failed item or explicit ``partial`` -> PARTIAL;
   an exception escaping the ``with`` block -> FAILED, saved, then re-raised; an explicit
-  ``failed`` (a workflow whose every step failed) -> FAILED; else COMPLETE.
+  ``failed`` (a workflow whose every step failed) -> FAILED; else COMPLETE;
+- atomic publication (ADR 0022): every table write is pending until the run finishes; a
+  COMPLETE or PARTIAL run commits all of them at once (``knowledge_ts`` stays the write
+  time; reads pinned at ``as_of`` see the run from its commit time), a FAILED run drops
+  them. ``run.reader`` also sees the run's own pending writes. ``recover_unpublished``
+  (CLI start, under the ingest lock) completes interrupted commits and drops what crashed
+  runs left.
 
 Tasks keep only their own logic: what to fetch, how to combine frames, task-specific stats.
 """
@@ -39,6 +45,8 @@ REFERENCE = "instruments/reference"
 FETCH_ERROR = "FETCH_ERROR"
 # Item statuses that make a run PARTIAL. ``FETCH_ERROR`` items are retried on resume.
 FAILURES = (FETCH_ERROR, "STALE_DATA", "FAILED")
+# Run statuses whose table writes are published (ADR 0022); FAILED publishes nothing.
+PUBLISHED = (RunStatus.COMPLETE, RunStatus.PARTIAL)
 
 
 def utc_now() -> datetime:
@@ -103,6 +111,7 @@ class IngestRun:
         resumed = self._resume() if resume else None
         now = self.clock()
         self.record = resumed or start_run(task, session, now)
+        self.reader = ctx.reader.including(self.record.run_id)  # sees its own pending writes
 
     # ------------------------------------------------------------------ lifecycle
 
@@ -126,6 +135,7 @@ class IngestRun:
         return record
 
     def __enter__(self) -> Self:
+        self.checkpoint()  # a RUNNING record: recovery knows the run's pending writes as ours
         return self
 
     def __exit__(
@@ -156,8 +166,24 @@ class IngestRun:
         if self._failed:
             self.stats["failed_because"] = self._failed
         self.record.stats = self.stats
-        if self._save:
-            self.writer.save_run(self.record)
+        try:
+            self._publish_or_drop(status)
+        finally:
+            if self._save:
+                self.writer.save_run(self.record)
+
+    def _publish_or_drop(self, status: RunStatus) -> None:
+        """Commit every table the run wrote at once (COMPLETE / PARTIAL), else drop them. A
+        commit that fails marks the run FAILED; startup recovery settles what it left."""
+        if status not in PUBLISHED:
+            self.writer.abort_run(self.run_id)
+            return
+        try:
+            self.writer.commit_run(self.run_id, self.record.finished_at or self.clock())
+        except Exception as exc:
+            self.record.status = RunStatus.FAILED
+            self.stats["error"] = f"commit failed: {type(exc).__name__}: {exc}"
+            raise
 
     def checkpoint(self) -> None:
         """Save the record so far (resumable runs, long backfills)."""
@@ -255,7 +281,8 @@ class IngestRun:
     ) -> None:
         """Stamp and write one partition (validated against the table schema)."""
         day = session or self.session
-        self.writer.write_table(table, day, self.run_id, self.stamped(frame, source, day))
+        frame = self.stamped(frame, source, day)
+        self.writer.write_table(table, day, self.run_id, frame, pending=True)
 
     def rewrite(self, table: str, day: date, frame: pd.DataFrame) -> None:
         """Re-publish a partition's rows as this run (new ``knowledge_ts`` and ``run_id``).
@@ -263,7 +290,7 @@ class IngestRun:
         ``frame`` must be the whole partition as read now: the run is written as restating,
         so for merge tables (events) the runs before it stop being read (``TableStore``)."""
         out = frame.assign(knowledge_ts=pd.Timestamp(self.clock()), run_id=self.run_id)
-        self.writer.write_table(table, day, self.run_id, out, restates=True)
+        self.writer.write_table(table, day, self.run_id, out, restates=True, pending=True)
 
     def stage(self, table: str, key: str, frame: pd.DataFrame, source: str) -> None:
         """Stamp one item's rows into run scratch; ``publish`` writes them as one partition."""
@@ -276,11 +303,37 @@ class IngestRun:
             return 0
         frame = frame.sort_values(sort_by, kind="stable").reset_index(drop=True)
         frame["knowledge_ts"] = pd.Timestamp(self.clock())
-        self.writer.write_table(table, self.session, self.run_id, frame)
+        self.writer.write_table(table, self.session, self.run_id, frame, pending=True)
         return len(frame)
 
     def clear_staging(self) -> None:
         self.writer.staging.clear(self.run_id)
+
+
+def recover_unpublished(writer: StoreWriter, now: datetime) -> dict[str, list[str]]:
+    """Settle what crashed runs left, deterministically (ADR 0022). Call it only while
+    holding the ingest run lock, so no ingest run is in flight:
+
+    - a commit that reached its marker is completed (``recover_runs``); a run record a
+      crash left RUNNING becomes PARTIAL, noted ``recovered``;
+    - a run whose record is RUNNING or FAILED (an ingest run that crashed, or whose commit
+      failed before its marker) has its pending writes dropped. Pending writes with no run
+      record (a service's crashed run) are left to retention (``purge_pending_before``).
+    """
+    completed = writer.recover_runs()
+    for run_id in completed:
+        record = writer.load_run(run_id)
+        if record is not None and record.status not in PUBLISHED:
+            record.status, record.finished_at = RunStatus.PARTIAL, record.finished_at or now
+            record.stats["recovered"] = "published by recovery after a crash during commit"
+            writer.save_run(record)
+    dropped = []
+    for run_id in writer.pending_runs():
+        record = writer.load_run(run_id)
+        if record is not None and record.status in (RunStatus.RUNNING, RunStatus.FAILED):
+            writer.abort_run(run_id)
+            dropped.append(run_id)
+    return {"completed": completed, "dropped": dropped}
 
 
 def last_finished_session(writer: StoreWriter, task: str) -> date | None:

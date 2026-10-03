@@ -55,8 +55,11 @@ catalog       run log, dataset and schema versions, data-quality checks (a DuckD
 ```
 $ALGOTRADE_DATA_URL (default file://./var/data, git-ignored)
   tables/<table>/date=YYYY-MM-DD/run=<run_id>.parquet   + _runs.json (knowledge_ts per run;
-                                                         {knowledge_ts, restates} for a
-                                                         restating run)
+                                                         a dict with restates / visible_at /
+                                                         seq / file / prev when needed)
+  tables/_txn/pending/<run_id>.jsonl                     a running run's uncommitted writes
+  tables/_txn/commits/<run_id>.json, seq                 commit markers + commit sequence
+                                                         (ADR 0022)
   raw/source=<s>/dataset=<d>/date=YYYY-MM-DD/run=<run_id>/<key>.json.gz
   staging/<run_id>/<table>/<key>.parquet                 per-item scratch for resumable jobs
                                                          (cleared on completion; unfinished
