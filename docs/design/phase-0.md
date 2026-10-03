@@ -6,7 +6,7 @@
 | Reviewers | @adarbari |
 | Status | **In Review** (approve by merging this PR; it is labelled `no-automerge`) |
 | Created | 2026-10-03 |
-| Last Updated | 2026-10-03 |
+| Last Updated | 2026-10-03 (open questions resolved) |
 
 ---
 
@@ -286,7 +286,8 @@ StrategyConfig { id, kind: "screener"|"strategy", impl: registry name, params: {
                  selection: Selection | ref, backtest?: {initial_cash, costs, limits},
                  outputs?: {exports: [...]}, schedule?: "nightly" }
 ResolvedConfig { config: StrategyConfig, layers: [sources...], hash: sha256(canonical json) }
-UserContext    { user_id: str }   # phase 0: from --user / ALGOTRADE_USER, default "local"
+UserContext    { user_id: str }   # phase 0: plain label from --user / ALGOTRADE_USER, default "local";
+                                  # identity scheme deliberately deferred
 ```
 
 Example preset `config/presets/selections/liquid_optionable.toml`:
@@ -462,11 +463,11 @@ a single-user local system.
 
 | Question | Owner | Decision Needed By | Resolution |
 |---|---|---|---|
-| Approve uv workspace now (D1), with `brew install uv` needed locally? | @adarbari | before 0.7 | |
-| TOML for config files (decision 6)? | @adarbari | before 0.5 | |
-| User id scheme: free-form label now (e.g. `abhinav`), mapped to auth later? | @adarbari | before 0.5 | |
-| Should repo presets be per-user-overridable only by narrowing (AND), or also by replacement? Draft: both, via `selection_overrides` (narrow) or a full `selection` (replace) | @adarbari | before 0.5 | |
-| Keep the `algotrade` command name for the backtest app, or rename it to `algotrade-backtest`? Draft: rename, keeping `algotrade` as an alias for one phase | @adarbari | before 0.1 | |
+| Approve uv workspace now (D1), with `brew install uv` needed locally? | @adarbari | before 0.7 | **Yes**, adopt now |
+| TOML for config files (decision 6)? | @adarbari | before 0.5 | **Yes**, TOML |
+| User id scheme: free-form label now (e.g. `abhinav`), mapped to auth later? | @adarbari | before 0.5 | **Keep it simple:** a plain validated label (default `local`); the real identity scheme is out of scope for phase 0 |
+| Should repo presets be per-user-overridable only by narrowing (AND), or also by replacement? Draft: both, via `selection_overrides` (narrow) or a full `selection` (replace) | @adarbari | before 0.5 | **Both.** Narrowing (preset rules + user rules) is the default and inherits later preset improvements; replacing is the explicit escape hatch. The run audit records which was used |
+| Keep the `algotrade` command name for the backtest app, or rename it to `algotrade-backtest`? Draft: rename, keeping `algotrade` as an alias for one phase | @adarbari | before 0.1 | **Rename** to `algotrade-backtest` (matches `algotrade-ingest`, `algotrade-api`); `algotrade` stays as an alias through phase 1 |
 
 ---
 
