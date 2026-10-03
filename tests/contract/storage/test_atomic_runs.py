@@ -2,6 +2,7 @@
 partition at once when it commits, never in part; an aborted or crashed run shows nothing."""
 
 import threading
+import time
 from collections.abc import Callable, Iterator
 from datetime import date, timedelta
 from pathlib import Path
@@ -224,6 +225,10 @@ def test_a_concurrent_reader_sees_a_commit_whole_or_not_at_all(
         while not done.is_set():
             frame = backend.tables.read_range(A, DAYS[0], DAYS[-1])
             seen.append((0, set()) if frame is None else (len(frame), set(frame["value"])))
+            # A spinning reader re-takes the memory backend's lock before the writer wakes,
+            # stalling the commits for minutes (worse under coverage); pacing keeps reads
+            # interleaved with every commit without the convoy.
+            time.sleep(0.001)
 
     thread = threading.Thread(target=reader)
     thread.start()
@@ -233,7 +238,7 @@ def test_a_concurrent_reader_sees_a_commit_whole_or_not_at_all(
         done.set()
         thread.join()
     torn = [s for s in seen if s[0] != len(DAYS) or len(s[1]) != 1]
-    assert seen and not torn, torn[:3]
+    assert len(seen) > 40 and not torn, torn[:3]
 
 
 def test_result_runs_publish_together_or_not_at_all(backend: Backend) -> None:

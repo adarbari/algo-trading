@@ -30,7 +30,11 @@ Tests follow the directory layout (ADR 0020, `architecture/layout.toml`, checked
   mirroring the source. `make layout` lists folders at 8+.
 
 Run everything with `make test` (enforces 90% branch coverage). Hypothesis profiles are
-chosen with `HYPOTHESIS_PROFILE=dev|ci|nightly`.
+chosen with `HYPOTHESIS_PROFILE=dev|ci|nightly`. Tests run in parallel (pytest-xdist, one
+worker per CPU; `make test WORKERS=0` runs them serially), so every test must be isolated:
+its own `tmp_path` store, no shared files outside it, no fixed ports, and never the network
+(fake the source with `use_source` and a recorded payload). PRs test on Python 3.12; every
+push to `main` also runs 3.13.
 
 ## Reconciliation suite (cross-source)
 

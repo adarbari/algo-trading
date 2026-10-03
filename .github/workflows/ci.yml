@@ -39,13 +39,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.12", "3.13"]
+        # PRs test the primary version; every push to main (and the post-merge re-test) runs both.
+        python: ${{ fromJSON(github.event_name == 'pull_request' && '["3.12"]' || '["3.12", "3.13"]') }}
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
         with: { python-version: "${{ matrix.python }}", enable-cache: true }
+      - uses: actions/cache@v6
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-py${{ matrix.python }}-${{ hashFiles('uv.lock') }}
       - run: uv sync --all-packages --locked
-      - name: Unit + architecture + property + integration + e2e (coverage gate 90%)
+      # Hypothesis keeps failing examples here and replays them first on the next run.
+      - uses: actions/cache@v6
+        with:
+          path: .hypothesis
+          key: hypothesis-${{ runner.os }}-py${{ matrix.python }}-${{ github.run_id }}
+          restore-keys: hypothesis-${{ runner.os }}-py${{ matrix.python }}-
+      - name: Unit + architecture + property + integration + e2e (coverage gate 90%, one worker per CPU)
         run: make test
       - uses: actions/upload-artifact@v7
         if: matrix.python == '3.12'
@@ -94,6 +105,8 @@ jobs:
           key: npm-${{ runner.os }}-${{ hashFiles('apps/web/package-lock.json') }}
           restore-keys: npm-${{ runner.os }}-
       - run: npm ci --no-fund --no-audit
+      - name: No high or critical advisories in shipped dependencies (dev tooling is reported, not gated)
+        run: npm audit --omit=dev --audit-level=high && { npm audit --audit-level=high || true; }
       - name: Playwright image matches the locked @playwright/test
         run: |
           locked=$(node -p "require('@playwright/test/package.json').version")
