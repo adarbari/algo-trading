@@ -4,7 +4,8 @@
 stored run records by ``records.stored_summary``) plus the task run records of those steps
 into a ``Report``: one ``StepLine`` per step (status, duration, key counts, per-item status
 counts), failed items grouped by normalised reason with a few examples each, failed quality
-checks, screen coverage gaps and short "what to do" hints. ``render.py`` turns it into text
+checks, screen coverage gaps, the live verification against IBKR and short "what to do"
+hints. ``render.py`` turns it into text
 and HTML; ``notify.py`` mails it.
 """
 
@@ -82,6 +83,18 @@ class ScreenLine:
 
 
 @dataclass(frozen=True)
+class VerificationLine:
+    """The ``verify`` step of a session: checks by status, failing examples, or why skipped."""
+
+    session: str
+    status: str  # the step status
+    instruments: int
+    counts: tuple[tuple[str, int], ...]  # PASS / WARN / FAIL / NA
+    examples: tuple[str, ...]  # "AAPL close FAIL: ours 1.0 vs IBKR 2.0 (note)"
+    note: str = ""  # SKIPPED reason or step error
+
+
+@dataclass(frozen=True)
 class Report:
     sessions: tuple[str, ...]
     status: str
@@ -98,6 +111,7 @@ class Report:
     timings: tuple[StepTiming, ...] = ()  # run timing per step (timing.py)
     max_duration_s: float | None = None  # [alerts] max_duration_minutes
     catch_up_dropped: tuple[str, ...] = ()  # missed sessions over the catch-up cap
+    verification: tuple[VerificationLine, ...] = ()  # the verify step per session
 
     @property
     def bad_steps(self) -> tuple[StepLine, ...]:
@@ -203,6 +217,34 @@ def _rollups(session: str, result: Any) -> list[tuple[str, str, int, int]]:
     ]
 
 
+def _value(value: Any) -> str:
+    return f"{value:.6g}" if isinstance(value, int | float) else "-"
+
+
+def _verification(session: str, step: Mapping[str, Any]) -> list[VerificationLine]:
+    result = step.get("result")
+    stats = result if isinstance(result, Mapping) else {}
+    found = stats.get("checks")
+    counts: Mapping[str, Any] = found if isinstance(found, Mapping) else {}
+    examples = tuple(
+        f"{e.get('symbol')} {e.get('check')} {e.get('status')}: ours {_value(e.get('ours'))} "
+        f"vs IBKR {_value(e.get('theirs'))} ({e.get('note', '')})"
+        for e in stats.get("failing", [])
+        if isinstance(e, Mapping)
+    )
+    note = str(step.get("error") or step.get("reason") or "")
+    return [
+        VerificationLine(
+            session,
+            str(step.get("status")),
+            int(stats.get("instruments", 0)),
+            tuple((str(k), int(v)) for k, v in counts.items()),
+            examples,
+            note,
+        )
+    ]
+
+
 def _checks(session: str, result: Any) -> list[Check]:
     checks = result.get("checks", []) if isinstance(result, Mapping) else []
     return [
@@ -280,6 +322,17 @@ HINTS: tuple[tuple[re.Pattern[str], str], ...] = tuple(
             "older chains (thin delayed data). Re-run chains later; screens treat them as UNKNOWN.",
         ),
         (
+            r"IB Gateway not reachable|\[ibkr\] is disabled",
+            "Verification vs IBKR skipped: start IB Gateway (Read-Only API ticked, port as in "
+            ".env ALGOTRADE_IBKR_PORT) and set [ibkr] enabled = true; README, Live verification.",
+        ),
+        (
+            r"^verification",
+            "verification: our stored values disagree with IBKR beyond tolerance. See the "
+            "Verification section (or `verification/ibkr` rows); re-run `algotrade-ingest verify "
+            "--date D --symbols X` after fixing the producing task.",
+        ),
+        (
             r"^bars_fresh|^bars_count",
             "Bars check failed: re-run `algotrade-ingest bars --date D` "
             "and check the Massive key and plan.",
@@ -294,6 +347,7 @@ def hints(report: Report) -> tuple[str, ...]:
     texts += [s.note for s in report.steps if s.status in BAD_STEPS]
     texts += [f"{c.name}: {c.detail}" for c in report.checks]
     texts += [reason for screen in report.screens for reason, _ in screen.gaps]
+    texts += [v.note for v in report.verification if v.note]
     return tuple(h for pattern, h in HINTS if any(pattern.search(t) for t in texts))
 
 
@@ -310,6 +364,7 @@ def build_report(
     ``history``: step -> seconds of earlier nightlies, newest first (the timing trend)."""
     labels = labels or {}
     lines, failures, checks, screens, rollups = [], [], [], [], []
+    verification: list[VerificationLine] = []
     for session, name, step in _steps(summary):
         record = records.get((session, name))
         result = step.get("result")
@@ -330,6 +385,7 @@ def build_report(
         checks += _checks(session, result) if name == "quality" else []
         screens += _screens(session, result) if name == "screens" else []
         rollups += _rollups(session, result) if name == "rollups" else []
+        verification += _verification(session, step) if name == "verify" else []
     warnings = tuple(
         str(w.get("detail", w)) if isinstance(w, Mapping) else str(w)
         for w in summary.get("warnings", [])
@@ -348,6 +404,7 @@ def build_report(
         rollups=tuple(rollups),
         max_duration_s=max_duration_s,
         catch_up_dropped=tuple((summary.get("catch_up") or {}).get("dropped", [])),
+        verification=tuple(verification),
     )
     items = {key: len(r.items) for key, r in records.items() if r.items}
     timings = step_timings(list(_steps(summary)), report.started, report.duration_s, items, history)

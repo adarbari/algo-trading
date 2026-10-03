@@ -1,0 +1,26 @@
+# L3 site setting: the nightly live verification against IBKR (apps/ingestion/tasks/verification).
+# Read-only: IBKR market data only (ADR 0026). Tolerances reuse the reconciliation suite's
+# (docs/testing.md); a check over its tolerance but within `warn_multiple` times it is WARN,
+# beyond that FAIL; a check either side cannot answer is NA.
+
+[sample]
+# Always verified: liquid ETFs and stocks, a leveraged ETF (TQQQ), ADRs (TSM, NVO), a dividend
+# payer (KO, JNJ) and a thin name with a reverse split (RPGL).
+core_symbols = ["AAPL", "SPY", "QQQ", "IWM", "KO", "TQQQ", "TSM", "NVO", "JNJ", "RPGL"]
+rotating = 10                    # plus N names from the universe, chosen by a hash of the session
+                                 # (and every name with a split, dividend or ticker change that day)
+option_symbols = ["AAPL", "SPY"] # option quotes compared with our stored chain for these names
+options_per_symbol = 2           # the ATM call and put of the expiry nearest 30 days
+bar_sessions = 260               # IBKR daily bars requested per name (52 weeks + the HV window)
+
+[tolerances]
+close_rel = 0.002                # split-adjusted closes, worst session in the window (relative)
+range_rel = 0.001                # daily highs / lows (relative)
+hv_rel = 0.005                   # price_stats.hv20 vs close-to-close HV20 on IBKR closes (relative)
+high_52w_rel = 0.0005            # 52-week high (split-only basis, relative)
+extreme_rel = 0.0005             # 52-week low: ours >= IBKR, the gap at most div_ttm (slack, relative)
+yield_abs = 0.0005               # dividend yield (decimal: 0.05 percentage points)
+iv_abs = 0.025                   # implied vol (decimal: 2.5 vol points), ours and Cboe's
+spread_band = 1.0                # option mids may differ by this many half-spreads (the wider one)
+max_missing_sessions = 0         # IBKR sessions in the window we have no bar for
+warn_multiple = 2.0              # over tolerance by at most this factor: WARN; beyond: FAIL

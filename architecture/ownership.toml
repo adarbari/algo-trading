@@ -244,6 +244,35 @@ detect = [
 ]
 
 [[responsibility]]
+id = "session-sources"
+description = "Session-based sources (a stateful connection to a local gateway, e.g. IB Gateway): the SessionSource protocol (probe / open / close) and its one lifecycle (base.opened, always closed), built unconnected by the source registry (SessionSpec, SessionInputs) with their shared limiters"
+owner = [
+    "apps/ingestion/algotrade_ingestion/sources/framework/base.py",
+    "apps/ingestion/algotrade_ingestion/sources/framework/registry.py",
+]
+allowed = ["apps/ingestion/algotrade_ingestion/sources/vendors/ibkr/gateway.py"]  # its TCP probe of the gateway port
+section = "docs/adr/0026-live-verification-ibkr.md#session-sources"
+detect = [{ call = "SessionSpec" }, { call = "SessionInputs" }, { import = "socket" }]
+
+[[responsibility]]
+id = "broker-read-only"
+description = "The only code that talks to a broker API (ib_async), READ-ONLY market data: the IbkrMarketData facade guards the IB object (market-data calls only) and never sends an order, account or position request; tests/apps/ingestion/sources/vendors/ibkr/test_read_only_guard.py fails on any order / account API reference anywhere"
+owner = ["apps/ingestion/algotrade_ingestion/sources/vendors/ibkr/gateway.py"]
+section = "docs/adr/0026-live-verification-ibkr.md#read-only-by-construction"
+detect = [{ import = "ib_async" }, { import = "ib_insync" }, { import = "ibapi" }]
+
+[[responsibility]]
+id = "live-verification"
+description = "Compare a session's stored values with an independent live source (IBKR): the sample, the checks and their tolerances (verification.toml), the verification/ibkr table; the quality check `verification` grades it and the nightly email reports it"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/verification/*"]
+allowed = [
+    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the session's rows
+]
+section = "docs/adr/0026-live-verification-ibkr.md#the-verify-task"
+detect = [{ string = "verification/ibkr" }, { call = "compare_bars" }, { call = "Grader" }]
+
+[[responsibility]]
 id = "secrets-env"
 description = "Read environment variables and the local .env: credentials, the data URL, the config directory, the default user (callers receive values as parameters)"
 owner = ["src/algotrade/config/env.py"]
@@ -504,6 +533,10 @@ note = "none produced yet (phase 6); rollups are computed only by the rollups ta
 name = "results/*"
 owner = "src/algotrade/storage/tables/result_writer.py"
 note = "one results/<name> per screener (services/screening/run.py) or backtest output (services/backtests/run.py)"
+
+[[table]]
+name = "verification/ibkr"
+owner = "apps/ingestion/algotrade_ingestion/tasks/verification/verify.py"
 
 [[table]]
 name = "catalog/golden_datasets"

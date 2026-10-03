@@ -12,6 +12,7 @@ requires-python = ">=3.12"
 dependencies = [
     "algotrade",
     "openpyxl>=3.1",
+    "ib_async>=2.0",
 ]
 
 [project.scripts]

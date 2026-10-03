@@ -6,11 +6,16 @@ replayed later without the network:
     fetch(request)              -> raw bytes exactly as received, or None ("nothing there")
     normalize(request, payload) -> canonical frames keyed by storage table, or None
 
+Most sources are stateless HTTP clients. A ``SessionSource`` (IB Gateway) holds a stateful
+connection instead: built unconnected by the registry, ``probe``d cheaply before a workflow
+runs it, and ``opened`` / closed around the work by the task (``opened``), whatever happens.
+
 Tasks own everything else (through ``tasks/framework/run.py``): scheduling, rate-limit-aware
 fan-out, raw storage, stamping the point-in-time columns, staging, publishing and run records.
 """
 
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Protocol, runtime_checkable
@@ -82,6 +87,35 @@ class Throttled(Protocol):
     """A source whose vendor can be asked to pause (all processes share the pause)."""
 
     def cool_down(self, seconds: float) -> None: ...
+
+
+class SessionUnavailableError(ConnectionError):
+    """A session source cannot connect (gateway down, refused, handshake timed out)."""
+
+
+@runtime_checkable
+class SessionSource(Source, Protocol):
+    """A source over a stateful session (a socket to a local gateway), not HTTP requests.
+
+    ``probe`` -> why the session cannot be opened now (``None``: it can), without opening it
+    (a TCP check; workflows skip the task with that reason). ``open`` connects, raising
+    ``SessionUnavailableError``; ``close`` disconnects and never raises."""
+
+    def probe(self) -> str | None: ...
+
+    def open(self) -> None: ...
+
+    def close(self) -> None: ...
+
+
+@contextmanager
+def opened[S: SessionSource](source: S) -> Iterator[S]:
+    """Open ``source`` for the block and always close it afterwards (the one lifecycle)."""
+    source.open()
+    try:
+        yield source
+    finally:
+        source.close()
 
 
 class FixtureDataset(Protocol):

@@ -299,6 +299,11 @@ purpose = "maintenance tasks: quality checks, raw purge, id migration, golden lo
 kind = "task-domain"
 
 [[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/verification"
+purpose = "verification tasks: compare stored values with an independent live source (IBKR, read-only), the sample and the graded checks"
+kind = "task-domain"
+
+[[dir]]
 path = "apps/ingestion/algotrade_ingestion/workflows"
 purpose = "workflows: ordered, isolated runs of registry tasks (no modules of its own)"
 

@@ -17,6 +17,13 @@ lands. The target state of every item is described in [architecture.md](architec
 | 5b | Web app | Screener list, results table, contract detail, data freshness; L4 watchlists and preferences | |
 | 6 | Expansion | Backtests from the UI on a queue-backed job runner; on-request pulls; futures (IBKR); intraday bars + `rollups/daily/*`; S3 storage backend and hosting; screener outcome tracking | |
 
+## Live verification (LV): our data against IBKR, read-only (ADR 0026)
+
+| # | Delivers | Status |
+|---|---|---|
+| LV1 | IB Gateway session source (`sources/vendors/ibkr/`, read-only facade over `ib_async`; session sources in the framework; IBKR pacing), the `verify` task (`tasks/verification/`: sample, checks with the reconciliation tolerances, `verification/ibkr`), nightly step (SKIPPED when the gateway is down), quality check `verification`, email section, read-only fitness test + import contract. **Owner action:** set up IB Gateway (README, "Live verification") and set `[ibkr] enabled = true` | **done** |
+| LV2 | A trend of verification failures per check in the email; IBKR as the source of `option_symbols` IV history once a subscription is in place | later |
+
 ## Restructure (R): one owner per responsibility (ADR 0019)
 
 Each PR moved code to its target owner in `architecture/ownership.toml`, shrank

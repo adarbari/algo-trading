@@ -16,6 +16,8 @@ from algotrade_ingestion.sources.fixtures.source import GoldenCsvSource
 from algotrade_ingestion.sources.framework.base import FetchRequest, Source
 from algotrade_ingestion.sources.framework.http import RetryPolicy
 from algotrade_ingestion.sources.vendors.cboe.option_chains import CboeOptionsSource
+from algotrade_ingestion.sources.vendors.ibkr.gateway import GatewayConfig, IbkrMarketData
+from algotrade_ingestion.sources.vendors.ibkr.market_data import IbkrSource
 from algotrade_ingestion.sources.vendors.massive.bars import MassiveDailyBars
 from algotrade_ingestion.sources.vendors.massive.corporate_actions import MassiveCorporateActions
 from algotrade_ingestion.sources.vendors.massive.tickers import MassiveTickers
@@ -27,6 +29,7 @@ from algotrade_ingestion.sources.vendors.ssga.spy_holdings import SpyHoldingsSou
 from algotrade_ingestion.sources.vendors.treasury.par_yields import TreasuryParYields
 from algotrade_ingestion.tasks.framework.run import stamp
 from tests.conftest import GOLDEN_DIR, REPO_ROOT
+from tests.helpers.fake_ib import FakeIB
 from tests.helpers.ingest_fakes import http_for
 from tests.helpers.payloads import cboe as fx
 from tests.helpers.payloads import massive as massive_payloads
@@ -43,6 +46,15 @@ def cboe() -> Adapter:
     payload = fx.payload("TEST")
     source = CboeOptionsSource(http_for(lambda url: payload, RetryPolicy(tries=1)))
     return source, FetchRequest("TEST", "EQ:TEST", fx.SESSION)
+
+
+def ibkr() -> Adapter:
+    bars = [(fx.SESSION, 10.0, 11.0, 9.0, 10.5, 1e6)]
+    fake = FakeIB(bars={"AAPL": bars})
+    gateway = IbkrMarketData(GatewayConfig("127.0.0.1", 4002, 1), ib_factory=lambda: fake)
+    source = IbkrSource(gateway)
+    source.open()  # a session source: tasks open it (base.opened)
+    return source, FetchRequest("bars/AAPL", "EQ:AAPL", fx.SESSION)
 
 
 def golden() -> Adapter:
@@ -117,6 +129,7 @@ ADAPTERS: dict[str, Callable[[], Adapter]] = {
     "nasdaq_earnings": nasdaq_earnings,
     "cboe": cboe,
     "golden": golden,
+    "ibkr": ibkr,
     "nasdaq_trader": nasdaq_trader,
     "spy_holdings": spy_holdings,
 }

@@ -256,3 +256,47 @@ def test_the_committed_figi_overrides_file_loads() -> None:
 def test_figi_override_errors_name_the_line(rows: list[dict[str, str]], message: str) -> None:
     with pytest.raises(ConfigurationError, match=message):
         load_universe(figi_store(rows))
+
+
+def test_ibkr_and_verification_settings() -> None:
+    from algotrade.config.site.settings import (  # noqa: PLC0415
+        VerificationSettings,
+        load_verification,
+    )
+
+    sources = SourcesSettings.from_document(site("sources"))
+    assert not sources.vendor("ibkr").enabled and sources.vendor("ibkr").raw_retention_days == 30
+    assert (sources.ibkr.market_data_type, sources.ibkr.stream_wait_s) == (3, 4.0)
+    assert (sources.ibkr.connect_timeout_s, sources.ibkr.request_timeout_s) == (10.0, 60.0)
+    assert sources.max_verify_failures == 0.10
+    store = MemoryConfigStore({("site", "settings", "verification"): site("verification")})
+    verification = load_verification(store)
+    assert verification == VerificationSettings()  # the file states the defaults
+    assert verification.core_symbols[:3] == ("AAPL", "SPY", "QQQ") and verification.rotating == 10
+    assert load_verification(MemoryConfigStore({})) == VerificationSettings()
+    custom = VerificationSettings.from_document(
+        {"sample": {"core_symbols": ["aapl"], "rotating": 0}, "tolerances": {"iv_abs": 0.05}}
+    )
+    assert (custom.core_symbols, custom.rotating, custom.iv_abs) == (("AAPL",), 0, 0.05)
+
+
+@pytest.mark.parametrize(
+    ("doc", "message"),
+    [
+        ({"ibkr": {"market_data_type": 5}}, r"\[ibkr\] market_data_type: expected 1 \(live\)"),
+        ({"ibkr": {"host": "x"}}, r"\[ibkr\]: unknown keys \['host'\]"),  # host comes from .env
+        ({"quality": {"max_verify_failures": 2}}, "a fraction between 0 and 1"),
+    ],
+)
+def test_ibkr_errors_name_the_key(doc: dict[str, Any], message: str) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        SourcesSettings.from_document(doc)
+
+
+def test_verification_errors_name_the_key() -> None:
+    from algotrade.config.site.settings import VerificationSettings  # noqa: PLC0415
+
+    with pytest.raises(ConfigurationError, match=r"verification.toml \[sample\]: unknown keys"):
+        VerificationSettings.from_document({"sample": {"core": ["A"]}})
+    with pytest.raises(ConfigurationError, match="warn_multiple: expected a number >= 1"):
+        VerificationSettings.from_document({"tolerances": {"warn_multiple": 0.5}})

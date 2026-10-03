@@ -554,6 +554,9 @@ doing it. The ratchet `architecture/known_violations.toml` is empty: any hit fai
 | vendor HTTP, retries, retry cap, circuit breaker | `sources/framework/http.py` |
 | rate limiting | `sources/framework/limiter.py`, one per key, shared across threads and processes |
 | source construction (vendors and the golden fixture source) | `sources/framework/registry.py` (vendor specifics stay in `sources/vendors/<vendor>/`) |
+| session sources (a stateful gateway connection: probe, open, always close) | `sources/framework/base.py` (`SessionSource`, `opened`), `sources/framework/registry.py` (`SessionSpec`) |
+| broker access, READ-ONLY (the only `ib_async` import; market data only; ADR 0026) | `sources/vendors/ibkr/gateway.py` |
+| live verification against IBKR (sample, checks, `verification/ibkr`) | `tasks/verification/` |
 | locks (flock, named store locks, run-index lock); the ingest run lock | `storage/locks.py`; `services/jobs/exclusive.py` |
 | session / exchange calendar | `core/time/calendar.py` |
 | job execution | `services/jobs/` (apps use `run_job`; fan-out `as_completed`) |

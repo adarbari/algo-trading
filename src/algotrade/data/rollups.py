@@ -1,11 +1,12 @@
-"""Stored rollup rows (``rollups/instrument/<name>@v<N>``) over a range of sessions, and one
-instrument's latest row.
+"""Stored rollup rows (``rollups/instrument/<name>@v<N>``): a range of sessions, one session,
+or one instrument's latest row.
 
-Used by the rollup framework when one rollup reads another's output (``iv_history@v1``
-reads 252 sessions of ``iv30@v1``) and by the explore queries (feature series, pages). Each
-partition is one session's rows from the latest run that wrote it (or the run current at
-``as_of``). The stamp columns (``knowledge_ts``,
-``source``, ``run_id``) are dropped; ``session_date`` is kept as a ``date``.
+``rollup_rows`` serves the rollup framework when one rollup reads another's output
+(``iv_history@v1`` reads 252 sessions of ``iv30@v1``) and the explore queries (feature
+series, pages); ``rollup_on`` one session's rows for a consumer comparing them (the live
+verification). Each partition is one session's rows from the latest run that wrote it (or the
+run current at ``as_of``). The stamp columns (``knowledge_ts``, ``source``, ``run_id``) are
+dropped; ``session_date`` is kept as a ``date``.
 """
 
 from collections.abc import Sequence
@@ -56,3 +57,18 @@ def rollup_row(
         return None
     row = frame.drop(columns=[c for c in (*STAMPS, "session_date") if c in frame.columns])
     return snap.snapshot_date, {str(k): v for k, v in row.iloc[0].items()}
+
+
+def rollup_on(
+    reader: StoreReader,
+    table: str,
+    session: date,
+    ids: Sequence[str] | None = None,
+    as_of: datetime | None = None,
+) -> pd.DataFrame | None:
+    """One session's stored rows of a rollup (optionally only ``ids``), stamps dropped; ``None``
+    when that session has none. For consumers comparing a session's values (verification)."""
+    frame = reader.table(table, session, as_of, list(ids) if ids is not None else None)
+    if frame is None or frame.empty:
+        return None
+    return frame.drop(columns=[c for c in STAMPS if c in frame.columns]).reset_index(drop=True)

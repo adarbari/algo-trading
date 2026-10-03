@@ -5,7 +5,8 @@ it as is. Times are shown in America/Los_Angeles (the owner's zone) and UTC. Bot
 hold the same sections: header, statistics per step, run timing (start / end / share /
 throughput / trend per step, slowest highlighted, sub-steps), failure deep
 dive (step errors, failed items grouped by reason with examples, quality checks, screen
-coverage gaps), rollups, and what to do.
+coverage gaps), rollups, verification vs IBKR (checks by status, failing examples), and what
+to do.
 """
 
 from collections.abc import Iterable, Sequence
@@ -14,7 +15,12 @@ from html import escape
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from algotrade_ingestion.workflows.nightly.report import BAD_STEPS, Example, Report
+from algotrade_ingestion.workflows.nightly.report import (
+    BAD_STEPS,
+    Example,
+    Report,
+    VerificationLine,
+)
 from algotrade_ingestion.workflows.nightly.timing import StepTiming
 
 LOCAL = ZoneInfo("America/Los_Angeles")  # the owner's time zone for the email
@@ -164,6 +170,17 @@ def _step_rows(report: Report) -> list[list[str]]:
 STEP_HEAD = ["Step", "Status", "Time", "Items", "Key counts"]
 
 
+def _lines(texts: Iterable[str]) -> str:
+    return "\n".join(texts)
+
+
+def _verification_summary(v: VerificationLine) -> str:
+    if v.note and not v.counts:
+        return f"{v.status}: {v.note}"
+    counts = _pairs(v.counts) or "no checks"
+    return f"{v.status}: {v.instruments} instruments; {counts}"
+
+
 # ----------------------------------------------------------------------------- text
 
 
@@ -192,6 +209,11 @@ def render_text(report: Report) -> str:
         for _, name, rows, no_input in report.rollups:
             gap = f", no input for {no_input} session(s)" if no_input else ""
             out.append(f"  {name:<22}{rows:>12,}{gap}")
+    if report.verification:
+        out += ["", "VERIFICATION VS IBKR", ""]
+        for v in report.verification:
+            out.append(f"  {v.session}: {_verification_summary(v)}")
+            out += [f"      {e}" for e in v.examples]
     out += ["", "FAILURE DEEP DIVE", ""]
     out += _text_failures(report)
     if report.hints:
@@ -322,6 +344,15 @@ def render_html(report: Report) -> str:
     if report.rollups:
         rows = [[n, _num(r), _num(g)] for _, n, r, g in report.rollups]
         parts += [h3.format("Rollups"), _html_table(["Rollup", "Rows", "No-input sessions"], rows)]
+    if report.verification:
+        rows = [
+            [v.session, v.status, _verification_summary(v).split(": ", 1)[-1], _lines(v.examples)]
+            for v in report.verification
+        ]
+        parts += [
+            h2.format("Verification vs IBKR"),
+            _html_table(["Session", "Status", "Checks", "Failing examples"], rows, status_col=1),
+        ]
     parts.append(h2.format("Failure deep dive"))
     parts += _html_failures(report, h3)
     if report.hints:

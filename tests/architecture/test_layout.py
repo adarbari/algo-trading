@@ -22,7 +22,7 @@ from typing import Any
 
 import pytest
 
-from algotrade_ingestion.sources.framework.registry import SOURCES
+from algotrade_ingestion.sources.framework.registry import SESSION_SOURCES, SOURCES
 from algotrade_ingestion.tasks.framework.registry import TASKS
 from tests.conftest import REPO_ROOT
 
@@ -197,7 +197,7 @@ def test_every_vendor_folder_contributes_a_registered_source(vendor: str) -> Non
         name
         for name, spec in SOURCES.items()
         if str(getattr(spec.build, "__module__", "")).startswith(package + ".")
-    ]
+    ] + [n for n, s in SESSION_SOURCES.items() if s.kind.__module__.startswith(package + ".")]
     assert built_here, f"{vendor}: register at least one source in {LAYOUT['source_registry']}"
 
 

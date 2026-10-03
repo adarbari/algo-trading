@@ -5,6 +5,11 @@ sources.toml`` section (``enabled``, ``min_interval_s``), the environment variab
 (if any) and how that becomes request headers, its limiter key and default pacing, its retry
 policy and the class that builds it from an ``Http`` client.
 
+Session sources (IB Gateway) hold a stateful connection, not HTTP: a ``SessionSpec`` names
+the source, its section, its limiter keys and default pacing, the environment variables it
+needs, and builds it UNCONNECTED from ``SessionInputs`` (settings, environment, limiters);
+tasks open and close it (``base.opened``).
+
 Fixture sources (the synthetic golden CSVs) are not vendors: ``FIXTURES`` builds them from a
 directory, with no transport, pacing or ``sources.toml`` section (``fixture_source``).
 
@@ -19,6 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
+from algotrade.config import env as env_names
 from algotrade_ingestion.sources.fixtures.source import golden_source
 from algotrade_ingestion.sources.framework.base import FixtureSource, Source
 from algotrade_ingestion.sources.framework.http import (
@@ -31,6 +37,8 @@ from algotrade_ingestion.sources.framework.http import (
 )
 from algotrade_ingestion.sources.framework.limiter import Limiter
 from algotrade_ingestion.sources.vendors.cboe.option_chains import CboeOptionsSource, missing_chain
+from algotrade_ingestion.sources.vendors.ibkr.gateway import GatewayConfig, IbkrMarketData
+from algotrade_ingestion.sources.vendors.ibkr.market_data import IbkrSource
 from algotrade_ingestion.sources.vendors.massive.bars import MassiveDailyBars
 from algotrade_ingestion.sources.vendors.massive.corporate_actions import MassiveCorporateActions
 from algotrade_ingestion.sources.vendors.massive.tickers import MassiveTickers
@@ -54,6 +62,25 @@ class VendorConfig(Protocol):
     def min_interval_s(self) -> float | None: ...
 
 
+class IbkrOptions(Protocol):
+    """``[ibkr]`` beyond enabled / min_interval_s (``config.site.settings.IbkrSettings``)."""
+
+    @property
+    def historical_min_interval_s(self) -> float: ...
+
+    @property
+    def market_data_type(self) -> int: ...
+
+    @property
+    def connect_timeout_s(self) -> float: ...
+
+    @property
+    def request_timeout_s(self) -> float: ...
+
+    @property
+    def stream_wait_s(self) -> float: ...
+
+
 class RegistrySettings(Protocol):
     """What the registry reads from ``RegistrySettings`` (sources never import settings)."""
 
@@ -65,6 +92,9 @@ class RegistrySettings(Protocol):
 
     @property
     def limits_dir(self) -> str: ...
+
+    @property
+    def ibkr(self) -> IbkrOptions: ...
 
     def vendor(self, section: str) -> VendorConfig: ...
 
@@ -134,6 +164,73 @@ SOURCES: dict[str, SourceSpec] = {
 }
 
 
+@dataclass(frozen=True)
+class SessionInputs:
+    """What a session source is built from: settings, the environment and the shared
+    limiters (``limiter(key, min_interval_s)``: one per key, across threads and processes)."""
+
+    settings: RegistrySettings
+    env: Env
+    limiter: Callable[[str, float], Limiter]
+    interval: float  # the section's min_interval_s (or the spec's default)
+
+
+@dataclass(frozen=True)
+class SessionSpec:
+    """A source over a stateful session (a local gateway socket), built unconnected."""
+
+    name: str
+    section: str
+    limiter: str  # every message waits on this key
+    build: Callable[[SessionInputs], Source]
+    kind: type  # the class ``build`` returns; its ``name`` is the raw-store source name
+    min_interval_s: float = 0.0
+    env_vars: tuple[str, ...] = ()  # all required
+    env_hint: str = "add it to .env"
+    more_limiters: tuple[str, ...] = ()  # further limiter keys ``build`` uses (same section)
+
+
+IBKR_HISTORICAL = "ibkr_historical"  # second limiter key: historical-data requests
+
+
+def _ibkr(inputs: SessionInputs) -> Source:
+    """IB Gateway, read-only (ADR 0026): host / port / client id from the environment."""
+    options = inputs.settings.ibkr
+    config = GatewayConfig(
+        host=str(inputs.env(env_names.IBKR_HOST)),
+        port=int(str(inputs.env(env_names.IBKR_PORT))),
+        client_id=int(str(inputs.env(env_names.IBKR_CLIENT_ID))),
+        market_data_type=options.market_data_type,
+        connect_timeout_s=options.connect_timeout_s,
+        request_timeout_s=options.request_timeout_s,
+        stream_wait_s=options.stream_wait_s,
+    )
+    gateway = IbkrMarketData(
+        config,
+        general=inputs.limiter("ibkr", inputs.interval),
+        historical=inputs.limiter(IBKR_HISTORICAL, options.historical_min_interval_s),
+    )
+    return IbkrSource(gateway)
+
+
+SESSION_SOURCES: dict[str, SessionSpec] = {
+    s.name: s
+    for s in (
+        SessionSpec(
+            "ibkr",
+            "ibkr",
+            "ibkr",
+            _ibkr,
+            IbkrSource,
+            0.02,
+            (env_names.IBKR_HOST, env_names.IBKR_PORT, env_names.IBKR_CLIENT_ID),
+            "run IB Gateway (read-only API) and set it in .env (README, Live verification)",
+            (IBKR_HISTORICAL,),
+        ),
+    )
+}
+
+
 # Fixture sources by name: directory (None: the default) -> source.
 FIXTURES: dict[str, Callable[[Path | None], FixtureSource]] = {"synthetic": golden_source}
 
@@ -151,15 +248,17 @@ class Built:
     skipped: dict[str, str] = field(default_factory=dict)
 
 
-def unavailable(spec: SourceSpec, settings: RegistrySettings, env: Env) -> str | None:
+def unavailable(spec: SourceSpec | SessionSpec, settings: RegistrySettings, env: Env) -> str | None:
     if not settings.vendor(spec.section).enabled:
         return f"[{spec.section}] is disabled in sources.toml"
-    if spec.env_var is not None and env(spec.env_var) is None:
-        return f"{spec.env_var} is not set: {spec.env_hint}"
+    names = spec.env_vars if isinstance(spec, SessionSpec) else (spec.env_var,)
+    for name in names:
+        if name is not None and env(name) is None:
+            return f"{name} is not set: {spec.env_hint}"
     return None
 
 
-def interval(spec: SourceSpec, settings: RegistrySettings) -> float:
+def interval(spec: SourceSpec | SessionSpec, settings: RegistrySettings) -> float:
     configured = settings.vendor(spec.section).min_interval_s
     return spec.min_interval_s if configured is None else configured
 
@@ -171,16 +270,31 @@ def build_sources(
     limits_dir: Path | None = None,
     fixture_dir: Path | None = None,
 ) -> Built:
-    """Build the named sources (default: every vendor source); a named fixture source reads
-    ``fixture_dir``. Unknown names raise ``KeyError``."""
-    wanted = list(dict.fromkeys(SOURCES if names is None else names))
+    """Build the named sources (default: every vendor source, HTTP and session); a named
+    fixture source reads ``fixture_dir``. Unknown names raise ``KeyError``."""
+    wanted = list(dict.fromkeys([*SOURCES, *SESSION_SOURCES] if names is None else names))
     directory = limits_dir or Path(settings.limits_dir)
     limiters: dict[str, Limiter] = {}
     breakers: dict[str, CircuitBreaker] = {}
     built = Built()
+
+    def limiter(key: str, seconds: float) -> Limiter:
+        if key not in limiters:
+            limiters[key] = Limiter(key, seconds, directory)
+        return limiters[key]
+
     for name in wanted:
         if name in FIXTURES:
             built.sources[name] = fixture_source(name, fixture_dir)
+            continue
+        if name in SESSION_SOURCES:
+            session = SESSION_SOURCES[name]
+            reason = unavailable(session, settings, env)
+            if reason is not None:
+                built.skipped[name] = reason
+                continue
+            inputs = SessionInputs(settings, env, limiter, interval(session, settings))
+            built.sources[name] = session.build(inputs)
             continue
         spec = SOURCES[name]
         reason = unavailable(spec, settings, env)
@@ -188,8 +302,8 @@ def build_sources(
             built.skipped[name] = reason
             continue
         key = spec.limiter
-        if key not in limiters:
-            limiters[key] = Limiter(key, interval(spec, settings), directory)
+        if key not in breakers:
+            limiter(key, interval(spec, settings))
             breakers[key] = CircuitBreaker(key, settings.http_breaker_failures)
         secret = env(spec.env_var) if spec.env_var else None
         http = Http(
@@ -215,14 +329,18 @@ def raw_source(spec: SourceSpec) -> str:
     return name
 
 
-def raw_sections(specs: Mapping[str, SourceSpec] = SOURCES) -> dict[str, str]:
+def raw_sections(
+    specs: Mapping[str, SourceSpec] = SOURCES,
+    sessions: Mapping[str, SessionSpec] = SESSION_SOURCES,
+) -> dict[str, str]:
     """raw source name -> the sources.toml section its specs read (one each, by design;
     ``raw_retention_days`` there sets how long its raw responses are kept)."""
     out: dict[str, str] = {}
-    for spec in specs.values():
-        name = raw_source(spec)
-        if out.setdefault(name, spec.section) != spec.section:
-            raise ValueError(f"raw source {name!r} is in sections {out[name]} and {spec.section}")
+    pairs = [(raw_source(spec), spec.section) for spec in specs.values()]
+    pairs += [(str(getattr(s.kind, "name", "")), s.section) for s in sessions.values()]
+    for name, section in pairs:
+        if out.setdefault(name, section) != section:
+            raise ValueError(f"raw source {name!r} is in sections {out[name]} and {section}")
     return out
 
 
@@ -231,9 +349,15 @@ def raw_sections(specs: Mapping[str, SourceSpec] = SOURCES) -> dict[str, str]:
 RAW_SECTIONS: Mapping[str, str] = raw_sections()
 
 
-def limiter_keys(specs: Mapping[str, SourceSpec] = SOURCES) -> dict[str, set[str]]:
+def limiter_keys(
+    specs: Mapping[str, SourceSpec] = SOURCES,
+    sessions: Mapping[str, SessionSpec] = SESSION_SOURCES,
+) -> dict[str, set[str]]:
     """limiter key -> the sources.toml sections its sources read (one each, by design)."""
     out: dict[str, set[str]] = {}
-    for spec in specs.values():
-        out.setdefault(spec.limiter, set()).add(spec.section)
+    pairs = [(spec.limiter, spec.section) for spec in specs.values()]
+    for session in sessions.values():
+        pairs += [(key, session.section) for key in (session.limiter, *session.more_limiters)]
+    for key, section in pairs:
+        out.setdefault(key, set()).add(section)
     return out

@@ -17,6 +17,7 @@ from algotrade_ingestion.sources.framework import registry
 from algotrade_ingestion.sources.framework.http import Http
 from algotrade_ingestion.sources.framework.registry import (
     RAW_SECTIONS,
+    SESSION_SOURCES,
     SOURCES,
     build_sources,
     limiter_keys,
@@ -38,7 +39,8 @@ def settings(doc: dict[str, object] | None = None) -> SourcesSettings:
 
 def test_every_source_is_built_when_configured(tmp_path: Path) -> None:
     built = build_sources(settings(), ENV.get, limits_dir=tmp_path)
-    assert set(built.sources) == set(SOURCES) and built.skipped == {}
+    assert set(built.sources) == set(SOURCES)
+    assert built.skipped == {"ibkr": "[ibkr] is disabled in sources.toml"}  # until the owner
     assert list(tmp_path.iterdir()) == []  # limiter files appear on first request only
 
 
@@ -88,7 +90,8 @@ def test_raw_source_names_map_to_one_section_each() -> None:
     assert sections == RAW_SECTIONS
     assert sections["sec_edgar"] == "sec_edgar"  # submissions, company_tickers, companyfacts
     assert sections["cboe_delayed"] == "cboe" and sections["massive"] == "massive"
-    assert set(sections) == {raw_source(spec) for spec in SOURCES.values()}
+    assert set(sections) == {raw_source(spec) for spec in SOURCES.values()} | {"ibkr"}
+    assert sections["ibkr"] == "ibkr"
     clash = {"a": replace(SOURCES["cboe"], name="a"), "b": replace(SOURCES["cboe"], section="x")}
     with pytest.raises(ValueError, match="cboe_delayed"):
         raw_sections(clash)
@@ -121,3 +124,47 @@ def test_fixture_sources_come_from_the_registry_with_their_directory(tmp_path: P
     built_source = built.sources["synthetic"]
     assert isinstance(built_source, FixtureSource)
     assert built_source.build() and built_source.verify() == []  # regenerated into tmp_path
+
+
+IBKR_ENV = {
+    "ALGOTRADE_IBKR_HOST": "127.0.0.1",
+    "ALGOTRADE_IBKR_PORT": "4002",
+    "ALGOTRADE_IBKR_CLIENT_ID": "17",
+}
+
+
+def test_the_ibkr_session_source_is_built_unconnected_from_settings_and_env(
+    tmp_path: Path,
+) -> None:
+    from algotrade_ingestion.sources.framework.base import SessionSource  # noqa: PLC0415
+    from algotrade_ingestion.sources.vendors.ibkr.market_data import IbkrSource  # noqa: PLC0415
+
+    doc = {
+        **SITE_SOURCES,
+        "ibkr": {**SITE_SOURCES["ibkr"], "enabled": True, "market_data_type": 1},
+    }
+    built = build_sources(settings(doc), IBKR_ENV.get, ["ibkr"], tmp_path)
+    source = built.sources["ibkr"]
+    assert isinstance(source, IbkrSource) and isinstance(source, SessionSource)
+    gateway = source.gateway
+    assert (gateway.config.host, gateway.config.port, gateway.config.client_id) == (
+        "127.0.0.1",
+        4002,
+        17,
+    )
+    assert gateway.config.market_data_type == 1 and gateway.config.readonly
+    assert gateway._ib is None  # built unconnected: tasks open it
+    assert gateway.general.min_interval_s == 0.02  # type: ignore[attr-defined]
+    assert gateway.historical.min_interval_s == 10.0  # type: ignore[attr-defined]
+    assert {"ibkr", "ibkr_historical"} <= set(limiter_keys())
+    missing = build_sources(settings(doc), {}.get, ["ibkr"], tmp_path)
+    assert missing.skipped["ibkr"].startswith("ALGOTRADE_IBKR_HOST is not set")
+    assert set(SESSION_SOURCES) == {"ibkr"}
+
+
+def test_ibkr_is_disabled_by_default_with_ibkr_pacing() -> None:
+    section = SITE_SOURCES["ibkr"]
+    assert section["enabled"] is False  # the owner turns it on (README, Live verification)
+    assert section["min_interval_s"] <= 0.02 and section["historical_min_interval_s"] >= 10
+    parsed = settings().ibkr
+    assert parsed.market_data_type == 3 and parsed.historical_min_interval_s == 10.0

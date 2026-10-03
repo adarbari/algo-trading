@@ -19,6 +19,10 @@ NOTIFY_EMAIL_TO = "ALGOTRADE_NOTIFY_EMAIL_TO"  # comma-separated recipients
 NOTIFY_EMAIL_FROM = "ALGOTRADE_NOTIFY_EMAIL_FROM"  # default: the first recipient
 SMTP_USER = "ALGOTRADE_SMTP_USER"
 SMTP_PASSWORD = "ALGOTRADE_SMTP_PASSWORD"  # Gmail: an app password, never the account password
+# IB Gateway (read-only market data for the verify task): where it listens, which API client id.
+IBKR_HOST = "ALGOTRADE_IBKR_HOST"
+IBKR_PORT = "ALGOTRADE_IBKR_PORT"
+IBKR_CLIENT_ID = "ALGOTRADE_IBKR_CLIENT_ID"
 
 __all__ = ["config_dir", "credential", "data_url", "load_dotenv", "user_id"]
 

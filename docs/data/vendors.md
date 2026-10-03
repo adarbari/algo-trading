@@ -8,7 +8,7 @@ swapping a vendor never touches storage, features, strategies or the UI.
 
 **Pacing is shared.** Each source is declared once in `sources/framework/registry.py` with its
 `config/site/sources.toml` section and a limiter key (`cboe`, `nasdaqtrader`, `ssga`,
-`nasdaq`, `massive`, `sec`, `treasury`). One limiter per key (`sources/framework/limiter.py`) spaces requests by the
+`nasdaq`, `massive`, `sec`, `treasury`, `ibkr`, `ibkr_historical`). One limiter per key (`sources/framework/limiter.py`) spaces requests by the
 section's `min_interval_s` across every worker thread **and every process** on the machine
 (a lock file per key under `[http] limits_dir`, default `var/run/limits/`), so a backfill and
 the nightly run never exceed a vendor's limit together. Retries live in `sources/framework/http.py`:
@@ -174,6 +174,48 @@ come due spread evenly over the next 30 nights (~200 a night) instead of all on 
 slot day without a run is picked up by the next run. New CIKs always come first, then the
 stalest, so `--limit` works through a backlog oldest first; `--force` refetches all.
 
+## IBKR
+
+### Live verification through IB Gateway (implemented, read-only)
+
+[ADR 0026](../adr/0026-live-verification-ibkr.md). The nightly `verify` task compares a
+session's stored values with IBKR's, through a local **IB Gateway** and `ib_async` (the
+maintained fork of `ib_insync`). **Read-only by construction**, three layers:
+
+1. `sources/vendors/ibkr/gateway.py` (`IbkrMarketData`) is the only module that imports
+   `ib_async`; it exposes market data only and wraps the `IB` object in a guard that raises
+   `ReadOnlyViolationError` for anything but the market-data calls it names. It never calls
+   `IB.connect` (which syncs positions and account updates even with `readonly=True`): it
+   performs only the API handshake.
+2. `tests/apps/ingestion/sources/vendors/ibkr/test_read_only_guard.py` fails on any order or account API reference
+   (`placeOrder`, `cancelOrder`, `reqPositions`, `accountValues`, ...) in `src/` or `apps/`;
+   an import-linter contract keeps `ib_async` imports in the facade.
+3. The gateway's own **Read-Only API** setting (owner setup: README, "Live verification").
+
+| Request (`ctx.sources["ibkr"]`, key) | IB call | Pacing |
+|---|---|---|
+| `bars/<SYM>`: ~260 daily TRADES bars (split-adjusted by IB) | `reqHistoricalData` | `ibkr` + `ibkr_historical` |
+| `iv/<SYM>`: the underlying's 30-day implied vol, daily | `reqHistoricalData` (`OPTION_IMPLIED_VOLATILITY`) | `ibkr` + `ibkr_historical` |
+| `div/<SYM>`: IB dividends (past / next 12 months) + close | `reqMktData` tick 456, streamed up to `stream_wait_s`, then `cancelMktData` | `ibkr` |
+| `option_params/<SYM>`: listed expirations and strikes | `reqSecDefOptParams` | `ibkr` |
+| `option/<SYM>/<expiry>/<C|P>/<strike>`: a snapshot quote | `qualifyContracts` + `reqTickers` | `ibkr` |
+
+- **Pacing** (`[ibkr]`): every message waits `min_interval_s = 0.02` (IB allows 50
+  messages/s); every historical request also waits `historical_min_interval_s = 10` (60 per
+  10 minutes, never two identical requests within 10 s). Two shared limiter keys, `ibkr` and
+  `ibkr_historical`, across threads and processes. About 7 minutes for ~22 names.
+- **Market data type** `market_data_type`: 3 delayed (free, the default) or 1 live (needs a
+  market data subscription). Historical bars do not depend on it.
+- **Session lifecycle**: a `SessionSource` (`sources/framework/base.py`) built unconnected by
+  the registry; `probe` checks the port (no API), `opened(source)` connects for the task and
+  always disconnects. Gateway down: the nightly step is SKIPPED with
+  "IB Gateway not reachable on host:port", never FAILED.
+- **Raw**: every answer is saved as JSON under `raw/source=ibkr/dataset=market_data/`,
+  kept `raw_retention_days = 30`.
+- **Config**: `config/site/sources.toml [ibkr]` (`enabled = false` until the owner sets it
+  up), host / port / client id from `ALGOTRADE_IBKR_HOST` / `_PORT` / `_CLIENT_ID`; what is
+  verified and the tolerances in `config/site/verification.toml` (configuration.md).
+
 ## What IBKR gives us
 
 **Good for:**
@@ -189,7 +231,7 @@ stalest, so `--limit` works through a backlog oldest first; `--force` refetches 
 **Limits that shape the design:**
 
 - Historical data pacing: **no more than 60 requests per 10 minutes**, no identical
-  requests within 15 s ([IB docs](https://www.interactivebrokers.com/docs/tws-api/doc/market-data-historical/historical-data-limitations/pacing-violations-for-small-bars-30-secs-or-less)).
+  requests within 15 s (the `verify` task paces every historical request 10 s apart) ([IB docs](https://www.interactivebrokers.com/docs/tws-api/doc/market-data-historical/historical-data-limitations/pacing-violations-for-small-bars-30-secs-or-less)).
   The IBKR adapter must have a built-in rate limiter and resumable jobs.
 - Quotes are per contract, and there is a cap on simultaneous market data lines. Pulling
   ~1M option contracts every night is **not practical**; IBKR suits a curated options

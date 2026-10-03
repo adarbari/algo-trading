@@ -97,6 +97,37 @@ in the run summary (`var/logs/nightly-latest.json`).
 Each step can also run on its own (`chains`, `rollups`, `screen`), resumes after
 interruption, and prints its audit. See [docs/screeners/](docs/screeners/README.md).
 
+## Live verification (IB Gateway)
+
+Each night `verify` compares the latest session's stored data with Interactive Brokers:
+split-adjusted closes / highs / lows, HV20, the 52-week range, dividend yield, our `iv30` and
+Cboe's vs IB's implied vol, and a few option quotes (ADR 0026). It is **read-only by
+construction**: market data only, through a facade that cannot place, modify or cancel orders
+or read accounts, a fitness test that fails on any order / account API in the code, and the
+gateway's own Read-Only API setting. Results land in `verification/ibkr`, the quality check
+`verification` and a "Verification vs IBKR" section of the summary email. While the gateway
+is down (or `[ibkr]` is disabled, the default) the step is SKIPPED with a warning; ingestion
+never fails because of it.
+
+**Owner setup (once):**
+
+1. Install **IB Gateway** (stable) and log in (paper or live account; the job only reads).
+2. **Configure → Settings → API → Settings:** tick **Read-Only API**; tick "Enable ActiveX
+   and Socket Clients"; note the **Socket port** (4001 live, 4002 paper); add `127.0.0.1` to
+   Trusted IPs; untick "Allow connections from localhost only" only if the gateway runs on
+   another host.
+3. In `.env` (see [`.env.example`](.env.example)): `ALGOTRADE_IBKR_HOST=127.0.0.1`,
+   `ALGOTRADE_IBKR_PORT=<socket port>`, `ALGOTRADE_IBKR_CLIENT_ID=<a number no other API
+   client uses>`.
+4. In [`config/site/sources.toml`](config/site/sources.toml) set `[ibkr] enabled = true`
+   (`market_data_type = 3` delayed is free; 1 live needs a market data subscription).
+5. Try it: `algotrade-ingest verify --date <last session> --symbols AAPL,SPY` (about 20 s per
+   name: IB's historical-data pacing), then look at the run summary.
+6. Keep the gateway logged in at the nightly time (IB Gateway restarts daily; enable
+   auto-restart in Configure → Settings → Lock and Exit).
+
+What is verified and the tolerances: [`config/site/verification.toml`](config/site/verification.toml).
+
 ## API
 
 A read-only HTTP API over everything above, the web app's only backend
