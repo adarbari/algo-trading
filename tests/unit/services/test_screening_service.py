@@ -16,7 +16,7 @@ from algotrade.storage.writers import StoreWriter
 from tests.storage_helpers import T0, stamped, universe_rows
 
 DAY = date(2026, 10, 2)
-FEATURE = "features/option_liquidity@v1"
+FEATURE = "rollups/instrument/option_liquidity@v1"
 
 
 def seeded(last_verified: str = "2026-10-01") -> tuple[StoreReader, StoreWriter]:

@@ -14,7 +14,7 @@ class FeatureSpec:
 
     @property
     def table(self) -> str:
-        return f"features/{self.name}@v{self.version}"
+        return f"rollups/instrument/{self.name}@v{self.version}"
 
 
 FEATURES: dict[str, FeatureSpec] = {

@@ -59,10 +59,13 @@ $ALGOTRADE_DATA_URL (default file://./var/data, git-ignored)
   runs/<run_id>.json                                     run records: audit + checkpoint
 ```
 
-Implemented tables: `universe`, `chains/underlying_quotes`, `chains/option_quotes`,
-`chains/status`, `features/option_liquidity@v1`, `results/<screener>`. Each
-(table, session, run) is one Parquet file sorted by `instrument_id`. Re-writing the same
-run replaces it; a newer run is kept alongside, and readers choose by `as_of`.
+Implemented tables (layers per [docs/design/phase-0.md](../design/phase-0.md)):
+L1 `instruments/reference`; L2 `bars/<interval>` (1d, 1h, 30m, 15m, 5m, 1m; OHLCV
+sanity-checked on write), `chains/underlying_quotes`, `chains/option_quotes`,
+`chains/status`, `events/<type>`; rollups `rollups/daily/*` and `rollups/instrument/*`
+(e.g. `rollups/instrument/option_liquidity@v1`); `universe`; `catalog/*`; `results/<name>`.
+Readers: `table`, `table_range` (date range, each partition resolved point-in-time),
+`bars`, `instruments` (latest snapshot on or before a date) and `instrument_terms`.
 
 ## Target physical layout (as more grains arrive)
 
