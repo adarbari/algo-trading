@@ -37,6 +37,7 @@ from algotrade_ingestion.sources.vendors.nasdaq.earnings import NasdaqEarningsSo
 from algotrade_ingestion.sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
 from algotrade_ingestion.sources.vendors.sec.edgar import SecSubmissions, SecTickerMap, user_agent
 from algotrade_ingestion.sources.vendors.ssga.spy_holdings import SpyHoldingsSource
+from algotrade_ingestion.sources.vendors.treasury.par_yields import TreasuryParYields
 
 type Env = Callable[[str], str | None]  # variable name -> value (``env.credential``)
 MASSIVE_KEY = "ALGOTRADE_MASSIVE_API_KEY"
@@ -124,6 +125,7 @@ SOURCES: dict[str, SourceSpec] = {
         _massive("massive_tickers", MassiveTickers),
         _sec("sec_tickers", SecTickerMap),
         _sec("sec_submissions", SecSubmissions),
+        SourceSpec("treasury", "treasury", "treasury", TreasuryParYields, 1.0),
     )
 }
 

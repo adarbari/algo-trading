@@ -55,7 +55,8 @@ only shrinks (`make dupes-update`).
 
 | Responsibility | Owner |
 |---|---|
-| Which snapshot a read sees (on or before D, else earliest + `pre_snapshot`); domain reads of market data | `algotrade/data/` (`reference`, `prices`, `events`, `chains`); consumers never import `storage.tables.readers` |
+| Which snapshot a read sees (on or before D, else earliest + `pre_snapshot`); domain reads of market data | `algotrade/data/` (`reference`, `prices`, `events`, `chains`, `rates`: the Treasury curve a date sees); consumers never import `storage.tables.readers` |
+| Option prices + Greeks; implied vol (NaN + status code); realised vol; rate conventions (par → continuous, curve) | `algotrade/quant/` (`black_scholes`, `implied_vol`, `realized_vol`, `rates`): pure numpy, conventions in ADR 0021 |
 | Run ids, run records, COMPLETE / PARTIAL | `storage/runs.py` (`start_run` + `RunRecord.finish` in services), `services/jobs/`; in ingestion `tasks/framework/run.py` (`IngestRun`): never write the loop in a task |
 | Raw save; stamping; ticker → id in ingestion | `tasks/framework/run.py` (`IngestRun`) |
 | Which ingestion steps run, with which defaults | `tasks/framework/registry.py`; nightly order, isolation, catch-up: `workflows/nightly/nightly.py` |
@@ -80,7 +81,8 @@ clock; `views/` the strategy-facing `MarketView` / `FeatureView` / `PriceSeries`
 configs, selections, resolution, catalog; `env.py`, `user.py`), `storage/` (`tables/`
 schemas, protocols, readers / writers; `backends/` the only code that knows Parquet layout;
 `configs/` config documents only, never tables; `runs.py`, `locks.py`, `factory.py`),
-`data/`, `features/`, `strategies/`, `engines/`, `analytics/`, `services/` (`backtests/`,
+`quant/` (pure numerics: pricing, IV, realised vol, rates; numpy only), `data/`, `features/`,
+`strategies/`, `engines/`, `analytics/`, `services/` (`backtests/`,
 `screening/` use cases; `jobs/`, `evaluation/`; shared `configs`, `datasets`, `selection`,
 `views`). In `apps/ingestion/algotrade_ingestion/`: `cli/`, `ops/`;
 `sources/framework/` (protocols, HTTP, pacing, the source registry), `sources/vendors/<vendor>/`
@@ -92,7 +94,8 @@ tasks and helpers used only inside their domain); `workflows/nightly/`.
 ## Code rules (enforced by CI; follow them up front)
 
 1. **Respect layers.** Strategies and screeners import only `core` (`core.views` for data,
-   `core.model` for types and errors). `core/` imports no other `algotrade` package and no pandas.
+   `core.model` for types and errors) and `quant` (pricing maths). `quant` imports only numpy
+   and `core`. `core/` imports no other `algotrade` package and no pandas.
    Check with `make arch`.
 2. **No file over 1000 lines** (aim for under 300). Split by responsibility. `make filelen`.
 3. **Every module starts with a docstring** stating its single responsibility.
@@ -126,6 +129,6 @@ tasks and helpers used only inside their domain); `workflows/nightly/`.
 | A decision that changes architecture | `.claude/skills/write-adr` |
 
 Commands (need `uv`): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make evaluate`, `make baseline`.
-Ingestion: `algotrade-ingest universe|universe-build|company-details|earnings|bars|corporate-actions|chains|features|screen|nightly|quality|schedule|purge-raw|migrate-ids|golden`, or `algotrade-ingest run <task>` for any registry task (see `README.md`).
+Ingestion: `algotrade-ingest universe|universe-build|company-details|earnings|bars|rates|corporate-actions|chains|features|screen|nightly|quality|schedule|purge-raw|migrate-ids|golden`, or `algotrade-ingest run <task>` for any registry task (see `README.md`).
 Configs: site presets in `config/site/` (reviewed via PR); user configs in `config/users/<id>/`
 (git-ignored). Check one with `algotrade-backtest [--user U] config validate|show <id>`.

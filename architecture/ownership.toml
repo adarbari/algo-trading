@@ -31,11 +31,54 @@ detect = [{ call = "latest_date" }]
 
 [[responsibility]]
 id = "market-data-reads"
-description = "Domain reads of market data (reference, InstrumentView, universe, bars + adjustments, events, chains) for consumers"
+description = "Domain reads of market data (reference, InstrumentView, universe, bars + adjustments, events, chains, rates) for consumers"
 owner = ["src/algotrade/data/*"]
 allowed = ["src/algotrade/storage/*"]  # the generic reader itself lives in storage
 section = "docs/adr/0019-ownership-and-boundaries.md#r1-only-data-reads-market-data"
 detect = [{ import = "algotrade.storage.tables.readers" }]
+
+[[responsibility]]
+id = "rates-reads"
+description = "Which Treasury curve a date sees (latest on or before, earliest flagged) and rates for a time to expiry: consumers call data.rates.curve, never read rates/treasury themselves"
+owner = ["src/algotrade/data/rates.py"]
+allowed = [
+    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "apps/ingestion/algotrade_ingestion/tasks/market/rates.py",  # its one producer
+    "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
+    "apps/ingestion/algotrade_ingestion/sources/vendors/treasury/*",  # the vendor's frame key
+]
+section = "docs/adr/0021-option-pricing-conventions.md#rates"
+detect = [{ string = "rates/treasury" }]
+
+# --------------------------------------------------------------------------- quant (pure numerics)
+
+[[responsibility]]
+id = "option-pricing"
+description = "European option prices and Greeks (Black-Scholes-Merton, continuous q and r) and the normal CDF they use"
+owner = ["src/algotrade/quant/black_scholes.py"]
+section = "docs/adr/0021-option-pricing-conventions.md#model"
+detect = [{ import = "scipy.stats" }, { call = "erfc" }, { call = "erf" }]
+
+[[responsibility]]
+id = "implied-vol"
+description = "Invert option prices to implied volatility, with a failure code per element"
+owner = ["src/algotrade/quant/implied_vol.py"]
+section = "docs/adr/0021-option-pricing-conventions.md#implied-volatility"
+detect = [{ import = "scipy.optimize" }, { call_regex = "(^|\\.)(brentq|newton|bisect|fsolve)$" }]
+
+[[responsibility]]
+id = "realized-vol"
+description = "Realised volatility estimators over rolling windows (close-to-close, Parkinson, Garman-Klass, Yang-Zhang), annualised"
+owner = ["src/algotrade/quant/realized_vol.py"]
+section = "docs/adr/0021-option-pricing-conventions.md#realised-volatility"
+detect = [{ call = "sliding_window_view" }]
+
+[[responsibility]]
+id = "rate-conventions"
+description = "Treasury par yield -> continuous rate, tenor labels -> days, yield-curve interpolation"
+owner = ["src/algotrade/quant/rates.py"]
+section = "docs/adr/0021-option-pricing-conventions.md#rates"
+detect = [{ call = "log1p" }, { call = "interp" }]
 
 # --------------------------------------------------------------------------- the ingest loop
 
@@ -274,6 +317,10 @@ target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_impo
 name = "events/index_change"
 owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_build.py"
 target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"
+
+[[table]]
+name = "rates/treasury"
+owner = "apps/ingestion/algotrade_ingestion/tasks/market/rates.py"
 
 [[table]]
 name = "rollups/instrument/option_liquidity@v1"

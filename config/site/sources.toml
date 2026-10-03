@@ -40,6 +40,11 @@ enabled = true
 min_interval_s = 0.2             # SEC fair access allows 10 requests/second; stay well below
 refresh_days = 30                # refetch a company's details after this many days
 
+[treasury]                       # daily par yield curve (risk-free rates), one request per year
+enabled = true
+min_interval_s = 1.0             # official site, no published limit; stay polite
+lookback_days = 10               # nightly window: the last N calendar days (catches late publications)
+
 [quality]                        # data-quality thresholds for the nightly checks
 max_bar_count_drop = 0.10        # FAIL if today's bar count falls >10% vs the previous session
 max_universe_change = 0.05       # FAIL on a >5% day-over-day change in coverage

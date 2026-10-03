@@ -55,7 +55,7 @@ contracts = ["Layout: core model and time are the base of core (they never impor
 [[dir]]
 path = "src/algotrade/core/views"
 purpose = "the strategy-facing read API: MarketView, FeatureView, PriceSeries"
-contracts = ["Strategies and screeners are pure: they only see core"]
+contracts = ["Strategies and screeners are pure: they only see core and quant"]
 
 [[dir]]
 path = "src/algotrade/core/validation"
@@ -102,6 +102,11 @@ contracts = [
 ]
 
 [[dir]]
+path = "src/algotrade/quant"
+purpose = "pure numerics (numpy only): option pricing and Greeks, implied vol, realised vol, rate conventions"
+contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"]
+
+[[dir]]
 path = "src/algotrade/data"
 purpose = "the domain read API: the only way consumers read market data (R1)"
 
@@ -116,7 +121,7 @@ purpose = "performance metrics and report formatting"
 [[dir]]
 path = "src/algotrade/strategies"
 purpose = "pure decision logic, split into trading strategies and screeners"
-contracts = ["Strategies and screeners are pure: they only see core"]
+contracts = ["Strategies and screeners are pure: they only see core and quant"]
 
 [[dir]]
 path = "src/algotrade/strategies/trading"
@@ -222,7 +227,7 @@ kind = "task-domain"
 
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/market"
-purpose = "market-data tasks: bars, corporate actions, earnings, option chains"
+purpose = "market-data tasks: bars, corporate actions, earnings, option chains, Treasury rates"
 kind = "task-domain"
 
 [[dir]]

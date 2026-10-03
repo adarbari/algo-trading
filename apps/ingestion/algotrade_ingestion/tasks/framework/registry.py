@@ -24,7 +24,13 @@ from algotrade_ingestion.sources.framework.base import DirectorySource, FixtureS
 from algotrade_ingestion.tasks.derived import features
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.maintenance import golden, migrate_ids, purge, quality
-from algotrade_ingestion.tasks.market import bars, corporate_actions, earnings, option_chains
+from algotrade_ingestion.tasks.market import (
+    bars,
+    corporate_actions,
+    earnings,
+    option_chains,
+    rates,
+)
 from algotrade_ingestion.tasks.reference import company_details, universe_build, universe_import
 
 type Params = Mapping[str, Any]
@@ -124,6 +130,12 @@ def _bars(ctx: TaskContext, p: Params) -> RunRecord:
     # Exchange sessions in the window; an explicit non-session date is fetched as asked.
     sessions = sessions_between(p.get("start") or session, p.get("end") or session) or [session]
     return bars.ingest_daily_bars(ctx, ctx.sources["massive_bars"], sessions, bool(p.get("force")))
+
+
+def _rates(ctx: TaskContext, p: Params) -> RunRecord:
+    end = p.get("end") or session_of(p)
+    start = p.get("start") or end - timedelta(ctx.settings.treasury_lookback_days - 1)
+    return rates.ingest_rates(ctx, ctx.sources["treasury"], start, end, bool(p.get("force")))
 
 
 def _corporate_actions(ctx: TaskContext, p: Params) -> RunRecord:
@@ -248,6 +260,16 @@ TASKS: dict[str, Task] = {
             sources=("massive_bars",),
             settings="sources.toml [massive]",
             params=(SESSION, FROM, TO, Param("force", ("--force",), None, "re-fetch stored")),
+        ),
+        Task(
+            "rates",
+            "Treasury par yield curve: risk-free rates by tenor (one request per year)",
+            rates,
+            ("rates/treasury",),
+            _rates,
+            sources=("treasury",),
+            settings="sources.toml [treasury] lookback_days",
+            params=(SESSION, FROM, TO, Param("force", ("--force",), None, "rewrite stored")),
         ),
         Task(
             "corporate-actions",

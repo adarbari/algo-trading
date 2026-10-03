@@ -114,7 +114,7 @@ layers = [
     "algotrade.services",
     "algotrade.engines",
     "algotrade.strategies | algotrade.features | algotrade.analytics | algotrade.data",
-    "algotrade.storage | algotrade.config",
+    "algotrade.storage | algotrade.config | algotrade.quant",
     "algotrade.core",
 ]
 
@@ -138,7 +138,7 @@ modules = [
 ]
 
 [[tool.importlinter.contracts]]
-name = "Strategies and screeners are pure: they only see core"
+name = "Strategies and screeners are pure: they only see core and quant"
 type = "forbidden"
 source_modules = ["algotrade.strategies"]
 forbidden_modules = [
@@ -147,6 +147,23 @@ forbidden_modules = [
     "algotrade.features",
     "algotrade.engines",
     "algotrade.services",
+    "algotrade.analytics",
+]
+
+[[tool.importlinter.contracts]]
+name = "Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"
+type = "forbidden"
+source_modules = ["algotrade.quant"]
+forbidden_modules = [
+    "pandas",
+    "pyarrow",
+    "algotrade.storage",
+    "algotrade.data",
+    "algotrade.config",
+    "algotrade.services",
+    "algotrade.engines",
+    "algotrade.strategies",
+    "algotrade.features",
     "algotrade.analytics",
 ]
 
@@ -215,6 +232,7 @@ modules = [
     "algotrade_ingestion.sources.vendors.nasdaq",
     "algotrade_ingestion.sources.vendors.sec",
     "algotrade_ingestion.sources.vendors.ssga",
+    "algotrade_ingestion.sources.vendors.treasury",
 ]
 
 [[tool.importlinter.contracts]]
@@ -291,6 +309,7 @@ type = "forbidden"
 source_modules = [
     "algotrade.core",
     "algotrade.config",
+    "algotrade.quant",
     "algotrade.storage.tables",
     "algotrade.storage.configs",
     "algotrade.storage.factory",
