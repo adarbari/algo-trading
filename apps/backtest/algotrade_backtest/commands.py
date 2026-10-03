@@ -4,19 +4,30 @@ import argparse
 import json
 
 from algotrade.analytics.report import markdown_table
+from algotrade.config.resolve import ResolvedConfig
+from algotrade.config.user import UserContext
 from algotrade.core.errors import ConfigurationError
 from algotrade.engines.backtest.engine import run_backtest
+from algotrade.services.backtests import run_configured_backtest
+from algotrade.services.configs import resolve_config
 from algotrade.services.datasets import list_datasets, load_dataset
 from algotrade.services.evaluation.baseline import compare_to_baseline, load_baseline, save_baseline
 from algotrade.services.evaluation.suite import run_suite, with_benchmark_excess
-from algotrade.storage.factory import open_backend
+from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.readers import StoreReader
 from algotrade.strategies.trading.registry import create_strategy
 
 SCORECARD_COLUMNS = (
-    "strategy", "dataset", "total_return", "excess_return", "sharpe", "excess_sharpe",
-    "max_drawdown", "num_trades", "exposure",
-)  # fmt: skip
+    "strategy",
+    "dataset",
+    "total_return",
+    "excess_return",
+    "sharpe",
+    "excess_sharpe",
+    "max_drawdown",
+    "num_trades",
+    "exposure",
+)
 
 
 def reader_for(args: argparse.Namespace) -> StoreReader:
@@ -47,7 +58,55 @@ def parse_params(pairs: list[str]) -> dict[str, float | int | str]:
     return params
 
 
+def _resolved(args: argparse.Namespace, config_id: str) -> ResolvedConfig:
+    return resolve_config(open_config_store(args.config_dir), config_id, UserContext(args.user))
+
+
+def cmd_config(args: argparse.Namespace) -> int:
+    resolved = _resolved(args, args.config_id)
+    if args.action == "validate":
+        print(
+            f"{resolved.config.id}: OK (hash {resolved.hash[:12]}, layers {list(resolved.layers)})"
+        )
+        return 0
+    print(
+        json.dumps(
+            {"hash": resolved.hash, "layers": list(resolved.layers), **resolved.canonical()},
+            indent=2,
+            default=str,
+        )
+    )
+    return 0
+
+
+def _config_backtest(args: argparse.Namespace) -> int:
+    if args.start is None or args.end is None:
+        raise ConfigurationError("--config needs --start and --end")
+    outcome = run_configured_backtest(
+        reader_for(args), _resolved(args, args.config), args.start, args.end
+    )
+    result = outcome.result
+    print(
+        json.dumps(
+            {
+                "config": outcome.config.config.id,
+                "config_hash": outcome.config.hash,
+                "user": args.user,
+                "selection": outcome.selection.as_dict(),
+                "metrics": result.metrics.as_dict(),
+            },
+            indent=2,
+            default=str,
+        )
+    )
+    return 0
+
+
 def cmd_backtest(args: argparse.Namespace) -> int:
+    if args.config:
+        return _config_backtest(args)
+    if not args.strategy:
+        raise ConfigurationError("--dataset needs --strategy")
     data, terms = load_dataset(reader_for(args), args.dataset)
     strategy = create_strategy(args.strategy, **parse_params(args.param))
     result = run_backtest(data, strategy, instruments=terms)

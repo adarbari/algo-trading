@@ -1,6 +1,7 @@
 """Registry of feature definitions known to the pipeline."""
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 
 from algotrade.features import option_liquidity
 
@@ -11,6 +12,13 @@ class FeatureSpec:
     version: int
     inputs: tuple[str, ...]
     description: str
+    # Output columns and their types ("str" | "float" | "int" | "bool" | "date"). Selections
+    # may reference them as ``rollup.<name>@v<version>.<column>``.
+    columns: Mapping[str, str] = field(default_factory=dict)
+
+    @property
+    def key(self) -> str:
+        return f"{self.name}@v{self.version}"
 
     @property
     def table(self) -> str:
@@ -25,6 +33,7 @@ FEATURES: dict[str, FeatureSpec] = {
             option_liquidity.VERSION,
             ("chains/option_quotes", "chains/underlying_quotes", "chains/status"),
             "Short-premium tradeability tiers (A-D) for puts and calls at the target expiry",
+            option_liquidity.COLUMNS,
         ),
     )
 }

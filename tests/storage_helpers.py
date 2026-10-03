@@ -39,3 +39,20 @@ def universe_rows(symbols: list[str], **overrides: object) -> list[dict[str, obj
         }
         for s in symbols
     ]
+
+
+def reference_rows(universe: list[dict[str, object]]) -> list[dict[str, object]]:
+    """L1 ``instruments/reference`` rows matching ``universe_rows`` (as the import writes them)."""
+    return [
+        {
+            "instrument_id": u["instrument_id"],
+            "symbol": u["symbol"],
+            "asset_class": "EQ",
+            "security_type": u["security_type"],
+            "multiplier": 1.0,
+            "status": u["status"],
+            "optionable": u["optionable"],
+            "is_etf": u["security_type"] == "ETF",
+        }
+        for u in universe
+    ]

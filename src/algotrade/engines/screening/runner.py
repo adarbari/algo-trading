@@ -22,6 +22,7 @@ class RunCoverage(StrEnum):
     COMPLETE = "COMPLETE"
     PARTIAL = "PARTIAL"
     UNIVERSE_INCOMPLETE = "UNIVERSE_INCOMPLETE"
+    EMPTY_SELECTION = "EMPTY_SELECTION"  # the strategy's selection matched nothing
 
 
 @dataclass(frozen=True)

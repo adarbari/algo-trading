@@ -89,3 +89,45 @@ def test_last_session_skips_weekends() -> None:
     assert cli.last_session(datetime(2026, 10, 3, 2, tzinfo=UTC)) == date(
         2026, 10, 2
     )  # Fri evening ET
+
+
+def test_screen_runs_a_user_config(env: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    call(
+        capsys,
+        "universe",
+        "--stocks",
+        str(env / "stocks.csv"),
+        "--etfs",
+        str(env / "etfs.csv"),
+        "--version",
+        "v",
+        "--date",
+        DAY,
+    )
+    call(capsys, "chains", "--date", DAY)
+    call(capsys, "features", "--date", DAY)
+    user_dir = env / "config" / "users" / "alice" / "strategies"
+    user_dir.mkdir(parents=True)
+    (user_dir / "stocks_only.toml").write_text(
+        'extends = "short_premium_liquidity"\nschedule = "nightly"\n'
+        '[selection_overrides]\nall = [{field = "instrument.is_etf", op = "eq", value = false}]\n'
+    )
+    site = Path(__file__).resolve().parents[3] / "config" / "site"
+    import shutil  # noqa: PLC0415
+
+    shutil.copytree(site, env / "config" / "site")
+    code, audit = call(
+        capsys,
+        "--config-dir",
+        str(env / "config"),
+        "screen",
+        "--date",
+        DAY,
+        "--config",
+        "stocks_only",
+        "--user",
+        "alice",
+    )
+    assert code == 0
+    assert audit["user"] == "alice"
+    assert audit["selection"]["selected"] == 1  # TQQQ (an ETF) narrowed away

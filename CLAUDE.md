@@ -69,4 +69,6 @@ without writing an ADR. Read in this order:
 | A decision that changes architecture | `.claude/skills/write-adr` |
 
 Commands: `make install`, `make check`, `make test`, `make evaluate`, `make baseline`.
-Ingestion: `algotrade-ingest universe|chains|features|screen|nightly|purge-raw` (see `README.md`).
+Ingestion: `algotrade-ingest universe|chains|features|screen|nightly|purge-raw|golden` (see `README.md`).
+Configs: site presets in `config/site/` (reviewed via PR); user configs in `config/users/<id>/`
+(git-ignored). Check one with `algotrade-backtest [--user U] config validate|show <id>`.

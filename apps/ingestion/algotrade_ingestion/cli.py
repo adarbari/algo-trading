@@ -4,7 +4,7 @@
                               --etfs optionable_us_etf_universe.csv --version 2026-10
     algotrade-ingest chains   [--date YYYY-MM-DD] [--workers 4] [--symbols SPY,AAPL]
     algotrade-ingest features [--date YYYY-MM-DD]
-    algotrade-ingest screen   [--date YYYY-MM-DD] [--export-dir out/]
+    algotrade-ingest screen   [--date YYYY-MM-DD] [--config ID] [--user U] [--export-dir out/]
     algotrade-ingest nightly  [--date YYYY-MM-DD] [--export-dir out/]
     algotrade-ingest purge-raw --keep-days 90
     algotrade-ingest golden build|verify|load [--golden-dir datasets/golden]
@@ -21,17 +21,18 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.errors import AlgoTradeError
-from algotrade.services.exports import write_legacy_exports
+from algotrade.services.configs import resolve_config
 from algotrade.services.screening import run_screener
-from algotrade.storage.factory import open_backend
+from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.readers import StoreReader
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.features import compute_option_liquidity
 from algotrade_ingestion.jobs.golden import load_golden
 from algotrade_ingestion.jobs.option_chains import ChainJobConfig, ingest_option_chains
 from algotrade_ingestion.jobs.universe import UniverseFile, import_universe
-from algotrade_ingestion.pipeline import run_nightly, universe_underlyings
+from algotrade_ingestion.pipeline import run_exports, run_nightly, universe_underlyings
 from algotrade_ingestion.sources.cboe import CboeOptionsSource
 from algotrade_ingestion.sources.http import urllib_transport
 from algotrade_ingestion.sources.synthetic.catalog import build_golden
@@ -50,6 +51,9 @@ def last_session(now: datetime) -> date:
 
 def _parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="algotrade-ingest", description=__doc__.splitlines()[0])
+    p.add_argument(
+        "--config-dir", help="site/user configs (default: $ALGOTRADE_CONFIG_DIR or ./config)"
+    )
     sub = p.add_subparsers(dest="command", required=True)
     u = sub.add_parser("universe", help="import the monthly master universe CSVs")
     u.add_argument("--stocks", type=Path, required=True)
@@ -65,6 +69,9 @@ def _parser() -> argparse.ArgumentParser:
             s.add_argument("--symbols", help="comma-separated subset of the universe")
         if name in ("screen", "nightly"):
             s.add_argument("--export-dir", type=Path)
+        if name == "screen":
+            s.add_argument("--config", default="short_premium_liquidity", help="config id")
+            s.add_argument("--user", default=SITE_USER, help="config owner (default: site)")
     g = sub.add_parser(
         "golden", help="golden test datasets: build CSVs, verify, load into the store"
     )
@@ -119,13 +126,21 @@ def _dispatch(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter
     elif args.command == "features":
         _print(compute_option_liquidity(reader, writer, session).stats)
     elif args.command == "screen":
-        outcome = run_screener(reader, writer, "short_premium_liquidity", session)
+        configs = open_config_store(args.config_dir)
+        config = resolve_config(configs, args.config, UserContext(args.user))
+        outcome = run_screener(reader, writer, config, session)
         if args.export_dir:
-            write_legacy_exports(outcome, args.export_dir, session.isoformat())
+            run_exports(outcome, config, args.export_dir)
         _print(outcome.audit)
     elif args.command == "nightly":
         result = run_nightly(
-            reader, writer, _source(), session, args.export_dir, ChainJobConfig(args.workers)
+            reader,
+            writer,
+            _source(),
+            open_config_store(args.config_dir),
+            session,
+            args.export_dir,
+            ChainJobConfig(args.workers),
         )
         _print(
             {
