@@ -5,11 +5,11 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from algotrade.backtest.config import BacktestConfig
-from algotrade.backtest.engine import run_backtest
 from algotrade.core.market_view import MarketView
-from algotrade.execution.costs import CostModel
-from algotrade.strategies.registry import STRATEGIES, create_strategy
+from algotrade.engines.backtest.config import BacktestConfig
+from algotrade.engines.backtest.costs import CostModel
+from algotrade.engines.backtest.engine import run_backtest
+from algotrade.strategies.trading.registry import STRATEGIES, create_strategy
 from tests.factories import series_from_closes
 
 prices = st.lists(st.floats(min_value=1.0, max_value=1_000.0), min_size=130, max_size=200)

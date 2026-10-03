@@ -16,6 +16,6 @@
 ## Rules before anything goes live
 
 1. Paper trade first, for long enough to cover different market regimes.
-2. Every live order passes through `risk/`. There is no bypass flag.
+2. Every live order passes through the risk limits (`engines/backtest/limits.py` today). There is no bypass flag.
 3. A kill switch that flattens and halts must exist and be tested.
 4. Live P&L is reconciled daily against what the simulator would have done.

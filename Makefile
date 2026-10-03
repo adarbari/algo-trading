@@ -44,19 +44,19 @@ test:            ## everything, with the coverage gate
 	$(PY) -m pytest --cov --cov-report=term --cov-report=xml
 
 datasets-verify:
-	$(BIN)algotrade datasets verify
+	$(BIN)algotrade-backtest datasets verify
 
 datasets-build:
-	$(BIN)algotrade datasets build
+	$(BIN)algotrade-backtest datasets build
 
 evaluate:        ## strategy scorecard vs committed baseline
-	$(BIN)algotrade evaluate --report scorecard.md
+	$(BIN)algotrade-backtest evaluate --report scorecard.md
 
 baseline:        ## accept current results as the new baseline (review the diff!)
-	$(BIN)algotrade evaluate --update-baseline
+	$(BIN)algotrade-backtest evaluate --update-baseline
 
 check: lint typecheck arch filelen datasets-verify test evaluate
 
 nightly:
 	HYPOTHESIS_PROFILE=nightly $(PY) -m pytest tests/property
-	$(BIN)algotrade evaluate --report scorecard.md
+	$(BIN)algotrade-backtest evaluate --report scorecard.md

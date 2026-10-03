@@ -6,7 +6,7 @@
 | Architecture | `tests/architecture/` | File-length limit, every layer tested + documented, module docstrings. | ms |
 | Property | `tests/property/` | Hypothesis invariants across *all* registered strategies. | ~1s (`dev`), minutes (`nightly`) |
 | Integration | `tests/integration/` | Real data store + engine across every golden dataset. | ~1s |
-| End-to-end | `tests/e2e/` | The `algotrade` CLI against committed datasets and baseline. | seconds |
+| End-to-end | `tests/e2e/` | The `algotrade-backtest` CLI against committed datasets and baseline. | seconds |
 
 Run everything with `make test` (enforces 90% branch coverage). Hypothesis profiles are
 chosen with `HYPOTHESIS_PROFILE=dev|ci|nightly`.
@@ -24,7 +24,7 @@ These run automatically for anything in `strategies/registry.py`:
 
 `datasets/golden/` holds deterministic synthetic regimes (trend, bear, random walk, mean
 reversion, crash, high vol, regime switching, correlated multi-asset). They are committed
-with SHA-256 checksums in `manifest.json`; `algotrade datasets verify` fails if a byte changes.
+with SHA-256 checksums in `manifest.json`; `algotrade-backtest datasets verify` fails if a byte changes.
 
 Why synthetic? Free, licence-clean, reproducible, and we can build the regimes we want to
 stress on purpose. **`random_walk` is the null hypothesis**: a strategy that looks good
