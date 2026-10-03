@@ -91,6 +91,7 @@ pythonpath = ["."]
 markers = [
     "e2e: end-to-end tests that exercise the CLI against the golden datasets",
     "slow: tests that take more than a few seconds",
+    "reconciliation: our features recomputed from recorded raw inputs vs another source's recorded values",
 ]
 filterwarnings = ["error"]
 

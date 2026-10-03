@@ -112,7 +112,7 @@ source (`tests/unit/<path>` = `src/algotrade/<path>`, `tests/apps/ingestion/<pat
 | Engine running strategies / screeners | `src/algotrade/engines/<engine>/` |
 | Table schema, store protocol / backend, config documents | `src/algotrade/storage/{tables,backends,configs}/` |
 | Site setting | `config/site/<group>.toml` + typed in `src/algotrade/config/site/settings.py` |
-| Tests | the mirrored `tests/unit/...` or `tests/apps/<app>/...` folder; builders `tests/helpers/` |
+| Tests | the mirrored `tests/unit/...` or `tests/apps/<app>/...` folder; builders `tests/helpers/`; cross-source checks `tests/reconciliation/` (recorded data `tests/fixtures/reconciliation/`) |
 | Docs | the `docs/` area folder (`data/`, `screeners/`, `ui/`); a decision: `docs/adr/` |
 
 **If nothing fits, add a new folder for the new kind**: declare it in `architecture/layout.toml`

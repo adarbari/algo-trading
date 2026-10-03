@@ -256,6 +256,12 @@ over a shorter window, unless every session of its window has a bar. The 52-week
 (daily highs / lows) need `min_year_sessions` (240) bars among the last `year_sessions` (252).
 Prices are split-adjusted as of the session: a later split never changes an earlier row.
 Returns and volatilities are scale-free; `adv_usd_20d` is close x volume, split-invariant.
+The 52-week high / low are on split-adjusted prices, **not dividend-adjusted** (decided
+2026-10-03 after the IBKR comparison: IBKR's 52-week range is dividend-adjusted, so on a payer
+it sits below ours by up to the dividends paid since the extreme; we keep the traded-price
+basis). `hv20` / `hv30` are close-to-close: the sample stdev of the last 20 / 30 log returns
+x sqrt(252); IBKR's own historical volatility uses another estimator and differs. Both are
+checked against recorded IBKR data by the reconciliation suite (`docs/testing.md`).
 The windows named in the columns are the v1 definition (changing one is a v2).
 
 **`dividends@v1` rules.** `div_ttm` sums cash dividends with ex-date in (session - 365 days,
