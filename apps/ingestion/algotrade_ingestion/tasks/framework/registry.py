@@ -181,7 +181,11 @@ def _chains(ctx: TaskContext, p: Params) -> RunRecord:
     underlyings = option_chains.select_underlyings(ctx.reader, session, symbols)
     workers = int(p.get("workers") or ctx.settings.cboe_workers)
     return option_chains.ingest_option_chains(
-        ctx, ctx.sources["cboe"], underlyings, session, option_chains.ChainJobConfig(workers)
+        ctx,
+        ctx.sources["cboe"],
+        underlyings,
+        session,
+        option_chains.ChainJobConfig(workers, priority_symbols=ctx.settings.cboe_priority_symbols),
     )
 
 

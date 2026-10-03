@@ -18,7 +18,12 @@ from typing import Any
 
 from algotrade.services.run_items import failed_items, normalise, status_code
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.workflows.nightly.timing import StepTiming, step_timings
+from algotrade_ingestion.workflows.nightly.timing import (
+    PacingLine,
+    StepTiming,
+    step_timings,
+    vendor_pacing,
+)
 
 BAD_STEPS = ("FAILED", "PARTIAL", "BLOCKED")
 # Key counts per step (result keys); other steps show their top-level numbers.
@@ -109,6 +114,7 @@ class Report:
     rollups: tuple[tuple[str, str, int, int], ...]  # session, rollup, rows, no_input sessions
     hints: tuple[str, ...] = field(default=())
     timings: tuple[StepTiming, ...] = ()  # run timing per step (timing.py)
+    pacing: tuple[PacingLine, ...] = ()  # vendor limiters per step (requests, 429s, waits)
     max_duration_s: float | None = None  # [alerts] max_duration_minutes
     catch_up_dropped: tuple[str, ...] = ()  # missed sessions over the catch-up cap
     verification: tuple[VerificationLine, ...] = ()  # the verify step per session
@@ -408,4 +414,9 @@ def build_report(
     )
     items = {key: len(r.items) for key, r in records.items() if r.items}
     timings = step_timings(list(_steps(summary)), report.started, report.duration_s, items, history)
-    return replace(report, hints=hints(report), timings=timings)
+    pacing = tuple(
+        line
+        for (session, name), record in records.items()
+        for line in vendor_pacing(session, name, record.stats.get("pacing"))
+    )
+    return replace(report, hints=hints(report), timings=timings, pacing=pacing)

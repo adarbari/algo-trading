@@ -188,7 +188,7 @@ alone (ADR 0019 `site-settings`); apps receive frozen dataclasses, never dicts:
 | File | Type | Holds |
 |---|---|---|
 | `defaults.toml` | `ScreeningSettings`, `BacktestSettings` (`CostSettings`, `LimitSettings`) | run defaults, layered per config |
-| `sources.toml` | `SourcesSettings` (`VendorSettings` per section) | per-vendor `enabled` and `min_interval_s` pacing, chain workers, earnings days, corporate-actions window, SEC refresh days (`[sec_edgar] refresh_days` company details, `facts_refresh_days` share counts; spread over the window by CIK); `[http]` retry cap, circuit breaker and limiter directory; raw and staging retention (a vendor section's `raw_retention_days` overrides the global raw window for every raw source in that section: `[sec_edgar]` keeps 7 days; see [storage.md](data/storage.md#retention)); `[quality]` thresholds of the nightly data-quality checks (`max_bar_count_drop`, `max_universe_change`; option chains: `max_chain_fetch_failures` = share of optionable names whose fetch failed (`FETCH_ERROR`, including an open circuit, or `NOT_ATTEMPTED`) above which `chains_fetch` FAILs, default 0.05; `max_chain_stale_share` = share of `STALE_DATA` chains above which `chains_stale` WARNs, default 0.20; both details list the OK / STALE_DATA / NO_CHAIN / NO_STANDARD_SERIES counts. `min_chain_coverage` was replaced by these two and is now rejected) |
+| `sources.toml` | `SourcesSettings` (`VendorSettings` per section) | per-vendor `enabled` and pacing (`min_interval_s`, `max_interval_s`, `start_interval_s`; see [Vendor pacing](#vendor-pacing)), chain workers and `[cboe] priority_symbols`, earnings days, corporate-actions window, SEC refresh days (`[sec_edgar] refresh_days` company details, `facts_refresh_days` share counts; spread over the window by CIK); `[http]` retry cap, circuit breaker, limiter directory and adaptive-pacing rules; raw and staging retention (a vendor section's `raw_retention_days` overrides the global raw window for every raw source in that section: `[sec_edgar]` keeps 7 days; see [storage.md](data/storage.md#retention)); `[quality]` thresholds of the nightly data-quality checks (`max_bar_count_drop`, `max_universe_change`; option chains: `max_chain_fetch_failures` = share of optionable names whose fetch failed (`FETCH_ERROR`, including an open circuit, or `NOT_ATTEMPTED`) above which `chains_fetch` FAILs, default 0.05; `max_chain_stale_share` = share of `STALE_DATA` chains above which `chains_stale` WARNs, default 0.20; both details list the OK / STALE_DATA / NO_CHAIN / NO_STANDARD_SERIES counts. `min_chain_coverage` was replaced by these two and is now rejected) |
 | `sources.toml [ibkr]` | `IbkrSettings` (`SourcesSettings.ibkr`) | IB Gateway for the read-only `verify` task (ADR 0026): `enabled` (off by default: a missing section is disabled too), `min_interval_s` (every message, 0.02 = 50/s), `historical_min_interval_s` (10: 60 historical requests per 10 minutes), `market_data_type` (1 live, 3 delayed), `connect_timeout_s`, `request_timeout_s`, `stream_wait_s` (IB dividends tick), `raw_retention_days` (30); `[quality] max_verify_failures` (0.10): the `verification` check FAILs above that share of failing graded checks and WARNs on any |
 | `verification.toml` | `VerificationSettings` | the live verification vs IBKR: `[sample]` `core_symbols` (always verified), `rotating` (more per session, by a hash of the session), `option_symbols` + `options_per_symbol` (option quotes compared with our chain), `bar_sessions` (IBKR daily bars per name); `[tolerances]` `close_rel`, `range_rel`, `hv_rel`, `high_52w_rel`, `extreme_rel` (52-week low, the dividend-gap rule), `yield_abs`, `iv_abs`, `spread_band` (option mids, in half-spreads), `max_missing_sessions`, `warn_multiple` (over tolerance by at most this factor: WARN; beyond: FAIL). Defaults are the reconciliation suite's tolerances (testing.md) |
 | `universe.toml` (+ `overrides/leveraged_etfs.csv`, `overrides/figi.csv`) | `UniverseSettings` | coverage mode (`nasdaq_trader` / `csv_import`), security types, include / exclude symbols, leverage rules (markers, conventions, patterns, inverse markers, exclusions; regexes are compiled and `leverage_patterns` need a `(?P<n>...)` group); `figi_overrides` from `figi.csv` (columns `symbol`, `figi`, `note`; a composite FIGI or blank for "no FIGI, symbol id"; a malformed FIGI, an unknown column, or a symbol or FIGI listed twice fails with its line; see [instruments.md](data/instruments.md#figi-based-instrument-ids-implemented-phase-18)) |
@@ -297,6 +297,46 @@ feature.drawdown_pct  expression float  (config/users/alice/features/momentum.to
   inputs: pct_from_high_52w@v1
   2026-10-02: 9840/10215 instruments with a value; e.g. EQ:BBG000B9XRY4=-3.1, ...
 ```
+
+## Vendor pacing
+
+One limiter per vendor key (`apps/ingestion/.../sources/framework/limiter.py`), shared by every
+thread and process through its lock file under `[http] limits_dir`. Each section of
+`sources.toml` sets its bounds; `[http]` sets how every limiter adapts:
+
+| Key | Where | Default | Meaning |
+|---|---|---|---|
+| `min_interval_s` | vendor section | the registry's default for the source | floor: the fastest the vendor is ever asked (Cboe 1.05, Massive 12.5, SEC 0.2, Nasdaq earnings 0.5, Treasury 1.0) |
+| `max_interval_s` | vendor section | 4 × the floor | ceiling the back-off stops at (Cboe 5.0) |
+| `start_interval_s` | vendor section | the floor | where each run starts |
+| `backoff_factor` | `[http]` | 1.5 | a 429 (after holding every process for its `Retry-After`), or too many errors: interval × this |
+| `max_error_rate`, `error_window` | `[http]` | 0.10, 50 | when the last `error_window` responses hold more than this share of errors (429, 5xx, a non-missing 403, timeouts and connection errors; **not** "no such object" answers such as a 404 or Cboe's S3 `AccessDenied`), slow down once and start a new window |
+| `speedup_after`, `speedup_factor` | `[http]` | 100, 1.05 | after this many responses in a row without an error, interval ÷ this, never below the floor |
+
+A burst of 429s from several workers backs off once (only a 429 arriving outside a running
+hold multiplies the interval). The adaptive state lives in the lock file; a key unused for 10
+minutes (`IDLE_RESET_S`) starts again from `start_interval_s`, so in practice **each run starts
+fresh** and concurrent processes share what the vendor told either of them.
+
+### Pacing stats
+
+Every ingest run records, under `stats.pacing.<limiter key>` (only keys that sent requests
+during the run; counts are this process's):
+
+| Key | Meaning |
+|---|---|
+| `requests` | requests that went through the limiter (each retry counts) |
+| `errors` | responses counted as errors (429s included; "no such object" never) |
+| `throttled_429` | HTTP 429 responses |
+| `backoffs_429` | of those, the ones that multiplied the interval (one per burst) |
+| `retry_after_wait_s` | seconds of `Retry-After` holds added |
+| `limiter_wait_s` | total seconds requests waited on the limiter (pacing + holds) |
+| `error_rate_slowdowns` | slowdowns from the error-rate window |
+| `speedups` | speed-ups after clean streaks |
+| `interval_start_s`, `interval_final_s`, `interval_min_s`, `interval_max_s` | the interval at the run's first and last request, and its range |
+
+The `chains` run also records `order_tiers` (`priority`, `liquidity`, `rest`: how many
+underlyings fell in each fetch-order tier). The nightly email lists each step's limiters under "Run timing" → "Vendor pacing" (requests, 429s, Retry-After and total rate-limit wait, slowdowns, interval range).
 
 ## Environment
 

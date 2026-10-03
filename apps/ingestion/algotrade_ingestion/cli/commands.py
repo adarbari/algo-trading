@@ -102,7 +102,7 @@ def run_task_command(
     spec = task(name)
     ctx = task_context(args, reader, writer)
     built = task_sources(spec, ctx.settings, params)
-    ctx.sources, ctx.unavailable = built.sources, built.skipped
+    ctx.sources, ctx.unavailable, ctx.pacing = built.sources, built.skipped, built.limiters
     record = run_task(name, ctx, params)
     print_json(run_summary(record))
     return 0 if record.status == "complete" else 1
@@ -148,6 +148,7 @@ def run_job(
         "sources": built.sources,
         "unavailable": built.skipped,
         "raw_sections": RAW_SECTIONS,
+        "pacing": built.limiters,
     }
     handlers: dict[str, JobKind | JobHandler] = {**LIBRARY_HANDLERS, "nightly": nightly_job}
     user_ctx = UserContext(user)

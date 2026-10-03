@@ -4,6 +4,7 @@ import urllib.error
 from dataclasses import replace
 from datetime import date
 from email.message import Message
+from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -18,6 +19,7 @@ from algotrade_ingestion.sources.framework.http import (
     get_with_retry,
     urllib_transport,
 )
+from algotrade_ingestion.sources.framework.limiter import Limiter, Pacing
 from algotrade_ingestion.sources.vendors.cboe.option_chains import (
     URL,
     CboeOptionsSource,
@@ -190,3 +192,44 @@ def test_a_block_is_still_an_error_even_with_a_not_found_rule() -> None:
         with pytest.raises(RuntimeError):
             http.get("u")
     assert breaker.open
+
+
+class Clock:
+    def __init__(self) -> None:
+        self.now, self.slept = 1000.0, []  # type: ignore[var-annotated]
+
+    def __call__(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.slept.append(seconds)
+        self.now += seconds
+
+
+def test_429_holds_the_shared_limiter_for_retry_after_and_backs_off(tmp_path: Path) -> None:
+    clock = Clock()
+    pacing = Pacing(1.0, max_interval_s=5.0)
+    limiter = Limiter("cboe", pacing, tmp_path, clock.sleep, clock)
+    stats = limiter.track()
+    in_thread: list[float] = []
+    body = get_with_retry(
+        scripted(HttpError(429, 47.0), b"ok"), "u", FAST, in_thread.append, limiter=limiter
+    )
+    assert body == b"ok"
+    assert in_thread == []  # the limiter waits it out, for every thread and process
+    assert clock.slept == [47.0] and limiter.interval == 1.5
+    assert (stats.requests, stats.throttled_429, stats.retry_after_wait_s) == (2, 1, 47.0)
+    assert stats.errors == 1 and stats.limiter_wait_s == 47.0
+
+
+def test_outcomes_reported_to_the_limiter() -> None:
+    limiter = CountingLimiter()
+    policy = replace(FAST, not_found=missing_chain)
+    denied = HttpError(403, body=b"<Error><Code>AccessDenied</Code></Error>")
+    assert get_with_retry(scripted(denied), "u", policy, lambda s: None, limiter=limiter) is None
+    flaky = scripted(OSError("timeout"), HttpError(503), b"x")
+    get_with_retry(flaky, "u", policy, lambda s: None, limiter=limiter)
+    assert limiter.outcomes == ["missing", "error", "error", "ok"]
+    no_header = RetryPolicy(tries=2, max_delay=9.0)
+    get_with_retry(scripted(HttpError(429), b"x"), "u", no_header, lambda s: None, limiter=limiter)
+    assert limiter.outcomes[-2:] == ["429", "ok"] and limiter.held == 5.0  # exponential default

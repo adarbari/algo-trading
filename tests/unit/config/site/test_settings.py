@@ -40,6 +40,12 @@ def test_the_committed_site_files_load() -> None:
     assert sources.vendor("cboe").enabled and sources.limits_dir == "var/run/limits"
     assert sources.vendor("sec_edgar").raw_retention_days == 7
     assert sources.vendor("cboe").raw_retention_days is None  # the global window
+    cboe = sources.vendor("cboe")
+    assert (cboe.min_interval_s, cboe.max_interval_s, cboe.start_interval_s) == (1.05, 5.0, None)
+    assert sources.cboe_workers == 2 and sources.cboe_priority_symbols[:2] == ("SPY", "QQQ")
+    assert (sources.http_backoff_factor, sources.http_speedup_factor) == (1.5, 1.05)
+    assert (sources.http_speedup_after, sources.http_error_window) == (100, 50)
+    assert sources.http_max_error_rate == 0.10
     assert nightly.max_catch_up == 5 and universe.source == "nasdaq_trader"
     defaults = site("defaults")
     assert BacktestSettings.parse(defaults["backtest"], "b") == BacktestSettings()
@@ -72,6 +78,23 @@ def test_missing_files_fall_back_to_defaults() -> None:
         ({"quality": {"max_chain_fetch_failures": 1.5}}, "a fraction between 0 and 1"),
         ({"quality": {"max_chain_stale_share": -0.1}}, "max_chain_stale_share: expected a number"),
         ({"quality": {"min_chain_coverage": 0.95}}, r"\[quality\]: unknown keys"),
+        (
+            {"cboe": {"min_interval_s": 2, "max_interval_s": 1}},
+            r"\[cboe\] max_interval_s: expected >= min",
+        ),
+        ({"cboe": {"min_interval_s": 1, "start_interval_s": 0.5}}, r"\[cboe\] start_interval_s"),
+        (
+            {"cboe": {"max_interval_s": 2, "start_interval_s": 3}},
+            r"start_interval_s: expected between",
+        ),
+        ({"cboe": {"max_interval_s": -1}}, r"max_interval_s: expected a number >= 0"),
+        ({"cboe": {"priority_symbols": "SPY"}}, r"priority_symbols"),
+        ({"http": {"backoff_factor": 0.5}}, r"\[http\] backoff_factor: expected a number >= 1"),
+        ({"http": {"speedup_factor": 0.9}}, r"speedup_factor: expected a number >= 1"),
+        ({"http": {"speedup_after": 0}}, r"speedup_after: expected an integer >= 1"),
+        ({"http": {"error_window": 0}}, r"error_window: expected an integer >= 1"),
+        ({"http": {"max_error_rate": 2}}, r"max_error_rate: expected a fraction"),
+        ({"http": {"pace": 1}}, r"\[http\]: unknown keys \['pace'\]"),
     ],
 )
 def test_sources_errors_name_the_key(doc: dict[str, Any], message: str) -> None:
@@ -287,6 +310,7 @@ def test_ibkr_and_verification_settings() -> None:
     [
         ({"ibkr": {"market_data_type": 5}}, r"\[ibkr\] market_data_type: expected 1 \(live\)"),
         ({"ibkr": {"host": "x"}}, r"\[ibkr\]: unknown keys \['host'\]"),  # host comes from .env
+        ({"ibkr": {"max_interval_s": 1}}, r"\[ibkr\]: unknown keys \['max_interval_s'\]"),  # fixed
         ({"quality": {"max_verify_failures": 2}}, "a fraction between 0 and 1"),
     ],
 )
@@ -354,3 +378,18 @@ def test_the_committed_feature_files_load() -> None:
     definitions = load_features(store)
     assert {d.name for d in definitions} >= {"liquidity_class", "div_yield", "near_52w"}
     assert [d.name for d in definitions if d.materialise] == ["div_yield"]
+
+
+def test_pacing_settings_are_typed() -> None:
+    cboe_doc = {"min_interval_s": 1, "max_interval_s": 4, "start_interval_s": 2}
+    doc = {
+        "http": {"backoff_factor": 2, "speedup_after": 10, "max_error_rate": 0.2},
+        "cboe": {**cboe_doc, "priority_symbols": ["spy", "QQQ"]},
+        "massive": {},
+    }
+    s = SourcesSettings.from_document(doc)
+    cboe = s.vendor("cboe")
+    assert (cboe.min_interval_s, cboe.max_interval_s, cboe.start_interval_s) == (1.0, 4.0, 2.0)
+    assert s.cboe_priority_symbols == ("SPY", "QQQ")
+    assert (s.http_backoff_factor, s.http_speedup_after, s.http_max_error_rate) == (2.0, 10, 0.2)
+    assert s.vendor("massive").max_interval_s is None  # the registry's default ceiling

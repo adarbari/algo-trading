@@ -12,7 +12,7 @@ from algotrade.data import StoreReader
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.sources.framework import registry
 from algotrade_ingestion.sources.framework.base import Source
-from algotrade_ingestion.sources.framework.http import Http, Pacer, RetryPolicy, Transport
+from algotrade_ingestion.sources.framework.http import AdaptivePacer, Http, RetryPolicy, Transport
 from algotrade_ingestion.tasks.framework.run import TaskContext
 
 FIXED = datetime(2026, 10, 2, 22, tzinfo=UTC)
@@ -31,17 +31,18 @@ def task_ctx(
 
 
 def http_for(
-    transport: Transport, policy: RetryPolicy | None = None, limiter: Pacer | None = None
+    transport: Transport, policy: RetryPolicy | None = None, limiter: AdaptivePacer | None = None
 ) -> Http:
     """What the registry would hand a source, around a fake transport."""
     return Http(transport, policy or RetryPolicy(), limiter, sleep=lambda s: None)
 
 
 class CountingLimiter:
-    """A ``Pacer`` that only counts: proves sources wait on the limiter they were given."""
+    """An ``AdaptivePacer`` that only counts: proves sources wait on the limiter they were given."""
 
     def __init__(self) -> None:
         self.waits, self.held = 0, 0.0
+        self.outcomes: list[str] = []
 
     def wait(self) -> float:
         self.waits += 1
@@ -49,6 +50,13 @@ class CountingLimiter:
 
     def hold(self, seconds: float) -> None:
         self.held += seconds
+
+    def throttled(self, seconds: float) -> None:
+        self.held += seconds
+        self.outcomes.append("429")
+
+    def record(self, outcome: str) -> None:
+        self.outcomes.append(outcome)
 
 
 def use_source(monkeypatch: pytest.MonkeyPatch, name: str, source: Source) -> None:

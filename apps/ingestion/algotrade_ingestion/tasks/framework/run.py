@@ -18,6 +18,8 @@ Every ingestion task runs inside one ``IngestRun``, which owns:
   them. ``run.reader`` also sees the run's own pending writes. ``recover_unpublished``
   (CLI start, under the ingest lock) completes interrupted commits and drops what crashed
   runs left;
+- pacing stats: what each vendor limiter did while the run was open (``stats["pacing"]``,
+  one entry per limiter key that sent requests; keys in docs/configuration.md);
 - the run's staging (per-item scratch): dropped right after a successful commit when nothing
   is left for a resume to refetch (COMPLETE, or PARTIAL without ``RETRYABLE`` items); kept
   otherwise (retryable items, FAILED runs) so a resume can publish it, until
@@ -30,7 +32,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from types import TracebackType
-from typing import Any, Self
+from typing import Any, Protocol, Self
 
 import pandas as pd
 
@@ -58,12 +60,28 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+class PacingStats(Protocol):
+    requests: int
+
+    def as_dict(self) -> dict[str, Any]: ...
+
+
+class PacingMeter(Protocol):
+    """A vendor limiter (``sources/framework/limiter.py``) seen from a run: collect what it
+    does while the run is open."""
+
+    def track(self) -> PacingStats: ...
+
+    def untrack(self, stats: PacingStats) -> None: ...
+
+
 @dataclass
 class TaskContext:
     """What a task runs against: storage, built sources (by name), settings and a clock.
     ``unavailable``: why each source the registry left out is missing (disabled, no key).
     ``raw_sections``: raw source name -> its ``sources.toml`` section (the source registry's
-    ``RAW_SECTIONS``, passed in by the entry point: tasks never import the registry)."""
+    ``RAW_SECTIONS``, passed in by the entry point: tasks never import the registry).
+    ``pacing``: limiter key -> that vendor's limiter (``Built.limiters``), for run stats."""
 
     reader: StoreReader
     writer: StoreWriter
@@ -74,6 +92,7 @@ class TaskContext:
     user: str = SITE_USER
     unavailable: Mapping[str, str] = field(default_factory=dict)
     raw_sections: Mapping[str, str] = field(default_factory=dict)
+    pacing: Mapping[str, PacingMeter] = field(default_factory=dict)
 
 
 class NoResponseError(LookupError):
@@ -116,6 +135,7 @@ class IngestRun:
         self._partial: list[str] = []
         self._failed: list[str] = []
         self._resolvers: dict[date | None, SymbolResolver] = {}
+        self._pacing: dict[str, PacingStats] = {}
         resumed = self._resume() if resume else None
         now = self.clock()
         self.record = resumed or start_run(task, session, now)
@@ -143,6 +163,7 @@ class IngestRun:
         return record
 
     def __enter__(self) -> Self:
+        self._pacing = {key: meter.track() for key, meter in self.ctx.pacing.items()}
         self.checkpoint()  # a RUNNING record: recovery knows the run's pending writes as ours
         return self
 
@@ -173,12 +194,24 @@ class IngestRun:
             self.stats["partial"] = self._partial
         if self._failed:
             self.stats["failed_because"] = self._failed
+        self._pacing_stats()
         self.record.stats = self.stats
         try:
             self._publish_or_drop(status)
         finally:
             if self._save:
                 self.writer.save_run(self.record)
+
+    def _pacing_stats(self) -> None:
+        """Stop tracking the vendor limiters; record those that sent requests this run."""
+        used: dict[str, dict[str, Any]] = {}
+        for key, stats in self._pacing.items():
+            self.ctx.pacing[key].untrack(stats)
+            if stats.requests:
+                used[key] = stats.as_dict()
+        self._pacing = {}
+        if used:
+            self.stats["pacing"] = used
 
     def _publish_or_drop(self, status: RunStatus) -> None:
         """Commit every table the run wrote at once (COMPLETE / PARTIAL), else drop them. A

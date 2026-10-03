@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from algotrade.config.site.settings import SourcesSettings
+from algotrade.core.model.errors import ConfigurationError
 from algotrade_ingestion.sources.framework import registry
 from algotrade_ingestion.sources.framework.http import Http
 from algotrade_ingestion.sources.framework.registry import (
@@ -159,6 +160,7 @@ def test_the_ibkr_session_source_is_built_unconnected_from_settings_and_env(
     assert gateway._ib is None  # built unconnected: tasks open it
     assert gateway.general.min_interval_s == 0.02  # type: ignore[attr-defined]
     assert gateway.historical.min_interval_s == 10.0  # type: ignore[attr-defined]
+    assert gateway.general.pacing.ceiling == 0.02  # type: ignore[attr-defined]  # fixed pace
     assert {"ibkr", "ibkr_historical"} <= set(limiter_keys())
     missing = build_sources(settings(doc), {}.get, ["ibkr"], tmp_path)
     assert missing.skipped["ibkr"].startswith("ALGOTRADE_IBKR_HOST is not set")
@@ -171,3 +173,15 @@ def test_ibkr_site_section_uses_ibkr_pacing() -> None:
     assert section["min_interval_s"] <= 0.02 and section["historical_min_interval_s"] >= 10
     parsed = settings().ibkr
     assert parsed.market_data_type == 3 and parsed.historical_min_interval_s == 10.0
+
+
+def test_each_key_gets_adaptive_pacing_from_its_section_and_http(tmp_path: Path) -> None:
+    built = build_sources(settings(), ENV.get, limits_dir=tmp_path)
+    cboe, massive = built.limiters["cboe"].pacing, built.limiters["massive"].pacing
+    assert (cboe.min_interval_s, cboe.ceiling, cboe.start) == (1.05, 5.0, 1.05)
+    assert (cboe.backoff_factor, cboe.error_window, cboe.speedup_after) == (1.5, 50, 100)
+    assert (massive.min_interval_s, massive.ceiling) == (12.5, 50.0)  # default: 4 x floor
+    assert set(built.limiters) == {spec.limiter for spec in SOURCES.values()}  # ibkr: off
+    bad = {**SITE_SOURCES, "massive": {"max_interval_s": 1.0}}  # below the default floor
+    with pytest.raises(ConfigurationError, match=r"\[massive\]: max_interval_s 1.0 is below"):
+        build_sources(settings(bad), ENV.get, ["massive_bars"], tmp_path)
