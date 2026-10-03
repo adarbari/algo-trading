@@ -412,7 +412,7 @@ close of bar t  : Portfolio marked to market -> equity[t]
 | Test suite | ≤ 60 s locally and in CI |
 | Golden evaluation (3 strategies × 8 datasets) from the store | ≤ 5 s |
 | Selection, 10k instruments × 10 rules | ≤ 1 s |
-| Nightly options pipeline, ~4.2k underlyings | ≤ 25 min (WARN recorded above 40 min) |
+| Nightly options pipeline, ~4.2k underlyings | ~2 h, dominated by paced Cboe chains at 40 requests/min (WARN recorded above 150 min) |
 | Config resolution | deterministic hash on every OS |
 | Code gates | no file > 1000 lines, coverage ≥ 90%, strict mypy, all import contracts |
 
@@ -432,7 +432,7 @@ asleep starts on wake, which is safe because of `last_closed_session` and catch-
 is not COMPLETE triggers a desktop notification; every run's summary is in
 `var/logs/nightly-latest.json`. Monitoring lives in run records today: status per job and per
 nightly step, coverage per screen (alert below 98%), selection size per config (alert on a
-> 20% day-over-day change), nightly duration (recorded as a WARN above 40 min,
+> 20% day-over-day change), nightly duration (recorded as a WARN above 150 min,
 `config/site/nightly.toml`).
 
 ## 12. Hosting

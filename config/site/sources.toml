@@ -14,8 +14,10 @@ limits_dir = "var/run/limits"    # shared pacing state, one lock file per vendor
 
 [cboe]                           # option chains (delayed feed), one request per underlying
 enabled = true
-workers = 4
-min_interval_s = 0.0             # unpaced today; the workers bound concurrency
+workers = 2
+min_interval_s = 1.5             # Cboe throttles (HTTP 429, then 403 blocks) when unpaced: on
+                                 # 2026-10-03, 4 unpaced workers averaged ~24 requests/min under
+                                 # back-off before being blocked. 1.5 s = 40/min, ~105 min for 4.2k.
 
 [nasdaq_trader]                  # universe: symbol directory + listed options
 enabled = true
