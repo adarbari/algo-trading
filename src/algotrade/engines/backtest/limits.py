@@ -21,9 +21,9 @@ def apply_limits(targets: TargetWeights, limits: RiskLimits) -> dict[str, float]
     """Clip per-position weights, drop shorts if disallowed, then scale to gross limit."""
     cap = limits.max_position_weight
     clipped: dict[str, float] = {}
-    for symbol, weight in targets.items():
+    for instrument, weight in targets.items():
         allowed = weight if weight >= 0 or limits.allow_short else 0.0
-        clipped[symbol] = max(-cap, min(cap, allowed))
+        clipped[instrument] = max(-cap, min(cap, allowed))
     gross = sum(abs(w) for w in clipped.values())
     if gross > limits.max_gross_exposure:
         scale = limits.max_gross_exposure / gross

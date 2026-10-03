@@ -100,7 +100,7 @@ def ohlcv_from_closes(
     lows = body_lo * (1 - np.abs(rng.normal(0, intraday_vol, n)))
     volume = np.round(base_volume * rng.lognormal(0, 0.3, n))
     return PriceSeries(
-        symbol=symbol,
+        instrument_id=symbol,
         timestamps=timestamps,
         open=np.round(opens, 4),
         high=np.round(highs, 4) + 0.0001,

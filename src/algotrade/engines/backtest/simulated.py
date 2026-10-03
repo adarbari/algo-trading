@@ -16,9 +16,15 @@ from algotrade.engines.backtest.costs import CostModel
 
 
 class SimulatedBroker:
-    def __init__(self, costs: CostModel | None = None, lot_size: float = 1.0) -> None:
+    def __init__(
+        self,
+        costs: CostModel | None = None,
+        lot_size: float = 1.0,
+        multipliers: Mapping[str, float] | None = None,
+    ) -> None:
         self.costs = costs or CostModel()
         self.lot_size = lot_size
+        self._multipliers = dict(multipliers or {})
         self._pending: list[Order] = []
 
     @property
@@ -40,25 +46,39 @@ class SimulatedBroker:
         fills: list[Fill] = []
         ordered = sorted(self._pending, key=lambda o: o.side is Side.BUY)  # sells first
         for order in ordered:
-            price = self.costs.fill_price(order.side, open_prices[order.symbol])
+            price = self.costs.fill_price(order.side, open_prices[order.instrument_id])
+            multiplier = self._multipliers.get(order.instrument_id, 1.0)
+            unit_value = price * multiplier
             quantity = order.quantity
             if order.side is Side.BUY:
-                quantity = self._affordable(quantity, price, buying_power)
+                quantity = self._affordable(quantity, unit_value, buying_power)
                 if quantity <= 0:
                     continue
-            commission = self.costs.commission(quantity * price)
-            buying_power -= order.side.sign * quantity * price + commission
-            fills.append(Fill(order.symbol, order.side, quantity, price, commission, timestamp))
+            commission = self.costs.commission(quantity * unit_value)
+            buying_power -= order.side.sign * quantity * unit_value + commission
+            fills.append(
+                Fill(
+                    order.instrument_id,
+                    order.side,
+                    quantity,
+                    price,
+                    commission,
+                    timestamp,
+                    multiplier,
+                )
+            )
         self._pending.clear()
         return fills
 
-    def _affordable(self, quantity: float, price: float, buying_power: float) -> float:
+    def _affordable(self, quantity: float, unit_value: float, buying_power: float) -> float:
+        """Largest whole-lot quantity whose cost (value + commission) fits ``buying_power``."""
+
         def cost(q: float) -> float:
-            return q * price + self.costs.commission(q * price)
+            return q * unit_value + self.costs.commission(q * unit_value)
 
         if cost(quantity) <= buying_power:
             return quantity
-        per_unit = price * (1 + self.costs.commission_bps / 10_000)
+        per_unit = unit_value * (1 + self.costs.commission_bps / 10_000)
         lots = math.floor(max(buying_power, 0.0) / per_unit / self.lot_size)
         while lots > 0 and cost(lots * self.lot_size) > buying_power:
             lots -= 1

@@ -23,7 +23,7 @@ class Side(StrEnum):
 class Order:
     """A market order. ``quantity`` is always positive; direction lives in ``side``."""
 
-    symbol: str
+    instrument_id: str
     side: Side
     quantity: float
     created_at: datetime
@@ -37,14 +37,19 @@ class Order:
 
 @dataclass(frozen=True, slots=True)
 class Fill:
-    """An executed (possibly simulated) trade."""
+    """An executed (possibly simulated) trade.
 
-    symbol: str
+    ``multiplier`` is the instrument's contract multiplier (1 for stocks, 100 for US equity
+    options, 50 for ES futures). Cash and P&L always use ``quantity * price * multiplier``.
+    """
+
+    instrument_id: str
     side: Side
     quantity: float
     price: float
     commission: float
     timestamp: datetime
+    multiplier: float = 1.0
 
     @property
     def signed_quantity(self) -> float:
@@ -52,4 +57,4 @@ class Fill:
 
     @property
     def notional(self) -> float:
-        return self.quantity * self.price
+        return self.quantity * self.price * self.multiplier

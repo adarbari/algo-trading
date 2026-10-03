@@ -13,7 +13,7 @@ def frame_to_series(symbol: str, frame: pd.DataFrame) -> PriceSeries:
     """Convert a validated OHLCV frame (see ``validate_ohlcv``) to a ``PriceSeries``."""
     ts = pd.to_datetime(frame[TIMESTAMP_COLUMN], utc=True).dt.tz_localize(None)
     return PriceSeries(
-        symbol=symbol,
+        instrument_id=symbol,
         timestamps=ts.to_numpy(dtype="datetime64[ns]").copy(),
         **{f: frame[f].to_numpy(dtype=np.float64).copy() for f in FIELDS},
     )

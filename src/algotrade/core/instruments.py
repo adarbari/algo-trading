@@ -6,6 +6,8 @@ ids, never by a raw ticker string, so switching to reference-store ids later is 
 change rather than a schema change.
 """
 
+from collections.abc import Iterable
+from dataclasses import dataclass
 from enum import StrEnum
 
 
@@ -28,3 +30,25 @@ def symbol_of(instrument: str) -> str:
     if not sep or not symbol:
         raise ValueError(f"not an instrument id: {instrument!r}")
     return symbol
+
+
+@dataclass(frozen=True, slots=True)
+class Instrument:
+    """The contract terms engines need. Full reference data lives in storage (L1)."""
+
+    instrument_id: str
+    symbol: str
+    asset_class: AssetClass = AssetClass.EQUITY
+    multiplier: float = 1.0
+    currency: str = "USD"
+    tick_size: float = 0.01
+
+    def __post_init__(self) -> None:
+        if self.multiplier <= 0:
+            raise ValueError(f"{self.instrument_id}: multiplier must be positive")
+        if self.tick_size <= 0:
+            raise ValueError(f"{self.instrument_id}: tick_size must be positive")
+
+
+def multipliers(instruments: Iterable[Instrument]) -> dict[str, float]:
+    return {i.instrument_id: i.multiplier for i in instruments}

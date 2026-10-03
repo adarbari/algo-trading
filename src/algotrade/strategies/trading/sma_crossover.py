@@ -7,7 +7,7 @@ from algotrade.strategies.trading.base import Strategy
 
 
 class SmaCrossover(Strategy):
-    """Hold a symbol while its fast SMA is above its slow SMA; equal-weight the holdings."""
+    """Hold an instrument while its fast SMA is above its slow SMA; equal-weight the holdings."""
 
     name = "sma_crossover"
 
@@ -25,7 +25,7 @@ class SmaCrossover(Strategy):
     def on_bar(self, view: MarketView) -> TargetWeights | None:
         held = frozenset(
             s
-            for s in view.symbols
+            for s in view.instruments
             if view.history(s, lookback=self.fast).mean()
             > view.history(s, lookback=self.slow).mean()
         )
@@ -34,7 +34,7 @@ class SmaCrossover(Strategy):
         self._held = held
         if not held:
             return {}
-        return dict.fromkeys(sorted(held), 1.0 / len(view.symbols))
+        return dict.fromkeys(sorted(held), 1.0 / len(view.instruments))
 
     def params(self) -> dict[str, float | int | str]:
         return {"fast": self.fast, "slow": self.slow}

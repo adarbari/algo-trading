@@ -23,7 +23,7 @@ def align(series: Mapping[str, PriceSeries]) -> dict[str, PriceSeries]:
     for symbol, s in series.items():
         mask = np.isin(s.timestamps, common)
         out[symbol] = PriceSeries(
-            symbol=symbol,
+            instrument_id=symbol,
             timestamps=s.timestamps[mask].copy(),
             **{f: s.field(f)[mask].copy() for f in FIELDS},
         )
