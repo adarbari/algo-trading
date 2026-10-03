@@ -1,6 +1,6 @@
 # ADR 0006: Storage organised by data grain, Parquet + DuckDB, swappable adapters
 
-**Status:** accepted (2026-10-02); raw retention amended by [0014](0014-cboe-options-source.md). Spec: [docs/data/storage.md](../data/storage.md).
+**Status:** accepted (2026-10-02); raw retention amended by [0014](0014-cboe-options-source.md); layers added by [0016](0016-four-data-layers.md). Note: tables are plain Parquet read with pyarrow today; DuckDB as the query engine and catalog is planned, not yet used. Spec: [docs/data/storage.md](../data/storage.md).
 
 ## Context
 We need ticker-level, ticker-day and ticker-day-time data (and more), stored for free now,

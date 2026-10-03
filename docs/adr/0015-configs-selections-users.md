@@ -1,7 +1,7 @@
 # ADR 0015: Configs, selections and users
 
 **Status:** accepted (2026-10-03). Implemented in phase 0.5. Amends [0013](0013-universe.md).
-Spec: [docs/design/phase-0.md](../design/phase-0.md) (Data Layers L3/L4, D2, D3).
+Spec: [docs/configuration.md](../configuration.md).
 
 ## Context
 The owner wants the universe to be every ticker and ETF, with each strategy working on a
@@ -24,6 +24,13 @@ own configurations.
   presets). Identity and auth come with the API (phase 4).
 - **Market data and rollups are global; configs, results and jobs are per user.** Every
   result and run record carries `user_id`, `config_id` and the SHA-256 `config_hash`.
+
+| Alternative | Rejected because |
+|---|---|
+| Python callables as selections | Cannot be stored, shown in a UI or audited |
+| SQL strings | Injection risk; couples configs to one query engine |
+| One filtered "production universe" | Not configurable per strategy or user |
+| Data and rollups per user | Multiplies ingestion cost and lets users' data disagree |
 
 ## Consequences
 - Adding a strategy subset is a config change, not a code change.

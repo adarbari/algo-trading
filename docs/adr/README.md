@@ -11,7 +11,7 @@ Do not rewrite history. Use `.claude/skills/write-adr` to add one.
 | [0003](0003-golden-master-baseline.md) | Golden datasets and a golden-master results baseline | accepted |
 | [0004](0004-apps-and-shared-libraries.md) | Four apps, shared libraries, one repo | accepted |
 | [0005](0005-ingestion-is-the-only-writer.md) | Ingestion is the only writer of market and feature data | accepted |
-| [0006](0006-storage-grains-and-adapters.md) | Storage by data grain, Parquet + DuckDB, swappable adapters | accepted |
+| [0006](0006-storage-grains-and-adapters.md) | Storage by data grain, Parquet (DuckDB-readable), swappable adapters | accepted |
 | [0007](0007-point-in-time-data.md) | Point-in-time data and versioned features | accepted |
 | [0008](0008-backtests-read-only-from-stores.md) | Backtests read only from stores | accepted |
 | [0009](0009-generic-instrument-model.md) | Generic instrument model (futures-ready) | accepted |
@@ -21,3 +21,5 @@ Do not rewrite history. Use `.claude/skills/write-adr` to add one.
 | [0013](0013-universe.md) | The universe | accepted |
 | [0014](0014-cboe-options-source.md) | Cboe delayed feed for option chains; limited raw retention | accepted |
 | [0015](0015-configs-selections-users.md) | Configs, selections and users | accepted |
+| [0016](0016-four-data-layers.md) | Four data layers; instrument level as daily snapshots | accepted |
+| [0017](0017-golden-data-through-ingestion.md) | Golden datasets load through ingestion into a separate fixture store | accepted |
