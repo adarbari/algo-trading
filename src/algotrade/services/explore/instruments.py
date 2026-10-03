@@ -12,11 +12,17 @@ from typing import Any
 import pandas as pd
 
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
-from algotrade.core.model.fields import COMPANY_TABLE, REFERENCE_TABLE, field_source, rollup_field
+from algotrade.core.model.fields import (
+    COMPANY_TABLE,
+    FEATURE_FIELD_PREFIX,
+    REFERENCE_TABLE,
+    field_source,
+    is_feature_field,
+    rollup_field,
+)
 from algotrade.data.events import ALL_TIME, read_events
 from algotrade.data.prices import adjusted_bars
 from algotrade.data.reference import (
-    instrument_view,
     instruments,
     read_snapshot,
     resolver,
@@ -34,6 +40,7 @@ from algotrade.services.explore.store import (
     record,
     records,
 )
+from algotrade.services.features import field_view, read_expressions, site_features
 
 DEFAULT_SPAN = timedelta(days=365)
 EVENTS_PREFIX = "events/"
@@ -60,8 +67,8 @@ class InstrumentDetail:
     reference_snapshot: date
     reference: dict[str, Any]
     company: dict[str, Any] | None
-    features: dict[str, Any]  # field name (rollup.<key>.<column>) -> latest value
-    feature_sessions: dict[str, date]  # rollup key -> the session its values are for
+    features: dict[str, Any]  # field name (rollup.<key>.<column>, feature.<name>) -> value
+    feature_sessions: dict[str, date]  # rollup key (or "expressions") -> its values' session
 
 
 def instrument_detail(store: ReadStore, key: str, on: date | None = None) -> InstrumentDetail:
@@ -81,6 +88,14 @@ def instrument_detail(store: ReadStore, key: str, on: date | None = None) -> Ins
         sessions[rollup_key] = found[0]
         values = record(found[1], ["instrument_id"])
         features.update({rollup_field(rollup_key, c): v for c, v in values.items()})
+    if sessions:  # expression features, on the latest session any group has for it
+        latest = max(sessions.values())
+        names = list(site_features().expressions)
+        rows = read_expressions(store.reader, names, latest, instruments=[iid]).frame
+        if len(rows):
+            values = record(rows.iloc[0], ["instrument_id", "session_date"])
+            features.update({f"{FEATURE_FIELD_PREFIX}{n}": values.get(n) for n in names})
+            sessions["expressions"] = latest
     return InstrumentDetail(iid, session, reference, company, features, sessions)
 
 
@@ -149,13 +164,20 @@ class FeatureSeries:
 
 
 def _rollup_fields(names: list[str] | None) -> dict[str, list[tuple[str, str]]]:
-    """Rollup table -> [(field name, column)]; every rollup column when ``names`` is None."""
-    wanted = names or [rollup_field(k, c) for k, r in GROUPS.items() for c in r.columns]
+    """Rollup table -> [(field name, column)] (``""``: expression features, by name); every
+    rollup column and expression feature when ``names`` is None."""
+    wanted = names or [
+        *(rollup_field(k, c) for k, r in GROUPS.items() for c in r.columns),
+        *(f"{FEATURE_FIELD_PREFIX}{n}" for n in site_features().expressions),
+    ]
     known = field_catalog().fields
     tables: dict[str, list[tuple[str, str]]] = {}
     for name in wanted:
         if name not in known:
             raise NotFoundError(f"no feature {name!r} (GET /features lists them)")
+        if is_feature_field(name):
+            tables.setdefault("", []).append((name, name.removeprefix(FEATURE_FIELD_PREFIX)))
+            continue
         table, column = field_source(name)
         if table in (REFERENCE_TABLE, COMPANY_TABLE):
             raise NotFoundError(f"{name}: a reference field has no time series")
@@ -172,7 +194,11 @@ def instrument_features(
     tables = _rollup_fields(names)
     by_day: dict[date, dict[str, Any]] = {}
     for table, fields in tables.items():
-        frame = rollup_rows(store.reader, table, first, last, instruments=[iid])
+        if table:
+            frame = rollup_rows(store.reader, table, first, last, instruments=[iid])
+        else:
+            computed = [column for _, column in fields]
+            frame = read_expressions(store.reader, computed, first, last, instruments=[iid]).frame
         if frame is None:
             continue
         for row in frame.to_dict("records"):
@@ -227,7 +253,7 @@ def compare_features(
     for name in wanted:
         catalogue.check_field(name, "features")
     ids = [c.instrument_id for c in compared]
-    view = instrument_view(store.reader, session, wanted, ids=ids)
+    view = field_view(store.reader, session, wanted, ids=ids)
     by_id = {str(r["instrument_id"]): record(r) for r in view.frame.to_dict("records")}
     rows = [
         {

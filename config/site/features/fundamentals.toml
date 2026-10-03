@@ -1,0 +1,21 @@
+# Expression features over fundamentals and dividends (L3; ADR 0023 step 3).
+# Language and keys: docs/configuration.md "Expression features".
+
+[div_yield]
+expr = "if(price_stats.close > 0, dividends.div_ttm / price_stats.close, null)"
+dtype = "float32"
+unit = "decimal"
+description = "Trailing dividend yield: div_ttm / close; the continuous q in option pricing (iv30 reads it, so it is stored)"
+null_meaning = "dividends div_ttm is null (no dividend in the window and too little bar history to call it a non-payer), or the close is not positive"
+valid_range = [0, 1]
+materialise = true  # iv30@v1 prices with it: stored as rollups/instrument/div_yield@v1
+version = 1
+
+[market_cap]
+expr = 'if(fundamentals.market_cap_status == "OK", fundamentals.shares_outstanding * price_stats.close, null)'
+dtype = "float"
+unit = "usd"
+description = "shares_outstanding x close (the company total times this class's close)"
+null_meaning = "fundamentals market_cap_status is not OK (no count, a stale count, or no close)"
+valid_range = [0, inf]
+version = 1

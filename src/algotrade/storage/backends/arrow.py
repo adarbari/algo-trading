@@ -9,6 +9,7 @@ written before the schemas were typed (``string`` vs ``large_string``, all-null 
 """
 
 import io
+from collections.abc import Iterable
 
 import pandas as pd
 import pyarrow as pa
@@ -16,11 +17,12 @@ import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 from algotrade.core.model.errors import DataValidationError
-from algotrade.storage.tables.schemas import SCHEMA_VERSION, TableSpec, spec_for
+from algotrade.storage.tables.schemas import COMMON, SCHEMA_VERSION, TableSpec, spec_for
 
 ARROW_TYPES: dict[str, pa.DataType] = {
     "string": pa.large_string(),
     "float64": pa.float64(),
+    "float32": pa.float32(),
     "int64": pa.int64(),
     "bool": pa.bool_(),
     "date": pa.date32(),
@@ -93,6 +95,11 @@ def concat(table: str, parts: list[pa.Table]) -> pa.Table:
     spec = table_spec(table)
     promote = "permissive" if spec is None or spec.open_ended else "default"
     return pa.concat_tables([conform(table, p) for p in parts], promote_options=promote)
+
+
+def keep_columns(columns: Iterable[str]) -> set[str]:
+    """A column-pruned read keeps these as well: the row key and the point-in-time columns."""
+    return {*columns, *COMMON, "instrument_id", "ts", "change"}
 
 
 def parquet_bytes(data: pa.Table) -> bytes:

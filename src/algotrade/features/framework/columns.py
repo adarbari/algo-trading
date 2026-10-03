@@ -1,9 +1,10 @@
 """Type a rollup's output by its declaration, so the stored types come from one place.
 
 ``conform`` returns ``instrument_id`` plus exactly the declared columns, in declared order,
-each cast to the pandas dtype that stores as the declared type (``int`` -> int64, ``date`` ->
-date32, ...) even when every value is null. A declared column the compute left out is all
-null (UNKNOWN); an undeclared one is an error, as is a value that does not fit its type.
+each cast to the pandas dtype that stores as the declared type (``float32`` -> float32,
+``int`` -> int64, ``date`` -> date32, ...) even when every value is null. A declared column
+the compute left out is all null (UNKNOWN); an undeclared one is an error, as is a value
+that does not fit its type.
 """
 
 from collections.abc import Mapping
@@ -17,6 +18,8 @@ def _cast(values: pd.Series, kind: str) -> pd.Series:
     """One column as its declared type (Arrow-backed where nulls must keep the type)."""
     if kind == "float":
         return pd.to_numeric(values, errors="raise").astype("float64")
+    if kind == "float32":
+        return pd.to_numeric(values, errors="raise").astype("float32")
     if kind == "int":
         return pd.to_numeric(values, errors="raise").astype("int64[pyarrow]")
     if kind == "date":

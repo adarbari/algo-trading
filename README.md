@@ -28,7 +28,8 @@ algotrade-ingest rates --from 2024-01-01 --to 2026-10-02   # Treasury par yield 
 algotrade-ingest company-details [--force] [--limit N]   # SEC EDGAR company details (needs ALGOTRADE_SEC_CONTACT in .env)
 algotrade-ingest shares [--force] [--limit N]   # shares outstanding from SEC company facts (first run ~6k CIKs, ~30-40 min)
 algotrade-ingest rollups --from 2024-10-03 --to 2026-10-02   # backfill rollups (price_stats, earnings, option_liquidity) per session
-algotrade-ingest rollups [--date D] [--only price_stats@v1]    # one session (alias: features); config/site/rollups.toml
+algotrade-ingest rollups [--date D] [--only price_stats@v2]    # one session (alias: features); config/site/rollups.toml
+algotrade-ingest retire-features --group price_stats@v1 [--dry-run]   # delete a superseded group's tables once v2 covers them
 algotrade-ingest nightly --export-dir out/      # catch up missed sessions; universe -> company details -> shares -> earnings -> bars -> rates -> corporate actions -> chains -> rollups -> screen jobs -> quality -> purge
 algotrade-ingest report --date D [--out r.html] [--send]   # the nightly summary email for a past session (read-only)
 algotrade-ingest quality                        # data-quality checks for a session

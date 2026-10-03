@@ -184,7 +184,6 @@ type = "forbidden"
 source_modules = [
     "algotrade.features.rollups",
     "algotrade.features.registry",
-    "algotrade.features.catalogue",
     "algotrade.features.framework.feature",
     "algotrade.features.framework.declaration",
     "algotrade.features.framework.columns",
@@ -198,6 +197,29 @@ forbidden_modules = [
     "algotrade.strategies",
     "algotrade.analytics",
     "algotrade.features.framework.runner",
+]
+
+[[tool.importlinter.contracts]]
+name = "Expressions are pure: no storage, data, services or Python eval of config text"
+type = "forbidden"
+source_modules = [
+    "algotrade.features.expressions.lexer",
+    "algotrade.features.expressions.parser",
+    "algotrade.features.expressions.nodes",
+    "algotrade.features.expressions.checker",
+    "algotrade.features.expressions.functions",
+    "algotrade.features.expressions.evaluator",
+    "algotrade.features.expressions.frame",
+]
+forbidden_modules = [
+    "algotrade.storage",
+    "algotrade.data",
+    "algotrade.config",
+    "algotrade.services",
+    "algotrade.engines",
+    "algotrade.strategies",
+    "algotrade.features.framework.runner",
+    "pyarrow",
 ]
 
 [[tool.importlinter.contracts]]

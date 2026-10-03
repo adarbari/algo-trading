@@ -1,0 +1,94 @@
+# Liquidity class from dollar volume, price and option liquidity (L3; ADR 0023 step 3). Was the
+# liquidity_class@v1 group; the thresholds are params. Unknown inputs are null and propagate
+# (three-valued and / or): the class is UNKNOWN only when an unknown input could change it.
+# Language and keys: docs/configuration.md "Expression features".
+
+[option_chain_known]
+expr = '''
+if(exists(option_liquidity),
+   one_of(option_liquidity.liq_status, "OK", "NO_CHAIN", "NO_STANDARD_SERIES", "NO_TARGET_EXPIRY"),
+   true)
+'''
+dtype = "bool"
+unit = "flag"
+description = "Whether the session's chain run says what the options are: its fetch succeeded, or it did not list the instrument (no options)"
+null_meaning = "no option_liquidity rows for the session (chains not run)"
+version = 1
+
+[option_tier]
+kind = "label"
+expr = '''
+if(option_chain_known,
+   max(coalesce(option_liquidity.put_tier, "D"), coalesce(option_liquidity.call_tier, "D")),
+   null)
+'''
+dtype = "str"
+unit = "category"
+categories = ["A", "B", "C", "D"]
+description = "The worse of the put and call tier (option_liquidity); D: no usable options, also for an instrument the session's chain run did not list"
+null_meaning = "option_chain_known is not true (no chain run for the session, or its fetch failed: STALE_DATA, FETCH_ERROR, NOT_ATTEMPTED)"
+version = 1
+
+[option_chain_oi]
+expr = "if(option_chain_known, coalesce(option_liquidity.chain_oi, 0), null)"
+dtype = "int"
+unit = "count"
+description = "Chain open interest (option_liquidity); 0 when the chain run did not list the instrument"
+null_meaning = "option_chain_known is not true"
+valid_range = [0, inf]
+version = 1
+
+[option_chain_volume]
+expr = "if(option_chain_known, coalesce(option_liquidity.chain_volume, 0), null)"
+dtype = "int"
+unit = "count"
+description = "Chain volume (option_liquidity); 0 when the chain run did not list the instrument"
+null_meaning = "option_chain_known is not true"
+valid_range = [0, inf]
+version = 1
+
+[liquidity_high]
+expr = '''
+(min_adv_usd <= 0 or price_stats.adv_usd_20d >= min_adv_usd)
+and (min_price <= 0 or price_stats.close >= min_price)
+and option_tier == "A"
+and (min_chain_oi <= 0 or option_chain_oi >= min_chain_oi)
+and (min_chain_volume <= 0 or option_chain_volume >= min_chain_volume)
+'''
+params = { min_adv_usd = 100_000_000.0, min_price = 10.0, min_chain_oi = 50_000, min_chain_volume = 5_000 }
+dtype = "bool"
+unit = "flag"
+description = "Every HIGH threshold holds: 20-session ADV >= $100M, close >= $10, worse option tier A, chain OI >= 50k, chain volume >= 5k (params; a threshold <= 0 is no requirement)"
+null_meaning = "no threshold fails and one cannot be checked (an unknown ADV, close or option input)"
+version = 1
+
+[liquidity_medium]
+expr = '''
+(min_adv_usd <= 0 or price_stats.adv_usd_20d >= min_adv_usd)
+and (min_price <= 0 or price_stats.close >= min_price)
+and one_of(option_tier, "A", "B")
+and (min_chain_oi <= 0 or option_chain_oi >= min_chain_oi)
+and (min_chain_volume <= 0 or option_chain_volume >= min_chain_volume)
+'''
+params = { min_adv_usd = 10_000_000.0, min_price = 5.0, min_chain_oi = 5_000, min_chain_volume = 0 }
+dtype = "bool"
+unit = "flag"
+description = "Every MEDIUM threshold holds: 20-session ADV >= $10M, close >= $5, worse option tier A or B, chain OI >= 5k (params; chain volume 0: no requirement)"
+null_meaning = "no threshold fails and one cannot be checked (an unknown ADV, close or option input)"
+version = 1
+
+[liquidity_class]
+kind = "label"
+expr = '''
+if(not exists(price_stats), null,
+   if(is_null(liquidity_high), "UNKNOWN",
+      if(liquidity_high, "HIGH",
+         if(is_null(liquidity_medium), "UNKNOWN",
+            if(liquidity_medium, "MEDIUM", "LOW")))))
+'''
+dtype = "str"
+unit = "category"
+categories = ["HIGH", "MEDIUM", "LOW", "UNKNOWN"]
+description = "HIGH when every HIGH threshold holds, else MEDIUM when every MEDIUM one does, else LOW; UNKNOWN when an unknown input decides it"
+null_meaning = "no price_stats row for the instrument on the session (no bar)"
+version = 1

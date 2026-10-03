@@ -1,9 +1,32 @@
 ---
 name: add-feature
-description: Add a computed feature (a documented column of a feature group, e.g. an indicator, IV rank, yield, momentum score) to the feature store and the nightly pipeline. Use whenever strategies or screeners need a new derived input.
+description: Add a computed feature to the feature store: a formula over existing features (a ratio, spread, label from thresholds) as a TOML expression feature with no code, or a new documented column of a feature group (an indicator, IV rank, momentum score) computed nightly. Use whenever strategies or screeners need a new derived input.
 ---
 
-# Add a feature (a column of a feature group)
+# Add a feature
+
+**First: is it a formula over features that already exist?** (`iv30 - hv30`, `close /
+high_52w - 1`, a HIGH / LOW label from thresholds, `shares x close`.) Then it is an
+**expression feature: a TOML entry, no code** (ADR 0023 step 3):
+
+1. Add `[name]` to the theme file in `config/site/features/` (`price.toml`,
+   `volatility.toml`, `fundamentals.toml`, `liquidity.toml`; a new theme is a new file):
+   `expr`, `dtype`, `unit`, `description`, `null_meaning`, and as needed `kind = "label"` +
+   `categories`, `valid_range = [min, max]` (`inf` open; a flag, never a clip), `params = {...}`
+   (thresholds as named constants), `version` (bump it when the formula changes). The language
+   (names `group.column`, other expressions and params by name; `+ - * /`, comparisons,
+   `and or not`, `if abs min max log sqrt clip coalesce is_null one_of exists`; null
+   propagates) is in `docs/configuration.md` "Expression features".
+2. Virtual by default: it is computed on read (`feature.<name>` in selections, `FeatureView`
+   `expressions=`, `services.features.read_expressions` for a series). Set `materialise = true`
+   only when a feature group reads it or reading it is too slow; it is then stored as
+   `rollups/instrument/<name>@v<N>` by the `rollups` task (add its `[[table]]` to
+   `architecture/ownership.toml`).
+3. `make features-doc`; tests: a case in `tests/unit/features/test_site.py` (values, nulls,
+   categories). A bad formula fails at load naming the file, the feature and the position.
+
+Otherwise (it needs history, a chain, an input table, or maths that is not a formula over a
+row), it is a **column of a feature group**:
 
 Read first: ADR 0007, ADR 0023 (the feature store), `docs/data/layers.md` ("Rollups as
 built"), the catalogue `docs/data/features.md` (does the feature already exist?) and an
@@ -30,8 +53,8 @@ loader under `features/`, and never write a new task for a group. `make ownershi
    `tests/unit/data/`); run `make layout` and plan a split if the folder is at 8+ modules.
 1. **Declare its features** in `src/algotrade/features/rollups/<name>.py`: `FEATURES = (
    Feature(name, dtype, unit, description, null_meaning, kind, valid_range=..., categories=...,
-   inputs=...), ...)` (`features/framework/feature.py`): `dtype` one of `float | int | bool |
-   str | date`; `unit` from `UNITS` (`decimal` 0.25 = 25%, `pct_points` 25 = 25%, `usd`,
+   inputs=...), ...)` (`features/framework/feature.py`): `dtype` one of `float32 | float | int |
+   bool | str | date` (new groups store floats as `float32`); `unit` from `UNITS` (`decimal` 0.25 = 25%, `pct_points` 25 = 25%, `usd`,
    `usd_per_share`, `count`, `sessions`, `days`, `date`, `flag`, `category`, ...); `kind`
    `window | chain | expression | cross_section | label`; say exactly when it is null (null is
    UNKNOWN, never zero); a sane `valid_range` for numbers (values outside are kept, not
@@ -49,7 +72,7 @@ loader under `features/`, and never write a new task for a group. `make ownershi
    `data` owner and an `INPUTS` entry. `compute` receives only rows on or before its session;
    missing history is null (UNKNOWN), never zero.
    **Another group's output** is an input like any other: `Input("rollups/instrument/
-   price_stats@v1", lookback=...)` hands `compute` that group's rows (with `session_date`)
+   price_stats@v2", lookback=...)` hands `compute` that group's rows (with `session_date`)
    for the session and the lookback; `None` (NO_INPUT when required) when the session has
    none. The registry orders groups by dependency and refuses cycles; never call another
    group's `compute` yourself. Test a chain with `runner.compute_in_memory` (no writes).
@@ -67,8 +90,11 @@ loader under `features/`, and never write a new task for a group. `make ownershi
    `tests/architecture/test_rollups.py` and `test_features.py` check all of this (every
    column documented, inputs resolve, golden output within ranges and categories).
 6. **Changing an existing group's stored columns (a new column, a changed definition or a
-   window named in a column)?** Create `name@v2`; do not edit v1. Update dependents
-   explicitly. Metadata-only edits (a better description) need no new version.
+   window named in a column)?** Create `name@v<N+1>`; do not edit the old version. Update
+   dependents explicitly, add the old key to `SUPERSEDED` in `features/registry.py` (its
+   fields then fail with the field that replaced them), and after the owner's backfill retire
+   the old table with `algotrade-ingest retire-features --group <name>@v<N> [--dry-run]`.
+   Metadata-only edits (a better description) need no new version.
 7. **Tests** (`tests/unit/features/rollups/`): hand-computed values on a small stored series
    (`tests/helpers/rollup_store.py`), missing history / gaps are null, a backfill equals the
    per-session compute, and anything adjustment-sensitive (splits) as of each session.

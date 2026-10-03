@@ -98,6 +98,9 @@ def _compute_chunk(
         if missing:
             yield SessionResult(session, None, f"no {', '.join(missing)} for {session}")
             continue
+        if all(f is None for f in frames.values()):  # every input optional, none has rows
+            yield SessionResult(session, None, f"no input for {session}")
+            continue
         out = rollup.compute(frames, session, params)
         yield SessionResult(session, conform(rollup.table, out, rollup.columns))
 
@@ -130,7 +133,7 @@ def compute_in_memory(
 
 def by_key(rollups: Mapping[str, FeatureGroup], only: Sequence[str] | None) -> list[FeatureGroup]:
     """The rollups named in ``only`` (keys ``<name>@v<N>``; all when empty), in registry order
-    (dependency order: ``features.registry``)."""
+    (dependency order: ``features.site``)."""
     if not only:
         return list(rollups.values())
     unknown = sorted(set(only) - set(rollups))

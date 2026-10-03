@@ -1,29 +1,38 @@
-"""The feature catalogue: every feature of every registered group, rendered as Markdown.
+"""The feature catalogue: every feature of the site's ``FeatureSet``, rendered as Markdown.
 
-``render()`` is the content of ``docs/data/features.md`` (written by ``make features-doc``;
-a fitness test keeps the committed file up to date). Per group: its table, inputs and
-description; per feature: kind, type, unit, valid values (range or categories),
-description, when it is null, and what it is computed from.
+``render(features)`` is the content of ``docs/data/features.md`` (written by
+``make features-doc`` from the repository's ``config/``; a fitness test keeps the committed
+file up to date). Per code group: its table, inputs and description; per feature: kind,
+type, unit, valid values (range or categories), description, when it is null, and what it
+is computed from. Then the expression features by theme file (formula, and where it is
+stored when materialised) and the superseded group versions.
 """
 
+from algotrade.features.expressions.definitions import Expression
+from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.framework.declaration import FeatureGroup
 from algotrade.features.framework.feature import Feature
-from algotrade.features.registry import FEATURES, GROUPS
 
 PATH = "docs/data/features.md"
 HEADER = """# Feature catalogue
 
-Generated from `src/algotrade/features/registry.py` by `make features-doc`; do not edit by
+Generated from `src/algotrade/features/registry.py` (code groups) and
+`config/site/features/*.toml` (expression features) by `make features-doc`; do not edit by
 hand (a fitness test fails when it is out of date). The model is in
 [ADR 0023](../adr/0023-feature-store.md); how groups are computed and stored is in
-[layers.md](layers.md#rollups-as-built).
+[layers.md](layers.md#rollups-as-built); the expression language is in
+[configuration.md](../configuration.md#expression-features).
 
-A feature is `<group>.<column>@v<N>`, selectable as `rollup.<group>@v<N>.<column>`. Null is
-UNKNOWN, never zero: "Null when" says why a value can be missing. Valid values are a sanity
-range (values outside are kept, not clipped) or a label's categories. Units: `decimal` is a
-fraction (0.25 = 25%), `pct_points` a quoted percentage (25 = 25%), `sessions` exchange
-sessions, `days` calendar days.
+A group feature is `<group>.<column>@v<N>`, selectable as `rollup.<group>@v<N>.<column>`; an
+expression feature is `<name>@v<N>`, selectable as `feature.<name>` and computed on read from
+the stored features it names (unless materialised). Null is UNKNOWN, never zero: "Null when"
+says why a value can be missing. Valid values are a sanity range or a label's categories:
+values outside a range are kept, never clipped, and are reported by the feature-quality
+checks (ADR 0023, step 7). Units: `decimal` is a fraction (0.25 = 25%), `pct_points` a
+quoted percentage (25 = 25%), `sessions` exchange sessions, `days` calendar days. Types:
+`float32` is a 32-bit float (about 7 significant digits).
 """
+_COLUMNS = "| Feature | Kind | Type | Unit | Valid values | Description | Null when |"
 
 
 def _number(value: float) -> str:
@@ -47,6 +56,12 @@ def _cell(text: str) -> str:
     return text.replace("|", "\\|").replace("\n", " ")
 
 
+def _row(f: Feature, *extra: str) -> str:
+    cells = [f"`{f.name}`", f.kind, f.dtype, f.unit, valid_values(f), f.description,
+             f.null_meaning, *extra]  # fmt: skip
+    return "| " + " | ".join(_cell(c) for c in cells) + " |"
+
+
 def _group(g: FeatureGroup) -> list[str]:
     inputs = ", ".join(f"`{i.table}`" + ("" if i.required else " (optional)") for i in g.inputs)
     lines = [
@@ -54,31 +69,75 @@ def _group(g: FeatureGroup) -> list[str]:
         "",
         f"{g.description}. Stored as `{g.table}`; reads {inputs}.",
         "",
-        "| Feature | Kind | Type | Unit | Valid values | Description | Null when | Inputs |",
+        f"{_COLUMNS} Inputs |",
         "|---|---|---|---|---|---|---|---|",
     ]
-    for f in g.features:
-        cells = [
-            f"`{f.name}`",
-            f.kind,
-            f.dtype,
-            f.unit,
-            valid_values(f),
-            f.description,
-            f.null_meaning,
-            ", ".join(f"`{r}`" for r in f.inputs),
-        ]
-        lines.append("| " + " | ".join(_cell(c) for c in cells) + " |")
+    lines += [_row(f, ", ".join(f"`{r}`" for r in f.inputs)) for f in g.features]
     return [*lines, ""]
 
 
-def render() -> str:
-    """The whole catalogue (``docs/data/features.md``)."""
+def _formula(e: Expression) -> str:
+    text = " ".join(e.definition.expr.split())
+    params = ", ".join(f"{k} = {v!r}" for k, v in e.definition.params.items())
+    return f"`{text}`" + (f" ({params})" if params else "")
+
+
+def _expressions(fs: FeatureSet) -> list[str]:
     lines = [
-        HEADER,
-        f"{len(FEATURES)} features in {len(GROUPS)} groups, in dependency order.",
+        "## Expression features",
+        "",
+        "Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unless "
+        "stored (materialised, by the `rollups` task after its inputs).",
         "",
     ]
-    for g in GROUPS.values():
+    themes = sorted({e.definition.theme for e in fs.expressions.values()})
+    for theme in themes:
+        lines += [
+            f"### `{theme}.toml`",
+            "",
+            f"{_COLUMNS} Formula | Stored |",
+            "|---|---|---|---|---|---|---|---|---|",
+        ]
+        for e in fs.expressions.values():
+            if e.definition.theme == theme:
+                stored = f"`{fs.table(e.name)}`" if e.materialise else "virtual"
+                lines.append(_row(e.feature, _formula(e), stored))
+        lines.append("")
+    return lines
+
+
+def _superseded(fs: FeatureSet) -> list[str]:
+    lines = [
+        "## Superseded groups",
+        "",
+        "Readable until retired (`algotrade-ingest retire-features --group <key>`); their "
+        "selection fields fail with the field that replaced them.",
+        "",
+        "| Group | Replaced by |",
+        "|---|---|",
+    ]
+    for key, old in fs.superseded.items():
+        moves = ", ".join(
+            f"`{c}` -> `{n}`" if n else f"`{c}` retired" for c, n in old.fields.items()
+        )
+        lines.append(
+            f"| `{key}` | `{old.by}` + expression features" + (f"; {moves}" if moves else "") + " |"
+        )
+    return [*lines, ""]
+
+
+def render(fs: FeatureSet) -> str:
+    """The whole catalogue (``docs/data/features.md``)."""
+    groups = [g for g in fs.groups.values() if g.key in fs.code]
+    stored = sum(len(g.features) for g in groups)
+    lines = [
+        HEADER,
+        f"{stored} stored features in {len(groups)} groups, in dependency order; "
+        f"{len(fs.expressions)} expression features.",
+        "",
+    ]
+    for g in groups:
         lines += _group(g)
+    lines += _expressions(fs)
+    lines += _superseded(fs)
     return "\n".join(lines).rstrip() + "\n"

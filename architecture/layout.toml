@@ -133,7 +133,7 @@ purpose = "the domain read API: the only way consumers read market data (R1); fe
 
 [[dir]]
 path = "src/algotrade/features"
-purpose = "the feature store: the framework, the feature groups, the registry (registry.py) and the generated catalogue (catalogue.py)"
+purpose = "the feature store: the framework, the feature groups, expression features, the registry (registry.py), the site feature set (site.py) and the generated catalogue (catalogue.py)"
 contracts = [
     "Features read market data only through algotrade.data (never storage)",
     "Features ask algotrade.data for inputs by table name (data.feature_inputs), never a domain reader",
@@ -143,6 +143,11 @@ contracts = [
 path = "src/algotrade/features/framework"
 purpose = "the feature-group framework: Feature and FeatureGroup declarations, column typing, dependency graph, per-session runner"
 contracts = ["Features read market data only through algotrade.data (never storage)"]
+
+[[dir]]
+path = "src/algotrade/features/expressions"
+purpose = "the expression language for features (lexer, parser, type checker, vectorised evaluator, built-ins) and expression feature definitions resolved into the site FeatureSet"
+contracts = ["Expressions are pure: no storage, data, services or Python eval of config text"]
 
 [[dir]]
 path = "src/algotrade/features/rollups"
@@ -631,6 +636,10 @@ purpose = "configuration by layer: site/ (L3, reviewed via PR) and users/ (L4, l
 [[config_dir]]
 path = "config/site"
 purpose = "L3 site settings: one <name>.toml per settings group, each loaded by config/site/settings.py"
+
+[[config_dir]]
+path = "config/site/features"
+purpose = "L3 expression features, one <theme>.toml per theme (loaded by config/site/settings.py load_features; ADR 0023 step 3)"
 
 [[config_dir]]
 path = "config/site/presets"

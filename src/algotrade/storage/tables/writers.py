@@ -44,3 +44,11 @@ class StoreWriter(ResultWriter):
     def purge_pending_before(self, cutoff: datetime) -> int:
         """Abort runs left uncommitted, last written before ``cutoff`` (retention)."""
         return self._backend.tables.purge_pending_before(cutoff)
+
+    def table_size(self, table: str) -> int:
+        """Bytes ``table`` takes in the store (every run)."""
+        return self._backend.tables.size(table)
+
+    def drop_table(self, table: str) -> int:
+        """Delete every partition of a superseded table (``retire-features`` only)."""
+        return self._backend.tables.drop(table)

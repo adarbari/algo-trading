@@ -1,4 +1,4 @@
-"""``price_stats@v1``: trend, range, realised volatility and dollar volume from daily bars.
+"""``price_stats@v2``: trend, range, realised volatility and dollar volume from daily bars.
 
 Input: ``bars/1d`` split-adjusted AS OF the session (``data.prices.session_bars``; never total
 return), the session plus enough earlier sessions for the longest window. One row per
@@ -16,7 +16,6 @@ window, unless every session of its window has a bar; the 52-week high / low nee
                         split-adjusted prices, NOT dividend-adjusted (decided 2026-10-03 after
                         the IBKR comparison: IBKR's 52-week range is dividend-adjusted, so on a
                         payer its values sit below ours by up to the dividends since the bar)
-    pct_from_high_52w   close / high_52w - 1 (<= 0);  pct_from_low_52w: close / low_52w - 1
     hv20, hv30          close-to-close realised vol (``quant.realized_vol``): sample stdev
                         of the last 20 / 30 log returns x sqrt(252) (IBKR's own HV uses another
                         estimator and differs)
@@ -24,9 +23,13 @@ window, unless every session of its window has a bar; the 52-week high / low nee
     adv_usd_20d         mean of close x volume over 20 sessions (split-invariant)
     history_days        sessions with a bar among the last ``year_sessions``
 
-The windows named in the columns (20, 50, 200, 60, 30) are the v1 definition: changing one
-is a new version. ``config/site/rollups.toml ["price_stats@v1"]`` sets the 52-week length,
+The windows named in the columns (20, 50, 200, 60, 30) are part of the definition: changing
+one is a new version. ``config/site/rollups.toml ["price_stats@v2"]`` sets the 52-week length,
 its minimum bars and the annualisation.
+
+v2 (ADR 0023 step 3) stores the same values as v1 as 32-bit floats and drops the columns
+computed from other columns: ``pct_from_high_52w`` / ``pct_from_low_52w`` are expression
+features (``config/site/features/price.toml``), computed on read.
 """
 
 from dataclasses import dataclass
@@ -44,7 +47,7 @@ from algotrade.quant import realized_vol
 type Matrix = npt.NDArray[np.float64]
 
 NAME = "price_stats"
-VERSION = 1
+VERSION = 2
 BARS = "bars/1d"
 SMA_WINDOWS = (20, 50, 200)
 RETURN_WINDOWS = (20, 60)
@@ -61,51 +64,42 @@ def _gap(n: int) -> str:
 
 FEATURES = (
     Feature(
-        "close", "float", "usd_per_share", "The session's close, split-adjusted as of the session",
+        "close", "float32", "usd_per_share",
+        "The session's close, split-adjusted as of the session",
         "never: a row exists only for an instrument with a bar on the session",
         valid_range=(0, None), inputs=(CLOSE,),
     ),
     *(
         Feature(
-            f"sma_{n}", "float", "usd_per_share", f"Mean close over the last {n} sessions",
+            f"sma_{n}", "float32", "usd_per_share", f"Mean close over the last {n} sessions",
             _gap(n), valid_range=(0, None), inputs=(CLOSE,),
         )
         for n in SMA_WINDOWS
     ),
     *(
         Feature(
-            f"ret_{n}d", "float", "decimal", f"Close / close {n} sessions earlier - 1",
+            f"ret_{n}d", "float32", "decimal", f"Close / close {n} sessions earlier - 1",
             _gap(n + 1), valid_range=(-1, None), inputs=(CLOSE,),
         )
         for n in RETURN_WINDOWS
     ),
     Feature(
-        "high_52w", "float", "usd_per_share",
+        "high_52w", "float32", "usd_per_share",
         "Highest daily high over the last 52 weeks (252 sessions), split-adjusted (not "
         "dividend-adjusted)",
         "fewer than min_year_sessions (240) bars among the last year_sessions (252)",
         valid_range=(0, None), inputs=(HIGH,),
     ),
     Feature(
-        "low_52w", "float", "usd_per_share",
+        "low_52w", "float32", "usd_per_share",
         "Lowest daily low over the last 52 weeks (252 sessions), split-adjusted (not "
         "dividend-adjusted)",
         "fewer than min_year_sessions (240) bars among the last year_sessions (252)",
         valid_range=(0, None), inputs=(LOW,),
     ),
-    Feature(
-        "pct_from_high_52w", "float", "decimal", "Close / 52-week high - 1 (at or below 0)",
-        "high_52w is null", "expression", valid_range=(-1, 0),
-        inputs=("price_stats.close@v1", "price_stats.high_52w@v1"),
-    ),
-    Feature(
-        "pct_from_low_52w", "float", "decimal", "Close / 52-week low - 1 (at or above 0)",
-        "low_52w is null", "expression", valid_range=(0, None),
-        inputs=("price_stats.close@v1", "price_stats.low_52w@v1"),
-    ),
     *(
         Feature(
-            f"hv{n}", "float", "decimal",
+            f"hv{n}", "float32", "decimal",
             f"Close-to-close realised volatility: sample stdev of the last {n} log returns "
             "x sqrt(252)",
             _gap(n + 1), valid_range=(0, 5), inputs=(CLOSE,),
@@ -113,12 +107,12 @@ FEATURES = (
         for n in HV_WINDOWS
     ),
     Feature(
-        f"hv{YZ_WINDOW}_yz", "float", "decimal",
+        f"hv{YZ_WINDOW}_yz", "float32", "decimal",
         f"Yang-Zhang realised volatility over {YZ_WINDOW} sessions, annualised (252)",
         _gap(YZ_WINDOW + 1), valid_range=(0, 5), inputs=(OPEN, HIGH, LOW, CLOSE),
     ),
     Feature(
-        f"adv_usd_{ADV_WINDOW}d", "float", "usd",
+        f"adv_usd_{ADV_WINDOW}d", "float32", "usd",
         f"Mean daily dollar volume (close x volume) over {ADV_WINDOW} sessions",
         _gap(ADV_WINDOW), valid_range=(0, None), inputs=(CLOSE, VOLUME),
     ),
@@ -206,8 +200,6 @@ def stats(px: Panel, p: PriceStatsParams) -> dict[str, Matrix]:
     enough = bars_in_year >= p.min_year_sessions
     out["high_52w"] = np.where(enough, np.fmax.reduce(high[year], axis=0), np.nan)
     out["low_52w"] = np.where(enough, np.fmin.reduce(low[year], axis=0), np.nan)
-    out["pct_from_high_52w"] = last / out["high_52w"] - 1.0
-    out["pct_from_low_52w"] = last / out["low_52w"] - 1.0
     for n in HV_WINDOWS:
         out[f"hv{n}"] = realized_vol.close_to_close(close[-n - 1 :], n, p.periods_per_year)[-1]
     w = slice(-YZ_WINDOW - 1, None)

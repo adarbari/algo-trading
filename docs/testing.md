@@ -38,7 +38,8 @@ chosen with `HYPOTHESIS_PROFILE=dev|ci|nightly`.
 recorded snapshot of that source with OUR raw inputs for the same session, both committed under
 `tests/fixtures/reconciliation/<source>_<session>/` (a README there gives provenance and field
 meanings). The test recomputes our side with production code (`data.prices.adjust_bars`, the
-feature groups' `compute` through their `FeatureGroup`, `quant.realized_vol`), so a change to
+feature groups' `compute` through their `FeatureGroup`, expression features through the
+site `FeatureSet`, `quant.realized_vol`), so a change to
 adjustment or feature maths that drifts from the market shows up in `make check` (the tests
 carry the pytest marker `reconciliation`: `pytest -m reconciliation`).
 
@@ -51,7 +52,7 @@ carry the pytest marker `reconciliation`: `pytest -m reconciliation`).
 | `price_stats.hv20` equals close-to-close HV20 recomputed from IBKR's closes | 0.5% relative |
 | `high_52w` equals IBKR's where no dividend adjustment moves it (AAPL, SPY, RPGL) | 0.05% relative |
 | `high_52w` / `low_52w` on our split-only basis: ours >= IBKR's (dividend-adjusted), the gap at most `div_ttm` | 0.05% slack |
-| `dividends.div_yield` | 0.05 percentage points |
+| `div_yield` (the expression feature: `dividends.div_ttm / price_stats.close`) | 0.05 percentage points |
 | Recorded `iv30` (ours, status OK) vs IBKR's implied vol, every name IBKR has one for | 2.5 vol points |
 
 Not compared, on purpose: IBKR's HV30 (a different estimator from our close-to-close

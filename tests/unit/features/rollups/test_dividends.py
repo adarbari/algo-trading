@@ -1,5 +1,6 @@
-"""``dividends@v1``: trailing-12-month sum split-adjusted to the session, yield, zero vs
-unknown by history, specials, and a stored ``price_stats@v1`` read through the framework."""
+"""``dividends@v2``: trailing-12-month sum split-adjusted to the session, zero vs unknown by
+history, specials, a stored ``price_stats@v2`` read through the framework, and the
+materialised ``div_yield`` expression computed from them."""
 
 from dataclasses import replace
 from datetime import date, timedelta
@@ -10,6 +11,9 @@ import pytest
 from algotrade.features.framework.runner import compute_in_memory, compute_one
 from algotrade.features.rollups import dividends, price_stats
 from algotrade.features.rollups.dividends import GROUP, DividendParams
+from algotrade.features.site import site_features
+from algotrade.storage.configs.files import FileConfigStore
+from tests.conftest import REPO_ROOT
 from tests.helpers.rollup_store import END, series, store, write_bars, write_dividends, write_split
 
 
@@ -48,8 +52,6 @@ def test_ttm_is_split_adjusted_to_the_session() -> None:
     a = rows.loc["EQ:A"]
     assert a["div_ttm"] == pytest.approx(0.82 / 4 + 0.25 + 0.25)
     assert a["div_count_ttm"] == 3 and a["last_ex_date"] == END
-    close = series(260)[-1]
-    assert a["div_yield"] == pytest.approx(a["div_ttm"] / close)
     special = _rows(reader, DividendParams(include_special=True)).loc["EQ:A"]
     assert special["div_ttm"] == pytest.approx(a["div_ttm"] + 1.0)
 
@@ -58,20 +60,32 @@ def test_zero_needs_a_year_of_history_and_a_payer_is_always_known() -> None:
     reader, _ = _setup()
     rows = _rows(reader)
     none = rows.loc["EQ:NONE"]
-    assert (none["div_ttm"], none["div_yield"], none["div_count_ttm"]) == (0.0, 0.0, 0)
+    assert (none["div_ttm"], none["div_count_ttm"]) == (0.0, 0)
     assert pd.isna(none["last_ex_date"])
     new = rows.loc["EQ:NEW"]
-    assert new[["div_ttm", "div_yield", "div_count_ttm", "last_ex_date"]].isna().all()
+    assert new[["div_ttm", "div_count_ttm", "last_ex_date"]].isna().all()
     young = rows.loc["EQ:YOUNG"]
     assert young["div_ttm"] == pytest.approx(0.40) and young["div_count_ttm"] == 1
     lenient = _rows(reader, DividendParams(min_history_days=50)).loc["EQ:NEW"]
     assert lenient["div_ttm"] == 0.0
 
 
+def test_the_materialised_yield_is_ttm_over_close() -> None:
+    reader, _ = _setup()
+    yields = site_features(FileConfigStore(REPO_ROOT / "config")).groups["div_yield@v1"]
+    out = compute_in_memory(reader, [price_stats.GROUP, GROUP, yields], [END])  # type: ignore[arg-type]
+    frame = out["div_yield@v1"][0].frame
+    assert frame is not None
+    got = frame.set_index("instrument_id")["div_yield"]
+    ttm = _rows(reader)["div_ttm"]
+    assert got["EQ:A"] == pytest.approx(ttm["EQ:A"] / series(260)[-1], rel=1e-6)
+    assert got["EQ:NONE"] == 0.0 and pd.isna(got["EQ:NEW"])
+
+
 def test_reads_stored_price_stats_and_needs_them() -> None:
     reader, _ = _setup()
     assert compute_one(reader, GROUP, END).no_input == (
-        f"no rollups/instrument/price_stats@v1 for {END}"
+        f"no rollups/instrument/price_stats@v2 for {END}"
     )
 
 

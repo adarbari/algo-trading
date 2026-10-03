@@ -14,14 +14,15 @@ def test_universe_defaults_to_the_latest_snapshot(client: TestClient) -> None:
     first = body["page"]["items"][0]
     assert (first["sector"], first["liquidity_class"], first["is_leveraged"]) == (
         "Technology",
-        "A",
+        "HIGH",
         False,
     )
 
 
 def test_universe_filters(client: TestClient) -> None:
     assert _symbols(client.get("/universe?leveraged=true").json()) == ["BULL"]
-    assert _symbols(client.get("/universe?liquidity_class=a").json()) == ["AAA", "BULL"]
+    assert _symbols(client.get("/universe?liquidity_class=high").json()) == ["AAA", "BULL"]
+    assert _symbols(client.get("/universe?liquidity_class=MEDIUM").json()) == ["BBB"]
     assert _symbols(client.get("/universe?sector=technology").json()) == ["AAA"]
     assert _symbols(client.get("/universe?q=bb").json()) == ["BBB"]
     assert _symbols(client.get("/universe?security_type=ETF").json()) == []

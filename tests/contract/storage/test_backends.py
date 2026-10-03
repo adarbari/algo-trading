@@ -257,3 +257,29 @@ def test_table_names_list_every_written_table(backend: Backend) -> None:
     backend.tables.write(TABLE, D1, "r1", stamped(rows({"EQ:A": 1.0}), D1, "r1"))
     backend.tables.write("catalog/demo", D2, "r1", stamped(rows({"EQ:A": 1.0}), D2, "r1"))
     assert StoreReader(backend).table_names() == ["catalog/demo", TABLE]
+
+
+def test_read_range_prunes_columns_and_keeps_float32(backend: Backend) -> None:
+    frame = stamped([{"instrument_id": "EQ:A", "a": 1.5, "b": "x"}], D1, "r1")
+    backend.tables.write(TABLE, D1, "r1", frame.astype({"a": "float32"}))
+    StoreWriter(backend).write_table(TABLE, D2, "r1", stamped(rows({"EQ:A": 2.0}), D2, "r1"))
+    out = StoreReader(backend).table_range(TABLE, D1, D2, columns=["value", "missing"])
+    assert out is not None
+    assert "a" not in out.columns and "b" not in out.columns and "instrument_id" in out.columns
+    assert out["value"].isna().tolist() == [True, False]  # D1 has no such column
+    full = backend.tables.read(TABLE, D1)
+    assert full is not None and str(full["a"].dtype) == "float32"
+
+
+def test_size_and_drop_a_table(backend: Backend) -> None:
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    assert writer.table_size(TABLE) == 0 and writer.drop_table(TABLE) == 0
+    for day in (D1, D2):
+        writer.write_table(TABLE, day, "r1", stamped(rows({"EQ:A": 1.0}), day, "r1"))
+    writer.write_table(TABLE, D2, "r2", stamped(rows({"EQ:A": 2.0}), D2, "r2", T0))
+    writer.write_table("catalog/demo", D1, "r1", stamped(rows({"EQ:A": 1.0}), D1, "r1"))
+    assert writer.table_size(TABLE) > writer.table_size("catalog/demo") > 0
+    assert writer.drop_table(TABLE) == 2
+    assert reader.dates(TABLE) == [] and reader.table(TABLE, D2) is None
+    assert writer.table_size(TABLE) == 0 and reader.table_names() == ["catalog/demo"]
+    assert reader.table("catalog/demo", D1) is not None

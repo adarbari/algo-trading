@@ -27,7 +27,8 @@ once here and implemented once, in a new pure library layer `algotrade.quant`.
   `chains/option_quotes` are the vendor's and are kept as a cross-check only).
 - **Dividend yield** `q` = trailing-12-month cash dividends (`events/dividend`, by ex-date) /
   the underlying's price on the session, as a continuous yield. Computed by `dividends@v1`
-  (see the 2b.3 addendum); callers outside rollups pass `q` explicitly (0 for non-payers).
+  (see the 2b.3 addendum; since ADR 0023 step 3 the expression feature `div_yield`, stored as
+  `div_yield@v1`, over `dividends@v2.div_ttm`); callers outside rollups pass `q` explicitly (0 for non-payers).
 - The normal CDF is `0.5 * erfc(-x / sqrt 2)` (exact in the tails), numpy only; no scipy.
 
 ### Implied volatility
@@ -94,7 +95,7 @@ PROVISIONAL after 60 sessions of history (flagged with `history_days`) and FULL 
 risk-free rate is the Treasury curve (`data.rates`); the dividend yield is trailing-12-month
 dividends / close.
 
-### Dividend yield (`dividends@v1`)
+### Dividend yield (`dividends@v1`; the `div_yield` expression feature since ADR 0023 step 3)
 `q = div_ttm / close`, with `div_ttm` the cash dividends whose ex-date is in (session - 365
 days, session], each divided by the ratio of every split after its ex-date up to the session
 (the close is in the session's share terms, so the dividends must be too). The simple yield is
@@ -132,7 +133,7 @@ Failures are a null `iv30` plus `iv30_status`: `NO_SPOT`, `NO_CHAIN`, `NO_EXPIRY
 | Inverting bid and ask separately | twice the work, and the spread is already filtered; the mid is the market's estimate |
 | Linear in vol across expiries | not arbitrage-consistent; total variance is the standard |
 
-### IV rank (`iv_history@v1`)
+### IV rank (`iv_history@v1`; `iv_history@v2` since ADR 0023 step 3)
 Rank `(iv - min) / (max - min)` and percentile (share of earlier values strictly below today)
 over the last 252 sessions of our IV30 (or Cboe's: `source = "cboe"`). Below 60 sessions with
 an IV the status is UNKNOWN and both are null; 60 to 251 PROVISIONAL; 252 FULL.

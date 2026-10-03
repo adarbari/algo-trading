@@ -12,7 +12,13 @@ from datetime import UTC, date, datetime
 
 import pandas as pd
 
-from algotrade.storage.backends.arrow import concat, to_arrow, to_frame
+from algotrade.storage.backends.arrow import (
+    concat,
+    keep_columns,
+    parquet_bytes,
+    to_arrow,
+    to_frame,
+)
 from algotrade.storage.backends.run_selection import (
     RunEntry,
     committed,
@@ -150,16 +156,32 @@ class MemoryTables:
         as_of: datetime | None = None,
         instruments: Sequence[str] | None = None,
         own_run: str | None = None,
+        columns: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
         upto = self._seq  # one commit sequence for the whole range
         days = [d for d in self.dates(table, own_run) if start <= d <= end]
-        return concat_frames(
-            [
-                f
-                for d in days
-                if (f := self._read(table, d, as_of, instruments, own_run, upto)) is not None
-            ]
-        )
+        frames = [
+            f
+            for d in days
+            if (f := self._read(table, d, as_of, instruments, own_run, upto)) is not None
+        ]
+        if columns is not None:
+            frames = [f[[c for c in f.columns if c in keep_columns(columns)]] for f in frames]
+        return concat_frames(frames)
+
+    def size(self, table: str) -> int:
+        with self._index_lock:
+            frames = [f for (key, _, _), f in self._frames.items() if key[0] == table]
+        return sum(len(parquet_bytes(to_arrow(table, f))) for f in frames)
+
+    def drop(self, table: str) -> int:
+        with self._index_lock:
+            keys = [k for k in self._partitions if k[0] == table]
+            for key in keys:
+                del self._partitions[key]
+            for frame_key in [k for k in self._frames if k[0][0] == table]:
+                del self._frames[frame_key]
+            return len(keys)
 
     def dates(self, table: str, own_run: str | None = None) -> list[date]:
         with self._index_lock:

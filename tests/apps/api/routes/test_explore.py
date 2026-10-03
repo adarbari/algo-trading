@@ -1,8 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
-HV20 = "rollup.price_stats@v1.hv20"
-CLOSE = "rollup.price_stats@v1.close"
+HV20 = "rollup.price_stats@v2.hv20"
+CLOSE = "rollup.price_stats@v2.close"
 
 
 def test_ticker_table_with_requested_columns(client: TestClient) -> None:
@@ -15,6 +15,17 @@ def test_ticker_table_with_requested_columns(client: TestClient) -> None:
     assert rows[0][HV20] == pytest.approx(0.22)
     assert set(rows[0]) == {"instrument_id", "symbol", "company_name", "security_type",
                             HV20, "instrument.sector"}  # fmt: skip
+
+
+def test_ticker_table_with_expression_features(client: TestClient) -> None:
+    params = {"columns": "feature.liquidity_class", "sort": "feature.liquidity_class"}
+    rows = client.get("/explore/tickers", params=params).json()["page"]["items"]
+    assert [(r["symbol"], r["feature.liquidity_class"]) for r in rows] == [
+        ("AAA", "HIGH"), ("BULL", "HIGH"), ("CCC", "LOW"), ("BBB", "MEDIUM"),
+    ]  # fmt: skip
+    tiers = {"ids": "AAA,CCC", "features": "feature.option_tier"}
+    compare = client.get("/explore/compare", params=tiers)
+    assert compare.json()["rows"][0]["values"] == {"EQ:AAA": "A", "EQ:CCC": "D"}
 
 
 def test_ticker_table_filters_pages_and_defaults(client: TestClient) -> None:
