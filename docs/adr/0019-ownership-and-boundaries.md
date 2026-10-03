@@ -1,6 +1,7 @@
 # ADR 0019: Ownership and boundaries
 
-**Status:** accepted (2026-10-02). Extends [0001](0001-layered-architecture.md),
+**Status:** implemented (accepted 2026-10-02; restructure PRs 2–6 landed, the ratchet is
+empty). Extends [0001](0001-layered-architecture.md),
 [0005](0005-ingestion-is-the-only-writer.md), [0006](0006-storage-grains-and-adapters.md),
 [0010](0010-jobs-model.md) and [0018](0018-figi-instrument-ids.md). Registry:
 `architecture/ownership.toml`. Work plan: [roadmap](../roadmap.md), track R.
@@ -89,17 +90,35 @@ what to fetch and how to compose tables. Responsibilities: `run-records`, `raw-p
 One typed loader in `config/` for site settings (`site-settings`); environment variables are
 read in one place (`secrets-env`). Every key in `config/site/*.toml` must drive code.
 
+### Settled in PR 6
+- **Site settings.** The types of every site file, including app-only sections (vendor
+  pacing, nightly, universe coverage), live in the library (`algotrade.config.settings`),
+  next to their one loader: a key is validated where it is parsed, apps receive frozen
+  dataclasses, and `config/` stays free of I/O (documents come from the `ConfigStore`).
+  Vendor *section names* are config keys there; vendor code stays in `sources/`.
+- **Environment.** `algotrade.config.env` is the only reader of environment variables and
+  `.env`; the storage factory and the source registry receive values as parameters.
+- **Run records.** One-shot use cases (screens, backtests) call `storage.runs.start_run`
+  and `RunRecord.finish(complete=...)`; they never build ids or pick a status themselves.
+- **Fixture sources.** The golden CSVs are a source built only by the source registry
+  (`FIXTURES`, `fixture_source`), like a vendor but with no transport or `sources.toml`
+  section; tasks receive it as `ctx.sources["synthetic"]`.
+- **Ratchet at zero.** `known_violations.toml` is empty and has no pending contracts, and
+  `tests/architecture/test_ownership.py` asserts both. A genuine exception needs an ADR
+  and goes into the responsibility's `allowed` list with the reason.
+
 ### Guardrails
 | Check | What it enforces | Ratchet |
 |---|---|---|
-| `make ownership` (`scripts/check_ownership.py`) | detect hits only inside the owner (or its target owner) | `architecture/known_violations.toml`, shrink-only |
+| `make ownership` (`scripts/check_ownership.py`) | detect hits only inside the owner (or its target owner) | `architecture/known_violations.toml`: empty since PR 6, kept empty by a fitness test |
 | `make dupes` (`scripts/check_dupes.py`) | pylint `duplicate-code` over `src/` and `apps/` | `architecture/dupes_baseline.txt`, must match |
-| `make arch` (import-linter) | the rules that already hold as contracts | pending ones: `[[pending_contract]]` in the registry |
+| `make arch` (import-linter) | R1–R5 and the layer rules, as contracts | none pending since PR 6 |
 | `tests/architecture/test_ownership.py` | one producing owner per table; registry paths exist; site settings are read | `KNOWN_UNREAD`, shrink-only |
 
 Both ratchets fail when a count goes **down** without the file being updated, so fixed
-problems cannot come back. Each restructure PR moves code to the target owner, shrinks the
-ratchets and enables its pending contracts in `pyproject.toml`.
+problems cannot come back. Each restructure PR moved code to the target owner, shrank the
+ratchets and enabled its pending contracts in `pyproject.toml`; after PR 6 any ownership hit
+fails CI outright.
 
 | Alternative | Rejected because |
 |---|---|
@@ -111,7 +130,8 @@ ratchets and enables its pending contracts in `pyproject.toml`.
 - Adding code that does an owned job outside its owner fails CI with the owner's name and
   this section. Agents find owners in `CLAUDE.md` and `architecture/ownership.toml`; the
   `add-responsibility` skill covers adding or moving one.
-- `known_violations.toml` is the restructure's to-do list, per responsibility.
+- `known_violations.toml` was the restructure's to-do list, per responsibility; it is now
+  empty and must stay so.
 - Detection is heuristic (AST names, not semantics). A false positive is fixed by
   narrowing the detect rule or listing the module in `allowed` with a reason, never by
   growing the ratchet.

@@ -1,34 +1,4 @@
-# Ratchet for scripts/check_ownership.py (ADR 0019). Today's ownership violations:
-# each entry is a file doing work another module owns. This list may only shrink:
-# fix a violation, then lower or remove its entry (`make ownership-update`).
-# Never add entries by hand; extend the owner named in architecture/ownership.toml.
-
-[[violation]]
-responsibility = "run-records"
-file = "src/algotrade/services/backtests.py"
-count = 2
-
-[[violation]]
-responsibility = "run-records"
-file = "src/algotrade/services/screening.py"
-count = 3
-
-[[violation]]
-responsibility = "secrets-env"
-file = "src/algotrade/services/configs.py"
-count = 1
-
-[[violation]]
-responsibility = "site-settings"
-file = "apps/ingestion/algotrade_ingestion/settings.py"
-count = 1
-
-[[violation]]
-responsibility = "source-construction"
-file = "apps/ingestion/algotrade_ingestion/commands.py"
-count = 2
-
-[[violation]]
-responsibility = "source-construction"
-file = "apps/ingestion/algotrade_ingestion/tasks/golden.py"
-count = 2
+# Ratchet for scripts/check_ownership.py (ADR 0019): ownership violations, one entry per
+# file doing work another module owns. EMPTY since restructure PR 6, and a fitness test
+# keeps it empty: extend the owner named in architecture/ownership.toml instead. A real
+# exception needs an ADR and goes in that responsibility's `allowed` list, with why.

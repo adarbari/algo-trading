@@ -24,15 +24,15 @@ from typing import Any, Self
 
 import pandas as pd
 
+from algotrade.config.settings import SourcesSettings
 from algotrade.config.user import SITE_USER
 from algotrade.data import StoreReader
 from algotrade.data.reference import resolver as reference_resolver
 from algotrade.data.reference import snapshot
 from algotrade.data.resolver import SymbolResolver
 from algotrade.storage.config_store import ConfigStore
-from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
+from algotrade.storage.runs import RunRecord, RunStatus, start_run
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.settings import SourcesSettings
 from algotrade_ingestion.sources.base import FetchRequest, Normalized, Source
 
 REFERENCE = "instruments/reference"
@@ -102,7 +102,7 @@ class IngestRun:
         self._resolvers: dict[date | None, SymbolResolver] = {}
         resumed = self._resume() if resume else None
         now = self.clock()
-        self.record = resumed or RunRecord(new_run_id(task, session, now), task, session, now)
+        self.record = resumed or start_run(task, session, now)
 
     # ------------------------------------------------------------------ lifecycle
 

@@ -179,23 +179,14 @@ source_modules = ["algotrade.core"]
 forbidden_modules = ["pandas"]
 allow_indirect_imports = true
 
-# ---- ADR 0019: ownership and boundaries. Contracts that hold today; the ones that need a
-# restructure PR first are listed as `pending_contract` in architecture/ownership.toml.
+# ---- ADR 0019: ownership and boundaries. Every contract the restructure planned is enabled
+# (no `pending_contract` remains in architecture/ownership.toml; a fitness test keeps it so).
 
 [[tool.importlinter.contracts]]
-name = "R4 (partial): vendor sources never touch storage I/O, run records or the resolver"
+name = "R4: vendor sources never import storage or data (standard frames carry their own schema)"
 type = "forbidden"
 source_modules = ["algotrade_ingestion.sources"]
-forbidden_modules = [
-    "algotrade.storage.writers",
-    "algotrade.storage.readers",
-    "algotrade.storage.backends",
-    "algotrade.storage.factory",
-    "algotrade.storage.runs",
-    "algotrade.data",
-    "algotrade.storage.result_writer",
-    "algotrade.storage.config_store",
-]
+forbidden_modules = ["algotrade.storage", "algotrade.data"]
 
 [[tool.importlinter.contracts]]
 name = "Vendor sources are leaf adapters: no steps, pipeline, CLI, settings or use cases"
@@ -206,8 +197,8 @@ forbidden_modules = [
     "algotrade_ingestion.workflows",
     "algotrade_ingestion.commands",
     "algotrade_ingestion.cli",
-    "algotrade_ingestion.settings",
     "algotrade_ingestion.schedule",
+    "algotrade.config.settings",
     "algotrade.services",
     "algotrade.engines",
     "algotrade.strategies",

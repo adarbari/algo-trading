@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from algotrade.data.resolver import SymbolResolver
-from algotrade.storage.schemas import COMMON, validate_frame
+from algotrade.storage.schemas import COMMON, spec_for, validate_frame
 from algotrade_ingestion.sources.base import FetchRequest, Source
 from algotrade_ingestion.sources.cboe import CboeOptionsSource
 from algotrade_ingestion.sources.http import RetryPolicy
@@ -127,6 +127,9 @@ def test_normalized_tables_satisfy_storage_schemas(adapter: Adapter) -> None:
         # Vendor-ticker tables carry ``symbol``; the task resolves ids (ADR 0018).
         assert "instrument_id" in frame.columns or "symbol" in frame.columns
         resolved = frame if "instrument_id" in frame.columns else SymbolResolver().resolve(frame)[0]
+        spec = spec_for(table)
+        if not spec.open_ended and spec.column("symbol") is None:  # e.g. bars: the task drops it
+            resolved = resolved.drop(columns="symbol", errors="ignore")
         session = normalized.session_date or fx.SESSION
         validate_frame(table, stamp(resolved, session, fx.CLOCK_TS, source.name, "run-1"))
 

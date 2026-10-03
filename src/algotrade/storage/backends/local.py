@@ -4,6 +4,8 @@ Layout under the root directory (an internal detail; nothing else may rely on it
 
     tables/<table>/date=YYYY-MM-DD/run=<run_id>.parquet   (+ _runs.json knowledge index,
                                                            .runs.lock guarding it)
+                                                          typed per storage/schemas.py,
+                                                          ~64k-row groups + page index
     raw/source=<s>/dataset=<d>/date=YYYY-MM-DD/run=<run_id>/<key>.json.gz
     staging/<run_id>/<table>/<key>.parquet
     runs/<run_id>.json
@@ -25,9 +27,9 @@ from datetime import date, datetime
 from pathlib import Path
 
 import pandas as pd
-import pyarrow as pa
 import pyarrow.parquet as pq
 
+from algotrade.storage.backends.arrow import concat, conform, parquet_bytes, to_arrow, to_frame
 from algotrade.storage.backends.selection import concat_frames, latest_run, select_instruments
 from algotrade.storage.locks import FileLock, held
 from algotrade.storage.runs import RunRecord, run_session
@@ -68,7 +70,8 @@ class LocalTables:
 
     def write(self, table: str, session_date: date, run_id: str, frame: pd.DataFrame) -> None:
         directory = self._dir(table, session_date)
-        _atomic_write(directory / f"run={_safe(run_id)}.parquet", _parquet_bytes(frame))
+        data = parquet_bytes(to_arrow(table, frame))
+        _atomic_write(directory / f"run={_safe(run_id)}.parquet", data)
         with held(FileLock(directory / _INDEX_LOCK)):
             index = self._index(directory)
             if not frame.empty:
@@ -92,7 +95,7 @@ class LocalTables:
         if path is None:
             return None
         filters = [("instrument_id", "in", list(instruments))] if instruments is not None else None
-        frame = pd.read_parquet(path, filters=filters)
+        frame = to_frame(conform(table, pq.read_table(path, filters=filters)))
         return select_instruments(frame, instruments)
 
     def read_range(
@@ -111,9 +114,8 @@ class LocalTables:
         if not paths:
             return None
         filters = [("instrument_id", "in", list(instruments))] if instruments is not None else None
-        tables = [pq.read_table(path, filters=filters) for path in paths]
-        combined = pa.concat_tables(tables, promote_options="permissive")
-        return concat_frames([combined.to_pandas()])
+        combined = concat(table, [pq.read_table(path, filters=filters) for path in paths])
+        return concat_frames([to_frame(combined)])
 
     def dates(self, table: str) -> list[date]:
         base = self.root / table

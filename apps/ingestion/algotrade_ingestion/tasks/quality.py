@@ -8,11 +8,11 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import date
 
+from algotrade.config.settings import SourcesSettings
 from algotrade.data import StoreReader
 from algotrade.data.chains import chain_status
 from algotrade.data.reference import snapshot
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.settings import SourcesSettings
 from algotrade_ingestion.tasks.framework import IngestRun, TaskContext
 
 TASK = "data_quality"

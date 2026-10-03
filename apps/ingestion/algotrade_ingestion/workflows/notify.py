@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Protocol
 
-from algotrade_ingestion.settings import NightlySettings
+from algotrade.config.settings import NightlySettings
 
 TITLE = "algotrade nightly"
 

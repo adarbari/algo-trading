@@ -32,18 +32,25 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from algotrade.config.env import data_url, load_dotenv
+from algotrade.config.settings import load_nightly
 from algotrade.config.user import SITE_USER
 from algotrade.core.calendar import last_closed_session
 from algotrade.core.errors import AlgoTradeError
 from algotrade.data import StoreReader
 from algotrade.services.configs import default_user
 from algotrade.services.jobs import RunLockedError, exclusive_run
-from algotrade.storage.factory import open_backend, open_config_store
+from algotrade.storage.factory import open_backend
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.commands import golden, print_json, report, run_job, run_task_command
-from algotrade_ingestion.env import load_dotenv
+from algotrade_ingestion.commands import (
+    config_store,
+    golden,
+    print_json,
+    report,
+    run_job,
+    run_task_command,
+)
 from algotrade_ingestion.schedule import LABEL, nightly_plist
-from algotrade_ingestion.settings import load_nightly
 from algotrade_ingestion.tasks.registry import TASKS, Task
 
 # Task commands kept under their own names (``algotrade-ingest bars ...``); every registry
@@ -67,7 +74,7 @@ def writes(args: argparse.Namespace) -> bool:
 
 def default_session(args: argparse.Namespace, now: datetime) -> date:
     """The last closed exchange session at ``now`` (settle margin from nightly.toml)."""
-    settings = load_nightly(open_config_store(getattr(args, "config_dir", None)))
+    settings = load_nightly(config_store(args))
     return last_closed_session(now, timedelta(minutes=settings.settle_minutes))
 
 
@@ -188,7 +195,7 @@ def _dispatch(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter
 def main(argv: Sequence[str] | None = None) -> int:
     load_dotenv()
     args = _parser().parse_args(argv)
-    backend = open_backend()
+    backend = open_backend(data_url())
     try:
         if not writes(args):
             return _dispatch(args, StoreReader(backend), StoreWriter(backend))

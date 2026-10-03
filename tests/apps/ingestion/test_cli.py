@@ -182,7 +182,7 @@ def test_quality_and_schedule_commands(
 def test_company_details_command(
     env: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from algotrade_ingestion.settings import SourcesSettings  # noqa: PLC0415
+    from algotrade.config.settings import SourcesSettings  # noqa: PLC0415
     from tests.apps.ingestion.tasks.test_company_details import FakeSec, sources  # noqa: PLC0415
 
     call(capsys, "universe", "--stocks", str(env / "stocks.csv"), "--version", "v", "--date", DAY)
@@ -218,10 +218,11 @@ def test_a_second_writing_run_exits_3_unless_it_waits(
 ) -> None:
     import threading  # noqa: PLC0415
 
+    from algotrade.config.env import data_url  # noqa: PLC0415
     from algotrade.services.jobs import exclusive_run  # noqa: PLC0415
     from algotrade.storage.factory import open_backend  # noqa: PLC0415
 
-    other = open_backend()  # its own lock file handle: behaves like another process
+    other = open_backend(data_url())  # its own lock file handle: behaves like another process
     with exclusive_run(other):
         assert cli.main(["purge-raw", "--date", DAY]) == cli.LOCKED_EXIT
         assert "pass --wait" in capsys.readouterr().err
@@ -243,6 +244,7 @@ def test_nightly_recovers_a_job_left_running_by_a_crashed_process(
 ) -> None:
     from datetime import UTC, datetime  # noqa: PLC0415
 
+    from algotrade.config.env import data_url  # noqa: PLC0415
     from algotrade.config.user import SITE_USER, UserContext  # noqa: PLC0415
     from algotrade.services.jobs import JobRecord, JobStatus, job_id_for  # noqa: PLC0415
     from algotrade.storage.factory import open_backend  # noqa: PLC0415
@@ -252,6 +254,6 @@ def test_nightly_recovers_a_job_left_running_by_a_crashed_process(
     job_id = job_id_for("nightly", params, UserContext(SITE_USER))
     stuck = JobRecord(job_id, "nightly", params, SITE_USER, datetime.now(UTC))
     stuck.status = JobStatus.RUNNING
-    open_backend().runs.save(stuck.to_run())
+    open_backend(data_url()).runs.save(stuck.to_run())
     _, result = call(capsys, "nightly", "--date", DAY, "--workers", "1")
     assert result["job_id"] == job_id and "earnings" in result["runs"][-1]["steps"]

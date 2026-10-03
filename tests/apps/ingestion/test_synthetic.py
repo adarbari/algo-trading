@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from algotrade.core.series import FIELDS, align
-from algotrade.storage.schemas import bar_problems
+from algotrade_ingestion.sources.synthetic.files import bar_problems
 from algotrade_ingestion.sources.synthetic.generators import (
     Regime,
     business_days,

@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from algotrade_ingestion.settings import NightlySettings
+from algotrade.config.settings import NightlySettings
 from algotrade_ingestion.workflows import notify
 
 

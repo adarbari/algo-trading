@@ -5,6 +5,9 @@ sources.toml`` section (``enabled``, ``min_interval_s``), the environment variab
 (if any) and how that becomes request headers, its limiter key and default pacing, its retry
 policy and the class that builds it from an ``Http`` client.
 
+Fixture sources (the synthetic golden CSVs) are not vendors: ``FIXTURES`` builds them from a
+directory, with no transport, pacing or ``sources.toml`` section (``fixture_source``).
+
 ``build_sources(settings, env)`` builds every available source: one ``Limiter`` per limiter
 key (shared across threads and processes, ``sources/limiter.py``) and one ``CircuitBreaker``
 per key. A source whose section is disabled or whose variable is missing is left out, with
@@ -16,7 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
-from algotrade_ingestion.sources.base import Source
+from algotrade_ingestion.sources.base import FixtureSource, Source
 from algotrade_ingestion.sources.cboe import CboeOptionsSource
 from algotrade_ingestion.sources.http import (
     BROWSER_USER_AGENT,
@@ -35,6 +38,7 @@ from algotrade_ingestion.sources.nasdaq_earnings import NasdaqEarningsSource
 from algotrade_ingestion.sources.nasdaq_trader import NasdaqTraderSource
 from algotrade_ingestion.sources.sec_edgar import SecSubmissions, SecTickerMap, user_agent
 from algotrade_ingestion.sources.spy_holdings import SpyHoldingsSource
+from algotrade_ingestion.sources.synthetic.source import golden_source
 
 type Env = Callable[[str], str | None]  # variable name -> value (``env.credential``)
 MASSIVE_KEY = "ALGOTRADE_MASSIVE_API_KEY"
@@ -126,6 +130,15 @@ SOURCES: dict[str, SourceSpec] = {
 }
 
 
+# Fixture sources by name: directory (None: the default) -> source.
+FIXTURES: dict[str, Callable[[Path | None], FixtureSource]] = {"synthetic": golden_source}
+
+
+def fixture_source(name: str, directory: Path | None = None) -> FixtureSource:
+    """The fixture source ``name`` over ``directory``. Unknown names raise ``KeyError``."""
+    return FIXTURES[name](directory)
+
+
 @dataclass
 class Built:
     """Sources by name, and why each unavailable one was left out."""
@@ -152,14 +165,19 @@ def build_sources(
     env: Env,
     names: Iterable[str] | None = None,
     limits_dir: Path | None = None,
+    fixture_dir: Path | None = None,
 ) -> Built:
-    """Build the named sources (default: all). Unknown names raise ``KeyError``."""
+    """Build the named sources (default: every vendor source); a named fixture source reads
+    ``fixture_dir``. Unknown names raise ``KeyError``."""
     wanted = list(dict.fromkeys(SOURCES if names is None else names))
     directory = limits_dir or Path(settings.limits_dir)
     limiters: dict[str, Limiter] = {}
     breakers: dict[str, CircuitBreaker] = {}
     built = Built()
     for name in wanted:
+        if name in FIXTURES:
+            built.sources[name] = fixture_source(name, fixture_dir)
+            continue
         spec = SOURCES[name]
         reason = unavailable(spec, settings, env)
         if reason is not None:

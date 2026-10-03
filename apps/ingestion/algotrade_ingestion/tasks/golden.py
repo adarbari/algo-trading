@@ -12,31 +12,25 @@ synthetic symbols such as ``AAA`` collide with real tickers.
 """
 
 from datetime import date
-from pathlib import Path
 
 import pandas as pd
 
 from algotrade.core.instruments import AssetClass
 from algotrade.data.resolver import SymbolResolver
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.sources.base import FetchRequest
-from algotrade_ingestion.sources.synthetic.files import GoldenFiles
-from algotrade_ingestion.sources.synthetic.source import BARS_TABLE, GoldenCsvSource
+from algotrade_ingestion.sources.base import FetchRequest, FixtureSource
 from algotrade_ingestion.tasks.framework import IngestRun, TaskContext
 from algotrade_ingestion.tasks.instrument_ids import assign_ids
 
 TASK = "golden_load"
-SOURCE = GoldenCsvSource.name
+SOURCE = "synthetic"  # the fixture source's registry name (``sources/registry.FIXTURES``)
+BARS = "bars/1d"
 CATALOG = "catalog/golden_datasets"
 
 
-def golden_files(directory: Path) -> GoldenFiles:
-    return GoldenFiles(directory)
-
-
-def golden_reference(files: GoldenFiles, session: date) -> pd.DataFrame:
+def golden_reference(source: FixtureSource, session: date) -> pd.DataFrame:
     """``instruments/reference`` rows for every golden symbol (no FIGIs: symbol ids)."""
-    symbols = sorted({s for ds in files.manifest().values() for s in ds.symbols})
+    symbols = sorted({s for ds in source.datasets().values() for s in ds.symbols})
     listed = pd.DataFrame({"symbol": symbols, "figi": None, "status": "ACTIVE"})
     reference = assign_ids(listed, None, session).reference
     return reference[["instrument_id", "symbol"]].assign(
@@ -49,10 +43,9 @@ def golden_reference(files: GoldenFiles, session: date) -> pd.DataFrame:
     )
 
 
-def _collect(files: GoldenFiles, resolver: SymbolResolver) -> tuple[pd.DataFrame, pd.DataFrame]:
-    source = GoldenCsvSource(files)
+def _collect(source: FixtureSource, resolver: SymbolResolver) -> tuple[pd.DataFrame, pd.DataFrame]:
     bars, catalog = [], []
-    for ds in files.manifest().values():
+    for ds in source.datasets().values():
         for symbol in ds.symbols:
             iid = resolver.id_for(symbol)
             request = FetchRequest(f"{ds.name}/{symbol}", iid)
@@ -60,7 +53,7 @@ def _collect(files: GoldenFiles, resolver: SymbolResolver) -> tuple[pd.DataFrame
             normalized = source.normalize(request, payload) if payload is not None else None
             if normalized is None:
                 raise ValueError(f"golden file missing or empty: {request.key}")
-            bars.append(normalized.tables[BARS_TABLE])
+            bars.append(normalized.tables[BARS])
             catalog.append(
                 {
                     "instrument_id": iid,
@@ -73,12 +66,12 @@ def _collect(files: GoldenFiles, resolver: SymbolResolver) -> tuple[pd.DataFrame
     return pd.concat(bars, ignore_index=True), pd.DataFrame(catalog)
 
 
-def load_golden(ctx: TaskContext, files: GoldenFiles) -> RunRecord:
-    problems = files.verify()
+def load_golden(ctx: TaskContext, source: FixtureSource) -> RunRecord:
+    problems = source.verify()
     if problems:
         raise ValueError(f"golden files failed verification: {problems}")
-    reference = golden_reference(files, date.min)
-    bars, catalog = _collect(files, SymbolResolver.from_reference(reference))
+    reference = golden_reference(source, date.min)
+    bars, catalog = _collect(source, SymbolResolver.from_reference(reference))
     bars["session_date"] = bars["ts"].dt.date
     first: date = min(bars["session_date"])
     with IngestRun(ctx, TASK, first) as run:
@@ -86,7 +79,7 @@ def load_golden(ctx: TaskContext, files: GoldenFiles) -> RunRecord:
         for key, day in bars.groupby("session_date", sort=True):
             session = key if isinstance(key, date) else date.fromisoformat(str(key))
             frame = day.drop(columns="session_date").reset_index(drop=True)
-            run.write("bars/1d", frame, SOURCE, session=session)
+            run.write(BARS, frame, SOURCE, session=session)
         run.write("instruments/reference", reference, SOURCE)
         run.write(CATALOG, catalog, SOURCE)
         run.stats.update(

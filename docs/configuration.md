@@ -51,7 +51,10 @@ built-in defaults  <  L3 site (defaults.toml + preset)  <  L4 user config  <  ru
   preset with `selection_overrides` (AND-ed with the preset's rules, so later preset fixes
   still apply) or **replaces** it with its own `selection`. A user can never widen coverage:
   covering a new instrument is a site change.
-- **Settings.** `[screening]` and `[backtest]` come from defaults, overridden by the config.
+- **Settings.** `[screening]` and `[backtest]` come from defaults, overridden by the config,
+  and are typed at resolve time (`ResolvedConfig.screening`, `.backtest`; see
+  [site settings](#site-settings-typed-one-loader)): an unknown key or a bad value fails
+  with its path, e.g. `sma_trend [backtest.costs]: unknown keys ['fee']`.
 - **Hash.** SHA-256 of everything that affects results (impl, params, selection, schedule,
   exports, settings), not of provenance. Every result row and run record carries `user_id`,
   `config_id` and `config_hash`; `layers` records which files were used.
@@ -96,12 +99,35 @@ all = [ { field = "instrument.is_leveraged", op = "eq", value = false } ]
 `[backtest] price_adjustment` (`none` / `splits` / `total_return`, default `splits`) chooses
 how stored unadjusted bars are adjusted for corporate actions when a backtest reads them.
 
-Ingestion settings are L3 too: `config/site/universe.toml` (coverage rules) and
-`config/site/sources.toml` (per-vendor `enabled` and `min_interval_s` pacing, chain workers,
-`[http]` retry cap, circuit breaker and limiter directory, raw retention, and the `[quality]`
-thresholds of the nightly data-quality checks) and `config/site/nightly.toml` (`[sessions]`
-settle margin after the close and catch-up cap, `[alerts]` nightly duration, `[notify]`
-desktop notification on/off and the summary file path). Credentials never go there.
+## Site settings (typed, one loader)
+
+Every `config/site/*.toml` is loaded and validated by `src/algotrade/config/settings.py`
+alone (ADR 0019 `site-settings`); apps receive frozen dataclasses, never dicts:
+
+| File | Type | Holds |
+|---|---|---|
+| `defaults.toml` | `ScreeningSettings`, `BacktestSettings` (`CostSettings`, `LimitSettings`) | run defaults, layered per config |
+| `sources.toml` | `SourcesSettings` (`VendorSettings` per section) | per-vendor `enabled` and `min_interval_s` pacing, chain workers, earnings days, corporate-actions window, SEC refresh days; `[http]` retry cap, circuit breaker and limiter directory; raw and staging retention; `[quality]` thresholds of the nightly data-quality checks |
+| `universe.toml` (+ `overrides/leveraged_etfs.csv`) | `UniverseSettings` | coverage mode (`nasdaq_trader` / `csv_import`), security types, include / exclude symbols, leverage markers |
+| `nightly.toml` | `NightlySettings` | `[sessions]` settle margin and catch-up cap, `[alerts]` nightly duration, `[notify]` desktop notification and the summary file path |
+
+A missing file or key falls back to the dataclass default. Anything else is an error that
+names the file, section and key: unknown keys (a typo is never silently ignored), wrong
+types (`enabled = "yes"`), out-of-range values (`workers = 0`, a fraction above 1, a
+negative interval) and invalid leverage-marker regexes. Every key must also drive code
+(`tests/architecture/test_ownership.py`). Credentials never go in these files.
+
+## Environment
+
+`src/algotrade/config/env.py` is the only code that reads environment variables. Entry points
+call `load_dotenv()` once (a local `.env`, never overriding what is already set).
+
+| Variable | Read by | Default |
+|---|---|---|
+| `ALGOTRADE_DATA_URL` | `data_url()`, passed to `storage.factory.open_backend(url)`; `--data-url` wins | `file://./var/data` |
+| `ALGOTRADE_CONFIG_DIR` | `config_dir()`, passed to `open_config_store(dir)`; `--config-dir` wins | `./config` |
+| `ALGOTRADE_USER` | `user_id()`, the default `--user` | `local` (`site` for site screens) |
+| `ALGOTRADE_MASSIVE_API_KEY`, `ALGOTRADE_SEC_CONTACT` | `credential()`, handed to the source registry | unset: the source is skipped with the reason |
 
 ## Users
 

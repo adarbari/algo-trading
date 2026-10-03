@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from algotrade_ingestion import cli
-from algotrade_ingestion.sources.registry import SOURCES
+from algotrade_ingestion.sources.registry import FIXTURES, SOURCES
 from algotrade_ingestion.tasks.registry import TASKS
 from algotrade_ingestion.workflows.nightly import FINALLY, NIGHTLY, SCREENS
 from tests.conftest import REPO_ROOT
@@ -68,7 +68,8 @@ def test_every_task_is_reachable_from_the_cli(name: str) -> None:
 
 def test_every_declared_source_can_be_built() -> None:
     names = {s for t in TASKS.values() for s in (*t.sources, *t.optional_sources)}
-    assert names <= set(SOURCES), sorted(names - set(SOURCES))
+    known = {*SOURCES, *FIXTURES}
+    assert names <= known, sorted(names - known)
 
 
 def test_nightly_is_an_ordered_list_of_registry_tasks() -> None:

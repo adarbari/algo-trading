@@ -19,9 +19,10 @@ lands. The target state of every item is described in [architecture.md](architec
 
 ## Restructure (R): one owner per responsibility (ADR 0019)
 
-Each PR moves code to its target owner in `architecture/ownership.toml`, shrinks
-`architecture/known_violations.toml` and enables its `pending_contract`s in `pyproject.toml`.
-Baseline identical throughout.
+Each PR moved code to its target owner in `architecture/ownership.toml`, shrank
+`architecture/known_violations.toml` and enabled its `pending_contract`s in `pyproject.toml`.
+Baseline identical throughout. **The track is complete:** the ratchet is empty, every planned
+contract is enforced, and a fitness test keeps it so (new exceptions need an ADR).
 
 | # | Delivers | Status |
 |---|---|---|
@@ -30,7 +31,7 @@ Baseline identical throughout.
 | R3 | `IngestRun` (the ingest loop, written once) + task registry (`jobs/` → `tasks/`); CLI (`run <task>` + the named commands) and nightly dispatch through the registry; settings defaults applied once; `cboe.workers` honoured | **done** |
 | R4 | Source registry from `sources.toml` + shared cross-process rate limiter (retry cap, circuit breaker) + run lock (`--wait`, exit 3, job recovery) + index lock; vendor helpers out of tasks; contract R3 | **done** |
 | R5 | Nightly workflow (`workflows/`): isolated steps with status + duration, hard dependencies vs data preconditions, quality + purge always last, COMPLETE / PARTIAL / FAILED rule in one place; exchange calendar `core/calendar.py` (NYSE holidays, early closes, `last_closed_session`); catch-up of missed sessions (capped, chains latest only); screens submitted as `screen` jobs (`universe_pre_snapshot` in the audit); failure notification + `var/logs/nightly-latest.json` (`config/site/nightly.toml`); launchd `RunAtLoad` false; apps run jobs through `services.jobs.run_job`, contract R5 | **done** |
-| R6 | Typed site settings (one loader in `config/`) + typed table schemas; environment read in one place; contract R4 (vendor modules already clean; only `sources/synthetic/files.py` still uses `storage.schemas.bar_problems`) | |
+| R6 | Typed site settings: one loader (`config/settings.py`) for every `config/site/*.toml`, frozen dataclasses, unknown keys and bad values fail with their path; environment read only in `config/env.py` (the storage factory takes the URL); screens and backtests open / close run records through `storage.runs` (`start_run`, `RunRecord.finish`); golden CSVs are a registered fixture source; OHLCV checks in `core/bars.py`, contract R4 in full; typed table schemas (declared column types, cast on write, `schema_version` stamped, older files cast on read, ~64k-row groups + page index); known violations 11 → 0, no pending contracts | **done** |
 
 ## Phase 0 follow-ups (the architecture is the target; these close the gaps)
 

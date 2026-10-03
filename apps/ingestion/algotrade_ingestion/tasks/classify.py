@@ -26,18 +26,6 @@ _SYMBOL_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("UNIT", re.compile(r"\.U$")),
     ("RIGHT", re.compile(r"\.R[T]?$")),
 )
-# A leveraged / inverse ETF always says so in its name. Absence of these markers is what lets
-# a plain ETF be marked not leveraged; presence without a curated override means UNKNOWN.
-DEFAULT_LEVERAGE_MARKERS = (
-    r"\b-?\d(\.\d)?x\b",
-    r"\bultra",
-    r"\bbull\b",
-    r"\bbear\b",
-    r"\binverse\b",
-    r"\bshort\b",
-    r"\bleveraged\b",
-    r"\bdaily\b",
-)
 
 
 def security_type(name: str, symbol: str, is_etf: bool) -> str:

@@ -4,7 +4,10 @@
 - every path the registry and its ratchets name exists, and every doc section it cites does;
 - every L3 site setting is read by code (ignored settings, like ``cboe.workers`` once was,
   are listed in ``KNOWN_UNREAD``, which may only shrink);
-- the ownership and duplicate-code ratchets pass on today's tree.
+- the ownership and duplicate-code ratchets pass on today's tree;
+- the restructure is finished: no known violation and no pending contract may remain, so a
+  regression cannot be parked silently (a real exception needs an ADR and an ``allowed``
+  entry with its reason).
 """
 
 import ast
@@ -27,12 +30,18 @@ CODE_FILES = sorted(
     p for top in ("src", "apps") for p in (REPO_ROOT / top).rglob("*.py") if ".venv" not in p.parts
 )
 SITE_SETTINGS = sorted((REPO_ROOT / "config" / "site").glob("*.toml"))
-# Typed views of L3 settings: every field must be used by code, not only parsed.
-TYPED_SETTINGS = {
-    "apps/ingestion/algotrade_ingestion/settings.py": "SourcesSettings",
-    "apps/ingestion/algotrade_ingestion/settings.py#universe": "UniverseSettings",
-    "apps/ingestion/algotrade_ingestion/settings.py#nightly": "NightlySettings",
-}
+# Typed views of L3 settings (the one loader): every field must be used by code, not only parsed.
+TYPED_SETTINGS_FILE = "src/algotrade/config/settings.py"
+TYPED_SETTINGS = (
+    "SourcesSettings",
+    "VendorSettings",
+    "UniverseSettings",
+    "NightlySettings",
+    "ScreeningSettings",
+    "BacktestSettings",
+    "CostSettings",
+    "LimitSettings",
+)
 # Settings that are parsed but drive nothing today. This list may only shrink: wire the
 # setting up (docs/roadmap.md, track R) or delete it from config/site, then remove it here.
 KNOWN_UNREAD: set[str] = set()
@@ -104,10 +113,13 @@ def test_known_violations_name_existing_files_and_responsibilities() -> None:
         assert entry["count"] > 0, entry
 
 
-def test_pending_contracts_name_the_pr_that_enables_them() -> None:
-    for contract in REGISTRY["pending_contract"]:
-        assert 2 <= contract["enabled_by_pr"] <= 6, contract["name"]
-        assert contract["source_modules"] and contract["forbidden_modules"], contract["name"]
+def test_restructure_is_complete_no_known_violations_or_pending_contracts() -> None:
+    """The ratchet is at zero: any ownership hit fails CI, and every planned import contract
+    is enforced. Exceptions go through an ADR into ``allowed``, never back into these lists."""
+    assert KNOWN.get("violation", []) == [], "known_violations.toml must stay empty (ADR 0019)"
+    assert "pending_contract" not in REGISTRY, "enable the contract in pyproject.toml instead"
+    for resp in REGISTRY["responsibility"]:
+        assert "target_pr" not in resp, f"{resp['id']}: the restructure track is complete"
 
 
 # ----------------------------------------------------------------------------- settings
@@ -122,10 +134,14 @@ def _keys(doc: Mapping[str, Any], prefix: str = "") -> Iterator[str]:
 
 
 def _code_names() -> tuple[set[str], Counter[str]]:
-    """-> (every literal / identifier in code, attribute reads by name off non-``cls``/``d``)."""
+    """-> (every literal / identifier in code, attribute reads by name outside the loader).
+
+    Reads inside the settings loader (defaults while parsing) do not count as use; its
+    methods reading ``self`` (e.g. ``SourcesSettings.vendor``) do."""
     names: set[str] = set()
     attrs: Counter[str] = Counter()
     for path in CODE_FILES:
+        loader = path == REPO_ROOT / TYPED_SETTINGS_FILE
         for node in ast.walk(ast.parse(path.read_text())):
             if isinstance(node, ast.Constant) and isinstance(node.value, str):
                 names.add(node.value)
@@ -136,15 +152,15 @@ def _code_names() -> tuple[set[str], Counter[str]]:
             elif isinstance(node, ast.Attribute):
                 names.add(node.attr)
                 owner = node.value.id if isinstance(node.value, ast.Name) else ""
-                if owner not in ("cls", "d"):
+                if (not loader or owner == "self") and owner not in ("cls", "d"):
                     attrs[node.attr] += 1
     return names, attrs
 
 
 def _typed_fields() -> list[str]:
     fields = []
-    for rel, cls in TYPED_SETTINGS.items():
-        tree = ast.parse((REPO_ROOT / rel.partition("#")[0]).read_text())
+    tree = ast.parse((REPO_ROOT / TYPED_SETTINGS_FILE).read_text())
+    for cls in TYPED_SETTINGS:
         node = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == cls)
         fields += [
             f"{cls}.{s.target.id}"

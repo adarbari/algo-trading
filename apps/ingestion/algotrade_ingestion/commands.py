@@ -11,22 +11,22 @@ import argparse
 import json
 import sys
 from collections.abc import Iterable, Mapping
+from pathlib import Path
 from typing import Any
 
+from algotrade.config.env import config_dir, credential
+from algotrade.config.settings import SourcesSettings, load_sources
 from algotrade.config.user import UserContext
 from algotrade.core.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.services.jobs import JobHandler, JobKind, JobRecord, JobStatus
 from algotrade.services.jobs import run_job as run_service_job
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
+from algotrade.storage.config_store import ConfigStore
 from algotrade.storage.factory import open_config_store
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.env import credential
-from algotrade_ingestion.settings import SourcesSettings, load_sources
 from algotrade_ingestion.sources.base import Source
-from algotrade_ingestion.sources.registry import Built, build_sources
-from algotrade_ingestion.sources.synthetic.catalog import build_golden
-from algotrade_ingestion.sources.synthetic.files import GoldenFiles
+from algotrade_ingestion.sources.registry import Built, build_sources, fixture_source
 from algotrade_ingestion.tasks.framework import TaskContext, run_summary
 from algotrade_ingestion.tasks.registry import TASKS, Task, run_task, task
 from algotrade_ingestion.workflows.nightly import FINALLY, NIGHTLY, nightly_job
@@ -35,18 +35,27 @@ from algotrade_ingestion.workflows.nightly import FINALLY, NIGHTLY, nightly_job
 LOCKED_KINDS = ("nightly", "screen")
 
 
+def config_store(args: argparse.Namespace) -> ConfigStore:
+    """``--config-dir``, else ``$ALGOTRADE_CONFIG_DIR``, else ./config."""
+    return open_config_store(config_dir(getattr(args, "config_dir", None)))
+
+
 def sources_settings(args: argparse.Namespace) -> SourcesSettings:
-    return load_sources(open_config_store(getattr(args, "config_dir", None)))
+    return load_sources(config_store(args))
 
 
-def sources_for(names: Iterable[str], settings: SourcesSettings) -> Built:
+def sources_for(
+    names: Iterable[str], settings: SourcesSettings, fixture_dir: Path | None = None
+) -> Built:
     """The named sources from the registry (credentials from the environment)."""
-    return build_sources(settings, credential, names)
+    return build_sources(settings, credential, names, fixture_dir=fixture_dir)
 
 
-def task_sources(spec: Task, settings: SourcesSettings) -> Built:
-    """An explicit run: every required source must be available, else a clear error."""
-    built = sources_for((*spec.sources, *spec.optional_sources), settings)
+def task_sources(spec: Task, settings: SourcesSettings, params: Mapping[str, Any]) -> Built:
+    """An explicit run: every required source must be available, else a clear error.
+    A fixture source reads the task's ``golden_dir`` parameter."""
+    names = (*spec.sources, *spec.optional_sources)
+    built = sources_for(names, settings, params.get("golden_dir"))
     missing = [s for s in spec.sources if s not in built.sources]
     if missing:
         reasons = sorted({built.skipped[s] for s in missing})
@@ -68,7 +77,7 @@ def task_context(
         writer,
         sources or {},
         sources_settings(args),
-        open_config_store(getattr(args, "config_dir", None)),
+        config_store(args),
     )
 
 
@@ -82,7 +91,7 @@ def run_task_command(
     """Run one registry task with the sources it declares; print its run summary."""
     spec = task(name)
     ctx = task_context(args, reader, writer)
-    built = task_sources(spec, ctx.settings)
+    built = task_sources(spec, ctx.settings, params)
     ctx.sources, ctx.unavailable = built.sources, built.skipped
     record = run_task(name, ctx, params)
     print_json(run_summary(record))
@@ -95,12 +104,12 @@ def print_json(payload: object) -> None:
 
 def golden(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter) -> int:
     """``golden build|verify`` (files only); ``golden load`` is the ``golden-load`` task."""
-    files = GoldenFiles(args.golden_dir)
+    source = fixture_source("synthetic", args.golden_dir)
     if args.action == "build":
-        print_json({"built": build_golden(files)})
+        print_json({"built": source.build()})
         return 0
     if args.action == "verify":
-        problems = files.verify()
+        problems = source.verify()
         print_json({"ok": not problems, "problems": problems})
         return 1 if problems else 0
     return run_task_command(args, reader, writer, "golden-load", {"golden_dir": args.golden_dir})
@@ -124,7 +133,7 @@ def run_job(
     resources: dict[str, object] = {
         "reader": reader,
         "writer": writer,
-        "configs": open_config_store(args.config_dir),
+        "configs": config_store(args),
         "sources_settings": settings,
         "sources": built.sources,
         "unavailable": built.skipped,

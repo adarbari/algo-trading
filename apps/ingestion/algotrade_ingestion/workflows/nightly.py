@@ -15,9 +15,9 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from algotrade.config.settings import NightlySettings, SourcesSettings, load_nightly
 from algotrade.data.reference import snapshot
 from algotrade.services.jobs import JobContext
-from algotrade_ingestion.settings import NightlySettings, SourcesSettings, load_nightly
 from algotrade_ingestion.tasks.framework import IngestRun, TaskContext
 from algotrade_ingestion.tasks.registry import TASKS, run_task, task
 from algotrade_ingestion.workflows.notify import Notifier, default_notifier, report

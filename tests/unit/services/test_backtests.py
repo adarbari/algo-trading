@@ -13,7 +13,7 @@ from algotrade.storage.backends.config_files import MemoryConfigStore
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.result_writer import ResultWriter
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.sources.synthetic.files import GoldenFiles
+from algotrade_ingestion.sources.registry import fixture_source
 from algotrade_ingestion.tasks.golden import load_golden
 from tests.conftest import GOLDEN_DIR
 from tests.ingest_helpers import task_ctx
@@ -39,7 +39,9 @@ def bull_config(**extra: Any) -> dict[str, Any]:
 @pytest.fixture(scope="module")
 def backend() -> MemoryBackend:
     b = MemoryBackend()
-    load_golden(task_ctx(StoreWriter(b), clock=lambda: LOADED), GoldenFiles(GOLDEN_DIR))
+    load_golden(
+        task_ctx(StoreWriter(b), clock=lambda: LOADED), fixture_source("synthetic", GOLDEN_DIR)
+    )
     return b
 
 

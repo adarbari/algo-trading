@@ -1,6 +1,9 @@
-"""Pick a storage backend from a URL (``ALGOTRADE_DATA_URL``)."""
+"""Open a storage backend from a URL, and the config store from a directory.
 
-import os
+Callers pass both explicitly (``algotrade.config.env`` resolves them from the environment);
+storage never reads environment variables.
+"""
+
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -11,13 +14,9 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.config_store import ConfigStore
 from algotrade.storage.interfaces import Backend
 
-ENV_VAR = "ALGOTRADE_DATA_URL"
-DEFAULT_URL = "file://./var/data"
 
-
-def open_backend(url: str | None = None) -> Backend:
+def open_backend(url: str) -> Backend:
     """``file://<path>`` (relative paths allowed) or ``memory://``."""
-    url = url or os.environ.get(ENV_VAR, DEFAULT_URL)
     parsed = urlparse(url)
     if parsed.scheme == "memory":
         return MemoryBackend()
@@ -26,10 +25,6 @@ def open_backend(url: str | None = None) -> Backend:
     raise ConfigurationError(f"unsupported storage URL {url!r} (expected file:// or memory://)")
 
 
-CONFIG_ENV_VAR = "ALGOTRADE_CONFIG_DIR"
-DEFAULT_CONFIG_DIR = "config"
-
-
-def open_config_store(directory: str | None = None) -> ConfigStore:
-    """TOML config files under ``directory`` (default ``$ALGOTRADE_CONFIG_DIR`` or ./config)."""
-    return FileConfigStore(Path(directory or os.environ.get(CONFIG_ENV_VAR, DEFAULT_CONFIG_DIR)))
+def open_config_store(directory: str | Path) -> ConfigStore:
+    """TOML config files under ``directory`` (``config.env.config_dir()`` by default)."""
+    return FileConfigStore(Path(directory))
