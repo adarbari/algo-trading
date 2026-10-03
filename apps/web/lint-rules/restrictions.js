@@ -146,6 +146,26 @@ const REACT_DOM = {
   message: message(3, 'react-dom belongs to src/app (mounting) and the design system (portals).'),
 };
 
+/**
+ * Libraries that only one design-system component may import (ADR 0011: one wrapper each).
+ * lightweight-charts: only components/Chart (its engine.ts); everything else draws charts with
+ * the Chart component. Floating UI: only the overlay components of the design system.
+ */
+const CHART_LIBRARY = {
+  name: 'lightweight-charts',
+  message: message(
+    3,
+    'lightweight-charts is wrapped by the Chart component (design-system/components/Chart) only: use <Chart> from @algotrade/ui.',
+  ),
+};
+const OVERLAY_LIBRARY = {
+  name: '@floating-ui/react',
+  message: message(
+    3,
+    'overlays (Tooltip, Popover, Dialog, Drawer) come from @algotrade/ui; Floating UI stays inside the design system.',
+  ),
+};
+
 /** Which libraries each layer may not import, beyond the shared bans. */
 const LAYER_BANS = {
   app: [],
@@ -173,6 +193,8 @@ function restrictedImports(layer) {
           ),
         })),
         ...LAYER_BANS[layer],
+        CHART_LIBRARY,
+        OVERLAY_LIBRARY,
       ],
       patterns: [STYLE_IMPORTS, DEEP_UI],
     },
@@ -204,34 +226,53 @@ export const appRestrictions = Object.keys(LAYER_BANS).map((layer) => ({
   },
 }));
 
+/** Design-system import bans; `chart` = the Chart folder, the one place lightweight-charts is allowed. */
+function designSystemImports({ chart }) {
+  return [
+    'error',
+    {
+      paths: [
+        ...http(HTTP_LIBRARIES),
+        ...CSS_IN_JS.map((name) => ({
+          name,
+          message: message(
+            3,
+            `${name}: the design system styles with CSS Modules and tokens only.`,
+          ),
+        })),
+        ROUTER,
+        QUERY,
+        ...(chart ? [] : [CHART_LIBRARY]),
+      ],
+      patterns: [
+        {
+          group: ['@/*', '**/src/**'],
+          message: message(1, 'the design system never imports app code (src/).'),
+        },
+      ],
+    },
+  ];
+}
+
+const CHART_FOLDER = 'design-system/components/Chart/**/*.{ts,tsx}';
+
 /** The design system: owns styling and HTML, but never talks HTTP or imports app code. */
 export const designSystemRestrictions = {
   name: 'algotrade/restrictions/design-system',
   files: ['design-system/**/*.{ts,tsx}'],
+  ignores: [CHART_FOLDER],
   rules: {
     'no-restricted-syntax': ['error', ...HTTP_SYNTAX],
-    'no-restricted-imports': [
-      'error',
-      {
-        paths: [
-          ...http(HTTP_LIBRARIES),
-          ...CSS_IN_JS.map((name) => ({
-            name,
-            message: message(
-              3,
-              `${name}: the design system styles with CSS Modules and tokens only.`,
-            ),
-          })),
-          ROUTER,
-          QUERY,
-        ],
-        patterns: [
-          {
-            group: ['@/*', '**/src/**'],
-            message: message(1, 'the design system never imports app code (src/).'),
-          },
-        ],
-      },
-    ],
+    'no-restricted-imports': designSystemImports({ chart: false }),
+  },
+};
+
+/** The Chart component: the same rules, plus the one licence to import lightweight-charts. */
+export const chartRestrictions = {
+  name: 'algotrade/restrictions/design-system-chart',
+  files: [CHART_FOLDER],
+  rules: {
+    'no-restricted-syntax': ['error', ...HTTP_SYNTAX],
+    'no-restricted-imports': designSystemImports({ chart: true }),
   },
 };

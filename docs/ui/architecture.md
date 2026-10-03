@@ -50,6 +50,12 @@ shell    routes     sections     actions       models       api/lib/     design 
 | `shared/api` | own files; `shared/config`, `shared/lib`; openapi-fetch | UI, upper layers |
 | `shared/lib`, `shared/config` | own files; `shared/lib` / `shared/config` | HTTP, UI, upper layers |
 | `design-system/` | itself (components via primitives' / components' `index.ts`, tokens) | app code (`src/`), HTTP, router, query |
+| `design-system/components/Chart/` | as `design-system/`, plus `lightweight-charts` (the only importer) | |
+
+Third-party UI libraries stay behind one design-system wrapper each: `lightweight-charts` only
+in `components/Chart` (ESLint `no-restricted-imports` everywhere else, including the rest of the
+design system); `@floating-ui/react` only inside the design system (Tooltip, Popover, Dialog,
+Drawer). App code uses the components.
 
 Two features that must work together are composed in a widget (or page); they never import each
 other. A page receives route params as props from its route in `app/`.

@@ -622,6 +622,20 @@ section = "docs/ui/design-system.md#value-formatting"
 enforced_by = ["eslint boundaries (apps/web/lint-rules/layers.js: only components and the package entry import design-system/format)", "review: data components and screens format through formatValue from @algotrade/ui"]
 
 [[web_responsibility]]
+id = "web-charting"
+description = "Drawing time-series charts with the chart library (lightweight-charts): series, markers, panes, crosshair, theming"
+owner = ["apps/web/design-system/components/Chart/*"]
+section = "docs/ui/design-system.md#charts-design-system-pr-4"
+enforced_by = ["eslint no-restricted-imports: lightweight-charts only in design-system/components/Chart (apps/web/lint-rules/restrictions.js)"]
+
+[[web_responsibility]]
+id = "web-overlays"
+description = "Overlay positioning, focus trapping / return and dismissal (Floating UI): Tooltip, Popover, Dialog, Drawer"
+owner = ["apps/web/design-system/components/**"]
+section = "docs/ui/design-system.md#overlays-design-system-pr-4"
+enforced_by = ["eslint no-restricted-imports: @floating-ui/react banned in src/ (apps/web/lint-rules/restrictions.js)"]
+
+[[web_responsibility]]
 id = "web-http"
 description = "Talking HTTP to the API: the typed client, fetch, errors, query keys, the generated schema"
 owner = ["apps/web/src/shared/api/**"]

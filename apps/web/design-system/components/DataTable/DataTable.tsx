@@ -30,6 +30,7 @@ import {
 } from 'react';
 
 import { formatValue } from '../../format';
+import { Checkbox } from '../Checkbox';
 import { ColumnPicker } from './ColumnPicker';
 import { alignOf, features, gridTemplate, toColumnDefs, type DataTableColumn } from './columns';
 import styles from './DataTable.module.css';
@@ -235,7 +236,7 @@ export function DataTable<TRow extends RowData>({
   /** A click on a row (delegated: rows are reached by keyboard through the grid) activates it. */
   function onClick(event: MouseEvent<HTMLDivElement>) {
     const target = event.target as Element;
-    if (target.closest('input, button, a')) return;
+    if (target.closest('input, label, button, a')) return;
     const rowId = target.closest<HTMLElement>('[data-row-id]')?.dataset['rowId'];
     const row = rowId === undefined ? undefined : tableRows.find((r) => r.id === rowId);
     if (!row) return;
@@ -320,17 +321,13 @@ export function DataTable<TRow extends RowData>({
               <div key={group.id} className={styles.row} role="row" aria-rowindex={1}>
                 {selectable && (
                   <div className={styles.selectCell} role="columnheader">
-                    {/* TODO(design system PR 2): use Checkbox once it has merged. */}
-                    <input
-                      type="checkbox"
-                      className={styles.checkbox}
-                      aria-label="Select all rows"
+                    <Checkbox
+                      label="Select all rows"
+                      hideLabel
                       checked={allSelected}
-                      ref={(node) => {
-                        if (node) node.indeterminate = someSelected && !allSelected;
-                      }}
+                      indeterminate={someSelected && !allSelected}
                       disabled={!ready || bodyRows === 0}
-                      onChange={() => {
+                      onCheckedChange={() => {
                         table.toggleAllRowsSelected(!allSelected);
                       }}
                     />
@@ -443,17 +440,14 @@ export function DataTable<TRow extends RowData>({
                   >
                     {selectable && (
                       <div className={styles.selectCell} role="gridcell">
-                        <input
-                          type="checkbox"
-                          className={styles.checkbox}
-                          aria-label={`Select ${getRowLabel ? getRowLabel(row.original) : row.id}`}
+                        <Checkbox
+                          label={`Select ${getRowLabel ? getRowLabel(row.original) : row.id}`}
+                          hideLabel
                           checked={selected}
-                          tabIndex={-1}
-                          onClick={(event) => {
-                            event.stopPropagation();
+                          excludeFromTabOrder
+                          onCheckedChange={(_checked, event) => {
                             row.getToggleSelectedHandler()(event);
                           }}
-                          onChange={() => undefined}
                         />
                       </div>
                     )}

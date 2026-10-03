@@ -32,12 +32,8 @@
 }
 
 .chevron {
+  display: inline-flex;
   flex: none;
-  width: var(--space-3);
-  height: var(--space-3);
-  fill: none;
-  stroke: var(--color-muted);
-  stroke-width: 1.5;
   transition: transform var(--duration-fast) var(--easing-standard);
 }
 

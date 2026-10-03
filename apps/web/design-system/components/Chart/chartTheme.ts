@@ -1,0 +1,57 @@
+/**
+ * The chart's colours and font, read from the CSS tokens of the active theme (the canvas cannot
+ * use CSS variables), and a hook that changes whenever the theme does: `data-theme` /
+ * `data-updown` on <html> (UiProvider) or the system colour scheme under `system`.
+ */
+import { useEffect, useState } from 'react';
+
+import { SERIES, type Series } from '../../tokens';
+import type { EngineTheme } from './engine';
+
+export function readTheme(element: Element): EngineTheme {
+  const css = getComputedStyle(element);
+  const read = (name: string) => css.getPropertyValue(name).trim();
+  const fontSize = Number.parseFloat(read('--font-size-xs'));
+  return {
+    surface: read('--color-surface'),
+    text: read('--color-text'),
+    text2: read('--color-text-2'),
+    muted: read('--color-muted'),
+    borderSoft: read('--color-border-soft'),
+    control: read('--color-control'),
+    row: read('--color-row'),
+    accentSoft: read('--color-accent-soft'),
+    track: read('--color-track'),
+    fontFamily: read('--font-sans'),
+    fontSize: Number.isFinite(fontSize) ? fontSize : 11.5,
+    series: Object.fromEntries(SERIES.map((s) => [s, read(`--color-${s}`)])) as Record<
+      Series,
+      string
+    >,
+  };
+}
+
+/** A number that changes when the active theme changes (re-read the tokens then). */
+export function useThemeVersion(): number {
+  const [version, setVersion] = useState(0);
+  useEffect(() => {
+    const bump = () => {
+      setVersion((v) => v + 1);
+    };
+    const observer = new MutationObserver(bump);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme', 'data-updown'],
+    });
+    const scheme =
+      typeof window.matchMedia === 'function'
+        ? window.matchMedia('(prefers-color-scheme: dark)')
+        : undefined;
+    scheme?.addEventListener('change', bump);
+    return () => {
+      observer.disconnect();
+      scheme?.removeEventListener('change', bump);
+    };
+  }, []);
+  return version;
+}

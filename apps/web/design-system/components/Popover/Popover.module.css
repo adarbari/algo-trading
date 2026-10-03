@@ -1,0 +1,36 @@
+/* Popover: a bordered surface over the page (borders, never shadows), sized to fit the viewport. */
+.popover {
+  z-index: var(--z-dropdown);
+  box-sizing: border-box;
+  overflow-y: auto;
+  min-width: var(--size-popover);
+  max-width: calc(100% - var(--space-4));
+  max-height: min(
+    var(--popover-available-height, 100%),
+    calc(var(--size-sidebar) + var(--space-10))
+  );
+  border: var(--border-width-thin) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+}
+
+.popover[data-padding='default'] {
+  padding: var(--space-2-5) var(--space-3);
+}
+
+.popover[data-padding='none'] {
+  padding: var(--space-1) 0;
+}
+
+.popover[data-width='wide'] {
+  width: calc(var(--size-sidebar) - var(--space-4));
+}
+
+.popover:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-accent);
+  outline-offset: var(--focus-ring-offset);
+}

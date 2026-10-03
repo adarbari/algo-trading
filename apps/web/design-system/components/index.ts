@@ -4,8 +4,19 @@
  * shape of primitives/Text (the template) and follow .claude/skills/add-ui-component.
  */
 export { AppShell, type AppShellProps } from './AppShell';
+export { Banner, type BannerProps, type BannerTone } from './Banner';
 export { BarList, type BarListItem, type BarListProps } from './BarList';
 export { Button, type ButtonProps, type ButtonVariant } from './Button';
+export {
+  Chart,
+  CHART_RANGES,
+  type ChartEvent,
+  type ChartEventKind,
+  type ChartPoint,
+  type ChartProps,
+  type ChartRange,
+  type ChartSeries,
+} from './Chart';
 export { Checkbox, type CheckboxProps } from './Checkbox';
 export { Chip, type ChipProps } from './Chip';
 export { Combobox, type ComboboxOption, type ComboboxProps } from './Combobox';
@@ -17,7 +28,17 @@ export {
   type DataTableProps,
   type DataTableSort,
 } from './DataTable';
+export { Dialog, type DialogProps } from './Dialog';
 export { Disclosure, type DisclosureProps } from './Disclosure';
+export {
+  Distribution,
+  type DistributionBin,
+  type DistributionMarker,
+  type DistributionProps,
+} from './Distribution';
+export { Drawer, type DrawerProps } from './Drawer';
+export { EmptyState, type EmptyStateProps } from './EmptyState';
+export { ErrorState, type ErrorStateProps } from './ErrorState';
 export { Field, type FieldProps } from './Field';
 export {
   HeatGrid,
@@ -31,11 +52,18 @@ export {
 export { Icon, ICON_NAMES, type IconName, type IconProps, type IconTone } from './Icon';
 export { IconButton, type IconButtonProps } from './IconButton';
 export { Input, type InputProps } from './Input';
+export { Kbd, type KbdProps } from './Kbd';
 export { KeyValue, type KeyValueItem, type KeyValueProps } from './KeyValue';
 export { Legend, type DataTone, type LegendItem, type LegendProps } from './Legend';
 export { NavTabs, type NavItem, type NavLinkRenderProps, type NavTabsProps } from './NavTabs';
 export { NumberInput, type NumberInputProps } from './NumberInput';
 export { Panel, type PanelProps, type PanelState } from './Panel';
+export {
+  Popover,
+  type PopoverPlacement,
+  type PopoverProps,
+  type PopoverTriggerProps,
+} from './Popover';
 export { SearchInput, type SearchInputProps } from './SearchInput';
 export {
   SegmentedControl,
@@ -44,10 +72,24 @@ export {
 } from './SegmentedControl';
 export { Select, type SelectOption, type SelectProps } from './Select';
 export { ShareBar, type ShareBarProps } from './ShareBar';
+export { Skeleton, type SkeletonProps } from './Skeleton';
+export { Sparkline, type SparklineProps, type SparklineTone } from './Sparkline';
 export { StackedBar, type StackedBarProps, type StackedBarSegment } from './StackedBar';
 export { StatStrip, type StatItem, type StatStripProps } from './StatStrip';
 export { StatusBadge, type StatusBadgeProps, type StatusTone } from './StatusBadge';
 export { Tabs, type TabItem, type TabsProps } from './Tabs';
 export { TickerTag, type TickerTagProps } from './TickerTag';
+export {
+  Toast,
+  ToastProvider,
+  useToast,
+  type ToastAction,
+  type ToastApi,
+  type ToastOptions,
+  type ToastProps,
+  type ToastProviderProps,
+  type ToastTone,
+} from './Toast';
+export { Tooltip, type TooltipProps, type TooltipTriggerProps } from './Tooltip';
 export { TopBar, type TopBarProps } from './TopBar';
 export { WorkspaceSwitch, type WorkspaceSwitchProps } from './WorkspaceSwitch';

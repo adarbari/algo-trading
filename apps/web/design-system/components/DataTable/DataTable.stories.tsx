@@ -5,11 +5,12 @@ import { expect, userEvent, within } from 'storybook/test';
 import { Mono } from '../../primitives/Mono';
 import { Stack } from '../../primitives/Stack';
 import { Text } from '../../primitives/Text';
+import { StatusBadge } from '../StatusBadge';
 import type { DataTableColumn } from './columns';
 import { DataTable, type DataTableProps } from './DataTable';
 import { makeUniverse, screenRows, type ScreenRow, type TickerRow } from './storyData';
 
-const DECISION_TONE = { QUALIFIED: 'positive', WATCH: 'info', EVENT_RISK: 'warning' } as const;
+const DECISION_TONE = { QUALIFIED: 'positive', WATCH: 'accent', EVENT_RISK: 'warning' } as const;
 
 /** The screener preview table from the approved Screener mockup. */
 const screenColumns: DataTableColumn<ScreenRow>[] = [
@@ -19,11 +20,9 @@ const screenColumns: DataTableColumn<ScreenRow>[] = [
     header: 'Decision',
     value: (r) => r.decision,
     width: 'sm',
-    // Slot. TODO(design system PR 2): render the StatusBadge component here.
+    // A cell slot: the decision as a StatusBadge (the text says the state; colour reinforces it).
     cell: ({ row }) => (
-      <Text size="xs" weight="semibold" tone={DECISION_TONE[row.decision]}>
-        {row.decision.replace('_', ' ')}
-      </Text>
+      <StatusBadge tone={DECISION_TONE[row.decision]}>{row.decision.replace('_', ' ')}</StatusBadge>
     ),
   },
   { id: 'score', header: 'Score', value: (r) => r.score, format: { kind: 'number' }, width: 'xs' },

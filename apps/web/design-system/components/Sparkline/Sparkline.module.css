@@ -1,0 +1,106 @@
+/* Sparkline: an inline SVG line at text height; non-scaling stroke so it stays crisp when stretched. */
+.root {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: var(--line-height-base);
+  vertical-align: middle;
+}
+
+.root[data-width='sm'] {
+  width: calc(var(--space-8) * 2);
+}
+
+.root[data-width='md'] {
+  width: calc(var(--space-8) * 3);
+}
+
+.root[data-width='lg'] {
+  width: calc(var(--space-8) * 4);
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.line {
+  fill: none;
+  stroke: var(--color-muted);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.baseline {
+  stroke: var(--color-control);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.dot {
+  position: absolute;
+  width: var(--space-1);
+  height: var(--space-1);
+  border-radius: var(--radius-lg);
+  background: var(--color-muted);
+  transform: translate(-50%, -50%);
+}
+
+[data-tone='up'] {
+  --spark: var(--color-up);
+}
+
+[data-tone='down'] {
+  --spark: var(--color-down);
+}
+
+[data-tone='s1'] {
+  --spark: var(--color-s1);
+}
+
+[data-tone='s2'] {
+  --spark: var(--color-s2);
+}
+
+[data-tone='s3'] {
+  --spark: var(--color-s3);
+}
+
+[data-tone='s4'] {
+  --spark: var(--color-s4);
+}
+
+[data-tone='s5'] {
+  --spark: var(--color-s5);
+}
+
+[data-tone='s6'] {
+  --spark: var(--color-s6);
+}
+
+.line[data-tone]:not([data-tone='muted']) {
+  stroke: var(--spark);
+}
+
+.dot[data-tone]:not([data-tone='muted']) {
+  background: var(--spark);
+}
+
+.placeholder {
+  display: block;
+  width: 100%;
+  height: var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--color-track);
+}
+
+.missing {
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+}
