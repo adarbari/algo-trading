@@ -6,16 +6,16 @@ nightly job PARTIAL). Thresholds come from ``config/site/sources.toml`` ``[quali
 
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from datetime import UTC, date, datetime
+from datetime import date
 
 from algotrade.data import StoreReader
 from algotrade.data.chains import chain_status
 from algotrade.data.reference import snapshot
-from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
-from algotrade.storage.writers import StoreWriter
+from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.settings import SourcesSettings
+from algotrade_ingestion.tasks.framework import IngestRun, TaskContext
 
-JOB = "data_quality"
+TASK = "data_quality"
 
 
 @dataclass(frozen=True)
@@ -125,24 +125,13 @@ CHECKS: tuple[Callable[[StoreReader, date, SourcesSettings], list[Check]], ...] 
 )
 
 
-def run_quality(
-    reader: StoreReader,
-    writer: StoreWriter,
-    session: date,
-    settings: SourcesSettings,
-    clock: Callable[[], datetime] = lambda: datetime.now(UTC),
-) -> RunRecord:
-    now = clock()
-    checks = [c for fn in CHECKS for c in fn(reader, session, settings)]
-    failed = [c.name for c in checks if c.status == "FAIL"]
-    record = RunRecord(
-        new_run_id(JOB, session, now),
-        JOB,
-        session,
-        now,
-        RunStatus.PARTIAL if failed else RunStatus.COMPLETE,
-        now,
-        stats={"checks": [asdict(c) for c in checks], "failed": failed},
-    )
-    writer.save_run(record)
-    return record
+def run_quality(ctx: TaskContext, session: date) -> RunRecord:
+    with IngestRun(ctx, TASK, session) as run:
+        checks = [c for fn in CHECKS for c in fn(ctx.reader, session, ctx.settings)]
+        for check in checks:
+            run.record_item(check.name, check.status)
+        failed = [c.name for c in checks if c.status == "FAIL"]
+        for name in failed:
+            run.partial(f"check {name} failed")
+        run.stats.update(checks=[asdict(c) for c in checks], failed=failed)
+    return run.record

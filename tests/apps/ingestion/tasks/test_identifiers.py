@@ -5,19 +5,20 @@ import pandas as pd
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.jobs.symbol_history import update_history
-from algotrade_ingestion.jobs.universe_build import (
+from algotrade_ingestion.sources.http import RetryPolicy
+from algotrade_ingestion.sources.massive import MassiveTickers, parse_tickers
+from algotrade_ingestion.sources.nasdaq_trader import NasdaqTraderSource
+from algotrade_ingestion.sources.spy_holdings import SpyHoldingsSource
+from algotrade_ingestion.tasks.symbol_history import update_history
+from algotrade_ingestion.tasks.universe_build import (
     UniverseSettings,
     UniverseSources,
     apply_identifiers,
     build_universe,
 )
-from algotrade_ingestion.sources.http import RetryPolicy
-from algotrade_ingestion.sources.massive import MassiveTickers, parse_tickers
-from algotrade_ingestion.sources.nasdaq_trader import NasdaqTraderSource
-from algotrade_ingestion.sources.spy_holdings import SpyHoldingsSource
 from tests import massive_fixture as mfx
 from tests import universe_fixture as fx
+from tests.ingest_helpers import task_ctx
 
 D1 = date(2026, 10, 1)
 D2 = D1 + timedelta(days=1)
@@ -133,27 +134,23 @@ def test_universe_build_with_identifiers_and_a_rename() -> None:
     backend = MemoryBackend()
     writer, reader = StoreWriter(backend), StoreReader(backend)
     first = build_universe(
-        writer,
-        reader,
+        task_ctx(writer, reader, CLOCK),
         sources(
             [("FB", "F_META"), ("AAPL", "F_AAPL")],
             [ticker("FB", "CS", "F_META"), ticker("AAPL", "CS", "F_AAPL")],
         ),
         UniverseSettings(),
         D1,
-        CLOCK,
     )
     assert first.stats["identifiers"]["with_figi"] == 2
     second = build_universe(
-        writer,
-        reader,
+        task_ctx(writer, reader, CLOCK),
         sources(
             [("META", "F_META"), ("AAPL", "F_AAPL")],
             [ticker("META", "CS", "F_META"), ticker("AAPL", "CS", "F_AAPL")],
         ),
         UniverseSettings(),
         D2,
-        CLOCK,
     )
     assert second.stats["events"]["reference_change"]["ticker_changed"] == 1
     history = reader.table("instruments/symbol_history", D2)

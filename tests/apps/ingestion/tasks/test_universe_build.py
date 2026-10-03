@@ -1,21 +1,23 @@
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 
 from algotrade.data import StoreReader
 from algotrade.storage.backends.config_files import MemoryConfigStore
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.jobs.universe_build import (
+from algotrade_ingestion.settings import universe_settings
+from algotrade_ingestion.sources.http import RetryPolicy
+from algotrade_ingestion.sources.nasdaq_trader import NasdaqTraderSource
+from algotrade_ingestion.sources.spy_holdings import SpyHoldingsSource
+from algotrade_ingestion.tasks.universe_build import (
     UniverseSettings,
     UniverseSources,
     build_universe,
     review_rows,
 )
-from algotrade_ingestion.pipeline import universe_settings
-from algotrade_ingestion.sources.http import RetryPolicy
-from algotrade_ingestion.sources.nasdaq_trader import NasdaqTraderSource
-from algotrade_ingestion.sources.spy_holdings import SpyHoldingsSource
 from tests import universe_fixture as fx
+from tests.ingest_helpers import task_ctx
 
 D1 = date(2026, 10, 1)
 D2 = D1 + timedelta(days=1)
@@ -84,7 +86,7 @@ SETTINGS = UniverseSettings(
 def test_two_days_of_universe_builds() -> None:
     backend = MemoryBackend()
     writer, reader = StoreWriter(backend), StoreReader(backend)
-    first = build_universe(writer, reader, DAY1, SETTINGS, D1, CLOCK)
+    first = build_universe(task_ctx(writer, reader, CLOCK), DAY1, SETTINGS, D1)
     assert first.status is RunStatus.COMPLETE
     ref1 = reader.table("instruments/reference", D1).set_index("symbol")  # type: ignore[union-attr]
     assert ref1.loc["ABR$D", "security_type"] == "PREFERRED"
@@ -98,7 +100,7 @@ def test_two_days_of_universe_builds() -> None:
         "override": 1,
     }
 
-    second = build_universe(writer, reader, DAY2, SETTINGS, D2, CLOCK)
+    second = build_universe(task_ctx(writer, reader, CLOCK), DAY2, SETTINGS, D2)
     ref2 = reader.table("instruments/reference", D2).set_index("symbol")  # type: ignore[union-attr]
     assert ref2.loc["GONE", "status"] == "DELISTED"
     assert ref2.loc["GONE", "delisted_on"] == D2
@@ -133,7 +135,9 @@ def test_unmatched_index_members_make_the_run_partial() -> None:
         fx.options(["AAPL"]),
         fx.spy(["MISSN"]),
     )
-    record = build_universe(StoreWriter(backend), StoreReader(backend), odd, SETTINGS, D1, CLOCK)
+    record = build_universe(
+        task_ctx(StoreWriter(backend), StoreReader(backend), CLOCK), odd, SETTINGS, D1
+    )
     assert record.status is RunStatus.PARTIAL
     assert record.stats["sp500_unmatched"] == ["MISSN"]
 
@@ -171,4 +175,22 @@ def test_an_empty_listing_file_fails_closed() -> None:
         fx.nasdaq([("AAPL", "Apple", "N", "N")]), fx.other([]), fx.options([]), fx.spy(["AAPL"])
     )
     with pytest.raises(ValueError, match="otherlisted had no rows"):
-        build_universe(StoreWriter(backend), StoreReader(backend), empty, SETTINGS, D1, CLOCK)
+        build_universe(
+            task_ctx(StoreWriter(backend), StoreReader(backend), CLOCK), empty, SETTINGS, D1
+        )
+
+
+def test_registry_task_builds_and_writes_the_review_file(tmp_path: Path) -> None:
+    from algotrade_ingestion.tasks.registry import run_task  # noqa: PLC0415
+
+    backend = MemoryBackend()
+    ctx = task_ctx(
+        StoreWriter(backend),
+        clock=CLOCK,
+        sources={"nasdaq_trader": DAY1.nasdaq_trader, "spy_holdings": DAY1.spy_holdings},
+    )
+    ctx.configs = MemoryConfigStore({("site", "settings", "universe"): {"source": "nasdaq_trader"}})
+    out = tmp_path / "review" / "leveraged.csv"
+    record = run_task("universe-build", ctx, {"session": D1, "review_out": out})
+    assert record.stats["review_out"] == str(out)
+    assert out.read_text().startswith("symbol,leverage,tracks,notes")

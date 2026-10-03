@@ -13,63 +13,38 @@ Leverage: ETFs whose names carry a leverage marker stay UNKNOWN unless curated i
 ``config/site/overrides/leveraged_etfs.csv``; ``review_rows`` lists them for curation.
 """
 
+import csv
 import re
-from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
-from typing import Any
+from dataclasses import dataclass
+from datetime import date
+from pathlib import Path
 
 import pandas as pd
 
 from algotrade.core.instruments import AssetClass
 from algotrade.data import StoreReader
-from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
-from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.jobs.classify import (
-    DEFAULT_LEVERAGE_MARKERS,
+from algotrade.storage.runs import RunRecord
+from algotrade_ingestion.settings import UniverseSettings
+from algotrade_ingestion.sources.base import FetchRequest, Source
+from algotrade_ingestion.tasks.classify import (
     leverage_flags,
     security_type,
 )
-from algotrade_ingestion.jobs.common import stamp
-from algotrade_ingestion.jobs.instrument_ids import (
+from algotrade_ingestion.tasks.framework import IngestRun, TaskContext
+from algotrade_ingestion.tasks.instrument_ids import (
     ID_MAP,
     Assigned,
     assign_ids,
     cumulative_map,
     rename_ids,
 )
-from algotrade_ingestion.jobs.reference_diff import diff_reference
-from algotrade_ingestion.jobs.symbol_history import update_history
-from algotrade_ingestion.sources.base import FetchRequest, Source
+from algotrade_ingestion.tasks.reference_diff import diff_reference
+from algotrade_ingestion.tasks.symbol_history import update_history
 
-JOB = "universe_build"
+TASK = "universe_build"
 HISTORY = "instruments/symbol_history"
 REFERENCE = "instruments/reference"
 _SUGGESTED = re.compile(r"(-?\d(?:\.\d)?)\s*x\b", re.I)
-
-
-@dataclass(frozen=True)
-class UniverseSettings:
-    security_types: tuple[str, ...] = ("COMMON_STOCK", "ADR", "ETF")
-    exclude_test_issues: bool = True
-    include_symbols: frozenset[str] = frozenset()
-    exclude_symbols: frozenset[str] = frozenset()
-    leverage_markers: tuple[str, ...] = DEFAULT_LEVERAGE_MARKERS
-    overrides: tuple[Mapping[str, str], ...] = field(default=())
-
-    @classmethod
-    def from_documents(
-        cls, doc: Mapping[str, Any] | None, overrides: list[dict[str, str]]
-    ) -> "UniverseSettings":
-        doc = doc or {}
-        return cls(
-            security_types=tuple(doc.get("security_types", cls.security_types)),
-            exclude_test_issues=bool(doc.get("exclude_test_issues", True)),
-            include_symbols=frozenset(s.upper() for s in doc.get("include_symbols", [])),
-            exclude_symbols=frozenset(s.upper() for s in doc.get("exclude_symbols", [])),
-            leverage_markers=tuple(doc.get("leverage_markers", DEFAULT_LEVERAGE_MARKERS)),
-            overrides=tuple(overrides),
-        )
 
 
 @dataclass(frozen=True)
@@ -79,15 +54,8 @@ class UniverseSources:
     tickers: Source | None = None  # Massive ticker list: FIGI, CIK, vendor security type
 
 
-def _fetch(
-    source: Source, key: str, writer: StoreWriter, session: date, run_id: str
-) -> dict[str, pd.DataFrame]:
-    request = FetchRequest(key, session_date=session)
-    payload = source.fetch(request)
-    if payload is None:
-        raise ValueError(f"{source.name}: {key} returned nothing")
-    writer.raw.put(source.name, source.dataset, session, run_id, key, payload)
-    normalized = source.normalize(request, payload)
+def _fetch(run: IngestRun, source: Source, key: str) -> dict[str, pd.DataFrame]:
+    normalized = run.fetch(source, FetchRequest(key, session_date=run.session))
     if normalized is None:
         raise ValueError(f"{source.name}: {key} had no rows")
     return dict(normalized.parsed)
@@ -195,6 +163,17 @@ def review_rows(reference: pd.DataFrame) -> list[dict[str, str]]:
     return rows
 
 
+def write_review(reader: StoreReader, session: date, path: Path) -> None:
+    """Write ``review_rows`` for the session's reference to ``path`` (CSV) for curation."""
+    reference = reader.table(REFERENCE, session)
+    rows = review_rows(reference) if reference is not None else []
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as fh:
+        out = csv.DictWriter(fh, fieldnames=["symbol", "leverage", "tracks", "notes"])
+        out.writeheader()
+        out.writerows(rows)
+
+
 def _before(reader: StoreReader, table: str, session: date) -> pd.DataFrame | None:
     """The latest snapshot of ``table`` strictly before ``session``, so a re-run of a session
     builds on the same history as its first run."""
@@ -203,21 +182,27 @@ def _before(reader: StoreReader, table: str, session: date) -> pd.DataFrame | No
 
 
 def build_universe(
-    writer: StoreWriter,
-    reader: StoreReader,
-    sources: UniverseSources,
-    settings: UniverseSettings,
-    session: date,
-    clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+    ctx: TaskContext, sources: UniverseSources, settings: UniverseSettings, session: date
 ) -> RunRecord:
-    now = clock()
-    run_id = new_run_id(JOB, session, now)
-    parsed: dict[str, pd.DataFrame] = {}
-    for key in ("nasdaqlisted", "otherlisted", "options"):
-        parsed.update(_fetch(sources.nasdaq_trader, key, writer, session, run_id))
-    parsed.update(_fetch(sources.spy_holdings, "SPY", writer, session, run_id))
-    if sources.tickers is not None:
-        parsed.update(_fetch(sources.tickers, "active", writer, session, run_id))
+    with IngestRun(ctx, TASK, session) as run:
+        parsed: dict[str, pd.DataFrame] = {}
+        for key in ("nasdaqlisted", "otherlisted", "options"):
+            parsed.update(_fetch(run, sources.nasdaq_trader, key))
+        parsed.update(_fetch(run, sources.spy_holdings, "SPY"))
+        if sources.tickers is not None:
+            parsed.update(_fetch(run, sources.tickers, "active"))
+        _build(run, ctx.reader, parsed, settings, sources.nasdaq_trader.name)
+    return run.record
+
+
+def _build(
+    run: IngestRun,
+    reader: StoreReader,
+    parsed: dict[str, pd.DataFrame],
+    settings: UniverseSettings,
+    source: str,
+) -> None:
+    session = run.session
     listings = pd.concat([parsed["nasdaqlisted"], parsed["otherlisted"]], ignore_index=True)
     previous = _before(reader, REFERENCE, session)
     sp500 = set(parsed["sp500"]["symbol"])
@@ -232,7 +217,8 @@ def build_universe(
         reader.table(REFERENCE, session) if previous is None else None,
     )
     history, ticker_changes = update_history(_before(reader, HISTORY, session), reference, session)
-    id_map = cumulative_map(_before(reader, ID_MAP, session), assigned.upgrades, now)
+    known_at = run.record.started_at
+    id_map = cumulative_map(_before(reader, ID_MAP, session), assigned.upgrades, known_at)
     covered = reference[coverage(reference, settings)]
     universe = pd.DataFrame(
         {
@@ -259,17 +245,18 @@ def build_universe(
     if extra:
         rows = pd.DataFrame(extra).assign(ts=pd.Timestamp(session, tz="UTC"))
         changes = pd.concat([changes, rows], ignore_index=True)
-    source = sources.nasdaq_trader.name
-    writer.write_table(REFERENCE, session, run_id, stamp(reference, session, now, source, run_id))
-    writer.write_table("universe", session, run_id, stamp(universe, session, now, source, run_id))
-    for table, frame in ((HISTORY, history), (ID_MAP, id_map)):
-        if not frame.empty:
-            writer.write_table(table, session, run_id, stamp(frame, session, now, source, run_id))
-    for table, frame in (("events/reference_change", changes), ("events/index_change", index)):
-        if not frame.empty:
-            writer.write_table(table, session, run_id, stamp(frame, session, now, source, run_id))
+    for table, frame in (
+        (REFERENCE, reference),
+        ("universe", universe),
+        (HISTORY, history),
+        (ID_MAP, id_map),
+        ("events/reference_change", changes),
+        ("events/index_change", index),
+    ):
+        if table in (REFERENCE, "universe") or not frame.empty:
+            run.write(table, frame, source)
     unmatched = sorted(sp500 - set(listings["symbol"]))
-    stats = {
+    run.stats.update({
         "listed": int(reference["status"].eq("ACTIVE").sum()),
         "delisted_carried": int(reference["status"].eq("DELISTED").sum()),
         "by_security_type": reference.loc[reference["status"].eq("ACTIVE"), "security_type"]
@@ -294,8 +281,6 @@ def build_universe(
             "reference_change": changes["change"].value_counts().to_dict(),
             "index_change": index["change"].value_counts().to_dict(),
         },
-    }
-    status = RunStatus.PARTIAL if unmatched else RunStatus.COMPLETE
-    record = RunRecord(run_id, JOB, session, now, status, now, stats=stats)
-    writer.save_run(record)
-    return record
+    })  # fmt: skip
+    if unmatched:
+        run.partial(f"{len(unmatched)} S&P 500 members not listed")

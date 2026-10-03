@@ -11,7 +11,6 @@ import pytest
 
 from algotrade.data.resolver import SymbolResolver
 from algotrade.storage.schemas import COMMON, validate_frame
-from algotrade_ingestion.jobs.common import stamp, with_ids
 from algotrade_ingestion.sources.base import FetchRequest, Source
 from algotrade_ingestion.sources.cboe import CboeOptionsSource
 from algotrade_ingestion.sources.http import RetryPolicy
@@ -26,6 +25,7 @@ from algotrade_ingestion.sources.sec_edgar import SecSubmissions, SecTickerMap
 from algotrade_ingestion.sources.spy_holdings import SpyHoldingsSource
 from algotrade_ingestion.sources.synthetic.files import GoldenFiles
 from algotrade_ingestion.sources.synthetic.source import GoldenCsvSource
+from algotrade_ingestion.tasks.framework import stamp
 from tests import cboe_fixture as fx
 from tests import earnings_fixture, massive_fixture, sec_fixture, universe_fixture
 from tests.conftest import GOLDEN_DIR
@@ -122,10 +122,10 @@ def test_normalized_tables_satisfy_storage_schemas(adapter: Adapter) -> None:
     normalized = source.normalize(request, payload)
     assert normalized is not None and (normalized.tables or normalized.parsed)
     for table, frame in normalized.tables.items():
-        assert not any(c in frame.columns for c in COMMON), "jobs add point-in-time columns"
-        # Vendor-ticker tables carry ``symbol``; the job resolves ids (ADR 0018).
+        assert not any(c in frame.columns for c in COMMON), "tasks add point-in-time columns"
+        # Vendor-ticker tables carry ``symbol``; the task resolves ids (ADR 0018).
         assert "instrument_id" in frame.columns or "symbol" in frame.columns
-        resolved, _ = with_ids(frame, SymbolResolver())
+        resolved = frame if "instrument_id" in frame.columns else SymbolResolver().resolve(frame)[0]
         session = normalized.session_date or fx.SESSION
         validate_frame(table, stamp(resolved, session, fx.CLOCK_TS, source.name, "run-1"))
 

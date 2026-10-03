@@ -10,21 +10,19 @@ their (FIGI) ids, new ones get symbol ids.
 
 import csv
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
 
 from algotrade.core.errors import DataValidationError
 from algotrade.core.instruments import AssetClass
-from algotrade.data import StoreReader
-from algotrade.data.reference import resolver as reference_resolver
 from algotrade.data.resolver import SymbolResolver
-from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
-from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.jobs.common import stamp
+from algotrade.storage.runs import RunRecord
+from algotrade_ingestion.tasks.framework import IngestRun, TaskContext
 
-JOB = "universe_import"
+TASK = "universe_import"
+SOURCE = "universe_csv"
 OPTIONAL = (
     "company_name",
     "security_type",
@@ -113,34 +111,23 @@ def reference_frame(universe: pd.DataFrame) -> pd.DataFrame:
 
 
 def import_universe(
-    writer: StoreWriter,
-    reader: StoreReader,
-    files: list[UniverseFile],
-    version: str,
-    snapshot: date,
-    now: datetime,
+    ctx: TaskContext, files: list[UniverseFile], version: str, snapshot: date
 ) -> RunRecord:
-    resolver = reference_resolver(reader, snapshot)
-    rows = [r for spec in files for r in read_rows(spec, version, resolver)]
-    frame = pd.DataFrame(rows)
-    before = len(frame)
-    frame = frame.drop_duplicates(subset="instrument_id", keep="first").reset_index(drop=True)
-    run_id = new_run_id(JOB, snapshot, now)
-    writer.write_table(
-        "universe", snapshot, run_id, stamp(frame, snapshot, now, "universe_csv", run_id)
-    )
-    reference = stamp(reference_frame(frame), snapshot, now, "universe_csv", run_id)
-    writer.write_table("instruments/reference", snapshot, run_id, reference)
-    stats = {
-        "files": [str(f.path) for f in files],
-        "rows_loaded": before,
-        "unique_tickers": len(frame),
-        "duplicates_removed": before - len(frame),
-        "by_security_type": frame["security_type"].value_counts().to_dict(),
-        "inactive_or_unoptionable": int(
-            (~frame["optionable"] | (frame["status"] != "ACTIVE")).sum()
-        ),
-    }
-    record = RunRecord(run_id, JOB, snapshot, now, RunStatus.COMPLETE, now, stats=stats)
-    writer.save_run(record)
-    return record
+    with IngestRun(ctx, TASK, snapshot) as run:
+        resolver = run.resolver()
+        frame = pd.DataFrame([r for spec in files for r in read_rows(spec, version, resolver)])
+        before = len(frame)
+        frame = frame.drop_duplicates(subset="instrument_id", keep="first").reset_index(drop=True)
+        run.write("universe", frame, SOURCE)
+        run.write("instruments/reference", reference_frame(frame), SOURCE)
+        run.stats.update(
+            files=[str(f.path) for f in files],
+            rows_loaded=before,
+            unique_tickers=len(frame),
+            duplicates_removed=before - len(frame),
+            by_security_type=frame["security_type"].value_counts().to_dict(),
+            inactive_or_unoptionable=int(
+                (~frame["optionable"] | (frame["status"] != "ACTIVE")).sum()
+            ),
+        )
+    return run.record

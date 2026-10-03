@@ -4,11 +4,12 @@ from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.jobs.earnings import ingest_earnings, weekdays
 from algotrade_ingestion.sources.base import FetchRequest
 from algotrade_ingestion.sources.http import HttpError, RetryPolicy
 from algotrade_ingestion.sources.nasdaq_earnings import NasdaqEarningsSource, parse_calendar
+from algotrade_ingestion.tasks.earnings import ingest_earnings, weekdays
 from tests.earnings_fixture import calendar
+from tests.ingest_helpers import task_ctx
 from tests.storage_helpers import write_reference
 
 DAY = date(2026, 10, 2)  # a Friday
@@ -68,7 +69,7 @@ def test_job_writes_snapshot_and_reports_failed_dates() -> None:
     write_reference(StoreWriter(backend), DAY, {"AAPL": "EQ:BBG000B9XRY4"})
     source = NasdaqEarningsSource(transport, lambda s: None, RetryPolicy(tries=1))
     reader = StoreReader(backend)
-    record = ingest_earnings(StoreWriter(backend), reader, source, DAY, days=5, clock=CLOCK)
+    record = ingest_earnings(task_ctx(StoreWriter(backend), reader, CLOCK), source, DAY, days=5)
     assert record.status is RunStatus.PARTIAL
     assert record.stats["dates_failed"][0].startswith("2026-10-06")
     assert (record.stats["rows"], record.stats["companies"]) == (2, 2)
@@ -84,6 +85,6 @@ def test_quiet_window_is_complete_with_no_rows() -> None:
     source = NasdaqEarningsSource(lambda url: calendar([]), lambda s: None, RetryPolicy(tries=1))
     backend = MemoryBackend()
     record = ingest_earnings(
-        StoreWriter(backend), StoreReader(backend), source, DAY, days=2, clock=CLOCK
+        task_ctx(StoreWriter(backend), StoreReader(backend), CLOCK), source, DAY, days=2
     )
     assert (record.status, record.stats["rows"]) == (RunStatus.COMPLETE, 0)

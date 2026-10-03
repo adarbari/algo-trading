@@ -6,8 +6,8 @@ replayed later without the network:
     fetch(request)              -> raw bytes exactly as received, or None ("nothing there")
     normalize(request, payload) -> canonical frames keyed by storage table, or None
 
-Jobs own everything else: scheduling, rate-limit-aware fan-out, raw storage, stamping the
-point-in-time columns, staging, publishing and run records.
+Tasks own everything else (through ``tasks/framework.py``): scheduling, rate-limit-aware
+fan-out, raw storage, stamping the point-in-time columns, staging, publishing and run records.
 """
 
 from collections.abc import Mapping
@@ -54,3 +54,14 @@ class Source(Protocol):
     def fetch(self, request: FetchRequest) -> bytes | None: ...
 
     def normalize(self, request: FetchRequest, payload: bytes) -> Normalized | None: ...
+
+
+@runtime_checkable
+class WindowedSource(Source, Protocol):
+    """A source whose data for a date window takes several requests (e.g. one per event kind).
+
+    ``window_requests`` -> ``(label, request)`` pairs; the label names the item and raw key."""
+
+    def window_requests(
+        self, start: date, end: date, session: date
+    ) -> list[tuple[str, FetchRequest]]: ...

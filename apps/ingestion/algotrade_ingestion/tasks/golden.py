@@ -11,24 +11,27 @@ Load into a dedicated fixture store (``make golden-store``), never the productio
 synthetic symbols such as ``AAA`` collide with real tickers.
 """
 
-from collections.abc import Callable
-from datetime import UTC, date, datetime
+from datetime import date
+from pathlib import Path
 
 import pandas as pd
 
 from algotrade.core.instruments import AssetClass
 from algotrade.data.resolver import SymbolResolver
-from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
-from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.jobs.common import stamp
-from algotrade_ingestion.jobs.instrument_ids import assign_ids
+from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.sources.base import FetchRequest
 from algotrade_ingestion.sources.synthetic.files import GoldenFiles
 from algotrade_ingestion.sources.synthetic.source import BARS_TABLE, GoldenCsvSource
+from algotrade_ingestion.tasks.framework import IngestRun, TaskContext
+from algotrade_ingestion.tasks.instrument_ids import assign_ids
 
-JOB = "golden_load"
+TASK = "golden_load"
 SOURCE = GoldenCsvSource.name
 CATALOG = "catalog/golden_datasets"
+
+
+def golden_files(directory: Path) -> GoldenFiles:
+    return GoldenFiles(directory)
 
 
 def golden_reference(files: GoldenFiles, session: date) -> pd.DataFrame:
@@ -70,11 +73,7 @@ def _collect(files: GoldenFiles, resolver: SymbolResolver) -> tuple[pd.DataFrame
     return pd.concat(bars, ignore_index=True), pd.DataFrame(catalog)
 
 
-def load_golden(
-    writer: StoreWriter,
-    files: GoldenFiles,
-    clock: Callable[[], datetime] = lambda: datetime.now(UTC),
-) -> RunRecord:
+def load_golden(ctx: TaskContext, files: GoldenFiles) -> RunRecord:
     problems = files.verify()
     if problems:
         raise ValueError(f"golden files failed verification: {problems}")
@@ -82,24 +81,18 @@ def load_golden(
     bars, catalog = _collect(files, SymbolResolver.from_reference(reference))
     bars["session_date"] = bars["ts"].dt.date
     first: date = min(bars["session_date"])
-    now = clock()
-    run_id = new_run_id(JOB, first, now)
-    stamped = stamp(bars.drop(columns="session_date"), first, now, SOURCE, run_id)
-    stamped["session_date"] = bars["session_date"]  # stamp sets one date; bars span many
-    stamped = stamped.sort_values(["session_date", "instrument_id"], kind="stable")
-    for key, day in stamped.groupby("session_date", sort=True):
-        session = key if isinstance(key, date) else date.fromisoformat(str(key))
-        writer.write_table("bars/1d", session, run_id, day.reset_index(drop=True))
-    writer.write_table(
-        "instruments/reference", first, run_id, stamp(reference, first, now, SOURCE, run_id)
-    )
-    writer.write_table(CATALOG, first, run_id, stamp(catalog, first, now, SOURCE, run_id))
-    stats = {
-        "datasets": int(catalog["dataset"].nunique()),
-        "instruments": len(reference),
-        "sessions": int(bars["session_date"].nunique()),
-        "bars": len(bars),
-    }
-    record = RunRecord(run_id, JOB, first, now, RunStatus.COMPLETE, now, stats=stats)
-    writer.save_run(record)
-    return record
+    with IngestRun(ctx, TASK, first) as run:
+        bars = bars.sort_values(["session_date", "instrument_id"], kind="stable")
+        for key, day in bars.groupby("session_date", sort=True):
+            session = key if isinstance(key, date) else date.fromisoformat(str(key))
+            frame = day.drop(columns="session_date").reset_index(drop=True)
+            run.write("bars/1d", frame, SOURCE, session=session)
+        run.write("instruments/reference", reference, SOURCE)
+        run.write(CATALOG, catalog, SOURCE)
+        run.stats.update(
+            datasets=int(catalog["dataset"].nunique()),
+            instruments=len(reference),
+            sessions=int(bars["session_date"].nunique()),
+            bars=len(bars),
+        )
+    return run.record

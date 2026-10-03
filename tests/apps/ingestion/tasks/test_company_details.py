@@ -11,14 +11,15 @@ from algotrade.data.reference import instrument_view
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.jobs.company_details import (
+from algotrade_ingestion.sources.http import HttpError, MinInterval, RetryPolicy
+from algotrade_ingestion.sources.sec_edgar import TICKERS_URL, SecSubmissions, SecTickerMap
+from algotrade_ingestion.tasks.company_details import (
     TABLE,
     CompanySources,
     due_ciks,
     ingest_company_details,
 )
-from algotrade_ingestion.sources.http import HttpError, MinInterval, RetryPolicy
-from algotrade_ingestion.sources.sec_edgar import TICKERS_URL, SecSubmissions, SecTickerMap
+from tests.ingest_helpers import task_ctx
 from tests.sec_fixture import submissions, tickers
 from tests.storage_helpers import stamped
 
@@ -98,7 +99,7 @@ def store(day: date = DAY) -> tuple[StoreWriter, StoreReader]:
 def test_first_run_fetches_every_cik_and_counts_funds() -> None:
     writer, reader = store()
     feed = FakeSec()
-    record = ingest_company_details(writer, reader, sources(feed), DAY, clock=CLOCK)
+    record = ingest_company_details(task_ctx(writer, reader, CLOCK), sources(feed), DAY)
     assert record.status is RunStatus.COMPLETE
     s = record.stats
     assert (s["cik_from_reference"], s["cik_from_sec_map"], s["no_cik"]) == (1, 2, 1)
@@ -124,27 +125,29 @@ def test_first_run_fetches_every_cik_and_counts_funds() -> None:
 def test_nightly_runs_are_incremental() -> None:
     writer, reader = store()
     first = FakeSec()
-    ingest_company_details(writer, reader, sources(first, refresh_days=30), DAY, clock=CLOCK)
+    ingest_company_details(task_ctx(writer, reader, CLOCK), sources(first, refresh_days=30), DAY)
     nxt = DAY + timedelta(days=1)
     again = FakeSec()
-    record = ingest_company_details(writer, reader, sources(again), nxt, clock=CLOCK)
+    record = ingest_company_details(task_ctx(writer, reader, CLOCK), sources(again), nxt)
     # Fresh companies are carried forward; only the CIK with no submissions is retried.
     assert (record.stats["requested"], again.submissions_requested) == (1, 1)
     company = reader.table(TABLE, nxt)
     assert company is not None and len(company) == 2
     later = DAY + timedelta(days=31)
     stale = FakeSec()
-    record = ingest_company_details(writer, reader, sources(stale), later, clock=CLOCK)
+    record = ingest_company_details(task_ctx(writer, reader, CLOCK), sources(stale), later)
     assert record.stats["requested"] == 3  # both stored companies are past refresh_days
     forced = FakeSec()
-    record = ingest_company_details(writer, reader, sources(forced), nxt, force=True, clock=CLOCK)
+    record = ingest_company_details(
+        task_ctx(writer, reader, CLOCK), sources(forced), nxt, force=True
+    )
     assert forced.submissions_requested == 3
 
 
 def test_limit_defers_and_errors_make_the_run_partial() -> None:
     writer, reader = store()
     feed = FakeSec(broken={"https://data.sec.gov/submissions/CIK0000789019.json"})
-    record = ingest_company_details(writer, reader, sources(feed), DAY, limit=2, clock=CLOCK)
+    record = ingest_company_details(task_ctx(writer, reader, CLOCK), sources(feed), DAY, limit=2)
     assert record.status is RunStatus.PARTIAL
     assert (record.stats["requested"], record.stats["deferred_by_limit"]) == (2, 1)
     assert record.stats["failed"][0].startswith("0000789019")
@@ -154,7 +157,7 @@ def test_limit_defers_and_errors_make_the_run_partial() -> None:
 def test_ticker_map_failure_still_uses_reference_ciks() -> None:
     writer, reader = store()
     record = ingest_company_details(
-        writer, reader, sources(FakeSec(broken={TICKERS_URL})), DAY, clock=CLOCK
+        task_ctx(writer, reader, CLOCK), sources(FakeSec(broken={TICKERS_URL})), DAY
     )
     assert record.status is RunStatus.PARTIAL
     assert (record.stats["cik_from_sec_map"], record.stats["rows"]) == (0, 1)
@@ -165,7 +168,7 @@ def test_nothing_known_writes_nothing() -> None:
     backup = dict(COMPANIES)
     COMPANIES.clear()
     try:
-        record = ingest_company_details(writer, reader, sources(FakeSec()), DAY, clock=CLOCK)
+        record = ingest_company_details(task_ctx(writer, reader, CLOCK), sources(FakeSec()), DAY)
     finally:
         COMPANIES.update(backup)
     assert (record.stats["rows"], record.stats["no_submissions"]) == (0, 3)
@@ -176,7 +179,7 @@ def test_needs_a_reference_snapshot() -> None:
     backend = MemoryBackend()
     with pytest.raises(MissingDataError):
         ingest_company_details(
-            StoreWriter(backend), StoreReader(backend), sources(FakeSec()), DAY, clock=CLOCK
+            task_ctx(StoreWriter(backend), StoreReader(backend), CLOCK), sources(FakeSec()), DAY
         )
 
 
@@ -192,7 +195,7 @@ def test_due_ciks_orders_new_then_stalest() -> None:
 def test_instrument_view_exposes_company_fields() -> None:
     writer, reader = store()
     nxt = DAY + timedelta(days=1)
-    ingest_company_details(writer, reader, sources(FakeSec()), nxt, clock=CLOCK)
+    ingest_company_details(task_ctx(writer, reader, CLOCK), sources(FakeSec()), nxt)
     view = instrument_view(
         reader, nxt + timedelta(days=3), ["instrument.symbol", "instrument.sector"]
     )

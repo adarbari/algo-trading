@@ -8,19 +8,19 @@ upgrade was recorded (``known_at``); later rows under the same symbol id belong 
 listing holds that symbol now. Re-running maps nothing (idempotent).
 """
 
-from collections.abc import Callable, Mapping
-from datetime import UTC, datetime
+from collections.abc import Mapping
+from datetime import date
 
 import pandas as pd
 
 from algotrade.core.errors import DataValidationError
 from algotrade.data import StoreReader
 from algotrade.data.reference import snapshot
-from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
-from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.jobs.instrument_ids import ID_MAP
+from algotrade.storage.runs import RunRecord
+from algotrade_ingestion.tasks.framework import IngestRun, TaskContext
+from algotrade_ingestion.tasks.instrument_ids import ID_MAP
 
-JOB = "migrate_ids"
+TASK = "migrate_ids"
 ID_COLUMNS = ("instrument_id", "underlying_id", "parent_id")
 
 type IdMap = Mapping[str, list[tuple[pd.Timestamp, str]]]  # old id -> [(known_at, new id)]
@@ -58,46 +58,39 @@ def remap(frame: pd.DataFrame, id_map: IdMap) -> tuple[pd.DataFrame, int]:
     return out, int(changed.sum())
 
 
-def migrate_ids(
-    writer: StoreWriter,
-    reader: StoreReader,
-    dry_run: bool = False,
-    clock: Callable[[], datetime] = lambda: datetime.now(UTC),
-) -> RunRecord:
-    now = clock()
-    run_id = new_run_id(JOB, now.date(), now)
+def migrate_ids(ctx: TaskContext, dry_run: bool = False) -> RunRecord:
+    reader = ctx.reader
     id_map = load_id_map(reader)
     tables: dict[str, dict[str, int]] = {}
-    failed: list[str] = []
-    for table in reader.table_names() if id_map else []:
-        if table == ID_MAP:
-            continue
-        for day in reader.dates(table):
-            frame = reader.table(table, day)
-            if frame is None or frame.empty or "knowledge_ts" not in frame.columns:
+    with IngestRun(ctx, TASK, ctx.clock().date(), save=not dry_run) as run:
+        for table in reader.table_names() if id_map else []:
+            if table == ID_MAP:
                 continue
-            out, rows = remap(frame, id_map)
-            if not rows:
-                continue
-            counts = tables.setdefault(table, {"partitions": 0, "rows": 0})
-            counts["partitions"] += 1
-            counts["rows"] += rows
-            if dry_run:
-                continue
-            try:
-                stamped = out.assign(knowledge_ts=pd.Timestamp(now), run_id=run_id)
-                writer.write_table(table, day, run_id, stamped)
-            except DataValidationError as exc:  # e.g. old and new id in one partition
-                failed.append(f"{table} {day.isoformat()}: {exc}")
-    stats = {
-        "dry_run": dry_run,
-        "mapped_ids": len(id_map),
-        "tables": tables,
-        "failed": failed[:20],
-        "failed_count": len(failed),
-    }
-    status = RunStatus.PARTIAL if failed else RunStatus.COMPLETE
-    record = RunRecord(run_id, JOB, now.date(), now, status, clock(), stats=stats)
-    if not dry_run:
-        writer.save_run(record)
-    return record
+            for day in reader.dates(table):
+                frame = reader.table(table, day)
+                if frame is None or frame.empty or "knowledge_ts" not in frame.columns:
+                    continue
+                out, rows = remap(frame, id_map)
+                if not rows:
+                    continue
+                counts = tables.setdefault(table, {"partitions": 0, "rows": 0})
+                counts["partitions"] += 1
+                counts["rows"] += rows
+                if not dry_run:
+                    _rewrite(run, table, day, out)
+        failed = run.failures()
+        run.stats.update(
+            dry_run=dry_run,
+            mapped_ids=len(id_map),
+            tables=tables,
+            failed=failed[:20],
+            failed_count=len(failed),
+        )
+    return run.record
+
+
+def _rewrite(run: IngestRun, table: str, day: date, frame: pd.DataFrame) -> None:
+    try:
+        run.rewrite(table, day, frame)
+    except DataValidationError as exc:  # e.g. old and new id in one partition
+        run.fail(f"{table} {day.isoformat()}", str(exc), kind="FAILED")

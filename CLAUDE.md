@@ -54,8 +54,8 @@ add to them; when you fix a violation, lower them (`make ownership-update`, `mak
 | Responsibility | Owner today → target (roadmap track R) |
 |---|---|
 | Which snapshot a read sees (on or before D, else earliest + `pre_snapshot`); domain reads of market data | `algotrade/data/` (`reference`, `prices`, `events`, `chains`); consumers never import `storage.readers` |
-| Run ids, run records, COMPLETE / PARTIAL; raw save; stamping; ticker → id in ingestion | `storage/runs.py`, `jobs/common.py` → `tasks/framework.py` (`IngestRun`) |
-| Which ingestion steps run, with which defaults | `pipeline.py` → task registry + `workflows/` |
+| Run ids, run records, COMPLETE / PARTIAL; raw save; stamping; ticker → id in ingestion | `tasks/framework.py` (`IngestRun`); never write the loop in a task |
+| Which ingestion steps run, with which defaults | `tasks/registry.py` (nightly order: `pipeline.py`) → + `workflows/` |
 | Vendor HTTP, retries, rate limiting; building sources; vendor specifics | `sources/http.py`, `sources/` → + `sources/registry.py`, shared limiter |
 | Running long work (threads, recovery), screens | `services/jobs/` (screens: `services/screening.py`, submitted as `screen` jobs) |
 | Site settings; environment variables | `config/`; `env.py` + `storage/factory.py` → `config/settings.py`, `config/env.py` |
@@ -100,6 +100,6 @@ add to them; when you fix a violation, lower them (`make ownership-update`, `mak
 | A decision that changes architecture | `.claude/skills/write-adr` |
 
 Commands (need `uv`): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make evaluate`, `make baseline`.
-Ingestion: `algotrade-ingest universe|universe-build|company-details|earnings|bars|corporate-actions|chains|features|screen|nightly|quality|schedule|purge-raw|migrate-ids|golden` (see `README.md`).
+Ingestion: `algotrade-ingest universe|universe-build|company-details|earnings|bars|corporate-actions|chains|features|screen|nightly|quality|schedule|purge-raw|migrate-ids|golden`, or `algotrade-ingest run <task>` for any registry task (see `README.md`).
 Configs: site presets in `config/site/` (reviewed via PR); user configs in `config/users/<id>/`
 (git-ignored). Check one with `algotrade-backtest [--user U] config validate|show <id>`.

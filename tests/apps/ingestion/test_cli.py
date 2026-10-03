@@ -10,7 +10,7 @@ from algotrade_ingestion import cli, commands
 from algotrade_ingestion.sources.cboe import CboeOptionsSource
 from algotrade_ingestion.sources.http import RetryPolicy
 from tests import cboe_fixture as fx
-from tests.apps.ingestion.test_jobs import FakeFeed
+from tests.apps.ingestion.tasks.test_option_chains import FakeFeed
 
 pytestmark = pytest.mark.e2e
 DAY = fx.SESSION.isoformat()
@@ -33,8 +33,12 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     earnings = calendar([("AAPL", "time-after-hours")])
     monkeypatch.setattr(
         commands,
-        "earnings_source",
-        lambda *_: NasdaqEarningsSource(lambda url: earnings, lambda s: None, RetryPolicy(tries=1)),
+        "earnings_sources",
+        lambda *_: {
+            "nasdaq_earnings": NasdaqEarningsSource(
+                lambda url: earnings, lambda s: None, RetryPolicy(tries=1)
+            )
+        },
     )
     feed = FakeFeed(
         {
@@ -44,8 +48,8 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     )
     monkeypatch.setattr(
         commands,
-        "cboe_source",
-        lambda *_: CboeOptionsSource(feed, lambda s: None, RetryPolicy(tries=1)),
+        "cboe_sources",
+        lambda *_: {"cboe": CboeOptionsSource(feed, lambda s: None, RetryPolicy(tries=1))},
     )
     (tmp_path / "stocks.csv").write_text(
         f"ticker,company_name,security_type,last_verified\nAAPL,Apple,COMMON_STOCK,{DAY}\n"
@@ -92,6 +96,8 @@ def test_individual_steps_and_purge(env: Path, capsys: pytest.CaptureFixture[str
     assert (code, dry["dry_run"], dry["mapped_ids"], dry["tables"]) == (0, True, 0, {})
     code, features = call(capsys, "features", "--date", DAY)
     assert features["liq_status"] == {"OK": 1}
+    code, again = call(capsys, "run", "features", "--date", DAY)  # the generic form
+    assert (code, again["liq_status"], again["status"]) == (0, {"OK": 1}, "complete")
     code, audit = call(capsys, "screen", "--date", DAY, "--export-dir", str(env / "out"))
     assert audit["coverage"] == "COMPLETE"
     code, purged = call(capsys, "purge-raw", "--keep-days", "0", "--date", "2026-10-03")
@@ -171,17 +177,21 @@ def test_company_details_command(
     env: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from algotrade_ingestion.settings import SourcesSettings  # noqa: PLC0415
-    from tests.apps.ingestion.test_company_details import FakeSec, sources  # noqa: PLC0415
+    from tests.apps.ingestion.tasks.test_company_details import FakeSec, sources  # noqa: PLC0415
 
     call(capsys, "universe", "--stocks", str(env / "stocks.csv"), "--version", "v", "--date", DAY)
     assert cli.main(["company-details", "--date", DAY]) == 2  # no contact email configured
     assert "ALGOTRADE_SEC_CONTACT" in capsys.readouterr().err
-    assert commands.company_sources(SourcesSettings(), required=False) is None
+    assert commands.sec_sources(SourcesSettings(), required=False) == {}
     monkeypatch.setenv("ALGOTRADE_SEC_CONTACT", "ops@example.org")
-    real = commands.company_sources(SourcesSettings())
-    assert real is not None and real.refresh_days == 30  # built without touching the network
-    feed = FakeSec()
-    monkeypatch.setattr(commands, "company_sources", lambda *_, **__: sources(feed))
+    real = commands.sec_sources(SourcesSettings())
+    assert set(real) == {"sec_tickers", "sec_submissions"}  # built without the network
+    fake = sources(FakeSec())
+    monkeypatch.setattr(
+        commands,
+        "sec_sources",
+        lambda *_: {"sec_tickers": fake.tickers, "sec_submissions": fake.submissions},
+    )
     code, result = call(capsys, "company-details", "--date", DAY, "--limit", "5")
     assert (code, result["rows"], result["cik_from_sec_map"]) == (0, 1, 1)  # AAPL via the map
     _, nightly = call(capsys, "nightly", "--date", DAY, "--workers", "1")

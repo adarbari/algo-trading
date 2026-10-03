@@ -239,7 +239,7 @@ Extra contracts:
 | `analytics/` | Metrics and report formatting from equity curves + fills. | core |
 | `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. `selection/`: three-valued evaluation with a per-rule audit. | strategies, config, analytics, core |
 | `services/` | Use cases: `jobs`, `configs`, `selection`, `backtests`, `screening`, golden `datasets`, `exports`, `evaluation/`. | everything below except `storage.writers` and `storage.readers` (through `data/`) |
-| `apps/ingestion` | Sources (Cboe, HTTP with retries, synthetic/golden), jobs (universe, option chains, rollups, golden load), nightly pipeline, `algotrade-ingest`. | library |
+| `apps/ingestion` | Sources (Cboe, HTTP with retries, synthetic/golden); `tasks/` (one module per dataset, run by `tasks/framework.py` `IngestRun` and declared once in `tasks/registry.py`); nightly workflow (`pipeline.py`, an ordered list of registry tasks); `algotrade-ingest`. | library |
 | `apps/backtest` | `algotrade-backtest` (`algotrade` alias): datasets list, backtest (golden dataset or config, via jobs), evaluate, config validate/show. Reads only through `data/`. | library |
 
 ### One bar in the backtest engine
@@ -327,9 +327,9 @@ truth, with the AST patterns `scripts/check_ownership.py` uses to flag anyone el
 |---|---|---|
 | snapshot selection ("latest on or before D", else earliest + `pre_snapshot`) | `data/reference.py` | same (done in R2) |
 | market-data reads for consumers | `data/` | same (done in R2) |
-| run ids, run records, COMPLETE / PARTIAL | `storage/runs.py`, `services/jobs/` | ingestion `tasks/framework.py` (R3) |
-| raw persistence, row stamping, id resolution in ingestion | `jobs/common.py`, storage backends | `tasks/framework.py` (R3) |
-| which ingestion steps run, with which defaults | `pipeline.py` | `tasks/registry.py`, `workflows/` (R3) |
+| run ids, run records, COMPLETE / PARTIAL | `storage/runs.py`, `services/jobs/`, ingestion `tasks/framework.py` | same (done in R3) |
+| raw persistence, row stamping, id resolution in ingestion | `tasks/framework.py` (`IngestRun`) | same (done in R3) |
+| which ingestion steps run, with which defaults | `tasks/registry.py`; nightly order in `pipeline.py` | `workflows/` (R5) |
 | vendor HTTP + retries | `sources/http.py` | same |
 | rate limiting | `sources/http.py` (`MinInterval`) | `sources/limiter.py`, shared across processes (R4) |
 | source construction + vendor specifics | `sources/` | `sources/registry.py` (R4) |
@@ -338,6 +338,29 @@ truth, with the AST patterns `scripts/check_ownership.py` uses to flag anyone el
 | site settings loading | `config/` | `config/settings.py`, one typed loader (R6) |
 | environment variables | `ingestion env.py`, `storage/factory.py` | `config/env.py` (R6) |
 | Parquet / Arrow I/O | `storage/backends/` | same |
+
+### Ingestion tasks (R3)
+
+An ingestion **task** produces stored tables and one run record; a **job** is something
+`services/jobs` runs (nightly, screens, backtests). In `apps/ingestion/algotrade_ingestion/tasks/`:
+
+- `framework.py`: `IngestRun`, the ingest loop written once. It creates the run id and
+  record (resuming an unfinished one when asked), `fetch`es (raw payload saved as received,
+  then normalised), records per-item status with exception capture, resolves tickers to ids
+  through `algotrade.data`, stamps the point-in-time columns, validates and writes, and
+  decides the status in one place: any failed item or explicit `partial` → PARTIAL; an
+  exception → a saved FAILED record, re-raised. The clock is injected (`TaskContext.clock`).
+- `registry.py`: every task declared once: name, description, tables it writes (checked
+  against `[[table]]` producers in `architecture/ownership.toml`), sources it needs (by name
+  in `TaskContext.sources`), the settings section it reads, its parameters (the CLI turns
+  them into flags) and `run(ctx, params)`. Defaults from settings are applied here, so
+  `algotrade-ingest <task>`, `algotrade-ingest run <task>` and nightly cannot drift.
+- one module per dataset (`bars.py`, `corporate_actions.py`, `earnings.py`, `option_chains.py`,
+  `company_details.py`, `universe_build.py`, `universe.py`, `features.py`, `quality.py`,
+  `migrate_ids.py`, `golden.py`): only what to fetch, how to combine frames, task stats.
+
+Sources are still built in `commands.py` (moves to `sources/registry.py` in R4); tasks receive
+them through the context and never build them.
 
 Rules: **R1** only `data/` reads market data for consumers; **R2** storage has no domain
 knowledge; **R3** tasks get sources from the registry, never import vendor modules; **R4**

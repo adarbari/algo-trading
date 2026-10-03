@@ -199,6 +199,16 @@ class MassiveCorporateActions(_Massive):
 
     dataset = "corporate_actions"
 
+    def window_requests(
+        self, start: date, end: date, session: date
+    ) -> list[tuple[str, FetchRequest]]:
+        """(label, request) per kind for events in ``[start, end]`` (``WindowedSource``)."""
+        span = f"{start.isoformat()}:{end.isoformat()}"
+        return [
+            (kind, FetchRequest(f"{kind}:{span}", session_date=session))
+            for kind in ("splits", "dividends")
+        ]
+
     def fetch(self, request: FetchRequest) -> bytes | None:
         kind, start, end = request.key.split(":")
         template = {"splits": SPLITS, "dividends": DIVIDENDS}[kind]

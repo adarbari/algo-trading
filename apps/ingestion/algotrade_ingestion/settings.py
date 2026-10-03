@@ -1,10 +1,14 @@
-"""Typed view of ``config/site/sources.toml`` (L3). Missing file or keys fall back to defaults."""
+"""Typed views of ``config/site/sources.toml`` and ``universe.toml`` (L3), loaded here only.
+
+Missing files or keys fall back to defaults.
+"""
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from algotrade.storage.config_store import ConfigStore
+from algotrade_ingestion.tasks.classify import DEFAULT_LEVERAGE_MARKERS
 
 
 @dataclass(frozen=True)
@@ -61,5 +65,41 @@ class SourcesSettings:
         )
 
 
+@dataclass(frozen=True)
+class UniverseSettings:
+    security_types: tuple[str, ...] = ("COMMON_STOCK", "ADR", "ETF")
+    exclude_test_issues: bool = True
+    include_symbols: frozenset[str] = frozenset()
+    exclude_symbols: frozenset[str] = frozenset()
+    leverage_markers: tuple[str, ...] = DEFAULT_LEVERAGE_MARKERS
+    overrides: tuple[Mapping[str, str], ...] = field(default=())
+
+    @classmethod
+    def from_documents(
+        cls, doc: Mapping[str, Any] | None, overrides: list[dict[str, str]]
+    ) -> "UniverseSettings":
+        doc = doc or {}
+        return cls(
+            security_types=tuple(doc.get("security_types", cls.security_types)),
+            exclude_test_issues=bool(doc.get("exclude_test_issues", True)),
+            include_symbols=frozenset(s.upper() for s in doc.get("include_symbols", [])),
+            exclude_symbols=frozenset(s.upper() for s in doc.get("exclude_symbols", [])),
+            leverage_markers=tuple(doc.get("leverage_markers", DEFAULT_LEVERAGE_MARKERS)),
+            overrides=tuple(overrides),
+        )
+
+
+def site_document(configs: ConfigStore, name: str) -> Mapping[str, Any] | None:
+    """``config/site/<name>.toml`` (``None`` when the file is missing)."""
+    return configs.load("site", "settings", name)
+
+
 def load_sources(configs: ConfigStore) -> SourcesSettings:
-    return SourcesSettings.from_document(configs.load("site", "settings", "sources"))
+    return SourcesSettings.from_document(site_document(configs, "sources"))
+
+
+def universe_settings(configs: ConfigStore) -> tuple[str, UniverseSettings]:
+    """``config/site/universe.toml`` -> (source, settings). Missing file: CSV import mode."""
+    doc = site_document(configs, "universe")
+    settings = UniverseSettings.from_documents(doc, configs.overrides("leveraged_etfs"))
+    return str((doc or {}).get("source", "csv_import")), settings
