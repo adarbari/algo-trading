@@ -35,6 +35,7 @@ from algotrade_ingestion.sources.vendors.massive.corporate_actions import Massiv
 from algotrade_ingestion.sources.vendors.massive.tickers import MassiveTickers
 from algotrade_ingestion.sources.vendors.nasdaq.earnings import NasdaqEarningsSource
 from algotrade_ingestion.sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
+from algotrade_ingestion.sources.vendors.sec.company_facts import SecCompanyFacts
 from algotrade_ingestion.sources.vendors.sec.edgar import SecSubmissions, SecTickerMap, user_agent
 from algotrade_ingestion.sources.vendors.ssga.spy_holdings import SpyHoldingsSource
 from algotrade_ingestion.sources.vendors.treasury.par_yields import TreasuryParYields
@@ -125,6 +126,7 @@ SOURCES: dict[str, SourceSpec] = {
         _massive("massive_tickers", MassiveTickers),
         _sec("sec_tickers", SecTickerMap),
         _sec("sec_submissions", SecSubmissions),
+        _sec("sec_company_facts", SecCompanyFacts),
         SourceSpec("treasury", "treasury", "treasury", TreasuryParYields, 1.0),
     )
 }

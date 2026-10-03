@@ -48,3 +48,7 @@ medium_min_price = 5.0
 medium_option_tiers = "A,B"       # "" = no option requirement
 medium_min_chain_oi = 5_000
 medium_min_chain_volume = 0       # 0 = no requirement
+
+["fundamentals@v1"]
+stale_days = 400         # shares whose period ended longer ago than this are STALE (no market cap);
+                         # 10-Q filers report every ~3 months, 20-F filers once a year

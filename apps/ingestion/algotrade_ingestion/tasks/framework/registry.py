@@ -31,7 +31,12 @@ from algotrade_ingestion.tasks.market import (
     option_chains,
     rates,
 )
-from algotrade_ingestion.tasks.reference import company_details, universe_build, universe_import
+from algotrade_ingestion.tasks.reference import (
+    company_details,
+    shares,
+    universe_build,
+    universe_import,
+)
 
 type Params = Mapping[str, Any]
 GOLDEN_DIR = Path("datasets/golden")
@@ -116,6 +121,13 @@ def _company_details(ctx: TaskContext, p: Params) -> RunRecord:
     return company_details.ingest_company_details(
         ctx, sources, session_of(p), bool(p.get("force")), p.get("limit")
     )
+
+
+def _shares(ctx: TaskContext, p: Params) -> RunRecord:
+    sources = shares.SharesSources(
+        ctx.sources["sec_company_facts"], ctx.settings.sec_facts_refresh_days
+    )
+    return shares.ingest_shares(ctx, sources, session_of(p), bool(p.get("force")), p.get("limit"))
 
 
 def _earnings(ctx: TaskContext, p: Params) -> RunRecord:
@@ -232,6 +244,20 @@ TASKS: dict[str, Task] = {
             _company_details,
             sources=("sec_tickers", "sec_submissions"),
             settings="sources.toml [sec_edgar]",
+            params=(
+                SESSION,
+                Param("force", ("--force",), None, "refetch every company"),
+                Param("limit", ("--limit",), int, "fetch at most N companies this run"),
+            ),
+        ),
+        Task(
+            "shares",
+            "shares outstanding from SEC company facts (incremental)",
+            shares,
+            ("instruments/shares",),
+            _shares,
+            sources=("sec_company_facts",),
+            settings="sources.toml [sec_edgar] facts_refresh_days",
             params=(
                 SESSION,
                 Param("force", ("--force",), None, "refetch every company"),

@@ -56,6 +56,7 @@ def universe_exists(ctx: TaskContext, session: date) -> str | None:
 NIGHTLY: tuple[Step, ...] = (
     Step("universe-build", latest_only=True),
     Step("company-details", latest_only=True),
+    Step("shares", latest_only=True),
     Step("earnings"),
     Step("bars"),
     Step("rates"),

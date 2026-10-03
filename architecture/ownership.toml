@@ -146,6 +146,13 @@ detect = [
     { call_regex = "(^|\\.)(ingest_[a-z_]+|build_universe|import_universe|run_quality|compute_option_liquidity|load_golden|run_migrate_ids)$" },
 ]
 
+[[responsibility]]
+id = "refresh-scheduling"
+description = "Which keys (CIKs) an incremental reference task refetches on a session: new first, then each once per refresh_days on its own slot day (crc32 of the key), so refreshes spread over the window"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/reference/refresh.py"]
+section = "docs/data/vendors.md#refreshes-spread-over-the-window"
+detect = [{ call = "crc32" }, { call = "slot_day" }]
+
 # --------------------------------------------------------------------------- vendors
 
 [[responsibility]]
@@ -309,6 +316,10 @@ name = "instruments/company"
 owner = "apps/ingestion/algotrade_ingestion/tasks/reference/company_details.py"
 
 [[table]]
+name = "instruments/shares"
+owner = "apps/ingestion/algotrade_ingestion/tasks/reference/shares.py"
+
+[[table]]
 name = "chains/underlying_quotes"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/option_chains.py"
 
@@ -377,6 +388,10 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
 name = "rollups/instrument/liquidity_class@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
+name = "rollups/instrument/fundamentals@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]

@@ -86,7 +86,7 @@ VENDOR_EXTRAS = {
     "cboe": ("workers",),
     "nasdaq_earnings": ("days",),
     "massive": ("corporate_actions_window",),
-    "sec_edgar": ("refresh_days",),
+    "sec_edgar": ("refresh_days", "facts_refresh_days"),
     "treasury": ("lookback_days",),
 }
 
@@ -120,6 +120,7 @@ class SourcesSettings:
     earnings_days: int = 60
     actions_window: tuple[int, int] = (-7, 30)
     sec_refresh_days: int = 30
+    sec_facts_refresh_days: int = 30
     treasury_lookback_days: int = 10
     http_max_retry_s: float = 300.0
     http_breaker_failures: int = 10
@@ -163,6 +164,9 @@ class SourcesSettings:
             actions_window=(window[0], window[1]),
             sec_refresh_days=_extra(vendors, "sec_edgar").integer(
                 "refresh_days", d.sec_refresh_days, 0
+            ),
+            sec_facts_refresh_days=_extra(vendors, "sec_edgar").integer(
+                "facts_refresh_days", d.sec_facts_refresh_days, 0
             ),
             treasury_lookback_days=_extra(vendors, "treasury").integer(
                 "lookback_days", d.treasury_lookback_days, 1

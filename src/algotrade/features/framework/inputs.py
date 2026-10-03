@@ -17,6 +17,10 @@ answers ``at(session, lookback)`` with a frame sorted by ``session_date``:
                        later one, e.g. a declared future ex-date); ``event_date`` added, the
                        stored partition date dropped (it says when we learned it, not when it
                        happened); an empty frame when there are none
+- ``instruments/shares``
+                       ``data.shares.share_facts``: every stored share-count fact FILED on
+                       or before the session (point in time by filing date, whenever it was
+                       stored), sorted by ``filed``; ``None`` when there is none
 - ``rates/treasury``   ``data.rates.curve``: the curve the session sees (latest on or before;
                        ``curve_date`` and ``pre_snapshot`` added); ``None`` when none is stored
 - ``rollups/instrument/<name>@v<N>``
@@ -43,6 +47,8 @@ from algotrade.data.prices import SessionBars, session_bars
 from algotrade.data.rates import TABLE as TREASURY
 from algotrade.data.rates import curve
 from algotrade.data.rollups import rollup_rows
+from algotrade.data.shares import TABLE as SHARES
+from algotrade.data.shares import share_facts
 from algotrade.features.framework.graph import is_rollup_table
 
 
@@ -98,6 +104,11 @@ def _event_snapshots(table: str) -> Loader:
         return _Snapshots(frame, days)
 
     return load
+
+
+def _share_facts(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+    frame = share_facts(reader)
+    return _Snapshots(frame, _days(frame["filed"]) if len(frame) else np.array([], "datetime64[D]"))
 
 
 @dataclass(frozen=True)
@@ -185,6 +196,7 @@ LOADERS: Mapping[str, Loader] = {
     "events/dividend": _events_by_date("events/dividend"),
     "events/split": _events_by_date("events/split"),
     TREASURY: _partition(_treasury),
+    SHARES: _share_facts,
 }
 
 

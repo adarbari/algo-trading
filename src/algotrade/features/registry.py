@@ -14,6 +14,7 @@ from algotrade.features.framework.graph import dependency_order
 from algotrade.features.rollups import (
     dividends,
     earnings,
+    fundamentals,
     iv30,
     iv_history,
     liquidity_class,
@@ -32,6 +33,7 @@ ROLLUPS: dict[str, Rollup] = {
             iv30.ROLLUP,
             iv_history.ROLLUP,
             liquidity_class.ROLLUP,
+            fundamentals.ROLLUP,
         )
     )
 }
