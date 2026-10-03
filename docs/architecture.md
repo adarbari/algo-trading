@@ -244,7 +244,7 @@ jobs), `notify.py` (summary + notification).
   second run exits with code 3, or queues with `--wait`. Holding it, the CLI marks `nightly` /
   `screen` jobs left running by a crashed process as failed (`JobRunner.recover`), so they
   never block a re-run.
-- **Vendor pacing** is shared across processes too (`sources/limiter.py`, `var/run/limits/`).
+- **Vendor pacing** is shared across processes too (`sources/framework/limiter.py`, `var/run/limits/`).
 - **Readers** pick, per partition, the latest run with `knowledge_ts ≤ as_of`. A reader racing
   a writer sees either the old or the new run, never a mix.
 - **Configs** are resolved once per run and the hash is recorded; edits affect only later runs.
@@ -294,8 +294,42 @@ Extra contracts:
 | `analytics/` | Metrics and report formatting from equity curves + fills. | core |
 | `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. `selection/`: three-valued evaluation with a per-rule audit. | strategies, config, analytics, core |
 | `services/` | Use cases: `jobs`, `configs`, `selection`, `backtests`, `screening`, golden `datasets`, `exports`, `evaluation/`. | everything below except `storage.writers` and `storage.readers` (through `data/`) |
-| `apps/ingestion` | Sources (Cboe, HTTP with retries, synthetic/golden); `tasks/` (one module per dataset, run by `tasks/framework.py` `IngestRun` and declared once in `tasks/registry.py`); nightly workflow (`workflows/`: ordered, isolated registry tasks, catch-up, screens as jobs, notification); `algotrade-ingest`. | library |
+| `apps/ingestion` | `sources/` (`framework/`: protocols, HTTP with retries, pacing, the source registry; `vendors/<vendor>/`; `fixtures/`: synthetic/golden); `tasks/` (`framework/`: `IngestRun` in `run.py` and the task registry; one module per dataset in `reference/`, `market/`, `derived/`, `maintenance/`); nightly workflow (`workflows/nightly/`: ordered, isolated registry tasks, catch-up, screens as jobs, notification); `cli/` (`algotrade-ingest`); `ops/` (schedule). | library |
 | `apps/backtest` | `algotrade-backtest` (`algotrade` alias): datasets list, backtest (golden dataset or config, via jobs), evaluate, config validate/show. Reads only through `data/`. | library |
+
+### Directory layout (ADR 0020)
+
+One folder holds one kind of thing. `architecture/layout.toml` declares every directory under
+`src/` and `apps/` with a one-line purpose; `tests/architecture/test_layout.py` fails on a
+module in an undeclared directory, on a directory with more than 10 modules (today's library
+exceptions, `[[exception]]`, only shrink and go away in Layout PR B), and on a package whose
+`__init__.py` has no docstring. The ingestion app:
+
+```
+apps/ingestion/algotrade_ingestion/
+  cli/            main.py (argument parsing, console script), commands.py
+  ops/            schedule.py (launchd plist for the nightly)
+  sources/
+    framework/    base.py, http.py, limiter.py, registry.py      non-vendor machinery
+    vendors/      cboe/, massive/, nasdaq/, sec/, ssga/          one folder per vendor
+    fixtures/     the golden synthetic source
+  tasks/
+    framework/    run.py (IngestRun, TaskContext), registry.py   machinery
+    reference/    universe_build, universe_import, classify, instrument_ids, reference_diff,
+                  symbol_history, company_details
+    market/       bars, corporate_actions, earnings, option_chains
+    derived/      features
+    maintenance/  quality, purge, migrate_ids, golden
+  workflows/
+    nightly/      nightly, steps, sessions, screens, notify
+```
+
+Folder rules (tests + import-linter): a vendor folder registers at least one source in
+`sources/framework/registry.py` and nothing else imports it; vendors never import each other,
+nor `tasks`, `workflows`, `cli` or `ops`; tasks never import `sources.vendors`. A module in
+`tasks/<domain>/` is a registered task or a helper imported only inside its domain (or by the
+task registry); `[[shared]]` names the reasoned exceptions (the ingestion id rule,
+`reference/instrument_ids.py`).
 
 ### One bar in the backtest engine
 
@@ -387,16 +421,16 @@ doing it. The ratchet `architecture/known_violations.toml` is empty: any hit fai
 |---|---|
 | snapshot selection ("latest on or before D", else earliest + `pre_snapshot`) | `data/reference.py` |
 | market-data reads for consumers | `data/` |
-| run ids, run records, COMPLETE / PARTIAL | `storage/runs.py` (`start_run`, `RunRecord.finish` for screens and backtests), `services/jobs/`, ingestion `tasks/framework.py` (`IngestRun`) |
-| raw persistence, row stamping, id resolution in ingestion | `tasks/framework.py` (`IngestRun`) |
-| which ingestion steps run, with which defaults | `tasks/registry.py`; nightly order in `workflows/nightly.py` |
-| vendor HTTP, retries, retry cap, circuit breaker | `sources/http.py` |
-| rate limiting | `sources/limiter.py`, one per key, shared across threads and processes |
-| source construction (vendors and the golden fixture source) | `sources/registry.py` (vendor specifics stay in `sources/<vendor>.py`) |
+| run ids, run records, COMPLETE / PARTIAL | `storage/runs.py` (`start_run`, `RunRecord.finish` for screens and backtests), `services/jobs/`, ingestion `tasks/framework/run.py` (`IngestRun`) |
+| raw persistence, row stamping, id resolution in ingestion | `tasks/framework/run.py` (`IngestRun`) |
+| which ingestion steps run, with which defaults | `tasks/framework/registry.py`; nightly order in `workflows/nightly/nightly.py` |
+| vendor HTTP, retries, retry cap, circuit breaker | `sources/framework/http.py` |
+| rate limiting | `sources/framework/limiter.py`, one per key, shared across threads and processes |
+| source construction (vendors and the golden fixture source) | `sources/framework/registry.py` (vendor specifics stay in `sources/vendors/<vendor>/`) |
 | locks (flock, named store locks, run-index lock); the ingest run lock | `storage/locks.py`; `services/jobs/exclusive.py` |
 | session / exchange calendar | `core/calendar.py` |
 | job execution | `services/jobs/` (apps use `run_job`; fan-out `as_completed`) |
-| screen execution | `services/screening.py`, submitted as `screen` jobs (nightly: `workflows/screens.py`) |
+| screen execution | `services/screening.py`, submitted as `screen` jobs (nightly: `workflows/nightly/screens.py`) |
 | site settings: `config/site/*.toml` → typed objects | `config/settings.py` (the store only reads files) |
 | environment variables and `.env` | `config/env.py` (the storage factory receives the URL) |
 | table schemas: required columns, declared types, validation | `storage/schemas.py` |
@@ -429,22 +463,23 @@ the table name and `SCHEMA_VERSION` into each Parquet file. Details:
 An ingestion **task** produces stored tables and one run record; a **job** is something
 `services/jobs` runs (nightly, screens, backtests). In `apps/ingestion/algotrade_ingestion/tasks/`:
 
-- `framework.py`: `IngestRun`, the ingest loop written once. It creates the run id and
+- `framework/run.py`: `IngestRun`, the ingest loop written once. It creates the run id and
   record (resuming an unfinished one when asked), `fetch`es (raw payload saved as received,
   then normalised), records per-item status with exception capture, resolves tickers to ids
   through `algotrade.data`, stamps the point-in-time columns, validates and writes, and
   decides the status in one place: any failed item or explicit `partial` → PARTIAL; an
   exception → a saved FAILED record, re-raised. The clock is injected (`TaskContext.clock`).
-- `registry.py`: every task declared once: name, description, tables it writes (checked
+- `framework/registry.py`: every task declared once: name, description, tables it writes (checked
   against `[[table]]` producers in `architecture/ownership.toml`), sources it needs (by name
   in `TaskContext.sources`), the settings section it reads, its parameters (the CLI turns
   them into flags) and `run(ctx, params)`. Defaults from settings are applied here, so
   `algotrade-ingest <task>`, `algotrade-ingest run <task>` and nightly cannot drift.
-- one module per dataset (`bars.py`, `corporate_actions.py`, `earnings.py`, `option_chains.py`,
-  `company_details.py`, `universe_build.py`, `universe.py`, `features.py`, `quality.py`,
-  `purge.py`, `migrate_ids.py`, `golden.py`): only what to fetch, how to combine frames, task stats.
+- one module per dataset, grouped by domain (`market/`: `bars.py`, `corporate_actions.py`,
+  `earnings.py`, `option_chains.py`; `reference/`: `company_details.py`, `universe_build.py`,
+  `universe_import.py`; `derived/`: `features.py`; `maintenance/`: `quality.py`, `purge.py`,
+  `migrate_ids.py`, `golden.py`): only what to fetch, how to combine frames, task stats.
 
-Sources are built by the source registry (`sources/registry.py`, R4): each declared once with
+Sources are built by the source registry (`sources/framework/registry.py`, R4): each declared once with
 its `sources.toml` section, credential variable, limiter key and default pacing. A source whose
 section is disabled or whose variable is missing is left out with a reason; nightly skips the
 tasks that need it (`skipped: <reason>`) and an explicit run fails with it. Tasks receive

@@ -1,0 +1,190 @@
+# Directory layout registry (ADR 0020): every directory that may hold Python code, with what
+# it holds. One folder = one kind of thing. Enforced by tests/architecture/test_layout.py:
+#
+#   - every module under src/ and apps/ lives in a directory declared here (a new folder or a
+#     stray file fails: declare the folder here with its purpose, in the same PR);
+#   - at most `max_modules` modules (excluding __init__.py) per directory; split by kind
+#     instead. `[[exception]]` lists today's oversized directories and may only shrink: the
+#     test fails once a listed directory is back under the limit (then delete the entry);
+#   - every package has an __init__.py whose docstring says what the folder holds;
+#   - `kind = "vendor"`: one folder per vendor. It contributes at least one source to the
+#     source registry, and nothing outside the folder imports it except the registry;
+#   - `kind = "task-domain"`: registered tasks (tasks/framework/registry.py) or private
+#     helpers. A module is imported only within its own domain folder or by the task
+#     registry, unless it is listed in `[[shared]]` with the reason.
+#
+#   path     a directory relative to the repo root; `*` matches one path segment
+#   purpose  one line: what belongs in it
+#   kind     optional: "vendor" or "task-domain" (rules above)
+#
+# Adding a folder or moving a responsibility: .claude/skills/add-responsibility.
+
+doc = "docs/adr/0020-directory-layout.md"
+max_modules = 10
+source_registry = "apps/ingestion/algotrade_ingestion/sources/framework/registry.py"
+task_registry = "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py"
+
+# --------------------------------------------------------------------------- library (src/)
+# Declared as they are today; Layout PR B reorganises the library.
+
+[[dir]]
+path = "src/algotrade"
+purpose = "the shared library package root (no modules of its own)"
+
+[[dir]]
+path = "src/algotrade/core"
+purpose = "domain value objects, instruments, views, calendar, ids, errors; no I/O, no pandas"
+
+[[dir]]
+path = "src/algotrade/config"
+purpose = "typed L3/L4 configuration, site settings loader and the environment"
+
+[[dir]]
+path = "src/algotrade/storage"
+purpose = "generic data contract: schemas, store protocols, reader/writer facades, runs, locks"
+
+[[dir]]
+path = "src/algotrade/storage/backends"
+purpose = "storage backend implementations: the only code that knows physical layout"
+
+[[dir]]
+path = "src/algotrade/data"
+purpose = "the domain read API: the only way consumers read market data (R1)"
+
+[[dir]]
+path = "src/algotrade/features"
+purpose = "pure, versioned feature (rollup) definitions and their registry"
+
+[[dir]]
+path = "src/algotrade/analytics"
+purpose = "performance metrics and report formatting"
+
+[[dir]]
+path = "src/algotrade/strategies"
+purpose = "pure decision logic, split into trading strategies and screeners"
+
+[[dir]]
+path = "src/algotrade/strategies/trading"
+purpose = "backtest strategies and their registry"
+
+[[dir]]
+path = "src/algotrade/strategies/screeners"
+purpose = "screeners: pure point-in-time filters, and their registry"
+
+[[dir]]
+path = "src/algotrade/engines"
+purpose = "engines that run strategies or screeners over data views"
+
+[[dir]]
+path = "src/algotrade/engines/backtest"
+purpose = "the event-driven backtest engine: bar loop, risk, sizing, simulated broker, portfolio"
+
+[[dir]]
+path = "src/algotrade/engines/screening"
+purpose = "the screening engine: run a screener and audit its coverage"
+
+[[dir]]
+path = "src/algotrade/engines/selection"
+purpose = "the selection engine: evaluate a Selection with a per-rule audit"
+
+[[dir]]
+path = "src/algotrade/services"
+purpose = "use cases: the backend's interface for apps and the API"
+
+[[dir]]
+path = "src/algotrade/services/evaluation"
+purpose = "use case: evaluate every strategy on every golden dataset against the baseline"
+
+[[dir]]
+path = "src/algotrade/services/jobs"
+purpose = "long-running work as jobs: runner, models, handlers, exclusive runs"
+
+# --------------------------------------------------------------------------- backtest app
+
+[[dir]]
+path = "apps/backtest/algotrade_backtest"
+purpose = "the backtest app: algotrade-backtest CLI and its command bodies"
+
+# --------------------------------------------------------------------------- ingestion app
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion"
+purpose = "the ingestion app package root (only __main__)"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/cli"
+purpose = "algotrade-ingest: argument parsing (main) and command bodies (commands)"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/ops"
+purpose = "operating the app on a host: scheduling the nightly run"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/sources"
+purpose = "sources: framework, vendors and fixtures (no modules of its own)"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/sources/framework"
+purpose = "non-vendor source machinery: protocols, HTTP, pacing, the source registry"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/sources/vendors"
+purpose = "one folder per data vendor (no modules of its own)"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/sources/vendors/*"
+purpose = "one vendor: fetch + normalise only; registered in sources/framework/registry.py"
+kind = "vendor"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/sources/fixtures"
+purpose = "the golden synthetic fixture source (generators, catalogue, CSV files)"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks"
+purpose = "ingestion tasks by domain (no modules of its own)"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/framework"
+purpose = "task machinery: the ingest run loop (IngestRun, TaskContext) and the task registry"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/reference"
+purpose = "reference-data tasks: universe, instrument ids, classification, history, companies"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/market"
+purpose = "market-data tasks: bars, corporate actions, earnings, option chains"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/derived"
+purpose = "derived-data tasks: features and rollups from stored data"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/maintenance"
+purpose = "maintenance tasks: quality checks, raw purge, id migration, golden load"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/workflows"
+purpose = "workflows: ordered, isolated runs of registry tasks (no modules of its own)"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/workflows/nightly"
+purpose = "the nightly workflow: sessions, steps, screens, notifications"
+
+# --------------------------------------------------------------------------- exceptions
+
+[[exception]]
+path = "src/algotrade/core"
+until = "layout-pr-b"
+reason = "12 modules today; Layout PR B splits the library by kind"
+
+# --------------------------------------------------------------------------- shared helpers
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/reference/instrument_ids.py"
+reason = "the ingestion id rule (ADR 0018, `id-resolution`): golden and migrate-ids reuse it"

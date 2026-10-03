@@ -56,16 +56,30 @@ only shrinks (`make dupes-update`).
 | Responsibility | Owner |
 |---|---|
 | Which snapshot a read sees (on or before D, else earliest + `pre_snapshot`); domain reads of market data | `algotrade/data/` (`reference`, `prices`, `events`, `chains`); consumers never import `storage.readers` |
-| Run ids, run records, COMPLETE / PARTIAL | `storage/runs.py` (`start_run` + `RunRecord.finish` in services), `services/jobs/`; in ingestion `tasks/framework.py` (`IngestRun`): never write the loop in a task |
-| Raw save; stamping; ticker → id in ingestion | `tasks/framework.py` (`IngestRun`) |
-| Which ingestion steps run, with which defaults | `tasks/registry.py`; nightly order, isolation, catch-up: `workflows/nightly.py` |
-| Vendor HTTP, retries, circuit breaker; pacing; building sources (incl. the golden fixture source); vendor specifics | `sources/http.py`; `sources/limiter.py` (one per key, cross-process); `sources/registry.py`; `sources/<vendor>.py` |
+| Run ids, run records, COMPLETE / PARTIAL | `storage/runs.py` (`start_run` + `RunRecord.finish` in services), `services/jobs/`; in ingestion `tasks/framework/run.py` (`IngestRun`): never write the loop in a task |
+| Raw save; stamping; ticker → id in ingestion | `tasks/framework/run.py` (`IngestRun`) |
+| Which ingestion steps run, with which defaults | `tasks/framework/registry.py`; nightly order, isolation, catch-up: `workflows/nightly/nightly.py` |
+| Vendor HTTP, retries, circuit breaker; pacing; building sources (incl. the golden fixture source); vendor specifics | `sources/framework/http.py`; `sources/framework/limiter.py` (one per key, cross-process); `sources/framework/registry.py`; `sources/vendors/<vendor>/` |
 | Locks: named store locks, run-index lock; one ingest run at a time | `storage/locks.py`; `services/jobs/exclusive.py` |
 | Running long work (threads, recovery), screens | `services/jobs/` (apps call `run_job`, never build a runner; fan-out: `as_completed`); screens: `services/screening.py`, submitted as `screen` jobs |
 | Site settings (`config/site/*.toml` → frozen dataclasses); environment variables + `.env` | `config/settings.py` (one loader); `config/env.py` (storage and sources receive values as parameters) |
 | Session / exchange calendar (holidays, early closes, last closed session) | `core/calendar.py`; never compute weekdays elsewhere |
 | Table schemas (columns, declared types, validation); Parquet / Arrow I/O | `storage/schemas.py`; `storage/backends/` (`arrow.py`: casts, `schema_version`, row groups) |
 | Each stored table | exactly one producing module (`[[table]]` in the registry) |
+| Which directory a module belongs in | `architecture/layout.toml` (see Directory layout below) |
+
+## Directory layout (ADR 0020; enforced by `tests/architecture/test_layout.py`)
+
+One folder holds one kind of thing. `architecture/layout.toml` declares every directory under
+`src/` and `apps/` with its purpose and rules; a new folder (or a module in an undeclared one)
+fails CI until it is declared there in the same PR. At most 10 modules per folder (split by
+kind; `[[exception]]` entries only shrink), and every `__init__.py` docstring says what the
+folder holds. In `apps/ingestion/algotrade_ingestion/`: `cli/`, `ops/`;
+`sources/framework/` (protocols, HTTP, pacing, the source registry), `sources/vendors/<vendor>/`
+(one folder per vendor, imported only by the source registry; vendors never import each
+other), `sources/fixtures/` (golden synthetic source); `tasks/framework/` (`IngestRun`, the
+task registry), `tasks/<domain>/` (`reference`, `market`, `derived`, `maintenance`: registered
+tasks and helpers used only inside their domain); `workflows/nightly/`.
 
 ## Code rules (enforced by CI; follow them up front)
 

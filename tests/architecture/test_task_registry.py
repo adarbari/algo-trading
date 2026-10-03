@@ -13,10 +13,10 @@ from pathlib import Path
 
 import pytest
 
-from algotrade_ingestion import cli
-from algotrade_ingestion.sources.registry import FIXTURES, SOURCES
-from algotrade_ingestion.tasks.registry import TASKS
-from algotrade_ingestion.workflows.nightly import FINALLY, NIGHTLY, SCREENS
+from algotrade_ingestion.cli import main as cli
+from algotrade_ingestion.sources.framework.registry import FIXTURES, SOURCES
+from algotrade_ingestion.tasks.framework.registry import TASKS
+from algotrade_ingestion.workflows.nightly.nightly import FINALLY, NIGHTLY, SCREENS
 from tests.conftest import REPO_ROOT
 
 REGISTRY = tomllib.loads((REPO_ROOT / "architecture" / "ownership.toml").read_text())
@@ -52,7 +52,9 @@ def test_task_tables_match_the_ownership_registry(name: str) -> None:
 def test_every_producing_task_module_is_registered() -> None:
     registered = {_module_path(t.module) for t in TASKS.values()}
     producing = {p for p in _producers() if p.startswith(TASKS_DIR)}
-    assert producing <= registered, f"not in tasks/registry.py: {sorted(producing - registered)}"
+    assert producing <= registered, (
+        f"not in tasks/framework/registry.py: {sorted(producing - registered)}"
+    )
 
 
 @pytest.mark.parametrize("name", sorted(TASKS))
@@ -86,8 +88,8 @@ def test_every_nightly_step_has_a_status_in_the_result() -> None:
 
     from algotrade.storage.backends.memory import MemoryBackend  # noqa: PLC0415
     from algotrade.storage.writers import StoreWriter  # noqa: PLC0415
-    from algotrade_ingestion.workflows.nightly import run_nightly  # noqa: PLC0415
-    from algotrade_ingestion.workflows.sessions import Plan  # noqa: PLC0415
+    from algotrade_ingestion.workflows.nightly.nightly import run_nightly  # noqa: PLC0415
+    from algotrade_ingestion.workflows.nightly.sessions import Plan  # noqa: PLC0415
     from tests.ingest_helpers import task_ctx  # noqa: PLC0415
 
     summary = run_nightly(task_ctx(StoreWriter(MemoryBackend())), Plan([date(2026, 10, 2)]))

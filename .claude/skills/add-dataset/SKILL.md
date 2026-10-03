@@ -12,7 +12,7 @@ module to `architecture/ownership.toml` (a test enforces it). Reading it for con
 through the market-data read owner (`algotrade/data/`: add a function to `reference`,
 `prices`, `events` or `chains`), with the one snapshot rule (`data.reference.snapshot`);
 never add another `latest_date(` call site. Writing it goes through the
-ingest loop owner, `IngestRun` in `apps/ingestion/.../tasks/framework.py` (run records, raw
+ingest loop owner, `IngestRun` in `apps/ingestion/.../tasks/framework/run.py` (run records, raw
 save, stamping, id resolution), not a copy of it. New site settings for it are read by the
 settings owner and must drive code (a test checks).
 
@@ -30,14 +30,17 @@ settings owner and must drive code (a test checks).
    idempotent rewrite, schema rejection). Every backend must pass.
 6. **Golden fixtures:** if backtests or screeners will read it, add synthetic fixtures so
    CI exercises it.
-7. **Ingestion task:** write `tasks/<dataset>.py` with only the task's own logic (what to
+7. **Ingestion task:** write `tasks/<domain>/<dataset>.py` (domain: `reference`, `market`,
+   `derived` or `maintenance`; a new domain folder is declared in `architecture/layout.toml`
+   first) with only the task's own logic (what to
    fetch, how to combine frames, task stats) inside `with IngestRun(ctx, TASK, session) as
    run:` using `run.fetch`, `run.attempt` (per-item status), `run.resolve`, `run.write`
    (stamps + validates) and `run.partial`. Never write the loop: no `RunRecord`,
    `new_run_id`, `raw.put` or stamping in a task. Then declare it **once** in
-   `tasks/registry.py` (name, description, module, tables = the `[[table]]` entries,
+   `tasks/framework/registry.py` (name, description, module, tables = the `[[table]]` entries,
    sources by name, settings section, params, `run(ctx, params)` applying defaults from
    settings). The CLI command (`algotrade-ingest <name>` and `run <name>`) comes from the
-   declaration; add a `Step` to `workflows/nightly.NIGHTLY` if it runs nightly.
+   declaration; add a `Step` to `workflows/nightly/nightly.py` `NIGHTLY` if it runs nightly.
+   Helpers it needs stay in the same domain folder (`tests/architecture/test_layout.py`).
    `tests/architecture/test_task_registry.py` checks tables and CLI reachability.
 8. Update `docs/data/storage.md` and run `make check`.

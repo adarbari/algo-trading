@@ -8,27 +8,31 @@ description: Add a new market data vendor or source adapter (e.g. IBKR, Massive,
 Read first: `docs/data/vendors.md`, `docs/data/storage.md`, ADRs 0005, 0006, 0008 and 0012.
 
 **Ownership check (ADR 0019):** a source owns only fetch + normalise for its vendor. HTTP,
-retries, the retry cap and the circuit breaker belong to `sources/http.py`; pacing belongs to
-the shared limiter (`sources/limiter.py`, one per key across threads and processes); building
+retries, the retry cap and the circuit breaker belong to `sources/framework/http.py`; pacing belongs to
+the shared limiter (`sources/framework/limiter.py`, one per key across threads and processes); building
 the source from `config/site/sources.toml` belongs to the source registry
-(`sources/registry.py`); raw saving, id resolution, stamping and run records belong to the
-ingest loop (`tasks/framework.py`, `IngestRun`). **Never pace, sleep or build a source
+(`sources/framework/registry.py`); raw saving, id resolution, stamping and run records belong to the
+ingest loop (`tasks/framework/run.py`, `IngestRun`). **Never pace, sleep or build a source
 yourself**: the source takes one `Http` client and calls `http.get(url)`. Keep every vendor detail (file
-names, request keys, response fields) inside `sources/<vendor>.py`; never import
+names, request keys, response fields) inside `sources/vendors/<vendor>/`; never import
 `algotrade.storage` (contract R4). New `sources.toml` keys are typed in
 `src/algotrade/config/settings.py`. Look these up in `architecture/ownership.toml`; `make ownership`
 must pass with `architecture/known_violations.toml` still empty.
 
-1. **Location:** `apps/ingestion/sources/<vendor>.py`, one module per vendor. If it grows past
-   about 300 lines, split it into a package (`client.py`, `mapping.py`, `limits.py`). Nothing
-   outside `apps/ingestion` may import it.
-2. **Implement `sources/base.py` `Source`:** `name`, `dataset`, `fetch(FetchRequest) -> bytes | None`
+1. **Location:** a new folder `apps/ingestion/algotrade_ingestion/sources/vendors/<vendor>/`
+   with an `__init__.py` docstring naming the vendor, and one module per dataset it serves
+   (e.g. `bars.py`); shared auth / paging goes in `client.py` (see `vendors/massive/`). The
+   folder is covered by the `sources/vendors/*` entry in `architecture/layout.toml`
+   (`tests/architecture/test_layout.py`): it must register at least one source (step 5), only
+   `sources/framework/registry.py` may import it, and vendors never import each other (an
+   import-linter independence contract: add the new folder to it in `pyproject.toml`).
+2. **Implement `sources/framework/base.py` `Source`:** `name`, `dataset`, `fetch(FetchRequest) -> bytes | None`
    (raw, exactly as received; `None` only for a genuine "nothing there", never for errors)
    and `normalize(FetchRequest, bytes) -> Normalized | None` (canonical frames keyed by
    storage table, without point-in-time columns). Its constructor takes one `Http` (tests:
    `tests.ingest_helpers.http_for(fake_transport)`). Rows keyed by a vendor ticker carry
    `symbol`; the task resolves `instrument_id` through the reference (ADR 0018). Register the adapter in
-   `tests/apps/ingestion/test_source_contract.py::ADAPTERS` with a canned payload.
+   `tests/apps/ingestion/sources/test_source_contract.py::ADAPTERS` with a canned payload.
 3. **Raw is saved for you:** tasks call `IngestRun.fetch(source, request)`, which saves the
    response as received under `raw/` before normalising. Normalisation must be re-runnable
    from raw alone. A source that needs several requests for one window (one per event kind)
@@ -38,18 +42,18 @@ must pass with `architecture/known_violations.toml` still empty.
    requests per 10 min = 10 s). The registry's limiter enforces it across every process; never
    call `time.sleep` in a source (a fitness test fails). Tasks checkpoint through
    `IngestRun.checkpoint()`.
-5. **Register it:** add one `SourceSpec` per source to `SOURCES` in `sources/registry.py`:
+5. **Register it:** add one `SourceSpec` per source to `SOURCES` in `sources/framework/registry.py`:
    name (e.g. `massive_bars`), section, limiter key (one per vendor host; sources sharing a key
    share the section), default `min_interval_s`, the credential variable and how it becomes
    headers (`Authorization`, a `User-Agent`), retry tries, and the class (built from `Http`).
-   Then declare the task that uses it in `tasks/registry.py` (see `add-dataset`). Tasks get it
+   Then declare the task that uses it in `tasks/framework/registry.py` (see `add-dataset`). Tasks get it
    as `ctx.sources["<name>"]`; they never import vendor modules (contract R3). A disabled
    section or a missing variable leaves the source out, and tasks needing it are skipped with
    that reason.
 6. **Secrets:** only from environment variables (`ALGOTRADE_<VENDOR>_*`), named in the
    `SourceSpec` and read through `env.credential`. Add placeholders to `.env.example`.
-7. **Tests:** save real responses as fixtures under `tests/fixtures/sources/<vendor>/`
-   (strip account ids). Unit-test normalisation, error handling (429s, gateway down,
+7. **Tests:** mirror the folder (`tests/apps/ingestion/sources/vendors/<vendor>/`). Save real
+   responses as fixtures under `tests/fixtures/sources/<vendor>/` (strip account ids). Unit-test normalisation, error handling (429s, gateway down,
    partial responses) and symbol mapping. No network access in CI.
 8. **Data quality:** validation in `storage/schemas.py` must pass. Add vendor-specific
    sanity checks (for example bid ≤ ask, open interest ≥ 0).

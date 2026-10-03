@@ -29,7 +29,7 @@ algotrade-ingest quality                        # data-quality checks for a sess
 algotrade-ingest schedule --time 23:30          # writes a launchd agent; prints install commands
 algotrade-ingest purge-raw [--keep-days 90]     # + unfinished-run scratch older than 14 days (defaults: sources.toml)
 algotrade-ingest migrate-ids [--dry-run]        # symbol ids -> FIGI ids per instruments/id_map (new runs, ADR 0018)
-algotrade-ingest run <task> [--date D | --from D --to D]   # any registry task (tasks/registry.py), same flags
+algotrade-ingest run <task> [--date D | --from D --to D]   # any registry task (tasks/framework/registry.py), same flags
 ```
 
 Source switches, pacing, retention and quality thresholds live in
@@ -89,9 +89,18 @@ Each app declares only its own dependencies; `uv.lock` pins everything (`make lo
 
 ## Layout
 
+Every directory under `src/` and `apps/` is declared, with its purpose, in
+[`architecture/layout.toml`](architecture/layout.toml) (one kind of thing per folder, at most
+10 modules; checked by `tests/architecture/test_layout.py`, ADR 0020).
+
 ```
 apps/
-  ingestion/    algotrade-ingest: sources (Cboe, ...), tasks (IngestRun + registry), nightly. Only writer of data.
+  ingestion/    algotrade-ingest. Only writer of data. In algotrade_ingestion/:
+    cli/          argument parsing (main.py) and command bodies
+    ops/          scheduling (launchd)
+    sources/      framework/ (protocols, HTTP, pacing, registry), vendors/<vendor>/, fixtures/
+    tasks/        framework/ (IngestRun, registry), reference/, market/, derived/, maintenance/
+    workflows/    nightly/
   backtest/     algotrade-backtest: datasets, backtest, evaluate
 src/algotrade/  shared library
   core/         domain types, MarketView, FeatureView, instruments (no pandas, no I/O)
@@ -108,7 +117,7 @@ tests/
   property/     hypothesis invariants (no look-ahead, accounting identity, no shorts)
   integration/  real data + engine stack across the golden set
   e2e/          the CLIs, end to end, against committed data + baseline
-  architecture/ structural rules (file length, docs, test mirroring)
+  architecture/ structural rules (layout, ownership, file length, docs, test mirroring)
 datasets/golden/   committed, checksummed synthetic CSVs; `make golden-store` loads them into
                    datasets/golden/store (git-ignored), the store backtests and CI read
 benchmarks/        baseline.json: golden-master results

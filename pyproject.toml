@@ -61,6 +61,7 @@ ignore = ["PLR0913", "PLR0917", "PLR2004"]
 [tool.ruff.lint.per-file-ignores]
 "apps/*/*/cli.py" = ["T20"]
 "apps/*/*/commands.py" = ["T20"]
+"apps/*/*/cli/*.py" = ["T20"]
 "scripts/**" = ["T20"]
 "tests/**" = ["PLR2004", "S101"]
 
@@ -195,24 +196,62 @@ source_modules = ["algotrade_ingestion.sources"]
 forbidden_modules = [
     "algotrade_ingestion.tasks",
     "algotrade_ingestion.workflows",
-    "algotrade_ingestion.commands",
     "algotrade_ingestion.cli",
-    "algotrade_ingestion.schedule",
+    "algotrade_ingestion.ops",
     "algotrade.config.settings",
     "algotrade.services",
     "algotrade.engines",
     "algotrade.strategies",
 ]
 
+# ---- Directory layout (architecture/layout.toml, tests/architecture/test_layout.py).
+
 [[tool.importlinter.contracts]]
-name = "Ingestion steps never import their entry points (CLI, commands, nightly workflow)"
+name = "Layout: vendors never import each other (one folder per vendor)"
+type = "independence"
+modules = [
+    "algotrade_ingestion.sources.vendors.cboe",
+    "algotrade_ingestion.sources.vendors.massive",
+    "algotrade_ingestion.sources.vendors.nasdaq",
+    "algotrade_ingestion.sources.vendors.sec",
+    "algotrade_ingestion.sources.vendors.ssga",
+]
+
+[[tool.importlinter.contracts]]
+name = "Layout: vendors never import tasks, workflows, the CLI or ops"
+type = "forbidden"
+source_modules = ["algotrade_ingestion.sources.vendors"]
+forbidden_modules = [
+    "algotrade_ingestion.tasks",
+    "algotrade_ingestion.workflows",
+    "algotrade_ingestion.cli",
+    "algotrade_ingestion.ops",
+]
+
+[[tool.importlinter.contracts]]
+name = "Layout: only the source registry imports vendor folders"
+type = "forbidden"
+source_modules = [
+    "algotrade_ingestion.cli",
+    "algotrade_ingestion.ops",
+    "algotrade_ingestion.workflows",
+    "algotrade_ingestion.tasks",
+    "algotrade_ingestion.sources.fixtures",
+    "algotrade_ingestion.sources.framework.base",
+    "algotrade_ingestion.sources.framework.http",
+    "algotrade_ingestion.sources.framework.limiter",
+]
+forbidden_modules = ["algotrade_ingestion.sources.vendors"]
+allow_indirect_imports = true  # cli -> sources.framework.registry -> vendors is the design
+
+[[tool.importlinter.contracts]]
+name = "Ingestion steps never import their entry points (CLI, nightly workflow, ops)"
 type = "forbidden"
 source_modules = ["algotrade_ingestion.tasks"]
 forbidden_modules = [
     "algotrade_ingestion.cli",
-    "algotrade_ingestion.commands",
     "algotrade_ingestion.workflows",
-    "algotrade_ingestion.schedule",
+    "algotrade_ingestion.ops",
 ]
 
 [[tool.importlinter.contracts]]
@@ -220,7 +259,6 @@ name = "R5: apps never build a job runner (they run jobs through the services.jo
 type = "forbidden"
 source_modules = [
     "algotrade_ingestion.cli",
-    "algotrade_ingestion.commands",
     "algotrade_ingestion.workflows",
     "algotrade_ingestion.tasks",
     "algotrade_backtest",
@@ -233,15 +271,11 @@ name = "R3: ingestion tasks never import vendor modules (sources come from the r
 type = "forbidden"
 source_modules = ["algotrade_ingestion.tasks"]
 forbidden_modules = [
-    "algotrade_ingestion.sources.cboe",
-    "algotrade_ingestion.sources.massive",
-    "algotrade_ingestion.sources.nasdaq_earnings",
-    "algotrade_ingestion.sources.nasdaq_trader",
-    "algotrade_ingestion.sources.sec_edgar",
-    "algotrade_ingestion.sources.spy_holdings",
-    "algotrade_ingestion.sources.registry",
-    "algotrade_ingestion.sources.http",
-    "algotrade_ingestion.sources.limiter",
+    "algotrade_ingestion.sources.vendors",
+    "algotrade_ingestion.sources.fixtures",
+    "algotrade_ingestion.sources.framework.registry",
+    "algotrade_ingestion.sources.framework.http",
+    "algotrade_ingestion.sources.framework.limiter",
 ]
 
 [[tool.importlinter.contracts]]

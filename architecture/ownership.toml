@@ -45,7 +45,7 @@ description = "Create run ids and run records and decide COMPLETE / PARTIAL for 
 owner = [
     "src/algotrade/storage/runs.py",
     "src/algotrade/services/jobs/*",
-    "apps/ingestion/algotrade_ingestion/tasks/framework.py",
+    "apps/ingestion/algotrade_ingestion/tasks/framework/run.py",
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
 detect = [{ call = "RunRecord" }, { call = "new_run_id" }, { attr = "RunStatus.PARTIAL" }]
@@ -53,14 +53,14 @@ detect = [{ call = "RunRecord" }, { call = "new_run_id" }, { attr = "RunStatus.P
 [[responsibility]]
 id = "raw-persistence"
 description = "Save vendor payloads as received to the raw store before parsing"
-owner = ["src/algotrade/storage/backends/*", "apps/ingestion/algotrade_ingestion/tasks/framework.py"]
+owner = ["src/algotrade/storage/backends/*", "apps/ingestion/algotrade_ingestion/tasks/framework/run.py"]
 section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
 detect = [{ call = "raw.put" }]
 
 [[responsibility]]
 id = "row-stamping"
 description = "Add the point-in-time columns (session_date, knowledge_ts, source, run_id) to stored rows"
-owner = ["apps/ingestion/algotrade_ingestion/tasks/framework.py"]
+owner = ["apps/ingestion/algotrade_ingestion/tasks/framework/run.py"]
 section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
 detect = [{ call = "stamp" }]
 
@@ -70,8 +70,8 @@ description = "Turn vendor tickers into instrument ids (ADR 0018); build EQ: ids
 owner = [
     "src/algotrade/core/instruments.py",
     "src/algotrade/data/resolver.py",
-    "apps/ingestion/algotrade_ingestion/tasks/instrument_ids.py",
-    "apps/ingestion/algotrade_ingestion/tasks/framework.py",
+    "apps/ingestion/algotrade_ingestion/tasks/reference/instrument_ids.py",
+    "apps/ingestion/algotrade_ingestion/tasks/framework/run.py",
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
 detect = [{ call = "with_ids" }, { call = "equity_id" }, { string_prefix = "EQ:" }]
@@ -80,7 +80,7 @@ detect = [{ call = "with_ids" }, { call = "equity_id" }, { string_prefix = "EQ:"
 id = "ingestion-step-dispatch"
 description = "Decide which ingestion steps run, in what order, with which defaults (CLI, nightly): tasks are declared once in the registry; nightly is an ordered list of isolated task steps"
 owner = [
-    "apps/ingestion/algotrade_ingestion/tasks/registry.py",
+    "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",
     "apps/ingestion/algotrade_ingestion/workflows/*",
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
@@ -93,7 +93,7 @@ detect = [
 [[responsibility]]
 id = "vendor-http"
 description = "HTTP transport to vendors, auth headers, polite retries and backoff"
-owner = ["apps/ingestion/algotrade_ingestion/sources/http.py"]
+owner = ["apps/ingestion/algotrade_ingestion/sources/framework/http.py"]
 section = "docs/adr/0019-ownership-and-boundaries.md#r3-tasks-get-sources-from-the-registry"
 detect = [
     { import = "urllib.request" },
@@ -107,19 +107,19 @@ detect = [
 [[responsibility]]
 id = "rate-limiting"
 description = "Pace requests to a vendor: one limiter per key, shared across threads and processes (file lock under var/run/limits)"
-owner = ["apps/ingestion/algotrade_ingestion/sources/limiter.py"]
-allowed = ["apps/ingestion/algotrade_ingestion/sources/http.py"]  # retry backoff waits (Retry-After), not pacing
+owner = ["apps/ingestion/algotrade_ingestion/sources/framework/limiter.py"]
+allowed = ["apps/ingestion/algotrade_ingestion/sources/framework/http.py"]  # retry backoff waits (Retry-After), not pacing
 section = "docs/adr/0019-ownership-and-boundaries.md#r3-tasks-get-sources-from-the-registry"
 detect = [{ call = "MinInterval" }, { attr = "time.sleep" }]
 
 [[responsibility]]
 id = "source-construction"
-description = "Build vendor sources (transport, credentials, pacing, retries) from config/site/sources.toml, and fixture sources (the golden CSVs) from a directory: each source declared once in sources/registry.py; vendor specifics stay in sources/"
-owner = ["apps/ingestion/algotrade_ingestion/sources/registry.py"]
+description = "Build vendor sources (transport, credentials, pacing, retries) from config/site/sources.toml, and fixture sources (the golden CSVs) from a directory: each source declared once in sources/framework/registry.py; vendor specifics stay in sources/"
+owner = ["apps/ingestion/algotrade_ingestion/sources/framework/registry.py"]
 allowed = ["apps/ingestion/algotrade_ingestion/sources/*"]  # vendor modules import their own helpers (http, base, sec_sic)
 section = "docs/adr/0019-ownership-and-boundaries.md#r3-tasks-get-sources-from-the-registry"
 detect = [
-    { import = "algotrade_ingestion.sources", except = ["algotrade_ingestion.sources.base", "algotrade_ingestion.sources.registry"] },
+    { import = "algotrade_ingestion.sources", except = ["algotrade_ingestion.sources.framework.base", "algotrade_ingestion.sources.framework.registry"] },
     { string = "nasdaqlisted" },
     { string = "otherlisted" },
     { string = "dividends" },
@@ -150,7 +150,7 @@ detect = [
 id = "locking"
 description = "Exclusive locks across threads and processes (flock): named store locks and the partition run-index lock (storage); the one-writer ingest run lock (services/jobs)"
 owner = ["src/algotrade/storage/locks.py", "src/algotrade/services/jobs/exclusive.py"]
-allowed = ["apps/ingestion/algotrade_ingestion/sources/limiter.py"]  # sources never import storage (R4): the limiter flocks its own state file
+allowed = ["apps/ingestion/algotrade_ingestion/sources/framework/limiter.py"]  # sources never import storage (R4): the limiter flocks its own state file
 section = "docs/adr/0019-ownership-and-boundaries.md#r2-storage-is-generic"
 detect = [{ import = "fcntl" }, { call = "flock" }]
 
@@ -197,91 +197,91 @@ detect = [
 
 [[responsibility]]
 id = "screen-execution"
-description = "Run a configured screen (select, screen, audit, write results); nightly submits `screen` jobs (workflows/screens.py)"
+description = "Run a configured screen (select, screen, audit, write results); nightly submits `screen` jobs (workflows/nightly/screens.py)"
 owner = ["src/algotrade/services/screening.py", "src/algotrade/services/jobs/handlers.py"]
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
 detect = [{ call = "run_screener" }]
 
 # --------------------------------------------------------------------------- stored tables
 # Every stored table has exactly one producing owner (tests/architecture/test_ownership.py),
-# and every ingestion task in tasks/registry.py declares exactly the tables its module produces.
+# and every ingestion task in tasks/framework/registry.py declares exactly the tables its module produces.
 # `also_written_by` lists today's extra writers: each is restructure work, not precedent.
 
 [[table]]
 name = "universe"
-owner = "apps/ingestion/algotrade_ingestion/tasks/universe_build.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/universe.py"
-also_written_by = ["apps/ingestion/algotrade_ingestion/tasks/universe.py"]
+owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_build.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"
+also_written_by = ["apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"]
 
 [[table]]
 name = "instruments/reference"
-owner = "apps/ingestion/algotrade_ingestion/tasks/universe_build.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/universe.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_build.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"
 also_written_by = [
-    "apps/ingestion/algotrade_ingestion/tasks/universe.py",
-    "apps/ingestion/algotrade_ingestion/tasks/golden.py",
+    "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py",
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/golden.py",
 ]
 
 [[table]]
 name = "instruments/symbol_history"
-owner = "apps/ingestion/algotrade_ingestion/tasks/universe_build.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/universe.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_build.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"
 
 [[table]]
 name = "instruments/id_map"
-owner = "apps/ingestion/algotrade_ingestion/tasks/universe_build.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/universe.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_build.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"
 
 [[table]]
 name = "instruments/company"
-owner = "apps/ingestion/algotrade_ingestion/tasks/company_details.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/reference/company_details.py"
 
 [[table]]
 name = "chains/underlying_quotes"
-owner = "apps/ingestion/algotrade_ingestion/tasks/option_chains.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/market/option_chains.py"
 
 [[table]]
 name = "chains/option_quotes"
-owner = "apps/ingestion/algotrade_ingestion/tasks/option_chains.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/market/option_chains.py"
 
 [[table]]
 name = "chains/status"
-owner = "apps/ingestion/algotrade_ingestion/tasks/option_chains.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/market/option_chains.py"
 
 [[table]]
 name = "bars/1d"
-owner = "apps/ingestion/algotrade_ingestion/tasks/bars.py"
-also_written_by = ["apps/ingestion/algotrade_ingestion/tasks/golden.py"]
+owner = "apps/ingestion/algotrade_ingestion/tasks/market/bars.py"
+also_written_by = ["apps/ingestion/algotrade_ingestion/tasks/maintenance/golden.py"]
 
 [[table]]
 name = "events/split"
-owner = "apps/ingestion/algotrade_ingestion/tasks/corporate_actions.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/market/corporate_actions.py"
 
 [[table]]
 name = "events/dividend"
-owner = "apps/ingestion/algotrade_ingestion/tasks/corporate_actions.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/market/corporate_actions.py"
 
 [[table]]
 name = "events/earnings"
-owner = "apps/ingestion/algotrade_ingestion/tasks/earnings.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/market/earnings.py"
 
 [[table]]
 name = "events/reference_change"
-owner = "apps/ingestion/algotrade_ingestion/tasks/universe_build.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/universe.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_build.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"
 
 [[table]]
 name = "events/index_change"
-owner = "apps/ingestion/algotrade_ingestion/tasks/universe_build.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/universe.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_build.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"
 
 [[table]]
 name = "rollups/instrument/option_liquidity@v1"
-owner = "apps/ingestion/algotrade_ingestion/tasks/features.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/features.py"
 
 [[table]]
 name = "rollups/daily/*"
-owner = "apps/ingestion/algotrade_ingestion/tasks/features.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/features.py"
 note = "none produced yet (phase 6); rollups are computed only by the features task"
 
 [[table]]
@@ -291,7 +291,7 @@ note = "one results/<name> per screener (services/screening.py) or backtest outp
 
 [[table]]
 name = "catalog/golden_datasets"
-owner = "apps/ingestion/algotrade_ingestion/tasks/golden.py"
+owner = "apps/ingestion/algotrade_ingestion/tasks/maintenance/golden.py"
 
 # Every table may additionally be rewritten by the one-off id migration (ADR 0018):
-# apps/ingestion/algotrade_ingestion/tasks/migrate_ids.py (an admin command, not a producer).
+# apps/ingestion/algotrade_ingestion/tasks/maintenance/migrate_ids.py (an admin command, not a producer).

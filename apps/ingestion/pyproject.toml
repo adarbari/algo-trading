@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-algotrade-ingest = "algotrade_ingestion.cli:main"
+algotrade-ingest = "algotrade_ingestion.cli.main:main"
 
 [tool.uv.sources]
 algotrade = { workspace = true }

@@ -5,9 +5,9 @@ staging_retention_days = 14      # scratch left by unfinished runs (no resume af
 
 # Each vendor section: `enabled` (off: its sources are not built and tasks needing them are
 # skipped) and `min_interval_s`, the spacing between requests to that vendor, shared by every
-# worker thread and every process on this machine (apps/ingestion/sources/limiter.py).
+# worker thread and every process on this machine (apps/ingestion/sources/framework/limiter.py).
 
-[http]                           # every vendor request (sources/http.py)
+[http]                           # every vendor request (sources/framework/http.py)
 max_retry_s = 300                # give up on one request after retrying for this long
 breaker_failures = 10            # this many 403/5xx in a row from a vendor: fail its remaining items fast
 limits_dir = "var/run/limits"    # shared pacing state, one lock file per vendor (git-ignored)
