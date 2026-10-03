@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling>=1.25"]
+requires = ["hatchling>=1.32.4"]
 build-backend = "hatchling.build"
 
 # The shared library. Apps are separate packages in the uv workspace below (ADR 0004):

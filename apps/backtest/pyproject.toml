@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling>=1.25"]
+requires = ["hatchling>=1.32.4"]
 build-backend = "hatchling.build"
 
 # The backtest app: research CLI. Reads data only through storage readers (ADR 0008).
