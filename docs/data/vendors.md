@@ -13,9 +13,31 @@ swapping a vendor never touches storage, features, strategies or the UI.
 | Ticker universe | Nasdaq Trader symbol directory (`nasdaqlisted.txt`, `otherlisted.txt`, `options.txt`) | — | Official, free, updated daily |
 | S&P 500 membership | SPY daily holdings file (State Street) | — | Membership changes become events |
 | Daily stock and ETF bars (swing / momentum) | Massive (formerly Polygon) free tier: all US tickers, 2 years history, 5 calls/min; "grouped daily" = whole market in 1 call | Alpaca (free account), IBKR, Yahoo (unofficial, history backfill only) | |
-| End-of-day option chains | **IBKR** (you have an account) for a focused list; see below | Schwab Trader API (free with account; Greeks; all expiries in one call; 120 req/min); Tradier (needs a brokerage account for Greeks); Alpaca (free indicative feed, history from 2024-02); Massive options (paid, from ~$29/mo, needed for the full universe in bulk) | No free source covers end-of-day chains for the whole universe with history. **We build our own IV history from day one.** |
+| End-of-day option chains | **Cboe delayed-quotes feed** (ADR 0014): whole chain + Greeks + IV + OI and the underlying's `iv30` in one request per underlying; about 4.2k requests a night | IBKR for a focused list / cross-check; Schwab Trader API (free with account; Greeks; all expiries in one call; 120 req/min); Tradier (needs a brokerage account for Greeks); Alpaca (free indicative feed, history from 2024-02); Massive options (paid, from ~$29/mo; licensed fallback) | No free source covers end-of-day chains for the whole universe with history. **We build our own IV history from day one.** |
 | Futures (later) | **IBKR** (contracts, history, including recently expired) | Databento (pay-as-you-go history), Massive futures (paid), Yahoo/Stooq continuous (unofficial, unclear rolls) | |
 | Synthetic | `sources/synthetic.py` (golden datasets) | — | Lets the whole pipeline run in CI with no account |
+
+## Cboe delayed-quotes feed (primary for options)
+
+`https://cdn-api.cboe.com/api/global/delayed_quotes/options/<SYMBOL>.json` (index options
+use a leading underscore, e.g. `_SPX`). Checked 2026-10-02: SPY returned 13,280 contracts
+in about 0.3 s.
+
+| Per contract | bid/ask (+ sizes), last, volume, open interest, IV, delta, gamma, vega, theta, rho, theo |
+|---|---|
+| Per underlying | price, OHLC, previous close, volume, `iv30` |
+
+Caveats, handled in `apps/ingestion/algotrade_ingestion/sources/cboe.py`:
+
+- **Not a licensed product.** It is the undocumented feed behind cboe.com and can change or
+  disappear. Check Cboe's site terms; keep Massive or Schwab as the fallback.
+- Delayed quotes. The snapshot is taken after the close, so it is valid for end-of-day use.
+- `open_interest` is OCC's figure as of the previous session.
+- Greeks and IV are Cboe's model values; ours (`quant/`) will cross-check them.
+- Be polite: 4 workers by default, Retry-After honoured on 429. **403 is an error, never
+  "no chain"**, and a run where more than 25% of optionable names return no chain is PARTIAL.
+- Raw responses are about 1–3 GB/day across the universe, so raw retention is limited
+  (ADR 0014, `algotrade-ingest purge-raw --keep-days 90`).
 
 ## What IBKR gives us
 
@@ -45,12 +67,8 @@ swapping a vendor never touches storage, features, strategies or the UI.
 - IB's Greeks come from IB's own model. We still compute Greeks ourselves in `quant/`, so
   the numbers stay consistent if we switch vendors; IB values are kept as a cross-check.
 
-## Options universe tiers (open decision)
+## Options universe coverage
 
-| Tier | Underlyings | Feasible source |
-|---|---|---|
-| Liquid | S&P 500 + liquid ETFs (including leveraged), about 600–800 | IBKR (paced, about 1–2 h nightly) or Schwab |
-| Full | All optionable, about 4.2k | Massive options (paid) or Schwab |
-
-Start with the **liquid** tier on IBKR. Moving to the full tier is a source and config
-change, not an architecture change.
+With the Cboe feed the **full** optionable universe (about 4.2k underlyings) is covered
+nightly. IBKR is no longer needed for option chains; it remains the plan for futures, for
+cross-checks and for execution.

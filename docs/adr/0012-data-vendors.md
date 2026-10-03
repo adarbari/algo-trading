@@ -1,6 +1,6 @@
 # ADR 0012: Several data sources, free first, IBKR for derivatives
 
-**Status:** accepted (2026-10-02). Detail: [docs/data/vendors.md](../data/vendors.md).
+**Status:** accepted (2026-10-02); options source amended by [0014](0014-cboe-options-source.md). Detail: [docs/data/vendors.md](../data/vendors.md).
 
 ## Context
 We need end-of-day data for options, swing/momentum (stocks and ETFs) and, later, futures,

@@ -12,6 +12,7 @@ requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.0",
     "pandas>=2.2",
+    "pyarrow>=16",
 ]
 
 [project.optional-dependencies]
@@ -28,15 +29,17 @@ dev = [
 
 [project.scripts]
 algotrade = "algotrade.cli.main:main"
+algotrade-ingest = "algotrade_ingestion.cli:main"
 
+# Apps are separate top-level packages in this one distribution for now (ADR 0004 / 0014).
 [tool.hatch.build.targets.wheel]
-packages = ["src/algotrade"]
+packages = ["src/algotrade", "apps/ingestion/algotrade_ingestion"]
 
 # ---------------------------------------------------------------- ruff
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-src = ["src", "tests", "scripts"]
+src = ["src", "apps/ingestion", "tests", "scripts"]
 
 [tool.ruff.lint]
 select = [
@@ -49,6 +52,7 @@ ignore = ["PLR0913", "PLR0917", "PLR2004"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/algotrade/cli/**" = ["T20"]
+"apps/*/*/cli.py" = ["T20"]
 "scripts/**" = ["T20"]
 "tests/**" = ["PLR2004", "S101"]
 
@@ -59,8 +63,8 @@ max-complexity = 10
 [tool.mypy]
 python_version = "3.12"
 strict = true
-mypy_path = "src"
-packages = ["algotrade"]
+mypy_path = ["src", "apps/ingestion"]
+packages = ["algotrade", "algotrade_ingestion"]
 warn_unreachable = true
 
 # ---------------------------------------------------------------- pytest
@@ -75,7 +79,7 @@ markers = [
 filterwarnings = ["error"]
 
 [tool.coverage.run]
-source = ["algotrade"]
+source = ["algotrade", "algotrade_ingestion"]
 branch = true
 
 [tool.coverage.report]
@@ -87,7 +91,7 @@ exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "@abstractmeth
 # ---------------------------------------------------------------- import-linter
 # These contracts ARE the architecture. See docs/architecture.md before changing them.
 [tool.importlinter]
-root_package = "algotrade"
+root_packages = ["algotrade", "algotrade_ingestion"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
@@ -95,23 +99,54 @@ name = "Layered architecture: higher layers may import lower layers, never the r
 type = "layers"
 layers = [
     "algotrade.cli",
-    "algotrade.evaluation",
-    "algotrade.backtest",
-    "algotrade.strategies | algotrade.risk | algotrade.execution | algotrade.portfolio | algotrade.analytics | algotrade.data",
+    "algotrade.services | algotrade.evaluation",
+    "algotrade.engines | algotrade.backtest",
+    "algotrade.strategies | algotrade.risk | algotrade.execution | algotrade.portfolio | algotrade.analytics | algotrade.features",
+    "algotrade.storage | algotrade.data",
     "algotrade.core",
 ]
 
 [[tool.importlinter.contracts]]
-name = "Strategies are pure: they only see core (no data I/O, no brokers, no portfolio internals)"
+name = "Strategies and screeners are pure: they only see core"
 type = "forbidden"
 source_modules = ["algotrade.strategies"]
 forbidden_modules = [
     "algotrade.data",
+    "algotrade.storage",
+    "algotrade.features",
     "algotrade.execution",
     "algotrade.portfolio",
     "algotrade.risk",
     "algotrade.analytics",
 ]
+
+[[tool.importlinter.contracts]]
+name = "Feature definitions are pure: no storage or data I/O"
+type = "forbidden"
+source_modules = ["algotrade.features"]
+forbidden_modules = ["algotrade.storage", "algotrade.data"]
+
+[[tool.importlinter.contracts]]
+name = "Only the ingestion app writes market and feature data (ADR 0005)"
+type = "forbidden"
+source_modules = [
+    "algotrade.cli",
+    "algotrade.services",
+    "algotrade.evaluation",
+    "algotrade.engines",
+    "algotrade.backtest",
+    "algotrade.strategies",
+    "algotrade.features",
+    "algotrade.data",
+    "algotrade.core",
+]
+forbidden_modules = ["algotrade.storage.writers"]
+
+[[tool.importlinter.contracts]]
+name = "Shared libraries never import apps (ADR 0004)"
+type = "forbidden"
+source_modules = ["algotrade"]
+forbidden_modules = ["algotrade_ingestion"]
 
 [[tool.importlinter.contracts]]
 name = "Core is dependency-free domain code (no pandas, no I/O)"

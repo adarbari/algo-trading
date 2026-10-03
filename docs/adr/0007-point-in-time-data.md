@@ -8,7 +8,7 @@ point-in-time data, backtests silently use information that was not available at
 
 ## Decision
 - Every market and feature row has `ts` (event time), `knowledge_ts` (when we learned
-  it), `source` and `ingest_run_id`.
+  it), `source` and `run_id`.
 - Readers accept `as_of`. Backtests for date D read with `as_of` set to the end of D.
 - Corrections are appended with a later `knowledge_ts`, never overwritten.
 - Features are named `name@version`. Changing logic means a new version; old versions

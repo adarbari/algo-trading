@@ -12,12 +12,12 @@ install:
 	$(BIN)pre-commit install
 
 lint:
-	$(BIN)ruff check src tests scripts
-	$(BIN)ruff format --check src tests scripts
+	$(BIN)ruff check src apps tests scripts
+	$(BIN)ruff format --check src apps tests scripts
 
 format:
-	$(BIN)ruff check --fix src tests scripts
-	$(BIN)ruff format src tests scripts
+	$(BIN)ruff check --fix src apps tests scripts
+	$(BIN)ruff format src apps tests scripts
 
 typecheck:
 	$(BIN)mypy
@@ -29,7 +29,7 @@ filelen:         ## no file over 1000 lines
 	$(PY) scripts/check_file_length.py
 
 unit:
-	$(PY) -m pytest tests/unit tests/architecture
+	$(PY) -m pytest tests/unit tests/architecture tests/contract tests/apps
 
 property:
 	$(PY) -m pytest tests/property

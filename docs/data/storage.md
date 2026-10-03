@@ -36,19 +36,35 @@ Every market and feature row carries:
 | `session_date` | The exchange trading day this row belongs to (futures sessions start the evening before). |
 | `knowledge_ts` | When we learned this value (ingestion time, UTC). Used for point-in-time reads. |
 | `source` | Which vendor or adapter produced it. |
-| `ingest_run_id` | Lineage back to the ingestion run and its raw file. |
+| `run_id` | Lineage back to the run (and its raw files and run record). |
 
 ## Processing tiers
 
 ```
-raw/          as received from the vendor (JSON/CSV, gzip). Never modified, kept forever. Allows replays.
+raw/          as received from the vendor (JSON/CSV, gzip). Never modified. Kept for a retention
+              window (default 90 days, ADR 0014) so recent days can be replayed.
 normalized/   validated, canonical schema, Parquet. What readers use.
 features/     derived values, versioned by name@version, Parquet.
 results/      screener and backtest outputs, keyed by run id, Parquet + a JSON run record.
 catalog       run log, dataset and schema versions, data-quality checks (a DuckDB or SQLite file).
 ```
 
-## Physical layout (local backend)
+## Physical layout (local backend, as implemented)
+
+```
+$ALGOTRADE_DATA_URL (default file://./var/data, git-ignored)
+  tables/<table>/date=YYYY-MM-DD/run=<run_id>.parquet   + _runs.json (knowledge_ts per run)
+  raw/source=<s>/dataset=<d>/date=YYYY-MM-DD/run=<run_id>/<key>.json.gz
+  staging/<run_id>/<table>/<key>.parquet                 per-item scratch for resumable jobs
+  runs/<run_id>.json                                     run records: audit + checkpoint
+```
+
+Implemented tables: `universe`, `chains/underlying_quotes`, `chains/option_quotes`,
+`chains/status`, `features/option_liquidity@v1`, `results/<screener>`. Each
+(table, session, run) is one Parquet file sorted by `instrument_id`. Re-writing the same
+run replaces it; a newer run is kept alongside, and readers choose by `as_of`.
+
+## Target physical layout (as more grains arrive)
 
 Partition by **time**, and sort by `instrument_id` inside each file. Partitioning by ticker
 would create hundreds of thousands of tiny files once the universe is around 10k

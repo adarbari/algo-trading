@@ -11,7 +11,7 @@ Read first: `docs/data/storage.md`, `docs/data/instruments.md`, ADRs 0006, 0007 
    cross-section, feature or result. New intervals of bars are **not** new datasets; add
    the `interval` value. Only create a new grain with an ADR.
 2. **Schema:** add or extend it in `storage/schemas.py`, including the common columns
-   (`instrument_id`, `ts`, `session_date`, `knowledge_ts`, `source`, `ingest_run_id`).
+   (`instrument_id`, `ts`, `session_date`, `knowledge_ts`, `source`, `run_id`).
    Bump the schema version; breaking changes need a migration and an ADR.
 3. **Interface:** add read and write methods to the grain's `Protocol` in
    `storage/interfaces.py`. Reads accept `as_of`.

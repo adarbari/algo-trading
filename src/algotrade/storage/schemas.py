@@ -1,0 +1,89 @@
+"""Canonical table schemas: the data contract every writer must satisfy.
+
+Every row carries the point-in-time columns (ADR 0007). Market tables also carry ``ts``.
+Feature and result tables are open-ended: they need the common columns plus
+``instrument_id``; the rest is defined by the feature or screener that produces them.
+"""
+
+from dataclasses import dataclass
+
+import pandas as pd
+
+from algotrade.core.errors import DataValidationError
+
+SCHEMA_VERSION = 1
+COMMON = ("session_date", "knowledge_ts", "source", "run_id")
+
+
+@dataclass(frozen=True)
+class TableSpec:
+    name: str
+    grain: str
+    required: tuple[str, ...]
+    open_ended: bool = False
+
+
+UNIVERSE = TableSpec(
+    "universe",
+    "universe",
+    ("instrument_id", "symbol", "security_type", "optionable", "status", "universe_version"),
+)
+UNDERLYING_QUOTES = TableSpec(
+    "chains/underlying_quotes",
+    "chain_snapshot",
+    ("instrument_id", "symbol", "ts", "price", "close", "volume", "iv30"),
+)
+OPTION_QUOTES = TableSpec(
+    "chains/option_quotes",
+    "chain_snapshot",
+    (
+        "instrument_id",
+        "underlying_id",
+        "ts",
+        "expiry",
+        "right",
+        "strike",
+        "bid",
+        "ask",
+        "volume",
+        "open_interest",
+        "iv",
+        "delta",
+    ),
+)
+CHAIN_STATUS = TableSpec("chains/status", "chain_snapshot", ("instrument_id", "status"))
+
+KNOWN: dict[str, TableSpec] = {
+    t.name: t for t in (UNIVERSE, UNDERLYING_QUOTES, OPTION_QUOTES, CHAIN_STATUS)
+}
+OPEN_PREFIXES = ("features/", "results/")
+
+
+def spec_for(table: str) -> TableSpec:
+    if table in KNOWN:
+        return KNOWN[table]
+    if table.startswith(OPEN_PREFIXES):
+        return TableSpec(table, table.split("/", 1)[0], ("instrument_id",), open_ended=True)
+    raise DataValidationError(table, ["unknown table; add a TableSpec to storage/schemas.py"])
+
+
+def validate_frame(table: str, frame: pd.DataFrame) -> None:
+    spec = spec_for(table)
+    missing = [c for c in (*COMMON, *spec.required) if c not in frame.columns]
+    problems = [f"missing columns: {missing}"] if missing else []
+    if not missing:
+        if frame[list(COMMON)].isna().to_numpy().any():
+            problems.append("point-in-time columns contain nulls")
+        if frame["instrument_id"].isna().any():
+            problems.append("null instrument_id")
+        if frame.duplicated(subset=_key(spec, frame)).any():
+            problems.append("duplicate rows for the table key")
+    if problems:
+        raise DataValidationError(table, problems)
+
+
+def _key(spec: TableSpec, frame: pd.DataFrame) -> list[str]:
+    key = ["instrument_id"]
+    if "ts" in frame.columns and spec.grain != "universe":
+        key.append("ts")
+    return key
