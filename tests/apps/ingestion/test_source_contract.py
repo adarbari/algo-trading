@@ -14,7 +14,11 @@ from algotrade_ingestion.jobs.common import stamp
 from algotrade_ingestion.sources.base import FetchRequest, Source
 from algotrade_ingestion.sources.cboe import CboeOptionsSource
 from algotrade_ingestion.sources.http import RetryPolicy
-from algotrade_ingestion.sources.massive import MassiveCorporateActions, MassiveDailyBars
+from algotrade_ingestion.sources.massive import (
+    MassiveCorporateActions,
+    MassiveDailyBars,
+    MassiveTickers,
+)
 from algotrade_ingestion.sources.nasdaq_earnings import NasdaqEarningsSource
 from algotrade_ingestion.sources.nasdaq_trader import NasdaqTraderSource
 from algotrade_ingestion.sources.spy_holdings import SpyHoldingsSource
@@ -66,7 +70,16 @@ def massive_actions() -> Adapter:
     return source, FetchRequest("splits:2026-09-01:2026-10-31")
 
 
+def massive_tickers() -> Adapter:
+    payload = massive_fixture.page(
+        [{"ticker": "AAPL", "type": "CS", "composite_figi": "BBG000B9XRY4"}]
+    )
+    source = MassiveTickers(lambda url: payload, lambda s: None, min_interval_s=0)
+    return source, FetchRequest("active")
+
+
 ADAPTERS: dict[str, Callable[[], Adapter]] = {
+    "massive_tickers": massive_tickers,
     "massive_bars": massive_bars,
     "massive_actions": massive_actions,
     "nasdaq_earnings": nasdaq_earnings,

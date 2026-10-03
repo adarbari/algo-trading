@@ -29,7 +29,11 @@ from algotrade_ingestion.jobs.universe_build import UniverseSources, build_unive
 from algotrade_ingestion.pipeline import nightly_job, universe_settings
 from algotrade_ingestion.sources.cboe import CboeOptionsSource
 from algotrade_ingestion.sources.http import BROWSER_USER_AGENT, Transport, urllib_transport
-from algotrade_ingestion.sources.massive import MassiveCorporateActions, MassiveDailyBars
+from algotrade_ingestion.sources.massive import (
+    MassiveCorporateActions,
+    MassiveDailyBars,
+    MassiveTickers,
+)
 from algotrade_ingestion.sources.nasdaq_earnings import NasdaqEarningsSource
 from algotrade_ingestion.sources.nasdaq_trader import NasdaqTraderSource
 from algotrade_ingestion.sources.spy_holdings import SpyHoldingsSource
@@ -88,8 +92,11 @@ def corporate_actions(
 
 def universe_sources() -> UniverseSources:
     transport = urllib_transport()
+    tickers = None
+    if massive_key(required=False) is not None:  # FIGI / CIK / vendor types need the key
+        tickers = MassiveTickers(massive_transport(), time.sleep)
     return UniverseSources(
-        NasdaqTraderSource(transport, time.sleep), SpyHoldingsSource(transport, time.sleep)
+        NasdaqTraderSource(transport, time.sleep), SpyHoldingsSource(transport, time.sleep), tickers
     )
 
 
