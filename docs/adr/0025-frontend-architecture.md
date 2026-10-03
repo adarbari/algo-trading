@@ -127,7 +127,8 @@ rule or check that keeps it in its owner.
 - Every lint message names its rule, `docs/ui/architecture.md` and the skill that explains the
   fix (`.claude/skills/add-ui-component`, `.claude/skills/add-web-page`).
 - The first screens take longer: each needs its components in the design system first, and
-  those wait for the approved mockups (ADR 0011). Tokens ship as **DRAFT**.
+  those wait for the approved mockups (ADR 0011). Tokens ship as **DRAFT**. (Note 2026-10-03:
+  tokens final from the approved mockups; layout primitives added. See ADR 0011.)
 - `make check` runs the web checks (`make web-check`); CI has a `web` job in the Playwright
   image, so auto-merge waits for it. Screenshot changes are reviewed as image diffs.
 - The API client's types come from `apps/api/openapi.json` (ADR 0024, the API's committed

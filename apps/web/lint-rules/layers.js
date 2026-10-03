@@ -19,6 +19,7 @@ export const elements = [
   { type: 'ds-tokens', pattern: 'design-system/tokens' },
   { type: 'ds-theme', pattern: 'design-system/theme' },
   { type: 'ds-testing', pattern: 'design-system/testing' },
+  { type: 'ds-foundations', pattern: 'design-system/foundations' },
   { type: 'ds-primitive', pattern: 'design-system/primitives/*', capture: ['name'] },
   { type: 'ds-component', pattern: 'design-system/components/*', capture: ['name'] },
   { type: 'app', pattern: 'src/app' },
@@ -113,6 +114,13 @@ const policies = [
   },
   { from: { element: { type: 'ds-tokens' } }, allow: { to: { element: { type: 'ds-tokens' } } } },
   { from: { element: { type: 'ds-testing' } }, allow: { to: { element: { type: 'ds-testing' } } } },
+  // Storybook foundation pages (the tokens page) document tokens using primitives.
+  {
+    from: { element: { type: 'ds-foundations' } },
+    allow: {
+      to: [{ element: { type: 'ds-foundations' } }, index('ds-primitive'), index('ds-tokens')],
+    },
+  },
   // Last, so their messages win: the two mistakes made most often.
   ...['page', 'widget', 'feature'].map((type) => ({
     from: { element: { type } },

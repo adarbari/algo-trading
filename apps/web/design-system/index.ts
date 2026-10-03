@@ -5,4 +5,13 @@
 export * from './components';
 export * from './primitives';
 export { UiProvider, type Theme, type UiProviderProps, type UpDownPalette } from './theme';
-export type { DensityName } from './tokens';
+export type {
+  Breakpoint,
+  DensityName,
+  FontSize,
+  FontWeight,
+  Radius,
+  Series,
+  Space,
+  Status,
+} from './tokens';

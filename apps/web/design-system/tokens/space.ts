@@ -1,4 +1,7 @@
-/** Spacing tokens (DRAFT, ADR 0011): a 4 px base scale. Step n = n * 4 px. */
+/**
+ * Spacing and size tokens: FINAL (ADR 0011). A 4 px scale with the two half steps the mockups
+ * use (6 px and 10 px: control and panel-header padding). Step n = n * 4 px.
+ */
 
 export const spaceUnit = 4;
 
@@ -6,14 +9,15 @@ export const space = {
   0: 0,
   0.5: 2,
   1: 4,
+  1.5: 6,
   2: 8,
+  2.5: 10,
   3: 12,
   4: 16,
   5: 20,
   6: 24,
   8: 32,
   10: 40,
-  12: 48,
 } as const;
 
 export type Space = keyof typeof space;
@@ -22,3 +26,22 @@ export type Space = keyof typeof space;
 export function spaceName(step: Space): string {
   return String(step).replace('.', '-');
 }
+
+/**
+ * Container widths (px) at which a Grid with `collapse` drops to one column. Container queries
+ * cannot read custom properties, so Grid.module.css repeats these numbers; Grid.test.tsx fails
+ * if the two disagree.
+ */
+export const breakpoint = { sm: 480, md: 720, lg: 960 } as const;
+
+export type Breakpoint = keyof typeof breakpoint;
+
+/** Fixed track widths for Grid templates. */
+export const size = {
+  /** The label column of a label / value grid. */
+  label: 140,
+  /** A side panel (filters, detail). */
+  sidebar: 320,
+  /** The widest a working page grows (mockups: 1600). */
+  page: 1600,
+} as const;

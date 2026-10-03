@@ -17,11 +17,16 @@ const withUi: Decorator = (Story, context) => (
 
 const preview: Preview = {
   decorators: [withUi],
-  initialGlobals: { theme: 'light', density: 'compact' },
+  initialGlobals: { theme: 'dark', density: 'compact' },
   globalTypes: {
     theme: {
       description: 'Colour theme',
-      toolbar: { title: 'Theme', icon: 'mirror', items: ['light', 'dark'], dynamicTitle: true },
+      toolbar: {
+        title: 'Theme',
+        icon: 'mirror',
+        items: ['dark', 'light', 'system'],
+        dynamicTitle: true,
+      },
     },
     density: {
       description: 'Density',

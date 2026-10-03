@@ -5,27 +5,27 @@ import { expectNoA11yViolations } from '../../testing';
 import { Text } from './Text';
 
 describe('Text', () => {
-  it('renders a semantic element for its variant', () => {
-    render(<Text variant="title">Screener</Text>);
-    expect(screen.getByRole('heading', { level: 1, name: 'Screener' })).toBeInTheDocument();
+  it('renders a span at the base size by default', () => {
+    render(<Text>IV rank</Text>);
+    const node = screen.getByText('IV rank');
+    expect(node.tagName).toBe('SPAN');
+    expect(node).toHaveAttribute('data-size', 'base');
+    expect(node).toHaveAttribute('data-tone', 'default');
   });
 
-  it('lets the caller pick the element', () => {
-    render(
-      <Text variant="heading" as="h3">
-        Legs
-      </Text>,
-    );
-    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent('Legs');
+  it('lets the caller pick the semantic element', () => {
+    render(<Text as="p">A paragraph</Text>);
+    expect(screen.getByText('A paragraph').tagName).toBe('P');
   });
 
-  it('exposes tone, numeric and mono as styling hooks, never as inline style', () => {
+  it('exposes size, tone, numeric and mono as styling hooks, never as inline style', () => {
     render(
-      <Text tone="up" numeric mono>
+      <Text size="md" tone="up" numeric mono>
         +1.24%
       </Text>,
     );
     const node = screen.getByText('+1.24%');
+    expect(node).toHaveAttribute('data-size', 'md');
     expect(node).toHaveAttribute('data-tone', 'up');
     expect(node).toHaveAttribute('data-numeric');
     expect(node).toHaveAttribute('data-mono');
@@ -35,9 +35,8 @@ describe('Text', () => {
   it('has no accessibility violations', async () => {
     const { container } = render(
       <>
-        <Text variant="title">Title</Text>
-        <Text>Body</Text>
-        <Text variant="caption" tone="muted">
+        <Text as="p">Body</Text>
+        <Text size="sm" tone="muted">
           Caption
         </Text>
       </>,

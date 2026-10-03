@@ -3,7 +3,7 @@
  * composes widgets and features with design-system primitives: no HTML elements, no styling,
  * no data fetching of its own (ADR 0025).
  */
-import { Stack, Text } from '@algotrade/ui';
+import { Heading, Stack, Text } from '@algotrade/ui';
 
 export interface PlaceholderPageProps {
   title: string;
@@ -13,10 +13,12 @@ export interface PlaceholderPageProps {
 export function PlaceholderPage({ title, summary }: PlaceholderPageProps) {
   return (
     <Stack gap={2}>
-      <Text variant="title">{title}</Text>
-      <Text tone="muted">{summary}</Text>
-      <Text variant="caption" tone="muted">
-        Not built yet: screens follow the approved mockups (ADR 0011).
+      <Heading level={1}>{title}</Heading>
+      <Text as="p" tone="secondary">
+        {summary}
+      </Text>
+      <Text as="p" size="sm" tone="muted">
+        Not built yet: screens are composed from design-system components (ADR 0011).
       </Text>
     </Stack>
   );

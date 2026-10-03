@@ -1,61 +1,68 @@
 /**
  * Text: the typography primitive and the TEMPLATE for every design-system component (folder =
  * Name.tsx + Name.module.css + Name.stories.tsx + Name.test.tsx + index.ts + __screenshots__).
- * All text on a screen goes through it; size, weight and colour come only from tokens.
+ * All running text on a screen goes through it (headings: Heading; codes: Mono); size, weight
+ * and colour come only from tokens. Numbers are always tabular.
  */
 import type { ReactNode } from 'react';
 
+import type { FontSize, FontWeight } from '../../tokens';
 import styles from './Text.module.css';
 
-export type TextVariant = 'title' | 'heading' | 'body' | 'label' | 'caption';
 export type TextTone =
-  'default' | 'muted' | 'accent' | 'positive' | 'negative' | 'warning' | 'up' | 'down';
-export type TextElement = 'p' | 'span' | 'h1' | 'h2' | 'h3' | 'h4' | 'strong' | 'em' | 'code';
+  | 'default'
+  | 'secondary'
+  | 'muted'
+  | 'accent'
+  | 'positive'
+  | 'warning'
+  | 'negative'
+  | 'info'
+  | 'up'
+  | 'down'
+  | 'inherit';
+export type TextElement = 'span' | 'p' | 'strong' | 'em' | 'label' | 'time' | 'abbr';
 
 export interface TextProps {
-  /** Typographic role; sets size, line height and weight. */
-  variant?: TextVariant;
+  /** Type-scale step: xs 11.5, sm 12, md 12.5, base 13 (default), lg 14, xl 16, 2xl 18, 3xl 22 px. */
+  size?: FontSize;
+  weight?: FontWeight;
+  /** Colour role: `secondary` / `muted` for de-emphasis, status tones, `up` / `down` for price moves. */
   tone?: TextTone;
-  weight?: 'regular' | 'medium' | 'semibold';
   /** Monospace (symbols, codes, ids). */
   mono?: boolean;
-  /** Right-aligned tabular figures for numeric columns. */
+  /** A number in a column: right-aligned, tabular figures. */
   numeric?: boolean;
   /** Single line with an ellipsis when too long. */
   truncate?: boolean;
-  /** The semantic element; defaults to h1/h2 for title/heading, p for body, span otherwise. */
+  /** The semantic element (`p` for paragraphs; `span` default). */
   as?: TextElement;
+  /** Tooltip / full value for truncated text or abbreviations. */
+  title?: string;
   children?: ReactNode;
 }
 
-const DEFAULT_ELEMENT: Record<TextVariant, TextElement> = {
-  title: 'h1',
-  heading: 'h2',
-  body: 'p',
-  label: 'span',
-  caption: 'span',
-};
-
 export function Text({
-  variant = 'body',
+  size = 'base',
+  weight = 'regular',
   tone = 'default',
-  weight,
   mono = false,
   numeric = false,
   truncate = false,
-  as,
+  as: Element = 'span',
+  title,
   children,
 }: TextProps) {
-  const Element = as ?? DEFAULT_ELEMENT[variant];
   return (
     <Element
       className={styles.text}
-      data-variant={variant}
-      data-tone={tone}
+      data-size={size}
       data-weight={weight}
+      data-tone={tone}
       data-mono={mono || undefined}
       data-numeric={numeric || undefined}
       data-truncate={truncate || undefined}
+      title={title}
     >
       {children}
     </Element>

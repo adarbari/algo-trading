@@ -1,0 +1,187 @@
+/*
+ * Grid: two-dimensional layout from tokens. The outer element is a size container so that
+ * `collapse` reacts to the space the grid has, not the viewport. The px values in the container
+ * queries are the breakpoint tokens (tokens/space.ts); Grid.test.tsx keeps them in sync.
+ */
+.container {
+  container-type: inline-size;
+  min-width: 0;
+}
+
+.grid {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.grid[data-columns='1'] {
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+.grid[data-columns='2'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.grid[data-columns='3'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.grid[data-columns='4'] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.grid[data-columns='6'] {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.grid[data-columns='12'] {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.grid[data-columns='label-value'] {
+  grid-template-columns: var(--size-label) minmax(0, 1fr);
+}
+
+.grid[data-columns='main-aside'] {
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+}
+
+.grid[data-columns='sidebar-start'] {
+  grid-template-columns: var(--size-sidebar) minmax(0, 1fr);
+}
+
+.grid[data-columns='sidebar-end'] {
+  grid-template-columns: minmax(0, 1fr) var(--size-sidebar);
+}
+
+.grid[data-align='start'] {
+  align-items: start;
+}
+
+.grid[data-align='center'] {
+  align-items: center;
+}
+
+.grid[data-align='stretch'] {
+  align-items: stretch;
+}
+
+.grid[data-align='baseline'] {
+  align-items: baseline;
+}
+
+.grid[data-gap='0'] {
+  gap: 0;
+}
+
+.grid[data-gap='0.5'] {
+  gap: var(--space-0-5);
+}
+
+.grid[data-gap='1'] {
+  gap: var(--space-1);
+}
+
+.grid[data-gap='1.5'] {
+  gap: var(--space-1-5);
+}
+
+.grid[data-gap='2'] {
+  gap: var(--space-2);
+}
+
+.grid[data-gap='2.5'] {
+  gap: var(--space-2-5);
+}
+
+.grid[data-gap='3'] {
+  gap: var(--space-3);
+}
+
+.grid[data-gap='4'] {
+  gap: var(--space-4);
+}
+
+.grid[data-gap='5'] {
+  gap: var(--space-5);
+}
+
+.grid[data-gap='6'] {
+  gap: var(--space-6);
+}
+
+.grid[data-gap='8'] {
+  gap: var(--space-8);
+}
+
+.grid[data-gap='10'] {
+  gap: var(--space-10);
+}
+
+.grid[data-row-gap='0'] {
+  row-gap: 0;
+}
+
+.grid[data-row-gap='0.5'] {
+  row-gap: var(--space-0-5);
+}
+
+.grid[data-row-gap='1'] {
+  row-gap: var(--space-1);
+}
+
+.grid[data-row-gap='1.5'] {
+  row-gap: var(--space-1-5);
+}
+
+.grid[data-row-gap='2'] {
+  row-gap: var(--space-2);
+}
+
+.grid[data-row-gap='2.5'] {
+  row-gap: var(--space-2-5);
+}
+
+.grid[data-row-gap='3'] {
+  row-gap: var(--space-3);
+}
+
+.grid[data-row-gap='4'] {
+  row-gap: var(--space-4);
+}
+
+.grid[data-row-gap='5'] {
+  row-gap: var(--space-5);
+}
+
+.grid[data-row-gap='6'] {
+  row-gap: var(--space-6);
+}
+
+.grid[data-row-gap='8'] {
+  row-gap: var(--space-8);
+}
+
+.grid[data-row-gap='10'] {
+  row-gap: var(--space-10);
+}
+
+@container (width < 480px) {
+  .grid[data-collapse='sm'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container (width < 720px) {
+  .grid[data-collapse='md'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container (width < 960px) {
+  .grid[data-collapse='lg'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
