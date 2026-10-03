@@ -330,3 +330,44 @@ def test_a_build_failing_at_symbol_history_leaves_the_previous_snapshot(
     assert "DFAC" in reference.index
     dfac = history[history["instrument_id"].eq(reference.loc["DFAC", "instrument_id"])]
     assert list(dfac["symbol"]) == ["DFAC"]
+
+
+def test_an_override_back_after_a_flip_is_one_id_change_event(
+    backend: Backend, tmp_path: Path
+) -> None:
+    """The 2026-10-02 crash: DFAC was upgraded to EQ:BBG_A at 05:05, held EQ:BBG_B after a
+    vendor flip (code before stable ids; an override replays it here), and the owner's
+    override moved it back. The id map then held two changes into EQ:BBG_A on the session and
+    the build wrote two ``id_changed`` rows under one key. MMED / MMEDV share a FIGI
+    meanwhile, and every build is a same-session re-run."""
+    store = Store(backend)
+    names = ["DFAC", "MMED", "MMEDV"]
+    vendor = {"DFAC": "BBG_A", "MMED": "BBG_M", "MMEDV": "BBG_M"}
+    store.build(D1, at(1), names, None)  # symbol ids
+    store.build(D2, at(5, 5), names, vendor)  # upgrades: DFAC -> A, MMED -> M
+    store.build(D2, at(9, 30), names, vendor, UniverseSettings(figi_overrides={"DFAC": "BBG_B"}))
+    owner = UniverseSettings(figi_overrides={"DFAC": "BBG_A"})
+    stats = store.build(D2, at(16, 23), names, vendor, owner)
+    pairs = store.table(ID_MAP, D2)[["old_id", "new_id"]].values.tolist()
+    assert sorted(pairs) == [
+        ["EQ:BBG_A", "EQ:BBG_B"], ["EQ:BBG_B", "EQ:BBG_A"], ["EQ:DFAC", "EQ:BBG_A"],
+        ["EQ:MMED", "EQ:BBG_M"],
+    ]  # fmt: skip
+    assert stats["events"]["reference_change"] == {"id_changed": 3}
+    assert stats["events"]["reference_change_duplicates_dropped"] == 0
+    events = store.table(CHANGES, D2)
+    assert not events.duplicated(["instrument_id", "ts", "change"]).any()
+    ids = events.set_index("instrument_id")
+    assert ids.loc["EQ:BBG_A", ["old", "new"]].tolist() == ["EQ:DFAC", "EQ:BBG_A"]
+    assert ids.loc["EQ:BBG_B", ["old", "new"]].tolist() == ["EQ:BBG_A", "EQ:BBG_B"]
+    assert ids.loc["EQ:BBG_M", ["old", "new"]].tolist() == ["EQ:MMED", "EQ:BBG_M"]
+    again = store.build(D2, at(17), names, vendor, owner)  # the re-run emits the same rows
+    assert again["events"] == stats["events"]
+    assert len(store.table(CHANGES, D2)) == 3
+    reference = store.table(REFERENCE, D2).set_index("symbol")
+    assert reference.loc["DFAC", "instrument_id"] == "EQ:BBG_A"
+    assert reference.loc["MMEDV", "instrument_id"] == "EQ:MMEDV"
+    out = tmp_path / "figi_review.csv"
+    assert write_figi_review(store.reader, D2, out) == 2  # MMED and MMEDV, not DFAC
+    record = migrate_ids(task_ctx(store.writer, store.reader, lambda: at(18)))
+    assert record.status is RunStatus.COMPLETE and record.stats["failed_count"] == 0

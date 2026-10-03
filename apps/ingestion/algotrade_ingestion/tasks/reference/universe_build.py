@@ -19,7 +19,9 @@ session when there is one, else the latest earlier session. A same-session re-ru
 keeps what the earlier run recorded (2026-10-03: a re-run that started from nothing wrote an
 id map of 3 upgrades that hid the 10,817 before it). Events compare against the previous
 session (``_previous``) with the session's upgrades applied, so a re-run emits the same rows
-under the same keys, which the merged event tables absorb.
+under the same keys, which the merged event tables absorb. A run writes at most one event per
+key (``reference_diff.one_per_key``): several id changes into one id on a session (DFAC,
+2026-10-02: a FIGI upgrade, then an override back after a vendor flip) are one ``id_changed``.
 
 Leverage (``classify.leverage_flags``): a curated row in
 ``config/site/overrides/leveraged_etfs.csv`` wins, then the leverage the name states, then the
@@ -53,7 +55,11 @@ from algotrade_ingestion.tasks.reference.instrument_ids import (
     figi_review_rows,
     rename_ids,
 )
-from algotrade_ingestion.tasks.reference.reference_diff import diff_reference
+from algotrade_ingestion.tasks.reference.reference_diff import (
+    diff_reference,
+    id_change_rows,
+    one_per_key,
+)
 from algotrade_ingestion.tasks.reference.symbol_history import update_history
 
 TASK = "universe_build"
@@ -275,14 +281,13 @@ def _build(
     )
     previous = rename_ids(_previous(reader, REFERENCE, session), upgraded)
     changes, index = diff_reference(previous, reference, session)
-    extra = ticker_changes + [
-        {"instrument_id": u.new_id, "symbol": u.symbol, "change": "id_changed",
-         "old": u.old_id, "new": u.new_id}
-        for u in upgraded.itertuples()
-    ]  # fmt: skip
+    extra = [frame for frame in (
+        pd.DataFrame(ticker_changes).assign(ts=pd.Timestamp(session, tz="UTC")),
+        id_change_rows(upgraded, session),
+    ) if not frame.empty]  # fmt: skip
     if extra:
-        rows = pd.DataFrame(extra).assign(ts=pd.Timestamp(session, tz="UTC"))
-        changes = pd.concat([changes, rows], ignore_index=True)
+        changes = pd.concat([changes, *extra], ignore_index=True)
+    changes, duplicates = one_per_key(changes)
     for table, frame in (
         (REFERENCE, reference),
         ("universe", universe),
@@ -321,6 +326,7 @@ def _build(
         "events": {
             "reference_change": changes["change"].value_counts().to_dict(),
             "index_change": index["change"].value_counts().to_dict(),
+            "reference_change_duplicates_dropped": duplicates,
         },
     })  # fmt: skip
     if unmatched:
