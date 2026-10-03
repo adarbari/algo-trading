@@ -25,6 +25,19 @@ const index = JSON.parse(
 };
 const stories = Object.values(index.entries).filter((entry) => entry.type === 'story');
 
+/**
+ * `a11y.manual`: Storybook's a11y addon otherwise runs axe by itself after every story render
+ * (preview `a11y: { test: 'error' }`), and a second axe run started while that one is in flight
+ * fails with "Axe is already running". This suite runs the one axe scan per page itself, after
+ * the render has finished and the screenshot is taken, so the two never overlap.
+ */
+const storyUrl = (id: string, theme: string): string =>
+  `/iframe.html?id=${id}&viewMode=story&globals=theme:${theme};a11y.manual:!true`;
+
+interface PreviewWindow {
+  __STORYBOOK_PREVIEW__?: { currentRender?: { phase?: string } };
+}
+
 test.skip(
   process.platform !== 'linux',
   'screenshot baselines are Linux (CI image): run `npm run visual:docker`',
@@ -33,8 +46,12 @@ test.skip(
 for (const story of stories) {
   for (const theme of THEMES) {
     test(`${story.id} (${theme})`, async ({ page }) => {
-      await page.goto(`/iframe.html?id=${story.id}&viewMode=story&globals=theme:${theme}`);
+      await page.goto(storyUrl(story.id, theme));
       await page.locator('#storybook-root').waitFor({ state: 'attached' });
+      // The story (including its play / afterEach hooks) has fully rendered.
+      await page.waitForFunction(
+        () => (window as PreviewWindow).__STORYBOOK_PREVIEW__?.currentRender?.phase === 'finished',
+      );
       await page.evaluate(() => document.fonts.ready);
       const folder = join(dirname(story.importPath), '__screenshots__').replace(/^\.\//, '');
       await expect(page).toHaveScreenshot(
@@ -43,6 +60,7 @@ for (const story of stories) {
           fullPage: true,
         },
       );
+      // Exactly one axe run per page load, awaited (light and dark are separate tests / pages).
       const axe = await new AxeBuilder({ page }).include('#storybook-root').analyze();
       expect(axe.violations.map((v) => `${v.id}: ${v.help} (${v.nodes.length})`)).toEqual([]);
     });
