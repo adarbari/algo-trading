@@ -4,7 +4,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from algotrade.core.options import OptionRight, third_friday
+from algotrade.core.model.options import OptionRight, third_friday
 from algotrade.features import option_liquidity as liq
 from algotrade.features.registry import FEATURES
 from tests.unit.features import legacy_reference

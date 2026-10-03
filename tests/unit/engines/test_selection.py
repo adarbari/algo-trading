@@ -4,8 +4,8 @@ from datetime import date
 from hypothesis import given
 from hypothesis import strategies as st
 
-from algotrade.config.schema import Group, Rule, Selection
-from algotrade.core.feature_view import FeatureView
+from algotrade.config.strategy.schema import Group, Rule, Selection
+from algotrade.core.views.feature_view import FeatureView
 from algotrade.engines.selection.evaluate import evaluate_group, evaluate_rule, evaluate_selection
 
 DAY = date(2026, 10, 2)

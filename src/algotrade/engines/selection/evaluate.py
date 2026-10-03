@@ -11,8 +11,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from algotrade.config.schema import Group, Rule, Selection
-from algotrade.core.feature_view import FeatureValue, FeatureView
+from algotrade.config.strategy.schema import Group, Rule, Selection
+from algotrade.core.views.feature_view import FeatureValue, FeatureView
 
 type Truth = bool | None  # None == UNKNOWN
 

@@ -3,11 +3,11 @@ from datetime import date
 import pandas as pd
 import pytest
 
-from algotrade.core.errors import ConfigurationError
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.data.prices import adjust_bars, load_price_data
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.writers import StoreWriter
+from algotrade.storage.tables.writers import StoreWriter
 from tests.storage_helpers import stamped
 
 DAYS = [date(2026, 9, 28), date(2026, 9, 29), date(2026, 9, 30)]

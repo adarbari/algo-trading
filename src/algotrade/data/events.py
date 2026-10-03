@@ -14,7 +14,7 @@ from datetime import date, datetime
 
 import pandas as pd
 
-from algotrade.storage.readers import StoreReader
+from algotrade.storage.tables.readers import StoreReader
 
 ALL_TIME = (date(1900, 1, 1), date(9999, 12, 31))
 

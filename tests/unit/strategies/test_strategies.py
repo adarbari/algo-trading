@@ -1,7 +1,7 @@
 import pytest
 
-from algotrade.core.errors import ConfigurationError
-from algotrade.core.market_view import MarketView
+from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.views.market_view import MarketView
 from algotrade.strategies.trading.buy_and_hold import BuyAndHold
 from algotrade.strategies.trading.registry import STRATEGIES, create_strategy
 from algotrade.strategies.trading.sma_crossover import SmaCrossover

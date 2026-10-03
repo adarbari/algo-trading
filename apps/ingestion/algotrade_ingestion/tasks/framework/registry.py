@@ -17,8 +17,8 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
-from algotrade.config.settings import load_universe
-from algotrade.core.calendar import sessions_between
+from algotrade.config.site.settings import load_universe
+from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.sources.framework.base import DirectorySource, FixtureSource
 from algotrade_ingestion.tasks.derived import features

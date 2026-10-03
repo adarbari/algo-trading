@@ -15,7 +15,7 @@ from datetime import date, datetime
 
 import pandas as pd
 
-from algotrade.core.instruments import equity_id, is_figi_id
+from algotrade.core.model.instruments import equity_id, is_figi_id
 
 ID_MAP = "instruments/id_map"
 # ``known_at``: when the upgrade was first recorded. Rows keyed by ``old_id`` that were known

@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from algotrade.config.settings import SourcesSettings
+from algotrade.config.site.settings import SourcesSettings
 from algotrade_ingestion.sources.framework import registry
 from algotrade_ingestion.sources.framework.http import Http
 from algotrade_ingestion.sources.framework.registry import SOURCES, build_sources, limiter_keys

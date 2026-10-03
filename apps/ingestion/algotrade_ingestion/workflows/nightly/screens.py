@@ -13,7 +13,7 @@ from typing import Any
 
 from algotrade.services.configs import scheduled
 from algotrade.services.jobs import JobRecord, JobRunner
-from algotrade.storage.config_store import ConfigStore
+from algotrade.storage.configs.store import ConfigStore
 from algotrade_ingestion.workflows.nightly.steps import Outcome, StepStatus, step_status
 
 type ScreenStep = Callable[[date], Outcome]

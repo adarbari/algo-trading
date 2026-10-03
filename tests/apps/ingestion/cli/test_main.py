@@ -181,7 +181,7 @@ def test_quality_and_schedule_commands(
 def test_company_details_command(
     env: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from algotrade.config.settings import SourcesSettings  # noqa: PLC0415
+    from algotrade.config.site.settings import SourcesSettings  # noqa: PLC0415
     from tests.apps.ingestion.tasks.reference.test_company_details import (  # noqa: PLC0415
         FakeSec,
         sources,

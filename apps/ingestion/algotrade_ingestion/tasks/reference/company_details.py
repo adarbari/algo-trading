@@ -16,8 +16,8 @@ from functools import partial
 
 import pandas as pd
 
-from algotrade.core.fields import COMPANY_COLUMNS
-from algotrade.core.instruments import pad_cik
+from algotrade.core.model.fields import COMPANY_COLUMNS
+from algotrade.core.model.instruments import pad_cik
 from algotrade.data import StoreReader
 from algotrade.data.reference import instruments, snapshot
 from algotrade.storage.runs import RunRecord

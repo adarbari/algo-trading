@@ -9,14 +9,16 @@ Read first: `docs/architecture.md`, ADRs 0001, 0002 and 0008, and `docs/trading-
 
 **Ownership check (ADR 0019):** a strategy only maps a `MarketView` to target weights.
 Data loading, adjustment, selection, sizing, costs and run records are owned elsewhere
-(`architecture/ownership.toml`); reuse them through `services/backtests.py`, never copy
+(`architecture/ownership.toml`); reuse them through `services/backtests/run.py`, never copy
 them. Shared signal maths belongs in one helper: `make dupes` must pass.
 
-1. **Location:** one module in `src/algotrade/strategies/` (`strategies/trading/` after phase 0).
-   Subclass `Strategy`: `warmup_bars`, `on_bar(view) -> target weights | None`, `params()`.
+1. **Location:** one module in `src/algotrade/strategies/trading/`. Subclass `Strategy`
+   (`strategies/trading/base.py`): `warmup_bars`, `on_bar(view) -> target weights | None`,
+   `params()`. The view is `core/views/market_view.py` (`MarketView`); weights and errors
+   come from `core/model/` (`types.py`, `errors.py`). Import nothing outside `core`.
 2. **Pure and deterministic:** read only from the view you are given. No I/O, no clocks,
    no randomness without a seeded parameter. Needs a new input? Add a feature (`add-feature`).
-3. **Register it** with one line in the strategy registry.
+3. **Register it** with one line in `strategies/trading/registry.py`.
 4. **Tests:** unit tests for entry and exit logic in `tests/unit/strategies/`. The property
    tests (look-ahead, accounting, long-only) run on it automatically and must pass.
 5. **Evaluate:** run `make evaluate`. It must beat `buy_and_hold` somewhere meaningful, and

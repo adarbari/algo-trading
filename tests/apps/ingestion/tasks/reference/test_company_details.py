@@ -5,12 +5,12 @@ from datetime import UTC, date, datetime, timedelta
 import pandas as pd
 import pytest
 
-from algotrade.core.errors import MissingDataError
+from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.reference import instrument_view
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
-from algotrade.storage.writers import StoreWriter
+from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.sources.framework.http import HttpError, RetryPolicy
 from algotrade_ingestion.sources.vendors.sec.edgar import TICKERS_URL, SecSubmissions, SecTickerMap
 from algotrade_ingestion.tasks.reference.company_details import (

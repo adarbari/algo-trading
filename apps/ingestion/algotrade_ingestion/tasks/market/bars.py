@@ -2,7 +2,7 @@
 
 Dates already stored are skipped unless forced, so a 2-year backfill (~500 requests at
 5/minute, ~1h45m) can be interrupted and resumed. Sessions come from the exchange calendar
-(``core/calendar.py``); a session the vendor has no rows for is recorded, not an error.
+(``core/time/calendar.py``); a session the vendor has no rows for is recorded, not an error.
 Vendor tickers become ids through the reference as of each session (ADR 0018); the loop
 itself (raw save, ids, stamping, run record) is ``IngestRun``'s.
 """

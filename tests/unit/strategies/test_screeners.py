@@ -2,8 +2,8 @@ from datetime import date
 
 import pytest
 
-from algotrade.core.errors import ConfigurationError
-from algotrade.core.feature_view import FeatureView
+from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.views.feature_view import FeatureView
 from algotrade.strategies.screeners import SCREENERS, Decision, create_screener
 from algotrade.strategies.screeners.short_premium_liquidity import ShortPremiumLiquidity
 

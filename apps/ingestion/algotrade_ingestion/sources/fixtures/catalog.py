@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from algotrade.core.series import PriceSeries
+from algotrade.core.views.series import PriceSeries
 from algotrade_ingestion.sources.fixtures.files import GoldenFiles
 from algotrade_ingestion.sources.fixtures.generators import (
     Regime,

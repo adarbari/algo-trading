@@ -5,7 +5,7 @@ from datetime import date, timedelta
 import pandas as pd
 import pytest
 
-from algotrade.core.errors import MissingDataError
+from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.reference import (
     instrument_terms,
@@ -16,7 +16,7 @@ from algotrade.data.reference import (
     snapshot,
 )
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.writers import StoreWriter
+from algotrade.storage.tables.writers import StoreWriter
 from tests.storage_helpers import T0, stamped, universe_rows
 
 D1, D2 = date(2026, 10, 1), date(2026, 10, 2)

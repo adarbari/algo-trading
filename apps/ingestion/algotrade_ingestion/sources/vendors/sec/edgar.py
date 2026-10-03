@@ -18,8 +18,8 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.core.fields import COMPANY_COLUMNS
-from algotrade.core.instruments import pad_cik
+from algotrade.core.model.fields import COMPANY_COLUMNS
+from algotrade.core.model.instruments import pad_cik
 from algotrade_ingestion.sources.framework.base import FetchRequest, Normalized
 from algotrade_ingestion.sources.framework.http import Http
 from algotrade_ingestion.sources.vendors.sec.sic import sic_division, sic_sector

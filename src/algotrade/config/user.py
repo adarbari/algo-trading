@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from algotrade.core.ids import validate_id
+from algotrade.core.model.ids import validate_id
 
 DEFAULT_USER = "local"
 SITE_USER = "site"  # runs scheduled from shared site presets

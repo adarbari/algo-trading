@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from algotrade.core.feature_view import FeatureValue, FeatureView
+from algotrade.core.views.feature_view import FeatureValue, FeatureView
 
 
 class Decision(StrEnum):

@@ -2,7 +2,7 @@
 
 from collections.abc import Callable, Mapping
 
-from algotrade.core.errors import ConfigurationError
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.strategies.screeners.base import Screener
 from algotrade.strategies.screeners.short_premium_liquidity import ShortPremiumLiquidity
 

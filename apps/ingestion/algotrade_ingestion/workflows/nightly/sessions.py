@@ -9,8 +9,8 @@ does not count as done, so its sessions are retried.
 from dataclasses import dataclass, field
 from datetime import date
 
-from algotrade.core.calendar import next_session, sessions_between
-from algotrade.storage.writers import StoreWriter
+from algotrade.core.time.calendar import next_session, sessions_between
+from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.framework.run import last_finished_session
 
 NIGHTLY_RUN = "nightly"  # the job name of the per-session nightly run records

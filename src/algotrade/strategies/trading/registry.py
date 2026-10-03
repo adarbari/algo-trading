@@ -5,7 +5,7 @@ Adding a strategy = add a module + one line here + tests. Explicit beats import-
 
 from collections.abc import Callable, Mapping
 
-from algotrade.core.errors import ConfigurationError
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.strategies.trading.base import Strategy
 from algotrade.strategies.trading.buy_and_hold import BuyAndHold
 from algotrade.strategies.trading.sma_crossover import SmaCrossover

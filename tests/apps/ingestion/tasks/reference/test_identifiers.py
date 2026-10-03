@@ -4,7 +4,7 @@ import pandas as pd
 
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.writers import StoreWriter
+from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.sources.framework.http import RetryPolicy
 from algotrade_ingestion.sources.vendors.massive.tickers import MassiveTickers, parse_tickers
 from algotrade_ingestion.sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource

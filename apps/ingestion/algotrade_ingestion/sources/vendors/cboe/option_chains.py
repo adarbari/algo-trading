@@ -19,8 +19,8 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.core.instruments import AssetClass, instrument_id
-from algotrade.core.options import is_standard_root, parse_osi
+from algotrade.core.model.instruments import AssetClass, instrument_id
+from algotrade.core.model.options import is_standard_root, parse_osi
 from algotrade_ingestion.sources.framework.base import FetchRequest, Normalized
 from algotrade_ingestion.sources.framework.http import Http
 

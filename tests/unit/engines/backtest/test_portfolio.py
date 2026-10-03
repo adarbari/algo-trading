@@ -1,6 +1,6 @@
 import pytest
 
-from algotrade.core.types import Fill, Side
+from algotrade.core.model.types import Fill, Side
 from algotrade.engines.backtest.portfolio import Portfolio
 from tests.factories import T0, fill
 

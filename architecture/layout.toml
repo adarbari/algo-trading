@@ -4,8 +4,7 @@
 #   - every module under src/ and apps/ lives in a directory declared here (a new folder or a
 #     stray file fails: declare the folder here with its purpose, in the same PR);
 #   - at most `max_modules` modules (excluding __init__.py) per directory; split by kind
-#     instead. `[[exception]]` lists today's oversized directories and may only shrink: the
-#     test fails once a listed directory is back under the limit (then delete the entry);
+#     instead. There are no exceptions (a fitness test keeps `[[exception]]` absent);
 #   - every package has an __init__.py whose docstring says what the folder holds;
 #   - `kind = "vendor"`: one folder per vendor. It contributes at least one source to the
 #     source registry, and nothing outside the folder imports it except the registry;
@@ -16,6 +15,7 @@
 #   path     a directory relative to the repo root; `*` matches one path segment
 #   purpose  one line: what belongs in it
 #   kind     optional: "vendor" or "task-domain" (rules above)
+#   contracts optional: import-linter contract names (pyproject.toml) enforcing the folder rule
 #
 # Adding a folder or moving a responsibility: .claude/skills/add-responsibility.
 
@@ -25,7 +25,8 @@ source_registry = "apps/ingestion/algotrade_ingestion/sources/framework/registry
 task_registry = "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py"
 
 # --------------------------------------------------------------------------- library (src/)
-# Declared as they are today; Layout PR B reorganises the library.
+# One folder = one kind of thing (Layout PR B). `contracts` name the import-linter contracts
+# (pyproject.toml) that enforce a folder's rule; the layout test checks they exist.
 
 [[dir]]
 path = "src/algotrade"
@@ -33,19 +34,72 @@ purpose = "the shared library package root (no modules of its own)"
 
 [[dir]]
 path = "src/algotrade/core"
-purpose = "domain value objects, instruments, views, calendar, ids, errors; no I/O, no pandas"
+purpose = "pure domain code, split by kind (curated exports in __init__ only)"
+contracts = ["Core is dependency-free domain code (no pandas, no I/O)"]
+
+[[dir]]
+path = "src/algotrade/core/*"
+purpose = "a pure core kind: no I/O, no pandas or pyarrow, no other algotrade package"
+contracts = ["Layout: core subpackages are pure (no pandas, pyarrow, storage or config) at every path"]
+
+[[dir]]
+path = "src/algotrade/core/model"
+purpose = "domain value objects: types, instruments, option contracts, field names, ids, errors"
+contracts = ["Layout: core model and time are the base of core (they never import views or validation)"]
+
+[[dir]]
+path = "src/algotrade/core/time"
+purpose = "the exchange session calendar and UTC clock helpers; never compute weekdays elsewhere"
+contracts = ["Layout: core model and time are the base of core (they never import views or validation)"]
+
+[[dir]]
+path = "src/algotrade/core/views"
+purpose = "the strategy-facing read API: MarketView, FeatureView, PriceSeries"
+contracts = ["Strategies and screeners are pure: they only see core"]
+
+[[dir]]
+path = "src/algotrade/core/validation"
+purpose = "pure sanity checks on domain values (OHLCV bar rules)"
 
 [[dir]]
 path = "src/algotrade/config"
-purpose = "typed L3/L4 configuration, site settings loader and the environment"
+purpose = "configuration, split by kind; env.py (the one environment reader) and user.py (L4 users)"
+contracts = ["Feature definitions and configs are pure: no storage I/O"]
+
+[[dir]]
+path = "src/algotrade/config/site"
+purpose = "L3 site settings: config/site/*.toml into frozen, validated dataclasses (one loader)"
+contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
+
+[[dir]]
+path = "src/algotrade/config/strategy"
+purpose = "strategy / screener configs and selections: schema, layer resolution, field catalog"
 
 [[dir]]
 path = "src/algotrade/storage"
-purpose = "generic data contract: schemas, store protocols, reader/writer facades, runs, locks"
+purpose = "generic data contract, split by kind; runs, locks and the backend factory"
+contracts = ["R2: storage is generic (no domain read helpers: readers move to algotrade.data)"]
+
+[[dir]]
+path = "src/algotrade/storage/tables"
+purpose = "market and result tables: schemas, store protocols, reader / writer facades"
+contracts = [
+    "Only the ingestion app writes market and feature data (ADR 0005)",
+    "R1: only algotrade.data reads market data (consumers never import storage readers)",
+    "Layout: market tables never import config documents",
+]
 
 [[dir]]
 path = "src/algotrade/storage/backends"
-purpose = "storage backend implementations: the only code that knows physical layout"
+purpose = "table backends (local Parquet, memory): the only code that knows physical layout"
+contracts = ["Parquet / Arrow I/O lives only in storage backends"]
+
+[[dir]]
+path = "src/algotrade/storage/configs"
+purpose = "config documents only: the ConfigStore protocol and its file / memory stores"
+contracts = [
+    "Layout: config documents and market tables stay separate (storage.configs never imports them)",
+]
 
 [[dir]]
 path = "src/algotrade/data"
@@ -62,6 +116,7 @@ purpose = "performance metrics and report formatting"
 [[dir]]
 path = "src/algotrade/strategies"
 purpose = "pure decision logic, split into trading strategies and screeners"
+contracts = ["Strategies and screeners are pure: they only see core"]
 
 [[dir]]
 path = "src/algotrade/strategies/trading"
@@ -74,6 +129,7 @@ purpose = "screeners: pure point-in-time filters, and their registry"
 [[dir]]
 path = "src/algotrade/engines"
 purpose = "engines that run strategies or screeners over data views"
+contracts = ["Engines are independent of each other"]
 
 [[dir]]
 path = "src/algotrade/engines/backtest"
@@ -89,7 +145,17 @@ purpose = "the selection engine: evaluate a Selection with a per-rule audit"
 
 [[dir]]
 path = "src/algotrade/services"
-purpose = "use cases: the backend's interface for apps and the API"
+purpose = "use cases (the backend's interface for apps); shared helpers: configs, datasets, selection, views"
+
+[[dir]]
+path = "src/algotrade/services/backtests"
+purpose = "use case: run a configured backtest, record its run and results"
+contracts = ["Layout: use-case packages are independent (backtests, screening)"]
+
+[[dir]]
+path = "src/algotrade/services/screening"
+purpose = "use case: run a screener over the universe, record the run, export its rows"
+contracts = ["Layout: use-case packages are independent (backtests, screening)"]
 
 [[dir]]
 path = "src/algotrade/services/evaluation"
@@ -98,6 +164,7 @@ purpose = "use case: evaluate every strategy on every golden dataset against the
 [[dir]]
 path = "src/algotrade/services/jobs"
 purpose = "long-running work as jobs: runner, models, handlers, exclusive runs"
+contracts = ["The job runner is generic: it knows no use case, engine or market-data reader"]
 
 # --------------------------------------------------------------------------- backtest app
 
@@ -175,13 +242,6 @@ purpose = "workflows: ordered, isolated runs of registry tasks (no modules of it
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/workflows/nightly"
 purpose = "the nightly workflow: sessions, steps, screens, notifications"
-
-# --------------------------------------------------------------------------- exceptions
-
-[[exception]]
-path = "src/algotrade/core"
-until = "layout-pr-b"
-reason = "12 modules today; Layout PR B splits the library by kind"
 
 # --------------------------------------------------------------------------- shared helpers
 

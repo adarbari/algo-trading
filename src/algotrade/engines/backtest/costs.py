@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from algotrade.core.types import Side
+from algotrade.core.model.types import Side
 
 
 @dataclass(frozen=True)

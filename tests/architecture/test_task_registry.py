@@ -87,7 +87,7 @@ def test_every_nightly_step_has_a_status_in_the_result() -> None:
     from datetime import date  # noqa: PLC0415
 
     from algotrade.storage.backends.memory import MemoryBackend  # noqa: PLC0415
-    from algotrade.storage.writers import StoreWriter  # noqa: PLC0415
+    from algotrade.storage.tables.writers import StoreWriter  # noqa: PLC0415
     from algotrade_ingestion.workflows.nightly.nightly import run_nightly  # noqa: PLC0415
     from algotrade_ingestion.workflows.nightly.sessions import Plan  # noqa: PLC0415
     from tests.ingest_helpers import task_ctx  # noqa: PLC0415

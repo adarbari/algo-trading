@@ -103,13 +103,17 @@ apps/
     workflows/    nightly/
   backtest/     algotrade-backtest: datasets, backtest, evaluate
 src/algotrade/  shared library
-  core/         domain types, MarketView, FeatureView, instruments (no pandas, no I/O)
-  storage/      data contract: schemas, stores, readers/writers, local + memory backends
+  core/         pure domain code (no pandas, no I/O): model/ (types, instruments, ids, errors),
+                time/ (calendar, clock), views/ (MarketView, FeatureView, series), validation/
+  config/       site/ (L3 settings loader), strategy/ (configs, selections, resolution), env, user
+  storage/      data contract: tables/ (schemas, readers/writers), backends/ (local + memory,
+                the only Parquet code), configs/ (config store), runs, locks
+  data/         the domain read API (reference, prices, events, chains)
   strategies/   trading/ (backtest strategies) and screeners/: pure, see only core
   features/     versioned rollup definitions (e.g. option_liquidity@v1)
   analytics/    performance metrics, report formatting
   engines/      backtest/ (loop, risk limits, sizing, simulated broker, portfolio), screening/
-  services/     use cases: screening, evaluation, views, exports
+  services/     use cases: backtests/, screening/ (+ exports), jobs/, evaluation/; shared helpers
 tests/
   unit/<layer>/ mirrors src; fast, isolated
   contract/     one suite every storage backend must pass

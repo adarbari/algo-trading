@@ -17,13 +17,13 @@ from datetime import date, datetime
 import numpy as np
 import pandas as pd
 
-from algotrade.core.errors import ConfigurationError, MissingDataError
-from algotrade.core.fields import REFERENCE_TABLE
-from algotrade.core.instruments import Instrument
-from algotrade.core.series import FIELDS, PriceSeries, align
+from algotrade.core.model.errors import ConfigurationError, MissingDataError
+from algotrade.core.model.fields import REFERENCE_TABLE
+from algotrade.core.model.instruments import Instrument
+from algotrade.core.views.series import FIELDS, PriceSeries, align
 from algotrade.data.events import read_events
 from algotrade.data.reference import REFERENCE_HINT, Snapshot, instrument_terms, read_snapshot
-from algotrade.storage.readers import StoreReader
+from algotrade.storage.tables.readers import StoreReader
 
 
 def bars(

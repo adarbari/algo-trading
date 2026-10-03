@@ -21,8 +21,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from algotrade.config.settings import UniverseSettings
-from algotrade.core.instruments import AssetClass
+from algotrade.config.site.settings import UniverseSettings
+from algotrade.core.model.instruments import AssetClass
 from algotrade.data import StoreReader
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.sources.framework.base import DirectorySource, FetchRequest, Source

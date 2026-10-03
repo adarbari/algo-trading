@@ -3,8 +3,8 @@
 from dataclasses import replace
 from datetime import date, datetime
 
-from algotrade.config.schema import Selection
-from algotrade.core.feature_view import FeatureValue, FeatureView
+from algotrade.config.strategy.schema import Selection
+from algotrade.core.views.feature_view import FeatureValue, FeatureView
 from algotrade.data import StoreReader
 from algotrade.data.reference import instrument_view
 from algotrade.engines.selection.evaluate import SelectionResult, evaluate_selection

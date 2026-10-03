@@ -15,9 +15,9 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.core.bars import ohlcv_problems
-from algotrade.core.errors import ConfigurationError, DataValidationError
-from algotrade.core.series import FIELDS, PriceSeries
+from algotrade.core.model.errors import ConfigurationError, DataValidationError
+from algotrade.core.validation.bars import ohlcv_problems
+from algotrade.core.views.series import FIELDS, PriceSeries
 
 MANIFEST = "manifest.json"
 TIMESTAMP = "timestamp"

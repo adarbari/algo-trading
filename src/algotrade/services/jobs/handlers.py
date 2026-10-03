@@ -13,11 +13,11 @@ from pathlib import Path
 from typing import Any
 
 from algotrade.engines.screening.runner import RunCoverage
-from algotrade.services.backtests import run_configured_backtest
+from algotrade.services.backtests.run import run_configured_backtest
 from algotrade.services.configs import resolve_config
-from algotrade.services.exports import run_exports
 from algotrade.services.jobs.runner import JobContext, JobKind
-from algotrade.services.screening import run_screener
+from algotrade.services.screening.exports import run_exports
+from algotrade.services.screening.run import run_screener
 
 
 def _config_hash(params: Mapping[str, Any], ctx: JobContext) -> str:

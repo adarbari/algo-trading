@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from algotrade.config.settings import DEFAULT_LEVERAGE_MARKERS
+from algotrade.config.site.settings import DEFAULT_LEVERAGE_MARKERS
 from algotrade_ingestion.sources.framework.base import FetchRequest
 from algotrade_ingestion.sources.framework.http import RetryPolicy
 from algotrade_ingestion.sources.vendors.nasdaq.symbol_directory import (

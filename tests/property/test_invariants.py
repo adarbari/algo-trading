@@ -5,7 +5,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from algotrade.core.market_view import MarketView
+from algotrade.core.views.market_view import MarketView
 from algotrade.engines.backtest.config import BacktestConfig
 from algotrade.engines.backtest.costs import CostModel
 from algotrade.engines.backtest.engine import run_backtest

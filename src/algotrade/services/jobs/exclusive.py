@@ -10,9 +10,9 @@ across processes. A second run either fails fast with ``RunLockedError`` or, wit
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from algotrade.core.errors import AlgoTradeError
-from algotrade.storage.interfaces import Backend
+from algotrade.core.model.errors import AlgoTradeError
 from algotrade.storage.locks import held
+from algotrade.storage.tables.interfaces import Backend
 
 INGEST_LOCK = "ingest"
 

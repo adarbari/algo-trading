@@ -7,7 +7,7 @@ from hypothesis import HealthCheck, settings
 from algotrade.data import StoreReader
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.writers import StoreWriter
+from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.sources.framework.base import FixtureSource
 from algotrade_ingestion.sources.framework.registry import fixture_source
 from algotrade_ingestion.tasks.maintenance.golden import load_golden

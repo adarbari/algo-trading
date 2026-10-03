@@ -55,16 +55,16 @@ only shrinks (`make dupes-update`).
 
 | Responsibility | Owner |
 |---|---|
-| Which snapshot a read sees (on or before D, else earliest + `pre_snapshot`); domain reads of market data | `algotrade/data/` (`reference`, `prices`, `events`, `chains`); consumers never import `storage.readers` |
+| Which snapshot a read sees (on or before D, else earliest + `pre_snapshot`); domain reads of market data | `algotrade/data/` (`reference`, `prices`, `events`, `chains`); consumers never import `storage.tables.readers` |
 | Run ids, run records, COMPLETE / PARTIAL | `storage/runs.py` (`start_run` + `RunRecord.finish` in services), `services/jobs/`; in ingestion `tasks/framework/run.py` (`IngestRun`): never write the loop in a task |
 | Raw save; stamping; ticker → id in ingestion | `tasks/framework/run.py` (`IngestRun`) |
 | Which ingestion steps run, with which defaults | `tasks/framework/registry.py`; nightly order, isolation, catch-up: `workflows/nightly/nightly.py` |
 | Vendor HTTP, retries, circuit breaker; pacing; building sources (incl. the golden fixture source); vendor specifics | `sources/framework/http.py`; `sources/framework/limiter.py` (one per key, cross-process); `sources/framework/registry.py`; `sources/vendors/<vendor>/` |
 | Locks: named store locks, run-index lock; one ingest run at a time | `storage/locks.py`; `services/jobs/exclusive.py` |
-| Running long work (threads, recovery), screens | `services/jobs/` (apps call `run_job`, never build a runner; fan-out: `as_completed`); screens: `services/screening.py`, submitted as `screen` jobs |
-| Site settings (`config/site/*.toml` → frozen dataclasses); environment variables + `.env` | `config/settings.py` (one loader); `config/env.py` (storage and sources receive values as parameters) |
-| Session / exchange calendar (holidays, early closes, last closed session) | `core/calendar.py`; never compute weekdays elsewhere |
-| Table schemas (columns, declared types, validation); Parquet / Arrow I/O | `storage/schemas.py`; `storage/backends/` (`arrow.py`: casts, `schema_version`, row groups) |
+| Running long work (threads, recovery), screens | `services/jobs/` (apps call `run_job`, never build a runner; fan-out: `as_completed`); screens: `services/screening/run.py`, submitted as `screen` jobs |
+| Site settings (`config/site/*.toml` → frozen dataclasses); environment variables + `.env` | `config/site/settings.py` (one loader); `config/env.py` (storage and sources receive values as parameters) |
+| Session / exchange calendar (holidays, early closes, last closed session) | `core/time/calendar.py`; never compute weekdays elsewhere |
+| Table schemas (columns, declared types, validation); Parquet / Arrow I/O | `storage/tables/schemas.py`; `storage/backends/` (`arrow.py`: casts, `schema_version`, row groups) |
 | Each stored table | exactly one producing module (`[[table]]` in the registry) |
 | Which directory a module belongs in | `architecture/layout.toml` (see Directory layout below) |
 
@@ -73,8 +73,16 @@ only shrinks (`make dupes-update`).
 One folder holds one kind of thing. `architecture/layout.toml` declares every directory under
 `src/` and `apps/` with its purpose and rules; a new folder (or a module in an undeclared one)
 fails CI until it is declared there in the same PR. At most 10 modules per folder (split by
-kind; `[[exception]]` entries only shrink), and every `__init__.py` docstring says what the
-folder holds. In `apps/ingestion/algotrade_ingestion/`: `cli/`, `ops/`;
+kind; no exceptions), and every `__init__.py` docstring says what the folder holds. In the
+library `src/algotrade/`: `core/` (`model/` value objects, ids, errors; `time/` calendar and
+clock; `views/` the strategy-facing `MarketView` / `FeatureView` / `PriceSeries`;
+`validation/` OHLCV checks; all pure), `config/` (`site/` L3 settings loader; `strategy/`
+configs, selections, resolution, catalog; `env.py`, `user.py`), `storage/` (`tables/`
+schemas, protocols, readers / writers; `backends/` the only code that knows Parquet layout;
+`configs/` config documents only, never tables; `runs.py`, `locks.py`, `factory.py`),
+`data/`, `features/`, `strategies/`, `engines/`, `analytics/`, `services/` (`backtests/`,
+`screening/` use cases; `jobs/`, `evaluation/`; shared `configs`, `datasets`, `selection`,
+`views`). In `apps/ingestion/algotrade_ingestion/`: `cli/`, `ops/`;
 `sources/framework/` (protocols, HTTP, pacing, the source registry), `sources/vendors/<vendor>/`
 (one folder per vendor, imported only by the source registry; vendors never import each
 other), `sources/fixtures/` (golden synthetic source); `tasks/framework/` (`IngestRun`, the
@@ -83,8 +91,8 @@ tasks and helpers used only inside their domain); `workflows/nightly/`.
 
 ## Code rules (enforced by CI; follow them up front)
 
-1. **Respect layers.** Strategies and screeners import only `core` (plus `FeatureView` /
-   `quant` once they exist). `core/` imports no other `algotrade` package and no pandas.
+1. **Respect layers.** Strategies and screeners import only `core` (`core.views` for data,
+   `core.model` for types and errors). `core/` imports no other `algotrade` package and no pandas.
    Check with `make arch`.
 2. **No file over 1000 lines** (aim for under 300). Split by responsibility. `make filelen`.
 3. **Every module starts with a docstring** stating its single responsibility.

@@ -1,6 +1,6 @@
 # L3 site setting: how the nightly workflow runs (apps/ingestion/workflows/nightly/nightly.py).
 
-[sessions]                       # which exchange sessions a nightly run ingests (core/calendar.py)
+[sessions]                       # which exchange sessions a nightly run ingests (core/time/calendar.py)
 settle_minutes = 30              # a session counts as closed this long after its close (16:00 / 13:00 New York)
 max_catch_up = 5                 # after missed nights, ingest at most this many sessions (the latest ones)
 

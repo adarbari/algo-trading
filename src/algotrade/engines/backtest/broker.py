@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Protocol
 
-from algotrade.core.types import Fill, Order
+from algotrade.core.model.types import Fill, Order
 
 
 class Broker(Protocol):

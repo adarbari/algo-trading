@@ -10,8 +10,8 @@ import pytest
 from algotrade.data import StoreReader
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.interfaces import Backend
-from algotrade.storage.writers import StoreWriter
+from algotrade.storage.tables.interfaces import Backend
+from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.maintenance.migrate_ids import migrate_ids
 from algotrade_ingestion.tasks.reference.instrument_ids import ID_MAP, ID_MAP_COLUMNS
 from tests.ingest_helpers import task_ctx

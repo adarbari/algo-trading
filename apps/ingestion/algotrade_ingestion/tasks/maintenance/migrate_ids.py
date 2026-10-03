@@ -13,7 +13,7 @@ from datetime import date
 
 import pandas as pd
 
-from algotrade.core.errors import DataValidationError
+from algotrade.core.model.errors import DataValidationError
 from algotrade.data import StoreReader
 from algotrade.data.reference import snapshot
 from algotrade.storage.runs import RunRecord

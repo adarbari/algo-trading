@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime
 
 import pandas as pd
 
-from algotrade.storage.writers import StoreWriter
+from algotrade.storage.tables.writers import StoreWriter
 
 T0 = datetime(2026, 10, 2, 22, 0, tzinfo=UTC)
 

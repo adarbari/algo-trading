@@ -16,11 +16,11 @@ from collections.abc import Mapping
 import numpy as np
 
 from algotrade.analytics.metrics import compute_metrics
-from algotrade.core.errors import ConfigurationError
-from algotrade.core.instruments import Instrument, multipliers
-from algotrade.core.market_view import MarketView
-from algotrade.core.series import PriceSeries
-from algotrade.core.time import to_utc_datetime
+from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.instruments import Instrument, multipliers
+from algotrade.core.time.clock import to_utc_datetime
+from algotrade.core.views.market_view import MarketView
+from algotrade.core.views.series import PriceSeries
 from algotrade.engines.backtest.config import BacktestConfig
 from algotrade.engines.backtest.limits import apply_limits
 from algotrade.engines.backtest.portfolio import Portfolio

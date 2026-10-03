@@ -11,7 +11,7 @@ import math
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 
-from algotrade.core.types import Fill, Order, Side
+from algotrade.core.model.types import Fill, Order, Side
 from algotrade.engines.backtest.costs import CostModel
 
 

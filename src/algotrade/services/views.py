@@ -7,9 +7,9 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.core.feature_view import FeatureValue, FeatureView
+from algotrade.core.views.feature_view import FeatureValue, FeatureView
 from algotrade.data import StoreReader
-from algotrade.storage.schemas import COMMON
+from algotrade.storage.tables.schemas import COMMON
 
 
 def to_value(value: Any) -> FeatureValue:

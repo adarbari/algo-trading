@@ -2,9 +2,9 @@
 
 import numpy as np
 
-from algotrade.core.errors import ConfigurationError
-from algotrade.core.market_view import MarketView
-from algotrade.core.types import TargetWeights
+from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.types import TargetWeights
+from algotrade.core.views.market_view import MarketView
 from algotrade.strategies.trading.base import Strategy
 
 

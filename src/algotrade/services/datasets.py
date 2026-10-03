@@ -4,9 +4,9 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 
-from algotrade.core.errors import MissingDataError
-from algotrade.core.instruments import Instrument
-from algotrade.core.series import PriceSeries, align
+from algotrade.core.model.errors import MissingDataError
+from algotrade.core.model.instruments import Instrument
+from algotrade.core.views.series import PriceSeries, align
 from algotrade.data import StoreReader
 from algotrade.data.prices import bars, frame_to_series
 from algotrade.data.reference import instrument_terms, read_snapshot, snapshot

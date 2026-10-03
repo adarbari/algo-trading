@@ -3,13 +3,13 @@ from datetime import date
 import pandas as pd
 import pytest
 
-from algotrade.core.errors import MissingDataError
+from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.prices import bars as read_bars
 from algotrade.data.prices import frame_to_series, load_price_data
 from algotrade.services.datasets import list_datasets
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.writers import StoreWriter
+from algotrade.storage.tables.writers import StoreWriter
 from tests.storage_helpers import stamped
 
 D1, D2 = date(2026, 10, 1), date(2026, 10, 2)

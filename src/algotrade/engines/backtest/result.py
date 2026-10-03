@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 
 from algotrade.analytics.metrics import PerformanceMetrics
-from algotrade.core.series import FloatArray, TimeArray
-from algotrade.core.types import Fill
+from algotrade.core.model.types import Fill
+from algotrade.core.views.series import FloatArray, TimeArray
 
 
 @dataclass(frozen=True)

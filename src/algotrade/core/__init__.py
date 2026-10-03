@@ -5,11 +5,11 @@ Rules for this package:
 - Everything is immutable where possible and timezone-aware (UTC).
 """
 
-from algotrade.core.errors import AlgoTradeError, DataValidationError
-from algotrade.core.instruments import Instrument
-from algotrade.core.market_view import MarketView
-from algotrade.core.series import PriceSeries
-from algotrade.core.types import Fill, Order, Side, TargetWeights
+from algotrade.core.model.errors import AlgoTradeError, DataValidationError
+from algotrade.core.model.instruments import Instrument
+from algotrade.core.model.types import Fill, Order, Side, TargetWeights
+from algotrade.core.views.market_view import MarketView
+from algotrade.core.views.series import PriceSeries
 
 __all__ = [
     "AlgoTradeError",

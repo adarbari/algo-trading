@@ -1,4 +1,4 @@
-"""Frames <-> Arrow tables under the declared table schemas (``storage/schemas.py``).
+"""Frames <-> Arrow tables under the declared table schemas (``storage/tables/schemas.py``).
 
 Shared by every backend so they cannot disagree: a write casts each declared column to its
 type (``ARROW_TYPES``), fails on uncastable data, nulls in a non-nullable column or an
@@ -15,8 +15,8 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
-from algotrade.core.errors import DataValidationError
-from algotrade.storage.schemas import SCHEMA_VERSION, TableSpec, spec_for
+from algotrade.core.model.errors import DataValidationError
+from algotrade.storage.tables.schemas import SCHEMA_VERSION, TableSpec, spec_for
 
 ARROW_TYPES: dict[str, pa.DataType] = {
     "string": pa.large_string(),

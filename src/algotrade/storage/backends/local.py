@@ -4,7 +4,7 @@ Layout under the root directory (an internal detail; nothing else may rely on it
 
     tables/<table>/date=YYYY-MM-DD/run=<run_id>.parquet   (+ _runs.json knowledge index,
                                                            .runs.lock guarding it)
-                                                          typed per storage/schemas.py,
+                                                          typed per storage/tables/schemas.py,
                                                           ~64k-row groups + page index
     raw/source=<s>/dataset=<d>/date=YYYY-MM-DD/run=<run_id>/<key>.json.gz
     staging/<run_id>/<table>/<key>.parquet
@@ -30,7 +30,7 @@ import pandas as pd
 import pyarrow.parquet as pq
 
 from algotrade.storage.backends.arrow import concat, conform, parquet_bytes, to_arrow, to_frame
-from algotrade.storage.backends.selection import concat_frames, latest_run, select_instruments
+from algotrade.storage.backends.run_selection import concat_frames, latest_run, select_instruments
 from algotrade.storage.locks import FileLock, held
 from algotrade.storage.runs import RunRecord, run_session
 

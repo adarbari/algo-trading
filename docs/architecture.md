@@ -38,14 +38,14 @@ versus planned. Detail lives in companion docs:
    L3 config/site/*.toml (shared, via PR) · L4 config/users/<id>/*.toml (per user)
 
  SHARED LIBRARY (src/algotrade/), layered top to bottom:
-   services/    use cases: jobs, configs, selection, screening, backtests, evaluation, exports
+   services/    use cases: backtests/ · screening/ (+ exports) · jobs/ · evaluation/ · configs, selection
    engines/     backtest/ · screening/ · selection/
    strategies/  trading/ (backtests) · screeners/. Pure: MarketView / FeatureView in, decisions out.
    features/    versioned rollup definitions          analytics/   metrics, reports
-   storage/     schemas · stores per layer · readers / writers · backends/ · config store
-   config/      typed configs, selections, users, layered resolution + hash
+   storage/     tables/ (schemas, readers / writers) · backends/ · configs/ (config store) · runs, locks
+   config/      site/ (L3 settings) · strategy/ (configs, selections, resolution + hash) · env, user
    (quant/      pricing maths, Greeks, IV: phase 2b)
-   core/        instruments, value objects, MarketView / FeatureView, options, errors, time
+   core/        model/ (value objects, instruments, options, ids, errors) · time/ · views/ · validation/
 ```
 
 ### Build status
@@ -208,7 +208,7 @@ jobs), `notify.py` (summary + notification).
 - **Status, in one place** (`steps.overall`): of the steps that ran, none succeeded → FAILED;
   any FAILED, BLOCKED or PARTIAL → PARTIAL; else COMPLETE. Each session gets a `nightly` run
   record with that status and its per-step results.
-- **Exchange calendar** (`core/calendar.py`, pure Python): NYSE full-day holidays (with the
+- **Exchange calendar** (`core/time/calendar.py`, pure Python): NYSE full-day holidays (with the
   Saturday/Sunday observance rules, Good Friday from the Easter computus, Juneteenth from 2022)
   and 13:00 early closes (July 3 and December 24 when they are sessions, the day after
   Thanksgiving). `last_closed_session(now)` is the latest session whose close plus a settle
@@ -278,32 +278,60 @@ apps/ingestion (algotrade_ingestion) · apps/backtest (algotrade_backtest)   nev
 Extra contracts:
 - strategies and screeners see only `core`
 - feature definitions and configs never touch storage
-- only `apps/ingestion` may import `storage.writers`
+- only `apps/ingestion` may import `storage.tables.writers`
 - inside `engines/backtest`, risk (`limits`, `sizing`), execution (`simulated`) and accounting
   (`portfolio`) stay independent
 
 | Package | Responsibility | May import |
 |---|---|---|
-| `core/` | Value objects (`Order`, `Fill`, `PriceSeries`), `Instrument`, `MarketView`, `FeatureView`, options, ids, errors, time. | numpy only |
-| `config/` | L3/L4 configuration: typed `StrategyConfig` / `Selection` / `Rule`, field catalogue, layered resolution and the config hash. Pure. | core |
-| `storage/` | Generic data contract: schemas, a `Protocol` per store, the generic reader (tables, ranges, dates, runs) and writer / result-writer facades, `local` (Parquet) and `memory` backends, `ConfigStore`. No domain rules. | core, pandas, pyarrow |
+| `core/` | `model/`: value objects (`Order`, `Fill`), `Instrument`, options, field names, ids, errors. `time/`: exchange calendar, clock helpers. `views/`: `MarketView`, `FeatureView`, `PriceSeries` (what strategies see). `validation/`: OHLCV sanity. | numpy only |
+| `config/` | `site/`: L3 site settings loader. `strategy/`: typed `StrategyConfig` / `Selection` / `Rule`, field catalogue, layered resolution and the config hash. `env.py` (environment), `user.py` (L4 users). Pure. | core |
+| `storage/` | Generic data contract. `tables/`: schemas, a `Protocol` per store, the generic reader (tables, ranges, dates, runs) and writer / result-writer facades. `backends/`: `local` (Parquet) and `memory`. `configs/`: the `ConfigStore` and its file / memory stores (never imports `tables/` or `backends/`). `runs.py`, `locks.py`, `factory.py`. No domain rules. | core, pandas, pyarrow (backends only) |
 | `data/` | The domain read API, the only way consumers read market data: `reference` (one snapshot rule, instruments, terms, `InstrumentView`, universe, `SymbolResolver`), `prices` (bars + split / dividend adjustment), `events` (by event date), `chains` (filter by underlying). | storage, core |
 | `strategies/` → `trading/` | Backtest strategies: `MarketView` in, target weights out, plus their registry. | core |
 | `strategies/` → `screeners/` | Screener contract, shared `Decision` categories, `short_premium_liquidity`. | core |
 | `features/` | Pure, versioned rollup definitions (`option_liquidity@v1`) with declared output columns, and their registry. | core |
 | `analytics/` | Metrics and report formatting from equity curves + fills. | core |
 | `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. `selection/`: three-valued evaluation with a per-rule audit. | strategies, config, analytics, core |
-| `services/` | Use cases: `jobs`, `configs`, `selection`, `backtests`, `screening`, golden `datasets`, `exports`, `evaluation/`. | everything below except `storage.writers` and `storage.readers` (through `data/`) |
+| `services/` | Use cases: `backtests/`, `screening/` (run + `exports`), `jobs/`, `evaluation/`; shared by several: `configs`, `selection`, golden `datasets`, `views` (FeatureView builder). | everything below except `storage.tables.writers` and `storage.tables.readers` (through `data/`) |
 | `apps/ingestion` | `sources/` (`framework/`: protocols, HTTP with retries, pacing, the source registry; `vendors/<vendor>/`; `fixtures/`: synthetic/golden); `tasks/` (`framework/`: `IngestRun` in `run.py` and the task registry; one module per dataset in `reference/`, `market/`, `derived/`, `maintenance/`); nightly workflow (`workflows/nightly/`: ordered, isolated registry tasks, catch-up, screens as jobs, notification); `cli/` (`algotrade-ingest`); `ops/` (schedule). | library |
 | `apps/backtest` | `algotrade-backtest` (`algotrade` alias): datasets list, backtest (golden dataset or config, via jobs), evaluate, config validate/show. Reads only through `data/`. | library |
 
 ### Directory layout (ADR 0020)
 
 One folder holds one kind of thing. `architecture/layout.toml` declares every directory under
-`src/` and `apps/` with a one-line purpose; `tests/architecture/test_layout.py` fails on a
-module in an undeclared directory, on a directory with more than 10 modules (today's library
-exceptions, `[[exception]]`, only shrink and go away in Layout PR B), and on a package whose
-`__init__.py` has no docstring. The ingestion app:
+`src/` and `apps/` with a one-line purpose and the import-linter contracts that enforce its
+rule; `tests/architecture/test_layout.py` fails on a module in an undeclared directory, on a
+directory with more than 10 modules (no exceptions), on a contract name that does not exist,
+and on a package whose `__init__.py` has no docstring. The library:
+
+```
+src/algotrade/
+  core/           pure: no I/O, no pandas / pyarrow, no other algotrade package
+    model/        types, instruments, options, fields, ids, errors
+    time/         calendar.py (exchange sessions), clock.py (UTC helpers)
+    views/        market_view, feature_view, series         what strategies see
+    validation/   bars.py (OHLCV sanity)
+  config/         env.py, user.py
+    site/         settings.py (the one L3 loader), fields.py
+    strategy/     schema.py, resolve.py, catalog.py           configs and selections
+  storage/        runs.py, locks.py, factory.py
+    tables/       interfaces, readers, writers, schemas, result_writer
+    backends/     local, memory, arrow, run_selection        the only Parquet / Arrow code
+    configs/      store.py (ConfigStore), files.py            config documents only
+  data/           reference, prices, events, chains, resolver
+  features/  strategies/{trading,screeners}/  engines/{backtest,screening,selection}/  analytics/
+  services/       configs, datasets, selection, views         shared by several use cases
+    backtests/    run.py
+    screening/    run.py, exports.py
+    jobs/  evaluation/
+```
+
+Library folder rules (import-linter): every `core/*` package is pure; `core.model` and
+`core.time` never import `core.views` / `core.validation`; strategies see only `core`;
+`storage.configs` never imports `storage.tables` or `storage.backends` (and the reverse);
+pyarrow only in `storage.backends`; `config.site` never imports `config.strategy`; the
+`backtests` and `screening` use cases are independent. The ingestion app:
 
 ```
 apps/ingestion/algotrade_ingestion/
@@ -428,17 +456,17 @@ doing it. The ratchet `architecture/known_violations.toml` is empty: any hit fai
 | rate limiting | `sources/framework/limiter.py`, one per key, shared across threads and processes |
 | source construction (vendors and the golden fixture source) | `sources/framework/registry.py` (vendor specifics stay in `sources/vendors/<vendor>/`) |
 | locks (flock, named store locks, run-index lock); the ingest run lock | `storage/locks.py`; `services/jobs/exclusive.py` |
-| session / exchange calendar | `core/calendar.py` |
+| session / exchange calendar | `core/time/calendar.py` |
 | job execution | `services/jobs/` (apps use `run_job`; fan-out `as_completed`) |
-| screen execution | `services/screening.py`, submitted as `screen` jobs (nightly: `workflows/nightly/screens.py`) |
-| site settings: `config/site/*.toml` → typed objects | `config/settings.py` (the store only reads files) |
+| screen execution | `services/screening/run.py`, submitted as `screen` jobs (nightly: `workflows/nightly/screens.py`) |
+| site settings: `config/site/*.toml` → typed objects | `config/site/settings.py` (the store only reads files) |
 | environment variables and `.env` | `config/env.py` (the storage factory receives the URL) |
-| table schemas: required columns, declared types, validation | `storage/schemas.py` |
+| table schemas: required columns, declared types, validation | `storage/tables/schemas.py` |
 | Parquet / Arrow I/O (casting to declared types, schema version, row groups) | `storage/backends/` (`arrow.py` shared by every backend) |
 
 ### Typed settings and schemas (R6)
 
-**Settings.** `config/settings.py` is the one loader for `config/site/*.toml`:
+**Settings.** `config/site/settings.py` is the one loader for `config/site/*.toml`:
 `SourcesSettings` (vendors, `[http]`, `[quality]`, retention), `UniverseSettings` (+ the
 curated leveraged-ETF overrides), `NightlySettings`, and the run defaults
 `ScreeningSettings` / `BacktestSettings` (layered per config by `resolve`, exposed as
@@ -450,7 +478,7 @@ number >= 0, got 'fast'`). `config/` does no file I/O: documents come from the
 `ConfigStore`. `config/env.py` is the only reader of environment variables (`credential`,
 `data_url`, `config_dir`, `user_id`, `load_dotenv`).
 
-**Schemas.** `storage/schemas.py` declares every column of every fixed table with an abstract
+**Schemas.** `storage/tables/schemas.py` declares every column of every fixed table with an abstract
 type (`string`, `float64`, `int64`, `bool`, `date`, `timestamp_utc`) and nullability; open
 tables (`events/`, `rollups/`, `results/`, `catalog/`) type their common and key columns.
 Writers validate (missing, undeclared, null keys, duplicates, OHLCV sanity); backends cast to

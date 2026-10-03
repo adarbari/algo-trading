@@ -8,7 +8,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import date
 
-from algotrade.config.settings import SourcesSettings
+from algotrade.config.site.settings import SourcesSettings
 from algotrade.data import StoreReader
 from algotrade.data.chains import chain_status
 from algotrade.data.reference import snapshot

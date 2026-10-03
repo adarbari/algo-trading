@@ -160,7 +160,7 @@ forbidden_modules = ["algotrade.storage"]
 name = "Only the ingestion app writes market and feature data (ADR 0005)"
 type = "forbidden"
 source_modules = ["algotrade", "algotrade_backtest"]
-forbidden_modules = ["algotrade.storage.writers"]
+forbidden_modules = ["algotrade.storage.tables.writers"]
 
 [[tool.importlinter.contracts]]
 name = "Shared libraries never import apps (ADR 0004)"
@@ -198,7 +198,7 @@ forbidden_modules = [
     "algotrade_ingestion.workflows",
     "algotrade_ingestion.cli",
     "algotrade_ingestion.ops",
-    "algotrade.config.settings",
+    "algotrade.config.site.settings",
     "algotrade.services",
     "algotrade.engines",
     "algotrade.strategies",
@@ -291,6 +291,12 @@ type = "forbidden"
 source_modules = [
     "algotrade.core",
     "algotrade.config",
+    "algotrade.storage.tables",
+    "algotrade.storage.configs",
+    "algotrade.storage.factory",
+    "algotrade.storage.runs",
+    "algotrade.storage.locks",
+    "algotrade.data",
     "algotrade.features",
     "algotrade.strategies",
     "algotrade.analytics",
@@ -311,19 +317,66 @@ forbidden_modules = [
     "algotrade.services.screening",
     "algotrade.engines",
     "algotrade.data",
-    "algotrade.storage.readers",
-    "algotrade.storage.writers",
+    "algotrade.storage.tables.readers",
+    "algotrade.storage.tables.writers",
 ]
 
 [[tool.importlinter.contracts]]
-name = "R1: only algotrade.data reads market data (consumers never import storage.readers)"
+name = "R1: only algotrade.data reads market data (consumers never import storage readers)"
 type = "forbidden"
 source_modules = ["algotrade.services", "algotrade.engines", "algotrade_backtest", "algotrade_ingestion"]
-forbidden_modules = ["algotrade.storage.readers"]
+forbidden_modules = ["algotrade.storage.tables.readers"]
 allow_indirect_imports = true  # through algotrade.data, which hands the reader on
 
 [[tool.importlinter.contracts]]
 name = "R2: storage is generic (no domain read helpers: readers move to algotrade.data)"
 type = "forbidden"
 source_modules = ["algotrade.storage"]
-forbidden_modules = ["algotrade.core.fields", "algotrade.core.feature_view", "algotrade.data"]
+forbidden_modules = [
+    "algotrade.core.model.fields",
+    "algotrade.core.views.feature_view",
+    "algotrade.data",
+]
+
+# ---- Library layout (Layout PR B: core/, config/, storage/, services/ folders by kind).
+
+[[tool.importlinter.contracts]]
+name = "Layout: core subpackages are pure (no pandas, pyarrow, storage or config) at every path"
+type = "forbidden"
+source_modules = [
+    "algotrade.core.model",
+    "algotrade.core.time",
+    "algotrade.core.views",
+    "algotrade.core.validation",
+]
+forbidden_modules = ["pandas", "pyarrow", "algotrade.storage", "algotrade.config", "algotrade.data"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Layout: core model and time are the base of core (they never import views or validation)"
+type = "forbidden"
+source_modules = ["algotrade.core.model", "algotrade.core.time"]
+forbidden_modules = ["algotrade.core.views", "algotrade.core.validation"]
+
+[[tool.importlinter.contracts]]
+name = "Layout: config documents and market tables stay separate (storage.configs never imports them)"
+type = "forbidden"
+source_modules = ["algotrade.storage.configs"]
+forbidden_modules = ["algotrade.storage.tables", "algotrade.storage.backends"]
+
+[[tool.importlinter.contracts]]
+name = "Layout: market tables never import config documents"
+type = "forbidden"
+source_modules = ["algotrade.storage.tables", "algotrade.storage.backends"]
+forbidden_modules = ["algotrade.storage.configs"]
+
+[[tool.importlinter.contracts]]
+name = "Layout: site settings never import strategy configs (resolve layers site defaults in)"
+type = "forbidden"
+source_modules = ["algotrade.config.site"]
+forbidden_modules = ["algotrade.config.strategy"]
+
+[[tool.importlinter.contracts]]
+name = "Layout: use-case packages are independent (backtests, screening)"
+type = "independence"
+modules = ["algotrade.services.backtests", "algotrade.services.screening"]

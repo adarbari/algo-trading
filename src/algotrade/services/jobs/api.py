@@ -10,7 +10,7 @@ from typing import Any
 from algotrade.config.user import UserContext
 from algotrade.services.jobs.models import JobRecord
 from algotrade.services.jobs.runner import JobHandler, JobKind, LocalJobRunner
-from algotrade.storage.interfaces import RunStore
+from algotrade.storage.tables.interfaces import RunStore
 
 
 def run_job(

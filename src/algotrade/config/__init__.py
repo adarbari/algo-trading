@@ -6,8 +6,8 @@ and hashes the result. No file I/O, except ``env``: the one reader of environmen
 and the local ``.env``.
 """
 
-from algotrade.config.resolve import ResolvedConfig, resolve
-from algotrade.config.schema import Group, Rule, Selection, StrategyConfig
+from algotrade.config.strategy.resolve import ResolvedConfig, resolve
+from algotrade.config.strategy.schema import Group, Rule, Selection, StrategyConfig
 from algotrade.config.user import UserContext
 
 __all__ = [

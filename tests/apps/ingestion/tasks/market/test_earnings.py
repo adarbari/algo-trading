@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
-from algotrade.storage.writers import StoreWriter
+from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.sources.framework.base import FetchRequest
 from algotrade_ingestion.sources.framework.http import HttpError, RetryPolicy
 from algotrade_ingestion.sources.vendors.nasdaq.earnings import NasdaqEarningsSource, parse_calendar

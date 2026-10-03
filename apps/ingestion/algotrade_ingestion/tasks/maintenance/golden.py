@@ -15,7 +15,7 @@ from datetime import date
 
 import pandas as pd
 
-from algotrade.core.instruments import AssetClass
+from algotrade.core.model.instruments import AssetClass
 from algotrade.data.resolver import SymbolResolver
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.sources.framework.base import FetchRequest, FixtureSource

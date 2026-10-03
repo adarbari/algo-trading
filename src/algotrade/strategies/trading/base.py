@@ -2,8 +2,8 @@
 
 from abc import ABC, abstractmethod
 
-from algotrade.core.market_view import MarketView
-from algotrade.core.types import TargetWeights
+from algotrade.core.model.types import TargetWeights
+from algotrade.core.views.market_view import MarketView
 
 
 class Strategy(ABC):

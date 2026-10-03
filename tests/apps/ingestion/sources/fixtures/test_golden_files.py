@@ -3,11 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from algotrade.core.errors import ConfigurationError, DataValidationError
+from algotrade.core.model.errors import ConfigurationError, DataValidationError
 from algotrade.data import StoreReader
 from algotrade.services.datasets import list_datasets, load_dataset
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.writers import StoreWriter
+from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.sources.fixtures.files import GoldenFiles
 from algotrade_ingestion.sources.fixtures.source import GoldenCsvSource
 from algotrade_ingestion.tasks.maintenance.golden import load_golden
