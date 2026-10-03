@@ -12,11 +12,11 @@ permissions:
 
 jobs:
   nightly:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64] # the owner's Mac (docs/ci.md): no Actions minutes
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
-        with: { python-version: "3.12", enable-cache: true }
+        with: { python-version: "3.12", enable-cache: false } # uv's own cache persists on the Mac
       - name: Install with the latest allowed dependency versions (catches upstream breakage)
         run: uv sync --all-packages --upgrade
       - run: make datasets-verify

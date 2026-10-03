@@ -19,11 +19,11 @@ env:
 jobs:
   quality:
     name: Lint, types, boundaries, ownership, duplicates, file length
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64] # the owner's Mac (docs/ci.md): no Actions minutes
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
-        with: { python-version: "3.12", enable-cache: true }
+        with: { python-version: "3.12", enable-cache: false } # uv's own cache persists on the Mac
       - run: uv sync --all-packages --locked
       - run: make lock-check
       - run: make lint
@@ -35,7 +35,7 @@ jobs:
 
   test:
     name: Tests (py${{ matrix.python }})
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64] # the owner's Mac (docs/ci.md): no Actions minutes
     strategy:
       fail-fast: false
       matrix:
@@ -44,11 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
-        with: { python-version: "${{ matrix.python }}", enable-cache: true }
-      - uses: actions/cache@v6
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-py${{ matrix.python }}-${{ hashFiles('uv.lock') }}
+        with: { python-version: "${{ matrix.python }}", enable-cache: false } # uv's own cache persists on the Mac
       - run: uv sync --all-packages --locked
       # Hypothesis keeps failing examples here and replays them first on the next run.
       - uses: actions/cache@v6
@@ -64,12 +60,12 @@ jobs:
 
   evaluate:
     name: Strategy evaluation vs baseline
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, ARM64] # the owner's Mac (docs/ci.md): no Actions minutes
     needs: [quality]
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
-        with: { python-version: "3.12", enable-cache: true }
+        with: { python-version: "3.12", enable-cache: false } # uv's own cache persists on the Mac
       - run: uv sync --all-packages --locked
       - run: make datasets-verify
       - name: Run every strategy on every golden dataset
