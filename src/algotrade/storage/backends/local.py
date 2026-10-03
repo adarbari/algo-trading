@@ -2,8 +2,11 @@
 
 Layout under the root directory (an internal detail; nothing else may rely on it)::
 
-    tables/<table>/date=YYYY-MM-DD/run=<run_id>.parquet   (+ _runs.json knowledge index,
-                                                           .runs.lock guarding it)
+    tables/<table>/date=YYYY-MM-DD/run=<run_id>.parquet   (+ _runs.json knowledge index:
+                                                           run -> knowledge_ts, or
+                                                           {knowledge_ts, restates} for a
+                                                           restating run; .runs.lock
+                                                           guarding it)
                                                           typed per storage/tables/schemas.py,
                                                           ~64k-row groups + page index
     raw/source=<s>/dataset=<d>/date=YYYY-MM-DD/run=<run_id>/<key>.json.gz
@@ -27,10 +30,17 @@ from datetime import date, datetime
 from pathlib import Path
 
 import pandas as pd
+import pyarrow as pa
 import pyarrow.parquet as pq
 
-from algotrade.storage.backends.arrow import concat, conform, parquet_bytes, to_arrow, to_frame
-from algotrade.storage.backends.run_selection import concat_frames, latest_run, select_instruments
+from algotrade.storage.backends.arrow import concat, parquet_bytes, to_arrow, to_frame
+from algotrade.storage.backends.run_selection import (
+    RunEntry,
+    merge_rows,
+    run_mode,
+    select_instruments,
+    select_runs,
+)
 from algotrade.storage.locks import FileLock, held
 from algotrade.storage.runs import RunRecord, run_session
 
@@ -68,21 +78,42 @@ class LocalTables:
     def _dir(self, table: str, session_date: date) -> Path:
         return self.root / table / f"date={session_date.isoformat()}"
 
-    def write(self, table: str, session_date: date, run_id: str, frame: pd.DataFrame) -> None:
+    def write(
+        self,
+        table: str,
+        session_date: date,
+        run_id: str,
+        frame: pd.DataFrame,
+        restates: bool = False,
+    ) -> None:
         directory = self._dir(table, session_date)
         data = parquet_bytes(to_arrow(table, frame))
         _atomic_write(directory / f"run={_safe(run_id)}.parquet", data)
         with held(FileLock(directory / _INDEX_LOCK)):
             index = self._index(directory)
             if not frame.empty:
-                index[run_id] = pd.Timestamp(frame["knowledge_ts"].max()).isoformat()
+                known = pd.Timestamp(frame["knowledge_ts"].max()).isoformat()
+                # A plain run keeps the original format (run -> knowledge_ts).
+                index[run_id] = {"knowledge_ts": known, "restates": True} if restates else known
             _atomic_write(directory / _INDEX, json.dumps(index, indent=2, sort_keys=True).encode())
 
-    def _chosen_file(self, table: str, session_date: date, as_of: datetime | None) -> Path | None:
+    def _partition(
+        self,
+        table: str,
+        session_date: date,
+        as_of: datetime | None,
+        instruments: Sequence[str] | None,
+    ) -> pa.Table | None:
+        """The partition as a read at ``as_of`` sees it (``run_selection``), conformed."""
         directory = self._dir(table, session_date)
-        known = {run: pd.Timestamp(ts) for run, ts in self._index(directory).items()}
-        chosen = latest_run(known, as_of)
-        return None if chosen is None else directory / f"run={chosen}.parquet"
+        entries = {run: _entry(value) for run, value in self._index(directory).items()}
+        runs = select_runs(entries, as_of, run_mode(table))
+        if not runs:
+            return None
+        filters = [("instrument_id", "in", list(instruments))] if instruments is not None else None
+        parts = [pq.read_table(directory / f"run={run}.parquet", filters=filters) for run in runs]
+        data = concat(table, parts)
+        return merge_rows(table, data) if len(runs) > 1 else data
 
     def read(
         self,
@@ -91,12 +122,8 @@ class LocalTables:
         as_of: datetime | None = None,
         instruments: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
-        path = self._chosen_file(table, session_date, as_of)
-        if path is None:
-            return None
-        filters = [("instrument_id", "in", list(instruments))] if instruments is not None else None
-        frame = to_frame(conform(table, pq.read_table(path, filters=filters)))
-        return select_instruments(frame, instruments)
+        data = self._partition(table, session_date, as_of, instruments)
+        return None if data is None else select_instruments(to_frame(data), instruments)
 
     def read_range(
         self,
@@ -106,16 +133,16 @@ class LocalTables:
         as_of: datetime | None = None,
         instruments: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
-        paths = [
-            path
+        parts = [
+            data
             for d in self.dates(table)
-            if start <= d <= end and (path := self._chosen_file(table, d, as_of)) is not None
+            if start <= d <= end
+            and (data := self._partition(table, d, as_of, instruments)) is not None
         ]
-        if not paths:
+        if not parts:
             return None
-        filters = [("instrument_id", "in", list(instruments))] if instruments is not None else None
-        combined = concat(table, [pq.read_table(path, filters=filters) for path in paths])
-        return concat_frames([to_frame(combined)])
+        frame = to_frame(concat(table, parts))
+        return None if frame.empty else frame.reset_index(drop=True)
 
     def dates(self, table: str) -> list[date]:
         base = self.root / table
@@ -135,10 +162,19 @@ class LocalTables:
         return sorted(found)
 
     @staticmethod
-    def _index(directory: Path) -> dict[str, str]:
+    def _index(directory: Path) -> dict[str, str | dict[str, object]]:
         path = directory / _INDEX
-        loaded: dict[str, str] = json.loads(path.read_text()) if path.exists() else {}
+        loaded: dict[str, str | dict[str, object]] = (
+            json.loads(path.read_text()) if path.exists() else {}
+        )
         return loaded
+
+
+def _entry(value: str | dict[str, object]) -> RunEntry:
+    """An index value: ``knowledge_ts`` (a plain run) or ``{knowledge_ts, restates}``."""
+    if isinstance(value, str):
+        return RunEntry(pd.Timestamp(value))
+    return RunEntry(pd.Timestamp(str(value["knowledge_ts"])), bool(value.get("restates")))
 
 
 class LocalRaw:

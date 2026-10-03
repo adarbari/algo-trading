@@ -4,7 +4,7 @@ import pytest
 
 from algotrade.core.model.errors import DataValidationError
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id, run_session
-from algotrade.storage.tables.schemas import spec_for, validate_frame
+from algotrade.storage.tables.schemas import TableSpec, spec_for, validate_frame
 from tests.storage_helpers import stamped
 
 
@@ -47,3 +47,12 @@ def test_column_types_are_checked() -> None:
 
     with pytest.raises(ValueError, match="unknown column type"):
         Column("x", "decimal")
+
+
+def test_tables_declare_how_their_runs_combine() -> None:
+    assert spec_for("events/dividend").runs == "merge"
+    assert spec_for("events/reference_change").runs == "merge"
+    for snapshot in ("bars/1d", "universe", "chains/option_quotes", "results/x", "rollups/daily/y"):
+        assert spec_for(snapshot).runs == "snapshot"
+    with pytest.raises(ValueError, match="run mode"):
+        TableSpec("t", "event", ("instrument_id",), runs="append")

@@ -7,8 +7,15 @@ storage backends cast writes to those types (and fail on uncastable data), stamp
 Feature, event, catalogue and result tables are open-ended: they need the common columns
 plus ``instrument_id`` (+ ``ts`` for events), which are typed; the rest is defined by the
 feature, event source or screener that produces them.
+
+Each table also declares how its runs combine (``TableSpec.runs``, ``RUN_MODES``): a
+``snapshot`` run is the partition's full contents (the latest run known at ``as_of`` replaces
+the others); a ``merge`` run is a window or increment (reads union every run known at
+``as_of``, the latest run's row winning per ``table_key``). Backends apply it
+(``storage/backends/run_selection.py``).
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 import numpy as np
@@ -24,6 +31,9 @@ SCHEMA_VERSION = 1
 COMMON = ("session_date", "knowledge_ts", "source", "run_id")
 # Abstract column types; storage backends map them to physical types (Arrow, DuckDB later).
 COLUMN_TYPES = frozenset({"string", "float64", "int64", "bool", "date", "timestamp_utc"})
+# How a partition's runs combine on read: "snapshot" (each run is the whole partition; the
+# latest known at as_of wins) or "merge" (each run is a window; the union, latest per key).
+RUN_MODES = frozenset({"snapshot", "merge"})
 
 
 @dataclass(frozen=True)
@@ -41,13 +51,19 @@ class Column:
 class TableSpec:
     """A table's contract. ``columns`` declares types: every column of a fixed table (others
     are rejected on write); the common and key columns of an open-ended one (the producer
-    defines the rest). Writes cast to the declared types and fail on uncastable data."""
+    defines the rest). Writes cast to the declared types and fail on uncastable data.
+    ``runs`` says how a partition's runs combine on read (``RUN_MODES``)."""
 
     name: str
     grain: str
     required: tuple[str, ...]
     open_ended: bool = False
     columns: tuple[Column, ...] = ()
+    runs: str = "snapshot"
+
+    def __post_init__(self) -> None:
+        if self.runs not in RUN_MODES:
+            raise ValueError(f"{self.name}: unknown run mode {self.runs!r}")
 
     def column(self, name: str) -> Column | None:
         return next((c for c in self.columns if c.name == name), None)
@@ -222,7 +238,10 @@ KNOWN: dict[str, TableSpec] = {
     )
 }
 # Open-ended tables: the producing rollup, event source, catalogue or screener defines the
-# columns beyond instrument_id (+ ts for events).
+# columns beyond instrument_id (+ ts for events). Event runs are windows (a backfill, then
+# nightly -7..+30-day windows into the same session), so they merge; rollups, catalogues and
+# results are full snapshots per run. Bars and chains (fixed, above) are snapshots too: a
+# re-fetched session replaces the earlier fetch.
 OPEN_PREFIXES = {
     "rollups/daily/": "rollup",
     "rollups/instrument/": "rollup",
@@ -244,7 +263,10 @@ def spec_for(table: str) -> TableSpec:
         if table.startswith(prefix) and len(table) > len(prefix):
             required = ("instrument_id", "ts") if grain == "event" else ("instrument_id",)
             keys = ("instrument_id string!", "ts timestamp_utc!")[: len(required)]
-            return TableSpec(table, grain, required, open_ended=True, columns=_columns(*keys))
+            runs = "merge" if grain == "event" else "snapshot"
+            return TableSpec(
+                table, grain, required, open_ended=True, columns=_columns(*keys), runs=runs
+            )
     raise DataValidationError(
         table, ["unknown table; add a TableSpec to storage/tables/schemas.py"]
     )
@@ -265,7 +287,7 @@ def validate_frame(table: str, frame: pd.DataFrame) -> None:
             problems.append("point-in-time columns contain nulls")
         if frame["instrument_id"].isna().any():
             problems.append("null instrument_id")
-        if frame.duplicated(subset=_key(spec, frame)).any():
+        if frame.duplicated(subset=table_key(spec, frame.columns)).any():
             problems.append("duplicate rows for the table key")
         if spec.grain == "bar":
             problems.extend(bar_problems(frame))
@@ -273,11 +295,14 @@ def validate_frame(table: str, frame: pd.DataFrame) -> None:
         raise DataValidationError(table, problems)
 
 
-def _key(spec: TableSpec, frame: pd.DataFrame) -> list[str]:
+def table_key(spec: TableSpec, columns: Iterable[object]) -> list[str]:
+    """The columns that identify a row: unique within a run (checked on write) and, for
+    ``merge`` tables, the key the latest run wins on across runs."""
+    present = {str(c) for c in columns}
     key = ["instrument_id"]
-    if "ts" in frame.columns and spec.grain != "universe":  # history rows: one per (id, from)
+    if "ts" in present and spec.grain != "universe":  # history rows: one per (id, from)
         key.append("ts")
-    if spec.grain == "event" and "change" in frame.columns:  # several kinds of change per day
+    if spec.grain == "event" and "change" in present:  # several kinds of change per day
         key.append("change")
     return key
 

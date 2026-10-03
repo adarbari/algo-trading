@@ -17,6 +17,15 @@ class StoreWriter(ResultWriter):
         self.raw = backend.raw
         self.staging = backend.staging
 
-    def write_table(self, table: str, session_date: date, run_id: str, frame: pd.DataFrame) -> None:
+    def write_table(
+        self,
+        table: str,
+        session_date: date,
+        run_id: str,
+        frame: pd.DataFrame,
+        restates: bool = False,
+    ) -> None:
+        """``restates``: ``frame`` is the partition's whole content (as read now), so earlier
+        runs stop counting for merge tables (``TableStore``); a no-op for snapshot tables."""
         validate_frame(table, frame)
-        self._backend.tables.write(table, session_date, run_id, frame)
+        self._backend.tables.write(table, session_date, run_id, frame, restates=restates)

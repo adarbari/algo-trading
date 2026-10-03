@@ -109,3 +109,50 @@ def test_a_partition_holding_old_and_new_ids_is_reported_not_written() -> None:
     assert record.status == "partial" and record.stats["failed_count"] == 1
     assert "bars/1d 2026-10-01" in record.stats["failed"][0]
     assert list(reader.table("bars/1d", D2)["instrument_id"]) == ["EQ:AAPL", "EQ:BBG1"]  # type: ignore[index]
+
+
+def dividend(iid: str, day: date, amount: float = 0.25) -> dict[str, object]:
+    return {"instrument_id": iid, "ts": pd.Timestamp(day, tz="UTC"), "cash_amount": amount}
+
+
+EVENT_DAYS = [D1 - timedelta(days=91 * q) for q in range(4)]
+
+
+def test_merge_tables_are_rewritten_whole_and_old_ids_stay_gone(backend: Backend) -> None:
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    seed(writer)
+    backfill = [dividend("EQ:AAPL", d) for d in EVENT_DAYS] + [dividend("EQ:KO", D1)]
+    writer.write_table("events/dividend", D1, "ca1", stamped(backfill, D1, "ca1"))
+    run = migrate_ids(task_ctx(writer, reader, lambda: MIGRATED))
+    assert run.stats["tables"]["events/dividend"] == {"partitions": 1, "rows": 4}
+    nightly = [dividend("EQ:BBG1", D1 + timedelta(days=5))]  # a later window run, new ids
+    later = MIGRATED + timedelta(hours=1)
+    writer.write_table("events/dividend", D1, "ca2", stamped(nightly, D1, "ca2", later))
+
+    merged = reader.table("events/dividend", D1)
+    assert merged is not None and len(merged) == 6  # 4 + KO + the nightly row
+    assert set(merged["instrument_id"]) == {"EQ:BBG1", "EQ:KO"}  # no EQ:AAPL resurrected
+    pinned = reader.table("events/dividend", D1, as_of=UPGRADED)
+    assert pinned is not None and "EQ:AAPL" in set(pinned["instrument_id"])
+    again = migrate_ids(task_ctx(writer, reader, lambda: later + timedelta(hours=1)))
+    assert "events/dividend" not in again.stats["tables"]  # idempotent
+
+
+def test_a_merge_partition_migrated_without_restating_is_repaired_by_a_rerun(
+    backend: Backend,
+) -> None:
+    """Stores migrated before restating runs existed hold the backfill (old ids) and a plain
+    migrate run (new ids): merged, both ids show. Re-running migrate-ids restates it."""
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    seed(writer)
+    old = [dividend("EQ:AAPL", d) for d in EVENT_DAYS]
+    writer.write_table("events/dividend", D1, "ca1", stamped(old, D1, "ca1"))
+    new = [dividend("EQ:BBG1", d) for d in EVENT_DAYS]
+    writer.write_table("events/dividend", D1, "m0", stamped(new, D1, "m0", MIGRATED))
+    before = reader.table("events/dividend", D1)
+    assert before is not None and set(before["instrument_id"]) == {"EQ:AAPL", "EQ:BBG1"}
+
+    rerun = migrate_ids(task_ctx(writer, reader, lambda: MIGRATED + timedelta(hours=1)))
+    assert rerun.status == "complete"
+    after = reader.table("events/dividend", D1)
+    assert after is not None and len(after) == 4 and set(after["instrument_id"]) == {"EQ:BBG1"}

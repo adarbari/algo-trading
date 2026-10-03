@@ -77,3 +77,28 @@ def test_stored_events_keep_each_snapshot_up_to_a_date() -> None:
         writer.write_table("events/earnings", day, f"r{day}", stamped([row], day, f"r{day}"))
     frame = stored_events(reader, "events/earnings", date(2026, 10, 1))
     assert list(frame["session_date"]) == [date(2026, 9, 1), date(2026, 10, 1)]  # not merged
+
+
+def test_a_nightly_window_run_does_not_hide_the_backfilled_dividends() -> None:
+    """Regression (real store, 2026-10-02): the 26-month corporate-actions backfill and that
+    night's -7..+30-day window run share ``date=2026-10-02``; reads picked the window run
+    only, so AAPL showed no trailing dividends. Event runs now merge."""
+    backend = MemoryBackend()
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    session = date(2026, 10, 2)
+
+    def dividend(iid: str, day: date) -> dict[str, object]:
+        return {"instrument_id": iid, "ts": pd.Timestamp(day, tz="UTC"), "cash_amount": 0.26}
+
+    paid = [date(2025, 11, 10), date(2026, 2, 9), date(2026, 5, 11), date(2026, 8, 10)]
+    backfill = [dividend("EQ:AAPL", d) for d in paid] + [dividend("EQ:KO", d) for d in paid]
+    writer.write_table("events/dividend", session, "ca1", stamped(backfill, session, "ca1"))
+    window = [dividend("EQ:XOM", date(2026, 10, 9))]  # tonight's run: nothing for AAPL / KO
+    late = T0 + timedelta(hours=5)
+    writer.write_table("events/dividend", session, "ca2", stamped(window, session, "ca2", late))
+    trailing = read_events(reader, "events/dividend", date(2025, 10, 2), session)
+    counts = trailing.frame.groupby("instrument_id").size().to_dict()
+    assert counts == {"EQ:AAPL": 4, "EQ:KO": 4}
+    assert trailing.runs == ["ca1"]
+    ahead = read_events(reader, "events/dividend", session, date(2026, 11, 1))
+    assert list(ahead.frame["instrument_id"]) == ["EQ:XOM"]

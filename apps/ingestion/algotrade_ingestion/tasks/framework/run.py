@@ -258,9 +258,12 @@ class IngestRun:
         self.writer.write_table(table, day, self.run_id, self.stamped(frame, source, day))
 
     def rewrite(self, table: str, day: date, frame: pd.DataFrame) -> None:
-        """Re-publish already-stamped rows as this run (new ``knowledge_ts`` and ``run_id``)."""
+        """Re-publish a partition's rows as this run (new ``knowledge_ts`` and ``run_id``).
+
+        ``frame`` must be the whole partition as read now: the run is written as restating,
+        so for merge tables (events) the runs before it stop being read (``TableStore``)."""
         out = frame.assign(knowledge_ts=pd.Timestamp(self.clock()), run_id=self.run_id)
-        self.writer.write_table(table, day, self.run_id, out)
+        self.writer.write_table(table, day, self.run_id, out, restates=True)
 
     def stage(self, table: str, key: str, frame: pd.DataFrame, source: str) -> None:
         """Stamp one item's rows into run scratch; ``publish`` writes them as one partition."""

@@ -14,10 +14,21 @@ class TableStore(Protocol):
     """Point-in-time tables partitioned by (table, session_date, run_id).
 
     Writing the same (table, date, run) again replaces it (idempotent). A different run for
-    the same date is kept alongside; readers get the latest run known at ``as_of``.
+    the same date is kept alongside. Which runs a read at ``as_of`` sees follows the table's
+    run mode (``TableSpec.runs``; ``storage/backends/run_selection.py``): a ``snapshot``
+    table gives the latest run known at ``as_of``; a ``merge`` table (events) the union of
+    the runs known at ``as_of``, the latest run's row winning per table key, starting from
+    the latest run written with ``restates=True`` (a rewrite of the whole partition).
     """
 
-    def write(self, table: str, session_date: date, run_id: str, frame: pd.DataFrame) -> None: ...
+    def write(
+        self,
+        table: str,
+        session_date: date,
+        run_id: str,
+        frame: pd.DataFrame,
+        restates: bool = False,
+    ) -> None: ...
 
     def read(
         self,
@@ -36,7 +47,8 @@ class TableStore(Protocol):
         instruments: Sequence[str] | None = None,
     ) -> pd.DataFrame | None:
         """All partitions with ``start <= session_date <= end``, each resolved point-in-time
-        exactly as ``read`` would, concatenated in date order. ``None`` if none exist."""
+        exactly as ``read`` would (runs merged per partition, not across partitions),
+        concatenated in date order. ``None`` if none exist."""
         ...
 
     def dates(self, table: str) -> list[date]: ...
