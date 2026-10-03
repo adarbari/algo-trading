@@ -1,13 +1,14 @@
 """The nightly pipeline: chains -> features -> screens -> exports, each step audited."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import Any
 
-from algotrade.config.resolve import ResolvedConfig
-from algotrade.config.user import SITE_USER
 from algotrade.services.configs import scheduled
-from algotrade.services.exports import EXPORTS
+from algotrade.services.exports import run_exports
+from algotrade.services.jobs import JobContext
 from algotrade.services.screening import ScreenOutcome, run_screener
 from algotrade.services.views import load_universe
 from algotrade.storage.config_store import ConfigStore
@@ -39,18 +40,6 @@ def universe_underlyings(reader: StoreReader, session_date: date) -> list[Underl
     return [Underlying(str(r.instrument_id), str(r.symbol)) for r in covered.itertuples()]
 
 
-def run_exports(
-    outcome: ScreenOutcome, config: ResolvedConfig, export_dir: Path
-) -> tuple[Path, ...]:
-    """The config's declared exports; site runs at the top level, users in a subfolder."""
-    user = config.user.user_id
-    target = export_dir if user == SITE_USER else export_dir / user
-    paths: list[Path] = []
-    for name in config.config.exports:
-        paths.extend(EXPORTS[name](outcome, target, outcome.session_date.isoformat()))
-    return tuple(paths)
-
-
 def run_nightly(
     reader: StoreReader,
     writer: StoreWriter,
@@ -74,3 +63,29 @@ def run_nightly(
         if export_dir is not None:
             exports.extend(run_exports(outcome, config, export_dir))
     return NightlyResult(chains, features, tuple(screens), tuple(exports))
+
+
+def nightly_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
+    """Job handler for the whole nightly pipeline. params: ``session``, ``export_dir``,
+    ``workers``. Resources: ``reader``, ``writer``, ``configs``, ``source``."""
+    r = ctx.resources
+    export_dir = Path(params["export_dir"]) if params.get("export_dir") else None
+    result = run_nightly(
+        r["reader"],
+        r["writer"],
+        r["source"],
+        r["configs"],
+        date.fromisoformat(params["session"]),
+        export_dir,
+        ChainJobConfig(int(params.get("workers", 4))),
+    )
+    partial = result.chains.status != "complete" or any(
+        s.audit["coverage"] != "COMPLETE" for s in result.screens
+    )
+    return {
+        "chains": result.chains.stats,
+        "features": result.features.stats,
+        "screens": [s.audit for s in result.screens],
+        "exports": [str(e) for e in result.exports],
+        "_partial": partial,
+    }

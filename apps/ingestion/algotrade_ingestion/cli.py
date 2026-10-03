@@ -23,8 +23,8 @@ from zoneinfo import ZoneInfo
 
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.errors import AlgoTradeError
-from algotrade.services.configs import resolve_config
-from algotrade.services.screening import run_screener
+from algotrade.services.jobs import JobRecord, JobStatus, LocalJobRunner
+from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.readers import StoreReader
 from algotrade.storage.writers import StoreWriter
@@ -32,7 +32,7 @@ from algotrade_ingestion.jobs.features import compute_option_liquidity
 from algotrade_ingestion.jobs.golden import load_golden
 from algotrade_ingestion.jobs.option_chains import ChainJobConfig, ingest_option_chains
 from algotrade_ingestion.jobs.universe import UniverseFile, import_universe
-from algotrade_ingestion.pipeline import run_exports, run_nightly, universe_underlyings
+from algotrade_ingestion.pipeline import nightly_job, universe_underlyings
 from algotrade_ingestion.sources.cboe import CboeOptionsSource
 from algotrade_ingestion.sources.http import urllib_transport
 from algotrade_ingestion.sources.synthetic.catalog import build_golden
@@ -104,6 +104,38 @@ def _golden(args: argparse.Namespace, writer: StoreWriter) -> int:
     return 0
 
 
+def _run_job(
+    args: argparse.Namespace,
+    reader: StoreReader,
+    writer: StoreWriter,
+    kind: str,
+    params: dict[str, object],
+    user: str,
+) -> JobRecord:
+    """Run one job to completion through the local runner (an explicit re-run: force=True)."""
+    resources = {
+        "reader": reader,
+        "writer": writer,
+        "source": _source(),
+        "configs": open_config_store(args.config_dir),
+    }
+    runner = LocalJobRunner(
+        writer.runs_backend, {**LIBRARY_HANDLERS, "nightly": nightly_job}, resources
+    )
+    try:
+        return runner.wait(runner.submit(kind, params, UserContext(user), force=True))
+    finally:
+        runner.shutdown()
+
+
+def _report(job: JobRecord) -> int:
+    if job.status is JobStatus.FAILED:
+        print(f"error: {job.error}", file=sys.stderr)
+        return 2
+    _print({"job_id": job.job_id, "status": job.status, **job.result})
+    return 0 if job.status is JobStatus.COMPLETE else 1
+
+
 def _dispatch(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter) -> int:
     if args.command == "golden":
         return _golden(args, writer)
@@ -126,30 +158,26 @@ def _dispatch(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter
     elif args.command == "features":
         _print(compute_option_liquidity(reader, writer, session).stats)
     elif args.command == "screen":
-        configs = open_config_store(args.config_dir)
-        config = resolve_config(configs, args.config, UserContext(args.user))
-        outcome = run_screener(reader, writer, config, session)
-        if args.export_dir:
-            run_exports(outcome, config, args.export_dir)
-        _print(outcome.audit)
-    elif args.command == "nightly":
-        result = run_nightly(
+        job = _run_job(
+            args,
             reader,
             writer,
-            _source(),
-            open_config_store(args.config_dir),
-            session,
-            args.export_dir,
-            ChainJobConfig(args.workers),
-        )
-        _print(
+            "screen",
             {
-                "chains": result.chains.stats,
-                "features": result.features.stats,
-                "screens": [s.audit for s in result.screens],
-                "exports": result.exports,
-            }
+                "config": args.config,
+                "session": session.isoformat(),
+                "export_dir": str(args.export_dir) if args.export_dir else None,
+            },
+            args.user,
         )
+        return _report(job)
+    elif args.command == "nightly":
+        params = {
+            "session": session.isoformat(),
+            "workers": args.workers,
+            "export_dir": str(args.export_dir) if args.export_dir else None,
+        }
+        return _report(_run_job(args, reader, writer, "nightly", params, SITE_USER))
     else:
         removed = writer.raw.purge_before(session - timedelta(days=args.keep_days))
         _print({"raw_files_removed": removed})

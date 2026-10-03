@@ -112,7 +112,7 @@ Extra contracts:
 | `features/` | Pure, versioned rollup definitions (`option_liquidity@v1`) and their registry. | core |
 | `analytics/` | Metrics and report formatting from equity curves + fills. | core |
 | `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. `selection/`: evaluates a selection with three-valued logic and a per-rule audit. | strategies, config, analytics, core |
-| `services/` | Use cases: `configs` (resolve, scheduled), `selection` (L1 + rollup rows → selection), `backtests` (configured runs), universe + `FeatureView` loading, `market_data` (stored bars → aligned series), golden `datasets`, screening runs, legacy exports, `evaluation/` (strategy × golden dataset vs baseline). | everything below except `storage.writers` |
+| `services/` | Use cases: `jobs` (submit / status / wait; local runner; library `backtest` and `screen` handlers), `configs` (resolve, scheduled), `selection` (L1 + rollup rows → selection), `backtests` (configured runs), universe + `FeatureView` loading, `market_data` (stored bars → aligned series), golden `datasets`, screening runs, legacy exports, `evaluation/` (strategy × golden dataset vs baseline). | everything below except `storage.writers` |
 | `apps/ingestion` | Sources (Cboe, HTTP with retries, synthetic/golden), jobs (universe, option chains, features, golden load), nightly pipeline, `algotrade-ingest`. | library |
 | `apps/backtest` | `algotrade-backtest` CLI (`algotrade` alias): datasets list, backtest, evaluate. Reads only through storage (`--data-url`). | library |
 
