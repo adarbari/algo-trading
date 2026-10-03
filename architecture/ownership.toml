@@ -78,13 +78,11 @@ detect = [{ call = "with_ids" }, { call = "equity_id" }, { string_prefix = "EQ:"
 
 [[responsibility]]
 id = "ingestion-step-dispatch"
-description = "Decide which ingestion steps run, in what order, with which defaults (CLI, nightly): tasks are declared once in the registry; nightly is an ordered list of task names"
+description = "Decide which ingestion steps run, in what order, with which defaults (CLI, nightly): tasks are declared once in the registry; nightly is an ordered list of isolated task steps"
 owner = [
     "apps/ingestion/algotrade_ingestion/tasks/registry.py",
-    "apps/ingestion/algotrade_ingestion/pipeline.py",
+    "apps/ingestion/algotrade_ingestion/workflows/*",
 ]
-target_owner = ["apps/ingestion/algotrade_ingestion/workflows/*"]
-target_pr = 5
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
 detect = [
     { call_regex = "(^|\\.)(ingest_[a-z_]+|build_universe|import_universe|run_quality|compute_option_liquidity|load_golden|run_migrate_ids)$" },
@@ -175,10 +173,9 @@ detect = [{ call = "load", arg = "site" }]
 
 [[responsibility]]
 id = "session-calendar"
-description = "Which day is a trading session, in exchange time (weekends, holidays, early closes)"
-owner = ["src/algotrade/core/time.py"]
-target_owner = ["src/algotrade/core/calendar.py"]
-target_pr = 5
+description = "Which day is a trading session, in exchange time (weekends, holidays, early closes); the last closed session"
+owner = ["src/algotrade/core/calendar.py"]
+allowed = ["src/algotrade/core/time.py"]  # business_days: a plain weekday grid for synthetic golden data (no holidays by design)
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
 detect = [
     { call = "ZoneInfo", arg = "America/New_York" },
@@ -188,7 +185,7 @@ detect = [
 
 [[responsibility]]
 id = "job-execution"
-description = "Execute long-running work: threads, locks, recovery, idempotency, step isolation"
+description = "Execute long-running work: threads, locks, recovery, idempotency; apps run jobs through services.jobs.run_job, fan-out through services.jobs.as_completed"
 owner = ["src/algotrade/services/jobs/*"]
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
 detect = [
@@ -200,9 +197,8 @@ detect = [
 
 [[responsibility]]
 id = "screen-execution"
-description = "Run a configured screen (select, screen, audit, write results); nightly submits `screen` jobs"
+description = "Run a configured screen (select, screen, audit, write results); nightly submits `screen` jobs (workflows/screens.py)"
 owner = ["src/algotrade/services/screening.py", "src/algotrade/services/jobs/handlers.py"]
-target_pr = 5
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
 detect = [{ call = "run_screener" }]
 
@@ -310,8 +306,3 @@ source_modules = ["algotrade_ingestion.sources"]
 forbidden_modules = ["algotrade.storage"]
 enabled_by_pr = 6
 
-[[pending_contract]]
-name = "R5: apps never build a job runner (they submit through services.jobs)"
-source_modules = ["algotrade_ingestion.cli", "algotrade_ingestion.commands", "algotrade_backtest"]
-forbidden_modules = ["algotrade.services.jobs.runner"]
-enabled_by_pr = 5

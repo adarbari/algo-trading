@@ -38,6 +38,6 @@ settings owner and must drive code (a test checks).
    `tasks/registry.py` (name, description, module, tables = the `[[table]]` entries,
    sources by name, settings section, params, `run(ctx, params)` applying defaults from
    settings). The CLI command (`algotrade-ingest <name>` and `run <name>`) comes from the
-   declaration; add it to `pipeline.NIGHTLY` if it runs nightly.
+   declaration; add a `Step` to `workflows/nightly.NIGHTLY` if it runs nightly.
    `tests/architecture/test_task_registry.py` checks tables and CLI reachability.
 8. Update `docs/data/storage.md` and run `make check`.

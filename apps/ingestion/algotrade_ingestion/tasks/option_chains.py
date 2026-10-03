@@ -12,15 +12,16 @@ Behaviour carried over from the original liquidity_screen.py and made stricter:
 Per-ticker results are staged, then published as one partition per table and session.
 """
 
-import concurrent.futures as cf
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
+from functools import partial
 
 import pandas as pd
 
 from algotrade.data import StoreReader
 from algotrade.data.reference import load_universe, resolver
+from algotrade.services.jobs import as_completed
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade_ingestion.sources.base import FetchRequest, Source, Throttled
 from algotrade_ingestion.tasks.framework import IngestRun, NoResponseError, TaskContext
@@ -82,12 +83,11 @@ def _process(run: IngestRun, source: Source, u: Underlying) -> str:
 
 
 def _run_pass(run: IngestRun, source: Source, todo: Sequence[Underlying], workers: int) -> None:
-    with cf.ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(_process, run, source, u): u for u in todo}
-        for done, future in enumerate(cf.as_completed(futures), start=1):
-            run.attempt(futures[future].instrument_id, future.result)
-            if done % CHECKPOINT_EVERY == 0:
-                run.checkpoint()
+    work = as_completed(partial(_process, run, source), todo, workers)
+    for done, (underlying, outcome) in enumerate(work, start=1):
+        run.attempt(underlying.instrument_id, outcome)
+        if done % CHECKPOINT_EVERY == 0:
+            run.checkpoint()
 
 
 def _publish(run: IngestRun, universe: Sequence[Underlying], source_name: str) -> None:

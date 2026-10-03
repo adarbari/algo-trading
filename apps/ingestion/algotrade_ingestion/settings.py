@@ -1,4 +1,5 @@
-"""Typed views of ``config/site/sources.toml`` and ``universe.toml`` (L3), loaded here only.
+"""Typed views of ``config/site/sources.toml``, ``universe.toml`` and ``nightly.toml`` (L3),
+loaded here only.
 
 Missing files or keys fall back to defaults.
 """
@@ -84,6 +85,37 @@ def _vendor(section: Mapping[str, Any]) -> VendorSettings:
 
 
 @dataclass(frozen=True)
+class NightlySettings:
+    """``config/site/nightly.toml``: sessions, catch-up, the duration alert, notification."""
+
+    settle_minutes: int = 30
+    max_catch_up: int = 5
+    max_duration_minutes: float = 40.0
+    notify_enabled: bool = True
+    notify_desktop: bool = True
+    summary_path: str = "var/logs/nightly-latest.json"
+
+    @classmethod
+    def from_document(cls, doc: Mapping[str, Any] | None) -> "NightlySettings":
+        doc = doc or {}
+
+        def section(name: str) -> Mapping[str, Any]:
+            value = doc.get(name, {})
+            return value if isinstance(value, Mapping) else {}
+
+        sessions, alerts, notify = section("sessions"), section("alerts"), section("notify")
+        d = cls()
+        return cls(
+            settle_minutes=int(sessions.get("settle_minutes", d.settle_minutes)),
+            max_catch_up=max(1, int(sessions.get("max_catch_up", d.max_catch_up))),
+            max_duration_minutes=float(alerts.get("max_duration_minutes", d.max_duration_minutes)),
+            notify_enabled=bool(notify.get("enabled", d.notify_enabled)),
+            notify_desktop=bool(notify.get("desktop", d.notify_desktop)),
+            summary_path=str(notify.get("summary_path", d.summary_path)),
+        )
+
+
+@dataclass(frozen=True)
 class UniverseSettings:
     security_types: tuple[str, ...] = ("COMMON_STOCK", "ADR", "ETF")
     exclude_test_issues: bool = True
@@ -114,6 +146,10 @@ def site_document(configs: ConfigStore, name: str) -> Mapping[str, Any] | None:
 
 def load_sources(configs: ConfigStore) -> SourcesSettings:
     return SourcesSettings.from_document(site_document(configs, "sources"))
+
+
+def load_nightly(configs: ConfigStore) -> NightlySettings:
+    return NightlySettings.from_document(site_document(configs, "nightly"))
 
 
 def universe_settings(configs: ConfigStore) -> tuple[str, UniverseSettings]:

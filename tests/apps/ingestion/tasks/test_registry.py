@@ -10,7 +10,6 @@ from algotrade.storage.backends.config_files import MemoryConfigStore
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion import pipeline
 from algotrade_ingestion.settings import SourcesSettings
 from algotrade_ingestion.tasks import (
     bars,
@@ -20,6 +19,7 @@ from algotrade_ingestion.tasks import (
     registry,
 )
 from algotrade_ingestion.tasks.registry import TASKS, run_task, session_of, task
+from algotrade_ingestion.workflows import nightly as pipeline
 from tests.ingest_helpers import FIXED, task_ctx
 
 DAY = date(2026, 10, 2)

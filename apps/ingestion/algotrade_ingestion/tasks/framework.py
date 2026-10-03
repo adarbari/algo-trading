@@ -10,7 +10,8 @@ Every ingestion task runs inside one ``IngestRun``, which owns:
 - point-in-time stamping (``session_date``, ``knowledge_ts``, ``source``, ``run_id``) and
   validated writes (``write``, ``stage`` / ``publish`` for per-item scratch);
 - the run status, decided in one place: any failed item or explicit ``partial`` -> PARTIAL;
-  an exception escaping the ``with`` block -> FAILED, saved, then re-raised; else COMPLETE.
+  an exception escaping the ``with`` block -> FAILED, saved, then re-raised; an explicit
+  ``failed`` (a workflow whose every step failed) -> FAILED; else COMPLETE.
 
 Tasks keep only their own logic: what to fetch, how to combine frames, task-specific stats.
 """
@@ -97,6 +98,7 @@ class IngestRun:
         self.unresolved = 0
         self._resolved = False
         self._partial: list[str] = []
+        self._failed: list[str] = []
         self._resolvers: dict[date | None, SymbolResolver] = {}
         resumed = self._resume() if resume else None
         now = self.clock()
@@ -139,7 +141,10 @@ class IngestRun:
         self._finish(self.status())
 
     def status(self) -> RunStatus:
-        """The status rule, in one place: failed items or explicit partial -> PARTIAL."""
+        """The status rule, in one place: explicit failed -> FAILED; failed items or explicit
+        partial -> PARTIAL; else COMPLETE."""
+        if self._failed:
+            return RunStatus.FAILED
         return RunStatus.PARTIAL if self.failures() or self._partial else RunStatus.COMPLETE
 
     def _finish(self, status: RunStatus) -> None:
@@ -148,6 +153,8 @@ class IngestRun:
             self.stats.setdefault("unresolved", self.unresolved)
         if self._partial:
             self.stats["partial"] = self._partial
+        if self._failed:
+            self.stats["failed_because"] = self._failed
         self.record.stats = self.stats
         if self._save:
             self.writer.save_run(self.record)
@@ -160,6 +167,11 @@ class IngestRun:
     def partial(self, reason: str) -> None:
         """Mark the run PARTIAL for a reason that is not one item's failure."""
         self._partial.append(reason)
+
+    def failed(self, reason: str) -> None:
+        """Mark the whole run FAILED without raising (e.g. a workflow none of whose steps
+        succeeded); the record is still saved on exit."""
+        self._failed.append(reason)
 
     # ------------------------------------------------------------------ items
 
@@ -266,6 +278,14 @@ class IngestRun:
 
     def clear_staging(self) -> None:
         self.writer.staging.clear(self.run_id)
+
+
+def last_finished_session(writer: StoreWriter, task: str) -> date | None:
+    """The latest session a run of ``task`` finished COMPLETE or PARTIAL for (FAILED and
+    unfinished runs do not count)."""
+    finished = (RunStatus.COMPLETE, RunStatus.PARTIAL)
+    done = [r.session_date for r in writer.runs_for(task) if r.status in finished]
+    return max(done) if done else None
 
 
 def run_summary(record: RunRecord) -> Mapping[str, Any]:

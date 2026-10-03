@@ -14,9 +14,9 @@ from pathlib import Path
 import pytest
 
 from algotrade_ingestion import cli
-from algotrade_ingestion.pipeline import NIGHTLY, SCREENS
 from algotrade_ingestion.sources.registry import SOURCES
 from algotrade_ingestion.tasks.registry import TASKS
+from algotrade_ingestion.workflows.nightly import FINALLY, NIGHTLY, SCREENS
 from tests.conftest import REPO_ROOT
 
 REGISTRY = tomllib.loads((REPO_ROOT / "architecture" / "ownership.toml").read_text())
@@ -72,5 +72,27 @@ def test_every_declared_source_can_be_built() -> None:
 
 
 def test_nightly_is_an_ordered_list_of_registry_tasks() -> None:
-    assert [n for n in NIGHTLY if n != SCREENS and n not in TASKS] == []
-    assert len(set(NIGHTLY)) == len(NIGHTLY)
+    names = [s.name for s in (*NIGHTLY, *FINALLY)]
+    assert [n for n in names if n != SCREENS and n not in TASKS] == []
+    assert len(set(names)) == len(names)
+    assert NIGHTLY[-1].name == "quality" and [s.name for s in FINALLY] == ["purge-raw"]
+    for step in NIGHTLY:
+        assert set(step.blocked_by) <= set(names[: names.index(step.name)]), step.name
+
+
+def test_every_nightly_step_has_a_status_in_the_result() -> None:
+    from datetime import date  # noqa: PLC0415
+
+    from algotrade.storage.backends.memory import MemoryBackend  # noqa: PLC0415
+    from algotrade.storage.writers import StoreWriter  # noqa: PLC0415
+    from algotrade_ingestion.workflows.nightly import run_nightly  # noqa: PLC0415
+    from algotrade_ingestion.workflows.sessions import Plan  # noqa: PLC0415
+    from tests.ingest_helpers import task_ctx  # noqa: PLC0415
+
+    summary = run_nightly(task_ctx(StoreWriter(MemoryBackend())), Plan([date(2026, 10, 2)]))
+    steps = summary["runs"][0]["steps"]
+    assert list(steps) == [s.name for s in NIGHTLY]
+    assert list(summary["steps"]) == [s.name for s in FINALLY]
+    for step in [*steps.values(), *summary["steps"].values()]:
+        assert step["status"] in ("COMPLETE", "PARTIAL", "FAILED", "SKIPPED", "BLOCKED")
+        assert "duration_s" in step

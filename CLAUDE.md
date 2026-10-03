@@ -55,12 +55,12 @@ add to them; when you fix a violation, lower them (`make ownership-update`, `mak
 |---|---|
 | Which snapshot a read sees (on or before D, else earliest + `pre_snapshot`); domain reads of market data | `algotrade/data/` (`reference`, `prices`, `events`, `chains`); consumers never import `storage.readers` |
 | Run ids, run records, COMPLETE / PARTIAL; raw save; stamping; ticker → id in ingestion | `tasks/framework.py` (`IngestRun`); never write the loop in a task |
-| Which ingestion steps run, with which defaults | `tasks/registry.py` (nightly order: `pipeline.py`) → + `workflows/` |
+| Which ingestion steps run, with which defaults | `tasks/registry.py`; nightly order, isolation, catch-up: `workflows/nightly.py` |
 | Vendor HTTP, retries, circuit breaker; pacing; building sources; vendor specifics | `sources/http.py`; `sources/limiter.py` (one per key, cross-process); `sources/registry.py`; `sources/<vendor>.py` |
 | Locks: named store locks, run-index lock; one ingest run at a time | `storage/locks.py`; `services/jobs/exclusive.py` |
-| Running long work (threads, recovery), screens | `services/jobs/` (screens: `services/screening.py`, submitted as `screen` jobs) |
+| Running long work (threads, recovery), screens | `services/jobs/` (apps call `run_job`, never build a runner; fan-out: `as_completed`); screens: `services/screening.py`, submitted as `screen` jobs |
 | Site settings; environment variables | `config/`; `env.py` + `storage/factory.py` → `config/settings.py`, `config/env.py` |
-| Session / exchange calendar | `core/time.py` → `core/calendar.py` |
+| Session / exchange calendar (holidays, early closes, last closed session) | `core/calendar.py`; never compute weekdays elsewhere |
 | Parquet / Arrow I/O | `storage/backends/` |
 | Each stored table | exactly one producing module (`[[table]]` in the registry) |
 

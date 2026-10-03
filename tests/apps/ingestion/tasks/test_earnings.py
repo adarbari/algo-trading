@@ -7,7 +7,7 @@ from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.sources.base import FetchRequest
 from algotrade_ingestion.sources.http import HttpError, RetryPolicy
 from algotrade_ingestion.sources.nasdaq_earnings import NasdaqEarningsSource, parse_calendar
-from algotrade_ingestion.tasks.earnings import ingest_earnings, weekdays
+from algotrade_ingestion.tasks.earnings import ingest_earnings, report_days
 from tests.earnings_fixture import calendar
 from tests.ingest_helpers import CountingLimiter, http_for, task_ctx
 from tests.storage_helpers import write_reference
@@ -49,8 +49,9 @@ def test_source_waits_on_the_shared_limiter() -> None:
     assert normalized is not None and normalized.session_date == date(2026, 10, 5)
 
 
-def test_weekdays_window() -> None:
-    assert weekdays(DAY, 4) == [date(2026, 10, 2), date(2026, 10, 5)]
+def test_report_days_are_exchange_sessions() -> None:
+    assert report_days(DAY, 4) == [date(2026, 10, 2), date(2026, 10, 5)]
+    assert report_days(date(2026, 11, 25), 3) == [date(2026, 11, 25), date(2026, 11, 27)]
 
 
 def test_job_writes_snapshot_and_reports_failed_dates() -> None:

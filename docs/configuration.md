@@ -99,7 +99,9 @@ how stored unadjusted bars are adjusted for corporate actions when a backtest re
 Ingestion settings are L3 too: `config/site/universe.toml` (coverage rules) and
 `config/site/sources.toml` (per-vendor `enabled` and `min_interval_s` pacing, chain workers,
 `[http]` retry cap, circuit breaker and limiter directory, raw retention, and the `[quality]`
-thresholds of the nightly data-quality checks). Credentials never go there.
+thresholds of the nightly data-quality checks) and `config/site/nightly.toml` (`[sessions]`
+settle margin after the close and catch-up cap, `[alerts]` nightly duration, `[notify]`
+desktop notification on/off and the summary file path). Credentials never go there.
 
 ## Users
 

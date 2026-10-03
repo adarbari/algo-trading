@@ -7,7 +7,7 @@ site settings section it reads, its parameters (which the CLI turns into flags) 
 earnings days, chain workers) are applied here, so the CLI and nightly cannot drift.
 
 ``algotrade-ingest <task>`` and ``algotrade-ingest run <task>`` both dispatch here; the
-nightly workflow is an ordered list of these names (``pipeline.NIGHTLY``).
+nightly workflow is an ordered list of these names (``workflows/nightly.py``).
 """
 
 from collections.abc import Callable, Mapping
@@ -17,6 +17,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+from algotrade.core.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.settings import universe_settings
 from algotrade_ingestion.sources.base import DirectorySource
@@ -29,6 +30,7 @@ from algotrade_ingestion.tasks import (
     golden,
     migrate_ids,
     option_chains,
+    purge,
     quality,
     universe,
     universe_build,
@@ -129,7 +131,8 @@ def _earnings(ctx: TaskContext, p: Params) -> RunRecord:
 
 def _bars(ctx: TaskContext, p: Params) -> RunRecord:
     session = session_of(p)
-    sessions = bars.sessions_between(p.get("start") or session, p.get("end") or session)
+    # Exchange sessions in the window; an explicit non-session date is fetched as asked.
+    sessions = sessions_between(p.get("start") or session, p.get("end") or session) or [session]
     return bars.ingest_daily_bars(ctx, ctx.sources["massive_bars"], sessions, bool(p.get("force")))
 
 
@@ -158,6 +161,10 @@ def _features(ctx: TaskContext, p: Params) -> RunRecord:
 
 def _quality(ctx: TaskContext, p: Params) -> RunRecord:
     return quality.run_quality(ctx, session_of(p))
+
+
+def _purge(ctx: TaskContext, p: Params) -> RunRecord:
+    return purge.purge(ctx, session_of(p), p.get("keep_days"), p.get("staging_keep_days"))
 
 
 def _migrate_ids(ctx: TaskContext, p: Params) -> RunRecord:
@@ -288,6 +295,24 @@ TASKS: dict[str, Task] = {
             _quality,
             settings="sources.toml [quality]",
             params=(SESSION,),
+        ),
+        Task(
+            "purge-raw",
+            "delete raw vendor responses and unfinished-run scratch older than N days",
+            purge,
+            (),  # deletes raw files and scratch; produces no table
+            _purge,
+            settings="sources.toml raw_retention_days, staging_retention_days",
+            params=(
+                Param("session", ("--date",), date.fromisoformat, "reference date"),
+                Param("keep_days", ("--keep-days",), int, "raw files (default: sources.toml)"),
+                Param(
+                    "staging_keep_days",
+                    ("--staging-keep-days",),
+                    int,
+                    "unfinished-run scratch (default: sources.toml)",
+                ),
+            ),
         ),
         Task(
             "migrate-ids",
