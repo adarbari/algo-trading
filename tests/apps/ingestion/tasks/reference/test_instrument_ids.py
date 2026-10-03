@@ -15,6 +15,7 @@ from algotrade_ingestion.sources.vendors.ssga.spy_holdings import SpyHoldingsSou
 from algotrade_ingestion.tasks.reference.instrument_ids import (
     assign_ids,
     cumulative_map,
+    figi_review_rows,
     rename_ids,
 )
 from algotrade_ingestion.tasks.reference.universe_build import (
@@ -91,6 +92,45 @@ def test_symbol_id_upgrades_to_a_figi_id_once() -> None:
     assert list(renamed["instrument_id"]) == ["EQ:BBG1", "EQ:BBG3", "EQ:REUSE"]
     again = assign_ids(listed({"AAPL": "BBG1"}), snapshot({"AAPL": ("EQ:BBG1", "BBG1")}), D3)
     assert again.upgrades.empty  # a FIGI id never changes
+
+
+def test_a_held_figi_id_survives_a_different_vendor_figi() -> None:
+    previous = snapshot({"DFAC": ("EQ:BBGA", "BBGA")})
+    out = assign_ids(listed({"DFAC": "BBGB"}), previous, D2)
+    row = out.reference.iloc[0]
+    assert (row["instrument_id"], row["figi"], row["vendor_figi"]) == ("EQ:BBGA", "BBGA", "BBGB")
+    assert row["figi_review_since"] == D2 and out.upgrades.empty
+    assert (out.stats["figi_changes_held"], out.stats["figi_review"]) == (1, 1)
+    agreed = assign_ids(listed({"DFAC": "BBGA"}), out.reference, D3)
+    assert agreed.reference.iloc[0]["vendor_figi"] is None and agreed.stats["figi_review"] == 0
+    assert figi_review_rows(agreed.reference) == []
+
+
+def test_a_blank_override_gives_a_symbol_id_and_records_the_change() -> None:
+    previous = snapshot({"MMEDV": ("EQ:BBGM", "BBGM"), "MMED": ("EQ:MMED", None)})
+    out = assign_ids(listed({"MMED": "BBGM", "MMEDV": "BBGM"}), previous, D2, {"MMEDV": None})
+    ids = dict(zip(out.reference["symbol"], out.reference["instrument_id"], strict=True))
+    assert ids == {"MMED": "EQ:BBGM", "MMEDV": "EQ:MMEDV"}
+    changes = out.upgrades[["old_id", "new_id"]].values.tolist()
+    # only the forced change: EQ:BBGM was another listing's id, so MMED's is no upgrade
+    assert changes == [["EQ:BBGM", "EQ:MMEDV"]]
+    assert (out.stats["ids_upgraded"], out.stats["ids_overridden"]) == (0, 1)
+    assert out.stats["figi_review"] == 0  # the owner resolved it
+
+
+def test_rename_ids_keeps_the_active_row_when_two_meet() -> None:
+    previous = pd.concat(
+        [
+            snapshot({"DFAC": ("EQ:BBGA", "BBGA")}),
+            snapshot({"DFAC": ("EQ:BBGB", "BBGB")}, "DELISTED"),
+        ],
+        ignore_index=True,
+    )
+    moved = pd.DataFrame({"old_id": ["EQ:BBGA"], "new_id": ["EQ:BBGB"]})
+    renamed = rename_ids(previous, moved)
+    assert renamed is not None and renamed[["instrument_id", "status"]].values.tolist() == [
+        ["EQ:BBGB", "ACTIVE"]
+    ]
 
 
 def test_cumulative_map_keeps_the_first_record() -> None:

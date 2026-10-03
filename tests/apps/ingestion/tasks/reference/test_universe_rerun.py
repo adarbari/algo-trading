@@ -33,13 +33,14 @@ from algotrade_ingestion.tasks.reference.universe_build import (
     UniverseSettings,
     UniverseSources,
     build_universe,
+    write_figi_review,
 )
 from tests import massive_fixture as mfx
 from tests import universe_fixture as fx
 from tests.ingest_helpers import http_for, task_ctx
 from tests.storage_helpers import T0, stamped
 
-D1, D2 = date(2026, 10, 1), date(2026, 10, 2)
+D1, D2, D3 = date(2026, 10, 1), date(2026, 10, 2), date(2026, 10, 5)
 CHANGES = "events/reference_change"
 
 
@@ -81,10 +82,15 @@ class Store:
         self.writer, self.reader = StoreWriter(backend), StoreReader(backend)
 
     def build(
-        self, day: date, at: datetime, names: list[str], figi: dict[str, str] | None
+        self,
+        day: date,
+        at: datetime,
+        names: list[str],
+        figi: dict[str, str] | None,
+        settings: UniverseSettings | None = None,
     ) -> dict[str, Any]:
         ctx = task_ctx(self.writer, self.reader, lambda: at)
-        return build_universe(ctx, sources(names, figi), UniverseSettings(), day).stats
+        return build_universe(ctx, sources(names, figi), settings or UniverseSettings(), day).stats
 
     def table(self, name: str, day: date) -> pd.DataFrame:
         frame = self.reader.table(name, day)
@@ -191,27 +197,95 @@ def test_migrate_ids_after_a_rerun_maps_every_upgrade(backend: Backend) -> None:
     assert set(merged["instrument_id"]) == {f"EQ:BBG_{s}" for s in NAMES}
 
 
-def test_a_figi_that_flips_within_a_session_keeps_one_history_row_per_key(
-    backend: Backend,
+def test_a_figi_that_flips_keeps_the_first_id_and_is_listed_for_review(
+    backend: Backend, tmp_path: Path
 ) -> None:
-    """2026-10-02: DFAC's vendor FIGI flipped A -> B -> A across same-session runs; the sixth
-    run reopened A's row next to its closed copy and failed on a duplicate key."""
+    """2026-10-02: DFAC's vendor FIGI flipped A -> B -> A across same-session runs, and its id
+    followed. Now the first FIGI id stays; the other FIGI goes to the review file."""
     store = Store(backend)
-    store.build(D1, at(1), ["AAPL", "DFAC"], figis("AAPL", "DFAC"))
-    flips = ["BBG_A", "BBG_B", "BBG_A", "BBG_B", "BBG_A", "BBG_A"]
+    store.build(D1, at(1), ["AAPL", "DFAC"], figis("AAPL"))  # DFAC: no FIGI yet, symbol id
+    flips = ["BBG_A", "BBG_B", "BBG_A", "BBG_B", "BBG_A", "BBG_B"]
     for n, figi in enumerate(flips):
-        store.build(D2, at(5 + n), ["AAPL", "DFAC"], {"AAPL": "BBG_AAPL", "DFAC": figi})
+        stats = store.build(D2, at(5 + n), ["AAPL", "DFAC"], {"AAPL": "BBG_AAPL", "DFAC": figi})
+        reference = store.table(REFERENCE, D2).set_index("symbol")
+        assert reference.loc["DFAC", "instrument_id"] == "EQ:BBG_A"  # never EQ:BBG_B
+        assert reference.loc["DFAC", "figi"] == "BBG_A"
+        assert list(reference["status"]) == ["ACTIVE"] * 3  # no phantom delisted EQ:BBG_B
+        expected = [] if figi == "BBG_A" else [
+            {"symbol": "DFAC", "held_figi": "BBG_A", "vendor_figi": "BBG_B",
+             "first_seen": "2026-10-02",
+             "note": "vendor reports a different FIGI; DFAC keeps EQ:BBG_A"}
+        ]  # fmt: skip
+        assert stats["figi_review"] == expected
+        assert stats["identifiers"]["figi_changes_held"] == (figi == "BBG_B")
         history = store.table(HISTORY, D2)
         assert not history.duplicated(["figi", "symbol", "valid_from"]).any()
-        dfac = history[history["symbol"].eq("DFAC")].set_index("figi")
-        open_rows = dfac[dfac["valid_to"].isna()]
-        assert list(open_rows.index) == [figi]  # one open row, the FIGI listed now
-    assert sorted(dfac.index) == ["BBG_A", "BBG_B", "BBG_DFAC"]
-    assert dfac.loc["BBG_DFAC", "valid_from"] == D1 and dfac.loc["BBG_DFAC", "valid_to"] == D2
-    assert dfac.loc["BBG_A", "valid_from"] == D2 and pd.isna(dfac.loc["BBG_A", "valid_to"])
-    assert dfac.loc["BBG_B", "valid_to"] == D2  # seen and superseded within the session
-    aapl = history[history["symbol"].eq("AAPL")]
-    assert len(aapl) == 1 and aapl["valid_from"].iloc[0] == D1
+        dfac = history[history["symbol"].eq("DFAC")]
+        assert list(dfac["figi"]) == ["BBG_A"] and dfac["valid_to"].isna().all()
+    id_map = store.table(ID_MAP, D2)
+    assert id_map[["old_id", "new_id"]].values.tolist() == [["EQ:DFAC", "EQ:BBG_A"]]
+    out = tmp_path / "figi_review.csv"
+    assert write_figi_review(store.reader, D2, out) == 1
+    assert out.read_text().splitlines() == [
+        "symbol,held_figi,vendor_figi,first_seen,note",
+        "DFAC,BBG_A,BBG_B,2026-10-02,vendor reports a different FIGI; DFAC keeps EQ:BBG_A",
+    ]
+    later = store.build(D3, at(23), ["AAPL", "DFAC"], {"AAPL": "BBG_AAPL", "DFAC": "BBG_B"})
+    assert later["figi_review"][0]["first_seen"] == "2026-10-02"  # carried while it persists
+
+
+def test_a_shared_figi_stays_with_its_holder_and_both_are_reviewed(backend: Backend) -> None:
+    """2026-10-02: MMED and MMEDV both reported one FIGI. MMED held the id; the history
+    gave the FIGI's open row to MMEDV (the last listing won)."""
+    store = Store(backend)
+    store.build(D1, at(1), ["MMED"], {"MMED": "BBG_M"})
+    # a history row written the old way: the FIGI's open row on the symbol-id listing
+    legacy = [{"instrument_id": "EQ:MMEDV", "ts": pd.Timestamp(D1, tz="UTC"), "figi": "BBG_M",
+               "symbol": "MMEDV", "valid_from": D1, "valid_to": None}]  # fmt: skip
+    store.writer.write_table(HISTORY, D1, "legacy", stamped(legacy, D1, "legacy", at(2)))
+    stats = store.build(D2, at(5), ["MMED", "MMEDV"], {"MMED": "BBG_M", "MMEDV": "BBG_M"})
+    reference = store.table(REFERENCE, D2).set_index("symbol")
+    assert reference.loc["MMED", "instrument_id"] == "EQ:BBG_M"
+    assert reference.loc["MMEDV", "instrument_id"] == "EQ:MMEDV"
+    assert stats["identifiers"]["figi_conflicts"] == 1
+    assert stats["figi_review"] == [
+        {"symbol": "MMED", "held_figi": "BBG_M", "vendor_figi": "BBG_M",
+         "first_seen": "2026-10-02", "note": "FIGI shared with MMEDV; MMED holds EQ:BBG_M"},
+        {"symbol": "MMEDV", "held_figi": "", "vendor_figi": "BBG_M", "first_seen": "2026-10-02",
+         "note": "FIGI shared with MMED; MMEDV keeps the symbol id EQ:MMEDV"},
+    ]  # fmt: skip
+    history = store.table(HISTORY, D2).set_index("symbol")
+    assert pd.isna(history.loc["MMED", "valid_to"])  # the holder has the open row
+    assert history.loc["MMEDV", "valid_to"] == D2  # the legacy row is closed ...
+    events = store.table(CHANGES, D2)
+    assert "ticker_changed" not in set(events["change"])  # ... without a ticker change
+    store.build(D2, at(6), ["MMED", "MMEDV"], {"MMED": "BBG_M", "MMEDV": "BBG_M"})
+    again = store.table(HISTORY, D2)
+    assert list(again.loc[again["valid_to"].isna(), "symbol"]) == ["MMED"]
+
+
+def test_an_override_forces_a_figi_and_records_the_id_change(backend: Backend) -> None:
+    store = Store(backend)
+    store.build(D1, at(1), ["DFAC"], {"DFAC": "BBG_A"})
+    dividends = [{"instrument_id": "EQ:BBG_A", "ts": pd.Timestamp(D1, tz="UTC"),
+                  "cash_amount": 0.25}]  # fmt: skip
+    store.writer.write_table("events/dividend", D1, "ca1", stamped(dividends, D1, "ca1", at(2)))
+    owner = UniverseSettings(figi_overrides={"DFAC": "BBG_B"})
+    stats = store.build(D2, at(5), ["DFAC"], {"DFAC": "BBG_A"}, owner)
+    assert stats["identifiers"]["ids_overridden"] == 1 and stats["figi_review"] == []
+    assert stats["events"]["reference_change"] == {"id_changed": 1}  # not removed + added
+    reference = store.table(REFERENCE, D2).set_index("symbol")
+    assert reference.loc["DFAC", "instrument_id"] == "EQ:BBG_B"
+    assert list(reference["status"]) == ["ACTIVE", "ACTIVE"]  # DFAC, ZZZ
+    id_map = store.table(ID_MAP, D2)
+    assert id_map[["old_id", "new_id", "symbol"]].values.tolist() == [
+        ["EQ:BBG_A", "EQ:BBG_B", "DFAC"]
+    ]
+    record = migrate_ids(task_ctx(store.writer, store.reader, lambda: at(12)))
+    assert record.stats["mapped_ids"] == 1
+    assert set(store.table("events/dividend", D1)["instrument_id"]) == {"EQ:BBG_B"}
+    again = store.build(D2, at(6), ["DFAC"], {"DFAC": "BBG_A"}, owner)
+    assert again["identifiers"]["ids_overridden"] == 0 and len(store.table(ID_MAP, D2)) == 1
 
 
 def test_a_ticker_that_flips_back_within_a_session_reopens_its_row(backend: Backend) -> None:

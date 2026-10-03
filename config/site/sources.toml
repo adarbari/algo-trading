@@ -57,4 +57,7 @@ lookback_days = 10               # nightly window: the last N calendar days (cat
 [quality]                        # data-quality thresholds for the nightly checks
 max_bar_count_drop = 0.10        # FAIL if today's bar count falls >10% vs the previous session
 max_universe_change = 0.05       # FAIL on a >5% day-over-day change in coverage
-min_chain_coverage = 0.95        # FAIL if fewer than 95% of optionable names returned a chain
+max_chain_fetch_failures = 0.05  # FAIL if over 5% of optionable names failed to fetch (FETCH_ERROR,
+                                 # incl. an open circuit, or never attempted)
+max_chain_stale_share = 0.20     # WARN if over 20% of chains are STALE_DATA (the feed served an
+                                 # older session; screens treat those names as UNKNOWN)

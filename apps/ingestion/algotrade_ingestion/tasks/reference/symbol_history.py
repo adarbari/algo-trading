@@ -17,13 +17,17 @@ As a last guard the output keeps one row per key: this build's decision for the 
 (an open row made now over a carried row; otherwise the later row).
 
 ``instrument_id`` is the instrument's id in the reference (``EQ:<FIGI>``, ADR 0018); rows of
-FIGIs no longer listed keep the id they had.
+FIGIs no longer listed keep the id they had. Only the listing that **holds** a FIGI's id has
+an open row: when several listings share a FIGI (MMED / MMEDV, 2026-10-02), the ones that
+kept symbol ids are not in the history (a row opened for one earlier is closed, no event).
 """
 
 from datetime import date
 from typing import Any
 
 import pandas as pd
+
+from algotrade.core.model.instruments import is_figi_id
 
 COLUMNS = ["instrument_id", "ts", "figi", "symbol", "valid_from", "valid_to"]
 KEY = ["figi", "symbol", "valid_from"]
@@ -38,7 +42,14 @@ def update_history(
     previous: pd.DataFrame | None, reference: pd.DataFrame, session: date
 ) -> tuple[pd.DataFrame, list[dict[str, object]]]:
     """-> (full history as of ``session``, ``ticker_changed`` reference-change rows)."""
-    active = reference[reference["status"].eq("ACTIVE") & reference["figi"].notna()]
+    with_figi = reference[reference["status"].eq("ACTIVE") & reference["figi"].notna()]
+    pairs = zip(with_figi["instrument_id"], with_figi["figi"], strict=True)
+    holds = pd.Series([is_figi_id(str(i), str(f)) for i, f in pairs], with_figi.index, bool)
+    active = with_figi[holds]
+    # A listing of a shared FIGI that kept its symbol id: a row a build opened for it before
+    # (the FIGI's last listing used to win) is closed without a ``ticker_changed`` event.
+    losers = {(str(f), s) for f, s in zip(with_figi["figi"], with_figi["symbol"], strict=True)}
+    losers -= set(zip(active["figi"].astype(str), active["symbol"], strict=True))
     current = dict(zip(active["figi"], active["symbol"], strict=True))
     ids = dict(zip(active["figi"], active["instrument_id"], strict=True))
     carried: list[Row] = []
@@ -51,7 +62,7 @@ def update_history(
             if _is_open(row) and current.get(figi) != row["symbol"]:
                 row["valid_to"] = session
                 symbol = current.get(figi)
-                if symbol is not None:
+                if symbol is not None and (figi, row["symbol"]) not in losers:
                     changes.append(
                         {
                             "instrument_id": ids[figi],

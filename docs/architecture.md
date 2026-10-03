@@ -432,8 +432,14 @@ close of bar t  : Portfolio marked to market -> equity[t]
 
 Single machine, stateless services over file storage. Shared work (ingestion, rollups) is
 O(universe); per-user work is O(users × configs). The nightly run ends with a `quality` run
-(universe size change, bar freshness and count drop, chain coverage, earnings present;
-thresholds in `config/site/sources.toml`); any FAIL marks the nightly `PARTIAL`. It is scheduled
+(universe size change, bar freshness and count drop, option chains, earnings present;
+thresholds in `config/site/sources.toml` `[quality]`); any FAIL marks the nightly `PARTIAL`.
+Option chains are judged on two separate counts: **fetch failures** (`FETCH_ERROR`, including
+an open circuit breaker, or never attempted) above `max_chain_fetch_failures` (5% of the
+universe) FAIL `chains_fetch`, because the night's data is missing; **stale chains**
+(`STALE_DATA`: the feed served an older session) above `max_chain_stale_share` (20%) only WARN
+`chains_stale`, because screens already treat those names as UNKNOWN. Both details report the
+OK / STALE_DATA / NO_CHAIN / NO_STANDARD_SERIES counts. It is scheduled
 locally by a launchd agent (`algotrade-ingest schedule`; `RunAtLoad` false, a run missed while
 asleep starts on wake, which is safe because of `last_closed_session` and catch-up). A run that
 is not COMPLETE triggers a desktop notification; every run's summary is in

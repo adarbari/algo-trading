@@ -3,7 +3,7 @@
 ADR 0019 ``site-settings``. Each file becomes a frozen dataclass that apps receive as is:
 
     sources.toml   -> SourcesSettings   (vendors, [http], [quality], retention)
-    universe.toml  -> UniverseSettings  (+ overrides/leveraged_etfs.csv)
+    universe.toml  -> UniverseSettings  (+ overrides/leveraged_etfs.csv, overrides/figi.csv)
     nightly.toml   -> NightlySettings
     rollups.toml   -> each rollup's params dataclass (declared by the rollup, typed here)
     defaults.toml  -> ScreeningSettings, BacktestSettings (layered per config by ``resolve``)
@@ -78,6 +78,9 @@ DEFAULT_LEVERAGE_EXCLUSIONS = (
     r"\bultra[- ]small\b",
 )
 UNIVERSE_SOURCES = ("nasdaq_trader", "csv_import")
+# A composite FIGI: 12 characters, the third always "G" (e.g. BBG000B9XRY4).
+FIGI = re.compile(r"^[A-Z]{2}G[A-Z0-9]{9}$")
+FIGI_OVERRIDE_COLUMNS = ("symbol", "figi", "note")
 PRICE_ADJUSTMENTS = ("none", "splits", "total_return")
 # ``[backtest] rebalance_selection``: never, the first session of each month / ISO week, or
 # every N sessions (``"21d"``). Interpreted by ``engines.selection.schedule``.
@@ -132,7 +135,8 @@ class SourcesSettings:
     limits_dir: str = "var/run/limits"
     max_bar_count_drop: float = 0.10
     max_universe_change: float = 0.05
-    min_chain_coverage: float = 0.95
+    max_chain_fetch_failures: float = 0.05
+    max_chain_stale_share: float = 0.20
 
     def vendor(self, section: str) -> VendorSettings:
         """``[section]`` of sources.toml (defaults when the section is missing)."""
@@ -148,7 +152,13 @@ class SourcesSettings:
         root.only(["raw_retention_days", "staging_retention_days", *sections])
         http = root.table("http", ["max_retry_s", "breaker_failures", "limits_dir"])
         quality = root.table(
-            "quality", ["max_bar_count_drop", "max_universe_change", "min_chain_coverage"]
+            "quality",
+            [
+                "max_bar_count_drop",
+                "max_universe_change",
+                "max_chain_fetch_failures",
+                "max_chain_stale_share",
+            ],
         )
         vendors = {
             name: root.table(name, [*VENDOR_KEYS, *VENDOR_EXTRAS.get(name, ())])
@@ -181,7 +191,12 @@ class SourcesSettings:
             limits_dir=http.text("limits_dir", d.limits_dir),
             max_bar_count_drop=quality.fraction("max_bar_count_drop", d.max_bar_count_drop),
             max_universe_change=quality.fraction("max_universe_change", d.max_universe_change),
-            min_chain_coverage=quality.fraction("min_chain_coverage", d.min_chain_coverage),
+            max_chain_fetch_failures=quality.fraction(
+                "max_chain_fetch_failures", d.max_chain_fetch_failures
+            ),
+            max_chain_stale_share=quality.fraction(
+                "max_chain_stale_share", d.max_chain_stale_share
+            ),
         )
 
 
@@ -286,7 +301,9 @@ def _typed(section: Table, key: str, default: Any) -> Any:
 
 @dataclass(frozen=True)
 class UniverseSettings:
-    """``config/site/universe.toml`` (coverage) + the curated ``overrides/leveraged_etfs.csv``.
+    """``config/site/universe.toml`` (coverage) + the curated ``overrides/leveraged_etfs.csv``
+    + the owner's ``overrides/figi.csv`` (``figi_overrides``: symbol -> the FIGI its id must
+    use, ``None`` for "no FIGI, symbol id"; ADR 0018).
     ``source``: "nasdaq_trader" (built nightly) or "csv_import" (also when the file is missing).
     """
 
@@ -301,6 +318,7 @@ class UniverseSettings:
     inverse_markers: tuple[str, ...] = DEFAULT_INVERSE_MARKERS
     leverage_exclusions: tuple[str, ...] = DEFAULT_LEVERAGE_EXCLUSIONS
     overrides: tuple[Mapping[str, str], ...] = field(default=())
+    figi_overrides: Mapping[str, str | None] = field(default_factory=dict)
 
     @classmethod
     def from_documents(
@@ -308,6 +326,7 @@ class UniverseSettings:
         doc: Mapping[str, Any] | None,
         overrides: Iterable[Mapping[str, str]] = (),
         where: str = "universe.toml",
+        figi_overrides: Iterable[Mapping[str, str]] = (),
     ) -> "UniverseSettings":
         d = cls()
         root = Table(doc, where)
@@ -343,7 +362,36 @@ class UniverseSettings:
             inverse_markers=_regexes(root, "inverse_markers", d.inverse_markers),
             leverage_exclusions=_regexes(root, "leverage_exclusions", d.leverage_exclusions),
             overrides=tuple(overrides),
+            figi_overrides=_figi_overrides(figi_overrides),
         )
+
+
+def _figi_overrides(rows: Iterable[Mapping[str, str]]) -> dict[str, str | None]:
+    """``overrides/figi.csv`` rows (symbol, figi, note) -> symbol -> FIGI (blank: ``None``).
+    Fails on an unknown column, a malformed FIGI, or a symbol or FIGI listed twice."""
+    where = "overrides/figi.csv"
+    out: dict[str, str | None] = {}
+    for n, row in enumerate(rows, start=2):  # line 1 is the header
+        unknown = sorted(str(k) for k in set(row) - set(FIGI_OVERRIDE_COLUMNS))
+        if unknown:
+            raise ConfigurationError(
+                f"{where} line {n}: unknown column(s) {unknown}; "
+                f"expected {list(FIGI_OVERRIDE_COLUMNS)}"
+            )
+        symbol = (row.get("symbol") or "").strip().upper()
+        figi = (row.get("figi") or "").strip().upper()
+        if not symbol:
+            raise ConfigurationError(f"{where} line {n}: symbol is required")
+        if figi and not FIGI.match(figi):
+            raise ConfigurationError(
+                f"{where} line {n}: figi {figi!r} is not a composite FIGI (e.g. BBG000B9XRY4)"
+            )
+        if symbol in out:
+            raise ConfigurationError(f"{where} line {n}: {symbol} is listed twice")
+        if figi and figi in out.values():
+            raise ConfigurationError(f"{where} line {n}: {figi} is forced for two symbols")
+        out[symbol] = figi or None
+    return out
 
 
 def _regexes(root: Table, key: str, default: tuple[str, ...]) -> tuple[str, ...]:
@@ -507,4 +555,6 @@ def load_rollups(
 def load_universe(configs: SiteDocuments) -> UniverseSettings:
     """``universe.toml`` + curated overrides. Missing file: CSV import mode."""
     doc = site_document(configs.load, "universe")
-    return UniverseSettings.from_documents(doc, configs.overrides("leveraged_etfs"))
+    return UniverseSettings.from_documents(
+        doc, configs.overrides("leveraged_etfs"), figi_overrides=configs.overrides("figi")
+    )

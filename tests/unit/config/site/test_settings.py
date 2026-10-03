@@ -19,6 +19,7 @@ from algotrade.config.site.settings import (
 )
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.storage.configs.files import MemoryConfigStore
+from algotrade.storage.factory import open_config_store
 from tests.conftest import REPO_ROOT
 
 SITE = REPO_ROOT / "config" / "site"
@@ -66,7 +67,9 @@ def test_missing_files_fall_back_to_defaults() -> None:
         ({"cboe": {"workers": True}}, r"workers: expected an integer"),
         ({"http": {"limits_dir": ""}}, "limits_dir: expected a non-empty string"),
         ({"http": 3}, "unknown keys"),
-        ({"quality": {"min_chain_coverage": 1.5}}, "a fraction between 0 and 1"),
+        ({"quality": {"max_chain_fetch_failures": 1.5}}, "a fraction between 0 and 1"),
+        ({"quality": {"max_chain_stale_share": -0.1}}, "max_chain_stale_share: expected a number"),
+        ({"quality": {"min_chain_coverage": 0.95}}, r"\[quality\]: unknown keys"),
     ],
 )
 def test_sources_errors_name_the_key(doc: dict[str, Any], message: str) -> None:
@@ -206,3 +209,44 @@ def test_site_rollups_toml_loads_for_every_registered_rollup() -> None:
     params = rollup_params(doc, {k: r.params for k, r in ROLLUPS.items()})
     assert params["option_liquidity@v1"] == ROLLUPS["option_liquidity@v1"].params  # defaults
     assert params["price_stats@v1"] == ROLLUPS["price_stats@v1"].params
+
+
+def figi_store(rows: list[dict[str, str]]) -> MemoryConfigStore:
+    return MemoryConfigStore({}, overrides={"figi": rows})
+
+
+def test_figi_overrides_load_through_the_universe_loader() -> None:
+    rows = [
+        {"symbol": "dfac", "figi": "BBG011DXY5J0", "note": "first FIGI; vendor flips"},
+        {"symbol": "MMEDV", "figi": "", "note": "when-issued line: no FIGI of its own"},
+    ]
+    settings = load_universe(figi_store(rows))
+    assert settings.figi_overrides == {"DFAC": "BBG011DXY5J0", "MMEDV": None}
+
+
+def test_the_committed_figi_overrides_file_loads() -> None:
+    load_universe(open_config_store(REPO_ROOT / "config"))  # header + comments only: valid
+
+
+@pytest.mark.parametrize(
+    ("rows", "message"),
+    [
+        ([{"symbol": "A", "figi": "BBG1", "note": ""}], "line 2: figi 'BBG1' is not a composite"),
+        ([{"symbol": "", "figi": "BBG011DXY5J0", "note": ""}], "line 2: symbol is required"),
+        (
+            [{"symbol": "A", "figi": "", "note": ""}, {"symbol": "a", "figi": "", "note": ""}],
+            "line 3: A is listed twice",
+        ),
+        (
+            [
+                {"symbol": "A", "figi": "BBG011DXY5J0", "note": ""},
+                {"symbol": "B", "figi": "BBG011DXY5J0", "note": ""},
+            ],
+            "line 3: BBG011DXY5J0 is forced for two symbols",
+        ),
+        ([{"symbol": "A", "figi": "", "why": ""}], r"unknown column\(s\) \['why'\]"),
+    ],
+)
+def test_figi_override_errors_name_the_line(rows: list[dict[str, str]], message: str) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        load_universe(figi_store(rows))

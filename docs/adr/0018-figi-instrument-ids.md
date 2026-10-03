@@ -31,6 +31,23 @@ CSV import), so changing the scheme meant changing every one of them.
   from nothing: on 2026-10-02 it wrote 3 upgrades that hid 10,817, and `migrate-ids` mapped 3
   ids. The map is keyed on the pair, not `old_id` alone, because a reused symbol id can
   upgrade again to another FIGI (told apart by `known_at`).
+- **FIGI ids never change automatically** (addendum, 2026-10-03; owner decision 1a). On
+  2026-10-02 the vendor reported two FIGIs for DFAC across same-session runs
+  (BBG011DXY5J0 -> BBG0132J6C32 -> BBG011DXY5J0) and the id followed each flip, leaving a
+  phantom delisted instrument and same-day rollups under the second id; MMED and MMEDV were
+  reported with one FIGI and the symbol history gave its open row to MMEDV, which held a symbol
+  id. Now: once a listing (same symbol, as the build already tracks) holds `EQ:<FIGI>`, a
+  build keeps that id and FIGI whatever the vendor reports; a different vendor FIGI is stored
+  as `vendor_figi` (with `figi_review_since`) and listed in a review file
+  (`universe-build --figi-review-out`, default `var/figi_review.csv`: symbol, held_figi,
+  vendor_figi, first_seen, note) and in the run stats. A shared FIGI stays with the listing
+  that held it; the others keep symbol ids; all are listed; only the holder has an open
+  `symbol_history` row. The owner resolves a row with `config/site/overrides/figi.csv`
+  (symbol, figi, note; blank figi = symbol id), loaded and validated by the site settings
+  loader; an override that changes a held id is an **explicit** id change, recorded in
+  `instruments/id_map` so `migrate-ids` moves history. Rejected: following the vendor (ids
+  churn with vendor noise, splitting history) and failing the build (one bad FIGI would stop
+  the nightly).
 - **One resolver.** `SymbolResolver` (`data/resolver.py`, moved from `storage/` in R2) maps
   symbol -> id from an `instruments/reference` snapshot: `data.reference.resolver(reader, D)`
   uses the latest snapshot on

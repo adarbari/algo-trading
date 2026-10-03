@@ -8,7 +8,10 @@ Writes, for the session:
   issues, include / exclude lists). Strategies narrow it further with selections.
 - ``events/reference_change`` and ``events/index_change`` from the previous session's
   snapshot.
-- ``instruments/id_map`` when a symbol id becomes a FIGI id (ADR 0018, ``instrument_ids``).
+- ``instruments/id_map`` when a symbol id becomes a FIGI id, or an owner override in
+  ``config/site/overrides/figi.csv`` changes one (ADR 0018, ``instrument_ids``). A FIGI id
+  never changes otherwise: a different vendor FIGI for a held listing, and a FIGI several
+  listings share, are kept out of the ids and listed by ``write_figi_review`` instead.
 
 Cumulative state (ids, ``first_seen``, delistings carried, ``symbol_history``, ``id_map``)
 builds on the latest snapshot **known** at build time (``_known``): an earlier run of the same
@@ -42,10 +45,12 @@ from algotrade_ingestion.tasks.reference.classify import (
     security_type,
 )
 from algotrade_ingestion.tasks.reference.instrument_ids import (
+    FIGI_REVIEW_COLUMNS,
     ID_MAP,
     Assigned,
     assign_ids,
     cumulative_map,
+    figi_review_rows,
     rename_ids,
 )
 from algotrade_ingestion.tasks.reference.reference_diff import diff_reference
@@ -101,7 +106,7 @@ def build_reference(
         delisted_on=None,
     )
     ref, disagreements = apply_identifiers(ref, tickers)
-    assigned = assign_ids(ref, previous, session)
+    assigned = assign_ids(ref, previous, session, settings.figi_overrides)
     ref, previous = assigned.reference, rename_ids(previous, assigned.upgrades)
     ref["is_etf"] = ref["is_etf"] | ref["security_type"].eq("ETF")
     ref = pd.concat([ref, leverage_flags(ref, settings)], axis=1)
@@ -174,6 +179,19 @@ def write_review(reader: StoreReader, session: date, path: Path) -> None:
         out = csv.DictWriter(fh, fieldnames=["symbol", "leverage", "tracks", "notes"])
         out.writeheader()
         out.writerows(rows)
+
+
+def write_figi_review(reader: StoreReader, session: date, path: Path) -> int:
+    """Write ``figi_review_rows`` for the session's reference to ``path`` (CSV: symbol,
+    held_figi, vendor_figi, first_seen, note); -> the number of rows."""
+    reference = reader.table(REFERENCE, session)
+    rows = figi_review_rows(reference) if reference is not None else []
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as fh:
+        out = csv.DictWriter(fh, fieldnames=FIGI_REVIEW_COLUMNS)
+        out.writeheader()
+        out.writerows(rows)
+    return len(rows)
 
 
 def _known(reader: StoreReader, table: str, session: date) -> pd.DataFrame | None:
@@ -299,6 +317,7 @@ def _build(
             .value_counts()
             .to_dict(),
         },
+        "figi_review": figi_review_rows(reference),
         "events": {
             "reference_change": changes["change"].value_counts().to_dict(),
             "index_change": index["change"].value_counts().to_dict(),
