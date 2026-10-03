@@ -60,13 +60,26 @@ INSTRUMENT_REFERENCE = TableSpec(
     "reference",
     ("instrument_id", "symbol", "asset_class", "security_type", "multiplier", "status"),
 )
+# L1: which symbol each FIGI used and when (one full history per snapshot date).
+SYMBOL_HISTORY = TableSpec(
+    "instruments/symbol_history",
+    "reference",
+    ("instrument_id", "ts", "figi", "symbol", "valid_from"),
+)
 # L2: OHLCV bars; the table name carries the interval, e.g. "bars/1d", "bars/5m".
 BAR_INTERVALS = frozenset({"1d", "1h", "30m", "15m", "5m", "1m"})
 BAR_COLUMNS = ("instrument_id", "ts", "open", "high", "low", "close", "volume")
 
 KNOWN: dict[str, TableSpec] = {
     t.name: t
-    for t in (UNIVERSE, UNDERLYING_QUOTES, OPTION_QUOTES, CHAIN_STATUS, INSTRUMENT_REFERENCE)
+    for t in (
+        UNIVERSE,
+        UNDERLYING_QUOTES,
+        OPTION_QUOTES,
+        CHAIN_STATUS,
+        INSTRUMENT_REFERENCE,
+        SYMBOL_HISTORY,
+    )
 }
 # Open-ended tables: the producing rollup, event source, catalogue or screener defines the
 # columns beyond instrument_id (+ ts for events).
@@ -113,8 +126,10 @@ def validate_frame(table: str, frame: pd.DataFrame) -> None:
 
 def _key(spec: TableSpec, frame: pd.DataFrame) -> list[str]:
     key = ["instrument_id"]
-    if "ts" in frame.columns and spec.grain != "universe":
+    if "ts" in frame.columns and spec.grain != "universe":  # history rows: one per (id, from)
         key.append("ts")
+    if spec.grain == "event" and "change" in frame.columns:  # several kinds of change per day
+        key.append("change")
     return key
 
 

@@ -31,9 +31,11 @@ from algotrade_ingestion.jobs.classify import (
 )
 from algotrade_ingestion.jobs.common import stamp
 from algotrade_ingestion.jobs.reference_diff import diff_reference
+from algotrade_ingestion.jobs.symbol_history import update_history
 from algotrade_ingestion.sources.base import FetchRequest, Source
 
 JOB = "universe_build"
+HISTORY = "instruments/symbol_history"
 REFERENCE = "instruments/reference"
 _SUGGESTED = re.compile(r"(-?\d(?:\.\d)?)\s*x\b", re.I)
 
@@ -66,6 +68,7 @@ class UniverseSettings:
 class UniverseSources:
     nasdaq_trader: Source
     spy_holdings: Source
+    tickers: Source | None = None  # Massive ticker list: FIGI, CIK, vendor security type
 
 
 def _fetch(
@@ -89,7 +92,9 @@ def build_reference(
     settings: UniverseSettings,
     previous: pd.DataFrame | None,
     session: date,
-) -> pd.DataFrame:
+    tickers: pd.DataFrame | None = None,
+) -> tuple[pd.DataFrame, int]:
+    """Every listing (+ carried-forward delistings); -> (reference, vendor-type disagreements)."""
     listings = listings.drop_duplicates("symbol", keep="first").reset_index(drop=True)
     ref = listings.assign(
         instrument_id=[instrument_id(AssetClass.EQUITY, s) for s in listings["symbol"]],
@@ -109,6 +114,8 @@ def build_reference(
         first_seen=session,
         delisted_on=None,
     )
+    ref, disagreements = apply_identifiers(ref, tickers)
+    ref["is_etf"] = ref["is_etf"] | ref["security_type"].eq("ETF")
     ref = pd.concat(
         [ref, leverage_flags(ref, settings.overrides, settings.leverage_markers)], axis=1
     )
@@ -125,7 +132,29 @@ def build_reference(
             gone["status"], gone["in_sp500"] = "DELISTED", False
             keep = [c for c in ref.columns if c in gone.columns]
             ref = pd.concat([ref, gone[keep]], ignore_index=True)
-    return ref.sort_values("instrument_id").reset_index(drop=True)
+    return ref.sort_values("instrument_id").reset_index(drop=True), disagreements
+
+
+def apply_identifiers(
+    reference: pd.DataFrame, tickers: pd.DataFrame | None
+) -> tuple[pd.DataFrame, int]:
+    """Add FIGI / CIK and prefer the vendor's security type over our name rules.
+
+    -> (reference, rows where the vendor type disagreed with the name rules)."""
+    if tickers is None or tickers.empty:
+        return reference.assign(
+            figi=None,
+            share_class_figi=None,
+            cik=None,
+            vendor_type=None,
+            security_type_source="name_rule",
+        ), 0
+    merged = reference.merge(tickers, on="symbol", how="left")
+    vendor = merged["vendor_security_type"]
+    disagree = int((vendor.notna() & vendor.ne(merged["security_type"])).sum())
+    merged["security_type_source"] = vendor.notna().map({True: "vendor", False: "name_rule"})
+    merged["security_type"] = vendor.where(vendor.notna(), merged["security_type"])
+    return merged.drop(columns=["vendor_security_type"]), disagree
 
 
 def coverage(reference: pd.DataFrame, settings: UniverseSettings) -> pd.Series:
@@ -168,6 +197,8 @@ def build_universe(
     for key in ("nasdaqlisted", "otherlisted", "options"):
         parsed.update(_fetch(sources.nasdaq_trader, key, writer, session, run_id))
     parsed.update(_fetch(sources.spy_holdings, "SPY", writer, session, run_id))
+    if sources.tickers is not None:
+        parsed.update(_fetch(sources.tickers, "active", writer, session, run_id))
     listings = pd.concat([parsed["nasdaqlisted"], parsed["otherlisted"]], ignore_index=True)
     previous_date = reader.latest_date(REFERENCE, on_or_before=session)
     previous = (
@@ -176,9 +207,20 @@ def build_universe(
         else None
     )
     sp500 = set(parsed["sp500"]["symbol"])
-    reference = build_reference(
-        listings, set(parsed["options"]["symbol"]), sp500, settings, previous, session
+    reference, disagreements = build_reference(
+        listings,
+        set(parsed["options"]["symbol"]),
+        sp500,
+        settings,
+        previous,
+        session,
+        parsed.get("tickers"),
     )
+    history_date = reader.latest_date(HISTORY, on_or_before=session)
+    old_history = None
+    if history_date is not None and history_date < session:
+        old_history = reader.table(HISTORY, history_date)
+    history, ticker_changes = update_history(old_history, reference, session)
     covered = reference[coverage(reference, settings)]
     universe = pd.DataFrame(
         {
@@ -197,9 +239,14 @@ def build_universe(
         }
     )
     changes, index = diff_reference(previous, reference, session)
+    if ticker_changes:
+        extra = pd.DataFrame(ticker_changes).assign(ts=pd.Timestamp(session, tz="UTC"))
+        changes = pd.concat([changes, extra], ignore_index=True)
     source = sources.nasdaq_trader.name
     writer.write_table(REFERENCE, session, run_id, stamp(reference, session, now, source, run_id))
     writer.write_table("universe", session, run_id, stamp(universe, session, now, source, run_id))
+    if not history.empty:
+        writer.write_table(HISTORY, session, run_id, stamp(history, session, now, source, run_id))
     for table, frame in (("events/reference_change", changes), ("events/index_change", index)):
         if not frame.empty:
             writer.write_table(table, session, run_id, stamp(frame, session, now, source, run_id))
@@ -215,6 +262,15 @@ def build_universe(
         "sp500_members": len(sp500),
         "sp500_unmatched": unmatched,
         "leverage": reference["leverage_source"].value_counts().to_dict(),
+        "identifiers": {
+            "with_figi": int(reference["figi"].notna().sum()),
+            "vendor_type_disagreements": disagreements,
+            "security_type_source": reference.loc[
+                reference["status"].eq("ACTIVE"), "security_type_source"
+            ]
+            .value_counts()
+            .to_dict(),
+        },
         "events": {
             "reference_change": changes["change"].value_counts().to_dict(),
             "index_change": index["change"].value_counts().to_dict(),

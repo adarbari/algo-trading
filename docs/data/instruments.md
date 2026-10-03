@@ -84,3 +84,17 @@ Leverage: non-ETFs are unleveraged; curated rows in `config/site/overrides/lever
 win; an ETF without a leverage marker in its name is unleveraged; an ETF with a marker and no
 curated row is **UNKNOWN** and listed in the review file with the leverage its name suggests
 (2026-10-02: 957 candidates). Curate by moving reviewed rows into the overrides file.
+
+
+## Identifiers and vendor types (implemented, phase 1.5)
+
+When a Massive key is configured, the universe build also reads Massive's ticker list (~13
+requests): every row gets `figi` (composite), `share_class_figi` and `cik`, and **Massive's
+security type wins over the name rules** (`security_type_source` = `vendor` or `name_rule`;
+disagreements are counted in the run stats). Notably, closed-end funds (`FUND`) become `CEF`
+and drop out of the default coverage.
+
+`instruments/symbol_history` tracks which symbol each FIGI used and when; a FIGI that comes
+back under a new symbol closes the old row and emits `events/reference_change` with
+`change = ticker_changed` (e.g. FB -> META). `instrument_id` is still `EQ:<symbol>`; switching
+to FIGI-based ids is the remaining step, and this table is its mapping.

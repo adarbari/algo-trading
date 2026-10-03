@@ -39,8 +39,15 @@ def _collect(files: GoldenFiles) -> tuple[pd.DataFrame, pd.DataFrame]:
             if normalized is None:
                 raise ValueError(f"golden file missing or empty: {request.key}")
             bars.append(normalized.tables[BARS_TABLE])
-            catalog.append({"instrument_id": iid, "symbol": symbol, "dataset": ds.name,
-                            "description": ds.description, "tags": ",".join(ds.tags)})  # fmt: skip
+            catalog.append(
+                {
+                    "instrument_id": iid,
+                    "symbol": symbol,
+                    "dataset": ds.name,
+                    "description": ds.description,
+                    "tags": ",".join(ds.tags),
+                }
+            )
     return pd.concat(bars, ignore_index=True), pd.DataFrame(catalog)
 
 
@@ -63,16 +70,28 @@ def load_golden(
     for key, day in stamped.groupby("session_date", sort=True):
         session = key if isinstance(key, date) else date.fromisoformat(str(key))
         writer.write_table("bars/1d", session, run_id, day.reset_index(drop=True))
-    reference = catalog[["instrument_id", "symbol"]].drop_duplicates().assign(
-        asset_class=AssetClass.EQUITY.value, security_type="COMMON_STOCK", multiplier=1.0,
-        tick_size=0.01, currency="USD", status="ACTIVE",
-    )  # fmt: skip
+    reference = (
+        catalog[["instrument_id", "symbol"]]
+        .drop_duplicates()
+        .assign(
+            asset_class=AssetClass.EQUITY.value,
+            security_type="COMMON_STOCK",
+            multiplier=1.0,
+            tick_size=0.01,
+            currency="USD",
+            status="ACTIVE",
+        )
+    )
     writer.write_table(
         "instruments/reference", first, run_id, stamp(reference, first, now, SOURCE, run_id)
     )
     writer.write_table(CATALOG, first, run_id, stamp(catalog, first, now, SOURCE, run_id))
-    stats = {"datasets": int(catalog["dataset"].nunique()), "instruments": len(reference),
-             "sessions": int(bars["session_date"].nunique()), "bars": len(bars)}  # fmt: skip
+    stats = {
+        "datasets": int(catalog["dataset"].nunique()),
+        "instruments": len(reference),
+        "sessions": int(bars["session_date"].nunique()),
+        "bars": len(bars),
+    }
     record = RunRecord(run_id, JOB, first, now, RunStatus.COMPLETE, now, stats=stats)
     writer.save_run(record)
     return record

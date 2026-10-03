@@ -274,3 +274,16 @@ def test_instrument_view_joins_reference_and_session_rollups(backend: Backend) -
     assert reader.instrument_view(D1, ["rollup.liq@v1.put_tier"]).missing == (
         "rollups/instrument/liq@v1",
     )  # a rollup is read for the session only, never stale
+
+
+def test_events_allow_several_kinds_of_change_per_day(backend: Backend) -> None:
+    ts = pd.Timestamp(D1, tz="UTC")
+    rows = [
+        {"instrument_id": "EQ:META", "ts": ts, "change": "added"},
+        {"instrument_id": "EQ:META", "ts": ts, "change": "ticker_changed"},
+    ]
+    StoreWriter(backend).write_table("events/reference_change", D1, "r1", stamped(rows, D1, "r1"))
+    with pytest.raises(DataValidationError, match="duplicate"):
+        StoreWriter(backend).write_table(
+            "events/reference_change", D1, "r1", stamped(rows[:1] * 2, D1, "r1")
+        )
