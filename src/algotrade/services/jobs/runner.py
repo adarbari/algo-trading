@@ -21,8 +21,16 @@ class JobContext:
     resources: Mapping[str, Any]
 
 
-# A handler returns a JSON-able summary; ("partial", summary) marks a partial result.
+# A handler returns a JSON-able summary; a ``"_partial": True`` entry marks a partial result.
 type JobHandler = Callable[[Mapping[str, Any], JobContext], Mapping[str, Any]]
+# What makes two submissions the same job (default: the params themselves).
+type JobIdentity = Callable[[Mapping[str, Any], JobContext], Mapping[str, Any]]
+
+
+@dataclass(frozen=True)
+class JobKind:
+    handler: JobHandler
+    identity: JobIdentity | None = None
 
 
 class JobRunner(Protocol):
@@ -41,12 +49,13 @@ class LocalJobRunner:
     def __init__(
         self,
         runs: RunStore,
-        handlers: Mapping[str, JobHandler],
+        handlers: Mapping[str, JobKind | JobHandler],
         resources: Mapping[str, Any],
         workers: int = 2,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
-        self._runs, self._handlers, self._resources = runs, dict(handlers), resources
+        self._kinds = {k: v if isinstance(v, JobKind) else JobKind(v) for k, v in handlers.items()}
+        self._runs, self._resources = runs, resources
         self._clock = clock
         self._pool = cf.ThreadPoolExecutor(max_workers=workers, thread_name_prefix="job")
         self._futures: dict[str, cf.Future[None]] = {}
@@ -54,16 +63,19 @@ class LocalJobRunner:
 
     @property
     def kinds(self) -> tuple[str, ...]:
-        return tuple(sorted(self._handlers))
+        return tuple(sorted(self._kinds))
 
     def submit(
         self, kind: str, params: Mapping[str, Any], user: UserContext, force: bool = False
     ) -> str:
         """Queue a job. Identical work returns the existing job unless it failed, or unless
         ``force`` asks to run a finished job again (an explicit re-run, e.g. from a CLI)."""
-        if kind not in self._handlers:
+        if kind not in self._kinds:
             raise ConfigurationError(f"unknown job kind {kind!r}; known: {list(self.kinds)}")
-        job_id = job_id_for(kind, params, user)
+        identity_fn = self._kinds[kind].identity
+        context = JobContext(user, self._resources)
+        identity = identity_fn(params, context) if identity_fn else params
+        job_id = job_id_for(kind, identity, user)
         with self._lock:
             existing = self._runs.load(job_id)
             in_flight = existing is not None and existing.status in (
@@ -112,7 +124,7 @@ class LocalJobRunner:
         self._runs.save(record.to_run())
         context = JobContext(UserContext(record.user), self._resources)
         try:
-            summary = dict(self._handlers[record.kind](record.params, context))
+            summary = dict(self._kinds[record.kind].handler(record.params, context))
             partial = summary.pop("_partial", False)
             record.result = summary
             record.status = JobStatus.PARTIAL if partial else JobStatus.COMPLETE

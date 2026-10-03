@@ -2,11 +2,13 @@
 
 import math
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date, datetime
 
 import pandas as pd
 
 from algotrade.core.errors import MissingDataError
+from algotrade.core.fields import REFERENCE_TABLE, field_source, instrument_field
 from algotrade.core.instruments import AssetClass, Instrument
 from algotrade.storage.interfaces import Backend
 from algotrade.storage.runs import RunRecord
@@ -17,6 +19,21 @@ def _present[T](value: object, default: T) -> T:
     if value is None or (isinstance(value, float) and math.isnan(value)):
         return default
     return value  # type: ignore[return-value]
+
+
+@dataclass(frozen=True)
+class InstrumentView:
+    """L1 for one date: reference facts + rollups, one row per instrument (ADR 0016).
+
+    Columns are field names (``instrument.<col>``, ``rollup.<name>@vN.<col>``) plus
+    ``instrument_id``. A rollup with no partition for ``session`` is listed in ``missing``
+    and its fields are absent, which selections treat as UNKNOWN (never as a pass).
+    """
+
+    session: date
+    reference_snapshot: date
+    frame: pd.DataFrame
+    missing: tuple[str, ...]
 
 
 class StoreReader:
@@ -88,6 +105,40 @@ class StoreReader:
         if frame is None:  # pragma: no cover - a listed date always has a run
             raise MissingDataError(table, f"snapshot {snapshot} unreadable", "re-run ingestion")
         return frame
+
+    def instrument_view(
+        self,
+        session: date,
+        fields: Sequence[str] | None = None,
+        instruments: Sequence[str] | None = None,
+        as_of: datetime | None = None,
+    ) -> InstrumentView:
+        """Reference snapshot on or before ``session`` joined with rollups *for* ``session``.
+
+        ``fields`` limits the columns (and the rollup tables read); ``None`` means every
+        reference column and no rollups.
+        """
+        reference = self.instruments(session, instruments, as_of)
+        snapshot = self.latest_date(REFERENCE_TABLE, session)
+        assert snapshot is not None  # instruments() raised otherwise
+        wanted: dict[str, list[tuple[str, str]]] = {}
+        for name in fields if fields is not None else [instrument_field(str(c)) for c in reference]:
+            table, column = field_source(name)
+            wanted.setdefault(table, []).append((name, column))
+        out = pd.DataFrame({"instrument_id": reference["instrument_id"].astype(str)})
+        missing: list[str] = []
+        for table, columns in wanted.items():
+            frame = reference if table == REFERENCE_TABLE else self.table(table, session, as_of)
+            if frame is None:
+                missing.append(table)
+                continue
+            # Build the joined columns by name so the join key itself is never renamed.
+            picked = pd.DataFrame({"instrument_id": frame["instrument_id"].astype(str)})
+            for name, column in columns:
+                if column in frame.columns:
+                    picked[name] = frame[column].to_numpy()
+            out = out.merge(picked, on="instrument_id", how="left")
+        return InstrumentView(session, snapshot, out, tuple(sorted(missing)))
 
     def instrument_terms(
         self, on_or_before: date, instruments: Sequence[str] | None = None

@@ -1,5 +1,6 @@
 """Use case: resolve configs from the ``ConfigStore`` and find scheduled ones."""
 
+import os
 from collections.abc import Mapping
 from typing import Any
 
@@ -8,6 +9,13 @@ from algotrade.config.resolve import ResolvedConfig, resolve
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.features.registry import FEATURES
 from algotrade.storage.config_store import ConfigStore
+
+USER_ENV_VAR = "ALGOTRADE_USER"
+
+
+def default_user(fallback: str) -> UserContext:
+    """``$ALGOTRADE_USER`` if set, else ``fallback`` (CLIs: ``local``; site screens: ``site``)."""
+    return UserContext(os.environ.get(USER_ENV_VAR) or fallback)
 
 
 def field_catalog() -> FieldCatalog:

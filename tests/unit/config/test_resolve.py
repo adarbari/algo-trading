@@ -184,3 +184,27 @@ def test_deep_merge() -> None:
         "a": {"b": 3, "c": 2},
         "l": [2],
     }
+
+
+@pytest.mark.parametrize(
+    "doc",
+    [
+        {"id": "x", "kind": "screener", "impl": "s", "selection": "active", "api_key": "abc"},
+        {
+            "id": "x",
+            "kind": "screener",
+            "impl": "s",
+            "selection": "active",
+            "params": {"vendor_token": "abc"},
+        },
+        {"extends": "scr", "exports": [{"password": "p"}]},
+    ],
+)
+def test_configs_never_hold_secrets(doc: dict) -> None:  # type: ignore[type-arg]
+    with pytest.raises(ConfigurationError, match="looks like a secret"):
+        resolve("x", UserContext("u1"), store({("u1", "strategies", "x"): doc}).load)
+
+
+def test_secret_like_run_overrides_are_rejected() -> None:
+    with pytest.raises(ConfigurationError, match=r"run-overrides\.params\.token"):
+        resolve("scr", UserContext(SITE_USER), store().load, overrides={"params": {"token": 1}})

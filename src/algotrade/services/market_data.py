@@ -1,6 +1,7 @@
 """Turn stored bars into the aligned ``PriceSeries`` engines consume."""
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date, datetime
 
 import numpy as np
@@ -24,6 +25,15 @@ def frame_to_series(bars: pd.DataFrame) -> dict[str, PriceSeries]:
     return out
 
 
+@dataclass(frozen=True)
+class PriceData:
+    """Aligned series, contract terms, and exactly which stored runs they came from."""
+
+    series: dict[str, PriceSeries]
+    terms: dict[str, Instrument]
+    versions: dict[str, list[str]]  # table -> run ids read (for reproducibility)
+
+
 def load_price_data(
     reader: StoreReader,
     instruments: Sequence[str],
@@ -31,8 +41,13 @@ def load_price_data(
     end: date,
     interval: str = "1d",
     as_of: datetime | None = None,
-) -> tuple[dict[str, PriceSeries], dict[str, Instrument]]:
+) -> PriceData:
     """Aligned series plus contract terms (as of ``start``) for a backtest."""
     bars = reader.bars(interval, start, end, instruments, as_of)
+    reference = reader.instruments(start, instruments, as_of)
+    versions = {
+        f"bars/{interval}": sorted(map(str, bars["run_id"].unique())),
+        "instruments/reference": sorted(map(str, reference["run_id"].unique())),
+    }
     terms = reader.instrument_terms(start, instruments)
-    return align(frame_to_series(bars)), terms
+    return PriceData(align(frame_to_series(bars)), terms, versions)

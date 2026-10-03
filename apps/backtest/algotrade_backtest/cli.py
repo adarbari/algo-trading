@@ -32,7 +32,7 @@ def build_parser() -> argparse.ArgumentParser:
     ds.add_argument("action", choices=["list"])
 
     parser.add_argument("--config-dir", help="site/user configs (default: ./config)")
-    parser.add_argument("--user", default="local", help="config owner (default: local)")
+    parser.add_argument("--user", help="config owner (default: $ALGOTRADE_USER or local)")
 
     bt = sub.add_parser("backtest", help="a strategy on a golden dataset, or a config")
     target = bt.add_mutually_exclusive_group(required=True)

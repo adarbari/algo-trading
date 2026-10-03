@@ -244,3 +244,33 @@ def test_open_ended_table_prefixes(backend: Backend) -> None:
     )
     with pytest.raises(DataValidationError, match="unknown table"):
         writer.write_table("rollups/instrument/", D1, "r1", event)
+
+
+def test_instrument_view_joins_reference_and_session_rollups(backend: Backend) -> None:
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    ref = [
+        {
+            "instrument_id": i,
+            "symbol": i[3:],
+            "asset_class": "EQ",
+            "security_type": "ETF",
+            "multiplier": 1.0,
+            "status": "ACTIVE",
+        }
+        for i in ("EQ:A", "EQ:B")
+    ]
+    writer.write_table("instruments/reference", D1, "r1", stamped(ref, D1, "r1"))
+    liq = [{"instrument_id": "EQ:A", "put_tier": "A"}]
+    writer.write_table("rollups/instrument/liq@v1", D2, "r2", stamped(liq, D2, "r2"))
+    fields = ["instrument.symbol", "rollup.liq@v1.put_tier", "rollup.other@v1.x"]
+    view = reader.instrument_view(D2, fields)
+    assert view.reference_snapshot == D1
+    assert view.missing == ("rollups/instrument/other@v1",)
+    rows = view.frame.set_index("instrument_id")
+    assert rows.loc["EQ:A", "rollup.liq@v1.put_tier"] == "A"
+    assert pd.isna(rows.loc["EQ:B", "rollup.liq@v1.put_tier"])
+    everything = reader.instrument_view(D2)
+    assert {"instrument.symbol", "instrument.multiplier"} <= set(everything.frame.columns)
+    assert reader.instrument_view(D1, ["rollup.liq@v1.put_tier"]).missing == (
+        "rollups/instrument/liq@v1",
+    )  # a rollup is read for the session only, never stale

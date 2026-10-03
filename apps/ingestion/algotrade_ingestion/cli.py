@@ -23,6 +23,7 @@ from zoneinfo import ZoneInfo
 
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.errors import AlgoTradeError
+from algotrade.services.configs import default_user
 from algotrade.services.jobs import JobRecord, JobStatus, LocalJobRunner
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.factory import open_backend, open_config_store
@@ -71,7 +72,7 @@ def _parser() -> argparse.ArgumentParser:
             s.add_argument("--export-dir", type=Path)
         if name == "screen":
             s.add_argument("--config", default="short_premium_liquidity", help="config id")
-            s.add_argument("--user", default=SITE_USER, help="config owner (default: site)")
+            s.add_argument("--user", help="config owner (default: $ALGOTRADE_USER or site)")
     g = sub.add_parser(
         "golden", help="golden test datasets: build CSVs, verify, load into the store"
     )
@@ -168,7 +169,7 @@ def _dispatch(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter
                 "session": session.isoformat(),
                 "export_dir": str(args.export_dir) if args.export_dir else None,
             },
-            args.user,
+            args.user or default_user(SITE_USER).user_id,
         )
         return _report(job)
     elif args.command == "nightly":

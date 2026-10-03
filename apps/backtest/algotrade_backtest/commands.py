@@ -9,7 +9,7 @@ from algotrade.config.resolve import ResolvedConfig
 from algotrade.config.user import UserContext
 from algotrade.core.errors import ConfigurationError
 from algotrade.engines.backtest.engine import run_backtest
-from algotrade.services.configs import resolve_config
+from algotrade.services.configs import default_user, resolve_config
 from algotrade.services.datasets import list_datasets, load_dataset
 from algotrade.services.evaluation.baseline import compare_to_baseline, load_baseline, save_baseline
 from algotrade.services.evaluation.suite import run_suite, with_benchmark_excess
@@ -17,6 +17,7 @@ from algotrade.services.jobs import JobStatus, LocalJobRunner
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.readers import StoreReader
+from algotrade.storage.result_writer import ResultWriter
 from algotrade.strategies.trading.registry import create_strategy
 
 SCORECARD_COLUMNS = (
@@ -60,8 +61,12 @@ def parse_params(pairs: list[str]) -> dict[str, float | int | str]:
     return params
 
 
+def _user(args: argparse.Namespace) -> UserContext:
+    return UserContext(args.user) if args.user else default_user("local")
+
+
 def _resolved(args: argparse.Namespace, config_id: str) -> ResolvedConfig:
-    return resolve_config(open_config_store(args.config_dir), config_id, UserContext(args.user))
+    return resolve_config(open_config_store(args.config_dir), config_id, _user(args))
 
 
 def cmd_config(args: argparse.Namespace) -> int:
@@ -86,7 +91,11 @@ def _config_backtest(args: argparse.Namespace) -> int:
     if args.start is None or args.end is None:
         raise ConfigurationError("--config needs --start and --end")
     backend = open_backend(args.data_url)
-    resources = {"reader": StoreReader(backend), "configs": open_config_store(args.config_dir)}
+    resources = {
+        "reader": StoreReader(backend),
+        "writer": ResultWriter(backend),
+        "configs": open_config_store(args.config_dir),
+    }
     runner = LocalJobRunner(backend.runs, LIBRARY_HANDLERS, resources)
     try:
         params = {
@@ -94,7 +103,7 @@ def _config_backtest(args: argparse.Namespace) -> int:
             "start": args.start.isoformat(),
             "end": args.end.isoformat(),
         }
-        job = runner.wait(runner.submit("backtest", params, UserContext(args.user), force=True))
+        job = runner.wait(runner.submit("backtest", params, _user(args), force=True))
     finally:
         runner.shutdown()
     if job.status is JobStatus.FAILED:
