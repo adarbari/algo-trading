@@ -23,7 +23,7 @@ jobs:
           version=$(python -c "import algotrade; print(algotrade.__version__)")
           test "v$version" = "${GITHUB_REF_NAME}" || { echo "tag ${GITHUB_REF_NAME} != v$version"; exit 1; }
       - run: python -m build
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: dist/*
           generate_release_notes: true
