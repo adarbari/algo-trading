@@ -5,7 +5,7 @@ BIN = $(dir $(PY))
 GOLDEN_URL ?= file://datasets/golden/store
 
 
-.PHONY: install lock-check lint format typecheck arch filelen unit property integration e2e test \
+.PHONY: install lock-check lint format typecheck arch ownership ownership-update dupes dupes-update filelen unit property integration e2e test \
         evaluate baseline datasets-verify datasets-build golden-store check nightly
 
 UV ?= uv
@@ -30,6 +30,18 @@ typecheck:
 
 arch:            ## dependency boundaries between layers
 	$(BIN)lint-imports
+
+ownership:       ## every responsibility done only by its owner (ADR 0019); ratchet only shrinks
+	$(PY) scripts/check_ownership.py --summary
+
+ownership-update: ## after fixing violations: shrink architecture/known_violations.toml
+	$(PY) scripts/check_ownership.py --update
+
+dupes:           ## no new copy-pasted code in src/ and apps/ (pylint duplicate-code ratchet)
+	$(PY) scripts/check_dupes.py
+
+dupes-update:    ## after removing duplicates: lower architecture/dupes_baseline.txt
+	$(PY) scripts/check_dupes.py --update
 
 filelen:         ## no file over 1000 lines
 	$(PY) scripts/check_file_length.py
@@ -65,7 +77,7 @@ evaluate: golden-store  ## strategy scorecard vs committed baseline
 baseline: golden-store  ## accept current results as the new baseline (review the diff!)
 	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate --update-baseline
 
-check: lock-check lint typecheck arch filelen datasets-verify test evaluate
+check: lock-check lint typecheck arch ownership dupes filelen datasets-verify test evaluate
 
 nightly:
 	HYPOTHESIS_PROFILE=nightly $(PY) -m pytest tests/property

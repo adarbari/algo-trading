@@ -1,0 +1,374 @@
+# Ratchet for scripts/check_ownership.py (ADR 0019). Today's ownership violations:
+# each entry is a file doing work another module owns. This list may only shrink:
+# fix a violation, then lower or remove its entry (`make ownership-update`).
+# Never add entries by hand; extend the owner named in architecture/ownership.toml.
+
+[[violation]]
+responsibility = "id-resolution"
+file = "apps/ingestion/algotrade_ingestion/jobs/bars.py"
+count = 2
+
+[[violation]]
+responsibility = "id-resolution"
+file = "apps/ingestion/algotrade_ingestion/jobs/earnings.py"
+count = 1
+
+[[violation]]
+responsibility = "ingestion-step-dispatch"
+file = "apps/ingestion/algotrade_ingestion/cli.py"
+count = 3
+
+[[violation]]
+responsibility = "ingestion-step-dispatch"
+file = "apps/ingestion/algotrade_ingestion/commands.py"
+count = 8
+
+[[violation]]
+responsibility = "job-execution"
+file = "apps/backtest/algotrade_backtest/commands.py"
+count = 1
+
+[[violation]]
+responsibility = "job-execution"
+file = "apps/ingestion/algotrade_ingestion/commands.py"
+count = 1
+
+[[violation]]
+responsibility = "job-execution"
+file = "apps/ingestion/algotrade_ingestion/jobs/option_chains.py"
+count = 1
+
+[[violation]]
+responsibility = "market-data-reads"
+file = "apps/backtest/algotrade_backtest/commands.py"
+count = 1
+
+[[violation]]
+responsibility = "market-data-reads"
+file = "apps/ingestion/algotrade_ingestion/cli.py"
+count = 1
+
+[[violation]]
+responsibility = "market-data-reads"
+file = "apps/ingestion/algotrade_ingestion/commands.py"
+count = 1
+
+[[violation]]
+responsibility = "market-data-reads"
+file = "apps/ingestion/algotrade_ingestion/jobs/bars.py"
+count = 1
+
+[[violation]]
+responsibility = "market-data-reads"
+file = "apps/ingestion/algotrade_ingestion/jobs/company_details.py"
+count = 1
+
+[[violation]]
+responsibility = "market-data-reads"
+file = "apps/ingestion/algotrade_ingestion/jobs/earnings.py"
+count = 1
+
+[[violation]]
+responsibility = "market-data-reads"
+file = "apps/ingestion/algotrade_ingestion/jobs/features.py"
+count = 1
+
+[[violation]]
+responsibility = "market-data-reads"
+file = "apps/ingestion/algotrade_ingestion/jobs/migrate_ids.py"
+count = 1
+
+[[violation]]
+responsibility = "market-data-reads"
+file = "apps/ingestion/algotrade_ingestion/jobs/quality.py"
+count = 1
+
+[[violation]]
+responsibility = "market-data-reads"
+file = "apps/ingestion/algotrade_ingestion/jobs/universe.py"
+count = 1
+
+[[violation]]
+responsibility = "market-data-reads"
+file = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
+count = 1
+
+[[violation]]
+responsibility = "market-data-reads"
+file = "apps/ingestion/algotrade_ingestion/pipeline.py"
+count = 1
+
+[[violation]]
+responsibility = "market-data-reads"
+file = "src/algotrade/services/backtests.py"
+count = 1
+
+[[violation]]
+responsibility = "market-data-reads"
+file = "src/algotrade/services/datasets.py"
+count = 1
+
+[[violation]]
+responsibility = "market-data-reads"
+file = "src/algotrade/services/evaluation/suite.py"
+count = 1
+
+[[violation]]
+responsibility = "market-data-reads"
+file = "src/algotrade/services/market_data.py"
+count = 1
+
+[[violation]]
+responsibility = "market-data-reads"
+file = "src/algotrade/services/screening.py"
+count = 1
+
+[[violation]]
+responsibility = "market-data-reads"
+file = "src/algotrade/services/selection.py"
+count = 1
+
+[[violation]]
+responsibility = "market-data-reads"
+file = "src/algotrade/services/views.py"
+count = 1
+
+[[violation]]
+responsibility = "rate-limiting"
+file = "apps/ingestion/algotrade_ingestion/commands.py"
+count = 13
+
+[[violation]]
+responsibility = "rate-limiting"
+file = "apps/ingestion/algotrade_ingestion/jobs/option_chains.py"
+count = 1
+
+[[violation]]
+responsibility = "rate-limiting"
+file = "apps/ingestion/algotrade_ingestion/sources/massive.py"
+count = 1
+
+[[violation]]
+responsibility = "rate-limiting"
+file = "apps/ingestion/algotrade_ingestion/sources/sec_edgar.py"
+count = 1
+
+[[violation]]
+responsibility = "raw-persistence"
+file = "apps/ingestion/algotrade_ingestion/jobs/bars.py"
+count = 2
+
+[[violation]]
+responsibility = "raw-persistence"
+file = "apps/ingestion/algotrade_ingestion/jobs/company_details.py"
+count = 2
+
+[[violation]]
+responsibility = "raw-persistence"
+file = "apps/ingestion/algotrade_ingestion/jobs/earnings.py"
+count = 1
+
+[[violation]]
+responsibility = "raw-persistence"
+file = "apps/ingestion/algotrade_ingestion/jobs/option_chains.py"
+count = 1
+
+[[violation]]
+responsibility = "raw-persistence"
+file = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
+count = 1
+
+[[violation]]
+responsibility = "row-stamping"
+file = "apps/ingestion/algotrade_ingestion/jobs/bars.py"
+count = 2
+
+[[violation]]
+responsibility = "row-stamping"
+file = "apps/ingestion/algotrade_ingestion/jobs/company_details.py"
+count = 1
+
+[[violation]]
+responsibility = "row-stamping"
+file = "apps/ingestion/algotrade_ingestion/jobs/earnings.py"
+count = 1
+
+[[violation]]
+responsibility = "row-stamping"
+file = "apps/ingestion/algotrade_ingestion/jobs/features.py"
+count = 1
+
+[[violation]]
+responsibility = "row-stamping"
+file = "apps/ingestion/algotrade_ingestion/jobs/golden.py"
+count = 3
+
+[[violation]]
+responsibility = "row-stamping"
+file = "apps/ingestion/algotrade_ingestion/jobs/option_chains.py"
+count = 2
+
+[[violation]]
+responsibility = "row-stamping"
+file = "apps/ingestion/algotrade_ingestion/jobs/universe.py"
+count = 2
+
+[[violation]]
+responsibility = "row-stamping"
+file = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
+count = 4
+
+[[violation]]
+responsibility = "run-records"
+file = "apps/ingestion/algotrade_ingestion/jobs/bars.py"
+count = 6
+
+[[violation]]
+responsibility = "run-records"
+file = "apps/ingestion/algotrade_ingestion/jobs/company_details.py"
+count = 3
+
+[[violation]]
+responsibility = "run-records"
+file = "apps/ingestion/algotrade_ingestion/jobs/earnings.py"
+count = 3
+
+[[violation]]
+responsibility = "run-records"
+file = "apps/ingestion/algotrade_ingestion/jobs/features.py"
+count = 2
+
+[[violation]]
+responsibility = "run-records"
+file = "apps/ingestion/algotrade_ingestion/jobs/golden.py"
+count = 2
+
+[[violation]]
+responsibility = "run-records"
+file = "apps/ingestion/algotrade_ingestion/jobs/migrate_ids.py"
+count = 3
+
+[[violation]]
+responsibility = "run-records"
+file = "apps/ingestion/algotrade_ingestion/jobs/option_chains.py"
+count = 3
+
+[[violation]]
+responsibility = "run-records"
+file = "apps/ingestion/algotrade_ingestion/jobs/quality.py"
+count = 3
+
+[[violation]]
+responsibility = "run-records"
+file = "apps/ingestion/algotrade_ingestion/jobs/universe.py"
+count = 2
+
+[[violation]]
+responsibility = "run-records"
+file = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
+count = 3
+
+[[violation]]
+responsibility = "run-records"
+file = "src/algotrade/services/backtests.py"
+count = 2
+
+[[violation]]
+responsibility = "run-records"
+file = "src/algotrade/services/screening.py"
+count = 3
+
+[[violation]]
+responsibility = "screen-execution"
+file = "apps/ingestion/algotrade_ingestion/pipeline.py"
+count = 1
+
+[[violation]]
+responsibility = "secrets-env"
+file = "src/algotrade/services/configs.py"
+count = 1
+
+[[violation]]
+responsibility = "session-calendar"
+file = "apps/ingestion/algotrade_ingestion/cli.py"
+count = 2
+
+[[violation]]
+responsibility = "session-calendar"
+file = "apps/ingestion/algotrade_ingestion/jobs/bars.py"
+count = 1
+
+[[violation]]
+responsibility = "session-calendar"
+file = "apps/ingestion/algotrade_ingestion/jobs/earnings.py"
+count = 1
+
+[[violation]]
+responsibility = "session-calendar"
+file = "src/algotrade/core/options.py"
+count = 1
+
+[[violation]]
+responsibility = "site-settings"
+file = "apps/ingestion/algotrade_ingestion/pipeline.py"
+count = 1
+
+[[violation]]
+responsibility = "site-settings"
+file = "apps/ingestion/algotrade_ingestion/settings.py"
+count = 1
+
+[[violation]]
+responsibility = "snapshot-selection"
+file = "apps/ingestion/algotrade_ingestion/jobs/company_details.py"
+count = 1
+
+[[violation]]
+responsibility = "snapshot-selection"
+file = "apps/ingestion/algotrade_ingestion/jobs/migrate_ids.py"
+count = 1
+
+[[violation]]
+responsibility = "snapshot-selection"
+file = "apps/ingestion/algotrade_ingestion/jobs/quality.py"
+count = 3
+
+[[violation]]
+responsibility = "snapshot-selection"
+file = "src/algotrade/services/datasets.py"
+count = 2
+
+[[violation]]
+responsibility = "snapshot-selection"
+file = "src/algotrade/services/views.py"
+count = 1
+
+[[violation]]
+responsibility = "source-construction"
+file = "apps/ingestion/algotrade_ingestion/commands.py"
+count = 9
+
+[[violation]]
+responsibility = "source-construction"
+file = "apps/ingestion/algotrade_ingestion/jobs/bars.py"
+count = 1
+
+[[violation]]
+responsibility = "source-construction"
+file = "apps/ingestion/algotrade_ingestion/jobs/company_details.py"
+count = 1
+
+[[violation]]
+responsibility = "source-construction"
+file = "apps/ingestion/algotrade_ingestion/jobs/earnings.py"
+count = 1
+
+[[violation]]
+responsibility = "source-construction"
+file = "apps/ingestion/algotrade_ingestion/jobs/golden.py"
+count = 2
+
+[[violation]]
+responsibility = "source-construction"
+file = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
+count = 4

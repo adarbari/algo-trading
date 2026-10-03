@@ -7,6 +7,11 @@ description: Add a trading strategy for backtesting (momentum, swing, mean rever
 
 Read first: `docs/architecture.md`, ADRs 0001, 0002 and 0008, and `docs/trading-pitfalls.md`.
 
+**Ownership check (ADR 0019):** a strategy only maps a `MarketView` to target weights.
+Data loading, adjustment, selection, sizing, costs and run records are owned elsewhere
+(`architecture/ownership.toml`); reuse them through `services/backtests.py`, never copy
+them. Shared signal maths belongs in one helper: `make dupes` must pass.
+
 1. **Location:** one module in `src/algotrade/strategies/` (`strategies/trading/` after phase 0).
    Subclass `Strategy`: `warmup_bars`, `on_bar(view) -> target weights | None`, `params()`.
 2. **Pure and deterministic:** read only from the view you are given. No I/O, no clocks,

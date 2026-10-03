@@ -1,0 +1,353 @@
+# Ownership registry (ADR 0019): every responsibility has exactly ONE owner.
+#
+# Before writing code that does X, find X here and extend its owner; never re-implement it.
+# A new responsibility needs an entry + owner in the same PR (.claude/skills/add-responsibility).
+#
+#   owner         module globs that own it TODAY (fnmatch; `*` crosses directories)
+#   target_owner  where it lives after the restructure (docs/roadmap.md, track R); hits there
+#                 are allowed too, so later PRs can move code without touching this file first
+#   target_pr     the restructure PR that moves it to target_owner
+#   allowed       other modules that may legitimately match a detect rule (rare; say why)
+#   detect        AST patterns that signal "this module is doing that work":
+#                   call = "name"          a call to name / x.name (arg = "lit": with that literal)
+#                   call_regex = "re"      a call whose dotted callee matches the regex
+#                   attr = "a.b"           an attribute expression ending in a.b (read or call)
+#                   import = "mod"         importing mod or a submodule (except = [prefixes])
+#                   string / string_prefix a string literal (docstrings ignored)
+#
+# scripts/check_ownership.py reports hits outside owner/target_owner/allowed; today's hits are
+# listed in architecture/known_violations.toml, which may only shrink.
+
+doc = "docs/adr/0019-ownership-and-boundaries.md"
+
+# --------------------------------------------------------------------------- reading data
+
+[[responsibility]]
+id = "snapshot-selection"
+description = "Pick the snapshot a reader sees: the latest partition on or before a date, with one fallback rule"
+owner = ["src/algotrade/storage/readers.py"]
+target_owner = ["src/algotrade/data/reference.py"]
+target_pr = 2
+section = "docs/adr/0019-ownership-and-boundaries.md#r1-only-data-reads-market-data"
+detect = [{ call = "latest_date" }]
+
+[[responsibility]]
+id = "market-data-reads"
+description = "Domain reads of market data (reference, InstrumentView, universe, bars + adjustments, events, chains) for consumers"
+owner = ["src/algotrade/storage/*"]
+target_owner = ["src/algotrade/data/*"]
+target_pr = 2
+section = "docs/adr/0019-ownership-and-boundaries.md#r1-only-data-reads-market-data"
+detect = [{ import = "algotrade.storage.readers" }]
+
+# --------------------------------------------------------------------------- the ingest loop
+
+[[responsibility]]
+id = "run-records"
+description = "Create run ids and run records and decide COMPLETE / PARTIAL for a run"
+owner = ["src/algotrade/storage/runs.py", "src/algotrade/services/jobs/*"]
+target_owner = ["apps/ingestion/algotrade_ingestion/tasks/framework.py"]
+target_pr = 3
+section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
+detect = [{ call = "RunRecord" }, { call = "new_run_id" }, { attr = "RunStatus.PARTIAL" }]
+
+[[responsibility]]
+id = "raw-persistence"
+description = "Save vendor payloads as received to the raw store before parsing"
+owner = ["src/algotrade/storage/backends/*"]
+target_owner = ["apps/ingestion/algotrade_ingestion/tasks/framework.py"]
+target_pr = 3
+section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
+detect = [{ call = "raw.put" }]
+
+[[responsibility]]
+id = "row-stamping"
+description = "Add the point-in-time columns (session_date, knowledge_ts, source, run_id) to stored rows"
+owner = ["apps/ingestion/algotrade_ingestion/jobs/common.py"]
+target_owner = ["apps/ingestion/algotrade_ingestion/tasks/framework.py"]
+target_pr = 3
+section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
+detect = [{ call = "stamp" }]
+
+[[responsibility]]
+id = "id-resolution"
+description = "Turn vendor tickers into instrument ids (ADR 0018); build EQ: ids only through the id rule"
+owner = [
+    "src/algotrade/core/instruments.py",
+    "src/algotrade/storage/resolver.py",
+    "apps/ingestion/algotrade_ingestion/jobs/instrument_ids.py",
+    "apps/ingestion/algotrade_ingestion/jobs/common.py",
+]
+target_owner = ["src/algotrade/data/reference.py", "apps/ingestion/algotrade_ingestion/tasks/framework.py"]
+target_pr = 3
+section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
+detect = [{ call = "with_ids" }, { call = "equity_id" }, { string_prefix = "EQ:" }]
+
+[[responsibility]]
+id = "ingestion-step-dispatch"
+description = "Decide which ingestion steps run, in what order, with which defaults (CLI, nightly)"
+owner = ["apps/ingestion/algotrade_ingestion/pipeline.py"]
+target_owner = [
+    "apps/ingestion/algotrade_ingestion/tasks/registry.py",
+    "apps/ingestion/algotrade_ingestion/workflows/*",
+]
+target_pr = 3
+section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
+detect = [
+    { call_regex = "(^|\\.)(ingest_[a-z_]+|build_universe|import_universe|run_quality|compute_option_liquidity|load_golden|run_migrate_ids)$" },
+]
+
+# --------------------------------------------------------------------------- vendors
+
+[[responsibility]]
+id = "vendor-http"
+description = "HTTP transport to vendors, auth headers, polite retries and backoff"
+owner = ["apps/ingestion/algotrade_ingestion/sources/http.py"]
+section = "docs/adr/0019-ownership-and-boundaries.md#r3-tasks-get-sources-from-the-registry"
+detect = [
+    { import = "urllib.request" },
+    { import = "urllib.error" },
+    { import = "http.client" },
+    { import = "requests" },
+    { import = "httpx" },
+    { import = "aiohttp" },
+]
+
+[[responsibility]]
+id = "rate-limiting"
+description = "Pace requests to a vendor; one limiter shared across workers and processes"
+owner = ["apps/ingestion/algotrade_ingestion/sources/http.py"]
+target_owner = ["apps/ingestion/algotrade_ingestion/sources/limiter.py"]
+target_pr = 4
+section = "docs/adr/0019-ownership-and-boundaries.md#r3-tasks-get-sources-from-the-registry"
+detect = [{ call = "MinInterval" }, { attr = "time.sleep" }]
+
+[[responsibility]]
+id = "source-construction"
+description = "Build vendor sources (transport, credentials, pacing) from config/site/sources.toml; vendor specifics stay in sources/"
+owner = ["apps/ingestion/algotrade_ingestion/sources/*"]
+target_owner = ["apps/ingestion/algotrade_ingestion/sources/registry.py"]
+target_pr = 4
+section = "docs/adr/0019-ownership-and-boundaries.md#r3-tasks-get-sources-from-the-registry"
+detect = [
+    { import = "algotrade_ingestion.sources", except = ["algotrade_ingestion.sources.base"] },
+    { string = "nasdaqlisted" },
+    { string = "otherlisted" },
+    { string = "dividends" },
+]
+
+[[responsibility]]
+id = "secrets-env"
+description = "Read environment variables: credentials, data and config URLs, the default user"
+owner = [
+    "apps/ingestion/algotrade_ingestion/env.py",
+    "src/algotrade/storage/factory.py",
+    "src/algotrade/storage/dotenv.py",
+]
+target_owner = ["src/algotrade/config/env.py"]
+target_pr = 6
+section = "docs/adr/0019-ownership-and-boundaries.md#settings-and-environment"
+detect = [{ attr = "os.environ" }, { call = "getenv" }, { call = "putenv" }]
+
+# --------------------------------------------------------------------------- storage
+
+[[responsibility]]
+id = "parquet-io"
+description = "Physical file formats and paths (Parquet today, DuckDB later)"
+owner = ["src/algotrade/storage/backends/*"]
+section = "docs/adr/0019-ownership-and-boundaries.md#r2-storage-is-generic"
+detect = [
+    { import = "pyarrow" },
+    { import = "duckdb" },
+    { call = "read_parquet" },
+    { call = "to_parquet" },
+]
+
+# --------------------------------------------------------------------------- settings, time, jobs
+
+[[responsibility]]
+id = "site-settings"
+description = "Load and type L3 site settings (universe, sources, quality, backtest): one loader"
+owner = ["src/algotrade/config/*", "src/algotrade/storage/config_store.py", "src/algotrade/storage/backends/config_files.py"]
+target_owner = ["src/algotrade/config/settings.py"]
+target_pr = 6
+section = "docs/adr/0019-ownership-and-boundaries.md#settings-and-environment"
+detect = [{ call = "load", arg = "site" }]
+
+[[responsibility]]
+id = "session-calendar"
+description = "Which day is a trading session, in exchange time (weekends, holidays, early closes)"
+owner = ["src/algotrade/core/time.py"]
+target_owner = ["src/algotrade/core/calendar.py"]
+target_pr = 5
+section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
+detect = [
+    { call = "ZoneInfo", arg = "America/New_York" },
+    { call = "weekday" },
+    { call = "busday_offset" },
+]
+
+[[responsibility]]
+id = "job-execution"
+description = "Execute long-running work: threads, locks, recovery, idempotency, step isolation"
+owner = ["src/algotrade/services/jobs/*"]
+section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
+detect = [
+    { call = "LocalJobRunner" },
+    { call = "ThreadPoolExecutor" },
+    { call = "ProcessPoolExecutor" },
+    { call = "threading.Thread" },
+]
+
+[[responsibility]]
+id = "screen-execution"
+description = "Run a configured screen (select, screen, audit, write results); nightly submits `screen` jobs"
+owner = ["src/algotrade/services/screening.py", "src/algotrade/services/jobs/handlers.py"]
+target_pr = 5
+section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
+detect = [{ call = "run_screener" }]
+
+# --------------------------------------------------------------------------- stored tables
+# Every stored table has exactly one producing owner (tests/architecture/test_ownership.py).
+# `also_written_by` lists today's extra writers: each is restructure work, not precedent.
+
+[[table]]
+name = "universe"
+owner = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/universe.py"
+also_written_by = ["apps/ingestion/algotrade_ingestion/jobs/universe.py"]
+
+[[table]]
+name = "instruments/reference"
+owner = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/universe.py"
+also_written_by = [
+    "apps/ingestion/algotrade_ingestion/jobs/universe.py",
+    "apps/ingestion/algotrade_ingestion/jobs/golden.py",
+]
+
+[[table]]
+name = "instruments/symbol_history"
+owner = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/universe.py"
+
+[[table]]
+name = "instruments/id_map"
+owner = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/universe.py"
+
+[[table]]
+name = "instruments/company"
+owner = "apps/ingestion/algotrade_ingestion/jobs/company_details.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/company_details.py"
+
+[[table]]
+name = "chains/underlying_quotes"
+owner = "apps/ingestion/algotrade_ingestion/jobs/option_chains.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/option_chains.py"
+
+[[table]]
+name = "chains/option_quotes"
+owner = "apps/ingestion/algotrade_ingestion/jobs/option_chains.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/option_chains.py"
+
+[[table]]
+name = "chains/status"
+owner = "apps/ingestion/algotrade_ingestion/jobs/option_chains.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/option_chains.py"
+
+[[table]]
+name = "bars/1d"
+owner = "apps/ingestion/algotrade_ingestion/jobs/bars.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/bars.py"
+also_written_by = ["apps/ingestion/algotrade_ingestion/jobs/golden.py"]
+
+[[table]]
+name = "events/split"
+owner = "apps/ingestion/algotrade_ingestion/jobs/bars.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/corporate_actions.py"
+
+[[table]]
+name = "events/dividend"
+owner = "apps/ingestion/algotrade_ingestion/jobs/bars.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/corporate_actions.py"
+
+[[table]]
+name = "events/earnings"
+owner = "apps/ingestion/algotrade_ingestion/jobs/earnings.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/earnings.py"
+
+[[table]]
+name = "events/reference_change"
+owner = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/universe.py"
+
+[[table]]
+name = "events/index_change"
+owner = "apps/ingestion/algotrade_ingestion/jobs/universe_build.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/universe.py"
+
+[[table]]
+name = "rollups/instrument/option_liquidity@v1"
+owner = "apps/ingestion/algotrade_ingestion/jobs/features.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/features.py"
+
+[[table]]
+name = "rollups/daily/*"
+owner = "apps/ingestion/algotrade_ingestion/jobs/features.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/features.py"
+note = "none produced yet (phase 6); rollups are computed only by the features task"
+
+[[table]]
+name = "results/*"
+owner = "src/algotrade/storage/result_writer.py"
+note = "one results/<name> per screener (services/screening.py) or backtest output (services/backtests.py)"
+
+[[table]]
+name = "catalog/golden_datasets"
+owner = "apps/ingestion/algotrade_ingestion/jobs/golden.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/golden.py"
+
+# Every table may additionally be rewritten by the one-off id migration (ADR 0018):
+# apps/ingestion/algotrade_ingestion/jobs/migrate_ids.py (an admin command, not a producer).
+
+# --------------------------------------------------------------------------- pending contracts
+# Import-linter contracts that cannot hold until a restructure PR lands. Add each to
+# pyproject.toml in the PR named here (and delete it from this list).
+
+[[pending_contract]]
+name = "R1: only algotrade.data reads market data (consumers never import storage.readers)"
+source_modules = ["algotrade.services", "algotrade.engines", "algotrade_backtest", "algotrade_ingestion"]
+forbidden_modules = ["algotrade.storage.readers"]
+enabled_by_pr = 2
+
+[[pending_contract]]
+name = "R2: storage is generic (no domain read helpers: readers move to algotrade.data)"
+source_modules = ["algotrade.storage"]
+forbidden_modules = ["algotrade.core.fields", "algotrade.core.feature_view"]
+enabled_by_pr = 2
+
+[[pending_contract]]
+name = "R3: ingestion tasks never import vendor modules (sources come from the registry)"
+source_modules = ["algotrade_ingestion.tasks"]
+forbidden_modules = [
+    "algotrade_ingestion.sources.cboe",
+    "algotrade_ingestion.sources.massive",
+    "algotrade_ingestion.sources.nasdaq_earnings",
+    "algotrade_ingestion.sources.nasdaq_trader",
+    "algotrade_ingestion.sources.sec_edgar",
+    "algotrade_ingestion.sources.spy_holdings",
+]
+enabled_by_pr = 4
+
+[[pending_contract]]
+name = "R4: vendor sources never import storage (standard frames carry their own schema)"
+source_modules = ["algotrade_ingestion.sources"]
+forbidden_modules = ["algotrade.storage"]
+enabled_by_pr = 6
+
+[[pending_contract]]
+name = "R5: apps never build a job runner (they submit through services.jobs)"
+source_modules = ["algotrade_ingestion.cli", "algotrade_ingestion.commands", "algotrade_backtest"]
+forbidden_modules = ["algotrade.services.jobs.runner"]
+enabled_by_pr = 5

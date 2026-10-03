@@ -40,6 +40,7 @@ dev = [
     "pandas-stubs>=2.2",
     "import-linter>=2.15",
     "pre-commit>=3.7",
+    "pylint>=4.1.2",
 ]
 
 # ---------------------------------------------------------------- ruff
@@ -176,3 +177,84 @@ type = "forbidden"
 source_modules = ["algotrade.core"]
 forbidden_modules = ["pandas"]
 allow_indirect_imports = true
+
+# ---- ADR 0019: ownership and boundaries. Contracts that hold today; the ones that need a
+# restructure PR first are listed as `pending_contract` in architecture/ownership.toml.
+
+[[tool.importlinter.contracts]]
+name = "R4 (partial): vendor sources never touch storage I/O, run records or the resolver"
+type = "forbidden"
+source_modules = ["algotrade_ingestion.sources"]
+forbidden_modules = [
+    "algotrade.storage.writers",
+    "algotrade.storage.readers",
+    "algotrade.storage.backends",
+    "algotrade.storage.factory",
+    "algotrade.storage.runs",
+    "algotrade.storage.resolver",
+    "algotrade.storage.result_writer",
+    "algotrade.storage.config_store",
+]
+
+[[tool.importlinter.contracts]]
+name = "Vendor sources are leaf adapters: no steps, pipeline, CLI, settings or use cases"
+type = "forbidden"
+source_modules = ["algotrade_ingestion.sources"]
+forbidden_modules = [
+    "algotrade_ingestion.jobs",
+    "algotrade_ingestion.pipeline",
+    "algotrade_ingestion.commands",
+    "algotrade_ingestion.cli",
+    "algotrade_ingestion.settings",
+    "algotrade_ingestion.schedule",
+    "algotrade.services",
+    "algotrade.engines",
+    "algotrade.strategies",
+]
+
+[[tool.importlinter.contracts]]
+name = "Ingestion steps never import their entry points (CLI, commands, nightly pipeline)"
+type = "forbidden"
+source_modules = ["algotrade_ingestion.jobs"]
+forbidden_modules = [
+    "algotrade_ingestion.cli",
+    "algotrade_ingestion.commands",
+    "algotrade_ingestion.pipeline",
+    "algotrade_ingestion.schedule",
+]
+
+[[tool.importlinter.contracts]]
+name = "Vendor HTTP lives only in ingestion sources (urllib.request: check_ownership.py)"
+type = "forbidden"
+source_modules = ["algotrade", "algotrade_backtest", "algotrade_ingestion.jobs"]
+forbidden_modules = ["http", "requests"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Parquet / Arrow I/O lives only in storage backends"
+type = "forbidden"
+source_modules = [
+    "algotrade.core",
+    "algotrade.config",
+    "algotrade.features",
+    "algotrade.strategies",
+    "algotrade.analytics",
+    "algotrade.engines",
+    "algotrade.services",
+    "algotrade_backtest",
+    "algotrade_ingestion",
+]
+forbidden_modules = ["pyarrow"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "The job runner is generic: it knows no use case, engine or market-data reader"
+type = "forbidden"
+source_modules = ["algotrade.services.jobs.runner", "algotrade.services.jobs.models"]
+forbidden_modules = [
+    "algotrade.services.backtests",
+    "algotrade.services.screening",
+    "algotrade.engines",
+    "algotrade.storage.readers",
+    "algotrade.storage.writers",
+]

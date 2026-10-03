@@ -7,6 +7,12 @@ description: Add an end-of-day screener (options or equities) that filters and r
 
 Read first: ADRs 0007 and 0008, and `docs/data/storage.md` (feature and result grains).
 
+**Ownership check (ADR 0019):** a screener only scores a `FeatureView`. Selecting,
+auditing coverage, writing results and run records belong to `services/screening.py`;
+running it belongs to the job runner (`services/jobs`, kind `screen`; nightly submits
+`screen` jobs). Shared filters live in one helper, not copies: `make dupes` must pass.
+Owners are listed in `architecture/ownership.toml`.
+
 1. **Location:** `src/algotrade/strategies/screeners/<name>.py`. Implement the screener
    interface: `screen(view: FeatureView) -> ranked rows`. Each row carries
    `instrument_id`, a score and human-readable `reasons`.

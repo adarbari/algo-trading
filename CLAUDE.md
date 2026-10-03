@@ -43,6 +43,26 @@ without writing an ADR. Read in this order:
 - **Universe**: S&P 500 + all Nasdaq-listed stocks + all ETFs including leveraged and
   inverse, saved as daily snapshots. (ADR 0013)
 
+## Ownership (ADR 0019; enforced by `make ownership`, `make dupes`, `make arch`)
+
+**Before writing code that does X, find X's owner in `architecture/ownership.toml`. Extend
+the owner; never re-implement it elsewhere. A new responsibility needs an entry + owner in
+the same PR** (`.claude/skills/add-responsibility`). The ratchets
+(`architecture/known_violations.toml`, `architecture/dupes_baseline.txt`) only shrink: never
+add to them; when you fix a violation, lower them (`make ownership-update`, `make dupes-update`).
+
+| Responsibility | Owner today → target (roadmap track R) |
+|---|---|
+| Latest snapshot on or before D; domain reads of market data | `storage/readers.py` → `algotrade/data/` |
+| Run ids, run records, COMPLETE / PARTIAL; raw save; stamping; ticker → id in ingestion | `storage/runs.py`, `jobs/common.py` → `tasks/framework.py` (`IngestRun`) |
+| Which ingestion steps run, with which defaults | `pipeline.py` → task registry + `workflows/` |
+| Vendor HTTP, retries, rate limiting; building sources; vendor specifics | `sources/http.py`, `sources/` → + `sources/registry.py`, shared limiter |
+| Running long work (threads, recovery), screens | `services/jobs/` (screens: `services/screening.py`, submitted as `screen` jobs) |
+| Site settings; environment variables | `config/`; `env.py` + `storage/factory.py` → `config/settings.py`, `config/env.py` |
+| Session / exchange calendar | `core/time.py` → `core/calendar.py` |
+| Parquet / Arrow I/O | `storage/backends/` |
+| Each stored table | exactly one producing module (`[[table]]` in the registry) |
+
 ## Code rules (enforced by CI; follow them up front)
 
 1. **Respect layers.** Strategies and screeners import only `core` (plus `FeatureView` /
@@ -76,6 +96,7 @@ without writing an ADR. Read in this order:
 | New trading strategy | `.claude/skills/add-strategy` |
 | New screener | `.claude/skills/add-screener` |
 | New UI widget or screen | `.claude/skills/add-ui-component` |
+| New responsibility, or moving one between modules | `.claude/skills/add-responsibility` |
 | A decision that changes architecture | `.claude/skills/write-adr` |
 
 Commands (need `uv`): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make evaluate`, `make baseline`.
