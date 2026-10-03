@@ -9,6 +9,7 @@ added quickly **without** the codebase or the results quietly rotting.
 brew install uv       # once: the package/workspace manager (https://docs.astral.sh/uv/)
 make install          # library + apps + dev tools into .venv from uv.lock, + pre-commit hooks
 make check            # everything CI runs: lint, types, boundaries, file length, tests, evaluation
+make changed          # narrow first check: tests mirroring the files you changed, then the fast gates
 .venv/bin/algotrade-backtest --data-url file://datasets/golden/store datasets list   # after `make golden-store`
 .venv/bin/algotrade-backtest --data-url file://datasets/golden/store backtest --strategy sma_crossover --dataset bull_trend --param fast=10
 make evaluate                                   # every strategy x golden dataset vs baseline

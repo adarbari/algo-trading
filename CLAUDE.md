@@ -250,8 +250,16 @@ Token habits (every session):
   `architecture/ownership.toml`; the feature catalogue `docs/data/features.md` by grep.
 - **Never open generated or bulk files**: `uv.lock`, `apps/web/package-lock.json`,
   `apps/api/openapi.json`, `datasets/golden/**`, `tests/fixtures/**`, `__screenshots__/`.
-- **Verify narrow first**: the mirrored test file (`.venv/bin/python -m pytest <path> -q
-  -x`), then the gate for what you touched (`make arch|layout|ownership|dupes`), then
-  `make check` once at the end. Send long runs to `checker` or pipe through `tail`.
+- **Verify narrow first**: `make changed` (the mirrored tests of every file changed vs
+  `origin/main`, then `arch`, `layout`, `ownership`), or one test file (`.venv/bin/python -m
+  pytest <path> -q -x`); then `make check` once before pushing. Send long runs to `checker`
+  or pipe through `tail`. Re-run `make web-visual` only when the design system changed.
+- **Brief by pointer, report in the PR**: brief a subagent with paths, the owner, the skill
+  and the acceptance check, not pasted file contents. A subagent's hand-back is at most 150
+  words (PR link, checks and result, deviations from the brief, decisions needed); the full
+  write-up (findings, timings, screenshots) goes in the PR description, where it is read once.
+- **Check pages by text first**: verify a web page through its text and accessibility tree;
+  take a screenshot only for a visual state they cannot show, once per state, at reduced
+  scale.
 - **Load only the matching skill**, run independent agents in parallel in one message, and
   do not re-read a file you just edited or paste whole files or diffs into the chat.
