@@ -23,9 +23,16 @@ type Transport = Callable[[str], bytes]
 type Sleep = Callable[[float], None]
 
 
-def urllib_transport(user_agent: str = DEFAULT_USER_AGENT, timeout: float = 60.0) -> Transport:
+def urllib_transport(
+    user_agent: str = DEFAULT_USER_AGENT,
+    timeout: float = 60.0,
+    headers: dict[str, str] | None = None,
+) -> Transport:
+    """``headers`` carry credentials (e.g. ``Authorization``) so keys never appear in URLs."""
+    all_headers = {"User-Agent": user_agent, **(headers or {})}
+
     def get(url: str) -> bytes:
-        request = urllib.request.Request(url, headers={"User-Agent": user_agent})
+        request = urllib.request.Request(url, headers=all_headers)
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 body: bytes = response.read()
@@ -70,3 +77,20 @@ def get_with_retry(
             last = exc
         sleep(min(policy.max_delay, policy.base_delay * (attempt + 1) + random.uniform(0, 0.5)))
     raise RuntimeError(f"giving up on {url}: {last}")
+
+
+class MinInterval:
+    """Space requests at least ``seconds`` apart (vendor rate limits, e.g. 5 per minute)."""
+
+    def __init__(
+        self, seconds: float, sleep: Sleep = time.sleep, clock: Callable[[], float] = time.monotonic
+    ) -> None:
+        self.seconds, self._sleep, self._clock = seconds, sleep, clock
+        self._last: float | None = None
+
+    def wait(self) -> None:
+        now = self._clock()
+        if self._last is not None and now - self._last < self.seconds:
+            self._sleep(self.seconds - (now - self._last))
+            now = self._clock()
+        self._last = now

@@ -1,0 +1,185 @@
+import json
+from datetime import UTC, date, datetime
+
+import pytest
+
+from algotrade.core.errors import ConfigurationError
+from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.readers import StoreReader
+from algotrade.storage.runs import RunStatus
+from algotrade.storage.writers import StoreWriter
+from algotrade_ingestion.env import load_dotenv, massive_key
+from algotrade_ingestion.jobs.bars import (
+    ingest_corporate_actions,
+    ingest_daily_bars,
+    sessions_between,
+)
+from algotrade_ingestion.sources.base import FetchRequest
+from algotrade_ingestion.sources.http import HttpError, MinInterval, RetryPolicy
+from algotrade_ingestion.sources.massive import (
+    MassiveCorporateActions,
+    MassiveDailyBars,
+    act_symbol,
+    parse_grouped,
+)
+from tests import massive_fixture as fx
+
+D1, D2 = date(2026, 9, 30), date(2026, 10, 1)
+CLOCK = lambda: datetime(2026, 10, 2, 22, tzinfo=UTC)  # noqa: E731
+NO_RETRY = RetryPolicy(tries=1)
+
+
+def test_parse_grouped_maps_tickers_and_drops_bad_rows() -> None:
+    bars, invalid = parse_grouped(
+        D1,
+        fx.grouped(
+            D1,
+            [
+                ("AAPL", 10, 11, 9, 10.5, 1000),
+                ("KIMpL", 25, 26, 24, 25.5, 10),
+                ("BAD", 10, 9, 8, 10, 5),
+                ("ZERO", 0, 1, 0, 1, 5),
+            ],
+        ),
+    )
+    assert list(bars["instrument_id"]) == ["EQ:AAPL", "EQ:KIM$L"]
+    assert invalid == 2
+    assert str(bars["ts"].dt.tz) == "UTC"
+    assert parse_grouped(D1, fx.grouped(D1, []))[0].empty  # holiday
+    assert (act_symbol("BRK.B"), act_symbol("KIMpL")) == ("BRK.B", "KIM$L")
+
+
+def test_min_interval_paces_requests() -> None:
+    now = {"t": 0.0}
+    slept: list[float] = []
+
+    def sleep(seconds: float) -> None:
+        slept.append(seconds)
+        now["t"] += seconds
+
+    pace = MinInterval(12.5, sleep, lambda: now["t"])
+    pace.wait()
+    now["t"] += 2.5
+    pace.wait()
+    assert slept == [10.0]
+
+
+def test_corporate_actions_follow_pagination() -> None:
+    pages = {
+        "first": fx.page(
+            [{"ticker": "NVDA", "execution_date": "2026-09-30", "split_from": 1, "split_to": 10}],
+            next_url="https://api.massive.com/next",
+        ),
+        "next": fx.page(
+            [{"ticker": "KIMpL", "execution_date": "2026-09-29", "split_from": 2, "split_to": 1}]
+        ),
+    }
+    urls: list[str] = []
+
+    def transport(url: str) -> bytes:
+        urls.append(url)
+        return pages["next" if url.endswith("/next") else "first"]
+
+    source = MassiveCorporateActions(transport, lambda s: None, NO_RETRY, min_interval_s=0)
+    request = FetchRequest("splits:2026-09-01:2026-10-31")
+    normalized = source.normalize(request, source.fetch(request) or b"")
+    assert normalized is not None
+    splits = normalized.tables["events/split"].set_index("symbol")
+    assert splits.loc["NVDA", "ratio"] == 10.0
+    assert splits.loc["KIM$L", "ratio"] == 0.5
+    assert "execution_date.gte=2026-09-01" in urls[0] and len(urls) == 2
+    assert "apiKey" not in "".join(urls)  # the key travels in a header, never in URLs
+
+
+def test_dividends_on_the_same_ex_date_are_summed() -> None:
+    payload = fx.page(
+        [
+            {
+                "ticker": "COST",
+                "ex_dividend_date": "2026-09-30",
+                "cash_amount": 1.3,
+                "currency": "USD",
+            },
+            {
+                "ticker": "COST",
+                "ex_dividend_date": "2026-09-30",
+                "cash_amount": 15.0,
+                "currency": "USD",
+            },
+            {"ticker": "", "ex_dividend_date": "2026-09-30", "cash_amount": 1.0},
+        ]
+    )
+    source = MassiveCorporateActions(
+        lambda url: payload, lambda s: None, NO_RETRY, min_interval_s=0
+    )
+    request = FetchRequest("dividends:2026-09-01:2026-10-31")
+    normalized = source.normalize(request, source.fetch(request) or b"")
+    assert normalized is not None
+    dividends = normalized.tables["events/dividend"]
+    assert list(dividends["cash_amount"]) == [16.3]
+
+
+def test_daily_bars_job_resumes_and_records_holidays() -> None:
+    calls: list[str] = []
+
+    def transport(url: str) -> bytes:
+        calls.append(url)
+        if "2026-10-01" in url:
+            return fx.grouped(D2, [])  # a holiday
+        if "2026-10-02" in url:
+            raise HttpError(500)
+        return fx.grouped(D1, [("AAPL", 10, 11, 9, 10.5, 1000)])
+
+    backend = MemoryBackend()
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    source = MassiveDailyBars(transport, lambda s: None, NO_RETRY, min_interval_s=0)
+    first = ingest_daily_bars(
+        writer, reader, source, sessions_between(D1, date(2026, 10, 2)), clock=CLOCK
+    )
+    assert first.items == {
+        "2026-09-30": "OK: 1 bars",
+        "2026-10-01": "NO_SESSION",
+        "2026-10-02": first.items["2026-10-02"],
+    }
+    assert first.items["2026-10-02"].startswith("FETCH_ERROR")
+    assert first.status is RunStatus.PARTIAL
+    assert reader.dates("bars/1d") == [D1]
+    calls.clear()
+    second = ingest_daily_bars(writer, reader, source, [D1], clock=CLOCK)
+    assert second.items == {"2026-09-30": "STORED"} and calls == []  # resumed: nothing re-fetched
+    forced = ingest_daily_bars(writer, reader, source, [D1], force=True, clock=CLOCK)
+    assert forced.items["2026-09-30"].startswith("OK") and len(calls) == 1
+
+
+def test_corporate_actions_job_writes_snapshots_and_reports_failures() -> None:
+    def transport(url: str) -> bytes:
+        if "dividends" in url:
+            raise HttpError(500)
+        return fx.page(
+            [{"ticker": "NVDA", "execution_date": "2026-09-30", "split_from": 1, "split_to": 10}]
+        )
+
+    backend = MemoryBackend()
+    source = MassiveCorporateActions(transport, lambda s: None, NO_RETRY, min_interval_s=0)
+    record = ingest_corporate_actions(StoreWriter(backend), source, D2, D1, D2, clock=CLOCK)
+    assert record.status is RunStatus.PARTIAL
+    assert record.stats["events/split"] == 1
+    assert StoreReader(backend).table("events/split", D2) is not None
+
+
+def test_env_loading_and_missing_key(
+    tmp_path: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    env = tmp_path / ".env"  # type: ignore[operator]
+    env.write_text("# comment\nALGOTRADE_MASSIVE_API_KEY='abc'\nOTHER=1\nnot a pair\n")
+    monkeypatch.delenv("ALGOTRADE_MASSIVE_API_KEY", raising=False)
+    monkeypatch.delenv("OTHER", raising=False)
+    load_dotenv(env)
+    assert massive_key() == "abc"
+    monkeypatch.setenv("ALGOTRADE_MASSIVE_API_KEY", "")
+    load_dotenv(env)  # never overrides what is already set
+    assert massive_key(required=False) is None
+    with pytest.raises(ConfigurationError, match="ALGOTRADE_MASSIVE_API_KEY is not set"):
+        massive_key()
+    load_dotenv(tmp_path / "missing")  # type: ignore[operator]
+    assert json.loads('{"ok": true}')["ok"]

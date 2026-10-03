@@ -10,6 +10,7 @@ initial_cash = 100000.0
 cash_buffer = 0.01
 lot_size = 1.0
 periods_per_year = 252
+price_adjustment = "splits"  # none | splits | total_return (applied at read time)
 
 [backtest.costs]
 commission_bps = 1.0

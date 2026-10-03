@@ -27,7 +27,7 @@ PORTFOLIO = "PORTFOLIO"  # instrument_id for portfolio-level result rows (the eq
 
 def backtest_settings(settings: Mapping[str, Any]) -> BacktestConfig:
     """Resolved ``[backtest]`` settings -> engine config."""
-    bt = dict(settings["backtest"])
+    bt = {k: v for k, v in settings["backtest"].items() if k != "price_adjustment"}
     return BacktestConfig(
         initial_cash=float(bt["initial_cash"]),
         costs=CostModel(**bt["costs"]),
@@ -110,7 +110,8 @@ def run_configured_backtest(
     selected = select(reader, config.selection, start)
     if selected.empty:
         raise ConfigurationError(f"{config.config.id}: selection matched no instruments on {start}")
-    data = load_price_data(reader, selected.instruments, start, end)
+    adjustment = str(config.settings["backtest"].get("price_adjustment", "splits"))
+    data = load_price_data(reader, selected.instruments, start, end, adjustment=adjustment)
     strategy = create_strategy(config.config.impl, **dict(config.config.params))
     result = run_backtest(data.series, strategy, backtest_settings(config.settings), data.terms)
     outcome = BacktestOutcome(config, selected, result, data.versions)
