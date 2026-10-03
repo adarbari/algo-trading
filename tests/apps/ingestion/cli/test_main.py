@@ -113,6 +113,26 @@ def test_individual_steps_and_purge(env: Path, capsys: pytest.CaptureFixture[str
     assert (purged["raw_files_removed"], purged["staging_runs_removed"]) == (1, 0)
 
 
+def test_rollups_only_iv30(env: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from algotrade.storage.factory import open_backend  # noqa: PLC0415
+    from algotrade.storage.tables.readers import StoreReader  # noqa: PLC0415
+    from algotrade.storage.tables.writers import StoreWriter  # noqa: PLC0415
+    from tests.rollup_helpers import write_curve  # noqa: PLC0415
+
+    call(capsys, "universe", "--stocks", str(env / "stocks.csv"), "--version", "v", "--date", DAY)
+    call(capsys, "chains", "--date", DAY, "--symbols", "aapl")
+    code, before = call(capsys, "rollups", "--date", DAY, "--only", "iv30@v1")
+    assert (before["iv30@v1"]["no_input"], before["status"]) == (1, "partial")
+    backend = open_backend(f"file://{env / 'data'}")
+    write_curve(StoreWriter(backend), fx.SESSION, 0.04)
+    code, only = call(capsys, "rollups", "--date", DAY, "--only", "iv30@v1")
+    assert (code, only["iv30@v1"]["rows"], only["status"]) == (0, 1, "complete")
+    assert set(only) & {"price_stats@v1", "iv_history@v1"} == set()
+    frame = StoreReader(backend).table("rollups/instrument/iv30@v1", fx.SESSION)
+    assert frame is not None and frame["iv30_cboe"].iloc[0] == pytest.approx(0.42)
+    assert frame["iv30_status"].iloc[0] in ("OK", "SINGLE_EXPIRY")
+
+
 def test_missing_data_is_a_clean_error(env: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert cli.main(["screen", "--date", DAY]) == 2
     assert "universe import" in capsys.readouterr().err

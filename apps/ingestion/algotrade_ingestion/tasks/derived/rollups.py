@@ -9,6 +9,11 @@ on or before that session, and is written to that session's partition of
 reports the session under ``no_input``; that is not a failure, except for a rollup named with
 ``--only`` that computed nothing at all (the run is PARTIAL). A rollup that raises is a
 failed item (PARTIAL) and the others still run.
+
+Rollups run in dependency order (``features.registry``): a rollup that reads another
+rollup's table runs after it and reads what it just wrote (stored rows for sessions it did
+not write). When a rollup fails, the rollups that read it in this run are not computed (a
+failed item each, naming the dependency), so they never read a stale or partial input.
 """
 
 import time
@@ -19,10 +24,16 @@ from typing import Any
 
 from algotrade.core.time.calendar import sessions_between
 from algotrade.features.framework.declaration import Rollup
+from algotrade.features.framework.graph import dependents
 from algotrade.features.framework.runner import by_key, compute_sessions, rollup_params
 from algotrade.features.registry import ROLLUPS
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
+from algotrade_ingestion.tasks.framework.run import (
+    FAILURES,
+    IngestRun,
+    TaskContext,
+    status_label,
+)
 
 TASK = "rollups"
 SOURCE = "rollups"
@@ -68,8 +79,13 @@ def compute_rollups(
     params = rollup_params(ctx.configs, list(ROLLUPS.values()))  # validates the whole file
     with IngestRun(ctx, TASK, sessions[-1]) as run:
         run.stats["range"] = [sessions[0].isoformat(), sessions[-1].isoformat(), len(sessions)]
+        blocked: dict[str, str] = {}
         for rollup in rollups:
+            if rollup.key in blocked:
+                run.fail(rollup.key, f"not computed: {blocked[rollup.key]} failed", "FAILED")
+                continue
             work = partial(_one, run, rollup, sessions, params[rollup.key], bool(only))
-            run.attempt(rollup.key, work)
+            if status_label(run.attempt(rollup.key, work)) in FAILURES:
+                blocked.update(dict.fromkeys(dependents(rollups, rollup.key), rollup.key))
         run.stats["failed"] = run.failures()
     return run.record

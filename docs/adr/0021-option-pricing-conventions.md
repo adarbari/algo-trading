@@ -26,8 +26,8 @@ once here and implemented once, in a new pure library layer `algotrade.quant`.
   vol point, per day and per rate point (Cboe's `delta`, `gamma`, `theta`, `vega` on
   `chains/option_quotes` are the vendor's and are kept as a cross-check only).
 - **Dividend yield** `q` = trailing-12-month cash dividends (`events/dividend`, by ex-date) /
-  the underlying's price on the session, as a continuous yield. Computing it lands with the
-  IV rollup (2b.3); until then callers pass `q` explicitly (0 for non-payers).
+  the underlying's price on the session, as a continuous yield. Computed by `dividends@v1`
+  (see the 2b.3 addendum); callers outside rollups pass `q` explicitly (0 for non-payers).
 - The normal CDF is `0.5 * erfc(-x / sqrt 2)` (exact in the tails), numpy only; no scipy.
 
 ### Implied volatility
@@ -47,7 +47,7 @@ Prices are matched within `1e-10 × strike`. Every element gets a status, and a 
 | `VOL_BELOW_MIN` / `VOL_ABOVE_MAX` | inside the bounds, but the vol is outside [1e-4, 5] |
 | `NO_CONVERGENCE` | iteration limit (bisection guarantees convergence first; a safety net) |
 
-Which price is inverted (mid, or bid and ask separately) is the IV rollup's choice (2b.3).
+Which price is inverted: the mid (2b.3 addendum).
 
 ### Realised volatility
 `quant/realized_vol.py`: close-to-close (sample stdev of log returns), Parkinson,
@@ -86,3 +86,58 @@ annualised by `sqrt(252)`, NaN until the window is full.
   (`tasks/market/rates.py`).
 - Stored IV and Greeks (2b.3) carry the status code alongside the value, so screens can
   exclude or report failures instead of treating NaN as missing data.
+
+## Addendum (2026-10-03, phase 2b.3): IV30, dividend yield, IV rank
+
+**Owner decisions:** we compute our own IV30 beside Cboe's and use ours by default; IV rank is
+PROVISIONAL after 60 sessions of history (flagged with `history_days`) and FULL after 252; the
+risk-free rate is the Treasury curve (`data.rates`); the dividend yield is trailing-12-month
+dividends / close.
+
+### Dividend yield (`dividends@v1`)
+`q = div_ttm / close`, with `div_ttm` the cash dividends whose ex-date is in (session - 365
+days, session], each divided by the ratio of every split after its ex-date up to the session
+(the close is in the session's share terms, so the dividends must be too). The simple yield is
+used directly as the continuous `q` (the difference is second order for yields of a few
+percent). Distributions typed `special` are left out (a one-off is not a yield). A non-payer
+is 0 only with a year of bars (240 of 252 sessions); otherwise null, and pricing uses `q = 0`.
+
+### IV30 (`iv30@v1`)
+A constant-maturity 30-calendar-day at-the-money implied vol, per underlying:
+
+1. **Expiries:** among expiries 7 to 90 days out, the latest at or before 30 days and the
+   earliest at or after it, from the standard monthlies when they bracket 30 days, else from
+   every listed expiry (weeklies); else the single expiry nearest 30 days (flat vol,
+   `SINGLE_EXPIRY`). An expiry exactly 30 days out is used alone.
+2. **Forward ATM:** `t = days / 365`, `r = curve(t)`, `F = S e^{(r - q) t}` with `S` the
+   underlying quote's price; the two listed strikes around `F` (highest at or below, lowest
+   above).
+3. **Quotes:** each call and put at those strikes must have bid > 0, ask > bid,
+   `(ask - bid) / mid <= 0.35` and open interest >= 10 or volume >= 1 (all in `rollups.toml`).
+   The **mid** is inverted with `quant.implied_vol` (this answers "which price is inverted").
+4. **ATM vol:** call and put vols averaged per strike (put-call parity makes them equal for a
+   European; the average cancels American early-exercise and forward errors to first order),
+   then linear in strike to `F`.
+5. **Term:** linear in total variance `sigma^2 t` between the two expiries, evaluated at
+   30 days (`quant.implied_vol.interpolate_total_variance`), `sigma30 = sqrt(w(t30) / t30)`.
+
+Failures are a null `iv30` plus `iv30_status`: `NO_SPOT`, `NO_CHAIN`, `NO_EXPIRY`,
+`NO_QUOTES`, `WIDE_SPREADS`, `ILLIQUID`, `IV_FAILED` (the furthest step an expiry reached).
+`iv30_cboe` keeps the feed's value (a percentage, stored as a decimal) for comparison only.
+
+| Alternative | Rejected because |
+|---|---|
+| Cboe's `iv30` only | unknown method and inputs (ADR 0014); kept as a cross-check column |
+| VIX-style variance swap (whole strip of OTM options) | needs deep, clean strips; most single names have a handful of liquid strikes |
+| Inverting bid and ask separately | twice the work, and the spread is already filtered; the mid is the market's estimate |
+| Linear in vol across expiries | not arbitrage-consistent; total variance is the standard |
+
+### IV rank (`iv_history@v1`)
+Rank `(iv - min) / (max - min)` and percentile (share of earlier values strictly below today)
+over the last 252 sessions of our IV30 (or Cboe's: `source = "cboe"`). Below 60 sessions with
+an IV the status is UNKNOWN and both are null; 60 to 251 PROVISIONAL; 252 FULL.
+
+### Ownership exceptions
+`features/rollups/iv30.py` names its input `rates/treasury` (the framework reads it through
+`data.rates`), and `features/rollups/dividends.py` is named `dividends` (a rollup, not a
+vendor source): both are `allowed` entries in `architecture/ownership.toml` with this reason.

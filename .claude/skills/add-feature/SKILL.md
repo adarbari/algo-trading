@@ -22,16 +22,23 @@ never write a new task for a rollup. `make ownership` and `make dupes` must pass
    declared columns), and `params` (a frozen dataclass of defaults, validated in
    `__post_init__`; `None` if it takes none).
 2. **Inputs** must have a loader in `features/framework/inputs.py` (`bars/1d` split-adjusted
-   as of each session, `events/earnings` snapshots, `chains/*` partitions). A new input table
-   gets a loader there that reads through `algotrade.data` (extend the data owner if needed).
-   `compute` receives only rows on or before its session; missing history is null
-   (UNKNOWN), never zero.
+   as of each session, `events/earnings` snapshots, `events/dividend` / `events/split` by
+   event date, `rates/treasury` the curve the session sees, `chains/*` partitions). A new
+   input table gets a loader there that reads through `algotrade.data` (extend the data
+   owner if needed). `compute` receives only rows on or before its session; missing history
+   is null (UNKNOWN), never zero.
+   **Another rollup's output** is an input like any other: `Input("rollups/instrument/
+   price_stats@v1", lookback=...)` hands `compute` that rollup's rows (with `session_date`)
+   for the session and the lookback; `None` (NO_INPUT when required) when the session has
+   none. The registry orders rollups by dependency and refuses cycles; never call another
+   rollup's `compute` yourself. Test a chain with `runner.compute_in_memory` (no writes).
 3. **Pure computation:** pricing and volatility maths belong in `quant/`
    (`black_scholes`, `implied_vol`, `realized_vol` (1-d or sessions x instruments),
    `rates`; ADR 0021), sessions in `core/time/calendar.py`.
-4. **Register it** in `src/algotrade/features/registry.py` (`ROLLUPS`). That alone makes it
-   computed by the `rollups` task (nightly and `algotrade-ingest rollups --from/--to`) and
-   selectable as `rollup.<name>@v1.<column>`.
+4. **Register it** in `src/algotrade/features/registry.py` (`ROLLUPS`; the order is computed
+   from the dependencies). That alone makes it computed by the `rollups` task (nightly and
+   `algotrade-ingest rollups --from/--to`), after the rollups it reads, and selectable as
+   `rollup.<name>@v1.<column>`.
 5. **Harness, same PR:** a `[[table]]` entry for `rollups/instrument/<name>@v1` owned by
    `tasks/derived/rollups.py` in `architecture/ownership.toml`; a `["<name>@v1"]` section in
    `config/site/rollups.toml` if it has params (every key must drive code);

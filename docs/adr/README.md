@@ -26,4 +26,4 @@ Do not rewrite history. Use `.claude/skills/write-adr` to add one.
 | [0018](0018-figi-instrument-ids.md) | FIGI-based instrument ids through one symbol resolver | accepted |
 | [0019](0019-ownership-and-boundaries.md) | Every responsibility has one owner; ownership registry and boundary guardrails | implemented |
 | [0020](0020-directory-layout.md) | Directory layout: one kind of thing per folder, declared in a layout registry | implemented |
-| [0021](0021-option-pricing-conventions.md) | Option pricing conventions: BSM, calendar/365 time, Treasury rates, IV failure codes | accepted |
+| [0021](0021-option-pricing-conventions.md) | Option pricing conventions: BSM, calendar/365 time, Treasury rates, IV failure codes; IV30 method, dividend yield, IV rank (2b.3 addendum) | accepted |

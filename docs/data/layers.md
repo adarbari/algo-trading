@@ -88,7 +88,7 @@ nightly and stored point-in-time:
 ```
 bars/1m ──► rollups/daily/session_stats@v1 ──┐
 bars/1d ─────────────────────────────────────┼─► rollups/instrument/price_stats@v1   (52w hi/lo, MAs, HV, ADV)
-chains/* ────────────────────────────────────┼─► rollups/instrument/option_liquidity@v1, iv_history@v1
+chains/* ────────────────────────────────────┼─► rollups/instrument/option_liquidity@v1, iv30@v1 ─► iv_history@v1
 events/earnings ─────────────────────────────┴─► rollups/instrument/earnings@v1     (next date, days to it)
 ```
 
@@ -192,18 +192,29 @@ A rollup is a versioned, pure definition, `<name>@v<N>`, stored as
   catalogue (`rollup.<name>@v<N>.<column>`) and the `[[table]]` producers all derive from it.
 - **Params** come from `config/site/rollups.toml` (one `["<name>@v<N>"]` section per rollup
   with parameters), typed by the one settings loader (`config/site/settings.py`).
+- **Rollups read rollups.** An input may name another rollup's table
+  (`rollups/instrument/<name>@v<N>`, with a lookback like any input). The registry orders
+  rollups by dependency (`features/framework/graph.py`, topological; an unknown dependency or
+  a cycle fails at import, and a fitness test checks the order). The task computes them in
+  that order, so a rollup reads what its dependencies just wrote (stored rows for sessions
+  they did not write); if a dependency fails, its dependents are not computed this run (a
+  failed item each). `compute_in_memory` evaluates a chain without writing: each rollup reads
+  the frames the earlier ones produced in memory (`produced`), which win over stored rows.
 - **Computed by** the `rollups` ingestion task: `algotrade-ingest rollups [--date D | --from D
   --to D] [--only price_stats@v1,...]` (alias `features`). A backfill computes each session
   exactly as the nightly run would have. Nightly runs it for every session it ingests, after
-  earnings, bars, corporate actions and chains.
+  earnings, bars, corporate actions, rates and chains. `--only` computes just the named
+  rollups; their dependencies are read from the store.
 
 | Rollup | Columns | Inputs | Status |
 |---|---|---|---|
 | `option_liquidity@v1` | `liq_status`, put/call tiers, target expiry + DTE, short strike, spreads, zone OI / volume, chain OI / volume, `underlying_price`, `iv30`, `stock_volume`, `chain_asof` (date) | the session's `chains/status` (required), `chains/option_quotes`, `chains/underlying_quotes` | built |
 | `price_stats@v1` | `close`, `sma_20/50/200`, `ret_20d/60d`, `high_52w`, `low_52w`, `pct_from_high_52w`, `pct_from_low_52w`, `hv20`, `hv30` (close-to-close), `hv20_yz` (Yang-Zhang), `adv_usd_20d`, `history_days` | `bars/1d` split-adjusted as of the session (not total return), 252 sessions back | built |
 | `earnings@v1` | `next_earnings_date`, `earnings_time` (pre / post / unknown), `days_to_earnings` (sessions), `date_confirmed` (null: the source does not say), `last_earnings_date` | every `events/earnings` snapshot stored on or before the session | built |
-| `liquidity_class@v1` | `liquidity_class` (HIGH/MEDIUM/LOW) with the thresholds used | `price_stats`, `option_liquidity`, `config/site/rollups.toml` | 2b |
-| `iv_history@v1` | `iv30`, `iv_rank_252d`, `iv_percentile_252d`, `history_days` (UNKNOWN below the minimum) | `chains/underlying_quotes` history | 2b |
+| `dividends@v1` | `div_ttm`, `div_yield`, `div_count_ttm`, `last_ex_date` | `events/dividend`, `events/split` (by event date), `price_stats@v1` | built |
+| `iv30@v1` | `iv30` (ours), `iv30_cboe`, `iv30_status`, `near_expiry`, `far_expiry`, `atm_strike_near`, `spot`, `rate`, `div_yield`, `n_quotes_used` | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `dividends@v1` | built |
+| `iv_history@v1` | `iv30`, `iv_rank_252d`, `iv_percentile_252d`, `history_days`, `rank_status` (UNKNOWN / PROVISIONAL / FULL), `iv_hv_spread`, `iv_hv_ratio` | `iv30@v1` over 252 sessions, `price_stats@v1` | built |
+| `liquidity_class@v1` | `liquidity_class` (HIGH / MEDIUM / LOW / UNKNOWN), `adv_usd_20d`, `close`, `option_tier`, `chain_oi`, `rule_hash` | `price_stats@v1`, `option_liquidity@v1`, thresholds in `config/site/rollups.toml` | built |
 | `fundamentals@v1` | `market_cap`, `shares_outstanding` | Massive / EDGAR | 2b |
 
 **`price_stats@v1` rules.** Windows are exchange sessions, not "the instrument's last n bars":
@@ -213,6 +224,37 @@ over a shorter window, unless every session of its window has a bar. The 52-week
 Prices are split-adjusted as of the session: a later split never changes an earlier row.
 Returns and volatilities are scale-free; `adv_usd_20d` is close x volume, split-invariant.
 The windows named in the columns are the v1 definition (changing one is a v2).
+
+**`dividends@v1` rules.** `div_ttm` sums cash dividends with ex-date in (session - 365 days,
+session], each divided by the ratio of every split after its ex-date up to the session, so it
+is in the same share terms as the session's close; `div_yield = div_ttm / close`. Distributions
+typed `special` are left out by default. No dividend in the window is 0 only with at least
+`min_history_days` (240) bars among the last 252 sessions; otherwise every column is null.
+A future (declared) ex-date never counts.
+
+**`iv30@v1` rules.** Our constant-maturity 30-day ATM vol, computed beside Cboe's and used by
+default (ADR 0021, "IV30"): bracketing expiries (standard monthlies first, 7 to 90 days),
+forward ATM `F = S e^{(r-q)t}` with `r` from the Treasury curve and `q = div_yield`, the two
+strikes around `F`, mid prices of calls and puts that pass the quality filters inverted with
+`quant.implied_vol`, put/call average, linear in strike to `F`, then linear in total variance
+to 30 days. `iv30_status` says why a value is missing (`NO_SPOT`, `NO_CHAIN`, `NO_EXPIRY`,
+`NO_QUOTES`, `WIDE_SPREADS`, `ILLIQUID`, `IV_FAILED`); `SINGLE_EXPIRY` (one usable expiry,
+flat vol) still has a value. `iv30_cboe` is the feed's percentage as a decimal.
+
+**`iv_history@v1` rules.** Over the last 252 sessions (today included) of `iv30@v1.iv30`
+(`source = "cboe"` switches to the feed's): rank `(iv - min) / (max - min)` (null when flat),
+percentile = share of earlier IVs strictly below today's, `history_days` = sessions with an IV.
+`rank_status` is UNKNOWN below 60 sessions (rank and percentile null), PROVISIONAL below 252,
+FULL from 252 (owner decision). History starts with the first stored chain: nothing is
+back-filled from before chains were collected. `iv_hv_spread = iv30 - hv30` and
+`iv_hv_ratio = iv30 / hv30` (`price_stats@v1`) are the variance-risk-premium inputs.
+
+**`liquidity_class@v1` rules.** HIGH when every HIGH threshold holds (ADV, close, the worse
+of the put / call option tier, chain open interest and volume), else MEDIUM when every MEDIUM
+one does, else LOW. A threshold that cannot be checked (null ADV; no `option_liquidity@v1`
+for the session; a failed chain fetch) is unknown, and the class is UNKNOWN unless it is
+decided without it (three-valued logic). An instrument not in the session's chain run has no
+options. `rule_hash` is the first 12 hex characters of the SHA-256 of the thresholds.
 
 **`earnings@v1` rules.** The earnings task stores, each session, the calendar for the days
 ahead. For each report date the authority is the latest snapshot on or before the session

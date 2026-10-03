@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from algotrade.quant import black_scholes as bs
-from algotrade.quant.implied_vol import IVStatus, implied_vol
+from algotrade.quant.implied_vol import IVStatus, implied_vol, interpolate_total_variance
 
 SPOT, R, Q = 100.0, 0.045, 0.015
 GRID = np.array(
@@ -77,3 +77,13 @@ def test_vectorised_shapes_and_puts() -> None:
     result = implied_vol(prices, SPOT, strikes, 0.5, R, Q, False)
     assert result.iv.shape == (2, 2) and result.status.shape == (2, 2)
     np.testing.assert_allclose(result.iv, 0.3, rtol=1e-8)
+
+
+def test_total_variance_interpolation() -> None:
+    t1, t2 = np.array([0.1, 0.1]), np.array([0.3, 0.1])
+    out = interpolate_total_variance(t1, [0.2, 0.25], t2, [0.3, 0.9], 0.2)
+    w = 0.04 * 0.1 + (0.09 * 0.3 - 0.04 * 0.1) * 0.5
+    assert out[0] == pytest.approx(np.sqrt(w / 0.2))
+    assert out[1] == 0.25  # one expiry: flat
+    at_ends = interpolate_total_variance(0.1, 0.2, 0.3, 0.3, [0.1, 0.3])
+    assert at_ends == pytest.approx([0.2, 0.3])

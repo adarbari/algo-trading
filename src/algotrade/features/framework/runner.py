@@ -6,6 +6,11 @@ each session hands ``compute`` only the rows on or before that session and types
 result by the declaration (``framework.columns``). The same code path serves one session
 and a backfill, so a backfilled row equals the row computed on its own session.
 
+A rollup that reads another rollup's output gets it through its input loader: from the store
+(the ``rollups`` task computes in dependency order and writes each session before the next
+rollup runs), or from ``produced``, frames computed in this process and not written
+(``compute_in_memory``: a read-only evaluation of a chain of rollups).
+
 ``rollup_params`` reads every rollup's parameters from ``config/site/rollups.toml`` through
 the one settings loader.
 """
@@ -21,7 +26,8 @@ from algotrade.config.site.settings import SiteDocuments, load_rollups
 from algotrade.data import StoreReader
 from algotrade.features.framework.columns import conform
 from algotrade.features.framework.declaration import Rollup
-from algotrade.features.framework.inputs import load_input
+from algotrade.features.framework.graph import dependency_order
+from algotrade.features.framework.inputs import Produced, load_input
 
 CHUNK = 126  # sessions per input load (half a year: ~2 GB of daily bars at most)
 
@@ -55,19 +61,26 @@ def compute_sessions(
     sessions: Sequence[date],
     params: Any = None,
     chunk: int = CHUNK,
+    produced: Produced | None = None,
 ) -> Iterator[SessionResult]:
-    """``rollup`` for each session in ``sessions`` (ascending), one result per session."""
+    """``rollup`` for each session in ``sessions`` (ascending), one result per session.
+    ``produced``: rows of other rollups computed in this process (they win over stored)."""
     params = rollup.params if params is None else params
     for i in range(0, len(sessions), chunk):
-        yield from _compute_chunk(reader, rollup, sessions[i : i + chunk], params)
+        yield from _compute_chunk(reader, rollup, sessions[i : i + chunk], params, produced)
 
 
 def _compute_chunk(
-    reader: StoreReader, rollup: Rollup, sessions: Sequence[date], params: Any
+    reader: StoreReader,
+    rollup: Rollup,
+    sessions: Sequence[date],
+    params: Any,
+    produced: Produced | None,
 ) -> Iterator[SessionResult]:
     lookbacks = {i.table: i.sessions_back(params) for i in rollup.inputs}
     loaded = {
-        i.table: load_input(reader, i.table, sessions, lookbacks[i.table]) for i in rollup.inputs
+        i.table: load_input(reader, i.table, sessions, lookbacks[i.table], produced)
+        for i in rollup.inputs
     }
     for session in sessions:
         frames: dict[str, pd.DataFrame | None] = {}
@@ -93,8 +106,28 @@ def compute_one(
     return next(compute_sessions(reader, rollup, [session], params))
 
 
+def compute_in_memory(
+    reader: StoreReader,
+    rollups: Sequence[Rollup],
+    sessions: Sequence[date],
+    params: Mapping[str, Any] | None = None,
+) -> dict[str, list[SessionResult]]:
+    """Every rollup in ``rollups`` for ``sessions``, in dependency order, WITHOUT writing:
+    each rollup reads the frames the earlier ones produced here (stored rows otherwise).
+    Holds every result in memory: for evaluation and tests, not backfills."""
+    produced: dict[str, dict[date, pd.DataFrame | None]] = {}
+    out: dict[str, list[SessionResult]] = {}
+    for rollup in dependency_order(rollups, stored_ok=True):
+        p = (params or {}).get(rollup.key)
+        results = list(compute_sessions(reader, rollup, sessions, p, produced=produced))
+        produced[rollup.table] = {r.session: r.frame for r in results}
+        out[rollup.key] = results
+    return out
+
+
 def by_key(rollups: Mapping[str, Rollup], only: Sequence[str] | None) -> list[Rollup]:
-    """The rollups named in ``only`` (keys ``<name>@v<N>``; all when empty), in registry order."""
+    """The rollups named in ``only`` (keys ``<name>@v<N>``; all when empty), in registry order
+    (dependency order: ``features.registry``)."""
     if not only:
         return list(rollups.values())
     unknown = sorted(set(only) - set(rollups))
