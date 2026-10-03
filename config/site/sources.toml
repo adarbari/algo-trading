@@ -1,6 +1,7 @@
 # L3 site setting: data sources used by apps/ingestion. Credentials never go here (use .env).
 
 raw_retention_days = 90          # raw vendor responses older than this are purged nightly
+staging_retention_days = 14      # scratch left by unfinished runs (no resume after this) is purged nightly
 
 [cboe]                           # option chains (delayed feed), one request per underlying
 enabled = true

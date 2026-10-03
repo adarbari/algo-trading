@@ -95,7 +95,7 @@ def test_individual_steps_and_purge(env: Path, capsys: pytest.CaptureFixture[str
     code, audit = call(capsys, "screen", "--date", DAY, "--export-dir", str(env / "out"))
     assert audit["coverage"] == "COMPLETE"
     code, purged = call(capsys, "purge-raw", "--keep-days", "0", "--date", "2026-10-03")
-    assert purged["raw_files_removed"] == 1
+    assert (purged["raw_files_removed"], purged["staging_runs_removed"]) == (1, 0)
 
 
 def test_missing_data_is_a_clean_error(env: Path, capsys: pytest.CaptureFixture[str]) -> None:

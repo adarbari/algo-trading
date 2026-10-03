@@ -117,6 +117,7 @@ def run_nightly(
             exports.extend(run_exports(outcome, config, export_dir))
     quality = run_quality(reader, writer, session_date, s)
     writer.raw.purge_before(session_date - timedelta(s.raw_retention_days))
+    writer.staging.purge_before(session_date - timedelta(s.staging_retention_days))
     return NightlyResult(
         universe,
         company,

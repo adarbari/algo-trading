@@ -20,7 +20,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from algotrade.storage.backends.selection import concat_frames, latest_run, select_instruments
-from algotrade.storage.runs import RunRecord
+from algotrade.storage.runs import RunRecord, run_session
 
 _INDEX = "_runs.json"
 
@@ -177,6 +177,16 @@ class LocalStaging:
 
     def clear(self, run_id: str) -> None:
         shutil.rmtree(self.root / _safe(run_id), ignore_errors=True)
+
+    def purge_before(self, cutoff: date) -> int:
+        old = [
+            d
+            for d in (self.root.iterdir() if self.root.exists() else [])
+            if d.is_dir() and (s := run_session(d.name)) is not None and s < cutoff
+        ]
+        for directory in old:
+            shutil.rmtree(directory, ignore_errors=True)
+        return len(old)
 
 
 class LocalRuns:

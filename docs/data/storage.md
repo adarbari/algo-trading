@@ -56,8 +56,12 @@ $ALGOTRADE_DATA_URL (default file://./var/data, git-ignored)
   tables/<table>/date=YYYY-MM-DD/run=<run_id>.parquet   + _runs.json (knowledge_ts per run)
   raw/source=<s>/dataset=<d>/date=YYYY-MM-DD/run=<run_id>/<key>.json.gz
   staging/<run_id>/<table>/<key>.parquet                 per-item scratch for resumable jobs
+                                                         (cleared on completion; unfinished
+                                                         runs purged after 14 days)
   runs/<run_id>.json                                     run records: audit + checkpoint
 ```
+
+What each nightly run adds, table by table, with sizes: [nightly-footprint.md](nightly-footprint.md).
 
 Implemented tables (layers per [layers.md](layers.md)):
 L1 `instruments/reference`, `instruments/symbol_history`, `instruments/id_map` (symbol id →
@@ -138,6 +142,28 @@ suite as `parquet_local`. That is what makes swapping backends safe.
 **Golden data uses the same adapters.** Tests point `ALGOTRADE_DATA_URL` at a fixture
 store built from the golden datasets, so backtests in CI go through exactly the code path
 production uses.
+
+## Moving to S3
+
+The location is a URL, so moving is a configuration change once an S3 backend exists:
+copy the store (`aws s3 sync var/data s3://bucket/prefix`), then set
+`ALGOTRADE_DATA_URL=s3://bucket/prefix` in `.env`. The object keys stay the same as the local
+paths, so DuckDB and other tools read them unchanged. Nothing outside `storage/backends/` changes.
+
+Not built yet. An `s3_parquet` backend needs to:
+
+- **Pass `tests/contract/storage/`** (against a local S3 emulator in CI; no network).
+- **Write objects directly.** An S3 PUT is atomic per object, so the local backend's
+  temp-file-then-rename step is not needed.
+- **Avoid the `_runs.json` read-modify-write.** Two writers to the same partition could
+  lose an entry. Either keep a single writer per partition (true today: one nightly job), or
+  drop the index and resolve runs by listing `run=*.parquet` and reading `knowledge_ts` from
+  each file's metadata.
+- **List by prefix and delete in batches** for `dates()` and the purges, instead of
+  directory walks. S3 lifecycle rules on `raw/` (90 days) and `staging/` (14 days) can
+  replace the nightly purge.
+- **Take credentials from the standard AWS environment** (`AWS_PROFILE` or keys in `.env`),
+  never from the URL. Put the SDK dependency in the library's pyproject, as an optional extra.
 
 ## Rules
 

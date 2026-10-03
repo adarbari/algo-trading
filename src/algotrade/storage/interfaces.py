@@ -70,6 +70,13 @@ class StagingStore(Protocol):
 
     def clear(self, run_id: str) -> None: ...
 
+    def purge_before(self, cutoff: date) -> int:
+        """Drop scratch of runs whose session (from the run id) is before ``cutoff``.
+
+        Finished runs clear their own scratch; this removes what unfinished runs left behind.
+        Ids not made by ``new_run_id`` are kept. Returns the number of runs removed."""
+        ...
+
 
 class RunStore(Protocol):
     def save(self, record: RunRecord) -> None: ...

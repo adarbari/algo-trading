@@ -14,6 +14,7 @@ from datetime import date
 from pathlib import Path
 
 from algotrade.core.errors import AlgoTradeError
+from algotrade.storage.dotenv import load_dotenv
 from algotrade_backtest.commands import cmd_backtest, cmd_config, cmd_datasets, cmd_evaluate
 
 DEFAULT_BASELINE = Path("benchmarks/baseline.json")
@@ -55,6 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    load_dotenv()  # same .env as algotrade-ingest, so both read the same ALGOTRADE_DATA_URL
     args = build_parser().parse_args(argv)
     handlers = {
         "datasets": cmd_datasets,
