@@ -19,6 +19,14 @@ DAY = fx.SESSION.isoformat()
 @pytest.fixture
 def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("ALGOTRADE_DATA_URL", f"file://{tmp_path / 'data'}")
+    # The repo's universe.toml builds from the network; these tests use CSV-import mode.
+    import shutil  # noqa: PLC0415
+
+    shutil.copytree(
+        Path(__file__).resolve().parents[3] / "config" / "site", tmp_path / "config" / "site"
+    )
+    (tmp_path / "config" / "site" / "universe.toml").write_text('source = "csv_import"\n')
+    monkeypatch.setenv("ALGOTRADE_CONFIG_DIR", str(tmp_path / "config"))
     feed = FakeFeed(
         {
             "AAPL": fx.payload("AAPL", options=fx.chain("AAPL", spread=0.02, oi=5000)),
@@ -112,10 +120,6 @@ def test_screen_runs_a_user_config(env: Path, capsys: pytest.CaptureFixture[str]
         'extends = "short_premium_liquidity"\nschedule = "nightly"\n'
         '[selection_overrides]\nall = [{field = "instrument.is_etf", op = "eq", value = false}]\n'
     )
-    site = Path(__file__).resolve().parents[3] / "config" / "site"
-    import shutil  # noqa: PLC0415
-
-    shutil.copytree(site, env / "config" / "site")
     code, audit = call(
         capsys,
         "--config-dir",

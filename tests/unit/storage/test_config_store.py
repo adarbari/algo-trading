@@ -77,3 +77,20 @@ def test_every_repo_config_resolves_against_the_catalogue() -> None:
     assert names, "the repo ships site presets"
     for name in names:
         resolve_config(store, name, UserContext(SITE_USER))
+
+
+def test_site_settings_and_overrides(root: Path) -> None:
+    (root / "site" / "universe.toml").write_text('source = "nasdaq_trader"\n')
+    (root / "site" / "overrides").mkdir()
+    (root / "site" / "overrides" / "leveraged_etfs.csv").write_text(
+        "symbol,leverage,tracks\n# a comment, with commas\nTQQQ,3,Nasdaq-100\n\n"
+    )
+    store = FileConfigStore(root)
+    assert store.load("site", "settings", "universe") == {"source": "nasdaq_trader"}
+    assert store.load("alice", "settings", "universe") is None
+    assert store.names("site", "settings") == ["universe"]
+    assert store.names("alice", "settings") == []
+    assert store.overrides("leveraged_etfs") == [
+        {"symbol": "TQQQ", "leverage": "3", "tracks": "Nasdaq-100"}
+    ]
+    assert store.overrides("missing") == []

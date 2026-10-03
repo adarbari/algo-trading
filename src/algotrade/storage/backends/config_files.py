@@ -7,6 +7,7 @@ users/<user>/strategies/<id>.toml          L4 (git-ignored locally)
 users/<user>/selections/<id>.toml
 """
 
+import csv
 import tomllib
 from collections.abc import Mapping
 from pathlib import Path
@@ -29,12 +30,14 @@ class FileConfigStore:
         if scope == SITE:
             if kind == "defaults":
                 return self.root / SITE / "defaults.toml"
+            if kind == "settings":
+                return self.root / SITE / f"{validate_id(kind, name)}.toml"
             return self.root / SITE / "presets" / kind / f"{validate_id(kind, name)}.toml"
         user = validate_id("user", scope)
         return self.root / "users" / user / kind / f"{validate_id(kind, name)}.toml"
 
     def load(self, scope: str, kind: str, name: str) -> Mapping[str, Any] | None:
-        if kind == "defaults" and scope != SITE:
+        if kind in ("defaults", "settings") and scope != SITE:
             return None
         path = self._path(scope, kind, name)
         if not path.exists():
@@ -45,6 +48,10 @@ class FileConfigStore:
             raise ConfigurationError(f"{path}: invalid TOML: {exc}") from exc
 
     def names(self, scope: str, kind: str) -> list[str]:
+        if kind == "settings":
+            if scope != SITE:
+                return []
+            return sorted(p.stem for p in (self.root / SITE).glob("*.toml") if p.stem != "defaults")
         if kind == "defaults":
             return ["defaults"] if scope == SITE and self._path(SITE, kind, "x").exists() else []
         directory = self._path(scope, kind, "x").parent
@@ -54,12 +61,32 @@ class FileConfigStore:
         base = self.root / "users"
         return sorted(p.name for p in base.iterdir() if p.is_dir()) if base.exists() else []
 
+    def overrides(self, name: str) -> list[dict[str, str]]:
+        path = self.root / SITE / "overrides" / f"{validate_id('override', name)}.csv"
+        if not path.exists():
+            return []
+        with path.open(newline="") as fh:
+            rows = [r for r in csv.DictReader(fh) if any((v or "").strip() for v in r.values())]
+        return [
+            {k: (v or "").strip() for k, v in r.items()}
+            for r in rows
+            if not r[next(iter(r))].startswith("#")
+        ]
+
 
 class MemoryConfigStore:
-    """Dict-backed store for tests: ``{(scope, kind, name): document}``."""
+    """Dict-backed store for tests: ``{(scope, kind, name): document}`` + override rows."""
 
-    def __init__(self, documents: Mapping[tuple[str, str, str], Mapping[str, Any]]) -> None:
+    def __init__(
+        self,
+        documents: Mapping[tuple[str, str, str], Mapping[str, Any]],
+        overrides: Mapping[str, list[dict[str, str]]] | None = None,
+    ) -> None:
         self._docs = dict(documents)
+        self._overrides = dict(overrides or {})
+
+    def overrides(self, name: str) -> list[dict[str, str]]:
+        return list(self._overrides.get(name, []))
 
     def load(self, scope: str, kind: str, name: str) -> Mapping[str, Any] | None:
         return self._docs.get((scope, kind, name))

@@ -1,0 +1,21 @@
+symbol,leverage,tracks,notes
+# Curated leverage for ETFs whose names carry a leverage marker. Negative = inverse. Verify each
+# row against the issuer's factsheet; add rows from the review file the universe build writes.
+TQQQ,3,Nasdaq-100,ProShares UltraPro QQQ
+SQQQ,-3,Nasdaq-100,ProShares UltraPro Short QQQ
+QLD,2,Nasdaq-100,ProShares Ultra QQQ
+QID,-2,Nasdaq-100,ProShares UltraShort QQQ
+PSQ,-1,Nasdaq-100,ProShares Short QQQ
+UPRO,3,S&P 500,ProShares UltraPro S&P500
+SPXU,-3,S&P 500,ProShares UltraPro Short S&P500
+SSO,2,S&P 500,ProShares Ultra S&P500
+SDS,-2,S&P 500,ProShares UltraShort S&P500
+SH,-1,S&P 500,ProShares Short S&P500
+SPXL,3,S&P 500,Direxion Daily S&P 500 Bull 3X
+SPXS,-3,S&P 500,Direxion Daily S&P 500 Bear 3X
+TNA,3,Russell 2000,Direxion Daily Small Cap Bull 3X
+TZA,-3,Russell 2000,Direxion Daily Small Cap Bear 3X
+SOXL,3,ICE Semiconductor,Direxion Daily Semiconductor Bull 3X
+SOXS,-3,ICE Semiconductor,Direxion Daily Semiconductor Bear 3X
+TMF,3,ICE US Treasury 20+ Year,Direxion Daily 20+ Year Treasury Bull 3X
+TMV,-3,ICE US Treasury 20+ Year,Direxion Daily 20+ Year Treasury Bear 3X

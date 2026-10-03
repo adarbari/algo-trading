@@ -2,6 +2,7 @@
 
     algotrade-ingest universe --stocks optionable_us_stock_universe.csv \\
                               --etfs optionable_us_etf_universe.csv --version 2026-10
+    algotrade-ingest universe-build [--date YYYY-MM-DD] [--review-out leveraged_candidates.csv]
     algotrade-ingest chains   [--date YYYY-MM-DD] [--workers 4] [--symbols SPY,AAPL]
     algotrade-ingest features [--date YYYY-MM-DD]
     algotrade-ingest screen   [--date YYYY-MM-DD] [--config ID] [--user U] [--export-dir out/]
@@ -13,6 +14,7 @@ Storage location comes from ALGOTRADE_DATA_URL (default file://./var/data).
 """
 
 import argparse
+import csv
 import json
 import sys
 import time
@@ -33,9 +35,12 @@ from algotrade_ingestion.jobs.features import compute_option_liquidity
 from algotrade_ingestion.jobs.golden import load_golden
 from algotrade_ingestion.jobs.option_chains import ChainJobConfig, ingest_option_chains
 from algotrade_ingestion.jobs.universe import UniverseFile, import_universe
-from algotrade_ingestion.pipeline import nightly_job, universe_underlyings
+from algotrade_ingestion.jobs.universe_build import UniverseSources, build_universe, review_rows
+from algotrade_ingestion.pipeline import nightly_job, universe_settings, universe_underlyings
 from algotrade_ingestion.sources.cboe import CboeOptionsSource
 from algotrade_ingestion.sources.http import urllib_transport
+from algotrade_ingestion.sources.nasdaq_trader import NasdaqTraderSource
+from algotrade_ingestion.sources.spy_holdings import SpyHoldingsSource
 from algotrade_ingestion.sources.synthetic.catalog import build_golden
 from algotrade_ingestion.sources.synthetic.files import GoldenFiles
 
@@ -61,6 +66,11 @@ def _parser() -> argparse.ArgumentParser:
     u.add_argument("--etfs", type=Path)
     u.add_argument("--version", required=True)
     u.add_argument("--date", type=date.fromisoformat)
+    ub = sub.add_parser(
+        "universe-build", help="build the universe from Nasdaq Trader + SPY holdings"
+    )
+    ub.add_argument("--date", type=date.fromisoformat)
+    ub.add_argument("--review-out", type=Path, help="write leverage candidates to curate (CSV)")
     for name in ("chains", "features", "screen", "nightly"):
         s = sub.add_parser(name)
         s.add_argument("--date", type=date.fromisoformat)
@@ -86,6 +96,31 @@ def _parser() -> argparse.ArgumentParser:
 
 def _source() -> CboeOptionsSource:
     return CboeOptionsSource(urllib_transport(), time.sleep)
+
+
+def _universe_sources() -> UniverseSources:
+    transport = urllib_transport()
+    return UniverseSources(
+        NasdaqTraderSource(transport, time.sleep), SpyHoldingsSource(transport, time.sleep)
+    )
+
+
+def _universe_build(
+    args: argparse.Namespace, reader: StoreReader, writer: StoreWriter, session: date
+) -> int:
+    _, settings = universe_settings(open_config_store(args.config_dir))
+    record = build_universe(writer, reader, _universe_sources(), settings, session)
+    if args.review_out:
+        reference = reader.table("instruments/reference", session)
+        rows = review_rows(reference) if reference is not None else []
+        args.review_out.parent.mkdir(parents=True, exist_ok=True)
+        with args.review_out.open("w", newline="") as fh:
+            out = csv.DictWriter(fh, fieldnames=["symbol", "leverage", "tracks", "notes"])
+            out.writeheader()
+            out.writerows(rows)
+        record.stats["review_out"] = str(args.review_out)
+    _print({"run_id": record.run_id, "status": record.status, **record.stats})
+    return 0 if record.status == "complete" else 1
 
 
 def _print(payload: object) -> None:
@@ -118,6 +153,7 @@ def _run_job(
         "reader": reader,
         "writer": writer,
         "source": _source(),
+        "universe_sources": _universe_sources(),
         "configs": open_config_store(args.config_dir),
     }
     runner = LocalJobRunner(
@@ -141,6 +177,8 @@ def _dispatch(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter
     if args.command == "golden":
         return _golden(args, writer)
     session = args.date if getattr(args, "date", None) else last_session(datetime.now(UTC))
+    if args.command == "universe-build":
+        return _universe_build(args, reader, writer, session)
     if args.command == "universe":
         files = [UniverseFile(args.stocks, "STOCK")] + (
             [UniverseFile(args.etfs, "ETF")] if args.etfs else []

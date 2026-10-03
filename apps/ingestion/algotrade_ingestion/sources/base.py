@@ -37,8 +37,11 @@ class Normalized:
     """
 
     session_date: date | None
-    tables: Mapping[str, pd.DataFrame]
+    tables: Mapping[str, pd.DataFrame]  # storage-ready: validated against storage schemas
     notes: Mapping[str, int] = field(default_factory=dict)  # e.g. {"nonstandard_series": 3}
+    # Intermediate frames a job composes into storage tables (e.g. listings + option
+    # underlyings + index members -> instruments/reference). Not stored as-is.
+    parsed: Mapping[str, pd.DataFrame] = field(default_factory=dict)
 
 
 @runtime_checkable

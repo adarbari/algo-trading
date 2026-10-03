@@ -14,9 +14,12 @@ from algotrade_ingestion.jobs.common import stamp
 from algotrade_ingestion.sources.base import FetchRequest, Source
 from algotrade_ingestion.sources.cboe import CboeOptionsSource
 from algotrade_ingestion.sources.http import RetryPolicy
+from algotrade_ingestion.sources.nasdaq_trader import NasdaqTraderSource
+from algotrade_ingestion.sources.spy_holdings import SpyHoldingsSource
 from algotrade_ingestion.sources.synthetic.files import GoldenFiles
 from algotrade_ingestion.sources.synthetic.source import GoldenCsvSource
 from tests import cboe_fixture as fx
+from tests import universe_fixture
 from tests.conftest import GOLDEN_DIR
 
 type Adapter = tuple[Source, FetchRequest]
@@ -32,7 +35,22 @@ def golden() -> Adapter:
     return GoldenCsvSource(GoldenFiles(GOLDEN_DIR)), FetchRequest("bull_trend/BULL", "EQ:BULL")
 
 
-ADAPTERS: dict[str, Callable[[], Adapter]] = {"cboe": cboe, "golden": golden}
+def nasdaq_trader() -> Adapter:
+    payload = universe_fixture.nasdaq([("AAPL", "Apple Inc. - Common Stock", "N", "N")])
+    return NasdaqTraderSource(lambda url: payload, lambda s: None), FetchRequest("nasdaqlisted")
+
+
+def spy_holdings() -> Adapter:
+    payload = universe_fixture.spy(["AAPL"])
+    return SpyHoldingsSource(lambda url: payload, lambda s: None), FetchRequest("SPY")
+
+
+ADAPTERS: dict[str, Callable[[], Adapter]] = {
+    "cboe": cboe,
+    "golden": golden,
+    "nasdaq_trader": nasdaq_trader,
+    "spy_holdings": spy_holdings,
+}
 
 
 @pytest.fixture(params=sorted(ADAPTERS))
@@ -51,7 +69,7 @@ def test_normalized_tables_satisfy_storage_schemas(adapter: Adapter) -> None:
     payload = source.fetch(request)
     assert payload is not None
     normalized = source.normalize(request, payload)
-    assert normalized is not None and normalized.tables
+    assert normalized is not None and (normalized.tables or normalized.parsed)
     for table, frame in normalized.tables.items():
         assert not any(c in frame.columns for c in COMMON), "jobs add point-in-time columns"
         session = normalized.session_date or fx.SESSION
