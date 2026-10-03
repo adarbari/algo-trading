@@ -49,10 +49,11 @@ Two physical parts, always read together:
 - **Not in L1:** option and futures *contracts*. There are 1M+ option series; their terms
   (underlying, expiry, strike, right, standard/adjusted) live in the OSI symbol and on each
   chain row in L2. Futures get `instruments/futures_contracts` when they arrive (phase 6).
-- **Stable id.** `instrument_id` is `EQ:<ticker>` today (interim). Phase 1 switches to an id
-  that survives renames and ticker reuse (FB → META): the FIGI from reference data, plus
-  `instruments/symbol_history` mapping ticker → id over time. Every table is already keyed by
-  `instrument_id`, so this is a mapping change, not a schema change.
+- **Stable id** ([ADR 0018](../adr/0018-figi-instrument-ids.md)). `instrument_id` is
+  `EQ:<composite FIGI>` when the FIGI is known (it survives renames and ticker reuse:
+  FB → META), else `EQ:<ticker>`. `instruments/symbol_history` maps ticker → id over time and
+  `instruments/id_map` records symbol-id → FIGI-id upgrades. Tickers become ids only through
+  `SymbolResolver` (`StoreReader.resolver(session)`).
 - **InstrumentView** (`StoreReader.instrument_view(session, fields)`) returns reference facts
   (latest snapshot on or before the session) joined with rollups **for** the session, one row
   per instrument, columns named by field. A rollup with no data for the session is listed in
@@ -71,7 +72,7 @@ Two physical parts, always read together:
 
 | Column | Type | Notes |
 |---|---|---|
-| `instrument_id` | str | `EQ:AAPL` |
+| `instrument_id` | str | `EQ:BBG000B9XRY4` (`EQ:AAPL` without a FIGI) |
 | `ts` | timestamp UTC | bar start |
 | `session_date` | date | exchange trading day |
 | `open`, `high`, `low`, `close` | float64 | **unadjusted**; sanity-checked on write (positive, high ≥ open/close ≥ low) |

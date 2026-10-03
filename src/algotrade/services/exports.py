@@ -11,7 +11,6 @@ from pathlib import Path
 from algotrade.config.resolve import ResolvedConfig
 from algotrade.config.user import SITE_USER
 from algotrade.core.feature_view import FeatureValue
-from algotrade.core.instruments import symbol_of
 from algotrade.services.screening import ScreenOutcome
 from algotrade.services.views import to_value
 from algotrade.strategies.screeners.base import Decision
@@ -104,7 +103,7 @@ def legacy_rows(outcome: ScreenOutcome) -> list[dict[str, str]]:
     rows = []
     for r in outcome.run.rows:
         u = meta.loc[r.instrument_id]
-        row = {"ticker": symbol_of(r.instrument_id)}
+        row = {"ticker": str(u["symbol"])}  # ids may be FIGI-based (ADR 0018)
         row.update(
             {
                 k: "" if k not in u or u[k] is None else _text(to_value(u[k]))

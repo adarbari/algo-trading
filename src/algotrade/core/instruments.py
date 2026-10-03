@@ -1,9 +1,11 @@
-"""Instrument identifiers.
+"""Instrument identifiers (ADR 0009, ADR 0018).
 
-Interim scheme until the reference store (ADR 0009) assigns ids: ``<CLASS>:<SYMBOL>``,
-for example ``EQ:SPY`` or ``OPT:SPY261231C00586000``. Every stored row is keyed by these
-ids, never by a raw ticker string, so switching to reference-store ids later is a mapping
-change rather than a schema change.
+- Equities and ETFs: ``EQ:<composite FIGI>`` (``EQ:BBG000B9XRY4``) when the FIGI is known,
+  else the symbol id ``EQ:<SYMBOL>``. A FIGI id never changes, whatever the ticker does.
+- Options: ``OPT:<OCC symbol>`` (``OPT:SPY261231C00586000``).
+
+Every stored row is keyed by these ids, never by a raw ticker. Code that has a vendor ticker
+resolves it through ``storage.resolver.SymbolResolver``; only ``equity_id`` builds ``EQ:`` ids.
 """
 
 from collections.abc import Iterable
@@ -25,11 +27,24 @@ def instrument_id(asset_class: AssetClass, symbol: str) -> str:
     return f"{asset_class.value}:{cleaned}"
 
 
-def symbol_of(instrument: str) -> str:
-    _, sep, symbol = instrument.partition(":")
-    if not sep or not symbol:
+def equity_id(symbol: str, figi: str | None = None) -> str:
+    """The id rule for equities and ETFs: FIGI-based when a composite FIGI is known."""
+    has_figi = figi is not None and bool(str(figi).strip())
+    return instrument_id(AssetClass.EQUITY, str(figi) if has_figi else symbol)
+
+
+def is_figi_id(instrument: str, figi: str | None) -> bool:
+    """True when ``instrument`` is the FIGI-based id for ``figi``."""
+    return figi is not None and bool(str(figi).strip()) and instrument == equity_id("", figi)
+
+
+def key_of(instrument: str) -> str:
+    """The part after the class prefix: a symbol, a FIGI or an OCC symbol (never display it
+    as a ticker; read ``symbol`` from the reference instead)."""
+    _, sep, key = instrument.partition(":")
+    if not sep or not key:
         raise ValueError(f"not an instrument id: {instrument!r}")
-    return symbol
+    return key
 
 
 @dataclass(frozen=True, slots=True)

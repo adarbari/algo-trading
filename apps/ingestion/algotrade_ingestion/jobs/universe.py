@@ -4,6 +4,8 @@ Accepts the files produced by the existing monthly refresh process
 (``optionable_us_stock_universe.csv``, ``optionable_us_etf_universe.csv``). Only ``ticker``
 is required; missing optional columns get conservative defaults. Every row is kept;
 strategies choose their subset with selections (``config/site/presets/selections``).
+Tickers resolve through the reference as of the snapshot (ADR 0018): known instruments keep
+their (FIGI) ids, new ones get symbol ids.
 """
 
 import csv
@@ -14,7 +16,9 @@ from pathlib import Path
 import pandas as pd
 
 from algotrade.core.errors import DataValidationError
-from algotrade.core.instruments import AssetClass, instrument_id
+from algotrade.core.instruments import AssetClass
+from algotrade.storage.readers import StoreReader
+from algotrade.storage.resolver import SymbolResolver
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.common import stamp
@@ -44,7 +48,9 @@ class UniverseFile:
     asset_class: str  # "STOCK" or "ETF", as in the original combine step
 
 
-def read_rows(spec: UniverseFile, version: str) -> list[dict[str, object]]:
+def read_rows(
+    spec: UniverseFile, version: str, resolver: SymbolResolver
+) -> list[dict[str, object]]:
     with spec.path.open(newline="") as fh:
         reader = csv.DictReader(fh)
         if reader.fieldnames is None or "ticker" not in reader.fieldnames:
@@ -57,7 +63,7 @@ def read_rows(spec: UniverseFile, version: str) -> list[dict[str, object]]:
             row: dict[str, object] = {k: (raw.get(k) or "").strip() for k in OPTIONAL}
             default_type = "ETF" if spec.asset_class == "ETF" else "COMMON_STOCK"
             row.update(
-                instrument_id=instrument_id(AssetClass.EQUITY, ticker),
+                instrument_id=resolver.id_for(ticker),
                 symbol=ticker,
                 asset_class=spec.asset_class,
                 security_type=(str(row["security_type"]) or default_type).upper(),
@@ -106,9 +112,15 @@ def reference_frame(universe: pd.DataFrame) -> pd.DataFrame:
 
 
 def import_universe(
-    writer: StoreWriter, files: list[UniverseFile], version: str, snapshot: date, now: datetime
+    writer: StoreWriter,
+    reader: StoreReader,
+    files: list[UniverseFile],
+    version: str,
+    snapshot: date,
+    now: datetime,
 ) -> RunRecord:
-    rows = [r for spec in files for r in read_rows(spec, version)]
+    resolver = reader.resolver(snapshot)
+    rows = [r for spec in files for r in read_rows(spec, version, resolver)]
     frame = pd.DataFrame(rows)
     before = len(frame)
     frame = frame.drop_duplicates(subset="instrument_id", keep="first").reset_index(drop=True)

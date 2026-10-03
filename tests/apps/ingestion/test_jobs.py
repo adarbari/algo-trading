@@ -18,6 +18,7 @@ from algotrade_ingestion.jobs.universe import UniverseFile, import_universe
 from algotrade_ingestion.sources.cboe import URL, CboeOptionsSource
 from algotrade_ingestion.sources.http import HttpError, RetryPolicy
 from tests import cboe_fixture as fx
+from tests.storage_helpers import write_reference
 
 DAY = fx.SESSION
 CLOCK = lambda: datetime(2026, 10, 2, 22, 0, tzinfo=UTC)  # noqa: E731
@@ -142,8 +143,10 @@ def test_universe_import(tmp_path: Path) -> None:
     etfs = tmp_path / "etfs.csv"
     etfs.write_text("ticker,notes\nTQQQ,leveraged\n")
     backend = MemoryBackend()
+    write_reference(StoreWriter(backend), DAY, {"AAPL": "EQ:BBG000B9XRY4"})
     record = import_universe(
         StoreWriter(backend),
+        StoreReader(backend),
         [UniverseFile(stocks, "STOCK"), UniverseFile(etfs, "ETF")],
         "2026-10",
         DAY,
@@ -156,6 +159,8 @@ def test_universe_import(tmp_path: Path) -> None:
     frame = StoreReader(backend).table("universe", DAY)
     assert frame is not None
     assert set(frame["universe_version"]) == {"2026-10"}
+    ids = dict(zip(frame["symbol"], frame["instrument_id"], strict=True))
+    assert (ids["AAPL"], ids["QURE"]) == ("EQ:BBG000B9XRY4", "EQ:QURE")  # known keeps its id
 
 
 def test_universe_import_requires_ticker(tmp_path: Path) -> None:
@@ -166,6 +171,12 @@ def test_universe_import_requires_ticker(tmp_path: Path) -> None:
     bad = tmp_path / "bad.csv"
     bad.write_text("symbol\nAAPL\n")
     with pytest.raises(DataValidationError, match="ticker"):
+        backend = MemoryBackend()
         import_universe(
-            StoreWriter(MemoryBackend()), [UniverseFile(bad, "STOCK")], "v", DAY, CLOCK()
+            StoreWriter(backend),
+            StoreReader(backend),
+            [UniverseFile(bad, "STOCK")],
+            "v",
+            DAY,
+            CLOCK(),
         )

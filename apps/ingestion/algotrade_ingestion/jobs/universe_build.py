@@ -7,6 +7,7 @@ Writes, for the session:
 - ``universe``: the **coverage** defined by ``config/site/universe.toml`` (types, test
   issues, include / exclude lists). Strategies narrow it further with selections.
 - ``events/reference_change`` and ``events/index_change`` from the previous snapshot.
+- ``instruments/id_map`` when a symbol id becomes a FIGI id (ADR 0018, ``instrument_ids``).
 
 Leverage: ETFs whose names carry a leverage marker stay UNKNOWN unless curated in
 ``config/site/overrides/leveraged_etfs.csv``; ``review_rows`` lists them for curation.
@@ -20,7 +21,7 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.core.instruments import AssetClass, instrument_id
+from algotrade.core.instruments import AssetClass
 from algotrade.storage.readers import StoreReader
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
 from algotrade.storage.writers import StoreWriter
@@ -30,6 +31,13 @@ from algotrade_ingestion.jobs.classify import (
     security_type,
 )
 from algotrade_ingestion.jobs.common import stamp
+from algotrade_ingestion.jobs.instrument_ids import (
+    ID_MAP,
+    Assigned,
+    assign_ids,
+    cumulative_map,
+    rename_ids,
+)
 from algotrade_ingestion.jobs.reference_diff import diff_reference
 from algotrade_ingestion.jobs.symbol_history import update_history
 from algotrade_ingestion.sources.base import FetchRequest, Source
@@ -93,11 +101,13 @@ def build_reference(
     previous: pd.DataFrame | None,
     session: date,
     tickers: pd.DataFrame | None = None,
-) -> tuple[pd.DataFrame, int]:
-    """Every listing (+ carried-forward delistings); -> (reference, vendor-type disagreements)."""
+    id_basis: pd.DataFrame | None = None,
+) -> tuple[pd.DataFrame, int, Assigned]:
+    """Every listing (+ carried-forward delistings); -> (reference, vendor-type
+    disagreements, id assignment). Ids build on ``previous``, else on ``id_basis`` (an
+    earlier run for the same session)."""
     listings = listings.drop_duplicates("symbol", keep="first").reset_index(drop=True)
     ref = listings.assign(
-        instrument_id=[instrument_id(AssetClass.EQUITY, s) for s in listings["symbol"]],
         asset_class=AssetClass.EQUITY.value,
         currency="USD",
         multiplier=1.0,
@@ -115,6 +125,8 @@ def build_reference(
         delisted_on=None,
     )
     ref, disagreements = apply_identifiers(ref, tickers)
+    assigned = assign_ids(ref, previous if previous is not None else id_basis, session)
+    ref, previous = assigned.reference, rename_ids(previous, assigned.upgrades)
     ref["is_etf"] = ref["is_etf"] | ref["security_type"].eq("ETF")
     ref = pd.concat(
         [ref, leverage_flags(ref, settings.overrides, settings.leverage_markers)], axis=1
@@ -132,7 +144,7 @@ def build_reference(
             gone["status"], gone["in_sp500"] = "DELISTED", False
             keep = [c for c in ref.columns if c in gone.columns]
             ref = pd.concat([ref, gone[keep]], ignore_index=True)
-    return ref.sort_values("instrument_id").reset_index(drop=True), disagreements
+    return ref.sort_values("instrument_id").reset_index(drop=True), disagreements, assigned
 
 
 def apply_identifiers(
@@ -183,6 +195,13 @@ def review_rows(reference: pd.DataFrame) -> list[dict[str, str]]:
     return rows
 
 
+def _before(reader: StoreReader, table: str, session: date) -> pd.DataFrame | None:
+    """The latest snapshot of ``table`` strictly before ``session``, so a re-run of a session
+    builds on the same history as its first run."""
+    days = [d for d in reader.dates(table) if d < session]
+    return reader.table(table, days[-1]) if days else None
+
+
 def build_universe(
     writer: StoreWriter,
     reader: StoreReader,
@@ -200,14 +219,9 @@ def build_universe(
     if sources.tickers is not None:
         parsed.update(_fetch(sources.tickers, "active", writer, session, run_id))
     listings = pd.concat([parsed["nasdaqlisted"], parsed["otherlisted"]], ignore_index=True)
-    previous_date = reader.latest_date(REFERENCE, on_or_before=session)
-    previous = (
-        reader.table(REFERENCE, previous_date)
-        if previous_date and previous_date < session
-        else None
-    )
+    previous = _before(reader, REFERENCE, session)
     sp500 = set(parsed["sp500"]["symbol"])
-    reference, disagreements = build_reference(
+    reference, disagreements, assigned = build_reference(
         listings,
         set(parsed["options"]["symbol"]),
         sp500,
@@ -215,12 +229,10 @@ def build_universe(
         previous,
         session,
         parsed.get("tickers"),
+        reader.table(REFERENCE, session) if previous is None else None,
     )
-    history_date = reader.latest_date(HISTORY, on_or_before=session)
-    old_history = None
-    if history_date is not None and history_date < session:
-        old_history = reader.table(HISTORY, history_date)
-    history, ticker_changes = update_history(old_history, reference, session)
+    history, ticker_changes = update_history(_before(reader, HISTORY, session), reference, session)
+    id_map = cumulative_map(_before(reader, ID_MAP, session), assigned.upgrades, now)
     covered = reference[coverage(reference, settings)]
     universe = pd.DataFrame(
         {
@@ -238,15 +250,21 @@ def build_universe(
             "notes": "",
         }
     )
-    changes, index = diff_reference(previous, reference, session)
-    if ticker_changes:
-        extra = pd.DataFrame(ticker_changes).assign(ts=pd.Timestamp(session, tz="UTC"))
-        changes = pd.concat([changes, extra], ignore_index=True)
+    changes, index = diff_reference(rename_ids(previous, assigned.upgrades), reference, session)
+    extra = ticker_changes + [
+        {"instrument_id": u.new_id, "symbol": u.symbol, "change": "id_changed",
+         "old": u.old_id, "new": u.new_id}
+        for u in assigned.upgrades.itertuples()
+    ]  # fmt: skip
+    if extra:
+        rows = pd.DataFrame(extra).assign(ts=pd.Timestamp(session, tz="UTC"))
+        changes = pd.concat([changes, rows], ignore_index=True)
     source = sources.nasdaq_trader.name
     writer.write_table(REFERENCE, session, run_id, stamp(reference, session, now, source, run_id))
     writer.write_table("universe", session, run_id, stamp(universe, session, now, source, run_id))
-    if not history.empty:
-        writer.write_table(HISTORY, session, run_id, stamp(history, session, now, source, run_id))
+    for table, frame in ((HISTORY, history), (ID_MAP, id_map)):
+        if not frame.empty:
+            writer.write_table(table, session, run_id, stamp(frame, session, now, source, run_id))
     for table, frame in (("events/reference_change", changes), ("events/index_change", index)):
         if not frame.empty:
             writer.write_table(table, session, run_id, stamp(frame, session, now, source, run_id))
@@ -264,6 +282,7 @@ def build_universe(
         "leverage": reference["leverage_source"].value_counts().to_dict(),
         "identifiers": {
             "with_figi": int(reference["figi"].notna().sum()),
+            **assigned.stats,
             "vendor_type_disagreements": disagreements,
             "security_type_source": reference.loc[
                 reference["status"].eq("ACTIVE"), "security_type_source"

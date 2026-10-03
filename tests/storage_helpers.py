@@ -1,8 +1,11 @@
 """Builders for stamped frames used across storage, service and app tests."""
 
+from collections.abc import Mapping
 from datetime import UTC, date, datetime
 
 import pandas as pd
+
+from algotrade.storage.writers import StoreWriter
 
 T0 = datetime(2026, 10, 2, 22, 0, tzinfo=UTC)
 
@@ -56,3 +59,21 @@ def reference_rows(universe: list[dict[str, object]]) -> list[dict[str, object]]
         }
         for u in universe
     ]
+
+
+def write_reference(
+    writer: StoreWriter, session: date, ids: Mapping[str, str], run_id: str = "ref"
+) -> None:
+    """An ``instruments/reference`` snapshot mapping symbol -> id (all active equities)."""
+    rows = [
+        {
+            "instrument_id": iid,
+            "symbol": symbol,
+            "asset_class": "EQ",
+            "security_type": "COMMON_STOCK",
+            "multiplier": 1.0,
+            "status": "ACTIVE",
+        }
+        for symbol, iid in ids.items()
+    ]
+    writer.write_table("instruments/reference", session, run_id, stamped(rows, session, run_id))

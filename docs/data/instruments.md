@@ -96,5 +96,44 @@ and drop out of the default coverage.
 
 `instruments/symbol_history` tracks which symbol each FIGI used and when; a FIGI that comes
 back under a new symbol closes the old row and emits `events/reference_change` with
-`change = ticker_changed` (e.g. FB -> META). `instrument_id` is still `EQ:<symbol>`; switching
-to FIGI-based ids is the remaining step, and this table is its mapping.
+`change = ticker_changed` (e.g. FB -> META).
+
+
+## FIGI-based instrument ids (implemented, phase 1.8)
+
+Decision record: [ADR 0018](../adr/0018-figi-instrument-ids.md).
+
+| Instrument | `instrument_id` | Example |
+|---|---|---|
+| Equity / ETF with a composite FIGI | `EQ:<composite FIGI>` | `EQ:BBG000B9XRY4` (AAPL) |
+| Equity / ETF without one (no Massive key, unknown to Massive, golden data) | `EQ:<symbol>` | `EQ:BULL` |
+| Option contract | `OPT:<OCC symbol>`; `underlying_id` = the underlying's id | `OPT:SPY261231C00586000` |
+
+- **Stable.** A FIGI id never changes. A ticker change only updates `symbol` in the
+  reference (and emits `ticker_changed`). A build that finds no FIGI for a symbol whose id was
+  FIGI-based carries the id and FIGI forward (`ids_carried`).
+- **Upgrades.** When a symbol-id instrument gains a FIGI, the universe build writes
+  `instruments/id_map` (`old_id`, `new_id`, `symbol`, `effective`, `known_at`; the full map in
+  every snapshot) and an `id_changed` reference-change event; the old id is not reported as
+  delisted. Build stats: `identifiers.ids_by_figi`, `ids_by_symbol`, `ids_carried`,
+  `ids_upgraded`, `figi_conflicts` (two listings with one FIGI: the holder keeps it).
+- **One resolver.** `SymbolResolver` maps symbol → id from the reference snapshot on or before
+  a date (`StoreReader.resolver(D)`; before the first snapshot, the earliest one). Active rows
+  win a reused ticker. Vendor adapters (Massive bars/splits/dividends, Nasdaq earnings) emit
+  `symbol`; jobs resolve ids and count `unresolved` symbols, which keep symbol ids. CLI flags
+  (`chains --symbols`), `universe.toml` include/exclude lists and exports stay symbol-based.
+- **Migrating stored data.** `algotrade-ingest migrate-ids [--dry-run]` reads the latest
+  `instruments/id_map` and rewrites every partition whose latest run holds a mapped id
+  (`instrument_id`, `underlying_id`, `parent_id`) as a **new run** with a later
+  `knowledge_ts`. Old runs stay readable with `as_of`. Only rows known before the upgrade
+  (`known_at`) move, so a symbol id reused later is left alone. A partition that would hold
+  both ids is reported, not written. Re-running maps nothing.
+
+Owner steps on an existing store (after the bars backfill finishes):
+
+```bash
+algotrade-ingest universe-build            # with ALGOTRADE_MASSIVE_API_KEY set: writes id_map
+algotrade-ingest migrate-ids --dry-run     # per-table partition / row counts, writes nothing
+algotrade-ingest migrate-ids               # appends the rewritten partitions as new runs
+algotrade-ingest migrate-ids --dry-run     # should now report no tables
+```

@@ -25,6 +25,9 @@ without writing an ADR. Read in this order:
 - **Backtests only read stores.** They never fetch; missing data is an error. (ADR 0008)
 - **Generic instruments** keyed by `instrument_id` with `multiplier`, `parent_id` and
   `calendar`, so futures and options fit without redesign. (ADR 0009)
+- **FIGI ids**: equities/ETFs are `EQ:<composite FIGI>` (symbol id without one). Turn a
+  ticker into an id only through `SymbolResolver` (`StoreReader.resolver(date)`); never
+  build `EQ:` strings. (ADR 0018)
 - **Long-running work is a job** via `services/jobs` (backtests, screens, nightly; the UI and
   on-request pulls later). (ADR 0010)
 - **Configs, selections, users**: the universe is coverage; each strategy/screener picks a
@@ -76,6 +79,6 @@ without writing an ADR. Read in this order:
 | A decision that changes architecture | `.claude/skills/write-adr` |
 
 Commands (need `uv`): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make evaluate`, `make baseline`.
-Ingestion: `algotrade-ingest universe|universe-build|company-details|earnings|bars|corporate-actions|chains|features|screen|nightly|quality|schedule|purge-raw|golden` (see `README.md`).
+Ingestion: `algotrade-ingest universe|universe-build|company-details|earnings|bars|corporate-actions|chains|features|screen|nightly|quality|schedule|purge-raw|migrate-ids|golden` (see `README.md`).
 Configs: site presets in `config/site/` (reviewed via PR); user configs in `config/users/<id>/`
 (git-ignored). Check one with `algotrade-backtest [--user U] config validate|show <id>`.

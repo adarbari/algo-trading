@@ -66,6 +66,12 @@ SYMBOL_HISTORY = TableSpec(
     "reference",
     ("instrument_id", "ts", "figi", "symbol", "valid_from"),
 )
+# L1: symbol id -> FIGI id upgrades (ADR 0018); cumulative, one full map per snapshot date.
+ID_MAP = TableSpec(
+    "instruments/id_map",
+    "reference",
+    ("instrument_id", "ts", "old_id", "new_id", "symbol", "effective", "known_at"),
+)
 # L1: company details from SEC EDGAR, per instrument (one full snapshot per date).
 INSTRUMENT_COMPANY = TableSpec(
     "instruments/company",
@@ -85,6 +91,7 @@ KNOWN: dict[str, TableSpec] = {
         CHAIN_STATUS,
         INSTRUMENT_REFERENCE,
         SYMBOL_HISTORY,
+        ID_MAP,
         INSTRUMENT_COMPANY,
     )
 }

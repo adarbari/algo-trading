@@ -8,7 +8,8 @@
 The API key travels in an ``Authorization`` header (set on the transport), never in URLs, so it
 cannot leak into logs or the raw store. Free tier: 5 requests/minute, so every request waits on
 a ``MinInterval`` (default 12.5 s). Bars are stored **unadjusted**; corporate actions are applied
-at read time (ADR 0016).
+at read time (ADR 0016). Rows carry the vendor ``symbol`` (ACT style); the jobs resolve
+``instrument_id`` through the reference (ADR 0018).
 """
 
 import json
@@ -19,7 +20,6 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from algotrade.core.instruments import AssetClass, instrument_id
 from algotrade.storage.schemas import BAR_COLUMNS
 from algotrade_ingestion.sources.base import FetchRequest, Normalized
 from algotrade_ingestion.sources.http import (
@@ -53,16 +53,15 @@ def _ts(value: str) -> pd.Timestamp:
 
 
 def parse_grouped(day: date, payload: bytes) -> tuple[pd.DataFrame, int]:
-    """-> (``bars/1d`` rows for the session, invalid rows dropped). Empty on holidays."""
+    """-> (``bars/1d`` rows keyed by ``symbol``, invalid rows dropped). Empty on holidays."""
     results = json.loads(payload).get("results") or []
     frame = pd.DataFrame(results, columns=["T", "o", "h", "l", "c", "v", "vw", "t", "n"])
+    columns = ["symbol", *BAR_COLUMNS[1:], "vwap", "trades"]
     if frame.empty:
-        return pd.DataFrame(columns=[*BAR_COLUMNS, "vwap", "trades"]), 0
+        return pd.DataFrame(columns=columns), 0
     bars = pd.DataFrame(
         {
-            "instrument_id": [
-                instrument_id(AssetClass.EQUITY, act_symbol(str(t))) for t in frame["T"]
-            ],
+            "symbol": [act_symbol(str(t)) for t in frame["T"]],
             "ts": pd.to_datetime(frame["t"], unit="ms", utc=True),
             "open": frame["o"],
             "high": frame["h"],
@@ -84,14 +83,13 @@ def parse_grouped(day: date, payload: bytes) -> tuple[pd.DataFrame, int]:
         & (h >= np.maximum(o, c))
         & (low <= np.minimum(o, c))
     )
-    bars = bars[valid].drop_duplicates("instrument_id", keep="last")
-    return bars.sort_values("instrument_id").reset_index(drop=True), int((~valid).sum())
+    bars = bars[valid].drop_duplicates("symbol", keep="last")
+    return bars.sort_values("symbol").reset_index(drop=True), int((~valid).sum())
 
 
 def parse_splits(results: list[dict[str, Any]]) -> pd.DataFrame:
     rows = [
         {
-            "instrument_id": instrument_id(AssetClass.EQUITY, act_symbol(str(r["ticker"]))),
             "ts": _ts(r["execution_date"]),
             "symbol": act_symbol(str(r["ticker"])),
             "split_from": float(r["split_from"]),
@@ -104,22 +102,13 @@ def parse_splits(results: list[dict[str, Any]]) -> pd.DataFrame:
     ]
     return pd.DataFrame(
         rows,
-        columns=[
-            "instrument_id",
-            "ts",
-            "symbol",
-            "split_from",
-            "split_to",
-            "ratio",
-            "adjustment_type",
-        ],
-    ).drop_duplicates(["instrument_id", "ts"])
+        columns=["ts", "symbol", "split_from", "split_to", "ratio", "adjustment_type"],
+    ).drop_duplicates(["symbol", "ts"])
 
 
 def parse_dividends(results: list[dict[str, Any]]) -> pd.DataFrame:
     rows = [
         {
-            "instrument_id": instrument_id(AssetClass.EQUITY, act_symbol(str(r["ticker"]))),
             "ts": _ts(r["ex_dividend_date"]),
             "symbol": act_symbol(str(r["ticker"])),
             "cash_amount": float(r["cash_amount"]),
@@ -134,9 +123,8 @@ def parse_dividends(results: list[dict[str, Any]]) -> pd.DataFrame:
         if r.get("ticker") and r.get("ex_dividend_date") and r.get("cash_amount")
     ]
     columns = [
-        "instrument_id",
-        "ts",
         "symbol",
+        "ts",
         "cash_amount",
         "currency",
         "pay_date",
@@ -150,7 +138,7 @@ def parse_dividends(results: list[dict[str, Any]]) -> pd.DataFrame:
     if frame.empty:
         return frame
     return (
-        frame.groupby(["instrument_id", "ts"], as_index=False).agg(
+        frame.groupby(["symbol", "ts"], as_index=False).agg(
             {**dict.fromkeys(columns[2:], "first"), "cash_amount": "sum"}
         )
     )[columns]

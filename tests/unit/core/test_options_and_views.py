@@ -3,7 +3,7 @@ from datetime import date
 import pytest
 
 from algotrade.core.feature_view import FeatureView
-from algotrade.core.instruments import AssetClass, instrument_id, symbol_of
+from algotrade.core.instruments import AssetClass, equity_id, instrument_id, is_figi_id, key_of
 from algotrade.core.options import (
     OptionRight,
     is_standard_root,
@@ -45,11 +45,20 @@ def test_monthly_falls_back_to_thursday_on_holiday() -> None:
 
 def test_instrument_ids() -> None:
     assert instrument_id(AssetClass.EQUITY, " spy ") == "EQ:SPY"
-    assert symbol_of("OPT:SPY261231C00586000") == "SPY261231C00586000"
+    assert key_of("OPT:SPY261231C00586000") == "SPY261231C00586000"
     with pytest.raises(ValueError, match="empty"):
         instrument_id(AssetClass.EQUITY, " ")
     with pytest.raises(ValueError, match="not an instrument"):
-        symbol_of("SPY")
+        key_of("SPY")
+
+
+def test_equity_ids_prefer_the_figi() -> None:
+    assert equity_id("aapl", "BBG000B9XRY4") == "EQ:BBG000B9XRY4"
+    assert equity_id("aapl") == "EQ:AAPL"
+    assert equity_id("AAPL", " ") == "EQ:AAPL"
+    assert is_figi_id("EQ:BBG000B9XRY4", "BBG000B9XRY4")
+    assert not is_figi_id("EQ:AAPL", "BBG000B9XRY4")
+    assert not is_figi_id("EQ:AAPL", None)
 
 
 def test_feature_view_is_read_only_and_sorted() -> None:
