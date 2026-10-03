@@ -153,7 +153,9 @@ algotrade-backtest --user U backtest --config sma_trend --start S --end E
 Results land in `results/backtest_equity` (instrument `PORTFOLIO`) and
 `results/backtest_fills`, and the run record holds the metrics, the selection audit, the config
 hash and the exact `bars` / reference runs read. Survivorship rule: the selection is evaluated as of the backtest's start date
-(re-evaluation at a `rebalance_selection` interval is planned, phase 2b), never with
+(or, with `[backtest] rebalance_selection`, on every rebalance session, point in time, the set
+taking effect `selection_lag_sessions` bars later; see configuration.md "Rebalancing
+selections"), never with
 today's universe.
 
 ### Critical path: a configured screen
@@ -296,7 +298,7 @@ Extra contracts:
 | `strategies/` → `screeners/` | Screener contract, shared `Decision` categories, `short_premium_liquidity`. | core, quant |
 | `features/` | Rollups (2b.2): `framework/` (the `Rollup` declaration: inputs + lookback, params from `rollups.toml`, typed columns; inputs loaded through `data`; the per-session runner, point in time, chunked backfills), `rollups/` (pure definitions: `option_liquidity`, `price_stats`, `earnings` @v1; only core, quant, numpy, pandas), `registry.py` (the selection catalogue and the `rollups` task are built from it). | data (framework only), config.site, quant, core |
 | `analytics/` | Metrics and report formatting from equity curves + fills. | core |
-| `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. `selection/`: three-valued evaluation with a per-rule audit. | strategies, config, analytics, core |
+| `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. `selection/`: three-valued evaluation with a per-rule audit; `schedule.py`, the rebalance sessions and the audit of each change. `backtest/universe.py`: the tradable set per bar (fixed, or from a rebalance schedule; exits on removal). | strategies, config, analytics, core |
 | `services/` | Use cases: `backtests/`, `screening/` (run + `exports`), `jobs/`, `evaluation/`; shared by several: `configs`, `selection`, golden `datasets`, `views` (FeatureView builder). | everything below except `storage.tables.writers` and `storage.tables.readers` (through `data/`) |
 | `apps/ingestion` | `sources/` (`framework/`: protocols, HTTP with retries, pacing, the source registry; `vendors/<vendor>/`; `fixtures/`: synthetic/golden); `tasks/` (`framework/`: `IngestRun` in `run.py` and the task registry; one module per dataset in `reference/`, `market/`, `derived/`, `maintenance/`); nightly workflow (`workflows/nightly/`: ordered, isolated registry tasks, catch-up, screens as jobs, notification); `cli/` (`algotrade-ingest`); `ops/` (schedule). | library |
 | `apps/backtest` | `algotrade-backtest` (`algotrade` alias): datasets list, backtest (golden dataset or config, via jobs), evaluate, config validate/show. Reads only through `data/`. | library |

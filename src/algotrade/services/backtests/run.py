@@ -16,7 +16,10 @@ from algotrade.engines.backtest.costs import CostModel
 from algotrade.engines.backtest.engine import run_backtest
 from algotrade.engines.backtest.limits import RiskLimits
 from algotrade.engines.backtest.result import BacktestResult
+from algotrade.engines.backtest.universe import Schedule
 from algotrade.engines.selection.evaluate import SelectionResult
+from algotrade.engines.selection.schedule import Rebalance, turnover
+from algotrade.services.backtests.rebalance import load_rebalanced
 from algotrade.services.selection import select
 from algotrade.storage.runs import start_run
 from algotrade.storage.tables.result_writer import ResultWriter
@@ -54,17 +57,30 @@ class BacktestOutcome:
     versions: dict[str, list[str]]
     as_of: datetime  # data version pin: stored data as known at launch (ADR 0007)
     reference_snapshot: date  # the instruments/reference snapshot used for ``start``
-    survivorship_bias: bool  # ``start`` is before the first reference snapshot
+    survivorship_bias: bool  # ``start`` (or any rebalance session) is before the first snapshot
     run_id: str | None = None  # set when results were saved
+    rebalances: tuple[Rebalance, ...] = ()  # every selection evaluation (rebalance_selection)
 
     def data_stats(self) -> dict[str, Any]:
         """What a run must record to be reproduced: the version pin and the data read."""
-        return {
+        stats: dict[str, Any] = {
             "as_of": self.as_of.isoformat(),
             "data_versions": self.versions,
             "reference_snapshot": self.reference_snapshot.isoformat(),
             "survivorship_bias": self.survivorship_bias,
         }
+        if self.rebalances:
+            bt = self.config.backtest
+            stats["rebalance"] = {
+                "frequency": bt.rebalance_selection,
+                "lag_sessions": bt.selection_lag_sessions,
+                "instruments_ever_selected": len(
+                    {i for r in self.rebalances for i in r.selection.instruments}
+                ),
+                "mean_turnover": turnover(self.rebalances),
+                "evaluations": [r.as_dict() for r in self.rebalances],
+            }
+        return stats
 
 
 def _result_frames(
@@ -109,6 +125,11 @@ def _result_frames(
     return out
 
 
+def _check_selected(config: ResolvedConfig, selected: SelectionResult, start: date) -> None:
+    if selected.empty:
+        raise ConfigurationError(f"{config.config.id}: selection matched no instruments on {start}")
+
+
 def run_configured_backtest(
     reader: StoreReader,
     config: ResolvedConfig,
@@ -119,6 +140,9 @@ def run_configured_backtest(
 ) -> BacktestOutcome:
     """Selection is evaluated on ``start`` (no survivorship from today's universe, unless
     ``start`` is before the first reference snapshot: then ``survivorship_bias`` is set).
+    With ``[backtest] rebalance_selection`` it is re-evaluated point in time on each rebalance
+    session and the tradable set changes (``services.backtests.rebalance``; the audit of every
+    evaluation is in ``data_stats()["rebalance"]``).
 
     Data is read as stored at launch: ``as_of = now`` pins the version (ADR 0007), so a
     rerun with the same ``now`` reads the same rows even after later ingestion runs.
@@ -132,15 +156,23 @@ def run_configured_backtest(
     if config.selection is None:
         raise ConfigurationError(f"{config.config.id}: a backtest needs a selection")
     now = now or datetime.now(UTC)
-    selected = select(reader, config.selection, start, as_of=now)
-    if selected.empty:
-        raise ConfigurationError(f"{config.config.id}: selection matched no instruments on {start}")
-    adjustment = config.backtest.price_adjustment
-    data = load_price_data(
-        reader, selected.instruments, start, end, as_of=now, adjustment=adjustment
-    )
+    bt = config.backtest
+    schedule: Schedule | None = None
+    history: tuple[Rebalance, ...] = ()
+    if bt.rebalance_selection == "none":
+        selected = select(reader, config.selection, start, as_of=now)
+        _check_selected(config, selected, start)
+        data = load_price_data(
+            reader, selected.instruments, start, end, as_of=now, adjustment=bt.price_adjustment
+        )
+    else:
+        rebalanced = load_rebalanced(reader, config.selection, start, end, bt, now)
+        history = rebalanced.rebalances
+        selected = history[0].selection
+        _check_selected(config, selected, start)
+        data, schedule = rebalanced.prices, rebalanced.schedule
     strategy = create_strategy(config.config.impl, **dict(config.config.params))
-    result = run_backtest(data.series, strategy, backtest_settings(config.backtest), data.terms)
+    result = run_backtest(data.series, strategy, backtest_settings(bt), data.terms, schedule)
     outcome = BacktestOutcome(
         config,
         selected,
@@ -148,7 +180,8 @@ def run_configured_backtest(
         data.versions,
         now,
         data.reference.snapshot_date,
-        data.reference.pre_snapshot,
+        data.reference.pre_snapshot or any(r.survivorship_bias for r in history),
+        rebalances=history,
     )
     if writer is None:
         return outcome

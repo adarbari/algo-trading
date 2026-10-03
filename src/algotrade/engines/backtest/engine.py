@@ -9,6 +9,9 @@ Timing model for bar ``t`` (see docs/adr/0002-fill-model.md):
 4. Risk limits are applied and orders are queued for the open of ``t+1``.
 
 Orders decided on the final bar never fill.
+
+With a ``schedule`` (``[backtest] rebalance_selection``) the tradable set changes over time;
+``engines.backtest.universe`` holds those rules. Without one, every series trades every bar.
 """
 
 from collections.abc import Mapping
@@ -27,6 +30,7 @@ from algotrade.engines.backtest.portfolio import Portfolio
 from algotrade.engines.backtest.result import BacktestResult
 from algotrade.engines.backtest.simulated import SimulatedBroker
 from algotrade.engines.backtest.sizing import targets_to_orders
+from algotrade.engines.backtest.universe import DynamicUniverse, Schedule, StaticUniverse
 from algotrade.strategies.trading.base import Strategy
 
 
@@ -45,11 +49,14 @@ def run_backtest(
     strategy: Strategy,
     config: BacktestConfig | None = None,
     instruments: Mapping[str, Instrument] | None = None,
+    schedule: Schedule | None = None,
 ) -> BacktestResult:
     """Run ``strategy`` over aligned ``data`` keyed by instrument id.
 
     ``instruments`` supplies contract terms (multipliers); instruments not listed are
-    treated as multiplier-1 equities.
+    treated as multiplier-1 equities. ``schedule``: (effective date, selected set) pairs, the
+    first in force from bar 0; ``data`` then shares one timeline with NaN for missing bars
+    (``core.views.series.panel``).
     """
     config = config or BacktestConfig()
     contract_multipliers = multipliers((instruments or {}).values())
@@ -58,6 +65,11 @@ def run_backtest(
         raise ConfigurationError(f"{n} bars is not enough for warmup of {strategy.warmup_bars}")
 
     timestamps = next(iter(data.values())).timestamps
+    universe: StaticUniverse | DynamicUniverse = (
+        StaticUniverse(data)
+        if schedule is None
+        else DynamicUniverse(data, schedule, strategy.warmup_bars)
+    )
     broker = SimulatedBroker(config.costs, config.lot_size, contract_multipliers)
     portfolio = Portfolio(config.initial_cash)
     equity = np.empty(n)
@@ -66,12 +78,13 @@ def run_backtest(
 
     for t in range(n):
         now = to_utc_datetime(timestamps[t])
-        opens = {s: float(series.open[t]) for s, series in data.items()}
-        closes = {s: float(series.close[t]) for s, series in data.items()}
+        opens = universe.opens(t)
+        closes = universe.closes(t)
+        universe.rebalance(t, portfolio.positions, broker, now)
 
         leverage_room = max(0.0, config.limits.max_gross_exposure - 1.0)
         buying_power = portfolio.cash + leverage_room * max(0.0, portfolio.equity(opens))
-        for fill in broker.execute_pending(opens, now, buying_power):
+        for fill in universe.execute(t, broker, now, buying_power):
             portfolio.apply_fill(fill)
             fills.append(fill)
 
@@ -80,7 +93,10 @@ def run_backtest(
 
         if t + 1 < strategy.warmup_bars or t == n - 1:
             continue
-        targets = strategy.on_bar(MarketView(data, t))
+        view = universe.view(t)
+        if not view:
+            continue
+        targets = strategy.on_bar(MarketView(view, t))
         if targets is None:
             continue
         limited = apply_limits(targets, config.limits)
@@ -94,7 +110,7 @@ def run_backtest(
             config.lot_size,
             contract_multipliers,
         )
-        broker.submit(orders)
+        universe.submit(broker, orders)
 
     return BacktestResult(
         strategy=strategy.name,

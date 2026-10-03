@@ -79,6 +79,9 @@ DEFAULT_LEVERAGE_EXCLUSIONS = (
 )
 UNIVERSE_SOURCES = ("nasdaq_trader", "csv_import")
 PRICE_ADJUSTMENTS = ("none", "splits", "total_return")
+# ``[backtest] rebalance_selection``: never, the first session of each month / ISO week, or
+# every N sessions (``"21d"``). Interpreted by ``engines.selection.schedule``.
+REBALANCE_SELECTION = re.compile(r"^(none|monthly|weekly|[1-9][0-9]*d)$")
 # Per-vendor keys beyond ``enabled`` / ``min_interval_s`` (sections are config keys; the
 # vendor code that reads them stays in apps/ingestion/sources).
 VENDOR_KEYS = ("enabled", "min_interval_s")
@@ -411,6 +414,16 @@ class LimitSettings:
     allow_short: bool = False
 
 
+def _rebalance(t: Table, default: str) -> str:
+    value = t.text("rebalance_selection", default)
+    if not REBALANCE_SELECTION.match(value):
+        raise ConfigurationError(
+            f"{t.where} rebalance_selection: expected none, monthly, weekly or '<N>d' "
+            f"(N sessions >= 1), got {value!r}"
+        )
+    return value
+
+
 @dataclass(frozen=True)
 class BacktestSettings:
     """``[backtest]``: simulated account, costs and risk limits; price adjustment on read."""
@@ -420,6 +433,8 @@ class BacktestSettings:
     lot_size: float = 1.0
     periods_per_year: int = 252
     price_adjustment: str = "splits"
+    rebalance_selection: str = "none"  # none | monthly | weekly | <N>d (sessions)
+    selection_lag_sessions: int = 1  # a selection evaluated on D takes effect D + lag
     costs: CostSettings = CostSettings()
     limits: LimitSettings = LimitSettings()
 
@@ -436,6 +451,8 @@ class BacktestSettings:
             lot_size=t.number("lot_size", d.lot_size, 0),
             periods_per_year=t.integer("periods_per_year", d.periods_per_year, 1),
             price_adjustment=t.choice("price_adjustment", d.price_adjustment, PRICE_ADJUSTMENTS),
+            rebalance_selection=_rebalance(t, d.rebalance_selection),
+            selection_lag_sessions=t.integer("selection_lag_sessions", d.selection_lag_sessions, 1),
             costs=CostSettings(
                 commission_bps=costs.number("commission_bps", c.commission_bps, 0),
                 min_commission=costs.number("min_commission", c.min_commission, 0),

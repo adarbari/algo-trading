@@ -28,5 +28,9 @@ them. Shared signal maths belongs in one helper: `make dupes` must pass.
 7. **Config:** add a site preset in `config/site/presets/strategies/<id>.toml` (`kind =
    "strategy"`, `impl`, `params`, a `selection` preset or inline selection; `schedule =
    "nightly"` if it should run every night). Never filter instruments inside the strategy
-   itself; that is the selection's job. Check it with `algotrade-backtest config validate <id>`.
+   itself; that is the selection's job. To re-evaluate the selection over time, set
+   `[backtest] rebalance_selection` (and `selection_lag_sessions`; configuration.md
+   "Rebalancing selections"): the set in `view.instruments` can then change between bars, so
+   size from `view.instruments` on each call and do not assume an instrument stays (one that
+   leaves is closed by the engine). Check it with `algotrade-backtest config validate <id>`.
 8. Run `make check`.

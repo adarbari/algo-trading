@@ -96,6 +96,25 @@ def test_run_defaults_are_typed_with_nested_paths() -> None:
         ScreeningSettings.parse({"max_universe_age_days": 1.5}, "cfg [screening]")
 
 
+def test_rebalance_selection_is_typed() -> None:
+    default = BacktestSettings()
+    assert (default.rebalance_selection, default.selection_lag_sessions) == ("none", 1)
+    for value in ("none", "monthly", "weekly", "21d", "1d"):
+        assert (
+            BacktestSettings.parse({"rebalance_selection": value}, "x").rebalance_selection == value
+        )
+    bt = BacktestSettings.parse({"selection_lag_sessions": 3}, "x")
+    assert bt.selection_lag_sessions == 3
+    for bad in ("daily", "0d", "d", "monthly ", "-2d"):
+        with pytest.raises(ConfigurationError, match=r"cfg \[backtest\] rebalance_selection"):
+            BacktestSettings.parse({"rebalance_selection": bad}, "cfg [backtest]")
+    with pytest.raises(ConfigurationError, match="rebalance_selection: expected a non-empty"):
+        BacktestSettings.parse({"rebalance_selection": 30}, "cfg [backtest]")
+    for lag in (0, 1.5, True):
+        with pytest.raises(ConfigurationError, match="selection_lag_sessions"):
+            BacktestSettings.parse({"selection_lag_sessions": lag}, "cfg [backtest]")
+
+
 @pytest.mark.parametrize(
     ("doc", "message"),
     [

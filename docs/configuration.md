@@ -88,8 +88,8 @@ Evaluation (`engines/selection/`) uses **three-valued logic**: a missing value i
 UNKNOWN propagates through `all`/`any`/`not`, and only TRUE selects. Missing data therefore
 excludes an instrument and is counted, never passed. The audit saved with every run has, per
 top-level rule, the counts passed / failed / unknown and the funnel remaining after each rule
-(for `all`). Selection is evaluated **as of the run's session** (a backtest's start date), so
-backtests never use today's universe.
+(for `all`). Selection is evaluated **as of the run's session** (a backtest's start date, and
+each rebalance session with `rebalance_selection`), so backtests never use today's universe.
 
 Example site preset (`config/site/presets/selections/liquid_optionable.toml`):
 
@@ -114,6 +114,52 @@ all = [ { field = "instrument.is_leveraged", op = "eq", value = false } ]
 
 `[backtest] price_adjustment` (`none` / `splits` / `total_return`, default `splits`) chooses
 how stored unadjusted bars are adjusted for corporate actions when a backtest reads them.
+
+### Rebalancing selections
+
+By default a backtest evaluates its selection once, on `start`, and trades that set throughout.
+`[backtest] rebalance_selection` re-evaluates it over time (opt-in; follow-up F7):
+
+```toml
+[backtest]
+rebalance_selection = "monthly"   # none (default) | monthly | weekly | "<N>d"
+selection_lag_sessions = 1        # default 1; an integer >= 1
+```
+
+| Value | Evaluated on |
+|---|---|
+| `none` | `start` only (the behaviour without rebalancing) |
+| `monthly` | `start`, then the first session of every later calendar month |
+| `weekly` | `start`, then the first session of every later ISO week |
+| `"<N>d"` | `start`, then every N-th **session** after it (`"21d"`: about monthly) |
+
+Rules (`engines/selection/schedule.py`, `services/backtests/rebalance.py`,
+`engines/backtest/universe.py`):
+
+- **Point in time.** Each evaluation is the ordinary selection (`services.selection.select`) on
+  that session: the reference snapshot for the session and rollups *for* the session, read as
+  of the launch. A rebalance session with no partition of a rollup the selection uses is an
+  error (`MissingDataError`), never an empty set that would close every position.
+- **Lag.** A set evaluated on session D trades from the bar `selection_lag_sessions` bars after
+  D (default: D+1), so a rollup computed after D's close never drives a trade on D. The set
+  evaluated on `start` trades from the first bar, as without rebalancing.
+- **Exits.** An instrument that leaves the set is closed at the **open** of the effective bar
+  (ADR 0002: decisions fill at the next open); open orders for it are cancelled. New members
+  join the strategy's `MarketView` from the effective bar's close, so they are bought at the
+  next open. Strategies still see only `MarketView` (core): just the eligible instruments.
+- **Eligible.** In the set in force AND with a bar on each of the strategy's last
+  `max(1, warmup_bars)` bars (no gaps in a warm-up window). Bars are loaded once for the union
+  of every instrument ever selected and put on one timeline; an order for an instrument with
+  no bar that session waits for its next bar (or a newer order replaces it), and positions are
+  marked at their last close. A delisted holding stays marked at its last close (no delisting
+  proceeds model yet).
+- **Audit.** The run record's `rebalance` holds the frequency, lag, instruments ever selected,
+  mean turnover (share of the set added per re-evaluation) and, per evaluation: `evaluated`,
+  `effective`, `selected`, `added` / `removed` (listed up to 25, always counted),
+  `members_hash`, `survivorship_bias` (reference snapshot after the session) and the selection
+  `funnel` (the per-rule audit). `survivorship_bias` of the run is set if any evaluation has it.
+- **Hash.** Both keys are part of the config hash when set; a config that does not set them
+  keeps its previous hash (they are not written into the defaults).
 
 ## Site settings (typed, one loader)
 
@@ -174,6 +220,5 @@ All of these run as **jobs** (see [architecture.md](architecture.md#jobs)).
 
 | Item | Status |
 |---|---|
-| `rebalance_selection`: re-evaluate a backtest's selection at an interval | phase 2b |
 | L4 `watchlists/` and `preferences.toml` | phase 4–5 |
 | Database-backed `ConfigStore` written by the UI | phase 4 |

@@ -134,11 +134,14 @@ def load_price_data(
     interval: str = "1d",
     as_of: datetime | None = None,
     adjustment: str = "splits",
+    aligned: bool = True,
 ) -> PriceData:
     """Aligned, corporate-action-adjusted series plus contract terms (as of ``start``).
 
     Splits and dividends are those whose event date falls in ``start..end``, wherever
-    they were stored (``data.events``)."""
+    they were stored (``data.events``). ``aligned=False`` keeps each instrument's own bars
+    (for a changing selection, which puts them on one timeline with ``core.views.series.panel``).
+    """
     frame = bars(reader, interval, start, end, instruments, as_of)
     reference, snapshot = read_snapshot(
         reader, REFERENCE_TABLE, start, REFERENCE_HINT, as_of, instruments
@@ -159,7 +162,8 @@ def load_price_data(
             }
         )
     terms = instrument_terms(reader, start, instruments, as_of)
-    return PriceData(align(frame_to_series(frame)), terms, versions, snapshot)
+    series = frame_to_series(frame)
+    return PriceData(align(series) if aligned else series, terms, versions, snapshot)
 
 
 # ---------------------------------------------------------------------- per-session windows

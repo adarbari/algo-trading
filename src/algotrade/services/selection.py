@@ -6,16 +6,16 @@ from datetime import date, datetime
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.views.feature_view import FeatureValue, FeatureView
 from algotrade.data import StoreReader
-from algotrade.data.reference import instrument_view
+from algotrade.data.reference import InstrumentView, instrument_view
 from algotrade.engines.selection.evaluate import SelectionResult, evaluate_selection
 from algotrade.services.views import to_value
 
 
 def selection_view(
     reader: StoreReader, selection: Selection, session: date, as_of: datetime | None = None
-) -> tuple[FeatureView, tuple[str, ...]]:
-    """One row per instrument known on ``session``, keyed by field name, plus the rollup
-    tables that had no data for the session (their fields stay UNKNOWN)."""
+) -> tuple[FeatureView, InstrumentView]:
+    """One row per instrument known on ``session``, keyed by field name, plus the
+    ``InstrumentView`` it came from (``missing`` rollup tables stay UNKNOWN; ``pre_snapshot``)."""
     fields = {r.field for r in selection.where.rules()}
     if selection.order_by:
         fields.add(selection.order_by)
@@ -25,11 +25,16 @@ def selection_view(
     for record in view.frame.to_dict("records"):
         values = {c: to_value(record[c]) for c in columns}
         rows[str(record["instrument_id"])] = {c: v for c, v in values.items() if v is not None}
-    return FeatureView(session, rows), view.missing
+    return FeatureView(session, rows), view
 
 
 def select(
     reader: StoreReader, selection: Selection, session: date, as_of: datetime | None = None
 ) -> SelectionResult:
-    view, missing = selection_view(reader, selection, session, as_of)
-    return replace(evaluate_selection(selection, view), missing_tables=missing)
+    """Point in time: the reference snapshot and rollups for ``session``, read ``as_of``."""
+    view, source = selection_view(reader, selection, session, as_of)
+    return replace(
+        evaluate_selection(selection, view),
+        missing_tables=source.missing,
+        pre_snapshot=source.pre_snapshot,
+    )
