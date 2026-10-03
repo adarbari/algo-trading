@@ -10,19 +10,25 @@ from algotrade.core.errors import ConfigurationError
 REFERENCE_TABLE = "instruments/reference"
 COMPANY_TABLE = "instruments/company"
 ROLLUP_TABLE_PREFIX = "rollups/instrument/"
-# instrument.<column> fields read from the SEC company table rather than the reference.
-COMPANY_FIELDS = frozenset(
-    {
-        "sic",
-        "sic_description",
-        "sic_division",
-        "sector",
-        "industry",
-        "state_of_incorporation",
-        "fiscal_year_end",
-        "website",
-    }
+# ``instruments/company`` columns, in order, as the company source produces them.
+COMPANY_COLUMNS = (
+    "cik",
+    "name",
+    "entity_type",
+    "sic",
+    "sic_description",
+    "sic_division",
+    "sector",
+    "industry",
+    "state_of_incorporation",
+    "fiscal_year_end",
+    "website",
+    "former_names",
+    "exchanges",
+    "tickers",
 )
+# instrument.<column> fields read from the company table rather than the reference.
+COMPANY_FIELDS = frozenset(COMPANY_COLUMNS[3:11])
 
 
 def instrument_field(column: str) -> str:

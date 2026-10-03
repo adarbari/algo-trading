@@ -9,12 +9,16 @@ import pytest
 from algotrade_ingestion.sources.base import FetchRequest
 from algotrade_ingestion.sources.cboe import URL, CboeOptionsSource, parse_chain
 from algotrade_ingestion.sources.http import (
+    CircuitBreaker,
+    CircuitOpenError,
+    Http,
     HttpError,
     RetryPolicy,
     get_with_retry,
     urllib_transport,
 )
 from tests import cboe_fixture as fx
+from tests.ingest_helpers import CountingLimiter, http_for
 
 FAST = RetryPolicy(tries=3, base_delay=0, max_delay=0)
 
@@ -64,7 +68,7 @@ def test_urllib_transport_maps_http_errors() -> None:
 
 def test_source_builds_url() -> None:
     seen: list[str] = []
-    source = CboeOptionsSource(lambda url: seen.append(url) or b"{}", lambda s: None)
+    source = CboeOptionsSource(http_for(lambda url: seen.append(url) or b"{}"))
     assert source.fetch(FetchRequest("_SPX")) == b"{}"
     assert seen == [URL.format(symbol="_SPX")]
 
@@ -99,3 +103,49 @@ def test_session_falls_back_to_snapshot_date() -> None:
     parsed = parse_chain("TEST", "EQ:TEST", doc)
     assert parsed is not None
     assert parsed.session_date == date(2026, 10, 2)
+
+
+def test_every_attempt_waits_on_the_limiter_and_the_retry_time_is_capped() -> None:
+    limiter = CountingLimiter()
+    body = get_with_retry(
+        scripted(OSError("reset"), b"ok"), "u", FAST, lambda s: None, limiter=limiter
+    )
+    assert (body, limiter.waits) == (b"ok", 2)
+    ticks = iter([0.0, 0.0, 100.0, 100.0])
+    capped = RetryPolicy(tries=5, base_delay=10, max_delay=10, max_total_s=15)
+    with pytest.raises(RuntimeError, match="giving up on u after"):
+        get_with_retry(
+            scripted(HttpError(500), HttpError(500)),
+            "u",
+            capped,
+            lambda s: None,
+            clock=lambda: next(ticks),
+        )
+
+
+def test_circuit_breaker_fails_the_rest_fast_after_consecutive_blocks() -> None:
+    breaker = CircuitBreaker("cboe", threshold=3)
+    blocked = Http(scripted(*[HttpError(403)] * 3), FAST, breaker=breaker, sleep=lambda s: None)
+    with pytest.raises(RuntimeError, match="giving up"):
+        blocked.get("u1")  # three 403s in a row: the breaker opens
+    assert breaker.open
+    with pytest.raises(CircuitOpenError, match="circuit open after 3 consecutive"):
+        blocked.get("u2")  # no request sent
+    healthy = CircuitBreaker("x", threshold=2)
+    http = Http(
+        scripted(HttpError(503), b"a", HttpError(503), HttpError(404)),
+        FAST,
+        breaker=healthy,
+        sleep=lambda s: None,
+    )
+    assert http.get("a") == b"a" and http.get("b") is None  # successes and 404s reset it
+    assert not healthy.open
+    assert not CircuitBreaker("off", threshold=0).open
+
+
+def test_cool_down_holds_the_shared_limiter() -> None:
+    limiter = CountingLimiter()
+    source = CboeOptionsSource(http_for(lambda url: b"{}", limiter=limiter))
+    source.cool_down(30.0)
+    assert limiter.held == 30.0
+    Http(lambda url: b"").cool_down(5.0)  # no limiter: nothing to hold

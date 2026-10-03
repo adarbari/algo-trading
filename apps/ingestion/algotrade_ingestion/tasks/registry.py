@@ -19,6 +19,7 @@ from typing import Any
 
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.settings import universe_settings
+from algotrade_ingestion.sources.base import DirectorySource
 from algotrade_ingestion.tasks import (
     bars,
     company_details,
@@ -83,8 +84,11 @@ def session_of(params: Params) -> date:
 def _universe_build(ctx: TaskContext, p: Params) -> RunRecord:
     assert ctx.configs is not None
     _, settings = universe_settings(ctx.configs)
+    trader = ctx.sources["nasdaq_trader"]
+    if not isinstance(trader, DirectorySource):
+        raise TypeError("nasdaq_trader must be a DirectorySource (listing + options files)")
     sources = universe_build.UniverseSources(
-        ctx.sources["nasdaq_trader"],
+        trader,
         ctx.sources["spy_holdings"],
         ctx.sources.get("massive_tickers"),
     )
@@ -97,7 +101,7 @@ def _universe_build(ctx: TaskContext, p: Params) -> RunRecord:
 
 def _universe_mode(ctx: TaskContext) -> str | None:
     mode = universe_settings(ctx.configs)[0] if ctx.configs is not None else "csv_import"
-    return None if mode == "nasdaq_trader" else f"skipped ({mode})"
+    return None if mode == "nasdaq_trader" else f"skipped: {mode} mode"
 
 
 def _universe_csv(ctx: TaskContext, p: Params) -> RunRecord:

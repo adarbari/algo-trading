@@ -15,7 +15,7 @@ import io
 import pandas as pd
 
 from algotrade_ingestion.sources.base import FetchRequest, Normalized
-from algotrade_ingestion.sources.http import RetryPolicy, Sleep, Transport, get_with_retry
+from algotrade_ingestion.sources.http import Http
 
 SOURCE = "nasdaq_trader"
 DATASET = "symbol_directory"
@@ -82,18 +82,16 @@ class NasdaqTraderSource:
 
     name = SOURCE
     dataset = DATASET
+    listing_keys = FILES[:2]  # nasdaqlisted, otherlisted (``DirectorySource``)
+    options_key = FILES[2]
 
-    def __init__(
-        self, transport: Transport, sleep: Sleep, policy: RetryPolicy | None = None
-    ) -> None:
-        self._transport, self._sleep, self._policy = transport, sleep, policy or RetryPolicy()
+    def __init__(self, http: Http) -> None:
+        self._http = http
 
     def fetch(self, request: FetchRequest) -> bytes | None:
         if request.key not in FILES:
             raise ValueError(f"unknown Nasdaq Trader file {request.key!r}; expected {FILES}")
-        return get_with_retry(
-            self._transport, URL.format(file=request.key), self._policy, self._sleep
-        )
+        return self._http.get(URL.format(file=request.key))
 
     def normalize(self, request: FetchRequest, payload: bytes) -> Normalized | None:
         if request.key == "options":

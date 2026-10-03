@@ -1,0 +1,88 @@
+"""The source registry (``sources/registry.py``): every source declared once and built from
+``sources.toml`` + the environment, with one limiter and circuit breaker per vendor key.
+
+Fitness: every registered source has a ``sources.toml`` section and a limiter key, sources
+sharing a key read one section, and no vendor module paces itself (``time.sleep``)."""
+
+import ast
+import tomllib
+from dataclasses import replace
+from functools import partial
+from pathlib import Path
+
+import pytest
+
+from algotrade_ingestion.settings import SourcesSettings
+from algotrade_ingestion.sources import registry
+from algotrade_ingestion.sources.http import Http
+from algotrade_ingestion.sources.registry import SOURCES, build_sources, limiter_keys
+from tests.conftest import REPO_ROOT
+
+SITE_SOURCES = tomllib.loads((REPO_ROOT / "config" / "site" / "sources.toml").read_text())
+SOURCES_DIR = REPO_ROOT / "apps" / "ingestion" / "algotrade_ingestion" / "sources"
+# The two modules that may wait: the limiter (pacing) and http.py (retry backoff).
+MAY_SLEEP = {"limiter.py", "http.py"}
+ENV = {"ALGOTRADE_MASSIVE_API_KEY": "key", "ALGOTRADE_SEC_CONTACT": "ops@example.org"}
+
+
+def settings(doc: dict[str, object] | None = None) -> SourcesSettings:
+    return SourcesSettings.from_document(doc if doc is not None else SITE_SOURCES)
+
+
+def test_every_source_is_built_when_configured(tmp_path: Path) -> None:
+    built = build_sources(settings(), ENV.get, limits_dir=tmp_path)
+    assert set(built.sources) == set(SOURCES) and built.skipped == {}
+    assert list(tmp_path.iterdir()) == []  # limiter files appear on first request only
+
+
+def test_disabled_sections_and_missing_credentials_are_skipped_with_a_reason(
+    tmp_path: Path,
+) -> None:
+    doc = {**SITE_SOURCES, "cboe": {"enabled": False}}
+    built = build_sources(settings(doc), lambda name: None, limits_dir=tmp_path)
+    assert built.skipped["cboe"] == "[cboe] is disabled in sources.toml"
+    assert built.skipped["massive_bars"].startswith("ALGOTRADE_MASSIVE_API_KEY is not set")
+    assert built.skipped["sec_tickers"].startswith("ALGOTRADE_SEC_CONTACT is not set")
+    assert "nasdaq_trader" in built.sources and "cboe" not in built.sources
+    with pytest.raises(KeyError):
+        build_sources(settings(), ENV.get, ["nope"], tmp_path)
+
+
+def test_one_limiter_and_breaker_per_key_with_configured_or_default_pace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    http: dict[str, Http] = {}
+    for name, spec in SOURCES.items():
+        keep = partial(http.setdefault, name)
+        monkeypatch.setitem(registry.SOURCES, name, replace(spec, build=keep))  # type: ignore[arg-type]
+    doc = {"massive": {"min_interval_s": 1.0}, "http": {"breaker_failures": 4}}
+    build_sources(settings(doc), ENV.get, limits_dir=tmp_path)
+    bars, actions = http["massive_bars"], http["massive_corporate_actions"]
+    assert bars.limiter is actions.limiter and bars.breaker is actions.breaker
+    assert bars.limiter is not http["sec_tickers"].limiter
+    assert bars.limiter.min_interval_s == 1.0  # type: ignore[union-attr]
+    assert http["sec_tickers"].limiter.min_interval_s == 0.2  # type: ignore[union-attr]
+    assert http["sec_tickers"].policy.tries == 4 and bars.policy.max_total_s == 300.0
+    assert bars.breaker is not None and bars.breaker.threshold == 4
+
+
+def test_every_source_has_a_sources_toml_section_and_a_limiter_key() -> None:
+    for name, spec in SOURCES.items():
+        assert spec.name == name
+        assert isinstance(SITE_SOURCES.get(spec.section), dict), f"{name}: no [{spec.section}]"
+        assert "min_interval_s" in SITE_SOURCES[spec.section], f"{name}: [{spec.section}]"
+        assert spec.limiter, f"{name}: no limiter key"
+    shared = {k: v for k, v in limiter_keys().items() if len(v) > 1}
+    assert not shared, f"sources sharing a limiter key must read one section: {shared}"
+
+
+def test_no_vendor_module_sleeps_or_paces_itself() -> None:
+    offenders = []
+    for path in sorted(SOURCES_DIR.rglob("*.py")):
+        if path.name in MAY_SLEEP:
+            continue
+        for node in ast.walk(ast.parse(path.read_text())):
+            name = node.attr if isinstance(node, ast.Attribute) else getattr(node, "id", None)
+            if name in ("sleep", "MinInterval"):
+                offenders.append(f"{path.relative_to(REPO_ROOT)}:{node.lineno}")  # type: ignore[attr-defined]
+    assert not offenders, f"sources never pace themselves; use the registry's limiter: {offenders}"

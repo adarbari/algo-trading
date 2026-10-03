@@ -2,15 +2,24 @@
 
 Layout under the root directory (an internal detail; nothing else may rely on it)::
 
-    tables/<table>/date=YYYY-MM-DD/run=<run_id>.parquet   (+ _runs.json knowledge index)
+    tables/<table>/date=YYYY-MM-DD/run=<run_id>.parquet   (+ _runs.json knowledge index,
+                                                           .runs.lock guarding it)
     raw/source=<s>/dataset=<d>/date=YYYY-MM-DD/run=<run_id>/<key>.json.gz
     staging/<run_id>/<table>/<key>.parquet
     runs/<run_id>.json
+    locks/<name>.lock                                      (Backend.lock, e.g. the ingest run)
+
+Every file is written to a unique temp file in its directory and renamed into place, so
+concurrent writers never share a temp file and readers never see half a file. The
+``_runs.json`` read-modify-write is serialised by a file lock, so two runs writing the same
+partition at once (threads or processes) are both indexed.
 """
 
 import gzip
 import json
+import os
 import shutil
+import tempfile
 from collections.abc import Sequence
 from datetime import date, datetime
 from pathlib import Path
@@ -20,16 +29,24 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from algotrade.storage.backends.selection import concat_frames, latest_run, select_instruments
+from algotrade.storage.locks import FileLock, held
 from algotrade.storage.runs import RunRecord, run_session
 
 _INDEX = "_runs.json"
+_INDEX_LOCK = ".runs.lock"
 
 
 def _atomic_write(path: Path, data: bytes) -> None:
+    """Write via a unique temp file in the same directory, then rename into place."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.tmp")
-    tmp.write_bytes(data)
-    tmp.replace(path)
+    fd, name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+        Path(name).replace(path)
+    except BaseException:
+        Path(name).unlink(missing_ok=True)
+        raise
 
 
 def _safe(key: str) -> str:
@@ -52,10 +69,11 @@ class LocalTables:
     def write(self, table: str, session_date: date, run_id: str, frame: pd.DataFrame) -> None:
         directory = self._dir(table, session_date)
         _atomic_write(directory / f"run={_safe(run_id)}.parquet", _parquet_bytes(frame))
-        index = self._index(directory)
-        if not frame.empty:
-            index[run_id] = pd.Timestamp(frame["knowledge_ts"].max()).isoformat()
-        _atomic_write(directory / _INDEX, json.dumps(index, indent=2, sort_keys=True).encode())
+        with held(FileLock(directory / _INDEX_LOCK)):
+            index = self._index(directory)
+            if not frame.empty:
+                index[run_id] = pd.Timestamp(frame["knowledge_ts"].max()).isoformat()
+            _atomic_write(directory / _INDEX, json.dumps(index, indent=2, sort_keys=True).encode())
 
     def _chosen_file(self, table: str, session_date: date, as_of: datetime | None) -> Path | None:
         directory = self._dir(table, session_date)
@@ -215,3 +233,7 @@ class LocalBackend:
         self.raw = LocalRaw(root)
         self.staging = LocalStaging(root)
         self.runs = LocalRuns(root)
+
+    def lock(self, name: str) -> FileLock:
+        """A lock shared by every process using this data root (``locks/<name>.lock``)."""
+        return FileLock(self.root / "locks" / f"{_safe(name)}.lock")

@@ -11,7 +11,7 @@ from algotrade.data.reference import instrument_view
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.sources.http import HttpError, MinInterval, RetryPolicy
+from algotrade_ingestion.sources.http import HttpError, RetryPolicy
 from algotrade_ingestion.sources.sec_edgar import TICKERS_URL, SecSubmissions, SecTickerMap
 from algotrade_ingestion.tasks.company_details import (
     TABLE,
@@ -19,7 +19,7 @@ from algotrade_ingestion.tasks.company_details import (
     due_ciks,
     ingest_company_details,
 )
-from tests.ingest_helpers import task_ctx
+from tests.ingest_helpers import http_for, task_ctx
 from tests.sec_fixture import submissions, tickers
 from tests.storage_helpers import stamped
 
@@ -61,10 +61,10 @@ class FakeSec:
 
 
 def sources(feed: FakeSec, refresh_days: int = 30) -> CompanySources:
-    policy, limiter = RetryPolicy(tries=1), MinInterval(0)
+    policy = RetryPolicy(tries=1)
     return CompanySources(
-        SecTickerMap(feed, lambda s: None, policy, limiter),
-        SecSubmissions(feed, lambda s: None, policy, limiter),
+        SecTickerMap(http_for(feed, policy)),
+        SecSubmissions(http_for(feed, policy)),
         refresh_days,
     )
 

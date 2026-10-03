@@ -15,7 +15,7 @@ from typing import Any
 import pandas as pd
 
 from algotrade_ingestion.sources.base import FetchRequest, Normalized
-from algotrade_ingestion.sources.http import RetryPolicy, Sleep, Transport, get_with_retry
+from algotrade_ingestion.sources.http import Http
 
 SOURCE = "nasdaq_earnings"
 DATASET = "earnings_calendar"
@@ -89,22 +89,11 @@ class NasdaqEarningsSource:
     name = SOURCE
     dataset = DATASET
 
-    def __init__(
-        self,
-        transport: Transport,
-        sleep: Sleep,
-        policy: RetryPolicy | None = None,
-        pause_s: float = 0.5,
-    ) -> None:
-        self._transport, self._sleep, self._policy = transport, sleep, policy or RetryPolicy()
-        self._pause_s = pause_s  # be polite: one request per date, spaced out
+    def __init__(self, http: Http) -> None:
+        self._http = http  # paced by the shared ``nasdaq`` limiter (sources.toml)
 
     def fetch(self, request: FetchRequest) -> bytes | None:
-        day = date.fromisoformat(request.key)
-        self._sleep(self._pause_s)
-        return get_with_retry(
-            self._transport, URL.format(date=day.isoformat()), self._policy, self._sleep
-        )
+        return self._http.get(URL.format(date=date.fromisoformat(request.key).isoformat()))
 
     def normalize(self, request: FetchRequest, payload: bytes) -> Normalized | None:
         day = date.fromisoformat(request.key)

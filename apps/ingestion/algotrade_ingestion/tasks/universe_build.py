@@ -25,7 +25,7 @@ from algotrade.core.instruments import AssetClass
 from algotrade.data import StoreReader
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.settings import UniverseSettings
-from algotrade_ingestion.sources.base import FetchRequest, Source
+from algotrade_ingestion.sources.base import DirectorySource, FetchRequest, Source
 from algotrade_ingestion.tasks.classify import (
     leverage_flags,
     security_type,
@@ -49,7 +49,7 @@ _SUGGESTED = re.compile(r"(-?\d(?:\.\d)?)\s*x\b", re.I)
 
 @dataclass(frozen=True)
 class UniverseSources:
-    nasdaq_trader: Source
+    nasdaq_trader: DirectorySource
     spy_holdings: Source
     tickers: Source | None = None  # Massive ticker list: FIGI, CIK, vendor security type
 
@@ -185,30 +185,33 @@ def build_universe(
     ctx: TaskContext, sources: UniverseSources, settings: UniverseSettings, session: date
 ) -> RunRecord:
     with IngestRun(ctx, TASK, session) as run:
+        trader = sources.nasdaq_trader
         parsed: dict[str, pd.DataFrame] = {}
-        for key in ("nasdaqlisted", "otherlisted", "options"):
-            parsed.update(_fetch(run, sources.nasdaq_trader, key))
+        for key in (*trader.listing_keys, trader.options_key):
+            parsed.update(_fetch(run, trader, key))
         parsed.update(_fetch(run, sources.spy_holdings, "SPY"))
         if sources.tickers is not None:
             parsed.update(_fetch(run, sources.tickers, "active"))
-        _build(run, ctx.reader, parsed, settings, sources.nasdaq_trader.name)
+        listings = pd.concat([parsed[k] for k in trader.listing_keys], ignore_index=True)
+        _build(run, ctx.reader, listings, parsed[trader.options_key], parsed, settings, trader.name)
     return run.record
 
 
 def _build(
     run: IngestRun,
     reader: StoreReader,
+    listings: pd.DataFrame,
+    optionable: pd.DataFrame,
     parsed: dict[str, pd.DataFrame],
     settings: UniverseSettings,
     source: str,
 ) -> None:
     session = run.session
-    listings = pd.concat([parsed["nasdaqlisted"], parsed["otherlisted"]], ignore_index=True)
     previous = _before(reader, REFERENCE, session)
     sp500 = set(parsed["sp500"]["symbol"])
     reference, disagreements, assigned = build_reference(
         listings,
-        set(parsed["options"]["symbol"]),
+        set(optionable["symbol"]),
         sp500,
         settings,
         previous,

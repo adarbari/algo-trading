@@ -188,8 +188,16 @@ audits. The local runner uses 2 threads.
 
 ## 7. Consistency and concurrency
 
-- **Writers:** only ingestion writes market and rollup data. Partitions are written atomically
-  (temp file + rename); a run replaces only its own partition.
+- **Writers:** only ingestion writes market and rollup data. Every file is written to a unique
+  temp file in its directory and renamed into place; a run replaces only its own partition.
+  The per-partition run index (`_runs.json`) is updated under a file lock, so two runs writing
+  the same partition at once (threads or processes) are both indexed (contract-tested).
+- **One ingest run at a time per store:** every writing `algotrade-ingest` command takes the
+  store's `ingest` lock (`Backend.lock`; local: `locks/ingest.lock` under the data root). A
+  second run exits with code 3, or queues with `--wait`. Holding it, the CLI marks `nightly` /
+  `screen` jobs left running by a crashed process as failed (`JobRunner.recover`), so they
+  never block a re-run.
+- **Vendor pacing** is shared across processes too (`sources/limiter.py`, `var/run/limits/`).
 - **Readers** pick, per partition, the latest run with `knowledge_ts ≤ as_of`. A reader racing
   a writer sees either the old or the new run, never a mix.
 - **Configs** are resolved once per run and the hash is recorded; edits affect only later runs.
@@ -330,9 +338,10 @@ truth, with the AST patterns `scripts/check_ownership.py` uses to flag anyone el
 | run ids, run records, COMPLETE / PARTIAL | `storage/runs.py`, `services/jobs/`, ingestion `tasks/framework.py` | same (done in R3) |
 | raw persistence, row stamping, id resolution in ingestion | `tasks/framework.py` (`IngestRun`) | same (done in R3) |
 | which ingestion steps run, with which defaults | `tasks/registry.py`; nightly order in `pipeline.py` | `workflows/` (R5) |
-| vendor HTTP + retries | `sources/http.py` | same |
-| rate limiting | `sources/http.py` (`MinInterval`) | `sources/limiter.py`, shared across processes (R4) |
-| source construction + vendor specifics | `sources/` | `sources/registry.py` (R4) |
+| vendor HTTP, retries, retry cap, circuit breaker | `sources/http.py` | same |
+| rate limiting | `sources/limiter.py`, one per key, shared across threads and processes | same (done in R4) |
+| source construction | `sources/registry.py` (vendor specifics stay in `sources/<vendor>.py`) | same (done in R4) |
+| locks (flock, named store locks, run-index lock); the ingest run lock | `storage/locks.py`; `services/jobs/exclusive.py` | same (done in R4) |
 | session / exchange calendar | `core/time.py` | `core/calendar.py` (R5) |
 | job execution | `services/jobs/` | same; screens from nightly become `screen` jobs (R5) |
 | site settings loading | `config/` | `config/settings.py`, one typed loader (R6) |
@@ -359,8 +368,12 @@ An ingestion **task** produces stored tables and one run record; a **job** is so
   `company_details.py`, `universe_build.py`, `universe.py`, `features.py`, `quality.py`,
   `migrate_ids.py`, `golden.py`): only what to fetch, how to combine frames, task stats.
 
-Sources are still built in `commands.py` (moves to `sources/registry.py` in R4); tasks receive
-them through the context and never build them.
+Sources are built by the source registry (`sources/registry.py`, R4): each declared once with
+its `sources.toml` section, credential variable, limiter key and default pacing. A source whose
+section is disabled or whose variable is missing is left out with a reason; nightly skips the
+tasks that need it (`skipped: <reason>`) and an explicit run fails with it. Tasks receive
+sources through the context (`ctx.sources[name]`) and never import vendor modules
+(contract R3).
 
 Rules: **R1** only `data/` reads market data for consumers; **R2** storage has no domain
 knowledge; **R3** tasks get sources from the registry, never import vendor modules; **R4**

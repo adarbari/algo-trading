@@ -9,7 +9,7 @@ from algotrade_ingestion.sources.http import HttpError, RetryPolicy
 from algotrade_ingestion.sources.nasdaq_earnings import NasdaqEarningsSource, parse_calendar
 from algotrade_ingestion.tasks.earnings import ingest_earnings, weekdays
 from tests.earnings_fixture import calendar
-from tests.ingest_helpers import task_ctx
+from tests.ingest_helpers import CountingLimiter, http_for, task_ctx
 from tests.storage_helpers import write_reference
 
 DAY = date(2026, 10, 2)  # a Friday
@@ -37,18 +37,14 @@ def test_parse_forecast_and_reported_rows() -> None:
     assert parse_calendar(DAY, calendar([("", "time-pre-market")])).empty
 
 
-def test_source_paces_requests() -> None:
-    pauses: list[float] = []
+def test_source_waits_on_the_shared_limiter() -> None:
     urls: list[str] = []
-    source = NasdaqEarningsSource(
-        lambda url: urls.append(url) or calendar([("A", "x")]),
-        pauses.append,
-        RetryPolicy(tries=1),
-        pause_s=0.25,
-    )
+    limiter = CountingLimiter()
+    transport = lambda url: urls.append(url) or calendar([("A", "x")])  # noqa: E731
+    source = NasdaqEarningsSource(http_for(transport, RetryPolicy(tries=1), limiter))
     payload = source.fetch(FetchRequest("2026-10-05"))
     assert urls == ["https://api.nasdaq.com/api/calendar/earnings?date=2026-10-05"]
-    assert pauses == [0.25]
+    assert limiter.waits == 1
     normalized = source.normalize(FetchRequest("2026-10-05"), payload or b"")
     assert normalized is not None and normalized.session_date == date(2026, 10, 5)
 
@@ -67,7 +63,7 @@ def test_job_writes_snapshot_and_reports_failed_dates() -> None:
 
     backend = MemoryBackend()
     write_reference(StoreWriter(backend), DAY, {"AAPL": "EQ:BBG000B9XRY4"})
-    source = NasdaqEarningsSource(transport, lambda s: None, RetryPolicy(tries=1))
+    source = NasdaqEarningsSource(http_for(transport, RetryPolicy(tries=1)))
     reader = StoreReader(backend)
     record = ingest_earnings(task_ctx(StoreWriter(backend), reader, CLOCK), source, DAY, days=5)
     assert record.status is RunStatus.PARTIAL
@@ -82,7 +78,7 @@ def test_job_writes_snapshot_and_reports_failed_dates() -> None:
 
 
 def test_quiet_window_is_complete_with_no_rows() -> None:
-    source = NasdaqEarningsSource(lambda url: calendar([]), lambda s: None, RetryPolicy(tries=1))
+    source = NasdaqEarningsSource(http_for(lambda url: calendar([]), RetryPolicy(tries=1)))
     backend = MemoryBackend()
     record = ingest_earnings(
         task_ctx(StoreWriter(backend), StoreReader(backend), CLOCK), source, DAY, days=2

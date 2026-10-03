@@ -6,6 +6,17 @@ limits and prices before relying on them.
 Every vendor sits behind the same source interface in `apps/ingestion/sources/`. Adding or
 swapping a vendor never touches storage, features, strategies or the UI.
 
+**Pacing is shared.** Each source is declared once in `sources/registry.py` with its
+`config/site/sources.toml` section and a limiter key (`cboe`, `nasdaqtrader`, `ssga`,
+`nasdaq`, `massive`, `sec`). One limiter per key (`sources/limiter.py`) spaces requests by the
+section's `min_interval_s` across every worker thread **and every process** on the machine
+(a lock file per key under `[http] limits_dir`, default `var/run/limits/`), so a backfill and
+the nightly run never exceed a vendor's limit together. Retries live in `sources/http.py`:
+429 honours `Retry-After`, other failures back off, and one request gives up after
+`[http] max_retry_s`. After `[http] breaker_failures` consecutive 403/5xx from a vendor its
+circuit opens: the rest of the run's items for that vendor fail at once with
+`FETCH_ERROR: <key>: circuit open ...` (run PARTIAL) instead of each burning its retries.
+
 ## By use case
 
 | Data | Primary (free) | Alternatives | Notes |
@@ -51,7 +62,8 @@ Host `https://api.massive.com`; the key (`ALGOTRADE_MASSIVE_API_KEY` in `.env`) 
 | Splits | `/stocks/v1/splits` (date window, paginated) | `events/split` (ratio = split_to / split_from) |
 | Dividends | `/stocks/v1/dividends` (date window, paginated) | `events/dividend` (same ex-date amounts summed) |
 
-Free tier: 5 requests/minute, so requests are spaced 12.5 s apart. `algotrade-ingest bars
+Free tier: 5 requests/minute, so requests are spaced 12.5 s apart (`[massive]
+min_interval_s`, shared by bars, corporate actions and the ticker list). `algotrade-ingest bars
 --from 2024-10-01 --to 2026-10-01` backfills two years (~500 requests, ~1h45m) and resumes
 where it stopped; nightly fetches the session's bars and a corporate-action window (-7 to +30
 days; `[massive]` in `config/site/sources.toml`). Massive preferred tickers (`KIMpL`) are mapped to the universe's ACT style (`KIM$L`).
@@ -65,7 +77,8 @@ Prices are adjusted at read time (`none`, `splits`, `total_return`; setting
 with timing (pre-market / after hours / not supplied), the EPS forecast and number of
 estimates; past dates add the reported EPS and surprise. `algotrade-ingest earnings` stores a
 60-day forward window nightly in `events/earnings`, in the partition of the run's session, so
-date changes stay point-in-time; `--start` in the past backfills. About 2 minutes a night.
+date changes stay point-in-time; `--start` in the past backfills. About 2 minutes a night
+(requests spaced by `[nasdaq_earnings] min_interval_s`, 0.5 s).
 
 ## SEC EDGAR company details (implemented, phase 1.7)
 
@@ -77,7 +90,8 @@ date changes stay point-in-time; `--start` in the past backfills. About 2 minute
 Free, no key. SEC's [fair-access policy](https://www.sec.gov/os/accessing-edgar-data) requires
 a `User-Agent` naming the requester with a contact email and allows at most 10 requests/second.
 The email comes only from `ALGOTRADE_SEC_CONTACT` in `.env`; it is never stored, logged or
-committed. Requests are spaced 0.2 s apart (`[sec_edgar] min_interval_s`).
+committed. Requests are spaced 0.2 s apart (`[sec_edgar] min_interval_s`, shared by the
+ticker map and submissions).
 
 `algotrade-ingest company-details [--date D] [--force] [--limit N]` (and the nightly step after
 the universe build, skipped unless `[sec_edgar] enabled` and the contact are set) writes a full

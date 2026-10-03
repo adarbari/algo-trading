@@ -28,9 +28,9 @@ Baseline identical throughout.
 | R1 | Ownership registry, shrink-only ratchets (`make ownership`, `make dupes`), fitness tests, ADR 0019 | **done** |
 | R2 | `algotrade/data/` read layer + one snapshot rule (`reference`, `prices`, `events`, `chains`); fixes backtests before the first snapshot (flagged `survivorship_bias`) and reads events by event date; backtests pin `as_of` = launch time (ADR 0007 amended); contracts R1, R2 | **done** |
 | R3 | `IngestRun` (the ingest loop, written once) + task registry (`jobs/` → `tasks/`); CLI (`run <task>` + the named commands) and nightly dispatch through the registry; settings defaults applied once; `cboe.workers` honoured | **done** |
-| R4 | Source registry from `sources.toml` + shared cross-process rate limiter + run lock + index lock; contract R3 | |
+| R4 | Source registry from `sources.toml` + shared cross-process rate limiter (retry cap, circuit breaker) + run lock (`--wait`, exit 3, job recovery) + index lock; vendor helpers out of tasks; contract R3 | **done** |
 | R5 | Nightly workflow: isolated tasks, exchange calendar, screens submitted as `screen` jobs, failure notification; `cboe.enabled` honoured; contract R5 | |
-| R6 | Typed site settings (one loader in `config/`) + typed table schemas; environment read in one place; contract R4 | |
+| R6 | Typed site settings (one loader in `config/`) + typed table schemas; environment read in one place; contract R4 (vendor modules already clean; only `sources/synthetic/files.py` still uses `storage.schemas.bar_problems`) | |
 
 ## Phase 0 follow-ups (the architecture is the target; these close the gaps)
 

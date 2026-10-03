@@ -6,11 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from algotrade_ingestion import cli, commands
+from algotrade_ingestion import cli
 from algotrade_ingestion.sources.cboe import CboeOptionsSource
 from algotrade_ingestion.sources.http import RetryPolicy
+from algotrade_ingestion.sources.registry import build_sources
 from tests import cboe_fixture as fx
 from tests.apps.ingestion.tasks.test_option_chains import FakeFeed
+from tests.ingest_helpers import http_for, use_source
 
 pytestmark = pytest.mark.e2e
 DAY = fx.SESSION.isoformat()
@@ -31,14 +33,9 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     from tests.earnings_fixture import calendar  # noqa: PLC0415
 
     earnings = calendar([("AAPL", "time-after-hours")])
-    monkeypatch.setattr(
-        commands,
-        "earnings_sources",
-        lambda *_: {
-            "nasdaq_earnings": NasdaqEarningsSource(
-                lambda url: earnings, lambda s: None, RetryPolicy(tries=1)
-            )
-        },
+    policy = RetryPolicy(tries=1)
+    use_source(
+        monkeypatch, "nasdaq_earnings", NasdaqEarningsSource(http_for(lambda url: earnings, policy))
     )
     feed = FakeFeed(
         {
@@ -46,11 +43,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
             "TQQQ": fx.payload("TQQQ", options=fx.chain("TQQQ", spread=1.0, oi=5)),
         }
     )
-    monkeypatch.setattr(
-        commands,
-        "cboe_sources",
-        lambda *_: {"cboe": CboeOptionsSource(feed, lambda s: None, RetryPolicy(tries=1))},
-    )
+    use_source(monkeypatch, "cboe", CboeOptionsSource(http_for(feed, policy)))
     (tmp_path / "stocks.csv").write_text(
         f"ticker,company_name,security_type,last_verified\nAAPL,Apple,COMMON_STOCK,{DAY}\n"
     )
@@ -181,17 +174,16 @@ def test_company_details_command(
 
     call(capsys, "universe", "--stocks", str(env / "stocks.csv"), "--version", "v", "--date", DAY)
     assert cli.main(["company-details", "--date", DAY]) == 2  # no contact email configured
-    assert "ALGOTRADE_SEC_CONTACT" in capsys.readouterr().err
-    assert commands.sec_sources(SourcesSettings(), required=False) == {}
+    assert "company-details skipped: ALGOTRADE_SEC_CONTACT is not set" in capsys.readouterr().err
+    names = ["sec_tickers", "sec_submissions"]
+    none = build_sources(SourcesSettings(), lambda name: None, names)
+    assert none.sources == {} and "ALGOTRADE_SEC_CONTACT" in none.skipped["sec_tickers"]
+    real = build_sources(SourcesSettings(), lambda name: "ops@example.org", names, env / "lim")
+    assert set(real.sources) == set(names)  # built without the network
     monkeypatch.setenv("ALGOTRADE_SEC_CONTACT", "ops@example.org")
-    real = commands.sec_sources(SourcesSettings())
-    assert set(real) == {"sec_tickers", "sec_submissions"}  # built without the network
     fake = sources(FakeSec())
-    monkeypatch.setattr(
-        commands,
-        "sec_sources",
-        lambda *_: {"sec_tickers": fake.tickers, "sec_submissions": fake.submissions},
-    )
+    use_source(monkeypatch, "sec_tickers", fake.tickers)
+    use_source(monkeypatch, "sec_submissions", fake.submissions)
     code, result = call(capsys, "company-details", "--date", DAY, "--limit", "5")
     assert (code, result["rows"], result["cik_from_sec_map"]) == (0, 1, 1)  # AAPL via the map
     _, nightly = call(capsys, "nightly", "--date", DAY, "--workers", "1")
@@ -204,3 +196,47 @@ def test_nightly_skips_company_details_without_contact(
     call(capsys, "universe", "--stocks", str(env / "stocks.csv"), "--version", "v", "--date", DAY)
     _, nightly = call(capsys, "nightly", "--date", DAY, "--workers", "1")
     assert nightly["company_details"].startswith("skipped")
+
+
+def test_a_second_writing_run_exits_3_unless_it_waits(
+    env: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import threading  # noqa: PLC0415
+
+    from algotrade.services.jobs import exclusive_run  # noqa: PLC0415
+    from algotrade.storage.factory import open_backend  # noqa: PLC0415
+
+    other = open_backend()  # its own lock file handle: behaves like another process
+    with exclusive_run(other):
+        assert cli.main(["purge-raw", "--date", DAY]) == cli.LOCKED_EXIT
+        assert "pass --wait" in capsys.readouterr().err
+        code, _ = call(capsys, "schedule", "--out", str(env / "agent.plist"))
+        assert code == 0  # writes no store data: no lock needed
+        codes: list[int] = []
+        waiter = threading.Thread(
+            target=lambda: codes.append(cli.main(["purge-raw", "--date", DAY, "--wait"]))
+        )
+        waiter.start()
+        waiter.join(timeout=0.3)
+        assert waiter.is_alive() and codes == []  # queued behind the holder
+    waiter.join(timeout=30)
+    assert codes == [0]
+
+
+def test_nightly_recovers_a_job_left_running_by_a_crashed_process(
+    env: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from datetime import UTC, datetime  # noqa: PLC0415
+
+    from algotrade.config.user import SITE_USER, UserContext  # noqa: PLC0415
+    from algotrade.services.jobs import JobRecord, JobStatus, job_id_for  # noqa: PLC0415
+    from algotrade.storage.factory import open_backend  # noqa: PLC0415
+
+    call(capsys, "universe", "--stocks", str(env / "stocks.csv"), "--version", "v", "--date", DAY)
+    params = {"session": DAY, "workers": 1, "export_dir": None}
+    job_id = job_id_for("nightly", params, UserContext(SITE_USER))
+    stuck = JobRecord(job_id, "nightly", params, SITE_USER, datetime.now(UTC))
+    stuck.status = JobStatus.RUNNING
+    open_backend().runs.save(stuck.to_run())
+    code, result = call(capsys, "nightly", "--date", DAY, "--workers", "1")
+    assert code == 0 and result["job_id"] == job_id and "earnings" in result

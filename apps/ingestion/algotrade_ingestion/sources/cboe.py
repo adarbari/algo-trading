@@ -22,7 +22,7 @@ import pandas as pd
 from algotrade.core.instruments import AssetClass, instrument_id
 from algotrade.core.options import is_standard_root, parse_osi
 from algotrade_ingestion.sources.base import FetchRequest, Normalized
-from algotrade_ingestion.sources.http import RetryPolicy, Sleep, Transport, get_with_retry
+from algotrade_ingestion.sources.http import Http
 
 SOURCE = "cboe_delayed"
 DATASET = "option_chain"
@@ -61,16 +61,15 @@ class CboeOptionsSource:
     name = SOURCE
     dataset = DATASET
 
-    def __init__(
-        self, transport: Transport, sleep: Sleep, policy: RetryPolicy | None = None
-    ) -> None:
-        self._transport = transport
-        self._sleep = sleep
-        self._policy = policy or RetryPolicy()
+    def __init__(self, http: Http) -> None:
+        self._http = http
 
     def fetch(self, request: FetchRequest) -> bytes | None:
-        url = URL.format(symbol=request.key)
-        return get_with_retry(self._transport, url, self._policy, self._sleep)
+        return self._http.get(URL.format(symbol=request.key))
+
+    def cool_down(self, seconds: float) -> None:
+        """Pause new Cboe requests (every process) before a gentler retry pass."""
+        self._http.cool_down(seconds)
 
     def normalize(self, request: FetchRequest, payload: bytes) -> Normalized | None:
         if request.instrument_id is None:

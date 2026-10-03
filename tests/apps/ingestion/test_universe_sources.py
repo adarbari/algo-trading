@@ -16,6 +16,7 @@ from algotrade_ingestion.tasks.classify import (
     security_type,
 )
 from tests import universe_fixture as fx
+from tests.ingest_helpers import http_for
 
 
 def test_parse_listings_both_files() -> None:
@@ -62,14 +63,14 @@ def test_sources_fetch_and_normalize() -> None:
         urls.append(url)
         return payloads["nasdaqlisted"] if "nasdaqlisted" in url else fx.spy(["AAPL"])
 
-    nasdaq = NasdaqTraderSource(transport, lambda s: None, RetryPolicy(tries=1))
+    nasdaq = NasdaqTraderSource(http_for(transport, RetryPolicy(tries=1)))
     request = FetchRequest("nasdaqlisted")
     normalized = nasdaq.normalize(request, nasdaq.fetch(request) or b"")
     assert normalized is not None and list(normalized.parsed["nasdaqlisted"]["symbol"]) == ["AAPL"]
     with pytest.raises(ValueError, match="unknown Nasdaq Trader file"):
         nasdaq.fetch(FetchRequest("nope"))
     assert nasdaq.normalize(FetchRequest("options"), fx.options([])) is None
-    spy = SpyHoldingsSource(transport, lambda s: None)
+    spy = SpyHoldingsSource(http_for(transport))
     result = spy.normalize(FetchRequest("SPY"), spy.fetch(FetchRequest("SPY")) or b"")
     assert result is not None and result.session_date == date(2026, 10, 1)
     assert spy.normalize(FetchRequest("SPY"), fx.spy([])) is None

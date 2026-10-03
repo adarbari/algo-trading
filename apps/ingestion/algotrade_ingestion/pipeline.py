@@ -38,7 +38,8 @@ def skip_reason(name: str, ctx: TaskContext) -> str | None:
     spec = task(name)
     missing = [s for s in spec.sources if s not in ctx.sources]
     if missing:
-        return f"skipped (not configured or disabled: {', '.join(missing)})"
+        reasons = sorted({ctx.unavailable.get(s, f"{s} is not configured") for s in missing})
+        return f"skipped: {'; '.join(reasons)}"
     return spec.skip(ctx) if spec.skip else None
 
 
@@ -83,7 +84,8 @@ def run_nightly(
 
 def nightly_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
     """Job handler for the nightly workflow. params: ``session``, ``export_dir``, ``workers``.
-    Resources: ``reader``, ``writer``, ``configs``, ``sources`` (by name), ``sources_settings``."""
+    Resources: ``reader``, ``writer``, ``configs``, ``sources`` (by name), ``sources_settings``,
+    ``unavailable`` (source -> why it was not built)."""
     r = ctx.resources
     task_ctx = TaskContext(
         r["reader"],
@@ -92,6 +94,7 @@ def nightly_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]
         r.get("sources_settings") or SourcesSettings(),
         r["configs"],
         user=ctx.user.user_id,
+        unavailable=r.get("unavailable", {}),
     )
     export_dir = Path(params["export_dir"]) if params.get("export_dir") else None
     workers = int(params["workers"]) if params.get("workers") else None

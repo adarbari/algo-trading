@@ -4,7 +4,8 @@ Behaviour carried over from the original liquidity_screen.py and made stricter:
 - every ticker gets a status (OK, NO_CHAIN, NO_STANDARD_SERIES, STALE_DATA, FETCH_ERROR);
   none is dropped;
 - the task is resumable: a re-run for the same session reuses finished tickers;
-- failures get a second, gentler pass with one worker;
+- failures get a second, gentler pass with one worker, after a cool-down the source's shared
+  limiter applies to every process (``Throttled``);
 - raw responses are saved before parsing (``IngestRun.fetch``), so normalisation can be
   replayed.
 
@@ -12,8 +13,7 @@ Per-ticker results are staged, then published as one partition per table and ses
 """
 
 import concurrent.futures as cf
-import time
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 
@@ -22,7 +22,7 @@ import pandas as pd
 from algotrade.data import StoreReader
 from algotrade.data.reference import load_universe, resolver
 from algotrade.storage.runs import RunRecord, RunStatus
-from algotrade_ingestion.sources.base import FetchRequest, Source
+from algotrade_ingestion.sources.base import FetchRequest, Source, Throttled
 from algotrade_ingestion.tasks.framework import IngestRun, NoResponseError, TaskContext
 
 TASK = "option_chains"
@@ -112,7 +112,6 @@ def ingest_option_chains(
     universe: Sequence[Underlying],
     session_date: date,
     config: ChainJobConfig | None = None,
-    sleep: Callable[[float], None] = time.sleep,
 ) -> RunRecord:
     config = config or ChainJobConfig()
     with IngestRun(ctx, TASK, session_date, resume=True) as run:
@@ -121,7 +120,8 @@ def ingest_option_chains(
                   config.workers)  # fmt: skip
         failed = [u for u in universe if run.items.get(u.instrument_id, "").startswith("FETCH")]
         if failed:
-            sleep(config.retry_pause_s)
+            if isinstance(source, Throttled):
+                source.cool_down(config.retry_pause_s)
             _run_pass(run, source, failed, 1)
         _publish(run, universe, source.name)
         counts = run.counts()

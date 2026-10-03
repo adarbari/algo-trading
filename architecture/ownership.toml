@@ -108,22 +108,20 @@ detect = [
 
 [[responsibility]]
 id = "rate-limiting"
-description = "Pace requests to a vendor; one limiter shared across workers and processes"
-owner = ["apps/ingestion/algotrade_ingestion/sources/http.py"]
-target_owner = ["apps/ingestion/algotrade_ingestion/sources/limiter.py"]
-target_pr = 4
+description = "Pace requests to a vendor: one limiter per key, shared across threads and processes (file lock under var/run/limits)"
+owner = ["apps/ingestion/algotrade_ingestion/sources/limiter.py"]
+allowed = ["apps/ingestion/algotrade_ingestion/sources/http.py"]  # retry backoff waits (Retry-After), not pacing
 section = "docs/adr/0019-ownership-and-boundaries.md#r3-tasks-get-sources-from-the-registry"
 detect = [{ call = "MinInterval" }, { attr = "time.sleep" }]
 
 [[responsibility]]
 id = "source-construction"
-description = "Build vendor sources (transport, credentials, pacing) from config/site/sources.toml; vendor specifics stay in sources/"
-owner = ["apps/ingestion/algotrade_ingestion/sources/*"]
-target_owner = ["apps/ingestion/algotrade_ingestion/sources/registry.py"]
-target_pr = 4
+description = "Build vendor sources (transport, credentials, pacing, retries) from config/site/sources.toml: each source declared once; vendor specifics stay in sources/"
+owner = ["apps/ingestion/algotrade_ingestion/sources/registry.py"]
+allowed = ["apps/ingestion/algotrade_ingestion/sources/*"]  # vendor modules import their own helpers (http, base, sec_sic)
 section = "docs/adr/0019-ownership-and-boundaries.md#r3-tasks-get-sources-from-the-registry"
 detect = [
-    { import = "algotrade_ingestion.sources", except = ["algotrade_ingestion.sources.base"] },
+    { import = "algotrade_ingestion.sources", except = ["algotrade_ingestion.sources.base", "algotrade_ingestion.sources.registry"] },
     { string = "nasdaqlisted" },
     { string = "otherlisted" },
     { string = "dividends" },
@@ -155,6 +153,14 @@ detect = [
     { call = "read_parquet" },
     { call = "to_parquet" },
 ]
+
+[[responsibility]]
+id = "locking"
+description = "Exclusive locks across threads and processes (flock): named store locks and the partition run-index lock (storage); the one-writer ingest run lock (services/jobs)"
+owner = ["src/algotrade/storage/locks.py", "src/algotrade/services/jobs/exclusive.py"]
+allowed = ["apps/ingestion/algotrade_ingestion/sources/limiter.py"]  # sources never import storage (R4): the limiter flocks its own state file
+section = "docs/adr/0019-ownership-and-boundaries.md#r2-storage-is-generic"
+detect = [{ import = "fcntl" }, { call = "flock" }]
 
 # --------------------------------------------------------------------------- settings, time, jobs
 
@@ -297,19 +303,6 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/golden.py"
 # --------------------------------------------------------------------------- pending contracts
 # Import-linter contracts that cannot hold until a restructure PR lands. Add each to
 # pyproject.toml in the PR named here (and delete it from this list).
-
-[[pending_contract]]
-name = "R3: ingestion tasks never import vendor modules (sources come from the registry)"
-source_modules = ["algotrade_ingestion.tasks"]
-forbidden_modules = [
-    "algotrade_ingestion.sources.cboe",
-    "algotrade_ingestion.sources.massive",
-    "algotrade_ingestion.sources.nasdaq_earnings",
-    "algotrade_ingestion.sources.nasdaq_trader",
-    "algotrade_ingestion.sources.sec_edgar",
-    "algotrade_ingestion.sources.spy_holdings",
-]
-enabled_by_pr = 4
 
 [[pending_contract]]
 name = "R4: vendor sources never import storage (standard frames carry their own schema)"

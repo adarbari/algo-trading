@@ -34,9 +34,7 @@ TYPED_SETTINGS = {
 }
 # Settings that are parsed but drive nothing today. This list may only shrink: wire the
 # setting up (docs/roadmap.md, track R) or delete it from config/site, then remove it here.
-KNOWN_UNREAD = {
-    "SourcesSettings.cboe_enabled",  # chains always run; PR 5 makes nightly honour it
-}
+KNOWN_UNREAD: set[str] = set()
 
 
 def _paths_matching(pattern: str) -> list[Path]:

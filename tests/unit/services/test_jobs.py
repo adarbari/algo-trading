@@ -94,6 +94,7 @@ def test_errors_and_recovery() -> None:
         "job-noop-x", "noop", {}, "alice", T0 - timedelta(hours=3), JobStatus.RUNNING
     )
     runs.save(abandoned.to_run())
+    assert runner.recover(stale_after=timedelta(0), kinds=["other", "unknown"]) == []
     assert runner.recover(stale_after=timedelta(hours=1)) == ["job-noop-x"]
     recovered = runner.status("job-noop-x")
     assert recovered.status is JobStatus.FAILED
