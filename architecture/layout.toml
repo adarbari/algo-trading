@@ -127,20 +127,24 @@ contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow
 
 [[dir]]
 path = "src/algotrade/data"
-purpose = "the domain read API: the only way consumers read market data (R1)"
+purpose = "the domain read API: the only way consumers read market data (R1); feature inputs by table name (feature_inputs.py)"
 
 [[dir]]
 path = "src/algotrade/features"
-purpose = "versioned rollups: the framework, the definitions and their registry (registry.py)"
+purpose = "the feature store: the framework, the feature groups, the registry (registry.py) and the generated catalogue (catalogue.py)"
+contracts = [
+    "Features read market data only through algotrade.data (never storage)",
+    "Features ask algotrade.data for inputs by table name (data.feature_inputs), never a domain reader",
+]
 
 [[dir]]
 path = "src/algotrade/features/framework"
-purpose = "the rollup framework: declaration, column typing, input loading (through data), per-session runner"
-contracts = ["The rollup framework reads market data only through algotrade.data (never storage)"]
+purpose = "the feature-group framework: Feature and FeatureGroup declarations, column typing, dependency graph, per-session runner"
+contracts = ["Features read market data only through algotrade.data (never storage)"]
 
 [[dir]]
 path = "src/algotrade/features/rollups"
-purpose = "rollup definitions: one module per rollup, a pure compute + its ROLLUP declaration"
+purpose = "feature groups (rollups): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]

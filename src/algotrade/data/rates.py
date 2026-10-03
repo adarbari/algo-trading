@@ -14,6 +14,7 @@ from datetime import date, datetime
 import numpy.typing as npt
 import pandas as pd
 
+from algotrade.core.model.errors import MissingDataError
 from algotrade.data.reference import Snapshot, read_snapshot
 from algotrade.quant.rates import Array, YieldCurve
 from algotrade.storage.tables.readers import StoreReader
@@ -54,3 +55,15 @@ def curve(reader: StoreReader, on: date, as_of: datetime | None = None) -> Curve
     frame, snap = read_snapshot(reader, TABLE, on, HINT, as_of)
     rows = frame.sort_values("tenor_days", kind="stable")[COLUMNS].reset_index(drop=True)
     return Curve(rows, snap)
+
+
+def curve_as_rows(
+    reader: StoreReader, on: date, as_of: datetime | None = None
+) -> pd.DataFrame | None:
+    """The curve ``on`` sees as rows (``COLUMNS`` plus ``curve_date`` and ``pre_snapshot``),
+    or ``None`` when no curve is stored: the feature input ``rates/treasury``."""
+    try:
+        seen = curve(reader, on, as_of)
+    except MissingDataError:
+        return None
+    return seen.frame.assign(curve_date=seen.curve_date, pre_snapshot=seen.pre_snapshot)

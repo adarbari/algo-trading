@@ -33,6 +33,21 @@ contract is enforced, and a fitness test keeps it so (new exceptions need an ADR
 | R5 | Nightly workflow (`workflows/`): isolated steps with status + duration, hard dependencies vs data preconditions, quality + purge always last, COMPLETE / PARTIAL / FAILED rule in one place; exchange calendar `core/time/calendar.py` (NYSE holidays, early closes, `last_closed_session`); catch-up of missed sessions (capped, chains latest only); screens submitted as `screen` jobs (`universe_pre_snapshot` in the audit); failure notification + `var/logs/nightly-latest.json` (`config/site/nightly.toml`); launchd `RunAtLoad` false; apps run jobs through `services.jobs.run_job`, contract R5 | **done** |
 | R6 | Typed site settings: one loader (`config/site/settings.py`) for every `config/site/*.toml`, frozen dataclasses, unknown keys and bad values fail with their path; environment read only in `config/env.py` (the storage factory takes the URL); screens and backtests open / close run records through `storage.runs` (`start_run`, `RunRecord.finish`); golden CSVs are a registered fixture source; OHLCV checks in `core/validation/bars.py`, contract R4 in full; typed table schemas (declared column types, cast on write, `schema_version` stamped, older files cast on read, ~64k-row groups + page index); known violations 11 → 0, no pending contracts | **done** |
 
+## Feature store (FS): features as named, documented columns (ADR 0023)
+
+Pure refactors for stored data unless a step says otherwise: tables, columns and versions stay
+the same. The catalogue of every feature is [data/features.md](data/features.md).
+
+| # | Delivers | Status |
+|---|---|---|
+| FS1 | Per-feature definitions (`Feature`: entity, kind, dtype, unit, description, null meaning, valid range, categories, inputs, version) declared in feature groups (`FeatureGroup`, the eight rollups, byte-identical output); one registry (`GROUPS`, `FEATURES`, `feature(name)` lookups); generated catalogue `docs/data/features.md` (`make features-doc`) with fitness tests | **done** |
+| FS2 | Inputs through `data/`: features ask `data.feature_inputs` by table name (each table's read in its owner; generic stored-group reader); `features/` never imports storage or a domain reader (import-linter); ownership `feature-input-loading` | **done** |
+| FS3 | Features by name: unique group-independent names, copies become references, selections and `FeatureView` can name a feature directly | next |
+| FS4 | Expression features in config: typed expressions over features in `config/site/features.toml`, then per user (L4) | next |
+| FS5 | Virtual by default: expression features computed at read time; materialised only when needed | later |
+| FS6 | Feature quality (null rates, `valid_range` checks in nightly) and `cross_section` features | later |
+| FS7 | New grains (`market`, `contract`, `sector`) when a feature needs one | later |
+
 ## Phase 0 follow-ups (the architecture is the target; these close the gaps)
 
 | # | Item | Lands in |

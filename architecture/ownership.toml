@@ -85,7 +85,7 @@ detect = [{ call = "log1p" }, { call = "interp" }]
 
 [[responsibility]]
 id = "rollup-computation"
-description = "Compute rollups: the Rollup declaration (inputs + lookback, params from rollups.toml, typed columns), loading inputs through algotrade.data, point in time per session, backfills; definitions are pure compute modules, stored only by the rollups task"
+description = "Compute feature groups (rollups): the FeatureGroup declaration (inputs + lookback, params from rollups.toml, declared features), asking algotrade.data for inputs by table name, point in time per session, backfills; groups are pure compute modules, stored only by the rollups task"
 owner = [
     "src/algotrade/features/framework/*",
     "src/algotrade/features/registry.py",
@@ -93,7 +93,33 @@ owner = [
     "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py",
 ]
 section = "docs/data/layers.md#rollups-as-built"
-detect = [{ call = "compute_sessions" }, { call = "compute_one" }, { call = "Rollup" }]
+detect = [{ call = "compute_sessions" }, { call = "compute_one" }, { call = "FeatureGroup" }]
+
+[[responsibility]]
+id = "feature-metadata"
+description = "Feature definitions and their catalogue: each stored column is a Feature (kind, dtype, unit, description, null meaning, range, categories, inputs) declared in its group; the registry indexes them and catalogue.py renders docs/data/features.md (ADR 0023)"
+owner = [
+    "src/algotrade/features/framework/feature.py",
+    "src/algotrade/features/rollups/*",
+    "src/algotrade/features/registry.py",
+    "src/algotrade/features/catalogue.py",
+]
+section = "docs/adr/0023-feature-store.md#decision"
+detect = [{ call = "Feature" }, { string = "docs/data/features.md" }]
+
+[[responsibility]]
+id = "feature-input-loading"
+description = "What a feature group reads, by table name: each input table's point-in-time read for features (from its data owner), slicing per session and lookback, other groups' stored rows with this run's rows winning; features never read storage or a domain reader"
+owner = ["src/algotrade/data/feature_inputs.py"]
+section = "docs/adr/0023-feature-store.md#step-2-inputs-through-data"
+detect = [
+    { call = "session_bars" },
+    { call = "stored_events" },
+    { call = "events_by_event_date" },
+    { call = "share_facts" },
+    { call = "curve_as_rows" },
+    { call = "rollup_rows" },
+]
 
 # --------------------------------------------------------------------------- the ingest loop
 

@@ -1,4 +1,4 @@
-"""Compute rollups for one session or a range of sessions (a backfill), point in time.
+"""Compute feature groups for one session or a range of sessions (a backfill), point in time.
 
 ``compute_sessions`` loads each input once per chunk of up to ``CHUNK`` sessions (the whole
 range for a nightly run; a two-year backfill in a few reads, with bounded memory), then for
@@ -6,7 +6,8 @@ each session hands ``compute`` only the rows on or before that session and types
 result by the declaration (``framework.columns``). The same code path serves one session
 and a backfill, so a backfilled row equals the row computed on its own session.
 
-A rollup that reads another rollup's output gets it through its input loader: from the store
+Inputs are asked of ``algotrade.data`` by table name (``data.feature_inputs.load_input``).
+A group that reads another group's output gets it the same way: from the store
 (the ``rollups`` task computes in dependency order and writes each session before the next
 rollup runs), or from ``produced``, frames computed in this process and not written
 (``compute_in_memory``: a read-only evaluation of a chain of rollups).
@@ -24,10 +25,10 @@ import pandas as pd
 
 from algotrade.config.site.settings import SiteDocuments, load_rollups
 from algotrade.data import StoreReader
+from algotrade.data.feature_inputs import Produced, load_input
 from algotrade.features.framework.columns import conform
-from algotrade.features.framework.declaration import Rollup
+from algotrade.features.framework.declaration import FeatureGroup
 from algotrade.features.framework.graph import dependency_order
-from algotrade.features.framework.inputs import Produced, load_input
 
 CHUNK = 126  # sessions per input load (half a year: ~2 GB of daily bars at most)
 
@@ -41,13 +42,15 @@ class SessionResult:
     no_input: str | None = None
 
 
-def rollup_params(configs: SiteDocuments | None, rollups: Sequence[Rollup]) -> dict[str, Any]:
+def rollup_params(configs: SiteDocuments | None, rollups: Sequence[FeatureGroup]) -> dict[str, Any]:
     """Each rollup's params (``rollups.toml`` over its defaults; defaults without a store)."""
     declared = {r.key: r.params for r in rollups}
     return load_rollups(configs, declared) if configs is not None else dict(declared)
 
 
-def _check_point_in_time(rollup: Rollup, table: str, frame: pd.DataFrame, session: date) -> None:
+def _check_point_in_time(
+    rollup: FeatureGroup, table: str, frame: pd.DataFrame, session: date
+) -> None:
     """Loaders return frames sorted by ``session_date``: the last row is the latest."""
     if "session_date" in frame.columns and len(frame):
         latest = frame["session_date"].iloc[-1]
@@ -57,7 +60,7 @@ def _check_point_in_time(rollup: Rollup, table: str, frame: pd.DataFrame, sessio
 
 def compute_sessions(
     reader: StoreReader,
-    rollup: Rollup,
+    rollup: FeatureGroup,
     sessions: Sequence[date],
     params: Any = None,
     chunk: int = CHUNK,
@@ -72,7 +75,7 @@ def compute_sessions(
 
 def _compute_chunk(
     reader: StoreReader,
-    rollup: Rollup,
+    rollup: FeatureGroup,
     sessions: Sequence[date],
     params: Any,
     produced: Produced | None,
@@ -100,7 +103,7 @@ def _compute_chunk(
 
 
 def compute_one(
-    reader: StoreReader, rollup: Rollup, session: date, params: Any = None
+    reader: StoreReader, rollup: FeatureGroup, session: date, params: Any = None
 ) -> SessionResult:
     """``rollup`` for a single session."""
     return next(compute_sessions(reader, rollup, [session], params))
@@ -108,7 +111,7 @@ def compute_one(
 
 def compute_in_memory(
     reader: StoreReader,
-    rollups: Sequence[Rollup],
+    rollups: Sequence[FeatureGroup],
     sessions: Sequence[date],
     params: Mapping[str, Any] | None = None,
 ) -> dict[str, list[SessionResult]]:
@@ -125,7 +128,7 @@ def compute_in_memory(
     return out
 
 
-def by_key(rollups: Mapping[str, Rollup], only: Sequence[str] | None) -> list[Rollup]:
+def by_key(rollups: Mapping[str, FeatureGroup], only: Sequence[str] | None) -> list[FeatureGroup]:
     """The rollups named in ``only`` (keys ``<name>@v<N>``; all when empty), in registry order
     (dependency order: ``features.registry``)."""
     if not only:

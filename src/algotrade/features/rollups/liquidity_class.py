@@ -30,7 +30,8 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from algotrade.features.framework.declaration import Input, Inputs, Rollup
+from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
+from algotrade.features.framework.feature import Feature
 
 NAME = "liquidity_class"
 VERSION = 1
@@ -41,14 +42,54 @@ CLASSES = ("HIGH", "MEDIUM")
 KNOWN_CHAIN = frozenset({"OK", "NO_CHAIN", "NO_STANDARD_SERIES", "NO_TARGET_EXPIRY"})
 TIER_ORDER = "ABCD"
 
-COLUMNS: dict[str, str] = {
-    "liquidity_class": "str",
-    "adv_usd_20d": "float",
-    "close": "float",
-    "option_tier": "str",
-    "chain_oi": "int",
-    "rule_hash": "str",
-}
+_OPTIONS = tuple(
+    f"option_liquidity.{c}@v1" for c in ("put_tier", "call_tier", "chain_oi", "liq_status")
+)
+_UNKNOWN_OPTIONS = (
+    "unknown: no option_liquidity@v1 for the session, or its chain fetch failed "
+    "(STALE_DATA, FETCH_ERROR, NOT_ATTEMPTED)"
+)
+
+FEATURES = (
+    Feature(
+        "liquidity_class", "str", "category",
+        "HIGH when every HIGH threshold holds (ADV, close, worse option tier, chain OI and "
+        "volume; rollups.toml), else MEDIUM when every MEDIUM one does, else LOW; UNKNOWN when "
+        "an unknown threshold decides it",
+        "never", "label", categories=("HIGH", "MEDIUM", "LOW", "UNKNOWN"),
+        inputs=(
+            "price_stats.adv_usd_20d@v1", "price_stats.close@v1", *_OPTIONS,
+            "option_liquidity.chain_volume@v1",
+        ),
+    ),
+    Feature(
+        "adv_usd_20d", "float", "usd", "price_stats@v1 adv_usd_20d, as classified",
+        "price_stats@v1 adv_usd_20d is null (a gap in the last 20 sessions)", "expression",
+        valid_range=(0, None), inputs=("price_stats.adv_usd_20d@v1",),
+    ),
+    Feature(
+        "close", "float", "usd_per_share", "price_stats@v1 close, as classified",
+        "never: a row exists for each price_stats@v1 row", "expression",
+        valid_range=(0, None), inputs=("price_stats.close@v1",),
+    ),
+    Feature(
+        "option_tier", "str", "category",
+        "The worse of the put and call tier (option_liquidity@v1); D: no usable options, also "
+        "for an instrument the session's chain run did not list",
+        _UNKNOWN_OPTIONS, "expression", categories=("A", "B", "C", "D"), inputs=_OPTIONS,
+    ),
+    Feature(
+        "chain_oi", "int", "count",
+        "Chain open interest from option_liquidity@v1 (0 when the chain run did not list it)",
+        _UNKNOWN_OPTIONS, "expression", valid_range=(0, None), inputs=_OPTIONS,
+    ),
+    Feature(
+        "rule_hash", "str", "text",
+        "The first 12 hex characters of the SHA-256 of the thresholds: which rule made the row",
+        "never", "label",
+    ),
+)  # fmt: skip
+COLUMNS = column_types(FEATURES)
 
 
 @dataclass(frozen=True)
@@ -165,12 +206,12 @@ def compute(inputs: Inputs, session: date, p: LiquidityClassParams) -> pd.DataFr
     return frame.rename_axis("instrument_id").reset_index()[["instrument_id", *COLUMNS]]
 
 
-ROLLUP = Rollup(
+GROUP = FeatureGroup(
     NAME,
     VERSION,
     "HIGH / MEDIUM / LOW liquidity from dollar volume, price and option liquidity thresholds",
     (Input(PRICE_STATS), Input(OPTIONS, required=False)),
-    COLUMNS,
+    FEATURES,
     compute,
     LiquidityClassParams(),
 )

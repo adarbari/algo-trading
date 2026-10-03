@@ -209,12 +209,12 @@ def test_rollup_params_typed_from_the_declared_defaults() -> None:
 
 def test_site_rollups_toml_loads_for_every_registered_rollup() -> None:
     from algotrade.config.site.settings import rollup_params  # noqa: PLC0415
-    from algotrade.features.registry import ROLLUPS  # noqa: PLC0415
+    from algotrade.features.registry import GROUPS  # noqa: PLC0415
 
     doc = tomllib.loads((SITE / "rollups.toml").read_text())
-    params = rollup_params(doc, {k: r.params for k, r in ROLLUPS.items()})
-    assert params["option_liquidity@v1"] == ROLLUPS["option_liquidity@v1"].params  # defaults
-    assert params["price_stats@v1"] == ROLLUPS["price_stats@v1"].params
+    params = rollup_params(doc, {k: r.params for k, r in GROUPS.items()})
+    assert params["option_liquidity@v1"] == GROUPS["option_liquidity@v1"].params  # defaults
+    assert params["price_stats@v1"] == GROUPS["price_stats@v1"].params
 
 
 def figi_store(rows: list[dict[str, str]]) -> MemoryConfigStore:

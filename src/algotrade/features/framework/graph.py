@@ -9,21 +9,21 @@ cycle, so a bad graph fails when the registry is built, not halfway through a ni
 from collections.abc import Iterable, Sequence
 
 from algotrade.core.model.fields import ROLLUP_TABLE_PREFIX
-from algotrade.features.framework.declaration import Rollup
+from algotrade.features.framework.declaration import FeatureGroup
 
 
 def is_rollup_table(table: str) -> bool:
     return table.startswith(ROLLUP_TABLE_PREFIX)
 
 
-def dependencies(rollup: Rollup) -> tuple[str, ...]:
+def dependencies(rollup: FeatureGroup) -> tuple[str, ...]:
     """The keys (``<name>@v<N>``) of the rollups ``rollup`` reads, in declared order."""
     return tuple(
         i.table.removeprefix(ROLLUP_TABLE_PREFIX) for i in rollup.inputs if is_rollup_table(i.table)
     )
 
 
-def _cycle(pending: dict[str, Rollup]) -> list[str]:
+def _cycle(pending: dict[str, FeatureGroup]) -> list[str]:
     """One cycle among ``pending`` (each still has a pending dependency), as a key path."""
     key = next(iter(pending))
     path: list[str] = []
@@ -33,7 +33,9 @@ def _cycle(pending: dict[str, Rollup]) -> list[str]:
     return [*path[path.index(key) :], key]
 
 
-def dependency_order(rollups: Iterable[Rollup], stored_ok: bool = False) -> list[Rollup]:
+def dependency_order(
+    rollups: Iterable[FeatureGroup], stored_ok: bool = False
+) -> list[FeatureGroup]:
     """``rollups`` with every dependency first. Raises ``ValueError`` on a dependency that is
     not among ``rollups`` (unless ``stored_ok``: it is read from the store), a duplicate key,
     or a cycle (naming it)."""
@@ -45,7 +47,7 @@ def dependency_order(rollups: Iterable[Rollup], stored_ok: bool = False) -> list
         unknown = [d for d in dependencies(r) if d not in by_key]
         if unknown and not stored_ok:
             raise ValueError(f"rollup {r.key} reads unregistered rollups {unknown}")
-    done: list[Rollup] = []
+    done: list[FeatureGroup] = []
     pending = dict(by_key)
     while pending:
         ready = [r for r in pending.values() if not any(d in pending for d in dependencies(r))]
@@ -57,7 +59,7 @@ def dependency_order(rollups: Iterable[Rollup], stored_ok: bool = False) -> list
     return done
 
 
-def dependents(rollups: Sequence[Rollup], key: str) -> set[str]:
+def dependents(rollups: Sequence[FeatureGroup], key: str) -> set[str]:
     """Every rollup that reads ``key``, directly or through another rollup."""
     out: set[str] = set()
     frontier = {key}

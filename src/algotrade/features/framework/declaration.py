@@ -1,25 +1,31 @@
-"""The ``Rollup`` declaration: what a rollup reads, its parameters, its typed output columns
-and its pure ``compute``.
+"""The ``FeatureGroup`` declaration: features computed and stored together, what they read,
+their parameters and the pure ``compute``.
 
-A rollup is ``<name>@v<N>``, stored as ``rollups/instrument/<name>@v<N>`` with one row per
-instrument per session. Everything else is derived from the declaration: the selection
-catalogue (``rollup.<name>@v<N>.<column>``), the stored column types (``framework.columns``),
-the ``rollups.toml`` section (``params``) and the inputs the runner loads.
+A group is ``<name>@v<N>``, stored as ``rollups/instrument/<name>@v<N>`` with one row per
+instrument per session (today's groups are the rollups). It declares its features
+(``framework.feature.Feature``: one typed, documented column each) and everything else is
+derived from the declaration: the selection catalogue (``rollup.<name>@v<N>.<column>``), the
+stored column types (``framework.columns``), the ``rollups.toml`` section (``params``), the
+inputs the runner loads (through ``data.feature_inputs``) and the feature catalogue.
 
 ``compute(inputs, session, params)`` is pure: ``inputs`` maps each declared input table to
 its frame for the session (rows on or before the session only, ``None`` when an optional
-input has nothing), and it returns ``instrument_id`` plus the declared columns.
+input has nothing), and it returns ``instrument_id`` plus the declared feature columns.
+
+A group is re-versioned only when its stored columns change (a new column, a changed
+definition or window); each feature records its own version, equal to the group's for now.
 """
 
 import re
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field, is_dataclass
+from dataclasses import dataclass, field, is_dataclass, replace
 from datetime import date
 from typing import Any
 
 import pandas as pd
 
-from algotrade.core.model.fields import FIELD_TYPES, ROLLUP_TABLE_PREFIX
+from algotrade.core.model.fields import ROLLUP_TABLE_PREFIX
+from algotrade.features.framework.feature import Feature, feature_problems
 
 type Inputs = Mapping[str, pd.DataFrame | None]
 type Compute = Callable[[Inputs, date, Any], pd.DataFrame]
@@ -32,7 +38,7 @@ RESERVED = frozenset({"instrument_id", "session_date", "knowledge_ts", "source",
 @dataclass(frozen=True)
 class Input:
     """One input table. ``lookback``: earlier exchange sessions also needed (an int, or a
-    function of the params). ``required``: without data for the session the rollup has
+    function of the params). ``required``: without data for the session the group has
     nothing to compute (the runner reports NO_INPUT instead of calling ``compute``)."""
 
     table: str
@@ -46,22 +52,31 @@ class Input:
         return n
 
 
+def column_types(features: tuple[Feature, ...]) -> dict[str, str]:
+    """``{column: dtype}`` in declared order (the stored column order)."""
+    return {f.name: f.dtype for f in features}
+
+
 @dataclass(frozen=True)
-class Rollup:
+class FeatureGroup:
     name: str
     version: int
     description: str
     inputs: tuple[Input, ...]
-    columns: Mapping[str, str]  # output column -> field type ("str" | "float" | ...)
+    features: tuple[Feature, ...]
     compute: Compute = field(repr=False)
     # A frozen dataclass of default parameters (scalar fields are rollups.toml keys), or
-    # ``None``: the rollup takes no parameters.
+    # ``None``: the group takes no parameters.
     params: Any = None
 
     def __post_init__(self) -> None:
+        owned = tuple(
+            replace(f, version=f.version or self.version, group=self.key) for f in self.features
+        )
+        object.__setattr__(self, "features", owned)
         problems = declaration_problems(self)
         if problems:
-            raise ValueError(f"rollup {self.name}@v{self.version}: {'; '.join(problems)}")
+            raise ValueError(f"feature group {self.key}: {'; '.join(problems)}")
 
     @property
     def key(self) -> str:
@@ -71,26 +86,38 @@ class Rollup:
     def table(self) -> str:
         return f"{ROLLUP_TABLE_PREFIX}{self.key}"
 
+    @property
+    def columns(self) -> Mapping[str, str]:
+        """Output column -> field type, in declared order."""
+        return column_types(self.features)
 
-def declaration_problems(rollup: Rollup) -> list[str]:
+    def feature(self, column: str) -> Feature:
+        return next(f for f in self.features if f.name == column)
+
+
+def declaration_problems(group: FeatureGroup) -> list[str]:
     """Why a declaration is invalid (empty: valid)."""
     problems = []
-    if not _NAME.match(rollup.name):
+    if not _NAME.match(group.name):
         problems.append(f"name must match {_NAME.pattern}")
-    if rollup.version < 1:
+    if group.version < 1:
         problems.append("version must be >= 1")
-    if not rollup.inputs:
+    if not group.inputs:
         problems.append("declare at least one input")
-    if len({i.table for i in rollup.inputs}) != len(rollup.inputs):
+    if len({i.table for i in group.inputs}) != len(group.inputs):
         problems.append("inputs are declared twice")
-    if not rollup.columns:
-        problems.append("declare at least one output column")
-    bad = sorted(c for c, t in rollup.columns.items() if t not in FIELD_TYPES)
-    if bad:
-        problems.append(f"columns {bad}: types must be one of {sorted(FIELD_TYPES)}")
-    clash = sorted(set(rollup.columns) & RESERVED)
+    if not group.features:
+        problems.append("declare at least one feature")
+    names = [f.name for f in group.features]
+    if len(set(names)) != len(names):
+        problems.append("features are declared twice")
+    clash = sorted(set(names) & RESERVED)
     if clash:
         problems.append(f"columns {clash} are reserved")
-    if rollup.params is not None and not is_dataclass(rollup.params):
+    for f in group.features:
+        problems += feature_problems(f)
+        if f.version != group.version:
+            problems.append(f"{f.name}: version must be the group's ({group.version}) for now")
+    if group.params is not None and not is_dataclass(group.params):
         problems.append("params must be a dataclass instance (or None)")
     return problems

@@ -66,9 +66,10 @@ Fields come from a catalogue built from the code, so a typo or a type mismatch f
 | Field | Source table | Example |
 |---|---|---|
 | `instrument.<column>` | L1 `instruments/reference`; company columns from `instruments/company` | `instrument.security_type`, `instrument.is_leveraged`, `instrument.sector` |
-| `rollup.<name>@v<N>.<column>` | `rollups/instrument/<name>@v<N>` (columns and types declared on the rollup, `features/registry.py`) | `rollup.option_liquidity@v1.put_tier`, `rollup.price_stats@v1.hv30`, `rollup.price_stats@v1.adv_usd_20d`, `rollup.earnings@v1.days_to_earnings`, `rollup.fundamentals@v1.market_cap` |
+| `rollup.<name>@v<N>.<column>` | `rollups/instrument/<name>@v<N>` (each column a declared feature of the group, `features/registry.py`) | `rollup.option_liquidity@v1.put_tier`, `rollup.price_stats@v1.hv30`, `rollup.price_stats@v1.adv_usd_20d`, `rollup.earnings@v1.days_to_earnings`, `rollup.fundamentals@v1.market_cap` |
 
-Selectable rollup fields today ([data/layers.md](data/layers.md#rollups-as-built) has the rules):
+Selectable rollup fields today ([data/layers.md](data/layers.md#rollups-as-built) has the rules;
+[data/features.md](data/features.md) gives each one's meaning, unit, valid values and when it is null):
 
 | Rollup | Fields (type) |
 |---|---|

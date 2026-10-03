@@ -36,7 +36,8 @@ from datetime import date, timedelta
 import numpy as np
 import pandas as pd
 
-from algotrade.features.framework.declaration import Input, Inputs, Rollup
+from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
+from algotrade.features.framework.feature import Feature
 
 NAME = "fundamentals"
 VERSION = 1
@@ -45,14 +46,46 @@ PRICE_STATS = "rollups/instrument/price_stats@v1"
 SPLITS = "events/split"
 DEI, WEIGHTED = "dei", "weighted_basic"
 
-COLUMNS: dict[str, str] = {
-    "shares_outstanding": "float",
-    "shares_as_of": "date",
-    "shares_filed": "date",
-    "shares_source": "str",
-    "market_cap": "float",
-    "market_cap_status": "str",
-}
+_NO_SHARES = "no share-count fact filed by the session (ETFs, funds, no CIK): NO_SHARES"
+_FACTS = (f"{SHARES}.shares", f"{SHARES}.concept", f"{SHARES}.filed", f"{SHARES}.period_end")
+
+FEATURES = (
+    Feature(
+        "shares_outstanding", "float", "shares",
+        "Shares outstanding (company total of every class), split-adjusted to the session: "
+        "the latest cover-page count (dei) while the company tags it, else the latest "
+        "weighted average basic",
+        _NO_SHARES, valid_range=(0, None), inputs=(*_FACTS, f"{SPLITS}.ratio"),
+    ),
+    Feature(
+        "shares_as_of", "date", "date",
+        "The count's period end (the cover date, or the end of the averaged period)",
+        _NO_SHARES, inputs=(f"{SHARES}.period_end",),
+    ),
+    Feature(
+        "shares_filed", "date", "date", "The filing date that made the count public",
+        _NO_SHARES, inputs=(f"{SHARES}.filed",),
+    ),
+    Feature(
+        "shares_source", "str", "category",
+        "Which count: dei (cover page) or weighted_basic (weighted average basic)",
+        _NO_SHARES, "label", categories=(DEI, WEIGHTED), inputs=(f"{SHARES}.concept",),
+    ),
+    Feature(
+        "market_cap", "float", "usd",
+        "shares_outstanding x close (the company total times this class's close)",
+        "market_cap_status is not OK", "expression", valid_range=(0, None),
+        inputs=("fundamentals.shares_outstanding@v1", "price_stats.close@v1"),
+    ),
+    Feature(
+        "market_cap_status", "str", "category",
+        "OK; NO_SHARES (no count); STALE (period end more than stale_days, 400, before the "
+        "session; the count is still shown); NO_PRICE (no close)",
+        "never", "label", categories=("OK", "NO_SHARES", "STALE", "NO_PRICE"),
+        inputs=("fundamentals.shares_outstanding@v1", "price_stats.close@v1"),
+    ),
+)  # fmt: skip
+COLUMNS = column_types(FEATURES)
 
 
 @dataclass(frozen=True)
@@ -135,7 +168,7 @@ def compute(inputs: Inputs, session: date, p: FundamentalsParams) -> pd.DataFram
     )
 
 
-ROLLUP = Rollup(
+GROUP = FeatureGroup(
     NAME,
     VERSION,
     "Shares outstanding (SEC company facts, point in time by filing date) and market cap",
@@ -144,7 +177,7 @@ ROLLUP = Rollup(
         Input(SHARES, required=False),
         Input(SPLITS, lookback=split_lookback, required=False),
     ),
-    COLUMNS,
+    FEATURES,
     compute,
     FundamentalsParams(),
 )

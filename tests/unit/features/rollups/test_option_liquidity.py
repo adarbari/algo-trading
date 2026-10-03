@@ -5,7 +5,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from algotrade.core.model.options import OptionRight, third_friday
-from algotrade.features.registry import ROLLUPS
+from algotrade.features.registry import GROUPS
 from algotrade.features.rollups import option_liquidity as liq
 from tests.unit.features import legacy_reference
 
@@ -134,7 +134,7 @@ def test_contracts_from_rows_normalises_types() -> None:
 
 
 def test_registered() -> None:
-    assert ROLLUPS["option_liquidity@v1"].table == "rollups/instrument/option_liquidity@v1"
+    assert GROUPS["option_liquidity@v1"].table == "rollups/instrument/option_liquidity@v1"
 
 
 # ----------------------------------------------------------------- equivalence with the original

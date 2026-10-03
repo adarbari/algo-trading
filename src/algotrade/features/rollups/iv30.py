@@ -44,7 +44,8 @@ import numpy as np
 import pandas as pd
 
 from algotrade.core.model.options import standard_monthly_expiries
-from algotrade.features.framework.declaration import Input, Inputs, Rollup
+from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
+from algotrade.features.framework.feature import Feature
 from algotrade.quant.implied_vol import IVStatus, implied_vol, interpolate_total_variance
 from algotrade.quant.rates import DAYS_PER_YEAR, YieldCurve
 
@@ -57,18 +58,75 @@ DIVIDENDS = "rollups/instrument/dividends@v1"
 # Expiry-level failures, most informative last: an underlying reports the worst it reached.
 FAILURES = ("NO_QUOTES", "WIDE_SPREADS", "ILLIQUID", "IV_FAILED")
 
-COLUMNS: dict[str, str] = {
-    "iv30": "float",
-    "iv30_cboe": "float",
-    "iv30_status": "str",
-    "near_expiry": "date",
-    "far_expiry": "date",
-    "atm_strike_near": "float",
-    "spot": "float",
-    "rate": "float",
-    "div_yield": "float",
-    "n_quotes_used": "int",
-}
+_STATUSES = (
+    "OK", "SINGLE_EXPIRY", "NO_SPOT", "NO_CHAIN", "NO_EXPIRY", "NO_QUOTES", "WIDE_SPREADS",
+    "ILLIQUID", "IV_FAILED",
+)  # fmt: skip
+_QUOTES = tuple(f"{OPTIONS}.{c}" for c in ("bid", "ask", "strike", "expiry", "open_interest"))
+_SPOT = f"{UNDERLYINGS}.price"
+_NO_EXPIRY = "no expiry was selected (NO_SPOT, NO_CHAIN or NO_EXPIRY)"
+
+FEATURES = (
+    Feature(
+        "iv30", "float", "decimal",
+        "Our 30-calendar-day at-the-money implied volatility: forward ATM vols of the two "
+        "expiries around 30 days, interpolated in total variance (ADR 0021)",
+        "iv30_status is neither OK nor SINGLE_EXPIRY (the status says why)", "chain",
+        valid_range=(0, 5),
+        inputs=(*_QUOTES, _SPOT, f"{RATES}.rate_cont", "dividends.div_yield@v1"),
+    ),
+    Feature(
+        "iv30_cboe", "float", "decimal", "The feed's 30-day implied volatility, as a decimal",
+        "no underlying quote for it, or the feed gives no IV30", "chain", valid_range=(0, 5),
+        inputs=(f"{UNDERLYINGS}.iv30",),
+    ),
+    Feature(
+        "iv30_status", "str", "category",
+        "Why iv30 has a value or not; the first failing step wins (SINGLE_EXPIRY: one usable "
+        "expiry, flat vol, still a value)",
+        "never", "label", categories=_STATUSES, inputs=(*_QUOTES, _SPOT),
+    ),
+    Feature(
+        "near_expiry", "date", "date",
+        "The selected expiry at or before 30 days out (standard monthlies first, 7..90 days)",
+        f"no expiry in 7..90 days at or before the target, or {_NO_EXPIRY}", "chain",
+        inputs=(f"{OPTIONS}.expiry",),
+    ),
+    Feature(
+        "far_expiry", "date", "date",
+        "The selected expiry at or after 30 days out (standard monthlies first, 7..90 days)",
+        f"no expiry in 7..90 days at or after the target, or {_NO_EXPIRY}", "chain",
+        inputs=(f"{OPTIONS}.expiry",),
+    ),
+    Feature(
+        "atm_strike_near", "float", "usd_per_share",
+        "The listed strike nearest the forward in the near expiry (the far one without a near)",
+        _NO_EXPIRY, "chain", valid_range=(0, None), inputs=(f"{OPTIONS}.strike", _SPOT),
+    ),
+    Feature(
+        "spot", "float", "usd_per_share", "The underlying's price captured with the chain",
+        "no positive underlying price (NO_SPOT)", "chain", valid_range=(0, None),
+        inputs=(_SPOT,),
+    ),
+    Feature(
+        "rate", "float", "decimal",
+        "Continuous risk-free rate at 30 days, from the Treasury curve the session sees",
+        "never (the curve is a required input)", "chain",
+        valid_range=(-0.05, 0.25), inputs=(f"{RATES}.rate_cont",),
+    ),
+    Feature(
+        "div_yield", "float", "decimal",
+        "The dividend yield q used for the forward, as read from dividends@v1",
+        "dividends@v1 has no yield for it (UNKNOWN; priced with q = 0)", "expression",
+        valid_range=(0, 1), inputs=("dividends.div_yield@v1",),
+    ),
+    Feature(
+        "n_quotes_used", "int", "count",
+        "Option quotes whose implied vols were averaged, across both expiries",
+        "never (0 when none)", "chain", valid_range=(0, None), inputs=_QUOTES,
+    ),
+)  # fmt: skip
+COLUMNS = column_types(FEATURES)
 
 
 @dataclass(frozen=True)
@@ -295,7 +353,7 @@ def compute(inputs: Inputs, session: date, p: Iv30Params) -> pd.DataFrame:
     return out.join(terms).reset_index().reindex(columns=["instrument_id", *COLUMNS])
 
 
-ROLLUP = Rollup(
+GROUP = FeatureGroup(
     NAME,
     VERSION,
     "Our 30-day ATM implied vol (forward ATM, put/call mid IVs, total-variance term "
@@ -306,7 +364,7 @@ ROLLUP = Rollup(
         Input(UNDERLYINGS, required=False),
         Input(DIVIDENDS, required=False),
     ),
-    COLUMNS,
+    FEATURES,
     compute,
     Iv30Params(),
 )

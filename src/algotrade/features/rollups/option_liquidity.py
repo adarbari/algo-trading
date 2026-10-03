@@ -31,39 +31,141 @@ from typing import Any, cast
 import pandas as pd
 
 from algotrade.core.model.options import OptionRight, standard_monthly_expiries
-from algotrade.features.framework.declaration import Input, Inputs, Rollup
+from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
+from algotrade.features.framework.feature import Feature
 
 NAME = "option_liquidity"
 VERSION = 1
 
-_SIDE_COLUMNS = {
-    "tier": "str",
-    "strike": "float",
-    "delta": "float",
-    "bid": "float",
-    "ask": "float",
-    "spread_abs": "float",
-    "spread_pct": "float",
-    "strike_oi": "int",
-    "zone_oi": "int",
-    "zone_vol": "int",
-    "missing_delta": "int",
-}
-COLUMNS: dict[str, str] = {
-    "liq_status": "str",
-    "chain_oi": "int",
-    "chain_volume": "int",
-    "expiries_within_60d": "int",
-    "target_expiry": "date",
-    "target_dte": "int",
-    "short_put_ok": "bool",
-    "short_call_ok": "bool",
-    "underlying_price": "float",
-    "iv30": "float",
-    "stock_volume": "float",
-    "chain_asof": "date",
-    **{f"{side}_{col}": kind for side in ("put", "call") for col, kind in _SIDE_COLUMNS.items()},
-}
+_Q = "chains/option_quotes"
+_U = "chains/underlying_quotes"
+_STATUS = "chains/status.status"
+_CONTRACTS = tuple(f"{_Q}.{c}" for c in ("expiry", "strike", "right", "open_interest", "volume"))
+_PICK = tuple(f"{_Q}.{c}" for c in ("bid", "ask", "delta", "strike", "open_interest"))
+_NO_CHAIN = "no standard-series contracts (NO_STANDARD_SERIES), or the chain fetch failed"
+_NO_TARGET = "no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+_NO_QUOTE = "no underlying quote captured with the session's chain"
+_TIERS = ("A", "B", "C", "D")
+
+
+def _side(side: str) -> tuple[Feature, ...]:
+    """The per-side features (puts and calls are scored separately)."""
+    no_pick = f"no two-sided {side} quote with a delta at the target expiry; or {_NO_TARGET}"
+    delta = (-1.0, 0.0) if side == "put" else (0.0, 1.0)
+    return (
+        Feature(
+            f"{side}_tier", "str", "category",
+            f"Short-{side} tier: the first of A..C whose spread, zone OI, chain OI and bid "
+            "limits the short strike meets, else D (not tradeable)",
+            "never", "label", categories=_TIERS, inputs=(*_PICK, f"{_Q}.volume"),
+        ),
+        Feature(
+            f"{side}_strike", "float", "usd_per_share",
+            f"The short {side} strike: tightest relative spread with 0.20 <= |delta| <= 0.40 "
+            "(ties: higher OI), else the two-sided quote nearest |delta| 0.30",
+            no_pick, "chain", valid_range=(0, None), inputs=_PICK,
+        ),
+        Feature(
+            f"{side}_delta", "float", "ratio", "The short strike's delta (the feed's, 3 places)",
+            no_pick, "chain", valid_range=delta, inputs=(f"{_Q}.delta",),
+        ),
+        Feature(
+            f"{side}_bid", "float", "usd_per_share", "The short strike's bid",
+            no_pick, "chain", valid_range=(0, None), inputs=(f"{_Q}.bid",),
+        ),
+        Feature(
+            f"{side}_ask", "float", "usd_per_share", "The short strike's ask",
+            no_pick, "chain", valid_range=(0, None), inputs=(f"{_Q}.ask",),
+        ),
+        Feature(
+            f"{side}_spread_abs", "float", "usd_per_share", "ask - bid at the short strike",
+            no_pick, "chain", valid_range=(0, None), inputs=(f"{_Q}.bid", f"{_Q}.ask"),
+        ),
+        Feature(
+            f"{side}_spread_pct", "float", "decimal", "(ask - bid) / mid at the short strike",
+            no_pick, "chain", valid_range=(0, 2), inputs=(f"{_Q}.bid", f"{_Q}.ask"),
+        ),
+        Feature(
+            f"{side}_strike_oi", "int", "count", "Open interest at the short strike",
+            no_pick, "chain", valid_range=(0, None), inputs=(f"{_Q}.open_interest",),
+        ),
+        Feature(
+            f"{side}_zone_oi", "int", "count",
+            f"Open interest of the target expiry's {side}s with 0.15 <= |delta| <= 0.40",
+            _NO_TARGET, "chain", valid_range=(0, None), inputs=_CONTRACTS,
+        ),
+        Feature(
+            f"{side}_zone_vol", "int", "count",
+            f"Volume of the target expiry's {side}s with 0.15 <= |delta| <= 0.40",
+            _NO_TARGET, "chain", valid_range=(0, None), inputs=_CONTRACTS,
+        ),
+        Feature(
+            f"{side}_missing_delta", "int", "count",
+            f"The target expiry's {side}s without a delta (counted, not dropped)",
+            _NO_TARGET, "chain", valid_range=(0, None), inputs=(f"{_Q}.delta",),
+        ),
+    )  # fmt: skip
+
+
+FEATURES = (
+    Feature(
+        "liq_status", "str", "category",
+        "OK, NO_STANDARD_SERIES, NO_TARGET_EXPIRY, or the chain fetch status when it failed "
+        "(NO_CHAIN, STALE_DATA: ..., FETCH_ERROR, NOT_ATTEMPTED)",
+        "never", "label", inputs=(_STATUS, *_CONTRACTS),
+    ),
+    Feature(
+        "chain_oi", "int", "count", "Open interest across every standard-series contract",
+        _NO_CHAIN, "chain", valid_range=(0, None), inputs=(f"{_Q}.open_interest",),
+    ),
+    Feature(
+        "chain_volume", "int", "count", "Volume across every standard-series contract",
+        _NO_CHAIN, "chain", valid_range=(0, None), inputs=(f"{_Q}.volume",),
+    ),
+    Feature(
+        "expiries_within_60d", "int", "count", "Listed expiries 0..60 calendar days out",
+        _NO_CHAIN, "chain", valid_range=(0, None), inputs=(f"{_Q}.expiry",),
+    ),
+    Feature(
+        "target_expiry", "date", "date",
+        "The standard monthly closest to 35 days within 21..60 days, else any expiry in that "
+        "window, else any at least 14 days out",
+        _NO_TARGET, "chain", inputs=(f"{_Q}.expiry",),
+    ),
+    Feature(
+        "target_dte", "int", "days", "Calendar days from the session to the target expiry",
+        _NO_TARGET, "chain", valid_range=(0, None), inputs=(f"{_Q}.expiry",),
+    ),
+    Feature(
+        "short_put_ok", "bool", "flag", "put_tier is one of the OK tiers (A, B)",
+        _NO_TARGET, "expression", inputs=("option_liquidity.put_tier@v1",),
+    ),
+    Feature(
+        "short_call_ok", "bool", "flag", "call_tier is one of the OK tiers (A, B)",
+        _NO_TARGET, "expression", inputs=("option_liquidity.call_tier@v1",),
+    ),
+    Feature(
+        "underlying_price", "float", "usd_per_share",
+        "The underlying's price captured with the chain", _NO_QUOTE, "chain",
+        valid_range=(0, None), inputs=(f"{_U}.price",),
+    ),
+    Feature(
+        "iv30", "float", "pct_points",
+        "The feed's 30-day implied volatility as quoted (a percentage: 25.3 is 25.3%)",
+        _NO_QUOTE, "chain", valid_range=(0, 500), inputs=(f"{_U}.iv30",),
+    ),
+    Feature(
+        "stock_volume", "float", "shares", "The underlying's share volume, from the feed",
+        _NO_QUOTE, "chain", valid_range=(0, None), inputs=(f"{_U}.volume",),
+    ),
+    Feature(
+        "chain_asof", "date", "date", "When the feed's chain snapshot was taken",
+        _NO_QUOTE, "chain", inputs=(f"{_U}.ts",),
+    ),
+    *_side("put"),
+    *_side("call"),
+)  # fmt: skip
+COLUMNS = column_types(FEATURES)
 
 
 @dataclass(frozen=True)
@@ -282,7 +384,7 @@ def compute(inputs: Inputs, session: date, params: LiquidityParams) -> pd.DataFr
     )
 
 
-ROLLUP = Rollup(
+GROUP = FeatureGroup(
     NAME,
     VERSION,
     "Short-premium tradeability tiers (A-D) for puts and calls at the target expiry",
@@ -291,7 +393,7 @@ ROLLUP = Rollup(
         Input("chains/option_quotes", required=False),
         Input("chains/underlying_quotes", required=False),
     ),
-    COLUMNS,
+    FEATURES,
     compute,
     LiquidityParams(),
 )
