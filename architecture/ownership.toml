@@ -320,6 +320,7 @@ owner = ["apps/ingestion/algotrade_ingestion/tasks/verification/*"]
 allowed = [
     "src/algotrade/storage/tables/schemas.py",  # declares the table
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the session's rows
+    "src/algotrade/services/explore/ingestion.py",  # shows them read-only (/admin/verification/ibkr)
 ]
 section = "docs/adr/0026-live-verification-ibkr.md#the-verify-task"
 detect = [{ string = "verification/ibkr" }, { call = "compare_bars" }, { call = "Grader" }]

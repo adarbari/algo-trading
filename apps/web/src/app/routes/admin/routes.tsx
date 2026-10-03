@@ -5,6 +5,7 @@ import { WorkspaceLayout } from '../../layouts';
 import { ADMIN, workspaceGuard } from '../../workspaces';
 import { rootRoute } from '../root';
 import { placeholderRoute } from '../section-route';
+import { ingestionRoute } from './ingestion';
 
 export const adminRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -14,7 +15,7 @@ export const adminRoute = createRoute({
 });
 
 export const adminRoutes = adminRoute.addChildren([
-  placeholderRoute(adminRoute, ADMIN, '/admin/ingestion', 'ingestion'),
+  ingestionRoute(adminRoute),
   placeholderRoute(adminRoute, ADMIN, '/admin/screener-runs', 'screener-runs'),
   placeholderRoute(adminRoute, ADMIN, '/admin/users', 'users'),
 ]);

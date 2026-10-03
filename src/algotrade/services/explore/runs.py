@@ -5,7 +5,9 @@ Reads the records through the store (never the ingestion app): the nightly workf
 ``nightly`` record per session whose ``stats.steps`` hold each step's status, duration and
 result counts; every other job saves per-item statuses (``items``: key -> status, where a
 status may carry a detail after a colon, e.g. ``STALE_DATA: chain is for 2026-10-01``);
-failures are grouped by ``services.run_items``, as the nightly report groups them.
+failures are grouped by ``services.run_items``, as the nightly report groups them. Also every
+item of a run (the run-record drawer) and the latest data-quality checks (``data_quality``
+records' ``stats.checks``).
 """
 
 from collections import Counter
@@ -120,14 +122,20 @@ def failure_groups(items: dict[str, str]) -> list[FailureGroup]:
     ]
 
 
-def run_detail(store: ReadStore, run_id: str) -> RunDetail:
-    """One run record by id; ``NotFoundError`` when there is none."""
+def _load(store: ReadStore, run_id: str) -> RunRecord:
+    """One run record by id; ``NotFoundError`` when there is none (or the id is invalid)."""
     try:
         run = store.reader.run(run_id)
     except ValueError as exc:  # not a valid storage key
         raise NotFoundError(f"run {run_id!r}: {exc}") from exc
     if run is None:
         raise NotFoundError(f"no run {run_id!r}")
+    return run
+
+
+def run_detail(store: ReadStore, run_id: str) -> RunDetail:
+    """One run record by id; ``NotFoundError`` when there is none."""
+    run = _load(store, run_id)
     by_status = Counter(status_code(str(s)) for s in run.items.values())
     return RunDetail(
         run_id=run.run_id,
@@ -142,3 +150,53 @@ def run_detail(store: ReadStore, run_id: str) -> RunDetail:
         failures=failure_groups(run.items),
         stats=run.stats,
     )
+
+
+@dataclass(frozen=True)
+class RunItem:
+    key: str  # the item (a ticker, an instrument id, a step, a check)
+    code: str  # the status code (``STALE_DATA``)
+    status: str  # as recorded, with its detail (``STALE_DATA: chain is for 2026-10-01``)
+
+
+def run_items(store: ReadStore, run_id: str) -> list[RunItem]:
+    """Every item of one run record with its status, sorted by key (the run-record drawer and
+    its CSV); ``NotFoundError`` when there is no such run."""
+    run = _load(store, run_id)
+    return [RunItem(k, status_code(str(s)), str(s)) for k, s in sorted(run.items.items())]
+
+
+QUALITY = "data_quality"  # the job of the nightly data-quality checks
+
+
+@dataclass(frozen=True)
+class QualityCheck:
+    name: str
+    status: str  # PASS | WARN | FAIL
+    detail: str  # what was measured, against which rule
+
+
+@dataclass(frozen=True)
+class QualityReport:
+    run_id: str
+    session: date
+    status: str  # the run's: complete | partial | failed
+    finished_at: datetime | None
+    checks: list[QualityCheck]
+
+
+def quality_checks(store: ReadStore, on: date | None = None) -> QualityReport:
+    """The latest data-quality run for the latest session on or before ``on`` (default: the
+    latest); ``NotFoundError`` when there is none."""
+    found = [r for r in store.reader.runs(QUALITY) if on is None or r.session_date <= on]
+    if not found:
+        detail = f" on or before {on}" if on else ""
+        raise NotFoundError(f"no data-quality run{detail}")
+    run = max(found, key=lambda r: (r.session_date, r.started_at))
+    stored = run.stats.get("checks")
+    checks = [
+        QualityCheck(str(c.get("name", "")), str(c.get("status", "")), str(c.get("detail", "")))
+        for c in (stored if isinstance(stored, list) else [])
+        if isinstance(c, dict)
+    ] or [QualityCheck(name, str(status), "") for name, status in run.items.items()]
+    return QualityReport(run.run_id, run.session_date, run.status.value, run.finished_at, checks)

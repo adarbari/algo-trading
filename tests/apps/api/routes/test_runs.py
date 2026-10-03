@@ -30,3 +30,13 @@ def test_run_detail_groups_failures_by_reason(client: TestClient, ids: dict[str,
 def test_unknown_or_invalid_run_is_404(client: TestClient) -> None:
     assert client.get("/admin/runs/nope").status_code == 404
     assert client.get("/admin/runs/.hidden").status_code == 404
+
+
+def test_run_items_lists_every_item_with_its_code(client: TestClient, ids: dict[str, str]) -> None:
+    items = client.get(f"/admin/runs/{ids['chains']}/items").json()
+    assert items == [
+        {"key": "AAA", "code": "OK", "status": "OK"},
+        {"key": "BBB", "code": "NO_CHAIN", "status": "NO_CHAIN"},
+        {"key": "CCC", "code": "STALE_DATA", "status": "STALE_DATA: chain is for 2022-11-21"},
+    ]
+    assert client.get("/admin/runs/nope/items").status_code == 404

@@ -459,7 +459,7 @@ purpose = "the shell: entry, App (providers around the router); composition only
 
 [[web_dir]]
 path = "apps/web/src/app/providers"
-purpose = "app-wide providers: UiProvider, the TanStack Query client"
+purpose = "app-wide providers: UiProvider, ToastProvider, the TanStack Query client"
 
 [[web_dir]]
 path = "apps/web/src/app/router"

@@ -1,0 +1,1811 @@
+{
+  "_comment": "Shaped from real API responses of 2026-10-02 (trimmed: 2 nightly runs, 25 items, 5 leveraged ETFs; verification failing rows from the first verify run of that day; fetch tiers added). Served by e2e/admin-ingestion.spec.ts.",
+  "/admin/ingestion/completeness": {
+    "sessions": [
+      "2026-09-21",
+      "2026-09-22",
+      "2026-09-23",
+      "2026-09-24",
+      "2026-09-25",
+      "2026-09-28",
+      "2026-09-29",
+      "2026-09-30",
+      "2026-10-01",
+      "2026-10-02"
+    ],
+    "datasets": [
+      "instruments/reference",
+      "universe",
+      "bars/1d",
+      "chains/option_quotes",
+      "rollups/instrument/option_liquidity@v1",
+      "rollups/instrument/price_stats@v2",
+      "rollups/instrument/earnings@v1",
+      "rollups/instrument/iv30@v1",
+      "rollups/instrument/dividends@v2",
+      "rollups/instrument/iv_history@v2",
+      "rollups/instrument/fundamentals@v2"
+    ],
+    "cells": [
+      {
+        "dataset": "instruments/reference",
+        "session": "2026-09-21",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no snapshot on or before",
+        "run_ids": []
+      },
+      {
+        "dataset": "instruments/reference",
+        "session": "2026-09-22",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no snapshot on or before",
+        "run_ids": []
+      },
+      {
+        "dataset": "instruments/reference",
+        "session": "2026-09-23",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no snapshot on or before",
+        "run_ids": []
+      },
+      {
+        "dataset": "instruments/reference",
+        "session": "2026-09-24",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no snapshot on or before",
+        "run_ids": []
+      },
+      {
+        "dataset": "instruments/reference",
+        "session": "2026-09-25",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no snapshot on or before",
+        "run_ids": []
+      },
+      {
+        "dataset": "instruments/reference",
+        "session": "2026-09-28",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no snapshot on or before",
+        "run_ids": []
+      },
+      {
+        "dataset": "instruments/reference",
+        "session": "2026-09-29",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no snapshot on or before",
+        "run_ids": []
+      },
+      {
+        "dataset": "instruments/reference",
+        "session": "2026-09-30",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no snapshot on or before",
+        "run_ids": []
+      },
+      {
+        "dataset": "instruments/reference",
+        "session": "2026-10-01",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no snapshot on or before",
+        "run_ids": []
+      },
+      {
+        "dataset": "instruments/reference",
+        "session": "2026-10-02",
+        "status": "COMPLETE",
+        "present": 13295,
+        "expected": null,
+        "basis": "snapshot built",
+        "run_ids": ["universe_build-2026-10-02-20261003T173124Z"]
+      },
+      {
+        "dataset": "universe",
+        "session": "2026-09-21",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no snapshot on or before",
+        "run_ids": []
+      },
+      {
+        "dataset": "universe",
+        "session": "2026-09-22",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no snapshot on or before",
+        "run_ids": []
+      },
+      {
+        "dataset": "universe",
+        "session": "2026-09-23",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no snapshot on or before",
+        "run_ids": []
+      },
+      {
+        "dataset": "universe",
+        "session": "2026-09-24",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no snapshot on or before",
+        "run_ids": []
+      },
+      {
+        "dataset": "universe",
+        "session": "2026-09-25",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no snapshot on or before",
+        "run_ids": []
+      },
+      {
+        "dataset": "universe",
+        "session": "2026-09-28",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no snapshot on or before",
+        "run_ids": []
+      },
+      {
+        "dataset": "universe",
+        "session": "2026-09-29",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no snapshot on or before",
+        "run_ids": []
+      },
+      {
+        "dataset": "universe",
+        "session": "2026-09-30",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no snapshot on or before",
+        "run_ids": []
+      },
+      {
+        "dataset": "universe",
+        "session": "2026-10-01",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no snapshot on or before",
+        "run_ids": []
+      },
+      {
+        "dataset": "universe",
+        "session": "2026-10-02",
+        "status": "COMPLETE",
+        "present": 11427,
+        "expected": null,
+        "basis": "snapshot built",
+        "run_ids": ["universe_build-2026-10-02-20261003T173124Z"]
+      },
+      {
+        "dataset": "bars/1d",
+        "session": "2026-09-21",
+        "status": "COMPLETE",
+        "present": 12626,
+        "expected": 12592,
+        "basis": "rows on 2026-09-18",
+        "run_ids": ["daily_bars-2026-10-02-20261003T051929Z"]
+      },
+      {
+        "dataset": "bars/1d",
+        "session": "2026-09-22",
+        "status": "COMPLETE",
+        "present": 12601,
+        "expected": 12626,
+        "basis": "rows on 2026-09-21",
+        "run_ids": ["daily_bars-2026-10-02-20261003T051929Z"]
+      },
+      {
+        "dataset": "bars/1d",
+        "session": "2026-09-23",
+        "status": "COMPLETE",
+        "present": 12604,
+        "expected": 12601,
+        "basis": "rows on 2026-09-22",
+        "run_ids": ["daily_bars-2026-10-02-20261003T051929Z"]
+      },
+      {
+        "dataset": "bars/1d",
+        "session": "2026-09-24",
+        "status": "COMPLETE",
+        "present": 12625,
+        "expected": 12604,
+        "basis": "rows on 2026-09-23",
+        "run_ids": ["daily_bars-2026-10-02-20261003T051929Z"]
+      },
+      {
+        "dataset": "bars/1d",
+        "session": "2026-09-25",
+        "status": "COMPLETE",
+        "present": 12591,
+        "expected": 12625,
+        "basis": "rows on 2026-09-24",
+        "run_ids": ["daily_bars-2026-10-02-20261003T051929Z"]
+      },
+      {
+        "dataset": "bars/1d",
+        "session": "2026-09-28",
+        "status": "COMPLETE",
+        "present": 12572,
+        "expected": 12591,
+        "basis": "rows on 2026-09-25",
+        "run_ids": ["daily_bars-2026-10-02-20261003T051929Z"]
+      },
+      {
+        "dataset": "bars/1d",
+        "session": "2026-09-29",
+        "status": "COMPLETE",
+        "present": 12605,
+        "expected": 12572,
+        "basis": "rows on 2026-09-28",
+        "run_ids": ["daily_bars-2026-10-02-20261003T051929Z"]
+      },
+      {
+        "dataset": "bars/1d",
+        "session": "2026-09-30",
+        "status": "COMPLETE",
+        "present": 12613,
+        "expected": 12605,
+        "basis": "rows on 2026-09-29",
+        "run_ids": ["daily_bars-2026-10-02-20261003T051929Z"]
+      },
+      {
+        "dataset": "bars/1d",
+        "session": "2026-10-01",
+        "status": "COMPLETE",
+        "present": 12594,
+        "expected": 12613,
+        "basis": "rows on 2026-09-30",
+        "run_ids": ["daily_bars-2026-10-02-20261003T051929Z"]
+      },
+      {
+        "dataset": "bars/1d",
+        "session": "2026-10-02",
+        "status": "COMPLETE",
+        "present": 12601,
+        "expected": 12594,
+        "basis": "rows on 2026-10-01",
+        "run_ids": ["migrate_ids-2026-10-03-20261003T130731Z"]
+      },
+      {
+        "dataset": "chains/option_quotes",
+        "session": "2026-09-21",
+        "status": "MISSING",
+        "present": 0,
+        "expected": 4203,
+        "basis": "optionable universe, fetch OK",
+        "run_ids": []
+      },
+      {
+        "dataset": "chains/option_quotes",
+        "session": "2026-09-22",
+        "status": "MISSING",
+        "present": 0,
+        "expected": 4203,
+        "basis": "optionable universe, fetch OK",
+        "run_ids": []
+      },
+      {
+        "dataset": "chains/option_quotes",
+        "session": "2026-09-23",
+        "status": "MISSING",
+        "present": 0,
+        "expected": 4203,
+        "basis": "optionable universe, fetch OK",
+        "run_ids": []
+      },
+      {
+        "dataset": "chains/option_quotes",
+        "session": "2026-09-24",
+        "status": "MISSING",
+        "present": 0,
+        "expected": 4203,
+        "basis": "optionable universe, fetch OK",
+        "run_ids": []
+      },
+      {
+        "dataset": "chains/option_quotes",
+        "session": "2026-09-25",
+        "status": "MISSING",
+        "present": 0,
+        "expected": 4203,
+        "basis": "optionable universe, fetch OK",
+        "run_ids": []
+      },
+      {
+        "dataset": "chains/option_quotes",
+        "session": "2026-09-28",
+        "status": "MISSING",
+        "present": 0,
+        "expected": 4203,
+        "basis": "optionable universe, fetch OK",
+        "run_ids": []
+      },
+      {
+        "dataset": "chains/option_quotes",
+        "session": "2026-09-29",
+        "status": "MISSING",
+        "present": 0,
+        "expected": 4203,
+        "basis": "optionable universe, fetch OK",
+        "run_ids": []
+      },
+      {
+        "dataset": "chains/option_quotes",
+        "session": "2026-09-30",
+        "status": "MISSING",
+        "present": 0,
+        "expected": 4203,
+        "basis": "optionable universe, fetch OK",
+        "run_ids": []
+      },
+      {
+        "dataset": "chains/option_quotes",
+        "session": "2026-10-01",
+        "status": "MISSING",
+        "present": 0,
+        "expected": 4203,
+        "basis": "optionable universe, fetch OK",
+        "run_ids": []
+      },
+      {
+        "dataset": "chains/option_quotes",
+        "session": "2026-10-02",
+        "status": "PARTIAL",
+        "present": 3623,
+        "expected": 4203,
+        "basis": "optionable universe, fetch OK",
+        "run_ids": ["option_chains-2026-10-02-20261003T093502Z"]
+      },
+      {
+        "dataset": "rollups/instrument/option_liquidity@v1",
+        "session": "2026-09-21",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/option_liquidity@v1",
+        "session": "2026-09-22",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/option_liquidity@v1",
+        "session": "2026-09-23",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/option_liquidity@v1",
+        "session": "2026-09-24",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/option_liquidity@v1",
+        "session": "2026-09-25",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/option_liquidity@v1",
+        "session": "2026-09-28",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/option_liquidity@v1",
+        "session": "2026-09-29",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/option_liquidity@v1",
+        "session": "2026-09-30",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/option_liquidity@v1",
+        "session": "2026-10-01",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/option_liquidity@v1",
+        "session": "2026-10-02",
+        "status": "COMPLETE",
+        "present": 4203,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/price_stats@v2",
+        "session": "2026-09-21",
+        "status": "COMPLETE",
+        "present": 12626,
+        "expected": 12592,
+        "basis": "rows on 2026-09-18",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/price_stats@v2",
+        "session": "2026-09-22",
+        "status": "COMPLETE",
+        "present": 12601,
+        "expected": 12626,
+        "basis": "rows on 2026-09-21",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/price_stats@v2",
+        "session": "2026-09-23",
+        "status": "COMPLETE",
+        "present": 12604,
+        "expected": 12601,
+        "basis": "rows on 2026-09-22",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/price_stats@v2",
+        "session": "2026-09-24",
+        "status": "COMPLETE",
+        "present": 12625,
+        "expected": 12604,
+        "basis": "rows on 2026-09-23",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/price_stats@v2",
+        "session": "2026-09-25",
+        "status": "COMPLETE",
+        "present": 12591,
+        "expected": 12625,
+        "basis": "rows on 2026-09-24",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/price_stats@v2",
+        "session": "2026-09-28",
+        "status": "COMPLETE",
+        "present": 12572,
+        "expected": 12591,
+        "basis": "rows on 2026-09-25",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/price_stats@v2",
+        "session": "2026-09-29",
+        "status": "COMPLETE",
+        "present": 12605,
+        "expected": 12572,
+        "basis": "rows on 2026-09-28",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/price_stats@v2",
+        "session": "2026-09-30",
+        "status": "COMPLETE",
+        "present": 12613,
+        "expected": 12605,
+        "basis": "rows on 2026-09-29",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/price_stats@v2",
+        "session": "2026-10-01",
+        "status": "COMPLETE",
+        "present": 12594,
+        "expected": 12613,
+        "basis": "rows on 2026-09-30",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/price_stats@v2",
+        "session": "2026-10-02",
+        "status": "COMPLETE",
+        "present": 12601,
+        "expected": 12594,
+        "basis": "rows on 2026-10-01",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/earnings@v1",
+        "session": "2026-09-21",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/earnings@v1",
+        "session": "2026-09-22",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/earnings@v1",
+        "session": "2026-09-23",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/earnings@v1",
+        "session": "2026-09-24",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/earnings@v1",
+        "session": "2026-09-25",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/earnings@v1",
+        "session": "2026-09-28",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/earnings@v1",
+        "session": "2026-09-29",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/earnings@v1",
+        "session": "2026-09-30",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/earnings@v1",
+        "session": "2026-10-01",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/earnings@v1",
+        "session": "2026-10-02",
+        "status": "COMPLETE",
+        "present": 4412,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/iv30@v1",
+        "session": "2026-09-21",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/iv30@v1",
+        "session": "2026-09-22",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/iv30@v1",
+        "session": "2026-09-23",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/iv30@v1",
+        "session": "2026-09-24",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/iv30@v1",
+        "session": "2026-09-25",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/iv30@v1",
+        "session": "2026-09-28",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/iv30@v1",
+        "session": "2026-09-29",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/iv30@v1",
+        "session": "2026-09-30",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/iv30@v1",
+        "session": "2026-10-01",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/iv30@v1",
+        "session": "2026-10-02",
+        "status": "COMPLETE",
+        "present": 3625,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/dividends@v2",
+        "session": "2026-09-21",
+        "status": "COMPLETE",
+        "present": 12626,
+        "expected": 12592,
+        "basis": "rows on 2026-09-18",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/dividends@v2",
+        "session": "2026-09-22",
+        "status": "COMPLETE",
+        "present": 12601,
+        "expected": 12626,
+        "basis": "rows on 2026-09-21",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/dividends@v2",
+        "session": "2026-09-23",
+        "status": "COMPLETE",
+        "present": 12604,
+        "expected": 12601,
+        "basis": "rows on 2026-09-22",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/dividends@v2",
+        "session": "2026-09-24",
+        "status": "COMPLETE",
+        "present": 12625,
+        "expected": 12604,
+        "basis": "rows on 2026-09-23",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/dividends@v2",
+        "session": "2026-09-25",
+        "status": "COMPLETE",
+        "present": 12591,
+        "expected": 12625,
+        "basis": "rows on 2026-09-24",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/dividends@v2",
+        "session": "2026-09-28",
+        "status": "COMPLETE",
+        "present": 12572,
+        "expected": 12591,
+        "basis": "rows on 2026-09-25",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/dividends@v2",
+        "session": "2026-09-29",
+        "status": "COMPLETE",
+        "present": 12605,
+        "expected": 12572,
+        "basis": "rows on 2026-09-28",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/dividends@v2",
+        "session": "2026-09-30",
+        "status": "COMPLETE",
+        "present": 12613,
+        "expected": 12605,
+        "basis": "rows on 2026-09-29",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/dividends@v2",
+        "session": "2026-10-01",
+        "status": "COMPLETE",
+        "present": 12594,
+        "expected": 12613,
+        "basis": "rows on 2026-09-30",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/dividends@v2",
+        "session": "2026-10-02",
+        "status": "COMPLETE",
+        "present": 12601,
+        "expected": 12594,
+        "basis": "rows on 2026-10-01",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/iv_history@v2",
+        "session": "2026-09-21",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/iv_history@v2",
+        "session": "2026-09-22",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/iv_history@v2",
+        "session": "2026-09-23",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/iv_history@v2",
+        "session": "2026-09-24",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/iv_history@v2",
+        "session": "2026-09-25",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/iv_history@v2",
+        "session": "2026-09-28",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/iv_history@v2",
+        "session": "2026-09-29",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/iv_history@v2",
+        "session": "2026-09-30",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/iv_history@v2",
+        "session": "2026-10-01",
+        "status": "MISSING",
+        "present": 0,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": []
+      },
+      {
+        "dataset": "rollups/instrument/iv_history@v2",
+        "session": "2026-10-02",
+        "status": "COMPLETE",
+        "present": 3625,
+        "expected": null,
+        "basis": "no earlier session",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/fundamentals@v2",
+        "session": "2026-09-21",
+        "status": "COMPLETE",
+        "present": 12965,
+        "expected": 12955,
+        "basis": "rows on 2026-09-18",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/fundamentals@v2",
+        "session": "2026-09-22",
+        "status": "COMPLETE",
+        "present": 12950,
+        "expected": 12965,
+        "basis": "rows on 2026-09-21",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/fundamentals@v2",
+        "session": "2026-09-23",
+        "status": "COMPLETE",
+        "present": 12959,
+        "expected": 12950,
+        "basis": "rows on 2026-09-22",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/fundamentals@v2",
+        "session": "2026-09-24",
+        "status": "COMPLETE",
+        "present": 12984,
+        "expected": 12959,
+        "basis": "rows on 2026-09-23",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/fundamentals@v2",
+        "session": "2026-09-25",
+        "status": "COMPLETE",
+        "present": 12979,
+        "expected": 12984,
+        "basis": "rows on 2026-09-24",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/fundamentals@v2",
+        "session": "2026-09-28",
+        "status": "COMPLETE",
+        "present": 12945,
+        "expected": 12979,
+        "basis": "rows on 2026-09-25",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/fundamentals@v2",
+        "session": "2026-09-29",
+        "status": "COMPLETE",
+        "present": 12949,
+        "expected": 12945,
+        "basis": "rows on 2026-09-28",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/fundamentals@v2",
+        "session": "2026-09-30",
+        "status": "COMPLETE",
+        "present": 12964,
+        "expected": 12949,
+        "basis": "rows on 2026-09-29",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/fundamentals@v2",
+        "session": "2026-10-01",
+        "status": "COMPLETE",
+        "present": 12949,
+        "expected": 12964,
+        "basis": "rows on 2026-09-30",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      },
+      {
+        "dataset": "rollups/instrument/fundamentals@v2",
+        "session": "2026-10-02",
+        "status": "COMPLETE",
+        "present": 12966,
+        "expected": 12949,
+        "basis": "rows on 2026-10-01",
+        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+      }
+    ],
+    "last_closed": "2026-10-02"
+  },
+  "/admin/quality": {
+    "run_id": "data_quality-2026-10-02-20261003T153508Z",
+    "session": "2026-10-02",
+    "status": "partial",
+    "finished_at": "2026-10-03T15:35:09.066119Z",
+    "checks": [
+      {
+        "name": "universe_size",
+        "status": "PASS",
+        "detail": "11427 instruments (no earlier snapshot)"
+      },
+      {
+        "name": "bars_fresh",
+        "status": "PASS",
+        "detail": "latest bars session 2026-10-02, expected 2026-10-02"
+      },
+      {
+        "name": "bars_count",
+        "status": "PASS",
+        "detail": "12601 bars vs 12594 the session before (-0.1% drop)"
+      },
+      {
+        "name": "chains_coverage",
+        "status": "FAIL",
+        "detail": "86.2% of 4203 underlyings returned a chain"
+      },
+      {
+        "name": "earnings_present",
+        "status": "PASS",
+        "detail": "4412 upcoming earnings rows"
+      }
+    ]
+  },
+  "/admin/verification/ibkr": {
+    "session": "2026-10-02",
+    "run_ids": ["verify_ibkr-2026-10-02-20261003T183836Z"],
+    "instruments": 6,
+    "counts": {
+      "PASS": 42,
+      "WARN": 0,
+      "FAIL": 2,
+      "NA": 12
+    },
+    "by_check": [
+      {
+        "check": "low",
+        "counts": {
+          "PASS": 2,
+          "WARN": 0,
+          "FAIL": 2,
+          "NA": 0
+        }
+      },
+      {
+        "check": "bars_missing",
+        "counts": {
+          "PASS": 2,
+          "WARN": 0,
+          "FAIL": 0,
+          "NA": 0
+        }
+      },
+      {
+        "check": "close",
+        "counts": {
+          "PASS": 2,
+          "WARN": 0,
+          "FAIL": 0,
+          "NA": 0
+        }
+      },
+      {
+        "check": "div_yield",
+        "counts": {
+          "PASS": 0,
+          "WARN": 0,
+          "FAIL": 0,
+          "NA": 2
+        }
+      },
+      {
+        "check": "high",
+        "counts": {
+          "PASS": 2,
+          "WARN": 0,
+          "FAIL": 0,
+          "NA": 0
+        }
+      },
+      {
+        "check": "high_52w",
+        "counts": {
+          "PASS": 2,
+          "WARN": 0,
+          "FAIL": 0,
+          "NA": 0
+        }
+      },
+      {
+        "check": "hv20",
+        "counts": {
+          "PASS": 2,
+          "WARN": 0,
+          "FAIL": 0,
+          "NA": 0
+        }
+      },
+      {
+        "check": "iv30",
+        "counts": {
+          "PASS": 2,
+          "WARN": 0,
+          "FAIL": 0,
+          "NA": 0
+        }
+      },
+      {
+        "check": "iv30_cboe",
+        "counts": {
+          "PASS": 2,
+          "WARN": 0,
+          "FAIL": 0,
+          "NA": 0
+        }
+      },
+      {
+        "check": "low_52w",
+        "counts": {
+          "PASS": 2,
+          "WARN": 0,
+          "FAIL": 0,
+          "NA": 0
+        }
+      },
+      {
+        "check": "option_listed",
+        "counts": {
+          "PASS": 4,
+          "WARN": 0,
+          "FAIL": 0,
+          "NA": 0
+        }
+      },
+      {
+        "check": "option_mid",
+        "counts": {
+          "PASS": 0,
+          "WARN": 0,
+          "FAIL": 0,
+          "NA": 4
+        }
+      }
+    ],
+    "failing": [
+      {
+        "instrument_id": "EQ:BBG000BDTBL9",
+        "symbol": "SPY",
+        "check": "low",
+        "ours": 680.5868,
+        "theirs": 682.68,
+        "diff": 0.003066,
+        "tolerance": 0.001,
+        "status": "FAIL",
+        "note": "rel diff; worst session 2025-12-22 of 260 compared"
+      },
+      {
+        "instrument_id": "EQ:BBG000B9XRY4",
+        "symbol": "AAPL",
+        "check": "low",
+        "ours": 244.0,
+        "theirs": 244.65,
+        "diff": 0.002657,
+        "tolerance": 0.001,
+        "status": "FAIL",
+        "note": "rel diff; worst session 2025-10-10 of 260 compared"
+      }
+    ]
+  },
+  "/admin/runs/nightly": [
+    {
+      "run_id": "nightly-2026-10-02-20261003T132614Z",
+      "session": "2026-10-02",
+      "status": "partial",
+      "started_at": "2026-10-03T13:26:14.413853Z",
+      "finished_at": "2026-10-03T13:52:14.081716Z",
+      "duration_s": 1559.668,
+      "steps": [
+        {
+          "name": "bars",
+          "status": "COMPLETE",
+          "duration_s": 0.007,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        },
+        {
+          "name": "chains",
+          "status": "PARTIAL",
+          "duration_s": 1237.083,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        },
+        {
+          "name": "company-details",
+          "status": "COMPLETE",
+          "duration_s": 0.265,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        },
+        {
+          "name": "corporate-actions",
+          "status": "COMPLETE",
+          "duration_s": 13.13,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        },
+        {
+          "name": "earnings",
+          "status": "COMPLETE",
+          "duration_s": 83.698,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        },
+        {
+          "name": "quality",
+          "status": "PARTIAL",
+          "duration_s": 0.015,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        },
+        {
+          "name": "rates",
+          "status": "COMPLETE",
+          "duration_s": 18.316,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        },
+        {
+          "name": "rollups",
+          "status": "COMPLETE",
+          "duration_s": 20.033,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        },
+        {
+          "name": "screens",
+          "status": "PARTIAL",
+          "duration_s": 0.424,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        },
+        {
+          "name": "shares",
+          "status": "PARTIAL",
+          "duration_s": 11.585,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        },
+        {
+          "name": "universe-build",
+          "status": "FAILED",
+          "duration_s": 175.109,
+          "reason": null,
+          "error": "DataValidationError: instruments/symbol_history: duplicate rows for the table key",
+          "counts": {}
+        }
+      ],
+      "problems": ["steps not complete: universe-build, shares, chains, screens, quality"]
+    },
+    {
+      "run_id": "nightly-2026-10-02-20261003T130116Z",
+      "session": "2026-10-02",
+      "status": "partial",
+      "started_at": "2026-10-03T13:01:16.835830Z",
+      "finished_at": "2026-10-03T13:07:13.584064Z",
+      "duration_s": 356.748,
+      "steps": [
+        {
+          "name": "bars",
+          "status": "COMPLETE",
+          "duration_s": 0.005,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        },
+        {
+          "name": "chains",
+          "status": "PARTIAL",
+          "duration_s": 35.685,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        },
+        {
+          "name": "company-details",
+          "status": "COMPLETE",
+          "duration_s": 0.264,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        },
+        {
+          "name": "corporate-actions",
+          "status": "COMPLETE",
+          "duration_s": 13.141,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        },
+        {
+          "name": "earnings",
+          "status": "COMPLETE",
+          "duration_s": 82.521,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        },
+        {
+          "name": "quality",
+          "status": "PARTIAL",
+          "duration_s": 0.019,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        },
+        {
+          "name": "rates",
+          "status": "COMPLETE",
+          "duration_s": 17.249,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        },
+        {
+          "name": "rollups",
+          "status": "COMPLETE",
+          "duration_s": 20.318,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        },
+        {
+          "name": "screens",
+          "status": "PARTIAL",
+          "duration_s": 0.417,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        },
+        {
+          "name": "shares",
+          "status": "PARTIAL",
+          "duration_s": 11.598,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        },
+        {
+          "name": "universe-build",
+          "status": "COMPLETE",
+          "duration_s": 175.53,
+          "reason": null,
+          "error": null,
+          "counts": {}
+        }
+      ],
+      "problems": ["steps not complete: shares, chains, screens, quality"]
+    }
+  ],
+  "/admin/review/figi": {
+    "session": "2026-10-02",
+    "source": "universe_build-2026-10-02-20261003T173124Z",
+    "items": [
+      {
+        "first_seen": "2026-10-02",
+        "held_figi": "BBG01Z6N2YW2",
+        "note": "FIGI shared with MMEDV; MMED holds EQ:BBG01Z6N2YW2",
+        "symbol": "MMED",
+        "vendor_figi": "BBG01Z6N2YW2"
+      },
+      {
+        "first_seen": "2026-10-02",
+        "held_figi": "",
+        "note": "FIGI shared with MMED; MMEDV keeps the symbol id EQ:MMEDV",
+        "symbol": "MMEDV",
+        "vendor_figi": "BBG01Z6N2YW2"
+      }
+    ]
+  },
+  "/admin/review/leveraged": {
+    "session": "2026-10-02",
+    "source": "instruments/reference",
+    "items": [
+      {
+        "symbol": "AIQD",
+        "instrument_id": "EQ:BBG022MHC2L0",
+        "name": "MicroSectors -3? Short Artificial Intelligence (AI) ETNs",
+        "security_type": "ETN",
+        "exchange": "NYSE_ARCA"
+      },
+      {
+        "symbol": "CLIX",
+        "instrument_id": "EQ:BBG00J7QX2N7",
+        "name": "ProShares Long Online/Short Stores ETF",
+        "security_type": "ETF",
+        "exchange": "NYSE_ARCA"
+      },
+      {
+        "symbol": "CRSH",
+        "instrument_id": "EQ:BBG01LXWRVH9",
+        "name": "YieldMax Short TSLA Option Income Strategy ETF",
+        "security_type": "ETF",
+        "exchange": "NYSE_ARCA"
+      },
+      {
+        "symbol": "DIPS",
+        "instrument_id": "EQ:BBG01NSHTH65",
+        "name": "YieldMax Short NVDA Option Income Strategy ETF",
+        "security_type": "ETF",
+        "exchange": "NYSE_ARCA"
+      },
+      {
+        "symbol": "DWSH",
+        "instrument_id": "EQ:BBG00LDFG0W2",
+        "name": "AdvisorShares Dorsey Wright Short ETF",
+        "security_type": "ETF",
+        "exchange": "NASDAQ"
+      }
+    ]
+  },
+  "/admin/ingestion/chains/option_quotes/2026-10-02": {
+    "cell": {
+      "dataset": "chains/option_quotes",
+      "session": "2026-10-02",
+      "status": "PARTIAL",
+      "present": 3623,
+      "expected": 4203,
+      "basis": "optionable universe, fetch OK",
+      "run_ids": ["option_chains-2026-10-02-20261003T093502Z"]
+    },
+    "job": "option_chains",
+    "groups": [
+      {
+        "reason": "STALE_DATA: chain is for <date>",
+        "count": 515,
+        "examples": ["AAMI", "AAPD", "AB", "ACAD", "ACHC", "ACHV", "ACIU", "ACMR", "ACRS", "AETH"],
+        "statuses": [
+          "STALE_DATA: chain is for 2026-09-11",
+          "STALE_DATA: chain is for 2026-09-14",
+          "STALE_DATA: chain is for 2026-09-15",
+          "STALE_DATA: chain is for 2026-09-16",
+          "STALE_DATA: chain is for 2026-09-17",
+          "STALE_DATA: chain is for 2026-09-18",
+          "STALE_DATA: chain is for 2026-09-21",
+          "STALE_DATA: chain is for 2026-09-22",
+          "STALE_DATA: chain is for 2026-09-23",
+          "STALE_DATA: chain is for 2026-09-24"
+        ]
+      },
+      {
+        "reason": "NO_CHAIN",
+        "count": 63,
+        "examples": [
+          "ALBG",
+          "APLY",
+          "ASTN",
+          "AVXX",
+          "BCCC",
+          "BIDG",
+          "BMNZ",
+          "BPRO",
+          "CCML",
+          "CLIP"
+        ],
+        "statuses": ["NO_CHAIN"]
+      },
+      {
+        "reason": "NO_STANDARD_SERIES",
+        "count": 2,
+        "examples": ["ENLV", "RNA"],
+        "statuses": ["NO_STANDARD_SERIES"]
+      }
+    ],
+    "runs": [
+      {
+        "run_id": "option_chains-2026-10-02-20261003T093502Z",
+        "job": "option_chains",
+        "session": "2026-10-02",
+        "status": "partial",
+        "started_at": "2026-10-03T09:35:02.094636Z",
+        "finished_at": "2026-10-03T13:51:53.605759Z",
+        "duration_s": 15411.511,
+        "items_total": 4204,
+        "items_by_status": {
+          "OK": 3624,
+          "STALE_DATA": 515,
+          "NO_CHAIN": 63,
+          "NO_STANDARD_SERIES": 2
+        },
+        "failures": [
+          {
+            "reason": "STALE_DATA: chain is for <date>",
+            "count": 515,
+            "examples": [
+              "EQ:ACIU",
+              "EQ:ALLT",
+              "EQ:AOSL",
+              "EQ:ARX",
+              "EQ:ASND",
+              "EQ:BBG000B9WM03",
+              "EQ:BBG000BB05T9",
+              "EQ:BBG000BB5621",
+              "EQ:BBG000BBM0N2",
+              "EQ:BBG000BBPZZ9"
+            ],
+            "statuses": [
+              "STALE_DATA: chain is for 2026-09-11",
+              "STALE_DATA: chain is for 2026-09-14",
+              "STALE_DATA: chain is for 2026-09-15",
+              "STALE_DATA: chain is for 2026-09-16",
+              "STALE_DATA: chain is for 2026-09-17",
+              "STALE_DATA: chain is for 2026-09-18",
+              "STALE_DATA: chain is for 2026-09-21",
+              "STALE_DATA: chain is for 2026-09-22",
+              "STALE_DATA: chain is for 2026-09-23",
+              "STALE_DATA: chain is for 2026-09-24"
+            ]
+          },
+          {
+            "reason": "NO_CHAIN",
+            "count": 63,
+            "examples": [
+              "EQ:BBG000QL42S5",
+              "EQ:BBG008P5VFV1",
+              "EQ:BBG00FFPFT13",
+              "EQ:BBG00JHP6203",
+              "EQ:BBG00MH2Y8Y6",
+              "EQ:BBG00P35VS94",
+              "EQ:BBG00RMS4FG9",
+              "EQ:BBG00Y6DQMR4",
+              "EQ:BBG012R66QW2",
+              "EQ:BBG0136JPL00"
+            ],
+            "statuses": ["NO_CHAIN"]
+          },
+          {
+            "reason": "NO_STANDARD_SERIES",
+            "count": 2,
+            "examples": ["EQ:BBG01Z0T3959", "EQ:ENLV"],
+            "statuses": ["NO_STANDARD_SERIES"]
+          }
+        ],
+        "stats": {
+          "statuses": {
+            "NO_CHAIN": 63,
+            "NO_STANDARD_SERIES": 2,
+            "OK": 3624,
+            "STALE_DATA": 515
+          },
+          "universe": 4203,
+          "order_tiers": {
+            "priority": 536,
+            "liquidity": 1840,
+            "rest": 1827
+          }
+        }
+      }
+    ]
+  },
+  "/admin/runs/option_chains-2026-10-02-20261003T093502Z": {
+    "run_id": "option_chains-2026-10-02-20261003T093502Z",
+    "job": "option_chains",
+    "session": "2026-10-02",
+    "status": "partial",
+    "started_at": "2026-10-03T09:35:02.094636Z",
+    "finished_at": "2026-10-03T13:51:53.605759Z",
+    "duration_s": 15411.511,
+    "items_total": 4204,
+    "items_by_status": {
+      "OK": 3624,
+      "STALE_DATA": 515,
+      "NO_CHAIN": 63,
+      "NO_STANDARD_SERIES": 2
+    },
+    "failures": [
+      {
+        "reason": "STALE_DATA: chain is for <date>",
+        "count": 515,
+        "examples": [
+          "EQ:ACIU",
+          "EQ:ALLT",
+          "EQ:AOSL",
+          "EQ:ARX",
+          "EQ:ASND",
+          "EQ:BBG000B9WM03",
+          "EQ:BBG000BB05T9",
+          "EQ:BBG000BB5621",
+          "EQ:BBG000BBM0N2",
+          "EQ:BBG000BBPZZ9"
+        ],
+        "statuses": [
+          "STALE_DATA: chain is for 2026-09-11",
+          "STALE_DATA: chain is for 2026-09-14",
+          "STALE_DATA: chain is for 2026-09-15",
+          "STALE_DATA: chain is for 2026-09-16",
+          "STALE_DATA: chain is for 2026-09-17",
+          "STALE_DATA: chain is for 2026-09-18",
+          "STALE_DATA: chain is for 2026-09-21",
+          "STALE_DATA: chain is for 2026-09-22",
+          "STALE_DATA: chain is for 2026-09-23",
+          "STALE_DATA: chain is for 2026-09-24"
+        ]
+      },
+      {
+        "reason": "NO_CHAIN",
+        "count": 63,
+        "examples": [
+          "EQ:BBG000QL42S5",
+          "EQ:BBG008P5VFV1",
+          "EQ:BBG00FFPFT13",
+          "EQ:BBG00JHP6203",
+          "EQ:BBG00MH2Y8Y6",
+          "EQ:BBG00P35VS94",
+          "EQ:BBG00RMS4FG9",
+          "EQ:BBG00Y6DQMR4",
+          "EQ:BBG012R66QW2",
+          "EQ:BBG0136JPL00"
+        ],
+        "statuses": ["NO_CHAIN"]
+      },
+      {
+        "reason": "NO_STANDARD_SERIES",
+        "count": 2,
+        "examples": ["EQ:BBG01Z0T3959", "EQ:ENLV"],
+        "statuses": ["NO_STANDARD_SERIES"]
+      }
+    ],
+    "stats": {
+      "statuses": {
+        "NO_CHAIN": 63,
+        "NO_STANDARD_SERIES": 2,
+        "OK": 3624,
+        "STALE_DATA": 515
+      },
+      "universe": 4203,
+      "order_tiers": {
+        "priority": 536,
+        "liquidity": 1840,
+        "rest": 1827
+      }
+    }
+  },
+  "/admin/runs/option_chains-2026-10-02-20261003T093502Z/items": [
+    {
+      "key": "EQ:ACGL",
+      "code": "OK",
+      "status": "OK"
+    },
+    {
+      "key": "EQ:ACIU",
+      "code": "STALE_DATA",
+      "status": "STALE_DATA: chain is for 2026-10-01"
+    },
+    {
+      "key": "EQ:ACN",
+      "code": "OK",
+      "status": "OK"
+    },
+    {
+      "key": "EQ:ADCT",
+      "code": "OK",
+      "status": "OK"
+    },
+    {
+      "key": "EQ:ADNT",
+      "code": "OK",
+      "status": "OK"
+    },
+    {
+      "key": "EQ:ADSE",
+      "code": "OK",
+      "status": "OK"
+    },
+    {
+      "key": "EQ:AER",
+      "code": "OK",
+      "status": "OK"
+    },
+    {
+      "key": "EQ:AEXA",
+      "code": "OK",
+      "status": "OK"
+    },
+    {
+      "key": "EQ:AGO",
+      "code": "OK",
+      "status": "OK"
+    },
+    {
+      "key": "EQ:AGRO",
+      "code": "OK",
+      "status": "OK"
+    },
+    {
+      "key": "EQ:ALC",
+      "code": "OK",
+      "status": "OK"
+    },
+    {
+      "key": "EQ:ALKS",
+      "code": "OK",
+      "status": "OK"
+    },
+    {
+      "key": "EQ:ALLE",
+      "code": "OK",
+      "status": "OK"
+    },
+    {
+      "key": "EQ:ALLT",
+      "code": "STALE_DATA",
+      "status": "STALE_DATA: chain is for 2026-10-01"
+    },
+    {
+      "key": "EQ:AMBA",
+      "code": "OK",
+      "status": "OK"
+    },
+    {
+      "key": "EQ:AMBP",
+      "code": "OK",
+      "status": "OK"
+    },
+    {
+      "key": "EQ:AMRZ",
+      "code": "OK",
+      "status": "OK"
+    },
+    {
+      "key": "EQ:AON",
+      "code": "OK",
+      "status": "OK"
+    },
+    {
+      "key": "EQ:AOSL",
+      "code": "STALE_DATA",
+      "status": "STALE_DATA: chain is for 2026-10-01"
+    },
+    {
+      "key": "EQ:APTV",
+      "code": "OK",
+      "status": "OK"
+    },
+    {
+      "key": "EQ:ARBE",
+      "code": "OK",
+      "status": "OK"
+    },
+    {
+      "key": "EQ:ARCO",
+      "code": "OK",
+      "status": "OK"
+    },
+    {
+      "key": "EQ:ARQQ",
+      "code": "OK",
+      "status": "OK"
+    },
+    {
+      "key": "EQ:ARX",
+      "code": "STALE_DATA",
+      "status": "STALE_DATA: chain is for 2026-10-01"
+    },
+    {
+      "key": "EQ:AS",
+      "code": "OK",
+      "status": "OK"
+    }
+  ]
+}

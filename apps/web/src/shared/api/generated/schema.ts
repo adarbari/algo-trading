@@ -35,6 +35,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/quality": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Quality */
+        get: operations["quality_admin_quality_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/review/figi": {
         parameters: {
             query?: never;
@@ -86,6 +103,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/runs/{run_id}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run Items */
+        get: operations["run_items_admin_runs__run_id__items_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/runs/nightly": {
         parameters: {
             query?: never;
@@ -95,6 +129,23 @@ export interface paths {
         };
         /** Nightly */
         get: operations["nightly_admin_runs_nightly_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/verification/ibkr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Verification */
+        get: operations["verification_admin_verification_ibkr_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -573,6 +624,18 @@ export interface components {
             /** Runs */
             runs: components["schemas"]["RunDetail"][];
         };
+        /** CheckCounts */
+        CheckCounts: {
+            /** Check */
+            check: string;
+            /**
+             * Counts
+             * @description PASS / WARN / FAIL / NA -> rows
+             */
+            counts: {
+                [key: string]: number;
+            };
+        };
         /** Compared */
         Compared: {
             /** Instrument Id */
@@ -586,6 +649,12 @@ export interface components {
             cells: components["schemas"]["Cell"][];
             /** Datasets */
             datasets: string[];
+            /**
+             * Last Closed
+             * Format: date
+             * @description the exchange's last closed session; later than the last of `sessions` means the store is stale
+             */
+            last_closed: string;
             /** Sessions */
             sessions: string[];
         };
@@ -1056,6 +1125,40 @@ export interface components {
              */
             start: string;
         };
+        /** QualityCheck */
+        QualityCheck: {
+            /**
+             * Detail
+             * @description what was measured, against which rule
+             */
+            detail: string;
+            /** Name */
+            name: string;
+            /**
+             * Status
+             * @description PASS | WARN | FAIL
+             */
+            status: string;
+        };
+        /** QualityReport */
+        QualityReport: {
+            /** Checks */
+            checks: components["schemas"]["QualityCheck"][];
+            /** Finished At */
+            finished_at: string | null;
+            /** Run Id */
+            run_id: string;
+            /**
+             * Session
+             * Format: date
+             */
+            session: string;
+            /**
+             * Status
+             * @description the data-quality run's: complete | partial | failed
+             */
+            status: string;
+        };
         /** ReviewList */
         ReviewList: {
             /** Items */
@@ -1117,6 +1220,24 @@ export interface components {
             /**
              * Status
              * @description queued | running | complete | partial | failed
+             */
+            status: string;
+        };
+        /** RunItem */
+        RunItem: {
+            /**
+             * Code
+             * @description the status code (STALE_DATA)
+             */
+            code: string;
+            /**
+             * Key
+             * @description the item: a ticker, an instrument id, a step, a check
+             */
+            key: string;
+            /**
+             * Status
+             * @description as recorded, with its detail after a colon
              */
             status: string;
         };
@@ -1282,6 +1403,38 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** Verification */
+        Verification: {
+            /**
+             * By Check
+             * @description most failures first
+             */
+            by_check: components["schemas"]["CheckCounts"][];
+            /**
+             * Counts
+             * @description PASS / WARN / FAIL / NA over every row
+             */
+            counts: {
+                [key: string]: number;
+            };
+            /**
+             * Failing
+             * @description FAIL then WARN rows (at most 50), largest diff first: instrument_id, symbol, check, status, ours, theirs, diff, tolerance, note
+             */
+            failing: {
+                [key: string]: unknown;
+            }[];
+            /** Instruments */
+            instruments: number;
+            /** Run Ids */
+            run_ids: string[];
+            /**
+             * Session
+             * Format: date
+             * @description the partition shown: latest on or before the date
+             */
+            session: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -1341,6 +1494,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Completeness"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    quality_admin_quality_get: {
+        parameters: {
+            query?: {
+                /** @description default: the latest */
+                date?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QualityReport"];
                 };
             };
             /** @description Validation Error */
@@ -1437,6 +1622,37 @@ export interface operations {
             };
         };
     };
+    run_items_admin_runs__run_id__items_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     nightly_admin_runs_nightly_get: {
         parameters: {
             query?: {
@@ -1455,6 +1671,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NightlyRun"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verification_admin_verification_ibkr_get: {
+        parameters: {
+            query?: {
+                /** @description default: the latest */
+                date?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Verification"];
                 };
             };
             /** @description Validation Error */

@@ -10,6 +10,7 @@ def _cells(body: dict[str, object]) -> dict[tuple[str, str], dict[str, object]]:
 def test_completeness_grid(client: TestClient) -> None:
     body = client.get("/admin/ingestion/completeness", params={"sessions": 3}).json()
     assert body["sessions"] == ["2022-11-21", "2022-11-22", "2022-11-23"]
+    assert body["last_closed"] > "2022-11-23"  # the golden store is long stale
     cells = _cells(body)
     assert len(cells) == 3 * len(body["datasets"])
     bars = cells[("bars/1d", "2022-11-23")]
@@ -43,3 +44,32 @@ def test_drill_down_groups_run_items(client: TestClient) -> None:
 def test_drill_down_not_found(client: TestClient) -> None:
     assert client.get("/admin/ingestion/nope/2022-11-23").status_code == 404
     assert client.get("/admin/ingestion/bars/1d/not-a-date").status_code == 422
+
+
+def test_quality_shows_the_latest_checks(client: TestClient) -> None:
+    body = client.get("/admin/quality").json()
+    assert (body["session"], body["status"]) == ("2022-11-23", "complete")
+    assert [(c["name"], c["status"]) for c in body["checks"]] == [
+        ("bars_fresh", "PASS"),
+        ("chains_stale", "WARN"),
+    ]
+    assert client.get("/admin/quality", params={"date": "2022-11-22"}).status_code == 404
+
+
+def test_verification_counts_and_failing_rows(client: TestClient) -> None:
+    body = client.get("/admin/verification/ibkr").json()
+    assert (body["session"], body["instruments"]) == ("2022-11-23", 3)
+    assert body["counts"] == {"PASS": 1, "WARN": 1, "FAIL": 2, "NA": 1}
+    assert [c["check"] for c in body["by_check"]] == ["low", "close", "div_yield"]
+    assert body["by_check"][0]["counts"]["FAIL"] == 2
+    failing = [(r["symbol"], r["check"], r["status"]) for r in body["failing"]]
+    assert failing == [("BBB", "low", "FAIL"), ("AAA", "low", "FAIL"), ("BBB", "close", "WARN")]
+    assert set(body["failing"][0]) >= {
+        "instrument_id",
+        "ours",
+        "theirs",
+        "diff",
+        "tolerance",
+        "note",
+    }
+    assert client.get("/admin/verification/ibkr", params={"date": "2022-11-22"}).status_code == 404
