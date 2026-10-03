@@ -7,6 +7,10 @@ from tests.conftest import REPO_ROOT
 DOCS = REPO_ROOT / "docs"
 ADR_DIR = DOCS / "adr"
 SKILLS = REPO_ROOT / ".claude" / "skills"
+AGENTS = REPO_ROOT / ".claude" / "agents"
+# Subagents pin a model tier so routing by task risk is explicit (CLAUDE.md "Agents, models
+# and tokens"); "inherit" would silently run cheap lookups on the most expensive model.
+AGENT_MODELS = {"haiku", "sonnet", "opus"}
 LINK = re.compile(r"\]\(([^)#\s]+)(?:#[^)]*)?\)")
 
 
@@ -40,7 +44,7 @@ def test_relative_markdown_links_resolve() -> None:
 
 def test_paths_named_in_agent_instructions_exist() -> None:
     text = (REPO_ROOT / "CLAUDE.md").read_text()
-    referenced = set(re.findall(r"`((?:docs|\.claude/skills)/[^`\s]+)`", text))
+    referenced = set(re.findall(r"`((?:docs|\.claude/(?:skills|agents))/[^`\s]*)`", text))
     missing = [p for p in sorted(referenced) if not (REPO_ROOT / p).exists()]
     assert not missing, f"CLAUDE.md references missing paths: {missing}"
 
@@ -59,3 +63,20 @@ def test_every_skill_is_listed_in_agent_instructions() -> None:
     text = (REPO_ROOT / "CLAUDE.md").read_text()
     unlisted = [p.name for p in SKILLS.iterdir() if f".claude/skills/{p.name}" not in text]
     assert not unlisted, f"list these skills in CLAUDE.md: {unlisted}"
+
+
+def test_agents_are_well_formed_and_pin_a_model() -> None:
+    agents = sorted(AGENTS.glob("*.md"))
+    assert agents
+    for agent in agents:
+        text = agent.read_text()
+        match = re.match(r"---\nname: (\S+)\ndescription: .+?\nmodel: (\S+)\n", text)
+        assert match, f"{agent.name} needs name, description and model frontmatter, in that order"
+        assert match.group(1) == agent.stem
+        assert match.group(2) in AGENT_MODELS, f"{agent.name}: model must be one of {AGENT_MODELS}"
+
+
+def test_every_agent_is_listed_in_agent_instructions() -> None:
+    text = (REPO_ROOT / "CLAUDE.md").read_text()
+    unlisted = [p.stem for p in AGENTS.glob("*.md") if f"`{p.stem}`" not in text]
+    assert not unlisted, f"add these agents to the CLAUDE.md agents table: {unlisted}"

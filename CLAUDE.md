@@ -221,3 +221,33 @@ API: `algotrade-api [--reload]` (read-only, 127.0.0.1:8000); after a route / sch
 Configs: site presets in `config/site/` (reviewed via PR); user configs in `config/users/<id>/`
 (git-ignored). Check one with `algotrade-backtest [--user U] config validate|show <id>`; a
 user's expression features with `config validate-features`.
+
+## Agents, models and tokens (spend tokens where mistakes are expensive)
+
+Match the model to the risk of the task, not its size. Subagents in `.claude/agents/` pin
+their model; delegate to them by name (for an ad hoc agent, pass `model` explicitly).
+
+| Task | Agent (model) |
+|---|---|
+| Find an owner, folder, symbol, test or doc section; sweep many files | `scout` (haiku, read-only) |
+| Run tests, lint or a `make` gate; get back only the failures | `checker` (haiku, never fixes) |
+| A scoped change whose owner and pattern are known (a skill's steps, an expression feature, tests, a known-cause bug fix, docs) | `implementer` (sonnet) |
+| Plan or review: new responsibility / folder / table / ADR, layer boundaries, point-in-time and lookahead, `quant/` maths, atomic publish, locks and jobs, the IBKR read-only boundary, a bug that survived two fixes | `architect` (opus, plans and reviews, does not edit) |
+
+Quality is not traded for tokens: the cheaper model never decides design, `make check`
+gates every change whatever wrote it, a change in an `architect` area gets an `architect`
+review of the diff before it is finished, and an agent that hits ambiguity or fails the same
+check twice escalates one tier instead of retrying.
+
+Token habits (every session):
+
+- **Grep, then read the lines you need.** Long docs (`docs/architecture.md`,
+  `docs/configuration.md`, `docs/data/layers.md`) are read by section; owners by grepping
+  `architecture/ownership.toml`; the feature catalogue `docs/data/features.md` by grep.
+- **Never open generated or bulk files**: `uv.lock`, `apps/web/package-lock.json`,
+  `apps/api/openapi.json`, `datasets/golden/**`, `tests/fixtures/**`, `__screenshots__/`.
+- **Verify narrow first**: the mirrored test file (`.venv/bin/python -m pytest <path> -q
+  -x`), then the gate for what you touched (`make arch|layout|ownership|dupes`), then
+  `make check` once at the end. Send long runs to `checker` or pipe through `tail`.
+- **Load only the matching skill**, run independent agents in parallel in one message, and
+  do not re-read a file you just edited or paste whole files or diffs into the chat.
