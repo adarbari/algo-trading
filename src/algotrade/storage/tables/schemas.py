@@ -165,6 +165,10 @@ INSTRUMENT_REFERENCE = _fixed(
     *_strings("symbol", "name", "asset_class", "security_type", "security_type_source"),
     *_strings("exchange", "currency", "financial_status", "status", "vendor_type"),
     *_strings("figi", "share_class_figi", "cik", "tracks", "leverage_source"),
+    # FIGI review (ADR 0018): the vendor's FIGI when the build kept a different one or the
+    # FIGI is shared, and the session that was first seen.
+    "vendor_figi string",
+    "figi_review_since date",
     *_floats("multiplier", "tick_size", "round_lot", "leverage"),
     "is_etf bool",
     "is_test_issue bool",

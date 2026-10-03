@@ -22,6 +22,7 @@ make evaluate                                   # every strategy x golden datase
 algotrade-ingest universe --stocks optionable_us_stock_universe.csv \
                           --etfs optionable_us_etf_universe.csv --version 2026-10
 algotrade-ingest universe-build --review-out leveraged_candidates.csv   # universe + reference; CSV = ETFs whose leverage is still UNKNOWN
+                                            # also writes var/figi_review.csv (FIGI disagreements; --figi-review-out)
 algotrade-ingest bars --from 2024-10-01 --to 2026-10-01   # 2-year backfill (needs ALGOTRADE_MASSIVE_API_KEY in .env)
 algotrade-ingest rates --from 2024-01-01 --to 2026-10-02   # Treasury par yield curve (one request per year; no key)
 algotrade-ingest company-details [--force] [--limit N]   # SEC EDGAR company details (needs ALGOTRADE_SEC_CONTACT in .env)

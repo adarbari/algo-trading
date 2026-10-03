@@ -18,6 +18,7 @@ from tests.storage_helpers import stamped, universe_rows
 
 D1, D2 = date(2026, 10, 1), date(2026, 10, 2)
 CLOCK = lambda: datetime(2026, 10, 2, 23, tzinfo=UTC)  # noqa: E731
+CIRCUIT = "FETCH_ERROR: cboe: circuit open after 10 consecutive 403/5xx"
 
 
 def test_sources_settings_defaults_and_overrides() -> None:
@@ -73,7 +74,11 @@ def bars(day: date, n: int) -> pd.DataFrame:
 
 
 def seed(
-    bars_d1: int, bars_d2: int | None, universe_d1: int, universe_d2: int, chain_ok: float = 1.0
+    bars_d1: int,
+    bars_d2: int | None,
+    universe_d1: int,
+    universe_d2: int,
+    chains: list[str] | None = None,
 ) -> StoreReader:
     backend = MemoryBackend()
     w = StoreWriter(backend)
@@ -83,11 +88,8 @@ def seed(
     for day, n in ((D1, universe_d1), (D2, universe_d2)):
         rows = universe_rows([f"S{i}" for i in range(n)])
         w.write_table("universe", day, f"u{day.day}", stamped(rows, day, f"u{day.day}"))
-    ok = int(chain_ok * 10)
-    status = [
-        {"instrument_id": f"EQ:S{i}", "status": "OK" if i < ok else "FETCH_ERROR: x"}
-        for i in range(10)
-    ]
+    chains = chains if chains is not None else ["OK"] * 20
+    status = [{"instrument_id": f"EQ:S{i}", "status": s} for i, s in enumerate(chains)]
     w.write_table("chains/status", D2, "c", stamped(status, D2, "c"))
     earnings = [{"instrument_id": "EQ:S1", "ts": pd.Timestamp(D2 + timedelta(5), tz="UTC")}]
     w.write_table("events/earnings", D2, "e", stamped(earnings, D2, "e"))
@@ -109,7 +111,8 @@ def test_quality_passes_on_healthy_data() -> None:
         ((1000, None, 100, 100), "bars_fresh"),
         ((1000, 800, 100, 100), "bars_count"),
         ((1000, 1000, 100, 120), "universe_size"),
-        ((1000, 1000, 100, 100, 0.8), "chains_coverage"),
+        ((1000, 1000, 100, 100, ["OK"] * 18 + ["FETCH_ERROR: x"] * 2), "chains_fetch"),
+        ((1000, 1000, 100, 100, ["OK"] * 18 + [CIRCUIT, "NOT_ATTEMPTED"]), "chains_fetch"),
     ],
 )
 def test_quality_failures(args: tuple, check: str) -> None:  # type: ignore[type-arg]
@@ -117,6 +120,41 @@ def test_quality_failures(args: tuple, check: str) -> None:  # type: ignore[type
     assert checks(reader)[check] == "FAIL"
     record = run_quality(task_ctx(StoreWriter(MemoryBackend()), reader, CLOCK), D2)
     assert record.status is RunStatus.PARTIAL and check in record.stats["failed"]
+
+
+def chain_check(chains: list[str], name: str) -> dict[str, str]:
+    reader = seed(1000, 1000, 100, 100, chains)
+    record = run_quality(task_ctx(StoreWriter(MemoryBackend()), reader, CLOCK), D2)
+    check = next(c for c in record.stats["checks"] if c["name"] == name)
+    return {**check, "run": record.status.value}
+
+
+def test_chain_fetch_failures_up_to_the_threshold_pass() -> None:
+    check = chain_check(["OK"] * 19 + [CIRCUIT], "chains_fetch")  # 5%: not over 5%
+    assert check["status"] == "PASS" and check["run"] == RunStatus.COMPLETE.value
+
+
+def test_stale_chains_warn_but_do_not_fail_the_run() -> None:
+    chains = ["OK"] * 13 + ["STALE_DATA: chain is for 2026-10-01"] * 5 + ["NO_CHAIN"] * 2
+    check = chain_check(chains, "chains_stale")  # 25% stale > 20%
+    assert check["status"] == "WARN" and check["run"] == RunStatus.COMPLETE.value
+    assert (
+        "OK 13, STALE_DATA 5, NO_CHAIN 2, NO_STANDARD_SERIES 0, fetch failures 0"
+        in (check["detail"])
+    )
+    assert chain_check(chains, "chains_fetch")["status"] == "PASS"
+    four = ["OK"] * 16 + ["STALE_DATA: x"] * 4  # 20%: not over 20%
+    assert chain_check(four, "chains_stale")["status"] == "PASS"
+
+
+def test_chain_thresholds_come_from_sources_toml() -> None:
+    settings = SourcesSettings.from_document(
+        {"quality": {"max_chain_fetch_failures": 0.2, "max_chain_stale_share": 0.01}}
+    )
+    reader = seed(1000, 1000, 100, 100, ["OK"] * 18 + ["FETCH_ERROR: x", "STALE_DATA: x"])
+    ctx = task_ctx(StoreWriter(MemoryBackend()), reader, CLOCK, settings=settings)
+    result = {c["name"]: c["status"] for c in run_quality(ctx, D2).stats["checks"]}
+    assert (result["chains_fetch"], result["chains_stale"]) == ("PASS", "WARN")
 
 
 def test_quality_on_an_empty_store() -> None:

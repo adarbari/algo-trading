@@ -1,15 +1,29 @@
 """Assign equity / ETF instrument ids in a reference build (ADR 0018).
 
 - A listing with a composite FIGI gets ``EQ:<FIGI>``; one without keeps ``EQ:<symbol>``.
-- No FIGI today, but yesterday the same active symbol had a FIGI id: the id and FIGI carry
-  forward (a FIGI id never changes).
+- **A FIGI id never changes automatically** (owner decision, 2026-10-03). When the previous
+  active row of the same symbol held a FIGI id, the id and its FIGI carry forward, both when
+  the vendor reports no FIGI (``ids_carried``) and when it reports a *different* one
+  (``figi_changes_held``; the vendor's value is kept in ``vendor_figi`` for review).
 - Two listings sharing a FIGI: the one that already held the id (else the first symbol) keeps
-  it; the others get symbol ids and are counted as conflicts.
-- Yesterday's symbol id whose symbol now has a FIGI id (and no different FIGI before) is an
+  it; the others get symbol ids (``figi_conflicts``). Every listing of the FIGI is marked
+  for review.
+- An owner override (``config/site/overrides/figi.csv``: symbol -> FIGI, blank = no FIGI)
+  forces the listing's FIGI and goes first. When it changes an id the listing held, the
+  change is recorded in ``instruments/id_map`` like an upgrade (``ids_overridden``), so
+  ``migrate-ids`` moves the stored history.
+- A previous symbol id whose symbol now has a FIGI id (and no different FIGI before) is an
   **upgrade**: recorded in ``instruments/id_map``; ``rename_ids`` applies it to the previous
   snapshot, so the diff sees the same instrument rather than a delisting plus a listing.
+
+Review state lives on the reference row: ``vendor_figi`` (the vendor's FIGI when the build
+did not use it as the listing's own: a different FIGI than the one held, or one several
+listings share) and ``figi_review_since`` (the session it was first seen, carried while it
+persists). ``figi_review_rows`` turns them into the owner's review file.
 """
 
+import math
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
@@ -21,6 +35,7 @@ ID_MAP = "instruments/id_map"
 # ``known_at``: when the upgrade was first recorded. Rows keyed by ``old_id`` that were known
 # before it belong to the upgraded instrument; later ones (a reused symbol id) do not.
 ID_MAP_COLUMNS = ["instrument_id", "ts", "old_id", "new_id", "symbol", "effective", "known_at"]
+FIGI_REVIEW_COLUMNS = ["symbol", "held_figi", "vendor_figi", "first_seen", "note"]
 
 
 @dataclass
@@ -30,6 +45,24 @@ class Assigned:
     stats: dict[str, int] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class Held:
+    """The previous active row of a symbol."""
+
+    instrument_id: str = ""
+    figi: str | None = None
+    vendor_figi: str | None = None
+    review_since: date | None = None
+
+    @property
+    def held_figi(self) -> str | None:
+        """The FIGI its id stands for (``None`` for a symbol id)."""
+        return self.figi if is_figi_id(self.instrument_id, self.figi) else None
+
+
+NOTHING = Held()
+
+
 def _figi(value: object) -> str | None:
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return None
@@ -37,79 +70,196 @@ def _figi(value: object) -> str | None:
     return text or None
 
 
-def _previous_active(previous: pd.DataFrame | None) -> dict[str, tuple[str, str | None]]:
-    """symbol -> (id, figi) for yesterday's active rows."""
+def _date(value: object) -> date | None:
+    if value is None or value is pd.NaT or (isinstance(value, float) and math.isnan(value)):
+        return None
+    return pd.Timestamp(str(value)).date()
+
+
+def _previous_active(previous: pd.DataFrame | None) -> dict[str, Held]:
+    """symbol -> what the previous snapshot's active row held."""
     if previous is None or previous.empty:
         return {}
     active = previous[previous["status"].eq("ACTIVE")] if "status" in previous else previous
-    figis = active["figi"] if "figi" in active.columns else pd.Series(None, index=active.index)
+
+    def column(name: str) -> pd.Series:
+        return active[name] if name in active.columns else pd.Series(None, index=active.index)
+
     return {
-        str(s): (str(i), _figi(f))
-        for s, i, f in zip(active["symbol"], active["instrument_id"], figis, strict=True)
+        str(s): Held(str(i), _figi(f), _figi(v), _date(r))
+        for s, i, f, v, r in zip(
+            active["symbol"],
+            active["instrument_id"],
+            column("figi"),
+            column("vendor_figi"),
+            column("figi_review_since"),
+            strict=True,
+        )
     }
 
 
-def assign_ids(current: pd.DataFrame, previous: pd.DataFrame | None, session: date) -> Assigned:
-    """``current`` needs ``symbol`` (unique) and ``figi`` (may be null); ``previous`` is the
-    last reference snapshot (ids already held)."""
+def assign_ids(
+    current: pd.DataFrame,
+    previous: pd.DataFrame | None,
+    session: date,
+    overrides: Mapping[str, str | None] | None = None,
+) -> Assigned:
+    """``current`` needs ``symbol`` (unique) and ``figi`` (the vendor's, may be null);
+    ``previous`` is the last reference snapshot (ids already held); ``overrides`` maps a
+    symbol to the FIGI the owner fixed for it (``None``: no FIGI, a symbol id)."""
+    overrides = overrides or {}
     before = _previous_active(previous)
     ref = current.copy()
-    figis = [_figi(f) for f in ref["figi"]]
-    carried = 0
-    for n, symbol in enumerate(ref["symbol"]):
-        old_id, old_figi = before.get(str(symbol), ("", None))
-        if figis[n] is None and old_figi is not None and is_figi_id(old_id, old_figi):
-            figis[n], carried = old_figi, carried + 1
+    symbols = [str(s) for s in ref["symbol"]]
+    vendor = [_figi(f) for f in ref["figi"]]
+    figis, changed, carried = list(vendor), [False] * len(ref), 0
+    for n, symbol in enumerate(symbols):
+        held = before.get(symbol, NOTHING).held_figi
+        if symbol in overrides:
+            figis[n] = overrides[symbol]
+        elif held is not None and figis[n] != held:
+            carried += figis[n] is None
+            changed[n] = figis[n] is not None
+            figis[n] = held
     ref["figi"] = figis
-    wanted = [equity_id(str(s), f) for s, f in zip(ref["symbol"], figis, strict=True)]
-    held = [
-        before.get(str(s), ("", None))[0] == w for s, w in zip(ref["symbol"], wanted, strict=True)
+    wanted = [equity_id(s, f) for s, f in zip(symbols, figis, strict=True)]
+    rank = [
+        0 if s in overrides else 1 if before.get(s, NOTHING).instrument_id == w else 2
+        for s, w in zip(symbols, wanted, strict=True)
     ]
-    order = sorted(range(len(ref)), key=lambda n: (not held[n], str(ref["symbol"].iloc[n])))
     ids, taken, conflicts = [""] * len(ref), set(), 0
-    for n in order:
+    for n in sorted(range(len(ref)), key=lambda n: (rank[n], symbols[n])):
         iid = wanted[n]
         if iid in taken:
-            iid, conflicts = equity_id(str(ref["symbol"].iloc[n])), conflicts + 1
+            iid, conflicts = equity_id(symbols[n]), conflicts + 1
         ids[n] = iid
         taken.add(iid)
     ref["instrument_id"] = ids
-    previous_ids = set(previous["instrument_id"]) if previous is not None else set()
-    upgrades = []
-    for symbol, iid, figi in zip(ref["symbol"], ref["instrument_id"], ref["figi"], strict=True):
-        old_id, old_figi = before.get(str(symbol), ("", None))
-        if (
-            old_id
-            and old_id != iid
-            and is_figi_id(iid, figi)
-            and not is_figi_id(old_id, old_figi)
-            and old_figi in (None, figi)
-            and iid not in previous_ids
-        ):
-            upgrades.append({"old_id": old_id, "new_id": iid, "symbol": str(symbol)})
+    upgrades, forced = _id_changes(ref, before, previous, overrides)
+    _mark_review(ref, vendor, changed, before, overrides, session)
     active = ref["status"].eq("ACTIVE") if "status" in ref else pd.Series(True, index=ref.index)
+    by_figi = sum(
+        is_figi_id(i, f)
+        for i, f, a in zip(ref["instrument_id"], ref["figi"], active, strict=True)
+        if a
+    )
     stats = {
-        "ids_by_figi": int(
-            sum(
-                is_figi_id(i, f)
-                for i, f, a in zip(ref["instrument_id"], ref["figi"], active, strict=True)
-                if a
-            )
-        ),
+        "ids_by_figi": int(by_figi),
+        "ids_by_symbol": int(active.sum()) - int(by_figi),
         "ids_carried": carried,
-        "ids_upgraded": len(upgrades),
+        "ids_upgraded": len(upgrades) - forced,
+        "ids_overridden": forced,
         "figi_conflicts": conflicts,
+        "figi_changes_held": sum(changed),
+        "figi_review": int((ref["vendor_figi"].notna() & active).sum()),
     }
-    stats["ids_by_symbol"] = int(active.sum()) - stats["ids_by_figi"]
     return Assigned(ref, id_map_rows(upgrades, session), stats)
 
 
+def _id_changes(
+    ref: pd.DataFrame,
+    before: Mapping[str, Held],
+    previous: pd.DataFrame | None,
+    overrides: Mapping[str, str | None],
+) -> tuple[list[dict[str, str]], int]:
+    """-> (id_map rows: upgrades + owner-forced changes, how many were forced)."""
+    previous_ids = set(previous["instrument_id"]) if previous is not None else set()
+    rows, forced = [], 0
+    for symbol, iid, figi in zip(ref["symbol"], ref["instrument_id"], ref["figi"], strict=True):
+        old = before.get(str(symbol), NOTHING)
+        if not old.instrument_id or old.instrument_id == iid:
+            continue
+        row = {"old_id": old.instrument_id, "new_id": iid, "symbol": str(symbol)}
+        if str(symbol) in overrides:
+            rows.append(row)
+            forced += 1
+        elif (
+            is_figi_id(iid, figi)
+            and old.held_figi is None
+            and old.figi in (None, figi)
+            and iid not in previous_ids
+        ):
+            rows.append(row)
+    return rows, forced
+
+
+def _mark_review(
+    ref: pd.DataFrame,
+    vendor: list[str | None],
+    changed: list[bool],
+    before: Mapping[str, Held],
+    overrides: Mapping[str, str | None],
+    session: date,
+) -> None:
+    """Fill ``vendor_figi`` / ``figi_review_since`` in place: a held FIGI the vendor now
+    reports differently, and every active listing of a FIGI several listings share."""
+    active = ref["status"].eq("ACTIVE") if "status" in ref else pd.Series(True, index=ref.index)
+    figi = ref["figi"].where(active & ~ref["symbol"].isin(list(overrides)))
+    shared = figi.notna() & figi.duplicated(keep=False)
+    marks = [
+        vendor[n] if changed[n] else str(figi.iloc[n]) if shared.iloc[n] else None
+        for n in range(len(ref))
+    ]
+    since: list[date | None] = []
+    for symbol, mark in zip(ref["symbol"], marks, strict=True):
+        old = before.get(str(symbol), NOTHING)
+        if mark is None:
+            since.append(None)
+        else:
+            same = old.vendor_figi == mark and old.review_since is not None
+            since.append(old.review_since if same else session)
+    ref["vendor_figi"] = marks
+    ref["figi_review_since"] = pd.Series(since, index=ref.index, dtype=object)
+
+
+def _note(row: object, held: str | None, marked: pd.DataFrame) -> str:
+    symbol, iid, vendor = row.symbol, row.instrument_id, row.vendor_figi  # type: ignore[attr-defined]
+    if held is not None and held != vendor:
+        return f"vendor reports a different FIGI; {symbol} keeps {iid}"
+    others = marked.loc[marked["vendor_figi"].eq(vendor) & marked["symbol"].ne(symbol), "symbol"]
+    shared = ", ".join(sorted(str(s) for s in others))
+    if held is not None:
+        return f"FIGI shared with {shared}; {symbol} holds {iid}"
+    return f"FIGI shared with {shared}; {symbol} keeps the symbol id {iid}"
+
+
+def figi_review_rows(reference: pd.DataFrame) -> list[dict[str, str]]:
+    """Active listings marked for FIGI review (``FIGI_REVIEW_COLUMNS``): a held FIGI the
+    vendor reports differently, or a FIGI several listings share. The owner resolves one with
+    a row in ``config/site/overrides/figi.csv``, or it clears when the vendor agrees again."""
+    if "vendor_figi" not in reference.columns:
+        return []
+    marked = reference[reference["status"].eq("ACTIVE") & reference["vendor_figi"].notna()]
+    rows = []
+    for r in marked.sort_values("symbol").itertuples():
+        held = _figi(r.figi) if is_figi_id(str(r.instrument_id), _figi(r.figi)) else None
+        since = _date(r.figi_review_since)
+        rows.append(
+            {
+                "symbol": str(r.symbol),
+                "held_figi": held or "",
+                "vendor_figi": str(r.vendor_figi),
+                "first_seen": "" if since is None else since.isoformat(),
+                "note": _note(r, held, marked),
+            }
+        )
+    return rows
+
+
 def rename_ids(frame: pd.DataFrame | None, id_map: pd.DataFrame) -> pd.DataFrame | None:
-    """``frame`` with every ``old_id`` in ``id_map`` replaced by its ``new_id``."""
+    """``frame`` with every ``old_id`` in ``id_map`` replaced by its ``new_id``. A reference
+    snapshot that then holds an id twice (an override moved a listing onto an id a delisted
+    row still carries) keeps the active row."""
     if frame is None or id_map.empty:
         return frame
     mapping = dict(zip(id_map["old_id"], id_map["new_id"], strict=True))
-    return frame.assign(instrument_id=frame["instrument_id"].replace(mapping))
+    renamed = frame.assign(instrument_id=frame["instrument_id"].replace(mapping))
+    if "status" not in renamed.columns or not renamed["instrument_id"].duplicated().any():
+        return renamed
+    first = renamed["status"].ne("ACTIVE").astype(int)
+    order = first.sort_values(kind="stable").index
+    kept = renamed.loc[order].drop_duplicates("instrument_id", keep="first")
+    return kept.sort_index()
 
 
 def id_map_rows(upgrades: list[dict[str, str]], session: date) -> pd.DataFrame:

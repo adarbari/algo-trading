@@ -95,18 +95,37 @@ def check_universe(reader: StoreReader, session: date, s: SourcesSettings) -> li
     ]
 
 
+# Chain statuses (``tasks/market/option_chains``) by what they say about the night's fetch:
+# a failed or missing fetch is a source problem (FAIL); a stale chain is the feed serving an
+# older session (WARN: screens already treat those names as UNKNOWN); the rest are answers.
+FETCH_FAILURES = ("FETCH_ERROR", "NOT_ATTEMPTED")  # FETCH_ERROR includes an open circuit
+STALE = "STALE_DATA"
+REPORTED = ("OK", "STALE_DATA", "NO_CHAIN", "NO_STANDARD_SERIES")
+
+
 def check_chains(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:
     status_frame = chain_status(reader, session)
     if status_frame is None or status_frame.empty:
         return [Check("chains_present", "WARN", f"no option chains for {session}")]
-    ok = status_frame["status"].isin(["OK", "NO_STANDARD_SERIES"]).mean()
-    verdict = "FAIL" if ok < s.min_chain_coverage else "PASS"
+    labels = status_frame["status"].astype(str).str.split(":", n=1).str[0].str.strip()
+    total = len(labels)
+    counts = labels.value_counts()
+    failed = int(labels.isin(FETCH_FAILURES).sum())
+    stale = int(counts.get(STALE, 0))
+    breakdown = ", ".join(f"{k} {int(counts.get(k, 0))}" for k in REPORTED)
+    detail = f"of {total} underlyings: {breakdown}, fetch failures {failed}"
     return [
         Check(
-            "chains_coverage",
-            verdict,
-            f"{ok:.1%} of {len(status_frame)} underlyings returned a chain",
-        )
+            "chains_fetch",
+            "FAIL" if failed / total > s.max_chain_fetch_failures else "PASS",
+            f"{failed / total:.1%} failed to fetch "
+            f"(max {s.max_chain_fetch_failures:.0%}); {detail}",
+        ),
+        Check(
+            "chains_stale",
+            "WARN" if stale / total > s.max_chain_stale_share else "PASS",
+            f"{stale / total:.1%} stale (max {s.max_chain_stale_share:.0%}); {detail}",
+        ),
     ]
 
 

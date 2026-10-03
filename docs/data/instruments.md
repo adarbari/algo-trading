@@ -148,15 +148,39 @@ Decision record: [ADR 0018](../adr/0018-figi-instrument-ids.md).
 | Equity / ETF without one (no Massive key, unknown to Massive, golden data) | `EQ:<symbol>` | `EQ:BULL` |
 | Option contract | `OPT:<OCC symbol>`; `underlying_id` = the underlying's id | `OPT:SPY261231C00586000` |
 
-- **Stable.** A FIGI id never changes. A ticker change only updates `symbol` in the
-  reference (and emits `ticker_changed`). A build that finds no FIGI for a symbol whose id was
-  FIGI-based carries the id and FIGI forward (`ids_carried`).
+- **Stable.** A FIGI id never changes automatically. A ticker change only updates `symbol` in
+  the reference (and emits `ticker_changed`). When the previous active listing of a symbol
+  held a FIGI id, a build carries the id and FIGI forward when the vendor reports no FIGI
+  (`ids_carried`) **and when it reports a different one** (`figi_changes_held`): the vendor's
+  FIGI is kept in the reference's `vendor_figi` and the listing goes to the review file. On
+  2026-10-02 DFAC's vendor FIGI flipped BBG011DXY5J0 -> BBG0132J6C32 -> BBG011DXY5J0 across
+  same-session runs and its id followed; now it keeps `EQ:BBG011DXY5J0`, the id its two years
+  of bars are stored under (pinned by a row in `overrides/figi.csv`, so it holds whichever
+  run's snapshot a re-build starts from).
+- **Shared FIGI.** Two listings with one FIGI (MMED and its when-issued line MMEDV on
+  2026-10-02): the listing that already held the id keeps it (else the first symbol); the
+  other keeps its symbol id (`figi_conflicts`). Both are in the review file. Only the holder
+  has an open `symbol_history` row (before, the last listing won the FIGI's row; such a row is
+  closed without a `ticker_changed` event).
+- **Review file.** `universe-build --figi-review-out PATH` (default `var/figi_review.csv`; the
+  run stats carry the same rows as `figi_review`, counts under `identifiers`) lists every active
+  listing under review: `symbol, held_figi, vendor_figi, first_seen, note`. `held_figi` is the
+  FIGI its id stands for (blank for a symbol id); `first_seen` is the session the disagreement
+  was first seen (`figi_review_since` in the reference, carried while it persists). A row
+  disappears when the vendor agrees again or the owner resolves it.
+- **Owner resolution.** `config/site/overrides/figi.csv` (`symbol, figi, note`, reviewed via
+  PR, loaded and validated by the site settings loader) forces a listing's FIGI; a blank
+  `figi` means "no FIGI, symbol id". When the forced FIGI differs from the one the listing
+  holds, the build changes its id and records the change in `instruments/id_map` (+ an
+  `id_changed` event; `ids_overridden`), so `migrate-ids` moves the stored history. An
+  overridden listing is never in the review file.
 - **Upgrades.** When a symbol-id instrument gains a FIGI, the universe build writes
   `instruments/id_map` (`old_id`, `new_id`, `symbol`, `effective`, `known_at`; the full map in
   every snapshot; a session's runs merge per (`old_id`, `new_id`), keeping the first
   `known_at`) and an `id_changed` reference-change event; the old id is not reported as
   delisted. Build stats: `identifiers.ids_by_figi`, `ids_by_symbol`, `ids_carried`,
-  `ids_upgraded`, `figi_conflicts` (two listings with one FIGI: the holder keeps it).
+  `ids_upgraded`, `ids_overridden`, `figi_conflicts` (two listings with one FIGI: the holder
+  keeps it), `figi_changes_held`, `figi_review` (active listings under review).
 - **One resolver.** `SymbolResolver` maps symbol → id from the reference snapshot on or before
   a date (`data.reference.resolver(reader, D)`; before the first snapshot, the earliest one). Active rows
   win a reused ticker. Vendor adapters (Massive bars/splits/dividends, Nasdaq earnings) emit
@@ -176,4 +200,14 @@ algotrade-ingest universe-build            # with ALGOTRADE_MASSIVE_API_KEY set:
 algotrade-ingest migrate-ids --dry-run     # per-table partition / row counts, writes nothing
 algotrade-ingest migrate-ids               # appends the rewritten partitions as new runs
 algotrade-ingest migrate-ids --dry-run     # should now report no tables
+```
+
+Resolving the FIGI review file:
+
+```bash
+algotrade-ingest universe-build                       # writes var/figi_review.csv
+# for each row, check the FIGI on openfigi.com; to change a listing's FIGI (or give it a
+# symbol id), add `symbol,figi,note` to config/site/overrides/figi.csv in a PR, then:
+algotrade-ingest universe-build                       # applies it; id changes go to id_map
+algotrade-ingest migrate-ids --dry-run && algotrade-ingest migrate-ids
 ```

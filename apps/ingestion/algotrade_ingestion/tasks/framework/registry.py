@@ -40,6 +40,7 @@ from algotrade_ingestion.tasks.reference import (
 
 type Params = Mapping[str, Any]
 GOLDEN_DIR = Path("datasets/golden")
+FIGI_REVIEW_OUT = Path("var/figi_review.csv")
 
 
 @dataclass(frozen=True)
@@ -99,6 +100,10 @@ def _universe_build(ctx: TaskContext, p: Params) -> RunRecord:
     if p.get("review_out"):
         universe_build.write_review(ctx.reader, session_of(p), p["review_out"])
         record.stats["review_out"] = str(p["review_out"])
+    if p.get("figi_review_out"):
+        path = Path(p["figi_review_out"])
+        rows = universe_build.write_figi_review(ctx.reader, session_of(p), path)
+        record.stats["figi_review_out"] = {"path": str(path), "rows": rows}
     return record
 
 
@@ -220,6 +225,13 @@ TASKS: dict[str, Task] = {
             params=(
                 SESSION,
                 Param("review_out", ("--review-out",), Path, "write leverage candidates (CSV)"),
+                Param(
+                    "figi_review_out",
+                    ("--figi-review-out",),
+                    Path,
+                    "write FIGI disagreements to review (CSV)",
+                    default=FIGI_REVIEW_OUT,
+                ),
             ),
             skip=_universe_mode,
         ),

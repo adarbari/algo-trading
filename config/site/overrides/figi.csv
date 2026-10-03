@@ -1,0 +1,7 @@
+symbol,figi,note
+# Owner resolution of FIGI review rows (ADR 0018; the universe build writes var/figi_review.csv).
+# A row forces the composite FIGI a listing's id uses; a blank figi means no FIGI (symbol id).
+# If it differs from the FIGI the listing holds the build changes its id and records the change
+# in instruments/id_map: run migrate-ids afterwards to move stored history. Check the FIGI on
+# openfigi.com before adding a row and say why in the note.
+DFAC,BBG011DXY5J0,"2026-10-02: vendor flipped to BBG0132J6C32 and back; BBG011DXY5J0 holds its 2 years of bars, dividends and rollups"
