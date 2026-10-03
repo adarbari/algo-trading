@@ -4,7 +4,7 @@ import pytest
 
 from algotrade.core.model.errors import DataValidationError
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id, run_session
-from algotrade.storage.tables.schemas import TableSpec, spec_for, validate_frame
+from algotrade.storage.tables.schemas import TableSpec, spec_for, table_key, validate_frame
 from tests.storage_helpers import stamped
 
 
@@ -54,5 +54,11 @@ def test_tables_declare_how_their_runs_combine() -> None:
     assert spec_for("events/reference_change").runs == "merge"
     for snapshot in ("bars/1d", "universe", "chains/option_quotes", "results/x", "rollups/daily/y"):
         assert spec_for(snapshot).runs == "snapshot"
+    assert spec_for("instruments/reference").runs == "snapshot"
+    id_map, history = spec_for("instruments/id_map"), spec_for("instruments/symbol_history")
+    assert (id_map.runs, history.runs) == ("merge", "merge")
+    assert table_key(id_map, ["instrument_id", "ts", "old_id"]) == ["old_id", "new_id"]
+    assert table_key(history, ["instrument_id", "ts"]) == ["figi", "symbol", "valid_from"]
+    assert table_key(spec_for("events/x"), ["instrument_id", "ts"]) == ["instrument_id", "ts"]
     with pytest.raises(ValueError, match="run mode"):
         TableSpec("t", "event", ("instrument_id",), runs="append")

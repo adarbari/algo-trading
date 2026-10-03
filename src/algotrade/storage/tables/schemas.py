@@ -52,7 +52,8 @@ class TableSpec:
     """A table's contract. ``columns`` declares types: every column of a fixed table (others
     are rejected on write); the common and key columns of an open-ended one (the producer
     defines the rest). Writes cast to the declared types and fail on uncastable data.
-    ``runs`` says how a partition's runs combine on read (``RUN_MODES``)."""
+    ``runs`` says how a partition's runs combine on read (``RUN_MODES``); ``key``, when set,
+    is the table key (``table_key``) instead of the grain's default."""
 
     name: str
     grain: str
@@ -60,6 +61,7 @@ class TableSpec:
     open_ended: bool = False
     columns: tuple[Column, ...] = ()
     runs: str = "snapshot"
+    key: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.runs not in RUN_MODES:
@@ -79,9 +81,16 @@ def _columns(*specs: str) -> tuple[Column, ...]:
     return tuple(out)
 
 
-def _fixed(name: str, grain: str, required: tuple[str, ...], *columns: str) -> TableSpec:
-    spec = TableSpec(name, grain, required, columns=_columns(*columns))
-    undeclared = [c for c in (*COMMON, *required) if spec.column(c) is None]
+def _fixed(
+    name: str,
+    grain: str,
+    required: tuple[str, ...],
+    *columns: str,
+    runs: str = "snapshot",
+    key: tuple[str, ...] = (),
+) -> TableSpec:
+    spec = TableSpec(name, grain, required, columns=_columns(*columns), runs=runs, key=key)
+    undeclared = [c for c in (*COMMON, *required, *key) if spec.column(c) is None]
     if undeclared:
         raise ValueError(f"{name}: required columns without a type: {undeclared}")
     return spec
@@ -167,7 +176,9 @@ INSTRUMENT_REFERENCE = _fixed(
     "first_seen date",
     "delisted_on date",
 )
-# L1: which symbol each FIGI used and when (one full history per snapshot date).
+# L1: which symbol each FIGI used and when (the full history per snapshot date). Each build
+# only opens and closes rows, so a session's runs merge per (figi, symbol, valid_from): a
+# re-run that sees less can close a row (latest run wins) but never hide one.
 SYMBOL_HISTORY = _fixed(
     "instruments/symbol_history",
     "reference",
@@ -177,8 +188,13 @@ SYMBOL_HISTORY = _fixed(
     *_strings("figi", "symbol"),
     "valid_from date",
     "valid_to date",
+    runs="merge",
+    key=("figi", "symbol", "valid_from"),
 )
-# L1: symbol id -> FIGI id upgrades (ADR 0018); cumulative, one full map per snapshot date.
+# L1: symbol id -> FIGI id upgrades (ADR 0018); cumulative, the full map per snapshot date.
+# A session's runs merge per (old_id, new_id), so a run holding only its own upgrades can
+# never hide the earlier ones (2026-10-03). Keyed on the pair, not old_id alone: a reused
+# symbol id can upgrade again to another FIGI, and ``known_at`` tells the two apart.
 ID_MAP = _fixed(
     "instruments/id_map",
     "reference",
@@ -188,6 +204,8 @@ ID_MAP = _fixed(
     *_strings("old_id", "new_id", "symbol"),
     "effective date",
     "known_at timestamp_utc",
+    runs="merge",
+    key=("old_id", "new_id"),
 )
 # L1: company details from SEC EDGAR, per instrument (one full snapshot per date).
 INSTRUMENT_COMPANY = _fixed(
@@ -297,7 +315,10 @@ def validate_frame(table: str, frame: pd.DataFrame) -> None:
 
 def table_key(spec: TableSpec, columns: Iterable[object]) -> list[str]:
     """The columns that identify a row: unique within a run (checked on write) and, for
-    ``merge`` tables, the key the latest run wins on across runs."""
+    ``merge`` tables, the key the latest run wins on across runs. A spec's own ``key`` wins
+    over the grain's default (``instrument_id``, + ``ts``, + ``change`` for events)."""
+    if spec.key:
+        return list(spec.key)
     present = {str(c) for c in columns}
     key = ["instrument_id"]
     if "ts" in present and spec.grain != "universe":  # history rows: one per (id, from)

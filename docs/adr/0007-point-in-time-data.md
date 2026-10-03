@@ -38,13 +38,15 @@ combine (`TableSpec.runs` in `storage/tables/schemas.py`); storage applies it
 return the combined view and every backend agrees (`tests/contract/storage/`).
 
 - **`snapshot`**: every run is the partition's full contents, so the latest run known at
-  `as_of` replaces the others. Reference, company, id map, universe, bars (a re-fetched
+  `as_of` replaces the others. Reference, company, universe, bars (a re-fetched
   session replaces the earlier fetch), chains, rates, rollups, catalogues and results.
 - **`merge`**: every run is a window or an increment, so a read unions all runs known at
   `as_of` and, per table key (`instrument_id`, `ts`, + `change`), the latest run's row
   wins. All `events/*` tables: the corporate-actions backfill (26 months) and the nightly
   -7..+30-day window land in the same session's partition, and picking one run hid the
-  backfill (2026-10-03: AAPL / KO showed no trailing dividends).
+  backfill (2026-10-03: AAPL / KO showed no trailing dividends). Also the cumulative
+  instrument tables `instruments/id_map` and `instruments/symbol_history`, on their own key
+  (`TableSpec.key`), so a partial re-run cannot hide recorded upgrades or history (ADR 0018).
 - **Restating runs.** A run written with `restates=True` (`IngestRun.rewrite`, used by
   `migrate_ids`) holds the whole merged view as of its write; reads at or after it start
   from it, so rows it replaced (e.g. old symbol ids) are not resurrected. Reads pinned

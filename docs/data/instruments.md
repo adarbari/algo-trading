@@ -122,6 +122,17 @@ and drop out of the default coverage.
 back under a new symbol closes the old row and emits `events/reference_change` with
 `change = ticker_changed` (e.g. FB -> META).
 
+**Re-runs of a session.** The build's cumulative state (ids, `first_seen`, delistings
+carried, `symbol_history`, `id_map`) starts from the latest snapshot **known** when it runs:
+an earlier run of the same session if there is one, else the latest earlier session. So a
+re-run (the nightly re-building a session built by hand that morning) keeps what the earlier
+run recorded, and a listing that only the earlier run saw is carried as `DELISTED`.
+`events/reference_change` and `events/index_change` always diff against the **previous
+session** (with the session's id upgrades applied), so every run of a session emits the same
+rows under the same keys, which the merged event tables absorb. `symbol_history` and
+`id_map` are also **merge** tables ([storage.md](storage.md#how-runs-combine)): a run that
+holds less can never hide what an earlier run of the session recorded.
+
 
 ## FIGI-based instrument ids (implemented, phase 1.8)
 
@@ -138,7 +149,8 @@ Decision record: [ADR 0018](../adr/0018-figi-instrument-ids.md).
   FIGI-based carries the id and FIGI forward (`ids_carried`).
 - **Upgrades.** When a symbol-id instrument gains a FIGI, the universe build writes
   `instruments/id_map` (`old_id`, `new_id`, `symbol`, `effective`, `known_at`; the full map in
-  every snapshot) and an `id_changed` reference-change event; the old id is not reported as
+  every snapshot; a session's runs merge per (`old_id`, `new_id`), keeping the first
+  `known_at`) and an `id_changed` reference-change event; the old id is not reported as
   delisted. Build stats: `identifiers.ids_by_figi`, `ids_by_symbol`, `ids_carried`,
   `ids_upgraded`, `figi_conflicts` (two listings with one FIGI: the holder keeps it).
 - **One resolver.** `SymbolResolver` maps symbol → id from the reference snapshot on or before

@@ -23,6 +23,14 @@ CSV import), so changing the scheme meant changing every one of them.
   writes `instruments/id_map` (`instrument_id` = new id, `old_id`, `new_id`, `symbol`,
   `effective`; cumulative, one full map per snapshot) and an `id_changed`
   `events/reference_change` row. The old id is not reported as a delisting.
+- **Re-runs keep the map** (note, 2026-10-03). The build starts its cumulative state (ids,
+  `id_map`, `symbol_history`, `first_seen`, delistings) from the latest snapshot known when it
+  runs, including an earlier run of the same session; events still diff against the previous
+  session. `id_map` and `symbol_history` merge their runs (ADR 0007, key `old_id` + `new_id`
+  and `figi` + `symbol` + `valid_from`). Before this, a same-session re-run started the map
+  from nothing: on 2026-10-02 it wrote 3 upgrades that hid 10,817, and `migrate-ids` mapped 3
+  ids. The map is keyed on the pair, not `old_id` alone, because a reused symbol id can
+  upgrade again to another FIGI (told apart by `known_at`).
 - **One resolver.** `SymbolResolver` (`data/resolver.py`, moved from `storage/` in R2) maps
   symbol -> id from an `instruments/reference` snapshot: `data.reference.resolver(reader, D)`
   uses the latest snapshot on
