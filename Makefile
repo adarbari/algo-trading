@@ -6,7 +6,7 @@ GOLDEN_URL ?= file://datasets/golden/store
 
 
 .PHONY: install lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update filelen unit property integration e2e test \
-        evaluate baseline datasets-verify datasets-build golden-store check nightly features-doc
+        evaluate baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-visual
 
 UV ?= uv
 
@@ -84,7 +84,24 @@ evaluate: golden-store  ## strategy scorecard vs committed baseline
 baseline: golden-store  ## accept current results as the new baseline (review the diff!)
 	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate --update-baseline
 
-check: lock-check lint typecheck arch layout ownership dupes filelen datasets-verify test evaluate
+# ----------------------------------------------------------------------------- web (apps/web, ADR 0025)
+# Node 24 + npm (npm workspaces: apps/web and its design-system package); lockfile apps/web/package-lock.json.
+WEB = apps/web
+NPM ?= npm
+
+$(WEB)/node_modules/.package-lock.json: $(WEB)/package-lock.json
+	cd $(WEB) && $(NPM) ci --no-fund --no-audit
+
+web-install: $(WEB)/node_modules/.package-lock.json  ## web deps + the Playwright browser
+	cd $(WEB) && npx playwright install chromium
+
+web-check: $(WEB)/node_modules/.package-lock.json  ## generated files fresh, ds:check, lint, types, unit, build, storybook, e2e
+	cd $(WEB) && $(NPM) run check
+
+web-visual:      ## screenshots + axe over every story, in the CI Linux image (needs Docker)
+	cd $(WEB) && $(NPM) run visual:docker
+
+check: lock-check lint typecheck arch layout ownership dupes filelen datasets-verify test evaluate web-check
 
 nightly:
 	HYPOTHESIS_PROFILE=nightly $(PY) -m pytest tests/property

@@ -70,3 +70,38 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with: { name: scorecard, path: scorecard.md, if-no-files-found: ignore }
+
+  web:
+    name: Web (lint, types, unit, design system, build, Storybook, e2e, screenshots)
+    runs-on: ubuntu-latest
+    # The official Playwright image: browsers and fonts identical to the screenshot baselines
+    # (apps/web/scripts/in-playwright-docker.sh uses the same image locally). Its tag must
+    # match @playwright/test in apps/web/package-lock.json (checked below).
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    defaults:
+      run:
+        working-directory: apps/web
+    env:
+      CI: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: actions/cache@v6
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('apps/web/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
+      - run: npm ci --no-fund --no-audit
+      - name: Playwright image matches the locked @playwright/test
+        run: |
+          locked=$(node -p "require('@playwright/test/package.json').version")
+          test "$locked" = "1.63.0" || { echo "bump the web job's container image to v$locked-noble"; exit 1; }
+      - name: Generated files fresh, ds:check, lint, types, unit, build, Storybook, e2e
+        run: npm run check
+      - name: Screenshots + axe (light and dark) over every design-system story
+        run: npm run visual
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with: { name: playwright-report, path: "apps/web/playwright-report\napps/web/test-results", if-no-files-found: ignore }

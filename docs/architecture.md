@@ -11,6 +11,7 @@ versus planned. Detail lives in companion docs:
 | Instruments and the universe | [data/instruments.md](data/instruments.md) |
 | Vendors | [data/vendors.md](data/vendors.md) |
 | Screeners | [screeners/](screeners/README.md) |
+| Web app architecture (layers, component-only rules, workspaces) | [ui/architecture.md](ui/architecture.md) |
 | UI design system | [ui/design-system.md](ui/design-system.md) |
 | Who owns each responsibility (machine-readable) | `architecture/ownership.toml`, [ADR 0019](adr/0019-ownership-and-boundaries.md) |
 | Why each decision was made | [adr/](adr/README.md) |
@@ -52,7 +53,7 @@ versus planned. Detail lives in companion docs:
 
 | Area | Built | Planned (phase) |
 |---|---|---|
-| Apps | `apps/ingestion`, `apps/backtest`, `apps/api` v1 (read-only, ADR 0024) | API writes (submit jobs) (4), `apps/web` (5) |
+| Apps | `apps/ingestion`, `apps/backtest`, `apps/api` v1 (read-only, ADR 0024); `apps/web` skeleton + harness (ADR 0025: layers, design-system package, DRAFT tokens, placeholder routes) | API writes (submit jobs) (4), `apps/web` screens (5, after mockup approval) |
 | L1 | `instruments/reference` from the Nasdaq Trader + SPY universe builder (or universe CSVs) with FIGI / CIK and vendor security types (Massive), `instruments/symbol_history`, FIGI-based `instrument_id` + `instruments/id_map` + `SymbolResolver` (ADR 0018), company details (SEC EDGAR), `events/reference_change` (incl. `ticker_changed`, `id_changed`) + `events/index_change`, rollups `option_liquidity@v1`, `price_stats@v1`, `earnings@v1` (the rollup framework, 2b.2), `InstrumentView` reader | `iv_history`, `liquidity_class` rollups (2b.3); `fundamentals@v1` + `instruments/shares` from SEC company facts (2b.4) |
 | L2 | `chains/*` (Cboe), `events/earnings` (Nasdaq), `bars/1d` + `events/split` + `events/dividend` (Massive, unadjusted; adjusted at read time), `rates/treasury` (U.S. Treasury par yield curve), golden data | live Massive run awaits the API key (1); intraday bars + `rollups/daily/*` (6) |
 | L3 | `defaults.toml`, `universe.toml`, `sources.toml`, `nightly.toml`, `rollups.toml`, `overrides/leveraged_etfs.csv`, `presets/selections/*`, `presets/strategies/*` | |

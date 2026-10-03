@@ -1,6 +1,7 @@
 # Design system
 
-Decision record: [ADR 0011](../adr/0011-design-system-first-ui.md).
+Decision record: [ADR 0011](../adr/0011-design-system-first-ui.md). The app's architecture
+(layers, component-only rule, enforcement): [architecture.md](architecture.md), ADR 0025.
 
 ## Principle: dense but calm
 
@@ -18,11 +19,16 @@ noise.
 
 ```
 apps/web/
-  design-system/        package @algotrade/ui. The ONLY place styling decisions live.
-    tokens/             color, type, space, radius, border, motion, density, z-index
-    components/         one folder per component: Component.tsx, .stories.tsx, .test.tsx
-    COMPONENTS.md       GENERATED inventory of every component and its props (do not hand-edit)
-  app/                  screens. Imports UI only from @algotrade/ui.
+  design-system/          package @algotrade/ui. The ONLY place styling and raw HTML live.
+    tokens/               typed tokens (color, typography, space, shape, motion, density,
+                          layers) -> GENERATED tokens.css (`npm run tokens`)
+    theme/                UiProvider: fonts, tokens, theme, density, up/down palette
+    primitives/<Name>/    Stack, Text, ...: how screens lay out and set text
+    components/<Name>/    Name.tsx, Name.module.css, Name.stories.tsx, Name.test.tsx,
+                          index.ts, __screenshots__/ (copy primitives/Text, the template)
+    COMPONENTS.md         GENERATED inventory of every component and its props (do not hand-edit)
+  src/                    the app in layers (app, pages, widgets, features, entities, shared):
+                          imports UI only from @algotrade/ui. See architecture.md.
 ```
 
 ## Tokens
@@ -35,6 +41,14 @@ apps/web/
 | Shape | Radius 4–6 px; **borders, not shadows**, to separate surfaces |
 | Density | `compact` (default for tables) and `comfortable` |
 | Motion | 100–150 ms, no bouncing; respects `prefers-reduced-motion` |
+
+The tokens in `apps/web/design-system/tokens/` are a **DRAFT** of this table (12-step neutral
+greys, one blue accent, semantic positive / negative / warning / info, green / red up-down with
+a blue / orange colour-blind-safe alternative under `data-updown="cvd"`, Inter + JetBrains Mono,
+11–20 px type, 4 px space scale, radius 4 / 6 px, 1 px borders, 100 / 150 ms motion,
+compact / comfortable density). They change with the mockups and are final when the owner
+approves them. Every text colour passes WCAG AA on the canvas in both themes (checked by axe
+on every story).
 
 ## First component set
 
@@ -53,7 +67,7 @@ apps/web/
    screen that needs it (`DataTable`, not `ScreenerTable`). Behaviour comes in through props
    and composition, not screen-specific branches. Include a catalogue story, tests and a
    screenshot snapshot.
-3. **Then use it** from `app/`.
+3. **Then use it** from the app (`src/`, through the layer that owns it: architecture.md).
 4. Screens contain layout and data wiring only: no raw colours, no one-off spacing, no styled
    HTML elements.
 
@@ -61,12 +75,12 @@ apps/web/
 
 | Check | Tool |
 |---|---|
-| `app/` imports UI only from `@algotrade/ui` | ESLint `no-restricted-imports` |
-| No hex or rgb colours, inline styles or arbitrary sizes outside `design-system/` | ESLint and Stylelint rules |
-| Every design-system component has a catalogue story, a test and a screenshot snapshot | `scripts/check-design-system` |
-| `COMPONENTS.md` is up to date | regenerated in CI; fails on diff |
-| Screenshot changes are reviewed | Playwright screenshot comparison |
-| 1000-line file limit also covers `.ts` / `.tsx` | `scripts/check_file_length.py` |
+| App code (`src/`) imports UI only from `@algotrade/ui` (root only) and renders no HTML elements, `className` or `style` | ESLint (`apps/web/lint-rules/`; ADR 0025 rules 2-3) |
+| No hex / rgb colours, gradients, shadows, inline styles or one-off sizes; tokens only | ESLint (app code) and Stylelint (design-system CSS) |
+| Every design-system component has its stories (all states), a unit test with axe and screenshots | `npm run ds:check`, `tests/architecture/test_layout_web.py` |
+| `COMPONENTS.md` and `tokens.css` are up to date | regenerated in CI (`npm run generated:check`); fails on diff |
+| Screenshot changes are reviewed; contrast holds in light and dark | Playwright visual suite over every story (screenshot diff + axe), Linux image |
+| 1000-line file limit also covers `.ts` / `.tsx` / `.css` | `scripts/check_file_length.py` |
 
 ## Before any screen is built
 

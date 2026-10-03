@@ -1,0 +1,10 @@
+# apps/web build and test output (sources and lockfile are committed)
+node_modules/
+dist/
+storybook-static/
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+# The root .gitignore ignores Python build dirs named lib/; shared/lib here is source.
+!src/shared/lib/

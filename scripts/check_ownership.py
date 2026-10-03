@@ -154,6 +154,8 @@ def scan(root: Path, registry: list[Responsibility]) -> list[Hit]:
     hits = []
     for top in SCAN_ROOTS:
         for path in sorted((root / top).rglob("*.py")):
+            if {".venv", "node_modules"} & set(path.parts):
+                continue  # vendored dependencies (apps/web/node_modules), not our code
             rel = path.relative_to(root).as_posix()
             hits += [
                 h

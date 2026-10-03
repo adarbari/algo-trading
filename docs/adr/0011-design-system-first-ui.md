@@ -1,6 +1,8 @@
 # ADR 0011: Design-system-first UI
 
 **Status:** accepted (2026-10-02). Spec: [docs/ui/design-system.md](../ui/design-system.md).
+Extended by [0025](0025-frontend-architecture.md) (frontend architecture: layers, component-only
+app code, enforcement; [docs/ui/architecture.md](../ui/architecture.md)).
 
 ## Context
 The owner wants a clean, modern, minimal UI and explicitly does not want generic
