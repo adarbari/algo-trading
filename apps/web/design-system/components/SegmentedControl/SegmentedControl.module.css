@@ -1,0 +1,64 @@
+/* SegmentedControl: a bordered group; the selected option is inverted (text on bg colours). */
+.group {
+  display: inline-flex;
+  flex: none;
+  overflow: hidden;
+  width: max-content;
+  border: var(--border-width-thin) solid var(--color-control);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.option {
+  margin: 0;
+  padding-block: var(--space-1);
+  padding-inline: var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--color-text-2);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-base);
+  white-space: nowrap;
+  cursor: pointer;
+  transition-duration: var(--duration-fast);
+  transition-property: background-color, color;
+  transition-timing-function: var(--easing-standard);
+}
+
+.option + .option {
+  border-inline-start: var(--border-width-thin) solid var(--color-control);
+}
+
+.option:hover {
+  background: var(--color-row);
+  color: var(--color-text);
+}
+
+.option:focus-visible {
+  outline-offset: calc(-1 * var(--focus-ring-width));
+}
+
+.option[data-checked] {
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-weight: var(--font-weight-medium);
+}
+
+.option:disabled {
+  color: var(--color-muted);
+  cursor: not-allowed;
+}
+
+.option[data-checked]:disabled {
+  background: var(--color-muted);
+  color: var(--color-bg);
+}
+
+.group[data-size='sm'] .option {
+  padding-block: var(--space-0-5);
+  padding-inline: var(--space-2);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-xs);
+}

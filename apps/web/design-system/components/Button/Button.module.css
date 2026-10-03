@@ -1,0 +1,88 @@
+/* Button: variants and sizes as data attributes; borders, never shadows. */
+.button {
+  display: inline-flex;
+  flex: none;
+  gap: var(--space-1-5);
+  align-items: center;
+  justify-content: center;
+  min-height: var(--density-control-height);
+  margin: 0;
+  padding-block: 0;
+  padding-inline: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-control);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-base);
+  white-space: nowrap;
+  cursor: pointer;
+  transition-duration: var(--duration-fast);
+  transition-property: background-color, border-color, color;
+  transition-timing-function: var(--easing-standard);
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.button[data-size='sm'] {
+  min-height: auto;
+  padding-block: var(--space-0-5);
+  padding-inline: var(--space-2);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.button[data-full-width] {
+  width: 100%;
+}
+
+.button:hover {
+  background: var(--color-row);
+}
+
+.button[data-variant='primary'] {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-weight: var(--font-weight-medium);
+}
+
+.button[data-variant='primary']:hover {
+  border-color: var(--color-accent-strong);
+}
+
+.button[data-variant='ghost'] {
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-text-2);
+}
+
+.button[data-variant='ghost']:hover {
+  background: var(--color-row);
+  color: var(--color-text);
+}
+
+.button[data-variant='dashed'] {
+  border-style: dashed;
+}
+
+.button:disabled,
+.button[aria-busy='true'] {
+  cursor: not-allowed;
+}
+
+.button:disabled {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-muted);
+}
+
+.button[data-variant='ghost']:disabled {
+  border-color: transparent;
+  background: transparent;
+}

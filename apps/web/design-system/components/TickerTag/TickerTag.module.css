@@ -1,0 +1,78 @@
+/* TickerTag: mono symbol; border and swatch in the series colour (graphic contrast only). */
+.tag {
+  display: inline-flex;
+  flex: none;
+  gap: var(--space-1-5);
+  align-items: center;
+  padding-block: var(--space-0-5);
+  padding-inline: var(--space-2);
+  border: var(--border-width-thin) solid var(--color-control);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-sm);
+  white-space: nowrap;
+}
+
+.tag[data-removable] {
+  padding-inline-end: var(--space-0-5);
+}
+
+.swatch {
+  flex: none;
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-control);
+}
+
+.tag[data-series='s1'] {
+  border-color: var(--color-s1);
+}
+
+.tag[data-series='s1'] .swatch {
+  background: var(--color-s1);
+}
+
+.tag[data-series='s2'] {
+  border-color: var(--color-s2);
+}
+
+.tag[data-series='s2'] .swatch {
+  background: var(--color-s2);
+}
+
+.tag[data-series='s3'] {
+  border-color: var(--color-s3);
+}
+
+.tag[data-series='s3'] .swatch {
+  background: var(--color-s3);
+}
+
+.tag[data-series='s4'] {
+  border-color: var(--color-s4);
+}
+
+.tag[data-series='s4'] .swatch {
+  background: var(--color-s4);
+}
+
+.tag[data-series='s5'] {
+  border-color: var(--color-s5);
+}
+
+.tag[data-series='s5'] .swatch {
+  background: var(--color-s5);
+}
+
+.tag[data-series='s6'] {
+  border-color: var(--color-s6);
+}
+
+.tag[data-series='s6'] .swatch {
+  background: var(--color-s6);
+}

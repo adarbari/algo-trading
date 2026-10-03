@@ -1,0 +1,53 @@
+/* AppShell: top bar above a main region; the page layout is centred up to the page width. */
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: var(--color-bg);
+  container-type: inline-size;
+}
+
+.skip {
+  position: absolute;
+  z-index: var(--z-overlay);
+  inset-block-start: var(--space-2);
+  inset-inline-start: var(--space-2);
+  padding-block: var(--space-1);
+  padding-inline: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-accent-strong);
+  transform: translateY(-200%);
+}
+
+.skip:focus {
+  transform: none;
+}
+
+.main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.main:focus {
+  outline: none;
+}
+
+.main[data-layout='page'] {
+  gap: var(--space-4);
+  width: 100%;
+  max-width: var(--size-page);
+  margin-inline: auto;
+  padding-block: var(--space-5) var(--space-10);
+  padding-inline: var(--space-6);
+}
+
+@container (width < 720px) {
+  .main[data-layout='page'] {
+    padding-block: var(--space-3) var(--space-6);
+    padding-inline: var(--space-3);
+  }
+}

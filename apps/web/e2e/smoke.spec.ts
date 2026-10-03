@@ -1,6 +1,7 @@
 /**
  * Smoke test: the production build boots, `/` opens the TRADER workspace home (Ideas), the
- * ADMIN workspace is reachable, and both are accessible in dark (the default) and light.
+ * ADMIN workspace is reachable, the top bar's workspace switch and section links navigate, and
+ * both workspaces are accessible in dark (the default) and light.
  */
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
@@ -52,3 +53,18 @@ for (const theme of ['dark', 'light'] as const) {
     expect(errors).toEqual([]);
   });
 }
+
+test('the top bar switches workspace and section', async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto('/ideas');
+  await expect(page.getByRole('link', { name: 'Ideas' })).toHaveAttribute('aria-current', 'page');
+  await page.getByRole('link', { name: 'Explore' }).click();
+  await expect(page).toHaveURL(/\/explore$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Explore' })).toBeVisible();
+  await page.getByRole('radio', { name: 'Admin' }).click();
+  await expect(page).toHaveURL(/\/admin\/ingestion$/);
+  await expect(page.getByRole('radio', { name: 'Admin' })).toHaveAttribute('aria-checked', 'true');
+  await page.getByRole('radio', { name: 'Admin' }).press('ArrowLeft');
+  await expect(page).toHaveURL(/\/ideas$/);
+  expect(errors).toEqual([]);
+});

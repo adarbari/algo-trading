@@ -1,0 +1,43 @@
+/* IconButton: a square from the density's control height; quiet until hovered. */
+.iconButton {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--density-control-height);
+  height: var(--density-control-height);
+  margin: 0;
+  padding: 0;
+  border: var(--border-width-thin) solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition-duration: var(--duration-fast);
+  transition-property: background-color, border-color, color;
+  transition-timing-function: var(--easing-standard);
+}
+
+.iconButton[data-size='sm'] {
+  width: calc(var(--size-icon-sm) + var(--space-1));
+  height: calc(var(--size-icon-sm) + var(--space-1));
+  border-radius: var(--radius-sm);
+}
+
+.iconButton[data-variant='secondary'] {
+  border-color: var(--color-control);
+  background: var(--color-surface);
+  color: var(--color-text-2);
+}
+
+.iconButton:hover {
+  background: var(--color-row);
+  color: var(--color-text);
+}
+
+.iconButton:disabled {
+  background: transparent;
+  color: var(--color-muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}

@@ -1,0 +1,14 @@
+/* SearchInput: full width, or the top bar's fixed search width. */
+.searchInput {
+  display: flex;
+  min-width: 0;
+}
+
+.searchInput[data-width='full'] {
+  width: 100%;
+}
+
+.searchInput[data-width='fixed'] {
+  width: var(--size-search);
+  max-width: 100%;
+}

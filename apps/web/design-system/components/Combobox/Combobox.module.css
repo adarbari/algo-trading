@@ -1,0 +1,112 @@
+/* Combobox: Input plus a bordered popover list below it (no shadow; raised by z-index only). */
+.combobox {
+  position: relative;
+  min-width: 0;
+}
+
+.popover {
+  position: absolute;
+  z-index: var(--z-dropdown);
+  inset-block-start: calc(100% + var(--space-1));
+  inset-inline-start: 0;
+  min-width: max(100%, var(--size-popover));
+  max-width: max(100%, var(--size-sidebar));
+  border: var(--border-width-thin) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.list {
+  overflow-y: auto;
+  max-height: calc(var(--density-row-height) * 10);
+  padding-block: var(--space-1);
+}
+
+.group + .group,
+.option + .group {
+  margin-block-start: var(--space-1);
+  padding-block-start: var(--space-1);
+  border-top: var(--border-width-thin) solid var(--color-border-soft);
+}
+
+.groupLabel {
+  padding-block: var(--space-1);
+  padding-inline: var(--density-cell-padding-x);
+  color: var(--color-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-xs);
+}
+
+.option {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding-block: var(--density-cell-padding-y);
+  padding-inline: var(--density-cell-padding-x);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.option[data-active] {
+  background: var(--color-row);
+}
+
+.option[aria-disabled='true'] {
+  color: var(--color-muted);
+  cursor: not-allowed;
+}
+
+.optionMain {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-width: 0;
+}
+
+.optionLabel {
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.optionLabel[data-mono] {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+.option[aria-selected='true'] .optionLabel {
+  color: var(--color-accent-strong);
+}
+
+.badge {
+  flex: none;
+  padding-inline: var(--space-1);
+  border: var(--border-width-thin) solid var(--color-control);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-2);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-xs);
+}
+
+.status {
+  display: flex;
+  gap: var(--space-1-5);
+  align-items: center;
+  padding-block: var(--space-2);
+  padding-inline: var(--density-cell-padding-x);
+  border-top: var(--border-width-thin) solid var(--color-border-soft);
+  color: var(--color-muted);
+}
+
+.list:empty {
+  display: none;
+}
+
+.list:empty + .status {
+  border-top: 0;
+}

@@ -1,0 +1,83 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+
+import { Mono } from '../../primitives/Mono';
+import { Text } from '../../primitives/Text';
+import { NavTabs } from '../NavTabs';
+import { SearchInput } from '../SearchInput';
+import { WorkspaceSwitch } from '../WorkspaceSwitch';
+import { TopBar } from './TopBar';
+
+const WORKSPACES = [
+  { value: 'trader', label: 'Trader' },
+  { value: 'admin', label: 'Admin' },
+];
+const TRADER = [
+  { href: '/ideas', label: 'Ideas' },
+  { href: '/screeners', label: 'Screeners' },
+  { href: '/explore', label: 'Explore' },
+  { href: '/backtests', label: 'Backtests' },
+];
+
+const brand = <Mono weight="medium">algotrade</Mono>;
+
+const meta = {
+  title: 'Components/TopBar',
+  component: TopBar,
+  args: {
+    brand,
+    workspace: (
+      <WorkspaceSwitch workspaces={WORKSPACES} value="trader" onValueChange={() => undefined} />
+    ),
+    nav: <NavTabs items={TRADER} activeHref="/ideas" aria-label="Trader sections" />,
+    end: <SearchInput width="fixed" placeholder="Search a ticker…" aria-label="Search tickers" />,
+  },
+  parameters: {
+    layout: 'fullscreen',
+    states: {
+      notApplicable: {
+        Loading: 'the bar is static chrome; its slots show their own loading states',
+        Error: 'the bar is static chrome; errors belong to the page or a slot',
+      },
+    },
+  },
+} satisfies Meta<typeof TopBar>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const Default: Story = {};
+
+/** Admin workspace with a status note in the end slot. */
+export const AdminWithNote: Story = {
+  args: {
+    workspace: (
+      <WorkspaceSwitch workspaces={WORKSPACES} value="admin" onValueChange={() => undefined} />
+    ),
+    nav: (
+      <NavTabs
+        aria-label="Admin sections"
+        activeHref="/admin/ingestion"
+        items={[
+          { href: '/admin/ingestion', label: 'Ingestion' },
+          { href: '/admin/screener-runs', label: 'Screener runs' },
+          { href: '/admin/users', label: 'Users & configs' },
+        ]}
+      />
+    ),
+    end: <Text tone="muted">Latest session ingested: Fri 2 Oct</Text>,
+  },
+};
+
+/** Brand only (sign-in, error pages). */
+export const Empty: Story = { args: { workspace: undefined, nav: undefined, end: undefined } };
+
+/** Phone width (a 320 px frame): the slots wrap onto new lines. */
+export const Dense: Story = {
+  decorators: [
+    (Story) => (
+      <div style={{ maxWidth: 'var(--size-sidebar)' }}>
+        <Story />
+      </div>
+    ),
+  ],
+};

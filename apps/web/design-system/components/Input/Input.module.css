@@ -1,0 +1,104 @@
+/* Input: the box carries border, background and focus; the input itself is transparent. */
+.box {
+  display: inline-flex;
+  gap: var(--space-1-5);
+  align-items: center;
+  min-width: 0;
+  min-height: var(--density-control-height);
+  padding-inline: var(--space-2);
+  border: var(--border-width-thin) solid var(--color-control);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  transition-duration: var(--duration-fast);
+  transition-property: border-color;
+  transition-timing-function: var(--easing-standard);
+}
+
+.box[data-width='full'] {
+  display: flex;
+  width: 100%;
+}
+
+.box[data-size='sm'] {
+  min-height: auto;
+  padding-inline: var(--space-1-5);
+}
+
+.box[data-sunken] {
+  background: var(--color-bg);
+}
+
+.box:hover {
+  border-color: var(--color-muted);
+}
+
+.box:focus-within {
+  border-color: var(--color-accent);
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: calc(-1 * var(--border-width-thin));
+}
+
+.box[data-invalid] {
+  border-color: var(--color-negative);
+}
+
+.box[data-disabled] {
+  border-color: var(--color-border);
+  color: var(--color-muted);
+  cursor: not-allowed;
+}
+
+.input {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding-block: var(--space-1);
+  padding-inline: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  font-feature-settings: var(--font-features);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--line-height-base);
+}
+
+.input::placeholder {
+  color: var(--color-muted);
+  opacity: 1;
+}
+
+.input[data-align='end'] {
+  text-align: end;
+}
+
+.input[data-mono] {
+  font-family: var(--font-mono);
+}
+
+.input:disabled {
+  cursor: not-allowed;
+}
+
+.box[data-size='sm'] .input {
+  padding-block: var(--space-0-5);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+}
+
+.input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.adornment {
+  display: inline-flex;
+  flex: none;
+  gap: var(--space-1);
+  align-items: center;
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}

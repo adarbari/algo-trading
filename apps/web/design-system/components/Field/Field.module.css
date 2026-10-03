@@ -1,0 +1,46 @@
+/* Field: label above (stack) or in a label column (inline); hint and error under the control. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.field[data-layout='inline'] {
+  display: grid;
+  grid-template-columns: var(--size-label) minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.label {
+  color: var(--color-text-2);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-sm);
+}
+
+.field[data-layout='inline'] .label {
+  padding-block-start: calc((var(--density-control-height) - var(--line-height-sm)) / 2);
+}
+
+.field[data-disabled] .label {
+  color: var(--color-muted);
+}
+
+.required {
+  color: var(--color-negative);
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.message {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+}
