@@ -14,7 +14,7 @@ from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.common import stamp
 from algotrade_ingestion.jobs.option_chains import OPTIONS, STATUS, UNDERLYINGS
 
-TABLE = f"features/{liq.NAME}@v{liq.VERSION}"
+TABLE = f"rollups/instrument/{liq.NAME}@v{liq.VERSION}"
 HINT = "algotrade-ingest chains --date {d}"
 
 

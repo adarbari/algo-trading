@@ -17,8 +17,8 @@ def test_run_record_json_round_trip() -> None:
 
 
 def test_open_ended_tables_and_null_instrument() -> None:
-    assert spec_for("features/x@v1").open_ended
+    assert spec_for("rollups/instrument/x@v1").open_ended
     assert spec_for("results/screen").grain == "results"
     frame = stamped([{"instrument_id": None}], date(2026, 10, 2), "r")
     with pytest.raises(DataValidationError, match="null instrument_id"):
-        validate_frame("features/x@v1", frame)
+        validate_frame("rollups/instrument/x@v1", frame)

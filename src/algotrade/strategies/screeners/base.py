@@ -30,7 +30,7 @@ class ScreenRow:
 
 class Screener(ABC):
     name: str = "unnamed"
-    # Feature tables this screener reads, e.g. ("features/option_liquidity@v1",)
+    # Feature tables this screener reads, e.g. ("rollups/instrument/option_liquidity@v1",)
     requires: tuple[str, ...] = ()
 
     @abstractmethod

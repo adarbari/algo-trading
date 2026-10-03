@@ -53,17 +53,43 @@ OPTION_QUOTES = TableSpec(
 )
 CHAIN_STATUS = TableSpec("chains/status", "chain_snapshot", ("instrument_id", "status"))
 
+# L1: what each instrument is (one full snapshot per date). See docs/design/phase-0.md.
+INSTRUMENT_REFERENCE = TableSpec(
+    "instruments/reference",
+    "reference",
+    ("instrument_id", "symbol", "asset_class", "security_type", "multiplier", "status"),
+)
+# L2: OHLCV bars; the table name carries the interval, e.g. "bars/1d", "bars/5m".
+BAR_INTERVALS = frozenset({"1d", "1h", "30m", "15m", "5m", "1m"})
+BAR_COLUMNS = ("instrument_id", "ts", "open", "high", "low", "close", "volume")
+
 KNOWN: dict[str, TableSpec] = {
-    t.name: t for t in (UNIVERSE, UNDERLYING_QUOTES, OPTION_QUOTES, CHAIN_STATUS)
+    t.name: t
+    for t in (UNIVERSE, UNDERLYING_QUOTES, OPTION_QUOTES, CHAIN_STATUS, INSTRUMENT_REFERENCE)
 }
-OPEN_PREFIXES = ("features/", "results/")
+# Open-ended tables: the producing rollup, event source, catalogue or screener defines the
+# columns beyond instrument_id (+ ts for events).
+OPEN_PREFIXES = {
+    "rollups/daily/": "rollup",
+    "rollups/instrument/": "rollup",
+    "events/": "event",
+    "results/": "results",
+    "catalog/": "catalog",
+}
 
 
 def spec_for(table: str) -> TableSpec:
     if table in KNOWN:
         return KNOWN[table]
-    if table.startswith(OPEN_PREFIXES):
-        return TableSpec(table, table.split("/", 1)[0], ("instrument_id",), open_ended=True)
+    if table.startswith("bars/"):
+        interval = table.removeprefix("bars/")
+        if interval not in BAR_INTERVALS:
+            raise DataValidationError(table, [f"unknown bar interval {interval!r}"])
+        return TableSpec(table, "bar", BAR_COLUMNS)
+    for prefix, grain in OPEN_PREFIXES.items():
+        if table.startswith(prefix) and len(table) > len(prefix):
+            required = ("instrument_id", "ts") if grain == "event" else ("instrument_id",)
+            return TableSpec(table, grain, required, open_ended=True)
     raise DataValidationError(table, ["unknown table; add a TableSpec to storage/schemas.py"])
 
 
@@ -78,6 +104,8 @@ def validate_frame(table: str, frame: pd.DataFrame) -> None:
             problems.append("null instrument_id")
         if frame.duplicated(subset=_key(spec, frame)).any():
             problems.append("duplicate rows for the table key")
+        if spec.grain == "bar":
+            problems.extend(bar_problems(frame))
     if problems:
         raise DataValidationError(table, problems)
 
@@ -87,3 +115,21 @@ def _key(spec: TableSpec, frame: pd.DataFrame) -> list[str]:
     if "ts" in frame.columns and spec.grain != "universe":
         key.append("ts")
     return key
+
+
+def bar_problems(frame: pd.DataFrame) -> list[str]:
+    """OHLCV sanity checks. Bad bars silently produce great-looking backtests."""
+    problems: list[str] = []
+    prices = frame[["open", "high", "low", "close"]]
+    if prices.isna().to_numpy().any() or frame["volume"].isna().any():
+        problems.append("bars contain NaN prices or volume")
+        return problems
+    if (prices <= 0).to_numpy().any():
+        problems.append("non-positive prices")
+    if (frame["volume"] < 0).any():
+        problems.append("negative volume")
+    if (frame["high"] < frame[["open", "close"]].max(axis=1)).any():
+        problems.append("high below open/close")
+    if (frame["low"] > frame[["open", "close"]].min(axis=1)).any():
+        problems.append("low above open/close")
+    return problems

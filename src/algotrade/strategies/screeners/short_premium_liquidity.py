@@ -7,7 +7,7 @@ here that is ``Decision.QUALIFIED``. Missing or failed data is ``UNKNOWN`` (fail
 from algotrade.core.feature_view import FeatureView
 from algotrade.strategies.screeners.base import Decision, Screener, ScreenRow
 
-FEATURE = "features/option_liquidity@v1"
+FEATURE = "rollups/instrument/option_liquidity@v1"
 _TIER_SCORE = {"A": 3.0, "B": 2.0, "C": 1.0, "D": 0.0}
 _NO_MARKET = {"NO_CHAIN", "NO_STANDARD_SERIES", "NO_TARGET_EXPIRY"}
 

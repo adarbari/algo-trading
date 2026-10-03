@@ -5,7 +5,7 @@ from datetime import date, datetime
 
 import pandas as pd
 
-from algotrade.storage.backends.selection import latest_run, select_instruments
+from algotrade.storage.backends.selection import concat_frames, latest_run, select_instruments
 from algotrade.storage.runs import RunRecord
 
 
@@ -29,6 +29,19 @@ class MemoryTables:
         if chosen is None:
             return None
         return select_instruments(runs[chosen].copy(), instruments)
+
+    def read_range(
+        self,
+        table: str,
+        start: date,
+        end: date,
+        as_of: datetime | None = None,
+        instruments: Sequence[str] | None = None,
+    ) -> pd.DataFrame | None:
+        days = [d for d in self.dates(table) if start <= d <= end]
+        return concat_frames(
+            [f for d in days if (f := self.read(table, d, as_of, instruments)) is not None]
+        )
 
     def dates(self, table: str) -> list[date]:
         return sorted(d for (t, d) in self._data if t == table)

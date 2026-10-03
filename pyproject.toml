@@ -68,6 +68,10 @@ mypy_path = ["src", "apps/ingestion", "apps/backtest"]
 packages = ["algotrade", "algotrade_ingestion", "algotrade_backtest"]
 warn_unreachable = true
 
+[[tool.mypy.overrides]]
+module = ["pyarrow", "pyarrow.*"]  # pyarrow ships no type stubs
+ignore_missing_imports = true
+
 # ---------------------------------------------------------------- pytest
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -134,7 +134,7 @@ def test_contracts_from_rows_normalises_types() -> None:
 
 
 def test_registered() -> None:
-    assert "features/option_liquidity@v1" in FEATURES
+    assert "rollups/instrument/option_liquidity@v1" in FEATURES
 
 
 # ----------------------------------------------------------------- equivalence with the original

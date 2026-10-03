@@ -26,6 +26,18 @@ class TableStore(Protocol):
         instruments: Sequence[str] | None = None,
     ) -> pd.DataFrame | None: ...
 
+    def read_range(
+        self,
+        table: str,
+        start: date,
+        end: date,
+        as_of: datetime | None = None,
+        instruments: Sequence[str] | None = None,
+    ) -> pd.DataFrame | None:
+        """All partitions with ``start <= session_date <= end``, each resolved point-in-time
+        exactly as ``read`` would, concatenated in date order. ``None`` if none exist."""
+        ...
+
     def dates(self, table: str) -> list[date]: ...
 
 

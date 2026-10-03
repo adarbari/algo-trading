@@ -18,7 +18,7 @@ from algotrade.storage.writers import StoreWriter
 from tests.storage_helpers import T0, stamped, universe_rows
 
 D1, D2 = date(2026, 10, 1), date(2026, 10, 2)
-TABLE = "features/demo@v1"
+TABLE = "rollups/instrument/demo@v1"
 
 
 @pytest.fixture(params=["memory", "local"])
@@ -44,7 +44,7 @@ def test_round_trip_and_instrument_filter(backend: Backend) -> None:
     assert list(only_b["instrument_id"]) == ["EQ:B"]
     assert backend.tables.read(TABLE, D2) is None
     assert backend.tables.dates(TABLE) == [D1]
-    assert backend.tables.dates("features/none@v1") == []
+    assert backend.tables.dates("rollups/instrument/none@v1") == []
 
 
 def test_point_in_time_selection(backend: Backend) -> None:
@@ -142,3 +142,105 @@ def test_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assert env_backend.root == tmp_path / "env"
     with pytest.raises(ConfigurationError, match="unsupported"):
         open_backend("s3://bucket")
+
+
+def bar_rows(
+    day: date, close: float, instruments: tuple[str, ...] = ("EQ:A", "EQ:B")
+) -> list[dict[str, object]]:
+    ts = pd.Timestamp(day, tz="UTC")
+    return [
+        {
+            "instrument_id": i,
+            "ts": ts,
+            "open": close,
+            "high": close + 1,
+            "low": close - 1,
+            "close": close,
+            "volume": 100.0,
+        }
+        for i in instruments
+    ]
+
+
+def test_read_range_resolves_each_partition_point_in_time(backend: Backend) -> None:
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    later = T0 + timedelta(hours=1)
+    for offset, close in enumerate((10.0, 11.0, 12.0)):
+        day = D1 + timedelta(days=offset)
+        writer.write_table("bars/1d", day, "r1", stamped(bar_rows(day, close), day, "r1", T0))
+    writer.write_table("bars/1d", D2, "r2", stamped(bar_rows(D2, 99.0), D2, "r2", later))
+    bars = reader.bars("1d", D1, D1 + timedelta(days=2))
+    assert list(bars[bars.instrument_id == "EQ:A"]["close"]) == [10.0, 99.0, 12.0]
+    as_of = reader.bars("1d", D1, D1 + timedelta(days=2), ["EQ:B"], as_of=T0)
+    assert list(as_of["close"]) == [10.0, 11.0, 12.0]
+    assert set(as_of["instrument_id"]) == {"EQ:B"}
+    assert (
+        backend.tables.read_range("bars/1d", D1 - timedelta(days=9), D1 - timedelta(days=1)) is None
+    )
+    with pytest.raises(MissingDataError, match="no bars"):
+        reader.bars("5m", D1, D2)
+
+
+def test_bar_validation(backend: Backend) -> None:
+    writer = StoreWriter(backend)
+    bad = stamped(bar_rows(D1, 10.0), D1, "r1")
+    for column, value, message in (
+        ("high", 5.0, "high below"),
+        ("low", 50.0, "low above"),
+        ("open", -1.0, "non-positive"),
+        ("volume", -5.0, "negative volume"),
+        ("close", float("nan"), "NaN"),
+    ):
+        with pytest.raises(DataValidationError, match=message):
+            writer.write_table("bars/1d", D1, "r1", bad.assign(**{column: value}))
+    with pytest.raises(DataValidationError, match="interval"):
+        writer.write_table("bars/2d", D1, "r1", bad)
+
+
+def test_instrument_reference_snapshots(backend: Backend) -> None:
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    ref = [
+        {
+            "instrument_id": "EQ:A",
+            "symbol": "A",
+            "asset_class": "EQ",
+            "security_type": "COMMON_STOCK",
+            "multiplier": 1.0,
+            "status": "ACTIVE",
+        },
+        {
+            "instrument_id": "FUT:ESZ6",
+            "symbol": "ESZ6",
+            "asset_class": "FUT",
+            "security_type": "FUTURE",
+            "multiplier": 50.0,
+            "status": "ACTIVE",
+            "tick_size": 0.25,
+        },
+    ]
+    writer.write_table("instruments/reference", D1, "r1", stamped(ref, D1, "r1"))
+    renamed = [{**ref[0], "symbol": "A2"}]
+    writer.write_table("instruments/reference", D2, "r2", stamped(renamed, D2, "r2"))
+    assert list(reader.instruments(D1)["symbol"]) == ["A", "ESZ6"]
+    assert list(reader.instruments(D2 + timedelta(days=5))["symbol"]) == ["A2"]
+    terms = reader.instrument_terms(D1)
+    assert terms["FUT:ESZ6"].multiplier == 50.0
+    assert terms["FUT:ESZ6"].tick_size == 0.25
+    assert terms["EQ:A"].tick_size == 0.01
+    with pytest.raises(MissingDataError, match="no snapshot"):
+        reader.instruments(D1 - timedelta(days=1))
+
+
+def test_open_ended_table_prefixes(backend: Backend) -> None:
+    writer = StoreWriter(backend)
+    event = stamped(
+        [{"instrument_id": "EQ:A", "ts": pd.Timestamp(D1, tz="UTC"), "kind": "split"}], D1, "r1"
+    )
+    writer.write_table("events/split", D1, "r1", event)
+    with pytest.raises(DataValidationError, match="missing columns"):
+        writer.write_table("events/split", D1, "r1", event.drop(columns=["ts"]))
+    writer.write_table(
+        "catalog/golden_datasets", D1, "r1", stamped([{"instrument_id": "EQ:A"}], D1, "r1")
+    )
+    with pytest.raises(DataValidationError, match="unknown table"):
+        writer.write_table("rollups/instrument/", D1, "r1", event)
