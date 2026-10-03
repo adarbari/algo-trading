@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Duplicate-code ratchet (ADR 0019): copy-pasted blocks in src/ and apps/ may only go down.
+"""Duplicate-code ratchet (ADR 0019): copy-pasted blocks in src/, libs/, apps/ may only go down.
 
-Runs pylint's ``duplicate-code`` check (R0801) alone over the tracked Python files in ``src/``
-and ``apps/`` (tests excluded; imports, docstrings, comments and signatures ignored) and
-compares the number of duplicate blocks with ``architecture/dupes_baseline.txt``:
+Runs pylint's ``duplicate-code`` check (R0801) alone over the tracked Python files in ``src/``,
+``libs/`` and ``apps/`` (tests excluded; imports, docstrings, comments and signatures ignored)
+and compares the number of duplicate blocks with ``architecture/dupes_baseline.txt``:
 
 - more blocks than the baseline fails: reuse the owner (architecture/ownership.toml) instead;
 - fewer blocks fails too until the baseline is lowered (``make dupes-update``), so a removed
@@ -37,7 +37,10 @@ BLOCK = re.compile(r"R0801: Similar lines in \d+ files")
 
 def tracked_sources() -> list[str]:
     out = subprocess.run(
-        ["git", "ls-files", "src/*.py", "apps/*.py"], capture_output=True, text=True, check=True
+        ["git", "ls-files", "src/*.py", "libs/*.py", "apps/*.py"],
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout
     return out.split()
 

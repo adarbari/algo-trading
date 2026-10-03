@@ -15,8 +15,8 @@ import pandas as pd
 
 from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.sources.framework.base import FetchRequest, Source
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
+from algotrade_sources.framework.base import FetchRequest, Source
 
 TASK = "earnings_calendar"
 TABLE = "events/earnings"

@@ -55,7 +55,7 @@ _ID_OWNERS = {
 
 def test_equity_ids_are_built_only_by_the_id_rule_and_resolver() -> None:
     offenders = []
-    for root in (REPO_ROOT / "src", REPO_ROOT / "apps"):
+    for root in (REPO_ROOT / "src", REPO_ROOT / "libs", REPO_ROOT / "apps"):
         for path in root.rglob("*.py"):
             rel = path.relative_to(REPO_ROOT).as_posix()
             if rel in _ID_OWNERS or ".venv" in rel or "node_modules" in rel:

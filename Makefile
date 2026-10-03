@@ -19,12 +19,12 @@ lock-check:      ## uv.lock matches every pyproject.toml in the workspace
 	$(UV) lock --check
 
 lint:
-	$(BIN)ruff check src apps tests scripts
-	$(BIN)ruff format --check src apps tests scripts
+	$(BIN)ruff check src libs apps tests scripts
+	$(BIN)ruff format --check src libs apps tests scripts
 
 format:
-	$(BIN)ruff check --fix src apps tests scripts
-	$(BIN)ruff format src apps tests scripts
+	$(BIN)ruff check --fix src libs apps tests scripts
+	$(BIN)ruff format src libs apps tests scripts
 
 typecheck:
 	$(BIN)mypy
@@ -55,7 +55,7 @@ filelen:         ## no file over 1000 lines
 	$(PY) scripts/check_file_length.py
 
 unit:
-	$(PY) -m pytest tests/unit tests/architecture tests/contract tests/apps
+	$(PY) -m pytest tests/unit tests/architecture tests/contract tests/libs tests/apps
 
 property:
 	$(PY) -m pytest tests/property

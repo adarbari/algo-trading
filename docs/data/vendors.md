@@ -3,7 +3,7 @@
 Decision record: [ADR 0012](../adr/0012-data-vendors.md). Researched 2026-10-02; re-check
 limits and prices before relying on them.
 
-Every vendor sits behind the same source interface in `apps/ingestion/sources/`. Adding or
+Every vendor sits behind the same source interface in `libs/sources/algotrade_sources/`. Adding or
 swapping a vendor never touches storage, features, strategies or the UI.
 
 **Pacing is shared.** Each source is declared once in `sources/framework/registry.py` with its
@@ -47,7 +47,7 @@ in about 0.3 s.
 |---|---|
 | Per underlying | price, OHLC, previous close, volume, `iv30` |
 
-Caveats, handled in `apps/ingestion/algotrade_ingestion/sources/vendors/cboe/option_chains.py`:
+Caveats, handled in `libs/sources/algotrade_sources/vendors/cboe/option_chains.py`:
 
 - **Not a licensed product.** It is the undocumented feed behind cboe.com and can change or
   disappear. Check Cboe's site terms; keep Massive or Schwab as the fallback.
@@ -203,7 +203,7 @@ maintained fork of `ib_insync`). **Read-only by construction**, three layers:
    `ReadOnlyViolationError` for anything but the market-data calls it names. It never calls
    `IB.connect` (which syncs positions and account updates even with `readonly=True`): it
    performs only the API handshake.
-2. `tests/apps/ingestion/sources/vendors/ibkr/test_read_only_guard.py` fails on any order or account API reference
+2. `tests/libs/sources/vendors/ibkr/test_read_only_guard.py` fails on any order or account API reference
    (`placeOrder`, `cancelOrder`, `reqPositions`, `accountValues`, ...) in `src/` or `apps/`;
    an import-linter contract keeps `ib_async` imports in the facade.
 3. The gateway's own **Read-Only API** setting (owner setup: README, "Live verification").

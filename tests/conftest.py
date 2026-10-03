@@ -9,10 +9,10 @@ from algotrade.services.explore.store import ReadStore
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.sources.framework.base import FixtureSource
-from algotrade_ingestion.sources.framework.registry import fixture_source
 from algotrade_ingestion.tasks.maintenance.golden import load_golden
 from algotrade_ingestion.tasks.reference import reference_diff
+from algotrade_sources.framework.base import FixtureSource
+from algotrade_sources.framework.registry import fixture_source
 from tests.helpers.api_store import api_store
 from tests.helpers.ingest_fakes import task_ctx
 

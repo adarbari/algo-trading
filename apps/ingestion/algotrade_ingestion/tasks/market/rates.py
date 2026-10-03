@@ -15,8 +15,8 @@ from functools import partial
 import pandas as pd
 
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.sources.framework.base import FetchRequest, Source
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
+from algotrade_sources.framework.base import FetchRequest, Source
 
 TASK = "treasury_rates"
 TABLE = "rates/treasury"

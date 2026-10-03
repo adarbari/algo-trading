@@ -14,9 +14,9 @@ from pathlib import Path
 import pytest
 
 from algotrade_ingestion.cli import main as cli
-from algotrade_ingestion.sources.framework.registry import FIXTURES, SESSION_SOURCES, SOURCES
 from algotrade_ingestion.tasks.framework.registry import TASKS
 from algotrade_ingestion.workflows.nightly.nightly import FINALLY, NIGHTLY, SCREENS
+from algotrade_sources.framework.registry import FIXTURES, SESSION_SOURCES, SOURCES
 from tests.conftest import REPO_ROOT
 
 REGISTRY = tomllib.loads((REPO_ROOT / "architecture" / "ownership.toml").read_text())

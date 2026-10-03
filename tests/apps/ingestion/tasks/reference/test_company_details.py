@@ -11,14 +11,14 @@ from algotrade.data.reference import instrument_view
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.sources.framework.http import HttpError, RetryPolicy
-from algotrade_ingestion.sources.vendors.sec.edgar import TICKERS_URL, SecSubmissions, SecTickerMap
 from algotrade_ingestion.tasks.reference.company_details import (
     TABLE,
     CompanySources,
     due_ciks,
     ingest_company_details,
 )
+from algotrade_sources.framework.http import HttpError, RetryPolicy
+from algotrade_sources.vendors.sec.edgar import TICKERS_URL, SecSubmissions, SecTickerMap
 from tests.helpers.ingest_fakes import http_for, task_ctx
 from tests.helpers.payloads.sec import submissions, tickers
 from tests.helpers.stored_frames import stamped

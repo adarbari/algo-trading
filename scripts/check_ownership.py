@@ -4,7 +4,7 @@
 ``architecture/ownership.toml`` names, for each responsibility, the modules that own it and
 AST patterns that signal someone else doing the same work (a ``latest_date`` call, a
 ``RunRecord`` built, ``os.environ`` read, ``urllib.request`` imported…). This script scans
-``src/`` and ``apps/`` and reports every hit outside the owner's modules.
+``src/``, ``libs/`` and ``apps/`` and reports every hit outside the owner's modules.
 
 ``architecture/known_violations.toml`` lists today's hits (file + responsibility + count).
 - a hit that is not listed (or a count above the listed one) fails: extend the owner instead;
@@ -29,7 +29,7 @@ from pathlib import Path
 
 REGISTRY = Path("architecture/ownership.toml")
 KNOWN = Path("architecture/known_violations.toml")
-SCAN_ROOTS = ("src", "apps")
+SCAN_ROOTS = ("src", "libs", "apps")
 RULE_KINDS = ("call", "call_regex", "attr", "import", "string", "string_prefix")
 
 

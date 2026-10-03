@@ -12,7 +12,6 @@ from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.sources.framework.base import FetchRequest, Normalized
 from algotrade_ingestion.tasks.framework.run import (
     IngestRun,
     NoResponseError,
@@ -20,6 +19,7 @@ from algotrade_ingestion.tasks.framework.run import (
     run_summary,
     stamp,
 )
+from algotrade_sources.framework.base import FetchRequest, Normalized
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.stored_frames import write_reference
 

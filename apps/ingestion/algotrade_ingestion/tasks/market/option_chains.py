@@ -32,8 +32,8 @@ from algotrade.services.features import read_expressions, site_features, site_st
 from algotrade.services.jobs import as_completed
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.sources.framework.base import FetchRequest, Source, Throttled
 from algotrade_ingestion.tasks.framework.run import IngestRun, NoResponseError, TaskContext
+from algotrade_sources.framework.base import FetchRequest, Source, Throttled
 
 TASK = "option_chains"
 OPTIONS, UNDERLYINGS, STATUS = "chains/option_quotes", "chains/underlying_quotes", "chains/status"

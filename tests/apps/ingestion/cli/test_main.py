@@ -7,11 +7,11 @@ from pathlib import Path
 import pytest
 
 from algotrade_ingestion.cli import main as cli
-from algotrade_ingestion.sources.framework.http import RetryPolicy
-from algotrade_ingestion.sources.framework.registry import build_sources
-from algotrade_ingestion.sources.vendors.cboe.option_chains import CboeOptionsSource
-from algotrade_ingestion.sources.vendors.nasdaq.earnings import NasdaqEarningsSource
-from algotrade_ingestion.sources.vendors.treasury.par_yields import TreasuryParYields
+from algotrade_sources.framework.http import RetryPolicy
+from algotrade_sources.framework.registry import build_sources
+from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource
+from algotrade_sources.vendors.nasdaq.earnings import NasdaqEarningsSource
+from algotrade_sources.vendors.treasury.par_yields import TreasuryParYields
 from tests.apps.ingestion.tasks.market.test_option_chains import FakeFeed
 from tests.conftest import REPO_ROOT
 from tests.helpers.ingest_fakes import http_for, use_source

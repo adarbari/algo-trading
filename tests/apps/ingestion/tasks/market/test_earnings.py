@@ -4,10 +4,10 @@ from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.sources.framework.base import FetchRequest
-from algotrade_ingestion.sources.framework.http import HttpError, RetryPolicy
-from algotrade_ingestion.sources.vendors.nasdaq.earnings import NasdaqEarningsSource, parse_calendar
 from algotrade_ingestion.tasks.market.earnings import ingest_earnings, report_days
+from algotrade_sources.framework.base import FetchRequest
+from algotrade_sources.framework.http import HttpError, RetryPolicy
+from algotrade_sources.vendors.nasdaq.earnings import NasdaqEarningsSource, parse_calendar
 from tests.helpers.ingest_fakes import CountingLimiter, http_for, task_ctx
 from tests.helpers.payloads.nasdaq_earnings import calendar
 from tests.helpers.stored_frames import write_reference

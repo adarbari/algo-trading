@@ -39,7 +39,6 @@ from algotrade.config.site.settings import UniverseSettings
 from algotrade.core.model.instruments import AssetClass
 from algotrade.data import StoreReader
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.sources.framework.base import DirectorySource, FetchRequest, Source
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_ingestion.tasks.reference.classify import (
     LEVERAGE_SOURCES,
@@ -61,6 +60,7 @@ from algotrade_ingestion.tasks.reference.reference_diff import (
     one_per_key,
 )
 from algotrade_ingestion.tasks.reference.symbol_history import update_history
+from algotrade_sources.framework.base import DirectorySource, FetchRequest, Source
 
 TASK = "universe_build"
 HISTORY = "instruments/symbol_history"

@@ -8,10 +8,6 @@ from algotrade.data import StoreReader
 from algotrade.data.reference import resolver
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.sources.framework.http import RetryPolicy
-from algotrade_ingestion.sources.vendors.massive.tickers import MassiveTickers
-from algotrade_ingestion.sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
-from algotrade_ingestion.sources.vendors.ssga.spy_holdings import SpyHoldingsSource
 from algotrade_ingestion.tasks.reference.instrument_ids import (
     assign_ids,
     cumulative_map,
@@ -23,6 +19,10 @@ from algotrade_ingestion.tasks.reference.universe_build import (
     UniverseSources,
     build_universe,
 )
+from algotrade_sources.framework.http import RetryPolicy
+from algotrade_sources.vendors.massive.tickers import MassiveTickers
+from algotrade_sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
+from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource
 from tests.helpers.ingest_fakes import http_for, task_ctx
 from tests.helpers.payloads import massive as mfx
 from tests.helpers.payloads import universe as fx

@@ -5,10 +5,6 @@ import pandas as pd
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.sources.framework.http import RetryPolicy
-from algotrade_ingestion.sources.vendors.massive.tickers import MassiveTickers, parse_tickers
-from algotrade_ingestion.sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
-from algotrade_ingestion.sources.vendors.ssga.spy_holdings import SpyHoldingsSource
 from algotrade_ingestion.tasks.reference.symbol_history import update_history
 from algotrade_ingestion.tasks.reference.universe_build import (
     UniverseSettings,
@@ -16,6 +12,10 @@ from algotrade_ingestion.tasks.reference.universe_build import (
     apply_identifiers,
     build_universe,
 )
+from algotrade_sources.framework.http import RetryPolicy
+from algotrade_sources.vendors.massive.tickers import MassiveTickers, parse_tickers
+from algotrade_sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
+from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource
 from tests.helpers.ingest_fakes import http_for, task_ctx
 from tests.helpers.payloads import massive as mfx
 from tests.helpers.payloads import universe as fx

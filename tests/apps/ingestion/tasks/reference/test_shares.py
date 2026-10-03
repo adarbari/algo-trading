@@ -10,12 +10,12 @@ from algotrade.data.shares import TABLE, share_facts, stored_shares
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.sources.framework.http import HttpError, RetryPolicy
-from algotrade_ingestion.sources.vendors.sec.company_facts import SecCompanyFacts
 from algotrade_ingestion.tasks.reference.shares import SharesSources, ingest_shares
-from tests.apps.ingestion.sources.vendors.sec.test_company_facts import PAYLOAD
+from algotrade_sources.framework.http import HttpError, RetryPolicy
+from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts
 from tests.helpers.ingest_fakes import http_for, task_ctx
 from tests.helpers.stored_frames import stamped
+from tests.libs.sources.vendors.sec.test_company_facts import PAYLOAD
 
 DAY = date(2026, 10, 2)
 CLOCK = lambda: datetime(2026, 10, 2, 22, tzinfo=UTC)  # noqa: E731

@@ -10,8 +10,8 @@ from datetime import date
 from functools import partial
 
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.sources.framework.base import FetchRequest, Source, WindowedSource
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
+from algotrade_sources.framework.base import FetchRequest, Source, WindowedSource
 
 TASK = "corporate_actions"
 

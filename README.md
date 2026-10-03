@@ -204,6 +204,7 @@ route or schema run `.venv/bin/python scripts/export_openapi.py` and commit
 | Package | Path | Provides |
 |---|---|---|
 | `algotrade` | `src/algotrade` | the shared library |
+| `algotrade-sources` | `libs/sources` | vendor sources (`algotrade_sources`, ADR 0027): adapters, HTTP, pacing, registry, vendor SDKs |
 | `algotrade-ingestion` | `apps/ingestion` | `algotrade-ingest` (the only writer of data) |
 | `algotrade-backtest` | `apps/backtest` | `algotrade-backtest` (`algotrade` alias) |
 | `algotrade-api` | `apps/api` | `algotrade-api` (read-only FastAPI, ADR 0024) |
@@ -212,16 +213,18 @@ Each app declares only its own dependencies; `uv.lock` pins everything (`make lo
 
 ## Layout
 
-Every directory under `src/` and `apps/` is declared, with its purpose, in
+Every directory under `src/`, `libs/` and `apps/` is declared, with its purpose, in
 [`architecture/layout.toml`](architecture/layout.toml) (one kind of thing per folder, at most
 10 modules; checked by `tests/architecture/test_layout.py`, ADR 0020).
 
 ```
+libs/
+  sources/      algotrade-sources (ADR 0027). In algotrade_sources/: framework/ (protocols,
+                HTTP, pacing, registry), vendors/<vendor>/, fixtures/. Never imported by backtests
 apps/
   ingestion/    algotrade-ingest. Only writer of data. In algotrade_ingestion/:
     cli/          argument parsing (main.py) and command bodies
     ops/          scheduling (launchd)
-    sources/      framework/ (protocols, HTTP, pacing, registry), vendors/<vendor>/, fixtures/
     tasks/        framework/ (IngestRun, registry), reference/, market/, derived/, maintenance/
     workflows/    nightly/
   backtest/     algotrade-backtest: datasets, backtest, evaluate
