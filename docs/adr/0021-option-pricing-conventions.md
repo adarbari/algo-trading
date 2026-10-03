@@ -40,7 +40,7 @@ Prices are matched within `1e-10 × strike`. Every element gets a status, and a 
 | Code | Meaning |
 |---|---|
 | `OK` | solved |
-| `BAD_INPUT` | non-finite input, spot / strike / time <= 0, or a negative price |
+| `BAD_INPUT` | non-finite input, spot / strike / time <= 0, or a price below `-1e-10 × strike` (a model price that cancels to a tiny negative is numerically 0, so `AT_INTRINSIC`) |
 | `BELOW_INTRINSIC` | price below the discounted forward intrinsic value (no-arbitrage lower bound) |
 | `AT_INTRINSIC` | price equals that bound within tolerance: no time value, so no vol |
 | `ABOVE_MAX` | price at or above `S e^{-qt}` (calls) / `K e^{-rt}` (puts) |

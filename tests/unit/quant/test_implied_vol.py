@@ -64,6 +64,33 @@ def test_failure_codes() -> None:
     assert np.isnan(result.iv).all()
 
 
+def test_tiny_negative_model_price_is_no_time_value_not_bad_input() -> None:
+    # A far-OTM put: pv_k N(-d2) - fwd_s N(-d1) cancels to a negative subnormal.
+    s, k, t, r = 1.0, 0.3, 0.0996, 0.09375
+    p = float(bs.price(s, k, t, r, 0.0, 0.1, False))
+    assert -1e-300 < p <= 0.0
+    assert implied_vol(p, s, k, t, r, 0.0, False).reasons() == ["AT_INTRINSIC"]
+    assert implied_vol(-0.0, s, k, t, r, 0.0, False).reasons() == ["AT_INTRINSIC"]
+    assert implied_vol(-1e-6, s, k, t, r, 0.0, False).reasons() == ["BAD_INPUT"]
+
+
+def test_european_put_lower_bound_is_below_intrinsic_at_high_rates() -> None:
+    # Deep ITM put, high rate: the no-arbitrage bound K e^{-rt} - S e^{-qt} < K - S.
+    s, k, t, r, q = 50.0, 100.0, 1.0, 0.09375, 0.0
+    lower, _ = bs.bounds(s, k, t, r, q, False)
+    assert float(lower) == pytest.approx(k * np.exp(-r * t) - s)
+    assert float(lower) < k - s
+    sigmas = np.array([1e-3, 0.3])
+    prices = bs.price(s, k, t, r, q, sigmas, False)
+    result = implied_vol(prices, s, k, t, r, q, False)
+    assert result.reasons() == ["AT_INTRINSIC", "OK"]  # tiny vol sits on the bound
+    assert float(result.iv[1]) == pytest.approx(0.3)
+    # Between the bound and intrinsic is a valid European price, not BELOW_INTRINSIC.
+    between = implied_vol(0.5 * (float(lower) + (k - s)), s, k, t, r, q, False)
+    assert between.reasons() == ["OK"]
+    assert implied_vol(float(lower) - 1.0, s, k, t, r, q, False).reasons() == ["BELOW_INTRINSIC"]
+
+
 def test_iteration_limit_reports_no_convergence() -> None:
     price = bs.price(SPOT, 120.0, 0.25, R, Q, 0.35)
     result = implied_vol(price, SPOT, 120.0, 0.25, R, Q, max_iter=1)

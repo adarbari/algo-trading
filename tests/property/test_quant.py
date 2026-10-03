@@ -1,7 +1,7 @@
 """Property-based tests for the quant library: invariants for every valid input."""
 
 import numpy as np
-from hypothesis import given, settings
+from hypothesis import example, given, settings
 from hypothesis import strategies as st
 
 from algotrade.quant import black_scholes as bs
@@ -42,6 +42,8 @@ def test_prices_respect_bounds_and_rise_with_vol(
 
 @settings(max_examples=200)
 @given(spots, moneyness, years, rates, yields, vols, st.booleans())
+# Far-OTM put whose model price cancels to a negative subnormal (-5e-324): AT_INTRINSIC.
+@example(s=1.0, m=0.3, t=0.0996, r=0.09375, q=0.0, v=0.1, call=False)
 def test_implied_vol_round_trips_the_price(
     s: float, m: float, t: float, r: float, q: float, v: float, call: bool
 ) -> None:
