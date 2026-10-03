@@ -1,13 +1,14 @@
 """Daily bars from Massive: one ``bars/1d`` partition per session date, unadjusted.
 
 Dates already stored are skipped unless forced, so a 2-year backfill (~500 requests at
-5/minute, ~1h45m) can be interrupted and resumed. Holidays return no rows and are recorded,
-not treated as errors. Vendor tickers become ids through the reference as of each session
-(ADR 0018); the loop itself (raw save, ids, stamping, run record) is ``IngestRun``'s.
+5/minute, ~1h45m) can be interrupted and resumed. Sessions come from the exchange calendar
+(``core/calendar.py``); a session the vendor has no rows for is recorded, not an error.
+Vendor tickers become ids through the reference as of each session (ADR 0018); the loop
+itself (raw save, ids, stamping, run record) is ``IngestRun``'s.
 """
 
 from collections.abc import Sequence
-from datetime import date, timedelta
+from datetime import date
 from functools import partial
 
 from algotrade.storage.runs import RunRecord
@@ -17,15 +18,6 @@ from algotrade_ingestion.tasks.framework import IngestRun, TaskContext
 TASK = "daily_bars"
 BARS = "bars/1d"
 CHECKPOINT_EVERY = 5
-
-
-def sessions_between(start: date, end: date) -> list[date]:
-    """Weekdays in ``[start, end]``; exchange holidays come back empty and are recorded."""
-    return [
-        start + timedelta(i)
-        for i in range((end - start).days + 1)
-        if (start + timedelta(i)).weekday() < 5
-    ]
 
 
 def _one_session(run: IngestRun, source: Source, day: date) -> str:

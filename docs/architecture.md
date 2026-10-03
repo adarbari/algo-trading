@@ -131,7 +131,8 @@ nightly (the "nightly" job; later also intraday or on request)
            → validate + normalise → reference / events / bars / chains
            → rollups (versioned)
            → every config with schedule = "nightly" (site presets as user "site", then each
-             user's): select → screen → results/ + exports
+             user's): one `screen` job each → select → screen → results/ + exports
+  quality checks per session; raw / staging purge last
 on request
   backtest CLI / api → services.jobs.submit("backtest") → engines.backtest (reads stores only)
   api → services → results / rollups                       (web UI, phase 4–5)
@@ -183,6 +184,52 @@ audits. The local runner uses 2 threads.
 - `recover()` marks jobs abandoned by a crashed process as failed.
 - Handlers: the library provides `backtest` and `screen`; the ingestion app registers
   `nightly`. A queue-backed runner (phase 6) implements the same protocol.
+- Apps never build a runner (contract R5): CLIs call `services.jobs.run_job` (build, recover
+  the kinds the caller holds the lock for, run to completion, shut down). A handler runs child
+  jobs through `JobContext.jobs.run(...)`, in its own thread, so a busy pool cannot deadlock
+  (the nightly runs its `screen` jobs this way). Fan-out inside a task (chain workers) uses
+  `services.jobs.as_completed`.
+
+### The nightly workflow (R5)
+
+`apps/ingestion/algotrade_ingestion/workflows/`: `nightly.py` (the steps and the job
+handler), `steps.py` (isolation, status rule), `sessions.py` (catch-up), `screens.py` (screen
+jobs), `notify.py` (summary + notification).
+
+- **Steps** (`NIGHTLY`): `universe-build`, `company-details`, `earnings`, `bars`,
+  `corporate-actions`, `chains`, `features`, `screens`, `quality`; then `purge-raw` once
+  (`FINALLY`). Each is a registry task (or the `screens` job step) run in isolation: an
+  exception makes the step FAILED with its error and later steps still run. A step names its
+  hard dependencies (`features` on `chains`, `screens` on `features`): when one FAILED it is
+  BLOCKED. Data preconditions are separate: `chains`, `features` and `screens` need a universe
+  snapshot to exist, not today's build to succeed. Missing sources → SKIPPED with the reason.
+  `quality` ends every session and `purge-raw` ends the run, whatever failed before. Every
+  step records its status and duration.
+- **Status, in one place** (`steps.overall`): of the steps that ran, none succeeded → FAILED;
+  any FAILED, BLOCKED or PARTIAL → PARTIAL; else COMPLETE. Each session gets a `nightly` run
+  record with that status and its per-step results.
+- **Exchange calendar** (`core/calendar.py`, pure Python): NYSE full-day holidays (with the
+  Saturday/Sunday observance rules, Good Friday from the Easter computus, Juneteenth from 2022)
+  and 13:00 early closes (July 3 and December 24 when they are sessions, the day after
+  Thanksgiving). `last_closed_session(now)` is the latest session whose close plus a settle
+  margin (`config/site/nightly.toml`, 30 min) has passed in New York. Every default session in
+  `algotrade-ingest` comes from it, so a run started during market hours never ingests today's
+  intraday data as end of day.
+- **Catch-up** (`sessions.py`): without `--date`, the nightly runs every session after the
+  last COMPLETE / PARTIAL nightly up to the last closed session, oldest first, capped at the
+  latest `max_catch_up` (5; older ones are reported as `catch_up.dropped`). A FAILED nightly
+  is retried next time. Bars, corporate actions and earnings catch up; sources that only serve
+  the current snapshot (universe files, SEC, Cboe chains) and what depends on them (features,
+  screens) run only for the latest session. Chains still check that the Cboe snapshot's
+  session matches (`STALE_DATA` otherwise). `--date D` runs exactly D.
+- **Screens are jobs**: one `screen` job per scheduled screener config, for its owner;
+  exports are that job's output. The screen audit records `universe_pre_snapshot`
+  (survivorship).
+- **Notification** (`notify.py`): every run writes its summary to
+  `var/logs/nightly-latest.json`; when the status is not COMPLETE a `Notifier` is called
+  (default: a macOS notification through `osascript`, never in tests). A run longer than
+  `max_duration_minutes` (40) is recorded as a `nightly_duration` WARN. All in
+  `config/site/nightly.toml` (`[notify] enabled = false` turns notification off).
 
 ---
 
@@ -247,7 +294,7 @@ Extra contracts:
 | `analytics/` | Metrics and report formatting from equity curves + fills. | core |
 | `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. `selection/`: three-valued evaluation with a per-rule audit. | strategies, config, analytics, core |
 | `services/` | Use cases: `jobs`, `configs`, `selection`, `backtests`, `screening`, golden `datasets`, `exports`, `evaluation/`. | everything below except `storage.writers` and `storage.readers` (through `data/`) |
-| `apps/ingestion` | Sources (Cboe, HTTP with retries, synthetic/golden); `tasks/` (one module per dataset, run by `tasks/framework.py` `IngestRun` and declared once in `tasks/registry.py`); nightly workflow (`pipeline.py`, an ordered list of registry tasks); `algotrade-ingest`. | library |
+| `apps/ingestion` | Sources (Cboe, HTTP with retries, synthetic/golden); `tasks/` (one module per dataset, run by `tasks/framework.py` `IngestRun` and declared once in `tasks/registry.py`); nightly workflow (`workflows/`: ordered, isolated registry tasks, catch-up, screens as jobs, notification); `algotrade-ingest`. | library |
 | `apps/backtest` | `algotrade-backtest` (`algotrade` alias): datasets list, backtest (golden dataset or config, via jobs), evaluate, config validate/show. Reads only through `data/`. | library |
 
 ### One bar in the backtest engine
@@ -296,7 +343,7 @@ close of bar t  : Portfolio marked to market -> equity[t]
 | Test suite | ≤ 60 s locally and in CI |
 | Golden evaluation (3 strategies × 8 datasets) from the store | ≤ 5 s |
 | Selection, 10k instruments × 10 rules | ≤ 1 s |
-| Nightly options pipeline, ~4.2k underlyings | ≤ 25 min |
+| Nightly options pipeline, ~4.2k underlyings | ≤ 25 min (WARN recorded above 40 min) |
 | Config resolution | deterministic hash on every OS |
 | Code gates | no file > 1000 lines, coverage ≥ 90%, strict mypy, all import contracts |
 
@@ -311,9 +358,13 @@ Single machine, stateless services over file storage. Shared work (ingestion, ro
 O(universe); per-user work is O(users × configs). The nightly run ends with a `quality` run
 (universe size change, bar freshness and count drop, chain coverage, earnings present;
 thresholds in `config/site/sources.toml`); any FAIL marks the nightly `PARTIAL`. It is scheduled
-locally by a launchd agent (`algotrade-ingest schedule`). Monitoring lives in run records today:
-status per job, coverage per screen (alert below 98%), selection size per config (alert on a
-> 20% day-over-day change), nightly duration (alert above 40 min).
+locally by a launchd agent (`algotrade-ingest schedule`; `RunAtLoad` false, a run missed while
+asleep starts on wake, which is safe because of `last_closed_session` and catch-up). A run that
+is not COMPLETE triggers a desktop notification; every run's summary is in
+`var/logs/nightly-latest.json`. Monitoring lives in run records today: status per job and per
+nightly step, coverage per screen (alert below 98%), selection size per config (alert on a
+> 20% day-over-day change), nightly duration (recorded as a WARN above 40 min,
+`config/site/nightly.toml`).
 
 ## 12. Hosting
 
@@ -337,13 +388,14 @@ truth, with the AST patterns `scripts/check_ownership.py` uses to flag anyone el
 | market-data reads for consumers | `data/` | same (done in R2) |
 | run ids, run records, COMPLETE / PARTIAL | `storage/runs.py`, `services/jobs/`, ingestion `tasks/framework.py` | same (done in R3) |
 | raw persistence, row stamping, id resolution in ingestion | `tasks/framework.py` (`IngestRun`) | same (done in R3) |
-| which ingestion steps run, with which defaults | `tasks/registry.py`; nightly order in `pipeline.py` | `workflows/` (R5) |
+| which ingestion steps run, with which defaults | `tasks/registry.py`; nightly order in `workflows/nightly.py` | same (done in R5) |
 | vendor HTTP, retries, retry cap, circuit breaker | `sources/http.py` | same |
 | rate limiting | `sources/limiter.py`, one per key, shared across threads and processes | same (done in R4) |
 | source construction | `sources/registry.py` (vendor specifics stay in `sources/<vendor>.py`) | same (done in R4) |
 | locks (flock, named store locks, run-index lock); the ingest run lock | `storage/locks.py`; `services/jobs/exclusive.py` | same (done in R4) |
-| session / exchange calendar | `core/time.py` | `core/calendar.py` (R5) |
-| job execution | `services/jobs/` | same; screens from nightly become `screen` jobs (R5) |
+| session / exchange calendar | `core/calendar.py` | same (done in R5) |
+| job execution | `services/jobs/` (apps use `run_job`; fan-out `as_completed`) | same (done in R5) |
+| screen execution | `services/screening.py`, submitted as `screen` jobs (nightly: `workflows/screens.py`) | same (done in R5) |
 | site settings loading | `config/` | `config/settings.py`, one typed loader (R6) |
 | environment variables | `ingestion env.py`, `storage/factory.py` | `config/env.py` (R6) |
 | Parquet / Arrow I/O | `storage/backends/` | same |
@@ -366,7 +418,7 @@ An ingestion **task** produces stored tables and one run record; a **job** is so
   `algotrade-ingest <task>`, `algotrade-ingest run <task>` and nightly cannot drift.
 - one module per dataset (`bars.py`, `corporate_actions.py`, `earnings.py`, `option_chains.py`,
   `company_details.py`, `universe_build.py`, `universe.py`, `features.py`, `quality.py`,
-  `migrate_ids.py`, `golden.py`): only what to fetch, how to combine frames, task stats.
+  `purge.py`, `migrate_ids.py`, `golden.py`): only what to fetch, how to combine frames, task stats.
 
 Sources are built by the source registry (`sources/registry.py`, R4): each declared once with
 its `sources.toml` section, credential variable, limiter key and default pacing. A source whose

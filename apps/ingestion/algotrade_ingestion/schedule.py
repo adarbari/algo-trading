@@ -3,6 +3,12 @@
 The file is only written, never installed: loading it changes the machine's configuration,
 so the owner runs ``launchctl load`` themselves. launchd uses local time; the default 23:30
 falls after the US close (16:00 New York) whether the machine is in New York or London.
+
+``RunAtLoad`` is false: loading the agent (or logging in) does not start a run. If the
+machine is asleep at the scheduled time, launchd starts the missed run when it wakes, which
+may be during market hours. That is safe: without ``--date`` the nightly ingests only
+sessions whose close has passed (``core/calendar.last_closed_session``) and catches up the
+sessions missed since its last run (``workflows/sessions.py``).
 """
 
 import plistlib
@@ -23,6 +29,7 @@ def nightly_plist(repo: Path, hour: int, minute: int, export_dir: Path | None = 
             "Label": LABEL,
             "ProgramArguments": command,
             "WorkingDirectory": str(repo),
+            "RunAtLoad": False,
             "StartCalendarInterval": [
                 {"Weekday": d, "Hour": hour, "Minute": minute} for d in range(1, 6)
             ],

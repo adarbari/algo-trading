@@ -15,10 +15,13 @@ from algotrade.storage.interfaces import RunStore
 
 @dataclass(frozen=True)
 class JobContext:
-    """What a handler gets besides its params. Apps put their readers/writers here."""
+    """What a handler gets besides its params. Apps put their readers/writers here.
+    ``jobs``: the runner executing this job, so a handler can run child jobs (nightly ->
+    ``screen``) through it."""
 
     user: UserContext
     resources: Mapping[str, Any]
+    jobs: "JobRunner | None" = None
 
 
 # A handler returns a JSON-able summary; a ``"_partial": True`` entry marks a partial result.
@@ -41,6 +44,10 @@ class JobRunner(Protocol):
     def status(self, job_id: str) -> JobRecord: ...
 
     def wait(self, job_id: str, timeout: float | None = None) -> JobRecord: ...
+
+    def run(
+        self, kind: str, params: Mapping[str, Any], user: UserContext, force: bool = False
+    ) -> JobRecord: ...
 
 
 class LocalJobRunner:
@@ -70,6 +77,24 @@ class LocalJobRunner:
     ) -> str:
         """Queue a job. Identical work returns the existing job unless it failed, or unless
         ``force`` asks to run a finished job again (an explicit re-run, e.g. from a CLI)."""
+        return self._claim(kind, params, user, force, pooled=True)[0]
+
+    def run(
+        self, kind: str, params: Mapping[str, Any], user: UserContext, force: bool = False
+    ) -> JobRecord:
+        """Run a job to completion in the caller's thread (same identity and records as
+        ``submit``). Handlers run child jobs this way, so a busy pool cannot deadlock them."""
+        job_id, record = self._claim(kind, params, user, force, pooled=False)
+        if record is not None:
+            self._execute(record)
+            return self.status(job_id)
+        return self.wait(job_id)
+
+    def _claim(
+        self, kind: str, params: Mapping[str, Any], user: UserContext, force: bool, pooled: bool
+    ) -> tuple[str, JobRecord | None]:
+        """-> (job id, the new queued record, or ``None`` if the work exists). ``pooled``:
+        start it on the pool now (under the lock, so ``recover`` sees it in flight)."""
         if kind not in self._kinds:
             raise ConfigurationError(f"unknown job kind {kind!r}; known: {list(self.kinds)}")
         identity_fn = self._kinds[kind].identity
@@ -84,11 +109,12 @@ class LocalJobRunner:
             )
             done = existing is not None and existing.status is not JobStatus.FAILED
             if in_flight or (done and not force):
-                return job_id  # same work already queued, running or done
+                return job_id, None  # same work already queued, running or done
             record = JobRecord(job_id, kind, dict(params), user.user_id, self._clock())
             self._runs.save(record.to_run())
-            self._futures[job_id] = self._pool.submit(self._execute, record)
-        return job_id
+            if pooled:
+                self._futures[job_id] = self._pool.submit(self._execute, record)
+        return job_id, record
 
     def status(self, job_id: str) -> JobRecord:
         run = self._runs.load(job_id)
@@ -125,7 +151,7 @@ class LocalJobRunner:
     def _execute(self, record: JobRecord) -> None:
         record.status = JobStatus.RUNNING
         self._runs.save(record.to_run())
-        context = JobContext(UserContext(record.user), self._resources)
+        context = JobContext(UserContext(record.user), self._resources, self)
         try:
             summary = dict(self._kinds[record.kind].handler(record.params, context))
             partial = summary.pop("_partial", False)

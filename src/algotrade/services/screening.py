@@ -96,6 +96,8 @@ def run_screener(
         if universe.last_verified
         else None,
         "universe_rows_loaded": universe.rows_loaded,
+        # The universe came from a snapshot after the session: results carry survivorship bias.
+        "universe_pre_snapshot": universe.pre_snapshot,
     }
     if run.rows:
         frame = rows_frame(run, session_date, run_id, now)

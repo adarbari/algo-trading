@@ -31,6 +31,7 @@ SITE_SETTINGS = sorted((REPO_ROOT / "config" / "site").glob("*.toml"))
 TYPED_SETTINGS = {
     "apps/ingestion/algotrade_ingestion/settings.py": "SourcesSettings",
     "apps/ingestion/algotrade_ingestion/settings.py#universe": "UniverseSettings",
+    "apps/ingestion/algotrade_ingestion/settings.py#nightly": "NightlySettings",
 }
 # Settings that are parsed but drive nothing today. This list may only shrink: wire the
 # setting up (docs/roadmap.md, track R) or delete it from config/site, then remove it here.

@@ -2,7 +2,8 @@
 
 Task commands are generic: ``run_task_command`` asks the source registry
 (``sources/registry.py``) for the sources a registry task declares and runs it
-(``tasks/registry.py``). Nightly and screens run as jobs (``run_job``). Tests replace sources
+(``tasks/registry.py``). Nightly and screens run as jobs through the job service
+(``run_job``; apps never build a runner). Tests replace sources
 through ``sources.registry.SOURCES`` (no network in CI).
 """
 
@@ -10,18 +11,17 @@ import argparse
 import json
 import sys
 from collections.abc import Iterable, Mapping
-from datetime import timedelta
 from typing import Any
 
 from algotrade.config.user import UserContext
 from algotrade.core.errors import ConfigurationError
 from algotrade.data import StoreReader
-from algotrade.services.jobs import JobRecord, JobStatus, LocalJobRunner
+from algotrade.services.jobs import JobHandler, JobKind, JobRecord, JobStatus
+from algotrade.services.jobs import run_job as run_service_job
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.factory import open_config_store
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.env import credential
-from algotrade_ingestion.pipeline import NIGHTLY, nightly_job
 from algotrade_ingestion.settings import SourcesSettings, load_sources
 from algotrade_ingestion.sources.base import Source
 from algotrade_ingestion.sources.registry import Built, build_sources
@@ -29,6 +29,7 @@ from algotrade_ingestion.sources.synthetic.catalog import build_golden
 from algotrade_ingestion.sources.synthetic.files import GoldenFiles
 from algotrade_ingestion.tasks.framework import TaskContext, run_summary
 from algotrade_ingestion.tasks.registry import TASKS, Task, run_task, task
+from algotrade_ingestion.workflows.nightly import FINALLY, NIGHTLY, nightly_job
 
 # Job kinds this app runs under the ingest run lock: safe to recover at once (see cli.main).
 LOCKED_KINDS = ("nightly", "screen")
@@ -113,11 +114,12 @@ def run_job(
     params: dict[str, object],
     user: str,
 ) -> JobRecord:
-    """Run one job to completion through the local runner (an explicit re-run: force=True)."""
+    """Run one job to completion through the job service (an explicit re-run: force=True).
+    The caller holds the ingest run lock, so a queued/running job of ``LOCKED_KINDS`` was
+    left by a crashed process: it is marked failed first, or it would block this re-run."""
     settings = sources_settings(args)
-    names = [
-        n for t in NIGHTLY if t in TASKS for n in (*task(t).sources, *task(t).optional_sources)
-    ]
+    steps = [s.name for s in (*NIGHTLY, *FINALLY) if s.name in TASKS]
+    names = [n for t in steps for n in (*task(t).sources, *task(t).optional_sources)]
     built = sources_for(names, settings)
     resources: dict[str, object] = {
         "reader": reader,
@@ -127,21 +129,18 @@ def run_job(
         "sources": built.sources,
         "unavailable": built.skipped,
     }
-    runner = LocalJobRunner(
-        writer.runs_backend, {**LIBRARY_HANDLERS, "nightly": nightly_job}, resources
+    handlers: dict[str, JobKind | JobHandler] = {**LIBRARY_HANDLERS, "nightly": nightly_job}
+    user_ctx = UserContext(user)
+    return run_service_job(
+        writer.runs_backend, handlers, resources, kind, params, user_ctx, recover=LOCKED_KINDS
     )
-    # The caller holds the ingest run lock, so a queued/running job of these kinds was left
-    # by a crashed process: mark it failed now, or it would block this re-run.
-    runner.recover(timedelta(0), LOCKED_KINDS)
-    try:
-        return runner.wait(runner.submit(kind, params, UserContext(user), force=True))
-    finally:
-        runner.shutdown()
 
 
 def report(job: JobRecord) -> int:
     if job.status is JobStatus.FAILED:
         print(f"error: {job.error}", file=sys.stderr)
         return 2
-    print_json({"job_id": job.job_id, "status": job.status, **job.result})
+    print_json({"job_id": job.job_id, "status": job.status, "job_status": job.status, **job.result})
+    if job.result.get("status") == "FAILED":  # a workflow none of whose steps succeeded
+        return 2
     return 0 if job.status is JobStatus.COMPLETE else 1

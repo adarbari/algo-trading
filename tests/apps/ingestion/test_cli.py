@@ -29,6 +29,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     )
     (tmp_path / "config" / "site" / "universe.toml").write_text('source = "csv_import"\n')
     monkeypatch.setenv("ALGOTRADE_CONFIG_DIR", str(tmp_path / "config"))
+    monkeypatch.chdir(tmp_path)  # the nightly writes var/logs/nightly-latest.json here
     from algotrade_ingestion.sources.nasdaq_earnings import NasdaqEarningsSource  # noqa: PLC0415
     from tests.earnings_fixture import calendar  # noqa: PLC0415
 
@@ -74,9 +75,15 @@ def test_nightly_pipeline_end_to_end(env: Path, capsys: pytest.CaptureFixture[st
     code, nightly = call(
         capsys, "nightly", "--date", DAY, "--export-dir", str(env / "out"), "--workers", "2"
     )
-    assert code == 0
-    assert nightly["screens"][0]["coverage"] == "COMPLETE"
-    assert nightly["screens"][0]["decisions"] == {"QUALIFIED": 1, "LIQUIDITY_RISK": 1}
+    assert code == 0 and nightly["status"] == "COMPLETE" and nightly["sessions"] == [DAY]
+    steps = nightly["runs"][-1]["steps"]
+    screens = steps["screens"]["result"]["screens"]
+    assert screens[0]["coverage"] == "COMPLETE" and screens[0]["job_id"].startswith("job-screen")
+    assert screens[0]["decisions"] == {"QUALIFIED": 1, "LIQUIDITY_RISK": 1}
+    assert screens[0]["universe_pre_snapshot"] is False
+    assert all("duration_s" in s for s in steps.values())
+    latest = json.loads((env / "var" / "logs" / "nightly-latest.json").read_text())
+    assert latest["status"] == "COMPLETE" and latest["sessions"] == [DAY]
     with (env / "out" / f"short_premium_candidates_{DAY}.csv").open() as fh:
         assert [r["ticker"] for r in csv.DictReader(fh)] == ["AAPL"]
 
@@ -102,13 +109,19 @@ def test_missing_data_is_a_clean_error(env: Path, capsys: pytest.CaptureFixture[
     assert "universe import" in capsys.readouterr().err
 
 
-def test_last_session_skips_weekends() -> None:
+def test_default_session_is_the_last_closed_session(env: Path) -> None:
+    import argparse  # noqa: PLC0415
     from datetime import UTC, date, datetime  # noqa: PLC0415
 
-    assert cli.last_session(datetime(2026, 10, 4, 15, tzinfo=UTC)) == date(2026, 10, 2)  # Sunday
-    assert cli.last_session(datetime(2026, 10, 3, 2, tzinfo=UTC)) == date(
-        2026, 10, 2
-    )  # Fri evening ET
+    args = argparse.Namespace(config_dir=None)
+    sunday = datetime(2026, 10, 4, 15, tzinfo=UTC)
+    assert cli.default_session(args, sunday) == date(2026, 10, 2)
+    friday_evening_et = datetime(2026, 10, 3, 2, tzinfo=UTC)
+    assert cli.default_session(args, friday_evening_et) == date(2026, 10, 2)
+    during_market = datetime(2026, 10, 2, 15, tzinfo=UTC)  # 11:00 New York
+    assert cli.default_session(args, during_market) == date(2026, 10, 1)
+    good_friday = datetime(2027, 3, 26, 23, tzinfo=UTC)
+    assert cli.default_session(args, good_friday) == date(2027, 3, 25)
 
 
 def test_screen_runs_a_user_config(env: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -187,7 +200,8 @@ def test_company_details_command(
     code, result = call(capsys, "company-details", "--date", DAY, "--limit", "5")
     assert (code, result["rows"], result["cik_from_sec_map"]) == (0, 1, 1)  # AAPL via the map
     _, nightly = call(capsys, "nightly", "--date", DAY, "--workers", "1")
-    assert nightly["company_details"]["requested"] == 0  # already fresh: no requests
+    details = nightly["runs"][-1]["steps"]["company-details"]
+    assert details["result"]["requested"] == 0  # already fresh: no requests
 
 
 def test_nightly_skips_company_details_without_contact(
@@ -195,7 +209,8 @@ def test_nightly_skips_company_details_without_contact(
 ) -> None:
     call(capsys, "universe", "--stocks", str(env / "stocks.csv"), "--version", "v", "--date", DAY)
     _, nightly = call(capsys, "nightly", "--date", DAY, "--workers", "1")
-    assert nightly["company_details"].startswith("skipped")
+    details = nightly["runs"][-1]["steps"]["company-details"]
+    assert details["status"] == "SKIPPED" and details["reason"].startswith("skipped")
 
 
 def test_a_second_writing_run_exits_3_unless_it_waits(
@@ -233,10 +248,10 @@ def test_nightly_recovers_a_job_left_running_by_a_crashed_process(
     from algotrade.storage.factory import open_backend  # noqa: PLC0415
 
     call(capsys, "universe", "--stocks", str(env / "stocks.csv"), "--version", "v", "--date", DAY)
-    params = {"session": DAY, "workers": 1, "export_dir": None}
+    params = {"session": DAY, "catch_up": False, "workers": 1, "export_dir": None}
     job_id = job_id_for("nightly", params, UserContext(SITE_USER))
     stuck = JobRecord(job_id, "nightly", params, SITE_USER, datetime.now(UTC))
     stuck.status = JobStatus.RUNNING
     open_backend().runs.save(stuck.to_run())
-    code, result = call(capsys, "nightly", "--date", DAY, "--workers", "1")
-    assert code == 0 and result["job_id"] == job_id and "earnings" in result
+    _, result = call(capsys, "nightly", "--date", DAY, "--workers", "1")
+    assert result["job_id"] == job_id and "earnings" in result["runs"][-1]["steps"]

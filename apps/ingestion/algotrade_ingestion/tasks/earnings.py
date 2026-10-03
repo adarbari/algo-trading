@@ -13,6 +13,7 @@ from functools import partial
 import numpy as np
 import pandas as pd
 
+from algotrade.core.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.sources.base import FetchRequest, Source
 from algotrade_ingestion.tasks.framework import IngestRun, TaskContext
@@ -21,9 +22,9 @@ TASK = "earnings_calendar"
 TABLE = "events/earnings"
 
 
-def weekdays(start: date, days: int) -> list[date]:
-    """Weekdays in ``[start, start + days)``. Holidays are fetched too (they return no rows)."""
-    return [start + timedelta(i) for i in range(days) if (start + timedelta(i)).weekday() < 5]
+def report_days(start: date, days: int) -> list[date]:
+    """Exchange sessions in ``[start, start + days)``: the days companies report on."""
+    return sessions_between(start, start + timedelta(days - 1))
 
 
 def _one_day(run: IngestRun, source: Source, day: date, frames: list[pd.DataFrame]) -> str:
@@ -39,7 +40,7 @@ def ingest_earnings(
 ) -> RunRecord:
     frames: list[pd.DataFrame] = []
     with IngestRun(ctx, TASK, session) as run:
-        for day in weekdays(start or session, days):
+        for day in report_days(start or session, days):
             run.attempt(day.isoformat(), partial(_one_day, run, source, day, frames))
         rows = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
         if not rows.empty:

@@ -1,0 +1,13 @@
+# L3 site setting: how the nightly workflow runs (apps/ingestion/workflows/nightly.py).
+
+[sessions]                       # which exchange sessions a nightly run ingests (core/calendar.py)
+settle_minutes = 30              # a session counts as closed this long after its close (16:00 / 13:00 New York)
+max_catch_up = 5                 # after missed nights, ingest at most this many sessions (the latest ones)
+
+[alerts]
+max_duration_minutes = 40        # a nightly run longer than this is recorded as a WARN
+
+[notify]                         # after a run whose status is not COMPLETE
+enabled = true                   # false: no desktop notification (the summary file is still written)
+desktop = true                   # macOS notification via osascript (darwin only; never in tests)
+summary_path = "var/logs/nightly-latest.json"   # every run's summary, relative to the working directory

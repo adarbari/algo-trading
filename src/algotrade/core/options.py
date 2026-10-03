@@ -6,8 +6,9 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from enum import StrEnum
 
+from algotrade.core.calendar import third_friday
+
 _OSI = re.compile(r"^(?P<root>.*?)(?P<expiry>\d{6})(?P<right>[CP])(?P<strike>\d{8})$")
-_FRIDAY = 4
 
 
 class OptionRight(StrEnum):
@@ -43,12 +44,6 @@ def parse_osi(symbol: str) -> OsiSymbol | None:
 def is_standard_root(root: str, underlying: str) -> bool:
     """False for adjusted/non-standard series (e.g. ``AAPL1`` after a corporate action)."""
     return root.replace(".", "") == underlying.replace(".", "")
-
-
-def third_friday(year: int, month: int) -> date:
-    first = date(year, month, 1)
-    offset = (_FRIDAY - first.weekday()) % 7
-    return first + timedelta(days=offset + 14)
 
 
 def standard_monthly_expiries(listed: Iterable[date]) -> set[date]:

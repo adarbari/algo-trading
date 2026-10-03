@@ -4,21 +4,6 @@
 # Never add entries by hand; extend the owner named in architecture/ownership.toml.
 
 [[violation]]
-responsibility = "job-execution"
-file = "apps/backtest/algotrade_backtest/commands.py"
-count = 1
-
-[[violation]]
-responsibility = "job-execution"
-file = "apps/ingestion/algotrade_ingestion/commands.py"
-count = 1
-
-[[violation]]
-responsibility = "job-execution"
-file = "apps/ingestion/algotrade_ingestion/tasks/option_chains.py"
-count = 1
-
-[[violation]]
 responsibility = "run-records"
 file = "src/algotrade/services/backtests.py"
 count = 2
@@ -29,33 +14,8 @@ file = "src/algotrade/services/screening.py"
 count = 3
 
 [[violation]]
-responsibility = "screen-execution"
-file = "apps/ingestion/algotrade_ingestion/pipeline.py"
-count = 1
-
-[[violation]]
 responsibility = "secrets-env"
 file = "src/algotrade/services/configs.py"
-count = 1
-
-[[violation]]
-responsibility = "session-calendar"
-file = "apps/ingestion/algotrade_ingestion/cli.py"
-count = 2
-
-[[violation]]
-responsibility = "session-calendar"
-file = "apps/ingestion/algotrade_ingestion/tasks/bars.py"
-count = 1
-
-[[violation]]
-responsibility = "session-calendar"
-file = "apps/ingestion/algotrade_ingestion/tasks/earnings.py"
-count = 1
-
-[[violation]]
-responsibility = "session-calendar"
-file = "src/algotrade/core/options.py"
 count = 1
 
 [[violation]]

@@ -158,3 +158,58 @@ def test_job_identity_follows_the_resolved_config(golden_reader: StoreReader) ->
     for runner, job_id in zip((first, same, edited), ids, strict=True):
         assert runner.wait(job_id).status is JobStatus.COMPLETE
         runner.shutdown()
+
+
+def test_run_executes_in_the_callers_thread_and_children_go_through_the_runner() -> None:
+    threads: list[str] = []
+
+    def child(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
+        threads.append(threading.current_thread().name)
+        return {"n": params["n"], "_partial": params["n"] == 2}
+
+    def parent(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]:
+        assert ctx.jobs is not None
+        kids = [ctx.jobs.run("child", {"n": n}, ctx.user, force=True) for n in (1, 2)]
+        return {"kids": [k.status.value for k in kids]}
+
+    runs = MemoryRuns()
+    runner = LocalJobRunner(runs, {"child": child, "parent": parent}, {}, workers=1)
+    try:
+        job = runner.wait(runner.submit("parent", {}, USER), timeout=5)  # one worker: no deadlock
+        assert job.result == {"kids": ["complete", "partial"]}
+        assert len(runs.find("job:child")) == 2
+        again = runner.run("child", {"n": 1}, USER)  # done and not forced: the existing job
+        assert again.status is JobStatus.COMPLETE and len(threads) == 2
+    finally:
+        runner.shutdown()
+
+
+def test_run_job_service_api_recovers_and_runs() -> None:
+    from algotrade.services.jobs import run_job  # noqa: PLC0415
+
+    runs = MemoryRuns()
+    stuck = JobRecord(
+        job_id_for("echo", {"x": 1}, USER), "echo", {"x": 1}, "alice", T0 - timedelta(9)
+    )
+    stuck.status = JobStatus.RUNNING
+    runs.save(stuck.to_run())
+    echo = lambda params, ctx: {"x": params["x"]}  # noqa: E731
+    job = run_job(runs, {"echo": echo}, {}, "echo", {"x": 1}, USER, recover=("echo",))
+    assert job.status is JobStatus.COMPLETE and job.result == {"x": 1}
+
+
+def test_as_completed_yields_every_item_and_its_outcome() -> None:
+    from algotrade.services.jobs import as_completed  # noqa: PLC0415
+
+    def work(n: int) -> int:
+        if n == 3:
+            raise ValueError("three")
+        return n * 10
+
+    results: dict[int, object] = {}
+    for item, outcome in as_completed(work, [1, 2, 3], workers=2):
+        try:
+            results[item] = outcome()
+        except ValueError as exc:
+            results[item] = str(exc)
+    assert results == {1: 10, 2: 20, 3: "three"}

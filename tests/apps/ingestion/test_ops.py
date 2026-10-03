@@ -141,5 +141,6 @@ def test_nightly_plist() -> None:
     ]
     assert [d["Weekday"] for d in plist["StartCalendarInterval"]] == [1, 2, 3, 4, 5]
     assert plist["StartCalendarInterval"][0]["Hour"] == 23
+    assert plist["RunAtLoad"] is False  # a missed run starts on wake; catch-up makes it safe
     with pytest.raises(ValueError, match="invalid time"):
         nightly_plist(Path("/repo"), 25, 0)

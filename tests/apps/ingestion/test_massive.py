@@ -3,6 +3,7 @@ from datetime import UTC, date, datetime
 
 import pytest
 
+from algotrade.core.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
@@ -16,7 +17,7 @@ from algotrade_ingestion.sources.massive import (
     act_symbol,
     parse_grouped,
 )
-from algotrade_ingestion.tasks.bars import ingest_daily_bars, sessions_between
+from algotrade_ingestion.tasks.bars import ingest_daily_bars
 from algotrade_ingestion.tasks.corporate_actions import ingest_corporate_actions
 from tests import massive_fixture as fx
 from tests.ingest_helpers import http_for, task_ctx

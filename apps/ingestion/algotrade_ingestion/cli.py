@@ -10,15 +10,19 @@
     algotrade-ingest chains   [--date YYYY-MM-DD] [--workers N] [--symbols SPY,AAPL]
     algotrade-ingest features [--date YYYY-MM-DD]
     algotrade-ingest screen   [--date YYYY-MM-DD] [--config ID] [--user U] [--export-dir out/]
-    algotrade-ingest nightly  [--date YYYY-MM-DD] [--export-dir out/]
-    algotrade-ingest purge-raw --keep-days 90 [--staging-keep-days 14]
+    algotrade-ingest nightly  [--date YYYY-MM-DD] [--export-dir out/]   (no --date: catch up)
+    algotrade-ingest purge-raw [--keep-days 90] [--staging-keep-days 14]
     algotrade-ingest migrate-ids [--dry-run]   (symbol ids -> FIGI ids, append-only)
     algotrade-ingest golden build|verify|load [--golden-dir datasets/golden]
     algotrade-ingest run <task> [--date D | --from D --to D] [task flags]   (any registry task)
 
-Storage location comes from ALGOTRADE_DATA_URL (default file://./var/data). Every command that
-writes to the store takes the store's ingest run lock: a second concurrent run exits with
-code 3 unless it was given ``--wait`` (then it queues behind the first).
+Without ``--date`` a command uses the last closed exchange session (``core/calendar.py``:
+holidays and early closes known; a session counts once its close plus the settle margin in
+``config/site/nightly.toml`` has passed). ``nightly`` without ``--date`` also catches up the
+sessions missed since the last nightly. Storage location comes from ALGOTRADE_DATA_URL
+(default file://./var/data). Every command that writes to the store takes the store's ingest
+run lock: a second concurrent run exits with code 3 unless it was given ``--wait`` (then it
+queues behind the first).
 """
 
 import argparse
@@ -27,21 +31,21 @@ from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from algotrade.config.user import SITE_USER
+from algotrade.core.calendar import last_closed_session
 from algotrade.core.errors import AlgoTradeError
 from algotrade.data import StoreReader
 from algotrade.services.configs import default_user
 from algotrade.services.jobs import RunLockedError, exclusive_run
-from algotrade.storage.factory import open_backend
+from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.commands import golden, print_json, report, run_job, run_task_command
 from algotrade_ingestion.env import load_dotenv
 from algotrade_ingestion.schedule import LABEL, nightly_plist
+from algotrade_ingestion.settings import load_nightly
 from algotrade_ingestion.tasks.registry import TASKS, Task
 
-EXCHANGE_TZ = ZoneInfo("America/New_York")
 # Task commands kept under their own names (``algotrade-ingest bars ...``); every registry
 # task is also ``algotrade-ingest run <task>``. ``golden load`` runs the ``golden-load`` task.
 TASK_COMMANDS = tuple(name for name in TASKS if name != "golden-load")
@@ -61,12 +65,10 @@ def writes(args: argparse.Namespace) -> bool:
     return not (args.command == "golden" and args.action in ("build", "verify"))
 
 
-def last_session(now: datetime) -> date:
-    """Most recent weekday in exchange time. Pass --date explicitly on exchange holidays."""
-    day = now.astimezone(EXCHANGE_TZ).date()
-    while day.weekday() >= 5:
-        day -= timedelta(days=1)
-    return day
+def default_session(args: argparse.Namespace, now: datetime) -> date:
+    """The last closed exchange session at ``now`` (settle margin from nightly.toml)."""
+    settings = load_nightly(open_config_store(getattr(args, "config_dir", None)))
+    return last_closed_session(now, timedelta(minutes=settings.settle_minutes))
 
 
 def add_task_arguments(parser: argparse.ArgumentParser, spec: Task) -> None:
@@ -111,13 +113,6 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
     g.add_argument("action", choices=["build", "verify", "load"])
     g.add_argument("--golden-dir", type=Path, default=Path("datasets/golden"))
     add_wait(g)
-    r = sub.add_parser(
-        "purge-raw", help="delete raw vendor responses and unfinished-run scratch older than N days"
-    )
-    r.add_argument("--keep-days", type=int, default=90)
-    r.add_argument("--staging-keep-days", type=int, default=14, help="unfinished-run scratch")
-    r.add_argument("--date", type=date.fromisoformat, help="reference date (default: today)")
-    add_wait(r)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -167,7 +162,8 @@ def task_params(args: argparse.Namespace, session: date) -> dict[str, Any]:
 def _dispatch(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter) -> int:
     if args.command == "schedule":
         return write_schedule(args)
-    session = args.date if getattr(args, "date", None) else last_session(datetime.now(UTC))
+    explicit = getattr(args, "date", None) or getattr(args, "session", None)
+    session = explicit or default_session(args, datetime.now(UTC))
     if args.command == "golden":
         return golden(args, reader, writer)
     if getattr(args, "task", None):
@@ -180,17 +176,13 @@ def _dispatch(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter
         }
         user = args.user or default_user(SITE_USER).user_id
         return report(run_job(args, reader, writer, "screen", params, user))
-    if args.command == "nightly":
-        params = {
-            "session": session.isoformat(),
-            "workers": args.workers,
-            "export_dir": str(args.export_dir) if args.export_dir else None,
-        }
-        return report(run_job(args, reader, writer, "nightly", params, SITE_USER))
-    removed = writer.raw.purge_before(session - timedelta(days=args.keep_days))
-    staged = writer.staging.purge_before(session - timedelta(days=args.staging_keep_days))
-    print_json({"raw_files_removed": removed, "staging_runs_removed": staged})
-    return 0
+    params = {
+        "session": session.isoformat(),
+        "catch_up": explicit is None,  # no --date: also the sessions missed since the last run
+        "workers": args.workers,
+        "export_dir": str(args.export_dir) if args.export_dir else None,
+    }
+    return report(run_job(args, reader, writer, "nightly", params, SITE_USER))
 
 
 def main(argv: Sequence[str] | None = None) -> int:

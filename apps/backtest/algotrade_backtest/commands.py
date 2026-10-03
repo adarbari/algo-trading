@@ -14,7 +14,7 @@ from algotrade.services.configs import default_user, resolve_config
 from algotrade.services.datasets import list_datasets, load_dataset
 from algotrade.services.evaluation.baseline import compare_to_baseline, load_baseline, save_baseline
 from algotrade.services.evaluation.suite import run_suite, with_benchmark_excess
-from algotrade.services.jobs import JobStatus, LocalJobRunner
+from algotrade.services.jobs import JobStatus, run_job
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.result_writer import ResultWriter
@@ -96,16 +96,8 @@ def _config_backtest(args: argparse.Namespace) -> int:
         "writer": ResultWriter(backend),
         "configs": open_config_store(args.config_dir),
     }
-    runner = LocalJobRunner(backend.runs, LIBRARY_HANDLERS, resources)
-    try:
-        params = {
-            "config": args.config,
-            "start": args.start.isoformat(),
-            "end": args.end.isoformat(),
-        }
-        job = runner.wait(runner.submit("backtest", params, _user(args), force=True))
-    finally:
-        runner.shutdown()
+    params = {"config": args.config, "start": args.start.isoformat(), "end": args.end.isoformat()}
+    job = run_job(backend.runs, LIBRARY_HANDLERS, resources, "backtest", params, _user(args))
     if job.status is JobStatus.FAILED:
         print(f"error: {job.error}", file=sys.stderr)
         return 2
