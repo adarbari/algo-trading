@@ -121,6 +121,10 @@ and drop out of the default coverage.
 `instruments/symbol_history` tracks which symbol each FIGI used and when; a FIGI that comes
 back under a new symbol closes the old row and emits `events/reference_change` with
 `change = ticker_changed` (e.g. FB -> META).
+It keeps **one row per key** (`figi`, `symbol`, `valid_from`): a (FIGI, symbol) listed again
+after a run of the same session closed it (a vendor FIGI flipping A -> B -> A, DFAC on
+2026-10-02) reopens that row rather than opening a second one, and if two rows still share a
+key the build's own decision (the later row) wins.
 
 **Re-runs of a session.** The build's cumulative state (ids, `first_seen`, delistings
 carried, `symbol_history`, `id_map`) starts from the latest snapshot **known** when it runs:
