@@ -95,13 +95,15 @@ all = [ { field = "instrument.is_leveraged", op = "eq", value = false } ]
 
 ## Users
 
-Phase 0 identity is a **label for namespacing, not authentication**: `--user` on both CLIs
-(default `local`; `site` for runs scheduled from site presets). Market data and rollups are
+Phase 0 identity is a **label for namespacing, not authentication**: `--user` on both CLIs,
+defaulting to `$ALGOTRADE_USER`, else `local` (`site` for runs scheduled from site presets). Market data and rollups are
 global; configs, results and jobs are per user. Phase 4 maps authenticated users to
 `user_id`, and services enforce that users only read and write their own configs, results
 and jobs.
 
-Rules: configs never contain secrets (credentials come only from environment variables); ids
+Rules: configs never contain secrets. Keys that look like credentials (`api_key`, `token`,
+`password`, `secret`, …) anywhere in a config or in run overrides are rejected at load;
+credentials come only from environment variables. Ids
 are restricted to `[a-z0-9_-]`, so they are safe in paths.
 
 ## Running configs
@@ -119,8 +121,6 @@ All of these run as **jobs** (see [architecture.md](architecture.md#jobs)).
 
 | Item | Status |
 |---|---|
-| `ALGOTRADE_USER` env var as the default for `--user` | follow-up |
-| Lint rejecting secret-like keys (`*key*`, `*token*`, `*secret*`) in config files | follow-up |
 | `rebalance_selection`: re-evaluate a backtest's selection at an interval | phase 2b |
 | L4 `watchlists/` and `preferences.toml` | phase 4–5 |
 | Database-backed `ConfigStore` written by the UI | phase 4 |

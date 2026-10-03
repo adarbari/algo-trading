@@ -40,6 +40,43 @@ BUILTIN_DEFAULTS: Mapping[str, Any] = {
 }
 
 
+SECRET_MARKERS = (
+    "secret",
+    "password",
+    "passwd",
+    "token",
+    "api_key",
+    "apikey",
+    "credential",
+    "private_key",
+)
+
+
+def reject_secrets(document: Mapping[str, Any], path: str) -> None:
+    """Configs never hold credentials (they come only from environment variables)."""
+    for key, value in document.items():
+        if any(marker in str(key).lower() for marker in SECRET_MARKERS):
+            raise ConfigurationError(
+                f"{path}.{key}: looks like a secret; put credentials in environment variables"
+            )
+        if isinstance(value, Mapping):
+            reject_secrets(value, f"{path}.{key}")
+        elif isinstance(value, list):
+            for i, item in enumerate(value):
+                if isinstance(item, Mapping):
+                    reject_secrets(item, f"{path}.{key}[{i}]")
+
+
+def _checked(load: DocumentLoader) -> DocumentLoader:
+    def wrapped(scope: str, kind: str, name: str) -> Mapping[str, Any] | None:
+        document = load(scope, kind, name)
+        if document is not None:
+            reject_secrets(document, f"{scope}/{kind}/{name}")
+        return document
+
+    return wrapped
+
+
 def deep_merge(base: Mapping[str, Any], over: Mapping[str, Any]) -> dict[str, Any]:
     out = dict(base)
     for key, value in over.items():
@@ -137,6 +174,9 @@ def resolve(
     overrides: Mapping[str, Any] | None = None,
     catalog: FieldCatalog | None = None,
 ) -> ResolvedConfig:
+    load = _checked(load)
+    if overrides:
+        reject_secrets(overrides, "run-overrides")
     document, layers = _strategy_document(config_id, user, load)
     if overrides:
         document = deep_merge(document, overrides)

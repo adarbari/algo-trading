@@ -123,3 +123,37 @@ def test_backtest_handler_on_golden_store(golden_reader: StoreReader) -> None:
     assert job.result["selection"]["selected"] == 1
     assert job.result["metrics"]["num_trades"] == 1
     runner.shutdown()
+
+
+def test_job_identity_follows_the_resolved_config(golden_reader: StoreReader) -> None:
+    from algotrade.storage.backends.config_files import MemoryConfigStore  # noqa: PLC0415
+
+    def config(fast_slow: tuple[int, int]) -> MemoryConfigStore:
+        doc = {
+            "id": "trend",
+            "kind": "strategy",
+            "impl": "sma_crossover",
+            "params": {"fast": fast_slow[0], "slow": fast_slow[1]},
+            "selection": {
+                "name": "bull",
+                "where": {"all": [{"field": "instrument.symbol", "op": "eq", "value": "BULL"}]},
+            },
+        }
+        return MemoryConfigStore({("alice", "strategies", "trend"): doc})
+
+    params = {"config": "trend", "start": "2020-01-01", "end": "2022-12-31"}
+    first = LocalJobRunner(
+        MemoryRuns(), LIBRARY_HANDLERS, {"reader": golden_reader, "configs": config((20, 100))}
+    )
+    same = LocalJobRunner(
+        MemoryRuns(), LIBRARY_HANDLERS, {"reader": golden_reader, "configs": config((20, 100))}
+    )
+    edited = LocalJobRunner(
+        MemoryRuns(), LIBRARY_HANDLERS, {"reader": golden_reader, "configs": config((10, 50))}
+    )
+    ids = [r.submit("backtest", params, USER) for r in (first, same, edited)]
+    assert ids[0] == ids[1]  # same resolved config, dates and user: same job
+    assert ids[0] != ids[2]  # editing the config is new work
+    for runner, job_id in zip((first, same, edited), ids, strict=True):
+        assert runner.wait(job_id).status is JobStatus.COMPLETE
+        runner.shutdown()

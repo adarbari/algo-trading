@@ -10,9 +10,11 @@ from dataclasses import dataclass
 
 from algotrade.config.schema import NO_VALUE_OPS, Group, Rule
 from algotrade.core.errors import ConfigurationError
+from algotrade.core.fields import REFERENCE_TABLE, field_source
+
+__all__ = ["FIELD_TYPES", "INSTRUMENT_FIELDS", "REFERENCE_TABLE", "FieldCatalog", "field_source"]
 
 FIELD_TYPES = frozenset({"str", "float", "int", "bool", "date"})
-REFERENCE_TABLE = "instruments/reference"
 
 INSTRUMENT_FIELDS: Mapping[str, str] = {
     "instrument_id": "str",
@@ -34,17 +36,6 @@ INSTRUMENT_FIELDS: Mapping[str, str] = {
     "listed_on": "date",
     "delisted_on": "date",
 }
-
-
-def field_source(field_name: str) -> tuple[str, str]:
-    """``(table, column)`` a field is read from."""
-    head, _, rest = field_name.partition(".")
-    if head == "instrument" and rest:
-        return REFERENCE_TABLE, rest
-    if head == "rollup" and "." in rest:
-        rollup, _, column = rest.rpartition(".")
-        return f"rollups/instrument/{rollup}", column
-    raise ConfigurationError(f"field {field_name!r} must start with 'instrument.' or 'rollup.'")
 
 
 @dataclass(frozen=True)

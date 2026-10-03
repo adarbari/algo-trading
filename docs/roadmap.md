@@ -21,11 +21,11 @@ lands. The target state of every item is described in [architecture.md](architec
 
 | # | Item | Lands in |
 |---|---|---|
-| F1 | Configured backtests save results (`results/backtests`) and record dataset versions on the run | phase 1 |
-| F2 | `ALGOTRADE_USER` env var as the default for `--user` | phase 1 |
-| F3 | A single `InstrumentView` reader (reference + selected rollups, as of a date) | phase 1 |
-| F4 | Job idempotency keyed by (kind, config hash, session), so editing a config and resubmitting runs again | phase 1 |
-| F5 | Lint rejecting secret-like keys in config files | phase 1 |
+| F1 | Configured backtests save results (`results/backtest_equity`, `results/backtest_fills`) and record dataset versions on the run | **done** (1.1) |
+| F2 | `ALGOTRADE_USER` env var as the default for `--user` | **done** (1.1) |
+| F3 | A single `InstrumentView` reader (reference + selected rollups, as of a date) | **done** (1.1) |
+| F4 | Job idempotency keyed by (kind, config hash, session), so editing a config and resubmitting runs again | **done** (1.1) |
+| F5 | Reject secret-like keys in config files | **done** (1.1) |
 | F6 | DuckDB as the query engine and catalog (storage is Parquet read with pyarrow today) | when queries need it |
 | F7 | `rebalance_selection` (re-evaluate a backtest's selection at an interval) | phase 2b |
 

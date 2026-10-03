@@ -5,11 +5,18 @@ same ``JobRunner`` protocol, so the CLIs and the future API do not change.
 """
 
 from algotrade.services.jobs.models import JobRecord, JobStatus, job_id_for
-from algotrade.services.jobs.runner import JobContext, JobHandler, JobRunner, LocalJobRunner
+from algotrade.services.jobs.runner import (
+    JobContext,
+    JobHandler,
+    JobKind,
+    JobRunner,
+    LocalJobRunner,
+)
 
 __all__ = [
     "JobContext",
     "JobHandler",
+    "JobKind",
     "JobRecord",
     "JobRunner",
     "JobStatus",

@@ -53,10 +53,10 @@ Two physical parts, always read together:
   that survives renames and ticker reuse (FB → META): the FIGI from reference data, plus
   `instruments/symbol_history` mapping ticker → id over time. Every table is already keyed by
   `instrument_id`, so this is a mapping change, not a schema change.
-- **InstrumentView** is the read API that returns reference facts plus selected rollups for a
-  set of instruments as of D. Today the parts exist separately (`StoreReader.instruments`,
-  `instrument_terms`, and the selection view that joins reference + rollups); a single
-  `InstrumentView` reader is a roadmap follow-up.
+- **InstrumentView** (`StoreReader.instrument_view(session, fields)`) returns reference facts
+  (latest snapshot on or before the session) joined with rollups **for** the session, one row
+  per instrument, columns named by field. A rollup with no data for the session is listed in
+  `missing`, and its fields are UNKNOWN to selections (never stale values).
 
 ## L2: Instrument × time (values)
 

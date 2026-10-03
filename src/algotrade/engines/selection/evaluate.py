@@ -75,6 +75,7 @@ class SelectionResult:
     unknown_excluded: int
     truncated: int
     audit: tuple[RuleAudit, ...]
+    missing_tables: tuple[str, ...] = ()  # rollups with no data for the session (UNKNOWN)
 
     @property
     def empty(self) -> bool:
@@ -88,6 +89,7 @@ class SelectionResult:
             "unknown_excluded": self.unknown_excluded,
             "truncated": self.truncated,
             "rules": [a.__dict__ for a in self.audit],
+            "missing_tables": list(self.missing_tables),
         }
 
 

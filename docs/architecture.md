@@ -52,11 +52,11 @@ versus planned. Detail lives in companion docs:
 | Area | Built | Planned (phase) |
 |---|---|---|
 | Apps | `apps/ingestion`, `apps/backtest` | `apps/api` (4), `apps/web` (5) |
-| L1 | `instruments/reference` (from universe CSVs), `rollups/instrument/option_liquidity@v1` | Nasdaq Trader + SPY universe builder, company details, FIGI ids + `instruments/symbol_history`, `events/reference_change` (1); `price_stats`, `iv_history`, `earnings`, `liquidity_class`, `fundamentals` rollups (2b); a single `InstrumentView` reader (follow-up) |
+| L1 | `instruments/reference` (from universe CSVs), `rollups/instrument/option_liquidity@v1`, `InstrumentView` reader | Nasdaq Trader + SPY universe builder, company details, FIGI ids + `instruments/symbol_history`, `events/reference_change` (1); `price_stats`, `iv_history`, `earnings`, `liquidity_class`, `fundamentals` rollups (2b) |
 | L2 | `chains/*` (Cboe), `bars/1d` schema + reads (golden data) | Massive daily bars + split/dividend events, Nasdaq earnings events (1); intraday bars + `rollups/daily/*` (6) |
 | L3 | `defaults.toml`, `presets/selections/*`, `presets/strategies/*` | `universe.toml`, `sources.toml`, `overrides/leveraged_etfs.csv` (1); `rollups.toml` (2b) |
 | L4 | `strategies/`, `selections/` | `watchlists/`, `preferences.toml` (4–5); DB-backed `ConfigStore` (4) |
-| Jobs | local runner; `backtest`, `screen`, `nightly` | key by config hash (follow-up); queue-backed runner (6) |
+| Jobs | local runner keyed by config hash; `backtest`, `screen`, `nightly` | queue-backed runner (6) |
 | Other | uv workspace, Parquet storage (local + memory backends) | DuckDB query engine and catalog; S3 backend for hosting (6); `quant/` (2b) |
 
 ---
@@ -146,8 +146,9 @@ algotrade-backtest --user U backtest --config sma_trend --start S --end E
   → result_writer.write_result("backtests", …) + run record (user, config hash, dataset versions)
 ```
 
-The last step is a **follow-up**: today the metrics and selection audit are stored on the job
-record only. Survivorship rule: the selection is evaluated as of the backtest's start date
+Results land in `results/backtest_equity` (instrument `PORTFOLIO`) and
+`results/backtest_fills`, and the run record holds the metrics, the selection audit, the config
+hash and the exact `bars` / reference runs read. Survivorship rule: the selection is evaluated as of the backtest's start date
 (re-evaluation at a `rebalance_selection` interval is planned, phase 2b), never with
 today's universe.
 
@@ -172,8 +173,8 @@ report "no qualified candidates".
 audits. The local runner uses 2 threads.
 
 - **Idempotent:** identical work returns the existing job. The key is **(kind, config hash,
-  session)**, so editing a config and resubmitting runs again. Today the key is
-  (kind, params, user); moving to the config hash is a follow-up.
+  session or dates, user)**, so editing a config and resubmitting runs again. Each job kind
+  declares its identity (`JobKind(handler, identity)`).
 - `force` re-runs a finished job (the CLIs use it); failed jobs re-run on resubmit; a queued or
   running job is never duplicated.
 - `recover()` marks jobs abandoned by a crashed process as failed.
@@ -270,8 +271,8 @@ close of bar t  : Portfolio marked to market -> equity[t]
   to `user_id`, and services enforce per-user access to configs, results and jobs.
 - **PII:** none stored; user ids are opaque labels.
 - **Threats:** malicious configs (typed rules only, never code or SQL); path traversal (ids
-  restricted to `[a-z0-9_-]{1,64}`); secrets in configs (forbidden; credentials only from env;
-  a lint check is a follow-up); cross-user reads (namespaced now, enforced in phase 4).
+  restricted to `[a-z0-9_-]{1,64}`); secrets in configs (rejected at load: secret-like keys
+  such as `api_key`, `token`, `password`; credentials only from env); cross-user reads (namespaced now, enforced in phase 4).
 
 ---
 

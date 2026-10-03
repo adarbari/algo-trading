@@ -55,9 +55,10 @@ def test_load_price_data_aligns_and_returns_terms() -> None:
         "ref",
     )
     writer.write_table("instruments/reference", D1, "ref", ref)
-    series, terms = load_price_data(StoreReader(backend), ["EQ:A", "EQ:B"], D1, D2)
-    assert list(series["EQ:A"].close) == [2.0]  # aligned to the common session
-    assert set(terms) == {"EQ:A", "EQ:B"}
+    data = load_price_data(StoreReader(backend), ["EQ:A", "EQ:B"], D1, D2)
+    assert list(data.series["EQ:A"].close) == [2.0]  # aligned to the common session
+    assert set(data.terms) == {"EQ:A", "EQ:B"}
+    assert data.versions == {"bars/1d": ["r1", "r2"], "instruments/reference": ["ref"]}
 
 
 def test_frame_to_series_timestamps_are_naive_utc() -> None:
