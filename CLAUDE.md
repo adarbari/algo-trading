@@ -60,6 +60,7 @@ only shrinks (`make dupes-update`).
 | Run ids, run records, COMPLETE / PARTIAL | `storage/runs.py` (`start_run` + `RunRecord.finish` in services), `services/jobs/`; in ingestion `tasks/framework/run.py` (`IngestRun`): never write the loop in a task |
 | Raw save; stamping; ticker → id in ingestion | `tasks/framework/run.py` (`IngestRun`) |
 | Which ingestion steps run, with which defaults | `tasks/framework/registry.py`; nightly order, isolation, catch-up: `workflows/nightly/nightly.py` |
+| Nightly summary report + notifications (desktop alert, daily summary email over SMTP) | `workflows/nightly/` (`records.py` inputs, `report.py` pure builder, `timing.py` run timing, `render.py` text/HTML, `notify.py` notifiers) |
 | Vendor HTTP, retries, circuit breaker; pacing; building sources (incl. the golden fixture source); vendor specifics | `sources/framework/http.py`; `sources/framework/limiter.py` (one per key, cross-process); `sources/framework/registry.py`; `sources/vendors/<vendor>/` |
 | Locks: named store locks, run-index lock; one ingest run at a time | `storage/locks.py`; `services/jobs/exclusive.py` |
 | A run's table writes publish atomically (pending until COMPLETE / PARTIAL commits them all; FAILED drops them; crash recovery) | `storage/backends/` (`local_index.py`: commit marker + sequence); driven by `IngestRun` and `ResultWriter.publishing` (ADR 0022) |
@@ -154,6 +155,6 @@ docstring, and mirror it in tests. Never park code in a neighbouring folder
 | A decision that changes architecture | `.claude/skills/write-adr` |
 
 Commands (need `uv`): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make layout`, `make evaluate`, `make baseline`.
-Ingestion: `algotrade-ingest universe|universe-build|company-details|shares|earnings|bars|rates|corporate-actions|chains|rollups|screen|nightly|quality|schedule|purge-raw|migrate-ids|golden`, or `algotrade-ingest run <task>` for any registry task (see `README.md`).
+Ingestion: `algotrade-ingest universe|universe-build|company-details|shares|earnings|bars|rates|corporate-actions|chains|rollups|screen|nightly|report|quality|schedule|purge-raw|migrate-ids|golden`, or `algotrade-ingest run <task>` for any registry task (see `README.md`).
 Configs: site presets in `config/site/` (reviewed via PR); user configs in `config/users/<id>/`
 (git-ignored). Check one with `algotrade-backtest [--user U] config validate|show <id>`.

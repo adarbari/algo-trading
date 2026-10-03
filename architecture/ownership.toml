@@ -147,6 +147,24 @@ detect = [
 ]
 
 [[responsibility]]
+id = "ingestion-report"
+description = "The nightly summary report (statistics per step, failed items grouped by reason with examples, failed checks, hints) and notifications: the desktop alert and the daily summary email over SMTP"
+owner = [
+    "apps/ingestion/algotrade_ingestion/workflows/nightly/records.py",
+    "apps/ingestion/algotrade_ingestion/workflows/nightly/report.py",
+    "apps/ingestion/algotrade_ingestion/workflows/nightly/render.py",
+    "apps/ingestion/algotrade_ingestion/workflows/nightly/timing.py",
+    "apps/ingestion/algotrade_ingestion/workflows/nightly/notify.py",
+]
+section = "docs/architecture.md#nightly-summary-email"
+detect = [
+    { import = "smtplib" },
+    { import = "email" },
+    { call = "build_report" },
+    { string = "osascript" },
+]
+
+[[responsibility]]
 id = "refresh-scheduling"
 description = "Which keys (CIKs) an incremental reference task refetches on a session: new first, then each once per refresh_days on its own slot day (crc32 of the key), so refreshes spread over the window"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/reference/refresh.py"]
