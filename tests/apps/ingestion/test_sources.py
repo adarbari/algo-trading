@@ -6,6 +6,7 @@ from unittest import mock
 
 import pytest
 
+from algotrade_ingestion.sources.base import FetchRequest
 from algotrade_ingestion.sources.cboe import URL, CboeOptionsSource, parse_chain
 from algotrade_ingestion.sources.http import (
     HttpError,
@@ -64,7 +65,7 @@ def test_urllib_transport_maps_http_errors() -> None:
 def test_source_builds_url() -> None:
     seen: list[str] = []
     source = CboeOptionsSource(lambda url: seen.append(url) or b"{}", lambda s: None)
-    assert source.fetch("_SPX") == b"{}"
+    assert source.fetch(FetchRequest("_SPX")) == b"{}"
     assert seen == [URL.format(symbol="_SPX")]
 
 

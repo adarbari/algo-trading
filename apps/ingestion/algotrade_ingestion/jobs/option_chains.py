@@ -21,7 +21,7 @@ import pandas as pd
 from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.jobs.common import stamp
-from algotrade_ingestion.sources.cboe import DATASET, SOURCE, CboeOptionsSource, parse_chain
+from algotrade_ingestion.sources.base import FetchRequest, Source
 
 JOB = "option_chains"
 OPTIONS, UNDERLYINGS, STATUS = "chains/option_quotes", "chains/underlying_quotes", "chains/status"
@@ -52,41 +52,34 @@ def _resume_or_start(writer: StoreWriter, session: date, now: datetime) -> RunRe
 
 
 def _process(
-    source: CboeOptionsSource,
+    source: Source,
     writer: StoreWriter,
     run: RunRecord,
     u: Underlying,
     clock: Callable[[], datetime],
 ) -> str:
-    payload = source.fetch(u.symbol)
+    request = FetchRequest(u.symbol, u.instrument_id, run.session_date)
+    payload = source.fetch(request)
     if payload is None:
         return "NO_CHAIN"
-    writer.raw.put(SOURCE, DATASET, run.session_date, run.run_id, u.symbol, payload)
-    parsed = parse_chain(u.symbol, u.instrument_id, payload)
-    if parsed is None:
+    writer.raw.put(source.name, source.dataset, run.session_date, run.run_id, u.symbol, payload)
+    normalized = source.normalize(request, payload)
+    if normalized is None:
         return "NO_CHAIN"
-    if parsed.session_date != run.session_date:
-        return f"STALE_DATA: chain is for {parsed.session_date.isoformat()}"
+    if normalized.session_date != run.session_date:
+        return f"STALE_DATA: chain is for {normalized.session_date}"
     now = clock()
-    writer.staging.put(
-        run.run_id,
-        UNDERLYINGS,
-        u.symbol,
-        stamp(parsed.underlying, run.session_date, now, SOURCE, run.run_id),
-    )
-    if parsed.options.empty:
-        return "NO_STANDARD_SERIES"
-    writer.staging.put(
-        run.run_id,
-        OPTIONS,
-        u.symbol,
-        stamp(parsed.options, run.session_date, now, SOURCE, run.run_id),
-    )
-    return "OK"
+    for table in (UNDERLYINGS, OPTIONS):
+        frame = normalized.tables.get(table)
+        if frame is not None and not frame.empty:
+            stamped = stamp(frame, run.session_date, now, source.name, run.run_id)
+            writer.staging.put(run.run_id, table, u.symbol, stamped)
+    options = normalized.tables.get(OPTIONS)
+    return "NO_STANDARD_SERIES" if options is None or options.empty else "OK"
 
 
 def _run_pass(
-    source: CboeOptionsSource,
+    source: Source,
     writer: StoreWriter,
     run: RunRecord,
     todo: Sequence[Underlying],
@@ -106,7 +99,11 @@ def _run_pass(
 
 
 def _publish(
-    writer: StoreWriter, run: RunRecord, universe: Sequence[Underlying], now: datetime
+    writer: StoreWriter,
+    run: RunRecord,
+    universe: Sequence[Underlying],
+    now: datetime,
+    source_name: str,
 ) -> None:
     for table in (UNDERLYINGS, OPTIONS):
         frame = writer.staging.collect(run.run_id, table)
@@ -128,13 +125,13 @@ def _publish(
         STATUS,
         run.session_date,
         run.run_id,
-        stamp(status, run.session_date, now, SOURCE, run.run_id),
+        stamp(status, run.session_date, now, source_name, run.run_id),
     )
 
 
 def ingest_option_chains(
     writer: StoreWriter,
-    source: CboeOptionsSource,
+    source: Source,
     universe: Sequence[Underlying],
     session_date: date,
     config: ChainJobConfig | None = None,
@@ -157,7 +154,7 @@ def ingest_option_chains(
         sleep(config.retry_pause_s)
         _run_pass(source, writer, run, failed, 1, clock)
     now = clock()
-    _publish(writer, run, universe, now)
+    _publish(writer, run, universe, now, source.name)
     counts: dict[str, int] = {}
     for status in run.items.values():
         counts[status.split(":")[0]] = counts.get(status.split(":")[0], 0) + 1
