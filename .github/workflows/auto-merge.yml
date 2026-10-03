@@ -15,9 +15,13 @@ on:
     workflows: [CI]
     types: [completed]
 
+# Listing any permission sets every unlisted one to "none", so each API the job calls
+# must appear here: checks (read check runs), pull-requests + contents (merge, delete
+# branch), actions (re-run CI on the target branch).
 permissions:
   contents: write
   pull-requests: write
+  checks: read
   actions: write
 
 concurrency:
@@ -50,12 +54,14 @@ jobs:
             echo "No open PR whose head is $HEAD_SHA (newer push or already merged)."; exit 0
           fi
           number=$(jq -r .number <<<"$pr")
+          echo "Candidate: #$number at $HEAD_SHA"
           if [ "$(jq -r .isDraft <<<"$pr")" = "true" ]; then
             echo "#$number is a draft; skipping."; exit 0
           fi
           if jq -e '.labels | map(.name) | index("no-automerge")' <<<"$pr" >/dev/null; then
             echo "#$number is labelled no-automerge; skipping."; exit 0
           fi
+          echo "Checking every check run on $HEAD_SHA"
           bad=$(gh api "repos/$REPO/commits/$HEAD_SHA/check-runs?per_page=100" \
                   --jq '[.check_runs[] | select(.status != "completed" or
                          (.conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral"))
@@ -63,6 +69,7 @@ jobs:
           if [ -n "$bad" ]; then
             echo "#$number has checks that did not pass: $bad"; exit 0
           fi
+          echo "All checks passed; merging #$number"
           base=$(gh pr view "$number" --repo "$REPO" --json baseRefName --jq .baseRefName)
           gh pr merge "$number" --repo "$REPO" --squash --delete-branch --match-head-commit "$HEAD_SHA"
           echo "Merged #$number into $base."
