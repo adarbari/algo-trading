@@ -7,6 +7,7 @@ Feature and result tables are open-ended: they need the common columns plus
 
 from dataclasses import dataclass
 
+import numpy as np
 import pandas as pd
 
 from algotrade.core.errors import DataValidationError
@@ -118,18 +119,22 @@ def _key(spec: TableSpec, frame: pd.DataFrame) -> list[str]:
 
 
 def bar_problems(frame: pd.DataFrame) -> list[str]:
-    """OHLCV sanity checks. Bad bars silently produce great-looking backtests."""
+    """OHLCV sanity checks. Bad bars silently produce great-looking backtests.
+
+    Plain numpy on purpose: this runs on every partition written, often thousands per backfill.
+    """
+    o, h, low, c, v = (frame[col].to_numpy(dtype=np.float64) for col in
+                       ("open", "high", "low", "close", "volume"))  # fmt: skip
+    prices = np.stack([o, h, low, c])
+    if np.isnan(prices).any() or np.isnan(v).any():
+        return ["bars contain NaN prices or volume"]
     problems: list[str] = []
-    prices = frame[["open", "high", "low", "close"]]
-    if prices.isna().to_numpy().any() or frame["volume"].isna().any():
-        problems.append("bars contain NaN prices or volume")
-        return problems
-    if (prices <= 0).to_numpy().any():
+    if (prices <= 0).any():
         problems.append("non-positive prices")
-    if (frame["volume"] < 0).any():
+    if (v < 0).any():
         problems.append("negative volume")
-    if (frame["high"] < frame[["open", "close"]].max(axis=1)).any():
+    if (h < np.maximum(o, c)).any():
         problems.append("high below open/close")
-    if (frame["low"] > frame[["open", "close"]].min(axis=1)).any():
+    if (low > np.minimum(o, c)).any():
         problems.append("low above open/close")
     return problems

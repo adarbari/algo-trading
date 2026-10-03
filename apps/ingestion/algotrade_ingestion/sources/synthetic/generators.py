@@ -1,4 +1,4 @@
-"""Deterministic synthetic market data generators.
+"""Deterministic synthetic market data generators (price paths -> OHLCV ``PriceSeries``).
 
 Synthetic data is the backbone of the golden test set: it is free, licence-clean, fully
 reproducible, and lets us construct regimes (crashes, chop, trends) on purpose so we can
@@ -11,6 +11,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from algotrade.core.series import FloatArray, PriceSeries, TimeArray
+from algotrade.core.time import business_days
 
 TRADING_DAYS = 252
 
@@ -22,12 +23,6 @@ class Regime:
     bars: int
     drift: float
     vol: float
-
-
-def business_days(start: str, n: int) -> TimeArray:
-    first = np.busday_offset(np.datetime64(start, "D"), 0, roll="forward")
-    days = np.busday_offset(first, np.arange(n), roll="forward")
-    return days.astype("datetime64[ns]")
 
 
 def gbm_closes(
@@ -108,3 +103,14 @@ def ohlcv_from_closes(
         close=np.round(closes, 4),
         volume=volume.astype(np.float64),
     )
+
+
+__all__ = [
+    "Regime",
+    "business_days",
+    "correlated_gbm",
+    "gbm_closes",
+    "ohlcv_from_closes",
+    "ou_closes",
+    "regime_closes",
+]  # fmt: skip

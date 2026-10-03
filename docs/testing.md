@@ -23,15 +23,24 @@ These run automatically for anything in `strategies/registry.py`:
 ## The golden datasets
 
 `datasets/golden/` holds deterministic synthetic regimes (trend, bear, random walk, mean
-reversion, crash, high vol, regime switching, correlated multi-asset). They are committed
-with SHA-256 checksums in `manifest.json`; `algotrade-backtest datasets verify` fails if a byte changes.
+reversion, crash, high vol, regime switching, correlated multi-asset) as committed CSVs with
+SHA-256 checksums in `manifest.json`. These are the reviewable source of truth.
+
+```
+algotrade-ingest golden build    regenerate the CSVs from apps/ingestion/.../synthetic/catalog.py
+algotrade-ingest golden verify   every committed file matches its checksum      (make datasets-verify)
+algotrade-ingest golden load     load them into a store via the normal writers  (make golden-store)
+```
+
+`make golden-store` loads them into a **separate fixture store** (`datasets/golden/store`,
+git-ignored): `bars/1d`, `instruments/reference` and `catalog/golden_datasets`. Backtests,
+`make evaluate` and the tests read that store through `StoreReader`, the same code path as
+production data (ADR 0008). It is never mixed into the production store, because synthetic
+symbols such as `AAA` collide with real tickers.
 
 Why synthetic? Free, licence-clean, reproducible, and we can build the regimes we want to
 stress on purpose. **`random_walk` is the null hypothesis**: a strategy that looks good
 there is fitting noise.
-
-Real historical data should be added later as a separate, *non-committed* research set
-(downloaded by a script, cached locally), never as a CI dependency.
 
 ## The regression baseline (golden master)
 

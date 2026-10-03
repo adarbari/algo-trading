@@ -106,7 +106,7 @@ layers = [
     "algotrade.services",
     "algotrade.engines",
     "algotrade.strategies | algotrade.features | algotrade.analytics",
-    "algotrade.storage | algotrade.data",
+    "algotrade.storage",
     "algotrade.core",
 ]
 
@@ -130,7 +130,6 @@ name = "Strategies and screeners are pure: they only see core"
 type = "forbidden"
 source_modules = ["algotrade.strategies"]
 forbidden_modules = [
-    "algotrade.data",
     "algotrade.storage",
     "algotrade.features",
     "algotrade.engines",
@@ -142,7 +141,7 @@ forbidden_modules = [
 name = "Feature definitions are pure: no storage or data I/O"
 type = "forbidden"
 source_modules = ["algotrade.features"]
-forbidden_modules = ["algotrade.storage", "algotrade.data"]
+forbidden_modules = ["algotrade.storage"]
 
 [[tool.importlinter.contracts]]
 name = "Only the ingestion app writes market and feature data (ADR 0005)"

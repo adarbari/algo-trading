@@ -3,7 +3,8 @@
 Every strategy is evaluated against every dataset defined here, on every CI run and
 nightly. Add a dataset when you discover a market condition we do not yet cover; never
 silently change an existing one (create ``<name>_v2`` instead) because the regression
-baseline in ``benchmarks/baseline.json`` is keyed by dataset name.
+baseline in ``benchmarks/baseline.json`` is keyed by dataset name. Edit here, then run
+``algotrade-ingest golden build`` and commit the CSVs and manifest.
 """
 
 from collections.abc import Callable
@@ -12,8 +13,8 @@ from dataclasses import dataclass
 import numpy as np
 
 from algotrade.core.series import PriceSeries
-from algotrade.data.store import DatasetStore
-from algotrade.data.synthetic import (
+from algotrade_ingestion.sources.synthetic.files import GoldenFiles
+from algotrade_ingestion.sources.synthetic.generators import (
     Regime,
     business_days,
     correlated_gbm,
@@ -102,9 +103,9 @@ GOLDEN_DATASETS: tuple[GoldenSpec, ...] = (
 )  # fmt: skip
 
 
-def build_golden(store: DatasetStore) -> list[str]:
-    """(Re)generate every golden dataset into ``store``. Returns the dataset names."""
+def build_golden(files: GoldenFiles) -> list[str]:
+    """(Re)generate every golden dataset's CSV files. Returns the dataset names."""
     for spec in GOLDEN_DATASETS:
         rng = np.random.default_rng(spec.seed)
-        store.write(spec.name, spec.description, spec.build(rng), spec.tags)
+        files.write(spec.name, spec.description, spec.build(rng), spec.tags)
     return [s.name for s in GOLDEN_DATASETS]

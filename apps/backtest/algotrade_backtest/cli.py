@@ -1,6 +1,6 @@
 """``algotrade-backtest`` CLI (``algotrade`` is kept as an alias through phase 1).
 
-algotrade-backtest datasets build|verify|list
+algotrade-backtest [--data-url URL] datasets list
 algotrade-backtest backtest --strategy sma_crossover --dataset bull_trend [--param fast=10]
 algotrade-backtest evaluate [--update-baseline] [--report scorecard.md]
 """
@@ -13,17 +13,20 @@ from pathlib import Path
 from algotrade.core.errors import AlgoTradeError
 from algotrade_backtest.commands import cmd_backtest, cmd_datasets, cmd_evaluate
 
-DEFAULT_DATASETS = Path("datasets/golden")
 DEFAULT_BASELINE = Path("benchmarks/baseline.json")
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="algotrade-backtest", description=__doc__.splitlines()[0])
-    parser.add_argument("--datasets-dir", type=Path, default=DEFAULT_DATASETS)
+    parser.add_argument(
+        "--data-url",
+        help="storage to read (default: $ALGOTRADE_DATA_URL). Golden datasets live in the "
+        "fixture store built by `make golden-store`.",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    ds = sub.add_parser("datasets", help="manage the golden datasets")
-    ds.add_argument("action", choices=["build", "verify", "list"])
+    ds = sub.add_parser("datasets", help="list the golden datasets in the store")
+    ds.add_argument("action", choices=["list"])
 
     bt = sub.add_parser("backtest", help="run one strategy on one dataset")
     bt.add_argument("--strategy", required=True)

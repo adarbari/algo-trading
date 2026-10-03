@@ -1,8 +1,9 @@
 import numpy as np
+import pandas as pd
 
-from algotrade.data.alignment import align
-from algotrade.data.frames import series_to_frame
-from algotrade.data.synthetic import (
+from algotrade.core.series import FIELDS, align
+from algotrade.storage.schemas import bar_problems
+from algotrade_ingestion.sources.synthetic.generators import (
     Regime,
     business_days,
     correlated_gbm,
@@ -11,7 +12,6 @@ from algotrade.data.synthetic import (
     ou_closes,
     regime_closes,
 )
-from algotrade.data.validation import validate_ohlcv
 from tests.factories import series_from_closes
 
 
@@ -48,7 +48,7 @@ def test_generated_bars_pass_validation() -> None:
     rng = np.random.default_rng(4)
     closes = gbm_closes(rng, 300, 100.0, 0.0, 0.5)
     series = ohlcv_from_closes("X", rng, business_days("2020-01-01", 300), closes)
-    validate_ohlcv(series_to_frame(series), "synthetic")
+    assert bar_problems(pd.DataFrame({f: series.field(f) for f in FIELDS})) == []
 
 
 def test_align_intersects_timestamps() -> None:

@@ -8,9 +8,9 @@ added quickly **without** the codebase or the results quietly rotting.
 ```bash
 make install          # venv + dev deps + pre-commit hooks (Python 3.12+)
 make check            # everything CI runs: lint, types, boundaries, file length, tests, evaluation
-.venv/bin/algotrade-backtest datasets list
-.venv/bin/algotrade-backtest backtest --strategy sma_crossover --dataset bull_trend --param fast=10
-.venv/bin/algotrade-backtest evaluate --report scorecard.md
+.venv/bin/algotrade-backtest --data-url file://datasets/golden/store datasets list   # after `make golden-store`
+.venv/bin/algotrade-backtest --data-url file://datasets/golden/store backtest --strategy sma_crossover --dataset bull_trend --param fast=10
+make evaluate                                   # every strategy x golden dataset vs baseline
 ```
 
 ## Nightly options pipeline
@@ -48,7 +48,6 @@ apps/
 src/algotrade/  shared library
   core/         domain types, MarketView, FeatureView, instruments (no pandas, no I/O)
   storage/      data contract: schemas, stores, readers/writers, local + memory backends
-  data/         golden CSV datasets, validation, synthetic generators (replaced by storage in 0.3)
   strategies/   trading/ (backtest strategies) and screeners/: pure, see only core
   features/     versioned rollup definitions (e.g. option_liquidity@v1)
   analytics/    performance metrics, report formatting
@@ -62,7 +61,8 @@ tests/
   integration/  real data + engine stack across the golden set
   e2e/          the CLIs, end to end, against committed data + baseline
   architecture/ structural rules (file length, docs, test mirroring)
-datasets/golden/   committed, checksummed synthetic market regimes
+datasets/golden/   committed, checksummed synthetic CSVs; `make golden-store` loads them into
+                   datasets/golden/store (git-ignored), the store backtests and CI read
 benchmarks/        baseline.json: golden-master results
 docs/              architecture, testing, trading pitfalls, ADRs
 ```

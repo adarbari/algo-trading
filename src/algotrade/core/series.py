@@ -1,5 +1,6 @@
 """Columnar OHLCV container used by the engine and exposed (read-only) to strategies."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 import numpy as np
@@ -40,3 +41,26 @@ class PriceSeries:
             raise KeyError(f"Unknown field {name!r}; expected one of {FIELDS}")
         arr: FloatArray = getattr(self, name)
         return arr
+
+
+def align(series: Mapping[str, PriceSeries]) -> dict[str, PriceSeries]:
+    """Restrict every series to the timestamps present in *all* of them.
+
+    Dropping (rather than forward-filling) keeps the engine honest: a strategy never
+    trades on a bar that did not exist for one of its instruments.
+    """
+    if not series:
+        return {}
+    common: TimeArray | None = None
+    for s in series.values():
+        common = s.timestamps if common is None else np.intersect1d(common, s.timestamps)
+    assert common is not None
+    out: dict[str, PriceSeries] = {}
+    for instrument, s in series.items():
+        mask = np.isin(s.timestamps, common)
+        out[instrument] = PriceSeries(
+            instrument_id=instrument,
+            timestamps=s.timestamps[mask].copy(),
+            **{f: s.field(f)[mask].copy() for f in FIELDS},
+        )
+    return out
