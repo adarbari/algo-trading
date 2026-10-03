@@ -38,7 +38,7 @@ CONTRACTS = {
     ]
 }
 SHARED = {s["module"]: s for s in LAYOUT.get("shared", [])}
-PACKAGE_ROOTS = ("src", "apps/ingestion", "apps/backtest")  # directories on sys.path
+PACKAGE_ROOTS = ("src", "apps/ingestion", "apps/backtest", "apps/api")  # directories on sys.path
 
 
 def _rel(path: Path) -> str:

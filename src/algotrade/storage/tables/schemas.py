@@ -295,6 +295,11 @@ OPEN_PREFIXES = {
 }
 
 
+def result_table(name: str) -> str:
+    """The table a result named ``name`` (a screener, a backtest output) is stored in."""
+    return f"results/{name}"
+
+
 def spec_for(table: str) -> TableSpec:
     if table in KNOWN:
         return KNOWN[table]

@@ -52,7 +52,7 @@ versus planned. Detail lives in companion docs:
 
 | Area | Built | Planned (phase) |
 |---|---|---|
-| Apps | `apps/ingestion`, `apps/backtest` | `apps/api` (4), `apps/web` (5) |
+| Apps | `apps/ingestion`, `apps/backtest`, `apps/api` v1 (read-only, ADR 0025) | API writes (submit jobs) (4), `apps/web` (5) |
 | L1 | `instruments/reference` from the Nasdaq Trader + SPY universe builder (or universe CSVs) with FIGI / CIK and vendor security types (Massive), `instruments/symbol_history`, FIGI-based `instrument_id` + `instruments/id_map` + `SymbolResolver` (ADR 0018), company details (SEC EDGAR), `events/reference_change` (incl. `ticker_changed`, `id_changed`) + `events/index_change`, rollups `option_liquidity@v1`, `price_stats@v1`, `earnings@v1` (the rollup framework, 2b.2), `InstrumentView` reader | `iv_history`, `liquidity_class` rollups (2b.3); `fundamentals@v1` + `instruments/shares` from SEC company facts (2b.4) |
 | L2 | `chains/*` (Cboe), `events/earnings` (Nasdaq), `bars/1d` + `events/split` + `events/dividend` (Massive, unadjusted; adjusted at read time), `rates/treasury` (U.S. Treasury par yield curve), golden data | live Massive run awaits the API key (1); intraday bars + `rollups/daily/*` (6) |
 | L3 | `defaults.toml`, `universe.toml`, `sources.toml`, `nightly.toml`, `rollups.toml`, `overrides/leveraged_etfs.csv`, `presets/selections/*`, `presets/strategies/*` | |
@@ -302,16 +302,18 @@ and an HTML part (inline styles only, no images or external assets).
 
 ## 8. Code layout (enforced)
 
-Three packages in a uv workspace: `algotrade` (the library), `algotrade-ingestion` and
-`algotrade-backtest`, each declaring only its own dependencies, pinned by `uv.lock`.
+Four packages in a uv workspace: `algotrade` (the library), `algotrade-ingestion`,
+`algotrade-backtest` and `algotrade-api`, each declaring only its own dependencies, pinned by
+`uv.lock`.
 Dependencies point **downwards only**, and siblings on the same row may not import each other.
 `import-linter` enforces this (`[tool.importlinter]` in `pyproject.toml`).
 
 ```
-apps/ingestion (algotrade_ingestion) · apps/backtest (algotrade_backtest)   never import each other
+apps/ingestion · apps/backtest · apps/api (algotrade_api)   never import each other
         │ import the library, never the reverse
         ▼
-     services/           use cases: jobs, configs, selection, screening, backtests, evaluation
+     services/           use cases: jobs, configs, selection, screening, backtests, evaluation;
+                         explore/ (read-only queries the API serves)
         │
      engines/            backtest/ · screening/ · selection/   (independent of each other)
         │
@@ -345,6 +347,7 @@ Extra contracts:
 | `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. `selection/`: three-valued evaluation with a per-rule audit; `schedule.py`, the rebalance sessions and the audit of each change. `backtest/universe.py`: the tradable set per bar (fixed, or from a rebalance schedule; exits on removal). | strategies, config, analytics, core |
 | `services/` | Use cases: `backtests/`, `screening/` (run + `exports`), `jobs/`, `evaluation/`; shared by several: `configs`, `selection`, golden `datasets`, `views` (FeatureView builder). | everything below except `storage.tables.writers` and `storage.tables.readers` (through `data/`) |
 | `apps/ingestion` | `sources/` (`framework/`: protocols, HTTP with retries, pacing, the source registry; `vendors/<vendor>/`; `fixtures/`: synthetic/golden); `tasks/` (`framework/`: `IngestRun` in `run.py` and the task registry; one module per dataset in `reference/`, `market/`, `derived/`, `maintenance/`); nightly workflow (`workflows/nightly/`: ordered, isolated registry tasks, catch-up, screens as jobs, notification); `cli/` (`algotrade-ingest`); `ops/` (schedule). | library |
+| `apps/api` | `algotrade-api` (ADR 0025): `main.py` (app factory, CORS, error handlers), `routes/` (one router per area), `schemas/` (pydantic response models = the OpenAPI contract), `deps.py` (settings, store, user). Routes call one `services.explore` query each. | `services.explore`, `config`, `core` only (import-linter) |
 | `apps/backtest` | `algotrade-backtest` (`algotrade` alias): datasets list, backtest (golden dataset or config, via jobs), evaluate, config validate/show. Reads only through `data/`. | library |
 
 ### Directory layout (ADR 0020)
@@ -376,6 +379,8 @@ src/algotrade/
   services/       configs, datasets, selection, views         shared by several use cases
     backtests/    run.py
     screening/    run.py, exports.py
+    explore/      store, runs, universe, instruments, chains, features, screens,
+                  backtests, configs, ingestion               read-only queries (the API)
     jobs/  evaluation/
 ```
 
@@ -487,7 +492,38 @@ nightly step, coverage per screen (alert below 98%), selection size per config (
 > 20% day-over-day change), nightly duration (recorded as a WARN above 150 min,
 `config/site/nightly.toml`).
 
-## 12. Hosting
+## 12. API
+
+[ADR 0025](adr/0025-api.md). `apps/api` is the web app's only backend: a read-only FastAPI
+(`algotrade-api` → uvicorn on 127.0.0.1:8000, `--reload` for development) over
+`services/explore/`. It reads the store at `ALGOTRADE_DATA_URL` and the configs at
+`ALGOTRADE_CONFIG_DIR` for the single local user `ALGOTRADE_USER`.
+
+```
+web (apps/web) ──HTTP/JSON──▶ routes/<area>.py ──one call──▶ services/explore/<area>.py
+                               │ schemas/<area>.py             │ algotrade.data (market data)
+                               │ (pydantic → OpenAPI            │ StoreReader.runs / .run (records)
+                               ▼  → apps/api/openapi.json)      ▼ services.configs (configs)
+```
+
+| Area | Endpoints (GET; `?date=` defaults to the latest session the area has) |
+|---|---|
+| health | `/health`: storage kind, latest session, tables, versions |
+| explore | `/explore/tickers?date&<universe filters>&columns=<feature names>&sort=[-]<column>&page&size` (tickers × any catalogue columns, values through `InstrumentView`, columns validated against the catalogue); `/explore/compare?ids=a,b,c&features=` (one row per feature, one value per ticker); `/explore/compare/prices?ids&from&to&rebase=100&adjust` (closes on one date axis, rebased; `rebase=0`: raw) |
+| universe | `/universe?date&security_type&leveraged&sector&liquidity_class&q&page&size` |
+| instruments | `/instruments/{id}` (id or ticker: reference + company + latest features); `.../bars?from&to&adjust=splits\|none\|total_return`; `.../events?from&to`; `.../features?names&from&to` |
+| chains | `/chains/{underlying_id}?date&expiry`: expiries, strikes, quotes with Cboe IV + Greeks, underlying quote, fetch status, our IV30 |
+| features | `/features` (catalogue: kind, dtype, description, null meaning, version, inputs); `/features/{name}/distribution?date` (count, nulls, quantiles, histogram or categories) |
+| screens | `/screens` (screener configs + schedule + latest run); `/screens/{config_id}/results?date&decision&page&size` (+ audit) |
+| backtests | `/backtests`; `/backtests/{run_id}` (metrics, selection, data versions, rebalances, equity curve, fills) |
+| configs | `/configs`; `/configs/{id}` (resolved: layers + hash) |
+| admin (Admin workspace only; role-gating attaches to `/admin/`) | `/admin/ingestion/completeness?sessions=10` (dataset × session: present vs expected rows, COMPLETE / PARTIAL / MISSING / CARRIED, run ids); `/admin/ingestion/{dataset}/{session}` (drill-down: items not OK grouped by reason with examples, the runs); `/admin/runs/nightly?limit=` (per session: status, steps with status / duration / counts); `/admin/runs/{run_id}` (items by status, failures grouped by reason, stats); `/admin/review/figi`, `/admin/review/leveraged` (the owner's curation lists) |
+
+Errors: unknown id / no data for the date → 404; bad configuration → 400; bad parameters →
+422. The committed `apps/api/openapi.json` must match the app (`scripts/export_openapi.py`; a
+test fails when it is stale); the web client is generated from it.
+
+## 13. Hosting
 
 Local (macOS) today: Python 3.12 via uv, storage at `ALGOTRADE_DATA_URL` (default
 `file://./var/data`), configs at `ALGOTRADE_CONFIG_DIR` (default `./config`). Hosting needs no
@@ -496,7 +532,7 @@ redesign: an `s3://` storage backend, a DB-backed `ConfigStore` and a queue-back
 
 ---
 
-## 13. Ownership and boundaries
+## 14. Ownership and boundaries
 
 [ADR 0019](adr/0019-ownership-and-boundaries.md). Layers say who may import whom; ownership
 says who may *do* what. Each responsibility below has exactly one owner; the restructure
@@ -526,6 +562,8 @@ doing it. The ratchet `architecture/known_violations.toml` is empty: any hit fai
 | table schemas: required columns, declared types, validation, how a table's runs combine (`TableSpec.runs`) | `storage/tables/schemas.py` |
 | which runs of a partition a read sees (`snapshot` / `merge`, restating runs; ADR 0007) | `storage/backends/run_selection.py` |
 | Parquet / Arrow I/O (casting to declared types, schema version, row groups) | `storage/backends/` (`arrow.py` shared by every backend) |
+| HTTP: routers, response schemas, CORS, error mapping, the ASGI server (ADR 0025) | `apps/api/algotrade_api/` |
+| read-only queries pages show (which partition a `?date=` sees, pages, JSON-safe rows) | `services/explore/` |
 
 ### Typed settings and schemas (R6)
 
@@ -611,4 +649,5 @@ and `tests/architecture/`.
 | A selection or strategy config | a TOML file in `config/site/presets/` (shared) or `config/users/<id>/` ([configuration.md](configuration.md)); check with `algotrade-backtest config validate <id>` |
 | A UI widget or screen | `.claude/skills/add-ui-component` |
 | A new responsibility, or moving one | `.claude/skills/add-responsibility` |
+| An API endpoint | `.claude/skills/add-api-endpoint` |
 | An architectural decision | `.claude/skills/write-adr` |

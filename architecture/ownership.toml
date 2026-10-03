@@ -353,6 +353,29 @@ owner = ["src/algotrade/services/screening/run.py", "src/algotrade/services/jobs
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
 detect = [{ call = "run_screener" }]
 
+# --------------------------------------------------------------------------- api (ADR 0025)
+
+[[responsibility]]
+id = "http-api"
+description = "Serve HTTP: FastAPI routers (one per area), response schemas, CORS, error mapping and the ASGI server; routes call one services.explore query each"
+owner = ["apps/api/algotrade_api/*"]
+section = "docs/adr/0025-api.md#http-layer"
+detect = [{ import = "fastapi" }, { import = "starlette" }, { import = "uvicorn" }]
+
+[[responsibility]]
+id = "run-item-summary"
+description = "Summarise a run record's per-item statuses: status codes, which are fine, failed items grouped by a normalised reason (the nightly report and the API share it)"
+owner = ["src/algotrade/services/run_items.py"]
+section = "docs/adr/0025-api.md#explore-queries"
+detect = [{ string = "<date>" }, { string = "<url>" }]
+
+[[responsibility]]
+id = "explore-queries"
+description = "Read-only queries apps display (runs, universe, instruments, chains, features, screens, backtests, configs): which session a ?date= sees, pages, JSON-safe rows"
+owner = ["src/algotrade/services/explore/*"]
+section = "docs/adr/0025-api.md#explore-queries"
+detect = [{ call = "paginate" }, { call = "partition_for" }]
+
 # --------------------------------------------------------------------------- stored tables
 # Every stored table has exactly one producing owner (tests/architecture/test_ownership.py),
 # and every ingestion task in tasks/framework/registry.py declares exactly the tables its module produces.

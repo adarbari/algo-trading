@@ -116,6 +116,37 @@ def adjust_bars(
     return out
 
 
+def adjusted_bars(
+    reader: StoreReader,
+    interval: str,
+    start: date,
+    end: date,
+    instruments: Sequence[str] | None = None,
+    as_of: datetime | None = None,
+    adjustment: str = "splits",
+) -> tuple[pd.DataFrame, dict[str, list[str]]]:
+    """``bars`` adjusted for the splits (and dividends) whose event date is in
+    ``start..end`` (``adjust_bars``) -> (frame, table -> run ids read)."""
+    if adjustment not in ADJUSTMENTS:
+        raise ConfigurationError(
+            f"price adjustment must be one of {ADJUSTMENTS}, got {adjustment!r}"
+        )
+    frame = bars(reader, interval, start, end, instruments, as_of)
+    versions = {f"bars/{interval}": sorted(map(str, frame["run_id"].unique()))}
+    if adjustment != "none":
+        splits = read_events(reader, "events/split", start, end, instruments, as_of)
+        dividends = read_events(reader, "events/dividend", start, end, instruments, as_of)
+        frame = adjust_bars(frame, splits.frame, dividends.frame, adjustment)
+        versions.update(
+            {
+                k: e.runs
+                for k, e in (("events/split", splits), ("events/dividend", dividends))
+                if e.runs
+            }
+        )
+    return frame, versions
+
+
 @dataclass(frozen=True)
 class PriceData:
     """Aligned series, contract terms, and exactly which stored runs they came from."""
@@ -142,25 +173,11 @@ def load_price_data(
     they were stored (``data.events``). ``aligned=False`` keeps each instrument's own bars
     (for a changing selection, which puts them on one timeline with ``core.views.series.panel``).
     """
-    frame = bars(reader, interval, start, end, instruments, as_of)
+    frame, versions = adjusted_bars(reader, interval, start, end, instruments, as_of, adjustment)
     reference, snapshot = read_snapshot(
         reader, REFERENCE_TABLE, start, REFERENCE_HINT, as_of, instruments
     )
-    versions = {
-        f"bars/{interval}": sorted(map(str, frame["run_id"].unique())),
-        REFERENCE_TABLE: sorted(map(str, reference["run_id"].unique())),
-    }
-    if adjustment != "none":
-        splits = read_events(reader, "events/split", start, end, instruments, as_of)
-        dividends = read_events(reader, "events/dividend", start, end, instruments, as_of)
-        frame = adjust_bars(frame, splits.frame, dividends.frame, adjustment)
-        versions.update(
-            {
-                k: e.runs
-                for k, e in (("events/split", splits), ("events/dividend", dividends))
-                if e.runs
-            }
-        )
+    versions[REFERENCE_TABLE] = sorted(map(str, reference["run_id"].unique()))
     terms = instrument_terms(reader, start, instruments, as_of)
     series = frame_to_series(frame)
     return PriceData(align(series) if aligned else series, terms, versions, snapshot)

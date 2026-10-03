@@ -74,6 +74,7 @@ only shrinks (`make dupes-update`).
 | Site settings (`config/site/*.toml` → frozen dataclasses); environment variables + `.env` | `config/site/settings.py` (one loader); `config/env.py` (storage and sources receive values as parameters) |
 | Session / exchange calendar (holidays, early closes, last closed session) | `core/time/calendar.py`; never compute weekdays elsewhere |
 | Which runs of a partition a read sees (`snapshot`: latest; `merge`, all `events/*` + `instruments/id_map`, `instruments/symbol_history`: union, latest per key, from the latest restating run) | `storage/backends/run_selection.py`, per `TableSpec.runs` (ADR 0007) |
+| HTTP (FastAPI routers, response schemas, CORS, error mapping); read-only queries pages show | `apps/api/algotrade_api/` (routes call one query each); `services/explore/` (ADR 0025) |
 | Table schemas (columns, declared types, validation); Parquet / Arrow I/O | `storage/tables/schemas.py`; `storage/backends/` (`arrow.py`: casts, `schema_version`, row groups) |
 | Each stored table | exactly one producing module (`[[table]]` in the registry) |
 | Which directory a module belongs in | `architecture/layout.toml` (see Directory layout below) |
@@ -106,6 +107,8 @@ source (`tests/unit/<path>` = `src/algotrade/<path>`, `tests/apps/ingestion/<pat
 | Domain read of market data | `src/algotrade/data/` |
 | Domain value object, calendar, strategy view | `src/algotrade/core/{model,time,views}/` |
 | Use case (what an app or job runs) | `src/algotrade/services/<use-case>/`; long work as a job: `services/jobs/` |
+| Read-only query a page shows (the API's backend) | `src/algotrade/services/explore/<area>.py` |
+| API route / response schema | `apps/api/algotrade_api/routes/<area>.py` / `schemas/<area>.py` (`.claude/skills/add-api-endpoint`) |
 | Engine running strategies / screeners | `src/algotrade/engines/<engine>/` |
 | Table schema, store protocol / backend, config documents | `src/algotrade/storage/{tables,backends,configs}/` |
 | Site setting | `config/site/<group>.toml` + typed in `src/algotrade/config/site/settings.py` |
@@ -119,7 +122,8 @@ docstring, and mirror it in tests. Never park code in a neighbouring folder
 (pure), `config/{site,strategy}`, `storage/{tables,backends,configs}`, `quant/`, `data/`,
 `features/{framework,rollups}`, `strategies/{trading,screeners}`,
 `engines/{backtest,screening,selection}`, `analytics/`,
-`services/{backtests,screening,evaluation,jobs}`. Ingestion app: `cli/`, `ops/`,
+`services/{backtests,screening,evaluation,jobs,explore}`. API app: `routes/`, `schemas/`.
+Ingestion app: `cli/`, `ops/`,
 `sources/{framework,vendors/<vendor>,fixtures}`, `tasks/{framework,<domain>}`,
 `workflows/nightly/`.
 
@@ -159,9 +163,12 @@ docstring, and mirror it in tests. Never park code in a neighbouring folder
 | New screener | `.claude/skills/add-screener` |
 | New UI widget or screen | `.claude/skills/add-ui-component` |
 | New responsibility, or moving one between modules | `.claude/skills/add-responsibility` |
+| New API endpoint | `.claude/skills/add-api-endpoint` |
 | A decision that changes architecture | `.claude/skills/write-adr` |
 
 Commands (need `uv`): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make layout`, `make evaluate`, `make baseline`, `make features-doc`.
 Ingestion: `algotrade-ingest universe|universe-build|company-details|shares|earnings|bars|rates|corporate-actions|chains|rollups|screen|nightly|report|quality|schedule|purge-raw|migrate-ids|golden`, or `algotrade-ingest run <task>` for any registry task (see `README.md`).
+API: `algotrade-api [--reload]` (read-only, 127.0.0.1:8000); after a route / schema change run
+`scripts/export_openapi.py` and commit `apps/api/openapi.json`.
 Configs: site presets in `config/site/` (reviewed via PR); user configs in `config/users/<id>/`
 (git-ignored). Check one with `algotrade-backtest [--user U] config validate|show <id>`.
