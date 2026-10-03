@@ -36,6 +36,7 @@ from algotrade_ingestion.commands import (
     earnings,
     golden,
     print_json,
+    quality,
     report,
     run_job,
     universe_build,
@@ -45,6 +46,7 @@ from algotrade_ingestion.jobs.features import compute_option_liquidity
 from algotrade_ingestion.jobs.option_chains import ChainJobConfig, ingest_option_chains
 from algotrade_ingestion.jobs.universe import UniverseFile, import_universe
 from algotrade_ingestion.pipeline import universe_underlyings
+from algotrade_ingestion.schedule import LABEL, nightly_plist
 
 EXCHANGE_TZ = ZoneInfo("America/New_York")
 
@@ -78,7 +80,15 @@ def _parser() -> argparse.ArgumentParser:
     ea.add_argument(
         "--start", type=date.fromisoformat, help="first calendar date (default: --date)"
     )
-    ea.add_argument("--days", type=int, default=60, help="calendar days to fetch (default 60)")
+    ea.add_argument("--days", type=int, help="calendar days (default: sources.toml, 60)")
+    qa = sub.add_parser("quality", help="run the data-quality checks for a session")
+    qa.add_argument("--date", type=date.fromisoformat)
+    sc = sub.add_parser(
+        "schedule", help="write a launchd agent for the nightly job (not installed)"
+    )
+    sc.add_argument("--time", default="23:30", help="local time HH:MM on weekdays (default 23:30)")
+    sc.add_argument("--export-dir", type=Path, default=Path("out"))
+    sc.add_argument("--out", type=Path, default=Path("var") / f"{LABEL}.plist")
     bb = sub.add_parser("bars", help="unadjusted daily bars from Massive (resumable backfill)")
     bb.add_argument("--date", type=date.fromisoformat, help="single session (default: last)")
     bb.add_argument("--from", dest="start", type=date.fromisoformat, help="backfill start")
@@ -111,18 +121,50 @@ def _parser() -> argparse.ArgumentParser:
     return p
 
 
+def write_schedule(args: argparse.Namespace) -> int:
+    hour, minute = (int(x) for x in args.time.split(":"))
+    repo = Path.cwd().resolve()
+    export_dir = (repo / args.export_dir) if not args.export_dir.is_absolute() else args.export_dir
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_bytes(nightly_plist(repo, hour, minute, export_dir))
+    target = Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
+    print_json(
+        {
+            "written": str(args.out),
+            "weekdays_at": args.time,
+            "install": [
+                f"mkdir -p {repo / 'var' / 'logs'}",
+                f"cp {args.out.resolve()} {target}",
+                f"launchctl load {target}",
+            ],
+            "uninstall": [f"launchctl unload {target}", f"rm {target}"],
+        }
+    )
+    return 0
+
+
 def _dispatch(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter) -> int:
     if args.command == "golden":
         return golden(args, writer)
+    if args.command == "schedule":
+        return write_schedule(args)
     session = args.date if getattr(args, "date", None) else last_session(datetime.now(UTC))
     direct = {
         "universe-build": universe_build,
         "earnings": earnings,
         "bars": bars,
         "corporate-actions": corporate_actions,
+        "quality": quality,
     }
     if args.command in direct:
         return direct[args.command](args, reader, writer, session)
+    return _pipeline_command(args, reader, writer, session)
+
+
+def _pipeline_command(
+    args: argparse.Namespace, reader: StoreReader, writer: StoreWriter, session: date
+) -> int:
+    """universe import, chains, features, screen, nightly and purge-raw."""
     if args.command == "universe":
         files = [UniverseFile(args.stocks, "STOCK")] + (
             [UniverseFile(args.etfs, "ETF")] if args.etfs else []

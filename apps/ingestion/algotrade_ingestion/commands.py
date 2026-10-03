@@ -25,8 +25,10 @@ from algotrade_ingestion.jobs.bars import (
 )
 from algotrade_ingestion.jobs.earnings import ingest_earnings
 from algotrade_ingestion.jobs.golden import load_golden
+from algotrade_ingestion.jobs.quality import run_quality
 from algotrade_ingestion.jobs.universe_build import UniverseSources, build_universe, review_rows
 from algotrade_ingestion.pipeline import nightly_job, universe_settings
+from algotrade_ingestion.settings import SourcesSettings, load_sources
 from algotrade_ingestion.sources.cboe import CboeOptionsSource
 from algotrade_ingestion.sources.http import BROWSER_USER_AGENT, Transport, urllib_transport
 from algotrade_ingestion.sources.massive import (
@@ -41,18 +43,26 @@ from algotrade_ingestion.sources.synthetic.catalog import build_golden
 from algotrade_ingestion.sources.synthetic.files import GoldenFiles
 
 
-def cboe_source() -> CboeOptionsSource:
+def sources_settings(args: argparse.Namespace) -> SourcesSettings:
+    return load_sources(open_config_store(getattr(args, "config_dir", None)))
+
+
+def cboe_source(settings: SourcesSettings | None = None) -> CboeOptionsSource:
     return CboeOptionsSource(urllib_transport(), time.sleep)
 
 
-def earnings_source() -> NasdaqEarningsSource:
-    return NasdaqEarningsSource(urllib_transport(BROWSER_USER_AGENT), time.sleep)
+def earnings_source(settings: SourcesSettings | None = None) -> NasdaqEarningsSource:
+    pause = (settings or SourcesSettings()).earnings_pause_s
+    return NasdaqEarningsSource(urllib_transport(BROWSER_USER_AGENT), time.sleep, pause_s=pause)
 
 
 def earnings(
     args: argparse.Namespace, reader: StoreReader, writer: StoreWriter, session: date
 ) -> int:
-    record = ingest_earnings(writer, earnings_source(), session, args.start, args.days)
+    settings = sources_settings(args)
+    record = ingest_earnings(
+        writer, earnings_source(settings), session, args.start, args.days or settings.earnings_days
+    )
     print_json({"run_id": record.run_id, "status": record.status, **record.stats})
     return 0 if record.status == "complete" else 1
 
@@ -61,15 +71,28 @@ def massive_transport() -> Transport:
     return urllib_transport(headers={"Authorization": f"Bearer {massive_key()}"})
 
 
-def massive_sources() -> dict[str, object]:
-    """Nightly bars + corporate actions only when a Massive key is configured."""
-    if massive_key(required=False) is None:
+def massive_sources(settings: SourcesSettings | None = None) -> dict[str, object]:
+    """Nightly bars + corporate actions, only when enabled and a Massive key is configured."""
+    s = settings or SourcesSettings()
+    if not s.massive_enabled or massive_key(required=False) is None:
         return {}
     transport = massive_transport()
     return {
-        "bars_source": MassiveDailyBars(transport, time.sleep),
-        "actions_source": MassiveCorporateActions(transport, time.sleep),
+        "bars_source": MassiveDailyBars(
+            transport, time.sleep, min_interval_s=s.massive_min_interval_s
+        ),
+        "actions_source": MassiveCorporateActions(
+            transport, time.sleep, min_interval_s=s.massive_min_interval_s
+        ),
     }
+
+
+def quality(
+    args: argparse.Namespace, reader: StoreReader, writer: StoreWriter, session: date
+) -> int:
+    record = run_quality(reader, writer, session, sources_settings(args))
+    print_json({"run_id": record.run_id, "status": record.status, **record.stats})
+    return 0 if record.status == "complete" else 1
 
 
 def bars(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter, session: date) -> int:
@@ -144,15 +167,19 @@ def run_job(
     user: str,
 ) -> JobRecord:
     """Run one job to completion through the local runner (an explicit re-run: force=True)."""
-    resources = {
+    settings = sources_settings(args)
+    resources: dict[str, object] = {
         "reader": reader,
         "writer": writer,
-        "source": cboe_source(),
-        "universe_sources": universe_sources(),
-        "earnings_source": earnings_source(),
-        **massive_sources(),
+        "source": cboe_source(settings),
         "configs": open_config_store(args.config_dir),
+        "sources_settings": settings,
+        **massive_sources(settings),
     }
+    if settings.universe_enabled:
+        resources["universe_sources"] = universe_sources()
+    if settings.earnings_enabled:
+        resources["earnings_source"] = earnings_source(settings)
     runner = LocalJobRunner(
         writer.runs_backend, {**LIBRARY_HANDLERS, "nightly": nightly_job}, resources
     )

@@ -53,7 +53,7 @@ Host `https://api.massive.com`; the key (`ALGOTRADE_MASSIVE_API_KEY` in `.env`) 
 Free tier: 5 requests/minute, so requests are spaced 12.5 s apart. `algotrade-ingest bars
 --from 2024-10-01 --to 2026-10-01` backfills two years (~500 requests, ~1h45m) and resumes
 where it stopped; nightly fetches the session's bars and a corporate-action window (-7 to +30
-days). Massive preferred tickers (`KIMpL`) are mapped to the universe's ACT style (`KIM$L`).
+days; `[massive]` in `config/site/sources.toml`). Massive preferred tickers (`KIMpL`) are mapped to the universe's ACT style (`KIM$L`).
 Prices are adjusted at read time (`none`, `splits`, `total_return`; setting
 `[backtest] price_adjustment`).
 

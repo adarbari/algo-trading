@@ -23,11 +23,13 @@ from algotrade_ingestion.jobs.option_chains import (
     Underlying,
     ingest_option_chains,
 )
+from algotrade_ingestion.jobs.quality import run_quality
 from algotrade_ingestion.jobs.universe_build import (
     UniverseSettings,
     UniverseSources,
     build_universe,
 )
+from algotrade_ingestion.settings import SourcesSettings
 from algotrade_ingestion.sources.base import Source
 
 
@@ -37,6 +39,7 @@ class NightlyResult:
     earnings: RunRecord | None
     bars: RunRecord | None
     actions: RunRecord | None
+    quality: RunRecord | None
     chains: RunRecord
     features: RunRecord
     screens: tuple[ScreenOutcome, ...]
@@ -70,16 +73,25 @@ def run_nightly(
     earnings_source: Source | None = None,
     bars_source: Source | None = None,
     actions_source: Source | None = None,
+    sources_settings: SourcesSettings | None = None,
 ) -> NightlyResult:
+    """universe -> earnings -> bars -> corporate actions -> chains -> rollups -> screens ->
+    data-quality checks -> raw purge. Optional steps run only when their source is given."""
+    s = sources_settings or SourcesSettings()
     universe = None
     mode, settings = universe_settings(configs)
     if mode == "nasdaq_trader" and universe_sources is not None:
         universe = build_universe(writer, reader, universe_sources, settings, session_date)
-    earnings = ingest_earnings(writer, earnings_source, session_date) if earnings_source else None
+    earnings = None
+    if earnings_source is not None:
+        earnings = ingest_earnings(writer, earnings_source, session_date, days=s.earnings_days)
     bars = ingest_daily_bars(writer, reader, bars_source, [session_date]) if bars_source else None
     actions = None
     if actions_source is not None:
-        window = (session_date - timedelta(7), session_date + timedelta(30))
+        window = (
+            session_date + timedelta(s.actions_window[0]),
+            session_date + timedelta(s.actions_window[1]),
+        )
         actions = ingest_corporate_actions(writer, actions_source, session_date, *window)
     chains = ingest_option_chains(
         writer, source, universe_underlyings(reader, session_date), session_date, chain_config
@@ -94,8 +106,10 @@ def run_nightly(
         screens.append(outcome)
         if export_dir is not None:
             exports.extend(run_exports(outcome, config, export_dir))
+    quality = run_quality(reader, writer, session_date, s)
+    writer.raw.purge_before(session_date - timedelta(s.raw_retention_days))
     return NightlyResult(
-        universe, earnings, bars, actions, chains, features, tuple(screens), tuple(exports)
+        universe, earnings, bars, actions, quality, chains, features, tuple(screens), tuple(exports)
     )
 
 
@@ -116,9 +130,10 @@ def nightly_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]
         r.get("earnings_source"),
         r.get("bars_source"),
         r.get("actions_source"),
+        r.get("sources_settings"),
     )
     universe_partial = result.universe is not None and result.universe.status != "complete"
-    optional = (result.earnings, result.bars, result.actions)
+    optional = (result.earnings, result.bars, result.actions, result.quality)
     earnings_partial = any(r is not None and r.status != "complete" for r in optional)
     partial = (
         universe_partial
@@ -131,6 +146,7 @@ def nightly_job(params: Mapping[str, Any], ctx: JobContext) -> Mapping[str, Any]
         "earnings": result.earnings.stats if result.earnings else "skipped",
         "bars": result.bars.stats if result.bars else "skipped (no ALGOTRADE_MASSIVE_API_KEY)",
         "corporate_actions": result.actions.stats if result.actions else "skipped",
+        "quality": result.quality.stats if result.quality else "skipped",
         "chains": result.chains.stats,
         "features": result.features.stats,
         "screens": [s.audit for s in result.screens],

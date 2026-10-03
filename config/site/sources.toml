@@ -1,0 +1,28 @@
+# L3 site setting: data sources used by apps/ingestion. Credentials never go here (use .env).
+
+raw_retention_days = 90          # raw vendor responses older than this are purged nightly
+
+[cboe]                           # option chains (delayed feed), one request per underlying
+enabled = true
+workers = 4
+
+[nasdaq_trader]                  # universe: symbol directory + listed options
+enabled = true
+
+[spy_holdings]                   # S&P 500 membership
+enabled = true
+
+[nasdaq_earnings]                # earnings calendar
+enabled = true
+days = 60                        # forward window stored each night
+pause_s = 0.5                    # spacing between requests
+
+[massive]                        # daily bars, splits, dividends, identifiers (needs the API key)
+enabled = true
+min_interval_s = 12.5            # free tier: 5 requests/minute
+corporate_actions_window = [-7, 30]   # days around the session
+
+[quality]                        # data-quality thresholds for the nightly checks
+max_bar_count_drop = 0.10        # FAIL if today's bar count falls >10% vs the previous session
+max_universe_change = 0.05       # FAIL on a >5% day-over-day change in coverage
+min_chain_coverage = 0.95        # FAIL if fewer than 95% of optionable names returned a chain

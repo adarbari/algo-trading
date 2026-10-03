@@ -34,7 +34,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(
         commands,
         "earnings_source",
-        lambda: NasdaqEarningsSource(lambda url: earnings, lambda s: None, RetryPolicy(tries=1)),
+        lambda *_: NasdaqEarningsSource(lambda url: earnings, lambda s: None, RetryPolicy(tries=1)),
     )
     feed = FakeFeed(
         {
@@ -45,7 +45,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(
         commands,
         "cboe_source",
-        lambda: CboeOptionsSource(feed, lambda s: None, RetryPolicy(tries=1)),
+        lambda *_: CboeOptionsSource(feed, lambda s: None, RetryPolicy(tries=1)),
     )
     (tmp_path / "stocks.csv").write_text(
         f"ticker,company_name,security_type,last_verified\nAAPL,Apple,COMMON_STOCK,{DAY}\n"
@@ -146,3 +146,20 @@ def test_screen_runs_a_user_config(env: Path, capsys: pytest.CaptureFixture[str]
     assert code == 0
     assert audit["user"] == "alice"
     assert audit["selection"]["selected"] == 1  # TQQQ (an ETF) narrowed away
+
+
+def test_quality_and_schedule_commands(
+    env: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import plistlib  # noqa: PLC0415
+
+    code, result = call(capsys, "quality", "--date", DAY)
+    assert code == 1 and "universe_present" in result["failed"]  # empty store fails closed
+    monkeypatch.chdir(env)
+    code, written = call(capsys, "schedule", "--time", "22:15", "--out", str(env / "agent.plist"))
+    assert code == 0 and written["weekdays_at"] == "22:15"
+    assert any(step.startswith("launchctl load") for step in written["install"])
+    assert (
+        plistlib.loads((env / "agent.plist").read_bytes())["StartCalendarInterval"][0]["Minute"]
+        == 15
+    )

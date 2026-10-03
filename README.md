@@ -23,8 +23,15 @@ algotrade-ingest universe --stocks optionable_us_stock_universe.csv \
 algotrade-ingest universe-build --review-out leveraged_candidates.csv   # universe + reference
 algotrade-ingest bars --from 2024-10-01 --to 2026-10-01   # 2-year backfill (needs ALGOTRADE_MASSIVE_API_KEY in .env)
 algotrade-ingest nightly --export-dir out/      # universe -> earnings -> bars -> chains -> rollups -> screens
+algotrade-ingest quality                        # data-quality checks for a session
+algotrade-ingest schedule --time 23:30          # writes a launchd agent; prints install commands
 algotrade-ingest purge-raw --keep-days 90
 ```
+
+Source switches, pacing, retention and quality thresholds live in
+[`config/site/sources.toml`](config/site/sources.toml). The nightly run ends with data-quality
+checks (universe size, bar freshness and count, chain coverage, earnings present); any
+failure marks the run `PARTIAL`.
 
 Each step can also run on its own (`chains`, `features`, `screen`), resumes after
 interruption, and prints its audit. See [docs/screeners/](docs/screeners/README.md).
