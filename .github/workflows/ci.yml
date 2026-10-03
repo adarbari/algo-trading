@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch: # used by auto-merge.yml to re-test main after each merge
 
 concurrency:
   group: ci-${{ github.ref }}
