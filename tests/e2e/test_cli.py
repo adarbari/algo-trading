@@ -126,3 +126,34 @@ def test_evaluate_detects_drift_and_updates_baseline(cli: Cli, tmp_path: Path) -
     assert cli("evaluate", "--baseline", str(baseline), "--update-baseline").returncode == 0
     assert cli("evaluate", "--baseline", str(baseline)).returncode == 0
     assert cli("evaluate", "--baseline", str(tmp_path / "none.json")).returncode == 1
+
+
+def test_config_validate_and_show_site_presets(cli: Cli) -> None:
+    ok = cli("config", "validate", "short_premium_liquidity")
+    assert ok.returncode == 0, ok.stderr
+    assert "OK (hash" in ok.stdout
+    shown = json.loads(cli("config", "show", "sma_trend").stdout)
+    assert shown["impl"] == "sma_crossover"
+    assert shown["selection"]["name"] == "liquid_optionable"
+    assert cli("config", "validate", "nope").returncode == 2
+
+
+def test_user_config_backtest_reproduces_baseline(cli: Cli, tmp_path: Path) -> None:
+    strategies = tmp_path / "users" / "tester" / "strategies"
+    strategies.mkdir(parents=True)
+    (strategies / "bull_bh.toml").write_text(
+        'id = "bull_bh"\nkind = "strategy"\nimpl = "buy_and_hold"\n'
+        '[selection]\nname = "bull_only"\n'
+        '[selection.where]\nall = [{field = "instrument.symbol", op = "eq", value = "BULL"}]\n'
+    )
+    args = ("--config-dir", str(tmp_path), "--user", "tester", "backtest", "--config", "bull_bh")
+    proc = cli(*args, "--start", "2020-01-01", "--end", "2022-12-31")
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    baseline = json.loads((REPO_ROOT / "benchmarks" / "baseline.json").read_text())
+    expected = baseline["results"]["buy_and_hold@bull_trend"]["total_return"]
+    assert payload["metrics"]["total_return"] == pytest.approx(expected, rel=1e-9)
+    assert payload["selection"]["selected"] == 1
+    assert payload["user"] == "tester"
+    assert cli(*args).returncode == 2  # --config needs --start/--end
+    assert cli("backtest", "--dataset", "bull_trend").returncode == 2  # needs --strategy

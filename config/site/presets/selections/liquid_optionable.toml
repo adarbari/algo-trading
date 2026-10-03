@@ -1,0 +1,10 @@
+# Active, optionable common stocks, ADRs and ETFs. This is the filter the screening service
+# used to hard-code as the "production universe".
+name = "liquid_optionable"
+
+[where]
+all = [
+  { field = "instrument.security_type", op = "in", value = ["COMMON_STOCK", "ADR", "ETF"] },
+  { field = "instrument.status", op = "eq", value = "ACTIVE" },
+  { field = "instrument.optionable", op = "eq", value = true },
+]

@@ -1,0 +1,22 @@
+# L3 site defaults. Every config inherits these; a config's own [screening]/[backtest]
+# tables override them. See docs/design/phase-0.md (Data Layers, L3).
+
+[screening]
+min_coverage = 0.98          # below this share of processed instruments a run is PARTIAL
+max_universe_age_days = 45   # an older universe makes a COMPLETE run UNIVERSE_INCOMPLETE
+
+[backtest]
+initial_cash = 100000.0
+cash_buffer = 0.01
+lot_size = 1.0
+periods_per_year = 252
+
+[backtest.costs]
+commission_bps = 1.0
+min_commission = 0.0
+slippage_bps = 5.0
+
+[backtest.limits]
+max_position_weight = 1.0
+max_gross_exposure = 1.0
+allow_short = false

@@ -135,3 +135,7 @@ def write_legacy_exports(outcome: ScreenOutcome, out_dir: Path, version: str) ->
             writer.writeheader()
             writer.writerows(subset)
     return full, candidates
+
+
+# Export name (as listed in a config's ``exports``) -> writer(outcome, directory, version).
+EXPORTS = {"legacy_liquidity_csv": write_legacy_exports}

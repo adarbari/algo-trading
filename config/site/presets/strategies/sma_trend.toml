@@ -1,0 +1,9 @@
+# Example backtest config: SMA crossover over the liquid optionable selection.
+id = "sma_trend"
+kind = "strategy"
+impl = "sma_crossover"
+selection = "liquid_optionable"
+
+[params]
+fast = 20
+slow = 100

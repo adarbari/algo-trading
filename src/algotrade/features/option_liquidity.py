@@ -28,6 +28,35 @@ from algotrade.core.options import OptionRight, standard_monthly_expiries
 NAME = "option_liquidity"
 VERSION = 1
 
+_SIDE_COLUMNS = {
+    "tier": "str",
+    "strike": "float",
+    "delta": "float",
+    "bid": "float",
+    "ask": "float",
+    "spread_abs": "float",
+    "spread_pct": "float",
+    "strike_oi": "int",
+    "zone_oi": "int",
+    "zone_vol": "int",
+    "missing_delta": "int",
+}
+COLUMNS: dict[str, str] = {
+    "liq_status": "str",
+    "chain_oi": "int",
+    "chain_volume": "int",
+    "expiries_within_60d": "int",
+    "target_expiry": "date",
+    "target_dte": "int",
+    "short_put_ok": "bool",
+    "short_call_ok": "bool",
+    "underlying_price": "float",
+    "iv30": "float",
+    "stock_volume": "float",
+    "chain_asof": "date",
+    **{f"{side}_{col}": kind for side in ("put", "call") for col, kind in _SIDE_COLUMNS.items()},
+}
+
 
 @dataclass(frozen=True)
 class TierRule:

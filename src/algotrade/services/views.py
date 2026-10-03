@@ -13,15 +13,13 @@ from algotrade.core.feature_view import FeatureValue, FeatureView
 from algotrade.storage.readers import StoreReader
 from algotrade.storage.schemas import COMMON
 
-ACCEPTED_SECURITY_TYPES = frozenset({"COMMON_STOCK", "ADR", "ETF"})
 UNIVERSE_HINT = "algotrade-ingest universe import --stocks <csv> --etfs <csv> --version <v>"
-MAX_UNIVERSE_AGE = timedelta(days=45)
 
 
 @dataclass(frozen=True)
 class Universe:
     snapshot_date: date
-    frame: pd.DataFrame  # production rows only (active, optionable, accepted type)
+    frame: pd.DataFrame  # every covered instrument; strategies narrow it with selections
     rows_loaded: int
     version: str
     last_verified: date | None
@@ -30,9 +28,9 @@ class Universe:
     def instruments(self) -> list[str]:
         return list(self.frame["instrument_id"])
 
-    def is_stale(self, session_date: date) -> bool:
+    def is_stale(self, session_date: date, max_age_days: int) -> bool:
         reference = self.last_verified or self.snapshot_date
-        return session_date - reference > MAX_UNIVERSE_AGE
+        return session_date - reference > timedelta(days=max_age_days)
 
 
 def load_universe(
@@ -44,16 +42,11 @@ def load_universe(
             "universe", f"no snapshot on or before {session_date}", UNIVERSE_HINT
         )
     frame = reader.require("universe", snapshot, UNIVERSE_HINT, as_of)
-    production = frame[
-        (frame["status"].str.upper() == "ACTIVE")
-        & frame["optionable"].astype(bool)
-        & frame["security_type"].str.upper().isin(ACCEPTED_SECURITY_TYPES)
-    ].reset_index(drop=True)
     raw_verified = frame["last_verified"] if "last_verified" in frame else pd.Series(dtype=str)
     verified = pd.to_datetime(raw_verified, errors="coerce").dropna()
     return Universe(
         snapshot_date=snapshot,
-        frame=production,
+        frame=frame.reset_index(drop=True),
         rows_loaded=len(frame),
         version=str(frame["universe_version"].iloc[0]) if len(frame) else "",
         # Oldest verification date: the conservative reading when rows disagree (fail closed).

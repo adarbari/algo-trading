@@ -1,9 +1,9 @@
-"""Import the monthly master universe CSVs into a dated universe snapshot.
+"""Import the monthly master universe CSVs: the universe (coverage) plus L1 reference facts.
 
 Accepts the files produced by the existing monthly refresh process
 (``optionable_us_stock_universe.csv``, ``optionable_us_etf_universe.csv``). Only ``ticker``
 is required; missing optional columns get conservative defaults. Every row is kept;
-filtering to production rows happens at read time (``services.views.load_universe``).
+strategies choose their subset with selections (``config/site/presets/selections``).
 """
 
 import csv
@@ -30,6 +30,10 @@ OPTIONAL = (
     "source_crosscheck",
     "notes",
     "universe_version",
+    "is_leveraged",
+    "is_inverse",
+    "leverage",
+    "tracks",
 )
 _TRUE = {"TRUE", "T", "YES", "Y", "1"}
 
@@ -65,6 +69,42 @@ def read_rows(spec: UniverseFile, version: str) -> list[dict[str, object]]:
     return rows
 
 
+def _flag(value: object, is_etf: bool) -> bool | None:
+    """CSV flag -> bool. Blank means unknown for ETFs (could be leveraged) and False otherwise."""
+    text = str(value or "").strip().upper()
+    if text:
+        return text in _TRUE
+    return None if is_etf else False
+
+
+def reference_frame(universe: pd.DataFrame) -> pd.DataFrame:
+    """L1 ``instruments/reference`` rows for the imported equities, ADRs and ETFs."""
+    is_etf = universe["security_type"].eq("ETF")
+    flags = {
+        col: [_flag(v, e) for v, e in zip(universe[col], is_etf, strict=True)]
+        for col in ("is_leveraged", "is_inverse")
+    }
+    return pd.DataFrame(
+        {
+            "instrument_id": universe["instrument_id"],
+            "symbol": universe["symbol"],
+            "name": universe["company_name"],
+            "asset_class": AssetClass.EQUITY.value,
+            "security_type": universe["security_type"],
+            "exchange": universe["exchange"],
+            "currency": "USD",
+            "multiplier": 1.0,
+            "tick_size": 0.01,
+            "is_etf": is_etf,
+            **flags,
+            "leverage": pd.to_numeric(universe["leverage"], errors="coerce"),
+            "tracks": universe["tracks"].where(universe["tracks"] != "", None),
+            "optionable": universe["optionable"],
+            "status": universe["status"],
+        }
+    )
+
+
 def import_universe(
     writer: StoreWriter, files: list[UniverseFile], version: str, snapshot: date, now: datetime
 ) -> RunRecord:
@@ -76,6 +116,8 @@ def import_universe(
     writer.write_table(
         "universe", snapshot, run_id, stamp(frame, snapshot, now, "universe_csv", run_id)
     )
+    reference = stamp(reference_frame(frame), snapshot, now, "universe_csv", run_id)
+    writer.write_table("instruments/reference", snapshot, run_id, reference)
     stats = {
         "files": [str(f.path) for f in files],
         "rows_loaded": before,

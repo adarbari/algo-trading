@@ -106,14 +106,18 @@ layers = [
     "algotrade.services",
     "algotrade.engines",
     "algotrade.strategies | algotrade.features | algotrade.analytics",
-    "algotrade.storage",
+    "algotrade.storage | algotrade.config",
     "algotrade.core",
 ]
 
 [[tool.importlinter.contracts]]
 name = "Engines are independent of each other"
 type = "independence"
-modules = ["algotrade.engines.backtest", "algotrade.engines.screening"]
+modules = [
+    "algotrade.engines.backtest",
+    "algotrade.engines.screening",
+    "algotrade.engines.selection",
+]
 
 [[tool.importlinter.contracts]]
 name = "Backtest engine parts keep single responsibilities (risk, execution, accounting)"
@@ -138,9 +142,9 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
-name = "Feature definitions are pure: no storage or data I/O"
+name = "Feature definitions and configs are pure: no storage I/O"
 type = "forbidden"
-source_modules = ["algotrade.features"]
+source_modules = ["algotrade.features", "algotrade.config"]
 forbidden_modules = ["algotrade.storage"]
 
 [[tool.importlinter.contracts]]

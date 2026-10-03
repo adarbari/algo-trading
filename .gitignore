@@ -223,3 +223,6 @@ coverage.xml
 
 # golden fixture store (rebuilt by make golden-store)
 datasets/golden/store/
+
+# L4 user configs are local (a database later)
+config/users/
