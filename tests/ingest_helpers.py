@@ -7,9 +7,9 @@ from datetime import UTC, datetime
 
 import pytest
 
+from algotrade.config.settings import SourcesSettings
 from algotrade.data import StoreReader
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.settings import SourcesSettings
 from algotrade_ingestion.sources import registry
 from algotrade_ingestion.sources.base import Source
 from algotrade_ingestion.sources.http import Http, Pacer, RetryPolicy, Transport

@@ -5,6 +5,7 @@ import json
 import sys
 
 from algotrade.analytics.report import markdown_table
+from algotrade.config.env import config_dir, data_url
 from algotrade.config.resolve import ResolvedConfig
 from algotrade.config.user import UserContext
 from algotrade.core.errors import ConfigurationError
@@ -34,7 +35,7 @@ SCORECARD_COLUMNS = (
 
 
 def reader_for(args: argparse.Namespace) -> StoreReader:
-    return StoreReader(open_backend(args.data_url))
+    return StoreReader(open_backend(data_url(args.data_url)))
 
 
 def cmd_datasets(args: argparse.Namespace) -> int:
@@ -66,7 +67,7 @@ def _user(args: argparse.Namespace) -> UserContext:
 
 
 def _resolved(args: argparse.Namespace, config_id: str) -> ResolvedConfig:
-    return resolve_config(open_config_store(args.config_dir), config_id, _user(args))
+    return resolve_config(open_config_store(config_dir(args.config_dir)), config_id, _user(args))
 
 
 def cmd_config(args: argparse.Namespace) -> int:
@@ -90,11 +91,11 @@ def _config_backtest(args: argparse.Namespace) -> int:
     """Configured backtests go through the jobs runner, exactly as the UI will submit them."""
     if args.start is None or args.end is None:
         raise ConfigurationError("--config needs --start and --end")
-    backend = open_backend(args.data_url)
+    backend = open_backend(data_url(args.data_url))
     resources = {
         "reader": StoreReader(backend),
         "writer": ResultWriter(backend),
-        "configs": open_config_store(args.config_dir),
+        "configs": open_config_store(config_dir(args.config_dir)),
     }
     params = {"config": args.config, "start": args.start.isoformat(), "end": args.end.isoformat()}
     job = run_job(backend.runs, LIBRARY_HANDLERS, resources, "backtest", params, _user(args))

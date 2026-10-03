@@ -20,6 +20,7 @@ from algotrade.config.schema import (
     parse_selection,
     parse_strategy,
 )
+from algotrade.config.settings import BacktestSettings, ScreeningSettings, site_defaults
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.errors import ConfigurationError
 
@@ -116,6 +117,18 @@ class ResolvedConfig:
     layers: tuple[str, ...] = ()
     hash: str = field(default="")
 
+    @property
+    def screening(self) -> ScreeningSettings:
+        """The resolved ``[screening]`` settings, typed (validated by ``resolve``)."""
+        return ScreeningSettings.parse(
+            self.settings.get("screening"), f"{self.config.id} [screening]"
+        )
+
+    @property
+    def backtest(self) -> BacktestSettings:
+        """The resolved ``[backtest]`` settings, typed (validated by ``resolve``)."""
+        return BacktestSettings.parse(self.settings.get("backtest"), f"{self.config.id} [backtest]")
+
     def canonical(self) -> dict[str, Any]:
         """Everything that affects results (not provenance), in a stable JSON shape."""
         c = self.config
@@ -192,9 +205,10 @@ def resolve(
         catalog.check(selection.where, f"{config_id}.selection")
         if selection.order_by:
             catalog.check_field(selection.order_by, f"{config_id}.selection.order_by")
-    defaults = deep_merge(BUILTIN_DEFAULTS, load("site", "defaults", "defaults") or {})
+    defaults = deep_merge(BUILTIN_DEFAULTS, site_defaults(load))
     settings = deep_merge(defaults, config.settings)
     resolved = ResolvedConfig(config, selection, settings, user, tuple(layers))
+    _ = resolved.screening, resolved.backtest  # typed: a bad value fails here, with its path
     return ResolvedConfig(
         config, selection, settings, user, tuple(layers), fingerprint(resolved.canonical())
     )

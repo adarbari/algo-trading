@@ -9,14 +9,14 @@ from algotrade.data.reference import instrument_terms, snapshot
 from algotrade.engines.backtest.engine import run_backtest
 from algotrade.services.datasets import list_datasets, load_datasets
 from algotrade.strategies.trading.registry import STRATEGIES, create_strategy
+from algotrade_ingestion.sources.base import FixtureSource
 from algotrade_ingestion.sources.synthetic.catalog import GOLDEN_DATASETS
-from algotrade_ingestion.sources.synthetic.files import GoldenFiles
 
 DATASETS = sorted(s.name for s in GOLDEN_DATASETS)
 
 
-def test_golden_checksums_match(golden_files: GoldenFiles) -> None:
-    assert golden_files.verify() == []
+def test_golden_checksums_match(golden_source: FixtureSource) -> None:
+    assert golden_source.verify() == []
 
 
 def test_store_catalogue_matches_definitions(golden_reader: StoreReader) -> None:

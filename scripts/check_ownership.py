@@ -175,10 +175,10 @@ def load_known(root: Path) -> Counter[tuple[str, str]]:
 
 def write_known(root: Path, counts: Counter[tuple[str, str]]) -> None:
     lines = [
-        "# Ratchet for scripts/check_ownership.py (ADR 0019). Today's ownership violations:",
-        "# each entry is a file doing work another module owns. This list may only shrink:",
-        "# fix a violation, then lower or remove its entry (`make ownership-update`).",
-        "# Never add entries by hand; extend the owner named in architecture/ownership.toml.",
+        "# Ratchet for scripts/check_ownership.py (ADR 0019): ownership violations, one entry per",
+        "# file doing work another module owns. EMPTY since restructure PR 6, and a fitness test",
+        "# keeps it empty: extend the owner named in architecture/ownership.toml instead. A real",
+        "# exception needs an ADR and goes in that responsibility's `allowed` list, with why.",
         "",
     ]
     for (file, resp), count in sorted(counts.items(), key=lambda kv: (kv[0][1], kv[0][0])):

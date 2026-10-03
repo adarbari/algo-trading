@@ -6,11 +6,11 @@ from typing import Any
 
 import pytest
 
+from algotrade.config.settings import SourcesSettings
 from algotrade.storage.backends.config_files import MemoryConfigStore
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.settings import SourcesSettings
 from algotrade_ingestion.tasks import (
     bars,
     corporate_actions,

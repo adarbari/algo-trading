@@ -17,10 +17,10 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+from algotrade.config.settings import load_universe
 from algotrade.core.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.settings import universe_settings
-from algotrade_ingestion.sources.base import DirectorySource
+from algotrade_ingestion.sources.base import DirectorySource, FixtureSource
 from algotrade_ingestion.tasks import (
     bars,
     company_details,
@@ -85,7 +85,7 @@ def session_of(params: Params) -> date:
 
 def _universe_build(ctx: TaskContext, p: Params) -> RunRecord:
     assert ctx.configs is not None
-    _, settings = universe_settings(ctx.configs)
+    settings = load_universe(ctx.configs)
     trader = ctx.sources["nasdaq_trader"]
     if not isinstance(trader, DirectorySource):
         raise TypeError("nasdaq_trader must be a DirectorySource (listing + options files)")
@@ -102,7 +102,7 @@ def _universe_build(ctx: TaskContext, p: Params) -> RunRecord:
 
 
 def _universe_mode(ctx: TaskContext) -> str | None:
-    mode = universe_settings(ctx.configs)[0] if ctx.configs is not None else "csv_import"
+    mode = load_universe(ctx.configs).source if ctx.configs is not None else "csv_import"
     return None if mode == "nasdaq_trader" else f"skipped: {mode} mode"
 
 
@@ -172,7 +172,11 @@ def _migrate_ids(ctx: TaskContext, p: Params) -> RunRecord:
 
 
 def _golden_load(ctx: TaskContext, p: Params) -> RunRecord:
-    return golden.load_golden(ctx, golden.golden_files(Path(p.get("golden_dir") or GOLDEN_DIR)))
+    # ``golden_dir`` chose the directory when the registry built the fixture source.
+    source = ctx.sources["synthetic"]
+    if not isinstance(source, FixtureSource):
+        raise TypeError("synthetic must be a FixtureSource (the golden CSVs)")
+    return golden.load_golden(ctx, source)
 
 
 # ----------------------------------------------------------------------------- the registry
@@ -328,6 +332,7 @@ TASKS: dict[str, Task] = {
             golden,
             ("bars/1d", "instruments/reference", golden.CATALOG),
             _golden_load,
+            sources=("synthetic",),
             params=(Param("golden_dir", ("--golden-dir",), Path, default=GOLDEN_DIR),),
         ),
     )

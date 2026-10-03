@@ -29,3 +29,21 @@ def test_open_ended_tables_and_null_instrument() -> None:
     frame = stamped([{"instrument_id": None}], date(2026, 10, 2), "r")
     with pytest.raises(DataValidationError, match="null instrument_id"):
         validate_frame("rollups/instrument/x@v1", frame)
+
+
+def test_start_run_and_finish_decide_complete_or_partial() -> None:
+    from algotrade.storage.runs import start_run  # noqa: PLC0415
+
+    now = datetime(2026, 10, 2, 22, 1, 2, tzinfo=UTC)
+    record = start_run("screen-x-site", date(2026, 10, 2), now)
+    assert record.status is RunStatus.RUNNING and record.run_id.startswith("screen-x-site-")
+    assert record.finish(now, complete=False, stats={"n": 1}).status is RunStatus.PARTIAL
+    assert record.stats == {"n": 1} and record.finished_at == now
+    assert start_run("j", date(2026, 10, 2), now).finish(now).status is RunStatus.COMPLETE
+
+
+def test_column_types_are_checked() -> None:
+    from algotrade.storage.schemas import Column  # noqa: PLC0415
+
+    with pytest.raises(ValueError, match="unknown column type"):
+        Column("x", "decimal")

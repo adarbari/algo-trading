@@ -1,12 +1,12 @@
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
+from algotrade.config.settings import load_universe
 from algotrade.data import StoreReader
 from algotrade.storage.backends.config_files import MemoryConfigStore
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.settings import universe_settings
 from algotrade_ingestion.sources.http import RetryPolicy
 from algotrade_ingestion.sources.nasdaq_trader import NasdaqTraderSource
 from algotrade_ingestion.sources.spy_holdings import SpyHoldingsSource
@@ -147,10 +147,10 @@ def test_universe_settings_from_site_config() -> None:
         {("site", "settings", "universe"): {"source": "nasdaq_trader", "exclude_symbols": ["spy"]}},
         {"leveraged_etfs": [{"symbol": "TQQQ", "leverage": "3"}]},
     )
-    mode, settings = universe_settings(store)
-    assert (mode, settings.exclude_symbols) == ("nasdaq_trader", frozenset({"SPY"}))
+    settings = load_universe(store)
+    assert (settings.source, settings.exclude_symbols) == ("nasdaq_trader", frozenset({"SPY"}))
     assert settings.overrides[0]["symbol"] == "TQQQ"
-    assert universe_settings(MemoryConfigStore({}))[0] == "csv_import"
+    assert load_universe(MemoryConfigStore({})).source == "csv_import"
 
 
 def test_review_row_sign_for_inverse_names() -> None:

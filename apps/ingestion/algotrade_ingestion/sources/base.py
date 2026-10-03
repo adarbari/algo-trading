@@ -82,3 +82,33 @@ class Throttled(Protocol):
     """A source whose vendor can be asked to pause (all processes share the pause)."""
 
     def cool_down(self, seconds: float) -> None: ...
+
+
+class FixtureDataset(Protocol):
+    """One committed fixture dataset: its name, what it is, its symbols and tags."""
+
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def description(self) -> str: ...
+
+    @property
+    def symbols(self) -> tuple[str, ...]: ...
+
+    @property
+    def tags(self) -> tuple[str, ...]: ...
+
+
+@runtime_checkable
+class FixtureSource(Source, Protocol):
+    """A source over committed fixture files (the golden datasets), not a vendor: what the
+    files hold, an integrity check, and how to regenerate them."""
+
+    def datasets(self) -> Mapping[str, FixtureDataset]: ...
+
+    def verify(self) -> list[str]:
+        """Integrity problems; empty when every file matches its checksum."""
+        ...
+
+    def build(self) -> list[str]: ...

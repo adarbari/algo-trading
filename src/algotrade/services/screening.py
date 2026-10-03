@@ -13,7 +13,7 @@ from algotrade.engines.screening.runner import RunCoverage, ScreenRun, run_scree
 from algotrade.services.selection import select
 from algotrade.services.views import feature_view
 from algotrade.storage.result_writer import ResultWriter
-from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
+from algotrade.storage.runs import start_run
 from algotrade.strategies.screeners.registry import create_screener
 
 
@@ -69,20 +69,21 @@ def run_screener(
         raise ConfigurationError(f"{config.config.id} is a {config.config.kind}, not a screener")
     if config.selection is None:
         raise ConfigurationError(f"{config.config.id}: a screener needs a selection")
-    screening = config.settings["screening"]
+    screening = config.screening
     screener = create_screener(config.config.impl, **dict(config.config.params))
     universe = load_universe(reader, session_date)
     selected = select(reader, config.selection, session_date)
     view = feature_view(reader, screener.requires, session_date, selected.instruments)
-    run = run_screen(screener, view, list(selected.instruments), float(screening["min_coverage"]))
+    run = run_screen(screener, view, list(selected.instruments), screening.min_coverage)
     if selected.empty:
         run = _with_coverage(run, RunCoverage.EMPTY_SELECTION)
     elif run.coverage is RunCoverage.COMPLETE and universe.is_stale(
-        session_date, int(screening["max_universe_age_days"])
+        session_date, screening.max_universe_age_days
     ):
         run = _with_coverage(run, RunCoverage.UNIVERSE_INCOMPLETE)
     user = config.user.user_id
-    run_id = new_run_id(f"screen-{config.config.id}-{user}", session_date, now)
+    record = start_run(f"screen-{config.config.id}-{user}", session_date, now)
+    run_id = record.run_id
     audit = {
         **run.audit(),
         "user": user,
@@ -107,7 +108,6 @@ def run_screener(
             config.hash,
         )
         writer.write_result(config.config.impl, session_date, run_id, frame)
-    status = RunStatus.COMPLETE if run.coverage is RunCoverage.COMPLETE else RunStatus.PARTIAL
-    job = f"screen-{config.config.id}-{user}"
-    writer.save_run(RunRecord(run_id, job, session_date, now, status, now, stats=audit))
+    complete = run.coverage is RunCoverage.COMPLETE
+    writer.save_run(record.finish(now, complete=complete, stats=audit))
     return ScreenOutcome(run_id, session_date, run, universe, audit)

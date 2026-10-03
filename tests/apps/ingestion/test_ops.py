@@ -5,13 +5,13 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from algotrade.config.settings import SourcesSettings, load_sources
 from algotrade.data import StoreReader
 from algotrade.storage.backends.config_files import MemoryConfigStore
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.schedule import LABEL, nightly_plist
-from algotrade_ingestion.settings import SourcesSettings, load_sources
 from algotrade_ingestion.tasks.quality import run_quality
 from tests.ingest_helpers import task_ctx
 from tests.storage_helpers import stamped, universe_rows
@@ -30,7 +30,6 @@ def test_sources_settings_defaults_and_overrides() -> None:
         "massive": {"min_interval_s": 0.5, "corporate_actions_window": [-3, 10]},
         "quality": {"max_universe_change": 0.2},
         "sec_edgar": {"enabled": False, "min_interval_s": 0.5, "refresh_days": 7},
-        "nasdaq_trader": "not a table",
     }
     s = load_sources(MemoryConfigStore({("site", "settings", "sources"): doc}))
     earnings = s.vendor("nasdaq_earnings")

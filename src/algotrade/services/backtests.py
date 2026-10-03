@@ -1,6 +1,5 @@
 """Use case: run a configured strategy backtest over stored data."""
 
-from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
 from typing import Any
@@ -8,6 +7,7 @@ from typing import Any
 import pandas as pd
 
 from algotrade.config.resolve import ResolvedConfig
+from algotrade.config.settings import BacktestSettings
 from algotrade.core.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.data.prices import load_price_data
@@ -19,22 +19,30 @@ from algotrade.engines.backtest.result import BacktestResult
 from algotrade.engines.selection.evaluate import SelectionResult
 from algotrade.services.selection import select
 from algotrade.storage.result_writer import ResultWriter
-from algotrade.storage.runs import RunRecord, RunStatus, new_run_id
+from algotrade.storage.runs import start_run
 from algotrade.strategies.trading.registry import create_strategy
 
 PORTFOLIO = "PORTFOLIO"  # instrument_id for portfolio-level result rows (the equity curve)
 
 
-def backtest_settings(settings: Mapping[str, Any]) -> BacktestConfig:
-    """Resolved ``[backtest]`` settings -> engine config."""
-    bt = {k: v for k, v in settings["backtest"].items() if k != "price_adjustment"}
+def backtest_settings(bt: BacktestSettings) -> BacktestConfig:
+    """Typed ``[backtest]`` settings -> engine config (price adjustment applies on read)."""
+    costs, limits = bt.costs, bt.limits
     return BacktestConfig(
-        initial_cash=float(bt["initial_cash"]),
-        costs=CostModel(**bt["costs"]),
-        limits=RiskLimits(**bt["limits"]),
-        lot_size=float(bt["lot_size"]),
-        cash_buffer=float(bt["cash_buffer"]),
-        periods_per_year=int(bt["periods_per_year"]),
+        initial_cash=bt.initial_cash,
+        costs=CostModel(
+            commission_bps=costs.commission_bps,
+            min_commission=costs.min_commission,
+            slippage_bps=costs.slippage_bps,
+        ),
+        limits=RiskLimits(
+            max_position_weight=limits.max_position_weight,
+            max_gross_exposure=limits.max_gross_exposure,
+            allow_short=limits.allow_short,
+        ),
+        lot_size=bt.lot_size,
+        cash_buffer=bt.cash_buffer,
+        periods_per_year=bt.periods_per_year,
     )
 
 
@@ -127,12 +135,12 @@ def run_configured_backtest(
     selected = select(reader, config.selection, start, as_of=now)
     if selected.empty:
         raise ConfigurationError(f"{config.config.id}: selection matched no instruments on {start}")
-    adjustment = str(config.settings["backtest"].get("price_adjustment", "splits"))
+    adjustment = config.backtest.price_adjustment
     data = load_price_data(
         reader, selected.instruments, start, end, as_of=now, adjustment=adjustment
     )
     strategy = create_strategy(config.config.impl, **dict(config.config.params))
-    result = run_backtest(data.series, strategy, backtest_settings(config.settings), data.terms)
+    result = run_backtest(data.series, strategy, backtest_settings(config.backtest), data.terms)
     outcome = BacktestOutcome(
         config,
         selected,
@@ -145,8 +153,8 @@ def run_configured_backtest(
     if writer is None:
         return outcome
     user = config.user.user_id
-    job = f"backtest-{config.config.id}-{user}"
-    run_id = new_run_id(job, end, now)
+    record = start_run(f"backtest-{config.config.id}-{user}", end, now)
+    run_id = record.run_id
     for name, frame in _result_frames(outcome, end, run_id, now).items():
         if not frame.empty:
             writer.write_result(name, end, run_id, frame)
@@ -161,5 +169,5 @@ def run_configured_backtest(
         "metrics": result.metrics.as_dict(),
         **outcome.data_stats(),
     }
-    writer.save_run(RunRecord(run_id, job, end, now, RunStatus.COMPLETE, now, stats=stats))
+    writer.save_run(record.finish(now, stats=stats))
     return replace(outcome, run_id=run_id)

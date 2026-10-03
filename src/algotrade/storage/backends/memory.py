@@ -1,4 +1,5 @@
-"""In-memory backend for tests and experiments. Same semantics as the local backend.
+"""In-memory backend for tests and experiments. Same semantics as the local backend,
+including the declared column types (``backends/arrow.py``).
 
 One process only, so thread locks stand in for the local backend's file locks: one around
 each partition's run index, and named locks for ``Backend.lock``.
@@ -10,6 +11,7 @@ from datetime import date, datetime
 
 import pandas as pd
 
+from algotrade.storage.backends.arrow import to_arrow, to_frame
 from algotrade.storage.backends.selection import concat_frames, latest_run, select_instruments
 from algotrade.storage.locks import ThreadLock
 from algotrade.storage.runs import RunRecord, run_session
@@ -21,7 +23,7 @@ class MemoryTables:
         self._index_lock = threading.Lock()
 
     def write(self, table: str, session_date: date, run_id: str, frame: pd.DataFrame) -> None:
-        copy = frame.copy()
+        copy = to_frame(to_arrow(table, frame))  # stored as the local backend would type it
         with self._index_lock:
             self._data.setdefault((table, session_date), {})[run_id] = copy
 

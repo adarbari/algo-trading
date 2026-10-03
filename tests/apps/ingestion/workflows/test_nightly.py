@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from algotrade.config.settings import NightlySettings, load_nightly
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.calendar import last_closed_session
 from algotrade.services.jobs import JobContext, LocalJobRunner
@@ -17,7 +18,6 @@ from algotrade.storage.backends.config_files import MemoryConfigStore
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.settings import NightlySettings, load_nightly
 from algotrade_ingestion.tasks import registry
 from algotrade_ingestion.tasks.framework import IngestRun, TaskContext
 from algotrade_ingestion.workflows import screens as screens_module
@@ -327,10 +327,10 @@ def test_complete_runs_and_disabled_notification_stay_quiet(
 def test_nightly_settings() -> None:
     assert load_nightly(MemoryConfigStore({})) == NightlySettings()
     doc = {
-        "sessions": {"settle_minutes": 10, "max_catch_up": 0},
+        "sessions": {"settle_minutes": 10, "max_catch_up": 2},
         "alerts": {"max_duration_minutes": 20},
         "notify": {"enabled": False, "desktop": False, "summary_path": "x.json"},
     }
     s = load_nightly(MemoryConfigStore({("site", "settings", "nightly"): doc}))
-    assert (s.settle_minutes, s.max_catch_up, s.max_duration_minutes) == (10, 1, 20.0)
+    assert (s.settle_minutes, s.max_catch_up, s.max_duration_minutes) == (10, 2, 20.0)
     assert (s.notify_enabled, s.notify_desktop, s.summary_path) == (False, False, "x.json")

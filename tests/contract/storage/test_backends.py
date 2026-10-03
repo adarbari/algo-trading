@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from algotrade.config.env import data_url
 from algotrade.core.errors import ConfigurationError, DataValidationError, MissingDataError
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
@@ -148,7 +149,7 @@ def test_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assert isinstance(local, LocalBackend)
     assert local.root == tmp_path
     monkeypatch.setenv("ALGOTRADE_DATA_URL", f"file://{tmp_path}/env")
-    env_backend = open_backend()
+    env_backend = open_backend(data_url())
     assert isinstance(env_backend, LocalBackend)
     assert env_backend.root == tmp_path / "env"
     with pytest.raises(ConfigurationError, match="unsupported"):
@@ -239,5 +240,5 @@ def test_events_allow_several_kinds_of_change_per_day(backend: Backend) -> None:
 def test_table_names_list_every_written_table(backend: Backend) -> None:
     assert backend.tables.names() == []
     backend.tables.write(TABLE, D1, "r1", stamped(rows({"EQ:A": 1.0}), D1, "r1"))
-    backend.tables.write("bars/1d", D2, "r1", stamped(rows({"EQ:A": 1.0}), D2, "r1"))
-    assert StoreReader(backend).table_names() == ["bars/1d", TABLE]
+    backend.tables.write("catalog/demo", D2, "r1", stamped(rows({"EQ:A": 1.0}), D2, "r1"))
+    assert StoreReader(backend).table_names() == ["catalog/demo", TABLE]

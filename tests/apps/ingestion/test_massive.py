@@ -3,12 +3,12 @@ from datetime import UTC, date, datetime
 
 import pytest
 
+from algotrade.config.env import credential, load_dotenv
 from algotrade.core.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.env import credential, load_dotenv
 from algotrade_ingestion.sources.base import FetchRequest
 from algotrade_ingestion.sources.http import HttpError, RetryPolicy
 from algotrade_ingestion.sources.massive import (

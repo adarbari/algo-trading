@@ -13,8 +13,8 @@ from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
 
+from algotrade.config.env import load_dotenv
 from algotrade.core.errors import AlgoTradeError
-from algotrade.storage.dotenv import load_dotenv
 from algotrade_backtest.commands import cmd_backtest, cmd_config, cmd_datasets, cmd_evaluate
 
 DEFAULT_BASELINE = Path("benchmarks/baseline.json")

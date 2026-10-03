@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from algotrade_ingestion.settings import SourcesSettings
+from algotrade.config.settings import SourcesSettings
 from algotrade_ingestion.sources import registry
 from algotrade_ingestion.sources.http import Http
 from algotrade_ingestion.sources.registry import SOURCES, build_sources, limiter_keys
@@ -86,3 +86,17 @@ def test_no_vendor_module_sleeps_or_paces_itself() -> None:
             if name in ("sleep", "MinInterval"):
                 offenders.append(f"{path.relative_to(REPO_ROOT)}:{node.lineno}")  # type: ignore[attr-defined]
     assert not offenders, f"sources never pace themselves; use the registry's limiter: {offenders}"
+
+
+def test_fixture_sources_come_from_the_registry_with_their_directory(tmp_path: Path) -> None:
+    from algotrade_ingestion.sources.base import FixtureSource  # noqa: PLC0415
+    from algotrade_ingestion.sources.registry import FIXTURES, fixture_source  # noqa: PLC0415
+
+    source = fixture_source("synthetic", REPO_ROOT / "datasets" / "golden")
+    assert isinstance(source, FixtureSource) and source.verify() == []
+    assert "bull_trend" in source.datasets()
+    built = build_sources(settings(), ENV.get, ["synthetic"], tmp_path, tmp_path / "golden")
+    assert set(built.sources) == {"synthetic"} and set(FIXTURES) == {"synthetic"}
+    built_source = built.sources["synthetic"]
+    assert isinstance(built_source, FixtureSource)
+    assert built_source.build() and built_source.verify() == []  # regenerated into tmp_path

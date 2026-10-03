@@ -21,10 +21,10 @@ from pathlib import Path
 
 import pandas as pd
 
+from algotrade.config.settings import UniverseSettings
 from algotrade.core.instruments import AssetClass
 from algotrade.data import StoreReader
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.settings import UniverseSettings
 from algotrade_ingestion.sources.base import DirectorySource, FetchRequest, Source
 from algotrade_ingestion.tasks.classify import (
     leverage_flags,

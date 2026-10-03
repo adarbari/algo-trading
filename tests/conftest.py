@@ -8,7 +8,8 @@ from algotrade.data import StoreReader
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.writers import StoreWriter
-from algotrade_ingestion.sources.synthetic.files import GoldenFiles
+from algotrade_ingestion.sources.base import FixtureSource
+from algotrade_ingestion.sources.registry import fixture_source
 from algotrade_ingestion.tasks.golden import load_golden
 from tests.ingest_helpers import task_ctx
 
@@ -25,23 +26,24 @@ settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "dev"))
 
 
 @pytest.fixture(scope="session")
-def golden_files() -> GoldenFiles:
-    return GoldenFiles(GOLDEN_DIR)
+def golden_source() -> FixtureSource:
+    """The committed golden CSVs, as the source registry builds them."""
+    return fixture_source("synthetic", GOLDEN_DIR)
 
 
 @pytest.fixture(scope="session")
-def golden_reader(golden_files: GoldenFiles) -> StoreReader:
+def golden_reader(golden_source: FixtureSource) -> StoreReader:
     """The golden datasets loaded through the real ingestion job into an in-memory store."""
     backend = MemoryBackend()
-    load_golden(task_ctx(StoreWriter(backend)), golden_files)
+    load_golden(task_ctx(StoreWriter(backend)), golden_source)
     return StoreReader(backend)
 
 
 @pytest.fixture(scope="session")
-def golden_url(tmp_path_factory: pytest.TempPathFactory, golden_files: GoldenFiles) -> str:
+def golden_url(tmp_path_factory: pytest.TempPathFactory, golden_source: FixtureSource) -> str:
     """A local (Parquet) fixture store with the golden datasets, for CLI tests."""
     root = tmp_path_factory.mktemp("golden-store")
-    load_golden(task_ctx(StoreWriter(LocalBackend(root))), golden_files)
+    load_golden(task_ctx(StoreWriter(LocalBackend(root))), golden_source)
     return f"file://{root}"
 
 

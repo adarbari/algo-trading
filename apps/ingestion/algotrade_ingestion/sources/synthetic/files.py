@@ -15,9 +15,9 @@ from typing import Any
 
 import pandas as pd
 
+from algotrade.core.bars import ohlcv_problems
 from algotrade.core.errors import ConfigurationError, DataValidationError
 from algotrade.core.series import FIELDS, PriceSeries
-from algotrade.storage.schemas import bar_problems
 
 MANIFEST = "manifest.json"
 TIMESTAMP = "timestamp"
@@ -34,6 +34,10 @@ class GoldenDataset:
     symbols: tuple[str, ...]
     checksums: dict[str, str]
     tags: tuple[str, ...]
+
+
+def bar_problems(frame: pd.DataFrame) -> list[str]:
+    return ohlcv_problems(*(frame[f].to_numpy(dtype=float) for f in FIELDS))
 
 
 def parse_csv(payload: bytes, label: str) -> pd.DataFrame:

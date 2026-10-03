@@ -69,6 +69,48 @@ FIGI id upgrades, ADR 0018), `instruments/company`; L2 `bars/<interval>` (1d, 1h
 sanity-checked on write), `chains/underlying_quotes`, `chains/option_quotes`,
 `chains/status`, `events/<type>`; rollups `rollups/daily/*` and `rollups/instrument/*`
 (e.g. `rollups/instrument/option_liquidity@v1`); `universe`; `catalog/*`; `results/<name>`.
+## Column types and schema version
+
+`storage/schemas.py` is the data contract. Every **fixed** table (`universe`,
+`instruments/*`, `chains/*`, `bars/<interval>`) declares every column with an abstract type
+and nullability; open tables (`events/*`, `rollups/*`, `results/*`, `catalog/*`) declare the
+point-in-time columns and their keys (`instrument_id`, `ts` for events), and the producer
+defines the rest.
+
+| Abstract type | Parquet / Arrow (local backend) | pandas on read |
+|---|---|---|
+| `string` | `large_string` | `str` |
+| `float64` | `double` | `float64` |
+| `int64` | `int64` | `int64` (`float64` with nulls) |
+| `bool` | `bool` | `bool` (`object` with nulls) |
+| `date` | `date32` | `datetime.date` objects |
+| `timestamp_utc` | `timestamp[us, tz=UTC]` | `datetime64[us, UTC]` |
+
+On **write**, `StoreWriter` / `ResultWriter` validate (required and undeclared columns, null
+point-in-time columns or keys, duplicate keys, OHLCV sanity) and every backend casts through
+`storage/backends/arrow.py`: each declared column to its type (ints → floats, `string` vs
+`large_string`, all-null columns, second- or millisecond timestamps all become the declared
+type). Uncastable data (`multiplier = "one"`), nulls in a non-nullable column and undeclared
+columns of a fixed table fail with `DataValidationError`. The memory backend stores the same
+typed frame, so both backends return identical dtypes.
+
+Each Parquet file's schema metadata carries `algotrade.table` and
+`algotrade.schema_version` (`SCHEMA_VERSION`, now 1; files written before had none). On
+**read**, each file's declared columns are cast to today's types, so older files (e.g.
+`bars/1d` partitions whose `instrument_id` was `string` while others were `large_string`,
+or all-null `delisted_on` columns) read exactly like new ones, and fixed tables concatenate
+without type widening. Only open tables still use `promote_options="permissive"`, because
+their producer-defined columns may legitimately differ between runs. Changing a declared
+type is a schema change: bump `SCHEMA_VERSION`, keep reads of older files working, and
+record why.
+
+**Row groups.** Files are written with `row_group_size` ≈ 64k rows, zstd and a page index
+(`write_page_index=True`), so filtered reads (`instrument_id`, `underlying_id`) skip row
+groups and pages whose statistics cannot match (tested in
+`tests/contract/storage/test_typed_tables.py`). Producers write rows clustered by key (bars
+by instrument, option quotes by underlying through per-underlying staging), which is what
+makes the statistics selective.
+
 ## Reading
 
 Consumers (services, engines, apps) read market data only through `algotrade.data`
@@ -127,7 +169,7 @@ internal detail of the backend; nothing outside `storage/backends/` relies on it
 storage/
   interfaces.py        Protocols per grain: ReferenceStore, EventStore, BarStore, ChainStore,
                        UniverseStore, FeatureStore, ResultStore, Catalog
-  schemas.py           canonical column schemas + validation (the data contract)
+  schemas.py           canonical column schemas, declared types + validation (the data contract)
   readers.py           generic read-only facade (tables, ranges, dates, runs); domain reads are
                        algotrade/data/ (reference, prices, events, chains, resolver)
   writers.py           write facade. Only apps/ingestion may import this (import-linter).
@@ -135,7 +177,8 @@ storage/
     local.py           now: Parquet on the local filesystem (DuckDB-readable)
     (s3_parquet.py)    later: same files in S3-compatible object storage
     (postgres.py, clickhouse.py, ...)  only if ever needed
-  factory.py           open_stores(url) picks the backend from ALGOTRADE_DATA_URL
+  factory.py           open_backend(url) picks the backend; the URL comes from
+                       config/env.py (ALGOTRADE_DATA_URL), storage reads no environment
 ```
 
 Interface shape (illustrative):
@@ -184,5 +227,6 @@ Not built yet. An `s3_parquet` backend needs to:
    day's rows, never duplicates them.
 2. Corrections are new rows with a later `knowledge_ts`. Readers asking `as_of=T` get what
    was known at T.
-3. Schemas are versioned in `schemas.py`. Breaking changes need a migration plus an ADR.
+3. Schemas are typed and versioned in `schemas.py` (`SCHEMA_VERSION`, stamped in every file).
+   Breaking changes need a migration plus an ADR.
 4. No caller builds file paths. Paths exist only inside `storage/backends/`.

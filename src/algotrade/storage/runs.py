@@ -1,4 +1,10 @@
-"""Run records: the audit trail and checkpoint for every job (ADR 0010)."""
+"""Run records: the audit trail and checkpoint for every job (ADR 0010).
+
+The ``run-records`` owner (ADR 0019): run ids come from ``new_run_id``; a one-shot use case
+(a screen, a backtest) opens its record with ``start_run`` and closes it with
+``RunRecord.finish``, which decides COMPLETE or PARTIAL. The ingest loop (``IngestRun``) and
+the job runner (``services/jobs``) build on the same record.
+"""
 
 import json
 import re
@@ -27,6 +33,16 @@ class RunRecord:
     items: dict[str, str] = field(default_factory=dict)  # per-item status, e.g. ticker -> OK
     stats: dict[str, Any] = field(default_factory=dict)
 
+    def finish(
+        self, now: datetime, *, complete: bool = True, stats: dict[str, Any] | None = None
+    ) -> "RunRecord":
+        """Close the run: COMPLETE, or PARTIAL when ``complete`` is false. Returns ``self``."""
+        self.status = RunStatus.COMPLETE if complete else RunStatus.PARTIAL
+        self.finished_at = now
+        if stats is not None:
+            self.stats = stats
+        return self
+
     def to_json(self) -> str:
         data = asdict(self)
         data["session_date"] = self.session_date.isoformat()
@@ -54,6 +70,11 @@ class RunRecord:
 def new_run_id(job: str, session_date: date, now: datetime) -> str:
     """Sortable, filesystem-safe run id, e.g. ``option_chains-2026-10-02-20261003T010203Z``."""
     return f"{job}-{session_date.isoformat()}-{now.strftime('%Y%m%dT%H%M%SZ')}"
+
+
+def start_run(job: str, session_date: date, now: datetime) -> RunRecord:
+    """A new RUNNING record for ``job`` with a fresh run id."""
+    return RunRecord(new_run_id(job, session_date, now), job, session_date, now)
 
 
 _RUN_SESSION = re.compile(r"-(\d{4}-\d{2}-\d{2})-\d{8}T\d{6}Z$")

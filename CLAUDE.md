@@ -47,21 +47,24 @@ without writing an ADR. Read in this order:
 
 **Before writing code that does X, find X's owner in `architecture/ownership.toml`. Extend
 the owner; never re-implement it elsewhere. A new responsibility needs an entry + owner in
-the same PR** (`.claude/skills/add-responsibility`). The ratchets
-(`architecture/known_violations.toml`, `architecture/dupes_baseline.txt`) only shrink: never
-add to them; when you fix a violation, lower them (`make ownership-update`, `make dupes-update`).
+the same PR** (`.claude/skills/add-responsibility`). The ownership ratchet
+(`architecture/known_violations.toml`) is **at zero**: any violation fails CI, and a fitness
+test forbids parking new ones there or adding pending contracts. A genuine exception needs an
+ADR and an `allowed` entry with the reason. The dupes ratchet (`architecture/dupes_baseline.txt`)
+only shrinks (`make dupes-update`).
 
-| Responsibility | Owner today → target (roadmap track R) |
+| Responsibility | Owner |
 |---|---|
 | Which snapshot a read sees (on or before D, else earliest + `pre_snapshot`); domain reads of market data | `algotrade/data/` (`reference`, `prices`, `events`, `chains`); consumers never import `storage.readers` |
-| Run ids, run records, COMPLETE / PARTIAL; raw save; stamping; ticker → id in ingestion | `tasks/framework.py` (`IngestRun`); never write the loop in a task |
+| Run ids, run records, COMPLETE / PARTIAL | `storage/runs.py` (`start_run` + `RunRecord.finish` in services), `services/jobs/`; in ingestion `tasks/framework.py` (`IngestRun`): never write the loop in a task |
+| Raw save; stamping; ticker → id in ingestion | `tasks/framework.py` (`IngestRun`) |
 | Which ingestion steps run, with which defaults | `tasks/registry.py`; nightly order, isolation, catch-up: `workflows/nightly.py` |
-| Vendor HTTP, retries, circuit breaker; pacing; building sources; vendor specifics | `sources/http.py`; `sources/limiter.py` (one per key, cross-process); `sources/registry.py`; `sources/<vendor>.py` |
+| Vendor HTTP, retries, circuit breaker; pacing; building sources (incl. the golden fixture source); vendor specifics | `sources/http.py`; `sources/limiter.py` (one per key, cross-process); `sources/registry.py`; `sources/<vendor>.py` |
 | Locks: named store locks, run-index lock; one ingest run at a time | `storage/locks.py`; `services/jobs/exclusive.py` |
 | Running long work (threads, recovery), screens | `services/jobs/` (apps call `run_job`, never build a runner; fan-out: `as_completed`); screens: `services/screening.py`, submitted as `screen` jobs |
-| Site settings; environment variables | `config/`; `env.py` + `storage/factory.py` → `config/settings.py`, `config/env.py` |
+| Site settings (`config/site/*.toml` → frozen dataclasses); environment variables + `.env` | `config/settings.py` (one loader); `config/env.py` (storage and sources receive values as parameters) |
 | Session / exchange calendar (holidays, early closes, last closed session) | `core/calendar.py`; never compute weekdays elsewhere |
-| Parquet / Arrow I/O | `storage/backends/` |
+| Table schemas (columns, declared types, validation); Parquet / Arrow I/O | `storage/schemas.py`; `storage/backends/` (`arrow.py`: casts, `schema_version`, row groups) |
 | Each stored table | exactly one producing module (`[[table]]` in the registry) |
 
 ## Code rules (enforced by CI; follow them up front)

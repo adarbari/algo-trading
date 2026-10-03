@@ -24,4 +24,4 @@ Do not rewrite history. Use `.claude/skills/write-adr` to add one.
 | [0016](0016-four-data-layers.md) | Four data layers; instrument level as daily snapshots | accepted |
 | [0017](0017-golden-data-through-ingestion.md) | Golden datasets load through ingestion into a separate fixture store | accepted |
 | [0018](0018-figi-instrument-ids.md) | FIGI-based instrument ids through one symbol resolver | accepted |
-| [0019](0019-ownership-and-boundaries.md) | Every responsibility has one owner; ownership registry and boundary guardrails | accepted |
+| [0019](0019-ownership-and-boundaries.md) | Every responsibility has one owner; ownership registry and boundary guardrails | implemented |

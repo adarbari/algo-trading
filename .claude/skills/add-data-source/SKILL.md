@@ -15,8 +15,9 @@ the source from `config/site/sources.toml` belongs to the source registry
 ingest loop (`tasks/framework.py`, `IngestRun`). **Never pace, sleep or build a source
 yourself**: the source takes one `Http` client and calls `http.get(url)`. Keep every vendor detail (file
 names, request keys, response fields) inside `sources/<vendor>.py`; never import
-`algotrade.storage` I/O. Look these up in `architecture/ownership.toml`; `make ownership`
-must pass without growing `architecture/known_violations.toml`.
+`algotrade.storage` (contract R4). New `sources.toml` keys are typed in
+`src/algotrade/config/settings.py`. Look these up in `architecture/ownership.toml`; `make ownership`
+must pass with `architecture/known_violations.toml` still empty.
 
 1. **Location:** `apps/ingestion/sources/<vendor>.py`, one module per vendor. If it grows past
    about 300 lines, split it into a package (`client.py`, `mapping.py`, `limits.py`). Nothing

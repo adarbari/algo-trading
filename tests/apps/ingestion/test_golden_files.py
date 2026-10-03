@@ -9,6 +9,7 @@ from algotrade.services.datasets import list_datasets, load_dataset
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.writers import StoreWriter
 from algotrade_ingestion.sources.synthetic.files import GoldenFiles
+from algotrade_ingestion.sources.synthetic.source import GoldenCsvSource
 from algotrade_ingestion.tasks.golden import load_golden
 from tests.factories import series_from_closes
 from tests.ingest_helpers import task_ctx
@@ -43,7 +44,7 @@ def test_verify_detects_tampering(files: GoldenFiles, tmp_path: Path) -> None:
     assert any("checksum" in p for p in files.verify())
     backend = MemoryBackend()
     with pytest.raises(ValueError, match="verification"):
-        load_golden(task_ctx(StoreWriter(backend), clock=CLOCK), files)
+        load_golden(task_ctx(StoreWriter(backend), clock=CLOCK), GoldenCsvSource(files))
     path.unlink()
     assert any("missing" in p for p in files.verify())
 
@@ -65,7 +66,7 @@ def test_missing_manifest(tmp_path: Path) -> None:
 
 def test_load_into_store_and_read_back(files: GoldenFiles) -> None:
     backend = MemoryBackend()
-    record = load_golden(task_ctx(StoreWriter(backend), clock=CLOCK), files)
+    record = load_golden(task_ctx(StoreWriter(backend), clock=CLOCK), GoldenCsvSource(files))
     assert record.stats == {"datasets": 1, "instruments": 2, "sessions": 3, "bars": 6}
     reader = StoreReader(backend)
     info = list_datasets(reader)["demo"]

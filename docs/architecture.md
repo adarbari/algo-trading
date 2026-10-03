@@ -378,27 +378,51 @@ redesign: an `s3://` storage backend, a DB-backed `ConfigStore` and a queue-back
 ## 13. Ownership and boundaries
 
 [ADR 0019](adr/0019-ownership-and-boundaries.md). Layers say who may import whom; ownership
-says who may *do* what. Each responsibility below has one owner today and one target owner
-after the restructure (roadmap track R). `architecture/ownership.toml` is the source of
-truth, with the AST patterns `scripts/check_ownership.py` uses to flag anyone else doing it.
+says who may *do* what. Each responsibility below has exactly one owner; the restructure
+(roadmap track R) that moved them there is complete. `architecture/ownership.toml` is the
+source of truth, with the AST patterns `scripts/check_ownership.py` uses to flag anyone else
+doing it. The ratchet `architecture/known_violations.toml` is empty: any hit fails CI.
 
-| Responsibility | Owner today | Target owner (PR) |
-|---|---|---|
-| snapshot selection ("latest on or before D", else earliest + `pre_snapshot`) | `data/reference.py` | same (done in R2) |
-| market-data reads for consumers | `data/` | same (done in R2) |
-| run ids, run records, COMPLETE / PARTIAL | `storage/runs.py`, `services/jobs/`, ingestion `tasks/framework.py` | same (done in R3) |
-| raw persistence, row stamping, id resolution in ingestion | `tasks/framework.py` (`IngestRun`) | same (done in R3) |
-| which ingestion steps run, with which defaults | `tasks/registry.py`; nightly order in `workflows/nightly.py` | same (done in R5) |
-| vendor HTTP, retries, retry cap, circuit breaker | `sources/http.py` | same |
-| rate limiting | `sources/limiter.py`, one per key, shared across threads and processes | same (done in R4) |
-| source construction | `sources/registry.py` (vendor specifics stay in `sources/<vendor>.py`) | same (done in R4) |
-| locks (flock, named store locks, run-index lock); the ingest run lock | `storage/locks.py`; `services/jobs/exclusive.py` | same (done in R4) |
-| session / exchange calendar | `core/calendar.py` | same (done in R5) |
-| job execution | `services/jobs/` (apps use `run_job`; fan-out `as_completed`) | same (done in R5) |
-| screen execution | `services/screening.py`, submitted as `screen` jobs (nightly: `workflows/screens.py`) | same (done in R5) |
-| site settings loading | `config/` | `config/settings.py`, one typed loader (R6) |
-| environment variables | `ingestion env.py`, `storage/factory.py` | `config/env.py` (R6) |
-| Parquet / Arrow I/O | `storage/backends/` | same |
+| Responsibility | Owner |
+|---|---|
+| snapshot selection ("latest on or before D", else earliest + `pre_snapshot`) | `data/reference.py` |
+| market-data reads for consumers | `data/` |
+| run ids, run records, COMPLETE / PARTIAL | `storage/runs.py` (`start_run`, `RunRecord.finish` for screens and backtests), `services/jobs/`, ingestion `tasks/framework.py` (`IngestRun`) |
+| raw persistence, row stamping, id resolution in ingestion | `tasks/framework.py` (`IngestRun`) |
+| which ingestion steps run, with which defaults | `tasks/registry.py`; nightly order in `workflows/nightly.py` |
+| vendor HTTP, retries, retry cap, circuit breaker | `sources/http.py` |
+| rate limiting | `sources/limiter.py`, one per key, shared across threads and processes |
+| source construction (vendors and the golden fixture source) | `sources/registry.py` (vendor specifics stay in `sources/<vendor>.py`) |
+| locks (flock, named store locks, run-index lock); the ingest run lock | `storage/locks.py`; `services/jobs/exclusive.py` |
+| session / exchange calendar | `core/calendar.py` |
+| job execution | `services/jobs/` (apps use `run_job`; fan-out `as_completed`) |
+| screen execution | `services/screening.py`, submitted as `screen` jobs (nightly: `workflows/screens.py`) |
+| site settings: `config/site/*.toml` → typed objects | `config/settings.py` (the store only reads files) |
+| environment variables and `.env` | `config/env.py` (the storage factory receives the URL) |
+| table schemas: required columns, declared types, validation | `storage/schemas.py` |
+| Parquet / Arrow I/O (casting to declared types, schema version, row groups) | `storage/backends/` (`arrow.py` shared by every backend) |
+
+### Typed settings and schemas (R6)
+
+**Settings.** `config/settings.py` is the one loader for `config/site/*.toml`:
+`SourcesSettings` (vendors, `[http]`, `[quality]`, retention), `UniverseSettings` (+ the
+curated leveraged-ETF overrides), `NightlySettings`, and the run defaults
+`ScreeningSettings` / `BacktestSettings` (layered per config by `resolve`, exposed as
+`ResolvedConfig.screening` / `.backtest`). All are frozen dataclasses; the types live in the
+library, not in the app that reads them, so the loader validates every key in one place. A
+missing file or key falls back to the defaults; an unknown key, a wrong type or an
+out-of-range value fails with its path (`sources.toml [massive] min_interval_s: expected a
+number >= 0, got 'fast'`). `config/` does no file I/O: documents come from the
+`ConfigStore`. `config/env.py` is the only reader of environment variables (`credential`,
+`data_url`, `config_dir`, `user_id`, `load_dotenv`).
+
+**Schemas.** `storage/schemas.py` declares every column of every fixed table with an abstract
+type (`string`, `float64`, `int64`, `bool`, `date`, `timestamp_utc`) and nullability; open
+tables (`events/`, `rollups/`, `results/`, `catalog/`) type their common and key columns.
+Writers validate (missing, undeclared, null keys, duplicates, OHLCV sanity); backends cast to
+the declared types through `storage/backends/arrow.py`, fail on uncastable data, and stamp
+the table name and `SCHEMA_VERSION` into each Parquet file. Details:
+[data/storage.md](data/storage.md#column-types-and-schema-version).
 
 ### Ingestion tasks (R3)
 
@@ -429,14 +453,15 @@ sources through the context (`ctx.sources[name]`) and never import vendor module
 
 Rules: **R1** only `data/` reads market data for consumers; **R2** storage has no domain
 knowledge; **R3** tasks get sources from the registry, never import vendor modules; **R4**
-sources never import storage; **R5** everything runs through the job runner. Rules that
-already hold are import-linter contracts; the rest are `pending_contract` entries in the
-registry, enabled by the PR that makes them true. Every stored table has exactly one
-producing owner (`[[table]]` in the registry).
+sources never import storage; **R5** everything runs through the job runner. All five are
+import-linter contracts; none is pending. Every stored table has exactly one producing owner
+(`[[table]]` in the registry).
 
-Gates (all in `make check` and CI): `make ownership` (shrink-only
-`architecture/known_violations.toml`), `make dupes` (pylint duplicate-code against
-`architecture/dupes_baseline.txt`), `make arch`, and `tests/architecture/`.
+Gates (all in `make check` and CI): `make ownership` (the ratchet
+`architecture/known_violations.toml` is empty, and a fitness test keeps it empty with no
+pending contract: an exception needs an ADR and an `allowed` entry with its reason),
+`make dupes` (pylint duplicate-code against `architecture/dupes_baseline.txt`), `make arch`,
+and `tests/architecture/`.
 
 ## Rules of thumb
 
