@@ -7,6 +7,15 @@ description: Add a new market data vendor or source adapter (e.g. IBKR, Massive,
 
 Read first: `docs/data/vendors.md`, `docs/data/storage.md`, ADRs 0005, 0006, 0008 and 0012.
 
+**Ownership check (ADR 0019):** a source owns only fetch + normalise for its vendor. HTTP,
+retries and pacing belong to `sources/http.py` (shared limiter: `sources/limiter.py`, R4);
+building the source from `config/site/sources.toml` belongs to the source registry
+(`commands.py` until R4); raw saving, id resolution, stamping and run records belong to
+the ingest loop (`jobs/common.py` → `tasks/framework.py`). Keep every vendor detail (file
+names, request keys, response fields) inside `sources/<vendor>.py`; never import
+`algotrade.storage` I/O. Look these up in `architecture/ownership.toml`; `make ownership`
+must pass without growing `architecture/known_violations.toml`.
+
 1. **Location:** `apps/ingestion/sources/<vendor>.py`, one module per vendor. If it grows past
    about 300 lines, split it into a package (`client.py`, `mapping.py`, `limits.py`). Nothing
    outside `apps/ingestion` may import it.

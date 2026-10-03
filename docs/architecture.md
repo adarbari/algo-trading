@@ -12,6 +12,7 @@ versus planned. Detail lives in companion docs:
 | Vendors | [data/vendors.md](data/vendors.md) |
 | Screeners | [screeners/](screeners/README.md) |
 | UI design system | [ui/design-system.md](ui/design-system.md) |
+| Who owns each responsibility (machine-readable) | `architecture/ownership.toml`, [ADR 0019](adr/0019-ownership-and-boundaries.md) |
 | Why each decision was made | [adr/](adr/README.md) |
 | Order of work and follow-ups | [roadmap.md](roadmap.md) |
 
@@ -95,6 +96,7 @@ vendor responses, run and job records); above them sit outputs (results, per use
 | 10 | **The universe is coverage, not a filter:** every US-listed common stock, ADR and ETF (including leveraged and inverse), with S&P 500 membership as data, saved as a dated snapshot. Coverage is a site decision (`config/site/universe.toml`). **Each strategy picks its subset with a `Selection`** in a site (L3) or user (L4) config, resolved defaults < site < user < run; a user can narrow coverage but never widen it. Every run records the user and the config hash. | [0013](adr/0013-universe.md), [0015](adr/0015-configs-selections-users.md) |
 | 11 | The UI is built **design-system first**. | [0011](adr/0011-design-system-first-ui.md) |
 | 12 | Local first, hostable later: config from env vars, storage and configs behind URLs and protocols, the API serves the web build. | [0004](adr/0004-apps-and-shared-libraries.md) |
+| 13 | **Every responsibility has exactly one owner** (`architecture/ownership.toml`). Extend the owner; never re-implement. CI rejects new duplicates (`make ownership`, `make dupes`). | [0019](adr/0019-ownership-and-boundaries.md) |
 
 ---
 
@@ -313,6 +315,40 @@ redesign: an `s3://` storage backend, a DB-backed `ConfigStore` and a queue-back
 
 ---
 
+## 13. Ownership and boundaries
+
+[ADR 0019](adr/0019-ownership-and-boundaries.md). Layers say who may import whom; ownership
+says who may *do* what. Each responsibility below has one owner today and one target owner
+after the restructure (roadmap track R). `architecture/ownership.toml` is the source of
+truth, with the AST patterns `scripts/check_ownership.py` uses to flag anyone else doing it.
+
+| Responsibility | Owner today | Target owner (PR) |
+|---|---|---|
+| snapshot selection ("latest on or before D") | `storage/readers.py` | `data/reference.py` (R2) |
+| market-data reads for consumers | `storage/` | `data/` (R2) |
+| run ids, run records, COMPLETE / PARTIAL | `storage/runs.py`, `services/jobs/` | ingestion `tasks/framework.py` (R3) |
+| raw persistence, row stamping, id resolution in ingestion | `jobs/common.py`, storage backends | `tasks/framework.py` (R3) |
+| which ingestion steps run, with which defaults | `pipeline.py` | `tasks/registry.py`, `workflows/` (R3) |
+| vendor HTTP + retries | `sources/http.py` | same |
+| rate limiting | `sources/http.py` (`MinInterval`) | `sources/limiter.py`, shared across processes (R4) |
+| source construction + vendor specifics | `sources/` | `sources/registry.py` (R4) |
+| session / exchange calendar | `core/time.py` | `core/calendar.py` (R5) |
+| job execution | `services/jobs/` | same; screens from nightly become `screen` jobs (R5) |
+| site settings loading | `config/` | `config/settings.py`, one typed loader (R6) |
+| environment variables | `ingestion env.py`, `storage/factory.py` | `config/env.py` (R6) |
+| Parquet / Arrow I/O | `storage/backends/` | same |
+
+Rules: **R1** only `data/` reads market data for consumers; **R2** storage has no domain
+knowledge; **R3** tasks get sources from the registry, never import vendor modules; **R4**
+sources never import storage; **R5** everything runs through the job runner. Rules that
+already hold are import-linter contracts; the rest are `pending_contract` entries in the
+registry, enabled by the PR that makes them true. Every stored table has exactly one
+producing owner (`[[table]]` in the registry).
+
+Gates (all in `make check` and CI): `make ownership` (shrink-only
+`architecture/known_violations.toml`), `make dupes` (pylint duplicate-code against
+`architecture/dupes_baseline.txt`), `make arch`, and `tests/architecture/`.
+
 ## Rules of thumb
 
 - **One responsibility per module. 1000 lines is a hard ceiling; aim for about 300.**
@@ -334,4 +370,5 @@ redesign: an `s3://` storage backend, a DB-backed `ConfigStore` and a queue-back
 | A screener | `.claude/skills/add-screener` |
 | A selection or strategy config | a TOML file in `config/site/presets/` (shared) or `config/users/<id>/` ([configuration.md](configuration.md)); check with `algotrade-backtest config validate <id>` |
 | A UI widget or screen | `.claude/skills/add-ui-component` |
+| A new responsibility, or moving one | `.claude/skills/add-responsibility` |
 | An architectural decision | `.claude/skills/write-adr` |

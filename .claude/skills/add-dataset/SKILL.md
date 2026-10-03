@@ -7,6 +7,13 @@ description: Add a new stored dataset or data grain (e.g. intraday bars, earning
 
 Read first: `docs/data/storage.md`, `docs/data/instruments.md`, ADRs 0006, 0007 and 0009.
 
+**Ownership check (ADR 0019):** add a `[[table]]` entry with exactly **one** producing
+module to `architecture/ownership.toml` (a test enforces it). Reading it for consumers goes
+through the market-data read owner (`storage/readers.py` → `algotrade/data/`, R2), with the
+one snapshot rule; never add another `latest_date(` call site. Writing it goes through the
+ingest loop owner (run records, raw save, stamping, id resolution), not a copy of it. New
+site settings for it are read by the settings owner and must drive code (a test checks).
+
 1. **Pick the grain:** reference, event, bar(interval), chain snapshot, universe,
    cross-section, feature or result. New intervals of bars are **not** new datasets; add
    the `interval` value. Only create a new grain with an ADR.

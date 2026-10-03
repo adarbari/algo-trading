@@ -18,7 +18,7 @@ env:
 
 jobs:
   quality:
-    name: Lint, types, boundaries, file length
+    name: Lint, types, boundaries, ownership, duplicates, file length
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -29,6 +29,8 @@ jobs:
       - run: make lint
       - run: make typecheck
       - run: make arch
+      - run: make ownership
+      - run: make dupes
       - run: make filelen
 
   test:

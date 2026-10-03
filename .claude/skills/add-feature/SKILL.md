@@ -7,6 +7,12 @@ description: Add a computed feature (indicator, IV rank, yield, momentum score) 
 
 Read first: ADR 0007 and `docs/data/storage.md` (feature grain).
 
+**Ownership check (ADR 0019):** the computation is pure and lives in `features/`; the
+nightly task that stores it is the single producer of its `rollups/...` table (add a
+`[[table]]` entry to `architecture/ownership.toml`). Read inputs through the market-data
+read owner, never storage directly or a new snapshot rule. `make ownership` and
+`make dupes` must pass.
+
 1. **Define it** in `src/algotrade/features/definitions/<group>.py` as `name@v1`, with
    declared inputs (datasets and lookback), output type and grain (per instrument or per
    market).

@@ -17,6 +17,21 @@ lands. The target state of every item is described in [architecture.md](architec
 | 5b | Web app | Screener list, results table, contract detail, data freshness; L4 watchlists and preferences | |
 | 6 | Expansion | Backtests from the UI on a queue-backed job runner; on-request pulls; futures (IBKR); intraday bars + `rollups/daily/*`; S3 storage backend and hosting; screener outcome tracking | |
 
+## Restructure (R): one owner per responsibility (ADR 0019)
+
+Each PR moves code to its target owner in `architecture/ownership.toml`, shrinks
+`architecture/known_violations.toml` and enables its `pending_contract`s in `pyproject.toml`.
+Baseline identical throughout.
+
+| # | Delivers | Status |
+|---|---|---|
+| R1 | Ownership registry, shrink-only ratchets (`make ownership`, `make dupes`), fitness tests, ADR 0019 | **done** |
+| R2 | `algotrade/data/` read layer + one snapshot rule (`reference`, `prices`, `events`, `chains`); fixes backtests before the first snapshot and reads events by event date; contracts R1, R2 | |
+| R3 | `IngestRun` (the ingest loop, written once) + task registry (`jobs/` → `tasks/`); CLI and nightly dispatch through the registry | |
+| R4 | Source registry from `sources.toml` + shared cross-process rate limiter + run lock + index lock; contract R3 | |
+| R5 | Nightly workflow: isolated tasks, exchange calendar, screens submitted as `screen` jobs, failure notification; `cboe.enabled` / `cboe.workers` honoured; contract R5 | |
+| R6 | Typed site settings (one loader in `config/`) + typed table schemas; environment read in one place; contract R4 | |
+
 ## Phase 0 follow-ups (the architecture is the target; these close the gaps)
 
 | # | Item | Lands in |
