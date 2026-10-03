@@ -23,7 +23,7 @@ dev = [
     "ruff>=0.6",
     "mypy>=1.11",
     "pandas-stubs>=2.2",
-    "import-linter>=2.0",
+    "import-linter>=2.15",
     "pre-commit>=3.7",
 ]
 
