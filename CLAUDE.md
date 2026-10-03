@@ -24,8 +24,12 @@ without writing an ADR. Read in this order:
 - **Backtests only read stores.** They never fetch; missing data is an error. (ADR 0008)
 - **Generic instruments** keyed by `instrument_id` with `multiplier`, `parent_id` and
   `calendar`, so futures and options fit without redesign. (ADR 0009)
-- **Long-running work is a job** via `services/jobs` (backtests from the UI, on-request
-  pulls). (ADR 0010)
+- **Long-running work is a job** via `services/jobs` (backtests, screens, nightly; the UI and
+  on-request pulls later). (ADR 0010)
+- **Configs, selections, users**: the universe is coverage; each strategy/screener picks a
+  subset with a typed `Selection`. Site presets live in `config/site/`, user configs in
+  `config/users/<id>/`; layering is defaults < site < user < run. Runs record user +
+  config hash. Missing data never passes a selection. (ADR 0015)
 - **Design-system-first UI**: screens use only `@algotrade/ui`. Missing component? Add it
   to the design system generically first. Dense but calm; no gradients, emoji icons or
   card-wrapped numbers. (ADR 0011)

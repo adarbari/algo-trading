@@ -17,4 +17,8 @@ Read first: `docs/architecture.md`, ADRs 0001, 0002 and 0008, and `docs/trading-
 5. **Evaluate:** run `make evaluate`. It must beat `buy_and_hold` somewhere meaningful, and
    a good result on `random_walk` alone is a red flag (it is fitting noise).
 6. **Baseline:** run `make baseline` and commit the new rows with an explanation in the PR.
-7. Run `make check`.
+7. **Config:** add a site preset in `config/site/presets/strategies/<id>.toml` (`kind =
+   "strategy"`, `impl`, `params`, a `selection` preset or inline selection; `schedule =
+   "nightly"` if it should run every night). Never filter instruments inside the strategy
+   itself; that is the selection's job. Check it with `algotrade-backtest config validate <id>`.
+8. Run `make check`.

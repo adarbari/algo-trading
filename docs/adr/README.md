@@ -20,3 +20,4 @@ Do not rewrite history. Use `.claude/skills/write-adr` to add one.
 | [0012](0012-data-vendors.md) | Several data sources, free first, IBKR for derivatives | accepted |
 | [0013](0013-universe.md) | The universe | accepted |
 | [0014](0014-cboe-options-source.md) | Cboe delayed feed for option chains; limited raw retention | accepted |
+| [0015](0015-configs-selections-users.md) | Configs, selections and users | accepted |

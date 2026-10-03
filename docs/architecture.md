@@ -1,42 +1,52 @@
 # Architecture
 
-This document has two parts:
+One architecture, described in two views:
 
-1. **Target architecture**: where the system is going. All new work must fit it.
-2. **Current code layout**: what exists today, and the rules enforced on it right now.
+1. **System view**: apps, storage, libraries and the rules between them.
+2. **Code layout**: packages and the import boundaries CI enforces.
 
-The reasons behind each decision are in [docs/adr/](adr/README.md). The order of work is
-in [docs/roadmap.md](roadmap.md).
+The reasons behind each decision are in [docs/adr/](adr/README.md). The order of work is in
+[docs/roadmap.md](roadmap.md). Phase 0 (this layout) is specified in
+[docs/design/phase-0.md](design/phase-0.md).
 
 ---
 
-## 1. Target architecture
+## 1. System view
 
 ### Apps and backend
 
 ```
  APPS (entry points: wiring, config, scheduling. Thin, little logic.)
 
-   apps/ingestion        apps/backtest          apps/api            apps/web
+   apps/ingestion        apps/backtest          apps/api (phase 4)  apps/web (phase 5)
    scheduled pipeline    CLI / notebooks        FastAPI server      React + design system
    pull → validate →         │                      │                  │
-   normalise → features      │ in-process           │◀──── HTTP ───────┘
-   → run screeners           │                      │
+   normalise → rollups       │ in-process           │◀──── HTTP ───────┘
+   → scheduled screens       │                      │
         │ WRITES             │ READS                │ READS (+ submits jobs)
         ▼                    ▼                      ▼
- ┌────────────────────────── storage (the data contract) ──────────────────────────┐
- │ reference · events · bars(interval) · chains · features · universe · results     │
- └───────────────────────────────────────────────────────────────────────────────────┘
+ ┌─────────────────────────── storage (the data contract) ────────────────────────────┐
+ │ L1 instruments/reference · L2 bars/<interval> · chains · events · rollups/* ·       │
+ │ universe · catalog/* · results/* · run & job records       (+ L3/L4 config files)   │
+ └──────────────────────────────────────────────────────────────────────────────────────┘
 
- SHARED LIBRARIES (src/algotrade/), layered top to bottom:
-   services/    use cases + the jobs model (run_backtest, run_screen, ingest, ...)
-   engines/     backtest/ (loop, simulated fills, portfolio, risk)   screening/
-   strategies/  trading/ (backtests)   screeners/ (screening). Pure: FeatureView in, decisions out.
-   features/    versioned feature definitions, pipeline, point-in-time FeatureView
-   storage/     repository interfaces per data grain · readers · writers · backends/
-   quant/       pricing maths, Greeks, implied volatility, roll maths
-   core/        instruments, value objects, calendars, errors, time
+ SHARED LIBRARY (src/algotrade/), layered top to bottom:
+   services/    use cases: jobs, configs, selection, screening, backtests, evaluation, exports
+   engines/     backtest/ · screening/ · selection/
+   strategies/  trading/ (backtests) · screeners/. Pure: MarketView / FeatureView in, decisions out.
+   features/    versioned rollup definitions          analytics/   metrics, reports
+   storage/     schemas · stores per layer · readers / writers · backends/ · config store
+   config/      typed configs, selections, users, layered resolution + hash
+   (quant/      pricing maths, Greeks, IV: phase 2)
+   core/        instruments, value objects, MarketView / FeatureView, options, errors, time
 ```
+
+| Component | Status |
+|---|---|
+| `apps/ingestion`, `apps/backtest`, library layers above | built (phase 0 + options slice) |
+| `quant/`, `rollups/daily/*`, bars from Massive, earnings events | phases 1–2 |
+| `apps/api`, `apps/web` | phases 4–5 |
+| Job queue beyond the local runner, futures | phase 6 |
 
 ### Non-negotiable rules
 
@@ -54,6 +64,7 @@ in [docs/roadmap.md](roadmap.md).
 | 10 | The universe is **S&P 500 constituents + all Nasdaq-listed stocks + all ETFs (including leveraged and inverse)**, saved as a dated snapshot each day. | [0013](adr/0013-universe.md) |
 | 11 | The UI is built **design-system first**: screens use only design-system components. A missing component is added to the design system in a generic form first. | [0011](adr/0011-design-system-first-ui.md) |
 | 12 | Local first, hostable later: config from env vars, storage behind URLs, the API serves the web build. | [0004](adr/0004-apps-and-shared-libraries.md) |
+| 13 | The universe is everything we cover; **each strategy picks its subset with a `Selection`**, configured per site (L3) and per user (L4). Every run records the user and the resolved config hash. | [0015](adr/0015-configs-selections-users.md) |
 
 Detailed specs:
 [storage](data/storage.md) · [instruments & universe](data/instruments.md) ·
@@ -62,10 +73,10 @@ Detailed specs:
 ### Data flow
 
 ```
-nightly (and later: intraday or on request, via a job)
-  ingestion: universe snapshot → pull per source → raw/ (as received, kept forever)
+nightly (a job; later also intraday or on request)
+  ingestion: universe + reference snapshot → pull per source → raw/ (as received, 90-day retention)
            → validate + normalise → reference / events / bars / chains
-           → compute features (versioned) → run all screeners → results/
+           → rollups (versioned) → every scheduled config: select → screen → results/ + exports
 on request
   api ──► services ──► reads results / features             (web UI)
   api ──► services.jobs.submit(backtest) ──► engines.backtest ──► results/
@@ -74,18 +85,18 @@ on request
 
 ---
 
-## 2. Current code layout (enforced today)
+## 2. Code layout (enforced)
 
-Phase 0 is in progress (see [docs/design/phase-0.md](design/phase-0.md)). The library
-already uses the target layers. Dependencies point **downwards only**, and siblings on the
-same row may not import each other. `import-linter` enforces this (`[tool.importlinter]` in
+Three packages in a uv workspace: `algotrade` (the library), `algotrade-ingestion` and
+`algotrade-backtest`. Dependencies point **downwards only**, and siblings on the same row may
+not import each other. `import-linter` enforces this (`[tool.importlinter]` in
 `pyproject.toml`).
 
 ```
 apps/ingestion (algotrade_ingestion) · apps/backtest (algotrade_backtest)   never import each other
         │ import the library, never the reverse
         ▼
-     services/           use cases: screening, evaluation, views, exports
+     services/           use cases: jobs, configs, selection, screening, backtests, evaluation
         │
      engines/            backtest/ · screening/ · selection/   (independent of each other)
         │
@@ -98,7 +109,7 @@ apps/ingestion (algotrade_ingestion) · apps/backtest (algotrade_backtest)   nev
 
 Extra contracts:
 - strategies and screeners see only `core`
-- feature definitions never touch storage
+- feature definitions and configs never touch storage
 - only `apps/ingestion` may import `storage.writers`
 - inside `engines/backtest`, risk (`limits`, `sizing`), execution (`simulated`) and accounting (`portfolio`) stay independent
 
@@ -114,7 +125,7 @@ Extra contracts:
 | `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. `selection/`: evaluates a selection with three-valued logic and a per-rule audit. | strategies, config, analytics, core |
 | `services/` | Use cases: `jobs` (submit / status / wait; local runner; library `backtest` and `screen` handlers), `configs` (resolve, scheduled), `selection` (L1 + rollup rows → selection), `backtests` (configured runs), universe + `FeatureView` loading, `market_data` (stored bars → aligned series), golden `datasets`, screening runs, legacy exports, `evaluation/` (strategy × golden dataset vs baseline). | everything below except `storage.writers` |
 | `apps/ingestion` | Sources (Cboe, HTTP with retries, synthetic/golden), jobs (universe, option chains, features, golden load), nightly pipeline, `algotrade-ingest`. | library |
-| `apps/backtest` | `algotrade-backtest` CLI (`algotrade` alias): datasets list, backtest, evaluate. Reads only through storage (`--data-url`). | library |
+| `apps/backtest` | `algotrade-backtest` CLI (`algotrade` alias): datasets list, backtest (golden dataset or config, via jobs), evaluate, config validate/show. Reads only through storage (`--data-url`). | library |
 
 ### One bar in the backtest engine
 
