@@ -22,7 +22,7 @@ import pandas as pd
 from algotrade.core.model.instruments import AssetClass, instrument_id
 from algotrade.core.model.options import is_standard_root, parse_osi
 from algotrade_ingestion.sources.framework.base import FetchRequest, Normalized
-from algotrade_ingestion.sources.framework.http import Http
+from algotrade_ingestion.sources.framework.http import Http, HttpError
 
 SOURCE = "cboe_delayed"
 DATASET = "option_chain"
@@ -53,6 +53,14 @@ class ParsedChain:
     underlying: pd.DataFrame  # one row, chains/underlying_quotes columns (minus common)
     options: pd.DataFrame  # chains/option_quotes columns (minus common)
     nonstandard_series: int
+
+
+def missing_chain(exc: HttpError) -> bool:
+    """Cboe's CDN serves chains from S3: a symbol with no published chain answers 403 with
+    S3's ``AccessDenied`` XML (measured 2026-10-03: 21 of 25 sampled "403" symbols had chains
+    a moment later only because the breaker had skipped them). A block (Cloudflare) answers
+    with HTML instead, so it still counts as an error and towards the circuit breaker."""
+    return exc.status == 403 and b"<Code>AccessDenied</Code>" in exc.body
 
 
 class CboeOptionsSource:

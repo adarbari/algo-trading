@@ -25,11 +25,12 @@ from algotrade_ingestion.sources.framework.http import (
     BROWSER_USER_AGENT,
     CircuitBreaker,
     Http,
+    HttpError,
     RetryPolicy,
     urllib_transport,
 )
 from algotrade_ingestion.sources.framework.limiter import Limiter
-from algotrade_ingestion.sources.vendors.cboe.option_chains import CboeOptionsSource
+from algotrade_ingestion.sources.vendors.cboe.option_chains import CboeOptionsSource, missing_chain
 from algotrade_ingestion.sources.vendors.massive.bars import MassiveDailyBars
 from algotrade_ingestion.sources.vendors.massive.corporate_actions import MassiveCorporateActions
 from algotrade_ingestion.sources.vendors.massive.tickers import MassiveTickers
@@ -83,6 +84,7 @@ class SourceSpec:
     env_hint: str = "add it to .env"
     headers: Callable[[str | None], dict[str, str]] = _no_headers  # from the env value
     tries: int = 7
+    not_found: Callable[[HttpError], bool] | None = None  # vendor's "no such object" errors
 
 
 def _bearer(key: str | None) -> dict[str, str]:
@@ -110,7 +112,7 @@ def _sec(name: str, build: Callable[[Http], Source]) -> SourceSpec:
 SOURCES: dict[str, SourceSpec] = {
     s.name: s
     for s in (
-        SourceSpec("cboe", "cboe", "cboe", CboeOptionsSource),
+        SourceSpec("cboe", "cboe", "cboe", CboeOptionsSource, not_found=missing_chain),
         SourceSpec("nasdaq_trader", "nasdaq_trader", "nasdaqtrader", NasdaqTraderSource),
         SourceSpec("spy_holdings", "spy_holdings", "ssga", SpyHoldingsSource),
         SourceSpec(
@@ -192,7 +194,11 @@ def build_sources(
         secret = env(spec.env_var) if spec.env_var else None
         http = Http(
             urllib_transport(headers=spec.headers(secret)),
-            RetryPolicy(tries=spec.tries, max_total_s=settings.http_max_retry_s),
+            RetryPolicy(
+                tries=spec.tries,
+                max_total_s=settings.http_max_retry_s,
+                not_found=spec.not_found,
+            ),
             limiters[key],
             breakers[key],
         )
