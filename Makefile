@@ -10,6 +10,8 @@ GOLDEN_URL ?= file://datasets/golden/store
 
 UV ?= uv
 WORKERS ?= auto
+# WEB_WORKERS=N caps vitest workers in web-check / check (vitest reads VITEST_MAX_WORKERS, = --maxWorkers); empty = vitest default
+WEB_WORKERS ?=
 BASE ?= origin/main
 
 doctor:          ## is this machine ready? (uv, Node 24, Docker, gh, venv, web deps, .env keys, store); prints the fix for each failure
@@ -108,8 +110,8 @@ $(WEB)/node_modules/.package-lock.json: $(WEB)/package-lock.json
 web-install: $(WEB)/node_modules/.package-lock.json  ## web deps + the Playwright browser
 	cd $(WEB) && npx playwright install chromium
 
-web-check: $(WEB)/node_modules/.package-lock.json  ## generated files fresh, ds:check, lint, types, unit, build, storybook, e2e
-	cd $(WEB) && $(NPM) run check
+web-check: $(WEB)/node_modules/.package-lock.json  ## generated files fresh, ds:check, lint, types, unit, build, storybook, e2e (WEB_WORKERS=N caps vitest)
+	cd $(WEB) && $(if $(WEB_WORKERS),VITEST_MAX_WORKERS=$(WEB_WORKERS) )$(NPM) run check
 
 web-real: $(WEB)/node_modules/.package-lock.json golden-store  ## real-app smoke: Vite dev + the real API, empty and golden stores, every route
 	cd $(WEB) && ALGOTRADE_PY=$(abspath $(PY)) npx playwright test -c playwright.real.config.ts

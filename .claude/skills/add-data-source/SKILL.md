@@ -24,13 +24,7 @@ names, request keys, response fields) inside `sources/vendors/<vendor>/`; never 
 `src/algotrade/config/site/settings.py`. Look these up in `architecture/ownership.toml`; `make ownership`
 must pass with `architecture/known_violations.toml` still empty.
 
-0. **Where it goes:** look the kind up in the "Where does this go?" table (CLAUDE.md,
-   Directory layout) and its folder in `architecture/layout.toml`. Here:
-   `libs/sources/algotrade_sources/vendors/<vendor>/` (new folder, covered by the
-   `libs/sources/algotrade_sources/vendors/*` entry). If no
-   folder fits, add one for the new kind (`.claude/skills/add-responsibility`, step 3);
-   never park code in a neighbouring folder. Tests go in the mirrored folder; run `make
-   layout` and plan a split if the folder is at 8+ modules.
+0. **Where it goes:** `libs/sources/algotrade_sources/vendors/<vendor>/` (new folder, covered by the `vendors/*` entry) (`grep -n purpose architecture/layout.toml`); no fit: new folder, `add-responsibility` step 3. Tests mirror it; if a folder is at 8+ modules, plan the split (`make layout`).
 1. **Location:** a new folder `libs/sources/algotrade_sources/vendors/<vendor>/`
    with an `__init__.py` docstring naming the vendor, and one module per dataset it serves
    (e.g. `bars.py`); shared auth / paging goes in `client.py` (see `vendors/massive/`). The

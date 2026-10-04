@@ -30,7 +30,8 @@ No new HTML: pages, widgets, features and entities only compose `@algotrade/ui`.
    `placeholderRoute` with a `createRoute` whose component is the page (params validated
    here). Role gating stays in `workspaceGuard` (`src/app/workspaces/guard.ts`).
 7. **Missing component?** Stop and follow `.claude/skills/add-ui-component` (design system
-   first; components wait for approved mockups).
+   first; mockup gate: a new page or a visual pattern in no approved mockup needs an
+   owner-approved mockup, other components do not; see that skill).
 8. **Every query ends in data, empty or error**: render all three states, never an infinite
    loading. Verify with the real-app smoke (`make web-real`).
 9. **Test:** unit tests next to each module; extend `e2e/smoke.spec.ts` (or add an e2e spec)

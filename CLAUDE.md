@@ -4,109 +4,49 @@ This file is the entry point. The decisions below are **settled**; do not re-ope
 without writing an ADR. Fresh session: run `/start` (`make doctor` + `make status` + the roadmap pickup list); end with
 `/wrap-up`. Note owner corrections and rule-preventable errors as you go; propose them via
 `.claude/skills/capture-learning` (checked for overlap and contradiction) before the PR.
-Read in this order:
+Read in this order, **by section and only when the task needs it** (grep, then read the lines):
 
-1. `docs/architecture.md`: target architecture + the rules enforced on today's code
-2. `docs/roadmap.md`, **"Now / Next" at the top first** (running jobs, next items, facts; a PR that opens or closes one updates it), then the phase table and open decisions
-3. The spec for your area: `docs/data/layers.md`, `docs/configuration.md`,
-   `docs/data/storage.md`, `docs/data/instruments.md`,
-   `docs/data/vendors.md`, `docs/ui/architecture.md`, `docs/ui/design-system.md`,
-   `docs/screeners/`
-4. `docs/adr/README.md`: why things are the way they are
+1. `docs/roadmap.md`, **"Now / Next" only** (`/start` reads just that): running jobs, next
+   items, facts; a PR that opens or closes one updates it. Phase tables and open decisions only on request.
+2. `docs/architecture.md` (target architecture + the rules enforced on today's code) and the
+   spec for your area: `docs/data/layers.md`, `docs/configuration.md`, `docs/data/storage.md`,
+   `docs/data/instruments.md`, `docs/data/vendors.md`, `docs/ui/architecture.md`,
+   `docs/ui/design-system.md`, `docs/screeners/`.
+3. `docs/adr/README.md`: why things are the way they are (the ADR number follows each decision below).
 
-## Settled decisions (summary)
+## Settled decisions (one line each; the ADR has the detail)
 
-- **Four apps, one repo**: `apps/ingestion`, `apps/backtest`, `apps/api`, `apps/web`. Apps
-  never import each other. They share libraries in `src/algotrade/` and talk through
-  storage (and HTTP for web → api). (ADR 0004)
-- **Only ingestion writes** market and feature data. (ADR 0005)
-- **Vendor sources are a shared package**: every vendor adapter, the source framework and the
-  vendor SDKs live in `libs/sources/algotrade_sources/` (uv workspace member
-  `algotrade-sources`). Ingestion uses it for batch pulls; the API may use it later for live,
-  read-only reads; backtests and the library never import it (import-linter). (ADR 0027,
-  amending ADR 0005)
-- **Storage by grain** (reference, event, bar(interval), chain, universe, feature, result)
-  behind `Protocol` interfaces. Parquet locally (DuckDB planned). No code outside
-  `storage/backends/` builds a path. (ADR 0006)
-- **Point-in-time**: rows carry `ts`, `session_date`, `knowledge_ts`, `source`,
-  `run_id`. Features are `name@version`, precomputed nightly. (ADR 0007)
-- **Feature store**: every stored feature column is a declared `Feature` (kind, dtype, unit,
-  description, null meaning, range) in a `FeatureGroup`; the catalogue `docs/data/features.md`
-  is generated (`make features-doc`). Features ask `data.feature_inputs` for inputs by table
-  name. A formula over existing features is an **expression feature** in
-  `config/site/features/<theme>.toml` (typed language, never Python `eval`), computed on read
-  unless `materialise = true`; selectable as `feature.<name>`. Users add their own (always
-  virtual, never shadowing a site name) in `config/users/<id>/features/`. Re-versioned groups
-  store `float32`. (ADR 0023)
-- **Backtests only read stores.** They never fetch; missing data is an error. (ADR 0008)
-- **Generic instruments** keyed by `instrument_id` with `multiplier`, `parent_id` and
-  `calendar`, so futures and options fit without redesign. (ADR 0009)
-- **FIGI ids**: equities/ETFs are `EQ:<composite FIGI>` (symbol id without one). Turn a
-  ticker into an id only through `SymbolResolver` (`data.reference.resolver(reader, date)`); never
-  build `EQ:` strings. (ADR 0018)
-- **Long-running work is a job** via `services/jobs` (backtests, screens, nightly; the UI and
-  on-request pulls later). (ADR 0010)
-- **Configs, selections, users**: the universe is coverage; each strategy/screener picks a
-  subset with a typed `Selection`. Site presets live in `config/site/`, user configs in
-  `config/users/<id>/`; layering is defaults < site < user < run. Runs record user +
-  config hash. Missing data never passes a selection. (ADR 0015)
-- **Design-system-first UI**: screens use only `@algotrade/ui`. Missing component? Add it
-  to the design system generically first. Dense but calm; no gradients, emoji icons or
-  card-wrapped numbers. (ADR 0011) The web app is layered and component-only: see Web UI
-  below. (ADR 0025)
-- **Vendors**: free first, each behind the source interface. Option chains come from the Cboe
-  delayed feed (full universe, nightly); IBKR covers futures and cross-checks. We compute
-  Greeks ourselves. (ADRs 0012, 0014) IBKR also **enriches** (conids, IB's IV / HV history):
-  IV rank uses IBKR's where it has one, ours as the fallback, always labelled
-  (`iv_rank_source`); every IBKR-derived feature carries `licence = "personal"`. (ADR 0028)
-- **Broker access is read-only**: IBKR only through the market-data facade
-  `algotrade_sources/vendors/ibkr/gateway.py`; no code may place, modify or cancel orders or touch
-  account functions (ADR 0026, enforced by a fitness test and import-linter).
-- **Universe**: S&P 500 + all Nasdaq-listed stocks + all ETFs including leveraged and
-  inverse, saved as daily snapshots. (ADR 0013)
+- **Four apps, one repo** (`apps/{ingestion,backtest,api,web}`): they never import each other; they share `src/algotrade/` and talk through storage (HTTP for web to api). (ADR 0004)
+- **Writes**: ingestion writes market and feature data. The API writes only user configs (ADR 0029) and its live-quote log (ADR 0028). (ADR 0005)
+- **Vendor sources are a shared package** `libs/sources/algotrade_sources/` (vendor SDKs live there): ingestion uses it for batch pulls, the API for live quotes; backtests and the library never import it. (ADR 0027)
+- **Storage by grain** behind `Protocol` interfaces, Parquet locally; no code outside `storage/backends/` builds a path. (ADR 0006)
+- **Point-in-time**: rows carry `ts`, `session_date`, `knowledge_ts`, `source`, `run_id`; features are `name@version`, precomputed nightly. (ADR 0007)
+- **Feature store**: every stored feature is a declared `Feature` in a `FeatureGroup`; a formula over features is a TOML expression feature (never Python `eval`); catalogue `docs/data/features.md` is generated (`make features-doc`); mechanics in `.claude/skills/add-feature`. (ADR 0023)
+- **Backtests only read stores**; missing data is an error. (ADR 0008)
+- **Generic instruments** keyed by `instrument_id` with `multiplier`, `parent_id`, `calendar`. (ADR 0009)
+- **FIGI ids** (`EQ:<composite FIGI>`): turn a ticker into an id only through `SymbolResolver`; never build `EQ:` strings. (ADR 0018)
+- **Long-running work is a job** via `services/jobs`. (ADR 0010)
+- **Configs, selections, users**: layering defaults < site < user < run; site presets in `config/site/`, user configs in `config/users/<id>/`; runs record user + config hash; missing data never passes a selection. (ADR 0015)
+- **Design-system-first UI**: screens use only `@algotrade/ui`; a missing component is added to the design system first; the web app is layered and component-only (Web UI below). (ADRs 0011, 0025)
+- **Vendors**: free first behind the source interface; Cboe chains, IBKR for futures and enrichment (IV rank prefers IBKR, labelled `iv_rank_source`; IBKR-derived features carry `licence = "personal"`); we compute Greeks ourselves. (ADRs 0012, 0014, 0028)
+- **Broker access is read-only**: IBKR only through `algotrade_sources/vendors/ibkr/gateway.py`; no orders, no account functions (fitness test + import-linter). (ADR 0026)
+- **Universe**: S&P 500 + Nasdaq-listed stocks + all ETFs, daily snapshots. (ADR 0013)
 
 ## Ownership (ADR 0019; enforced by `make ownership`, `make dupes`, `make arch`)
 
-**Before writing code that does X, find X's owner in `architecture/ownership.toml`. Extend
-the owner; never re-implement it elsewhere. A new responsibility needs an entry + owner in
-the same PR** (`.claude/skills/add-responsibility`). The ownership ratchet
+**Before writing code that does X, find X's owner:** `grep <keyword> architecture/ownership.toml`
+(authoritative: every responsibility and stored table). Extend the owner; never re-implement it elsewhere. **A new responsibility needs an entry + owner in the same PR** (`.claude/skills/add-responsibility`). The ownership ratchet
 (`architecture/known_violations.toml`) is **at zero**: any violation fails CI, and a fitness
 test forbids parking new ones there or adding pending contracts. A genuine exception needs an
 ADR and an `allowed` entry with the reason. **Never game a check** (e.g. reordering fields to
 dodge `make dupes`): fix the structure, or justify the exception in the PR. The dupes ratchet (`architecture/dupes_baseline.txt`)
 only shrinks (`make dupes-update`).
-
-| Responsibility | Owner |
-|---|---|
-| Which snapshot a read sees (on or before D, else earliest + `pre_snapshot`); domain reads of market data | `algotrade/data/` (`reference` (+ IBKR conids), `prices`, `events`, `chains`, `rates`: the Treasury curve a date sees; `rollups`: stored rollup rows; `shares`: share counts by filing date; `volatility`: IBKR's IV / HV); consumers never import `storage.tables.readers` |
-| What a feature group reads (each input table's point-in-time read, by table name; other groups' rows) | `data/feature_inputs.py` (`load_input`; each read lives in its `data` owner); `features/` never imports storage or a domain reader |
-| Computing feature groups (rollups); feature definitions + the feature catalogue | `features/framework/` (`FeatureGroup`, `Feature`, runner), `features/rollups/<group>.py` (`FEATURES` + pure compute), `features/registry.py` (`GROUPS`, `FEATURES`, `feature(name)`, `SUPERSEDED`), `features/site.py` (the site `FeatureSet`: groups + expression features), `features/catalogue.py` → `docs/data/features.md`; stored only by `tasks/derived/rollups.py` |
-| Expression features: the formula language (parse, type check, evaluate); definitions from `config/site/features/*.toml`; computing them on read; retiring superseded group tables | `features/expressions/` (lexer, parser, checker, evaluator, functions; `definitions.py`, `feature_set.py`); typed by `config/site/settings.py` (`load_features`); read path `services/features.py` (`read_expressions`, column-pruned through `data.rollups.feature_rows`); `tasks/maintenance/retire_features.py` (`algotrade-ingest retire-features`) |
-| Option prices + Greeks; implied vol (NaN + status code); realised vol; rate conventions (par → continuous, curve) | `algotrade/quant/` (`black_scholes`, `implied_vol`, `realized_vol`, `rates`): pure numpy, conventions in ADR 0021 |
-| Run ids, run records, COMPLETE / PARTIAL | `storage/runs.py` (`start_run` + `RunRecord.finish` in services), `services/jobs/`; in ingestion `tasks/framework/run.py` (`IngestRun`): never write the loop in a task |
-| Raw save; stamping; ticker → id in ingestion | `tasks/framework/run.py` (`IngestRun`) |
-| Which ingestion steps run, with which defaults | `tasks/framework/registry.py`; nightly order, isolation, catch-up: `workflows/nightly/nightly.py` |
-| Nightly summary report + notifications (desktop alert, daily summary email over SMTP) | `workflows/nightly/` (`records.py` inputs, `report.py` pure builder, `timing.py` run timing, `render.py` text/HTML, `notify.py` notifiers) |
-| Vendor HTTP, retries, circuit breaker; pacing; building sources (incl. the golden fixture source); vendor specifics | `sources/framework/http.py`; `sources/framework/limiter.py` (one per key, cross-process); `sources/framework/registry.py`; `sources/vendors/<vendor>/` |
-| Session sources (a stateful gateway connection: `SessionSource`, `opened`, `SessionSpec`) | `sources/framework/base.py`, `sources/framework/registry.py` |
-| Broker API, READ-ONLY (the only `ib_async` import; market data only, never orders / accounts) | `sources/vendors/ibkr/gateway.py` (ADR 0026; `tests/libs/sources/vendors/ibkr/test_read_only_guard.py`) |
-| Live verification vs IBKR (sample, checks, tolerances, `verification/ibkr`) | `tasks/verification/` (graded by the quality check `verification`) |
-| IBKR enrichment, read-only: conids (`instruments/ibkr_contracts`), IB's IV / HV history backfill + nightly snapshot (`volatility/ibkr_iv30`) | `tasks/reference/ibkr_contracts.py`, `tasks/market/ibkr_iv.py`; reads `data.reference.ibkr_contracts`, `data/volatility.py`; features `features/rollups/ibkr_iv.py` (ADR 0028) |
-| Locks: named store locks, run-index lock; one ingest run at a time | `storage/locks.py`; `services/jobs/exclusive.py` |
-| A run's table writes publish atomically (pending until COMPLETE / PARTIAL commits them all; FAILED drops them; crash recovery) | `storage/backends/` (`local_index.py`: commit marker + sequence); driven by `IngestRun` and `ResultWriter.publishing` (ADR 0022) |
-| Running long work (threads, recovery), screens | `services/jobs/` (apps call `run_job`, never build a runner; fan-out: `as_completed`); screens: `services/screening/run.py`, submitted as `screen` jobs |
-| Site settings (`config/site/*.toml` → frozen dataclasses); environment variables + `.env` | `config/site/settings.py` (one loader); `config/env.py` (storage and sources receive values as parameters) |
-| Session / exchange calendar (holidays, early closes, last closed session) | `core/time/calendar.py`; never compute weekdays elsewhere |
-| Which runs of a partition a read sees (`snapshot`: latest; `merge`, all `events/*` + `instruments/id_map`, `instruments/symbol_history`: union, latest per key, from the latest restating run) | `storage/backends/run_selection.py`, per `TableSpec.runs` (ADR 0007) |
-| HTTP (FastAPI routers, response schemas, CORS, error mapping); read-only queries pages show | `apps/api/algotrade_api/` (routes call one query each); `services/explore/` (ADR 0024) |
-| Writing user configs (rule-screen drafts, immutable versions, preset copy / rebase, schedule switch, user features) | `services/authoring/` + `storage/configs/writer.py` (`ConfigWriter`); the API's only write path, `routes/authoring/` (ADR 0029) |
-| Three-valued predicates (`Rule` / `Group`, Kleene logic; missing never passes); the rule-screen spec (parse, validate, catalogue check) | `core/model/predicates.py`; `core/model/screen_spec.py` + `config/strategy/screen_spec.py` (ADR 0029) |
-| Table schemas (columns, declared types, validation); Parquet / Arrow I/O | `storage/tables/schemas.py`; `storage/backends/` (`arrow.py`: casts, `schema_version`, row groups) |
-| Each stored table | exactly one producing module (`[[table]]` in the registry) |
-| Which directory a module belongs in | `architecture/layout.toml` (see Directory layout below) |
+Non-obvious: the expression language is `features/expressions/`, definitions are TOML in
+`config/site/features/`; run ids / run records are `storage/runs.py` + `services/jobs/` +
+`IngestRun` (never write the ingest loop in a task); only `data/` reads market data
+(consumers never import `storage.tables.readers`).
 
 ## Directory layout (ADR 0020; enforced by `tests/architecture/test_layout*.py`, `make layout`)
-
 One folder holds one kind of thing. `architecture/layout.toml` declares every directory under
 `src/`, `libs/`, `apps/`, `tests/`, `config/` and `docs/` with its purpose and rules; a new folder (or
 a file in an undeclared one) fails CI until it is declared there in the same PR. At most 10
@@ -119,49 +59,22 @@ source (`tests/unit/<path>` = `src/algotrade/<path>`, `tests/libs/sources/<path>
 `apps/ingestion/algotrade_ingestion/<path>`); shared test builders live in `tests/helpers/`
 (vendor payloads in `tests/helpers/payloads/`), recorded data in `tests/fixtures/`.
 
-**Where does this go?**
+**Where does this go?** `grep -n purpose architecture/layout.toml` (every folder, with its
+purpose). The non-obvious cases:
 
 | Kind of code | Folder |
 |---|---|
-| Vendor adapter (fetch + normalise) | `libs/sources/algotrade_sources/vendors/<vendor>/` (registered in `sources/framework/registry.py`) |
-| HTTP, pacing, source protocols | `libs/sources/algotrade_sources/framework/` |
-| Ingestion task | `apps/ingestion/.../tasks/<domain>/` (`reference`, `market`, `derived`, `maintenance`, `verification`) + `tasks/framework/registry.py` |
-| Comparing our data with a live source (verification check) | `apps/ingestion/.../tasks/verification/` (`checks.py`) |
-| Nightly step / ordering | `apps/ingestion/.../workflows/nightly/` |
-| Feature (a documented column) in a feature group (rollup) | `src/algotrade/features/rollups/<group>.py` (`FEATURES` + pure compute; framework: `features/framework/`; then `make features-doc`) |
+| A formula over existing features (ratio, spread, label from thresholds) | `config/site/features/<theme>.toml`, an expression feature: no code; `make features-doc` (`add-feature`) |
+| A feature (a documented column) in a feature group | `src/algotrade/features/rollups/<group>.py` (`FEATURES` + pure compute); then `make features-doc` |
 | A feature derived from a personal-use source (IBKR) | its group in `features/rollups/` with `licence="personal"` on each `Feature`; expression features over it inherit the licence (ADR 0028) |
-| A formula over existing features (ratio, spread, label from thresholds) | `config/site/features/<theme>.toml` (an expression feature: no code; `make features-doc`) |
-| The expression language itself (a new function, operator or type) | `src/algotrade/features/expressions/` |
-| What a feature group reads from a table (feature input) | `src/algotrade/data/feature_inputs.py` (`INPUTS`) + the table's read in its `data/` owner |
-| Trading strategy / screener | `src/algotrade/strategies/trading/` / `strategies/screeners/` |
-| Numeric model (pricing, vol, rates) | `src/algotrade/quant/` |
-| Domain read of market data | `src/algotrade/data/` |
-| Domain value object, calendar, strategy view | `src/algotrade/core/{model,time,views}/` |
-| Use case (what an app or job runs) | `src/algotrade/services/<use-case>/`; long work as a job: `services/jobs/` |
-| Read-only query a page shows (the API's backend) | `src/algotrade/services/explore/<area>.py` |
-| API route / response schema | `apps/api/algotrade_api/routes/<area>.py` / `schemas/<area>.py` (`.claude/skills/add-api-endpoint`) |
-| Engine running strategies / screeners | `src/algotrade/engines/<engine>/` |
-| Table schema, store protocol / backend, config documents | `src/algotrade/storage/{tables,backends,configs}/` |
-| Site setting | `config/site/<group>.toml` + typed in `src/algotrade/config/site/settings.py` |
-| Tests | the mirrored `tests/unit/...` or `tests/apps/<app>/...` folder; builders `tests/helpers/`; cross-source checks `tests/reconciliation/` (recorded data `tests/fixtures/reconciliation/`) |
-| Docs | the `docs/` area folder (`data/`, `screeners/`, `ui/`); a decision: `docs/adr/` |
-| Web: token, styling, HTML, reusable visual component | `apps/web/design-system/{tokens,primitives/<Name>,components/<Name>}/` (`@algotrade/ui`) |
-| Web: route, workspace (TRADER / ADMIN), provider | `apps/web/src/app/{routes/<workspace>,workspaces,providers}/` |
-| Web: what one route shows / a page section | `apps/web/src/pages/<page>/` / `apps/web/src/widgets/<widget>/` |
-| Web: user action or flow with state / domain model + read hooks | `apps/web/src/features/<feature>/` / `apps/web/src/entities/<entity>/` |
-| Web: HTTP client, query keys / pure helper / env | `apps/web/src/shared/{api,lib/<kind>,config}/` |
+| Comparing our data with a live source (verification check) | `apps/ingestion/.../tasks/verification/` (`checks.py`) |
+| Read-only query a page shows (the API's backend) | `src/algotrade/services/explore/<area>.py`; route / schema in `apps/api/algotrade_api/{routes,schemas}/` (`add-api-endpoint`) |
+| Web: component / page / feature | see Web UI below and `docs/ui/architecture.md` |
 
 **If nothing fits, add a new folder for the new kind**: declare it in `architecture/layout.toml`
 with a purpose (+ `contracts` if an import-linter rule guards it), give it an `__init__.py`
 docstring, and mirror it in tests. Never park code in a neighbouring folder
-(`.claude/skills/add-responsibility`). Library folders: `core/{model,time,views,validation}`
-(pure), `config/{site,strategy}`, `storage/{tables,backends,configs}`, `quant/`, `data/`,
-`features/{framework,rollups,expressions}`, `strategies/{trading,screeners}`,
-`engines/{backtest,screening,selection}`, `analytics/`,
-`services/{backtests,screening,evaluation,jobs,explore,authoring}`. API app: `routes/`, `schemas/`.
-Vendor sources (`libs/sources/algotrade_sources/`): `framework/`, `vendors/<vendor>/`,
-`fixtures/`. Ingestion app: `cli/`, `ops/`, `tasks/{framework,<domain>}`,
-`workflows/nightly/`.
+(`.claude/skills/add-responsibility`). A folder at its cap: split it by kind first.
 
 ## Web UI (ADR 0025; `docs/ui/architecture.md`; enforced by ESLint, Stylelint, `make web-check`, `test_layout_web.py`)
 
@@ -181,6 +94,7 @@ mockups 2026-10-03) -> primitives -> components -> screens; screens lay out and 
 with the primitives (Box, Surface, Stack, Grid, Text, Heading, Mono, Divider, VisuallyHidden).
 Every folder is a `[[web_dir]]` in `architecture/layout.toml`. Lint messages name the rule and
 the skill with the fix.
+
 
 ## Code rules (enforced by CI; follow them up front)
 
@@ -218,7 +132,6 @@ the skill with the fix.
     **Generated files** (`apps/api/openapi.json`, `apps/web/src/shared/api/generated/*`): on a
     merge conflict never hand-merge; take main's, then regenerate (`scripts/export_openapi.py`,
     `npm run api:generate`).
-
 ## Workflows: use the matching skill
 
 | Task | Skill |
@@ -242,8 +155,8 @@ work in a worktree.
 
 Commands (need `uv`; `make doctor` checks the machine, `make status` shows PRs, jobs, store): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make layout`, `make evaluate`, `make baseline`, `make features-doc`.
 Web (need Node 24): `make web-install`, `make web-check` (part of `make check`), `make web-visual` (screenshots, Docker); in `apps/web`: `npm run dev|storybook|check|visual:update`.
-Ingestion: `algotrade-ingest universe|universe-build|company-details|shares|earnings|bars|rates|corporate-actions|chains|rollups|verify|screen|nightly|report|quality|schedule|purge-raw|retire-features|migrate-ids|golden`, or `algotrade-ingest run <task>` for any registry task, e.g. `run ibkr-contracts`, `run ibkr-iv --from D1 --to D2 [--limit N]` (the resumable IBKR IV backfill; see `README.md`).
-API: `algotrade-api [--reload]` (read-only except user configs via `services/authoring`, 127.0.0.1:8000); after a route / schema change run
+Ingestion: `algotrade-ingest --help` lists the commands; `algotrade-ingest run <task>` runs any registry task, e.g. `run ibkr-contracts`, `run ibkr-iv --from D1 --to D2 [--limit N]` (the resumable IBKR IV backfill; see `README.md`).
+API: `algotrade-api [--reload]` (127.0.0.1:8000; reads, plus user-config writes via `services/authoring`); after a route / schema change run
 `scripts/export_openapi.py` and commit `apps/api/openapi.json`.
 Configs: site presets in `config/site/` (reviewed via PR); user configs in `config/users/<id>/`
 (git-ignored). Check one with `algotrade-backtest [--user U] config validate|show <id>`; a
@@ -251,23 +164,20 @@ user's expression features with `config validate-features`.
 
 ## Agents, models and tokens (spend tokens where mistakes are expensive)
 
-Match the model to the risk of the task, not its size. Subagents in `.claude/agents/` pin
-their model; delegate to them by name (for an ad hoc agent, pass `model` explicitly).
-
-| Task | Agent (model) |
-|---|---|
-| Find an owner, folder, symbol, test or doc section; sweep many files | `scout` (haiku, read-only) |
-| Run tests, lint or a `make` gate; get back only the failures | `checker` (haiku, never fixes) |
-| A scoped change whose owner and pattern are known (a skill's steps, an expression feature, tests, a known-cause bug fix, docs) | `implementer` (sonnet) |
-| Plan or review: new responsibility / folder / table / ADR, layer boundaries, point-in-time and lookahead, `quant/` maths, atomic publish, locks and jobs, the IBKR read-only boundary, a bug that survived two fixes | `architect` (opus, plans and reviews, does not edit) |
+Match the model to the risk of the task, not its size. Subagents in `.claude/agents/`
+(`scout`, `checker`, `implementer`, `architect`; their descriptions say when) pin their
+model; delegate by name (for an ad hoc agent, pass `model` explicitly).
 
 Quality is not traded for tokens: the cheaper model never decides design, `make check`
-gates every change whatever wrote it, a change in an `architect` area gets an `architect`
+gates every change whatever wrote it, a change in an `architect` area (new responsibility /
+folder / table / ADR, layer boundaries, point-in-time, `quant/` maths, atomic publish, locks
+and jobs, the IBKR read-only boundary, a bug that survived two fixes) gets an `architect`
 review of the diff before it is finished, and an agent that hits ambiguity or fails the same
 check twice escalates one tier instead of retrying.
 
-Shared machine: at most 2 agents at once, and `pytest -n 2`, `vitest --maxWorkers=2`
-(overload caused false timeouts on #94 / #95 / #98).
+Shared machine: at most 2 agents at once, and agents run `make check WORKERS=2 WEB_WORKERS=2`
+(`pytest -n 2`, `vitest --maxWorkers=2`; overload caused false timeouts on #94 / #95 / #98).
+The owner and CI use the defaults (`WORKERS=auto`).
 
 Token habits (every session):
 
@@ -296,3 +206,6 @@ Token habits (every session):
   scale.
 - **Load only the matching skill**, run independent agents in parallel in one message, and
   do not re-read a file you just edited or paste whole files or diffs into the chat.
+
+Harness audit: `/audit-harness` (`.claude/skills/audit-harness`); `/start` flags one older than
+30 days (date in `docs/roadmap.md` Now / Next), `/wrap-up` triggers it at CLAUDE.md >= 290 lines.

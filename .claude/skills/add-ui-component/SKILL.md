@@ -23,7 +23,11 @@ Read first: `docs/ui/architecture.md` (ADR 0025: layers, rules), `docs/ui/design
 2. **Missing? Design it generically.** Name it for what it is (`DataTable`, `SplitPane`), not
    the screen (`ScreenerTable`). Expose behaviour through props, variants and slots; no
    screen-specific branches; never accept `className` or `style` from callers.
-   Components wait for the owner-approved mockups (ADR 0011).
+   **Mockup gate (ADR 0011):** an owner-approved mockup is required first for a **new
+   screen/page**, or a **visual pattern in no approved mockup** (a new chart type, layout or
+   navigation pattern). **No mockup** for a component that appears in an approved screen
+   mockup or is built purely from existing tokens and primitives; its PR still carries
+   stories for every state, light and dark screenshots and axe, and the owner reviews it there.
 3. **Build it in the design system**: copy the template `design-system/primitives/Text/`:
    - `Name.tsx` (file docstring = its catalogue description; `NameProps` with a JSDoc per
      prop), `Name.module.css` (tokens only: `var(--color-*)`, `var(--space-*)`, ...; variants

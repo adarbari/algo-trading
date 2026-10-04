@@ -9,20 +9,14 @@ Read first: `docs/data/storage.md`, `docs/data/instruments.md`, ADRs 0006, 0007 
 
 **Ownership check (ADR 0019):** add a `[[table]]` entry with exactly **one** producing
 module to `architecture/ownership.toml` (a test enforces it). Reading it for consumers goes
-through the market-data read owner (`algotrade/data/`: add a function to `reference`,
-`prices`, `events` or `chains`), with the one snapshot rule (`data.reference.snapshot`);
+through the market-data read owner (`algotrade/data/`: add a function to the matching module; the folder is at the 10-module
+cap, so a new module needs a **split by kind first**), with the one snapshot rule (`data.reference.snapshot`);
 never add another `latest_date(` call site. Writing it goes through the
 ingest loop owner, `IngestRun` in `apps/ingestion/.../tasks/framework/run.py` (run records, raw
 save, stamping, id resolution), not a copy of it. New site settings for it are read by the
 settings owner and must drive code (a test checks).
 
-0. **Where it goes:** look the kind up in the "Where does this go?" table (CLAUDE.md,
-   Directory layout) and its folder in `architecture/layout.toml`. Here: schema in
-   `storage/tables/`, backends in `storage/backends/`, reads in `data/`, the task in
-   `tasks/<domain>/`. If no folder fits, add one for the new kind
-   (`.claude/skills/add-responsibility`, step 3); never park code in a neighbouring folder.
-   Tests go in the mirrored folder; run `make layout` and plan a split if the folder is at
-   8+ modules.
+0. **Where it goes:** schema in `storage/tables/`, backends in `storage/backends/`, reads in `data/`, the task in `tasks/<domain>/` (`grep -n purpose architecture/layout.toml`); no fit: new folder, `add-responsibility` step 3. Tests mirror it; if a folder is at 8+ modules, plan the split (`make layout`).
 1. **Pick the grain:** reference, event, bar(interval), chain snapshot, universe,
    cross-section, feature or result. New intervals of bars are **not** new datasets; add
    the `interval` value. Only create a new grain with an ADR.

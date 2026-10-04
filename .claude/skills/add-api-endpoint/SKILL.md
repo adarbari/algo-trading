@@ -1,6 +1,6 @@
 ---
 name: add-api-endpoint
-description: Add or change an endpoint of the read-only API (apps/api): the explore query in services, the response schema, the thin route, the OpenAPI export and the web client regeneration. Use whenever a web page needs data the API does not serve yet.
+description: Add or change an endpoint of the API (apps/api; reads, plus user-config writes via `services/authoring`, ADR 0029): the explore query in services, the response schema, the thin route, the OpenAPI export and the web client regeneration. Use whenever a web page needs data the API does not serve yet.
 ---
 
 # Add an API endpoint
@@ -22,8 +22,8 @@ read-only").
    data owner (`data/<area>.py`) with a generic read and a unit test in `tests/unit/data/`.
    Do not read storage partitions ad hoc in services when a domain rule is involved (which
    snapshot, adjustments, event dates).
-2. **Query.** Add a function to `services/explore/<area>.py` (a new area: a new module there;
-   the folder holds at most 10). It takes the `ReadStore`, resolves `?date=` with
+2. **Query.** Add a function to `services/explore/<area>.py` (a new area: a new module there; `services/explore/`, `routes/` and `schemas/` are at
+   the 10-module cap, so **split the folder by area first** (roadmap Next) or `make layout` fails). It takes the `ReadStore`, resolves `?date=` with
    `partition_for` (latest on or before; none yet = empty result) or
    `data.reference.snapshot`, raises `NotFoundError` for unknown ids, pages large lists with
    `paginate`, and returns a frozen dataclass of JSON-safe values (`record` / `records`).
