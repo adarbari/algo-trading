@@ -9,8 +9,8 @@ from algotrade.storage.configs.writer import MemoryConfigWriter
 
 
 def _bump(writer: MemoryConfigWriter, **changes: object) -> None:
-    preset = dict(writer.load("site", "screeners", "vrp") or {})
-    writer._docs[("site", "screeners", "vrp")] = preset | {"version": 4} | changes
+    preset = dict(writer.load("site", "screeners", "vrp@3") or {})
+    writer._docs[("site", "screeners", "vrp@4")] = preset | {"version": 4} | changes
 
 
 def test_copy_pins_the_preset_version(writer: MemoryConfigWriter) -> None:
@@ -23,17 +23,20 @@ def test_copy_pins_the_preset_version(writer: MemoryConfigWriter) -> None:
     assert screens.finalise(writer, "alice", "my_vrp").version == 1
     resolved = screens.screen_detail(writer, "alice", "my_vrp")
     assert resolved.preset and (resolved.preset.pinned, resolved.preset.current) == (3, 3)
-    assert resolved.resolved and resolved.resolved["schedule"] is None  # not inherited
+    assert resolved.schedule is None  # the preset's nightly schedule is not inherited
 
 
-def test_a_stale_pin_fails_closed_until_rebased(writer: MemoryConfigWriter) -> None:
+def test_a_stale_pin_keeps_resolving_and_rebase_is_optional(writer: MemoryConfigWriter) -> None:
     screens.save_draft(
         writer, "alice", "my_vrp", {"extends": "vrp@3", "criteria": {"price": {"value": 7}}}
     )
     screens.finalise(writer, "alice", "my_vrp")
-    _bump(writer)
+    before = screens.screen_detail(writer, "alice", "my_vrp")
+    price = {"field": "rollup.price_stats@v2.close", "op": "gt", "value": 50}
+    _bump(writer, criteria={"price": price})
     detail = screens.screen_detail(writer, "alice", "my_vrp")
-    assert detail.error and "rebase" in detail.error
+    assert detail.error is None and detail.hash == before.hash  # still v3's preset
+    assert detail.layers[0] == "site/screeners/vrp@3"
     assert detail.preset and detail.preset.rebase_available
     draft = presets.rebase(writer, "alice", "my_vrp")
     assert draft == {"id": "my_vrp", "extends": "vrp@4", "criteria": {"price": {"value": 7}}}

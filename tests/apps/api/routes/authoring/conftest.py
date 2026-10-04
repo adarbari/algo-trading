@@ -1,5 +1,5 @@
 """A client over a temporary config root (site defaults + features from the repo, a rule
-preset ``vrp@3``) whose user configs the write routes change."""
+preset at ``vrp/v3.toml``) whose user configs the write routes change."""
 
 from dataclasses import replace
 from pathlib import Path
@@ -35,11 +35,11 @@ value = 5
 def root(tmp_path: Path) -> Path:
     site = tmp_path / "site"
     (site / "presets" / "selections").mkdir(parents=True)
-    (site / "presets" / "screeners").mkdir()
+    (site / "presets" / "screeners" / "vrp").mkdir(parents=True)
     (site / "features").symlink_to(REPO_ROOT / "config" / "site" / "features")
     (site / "defaults.toml").symlink_to(REPO_ROOT / "config" / "site" / "defaults.toml")
     (site / "presets" / "selections" / "all_active.toml").write_text(SELECTION)
-    (site / "presets" / "screeners" / "vrp.toml").write_text(PRESET)
+    (site / "presets" / "screeners" / "vrp" / "v3.toml").write_text(PRESET)
     return tmp_path
 
 

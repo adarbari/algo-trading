@@ -1,9 +1,11 @@
 """Structural rules the codebase must keep. These complement import-linter contracts."""
 
 import ast
+import hashlib
 import re
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 from tests.conftest import REPO_ROOT
@@ -87,3 +89,58 @@ def test_generated_files_are_exempt_from_the_length_limit(tmp_path: Path) -> Non
         cwd=REPO_ROOT, capture_output=True, text=True, check=False,
     )  # fmt: skip
     assert proc.returncode == 0, proc.stdout
+
+
+# ----------------------------------------------------------------------------- preset versions
+PRESETS = Path("config/site/presets/screeners")
+PRESET_LOCK = Path("architecture/preset_versions.toml")
+
+
+def preset_version_problems(root: Path) -> list[str]:
+    """Why the site rule-screen preset versions under ``root`` break immutability (ADR 0029):
+    an unlisted or changed version file, a listed one gone, or a file whose ``id`` /
+    ``version`` disagree with its path."""
+    lock = tomllib.loads((root / PRESET_LOCK).read_text()).get("versions", {})
+    found = {
+        p.relative_to(root / PRESETS).as_posix(): p
+        for p in sorted((root / PRESETS).glob("*/*.toml"))
+    }
+    problems = [f"{name}: listed in {PRESET_LOCK} but gone" for name in lock if name not in found]
+    for name, path in found.items():
+        match = re.fullmatch(r"([a-z0-9_-]{1,64})/v([1-9][0-9]*)\.toml", name)
+        if match is None:
+            problems.append(f"{name}: a preset folder holds only v<N>.toml files")
+            continue
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if name not in lock:
+            problems.append(f'{name}: add `"{name}" = "{digest}"` to {PRESET_LOCK}')
+        elif lock[name] != digest:
+            problems.append(f"{name}: changed; versions are immutable: add v<N+1> instead")
+        doc = tomllib.loads(path.read_text())
+        if (doc.get("id"), doc.get("version")) != (match[1], int(match[2])):
+            problems.append(f"{name}: id / version must be {match[1]!r} / {match[2]}")
+    return problems
+
+
+def test_site_preset_versions_are_immutable() -> None:
+    assert preset_version_problems(REPO_ROOT) == []
+
+
+def test_preset_version_check_catches_edits(tmp_path: Path) -> None:
+    (tmp_path / PRESET_LOCK).parent.mkdir()
+    folder = tmp_path / PRESETS / "vrp"
+    folder.mkdir(parents=True)
+    v1 = folder / "v1.toml"
+    v1.write_text('id = "vrp"\nversion = 1\n')
+    digest = hashlib.sha256(v1.read_bytes()).hexdigest()
+    (tmp_path / PRESET_LOCK).write_text(f'[versions]\n"vrp/v1.toml" = "{digest}"\n')
+    assert preset_version_problems(tmp_path) == []
+    v1.write_text('id = "vrp"\nversion = 1\nx = 2\n')
+    (folder / "v2.toml").write_text('id = "vrp"\nversion = 3\n')
+    (folder / "draft.toml").write_text("")
+    problems = " | ".join(preset_version_problems(tmp_path))
+    assert "vrp/v1.toml: changed" in problems
+    assert "vrp/v2.toml: add" in problems and "version must be" in problems
+    assert "only v<N>.toml" in problems
+    v1.unlink()
+    assert any("gone" in p for p in preset_version_problems(tmp_path))

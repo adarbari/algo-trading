@@ -12,7 +12,7 @@ config/site/                        L3: reviewed via PR, versioned by git
   defaults.toml                     [screening] and [backtest] defaults
   presets/selections/<id>.toml      shared selections
   presets/strategies/<id>.toml      shared strategy / screener configs
-  presets/screeners/<id>.toml       rule-screen presets, carrying version = N (ADR 0029)
+  presets/screeners/<id>/v<N>.toml  rule-screen preset versions: immutable, hash-locked (ADR 0029)
 config/users/<user_id>/             L4: git-ignored locally; a DB behind ConfigStore later
   selections/<id>.toml
   strategies/<id>.toml
@@ -25,8 +25,9 @@ config/users/<user_id>/             L4: git-ignored locally; a DB behind ConfigS
 The location comes from `ALGOTRADE_CONFIG_DIR` (default `./config`) or `--config-dir`. Only
 `storage/configs/files.py` knows this layout; everything else uses the `ConfigStore`
 protocol (`load(scope, kind, name)`, `names`, `users`). A config id is found under the kind
-`strategies` or `screeners` (both is an error); a user's `screeners` document is their latest
-version with the schedule switch applied. User configs are **written** only by
+`strategies` or `screeners` (both is an error). `screeners` are versioned:
+`load(scope, "screeners", "<id>")` is the latest version (a user's with their schedule switch
+applied), `"<id>@<N>"` exactly version N. User configs are **written** only by
 `services/authoring` through `ConfigWriter` (`storage/configs/writer.py`; atomic files, a
 version is never overwritten), which the API calls (ADR 0029): save / discard a draft,
 finalise it (validated fail closed), copy a preset, rebase, switch the schedule, save a user
@@ -61,9 +62,9 @@ built-in defaults  <  L3 site (defaults.toml + preset)  <  L4 user config  <  ru
 
 - **Find the document.** A user config with the same id overrides the site preset of that id;
   `extends = "<preset id>"` builds a new id on top of a preset; a user-only config needs no
-  preset. `extends = "<preset id>@<N>"` pins the preset's `version = N`: when the site preset
-  moves on, the config fails closed (`... rebase onto it`) until the user rebases (results
-  never change silently). The `site` user (scheduled site presets) never reads user documents.
+  preset. `extends = "<preset id>@<N>"` pins version N of a rule-screen preset; it keeps
+  resolving when the site adds newer versions (rebasing is optional, results never change
+  silently). The `site` user (scheduled site presets) never reads user documents.
 - **Merge.** Tables merge deeply; lists are replaced.
 - **Selection.** A preset name resolves user-first, then site. A user either **narrows** the
   preset with `selection_overrides` (AND-ed with the preset's rules, so later preset fixes
@@ -73,8 +74,9 @@ built-in defaults  <  L3 site (defaults.toml + preset)  <  L4 user config  <  ru
   and are typed at resolve time (`ResolvedConfig.screening`, `.backtest`; see
   [site settings](#site-settings-typed-one-loader)): an unknown key or a bad value fails
   with its path, e.g. `sma_trend [backtest.costs]: unknown keys ['fee']`.
-- **Hash.** SHA-256 of everything that affects results (impl, params, selection, schedule,
-  exports, settings), not of provenance. Every result row and run record carries `user_id`,
+- **Hash.** SHA-256 of everything that affects results (impl, params, selection, exports,
+  settings), not of provenance and not of the schedule (when a config runs never changes what
+  it computes). Every result row and run record carries `user_id`,
   `config_id` and `config_hash`; `layers` records which files were used.
 
 ## Selections

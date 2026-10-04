@@ -33,7 +33,7 @@ from algotrade.storage.configs.files import (
     read_toml,
     version_file,
 )
-from algotrade.storage.configs.store import ConfigStore, screen_document
+from algotrade.storage.configs.store import ConfigStore, screen_document, split_version
 
 MAX_DOCUMENT_BYTES = 64 * 1024  # a config is a few KiB; refuse anything far larger
 
@@ -264,9 +264,12 @@ class MemoryConfigWriter(MemoryConfigStore):
     def load(self, scope: str, kind: str, name: str) -> Mapping[str, Any] | None:
         if kind != SCREENERS or scope == SITE:
             return super().load(scope, kind, name)
+        name, pinned = split_version(name)
         versions = self._versions.get((scope, name))
         if not versions:
             return None
+        if pinned is not None:
+            return versions.get(pinned)
         return screen_document(versions[max(versions)], self._schedules.get((scope, name)))
 
     def names(self, scope: str, kind: str) -> list[str]:

@@ -93,10 +93,11 @@ def test_detail_versions_and_schedule(writer: MemoryConfigWriter) -> None:
     detail = screens.screen_detail(writer, "alice", "mine")
     assert (detail.versions, detail.latest, detail.schedule) == ([1], 1, None)
     assert detail.draft_error and "nope" in detail.draft_error
-    assert detail.error is None and detail.resolved and detail.resolved["schedule"] is None
+    assert detail.error is None and detail.resolved is not None
     assert [v.version for v in screens.screen_versions(writer, "alice", "mine")] == [1]
     assert [r.config.id for r in scheduled(writer) if r.user.user_id == "alice"] == []
     assert screens.set_schedule(writer, "alice", "mine", "nightly") == "nightly"
+    assert screens.screen_detail(writer, "alice", "mine").hash == detail.hash  # when, not what
     assert [r.config.id for r in scheduled(writer) if r.user.user_id == "alice"] == ["mine"]
     with pytest.raises(ConfigurationError, match="schedule"):
         screens.set_schedule(writer, "alice", "mine", "hourly")

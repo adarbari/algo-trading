@@ -247,17 +247,39 @@ def test_extends_pins_a_preset_version() -> None:
         "version": 3,
         "criteria": {"active": ACTIVE},
     }
-    s = store({("site", "screeners", "p"): preset, ("u1", "screeners", "mine"): {"extends": "p@3"}})
+    v4 = preset | {"version": 4, "criteria": {"active": NOT_LEVERAGED}}
+    docs: dict[tuple[str, str, str], Any] = {
+        ("site", "screeners", "p@3"): preset,
+        ("site", "screeners", "p@4"): v4,
+        ("u1", "screeners", "mine"): {"extends": "p@3"},
+        ("u1", "screeners", "latest"): {"extends": "p"},
+    }
+    s = store(docs)
     r = resolve("mine", UserContext("u1"), s.load)
-    assert r.layers[:2] == ("site/screeners/p", "u1/screeners/mine")
-    stale = store(
-        {
-            ("site", "screeners", "p"): preset | {"version": 4},
-            ("u1", "screeners", "mine"): {"extends": "p@3"},
-        }
+    assert r.layers[:2] == ("site/screeners/p@3", "u1/screeners/mine")
+    assert r.config.rules["criteria"] == {"active": ACTIVE}  # v3, not the latest
+    assert resolve("latest", UserContext("u1"), s.load).config.rules["criteria"]["active"] == (
+        NOT_LEVERAGED
     )
-    with pytest.raises(ConfigurationError, match="rebase"):
-        resolve("mine", UserContext("u1"), stale.load)
+    for bad in ("p@9", "nope@1"):
+        gone = store(docs | {("u1", "screeners", "mine"): {"extends": bad}})
+        with pytest.raises(ConfigurationError):
+            resolve("mine", UserContext("u1"), gone.load)
+    lying = store(
+        docs
+        | {("site", "screeners", "p@4"): preset, ("u1", "screeners", "mine"): {"extends": "p@4"}}
+    )
+    with pytest.raises(ConfigurationError, match="says version"):
+        resolve("mine", UserContext("u1"), lying.load)
+
+
+def test_the_schedule_is_not_in_the_hash() -> None:
+    on = store({("u1", "strategies", "scr"): {"schedule": "nightly"}})
+    off = store({("u1", "strategies", "scr"): {"exports": []}})
+    assert (
+        resolve("scr", UserContext("u1"), on.load).hash
+        == resolve("scr", UserContext("u1"), off.load).hash
+    )
 
 
 @pytest.mark.parametrize("extends", ["p@", "p@0", "p@x", "P", 3, "p@3@4"])

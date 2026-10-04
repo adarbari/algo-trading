@@ -37,6 +37,6 @@ def writer() -> MemoryConfigWriter:
     return MemoryConfigWriter(
         {
             ("site", "selections", "all_active"): tomllib.loads(SELECTION),
-            ("site", "screeners", "vrp"): tomllib.loads(PRESET),
+            ("site", "screeners", "vrp@3"): tomllib.loads(PRESET),
         }
     )

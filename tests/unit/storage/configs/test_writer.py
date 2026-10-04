@@ -113,5 +113,6 @@ def test_file_layout_and_atomicity(tmp_path: Path) -> None:
     assert writer.versions("alice", "mine") == [1]
     (tmp_path / "users" / "alice" / "screeners" / ".hidden").mkdir()
     assert writer.names("alice", "screeners") == ["mine"]
+    assert writer.screen_dir("site", "mine") == tmp_path / "site" / "presets" / "screeners" / "mine"
     with pytest.raises(ConfigurationError, match="site"):
-        writer.screen_dir("site", "mine")
+        writer.add_version("site", "mine", 1, DOC)  # site presets change by PR only

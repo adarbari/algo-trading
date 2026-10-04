@@ -30,14 +30,19 @@ def test_copy_finalise_schedule_and_rebase(writer_client: TestClient, root: Path
         "current": 3,
         "rebase_available": False,
     }
-    assert c.put("/screeners/my_vrp/schedule?user=alice", json={"schedule": "nightly"}).json() == {
+    scheduled = c.put("/screeners/my_vrp/schedule?user=alice", json={"schedule": "nightly"})
+    assert c.get("/screeners/my_vrp?user=alice").json()["hash"] == done["hash"]
+    assert scheduled.json() == {
         "screener_id": "my_vrp",
         "schedule": "nightly",
     }
-    preset = root / "site" / "presets" / "screeners" / "vrp.toml"
-    preset.write_text(preset.read_text().replace("version = 3", "version = 4"))
+    hash_v1 = c.get("/screeners/my_vrp?user=alice").json()["hash"]
+    presets = root / "site" / "presets" / "screeners" / "vrp"
+    v3 = (presets / "v3.toml").read_text()
+    (presets / "v4.toml").write_text(v3.replace("version = 3", "version = 4").replace("5", "7"))
     stale = c.get("/screeners/my_vrp?user=alice").json()
-    assert "rebase" in stale["error"] and stale["preset"]["rebase_available"]
+    assert stale["error"] is None and stale["hash"] == hash_v1  # the pin still resolves
+    assert stale["preset"]["rebase_available"]
     assert c.post("/screeners/my_vrp/rebase?user=alice").json()["document"]["extends"] == "vrp@4"
     assert c.post("/screeners/my_vrp/finalise?user=alice").json()["version"] == 2
     versions = c.get("/screeners/my_vrp/versions?user=alice").json()

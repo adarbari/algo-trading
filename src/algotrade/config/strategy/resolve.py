@@ -126,7 +126,8 @@ class ResolvedConfig:
         return screen_spec(self.config)
 
     def canonical(self) -> dict[str, Any]:
-        """Everything that affects results (not provenance), in a stable JSON shape."""
+        """Everything that affects results (not provenance, not the schedule: when a config
+        runs never changes what it computes), in a stable JSON shape."""
         c = self.config
         return (
             {
@@ -135,7 +136,6 @@ class ResolvedConfig:
                 "impl": c.impl,
                 "params": dict(sorted(c.params.items())),
                 "selection": selection_to_dict(self.selection) if self.selection else None,
-                "schedule": c.schedule,
                 "exports": list(c.exports),
                 "settings": self.settings,
             }
@@ -170,7 +170,7 @@ def config_document(
 
 
 def parse_extends(value: Any, path: str) -> tuple[str, int | None]:
-    """``"<preset>"`` or ``"<preset>@<N>"`` (pinned to the preset's ``version = N``)."""
+    """``"<preset>"`` or ``"<preset>@<N>"`` (pinned to version N of a rule-screen preset)."""
     if not isinstance(value, str):
         raise ConfigurationError(f"{path}.extends: expected '<preset>' or '<preset>@<version>'")
     name, at, pin = value.partition("@")
@@ -182,6 +182,21 @@ def parse_extends(value: Any, path: str) -> tuple[str, int | None]:
     return name, int(pin)
 
 
+def _pinned_preset(
+    load: DocumentLoader, preset: str, pin: int, where: str
+) -> tuple[str, Mapping[str, Any]]:
+    """Version ``pin`` of the site rule-screen preset ``preset`` (versions are immutable, so a
+    pin always resolves to what it was finalised against)."""
+    document = load("site", "screeners", f"{preset}@{pin}")
+    if document is None:
+        raise ConfigurationError(f"{where}: extends {preset}@{pin}: no such preset version")
+    if document.get("version") != pin:
+        raise ConfigurationError(
+            f"site/screeners/{preset}@{pin}: the file says version = {document.get('version')}"
+        )
+    return "screeners", document
+
+
 def _strategy_document(
     config_id: str, user: UserContext, load: DocumentLoader
 ) -> tuple[dict[str, Any], list[str]]:
@@ -191,18 +206,17 @@ def _strategy_document(
     base_id, pin = (config_id, None)
     if user_doc and "extends" in user_doc:
         base_id, pin = parse_extends(user_doc["extends"], where)
-    site = config_document(load, "site", base_id)
+    if pin is not None:
+        site: tuple[str, Mapping[str, Any]] | None = _pinned_preset(load, base_id, pin, where)
+    else:
+        site = config_document(load, "site", base_id)
     site_kind, site_doc = site if site else ("strategies", None)
     if user_doc and "extends" in user_doc and site_doc is None:
         raise ConfigurationError(f"{user.user_id}/{config_id}: extends unknown preset {base_id!r}")
     if user_doc is None and site_doc is None:
         raise ConfigurationError(f"unknown config {config_id!r} for user {user.user_id!r}")
-    if pin is not None and site_doc is not None and site_doc.get("version") != pin:
-        raise ConfigurationError(
-            f"{where}: pinned to {base_id}@{pin} but the site preset is at "
-            f"v{site_doc.get('version')}: rebase onto it (results never change silently)"
-        )
-    layers = [f"site/{site_kind}/{base_id}"] if site_doc else []
+    site_name = f"{base_id}@{pin}" if pin is not None else base_id
+    layers = [f"site/{site_kind}/{site_name}"] if site_doc else []
     merged = dict(site_doc or {})
     if user_doc:
         merged = deep_merge(merged, {k: v for k, v in user_doc.items() if k != "extends"})
