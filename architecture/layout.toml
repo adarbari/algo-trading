@@ -794,7 +794,7 @@ kind = "log"
 
 [[docs_dir]]
 path = "docs/data"
-purpose = "data specs: layers, storage, instruments, vendors, nightly footprint"
+purpose = "data specs: layers, storage, instruments, vendors, nightly footprint, feature catalogue, options positioning"
 
 [[docs_dir]]
 path = "docs/screeners"
