@@ -1371,11 +1371,8 @@ export interface components {
             priority: string[];
             /** Screeners */
             screeners: components["schemas"]["IdeaScreener"][];
-            /**
-             * Session
-             * Format: date
-             */
-            session: string;
+            /** Session */
+            session: string | null;
             /** Total */
             total: number;
         };

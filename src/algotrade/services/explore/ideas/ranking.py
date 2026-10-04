@@ -32,7 +32,7 @@ from algotrade.data.chains import chain_expiries
 from algotrade.data.reference import resolver, snapshot
 from algotrade.data.rollups import rollup_on
 from algotrade.features.rollups import earnings
-from algotrade.services.explore.store import NotFoundError, ReadStore
+from algotrade.services.explore.store import ReadStore
 from algotrade.services.views import to_value
 from algotrade.storage.tables.schemas import result_table
 
@@ -106,7 +106,7 @@ class IdeaScreener:
 
 @dataclass(frozen=True)
 class Ideas:
-    session: date  # the newest session any screen contributed
+    session: date | None  # the newest session any screen contributed (None: none stored yet)
     priority: list[str]
     screeners: list[IdeaScreener]  # priority order, then any other screener with picks
     total: int
@@ -157,12 +157,9 @@ def _screeners(frames: list[pd.DataFrame], priority: Sequence[str]) -> list[Idea
 
 def _latest_runs(reader: StoreReader, on: date | None, user: str) -> list[pd.DataFrame]:
     """Per config, its rows of the latest run in its latest session (the user's own screen
-    wins over a site screen of the same id). Each frame carries its ``_session``."""
+    wins over a site screen of the same id). Each frame carries its ``_session``; empty when
+    no screen results are stored by ``on``."""
     sessions = [d for d in reader.dates(RULE_SCREEN) if on is None or d <= on]
-    if not sessions:
-        raise NotFoundError(
-            f"{RULE_SCREEN}: nothing stored" + (f" on or before {on}" if on else "")
-        )
     latest: dict[tuple[str, str], pd.DataFrame] = {}
     for session in reversed(sessions[-LOOKBACK:]):
         frame = reader.table_range(RULE_SCREEN, session, session, None, None, SCREEN_COLUMNS)
@@ -314,9 +311,11 @@ def top_ideas(
 ) -> Ideas:
     """The ``limit`` best tickers picked by any of ``user``'s (or the site's) stored screens
     in sessions on or before ``on`` (the latest when None); ``priority`` lists screener ids,
-    best first (screens not listed rank after, by id). ``NotFoundError`` when no screen results
-    are stored by then."""
+    best first (screens not listed rank after, by id). Nothing stored by then is not an error:
+    the result has no items and no session (no screener has run yet)."""
     frames = _latest_runs(reader, on, user)
+    if not frames:
+        return Ideas(None, list(priority), [], 0, [])
     ids = sorted({str(c) for f in frames for c in f["config_id"].unique()})
     listed = {c: i for i, c in enumerate(priority)}
     rank_of = {c: listed.get(c, len(listed)) for c in ids}
@@ -324,9 +323,7 @@ def top_ideas(
     ranked = sorted(candidates, key=lambda i: (candidates[i][0][0], i))
     shown = ranked[: max(limit, 0)]
     picks = _attach_values(reader, {i: [p for _, p in candidates[i]] for i in shown})
-    session = max(f["_session"].iloc[0] for f in frames) if frames else None
-    if session is None:
-        raise NotFoundError(f"{RULE_SCREEN}: no results stored")
+    session = max(f["_session"].iloc[0] for f in frames)
     names = resolver(reader, session)
     context = _earnings(reader, session)
     expiries = chain_expiries(reader, session, shown)

@@ -16,9 +16,11 @@ export interface IdeasPageProps {
   onOpen: (symbol: string) => void;
   /** Open the screener Builder for a new screener. */
   onNewScreener: () => void;
+  /** Open the Screeners list. */
+  onScreeners: () => void;
 }
 
-export function IdeasPage({ onCompare, onOpen, onNewScreener }: IdeasPageProps) {
+export function IdeasPage({ onCompare, onOpen, onNewScreener, onScreeners }: IdeasPageProps) {
   return (
     <Stack gap={3}>
       <Stack gap={1}>
@@ -29,7 +31,7 @@ export function IdeasPage({ onCompare, onOpen, onNewScreener }: IdeasPageProps) 
       </Stack>
       <Grid columns="sidebar-start" gap={4} collapse="lg" align="start">
         <ScreenerRanking onNewScreener={onNewScreener} />
-        <TopIdeas onCompare={onCompare} onOpen={onOpen} />
+        <TopIdeas onCompare={onCompare} onOpen={onOpen} onScreeners={onScreeners} />
       </Grid>
     </Stack>
   );

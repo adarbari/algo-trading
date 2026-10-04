@@ -62,6 +62,31 @@ test('the list shows your screeners and the site presets', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+for (const width of [800, 1024, 1280]) {
+  test(`the site presets' actions fit their column and can be clicked at ${String(width)} px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto('/screeners');
+    const row = page
+      .getByRole('grid', { name: 'Site presets' })
+      .getByRole('row', { name: /vrp_scanner/ });
+    for (const name of ['Open', 'Copy to my screeners']) {
+      const button = row.getByRole('button', { name });
+      await expect(button).toBeInViewport({ ratio: 1 });
+      // Inside its own cell: not spilling into (or clipped by) the neighbouring column.
+      const fits = await button.evaluate((el) => {
+        const cell = el.closest('[role="gridcell"]')?.getBoundingClientRect();
+        const box = el.getBoundingClientRect();
+        return cell !== undefined && box.left >= cell.left && box.right <= cell.right;
+      });
+      expect(fits, `${name} fits its cell`).toBe(true);
+    }
+    await row.getByRole('button', { name: 'Open' }).click();
+    await expect(page).toHaveURL(/\/screeners\/vrp_scanner\/edit$/);
+  });
+}
+
 for (const theme of ['dark', 'light'] as const) {
   test(`the Builder shows the criteria and the live preview (${theme})`, async ({ page }) => {
     const errors = collectErrors(page);
@@ -264,7 +289,7 @@ test('an inherited tie-break can be cleared in your copy', async ({ page }) => {
   const mock = await mockBuilderApi(page);
   await page.goto('/screeners/vrp_scanner/edit');
   await expect(page.getByRole('combobox', { name: 'Feature or formula' }).last()).toHaveValue(
-    'feature.iv_hv_spread',
+    'IV − HV',
   );
   await page.getByRole('button', { name: 'Clear tie-break' }).click();
   await expect(page.getByRole('button', { name: 'Clear tie-break' })).toHaveCount(0);

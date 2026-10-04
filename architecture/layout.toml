@@ -421,7 +421,7 @@ purpose = "ESLint rule sets by concern: base (TS, React, a11y), layers (rules 1-
 
 [[web_dir]]
 path = "apps/web/scripts"
-purpose = "generators (tokens.css, COMPONENTS.md, API schema), the design-system completeness check, the Playwright Docker runner"
+purpose = "generators (tokens.css, COMPONENTS.md, API schema), the design-system completeness check, the node_modules guard (predev), the Playwright Docker runner"
 
 [[web_dir]]
 path = "apps/web/e2e"
@@ -434,6 +434,10 @@ purpose = "API responses recorded from the real API for end-to-end route mocks, 
 [[web_dir]]
 path = "apps/web/e2e/fixtures/*"
 purpose = "one page's recorded API responses (JSON), served by its e2e route mock"
+
+[[web_dir]]
+path = "apps/web/real"
+purpose = "Playwright real-app smoke: the Vite dev server against the real API on an empty and the golden store, every route, no mocks"
 
 [[web_dir]]
 path = "apps/web/visual"

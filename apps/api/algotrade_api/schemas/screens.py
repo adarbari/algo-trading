@@ -76,7 +76,7 @@ class IdeaScreener(Schema):
 
 
 class Ideas(Schema):
-    session: date
+    session: date | None  # None: no screener has stored results yet
     priority: list[str]
     screeners: list[IdeaScreener]
     total: int

@@ -27,6 +27,7 @@ vi.mock('@/widgets/top-ideas', async () => {
     TopIdeas: (props: {
       onCompare: (s: { sel: string; focus: string }) => void;
       onOpen: (s: string) => void;
+      onScreeners: () => void;
     }) => {
       widgets.top(props);
       return (
@@ -38,6 +39,7 @@ vi.mock('@/widgets/top-ideas', async () => {
           >
             compare
           </Button>
+          <Button onClick={props.onScreeners}>screeners</Button>
           <Button
             onClick={() => {
               props.onOpen('KO');
@@ -57,8 +59,14 @@ describe('IdeasPage', () => {
     const onCompare = vi.fn();
     const onOpen = vi.fn();
     const onNewScreener = vi.fn();
+    const onScreeners = vi.fn();
     const { container } = render(
-      <IdeasPage onCompare={onCompare} onOpen={onOpen} onNewScreener={onNewScreener} />,
+      <IdeasPage
+        onCompare={onCompare}
+        onOpen={onOpen}
+        onNewScreener={onNewScreener}
+        onScreeners={onScreeners}
+      />,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Ideas for Fri 2 Oct' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'new screener' }));
@@ -67,6 +75,8 @@ describe('IdeasPage', () => {
     expect(onCompare).toHaveBeenCalledWith({ sel: 'AAPL,MSFT', focus: 'AAPL' });
     await user.click(screen.getByRole('button', { name: 'open' }));
     expect(onOpen).toHaveBeenCalledWith('KO');
+    await user.click(screen.getByRole('button', { name: 'screeners' }));
+    expect(onScreeners).toHaveBeenCalledOnce();
     await expectNoA11yViolations(container);
   });
 });

@@ -11,6 +11,7 @@ function IdeasRoute() {
     <IdeasPage
       onCompare={(search) => void navigate({ to: '/explore', search })}
       onNewScreener={() => void navigate({ to: '/screeners/new' })}
+      onScreeners={() => void navigate({ to: '/screeners' })}
       onOpen={(symbol) => void navigate({ to: '/explore', search: { sel: symbol, focus: symbol } })}
     />
   );

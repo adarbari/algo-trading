@@ -3,7 +3,7 @@
  * screener priority then score. Filter by decision, hide near-term earnings, tick tickers to
  * compare them in Explore, or click one to open it there.
  */
-import { Chip, DataTable, Panel, Stack } from '@algotrade/ui';
+import { Button, Chip, DataTable, Panel, Stack, Text } from '@algotrade/ui';
 import { useMemo, useState } from 'react';
 
 import { CompareIdeasButton, type IdeaCompareSearch } from '@/features/idea-compare';
@@ -21,9 +21,11 @@ import {
 export interface TopIdeasProps {
   onCompare: (search: IdeaCompareSearch) => void;
   onOpen: (symbol: string) => void;
+  /** Open the Screeners list (where a screener is run). */
+  onScreeners: () => void;
 }
 
-export function TopIdeas({ onCompare, onOpen }: TopIdeasProps) {
+export function TopIdeas({ onCompare, onOpen, onScreeners }: TopIdeasProps) {
   const ideas = useIdeas();
   const [filters, setFilters] = useState<IdeaFilters>(NO_FILTERS);
   const [selected, setSelected] = useState<string[]>([]);
@@ -41,15 +43,31 @@ export function TopIdeas({ onCompare, onOpen }: TopIdeasProps) {
       decisions: on ? [...f.decisions, decision] : f.decisions.filter((d) => d !== decision),
     }));
   };
-  const state = ideas.isError && !ideas.data ? 'error' : ideas.isPending ? 'loading' : 'ready';
+  // No session: no screener has stored results yet (not an error: the API answers 200, empty).
+  const state =
+    ideas.isError && !ideas.data
+      ? 'error'
+      : ideas.isPending
+        ? 'loading'
+        : ideas.data.session === null
+          ? 'empty'
+          : 'ready';
 
   return (
     <Panel
       title="Top ideas · across all your screeners"
-      description={ideas.data ? `Session ${ideas.data.session}` : undefined}
+      description={ideas.data?.session ? `Session ${ideas.data.session}` : undefined}
       flush
       state={state}
       loadingLabel="Loading ideas…"
+      emptyMessage={
+        <Stack gap={2} align="start">
+          <Text tone="muted">No screener has run yet, so there are no ideas.</Text>
+          <Button variant="primary" onClick={onScreeners}>
+            Go to Screeners
+          </Button>
+        </Stack>
+      }
       errorMessage="The ideas failed to load."
       onRetry={() => void ideas.refetch()}
       actions={

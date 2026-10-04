@@ -75,7 +75,8 @@ export interface ScreenerSummary {
 }
 
 export interface IdeasData {
-  session: string;
+  /** The newest session any screener ran on; null: no screener has run yet. */
+  session: string | null;
   total: number;
   ideas: Idea[];
   /** The user's screeners, highest priority first (priority list, then any other picker). */

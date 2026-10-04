@@ -11,6 +11,7 @@
     "design-system"
   ],
   "scripts": {
+    "predev": "node scripts/check-node-modules.ts",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
@@ -19,6 +20,7 @@
     "format": "eslint --fix . && prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "prestorybook": "node scripts/check-node-modules.ts",
     "storybook": "storybook dev -p 6006",
     "storybook:build": "storybook build --quiet -o storybook-static",
     "e2e": "playwright test",

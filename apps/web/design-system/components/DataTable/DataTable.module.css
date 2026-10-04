@@ -12,6 +12,7 @@
   --dt-w-md: calc(var(--space-10) * 3);
   --dt-w-lg: calc(var(--space-10) * 4.5);
   --dt-w-xl: calc(var(--space-10) * 7);
+  --dt-w-2xl: calc(var(--space-10) * 9); /* a cell with two buttons */
 
   /* A two-line row (symbol + name) adds one xs line; useRowHeight.ts mirrors this. */
   --dt-row-height: calc(

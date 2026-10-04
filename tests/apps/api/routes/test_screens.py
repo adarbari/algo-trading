@@ -1,4 +1,13 @@
+from pathlib import Path
+
 from fastapi.testclient import TestClient
+
+from algotrade.config.user import UserContext
+from algotrade.services.explore.store import store_over
+from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.configs.files import FileConfigStore
+from algotrade_api.deps import ApiSettings
+from algotrade_api.main import create_app
 
 
 def test_screen_configs_with_latest_run(client: TestClient) -> None:
@@ -69,6 +78,20 @@ def test_ideas_limit_and_date(client: TestClient) -> None:
     assert [i["symbol"] for i in client.get("/ideas", params={"limit": 1}).json()["items"]] == [
         "AAA"
     ]
-    assert client.get("/ideas", params={"date": "2021-01-04"}).status_code == 404
+    before = client.get("/ideas", params={"date": "2021-01-04"})  # nothing stored by then
+    assert before.status_code == 200
+    assert (before.json()["session"], before.json()["items"], before.json()["total"]) == (
+        None, [], 0
+    )  # fmt: skip
     assert client.get("/ideas", params={"user": "Bad User"}).status_code == 400
     assert client.get("/ideas", params={"limit": 0}).status_code == 422
+
+
+def test_ideas_on_an_empty_store_is_an_empty_list_not_a_404(tmp_path: Path) -> None:
+    """The real app before any screener has run: 200 with no session, never a 404."""
+    store = store_over(MemoryBackend(), FileConfigStore(tmp_path), UserContext("local"))
+    empty = TestClient(create_app(ApiSettings("memory://", "config"), store))
+    response = empty.get("/ideas")
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["session"], body["items"], body["screeners"], body["total"]) == (None, [], [], 0)

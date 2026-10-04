@@ -108,6 +108,31 @@ jobs:
         if: matrix.python == '3.12' && needs.changes.outputs.python == 'true'
         with: { name: coverage, path: coverage.xml }
 
+  # The real app, not mocks: the Vite dev server against the real API on an EMPTY store and the
+  # golden fixture store, every route in both workspaces (apps/web/real, docs/ui/architecture.md).
+  # Fails on a console error, the Vite error overlay or a loading state that never resolves. It
+  # needs both toolchains, so it is its own job and runs for a change on either side.
+  real-app:
+    name: Real app smoke (Vite dev + real API, empty and golden stores)
+    needs: [changes]
+    if: needs.changes.outputs.python == 'true' || needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with: { python-version: "3.12", enable-cache: true }
+      - run: uv sync --all-packages --locked
+      - uses: actions/setup-node@v6
+        with: { node-version: "24" }
+      - run: npm ci --no-fund --no-audit
+        working-directory: apps/web
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - run: make web-real
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with: { name: real-app-report, path: "apps/web/playwright-report\napps/web/test-results", if-no-files-found: ignore }
+
   web:
     name: Web (lint, types, unit, design system, build, Storybook, e2e, screenshots)
     needs: [changes]

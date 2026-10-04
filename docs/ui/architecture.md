@@ -26,7 +26,7 @@ system; everything else composes it in layers that import only downward.
 | Pure helper (formatting, maths) | `apps/web/src/shared/lib/<kind>/<what-it-does>.ts` |
 | Build-time configuration (`VITE_*`) | `apps/web/src/shared/config/` |
 | Story / unit test | next to the component (`Name.stories.tsx`, `Name.test.tsx`) or module (`x.test.ts`) |
-| End-to-end test / screenshot suite | `apps/web/e2e/` / `apps/web/visual/` |
+| End-to-end test (mocked API) / real-app smoke / screenshot suite | `apps/web/e2e/` / `apps/web/real/` / `apps/web/visual/` |
 | Lint rule, generator, check | `apps/web/lint-rules/`, `apps/web/scripts/` |
 
 Nothing fits? Add a folder for the new kind, declare it as a `[[web_dir]]` in
@@ -100,12 +100,35 @@ data access, routing, workspace access, env) are `[[web_responsibility]]` entrie
 | Command | Does |
 |---|---|
 | `npm ci` / `make web-install` | install (lockfile `apps/web/package-lock.json`); `make web-install` also gets the Playwright browser |
-| `npm run dev` | dev server on :5173 (proxies `/api/*` to the API on :8000, prefix stripped) |
+| `npm run dev` | dev server on :5173 (proxies `/api/*` to the API on :8000, prefix stripped; `$API_PROXY_TARGET` overrides). `predev` / `prestorybook` run `scripts/check-node-modules.ts`, which stops with "node_modules is out of date with package-lock.json: run `make web-install`" when the installed packages differ from the lockfile (a pull changed the dependencies) |
 | `npm run check` / `make web-check` | generated files fresh, `ds:check`, lint (ESLint, Stylelint, Prettier), typecheck, unit tests, build, Storybook build, e2e |
+| `make web-real` (`npx playwright test -c playwright.real.config.ts`) | the real-app smoke (below): Vite dev + the real API, empty and golden stores; needs Python (`make install`); part of `make check` and CI's `real-app` job |
 | `npm run storybook` | the component catalogue on :6006 |
 | `npm run visual:docker` / `make web-visual` | screenshots + axe over every story in the CI Linux image (needs Docker) |
 | `npm run visual:update` | accept screenshot changes (commit the PNGs; reviewers see the diffs) |
 | `npm run tokens`, `components:md`, `api:generate` | regenerate `tokens.css`, `COMPONENTS.md`, the API schema |
+
+### Real-app smoke (`apps/web/real/`)
+
+The mocked e2e tests cannot see what only the real app shows: a stale `node_modules`, a page
+that waits forever on an endpoint that answers 404 or 500, a first-run store with nothing in
+it. So `make web-real` starts, for each of two stores, the real API (`uvicorn`, the repo's
+`config/`) and the Vite **dev** server (the error overlay exists only there), then opens every
+route of both workspaces (the top-bar sections plus `/screeners/new` and
+`/screeners/<id>/edit`): the **empty** store (a fresh install, before anything ran) and the
+**golden** fixture store (`make golden-store`). A route fails on:
+
+- a console error or uncaught page error;
+- the Vite error overlay (e.g. "Failed to resolve import");
+- a loading state (`aria-busy`, "Loading…") still showing after 10 s: every query must end in
+  data, empty or error (the app's query client never retries a 4xx);
+- a failed response other than the API's 404 `{"detail": ...}` ("nothing stored"), which pages
+  show as an empty or error panel (each such response and its console line cancel out). `/ideas`
+  is stricter: it must show its explained empty state, never a "failed to load" panel.
+
+A new route is covered by adding its path to `workspaces.ts` (or `EXTRA_ROUTES` in
+`real/routes.real.spec.ts` for a parameterised one). About 40 s; CI runs it as its own job
+(it needs Python and Node), local `make check` runs it after `make web-check`.
 
 The API client's types are generated from `apps/api/openapi.json` (the API's committed contract,
 ADR 0024) into `src/shared/api/generated/schema.ts`; regenerate in the same PR as an API change.

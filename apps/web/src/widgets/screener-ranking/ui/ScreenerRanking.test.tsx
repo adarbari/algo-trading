@@ -71,7 +71,7 @@ describe('ScreenerRanking', () => {
 
     hooks.useIdeas.mockReturnValue(fakeQuery({ ...data, screeners: [] }));
     const empty = setup();
-    expect(screen.getByText(/No screener has picked anything yet/)).toBeInTheDocument();
+    expect(screen.getByText(/No screener has run yet/)).toBeInTheDocument();
     await expectNoA11yViolations(empty.container);
     empty.unmount();
 

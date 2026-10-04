@@ -10,6 +10,7 @@ its code on that machine.
 | CI: lint, types, boundaries, ownership, dupes, file length, strategy evaluation | Python changes |
 | CI: tests (py3.12 on PRs; 3.12 + 3.13 on main) | Python changes (web-only PRs run `tests/architecture`) |
 | CI: web (lint, types, unit, Storybook, e2e, screenshots), in the Playwright image | web changes |
+| CI: real app smoke (Vite dev server + the real API, empty and golden stores) | Python or web changes |
 | Auto-merge sweeps | after every CI run and every 30 minutes |
 | Nightly evaluation | daily |
 | Release | version tags |

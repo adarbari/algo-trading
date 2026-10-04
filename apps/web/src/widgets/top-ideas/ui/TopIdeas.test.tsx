@@ -79,7 +79,7 @@ const response: IdeasResponse = {
 const data = toIdeasData(response);
 
 function setup() {
-  const handlers = { onCompare: vi.fn(), onOpen: vi.fn() };
+  const handlers = { onCompare: vi.fn(), onOpen: vi.fn(), onScreeners: vi.fn() };
   const view = render(<TopIdeas {...handlers} />);
   return { ...view, ...handlers, grid: () => screen.getByRole('grid', { name: 'Top ideas' }) };
 }
@@ -161,6 +161,14 @@ describe('TopIdeas', () => {
     expect(screen.getByText('No screener picked anything in this session.')).toBeInTheDocument();
     await expectNoA11yViolations(empty.container);
     empty.unmount();
+
+    hooks.useIdeas.mockReturnValue(fakeQuery<IdeasData>({ ...data, session: null, ideas: [] }));
+    const none = setup();
+    expect(screen.getByText(/No screener has run yet/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Go to Screeners' }));
+    expect(none.onScreeners).toHaveBeenCalledOnce();
+    await expectNoA11yViolations(none.container);
+    none.unmount();
 
     hooks.useIdeas.mockReturnValue(
       fakeQuery<IdeasData>(undefined, { isError: true, error: new Error('x') }),

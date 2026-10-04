@@ -89,4 +89,24 @@ describe('Combobox', () => {
     await userEvent.click(screen.getByRole('combobox'));
     await expectNoA11yViolations(container);
   });
+
+  it('shows the chosen option by its inputLabel, with the full label as a tooltip', () => {
+    render(
+      <Combobox
+        aria-label="Feature"
+        mono
+        value="rollup.price_stats@v2.close"
+        options={[
+          {
+            value: 'rollup.price_stats@v2.close',
+            label: 'rollup.price_stats@v2.close',
+            inputLabel: 'Last close',
+          },
+        ]}
+      />,
+    );
+    const input = screen.getByRole('combobox', { name: 'Feature' });
+    expect(input).toHaveValue('Last close');
+    expect(input.closest('[title]')).toHaveAttribute('title', 'rollup.price_stats@v2.close');
+  });
 });

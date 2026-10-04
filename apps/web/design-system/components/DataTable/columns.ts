@@ -19,7 +19,7 @@ import type { ReactNode } from 'react';
 import { isNumericFormat, type FormattedValue, type ValueFormat } from '../../format';
 
 /** Column width steps (minimum widths; every column also shares leftover space). */
-export type ColumnWidth = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+export type ColumnWidth = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 
 export interface DataTableCellContext<TRow> {
   row: TRow;

@@ -21,8 +21,10 @@
     "vite.config.ts",
     "playwright.config.ts",
     "playwright.visual.config.ts",
+    "playwright.real.config.ts",
     "scripts",
     "e2e",
+    "real",
     "visual"
   ]
 }

@@ -53,7 +53,7 @@ export function presetColumns(actions: ScreenerActions): DataTableColumn<Screene
       value: () => null,
       sortable: false,
       hideable: false,
-      width: 'lg',
+      width: '2xl', // Open + Copy to my screeners: narrower clips the buttons
       cell: ({ row }) =>
         isRules(row) ? (
           <Stack direction="row" gap={2} justify="end">
