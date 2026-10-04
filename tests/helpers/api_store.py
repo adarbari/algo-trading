@@ -4,6 +4,9 @@ reference facts with review marks, company details, rollups, events, an option c
 verification vs IBKR, run records (incl. data-quality checks), screen results and a saved
 backtest."""
 
+import atexit
+import shutil
+import tempfile
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -209,6 +212,14 @@ def _backtest(writer: StoreWriter) -> RunRecord:
     return run
 
 
+def _site_only_config_root() -> Path:
+    """The site presets alone: a developer's git-ignored ``config/users`` stays out of tests."""
+    root = Path(tempfile.mkdtemp(prefix="api-store-configs-"))
+    atexit.register(shutil.rmtree, root, ignore_errors=True)
+    (root / "site").symlink_to(CONFIG_ROOT / "site")
+    return root
+
+
 def api_store(source: FixtureSource) -> tuple[ReadStore, dict[str, str]]:
     """-> (the store, ids the tests use: ``nightly``, ``chains``, ``backtest`` run ids)."""
     backend = MemoryBackend()
@@ -227,4 +238,4 @@ def api_store(source: FixtureSource) -> tuple[ReadStore, dict[str, str]]:
         "backtest": backtest.run_id,
     }
     user = UserContext("local")
-    return store_over(backend, FileConfigStore(CONFIG_ROOT), user), ids
+    return store_over(backend, FileConfigStore(_site_only_config_root()), user), ids
