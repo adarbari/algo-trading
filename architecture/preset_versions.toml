@@ -7,3 +7,4 @@
 
 [versions]
 "vrp_scanner/v1.toml" = "9985ddc31bd67c653639b7040a535bfd89019e49e005503a8570af13badf81f6"
+"vrp_scanner/v2.toml" = "8d3a134a80f1e5f4a59d83b3837001b3606fa527f8958ea7b3f7c61912103871"

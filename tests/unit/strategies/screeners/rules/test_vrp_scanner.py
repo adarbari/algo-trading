@@ -1,5 +1,6 @@
-"""The site VRP scanner preset (``config/site/presets/screeners/vrp_scanner/v1.toml``): it
-resolves and validates against the catalogue as the site user, is not scheduled, and on a
+"""The site VRP scanner preset (``config/site/presets/screeners/vrp_scanner/v<N>.toml``): v1
+(pinned, ``extends = "vrp_scanner@1"``) and v2 (the latest) resolve and validate against the
+catalogue, are not scheduled, and on a
 fixed fixture of rows gives the owner-decided outcomes (docs/screeners/vrp-scanner.md): the
 hard gates reject or skip, liquidity misses are LIQUIDITY_RISK near misses, IBKR IV rank
 only lowers the score, STRONG tier, leveraged / inverse flag, classify by near_52w, ties by
@@ -13,13 +14,14 @@ import pytest
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.user import UserContext
 from algotrade.core.views.feature_view import FeatureView
-from algotrade.services.configs import resolve_config
+from algotrade.services.configs import resolve_config, resolve_rule_draft
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.strategies.screeners import Decision
 from algotrade.strategies.screeners.rules import evaluate_screen
 from tests.conftest import REPO_ROOT
 
 DAY = date(2026, 10, 2)
+STORE = FileConfigStore(REPO_ROOT / "config")
 
 GOOD: dict[str, Any] = {
     "feature.vrp_iv30": 0.60,
@@ -70,7 +72,14 @@ EXPECTED = {  # id: (decision, score, tier, class, flags)
 
 @pytest.fixture(scope="module")
 def preset() -> ResolvedConfig:
-    return resolve_config(FileConfigStore(REPO_ROOT / "config"), "vrp_scanner", UserContext("site"))
+    """v1, pinned the way a user's copy pins it (the bare id resolves the latest version)."""
+    pinned = {"id": "pinned_v1", "extends": "vrp_scanner@1"}
+    return resolve_rule_draft(STORE, "pinned_v1", UserContext("tester"), pinned)
+
+
+@pytest.fixture(scope="module")
+def preset_v2() -> ResolvedConfig:
+    return resolve_config(STORE, "vrp_scanner", UserContext("site"))
 
 
 def test_preset_resolves_and_validates(preset: ResolvedConfig) -> None:
@@ -113,3 +122,74 @@ def test_fixture_outcomes(preset: ResolvedConfig) -> None:
     summary = result.summary
     assert summary.passed == 4 and dict(summary.skipped_reasons) == {"no feature.vrp_iv30": 1}
     assert {m.criterion_id for m in summary.narrow_misses} == {"adv", "target_oi"}
+
+
+# ---------------------------------------------------------------------------------------- v2
+WING = "rollup.put_wing@v1"
+GOOD_V2: dict[str, Any] = {
+    **{k: v for k, v in GOOD.items() if "option_liquidity" not in k},
+    f"{WING}.wing_oi": 3_000,
+    f"{WING}.wing_volume": 2_000,
+    f"{WING}.wing_spread_pct": 0.08,
+    "rollup.price_moves@v1.one_day_move": 0.04,
+}
+FIXTURE_V2: dict[str, dict[str, Any]] = {
+    "EQ:STRONG": GOOD_V2,
+    "EQ:GAPPY": {**GOOD_V2, "rollup.price_moves@v1.one_day_move": 0.13},  # flag only
+    "EQ:NOMOVE": {**GOOD_V2, "rollup.price_moves@v1.one_day_move": None},  # flag unknown: none
+    "EQ:THINOI": {**GOOD_V2, f"{WING}.wing_oi": 800},  # within 50% of 1,000
+    "EQ:THINVOL": {**GOOD_V2, f"{WING}.wing_volume": 600},
+    "EQ:WIDE": {**GOOD_V2, f"{WING}.wing_spread_pct": 0.18},  # 15-20%: near miss
+    "EQ:EDGEOI": {**GOOD_V2, f"{WING}.wing_oi": 1_000},  # "> 1,000": exactly 1,000 misses
+    "EQ:VERYWIDE": {**GOOD_V2, f"{WING}.wing_spread_pct": 0.30},  # beyond the band
+    "EQ:NOWING": {  # no 8-15 delta strike: missing -> SKIPPED, never a pass
+        **GOOD_V2,
+        f"{WING}.wing_oi": None,
+        f"{WING}.wing_volume": None,
+        f"{WING}.wing_spread_pct": None,
+    },
+}
+
+
+def test_v2_resolves_with_put_wing_liquidity(preset_v2: ResolvedConfig) -> None:
+    spec = preset_v2.screen_spec
+    assert spec.version == 2 and preset_v2.config.schedule is None  # on request, like v1
+    soft = {
+        c.id: (c.field, c.rule.op, c.rule.value, c.on_miss)
+        for c in spec.criteria
+        if c.mode.value == "soft"
+    }
+    assert soft == {
+        "adv": ("rollup.price_stats@v2.adv_usd_20d", "gte", 50_000_000, "LIQUIDITY_RISK"),
+        "wing_oi": (f"{WING}.wing_oi", "gt", 1_000, "LIQUIDITY_RISK"),
+        "wing_volume": (f"{WING}.wing_volume", "gt", 1_000, "LIQUIDITY_RISK"),
+        "wing_spread": (f"{WING}.wing_spread_pct", "lt", 0.15, "LIQUIDITY_RISK"),
+    }
+    assert not any("option_liquidity" in c.field for c in spec.criteria)
+    assert [name for name, _ in spec.flags] == ["large_move", "leveraged_inverse"]
+    columns = dict(spec.columns)
+    assert columns["best_put_strike"] == f"{WING}.best_put_strike"
+    assert columns["best_put_delta"] == f"{WING}.best_put_delta"
+    assert columns["best_put_premium"] == f"{WING}.best_put_mid"
+    assert columns["best_put_roc"] == f"{WING}.best_put_roc"
+
+
+def test_v2_fixture_outcomes(preset_v2: ResolvedConfig) -> None:
+    result = evaluate_screen(preset_v2.screen_spec, FeatureView(DAY, FIXTURE_V2))
+    rows = {r.instrument_id: r for r in result.rows}
+    assert rows["EQ:STRONG"].decision is Decision.QUALIFIED and rows["EQ:STRONG"].flags == ()
+    assert rows["EQ:GAPPY"].decision is Decision.QUALIFIED
+    assert rows["EQ:GAPPY"].flags == ("large_move",)
+    assert rows["EQ:NOMOVE"].decision is Decision.QUALIFIED and rows["EQ:NOMOVE"].flags == ()
+    for iid in ("EQ:THINOI", "EQ:THINVOL", "EQ:WIDE", "EQ:EDGEOI"):
+        assert rows[iid].decision is Decision.LIQUIDITY_RISK, iid
+    assert rows["EQ:VERYWIDE"].decision is Decision.REJECT
+    assert rows["EQ:NOWING"].decision is Decision.SKIPPED
+    assert rows["EQ:NOWING"].reasons[0] == f"no {WING}.wing_oi"
+    misses = {m.instrument_id: m.criterion_id for m in result.summary.narrow_misses}
+    assert misses == {
+        "EQ:THINOI": "wing_oi",
+        "EQ:THINVOL": "wing_volume",
+        "EQ:WIDE": "wing_spread",
+        "EQ:EDGEOI": "wing_oi",
+    }

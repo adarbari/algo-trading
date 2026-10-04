@@ -1,0 +1,154 @@
+# VRP scanner v2: v1 (docs/screeners/vrp-scanner.md, "Owner decisions (2026-10-03)"; rule
+# screens: docs/screeners/rules.md, ADR 0029) with the option-trade follow-up's liquidity
+# measured where the trade is: the 8-15 delta puts (our delta) of the expiry nearest 45 days
+# (rollup put_wing@v1), a large one-day move flag (rollup price_moves@v1) and the best put's
+# strike / delta / premium / ROC as columns. An identification layer, not a trade signal.
+# Immutable: change it by adding v3.toml (architecture/preset_versions.toml). v1 stays as is.
+# Not scheduled: run it on request (preview, a `screen` job) or schedule a user copy.
+id = "vrp_scanner"
+kind = "screener"
+impl = "rules"
+version = 2
+selection = "liquid_optionable"   # the daily universe snapshot: active optionable stocks, ADRs, ETFs
+classify = "feature.near_52w"     # buckets the output: HIGH, LOW, BOTH
+
+# ---------------------------------------------------------------- core gates (HARD; funnel order)
+[criteria.iv30]
+field = "feature.vrp_iv30"        # lower of IBKR and Cboe IV30; missing -> SKIPPED (no IV30)
+op = "gte"
+value = 0.50                      # the owner may lower it to 0.40
+label = "IV30 >= 50%"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+label = "Price > $5"
+
+[criteria.iv_hv_spread]
+field = "feature.vrp_iv_hv_spread"
+op = "gte"
+value = 0.10
+label = "IV30 - HV30 >= 10 pts"
+
+[criteria.iv_hv_ratio]
+field = "feature.vrp_iv_hv_ratio"  # plain IV30 / HV30, no HV30 floor
+op = "gte"
+value = 1.25
+label = "IV30 / HV30 >= 1.25"
+
+[criteria.near_52w]
+field = "feature.near_52w"
+op = "in"
+value = ["HIGH", "LOW", "BOTH"]
+label = "Within 10% of the 52W high or low"
+
+# ----------------------------------------------- liquidity (SOFT: flag a near miss, don't reject)
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+label = "Stock ADV > $50M"
+
+# The option liquidity at the target strikes: the target expiry's puts with our |delta| in
+# 0.08..0.15 (put_wing@v1). No qualifying strike (or no chain) -> missing -> SKIPPED: an
+# option chain that cannot be validated is never labelled qualified.
+[criteria.wing_oi]
+field = "rollup.put_wing@v1.wing_oi"
+op = "gt"
+value = 1_000
+mode = "soft"
+tolerance = { relative = 0.5 }    # 500-1,000 contracts is a near miss
+on_miss = "LIQUIDITY_RISK"
+label = "OI > 1,000 at the 8-15 delta target strikes"
+
+[criteria.wing_volume]
+field = "rollup.put_wing@v1.wing_volume"
+op = "gt"
+value = 1_000
+mode = "soft"
+tolerance = { relative = 0.5 }    # 500-1,000 contracts is a near miss
+on_miss = "LIQUIDITY_RISK"
+label = "Option volume > 1,000 at the target strikes"
+
+[criteria.wing_spread]
+field = "rollup.put_wing@v1.wing_spread_pct"
+op = "lt"
+value = 0.15
+mode = "soft"
+tolerance = 0.05                  # a median spread of 15-20% of mid is a near miss
+on_miss = "LIQUIDITY_RISK"
+label = "Bid/ask < 15% of mid at the target strikes (median)"
+
+# ------------------------------------------------------- score only (a miss lowers the score)
+[criteria.iv_rank]
+field = "rollup.ibkr_iv@v1.iv_rank_252d_ibkr"   # IBKR's only; missing -> no points
+op = "gte"
+value = 0.5
+mode = "score"
+tolerance = 0.5
+label = "IBKR IV rank >= 50%"
+
+[criteria.execution]
+field = "feature.option_tier"
+op = "in"
+value = ["A", "B"]
+mode = "score"
+label = "Option execution tier A or B"
+
+[tiers.STRONG]
+all = [
+  { field = "feature.vrp_iv_hv_spread", op = "gte", value = 0.15 },
+  { field = "feature.vrp_iv_hv_ratio", op = "gte", value = 1.30 },
+]
+
+[flags.large_move]
+any = [{ field = "rollup.price_moves@v1.one_day_move", op = "gt", value = 0.10 }]  # HV30 unstable
+
+[flags.leveraged_inverse]
+any = [
+  { field = "instrument.is_leveraged", op = "eq", value = true },
+  { field = "instrument.is_inverse", op = "eq", value = true },
+]
+
+[columns]
+close = "rollup.price_stats@v2.close"
+iv30 = "feature.vrp_iv30"
+iv30_source = "feature.vrp_iv30_source"
+hv20 = "rollup.price_stats@v2.hv20"
+hv30 = "rollup.price_stats@v2.hv30"
+iv_hv_spread = "feature.vrp_iv_hv_spread"
+iv_hv_ratio = "feature.vrp_iv_hv_ratio"
+iv_rank_ibkr = "rollup.ibkr_iv@v1.iv_rank_252d_ibkr"
+high_52w = "rollup.price_stats@v2.high_52w"
+pct_from_high_52w = "feature.pct_from_high_52w"
+low_52w = "rollup.price_stats@v2.low_52w"
+pct_from_low_52w = "feature.pct_from_low_52w"
+dist_52w = "feature.dist_52w"
+ret_20d = "rollup.price_stats@v2.ret_20d"
+ret_60d = "rollup.price_stats@v2.ret_60d"
+vs_sma_20 = "feature.pct_vs_sma_20"
+vs_sma_50 = "feature.pct_vs_sma_50"
+vs_sma_200 = "feature.pct_vs_sma_200"
+next_earnings = "rollup.earnings@v1.next_earnings_date"
+days_to_earnings = "rollup.earnings@v1.days_to_earnings"
+adv_usd = "rollup.price_stats@v2.adv_usd_20d"
+option_volume = "feature.option_chain_volume"
+one_day_move = "rollup.price_moves@v1.one_day_move"
+target_expiry = "rollup.put_wing@v1.target_expiry"
+target_dte = "rollup.put_wing@v1.target_dte"
+wing_strikes = "rollup.put_wing@v1.n_strikes"
+wing_oi = "rollup.put_wing@v1.wing_oi"
+wing_volume = "rollup.put_wing@v1.wing_volume"
+wing_spread_pct = "rollup.put_wing@v1.wing_spread_pct"
+best_put_strike = "rollup.put_wing@v1.best_put_strike"
+best_put_delta = "rollup.put_wing@v1.best_put_delta"
+best_put_premium = "rollup.put_wing@v1.best_put_mid"
+best_put_oi = "rollup.put_wing@v1.best_put_oi"
+best_put_roc = "rollup.put_wing@v1.best_put_roc"
+
+[rank]
+tie_break = "feature.vrp_iv_hv_spread"

@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-81 stored features in 8 groups, in dependency order; 25 expression features.
+96 stored features in 10 groups, in dependency order; 25 expression features.
 
 ## `option_liquidity@v1`
 
@@ -108,6 +108,14 @@ IBKR's IV30 and HV30, and the IV rank and percentile over 252 sessions of IBKR's
 | `history_days_ibkr` | window | int | sessions | personal | >= 0 | Sessions of the 252-session window with an IBKR IV, today included (gaps are not filled) | never | `volatility/ibkr_iv30.iv30_ibkr` |
 | `rank_status_ibkr` | label | str | category | personal | UNKNOWN, PROVISIONAL, FULL | UNKNOWN below 60 sessions with an IBKR IV (no rank), PROVISIONAL below 252, FULL from 252 | never | `volatility/ibkr_iv30.iv30_ibkr` |
 
+## `price_moves@v1`
+
+The largest one-day close-to-close move over the last 20 sessions. Stored as `rollups/instrument/price_moves@v1`; reads `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `one_day_move` | window | float32 | decimal | open | >= 0 | Largest absolute one-day close-to-close return over the last 20 sessions (split-adjusted as of the session): 0.12 is a 12% move up or down | a session among the last 21 has no close (a gap), or the history is shorter | `bars/1d.close` |
+
 ## `dividends@v2`
 
 Trailing-12-month cash dividends, split-adjusted to the session. Stored as `rollups/instrument/dividends@v2`; reads `rollups/instrument/price_stats@v2`, `events/dividend` (optional), `events/split` (optional).
@@ -146,6 +154,27 @@ Our 30-day ATM implied vol (forward ATM, put/call mid IVs, total-variance term i
 | `rate` | chain | float | decimal | open | -0.05 .. 0.25 | Continuous risk-free rate at 30 days, from the Treasury curve the session sees | never (the curve is a required input) | `rates/treasury.rate_cont` |
 | `div_yield` | expression | float | decimal | open | 0 .. 1 | The dividend yield q used for the forward, as read from div_yield@v1 | div_yield@v1 has no yield for it (UNKNOWN; priced with q = 0) | `div_yield@v1` |
 | `n_quotes_used` | chain | int | count | open | >= 0 | Option quotes whose implied vols were averaged, across both expiries | never (0 when none) | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.open_interest` |
+
+## `put_wing@v1`
+
+The 8-15 delta puts (our delta) of the expiry nearest 45 days: strikes, OI, volume, spread and the best put by cash-secured ROC. Stored as `rollups/instrument/put_wing@v1`; reads `chains/option_quotes`, `rates/treasury`, `chains/underlying_quotes` (optional), `rollups/instrument/div_yield@v1` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `wing_status` | label | str | category | open | OK, NO_SPOT, NO_CHAIN, NO_EXPIRY, NO_STRIKE | OK, or the first failing step: NO_SPOT, NO_CHAIN (no puts), NO_EXPIRY (none 30..60 days out), NO_STRIKE (no put with our \|delta\| in 0.08..0.15 at the target expiry) | never | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `target_expiry` | chain | date | date | open |  | The put expiry closest to 45 calendar days among those 30..60 days out, standard monthlies first (ties: the earlier); the best put's expiry | no target expiry (wing_status NO_SPOT, NO_CHAIN or NO_EXPIRY) | `chains/option_quotes.expiry` |
+| `target_dte` | chain | int | days | open | 30 .. 60 | Calendar days from the session to the target expiry (the best put's DTE) | no target expiry (wing_status NO_SPOT, NO_CHAIN or NO_EXPIRY) | `chains/option_quotes.expiry` |
+| `n_strikes` | chain | int | count | open | >= 0 | Strikes at the target expiry whose put has our \|delta\| in 0.08..0.15 (edges included) | no target expiry (wing_status NO_SPOT, NO_CHAIN or NO_EXPIRY) | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `n_unpriced` | chain | int | count | open | >= 0 | Puts at the target expiry without our delta (no two-sided quote, or the implied-vol inversion failed): never counted as qualifying | no target expiry (wing_status NO_SPOT, NO_CHAIN or NO_EXPIRY) | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `wing_oi` | chain | int | count | open | >= 0 | Open interest across the qualifying puts | no put with our \|delta\| in 0.08..0.15 at the target expiry (NO_STRIKE), or no target expiry (wing_status NO_SPOT, NO_CHAIN or NO_EXPIRY) | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1`, `chains/option_quotes.open_interest` |
+| `wing_volume` | chain | int | count | open | >= 0 | Volume across the qualifying puts | no put with our \|delta\| in 0.08..0.15 at the target expiry (NO_STRIKE), or no target expiry (wing_status NO_SPOT, NO_CHAIN or NO_EXPIRY) | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1`, `chains/option_quotes.volume` |
+| `wing_spread_pct` | chain | float32 | decimal | open | 0 .. 2 | Median (ask - bid) / mid across the qualifying puts | no put with our \|delta\| in 0.08..0.15 at the target expiry (NO_STRIKE), or no target expiry (wing_status NO_SPOT, NO_CHAIN or NO_EXPIRY) | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `best_put_strike` | chain | float32 | usd_per_share | open | >= 0 | The qualifying put with the highest ROC (ties: higher OI, then lower strike): strike | no put with our \|delta\| in 0.08..0.15 at the target expiry (NO_STRIKE), or no target expiry (wing_status NO_SPOT, NO_CHAIN or NO_EXPIRY) | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `best_put_delta` | chain | float32 | ratio | open | -0.15 .. -0.08 | The best put's delta (ours, negative) | no put with our \|delta\| in 0.08..0.15 at the target expiry (NO_STRIKE), or no target expiry (wing_status NO_SPOT, NO_CHAIN or NO_EXPIRY) | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `best_put_iv` | chain | float32 | decimal | open | 0 .. 5 | The best put's implied vol (ours, from the mid) | no put with our \|delta\| in 0.08..0.15 at the target expiry (NO_STRIKE), or no target expiry (wing_status NO_SPOT, NO_CHAIN or NO_EXPIRY) | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `best_put_mid` | chain | float32 | usd_per_share | open | >= 0 | The best put's mid, (bid + ask) / 2 | no put with our \|delta\| in 0.08..0.15 at the target expiry (NO_STRIKE), or no target expiry (wing_status NO_SPOT, NO_CHAIN or NO_EXPIRY) | `chains/option_quotes.bid`, `chains/option_quotes.ask` |
+| `best_put_oi` | chain | int | count | open | >= 0 | The best put's open interest | no put with our \|delta\| in 0.08..0.15 at the target expiry (NO_STRIKE), or no target expiry (wing_status NO_SPOT, NO_CHAIN or NO_EXPIRY) | `chains/option_quotes.open_interest` |
+| `best_put_roc` | chain | float32 | decimal | open | 0 .. 1 | The best put's cash-secured return on capital: premium / (strike x 100) = mid / strike | no put with our \|delta\| in 0.08..0.15 at the target expiry (NO_STRIKE), or no target expiry (wing_status NO_SPOT, NO_CHAIN or NO_EXPIRY) | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
 
 ## `iv_history@v2`
 

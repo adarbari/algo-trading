@@ -1,14 +1,33 @@
 # Daily Stock Identifier — IV / HV Volatility Premium Scanner
 
-> **Status in this repo:** a site rule-screen preset,
-> `config/site/presets/screeners/vrp_scanner/v1.toml` (not scheduled; run it from the Builder
+> **Status in this repo:** a site rule-screen preset (not scheduled; run it from the Builder
 > preview or as a `screen` job), over the expression features in `config/site/features/vrp.toml`
 > (`vrp_iv30`, `vrp_iv30_source`, `vrp_iv_hv_spread`, `vrp_iv_hv_ratio`) and `price.toml`
-> (`dist_52w`, `pct_vs_sma_20/50/200`). Not yet features, so not in v1: the large one-day move
-> flag, the closest option expiry's DTE column (Ideas computes it on read), the `vrp_setup`
-> label, liquidity at the 8-15 delta strikes (v1 uses the target expiry's 0.15-0.40 delta put
-> OI and the short put's spread). See [README](README.md) for how each section maps onto the
-> architecture.
+> (`dist_52w`, `pct_vs_sma_20/50/200`). The latest version is
+> `config/site/presets/screeners/vrp_scanner/v2.toml`; `v1.toml` stays as it was (immutable;
+> user copies pinned to `vrp_scanner@1` keep computing it).
+>
+> - **v1** measured option liquidity with `option_liquidity@v1` (the target expiry's
+>   0.15-0.40 delta put OI, chain-wide option volume, the short put's spread).
+> - **v2** measures it where the trade is, the "Option-trade follow-up" below: the rollup
+>   `put_wing@v1` takes the expiry closest to 45 days within 30-60 (standard monthlies first,
+>   where open interest concentrates) and its puts with OUR
+>   |delta| (ADR 0021) in 0.08-0.15, edges included. SOFT rules (`on_miss = LIQUIDITY_RISK`):
+>   OI > 1,000 and volume > 1,000 across those strikes (near miss down to 500), median
+>   bid/ask < 15% of mid (near miss to 20%). An underlying with no such strike has no value,
+>   so it is SKIPPED, never passed. Flag `large_move` when `price_moves@v1.one_day_move`
+>   (the largest |1-day close-to-close return| over 20 sessions, split-adjusted) > 10%.
+>   Columns add the best put by ROC = premium / (strike x 100): strike, delta, premium (mid),
+>   OI, ROC, and the target expiry / DTE.
+> - Not yet features: the closest option expiry's DTE column (Ideas computes it on read), the
+>   `vrp_setup` label.
+>
+> **Backfill (owner, after merge):** chains are stored from 2026-10-02 only, so the new
+> groups are cheap to fill: `algotrade-ingest rollups --from 2026-10-02 --to <last session>
+> --only put_wing@v1,price_moves@v1` (`price_moves@v1` can go further back with the bars).
+> Until then v2 SKIPS every row (`no rollup.put_wing@v1.wing_oi`).
+>
+> See [README](README.md) for how each section maps onto the architecture.
 
 ## Owner decisions (2026-10-03)
 
@@ -48,7 +67,7 @@ mapping follows.
 | Momentum context, setup class | `columns` + a site label feature `vrp_setup` |
 | Universe audit, "no qualified" only when COMPLETE | selection over the daily universe snapshot; the existing runner audit |
 | Option follow-up ROC | premium / (strike × 100), cash-secured; no correlation penalty |
-| Gaps (later) | liquidity at the 8-15 delta strikes, gap-move feature, catalysts (FDA etc.) |
+| Gaps (later) | catalysts (FDA etc.); liquidity at the 8-15 delta strikes and the gap-move flag are in v2 (`put_wing@v1`, `price_moves@v1`) |
 
 **Version:** 1.3\
 **Purpose:** Daily identification of liquid stocks with unusually rich implied volatility relative to realized volatility, while the underlying is positioned near a meaningful 52-week extreme.
