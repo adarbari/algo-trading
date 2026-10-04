@@ -16,7 +16,7 @@ from algotrade_api.routes import (
     screens,
     universe,
 )
-from algotrade_api.routes.authoring import screeners, user_features
+from algotrade_api.routes.authoring import preferences, screeners, user_features
 
 ROUTERS: tuple[APIRouter, ...] = (
     health.router,
@@ -29,6 +29,8 @@ ROUTERS: tuple[APIRouter, ...] = (
     features.router,
     screens.router,
     screeners.router,
+    preferences.router,
+    screens.ideas_router,
     backtests.router,
     configs.router,
     admin.router,

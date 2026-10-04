@@ -362,6 +362,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ideas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Top */
+        get: operations["top_ideas_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/instruments/{instrument_id}": {
         parameters: {
             query?: never;
@@ -423,6 +440,23 @@ export interface paths {
         /** Features */
         get: operations["features_instruments__instrument_id__features_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/preferences/ideas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save Ideas Priority */
+        put: operations["save_ideas_priority_preferences_ideas_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1086,6 +1120,93 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** Idea */
+        Idea: {
+            /** Closest Expiry Dte */
+            closest_expiry_dte: number | null;
+            /** Days To Earnings */
+            days_to_earnings: number | null;
+            /** Instrument Id */
+            instrument_id: string;
+            /** Next Earnings Date */
+            next_earnings_date: string | null;
+            /** Picks */
+            picks: components["schemas"]["IdeaPick"][];
+            /** Rank */
+            rank: number;
+            /** Symbol */
+            symbol: string | null;
+        };
+        /** IdeaCriterion */
+        IdeaCriterion: {
+            /** Criterion Id */
+            criterion_id: string;
+            /** Distance */
+            distance: number | null;
+            /** Field */
+            field: string;
+            /** Outcome */
+            outcome: string;
+            /** Value */
+            value: number | string | null;
+        };
+        /** IdeaPick */
+        IdeaPick: {
+            /** Columns */
+            columns: {
+                [key: string]: unknown;
+            };
+            /** Config Id */
+            config_id: string;
+            /** Config Version */
+            config_version: number | null;
+            /** Criteria */
+            criteria: components["schemas"]["IdeaCriterion"][];
+            /** Decision */
+            decision: string;
+            /** Klass */
+            klass: string | null;
+            /** Reasons */
+            reasons: string;
+            /** Score */
+            score: number | null;
+            /**
+             * Session
+             * Format: date
+             */
+            session: string;
+            /** Tier */
+            tier: string | null;
+            /** User */
+            user: string;
+        };
+        /** Ideas */
+        Ideas: {
+            /** Items */
+            items: components["schemas"]["Idea"][];
+            /** Priority */
+            priority: string[];
+            /**
+             * Session
+             * Format: date
+             */
+            session: string;
+            /** Total */
+            total: number;
+        };
+        /** IdeasPriority */
+        IdeasPriority: {
+            /** Priority */
+            priority: string[];
+        };
+        /** IdeasPriorityBody */
+        IdeasPriorityBody: {
+            /**
+             * Priority
+             * @description screener ids, highest priority first
+             */
+            priority: string[];
         };
         /** InstrumentDetail */
         InstrumentDetail: {
@@ -2383,6 +2504,41 @@ export interface operations {
             };
         };
     };
+    top_ideas_get: {
+        parameters: {
+            query?: {
+                /** @description default: the latest */
+                date?: string | null;
+                limit?: number;
+                /** @description default: the API's user (a label until auth) */
+                user?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ideas"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     detail_instruments__instrument_id__get: {
         parameters: {
             query?: {
@@ -2508,6 +2664,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FeatureSeries"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_ideas_priority_preferences_ideas_put: {
+        parameters: {
+            query?: {
+                /** @description whose configs (a label until auth; default the API's) */
+                user?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdeasPriorityBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdeasPriority"];
                 };
             };
             /** @description Validation Error */

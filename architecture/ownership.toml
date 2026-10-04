@@ -516,6 +516,13 @@ owner = ["src/algotrade/services/explore/*"]
 section = "docs/adr/0024-api.md#explore-queries"
 detect = [{ call = "paginate" }, { call = "partition_for" }]
 
+[[responsibility]]
+id = "ideas-ranking"
+description = "The Ideas list (ADR 0029): one row per ticker over every rule screen's latest stored run, listing each screener that picked it, ranked by the user's screener priority (preferences.toml ideas.priority), then score, tie-break and instrument id; never recomputes a screen"
+owner = ["src/algotrade/services/explore/ideas/ranking.py"]
+section = "docs/adr/0029-rule-screener.md#owner-decisions-2026-10-03"
+detect = [{ call = "top_ideas" }]
+
 # --------------------------------------------------------------------------- stored tables
 # Every stored table has exactly one producing owner (tests/architecture/test_ownership.py),
 # and every ingestion task in tasks/framework/registry.py declares exactly the tables its module produces.

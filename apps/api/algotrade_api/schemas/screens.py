@@ -1,4 +1,4 @@
-"""``/screens``: screener configs and a screen's results."""
+"""``/screens``: screener configs and a screen's results; ``/ideas``: the best tickers."""
 
 from datetime import date
 from typing import Any
@@ -31,3 +31,42 @@ class ScreenResults(Schema):
     decisions: dict[str, int]
     audit: dict[str, Any]
     page: Page[ScreenRow]
+
+
+class IdeaCriterion(Schema):
+    criterion_id: str
+    field: str
+    outcome: str
+    value: float | str | None
+    distance: float | None
+
+
+class IdeaPick(Schema):
+    decision: str
+    score: float | None
+    reasons: str
+    config_id: str
+    config_version: int | None
+    user: str
+    session: date
+    klass: str | None
+    tier: str | None
+    criteria: list[IdeaCriterion]
+    columns: dict[str, Any]
+
+
+class Idea(Schema):
+    rank: int
+    instrument_id: str
+    symbol: str | None
+    picks: list[IdeaPick]
+    next_earnings_date: date | None
+    days_to_earnings: int | None
+    closest_expiry_dte: int | None
+
+
+class Ideas(Schema):
+    session: date
+    priority: list[str]
+    total: int
+    items: list[Idea]

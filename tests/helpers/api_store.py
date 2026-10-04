@@ -148,6 +148,44 @@ def _screen(writer: StoreWriter) -> None:
     writer.save_run(run.finish(NOW, stats={"coverage": "COMPLETE", "config_hash": "h"}))
 
 
+def _ideas(writer: StoreWriter) -> None:
+    """Two rule screens over AAA / BBB / CCC (+ earnings context for AAA), for ``/ideas``."""
+    common = {"user_id": SITE_USER, "config_hash": "h", "config_version": 1}
+    screens = {
+        "vrp": [
+            ("AAA", "QUALIFIED", 80.0, 1),
+            ("BBB", "WATCH", 90.0, 2),
+            ("CCC", "REJECT", 0.0, 3),
+        ],
+        "premium": [("AAA", "QUALIFIED", 100.0, 1), ("CCC", "SKIPPED", None, 2)],
+    }
+    for config, rows in screens.items():
+        run = start_run(screen_job(config, SITE_USER), END, NOW)
+        frame = [
+            {"instrument_id": f"EQ:{s}", "decision": d, "score": sc, "rank": rank,
+             "tie_break": None, "tier": "T1" if d == "QUALIFIED" else "", "class": "",
+             "reasons": "iv rank 40 < 50" if d == "WATCH" else "", "config_id": config, **common}
+            for s, d, sc, rank in rows
+        ]  # fmt: skip
+        writer.write_result("rule_screen", END, run.run_id, stamped(frame, END, run.run_id))
+        values = [
+            {"instrument_id": "EQ:BBB", "user_id": SITE_USER, "config_id": "vrp",
+             "criterion_id": "iv_rank", "field": "iv_rank", "mode": "SOFT", "value_num": 40.0,
+             "outcome": "NEAR", "distance": 10.0},
+            {"instrument_id": "EQ:AAA", "user_id": SITE_USER, "config_id": "vrp",
+             "criterion_id": "spread", "field": "spread", "mode": "column", "value_num": 0.05,
+             "outcome": "INFO"},
+        ]  # fmt: skip
+        if config == "vrp":
+            frame_values = stamped(values, END, run.run_id)
+            writer.write_result("rule_screen_values", END, run.run_id, frame_values)
+        writer.save_run(run.finish(NOW, stats={"coverage": "COMPLETE"}))
+    _write(writer, "rollups/instrument/earnings@v1", [
+        {"instrument_id": "EQ:AAA", "next_earnings_date": date(2022, 12, 1),
+         "earnings_time": "pre", "days_to_earnings": 6},
+    ])  # fmt: skip
+
+
 def _backtest(writer: StoreWriter) -> RunRecord:
     run = start_run(backtest_job("sma_trend", "local"), END, NOW)
     days = pd.to_datetime([PREVIOUS, END], utc=True)
@@ -177,6 +215,7 @@ def api_store(source: FixtureSource) -> tuple[ReadStore, dict[str, str]]:
     _market(writer)
     _runs(writer)
     _screen(writer)
+    _ideas(writer)
     backtest = _backtest(writer)
     ids = {
         "nightly": writer.runs_for("nightly")[0].run_id,

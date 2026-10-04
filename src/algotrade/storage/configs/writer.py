@@ -71,6 +71,10 @@ class ConfigWriter(ConfigStore, Protocol):
         """Replace ``users/<user>/features/<theme>.toml``."""
         ...
 
+    def save_preferences(self, user: str, document: Mapping[str, Any]) -> None:
+        """Replace ``users/<user>/preferences.toml``."""
+        ...
+
 
 # ----------------------------------------------------------------------------- TOML text
 _BARE_KEY = re.compile(r"[A-Za-z0-9_-]+")
@@ -239,6 +243,10 @@ class FileConfigWriter(FileConfigStore):
         )
         self._write(user, path, toml_text(document))
 
+    def save_preferences(self, user: str, document: Mapping[str, Any]) -> None:
+        path = self.root / "users" / _user(user) / "preferences.toml"
+        self._write(user, path, toml_text(document))
+
 
 # ----------------------------------------------------------------------------- memory
 def _copy(document: Mapping[str, Any]) -> dict[str, Any]:
@@ -315,3 +323,6 @@ class MemoryConfigWriter(MemoryConfigStore):
 
     def save_features(self, user: str, theme: str, document: Mapping[str, Any]) -> None:
         self._docs[(_user(user), "features", validate_id("theme", theme))] = _copy(document)
+
+    def save_preferences(self, user: str, document: Mapping[str, Any]) -> None:
+        self._docs[(_user(user), "preferences", "preferences")] = _copy(document)
