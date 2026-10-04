@@ -30,12 +30,17 @@ Group          { all: [Rule|Group] } | { any: [Rule|Group] } | { not: Rule|Group
 Selection      { name, where: Group, max_instruments?, order_by? }   # top-N by a field
 StrategyConfig { id, kind: screener|strategy, impl, params, selection (preset name or inline),
                  selection_overrides?, schedule?: nightly, exports?: [...],
-                 screening?: {...}, backtest?: {...}, extends? (user configs) }
+                 screening?: {...}, backtest?: {...}, extends? (user configs),
+                 rule screens (impl = "rules"): version?, criteria, tiers?, flags?,
+                 classify?, columns?, rank? }
+ScreenSpec     { criteria (HARD / SOFT + tolerance / SCORE), tiers, flags, ... }  # rules.md
 ResolvedConfig { config, selection, settings, user, layers, hash }
 UserContext    { user_id }   # a validated label: [a-z0-9_-]{1,64}
 ```
 
-Parsing errors name the exact path, e.g. `users/alice/strategies/x.selection.where.all[2]: op
+`Rule` / `Group` and their three-valued evaluation live in `core/model/predicates.py` (shared
+by selections and [rule screens](screeners/rules.md)); `ScreenSpec` in `core/model/screen_spec.py`,
+parsed by `config/strategy/screen_spec.py`. Parsing errors name the exact path, e.g. `users/alice/strategies/x.selection.where.all[2]: op
 must be one of [...]`. A bad config never runs (fail closed).
 
 ## Resolution

@@ -31,8 +31,10 @@ from algotrade.config.strategy.schema import (
     parse_selection,
     parse_strategy,
 )
+from algotrade.config.strategy.screen_spec import check_screen_spec, screen_spec
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.screen_spec import ScreenSpec
 
 # (scope, kind, name) -> document; scope is "site" or a user id;
 # kind is "defaults", "strategies" or "selections".
@@ -113,19 +115,32 @@ class ResolvedConfig:
         """The resolved ``[backtest]`` settings, typed (validated by ``resolve``)."""
         return BacktestSettings.parse(self.settings.get("backtest"), f"{self.config.id} [backtest]")
 
+    @property
+    def screen_spec(self) -> ScreenSpec:
+        """The rule-screen spec (``impl = "rules"`` only; validated by ``resolve``)."""
+        return screen_spec(self.config)
+
     def canonical(self) -> dict[str, Any]:
         """Everything that affects results (not provenance), in a stable JSON shape."""
         c = self.config
-        return {
-            "id": c.id,
-            "kind": c.kind,
-            "impl": c.impl,
-            "params": dict(sorted(c.params.items())),
-            "selection": selection_to_dict(self.selection) if self.selection else None,
-            "schedule": c.schedule,
-            "exports": list(c.exports),
-            "settings": self.settings,
-        } | ({"features": {d.name: d.canonical() for d in self.features}} if self.features else {})
+        return (
+            {
+                "id": c.id,
+                "kind": c.kind,
+                "impl": c.impl,
+                "params": dict(sorted(c.params.items())),
+                "selection": selection_to_dict(self.selection) if self.selection else None,
+                "schedule": c.schedule,
+                "exports": list(c.exports),
+                "settings": self.settings,
+            }
+            | ({"rules": c.rules} if c.rules else {})
+            | (
+                {"features": {d.name: d.canonical() for d in self.features}}
+                if self.features
+                else {}
+            )
+        )
 
     def with_features(self, features: tuple[FeatureDefinition, ...]) -> "ResolvedConfig":
         """This config reading these user features (they join the hash)."""
@@ -194,6 +209,10 @@ def resolve(
         catalog.check(selection.where, f"{config_id}.selection")
         if selection.order_by:
             catalog.check_field(selection.order_by, f"{config_id}.selection.order_by")
+    if config.rules:
+        spec = screen_spec(config)  # a malformed rule screen fails here, with its path
+        if catalog is not None:
+            check_screen_spec(spec, catalog, config_id)
     defaults = deep_merge(BUILTIN_DEFAULTS, site_defaults(load))
     settings = deep_merge(defaults, config.settings)
     resolved = ResolvedConfig(config, selection, settings, user, tuple(layers))

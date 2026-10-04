@@ -1,61 +1,15 @@
 """Evaluate a selection with three-valued logic and a per-rule audit.
 
-A missing value is UNKNOWN, never a pass or a fail. UNKNOWN propagates (Kleene logic): AND
-with a FALSE child is FALSE, otherwise UNKNOWN beats TRUE; ``not`` keeps UNKNOWN. An
+The predicate itself (``Rule`` / ``Group``, Kleene logic) is ``core.model.predicates``. An
 instrument is selected only when its result is TRUE, so missing data excludes it (fail
 closed) and is counted separately in the audit.
 """
 
-import operator
-from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Any
 
 from algotrade.config.strategy.schema import Group, Rule, Selection
-from algotrade.core.views.feature_view import FeatureValue, FeatureView
-
-type Truth = bool | None  # None == UNKNOWN
-
-_OPS: Mapping[str, Callable[[Any, Any], Any]] = {
-    "eq": operator.eq,
-    "ne": operator.ne,
-    "in": lambda value, expected: value in expected,
-    "not_in": lambda value, expected: value not in expected,
-    "between": lambda value, expected: expected[0] <= value <= expected[1],
-    "gt": operator.gt,
-    "gte": operator.ge,
-    "lt": operator.lt,
-    "lte": operator.le,
-}
-
-
-def evaluate_rule(rule: Rule, value: FeatureValue) -> Truth:
-    if rule.op == "is_null":
-        return value is None
-    if rule.op == "not_null":
-        return value is not None
-    if value is None:
-        return None
-    try:
-        return bool(_OPS[rule.op](value, rule.value))
-    except TypeError:  # data of the wrong type for the rule: not knowable
-        return None
-
-
-def evaluate_group(group: Group, row: Mapping[str, FeatureValue]) -> Truth:
-    results = [
-        evaluate_group(c, row) if isinstance(c, Group) else evaluate_rule(c, row.get(c.field))
-        for c in group.children
-    ]
-    if group.kind == "not":
-        return None if results[0] is None else not results[0]
-    if group.kind == "all":
-        if any(r is False for r in results):
-            return False
-        return None if any(r is None for r in results) else True
-    if any(r is True for r in results):
-        return True
-    return None if any(r is None for r in results) else False
+from algotrade.core.model.predicates import Truth, evaluate_group, evaluate_rule
+from algotrade.core.views.feature_view import FeatureView
 
 
 @dataclass(frozen=True)
