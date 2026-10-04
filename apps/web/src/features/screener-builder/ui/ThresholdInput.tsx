@@ -1,9 +1,10 @@
 /**
  * The threshold of a criterion, in the control its operator and field type call for: a number
- * in the field's unit (a fraction typed as a percent), a range, a list ("HIGH, LOW"), a
- * Yes / No choice or text. Nothing for "is empty" / "has a value".
+ * in the field's unit (a fraction typed as a percent), a range, a list (checkboxes from the
+ * field's categories, else "HIGH, LOW" typed; text fields only, ADR 0030), a Yes / No choice or
+ * text. Nothing for "is empty" / "has a value".
  */
-import { Input, NumberInput, Select, Stack, Text } from '@algotrade/ui';
+import { Checkbox, Input, NumberInput, Select, Stack, Text } from '@algotrade/ui';
 import { useState } from 'react';
 
 import type { CatalogueFeature } from '@/entities/feature';
@@ -67,6 +68,43 @@ function NumberField({
   );
 }
 
+/** A list chosen from the field's categories: one checkbox each, kept in the field's order. */
+function CategoryList({
+  categories,
+  value,
+  invalid,
+  disabled,
+  onChange,
+}: {
+  categories: readonly string[];
+  value: unknown;
+  invalid: boolean;
+  disabled: boolean;
+  onChange: (value: unknown) => void;
+}) {
+  const chosen = new Set(Array.isArray(value) ? value.map(String) : []);
+  return (
+    <Stack direction="row" gap={3} wrap>
+      {categories.map((category) => (
+        <Checkbox
+          key={category}
+          label={category}
+          checked={chosen.has(category)}
+          invalid={invalid}
+          disabled={disabled}
+          onCheckedChange={(checked) => {
+            const next = new Set(chosen);
+            if (checked) next.add(category);
+            else next.delete(category);
+            const list = categories.filter((c) => next.has(c));
+            onChange(list.length > 0 ? list : undefined);
+          }}
+        />
+      ))}
+    </Stack>
+  );
+}
+
 /** A list typed as text; committed on blur or Enter so a trailing comma survives typing. */
 function ListField({
   value,
@@ -124,6 +162,18 @@ export function ThresholdInput({
     );
   }
   if (shape === 'list') {
+    const categories = feature?.categories ?? [];
+    if (kind === 'text' && categories.length > 0) {
+      return (
+        <CategoryList
+          categories={categories}
+          value={value}
+          invalid={invalid}
+          disabled={disabled}
+          onChange={onChange}
+        />
+      );
+    }
     return (
       <ListField
         value={value}

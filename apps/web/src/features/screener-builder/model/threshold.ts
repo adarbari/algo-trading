@@ -28,7 +28,7 @@ const LABELS: Readonly<Record<string, string>> = {
 };
 
 const OPS: Readonly<Record<FieldKind, readonly string[]>> = {
-  number: ['gte', 'gt', 'lte', 'lt', 'between', 'eq', 'ne', 'in', 'not_in', 'is_null', 'not_null'],
+  number: ['gte', 'gt', 'lte', 'lt', 'between', 'eq', 'ne', 'is_null', 'not_null'],
   date: ['gte', 'gt', 'lte', 'lt', 'between', 'eq', 'ne', 'is_null', 'not_null'],
   text: ['eq', 'ne', 'in', 'not_in', 'is_null', 'not_null'],
   bool: ['eq', 'ne', 'is_null', 'not_null'],

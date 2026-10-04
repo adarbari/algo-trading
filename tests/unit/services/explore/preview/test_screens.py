@@ -94,6 +94,26 @@ def test_summary_funnel_and_coverage() -> None:
     assert got.session == DAY and got.user == ALICE and got.screener_id == "draft1"
 
 
+def test_a_screen_with_no_selection_runs_over_every_instrument() -> None:
+    """ADR 0030: who is screened is a criterion; the funnel starts at the whole snapshot."""
+    store = preview_store()
+    status = {"field": "instrument.status", "op": "eq", "value": "ACTIVE"}
+    base = {k: v for k, v in DRAFT.items() if k != "selection"}
+    everyone = preview(store, base)
+    assert everyone.coverage.base == everyone.coverage.selected == everyone.total == 5
+    assert everyone.coverage.selection["selection"] == "all"
+    gated = preview(store, {**base, "criteria": {"status": status, **base["criteria"]}})
+    first, price, oi = gated.funnel
+    assert (first.criterion_id, first.entering, first.failed, first.remaining) == (
+        "status",
+        5,
+        1,
+        4,
+    )
+    assert (price.entering, oi.entering) == (4, 2)  # the same funnel as with the selection
+    assert gated.decisions == {"QUALIFIED": 1, "REJECT": 3, "WATCH": 1}
+
+
 def test_limit_trims_rows_not_the_summary() -> None:
     got = preview(preview_store(), limit=2)
     assert [r.rank for r in got.rows] == [1, 2] and got.total == 4

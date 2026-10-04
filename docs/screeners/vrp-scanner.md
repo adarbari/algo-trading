@@ -4,9 +4,18 @@
 > preview or as a `screen` job), over the expression features in `config/site/features/vrp.toml`
 > (`vrp_iv30`, `vrp_iv30_source`, `vrp_iv_hv_spread`, `vrp_iv_hv_ratio`) and `price.toml`
 > (`dist_52w`, `pct_vs_sma_20/50/200`). The latest version is
-> `config/site/presets/screeners/vrp_scanner/v2.toml`; `v1.toml` stays as it was (immutable;
-> user copies pinned to `vrp_scanner@1` keep computing it).
+> `config/site/presets/screeners/vrp_scanner/v3.toml`; `v1.toml` and `v2.toml` stay as they were
+> (immutable; user copies pinned to `vrp_scanner@1` or `@2` keep computing them).
 >
+> - **v3** ([ADR 0030](../adr/0030-rule-screener-simplification.md)) is v2 with the rule-screen
+>   simplification: who is screened is three HARD criteria (`instrument.security_type in
+>   [COMMON_STOCK, ADR, ETF]`, `status = ACTIVE`, `optionable = true`) instead of a selection,
+>   so the funnel starts at the whole snapshot and a rejected name shows its reason; a missing
+>   HARD value is a REJECT and a missing SOFT or SCORE value only costs points (nothing is
+>   skipped); the 52-week gate is `feature.dist_52w <= 0.10` (which side shows in the
+>   `near_52w`, `pct_from_high_52w` and `pct_from_low_52w` columns); no tiers, classify or
+>   labels.
+
 > - **v1** measured option liquidity with `option_liquidity@v1` (the target expiry's
 >   0.15-0.40 delta put OI, chain-wide option volume, the short put's spread).
 > - **v2** (`name = "VRP"`) picks the trade the "Option-trade follow-up" below describes and
@@ -51,7 +60,7 @@ mapping follows.
 | Topic | Decision |
 |---|---|
 | IV30 gate | HARD, default **50%**, editable in the UI (the owner may lower it to 40%) |
-| Missing data | any gating criterion missing → SKIPPED (`no <field>`), never a pass; every run reports passed, skipped by reason and the narrow misses |
+| Missing data | v1 / v2: any gating criterion missing → SKIPPED (`no <field>`), never a pass. v3 (ADR 0030, owner 2026-10-04): a HARD one missing → REJECT, a SOFT or SCORE one missing → points off, never a pass; every run reports passed, missing data by field and the narrow misses |
 | Scoring | 100 when every threshold is met, minus each miss's normalised distance (no 0-30 / 0-20 weights); ties by the IV−HV spread |
 | Preset | a site preset visible in the Builder; users change it, re-run and see results; their copies pin the preset version |
 | IV30 source for the gate | the **lower** of IBKR's and Cboe's IV30 when both exist, else whichever exists, else UNKNOWN; our own IV30 is not used for the gate |
@@ -69,16 +78,16 @@ mapping follows.
 | Spec | Preset criterion / output |
 |---|---|
 | IV30 >= 50% | hard `feature.vrp_iv30 gte 0.50` (UI-editable); new site feature `vrp_iv30 = min(coalesce(ibkr_iv.iv30_ibkr, iv30.iv30_cboe), coalesce(iv30.iv30_cboe, ibkr_iv.iv30_ibkr))`: the lower of the two, whichever exists, else null (UNKNOWN) |
-| IV-HV >= 10 pts, IV/HV >= 1.25 | hard `feature.vrp_iv_hv_spread gte 0.10`, hard `feature.vrp_iv_hv_ratio gte 1.25`; new site features over `vrp_iv30` and `price_stats.hv30` (ratio = `vrp_iv30 / hv30`, no floor; HV30 missing or 0 → missing → SKIPPED); `[rank] tie_break = "feature.vrp_iv_hv_spread"` |
-| Stronger tier 15 pts / 1.30 | `tiers.STRONG` |
-| Within 10% of the 52W high / low; NEAR_HIGH / NEAR_LOW / BOTH | hard `feature.near_52w in [HIGH, LOW, BOTH]`; `classify = "feature.near_52w"` |
+| IV-HV >= 10 pts, IV/HV >= 1.25 | hard `feature.vrp_iv_hv_spread gte 0.10`, hard `feature.vrp_iv_hv_ratio gte 1.25`; new site features over `vrp_iv30` and `price_stats.hv30` (ratio = `vrp_iv30 / hv30`, no floor; HV30 missing or 0 → missing → REJECT in v3, SKIPPED before); `[rank] tie_break = "feature.vrp_iv_hv_spread"` |
+| Stronger tier 15 pts / 1.30 | v1 / v2: `tiers.STRONG` (a display label); v3: dropped (read the spread and ratio columns) |
+| Within 10% of the 52W high / low; NEAR_HIGH / NEAR_LOW / BOTH | v1 / v2: hard `feature.near_52w in [HIGH, LOW, BOTH]`, `classify`; v3: hard `feature.dist_52w lte 0.10`, the side in the `near_52w` column |
 | IV rank (0-10) | score `rollup.ibkr_iv@v1.iv_rank_252d_ibkr` with a tolerance; a miss or missing value lowers the score |
 | Price > $5 | hard `rollup.price_stats@v2.close gt 5` |
 | ADV > $50M, option volume / OI > 1,000, spread < 15% ("flag, don't reject") | soft with a tolerance band: a near miss is WATCH (options too thin: `on_miss = LIQUIDITY_RISK`), beyond the band REJECT |
 | Earnings < 14 days, event risk (0-5) | **dropped** (owner decision); `columns`: `rollup.earnings@v1.next_earnings_date` and a new feature, the closest option expiry's DTE |
 | Low HV, leveraged / inverse ETF, > 10% one-day gap | `flags` (`instrument.is_leveraged`) |
 | Momentum context, setup class | `columns` + a site label feature `vrp_setup` |
-| Universe audit, "no qualified" only when COMPLETE | selection over the daily universe snapshot; the existing runner audit |
+| Universe audit, "no qualified" only when COMPLETE | v1 / v2: a selection over the daily universe snapshot; v3: the base gates are criteria over the whole snapshot; the existing runner audit |
 | Option follow-up ROC | premium / (strike × 100), cash-secured; no correlation penalty |
 | Gaps (later) | catalysts (FDA etc.); the 8-15 delta put, its liquidity (scored) and the gap-move flag are in v2 (`put_wing@v1`, `price_moves@v1`) |
 

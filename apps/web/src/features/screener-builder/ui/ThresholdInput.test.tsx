@@ -86,6 +86,34 @@ describe('ThresholdInput', () => {
     expect(screen.getByText('no threshold')).toBeInTheDocument();
   });
 
+  it('lists a text field\'s categories as checkboxes for "in", keeping the field\'s order', async () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <ThresholdInput
+        feature={feature({ dtype: 'str', categories: ['HIGH', 'LOW', 'BOTH', 'NONE'] })}
+        op="in"
+        value={['LOW']}
+        onChange={onChange}
+      />,
+    );
+    expect(screen.getByRole('checkbox', { name: 'LOW' })).toBeChecked();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'HIGH' }));
+    expect(onChange).toHaveBeenLastCalledWith(['HIGH', 'LOW']);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'LOW' }));
+    expect(onChange).toHaveBeenLastCalledWith(undefined); // nothing chosen is an unset threshold
+    rerender(
+      <ThresholdInput
+        feature={feature({ dtype: 'str' })}
+        op="in"
+        value={undefined}
+        onChange={onChange}
+      />,
+    );
+    expect(
+      screen.getByRole('textbox', { name: 'Values, separated by commas' }),
+    ).toBeInTheDocument();
+  });
+
   it('takes free text for a text field without categories', async () => {
     const onChange = vi.fn();
     render(
