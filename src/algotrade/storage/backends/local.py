@@ -109,6 +109,9 @@ class LocalTables:
     def commit_run(self, run_id: str, at: datetime) -> int:
         return self.commits.commit_run(run_id, at)
 
+    def visible_seq(self) -> int:
+        return self.commits.published()
+
     def abort_run(self, run_id: str) -> int:
         return self.commits.abort_run(run_id)
 

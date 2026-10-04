@@ -58,6 +58,10 @@ class StoreReader:
         tables = self._backend.tables
         return tables.read_range(table, start, end, as_of, instruments, self.own_run, columns)
 
+    def visible_seq(self) -> int:
+        """The latest committed publish sequence: changes exactly when a commit publishes."""
+        return self._backend.tables.visible_seq()
+
     def table_names(self) -> list[str]:
         return self._backend.tables.names(self.own_run)
 

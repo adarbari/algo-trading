@@ -396,3 +396,20 @@ def test_a_read_never_opens_a_pending_file_under_a_name_it_pinned(
     got = _range_values(backend)
     assert opened[: len(DAYS)] == [local_index.default_file("resumed")] * len(DAYS)
     assert got in ([1.0] * len(DAYS), [3.0] * len(DAYS)), got  # never 4.0, never mixed
+
+
+def test_visible_seq_rises_only_when_a_commit_publishes(backend: Backend) -> None:
+    tables = backend.tables
+    start = tables.visible_seq()
+    pending_two_tables(backend)  # pending writes change nothing
+    assert tables.visible_seq() == start
+    tables.commit_run("r1", COMMIT)
+    published = tables.visible_seq()
+    assert published > start
+    tables.write(A, D2, "r2", value("r2", 3.0, D2), pending=True)
+    tables.abort_run("r2")  # a failed run publishes nothing
+    assert tables.commit_run("r3", COMMIT) == 0  # nor does a commit without writes
+    assert tables.visible_seq() == published
+    pending_two_tables(backend, "r4", 5.0)
+    tables.commit_run("r4", COMMIT + timedelta(minutes=1))
+    assert tables.visible_seq() > published

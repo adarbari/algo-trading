@@ -1,8 +1,10 @@
 """Open the stores read-only, and what every explore query shares: the session a date
 resolves to, pages of rows, JSON-safe records and the not-found error."""
 
-from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+import threading
+from collections import OrderedDict
+from collections.abc import Hashable, Iterable, Mapping, Sequence
+from dataclasses import dataclass, field
 from datetime import date
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -31,6 +33,30 @@ class NotFoundError(AlgoTradeError):
     """The thing asked for (an instrument, a run, a config, a partition) does not exist."""
 
 
+class ResultCache:
+    """A small LRU of computed results. Callers key on ``StoreReader.visible_seq()`` (read
+    before computing), so a publish makes every earlier entry unreachable (ADR 0022)."""
+
+    def __init__(self, size: int = 8) -> None:
+        self._size = size
+        self._items: OrderedDict[Hashable, Any] = OrderedDict()
+        self._lock = threading.Lock()
+
+    def get(self, key: Hashable) -> Any | None:
+        with self._lock:
+            if key not in self._items:
+                return None
+            self._items.move_to_end(key)
+            return self._items[key]
+
+    def put(self, key: Hashable, value: Any) -> None:
+        with self._lock:
+            self._items[key] = value
+            self._items.move_to_end(key)
+            while len(self._items) > self._size:
+                self._items.popitem(last=False)
+
+
 @dataclass(frozen=True)
 class ReadStore:
     """What explore queries read: market data (read-only), configs, and whose configs."""
@@ -39,6 +65,7 @@ class ReadStore:
     configs: ConfigStore
     user: UserContext
     kind: str = "memory"  # the storage URL scheme (file, memory)
+    cache: ResultCache = field(default_factory=ResultCache, compare=False, repr=False)
 
 
 def open_store(data_url: str, config_dir: str | Path, user: UserContext) -> ReadStore:
