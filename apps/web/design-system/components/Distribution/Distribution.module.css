@@ -18,6 +18,10 @@
   margin-block-start: calc(var(--line-height-xs) + var(--space-1));
 }
 
+.plot[data-markers='2'] {
+  margin-block-start: calc((var(--line-height-xs) + var(--space-1)) * 2);
+}
+
 .plot[data-height='sm'] {
   height: calc(var(--space-10) * 2);
 }
@@ -40,6 +44,10 @@
   position: absolute;
   inset-block: calc((var(--line-height-xs) + var(--space-1)) * -1) 0;
   border-inline-start: var(--border-width-thin) dashed var(--color-text-2);
+}
+
+.marker[data-row='1'] {
+  inset-block-start: calc((var(--line-height-xs) + var(--space-1)) * -2);
 }
 
 .marker[data-tone='accent'] {

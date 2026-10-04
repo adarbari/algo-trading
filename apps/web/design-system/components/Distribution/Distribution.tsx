@@ -6,13 +6,14 @@
  * with a generated summary (count, range, the tallest bin, the markers). Loading, empty and
  * error states use Skeleton, EmptyState and ErrorState.
  */
-import type { CSSProperties, ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 import { formatValue, type ValueFormat } from '../../format';
 import { EmptyState } from '../EmptyState';
 import { ErrorState } from '../ErrorState';
 import { Skeleton } from '../Skeleton';
 import styles from './Distribution.module.css';
+import { layoutLabels } from './labelLayout';
 
 export interface DistributionBin {
   /** Lower edge (inclusive). */
@@ -36,7 +37,11 @@ export interface DistributionProps {
   label: string;
   /** How bin edges and markers read (default a number). */
   format?: ValueFormat;
-  /** Quantile lines and highlighted values. */
+  /**
+   * Quantile lines and highlighted values. Quantile labels that would overlap are stacked or
+   * dropped (earlier markers win, so list the important ones first); lines and the accessible
+   * summary always keep every marker, and an accent marker's label is always shown.
+   */
   markers?: readonly DistributionMarker[];
   /** Plot height: `sm` 80 px or `md` 120 px (default). */
   height?: 'sm' | 'md';
@@ -49,6 +54,8 @@ export interface DistributionProps {
 }
 
 const SCALE = 1000;
+/** Width assumed before the plot is measured (and where there is no layout, as in tests). */
+const FALLBACK_WIDTH = 480;
 const GAP = 0.08;
 
 /** The accessible summary of a histogram. */
@@ -74,6 +81,9 @@ export function describeDistribution(
   return `${parts.join('; ')}.`;
 }
 
+const edgeOf = (fraction: number) =>
+  fraction < 0.08 ? 'start' : fraction > 0.92 ? 'end' : undefined;
+
 export function Distribution({
   bins,
   label,
@@ -85,6 +95,21 @@ export function Distribution({
   onRetry,
   emptyMessage = 'No values to show.',
 }: DistributionProps) {
+  const plotRef = useRef<HTMLDivElement>(null);
+  const [plotWidth, setPlotWidth] = useState(FALLBACK_WIDTH);
+  useLayoutEffect(() => {
+    const el = plotRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const measure = () => {
+      if (el.clientWidth > 0) setPlotWidth(el.clientWidth);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+    };
+  });
   if (status === 'loading')
     return <Skeleton variant="rect" height="sm" label={`Loading ${label}`} />;
   if (status === 'error') {
@@ -101,13 +126,20 @@ export function Distribution({
   const x = (v: number) => ((v - min) / span) * SCALE;
   const tallest = Math.max(...bins.map((b) => b.count));
   const fmt = (v: number) => formatValue(v, format).text;
-  const at = (v: number) => {
-    const pct = (x(v) / SCALE) * 100;
-    return {
-      style: { insetInlineStart: `${pct.toFixed(2)}%` } as CSSProperties,
-      edge: pct < 8 ? 'start' : pct > 92 ? 'end' : undefined,
-    };
-  };
+  const at = (v: number) => ({
+    style: { insetInlineStart: `${((x(v) / SCALE) * 100).toFixed(2)}%` } as CSSProperties,
+  });
+  // Quantile labels share two rows above the plot; the accent label sits under the axis.
+  const quantiles = markers.filter((m) => m.tone !== 'accent');
+  const placed = layoutLabels(
+    quantiles.map((m) => ({
+      x: (x(m.value) / SCALE) * plotWidth,
+      chars: `${m.label} ${fmt(m.value)}`.length,
+    })),
+    plotWidth,
+  );
+  const placement = new Map(quantiles.map((m, i) => [m, placed[i]]));
+  const rows = placed.some((p) => p.row === 1) ? 2 : 1;
 
   return (
     <div
@@ -118,7 +150,8 @@ export function Distribution({
       <div
         className={styles.plot}
         data-height={height}
-        data-markers={markers.length > 0 || undefined}
+        data-markers={markers.length > 0 ? rows : undefined}
+        ref={plotRef}
       >
         <svg
           className={styles.svg}
@@ -143,19 +176,26 @@ export function Distribution({
           })}
         </svg>
         {markers.map((marker) => {
-          const { style, edge } = at(marker.value);
+          const { style } = at(marker.value);
+          const accent = marker.tone === 'accent';
+          const place = placement.get(marker);
+          const hidden = !accent && place?.row === 'hidden';
+          const edge = accent ? edgeOf(x(marker.value) / SCALE) : place?.edge;
           return (
             <span
               key={`${marker.label}-${String(marker.value)}`}
               className={styles.marker}
               data-tone={marker.tone ?? 'default'}
               data-edge={edge}
+              data-row={place?.row === 1 ? 1 : undefined}
               style={style}
               aria-hidden="true"
             >
-              <span className={styles.markerLabel}>
-                {marker.label} {fmt(marker.value)}
-              </span>
+              {hidden ? null : (
+                <span className={styles.markerLabel}>
+                  {marker.label} {fmt(marker.value)}
+                </span>
+              )}
             </span>
           );
         })}

@@ -32,6 +32,21 @@ export const Default: Story = {
   },
 };
 
+/** A long right tail: close quantiles would collide, so labels stack or drop; AAPL stays. */
+export const Skewed: Story = {
+  args: {
+    markers: [
+      { value: 0.24, label: 'median' },
+      { value: 0.17, label: 'p10' },
+      { value: 0.38, label: 'p90' },
+      { value: 0.21, label: 'p25' },
+      { value: 0.31, label: 'p75' },
+      { value: 0.62, label: 'p99' },
+      { value: 0.23, label: 'AAPL', tone: 'accent' },
+    ],
+  },
+};
+
 /** Bars only. */
 export const Plain: Story = {};
 

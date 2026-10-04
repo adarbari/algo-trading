@@ -90,6 +90,17 @@ describe('Chart', () => {
     expect(screen.getByRole('img').getAttribute('aria-label')).toContain('rebased to 100');
   });
 
+  it('formats the volume pane as a compact count and the price as currency', async () => {
+    render(<Chart label="AAPL" series={[aapl]} volume={aaplVolume} />);
+    await waitFor(() => {
+      expect(engine.draw).toHaveBeenCalled();
+    });
+    const input = lastInput();
+    expect(input.formatVolume(800_000_000)).toBe('800M');
+    expect(input.formatVolume(11_400)).toBe('11.4K');
+    expect(input.formatValue(333.69)).toBe('$333.69');
+  });
+
   it('shows the crosshair read-out with formatted values, volume and events', async () => {
     render(
       <Chart label="AAPL" series={[aapl]} range="3M" events={aaplEvents} volume={aaplVolume} />,

@@ -37,6 +37,23 @@ describe('Distribution', () => {
     expect(screen.getByText('AAPL 30')).toBeInTheDocument();
   });
 
+  it('drops quantile labels that would collide but keeps the highlighted one and the summary', () => {
+    const markers = [
+      { value: 14, label: 'p10' },
+      { value: 14.5, label: 'p25' },
+      { value: 15, label: 'median' },
+      { value: 15.5, label: 'p75' },
+      { value: 16, label: 'p90' },
+      { value: 15, label: 'AAPL', tone: 'accent' as const },
+    ];
+    const { container } = render(<Distribution label="ADV" bins={bins} markers={markers} />);
+    expect(screen.getByText('AAPL 15')).toBeInTheDocument();
+    expect(screen.getByText('p10 14')).toBeInTheDocument();
+    expect(screen.queryByText('median 15')).not.toBeInTheDocument();
+    expect(container.querySelectorAll('[data-tone="default"]')).toHaveLength(5);
+    expect(screen.getByRole('img').getAttribute('aria-label')).toMatch(/p90 16/);
+  });
+
   it('shows loading, empty and error states', async () => {
     const onRetry = vi.fn();
     const { rerender } = render(<Distribution label="ADV" bins={bins} status="loading" />);

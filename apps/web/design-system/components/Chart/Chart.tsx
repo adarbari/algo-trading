@@ -70,6 +70,9 @@ function byDay(points: readonly ChartPoint[]): Map<string, number> {
   return new Map(points.map((p) => [p.time, p.value]));
 }
 
+/** Volume is a count of shares: compact (800M), whatever the price format is. */
+const VOLUME_FORMAT = { kind: 'compact' } as const satisfies ValueFormat;
+
 export function Chart({
   label,
   series,
@@ -155,6 +158,7 @@ export function Chart({
           volume: chart.volume,
           rebase,
           formatValue: (v) => formatValue(v, axisFormat).text,
+          formatVolume: (v) => formatValue(v, VOLUME_FORMAT).text,
         },
         theme,
         (info) => {
@@ -206,7 +210,7 @@ export function Chart({
             id: 'volume',
             header: 'Volume',
             value: (r: ChartTableRow) => r.volume,
-            format: { kind: 'compact' } as const,
+            format: VOLUME_FORMAT,
           },
         ]
       : []),

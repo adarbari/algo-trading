@@ -56,6 +56,8 @@ export interface EngineInput {
   rebase: boolean;
   /** Axis labels (the shared value formatter). */
   formatValue: (value: number) => string;
+  /** Volume pane labels (a compact count, never the price's currency). */
+  formatVolume: (value: number) => string;
 }
 
 export interface CrosshairInfo {
@@ -111,7 +113,6 @@ export function drawChart(
       vertLine: { color: theme.control, style: LineStyle.Solid, labelBackgroundColor: theme.row },
       horzLine: { color: theme.control, style: LineStyle.Dashed, labelBackgroundColor: theme.row },
     },
-    localization: { priceFormatter: input.formatValue },
     handleScroll: false,
     handleScale: false,
     kineticScroll: { mouse: false, touch: false },
@@ -120,6 +121,8 @@ export function drawChart(
   const drawn: ISeriesApi<'Line' | 'Area'>[] = input.series.map((s) => {
     const color = theme.series[s.tone];
     const common = {
+      // Per series, not chart-wide (a chart-wide formatter would also format the volume pane).
+      priceFormat: { type: 'custom' as const, formatter: input.formatValue, minMove: 0.01 },
       priceLineVisible: false,
       lastValueVisible: false,
       crosshairMarkerRadius: 3,
@@ -172,7 +175,7 @@ export function drawChart(
       HistogramSeries,
       {
         color: theme.control,
-        priceFormat: { type: 'volume' },
+        priceFormat: { type: 'custom', formatter: input.formatVolume, minMove: 1 },
         priceLineVisible: false,
         lastValueVisible: false,
       },

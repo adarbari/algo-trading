@@ -392,7 +392,7 @@ Source: `design-system/components/Distribution`
 | `bins` | `readonly DistributionBin[]` | yes |  |
 | `label` | `string` | yes | What is distributed ("IV30 across 1,840 tickers"): starts the accessible summary. |
 | `format` | `ValueFormat` | no | How bin edges and markers read (default a number). |
-| `markers` | `readonly DistributionMarker[]` | no | Quantile lines and highlighted values. |
+| `markers` | `readonly DistributionMarker[]` | no | Quantile lines and highlighted values. Quantile labels that would overlap are stacked or dropped (earlier markers win, so list the important ones first); lines and the accessible summary always keep every marker, and an accent marker's label is always shown. |
 | `height` | `'sm' \| 'md'` | no | Plot height: `sm` 80 px or `md` 120 px (default). |
 | `status` | `'ready' \| 'loading' \| 'error'` | no | `ready` (default), `loading` or `error`. |
 | `errorMessage` | `ReactNode` | no |  |
