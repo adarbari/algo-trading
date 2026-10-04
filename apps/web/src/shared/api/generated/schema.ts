@@ -693,6 +693,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/screens/{config_id}/table": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Table */
+        get: operations["table_screens__config_id__table_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/universe": {
         parameters: {
             query?: never;
@@ -979,6 +996,28 @@ export interface components {
              * @description the site rule-screen preset to extend (pinned)
              */
             preset: string;
+        };
+        /** CriterionHeader */
+        CriterionHeader: {
+            /** Criterion Id */
+            criterion_id: string;
+            /** Field */
+            field: string;
+            /**
+             * Mode
+             * @description hard, soft or score, as the screen states it
+             */
+            mode: string;
+        };
+        /** CriterionResult */
+        CriterionResult: {
+            /**
+             * Outcome
+             * @description PASS, NEAR, FAIL or MISSING
+             */
+            outcome: string;
+            /** Value */
+            value: number | string | null;
         };
         /** CriterionValue */
         CriterionValue: {
@@ -1686,6 +1725,17 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** Page[ScreenTableRow] */
+        Page_ScreenTableRow_: {
+            /** Items */
+            items: components["schemas"]["ScreenTableRow"][];
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+            /** Total */
+            total: number;
+        };
         /** Page[UniverseRow] */
         Page_UniverseRow_: {
             /** Items */
@@ -2210,6 +2260,113 @@ export interface components {
             values: {
                 [key: string]: unknown;
             };
+        };
+        /** ScreenTable */
+        ScreenTable: {
+            /**
+             * Changes
+             * @description new / dropped counts, before any filter
+             */
+            changes: {
+                [key: string]: number;
+            };
+            /**
+             * Column Names
+             * @description the screen's display columns, in its order
+             */
+            column_names: string[];
+            /** Config Id */
+            config_id: string;
+            /**
+             * Criteria
+             * @description the screen's criteria, in its order
+             */
+            criteria: components["schemas"]["CriterionHeader"][];
+            /**
+             * Decisions
+             * @description every decision of the run, before any filter
+             */
+            decisions: {
+                [key: string]: number;
+            };
+            /**
+             * Feature Columns
+             * @description the requested catalogue features, in order
+             */
+            feature_columns: string[];
+            /**
+             * Missing
+             * @description tables with no partition for the session (their features are null)
+             */
+            missing: string[];
+            page: components["schemas"]["Page_ScreenTableRow_"];
+            /**
+             * Previous Session
+             * @description null: the screen has no earlier run
+             */
+            previous_session: string | null;
+            /** Run Id */
+            run_id: string;
+            /**
+             * Session
+             * Format: date
+             */
+            session: string;
+            /** User */
+            user: string;
+        };
+        /** ScreenTableRow */
+        ScreenTableRow: {
+            /**
+             * Change
+             * @description new or dropped against the previous run (null: same, or no previous run)
+             */
+            change: string | null;
+            /**
+             * Columns
+             * @description the screen's display columns
+             */
+            columns: {
+                [key: string]: unknown;
+            };
+            /**
+             * Criteria
+             * @description criterion id -> what it judged
+             */
+            criteria: {
+                [key: string]: components["schemas"]["CriterionResult"];
+            };
+            /** Decision */
+            decision: string;
+            /**
+             * Features
+             * @description the requested catalogue features, by name
+             */
+            features: {
+                [key: string]: unknown;
+            };
+            /** Flags */
+            flags: string[];
+            /** Instrument Id */
+            instrument_id: string;
+            /** Name */
+            name: string | null;
+            /**
+             * Previous Decision
+             * @description the decision in the previous run (null: none, or not in it)
+             */
+            previous_decision: string | null;
+            /**
+             * Rank
+             * @description 1 = best: score, then the tie-break, then the instrument id
+             */
+            rank: number;
+            /** Reasons */
+            reasons: string;
+            /** Score */
+            score: number | null;
+            /** Symbol */
+            symbol: string | null;
         };
         /** Step */
         Step: {
@@ -3701,6 +3858,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScreenResults"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    table_screens__config_id__table_get: {
+        parameters: {
+            query?: {
+                /** @description new or dropped since the previous run */
+                change?: string | null;
+                /** @description comma-separated catalogue features to add */
+                columns?: string | null;
+                /** @description default: the latest */
+                date?: string | null;
+                /** @description comma-separated decisions (default: all) */
+                decision?: string | null;
+                page?: number;
+                /** @description ticker or name contains */
+                q?: string | null;
+                size?: number;
+                /** @description rank, score, symbol, name, decision, criterion:<id>, column:<name> or a requested feature; '-' prefix: descending; nulls last (default: rank) */
+                sort?: string | null;
+            };
+            header?: never;
+            path: {
+                config_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenTable"];
                 };
             };
             /** @description Validation Error */

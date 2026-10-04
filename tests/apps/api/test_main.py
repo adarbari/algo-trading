@@ -88,6 +88,7 @@ ENDPOINTS = (
     "/features/rollup.price_stats@v2.hv20/distribution",
     "/screens",
     "/screens/short_premium_liquidity/results",
+    "/screens/vrp_scanner/table?columns=rollup.price_stats@v2.hv20",
     "/ideas",
     "/backtests",
     "/configs",

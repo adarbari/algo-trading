@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
+import pandas as pd
+
+from algotrade.config.strategy.resolve import ResolvedConfig
+from algotrade.config.strategy.schema import RULES_IMPL
 from algotrade.config.user import SITE_USER
 from algotrade.data.reference import resolver
 from algotrade.services.explore.configs import ConfigSummary, config_list, resolved
@@ -74,6 +78,36 @@ class ScreenResults:
     page: Page[dict[str, Any]]
 
 
+@dataclass(frozen=True)
+class RunRows:
+    """A screen's stored rows of its latest run in one session: whose run, which, the rows."""
+
+    config: ResolvedConfig
+    owner: str
+    session: date
+    run_id: str
+    rows: pd.DataFrame
+
+
+def run_rows(store: ReadStore, config_id: str, on: date | None) -> RunRows:
+    """The rows the screen saved for the latest session on or before ``on`` (the user's run,
+    else the site's). ``NotFoundError``: not a screener, or nothing stored."""
+    config = resolved(store, config_id)
+    if config.config.kind != SCREENER:
+        raise NotFoundError(f"{config_id} is a {config.config.kind}, not a screener")
+    rules = config.config.impl == RULES_IMPL  # one table holds every rule screen's rows
+    table = result_table("rule_screen" if rules else config.config.impl)
+    session = partition_for(store.reader, table, on)
+    frame = store.reader.table(table, session)
+    if frame is None:  # pragma: no cover - partition_for found the partition
+        raise NotFoundError(f"{table}: nothing stored for {session}")
+    for owner in _owners(store):
+        rows = frame[(frame["config_id"] == config_id) & (frame["user_id"] == owner)]
+        if len(rows):
+            return RunRows(config, owner, session, str(rows["run_id"].iloc[0]), rows)
+    raise NotFoundError(f"no results of {config_id} stored for {session}")
+
+
 def screen_results(
     store: ReadStore,
     config_id: str,
@@ -84,21 +118,8 @@ def screen_results(
 ) -> ScreenResults:
     """The rows the screen saved for the latest session on or before ``on`` (the user's run,
     else the site's), filtered by ``decision``, sorted by score (best first)."""
-    config = resolved(store, config_id)
-    if config.config.kind != SCREENER:
-        raise NotFoundError(f"{config_id} is a {config.config.kind}, not a screener")
-    table = result_table(config.config.impl)
-    session = partition_for(store.reader, table, on)
-    frame = store.reader.table(table, session)
-    if frame is None:  # pragma: no cover - partition_for found the partition
-        raise NotFoundError(f"{table}: nothing stored for {session}")
-    for owner in _owners(store):
-        rows = frame[(frame["config_id"] == config_id) & (frame["user_id"] == owner)]
-        if len(rows):
-            break
-    else:
-        raise NotFoundError(f"no results of {config_id} stored for {session}")
-    run_id = str(rows["run_id"].iloc[0])
+    found = run_rows(store, config_id, on)
+    rows, owner, run_id, session = found.rows, found.owner, found.run_id, found.session
     names = resolver(store.reader, session)
     items = []
     for row in rows.sort_values("score", ascending=False, kind="stable").to_dict("records"):

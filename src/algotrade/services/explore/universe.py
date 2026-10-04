@@ -6,7 +6,7 @@ sector / industry and the liquidity class (an expression feature) for the same s
 (``services.features.field_view``).
 """
 
-from collections.abc import Callable
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -25,6 +25,7 @@ from algotrade.services.explore.store import (
     NotFoundError,
     Page,
     ReadStore,
+    cached,
     paginate,
     partition_for,
     records,
@@ -118,27 +119,6 @@ class _Computed:
     rows: list[dict[str, Any]]
 
 
-def _features_key(store: ReadStore) -> str:
-    """The user's catalogue as text: an edited feature file must not hit a stale entry."""
-    features = store_features(store)
-    return repr(sorted((n, repr(e.definition)) for n, e in features.expressions.items()))
-
-
-def _cached(
-    store: ReadStore, query: tuple[Any, ...], compute: Callable[[], _Computed]
-) -> _Computed:
-    """``compute()`` once per (query, user catalogue, published state): a page of a query
-    already computed is sliced from it. The commit sequence is read before computing, so a
-    publish landing meanwhile stores the result under the older key and is never served."""
-    key = (*query, store.user.user_id, _features_key(store), store.reader.visible_seq())
-    hit = store.cache.get(key)
-    if hit is not None:
-        return hit  # type: ignore[no-any-return]
-    done = compute()
-    store.cache.put(key, done)
-    return done
-
-
 def universe_page(
     store: ReadStore, on: date | None, filters: UniverseFilter, page: int, size: int
 ) -> UniversePage:
@@ -149,7 +129,7 @@ def universe_page(
         frame = _filtered(frame, filters).sort_values("symbol", kind="stable")
         return _Computed(universe, missing, records(frame[list(COLUMNS)]))
 
-    done = _cached(store, ("universe", on, filters), compute)
+    done = cached(store, ("universe", on, filters), compute)
     universe = done.universe
     return UniversePage(
         session=on or universe.snapshot_date,
@@ -209,7 +189,7 @@ def ticker_table(
         frame = _sorted(_filtered(frame, filters)[[*TICKER_BASE, *wanted]], order)
         return _Computed(universe, missing, records(frame))
 
-    done = _cached(store, ("tickers", on, filters, tuple(wanted), order), compute)
+    done = cached(store, ("tickers", on, filters, tuple(wanted), order), compute)
     universe = done.universe
     return TickerTable(
         session=on or universe.snapshot_date,
@@ -220,6 +200,24 @@ def ticker_table(
         missing=done.missing,
         page=paginate(done.rows, page, size),
     )
+
+
+@dataclass(frozen=True)
+class TickerColumns:
+    frame: pd.DataFrame  # TICKER_BASE + one column per requested name, one row per instrument
+    missing: list[str]  # tables with no partition for the session (their columns are null)
+
+
+def ticker_columns(
+    store: ReadStore, on: date | None, columns: list[str], instrument_ids: Collection[str]
+) -> TickerColumns:
+    """The tickers ``instrument_ids`` of the universe for ``on`` (the latest snapshot when
+    None) with ``columns`` (catalogue field names; ``ConfigurationError`` for one the user
+    does not have). Rows follow the universe snapshot's order."""
+    wanted = checked_columns(store, columns)
+    frame, _, missing = _universe(store, on, wanted)
+    keep = frame[frame["instrument_id"].isin(set(instrument_ids))]
+    return TickerColumns(keep[[*TICKER_BASE, *wanted]], missing)
 
 
 @dataclass(frozen=True)

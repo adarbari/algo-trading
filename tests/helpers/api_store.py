@@ -152,7 +152,7 @@ def _ideas(writer: StoreWriter) -> None:
     """Two rule screens over AAA / BBB / CCC (+ earnings context for AAA), for ``/ideas``."""
     common = {"user_id": SITE_USER, "config_hash": "h", "config_version": 1}
     screens = {
-        "vrp": [
+        "vrp_scanner": [
             ("AAA", "QUALIFIED", 80.0, 1),
             ("BBB", "WATCH", 90.0, 2),
             ("CCC", "REJECT", 0.0, 3),
@@ -165,25 +165,37 @@ def _ideas(writer: StoreWriter) -> None:
             {"instrument_id": f"EQ:{s}", "decision": d, "score": sc, "rank": rank,
              "tie_break": None,
              "reasons": "iv rank 40 < 50" if d == "WATCH" else "", "config_id": config, **common,
-             "flags": "leveraged_inverse" if (s, config) == ("AAA", "vrp") else ""}
+             "flags": "leveraged_inverse" if (s, config) == ("AAA", "vrp_scanner") else ""}
             for s, d, sc, rank in rows
         ]  # fmt: skip
         writer.write_result("rule_screen", END, run.run_id, stamped(frame, END, run.run_id))
         values = [
-            {"instrument_id": "EQ:BBB", "user_id": SITE_USER, "config_id": "vrp",
+            {"instrument_id": "EQ:BBB", "user_id": SITE_USER, "config_id": "vrp_scanner",
              "criterion_id": "iv_rank", "field": "iv_rank", "mode": "SOFT", "value_num": 40.0,
              "outcome": "NEAR", "distance": 10.0},
-            {"instrument_id": "EQ:AAA", "user_id": SITE_USER, "config_id": "vrp",
+            {"instrument_id": "EQ:AAA", "user_id": SITE_USER, "config_id": "vrp_scanner",
              "criterion_id": "spread", "field": "spread", "mode": "column", "value_num": 0.05,
              "outcome": "INFO"},
-            {"instrument_id": "EQ:AAA", "user_id": SITE_USER, "config_id": "vrp",
+            {"instrument_id": "EQ:AAA", "user_id": SITE_USER, "config_id": "vrp_scanner",
              "criterion_id": "iv30", "field": "feature.vrp_iv30", "mode": "HARD",
              "value_num": 0.62, "outcome": "PASS"},
         ]  # fmt: skip
-        if config == "vrp":
+        if config == "vrp_scanner":
             frame_values = stamped(values, END, run.run_id)
             writer.write_result("rule_screen_values", END, run.run_id, frame_values)
         writer.save_run(run.finish(NOW, stats={"coverage": "COMPLETE"}))
+    before = start_run(
+        screen_job("vrp_scanner", SITE_USER), PREVIOUS, NOW
+    )  # the run before: changes
+    earlier = [
+        {"instrument_id": f"EQ:{s}", "decision": d, "score": sc, "rank": rank, "tie_break": None,
+         "reasons": "", "config_id": "vrp_scanner", "flags": "", **common}
+        for s, d, sc, rank in (("AAA", "REJECT", 0.0, 3), ("BBB", "QUALIFIED", 80.0, 1),
+                               ("CCC", "QUALIFIED", 60.0, 2))
+    ]  # fmt: skip
+    writer.write_result("rule_screen", PREVIOUS, before.run_id,
+                        stamped(earlier, PREVIOUS, before.run_id))  # fmt: skip
+    writer.save_run(before.finish(NOW, stats={"coverage": "COMPLETE"}))
     _write(writer, "rollups/instrument/earnings@v1", [
         {"instrument_id": "EQ:AAA", "next_earnings_date": date(2022, 12, 1),
          "earnings_time": "pre", "days_to_earnings": 6},

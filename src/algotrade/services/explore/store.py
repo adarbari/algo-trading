@@ -3,7 +3,7 @@ resolves to, pages of rows, JSON-safe records and the not-found error."""
 
 import threading
 from collections import OrderedDict
-from collections.abc import Hashable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Hashable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from importlib.metadata import PackageNotFoundError, version
@@ -71,6 +71,25 @@ class ReadStore:
     preview_cache: ResultCache = field(
         default_factory=lambda: ResultCache(4), compare=False, repr=False
     )
+
+
+def features_key(store: ReadStore) -> str:
+    """The user's catalogue as text: an edited feature file must not hit a stale entry."""
+    features = store_features(store)
+    return repr(sorted((n, repr(e.definition)) for n, e in features.expressions.items()))
+
+
+def cached[T](store: ReadStore, query: tuple[Any, ...], compute: Callable[[], T]) -> T:
+    """``compute()`` once per (query, user catalogue, published state): a page of a query
+    already computed is sliced from it. The commit sequence is read before computing, so a
+    publish landing meanwhile stores the result under the older key and is never served."""
+    key = (*query, store.user.user_id, features_key(store), store.reader.visible_seq())
+    hit = store.cache.get(key)
+    if hit is not None:
+        return hit  # type: ignore[no-any-return]
+    done = compute()
+    store.cache.put(key, done)
+    return done
 
 
 def open_store(data_url: str, config_dir: str | Path, user: UserContext) -> ReadStore:

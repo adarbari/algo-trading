@@ -14,17 +14,18 @@ def test_ideas_one_row_per_ticker_ranked_with_every_pick(client: TestClient) -> 
     body = client.get("/ideas").json()
     assert (body["session"], body["total"], body["priority"]) == ("2022-11-23", 2, [])
     first, second = body["items"]
-    # No priority stored: screens rank by id (premium < vrp), then score: AAA (100) first.
+    # No priority stored: screens rank by id (premium < vrp_scanner), then score: AAA (100) first.
     assert (first["rank"], first["symbol"]) == (1, "AAA")
     assert [(p["config_id"], p["decision"]) for p in first["picks"]] == [
         ("premium", "QUALIFIED"),
-        ("vrp", "QUALIFIED"),
+        ("vrp_scanner", "QUALIFIED"),
     ]
     assert first["picks"][1]["columns"] == {"spread": 0.05}
     assert first["picks"][1]["criterion_values"] == {"iv30": 0.62}
     assert (first["picks"][0]["flags"], first["picks"][1]["flags"]) == ([], ["leveraged_inverse"])
-    assert body["screeners"] == [
-        {"config_id": c, "user": "site", "name": c, "version": 1} for c in ("premium", "vrp")
+    assert body["screeners"] == [  # a site preset shows its own name, else its id
+        {"config_id": c, "user": "site", "name": name, "version": 1}
+        for c, name in (("premium", "premium"), ("vrp_scanner", "VRP"))
     ]
     assert (first["next_earnings_date"], first["days_to_earnings"]) == ("2022-12-01", 6)
     assert first["closest_expiry_dte"] == 30  # the nearest stored expiry (2022-12-23)

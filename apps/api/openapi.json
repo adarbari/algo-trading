@@ -635,6 +635,59 @@
         "title": "CopyBody",
         "type": "object"
       },
+      "CriterionHeader": {
+        "properties": {
+          "criterion_id": {
+            "title": "Criterion Id",
+            "type": "string"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "mode": {
+            "description": "hard, soft or score, as the screen states it",
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "criterion_id",
+          "field",
+          "mode"
+        ],
+        "title": "CriterionHeader",
+        "type": "object"
+      },
+      "CriterionResult": {
+        "properties": {
+          "outcome": {
+            "description": "PASS, NEAR, FAIL or MISSING",
+            "title": "Outcome",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "value",
+          "outcome"
+        ],
+        "title": "CriterionResult",
+        "type": "object"
+      },
       "CriterionValue": {
         "properties": {
           "criterion_id": {
@@ -2488,6 +2541,37 @@
         "title": "Page[ScreenRow]",
         "type": "object"
       },
+      "Page_ScreenTableRow_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenTableRow"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "size"
+        ],
+        "title": "Page[ScreenTableRow]",
+        "type": "object"
+      },
       "Page_UniverseRow_": {
         "properties": {
           "items": {
@@ -3493,6 +3577,229 @@
           "values"
         ],
         "title": "ScreenRow",
+        "type": "object"
+      },
+      "ScreenTable": {
+        "properties": {
+          "changes": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "new / dropped counts, before any filter",
+            "title": "Changes",
+            "type": "object"
+          },
+          "column_names": {
+            "description": "the screen's display columns, in its order",
+            "items": {
+              "type": "string"
+            },
+            "title": "Column Names",
+            "type": "array"
+          },
+          "config_id": {
+            "title": "Config Id",
+            "type": "string"
+          },
+          "criteria": {
+            "description": "the screen's criteria, in its order",
+            "items": {
+              "$ref": "#/components/schemas/CriterionHeader"
+            },
+            "title": "Criteria",
+            "type": "array"
+          },
+          "decisions": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "every decision of the run, before any filter",
+            "title": "Decisions",
+            "type": "object"
+          },
+          "feature_columns": {
+            "description": "the requested catalogue features, in order",
+            "items": {
+              "type": "string"
+            },
+            "title": "Feature Columns",
+            "type": "array"
+          },
+          "missing": {
+            "description": "tables with no partition for the session (their features are null)",
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing",
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/components/schemas/Page_ScreenTableRow_"
+          },
+          "previous_session": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null: the screen has no earlier run",
+            "title": "Previous Session"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "session": {
+            "format": "date",
+            "title": "Session",
+            "type": "string"
+          },
+          "user": {
+            "title": "User",
+            "type": "string"
+          }
+        },
+        "required": [
+          "config_id",
+          "user",
+          "session",
+          "previous_session",
+          "run_id",
+          "decisions",
+          "changes",
+          "criteria",
+          "column_names",
+          "feature_columns",
+          "missing",
+          "page"
+        ],
+        "title": "ScreenTable",
+        "type": "object"
+      },
+      "ScreenTableRow": {
+        "properties": {
+          "change": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "new or dropped against the previous run (null: same, or no previous run)",
+            "title": "Change"
+          },
+          "columns": {
+            "additionalProperties": true,
+            "description": "the screen's display columns",
+            "title": "Columns",
+            "type": "object"
+          },
+          "criteria": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CriterionResult"
+            },
+            "description": "criterion id -> what it judged",
+            "title": "Criteria",
+            "type": "object"
+          },
+          "decision": {
+            "title": "Decision",
+            "type": "string"
+          },
+          "features": {
+            "additionalProperties": true,
+            "description": "the requested catalogue features, by name",
+            "title": "Features",
+            "type": "object"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
+          "instrument_id": {
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "previous_decision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the decision in the previous run (null: none, or not in it)",
+            "title": "Previous Decision"
+          },
+          "rank": {
+            "description": "1 = best: score, then the tie-break, then the instrument id",
+            "title": "Rank",
+            "type": "integer"
+          },
+          "reasons": {
+            "title": "Reasons",
+            "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          }
+        },
+        "required": [
+          "rank",
+          "instrument_id",
+          "symbol",
+          "name",
+          "decision",
+          "score",
+          "reasons",
+          "flags",
+          "change",
+          "previous_decision",
+          "criteria",
+          "columns",
+          "features"
+        ],
+        "title": "ScreenTableRow",
         "type": "object"
       },
       "ScreenerDetail": {
@@ -6746,6 +7053,180 @@
           }
         },
         "summary": "Results",
+        "tags": [
+          "screens"
+        ]
+      }
+    },
+    "/screens/{config_id}/table": {
+      "get": {
+        "operationId": "table_screens__config_id__table_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "config_id",
+            "required": true,
+            "schema": {
+              "title": "Config Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "default: the latest",
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "default: the latest",
+              "title": "Date"
+            }
+          },
+          {
+            "description": "comma-separated decisions (default: all)",
+            "in": "query",
+            "name": "decision",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "comma-separated decisions (default: all)",
+              "title": "Decision"
+            }
+          },
+          {
+            "description": "new or dropped since the previous run",
+            "in": "query",
+            "name": "change",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "new or dropped since the previous run",
+              "title": "Change"
+            }
+          },
+          {
+            "description": "ticker or name contains",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ticker or name contains",
+              "title": "Q"
+            }
+          },
+          {
+            "description": "comma-separated catalogue features to add",
+            "in": "query",
+            "name": "columns",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "comma-separated catalogue features to add",
+              "title": "Columns"
+            }
+          },
+          {
+            "description": "rank, score, symbol, name, decision, criterion:<id>, column:<name> or a requested feature; '-' prefix: descending; nulls last (default: rank)",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "rank, score, symbol, name, decision, criterion:<id>, column:<name> or a requested feature; '-' prefix: descending; nulls last (default: rank)",
+              "title": "Sort"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenTable"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Table",
         "tags": [
           "screens"
         ]
