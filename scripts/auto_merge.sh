@@ -7,7 +7,9 @@
 # A PR is merged only when all of these hold:
 #   - open, not a draft, not from a fork, not labelled "no-automerge"
 #   - the latest CI run for its head commit concluded "success"
-#   - every check run on that commit completed as success, skipped or neutral
+#   - every other check run on that commit completed as success, skipped or neutral
+#     (checks of superseded CI runs for the same commit are ignored: a re-run or a renamed
+#     job would otherwise leave their cancelled checks blocking the PR forever)
 #   - GitHub reports it MERGEABLE (conflicts are left for the author or Dependabot to rebase)
 # Each run sweeps every open PR, so a missed or cancelled run is caught by the next one.
 set -euo pipefail
@@ -26,14 +28,17 @@ try_merge() {
     echo "#$number: labelled no-automerge, skipped"; return
   fi
   sha=$(jq -r .headRefOid <<<"$pr")
-  ci=$(gh api "repos/$REPO/actions/runs?head_sha=$sha&event=pull_request&per_page=50" \
-         --jq '[.workflow_runs[] | select(.name == "CI")] | sort_by(.created_at) | last
-               | if . == null then "missing" else (.conclusion // .status) end')
+  runs=$(gh api "repos/$REPO/actions/runs?head_sha=$sha&event=pull_request&per_page=50" \
+          --jq '[.workflow_runs[] | select(.name == "CI")] | sort_by(.created_at)')
+  ci=$(jq -r 'last | if . == null then "missing" else (.conclusion // .status) end' <<<"$runs")
   if [ "$ci" != "success" ]; then echo "#$number: CI on ${sha:0:7} is '$ci', waiting"; return; fi
+  superseded=$(jq -c '[.[:-1][].check_suite_id]' <<<"$runs")
   bad=$(gh api "repos/$REPO/commits/$sha/check-runs?per_page=100" \
-          --jq '[.check_runs[] | select(.status != "completed" or
-                 (.conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral"))
-                 | .name] | join(", ")')
+        | jq -r --argjson superseded "$superseded" '
+            [.check_runs[] | select(.check_suite.id as $s | $superseded | index($s) | not)
+             | select(.status != "completed" or
+                      (.conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral"))
+             | .name] | join(", ")')
   if [ -n "$bad" ]; then echo "#$number: checks not passed: $bad"; return; fi
   # GitHub computes mergeability lazily and resets it whenever the base branch moves, so the
   # first answer is often UNKNOWN. Ask again a few times before giving up until the next sweep.
