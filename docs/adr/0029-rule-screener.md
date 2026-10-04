@@ -79,9 +79,11 @@ identity arrives.
   `config_hash`, `knowledge_ts`, `source`, `run_id`.
 - `results/rule_screen_values` (long): `instrument_id, criterion_id, field, mode, value_num,
   value_str, outcome (PASS / NEAR / FAIL / MISSING / INFO), distance, penalty`.
-- `results/rule_screen_summary` (one row per run and entry): the run summary above (counts
-  by decision and skip reason, one row per narrow miss). One schema for every config, so
-  Ideas can query across screens; no per-config tables or drifting wide columns.
+- The run summary above is stored in the screen's **run record** (`stats["summary"]`, next
+  to the coverage audit; the screen job's result and the results page carry it). One schema
+  for every config, so Ideas can query across screens; no per-config tables or drifting wide
+  columns. Both tables merge per (`user_id`, `config_id`, `instrument_id`) because every
+  config shares a session's partition; readers take a config's latest run (`run_id`).
 - Pages (results, Ideas) read stored rows for sessions <= `?date=` and never recompute.
 
 ### Preview == nightly

@@ -13,7 +13,7 @@ from enum import StrEnum
 
 from algotrade.core.model.errors import AlgoTradeError
 from algotrade.core.views.feature_view import FeatureView
-from algotrade.strategies.screeners.base import Decision, Screener, ScreenRow
+from algotrade.strategies.screeners.base import Screener, ScreenRow
 
 DEFAULT_MIN_COVERAGE = 0.98
 
@@ -36,7 +36,7 @@ class ScreenRun:
 
     @property
     def processed(self) -> int:
-        return sum(1 for r in self.rows if r.decision is not Decision.UNKNOWN)
+        return sum(1 for r in self.rows if r.decision.processed)
 
     @property
     def coverage_pct(self) -> float:
@@ -50,7 +50,7 @@ class ScreenRun:
             Counter(
                 r.reasons[0] if r.reasons else "unspecified"
                 for r in self.rows
-                if r.decision is Decision.UNKNOWN
+                if not r.decision.processed
             )
         )
 
@@ -75,22 +75,33 @@ def run_screen(
     universe: Sequence[str],
     min_coverage: float = DEFAULT_MIN_COVERAGE,
 ) -> ScreenRun:
+    if sorted(set(universe)) and set(view.instruments) != set(universe):
+        raise AlgoTradeError("FeatureView must contain exactly the universe instruments")
+    rows = screener.screen(view) if universe else []
+    return audit_rows(screener.name, rows, universe, min_coverage)
+
+
+def audit_rows(
+    screener: str,
+    rows: Sequence[ScreenRow],
+    universe: Sequence[str],
+    min_coverage: float = DEFAULT_MIN_COVERAGE,
+) -> ScreenRun:
+    """Check ``rows`` (a screener's output) cover ``universe`` exactly once and grade the
+    run's coverage. ``run_screen`` screens then audits; a rule screen audits its own rows."""
     unique = sorted(set(universe))
     if not unique:
-        return ScreenRun(screener.name, (), len(universe), 0, 0, RunCoverage.UNIVERSE_INCOMPLETE)
-    if set(view.instruments) != set(unique):
-        raise AlgoTradeError("FeatureView must contain exactly the universe instruments")
-    rows = screener.screen(view)
+        return ScreenRun(screener, (), len(universe), 0, 0, RunCoverage.UNIVERSE_INCOMPLETE)
     by_id: dict[str, ScreenRow] = {}
     for row in rows:
         if row.instrument_id in by_id:
-            raise AlgoTradeError(f"{screener.name} returned {row.instrument_id} twice")
+            raise AlgoTradeError(f"{screener} returned {row.instrument_id} twice")
         by_id[row.instrument_id] = row
     if set(by_id) != set(unique):
-        raise AlgoTradeError(f"{screener.name} must return one row per universe instrument")
+        raise AlgoTradeError(f"{screener} must return one row per universe instrument")
     ordered = tuple(by_id[i] for i in unique)
     run = ScreenRun(
-        screener.name,
+        screener,
         ordered,
         len(universe),
         len(unique),

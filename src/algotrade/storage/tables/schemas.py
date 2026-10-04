@@ -296,6 +296,46 @@ VERIFICATION_IBKR = _fixed(
     *_floats("ours", "theirs", "diff", "tolerance"),
     key=("instrument_id", "check"),
 )
+# Rule screens (ADR 0029): one fixed schema for every rule-screen config, so pages and Ideas
+# query across screens. Many configs and users share a session's partition, so runs merge
+# on (user, config, instrument): readers take a config's rows of its latest run (``run_id``
+# from the run record), since a later run never removes rows an earlier one wrote.
+RULE_SCREEN = _fixed(
+    "results/rule_screen",
+    "results",
+    ("instrument_id", "user_id", "config_id", "config_hash", "decision", "rank"),
+    "instrument_id string!",
+    "user_id string!",
+    "config_id string!",
+    "config_version int64",
+    "config_hash string!",
+    "decision string!",
+    "score float64",
+    "rank int64!",
+    "tie_break float64",
+    *_strings("tier", "class", "flags", "reasons", "failed", "near_missed", "missing"),
+    runs="merge",
+    key=("user_id", "config_id", "instrument_id"),
+)
+# One row per (instrument, criterion) and per display column (``mode = "column"``,
+# ``outcome = "INFO"``): the value, PASS / NEAR / FAIL / MISSING, distance and penalty.
+RULE_SCREEN_VALUES = _fixed(
+    "results/rule_screen_values",
+    "results",
+    ("instrument_id", "user_id", "config_id", "criterion_id", "field", "mode", "outcome"),
+    "instrument_id string!",
+    "user_id string!",
+    "config_id string!",
+    "criterion_id string!",
+    "field string!",
+    "mode string!",
+    "value_num float64",
+    "value_str string",
+    "outcome string!",
+    *_floats("distance", "normalised", "penalty"),
+    runs="merge",
+    key=("user_id", "config_id", "instrument_id", "mode", "criterion_id"),
+)
 # L2: OHLCV bars; the table name carries the interval, e.g. "bars/1d", "bars/5m".
 BAR_INTERVALS = frozenset({"1d", "1h", "30m", "15m", "5m", "1m"})
 BAR_COLUMNS = ("instrument_id", "ts", "open", "high", "low", "close", "volume")
@@ -322,6 +362,8 @@ KNOWN: dict[str, TableSpec] = {
         VERIFICATION_IBKR,
         IBKR_CONTRACTS,
         IBKR_IV30,
+        RULE_SCREEN,
+        RULE_SCREEN_VALUES,
     )
 }
 # Open-ended tables: the producing rollup, event source, catalogue or screener defines the

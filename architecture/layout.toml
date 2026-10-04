@@ -172,6 +172,11 @@ path = "src/algotrade/strategies/screeners"
 purpose = "screeners: pure point-in-time filters, and their registry"
 
 [[dir]]
+path = "src/algotrade/strategies/screeners/rules"
+purpose = "the rule screener (ADR 0029): criteria, decision incl. SKIPPED, distance score, tiers / flags / classify, run summary (pure)"
+contracts = ["Strategies and screeners are pure: they only see core and quant"]
+
+[[dir]]
 path = "src/algotrade/engines"
 purpose = "engines that run strategies or screeners over data views"
 contracts = ["Engines are independent of each other"]
