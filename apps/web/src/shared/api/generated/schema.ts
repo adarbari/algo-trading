@@ -328,6 +328,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/features/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check */
+        post: operations["check_features_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/features/user": {
         parameters: {
             query?: never;
@@ -584,6 +601,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/screeners/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview */
+        post: operations["preview_screeners_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/screens": {
         parameters: {
             query?: never;
@@ -795,6 +829,25 @@ export interface components {
             /** Runs */
             runs: components["schemas"]["RunDetail"][];
         };
+        /** CheckBody */
+        CheckBody: {
+            /**
+             * Expr
+             * @description the formula (the expression feature language)
+             */
+            expr: string;
+            /**
+             * Sample
+             * @description how many sample values to return
+             * @default 5
+             */
+            sample: number;
+            /**
+             * User
+             * @description whose catalogue (default the API's)
+             */
+            user?: string | null;
+        };
         /** CheckCounts */
         CheckCounts: {
             /** Check */
@@ -886,6 +939,28 @@ export interface components {
              */
             preset: string;
         };
+        /** CriterionValue */
+        CriterionValue: {
+            /** Criterion Id */
+            criterion_id: string;
+            /** Distance */
+            distance: number | null;
+            /** Field */
+            field: string;
+            /** Mode */
+            mode: string;
+            /** Normalised */
+            normalised: number | null;
+            /**
+             * Outcome
+             * @description PASS, NEAR, FAIL or MISSING
+             */
+            outcome: string;
+            /** Penalty */
+            penalty: number;
+            /** Value */
+            value: unknown;
+        };
         /** Distribution */
         Distribution: {
             /**
@@ -949,6 +1024,35 @@ export interface components {
             gross_exposure: number;
             /** Ts */
             ts: string;
+        };
+        /** ExpressionCheck */
+        ExpressionCheck: {
+            /** Categories */
+            categories: string[] | null;
+            /** Dtype */
+            dtype: string;
+            /** Expr */
+            expr: string;
+            /** Inputs */
+            inputs: string[];
+            /** Licence */
+            licence: string;
+            /** Non Null */
+            non_null: number;
+            /** Rows */
+            rows: number;
+            /** Sample */
+            sample: components["schemas"]["SampleValue"][];
+            /**
+             * Session
+             * @description the session sampled (None: nothing stored)
+             */
+            session: string | null;
+            /**
+             * Type
+             * @description num, bool, str or date
+             */
+            type: string;
         };
         /** FailureGroup */
         FailureGroup: {
@@ -1098,6 +1202,35 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** FunnelStep */
+        FunnelStep: {
+            /** Criterion Id */
+            criterion_id: string;
+            /**
+             * Entering
+             * @description rows that passed or narrowly missed every earlier step
+             */
+            entering: number;
+            /** Failed */
+            failed: number;
+            /** Field */
+            field: string;
+            /** Label */
+            label: string | null;
+            /** Missing */
+            missing: number;
+            /** Mode */
+            mode: string;
+            /** Near */
+            near: number;
+            /** Passed */
+            passed: number;
+            /**
+             * Remaining
+             * @description passed + near: what the next step sees
+             */
+            remaining: number;
+        };
         /** Health */
         Health: {
             /** Latest Session */
@@ -1246,6 +1379,23 @@ export interface components {
             values: {
                 [key: string]: unknown;
             };
+        };
+        /** NarrowMiss */
+        NarrowMiss: {
+            /** Criterion Id */
+            criterion_id: string;
+            /** Distance */
+            distance: number | null;
+            /** Field */
+            field: string;
+            /** Instrument Id */
+            instrument_id: string;
+            /** Normalised */
+            normalised: number | null;
+            /** Threshold */
+            threshold: number | null;
+            /** Value */
+            value: unknown;
         };
         /** NightlyRun */
         NightlyRun: {
@@ -1404,6 +1554,102 @@ export interface components {
             /** Rebase Available */
             rebase_available: boolean;
         };
+        /** PreviewBody */
+        PreviewBody: {
+            /**
+             * Limit
+             * @description how many top rows to return
+             * @default 50
+             */
+            limit: number;
+            /**
+             * Spec
+             * @description the draft rule screen (as the Builder holds it)
+             */
+            spec: {
+                [key: string]: unknown;
+            };
+            /**
+             * User
+             * @description whose catalogue and presets (default the API's)
+             */
+            user?: string | null;
+        };
+        /** PreviewCoverage */
+        PreviewCoverage: {
+            /** Base */
+            base: number;
+            /** Coverage */
+            coverage: string;
+            /** Coverage Pct */
+            coverage_pct: number;
+            /** Min Coverage */
+            min_coverage: number;
+            /** Missing Tables */
+            missing_tables: string[];
+            /** Pre Snapshot */
+            pre_snapshot: boolean;
+            /** Processed */
+            processed: number;
+            /** Selected */
+            selected: number;
+            /** Selection */
+            selection: {
+                [key: string]: unknown;
+            };
+            /** Skipped */
+            skipped: number;
+            /**
+             * Universe Snapshot
+             * Format: date
+             */
+            universe_snapshot: string;
+        };
+        /** PreviewRow */
+        PreviewRow: {
+            /**
+             * Classification
+             * @description the spec's classify field
+             */
+            classification: string | null;
+            /** Columns */
+            columns: {
+                [key: string]: unknown;
+            };
+            /** Criteria */
+            criteria: components["schemas"]["CriterionValue"][];
+            /** Decision */
+            decision: string;
+            /** Flags */
+            flags: string[];
+            /** Instrument Id */
+            instrument_id: string;
+            /** Rank */
+            rank: number;
+            /** Reasons */
+            reasons: string[];
+            /** Score */
+            score: number | null;
+            /** Symbol */
+            symbol: string | null;
+            /** Tier */
+            tier: string | null;
+        };
+        /** PreviewSummary */
+        PreviewSummary: {
+            /** Narrow Misses */
+            narrow_misses: components["schemas"]["NarrowMiss"][];
+            /** Passed */
+            passed: number;
+            /** Rows */
+            rows: number;
+            /** Skipped */
+            skipped: number;
+            /** Skipped Reasons */
+            skipped_reasons: {
+                [key: string]: number;
+            };
+        };
         /** PriceComparison */
         PriceComparison: {
             /** Adjustment */
@@ -1554,6 +1800,13 @@ export interface components {
              */
             status: string;
         };
+        /** SampleValue */
+        SampleValue: {
+            /** Instrument Id */
+            instrument_id: string;
+            /** Value */
+            value: number | boolean | string | null;
+        };
         /** SavedFeature */
         SavedFeature: {
             /** Dtype */
@@ -1644,6 +1897,44 @@ export interface components {
             };
             /** Version */
             version: number;
+        };
+        /** ScreenPreview */
+        ScreenPreview: {
+            /**
+             * Cached
+             * @description the field frame came from the in-process cache
+             */
+            cached: boolean;
+            /** Config Hash */
+            config_hash: string;
+            coverage: components["schemas"]["PreviewCoverage"];
+            /** Decisions */
+            decisions: {
+                [key: string]: number;
+            };
+            /** Funnel */
+            funnel: components["schemas"]["FunnelStep"][];
+            /**
+             * Last Closed
+             * Format: date
+             * @description the latest closed exchange session
+             */
+            last_closed: string;
+            /** Rows */
+            rows: components["schemas"]["PreviewRow"][];
+            /** Screener Id */
+            screener_id: string;
+            /**
+             * Session
+             * Format: date
+             * @description the session evaluated
+             */
+            session: string;
+            summary: components["schemas"]["PreviewSummary"];
+            /** Total */
+            total: number;
+            /** User */
+            user: string;
         };
         /** ScreenResults */
         ScreenResults: {
@@ -2452,6 +2743,39 @@ export interface operations {
             };
         };
     };
+    check_features_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpressionCheck"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     save_user_feature_features_user_post: {
         parameters: {
             query?: {
@@ -2986,6 +3310,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScreenerVersion"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_screeners_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenPreview"];
                 };
             };
             /** @description Validation Error */

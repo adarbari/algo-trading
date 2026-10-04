@@ -368,6 +368,40 @@
         "title": "CellDetail",
         "type": "object"
       },
+      "CheckBody": {
+        "properties": {
+          "expr": {
+            "description": "the formula (the expression feature language)",
+            "title": "Expr",
+            "type": "string"
+          },
+          "sample": {
+            "default": 5,
+            "description": "how many sample values to return",
+            "maximum": 50.0,
+            "minimum": 0.0,
+            "title": "Sample",
+            "type": "integer"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "whose catalogue (default the API's)",
+            "title": "User"
+          }
+        },
+        "required": [
+          "expr"
+        ],
+        "title": "CheckBody",
+        "type": "object"
+      },
       "CheckCounts": {
         "properties": {
           "check": {
@@ -601,6 +635,68 @@
         "title": "CopyBody",
         "type": "object"
       },
+      "CriterionValue": {
+        "properties": {
+          "criterion_id": {
+            "title": "Criterion Id",
+            "type": "string"
+          },
+          "distance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "normalised": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalised"
+          },
+          "outcome": {
+            "description": "PASS, NEAR, FAIL or MISSING",
+            "title": "Outcome",
+            "type": "string"
+          },
+          "penalty": {
+            "title": "Penalty",
+            "type": "number"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "required": [
+          "criterion_id",
+          "field",
+          "mode",
+          "value",
+          "outcome",
+          "distance",
+          "normalised",
+          "penalty"
+        ],
+        "title": "CriterionValue",
+        "type": "object"
+      },
       "Distribution": {
         "properties": {
           "categories": {
@@ -718,6 +814,90 @@
           "gross_exposure"
         ],
         "title": "EquityPoint",
+        "type": "object"
+      },
+      "ExpressionCheck": {
+        "properties": {
+          "categories": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categories"
+          },
+          "dtype": {
+            "title": "Dtype",
+            "type": "string"
+          },
+          "expr": {
+            "title": "Expr",
+            "type": "string"
+          },
+          "inputs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Inputs",
+            "type": "array"
+          },
+          "licence": {
+            "title": "Licence",
+            "type": "string"
+          },
+          "non_null": {
+            "title": "Non Null",
+            "type": "integer"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "sample": {
+            "items": {
+              "$ref": "#/components/schemas/SampleValue"
+            },
+            "title": "Sample",
+            "type": "array"
+          },
+          "session": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the session sampled (None: nothing stored)",
+            "title": "Session"
+          },
+          "type": {
+            "description": "num, bool, str or date",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expr",
+          "type",
+          "dtype",
+          "categories",
+          "inputs",
+          "licence",
+          "session",
+          "rows",
+          "non_null",
+          "sample"
+        ],
+        "title": "ExpressionCheck",
         "type": "object"
       },
       "FailureGroup": {
@@ -1084,6 +1264,73 @@
           "hash"
         ],
         "title": "Finalised",
+        "type": "object"
+      },
+      "FunnelStep": {
+        "properties": {
+          "criterion_id": {
+            "title": "Criterion Id",
+            "type": "string"
+          },
+          "entering": {
+            "description": "rows that passed or narrowly missed every earlier step",
+            "title": "Entering",
+            "type": "integer"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "missing": {
+            "title": "Missing",
+            "type": "integer"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "near": {
+            "title": "Near",
+            "type": "integer"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "integer"
+          },
+          "remaining": {
+            "description": "passed + near: what the next step sees",
+            "title": "Remaining",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "criterion_id",
+          "field",
+          "mode",
+          "label",
+          "entering",
+          "passed",
+          "near",
+          "failed",
+          "missing",
+          "remaining"
+        ],
+        "title": "FunnelStep",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -1522,6 +1769,69 @@
           "values"
         ],
         "title": "InstrumentEvent",
+        "type": "object"
+      },
+      "NarrowMiss": {
+        "properties": {
+          "criterion_id": {
+            "title": "Criterion Id",
+            "type": "string"
+          },
+          "distance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "instrument_id": {
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "normalised": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalised"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "required": [
+          "instrument_id",
+          "criterion_id",
+          "field",
+          "value",
+          "threshold",
+          "distance",
+          "normalised"
+        ],
+        "title": "NarrowMiss",
         "type": "object"
       },
       "NightlyRun": {
@@ -2004,6 +2314,250 @@
         "title": "PresetPin",
         "type": "object"
       },
+      "PreviewBody": {
+        "properties": {
+          "limit": {
+            "default": 50,
+            "description": "how many top rows to return",
+            "maximum": 1000.0,
+            "minimum": 0.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "spec": {
+            "additionalProperties": true,
+            "description": "the draft rule screen (as the Builder holds it)",
+            "title": "Spec",
+            "type": "object"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "whose catalogue and presets (default the API's)",
+            "title": "User"
+          }
+        },
+        "required": [
+          "spec"
+        ],
+        "title": "PreviewBody",
+        "type": "object"
+      },
+      "PreviewCoverage": {
+        "properties": {
+          "base": {
+            "title": "Base",
+            "type": "integer"
+          },
+          "coverage": {
+            "title": "Coverage",
+            "type": "string"
+          },
+          "coverage_pct": {
+            "title": "Coverage Pct",
+            "type": "number"
+          },
+          "min_coverage": {
+            "title": "Min Coverage",
+            "type": "number"
+          },
+          "missing_tables": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Tables",
+            "type": "array"
+          },
+          "pre_snapshot": {
+            "title": "Pre Snapshot",
+            "type": "boolean"
+          },
+          "processed": {
+            "title": "Processed",
+            "type": "integer"
+          },
+          "selected": {
+            "title": "Selected",
+            "type": "integer"
+          },
+          "selection": {
+            "additionalProperties": true,
+            "title": "Selection",
+            "type": "object"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "universe_snapshot": {
+            "format": "date",
+            "title": "Universe Snapshot",
+            "type": "string"
+          }
+        },
+        "required": [
+          "coverage",
+          "base",
+          "selected",
+          "processed",
+          "skipped",
+          "coverage_pct",
+          "min_coverage",
+          "selection",
+          "missing_tables",
+          "pre_snapshot",
+          "universe_snapshot"
+        ],
+        "title": "PreviewCoverage",
+        "type": "object"
+      },
+      "PreviewRow": {
+        "properties": {
+          "classification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the spec's classify field",
+            "title": "Classification"
+          },
+          "columns": {
+            "additionalProperties": true,
+            "title": "Columns",
+            "type": "object"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/CriterionValue"
+            },
+            "title": "Criteria",
+            "type": "array"
+          },
+          "decision": {
+            "title": "Decision",
+            "type": "string"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
+          "instrument_id": {
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          }
+        },
+        "required": [
+          "instrument_id",
+          "symbol",
+          "rank",
+          "decision",
+          "score",
+          "tier",
+          "classification",
+          "flags",
+          "reasons",
+          "columns",
+          "criteria"
+        ],
+        "title": "PreviewRow",
+        "type": "object"
+      },
+      "PreviewSummary": {
+        "properties": {
+          "narrow_misses": {
+            "items": {
+              "$ref": "#/components/schemas/NarrowMiss"
+            },
+            "title": "Narrow Misses",
+            "type": "array"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "integer"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "skipped_reasons": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Skipped Reasons",
+            "type": "object"
+          }
+        },
+        "required": [
+          "rows",
+          "passed",
+          "skipped",
+          "skipped_reasons",
+          "narrow_misses"
+        ],
+        "title": "PreviewSummary",
+        "type": "object"
+      },
       "PriceComparison": {
         "properties": {
           "adjustment": {
@@ -2304,6 +2858,40 @@
         "title": "RunItem",
         "type": "object"
       },
+      "SampleValue": {
+        "properties": {
+          "instrument_id": {
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "instrument_id",
+          "value"
+        ],
+        "title": "SampleValue",
+        "type": "object"
+      },
       "SavedFeature": {
         "properties": {
           "dtype": {
@@ -2438,6 +3026,86 @@
           "latest_status"
         ],
         "title": "ScreenConfig",
+        "type": "object"
+      },
+      "ScreenPreview": {
+        "properties": {
+          "cached": {
+            "description": "the field frame came from the in-process cache",
+            "title": "Cached",
+            "type": "boolean"
+          },
+          "config_hash": {
+            "title": "Config Hash",
+            "type": "string"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/PreviewCoverage"
+          },
+          "decisions": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Decisions",
+            "type": "object"
+          },
+          "funnel": {
+            "items": {
+              "$ref": "#/components/schemas/FunnelStep"
+            },
+            "title": "Funnel",
+            "type": "array"
+          },
+          "last_closed": {
+            "description": "the latest closed exchange session",
+            "format": "date",
+            "title": "Last Closed",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "screener_id": {
+            "title": "Screener Id",
+            "type": "string"
+          },
+          "session": {
+            "description": "the session evaluated",
+            "format": "date",
+            "title": "Session",
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/PreviewSummary"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "user": {
+            "title": "User",
+            "type": "string"
+          }
+        },
+        "required": [
+          "screener_id",
+          "user",
+          "config_hash",
+          "session",
+          "last_closed",
+          "summary",
+          "decisions",
+          "funnel",
+          "coverage",
+          "total",
+          "rows",
+          "cached"
+        ],
+        "title": "ScreenPreview",
         "type": "object"
       },
       "ScreenResults": {
@@ -4293,6 +4961,47 @@
         ]
       }
     },
+    "/features/check": {
+      "post": {
+        "operationId": "check_features_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpressionCheck"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check",
+        "tags": [
+          "features"
+        ]
+      }
+    },
     "/features/user": {
       "post": {
         "operationId": "save_user_feature_features_user_post",
@@ -4892,6 +5601,47 @@
         "summary": "Save Ideas Priority",
         "tags": [
           "ideas"
+        ]
+      }
+    },
+    "/screeners/preview": {
+      "post": {
+        "operationId": "preview_screeners_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenPreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview",
+        "tags": [
+          "screeners"
         ]
       }
     },

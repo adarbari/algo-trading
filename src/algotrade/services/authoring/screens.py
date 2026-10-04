@@ -9,7 +9,7 @@ from typing import Any
 
 from algotrade.config.site.fields import reject_secrets
 from algotrade.config.strategy.resolve import ResolvedConfig, config_document, parse_extends
-from algotrade.config.strategy.schema import RULES_IMPL, SCHEDULES
+from algotrade.config.strategy.schema import SCHEDULES
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.authoring.scope import (
@@ -18,11 +18,9 @@ from algotrade.services.authoring.scope import (
     author,
     screen_id,
 )
-from algotrade.services.configs import resolve_config
-from algotrade.storage.configs.store import OverlayConfigStore, screen_document
+from algotrade.services.configs import resolve_config, resolve_rule_draft
 from algotrade.storage.configs.writer import ConfigWriter, VersionExistsError
 
-SCREENERS = "screeners"
 # Set by the authoring flow, never by a draft: finalise numbers versions; the schedule is a
 # separate switch.
 MANAGED_KEYS = ("version", "schedule")
@@ -33,12 +31,7 @@ def validate(
 ) -> ResolvedConfig:
     """``document`` resolved as ``user``'s screen ``name``; a ``ConfigurationError`` (with
     its path) unless it is a valid rule screen."""
-    draft = screen_document(document, writer.schedule(user.user_id, name))
-    store = OverlayConfigStore(writer, {(user.user_id, SCREENERS, name): draft})
-    resolved = resolve_config(store, name, user)
-    if resolved.config.kind != "screener" or resolved.config.impl != RULES_IMPL:
-        raise ConfigurationError(f"{user.user_id}/{name}: not a rule screen (impl = 'rules')")
-    return resolved
+    return resolve_rule_draft(writer, name, user, document, writer.schedule(user.user_id, name))
 
 
 def draft_document(name: str, document: Mapping[str, Any]) -> dict[str, Any]:

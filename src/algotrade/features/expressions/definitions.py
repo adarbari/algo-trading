@@ -237,6 +237,21 @@ def build_expressions(
     return {n: e for n, e in out.items() if n in defs}
 
 
+def formula_type(
+    expr: str,
+    groups: Mapping[str, FeatureGroup],
+    base: Mapping[str, Expression],
+    where: str = "expr",
+) -> Type:
+    """The type of a free-standing formula (no params) over ``groups`` and the expressions
+    in ``base``: what the Builder checks before a user names a feature. Raises
+    ``ExpressionError`` (with the position) at the first problem."""
+    by_name = {g.name: g for g in groups.values()}
+    declared = {n: feature_type(e.feature.dtype, e.feature.categories) for n, e in base.items()}
+    node = parse_formula(expr, where)
+    return check_formula(node, _Scope(where, by_name, declared), where)
+
+
 def _fits(d: FeatureDefinition, result: Type) -> None:
     want = KIND_OF[d.dtype]
     if result.kind != want:
