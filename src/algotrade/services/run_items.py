@@ -26,7 +26,8 @@ def status_code(status: str) -> str:
 
 def normalise(message: str, key: str = "") -> str:
     """A failure reason without the specifics that make every item's message different."""
-    text = message.replace(key, "<id>") if key else message
+    # The key as a whole token only: ticker "E" must not turn STALE_DATA into STAL<id>_DATA.
+    text = re.sub(rf"(?<!\w){re.escape(key)}(?!\w)", "<id>", message) if key else message
     text = _URL.sub("<url>", text)
     text = _DATE.sub("<date>", text)
     return _NUMBER.sub("<n>", text).strip()

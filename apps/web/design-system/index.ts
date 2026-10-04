@@ -10,6 +10,7 @@ export {
   type ValueFormat,
   type ValueTone,
 } from './format';
+export { saveTextFile } from './files';
 export * from './primitives';
 export { UiProvider, type Theme, type UiProviderProps, type UpDownPalette } from './theme';
 export type {

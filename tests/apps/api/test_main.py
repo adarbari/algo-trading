@@ -95,6 +95,8 @@ ENDPOINTS = (
     "/explore/compare/prices?ids=AAA,BBB",
     "/admin/ingestion/completeness",
     "/admin/ingestion/chains/option_quotes/2022-11-23",
+    "/admin/quality",
+    "/admin/verification/ibkr",
 )
 
 

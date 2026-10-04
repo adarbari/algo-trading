@@ -407,6 +407,10 @@ path = "apps/web/design-system/format"
 purpose = "value formatters shared by the data components (number, percent, compact currency, date, signed delta with up/down tone); exported from @algotrade/ui"
 
 [[web_dir]]
+path = "apps/web/design-system/files"
+purpose = "browser file helpers (save text the app built as a download); exported from @algotrade/ui"
+
+[[web_dir]]
 path = "apps/web/design-system/foundations"
 purpose = "Storybook foundation pages (Foundations/Tokens: colours with contrast, type, space, radius, density)"
 styles = true
@@ -459,7 +463,7 @@ purpose = "the shell: entry, App (providers around the router); composition only
 
 [[web_dir]]
 path = "apps/web/src/app/providers"
-purpose = "app-wide providers: UiProvider, the TanStack Query client"
+purpose = "app-wide providers: UiProvider, ToastProvider, the TanStack Query client"
 
 [[web_dir]]
 path = "apps/web/src/app/router"

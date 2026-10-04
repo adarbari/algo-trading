@@ -6,5 +6,6 @@ playwright-report/
 test-results/
 *.tsbuildinfo
 
-# The root .gitignore ignores Python build dirs named lib/; shared/lib here is source.
-!src/shared/lib/
+# The root .gitignore ignores Python build dirs named lib/; every lib/ here is source
+# (src/shared/lib, a slice's lib segment such as src/features/<feature>/lib).
+!lib/

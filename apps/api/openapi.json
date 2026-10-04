@@ -368,6 +368,28 @@
         "title": "CellDetail",
         "type": "object"
       },
+      "CheckCounts": {
+        "properties": {
+          "check": {
+            "title": "Check",
+            "type": "string"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "PASS / WARN / FAIL / NA -> rows",
+            "title": "Counts",
+            "type": "object"
+          }
+        },
+        "required": [
+          "check",
+          "counts"
+        ],
+        "title": "CheckCounts",
+        "type": "object"
+      },
       "Compared": {
         "properties": {
           "instrument_id": {
@@ -409,6 +431,12 @@
             "title": "Datasets",
             "type": "array"
           },
+          "last_closed": {
+            "description": "the exchange's last closed session; later than the last of `sessions` means the store is stale",
+            "format": "date",
+            "title": "Last Closed",
+            "type": "string"
+          },
           "sessions": {
             "items": {
               "format": "date",
@@ -421,7 +449,8 @@
         "required": [
           "sessions",
           "datasets",
-          "cells"
+          "cells",
+          "last_closed"
         ],
         "title": "Completeness",
         "type": "object"
@@ -1634,6 +1663,77 @@
         "title": "PriceComparison",
         "type": "object"
       },
+      "QualityCheck": {
+        "properties": {
+          "detail": {
+            "description": "what was measured, against which rule",
+            "title": "Detail",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "description": "PASS | WARN | FAIL",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "detail"
+        ],
+        "title": "QualityCheck",
+        "type": "object"
+      },
+      "QualityReport": {
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/QualityCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "session": {
+            "format": "date",
+            "title": "Session",
+            "type": "string"
+          },
+          "status": {
+            "description": "the data-quality run's: complete | partial | failed",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "session",
+          "status",
+          "finished_at",
+          "checks"
+        ],
+        "title": "QualityReport",
+        "type": "object"
+      },
       "ReviewList": {
         "properties": {
           "items": {
@@ -1760,6 +1860,32 @@
           "stats"
         ],
         "title": "RunDetail",
+        "type": "object"
+      },
+      "RunItem": {
+        "properties": {
+          "code": {
+            "description": "the status code (STALE_DATA)",
+            "title": "Code",
+            "type": "string"
+          },
+          "key": {
+            "description": "the item: a ticker, an instrument id, a step, a check",
+            "title": "Key",
+            "type": "string"
+          },
+          "status": {
+            "description": "as recorded, with its detail after a colon",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "code",
+          "status"
+        ],
+        "title": "RunItem",
         "type": "object"
       },
       "ScreenConfig": {
@@ -2288,6 +2414,62 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "Verification": {
+        "properties": {
+          "by_check": {
+            "description": "most failures first",
+            "items": {
+              "$ref": "#/components/schemas/CheckCounts"
+            },
+            "title": "By Check",
+            "type": "array"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "PASS / WARN / FAIL / NA over every row",
+            "title": "Counts",
+            "type": "object"
+          },
+          "failing": {
+            "description": "FAIL then WARN rows (at most 50), largest diff first: instrument_id, symbol, check, status, ours, theirs, diff, tolerance, note",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Failing",
+            "type": "array"
+          },
+          "instruments": {
+            "title": "Instruments",
+            "type": "integer"
+          },
+          "run_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Run Ids",
+            "type": "array"
+          },
+          "session": {
+            "description": "the partition shown: latest on or before the date",
+            "format": "date",
+            "title": "Session",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session",
+          "run_ids",
+          "instruments",
+          "counts",
+          "by_check",
+          "failing"
+        ],
+        "title": "Verification",
+        "type": "object"
       }
     }
   },
@@ -2390,6 +2572,58 @@
           }
         },
         "summary": "Dataset Session",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/quality": {
+      "get": {
+        "operationId": "quality_admin_quality_get",
+        "parameters": [
+          {
+            "description": "default: the latest",
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "default: the latest",
+              "title": "Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Quality",
         "tags": [
           "admin"
         ]
@@ -2556,6 +2790,104 @@
           }
         },
         "summary": "Run",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/runs/{run_id}/items": {
+      "get": {
+        "operationId": "run_items_admin_runs__run_id__items_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RunItem"
+                  },
+                  "title": "Response Run Items Admin Runs  Run Id  Items Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Items",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/verification/ibkr": {
+      "get": {
+        "operationId": "verification_admin_verification_ibkr_get",
+        "parameters": [
+          {
+            "description": "default: the latest",
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "default: the latest",
+              "title": "Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Verification"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Verification",
         "tags": [
           "admin"
         ]

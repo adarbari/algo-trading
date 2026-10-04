@@ -1,7 +1,8 @@
 """The store the API and explore tests read: the golden datasets loaded through ingestion, plus
 one session (``END``, the last golden session) of everything else a page shows: universe,
-reference facts with review marks, company details, rollups, events, an option chain, run
-records, screen results and a saved backtest."""
+reference facts with review marks, company details, rollups, events, an option chain, the
+verification vs IBKR, run records (incl. data-quality checks), screen results and a saved
+backtest."""
 
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -97,6 +98,16 @@ def _market(writer: StoreWriter) -> None:
     options = chain_rows("EQ:AAA", END, 100.0, expiries, 0.03)
     write_chains(writer, END, options, {"EQ:AAA": 100.0})
     _write(writer, "chains/status", [{"instrument_id": "EQ:AAA", "symbol": "AAA", "status": "OK"}])
+    _write(writer, "verification/ibkr", [
+        {"instrument_id": f"EQ:{s}", "symbol": s, "check": check, "status": status,
+         "ours": 1.0, "theirs": None if diff is None else 1 + diff, "diff": diff,
+         "tolerance": 0.001, "note": "rel diff"}
+        for s, check, status, diff in (
+            ("AAA", "close", "PASS", 0.0), ("AAA", "low", "FAIL", 0.002),
+            ("BBB", "low", "FAIL", 0.003), ("BBB", "close", "WARN", 0.0015),
+            ("CCC", "div_yield", "NA", None),
+        )
+    ])  # fmt: skip
 
 
 def _runs(writer: StoreWriter) -> None:
@@ -113,6 +124,13 @@ def _runs(writer: StoreWriter) -> None:
     chains = start_run("option_chains", END, NOW)
     chains.items = {"AAA": "OK", "BBB": "NO_CHAIN", "CCC": "STALE_DATA: chain is for 2022-11-21"}
     writer.save_run(chains.finish(NOW, complete=False))
+    quality = start_run("data_quality", END, NOW)
+    quality.items = {"bars_fresh": "PASS", "chains_stale": "WARN"}
+    quality.stats = {"checks": [
+        {"name": "bars_fresh", "status": "PASS", "detail": "latest bars session 2022-11-23"},
+        {"name": "chains_stale", "status": "WARN", "detail": "25.0% stale (max 20%)"},
+    ]}  # fmt: skip
+    writer.save_run(quality.finish(NOW))
     build = start_run("universe_build", END, NOW)
     review = {"symbol": "BBB", "held_figi": "", "vendor_figi": "BBG000000001", "note": "shared"}
     writer.save_run(build.finish(NOW, stats={"figi_review": [review]}))

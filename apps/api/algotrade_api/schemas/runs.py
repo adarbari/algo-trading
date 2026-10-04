@@ -1,4 +1,4 @@
-"""``/runs``: nightly run summaries and one run's detail."""
+"""``/runs``: nightly run summaries, one run's detail and items, the data-quality checks."""
 
 from datetime import date, datetime
 from typing import Any
@@ -57,3 +57,23 @@ class RunDetail(Schema):
         description="items not fine, grouped by normalised reason, largest first"
     )
     stats: dict[str, Any] = Field(description="the run's stats as recorded (counts, audit, errors)")
+
+
+class RunItem(Schema):
+    key: str = Field(description="the item: a ticker, an instrument id, a step, a check")
+    code: str = Field(description="the status code (STALE_DATA)")
+    status: str = Field(description="as recorded, with its detail after a colon")
+
+
+class QualityCheck(Schema):
+    name: str
+    status: str = Field(description="PASS | WARN | FAIL")
+    detail: str = Field(description="what was measured, against which rule")
+
+
+class QualityReport(Schema):
+    run_id: str
+    session: date
+    status: str = Field(description="the data-quality run's: complete | partial | failed")
+    finished_at: datetime | None
+    checks: list[QualityCheck]
