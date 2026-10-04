@@ -119,7 +119,12 @@ the skill with the fix.
    Dependencies go in the pyproject of the package that needs them (an app's own, not the
    library's), then `uv lock`; commit `uv.lock`.
 9. Before finishing any change, run `make check`.
-10. **PRs auto-merge** (squash, branch deleted) once every CI check on the latest commit
+10. **Push and open the PR yourself, then move on.** When `make check` passes, push the
+    feature branch (never `main`, never force-push), open the PR from the template and start
+    the next work item; do not ask the owner first and do not wait for CI (owner decision
+    2026-10-04). Only merging is off limits (below). A harness-learning PR still follows
+    `capture-learning`.
+    **PRs auto-merge** (squash, branch deleted) once every CI check on the latest commit
     passes (`.github/workflows/auto-merge.yml`). Open work in progress as a draft, or label
     it `no-automerge`, to keep it open for review. **Never merge yourself**: no
     `gh pr merge` (with or without `--auto`), no enabling GitHub auto-merge, no admin
