@@ -89,9 +89,13 @@ class FakeIB:
         self.calls.append(f"reqMktData {ticks}")
         past, close = self.dividends.get(contract.symbol, (None, float("nan")))
         nan = float("nan")
+        quote = None
+        if getattr(contract, "secType", "") == "OPT":
+            key = (contract.lastTradeDateOrContractMonth, float(contract.strike), contract.right)
+            quote = self.quotes.get(key)
         ticker = SimpleNamespace(
             dividends=None, close=close, _past=past, impliedVolatility=nan, histVolatility=nan,
-            _vols=self.vols.get(contract.symbol),
+            _vols=self.vols.get(contract.symbol), bid=nan, ask=nan, last=nan, _quote=quote,
         )  # fmt: skip
         self._streams.append(ticker)
         return ticker
@@ -101,6 +105,8 @@ class FakeIB:
         for t in self._streams:
             if t._vols is not None:
                 t.impliedVolatility, t.histVolatility = t._vols
+            if t._quote is not None:
+                t.bid, t.ask = t._quote
             if t._past is not None:
                 t.dividends = SimpleNamespace(
                     past12Months=t._past, next12Months=t._past, nextDate=None, nextAmount=None

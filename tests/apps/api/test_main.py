@@ -83,6 +83,7 @@ ENDPOINTS = (
     "/instruments/AAA/events",
     "/instruments/AAA/features",
     "/chains/AAA",
+    "/chains/AAA/live?expiry=2022-12-23",
     "/features",
     "/features/rollup.price_stats@v2.hv20/distribution",
     "/screens",

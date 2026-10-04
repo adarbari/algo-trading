@@ -23,8 +23,10 @@ SMTP_PASSWORD = "ALGOTRADE_SMTP_PASSWORD"  # Gmail: an app password, never the a
 IBKR_HOST = "ALGOTRADE_IBKR_HOST"
 IBKR_PORT = "ALGOTRADE_IBKR_PORT"
 IBKR_CLIENT_ID = "ALGOTRADE_IBKR_CLIENT_ID"
+# The API's live option quotes (ADR 0028) connect with their own client id, never ingestion's.
+IBKR_API_CLIENT_ID = "ALGOTRADE_IBKR_API_CLIENT_ID"  # default: ALGOTRADE_IBKR_CLIENT_ID + 1
 
-__all__ = ["config_dir", "credential", "data_url", "load_dotenv", "user_id"]
+__all__ = ["api_credential", "config_dir", "credential", "data_url", "load_dotenv", "user_id"]
 
 
 def load_dotenv(path: Path = Path(".env")) -> None:
@@ -42,6 +44,18 @@ def load_dotenv(path: Path = Path(".env")) -> None:
 def credential(name: str) -> str | None:
     """The variable's value; ``None`` when unset or empty. Never logged or stored."""
     return os.environ.get(name) or None
+
+
+def api_credential(name: str) -> str | None:
+    """``credential`` as the API sees it: the IBKR client id is the API's own
+    (``$ALGOTRADE_IBKR_API_CLIENT_ID``, else ``$ALGOTRADE_IBKR_CLIENT_ID`` + 1), so the API's
+    live quotes and an ingestion run never share an IB Gateway session id."""
+    if name != IBKR_CLIENT_ID:
+        return credential(name)
+    own, shared = credential(IBKR_API_CLIENT_ID), credential(IBKR_CLIENT_ID)
+    if own is not None or shared is None:
+        return own
+    return str(int(shared) + 1) if shared.isdigit() else None
 
 
 def data_url(explicit: str | None = None) -> str:

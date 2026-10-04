@@ -83,6 +83,46 @@ catalogue (`docs/data/features.md`) and the API's `/features` output. Today ther
 user (the account holder); when there are others, the API will hide `personal` features from
 users other than the owner (a later change, recorded here).
 
+### Live option quotes in the API
+(Owner-approved 2026-10-03, PR B.) Screener candidates and the Explore chain show live
+quotes: `GET /chains/{id}/live?expiry=D[&strikes=K...]` reads the calls and puts of one
+expiry from IB Gateway, directly from the API process, through the same facade
+(`IbkrMarketData.option_quotes`: `qualifyContracts` once per contract per session, then a
+`reqMktData` stream per contract until each has a bid and ask or `stream_wait_s` passes, then
+`cancelMktData`; all already on the allowlist, still no order or account call). Streams, not
+snapshot requests: IB serves delayed data (type 3) to streams only (error 10090 for
+snapshots, seen on the paper login 2026-10-03); outside trading hours only last, close,
+volume and IB's model IV / delta arrive.
+
+- **Session.** The API builds the `ibkr` session source from the registry (shared,
+  cross-process limiters) with its own client id (`ALGOTRADE_IBKR_API_CLIENT_ID`, default
+  `ALGOTRADE_IBKR_CLIENT_ID` + 1). One `SessionThread` (`sources/framework/session_thread.py`)
+  owns it: nothing connects until the first request; a failed open or a lost session makes
+  requests fall back at once for `[ibkr] live_retry_s`; a request waits at most
+  `live_timeout_s`. No worker or queue process: the read is synchronous, in the request.
+- **Cache.** An answer is reused for `live_cache_s` (60 s) per (underlying, expiry,
+  strikes), in process (`services/live/quotes.py`, status `CACHED`). A request names at most
+  `live_max_strikes` strikes (default: the `live_strikes` nearest the underlying), all of
+  them in the stored chain, which supplies the contract ids.
+- **Degrading, never failing.** `[ibkr]` disabled or not configured, the gateway down, busy
+  or slow, or any other feed error: the answer is the stored delayed chain for the same
+  strikes, `source = stored`, with `status` DISABLED / UNAVAILABLE / ERROR and a `detail`.
+  The page always renders. A 404 only for an underlying or expiry the stored chain lacks.
+- **The API's one write (amends ADR 0005 and 0024).** Each live answer is recorded,
+  asynchronously, to `live/option_quotes` (contract x time taken; `session_date` = the
+  exchange session it was taken in; `knowledge_ts` = when; `source = ibkr`). A bounded queue
+  and one recorder thread (`services/live/recorder.py`) write each batch as one run, pending
+  until it commits (ADR 0022); a full queue drops a snapshot (logged), a failed write is
+  logged, and neither touches the response. Only `live/*` tables, only through
+  `storage/tables/live_writer.py` (`LiveWriter` refuses any other table), enforced by two
+  import contracts ("Live quotes write only live/* tables...", "Only the live-quotes recorder
+  imports the live writer") and `ownership.toml` (`live-option-quotes`). Market and feature
+  data remain the ingestion app's alone. The recorder's thread and the session thread are
+  app infrastructure, not jobs: they are the two `allowed` exceptions to `job-execution` in
+  `ownership.toml`. Recorder runs get run ids from `storage.runs` but no run records. `data.chains.live_option_quotes` reads them back;
+  backtests never do (live rows are not point-in-time history of the stored chain), and like
+  every IBKR-derived value they carry the personal-use licence.
+
 ## Consequences
 - IV rank is available from day one for names IB covers, labelled `ibkr`; ours remains the
   fallback and the cross-check, labelled `ours`.
@@ -92,3 +132,8 @@ users other than the owner (a later change, recorded here).
   owner's call after watching the pacing stats.
 - Data derived from IBKR is personal-use: it must not be exposed to other users without
   revisiting this ADR.
+- The API is no longer strictly read-only: it appends the live quotes it served to `live/*`
+  (and nothing else). `live/option_quotes` grows with use (a few hundred rows a minute at
+  most while a page refreshes), so it is kept for 7 days (`sources.toml live_retention_days`,
+  default 7): the nightly `purge-raw` task deletes its partitions dated before
+  `session - 7` (`TableStore.purge_before`); no other table is touched.

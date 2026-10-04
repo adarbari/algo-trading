@@ -7,8 +7,15 @@ import pytest
 
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
-from algotrade.data.chains import chain_expiries, chain_status, option_quotes, underlying_quotes
+from algotrade.data.chains import (
+    chain_expiries,
+    chain_status,
+    live_option_quotes,
+    option_quotes,
+    underlying_quotes,
+)
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.tables.live_writer import LiveWriter
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.stored_frames import stamped
 
@@ -75,3 +82,22 @@ def test_chain_expiries_one_pruned_read_per_underlying_in_the_session_only() -> 
         "chains/option_quotes", later, "d", stamped([option("OPT:C", "EQ:C")], later, "d")
     )
     assert chain_expiries(reader, DAY, ["EQ:A", "EQ:C"]) == {"EQ:A": [near, far]}
+
+
+def test_live_option_quotes_keep_every_snapshot_and_filter_on_the_underlying() -> None:
+    backend = MemoryBackend()
+    writer, reader = LiveWriter(backend), StoreReader(backend)
+    assert live_option_quotes(reader, DAY) is None
+    for n, run in enumerate(("l1", "l2")):
+        rows = [
+            {**option(c, u), "ts": TS + pd.Timedelta(minutes=n), "close": None}
+            for c, u in (("OPT:A1", "EQ:A"), ("OPT:B1", "EQ:B"))
+        ]
+        for row in rows:
+            row.pop("open_interest")
+        with writer.publishing(run, TS.to_pydatetime()):
+            writer.write_live("live/option_quotes", DAY, run, stamped(rows, DAY, run))
+    only_a = live_option_quotes(reader, DAY, ["EQ:A"])
+    assert only_a is not None and list(only_a["instrument_id"]) == ["OPT:A1", "OPT:A1"]
+    every = live_option_quotes(reader, DAY)
+    assert every is not None and len(every) == 4

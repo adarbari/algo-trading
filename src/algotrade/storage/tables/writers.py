@@ -49,6 +49,10 @@ class StoreWriter(ResultWriter):
         """Bytes ``table`` takes in the store (every run)."""
         return self._backend.tables.size(table)
 
+    def purge_table_before(self, table: str, cutoff: date) -> int:
+        """Delete ``table``'s partitions dated before ``cutoff`` (retention: ``purge-raw``)."""
+        return self._backend.tables.purge_before(table, cutoff)
+
     def drop_table(self, table: str) -> int:
         """Delete every partition of a superseded table (``retire-features`` only)."""
         return self._backend.tables.drop(table)

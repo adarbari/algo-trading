@@ -74,7 +74,7 @@ What each nightly run adds, table by table, with sizes: [nightly-footprint.md](n
 
 ### Retention
 
-Tables and run records are kept forever. The rest is removed by `purge-raw` (the nightly's
+Tables (except `live/option_quotes`, below) and run records are kept forever. The rest is removed by `purge-raw` (the nightly's
 last step; `apps/ingestion/.../tasks/maintenance/purge.py`) or, for staging, by the run itself:
 
 - **Raw, per source.** Each raw source (`raw/source=<s>/`) is kept for its `sources.toml`
@@ -92,6 +92,11 @@ last step; `apps/ingestion/.../tasks/maintenance/purge.py`) or, for staging, by 
   PARTIAL with `FETCH_ERROR` items -> kept, and the next run of the task for that session
   resumes from it, refetches only those items, and drops it when it finishes; FAILED -> kept
   for the same resume. What is never resumed is purged after `staging_retention_days` (14).
+- **Live quotes.** `live/option_quotes` (what the API recorded, ADR 0028) keeps
+  `live_retention_days` (7) of session partitions; `purge-raw` deletes older ones
+  (`tables.purge_before`, stats `live_partitions_removed`). Only a table whose `TableSpec`
+  declares `retention_days` can be purged (any other raises); a purge is committed like a
+  run (ADR 0022).
 - **Uncommitted table writes** a crashed run left (ADR 0022) are purged after
   `staging_retention_days` too.
 

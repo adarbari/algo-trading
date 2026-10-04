@@ -3,6 +3,7 @@ handshake instead of ``IB.connect`` (which syncs positions and accounts), paced 
 
 import socket
 from datetime import date
+from types import SimpleNamespace
 
 import pytest
 
@@ -206,3 +207,54 @@ def test_vol_streams_are_cancelled_even_when_waiting_fails() -> None:
     with pytest.raises(RuntimeError):
         gw.underlying_vols({"AAPL": None})
     assert fake.calls.count("cancelMktData") == 1
+
+
+def test_option_quotes_qualify_once_per_session_then_stream_and_cancel() -> None:
+    fake = FakeIB(
+        quotes={("20261120", 230.0, "C"): (5.0, 5.2), ("20261120", 230.0, "P"): (4.0, 4.3)}
+    )
+    gw, general, historical = gateway(fake)
+    gw.connect()
+    rows = gw.option_quotes("AAPL", date(2026, 11, 20), [230.0, 999.0])
+    assert [(r["strike"], r["right"], r["listed"]) for r in rows] == [
+        (230.0, "C", True), (230.0, "P", True), (999.0, "C", False), (999.0, "P", False)
+    ]  # fmt: skip
+    assert rows[0] == {
+        "strike": 230.0, "right": "C", "listed": True, "conid": 1004, "bid": 5.0, "ask": 5.2,
+        "last": None, "close": None, "volume": None, "iv": None, "delta": None,
+    }  # fmt: skip
+    assert fake.calls.count("qualifyContracts") == 1 and fake.calls.count("reqMktData ") == 2
+    assert fake.calls.count("cancelMktData") == 2  # every stream ends
+    assert general.waits == 2 + 4 + 2 + 2  # handshake + type, 4 qualified, 2 streams + cancels
+    gw.option_quotes("AAPL", date(2026, 11, 20), [230.0])  # known contracts: no lookup
+    assert fake.calls.count("qualifyContracts") == 1 and fake.calls.count("reqMktData ") == 4
+    assert historical.waits == 0
+    assert set(gw.calls) <= MARKET_DATA_CALLS | CLIENT_CALLS
+    assert not set(FORBIDDEN) & set(fake.calls)
+    gw.close()
+    assert gw._options == {}
+
+
+def test_option_quotes_with_nothing_listed_send_no_snapshot_request() -> None:
+    fake = FakeIB()
+    gw, _, _ = gateway(fake)
+    gw.connect()
+    rows = gw.option_quotes("ZZZ", date(2026, 11, 20), [1.0])
+    assert all(not r["listed"] for r in rows) and "reqMktData " not in fake.calls
+
+
+def test_option_quotes_stop_waiting_after_the_stream_window() -> None:
+    fake = FakeIB(quotes={("20261120", 230.0, "C"): (5.0, 5.2)})
+    fake.quotes = {}  # listed (qualified below), but no quote ever arrives
+    now = iter([0.0, 0.0, 5.0])
+    cfg = GatewayConfig("127.0.0.1", 4002, 7, stream_wait_s=4.0)
+    gw = IbkrMarketData(cfg, ib_factory=lambda: fake, clock=lambda: next(now))
+    gw.connect()
+    gw._options[("AAPL", date(2026, 11, 20), 230.0, "C")] = SimpleNamespace(
+        conId=1, secType="OPT", lastTradeDateOrContractMonth="20261120", strike=230.0,
+        right="C", symbol="AAPL",
+    )  # fmt: skip
+    gw._options[("AAPL", date(2026, 11, 20), 230.0, "P")] = None
+    rows = gw.option_quotes("AAPL", date(2026, 11, 20), [230.0])
+    assert rows[0]["listed"] and rows[0]["bid"] is None
+    assert fake.calls.count("waitOnUpdate") == 1 and fake.calls.count("cancelMktData") == 1

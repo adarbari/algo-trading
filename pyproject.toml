@@ -294,6 +294,7 @@ forbidden_modules = [
     "numpy",
 ]
 allow_indirect_imports = true  # services.explore reads the stores on the API's behalf
+# services.live (ADR 0028) is the API's other library entry: live quotes, recorded to live/*.
 
 [[tool.importlinter.contracts]]
 name = "Explore queries are read-only: no writers, no jobs (ADR 0024)"
@@ -307,6 +308,22 @@ forbidden_modules = [
     "algotrade.services.authoring",
 ]
 allow_indirect_imports = true  # the backtest / screen use cases' naming helpers sit beside their writers
+
+# ---- ADR 0028: the API's live quotes write only live/* tables, only through the live writer.
+
+[[tool.importlinter.contracts]]
+name = "Live quotes write only live/* tables: no market-data writer, no jobs (ADR 0028)"
+type = "forbidden"
+source_modules = ["algotrade.services.live"]
+forbidden_modules = ["algotrade.storage.tables.writers", "algotrade.services.jobs"]
+
+[[tool.importlinter.contracts]]
+name = "Only the live-quotes recorder imports the live writer (ADR 0028)"
+type = "forbidden"
+source_modules = ["algotrade", "algotrade_api", "algotrade_ingestion", "algotrade_backtest"]
+forbidden_modules = ["algotrade.storage.tables.live_writer"]
+ignore_imports = ["algotrade.services.live.recorder -> algotrade.storage.tables.live_writer"]
+allow_indirect_imports = true  # the API reaches it only through services.live
 
 # ---- ADR 0019: ownership and boundaries. Every contract the restructure planned is enabled
 # (no `pending_contract` remains in architecture/ownership.toml; a fitness test keeps it so).

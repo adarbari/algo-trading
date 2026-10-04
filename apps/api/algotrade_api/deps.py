@@ -1,6 +1,7 @@
-"""Request dependencies: the API settings, the read-only store, the config writer (ADR
-0029: user configs only, through ``services.authoring``), the user a write is for, and the
-query parameters several routes share (universe filters, comma-separated lists).
+"""Request dependencies: the API settings, the read-only store, the live quotes (ADR 0028),
+the config writer (ADR 0029: user configs only, through ``services.authoring``), the user a
+write is for, and the query parameters several routes share (universe filters, comma-separated
+lists).
 
 Settings come from the environment through ``algotrade.config.env`` (the one reader):
 ``ALGOTRADE_DATA_URL``, ``ALGOTRADE_CONFIG_DIR`` and ``ALGOTRADE_USER`` (a single local
@@ -17,6 +18,7 @@ from algotrade.config.user import DEFAULT_USER, UserContext
 from algotrade.services.authoring.scope import ConfigWriter, open_writer
 from algotrade.services.explore.store import ReadStore, open_store
 from algotrade.services.explore.universe import UniverseFilter
+from algotrade.services.live.quotes import LiveQuotes
 
 DEV_ORIGINS = (
     "http://localhost:5173",  # the web app's dev server (Vite)
@@ -32,10 +34,11 @@ class ApiSettings:
     config_dir: str
     user: str = DEFAULT_USER
     cors_origins: tuple[str, ...] = field(default=DEV_ORIGINS)
+    live: bool = False  # read live quotes from IB Gateway (the served app; off in tests)
 
     @classmethod
     def from_env(cls) -> "ApiSettings":
-        return cls(data_url(), str(config_dir()), user_id(DEFAULT_USER))
+        return cls(data_url(), str(config_dir()), user_id(DEFAULT_USER), live=True)
 
     def open(self) -> ReadStore:
         return open_store(self.data_url, self.config_dir, UserContext(self.user))
@@ -71,6 +74,14 @@ def write_user(
 
 
 User = Annotated[str, Depends(write_user)]
+
+
+def get_live(request: Request) -> LiveQuotes:
+    """The live quotes ``create_app`` set up (one IB Gateway session per app)."""
+    return cast(LiveQuotes, request.app.state.live)
+
+
+Live = Annotated[LiveQuotes, Depends(get_live)]
 
 
 def universe_filter(

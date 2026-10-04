@@ -66,6 +66,7 @@ from algotrade.storage.backends.run_selection import (
 )
 from algotrade.storage.locks import FileLock, held
 from algotrade.storage.runs import RunRecord, run_session
+from algotrade.storage.tables.schemas import require_retention
 
 
 def _parquet_bytes(frame: pd.DataFrame) -> bytes:
@@ -241,12 +242,27 @@ class LocalTables:
     def drop(self, table: str) -> int:
         base = self.root / table
         days = sorted(base.glob("date=*")) if base.exists() else []
+        self._remove(days)
+        shutil.rmtree(base, ignore_errors=True)
+        return len(days)
+
+    def purge_before(self, table: str, cutoff: date) -> int:
+        """Retention (``require_retention``), committed like a run (``Commits.purge``)."""
+        require_retention(table)
+        base = self.root / table
+        days = [
+            d
+            for d in (sorted(base.glob("date=*")) if base.exists() else [])
+            if date.fromisoformat(d.name.removeprefix("date=")) < cutoff
+        ]
+        return self.commits.purge(days)
+
+    @staticmethod
+    def _remove(days: list[Path]) -> None:
         for day in days:
             with held(index_lock(day)):  # no write or commit is mid-way in the partition
                 (day / INDEX).unlink(missing_ok=True)  # unindexed first: readers see nothing
             shutil.rmtree(day)
-        shutil.rmtree(base, ignore_errors=True)
-        return len(days)
 
 
 def _read_file(path: Path, filters: list[Any] | None, columns: Sequence[str] | None) -> pa.Table:

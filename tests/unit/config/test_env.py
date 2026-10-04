@@ -34,3 +34,17 @@ def test_locations_and_user_resolve_flag_then_environment_then_default(
     assert env.data_url() == "memory://" and env.data_url("file://x") == "file://x"
     assert env.config_dir() == Path("/etc/algo") and env.config_dir("c") == Path("c")
     assert env.user_id("local") == "alice"
+
+
+def test_the_api_has_its_own_ibkr_client_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(env.IBKR_API_CLIENT_ID, raising=False)
+    monkeypatch.delenv(env.IBKR_CLIENT_ID, raising=False)
+    monkeypatch.setenv(env.IBKR_HOST, "127.0.0.1")
+    assert env.api_credential(env.IBKR_CLIENT_ID) is None
+    assert env.api_credential(env.IBKR_HOST) == "127.0.0.1"
+    monkeypatch.setenv(env.IBKR_CLIENT_ID, "17")
+    assert env.api_credential(env.IBKR_CLIENT_ID) == "18"  # ingestion's + 1
+    monkeypatch.setenv(env.IBKR_CLIENT_ID, "x")
+    assert env.api_credential(env.IBKR_CLIENT_ID) is None
+    monkeypatch.setenv(env.IBKR_API_CLIENT_ID, "21")
+    assert env.api_credential(env.IBKR_CLIENT_ID) == "21"

@@ -119,6 +119,7 @@ VENDOR_EXTRAS = {
         "iv_batch",
         "iv_history_days",
         "iv_backfill_per_night",
+        *("live_cache_s", "live_strikes", "live_max_strikes", "live_timeout_s", "live_retry_s"),
     ),
 }
 # Vendors that stay off unless their section says ``enabled = true`` (a missing section or key
@@ -177,12 +178,21 @@ class IbkrSettings:
     iv_batch: int = 50  # IV streams open together (under the account's market-data lines)
     iv_history_days: int = 730  # calendar days of IV history a backfill fetches per underlying
     iv_backfill_per_night: int = 100  # underlyings without IV history the nightly backfills
+    # The API's live option quotes (ADR 0028): cache, strikes per request, failing fast
+    live_cache_s: float = (
+        60.0  # an answer is reused for this long (per underlying, expiry, strikes)
+    )
+    live_strikes: int = 10  # strikes nearest the underlying asked for when none are named
+    live_max_strikes: int = 20  # most strikes one request may name (x 2 rights = contracts)
+    live_timeout_s: float = 20.0  # longest a request waits for IB Gateway before the fallback
+    live_retry_s: float = 30.0  # after the gateway fails, requests fall back at once this long
 
 
 @dataclass(frozen=True)
 class SourcesSettings:
     raw_retention_days: int = 90
     staging_retention_days: int = 14
+    live_retention_days: int = 7  # live/option_quotes partitions older than this are purged
     vendors: Mapping[str, VendorSettings] = field(default_factory=dict)  # by section name
     cboe_workers: int = 4
     cboe_priority_symbols: tuple[str, ...] = ()  # fetched first (with S&P 500 members)
@@ -218,7 +228,9 @@ class SourcesSettings:
         d = cls()
         root = Table(doc, where)
         sections = [k for k in root.names() if isinstance(root.raw(k), Mapping)]
-        root.only(["raw_retention_days", "staging_retention_days", *sections])
+        root.only(
+            ["raw_retention_days", "staging_retention_days", "live_retention_days", *sections]
+        )
         http = root.table(
             "http",
             [
@@ -255,6 +267,7 @@ class SourcesSettings:
             staging_retention_days=root.integer(
                 "staging_retention_days", d.staging_retention_days, 1
             ),
+            live_retention_days=root.integer("live_retention_days", d.live_retention_days, 1),
             vendors={name: _vendor(t, name not in OFF_BY_DEFAULT) for name, t in vendors.items()},
             cboe_workers=_extra(vendors, "cboe").integer("workers", d.cboe_workers, 1),
             cboe_priority_symbols=tuple(
@@ -315,6 +328,11 @@ def _ibkr(section: Table) -> IbkrSettings:
         iv_batch=section.integer("iv_batch", d.iv_batch, 1),
         iv_history_days=section.integer("iv_history_days", d.iv_history_days, 1),
         iv_backfill_per_night=section.integer("iv_backfill_per_night", d.iv_backfill_per_night, 0),
+        live_cache_s=section.number("live_cache_s", d.live_cache_s, 0),
+        live_strikes=section.integer("live_strikes", d.live_strikes, 1),
+        live_max_strikes=section.integer("live_max_strikes", d.live_max_strikes, 1),
+        live_timeout_s=section.number("live_timeout_s", d.live_timeout_s, 0),
+        live_retry_s=section.number("live_retry_s", d.live_retry_s, 0),
     )
 
 

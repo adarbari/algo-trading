@@ -162,7 +162,8 @@ never fails because of it.
    another host.
 3. In `.env` (see [`.env.example`](.env.example)): `ALGOTRADE_IBKR_HOST=127.0.0.1`,
    `ALGOTRADE_IBKR_PORT=<socket port>`, `ALGOTRADE_IBKR_CLIENT_ID=<a number no other API
-   client uses>`.
+   client uses>`. The API's live option quotes connect as `ALGOTRADE_IBKR_API_CLIENT_ID`
+   (default: the client id + 1), so `algotrade-api` and an ingestion run never collide.
 4. In [`config/site/sources.toml`](config/site/sources.toml) set `[ibkr] enabled = true`
    (`market_data_type = 3` delayed is free; 1 live needs a market data subscription).
 5. Try it: `algotrade-ingest verify --date <last session> --symbols AAPL,SPY` (about 20 s per
