@@ -52,7 +52,7 @@ const addCriterion = vi.fn();
 const setTieBreak = vi.fn();
 const builder = (patch: Record<string, unknown> = {}) => ({
   status: 'ready',
-  readOnly: false,
+  preset: null,
   selection: 'liquid_optionable',
   criteria: [
     { id: 'iv30', field: 'rollup.iv30@v1.iv30', op: 'gte', mode: 'hard', value: 0.5 },
@@ -148,11 +148,11 @@ describe('CriteriaTable', () => {
     expect(screen.getAllByText('my.criteria.close.field: unknown field')).toHaveLength(1);
   });
 
-  it('locks a preset that has not been copied', () => {
-    state.builder = builder({ readOnly: true });
+  it('keeps a preset editable: the first edit makes the copy', () => {
+    state.builder = builder({ preset: { id: 'vrp', version: 1 } });
     setup();
-    expect(screen.getByRole('button', { name: '+ Add criterion' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Remove criterion iv30' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '+ Add criterion' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Remove criterion iv30' })).toBeEnabled();
   });
 
   it('shows loading and the load error', () => {

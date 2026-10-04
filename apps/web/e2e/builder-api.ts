@@ -65,6 +65,31 @@ export async function mockBuilderApi(
   );
 
   const detailOf = (id: string): Json | null => details[id] ?? null;
+  // Your screens: one finalised with a working copy, one draft only; copies and new drafts join.
+  const own = new Set(['my-vrp']);
+  const listing = (): Json[] => [
+    {
+      screener_id: 'idea-draft',
+      status: 'DRAFT',
+      latest: null,
+      has_draft: true,
+      schedule: null,
+      preset_id: 'vrp_scanner',
+    },
+    ...[...own].map((id) => {
+      const detail = details[id] ?? {};
+      const versions = (detail['versions'] as number[] | undefined) ?? [];
+      const preset = detail['preset'] as { preset_id: string } | null | undefined;
+      return {
+        screener_id: id,
+        status: versions.length > 0 ? 'FINAL' : 'DRAFT',
+        latest: (detail['latest'] as number | null | undefined) ?? null,
+        has_draft: detail['draft'] != null,
+        schedule: (detail['schedule'] as string | null | undefined) ?? null,
+        preset_id: preset?.preset_id ?? null,
+      };
+    }),
+  ];
 
   await page.route('**/api/**', async (route: Route) => {
     const request = route.request();
@@ -75,6 +100,7 @@ export async function mockBuilderApi(
     const json = (data: unknown, status = 200) => route.fulfill({ status, json: data });
 
     if (path === '/configs' && method === 'GET') return json(CONFIGS);
+    if (path === '/screeners' && method === 'GET') return json(listing());
     if (path === '/screeners/preview' && method === 'POST') {
       const spec = body()['spec'] as Json;
       mock.previews.push(spec);
@@ -133,6 +159,7 @@ export async function mockBuilderApi(
     if (part === 'draft' && method === 'PUT') {
       const document = body()['document'] as Json;
       mock.drafts.push({ id, document });
+      own.add(id);
       const detail = detailOf(id) ?? {
         screener_id: id,
         user: 'abhinav',
@@ -149,6 +176,7 @@ export async function mockBuilderApi(
       mock.discarded.push(id);
       const detail = detailOf(id);
       if (detail) details[id] = { ...detail, draft: null, draft_error: null };
+      if (((detail?.['versions'] as number[] | undefined) ?? []).length === 0) own.delete(id);
       return route.fulfill({ status: 204 });
     }
     if (part === 'finalise' && method === 'POST') {
@@ -183,6 +211,7 @@ export async function mockBuilderApi(
     if (part === 'copy' && method === 'POST') {
       const preset = String(body()['preset']);
       mock.copies.push({ id, preset });
+      own.add(id);
       const draft = { id, extends: `${preset}@2` };
       details[id] = {
         ...structuredClone(DETAILS['vrp_scanner'] ?? {}),

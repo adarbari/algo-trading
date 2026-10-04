@@ -1,5 +1,8 @@
-/** The column that sorts rows with equal scores (`[rank] tie_break`): a numeric feature, high or low first. */
-import { SegmentedControl, Stack, Text } from '@algotrade/ui';
+/**
+ * The column that sorts rows with equal scores (`[rank] tie_break`): a numeric feature, high or
+ * low first. One a preset sets can be changed or cleared in a copy.
+ */
+import { Button, SegmentedControl, Stack, Text } from '@algotrade/ui';
 
 import { isNumericFeature, type CatalogueFeature } from '@/entities/feature';
 
@@ -48,6 +51,18 @@ export function TieBreakField({
         }}
         disabled={disabled || !field}
       />
+      {field && (
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={disabled}
+          onClick={() => {
+            onChange(null, order);
+          }}
+        >
+          Clear tie-break
+        </Button>
+      )}
     </Stack>
   );
 }

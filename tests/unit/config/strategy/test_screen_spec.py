@@ -282,3 +282,9 @@ def test_catalog_errors_name_the_criterion_and_its_field(
     with pytest.raises(ConfigurationError) as error:
         check_screen_spec(spec, CATALOG, "vrp")
     assert str(error.value).startswith(path)
+
+
+def test_an_empty_tie_break_clears_one() -> None:
+    doc = spec_doc(rank={"tie_break": "", "tie_break_order": "asc"})
+    spec = parse_screen_spec("vrp", doc, "vrp")
+    assert spec.tie_break is None

@@ -2,16 +2,17 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ScreenerSummary } from '@/entities/screen';
+import type { ScreenerListItem, ScreenerSummary } from '@/entities/screen';
 import { TestQueryProvider } from '@/shared/api';
 import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib/testing';
 
 import { ScreenerList } from './ScreenerList';
 
-const hooks = vi.hoisted(() => ({ useScreeners: vi.fn() }));
+const hooks = vi.hoisted(() => ({ useScreeners: vi.fn(), useMyScreeners: vi.fn() }));
 vi.mock('@/entities/screen', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useScreeners: hooks.useScreeners,
+  useMyScreeners: hooks.useMyScreeners,
 }));
 vi.mock('@/features/screener-copy', async () => {
   const { Button } = await import('@algotrade/ui');
@@ -58,9 +59,24 @@ const LIST = [
   screener('my-vrp', 'abhinav', 'rules', { schedule: 'nightly' }),
   screener('broken', 'abhinav', 'rules', { error: 'unknown field' }),
 ];
+const mine = (screener_id: string, patch: Partial<ScreenerListItem> = {}): ScreenerListItem => ({
+  screener_id,
+  status: 'FINAL',
+  latest: 1,
+  has_draft: false,
+  schedule: null,
+  preset_id: null,
+  ...patch,
+});
+const MINE = [
+  mine('my-vrp', { schedule: 'nightly', preset_id: 'vrp_scanner', has_draft: true, latest: 2 }),
+  mine('broken'),
+  mine('vrp_scanner', { status: 'DRAFT', latest: null, preset_id: 'vrp_scanner' }),
+];
 
 beforeEach(() => {
   hooks.useScreeners.mockReturnValue(fakeQuery(LIST));
+  hooks.useMyScreeners.mockReturnValue(fakeQuery(MINE));
 });
 
 const setup = () => {
@@ -76,9 +92,12 @@ const setup = () => {
 describe('ScreenerList', () => {
   it('separates your screeners from the site presets', async () => {
     const { container } = setup();
-    const mine = screen.getByRole('grid', { name: 'Your screeners' });
-    expect(within(mine).getByRole('row', { name: /my-vrp/ })).toHaveTextContent('Nightly');
-    expect(within(mine).getByRole('row', { name: /broken/ })).toHaveTextContent('Does not resolve');
+    const mineTable = screen.getByRole('grid', { name: 'Your screeners' });
+    expect(within(mineTable).getByRole('row', { name: /my-vrp/ })).toHaveTextContent('Nightly');
+    expect(within(mineTable).getByRole('row', { name: /my-vrp/ })).toHaveTextContent('v2 + draft');
+    expect(within(mineTable).getByRole('row', { name: /broken/ })).toHaveTextContent(
+      'Does not resolve',
+    );
     const presets = screen.getByRole('grid', { name: 'Site presets' });
     expect(within(presets).getByRole('row', { name: /short_premium/ })).toHaveTextContent('Python');
     expect(
@@ -89,15 +108,24 @@ describe('ScreenerList', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('opens a screener to edit, and a preset to view', async () => {
+  it('lists a draft-only screener, with the preset it copies', () => {
+    setup();
+    const rows = within(screen.getByRole('grid', { name: 'Your screeners' })).getAllByRole('row');
+    const row = rows.find((r) => r.textContent.startsWith('vrp_scanner'));
+    if (!row) throw new Error('no draft row');
+    expect(row).toHaveTextContent('DRAFT');
+    expect(row).toHaveTextContent('vrp_scanner');
+  });
+
+  it('opens a screener to edit, and a preset to see its preview', async () => {
     const { onOpen } = setup();
     await userEvent.click(
       within(screen.getByRole('row', { name: /my-vrp/ })).getByRole('button', { name: 'Edit' }),
     );
     expect(onOpen).toHaveBeenCalledWith('my-vrp');
     await userEvent.click(
-      within(screen.getByRole('row', { name: /vrp_scanner/ })).getByRole('button', {
-        name: 'View',
+      within(screen.getByRole('grid', { name: 'Site presets' })).getByRole('button', {
+        name: 'Open',
       }),
     );
     expect(onOpen).toHaveBeenLastCalledWith('vrp_scanner');
@@ -106,7 +134,7 @@ describe('ScreenerList', () => {
   it('copies a preset and opens the copy', async () => {
     const { onOpen } = setup();
     await userEvent.click(
-      within(screen.getByRole('row', { name: /vrp_scanner/ })).getByRole('button', {
+      within(screen.getByRole('grid', { name: 'Site presets' })).getByRole('button', {
         name: 'Copy to my screeners',
       }),
     );
@@ -116,12 +144,12 @@ describe('ScreenerList', () => {
   });
 
   it('says when you have none yet, and when the list failed to load', () => {
-    hooks.useScreeners.mockReturnValue(fakeQuery([LIST[0]]));
+    hooks.useMyScreeners.mockReturnValue(fakeQuery([]));
     const { rerender } = setup();
     expect(
-      screen.getByText('You have no finalized screener yet. Create one, or copy a preset.'),
+      screen.getByText('You have no screener yet. Create one, or open a preset and change it.'),
     ).toBeInTheDocument();
-    hooks.useScreeners.mockReturnValue(fakeQuery(undefined, { isError: true, isPending: false }));
+    hooks.useMyScreeners.mockReturnValue(fakeQuery(undefined, { isError: true, isPending: false }));
     rerender(
       <TestQueryProvider>
         <ScreenerList onOpen={vi.fn()} />

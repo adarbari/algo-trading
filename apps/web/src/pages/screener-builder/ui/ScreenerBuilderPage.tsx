@@ -15,17 +15,15 @@ import { ScreenSummary } from '@/widgets/screen-summary';
 export interface ScreenerBuilderPageProps {
   /** The screener being built. */
   id: string;
-  /** Open another screener's Builder (a preset's copy). */
-  onOpen: (id: string) => void;
   /** Open a ticker in Explore. */
   onOpenTicker: (symbol: string) => void;
 }
 
-export function ScreenerBuilderPage({ id, onOpen, onOpenTicker }: ScreenerBuilderPageProps) {
+export function ScreenerBuilderPage({ id, onOpenTicker }: ScreenerBuilderPageProps) {
   return (
     <ScreenerBuilderProvider id={id} key={id}>
       <Stack gap={3}>
-        <DraftBar onOpen={onOpen} />
+        <DraftBar />
         <Grid columns="main-aside" gap={4} collapse="lg" align="start">
           <CriteriaTable />
           <Stack gap={3}>

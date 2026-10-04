@@ -37,7 +37,6 @@ function EditScreener() {
   return (
     <ScreenerBuilderPage
       id={id}
-      onOpen={(next) => void navigate({ to: '/screeners/$id/edit', params: { id: next } })}
       onOpenTicker={(symbol) =>
         void navigate({ to: '/explore', search: { sel: symbol, focus: symbol } })
       }

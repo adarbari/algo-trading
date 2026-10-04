@@ -17,6 +17,14 @@ export function useScreeners() {
   });
 }
 
+/** The user's own screens: finalized ones and draft-only ones (status DRAFT). */
+export function useMyScreeners() {
+  return useQuery({
+    queryKey: queryKeys.screeners.mine(),
+    queryFn: () => unwrap(api.GET('/screeners')),
+  });
+}
+
 /** One screen: its draft, versions, schedule, preset pin and resolved working copy. */
 export function useScreener(id: string | null) {
   return useQuery({

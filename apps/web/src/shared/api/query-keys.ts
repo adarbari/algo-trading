@@ -31,6 +31,7 @@ export const queryKeys = {
   screeners: {
     all: () => ['screeners'] as const,
     list: () => ['screeners', 'list'] as const,
+    mine: () => ['screeners', 'mine'] as const,
     detail: (id: string) => ['screeners', 'detail', id] as const,
     versions: (id: string) => ['screeners', 'versions', id] as const,
     preview: (spec: unknown) => ['screeners', 'preview', spec] as const,

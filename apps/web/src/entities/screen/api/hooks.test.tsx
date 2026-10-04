@@ -7,6 +7,7 @@ import { api } from '@/shared/api';
 
 import {
   PREVIEW_ROWS,
+  useMyScreeners,
   useScreener,
   useScreenerVersions,
   useScreenPreview,
@@ -46,6 +47,18 @@ describe('useScreeners', () => {
     });
     expect(result.current.data?.map((c) => c.config_id)).toEqual(['a']);
     expect(GET).toHaveBeenCalledWith('/configs');
+  });
+});
+
+describe('useMyScreeners', () => {
+  it('reads GET /screeners: finalized and draft-only screens', async () => {
+    GET.mockResolvedValue(ok([{ screener_id: 'a', status: 'DRAFT' }]));
+    const { result } = renderHook(() => useMyScreeners(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(result.current.data?.[0]?.status).toBe('DRAFT');
+    expect(GET).toHaveBeenCalledWith('/screeners');
   });
 });
 

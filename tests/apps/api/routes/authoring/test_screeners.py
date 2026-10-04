@@ -88,3 +88,15 @@ def test_draft_put_delete_and_fail_closed_finalise(writer_client: TestClient, ro
 def test_ids_and_user_labels_are_strict(writer_client: TestClient, root: Path, url: str) -> None:
     assert writer_client.put(url, json={"document": OWN}).status_code == 400
     assert not (root / "users").exists()  # nothing written anywhere
+
+
+def test_list_has_finalised_and_draft_only_screens(writer_client: TestClient) -> None:
+    c = writer_client
+    assert c.get("/screeners?user=alice").json() == []
+    c.post("/screeners/vrp/copy?user=alice", json={"preset": "vrp"})  # a copy: draft only
+    c.put("/screeners/mine/draft?user=alice", json={"document": OWN})
+    c.post("/screeners/mine/finalise?user=alice")
+    listed = {s["screener_id"]: s for s in c.get("/screeners?user=alice").json()}
+    assert (listed["vrp"]["status"], listed["vrp"]["preset_id"]) == ("DRAFT", "vrp")
+    assert (listed["mine"]["status"], listed["mine"]["latest"]) == ("FINAL", 1)
+    assert c.get("/screeners?user=bob").json() == []

@@ -53,6 +53,10 @@ class ConfigWriter(ConfigStore, Protocol):
         """``True`` when there was a draft."""
         ...
 
+    def drafts(self, user: str) -> list[str]:
+        """The names of ``user``'s screens that have a draft (finalised or not), sorted."""
+        ...
+
     def versions(self, user: str, name: str) -> list[int]:
         """Finalised versions, ascending (the latest is the last)."""
         ...
@@ -220,6 +224,12 @@ class FileConfigWriter(FileConfigStore):
             return False
         return True
 
+    def drafts(self, user: str) -> list[str]:
+        scope = _user(user)
+        return [
+            n for n in self.screen_folders(scope) if (self.screen_dir(scope, n) / DRAFT).is_file()
+        ]
+
     def versions(self, user: str, name: str) -> list[int]:
         return self.screen_versions(_user(user), name)
 
@@ -297,6 +307,9 @@ class MemoryConfigWriter(MemoryConfigStore):
 
     def discard_draft(self, user: str, name: str) -> bool:
         return self._drafts.pop(self._screen(user, name), None) is not None
+
+    def drafts(self, user: str) -> list[str]:
+        return sorted(n for (u, n) in self._drafts if u == _user(user))
 
     def versions(self, user: str, name: str) -> list[int]:
         return sorted(self._versions.get(self._screen(user, name), {}))

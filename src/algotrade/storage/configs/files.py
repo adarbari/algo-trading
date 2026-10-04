@@ -80,6 +80,13 @@ class FileConfigStore:
             return self.root / SITE / "presets" / SCREENERS / name
         return self.root / "users" / validate_id("user", scope) / SCREENERS / name
 
+    def screen_folders(self, scope: str) -> list[str]:
+        """The ids of the screen folders in ``scope`` (with or without versions), sorted."""
+        base = self.screen_dir(scope, "x").parent
+        if not base.is_dir():
+            return []
+        return sorted(p.name for p in base.iterdir() if p.is_dir() and _ID_NAME.fullmatch(p.name))
+
     def screen_versions(self, scope: str, name: str) -> list[int]:
         """The finalised versions of the screen ``name`` in ``scope``, ascending."""
         directory = self.screen_dir(scope, name)
@@ -125,11 +132,7 @@ class FileConfigStore:
         if kind == "defaults":
             return ["defaults"] if scope == SITE and self._path(SITE, kind, "x").exists() else []
         if kind == SCREENERS:
-            base = self.screen_dir(scope, "x").parent
-            if not base.is_dir():
-                return []
-            ids = (p.name for p in base.iterdir() if p.is_dir() and _ID_NAME.fullmatch(p.name))
-            return sorted(n for n in ids if self.screen_versions(scope, n))
+            return [n for n in self.screen_folders(scope) if self.screen_versions(scope, n)]
         directory = self._path(scope, kind, "x").parent
         return sorted(p.stem for p in directory.glob("*.toml")) if directory.exists() else []
 

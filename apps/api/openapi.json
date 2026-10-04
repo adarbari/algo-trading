@@ -3624,6 +3624,68 @@
         "title": "ScreenerDetail",
         "type": "object"
       },
+      "ScreenerListItem": {
+        "properties": {
+          "has_draft": {
+            "description": "a working copy exists (beside a finalised version too)",
+            "title": "Has Draft",
+            "type": "boolean"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          },
+          "preset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the site preset the screen extends",
+            "title": "Preset Id"
+          },
+          "schedule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule"
+          },
+          "screener_id": {
+            "title": "Screener Id",
+            "type": "string"
+          },
+          "status": {
+            "description": "FINAL (has a finalised version) or DRAFT (a draft only)",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "screener_id",
+          "status",
+          "latest",
+          "has_draft",
+          "schedule",
+          "preset_id"
+        ],
+        "title": "ScreenerListItem",
+        "type": "object"
+      },
       "ScreenerVersion": {
         "properties": {
           "document": {
@@ -5942,6 +6004,62 @@
         "summary": "Save Ideas Priority",
         "tags": [
           "ideas"
+        ]
+      }
+    },
+    "/screeners": {
+      "get": {
+        "description": "The user's screens: finalised ones and draft-only ones (status DRAFT).",
+        "operationId": "screeners_screeners_get",
+        "parameters": [
+          {
+            "description": "whose configs (a label until auth; default the API's)",
+            "in": "query",
+            "name": "user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "whose configs (a label until auth; default the API's)",
+              "title": "User"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScreenerListItem"
+                  },
+                  "title": "Response Screeners Screeners Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Screeners",
+        "tags": [
+          "screeners"
         ]
       }
     },

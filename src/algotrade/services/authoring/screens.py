@@ -19,6 +19,7 @@ from algotrade.services.authoring.scope import (
     screen_id,
 )
 from algotrade.services.configs import resolve_config, resolve_rule_draft
+from algotrade.storage.configs.files import SCREENERS
 from algotrade.storage.configs.writer import ConfigWriter, VersionExistsError
 
 # Set by the authoring flow, never by a draft: finalise numbers versions; the schedule is a
@@ -83,12 +84,20 @@ def preset_pin(writer: ConfigWriter, document: Mapping[str, Any] | None) -> Pres
     return PresetPin(preset, pinned, current if isinstance(current, int) else None)
 
 
+def uncopied(name: str, site: tuple[str, Mapping[str, Any]] | None) -> PresetPin | None:
+    """The pin of a site rule-screen preset the user has not copied yet: the preset itself,
+    at its current version (``pinned`` None: nothing is based on it yet)."""
+    version = site[1].get("version") if site and site[0] == SCREENERS else None
+    return PresetPin(name, None, version) if isinstance(version, int) else None
+
+
 def screen_detail(writer: ConfigWriter, user: str, name: str) -> ScreenDetail:
     """``user``'s screen ``name`` (or the site preset ``name`` they have not copied yet)."""
     who, name = author(user), screen_id(name)
     draft, versions = writer.draft(who.user_id, name), writer.versions(who.user_id, name)
     latest = writer.version(who.user_id, name, versions[-1]) if versions else None
-    if draft is None and latest is None and config_document(writer.load, "site", name) is None:
+    site = config_document(writer.load, "site", name) if draft is None and latest is None else None
+    if draft is None and latest is None and site is None:
         raise ScreenNotFoundError(f"no screen {name!r} for user {who.user_id!r}")
     owner = who if versions else UserContext(SITE_USER)
     resolved: ResolvedConfig | None = None
@@ -112,13 +121,47 @@ def screen_detail(writer: ConfigWriter, user: str, name: str) -> ScreenDetail:
         versions=versions,
         latest=versions[-1] if versions else None,
         schedule=writer.schedule(who.user_id, name),
-        preset=preset_pin(writer, draft if draft is not None else latest),
+        preset=preset_pin(writer, draft if draft is not None else latest) or uncopied(name, site),
         hash=resolved.hash if resolved else None,
         layers=list(resolved.layers) if resolved else [],
         resolved=resolved.canonical() if resolved else None,
         error=error,
         working=working,
     )
+
+
+@dataclass(frozen=True)
+class ScreenListing:
+    screener_id: str
+    status: str  # FINAL (has a finalised version) or DRAFT (a draft only)
+    latest: int | None
+    has_draft: bool
+    schedule: str | None
+    preset_id: str | None  # the site preset it extends (draft, else latest version)
+
+
+def list_screens(writer: ConfigWriter, user: str) -> list[ScreenListing]:
+    """Every screen of ``user``: the finalised ones and the draft-only ones (status DRAFT),
+    sorted by id."""
+    who = author(user)
+    drafts = set(writer.drafts(who.user_id))
+    out = []
+    for name in sorted({*writer.names(who.user_id, SCREENERS), *drafts}):
+        versions = writer.versions(who.user_id, name)
+        draft = writer.draft(who.user_id, name) if name in drafts else None
+        latest = writer.version(who.user_id, name, versions[-1]) if versions else None
+        pin = preset_pin(writer, draft if draft is not None else latest)
+        out.append(
+            ScreenListing(
+                screener_id=name,
+                status="FINAL" if versions else "DRAFT",
+                latest=versions[-1] if versions else None,
+                has_draft=name in drafts,
+                schedule=writer.schedule(who.user_id, name),
+                preset_id=pin.preset_id if pin else None,
+            )
+        )
+    return out
 
 
 @dataclass(frozen=True)
