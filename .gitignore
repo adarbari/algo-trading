@@ -226,3 +226,6 @@ datasets/golden/store/
 
 # L4 user configs are local (a database later)
 config/users/
+
+# per-worktree PYTHONPATH written by scripts/worktree.sh
+worktree.env

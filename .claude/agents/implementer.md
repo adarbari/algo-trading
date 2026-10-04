@@ -14,6 +14,10 @@ Before writing:
 - Confirm the owner in `architecture/ownership.toml` and the folder in
   `architecture/layout.toml` with a grep. Extend the owner; never re-implement it.
 
+Work in a worktree (`scripts/worktree.sh <branch>`, then `source worktree.env`) when the
+main checkout is busy; never `--no-verify` / `SKIP=`. On a shared machine run `pytest -n 2`
+and `vitest --maxWorkers=2`.
+
 While writing:
 
 - Match the surrounding code: module docstring, naming, comment density, test layout

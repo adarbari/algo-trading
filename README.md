@@ -192,6 +192,19 @@ says which). Everything derived from IBKR is tagged `licence = personal`. Owner 
 .venv/bin/algotrade-ingest run rollups --date <last session> --only ibkr_iv@v1
 ```
 
+### Long runs (ops note)
+
+Anything longer than ~2 h (the IBKR IV backfill is ~8 h per 1500 names) runs detached from
+the agent or terminal session, not as a tool background command (those are killed at their
+limit). A resumable run only loses the batch in flight:
+
+```bash
+mkdir -p var/logs
+nohup sh -c '.venv/bin/algotrade-ingest run ibkr-iv --from <2 years ago> --to <last session> --limit 1500 \
+  > var/logs/ibkr-iv.log 2>&1; echo "exit=$? $(date -u +%FT%TZ)" > var/logs/ibkr-iv.status' >/dev/null 2>&1 &
+cat var/logs/ibkr-iv.status   # appears when the run ends; tail var/logs/ibkr-iv.log meanwhile
+```
+
 The nightly step continues the backfill on its own, `[ibkr] iv_backfill_per_night = 100`
 names a night (~33 min), so new names fill in without a command; the email's `ibkr-iv` line
 shows coverage, names still pending and the estimated hours left.
