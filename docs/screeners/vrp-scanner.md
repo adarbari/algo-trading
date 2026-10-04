@@ -14,13 +14,16 @@ mapping follows.
 | Topic | Decision |
 |---|---|
 | IV30 gate | HARD, default **50%**, editable in the UI (the owner may lower it to 40%) |
+| Missing data | any gating criterion missing → SKIPPED (`no <field>`), never a pass; every run reports passed, skipped by reason and the narrow misses |
+| Scoring | 100 when every threshold is met, minus each miss's normalised distance (no 0-30 / 0-20 weights); ties by the IV−HV spread |
+| Preset | a site preset visible in the Builder; users change it, re-run and see results; their copies pin the preset version |
 | IV30 source for the gate | the **lower** of IBKR's and Cboe's IV30 when both exist, else whichever exists, else UNKNOWN; our own IV30 is not used for the gate |
-| IV rank | IBKR's only; a SCORE criterion (missing → 0 points, never blocks) |
+| IV rank | IBKR's only; a SCORE criterion (missing lowers the score, never blocks) |
 | ROC | premium / (strike × 100), cash-secured |
 | Portfolio correlation | no correlation penalty |
 | Leveraged / inverse ETFs | included and flagged |
 | Earnings | **not a criterion**; results show the next quarterly earnings date and the DTE of the closest option expiry |
-| IV/HV ratio | HV30 floor of 15% in the denominator |
+| IV/HV ratio | plain IV30 / HV30: **no HV30 floor** (owner decision, later the same day) |
 | Output | screener results + Ideas (no email) |
 | Universe | our daily universe snapshot (not the monthly CSVs) |
 
@@ -29,12 +32,12 @@ mapping follows.
 | Spec | Preset criterion / output |
 |---|---|
 | IV30 >= 50% | hard `feature.vrp_iv30 gte 0.50` (UI-editable); new site feature `vrp_iv30 = min(coalesce(ibkr_iv.iv30_ibkr, iv30.iv30_cboe), coalesce(iv30.iv30_cboe, ibkr_iv.iv30_ibkr))`: the lower of the two, whichever exists, else null (UNKNOWN) |
-| IV-HV >= 10 pts (weight 30), IV/HV >= 1.25 (weight 20) | hard `feature.vrp_iv_hv_spread gte 0.10`, hard `feature.vrp_iv_hv_ratio gte 1.25`; new site features over `vrp_iv30` and `price_stats.hv30`, the ratio dividing by `max(hv30, 0.15)` |
+| IV-HV >= 10 pts, IV/HV >= 1.25 | hard `feature.vrp_iv_hv_spread gte 0.10`, hard `feature.vrp_iv_hv_ratio gte 1.25`; new site features over `vrp_iv30` and `price_stats.hv30` (ratio = `vrp_iv30 / hv30`, no floor; HV30 missing or 0 → missing → SKIPPED); `[rank] tie_break = "feature.vrp_iv_hv_spread"` |
 | Stronger tier 15 pts / 1.30 | `tiers.STRONG` |
-| Within 10% of the 52W high / low; NEAR_HIGH / NEAR_LOW / BOTH | hard `feature.near_52w in [HIGH, LOW, BOTH]`; `classify = "feature.near_52w"`; weight 15 on distance to the extreme (reverse ramp) |
-| IV rank (0-10) | score `rollup.ibkr_iv@v1.iv_rank_252d_ibkr`, weight 10; missing → 0 points |
+| Within 10% of the 52W high / low; NEAR_HIGH / NEAR_LOW / BOTH | hard `feature.near_52w in [HIGH, LOW, BOTH]`; `classify = "feature.near_52w"` |
+| IV rank (0-10) | score `rollup.ibkr_iv@v1.iv_rank_252d_ibkr` with a tolerance; a miss or missing value lowers the score |
 | Price > $5 | hard `rollup.price_stats@v2.close gt 5` |
-| ADV > $50M, option volume / OI > 1,000, spread < 15% ("flag, don't reject") | soft, `on_miss = WATCH` (options too thin: `on_miss = LIQUIDITY_RISK`); liquidity and execution scores (0-10 each) as score criteria |
+| ADV > $50M, option volume / OI > 1,000, spread < 15% ("flag, don't reject") | soft with a tolerance band: a near miss is WATCH (options too thin: `on_miss = LIQUIDITY_RISK`), beyond the band REJECT |
 | Earnings < 14 days, event risk (0-5) | **dropped** (owner decision); `columns`: `rollup.earnings@v1.next_earnings_date` and a new feature, the closest option expiry's DTE |
 | Low HV, leveraged / inverse ETF, > 10% one-day gap | `flags` (`instrument.is_leveraged`) |
 | Momentum context, setup class | `columns` + a site label feature `vrp_setup` |
@@ -234,10 +237,10 @@ Classify the setup as:
 
 ## Candidate scoring
 
-Use a transparent score rather than a black-box prediction.
+Use a transparent score rather than a black-box prediction. (Owner decision 2026-10-03: the preset scores by distance from each threshold, [rules.md](rules.md#score), not these bands.)
 
 **Volatility premium (0–30)** — larger IV-HV spread scores higher.\
-**IV/HV ratio (0–20)** — higher ratio scores higher subject to a reasonable HV floor.\
+**IV/HV ratio (0–20)** — higher ratio scores higher subject to a reasonable HV floor (owner decision 2026-10-03: no HV floor; plain IV30 / HV30).\
 **52W positioning (0–15)** — stronger proximity scores higher.\
 **IV percentile/rank (0–10)** — higher percentile scores higher.\
 **Liquidity (0–10)** — higher dollar volume, option volume and OI score higher.\
