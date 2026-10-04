@@ -130,9 +130,6 @@ class FileConfigStore:
                 return []
             ids = (p.name for p in base.iterdir() if p.is_dir() and _ID_NAME.fullmatch(p.name))
             return sorted(n for n in ids if self.screen_versions(scope, n))
-        if kind == "preferences":
-            exists = scope != SITE and self._path(scope, kind, "x").exists()
-            return ["preferences"] if exists else []
         directory = self._path(scope, kind, "x").parent
         return sorted(p.stem for p in directory.glob("*.toml")) if directory.exists() else []
 

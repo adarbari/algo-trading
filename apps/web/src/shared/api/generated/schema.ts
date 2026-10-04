@@ -447,6 +447,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/preferences/ideas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save Ideas Priority */
+        put: operations["save_ideas_priority_preferences_ideas_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/screeners/{screener_id}": {
         parameters: {
             query?: never;
@@ -1177,6 +1194,19 @@ export interface components {
             session: string;
             /** Total */
             total: number;
+        };
+        /** IdeasPriority */
+        IdeasPriority: {
+            /** Priority */
+            priority: string[];
+        };
+        /** IdeasPriorityBody */
+        IdeasPriorityBody: {
+            /**
+             * Priority
+             * @description screener ids, highest priority first
+             */
+            priority: string[];
         };
         /** InstrumentDetail */
         InstrumentDetail: {
@@ -2634,6 +2664,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FeatureSeries"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_ideas_priority_preferences_ideas_put: {
+        parameters: {
+            query?: {
+                /** @description whose configs (a label until auth; default the API's) */
+                user?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdeasPriorityBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdeasPriority"];
                 };
             };
             /** @description Validation Error */
