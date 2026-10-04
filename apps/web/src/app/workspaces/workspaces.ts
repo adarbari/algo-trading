@@ -33,7 +33,7 @@ export const TRADER: Workspace = {
       path: '/screeners',
       label: 'Screeners',
       summary:
-        'Builder: criteria with hard or soft mode, thresholds and weights, live preview, save and finalize.',
+        'Builder: criteria with hard, soft or score mode, thresholds and tolerances, live preview, save and finalize.',
     },
     {
       path: '/explore',

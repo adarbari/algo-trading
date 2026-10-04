@@ -67,7 +67,7 @@ and a `beforeLoad` guard (`app/workspaces/guard.ts`, the one place role gating w
 
 | Workspace | Sections (routes) |
 |---|---|
-| TRADER (default, `/` opens Ideas) | Ideas `/ideas`, Screeners `/screeners`, Explore `/explore`, Backtests `/backtests` |
+| TRADER (default, `/` opens Ideas) | Ideas `/ideas`, Screeners `/screeners` (list), `/screeners/new`, `/screeners/$id/edit` (Builder), Explore `/explore`, Backtests `/backtests` |
 | ADMIN | Ingestion `/admin/ingestion`, Screener runs & sharing `/admin/screener-runs`, Users & configs `/admin/users` |
 
 Explore is one page (ticker table with feature-catalogue columns, multi-select compare, detail

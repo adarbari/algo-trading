@@ -3349,6 +3349,19 @@
             },
             "title": "Versions",
             "type": "array"
+          },
+          "working": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the working copy's rule keys (criteria, tiers, ...) resolved through its layers: the draft when it resolves, else the latest version, else the preset",
+            "title": "Working"
           }
         },
         "required": [

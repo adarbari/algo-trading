@@ -28,6 +28,13 @@ export const queryKeys = {
     all: () => ['ideas'] as const,
     top: (limit: number) => ['ideas', 'top', limit] as const,
   },
+  screeners: {
+    all: () => ['screeners'] as const,
+    list: () => ['screeners', 'list'] as const,
+    detail: (id: string) => ['screeners', 'detail', id] as const,
+    versions: (id: string) => ['screeners', 'versions', id] as const,
+    preview: (spec: unknown) => ['screeners', 'preview', spec] as const,
+  },
   instruments: {
     detail: (id: string) => ['instruments', id] as const,
     bars: (id: string, from: string | null) => ['instruments', id, 'bars', from] as const,
@@ -40,5 +47,6 @@ export const queryKeys = {
   features: {
     catalogue: () => ['features'] as const,
     distribution: (name: string) => ['features', name, 'distribution'] as const,
+    check: (expr: string) => ['features', 'check', expr] as const,
   },
 } as const;

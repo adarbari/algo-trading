@@ -1921,6 +1921,13 @@ export interface components {
             user: string;
             /** Versions */
             versions: number[];
+            /**
+             * Working
+             * @description the working copy's rule keys (criteria, tiers, ...) resolved through its layers: the draft when it resolves, else the latest version, else the preset
+             */
+            working?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** ScreenerVersion */
         ScreenerVersion: {

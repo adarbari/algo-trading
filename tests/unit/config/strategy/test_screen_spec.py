@@ -265,3 +265,20 @@ def test_resolve_rejects_an_invalid_rule_screen() -> None:
     unknown = {"id": "mine", "extends": "vrp", "criteria": {"iv30": {"field": "rollup.vol@v1.x"}}}
     with pytest.raises(ConfigurationError, match="unknown field"):
         resolve("mine", UserContext("u1"), _store(unknown).load, catalog=CATALOG)
+
+
+@pytest.mark.parametrize(
+    ("criterion", "path"),
+    [
+        ({**IV30, "field": "rollup.vol@v1.nope"}, "vrp.criteria.c.field"),
+        ({**IV30, "value": "high"}, "vrp.criteria.c.value"),
+    ],
+)
+def test_catalog_errors_name_the_criterion_and_its_field(
+    criterion: dict[str, Any], path: str
+) -> None:
+    other = {"c2": IV30}
+    spec = parse_screen_spec("vrp", {"criteria": {**other, "c": criterion}}, "vrp")
+    with pytest.raises(ConfigurationError) as error:
+        check_screen_spec(spec, CATALOG, "vrp")
+    assert str(error.value).startswith(path)

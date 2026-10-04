@@ -19,6 +19,9 @@ def test_copy_finalise_schedule_and_rebase(writer_client: TestClient, root: Path
     copied = c.post("/screeners/my_vrp/copy?user=alice", json={"preset": "vrp"})
     assert copied.status_code == 201
     assert copied.json()["document"] == {"id": "my_vrp", "extends": "vrp@3"}
+    assert (
+        c.get("/screeners/my_vrp?user=alice").json()["working"]["criteria"]["price"]["value"] == 5
+    )
     assert c.post("/screeners/my_vrp/copy?user=alice", json={"preset": "vrp"}).status_code == 409
     done = c.post("/screeners/my_vrp/finalise?user=alice").json()
     assert done["version"] == 1 and done["hash"]
@@ -57,11 +60,14 @@ def test_draft_put_delete_and_fail_closed_finalise(writer_client: TestClient, ro
     saved = c.put("/screeners/mine/draft", json={"document": OWN | {"selection": "nope"}})
     assert saved.status_code == 200 and saved.json()["document"]["id"] == "mine"
     assert (root / "users" / "local" / "screeners" / "mine" / "draft.toml").is_file()
-    assert "nope" in c.get("/screeners/mine").json()["draft_error"]
+    broken = c.get("/screeners/mine").json()
+    assert "nope" in broken["draft_error"] and broken["working"] is None
     bad = c.post("/screeners/mine/finalise")
     assert bad.status_code == 400 and "nope" in bad.json()["detail"]
     assert c.get("/screeners/mine/versions").json() == []
     assert c.put("/screeners/mine/draft", json={"document": OWN}).status_code == 200
+    working = c.get("/screeners/mine").json()["working"]
+    assert working["criteria"]["price"]["value"] == 10  # the draft, resolved
     assert c.post("/screeners/mine/finalise").json()["version"] == 1
     assert c.delete("/screeners/mine/draft").status_code == 204
     assert c.post("/screeners/mine/finalise").status_code == 404

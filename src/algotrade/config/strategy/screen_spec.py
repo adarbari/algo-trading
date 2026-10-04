@@ -170,13 +170,12 @@ def screen_spec(config: StrategyConfig) -> ScreenSpec:
 
 def check_screen_spec(spec: ScreenSpec, catalog: FieldCatalog, path: str) -> None:
     """Every field exists in the catalogue and every value fits its field's type."""
-    catalog.check(Group("all", tuple(c.rule for c in spec.criteria)), f"{path}.criteria")
     for criterion in spec.criteria:
-        kind = catalog.fields[criterion.field]
+        where = f"{path}.criteria.{criterion.id}"
+        kind = catalog.check_field(criterion.rule.field, f"{where}.field")
+        catalog.check(Group("all", (criterion.rule,)), f"{where}.value")
         if criterion.tolerance is not None and kind not in _NUMERIC_TYPES:
-            raise _fail(
-                f"{path}.criteria.{criterion.id}", f"a tolerance needs a number, not {kind}"
-            )
+            raise _fail(f"{where}.tolerance", f"a tolerance needs a number, not {kind}")
     for section, groups in (("tiers", spec.tiers), ("flags", spec.flags)):
         for name, group in groups:
             catalog.check(group, f"{path}.{section}.{name}")

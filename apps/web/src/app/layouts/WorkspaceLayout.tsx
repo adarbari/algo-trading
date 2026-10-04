@@ -9,6 +9,11 @@ import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-route
 
 import { WORKSPACES, type Workspace, type WorkspaceId } from '../workspaces';
 
+/** The section a path belongs to (`/screeners/new` is in `/screeners`), else the path itself. */
+const activeSection = (workspace: Workspace, pathname: string): string =>
+  workspace.sections.find((s) => pathname === s.path || pathname.startsWith(`${s.path}/`))?.path ??
+  pathname;
+
 const WORKSPACE_OPTIONS = WORKSPACES.map((w) => ({ value: w.id, label: w.label }));
 
 export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
@@ -34,7 +39,7 @@ export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
             <NavTabs
               aria-label={`${workspace.label} sections`}
               items={workspace.sections.map((s) => ({ href: s.path, label: s.label }))}
-              activeHref={pathname}
+              activeHref={activeSection(workspace, pathname)}
               renderLink={({ href, ...link }) => <Link to={href} {...link} />}
             />
           }

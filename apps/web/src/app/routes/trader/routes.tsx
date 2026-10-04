@@ -8,12 +8,13 @@ import { placeholderRoute } from '../section-route';
 import { exploreRoute } from './explore-route';
 import { ideasRoute } from './ideas-route';
 import { traderRoute } from './layout-route';
+import { screenersRoutes } from './screeners-route';
 
 export { traderRoute } from './layout-route';
 
 export const traderRoutes = traderRoute.addChildren([
   ideasRoute,
-  placeholderRoute(traderRoute, TRADER, '/screeners', 'screeners'),
+  screenersRoutes,
   exploreRoute,
   placeholderRoute(traderRoute, TRADER, '/backtests', 'backtests'),
 ]);

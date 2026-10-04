@@ -1,7 +1,8 @@
 # Rule screens (`impl = "rules"`)
 
-> **Status:** engine implemented (`strategies/screeners/rules/`, nightly `screen` jobs);
-> Builder, preview and Ideas to come ([ADR 0029](../adr/0029-rule-screener.md)).
+> **Status:** engine, preview, Ideas and the web Builder implemented
+> (`strategies/screeners/rules/`, nightly `screen` jobs, Trader > Screeners;
+> [ADR 0029](../adr/0029-rule-screener.md)).
 
 A rule screen is a screener written as TOML instead of Python. The web Builder edits the same
 file. It obeys the [screener contract](README.md#contract-all-screeners): one row per
@@ -17,7 +18,9 @@ instrument of the selection, a shared `Decision`, fail closed, a coverage audit.
 | `config/users/<u>/screeners/<id>/schedule.toml` | the schedule switch (not part of a version, not in the config hash) |
 
 Finalise validates the spec (fields exist in the catalogue, types match, user features
-resolve) and refuses to save an invalid one. Finalising does not schedule: the nightly
+resolve) and refuses to save an invalid one. An error names the criterion and the key at
+fault (`<id>.criteria.<criterion_id>.field`, `.value` or `.tolerance`), so the Builder can mark
+the row; preview and finalise report the same paths. Finalising does not schedule: the nightly
 schedule (`schedule = "nightly"`) is a separate switch, kept outside the versioned document
 and the config hash (the hash says what a screen computes, not when it runs).
 
