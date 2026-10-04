@@ -1791,23 +1791,41 @@ export interface components {
         };
         /** PreviewRow */
         PreviewRow: {
-            /** Columns */
+            /**
+             * Columns
+             * @description the screen's display columns: name -> value
+             */
             columns: {
                 [key: string]: unknown;
             };
             /** Criteria */
             criteria: components["schemas"]["CriterionValue"][];
-            /** Decision */
+            /**
+             * Decision
+             * @description QUALIFIED, WATCH, LIQUIDITY_RISK, EVENT_RISK or REJECT
+             */
             decision: string;
-            /** Flags */
+            /**
+             * Flags
+             * @description warnings that never change the decision
+             */
             flags: string[];
             /** Instrument Id */
             instrument_id: string;
-            /** Rank */
+            /**
+             * Rank
+             * @description 1 = best: score, then the tie-break, then instrument id
+             */
             rank: number;
-            /** Reasons */
+            /**
+             * Reasons
+             * @description why the decision is not QUALIFIED (`no <field>` too)
+             */
             reasons: string[];
-            /** Score */
+            /**
+             * Score
+             * @description 100 minus the penalties, clipped to 0..100
+             */
             score: number | null;
             /** Symbol */
             symbol: string | null;

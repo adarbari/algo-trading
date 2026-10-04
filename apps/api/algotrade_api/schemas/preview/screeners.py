@@ -43,12 +43,12 @@ class CriterionValue(Schema):
 class PreviewRow(Schema):
     instrument_id: str
     symbol: str | None
-    rank: int
-    decision: str
-    score: float | None
-    flags: list[str]
-    reasons: list[str]
-    columns: dict[str, Any]
+    rank: int = Field(description="1 = best: score, then the tie-break, then instrument id")
+    decision: str = Field(description="QUALIFIED, WATCH, LIQUIDITY_RISK, EVENT_RISK or REJECT")
+    score: float | None = Field(description="100 minus the penalties, clipped to 0..100")
+    flags: list[str] = Field(description="warnings that never change the decision")
+    reasons: list[str] = Field(description="why the decision is not QUALIFIED (`no <field>` too)")
+    columns: dict[str, Any] = Field(description="the screen's display columns: name -> value")
     criteria: list[CriterionValue]
 
 

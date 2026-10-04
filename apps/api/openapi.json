@@ -2710,6 +2710,7 @@
         "properties": {
           "columns": {
             "additionalProperties": true,
+            "description": "the screen's display columns: name -> value",
             "title": "Columns",
             "type": "object"
           },
@@ -2721,10 +2722,12 @@
             "type": "array"
           },
           "decision": {
+            "description": "QUALIFIED, WATCH, LIQUIDITY_RISK, EVENT_RISK or REJECT",
             "title": "Decision",
             "type": "string"
           },
           "flags": {
+            "description": "warnings that never change the decision",
             "items": {
               "type": "string"
             },
@@ -2736,10 +2739,12 @@
             "type": "string"
           },
           "rank": {
+            "description": "1 = best: score, then the tie-break, then instrument id",
             "title": "Rank",
             "type": "integer"
           },
           "reasons": {
+            "description": "why the decision is not QUALIFIED (`no <field>` too)",
             "items": {
               "type": "string"
             },
@@ -2755,6 +2760,7 @@
                 "type": "null"
               }
             ],
+            "description": "100 minus the penalties, clipped to 0..100",
             "title": "Score"
           },
           "symbol": {
