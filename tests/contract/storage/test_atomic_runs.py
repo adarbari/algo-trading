@@ -366,3 +366,33 @@ def test_a_dropped_version_is_recorded_in_the_index(tmp_path: Path) -> None:
     assert sorted(p.name for p in directory.glob("run=*.parquet")) == sorted(
         local_index.run_file("resumed", e) for e in (entry, entry.prev)
     )
+
+
+def test_a_read_never_opens_a_pending_file_under_a_name_it_pinned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A read resolves a version to its file name, then opens it. Once two commits drop the
+    plain-named version, the run's next pending write must not take that name again: the
+    read would open the uncommitted rows instead of failing over to a fresh sequence."""
+    backend = LocalBackend(tmp_path / "data")
+    _commit_resumed(backend, 1)  # the plain file
+    real_dates, real_read, opened = backend.tables.dates, local._read_file, []
+
+    def dates(table: str, own_run: str | None = None) -> list[date]:
+        if not opened:  # pinned at commit 1; commit 2 lands before the indexes are read
+            _commit_resumed(backend, 2)
+        return real_dates(table, own_run)
+
+    def read_file(path: Path, *args: object) -> object:
+        opened.append(path.name)
+        if len(opened) == len(DAYS):  # the last partition resolved to the plain file
+            _commit_resumed(backend, 3)  # drops it
+            for day in DAYS:  # the resumed run starts its next attempt
+                backend.tables.write(A, day, "resumed", value("resumed", 4.0, day), pending=True)
+        return real_read(path, *args)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(backend.tables, "dates", dates)
+    monkeypatch.setattr(local, "_read_file", read_file)
+    got = _range_values(backend)
+    assert opened[: len(DAYS)] == [local_index.default_file("resumed")] * len(DAYS)
+    assert got in ([1.0] * len(DAYS), [3.0] * len(DAYS)), got  # never 4.0, never mixed

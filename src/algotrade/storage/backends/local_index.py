@@ -220,14 +220,15 @@ class Commits:
 
     @staticmethod
     def _fresh(directory: Path, run_id: str) -> str:
-        """A file no committed version of the run uses: the plain name for a run's first
-        write to the partition, else a unique one (a resumed run replacing its rows)."""
+        """A name no committed version of the run ever used: the plain one for a run's first
+        write to the partition, else a unique one (a resumed run replacing its rows).
+
+        Names are never reused, even after the version holding one is dropped: a read that
+        resolved its pinned version to that name before the drop opens it afterwards, and
+        would read a pending write there instead of failing over (``StaleSnapshotError``)."""
         plain = default_file(run_id)
-        return (
-            plain
-            if not (directory / plain).exists()
-            else f"run={run_id}~{secrets.token_hex(4)}.parquet"
-        )
+        first = run_id not in read_index(directory) and not (directory / plain).exists()
+        return plain if first else f"run={run_id}~{secrets.token_hex(4)}.parquet"
 
     def pending_runs(self) -> list[str]:
         directory = self.base / "pending"
