@@ -87,6 +87,7 @@ ENDPOINTS = (
     "/features/rollup.price_stats@v2.hv20/distribution",
     "/screens",
     "/screens/short_premium_liquidity/results",
+    "/ideas",
     "/backtests",
     "/configs",
     "/configs/sma_trend",

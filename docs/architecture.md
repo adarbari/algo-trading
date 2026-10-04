@@ -390,7 +390,7 @@ src/algotrade/
     backtests/    run.py
     screening/    run.py, exports.py
     explore/      store, runs, universe, instruments, chains, features, screens,
-                  backtests, configs, ingestion               read-only queries (the API)
+                  backtests, configs, ingestion, ideas/       read-only queries (the API)
     jobs/  evaluation/
 ```
 
@@ -536,6 +536,7 @@ web (apps/web) ──HTTP/JSON──▶ routes/<area>.py ──one call──▶
 | instruments | `/instruments/{id}` (id or ticker: reference + company + latest features); `.../bars?from&to&adjust=splits\|none\|total_return`; `.../events?from&to`; `.../features?names&from&to` |
 | chains | `/chains/{underlying_id}?date&expiry`: expiries, strikes, quotes with Cboe IV + Greeks, underlying quote, fetch status, our IV30 |
 | features | `/features` (catalogue: kind, dtype, description, null meaning, version, inputs); `/features/{name}/distribution?date` (count, nulls, quantiles, histogram or categories) |
+| ideas | `/ideas?date&user&limit` (one row per ticker over every rule screen's latest stored run, ranked by the user's `ideas.priority` in `config/users/<u>/preferences.toml`, then score) |
 | screens | `/screens` (screener configs + schedule + latest run); `/screens/{config_id}/results?date&decision&page&size` (+ audit) |
 | backtests | `/backtests`; `/backtests/{run_id}` (metrics, selection, data versions, rebalances, equity curve, fills) |
 | configs | `/configs`; `/configs/{id}` (resolved: layers + hash) |

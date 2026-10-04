@@ -28,3 +28,41 @@ def test_screen_results_not_found(client: TestClient) -> None:
     assert client.get("/screens/nope/results").status_code == 404
     early = client.get("/screens/short_premium_liquidity/results", params={"date": "2021-01-04"})
     assert early.status_code == 404
+
+
+def test_ideas_one_row_per_ticker_ranked_with_every_pick(client: TestClient) -> None:
+    body = client.get("/ideas").json()
+    assert (body["session"], body["total"], body["priority"]) == ("2022-11-23", 2, [])
+    first, second = body["items"]
+    # No priority stored: screens rank by id (premium < vrp), then score: AAA (100) first.
+    assert (first["rank"], first["symbol"]) == (1, "AAA")
+    assert [(p["config_id"], p["decision"]) for p in first["picks"]] == [
+        ("premium", "QUALIFIED"),
+        ("vrp", "QUALIFIED"),
+    ]
+    assert first["picks"][0]["tier"] == "T1"
+    assert first["picks"][1]["columns"] == {"spread": 0.05}
+    assert (first["next_earnings_date"], first["days_to_earnings"]) == ("2022-12-01", 6)
+    assert first["closest_expiry_dte"] is None
+    assert second["symbol"] == "BBB"
+    near = second["picks"][0]
+    assert near["reasons"] == "iv rank 40 < 50"
+    assert near["criteria"] == [
+        {
+            "criterion_id": "iv_rank",
+            "field": "iv_rank",
+            "outcome": "NEAR",
+            "value": 40.0,
+            "distance": 10.0,
+        }
+    ]
+    assert (second["next_earnings_date"], second["days_to_earnings"]) == (None, None)
+
+
+def test_ideas_limit_and_date(client: TestClient) -> None:
+    assert [i["symbol"] for i in client.get("/ideas", params={"limit": 1}).json()["items"]] == [
+        "AAA"
+    ]
+    assert client.get("/ideas", params={"date": "2021-01-04"}).status_code == 404
+    assert client.get("/ideas", params={"user": "Bad User"}).status_code == 400
+    assert client.get("/ideas", params={"limit": 0}).status_code == 422

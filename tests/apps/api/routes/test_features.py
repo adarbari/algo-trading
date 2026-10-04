@@ -77,5 +77,5 @@ def test_categorical_distribution(client: TestClient) -> None:
 
 def test_distribution_not_found(client: TestClient) -> None:
     assert client.get("/features/rollup.nope@v1.x/distribution").status_code == 404
-    unstored = "/features/rollup.earnings@v1.earnings_time/distribution"
+    unstored = "/features/rollup.dividends@v2.div_ttm/distribution"
     assert client.get(unstored).status_code == 404

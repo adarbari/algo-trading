@@ -29,6 +29,7 @@ ROUTERS: tuple[APIRouter, ...] = (
     features.router,
     screens.router,
     screeners.router,
+    screens.ideas_router,
     backtests.router,
     configs.router,
     admin.router,

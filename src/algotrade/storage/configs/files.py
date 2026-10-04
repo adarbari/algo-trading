@@ -68,6 +68,8 @@ class FileConfigStore:
                 return self.root / SITE / "features" / f"{validate_id(kind, name)}.toml"
             return self.root / SITE / "presets" / kind / f"{validate_id(kind, name)}.toml"
         user = validate_id("user", scope)
+        if kind == "preferences":  # one file per user: users/<id>/preferences.toml
+            return self.root / "users" / user / "preferences.toml"
         return self.root / "users" / user / kind / f"{validate_id(kind, name)}.toml"
 
     def screen_dir(self, scope: str, name: str) -> Path:
@@ -107,6 +109,8 @@ class FileConfigStore:
         return screen_document(document, self.screen_schedule(scope, name))
 
     def load(self, scope: str, kind: str, name: str) -> Mapping[str, Any] | None:
+        if kind == "preferences" and scope == SITE:  # a user's, never the site's
+            return None
         if kind in ("defaults", "settings") and scope != SITE:
             return None
         if kind == SCREENERS:
@@ -126,6 +130,9 @@ class FileConfigStore:
                 return []
             ids = (p.name for p in base.iterdir() if p.is_dir() and _ID_NAME.fullmatch(p.name))
             return sorted(n for n in ids if self.screen_versions(scope, n))
+        if kind == "preferences":
+            exists = scope != SITE and self._path(scope, kind, "x").exists()
+            return ["preferences"] if exists else []
         directory = self._path(scope, kind, "x").parent
         return sorted(p.stem for p in directory.glob("*.toml")) if directory.exists() else []
 

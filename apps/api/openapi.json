@@ -1146,6 +1146,262 @@
         "title": "Health",
         "type": "object"
       },
+      "Idea": {
+        "properties": {
+          "closest_expiry_dte": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closest Expiry Dte"
+          },
+          "days_to_earnings": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days To Earnings"
+          },
+          "instrument_id": {
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "next_earnings_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Earnings Date"
+          },
+          "picks": {
+            "items": {
+              "$ref": "#/components/schemas/IdeaPick"
+            },
+            "title": "Picks",
+            "type": "array"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          }
+        },
+        "required": [
+          "rank",
+          "instrument_id",
+          "symbol",
+          "picks",
+          "next_earnings_date",
+          "days_to_earnings",
+          "closest_expiry_dte"
+        ],
+        "title": "Idea",
+        "type": "object"
+      },
+      "IdeaCriterion": {
+        "properties": {
+          "criterion_id": {
+            "title": "Criterion Id",
+            "type": "string"
+          },
+          "distance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "criterion_id",
+          "field",
+          "outcome",
+          "value",
+          "distance"
+        ],
+        "title": "IdeaCriterion",
+        "type": "object"
+      },
+      "IdeaPick": {
+        "properties": {
+          "columns": {
+            "additionalProperties": true,
+            "title": "Columns",
+            "type": "object"
+          },
+          "config_id": {
+            "title": "Config Id",
+            "type": "string"
+          },
+          "config_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Version"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/IdeaCriterion"
+            },
+            "title": "Criteria",
+            "type": "array"
+          },
+          "decision": {
+            "title": "Decision",
+            "type": "string"
+          },
+          "klass": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Klass"
+          },
+          "reasons": {
+            "title": "Reasons",
+            "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "session": {
+            "format": "date",
+            "title": "Session",
+            "type": "string"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          },
+          "user": {
+            "title": "User",
+            "type": "string"
+          }
+        },
+        "required": [
+          "config_id",
+          "user",
+          "config_version",
+          "session",
+          "decision",
+          "score",
+          "tier",
+          "klass",
+          "reasons",
+          "criteria",
+          "columns"
+        ],
+        "title": "IdeaPick",
+        "type": "object"
+      },
+      "Ideas": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Idea"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "priority": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Priority",
+            "type": "array"
+          },
+          "session": {
+            "format": "date",
+            "title": "Session",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "session",
+          "priority",
+          "total",
+          "items"
+        ],
+        "title": "Ideas",
+        "type": "object"
+      },
       "InstrumentDetail": {
         "properties": {
           "company": {
@@ -4112,6 +4368,88 @@
         "summary": "Health",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/ideas": {
+      "get": {
+        "operationId": "top_ideas_get",
+        "parameters": [
+          {
+            "description": "default: the latest",
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "default: the latest",
+              "title": "Date"
+            }
+          },
+          {
+            "description": "default: the API's user (a label until auth)",
+            "in": "query",
+            "name": "user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "default: the API's user (a label until auth)",
+              "title": "User"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ideas"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Top",
+        "tags": [
+          "ideas"
         ]
       }
     },

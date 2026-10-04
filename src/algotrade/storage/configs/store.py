@@ -5,7 +5,7 @@ from typing import Any, Protocol
 
 from algotrade.core.model.errors import ConfigurationError
 
-KINDS = ("defaults", "strategies", "selections", "settings", "features", "screeners")
+KINDS = ("defaults", "strategies", "selections", "settings", "features", "screeners", "preferences")
 
 
 class ConfigStore(Protocol):
