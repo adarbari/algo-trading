@@ -269,6 +269,26 @@ IBKR_IV30 = _fixed(
     "source_kind string!",
     runs="merge",
 )
+# Live option quotes the API read from IB Gateway (ADR 0028, the API's one write exception):
+# every answer it served, one partition per session, a row per contract and time taken. Runs
+# merge (each is a few snapshots; all are kept, keyed by contract and ``ts``). Written only
+# through ``LiveWriter`` (``live/*``), never read by backtests. Licence: personal use.
+LIVE_OPTION_QUOTES = _fixed(
+    "live/option_quotes",
+    "live",
+    ("instrument_id", "underlying_id", "ts", "expiry", "right", "strike"),
+    "instrument_id string!",
+    "ts timestamp_utc!",
+    "underlying_id string!",
+    "symbol string",
+    "expiry date!",
+    "right string!",
+    "strike float64!",
+    *_floats("bid", "ask", "last", "close", "volume", "iv", "delta"),
+    "conid int64",
+    "market_data_type int64",
+    runs="merge",
+)
 # L2: the Treasury par yield curve, one partition per curve date, one row per tenor
 # (``instrument_id`` = ``RATE:UST-<tenor>``). Rates are decimals; ADR 0021 has the conventions.
 TREASURY_RATES = _fixed(
@@ -364,6 +384,7 @@ KNOWN: dict[str, TableSpec] = {
         IBKR_IV30,
         RULE_SCREEN,
         RULE_SCREEN_VALUES,
+        LIVE_OPTION_QUOTES,
     )
 }
 # Open-ended tables: the producing rollup, event source, catalogue or screener defines the

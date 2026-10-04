@@ -122,3 +122,19 @@ def test_enrichment_kinds_round_trip_through_raw_json() -> None:
 def test_unknown_keys_are_rejected(key: str) -> None:
     with pytest.raises(ValueError, match="unknown IBKR request key"):
         parse_key(key)
+
+
+def test_quotes_key_fetches_an_expiry_at_strikes_and_normalises_a_frame() -> None:
+    ib = FakeIB(quotes={("20261120", 230.0, "C"): (5.0, 5.2)})
+    src = source(ib)
+    request = FetchRequest("quotes__AAPL__2026-11-20__230.0+235.0", None, None)
+    with opened(src):
+        payload = src.fetch(request)
+    assert payload is not None
+    normalized = src.normalize(request, payload)
+    assert normalized is not None
+    frame = normalized.parsed["quotes"]
+    assert list(frame.columns)[:4] == ["strike", "right", "listed", "conid"]
+    assert frame["listed"].tolist() == [True, False, False, False]
+    assert frame.loc[0, "bid"] == 5.0 and pd.isna(frame.loc[1, "bid"])
+    assert parse_key(request.key) == ("quotes", ["AAPL", "2026-11-20", "230.0+235.0"])

@@ -205,6 +205,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/chains/{underlying_id}/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Live Chain
+         * @description Live quotes from IB Gateway (read-only, cached briefly); the stored delayed chain with
+         *     a status when the gateway cannot answer. Each live answer is recorded (``live/*``).
+         */
+        get: operations["live_chain_chains__underlying_id__live_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/configs": {
         parameters: {
             query?: never;
@@ -1380,6 +1401,106 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** LiveOptionChain */
+        LiveOptionChain: {
+            /**
+             * As Of
+             * @description when the quotes were taken (UTC)
+             */
+            as_of: string | null;
+            /**
+             * Delayed
+             * @description IB's delayed data, or the stored end-of-day chain
+             */
+            delayed: boolean;
+            /**
+             * Detail
+             * @description why the stored chain was served
+             */
+            detail: string | null;
+            /**
+             * Expiry
+             * Format: date
+             */
+            expiry: string;
+            /**
+             * Quotes
+             * @description sorted by strike, then right
+             */
+            quotes: components["schemas"]["LiveOptionQuote"][];
+            /**
+             * Session
+             * Format: date
+             * @description the stored chain the contracts come from
+             */
+            session: string;
+            /**
+             * Source
+             * @description ibkr: read live from IB Gateway; stored: the stored chain
+             */
+            source: string;
+            /**
+             * Status
+             * @description LIVE, CACHED (a live answer under live_cache_s old), DISABLED, UNAVAILABLE (gateway down, busy or slow), ERROR: the last three serve the stored chain
+             */
+            status: string;
+            /** Strikes */
+            strikes: number[];
+            /** Symbol */
+            symbol: string | null;
+            /** Underlying Id */
+            underlying_id: string;
+            /** Underlying Price */
+            underlying_price: number | null;
+        };
+        /** LiveOptionQuote */
+        LiveOptionQuote: {
+            /** Ask */
+            ask: number | null;
+            /** Bid */
+            bid: number | null;
+            /**
+             * Close
+             * @description IB's previous close (live answers only)
+             */
+            close: number | null;
+            /**
+             * Delta
+             * @description IB's model delta, or the stored chain's
+             */
+            delta: number | null;
+            /**
+             * Expiry
+             * Format: date
+             */
+            expiry: string;
+            /**
+             * Instrument Id
+             * @description the contract's id in the stored chain
+             */
+            instrument_id: string | null;
+            /**
+             * Iv
+             * @description implied vol, decimal (IB's model, or Cboe's stored)
+             */
+            iv: number | null;
+            /** Last */
+            last: number | null;
+            /**
+             * Listed
+             * @description false: IB has no such contract
+             */
+            listed: boolean;
+            /**
+             * Right
+             * @description C or P
+             */
+            right: string;
+            /** Strike */
+            strike: number;
+            /** Volume */
+            volume: number | null;
+        };
         /** NarrowMiss */
         NarrowMiss: {
             /** Criterion Id */
@@ -2507,6 +2628,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OptionChain"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    live_chain_chains__underlying_id__live_get: {
+        parameters: {
+            query: {
+                expiry: string;
+                /** @description strikes to quote (repeat the parameter); default: those nearest the underlying */
+                strikes?: number[] | null;
+            };
+            header?: never;
+            path: {
+                underlying_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveOptionChain"];
                 };
             };
             /** @description Validation Error */

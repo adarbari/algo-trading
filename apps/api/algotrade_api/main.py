@@ -1,8 +1,10 @@
-"""The app factory: routers, CORS for the local web dev server, and error handlers that map
-library errors to HTTP (not found -> 404, bad configuration or parameters -> 400, a write
-that clashes with what exists -> 409)."""
+"""The app factory: routers, CORS for the local web dev server, the live quotes (closed when
+the app stops), and error handlers that map library errors to HTTP (not found -> 404, bad
+configuration or parameters -> 400, a write that clashes with what exists -> 409)."""
 
 import json
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,8 +13,10 @@ from fastapi.responses import JSONResponse
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.services.authoring.scope import ConfigWriter, ConflictError, ScreenNotFoundError
 from algotrade.services.explore.store import NotFoundError, ReadStore
+from algotrade.services.live.quotes import LiveQuotes
 from algotrade_api import __version__
 from algotrade_api.deps import ApiSettings
+from algotrade_api.live import no_live, open_live
 from algotrade_api.routes import ROUTERS
 
 TITLE = "algotrade API"
@@ -31,20 +35,35 @@ def _conflict(request: Request, exc: Exception) -> JSONResponse:
 
 
 def create_app(
-    settings: ApiSettings, store: ReadStore | None = None, writer: ConfigWriter | None = None
+    settings: ApiSettings,
+    store: ReadStore | None = None,
+    writer: ConfigWriter | None = None,
+    live: LiveQuotes | None = None,
 ) -> FastAPI:
     """The API over ``store`` (default: the store and configs ``settings`` name); user
-    configs are written through ``writer`` (default: the files under ``settings.config_dir``)."""
+    configs are written through ``writer`` (default: the files under ``settings.config_dir``).
+    ``live``: the live quotes (default: IB Gateway when ``settings.live``, else switched off)."""
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        yield
+        app.state.live.close()
+
     app = FastAPI(
         title=TITLE,
         version=__version__,
         description=(
             "Read-only API over the algotrade stores (ADR 0024); it writes only user configs "
-            "and user features, through services.authoring (ADR 0029)."
+            "and user features, through services.authoring (ADR 0029), and the live option "
+            "quotes it served, to live/* tables (ADR 0028)."
         ),
+        lifespan=lifespan,
     )
     app.state.store = store if store is not None else settings.open()
     app.state.writer = writer if writer is not None else settings.open_writer()
+    if live is None:
+        live = open_live(settings.data_url, app.state.store.configs) if settings.live else no_live()
+    app.state.live = live
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),

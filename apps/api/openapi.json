@@ -1771,6 +1771,249 @@
         "title": "InstrumentEvent",
         "type": "object"
       },
+      "LiveOptionChain": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "when the quotes were taken (UTC)",
+            "title": "As Of"
+          },
+          "delayed": {
+            "description": "IB's delayed data, or the stored end-of-day chain",
+            "title": "Delayed",
+            "type": "boolean"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "why the stored chain was served",
+            "title": "Detail"
+          },
+          "expiry": {
+            "format": "date",
+            "title": "Expiry",
+            "type": "string"
+          },
+          "quotes": {
+            "description": "sorted by strike, then right",
+            "items": {
+              "$ref": "#/components/schemas/LiveOptionQuote"
+            },
+            "title": "Quotes",
+            "type": "array"
+          },
+          "session": {
+            "description": "the stored chain the contracts come from",
+            "format": "date",
+            "title": "Session",
+            "type": "string"
+          },
+          "source": {
+            "description": "ibkr: read live from IB Gateway; stored: the stored chain",
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "description": "LIVE, CACHED (a live answer under live_cache_s old), DISABLED, UNAVAILABLE (gateway down, busy or slow), ERROR: the last three serve the stored chain",
+            "title": "Status",
+            "type": "string"
+          },
+          "strikes": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Strikes",
+            "type": "array"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "underlying_id": {
+            "title": "Underlying Id",
+            "type": "string"
+          },
+          "underlying_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Underlying Price"
+          }
+        },
+        "required": [
+          "underlying_id",
+          "symbol",
+          "expiry",
+          "source",
+          "status",
+          "detail",
+          "as_of",
+          "delayed",
+          "session",
+          "underlying_price",
+          "strikes",
+          "quotes"
+        ],
+        "title": "LiveOptionChain",
+        "type": "object"
+      },
+      "LiveOptionQuote": {
+        "properties": {
+          "ask": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ask"
+          },
+          "bid": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bid"
+          },
+          "close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "IB's previous close (live answers only)",
+            "title": "Close"
+          },
+          "delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "IB's model delta, or the stored chain's",
+            "title": "Delta"
+          },
+          "expiry": {
+            "format": "date",
+            "title": "Expiry",
+            "type": "string"
+          },
+          "instrument_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the contract's id in the stored chain",
+            "title": "Instrument Id"
+          },
+          "iv": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "implied vol, decimal (IB's model, or Cboe's stored)",
+            "title": "Iv"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last"
+          },
+          "listed": {
+            "description": "false: IB has no such contract",
+            "title": "Listed",
+            "type": "boolean"
+          },
+          "right": {
+            "description": "C or P",
+            "title": "Right",
+            "type": "string"
+          },
+          "strike": {
+            "title": "Strike",
+            "type": "number"
+          },
+          "volume": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume"
+          }
+        },
+        "required": [
+          "instrument_id",
+          "expiry",
+          "right",
+          "strike",
+          "listed",
+          "bid",
+          "ask",
+          "last",
+          "close",
+          "volume",
+          "iv",
+          "delta"
+        ],
+        "title": "LiveOptionQuote",
+        "type": "object"
+      },
       "NarrowMiss": {
         "properties": {
           "criterion_id": {
@@ -3914,7 +4157,7 @@
     }
   },
   "info": {
-    "description": "Read-only API over the algotrade stores (ADR 0024); it writes only user configs and user features, through services.authoring (ADR 0029).",
+    "description": "Read-only API over the algotrade stores (ADR 0024); it writes only user configs and user features, through services.authoring (ADR 0029), and the live option quotes it served, to live/* tables (ADR 0028).",
     "title": "algotrade API",
     "version": "0.1.0"
   },
@@ -4471,6 +4714,80 @@
           }
         },
         "summary": "Chain",
+        "tags": [
+          "chains"
+        ]
+      }
+    },
+    "/chains/{underlying_id}/live": {
+      "get": {
+        "description": "Live quotes from IB Gateway (read-only, cached briefly); the stored delayed chain with\na status when the gateway cannot answer. Each live answer is recorded (``live/*``).",
+        "operationId": "live_chain_chains__underlying_id__live_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "underlying_id",
+            "required": true,
+            "schema": {
+              "title": "Underlying Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "expiry",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "Expiry",
+              "type": "string"
+            }
+          },
+          {
+            "description": "strikes to quote (repeat the parameter); default: those nearest the underlying",
+            "in": "query",
+            "name": "strikes",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "strikes to quote (repeat the parameter); default: those nearest the underlying",
+              "title": "Strikes"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveOptionChain"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Live Chain",
         "tags": [
           "chains"
         ]

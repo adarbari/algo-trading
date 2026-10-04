@@ -1,4 +1,5 @@
-"""Option chain snapshots for one session: option quotes, underlying quotes and fetch status.
+"""Option chain snapshots for one session: option quotes, underlying quotes and fetch status;
+and the live quotes the API recorded for a session (``live/option_quotes``, ADR 0028).
 
 Option quote rows are keyed by the contract (``instrument_id``) and carry their
 ``underlying_id``; ``option_quotes`` filters on the underlying, which is how consumers ask
@@ -16,6 +17,7 @@ from algotrade.storage.tables.readers import StoreReader
 OPTION_QUOTES = "chains/option_quotes"
 UNDERLYING_QUOTES = "chains/underlying_quotes"
 CHAIN_STATUS = "chains/status"
+LIVE_OPTION_QUOTES = "live/option_quotes"
 
 
 def option_quotes(
@@ -25,7 +27,12 @@ def option_quotes(
     as_of: datetime | None = None,
 ) -> pd.DataFrame | None:
     """Option quotes for ``session``, limited to the chains of ``underlying_ids``."""
-    frame = reader.table(OPTION_QUOTES, session, as_of)
+    return _of_underlyings(reader.table(OPTION_QUOTES, session, as_of), underlying_ids)
+
+
+def _of_underlyings(
+    frame: pd.DataFrame | None, underlying_ids: Sequence[str] | None
+) -> pd.DataFrame | None:
     if frame is None or underlying_ids is None:
         return frame
     wanted = frame["underlying_id"].astype(str).isin(list(underlying_ids))
@@ -75,3 +82,14 @@ def chain_status(
     if frame is None and hint is not None:
         raise MissingDataError(CHAIN_STATUS, f"no chain status for {session}", hint)
     return frame
+
+
+def live_option_quotes(
+    reader: StoreReader,
+    session: date,
+    underlying_ids: Sequence[str] | None = None,
+    as_of: datetime | None = None,
+) -> pd.DataFrame | None:
+    """The live quotes the API took during ``session`` (every snapshot: one row per contract
+    and ``ts``), limited to the chains of ``underlying_ids``. Personal-use licence (IBKR)."""
+    return _of_underlyings(reader.table(LIVE_OPTION_QUOTES, session, as_of), underlying_ids)

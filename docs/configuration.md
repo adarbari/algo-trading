@@ -369,6 +369,7 @@ call `load_dotenv()` once (a local `.env`, never overriding what is already set)
 | `ALGOTRADE_USER` | `user_id()`, the default `--user` | `local` (`site` for site screens) |
 | `ALGOTRADE_MASSIVE_API_KEY`, `ALGOTRADE_SEC_CONTACT` | `credential()`, handed to the source registry | unset: the source is skipped with the reason |
 | `ALGOTRADE_IBKR_HOST`, `ALGOTRADE_IBKR_PORT`, `ALGOTRADE_IBKR_CLIENT_ID` | `credential()`, handed to the source registry for the IB Gateway session (`verify`, read-only); port 4001 live gateway, 4002 paper | unset: the `ibkr` source is skipped with the reason |
+| `ALGOTRADE_IBKR_API_CLIENT_ID` | `api_credential()`: the client id of the API's live option quotes (ADR 0028) | `ALGOTRADE_IBKR_CLIENT_ID` + 1 |
 | `ALGOTRADE_NOTIFY_EMAIL_TO`, `ALGOTRADE_NOTIFY_EMAIL_FROM`, `ALGOTRADE_SMTP_USER`, `ALGOTRADE_SMTP_PASSWORD` | `credential()`, read by the nightly email notifier (`workflows/nightly/notify.py`) when `[notify.email] enabled`; recipients comma-separated, FROM defaults to the first recipient; Gmail needs an app password | unset with email enabled: a `notify` WARN "email not configured", the nightly carries on |
 
 ## Users

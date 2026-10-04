@@ -235,6 +235,14 @@ purpose = "read-only dry runs of unsaved Builder input (ADR 0029): a draft rule 
 contracts = ["Explore queries are read-only: no writers, no jobs (ADR 0024)"]
 
 [[dir]]
+path = "src/algotrade/services/live"
+purpose = "use case: the API's live option quotes (ADR 0028): a quote feed with a short cache and the stored chain as the fallback; answers recorded in the background to live/* tables"
+contracts = [
+    "Live quotes write only live/* tables: no market-data writer, no jobs (ADR 0028)",
+    "Only the live-quotes recorder imports the live writer (ADR 0028)",
+]
+
+[[dir]]
 path = "src/algotrade/services/jobs"
 purpose = "long-running work as jobs: runner, models, handlers, exclusive runs"
 contracts = ["The job runner is generic: it knows no use case, engine or market-data reader"]
@@ -260,7 +268,7 @@ contracts = [
 
 [[dir]]
 path = "libs/sources/algotrade_sources/framework"
-purpose = "non-vendor source machinery: protocols, HTTP, pacing, the source registry"
+purpose = "non-vendor source machinery: protocols, HTTP, pacing, the source registry, a session source served on its own thread (session_thread)"
 contracts = ["Layout: only the source registry imports vendor folders"]
 
 [[dir]]
@@ -281,7 +289,7 @@ purpose = "the golden synthetic fixture source (generators, catalogue, CSV files
 
 [[dir]]
 path = "apps/api/algotrade_api"
-purpose = "the API app: app factory (main), dependencies (deps), the ASGI app and the algotrade-api CLI"
+purpose = "the API app: app factory (main), dependencies (deps), the live-quotes feed over IB Gateway (live, ADR 0028), the ASGI app and the algotrade-api CLI"
 contracts = [
     "API: routes reach the library only through services.explore, config and core (ADR 0024)",
     "Apps never import each other (ADR 0004)",

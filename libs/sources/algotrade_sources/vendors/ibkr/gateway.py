@@ -4,7 +4,9 @@
 primary exchange), daily bars, the implied- and historical-volatility history of an underlying,
 a streamed snapshot of the underlying's option implied vol and historical vol (generic ticks
 106 and 104), IB dividends (generic tick 456), option chain parameters and option quote
-snapshots. Each returns plain JSON-able values; no ``ib_async`` object leaves this module.
+snapshots (one contract; or, streamed, the calls and puts of an expiry at given strikes: the
+API's live quotes, ADR 0028). Each returns plain JSON-able values; no ``ib_async`` object
+leaves this module.
 
 Read-only by construction (ADR 0026), three layers:
 
@@ -31,7 +33,7 @@ Both are the registry's shared limiters (``sources/framework/limiter.py``).
 import math
 import socket
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
@@ -118,6 +120,14 @@ def _price(value: Any) -> float | None:
     return number if math.isfinite(number) and number >= 0 else None
 
 
+def _number(value: Any) -> float | None:
+    """A finite number (a delta may be negative), else ``None``."""
+    if value is None:
+        return None
+    number = float(value)
+    return number if math.isfinite(number) else None
+
+
 @dataclass
 class IbkrMarketData:
     """Read-only market data over one IB Gateway API session (``connect`` ... ``close``)."""
@@ -130,6 +140,7 @@ class IbkrMarketData:
     calls: list[str] = field(default_factory=list)  # every guarded call made, in order
     _ib: _Guarded | None = None
     _contracts: dict[str, Any] = field(default_factory=dict)
+    _options: dict[tuple[str, date, float, str], Any] = field(default_factory=dict)
 
     # ------------------------------------------------------------------ lifecycle
 
@@ -168,6 +179,7 @@ class IbkrMarketData:
     def close(self) -> None:
         ib, self._ib = self._ib, None
         self._contracts.clear()
+        self._options.clear()
         if ib is not None:
             try:
                 ib.disconnect()
@@ -351,3 +363,70 @@ class IbkrMarketData:
             "last": _price(ticker.last) if ticker else None,
             "close": _price(ticker.close) if ticker else None,
         }
+
+    def option_quotes(
+        self, symbol: str, expiry: date, strikes: Sequence[float]
+    ) -> list[dict[str, Any]]:
+        """Quotes now of the calls and puts of ``symbol`` expiring ``expiry`` at ``strikes``
+        (SMART), one row per (strike, right). Contracts are qualified once per session (one
+        ``qualifyContracts`` for those not seen yet); every listed one is then streamed
+        (``reqMktData``: IB serves delayed data to streams, not to snapshot requests), read
+        once each has a bid and an ask or ``stream_wait_s`` passed (outside trading hours only
+        the close comes), and cancelled. Each contract is paced as a message. A contract IB
+        does not list is ``listed`` False. IB's model implied vol and delta come with a quote
+        when IB sends them (``None`` otherwise)."""
+        wanted = [(float(k), right) for k in strikes for right in ("C", "P")]
+        new = [w for w in wanted if (symbol, expiry, *w) not in self._options]
+        if new:
+            contracts = [
+                Option(ib_symbol(symbol), f"{expiry:%Y%m%d}", k, r, "SMART", "100", "USD")
+                for k, r in new
+            ]
+            for _ in contracts[1:]:
+                self.general.wait()
+            found = self._call("qualifyContracts", *contracts)
+            for w, c in zip(new, [*found, *[None] * len(new)], strict=False):
+                listed = c is not None and bool(getattr(c, "conId", 0))
+                self._options[(symbol, expiry, *w)] = c if listed else None
+        rows = [(w, self._options[(symbol, expiry, *w)]) for w in wanted]
+        tickers = iter(self._stream([c for _, c in rows if c is not None]))
+        out: list[dict[str, Any]] = []
+        for (strike, right), contract in rows:
+            if contract is None:
+                out.append({"strike": strike, "right": right, "listed": False})
+                continue
+            ticker = next(tickers, None)
+            greeks = getattr(ticker, "modelGreeks", None)
+            out.append(
+                {
+                    "strike": strike,
+                    "right": right,
+                    "listed": True,
+                    "conid": int(contract.conId),
+                    "bid": _price(getattr(ticker, "bid", None)),
+                    "ask": _price(getattr(ticker, "ask", None)),
+                    "last": _price(getattr(ticker, "last", None)),
+                    "close": _price(getattr(ticker, "close", None)),
+                    "volume": _price(getattr(ticker, "volume", None)),
+                    "iv": _price(getattr(greeks, "impliedVol", None)),
+                    "delta": _number(getattr(greeks, "delta", None)),
+                }
+            )
+        return out
+
+    def _stream(self, contracts: list[Any]) -> list[Any]:
+        """Stream ``contracts`` together until each has a bid and an ask (at most
+        ``stream_wait_s``), then cancel every stream: their tickers, in order."""
+        streams: list[tuple[Any, Any]] = []
+        try:
+            for contract in contracts:
+                streams.append((contract, self._call("reqMktData", contract, "", False, False)))
+            deadline = self.clock() + self.config.stream_wait_s
+            while (left := deadline - self.clock()) > 0 and any(
+                _price(t.bid) is None or _price(t.ask) is None for _, t in streams
+            ):
+                self.ib.waitOnUpdate(timeout=left)
+        finally:
+            for contract, _ in streams:
+                self._call("cancelMktData", contract)
+        return [t for _, t in streams]

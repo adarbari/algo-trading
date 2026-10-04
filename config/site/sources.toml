@@ -90,6 +90,14 @@ iv_batch = 50                    # IV streams open together (paper accounts have
 iv_history_days = 730            # calendar days of IV history a backfill fetches (2 years)
 iv_backfill_per_night = 100      # underlyings without IV history the nightly backfills (0: off;
                                  # 100 x 2 requests x 10 s = ~33 min a night)
+# The API's live option quotes (ADR 0028; GET /chains/{id}/live): read through the same facade on
+# its own client id (ALGOTRADE_IBKR_API_CLIENT_ID, default ALGOTRADE_IBKR_CLIENT_ID + 1); when the
+# gateway is down the API serves the stored delayed chain with a status instead.
+live_cache_s = 60                # an answer is reused this long (per underlying, expiry, strikes)
+live_strikes = 10                # strikes nearest the underlying asked for when none are named
+live_max_strikes = 20            # most strikes one request may name (x 2 rights = contracts)
+live_timeout_s = 20              # longest a request waits for IB Gateway before falling back
+live_retry_s = 30                # after the gateway fails, requests fall back at once this long
 raw_retention_days = 30          # raw IBKR responses (JSON) kept for replays of a verification
 
 [quality]                        # data-quality thresholds for the nightly checks

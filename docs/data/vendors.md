@@ -244,6 +244,7 @@ gives replaces a free source, and what derives from it carries `licence = person
 | `contracts__<SYM>+<SYM>...`: conid, primary exchange, security type, currency | `qualifyContracts` (one call per `contracts_batch` = 25) | `ibkr` (one slot per contract) | `instruments/ibkr_contracts` (task `ibkr-contracts`) |
 | `volhist__<SYM>__<CONID>__<from>`: IB's daily 30-day implied vol and historical vol from a date to the session | `reqHistoricalData` x 2 (`OPTION_IMPLIED_VOLATILITY`, `HISTORICAL_VOLATILITY`) | `ibkr` + `ibkr_historical` | `volatility/ibkr_iv30`, `source_kind = history` (task `ibkr-iv --from/--to`) |
 | `vols__<SYM>:<CONID>+...`: the IV and HV now | `reqMktData` generic ticks 106 + 104, `iv_batch` = 50 streams together, then `cancelMktData` | `ibkr` | `volatility/ibkr_iv30`, `source_kind = snapshot` (nightly `ibkr-iv`) |
+| `quotes__<SYM>__<expiry>__<strike>+...`: the calls and puts of an expiry at those strikes now (bid, ask, last, close, volume, IB's model IV and delta) | `qualifyContracts` (once per contract per session) + `reqMktData` streams (bid and ask, or `stream_wait_s`), then `cancelMktData` | `ibkr` (one slot per contract) | `live/option_quotes` (the API's `/chains/{id}/live`, ADR 0028) |
 
 - **Contracts**: every instrument of the option-chain coverage; new and renamed names the
   same night, the rest once per `contracts_refresh_days = 30` on a slot day by key (like the

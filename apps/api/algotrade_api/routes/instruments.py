@@ -1,5 +1,6 @@
 """``/instruments/{id}``: detail, bars, events and feature series; ``/chains/{id}``: its option
-chain (``id``: an instrument id or a ticker)."""
+chain as stored, ``/chains/{id}/live``: live quotes of one expiry (``id``: an instrument id or a
+ticker)."""
 
 from datetime import date
 from enum import StrEnum
@@ -9,12 +10,13 @@ from fastapi import APIRouter, Query
 
 from algotrade.services.explore import instruments
 from algotrade.services.explore.chains import option_chain
-from algotrade_api.deps import Store, name_list
+from algotrade_api.deps import Live, Store, name_list
 from algotrade_api.schemas.instruments import (
     BarSeries,
     FeatureSeries,
     InstrumentDetail,
     InstrumentEvent,
+    LiveOptionChain,
     OptionChain,
 )
 
@@ -78,3 +80,22 @@ def chain(
     expiry: date | None = None,
 ) -> OptionChain:
     return OptionChain.model_validate(option_chain(store, underlying_id, on, expiry))
+
+
+@chains.get("/{underlying_id}/live")
+def live_chain(
+    store: Store,
+    live: Live,
+    underlying_id: str,
+    expiry: date,
+    strikes: Annotated[
+        list[float] | None,
+        Query(
+            description="strikes to quote (repeat the parameter); default: those nearest "
+            "the underlying"
+        ),
+    ] = None,
+) -> LiveOptionChain:
+    """Live quotes from IB Gateway (read-only, cached briefly); the stored delayed chain with
+    a status when the gateway cannot answer. Each live answer is recorded (``live/*``)."""
+    return LiveOptionChain.model_validate(live.chain(store, underlying_id, expiry, strikes))

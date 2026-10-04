@@ -534,7 +534,7 @@ web (apps/web) ──HTTP/JSON──▶ routes/<area>.py ──one call──▶
 | explore | `/explore/tickers?date&<universe filters>&columns=<feature names>&sort=[-]<column>&page&size` (tickers × any catalogue columns, values through `InstrumentView`, columns validated against the catalogue); `/explore/compare?ids=a,b,c&features=` (one row per feature, one value per ticker); `/explore/compare/prices?ids&from&to&rebase=100&adjust` (closes on one date axis, rebased; `rebase=0`: raw) |
 | universe | `/universe?date&security_type&leveraged&sector&liquidity_class&optionable&q&page&size` |
 | instruments | `/instruments/{id}` (id or ticker: reference + company + latest features); `.../bars?from&to&adjust=splits\|none\|total_return`; `.../events?from&to`; `.../features?names&from&to` |
-| chains | `/chains/{underlying_id}?date&expiry`: expiries, strikes, quotes with Cboe IV + Greeks, underlying quote, fetch status, our IV30 |
+| chains | `/chains/{underlying_id}?date&expiry`: expiries, strikes, quotes with Cboe IV + Greeks, underlying quote, fetch status, our IV30; `/chains/{underlying_id}/live?expiry&strikes=` (repeatable; default the `live_strikes` nearest the underlying): live IBKR quotes through `services/live/` ([ADR 0028](adr/0028-ibkr-enrichment-source.md#live-option-quotes-in-the-api)), cached 60 s, recorded to `live/option_quotes`; when the gateway cannot answer, the stored chain with `source = stored` and a `status` (DISABLED, UNAVAILABLE, ERROR), never an error |
 | features | `/features` (catalogue: kind, dtype, description, null meaning, version, inputs); `/features/{name}/distribution?date` (count, nulls, quantiles, histogram or categories) |
 | ideas | `/ideas?date&user&limit` (one row per ticker over every rule screen's latest stored run, ranked by the user's `ideas.priority` in `config/users/<u>/preferences.toml`, then score) |
 | screens | `/screens` (screener configs + schedule + latest run); `/screens/{config_id}/results?date&decision&page&size` (+ audit) |
@@ -544,7 +544,7 @@ web (apps/web) ──HTTP/JSON──▶ routes/<area>.py ──one call──▶
 | admin (Admin workspace only; role-gating attaches to `/admin/`) | `/admin/ingestion/completeness?sessions=10` (dataset × session: present vs expected rows, COMPLETE / PARTIAL / MISSING / CARRIED, run ids); `/admin/ingestion/{dataset}/{session}` (drill-down: items not OK grouped by reason with examples, the runs); `/admin/runs/nightly?limit=` (per session: status, steps with status / duration / counts); `/admin/runs/{run_id}` (items by status, failures grouped by reason, stats); `/admin/runs/{run_id}/items` (every item with its status code); `/admin/quality?date=` (the latest data-quality checks: PASS / WARN / FAIL with detail); `/admin/verification/ibkr?date=` (the live verification vs IBKR: counts by status and check, failing rows); `/admin/review/figi`, `/admin/review/leveraged` (the owner's curation lists) |
 
 Errors: unknown id / no data for the date → 404; bad configuration → 400; bad parameters →
-422. The committed `apps/api/openapi.json` must match the app (`scripts/export_openapi.py`; a
+422. The API writes nothing except the live quotes it served (`live/*` tables, ADR 0028). The committed `apps/api/openapi.json` must match the app (`scripts/export_openapi.py`; a
 test fails when it is stale); the web client is generated from it.
 
 ## 13. Hosting

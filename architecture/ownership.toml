@@ -289,7 +289,7 @@ allowed = [
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#r3-tasks-get-sources-from-the-registry"
 detect = [
-    { import = "algotrade_sources", except = ["algotrade_sources.framework.base", "algotrade_sources.framework.registry"] },
+    { import = "algotrade_sources", except = ["algotrade_sources.framework.base", "algotrade_sources.framework.registry", "algotrade_sources.framework.session_thread"] },
     { string = "nasdaqlisted" },
     { string = "otherlisted" },
     { string = "dividends" },
@@ -301,6 +301,7 @@ description = "Session-based sources (a stateful connection to a local gateway, 
 owner = [
     "libs/sources/algotrade_sources/framework/base.py",
     "libs/sources/algotrade_sources/framework/registry.py",
+    "libs/sources/algotrade_sources/framework/session_thread.py",  # an app's long-lived session (ADR 0028)
 ]
 allowed = ["libs/sources/algotrade_sources/vendors/ibkr/gateway.py"]  # its TCP probe of the gateway port
 section = "docs/adr/0026-live-verification-ibkr.md#session-sources"
@@ -340,6 +341,21 @@ allowed = [
 ]
 section = "docs/adr/0028-ibkr-enrichment-source.md#decision"
 detect = [{ string = "instruments/ibkr_contracts" }, { string = "volatility/ibkr_iv30" }]
+
+[[responsibility]]
+id = "live-option-quotes"
+description = "The API's live option quotes, read-only (ADR 0028): IBKR quotes for an underlying's expiry through the facade on the API's own client id and session thread, a 60 s cache, the stored delayed chain + a status as the fallback, and the API's one write: the answers recorded in the background to live/option_quotes (only through LiveWriter, atomic per run); read back through data.chains"
+owner = [
+    "src/algotrade/services/live/*",
+    "apps/api/algotrade_api/live.py",
+    "src/algotrade/storage/tables/live_writer.py",
+]
+allowed = [
+    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/data/chains.py",  # the read of the recorded quotes (live_option_quotes)
+]
+section = "docs/adr/0028-ibkr-enrichment-source.md#live-option-quotes-in-the-api"
+detect = [{ string = "live/option_quotes" }, { call = "LiveWriter" }, { call = "SessionThread" }]
 
 [[responsibility]]
 id = "secrets-env"
@@ -427,6 +443,10 @@ detect = [
 id = "job-execution"
 description = "Execute long-running work: threads, locks, recovery, idempotency; apps run jobs through services.jobs.run_job, fan-out through services.jobs.as_completed"
 owner = ["src/algotrade/services/jobs/*"]
+allowed = [
+    "libs/sources/algotrade_sources/framework/session_thread.py",  # a gateway session's own thread (its socket + event loop), not work (ADR 0028)
+    "src/algotrade/services/live/recorder.py",  # the API's background writer of live quotes: one thread draining a queue, not a job (ADR 0028)
+]
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
 detect = [
     { call = "LocalJobRunner" },
@@ -676,6 +696,11 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/reference/ibkr_contracts.py"
 [[table]]
 name = "volatility/ibkr_iv30"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/ibkr_iv.py"
+
+[[table]]
+name = "live/option_quotes"
+owner = "src/algotrade/services/live/recorder.py"
+note = "the API's one write (ADR 0028): live IBKR quotes it served; personal-use licence"
 
 [[table]]
 name = "verification/ibkr"
