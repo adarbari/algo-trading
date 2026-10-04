@@ -763,6 +763,23 @@ Source: `design-system/components/Skeleton`
 | `height` | `'sm' \| 'md' \| 'lg'` | no | Height of a `rect`: `sm`, `md` (default, a chart) or `lg`. |
 | `label` | `string` | no | What is loading, for screen readers. |
 
+### SortableList
+
+SortableList: an ordered list whose items the user reorders, by dragging an item's handle (pointer) or from the keyboard: focus the handle, Space to grab, Up / Down to move, Space to drop, Escape to cancel. Every move is announced through a live region. Controlled: `items` in, `onReorder(newOrder)` out when a move is dropped. Items render arbitrary content through `renderItem`. Use it for a priority order the user owns (rule priority, column order).
+
+Source: `design-system/components/SortableList`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `items` | `readonly T[]` | yes | The items, in order (controlled). |
+| `getKey` | `(item: T) => string` | yes | A stable unique key per item. |
+| `getLabel` | `(item: T) => string` | yes | Plain-text name of an item: the handle's accessible name and the move announcements. |
+| `renderItem` | `(item: T, state: SortableItemState) => ReactNode` | yes | The content of one item (the handle is drawn by the list). |
+| `onReorder` | `(items: T[]) => void` | yes | Called with the new order when a move is dropped (not for a cancelled or no-op move). |
+| `label` | `string` | yes | Accessible name of the list ("Screener priority"). |
+| `disabled` | `boolean` | no | Handles are inert; the order cannot change. |
+| `empty` | `ReactNode` | no | Shown instead of the list when `items` is empty (an `EmptyState`). |
+
 ### Sparkline
 
 Sparkline: a tiny inline line of a series' recent shape for a table cell or a stat (30 days of closes, IV history). Plain SVG, no axes. Tone `auto` (default) draws it in the up / down colour by the change from first to last value; or a series colour `s1`-`s6`, `muted`. An optional dashed `baseline` (100 for a rebased series, 0 for a change) and a dot on the last value. It is an image with a generated summary ("IV30, 30 values: 21.2% to 24.4%, low 19.8%, high 25.1%"); missing values break the line. Fewer than two values show a muted dash.
