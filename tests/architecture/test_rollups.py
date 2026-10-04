@@ -1,7 +1,8 @@
 """Fitness tests for feature groups (rollups, ``features/registry.py``, and the groups that
 materialise expression features, ``features.site``): every declared group
 
-- is a valid declaration with typed columns, defined in ``features/rollups/``;
+- is a valid declaration with typed columns, defined in a kind folder of
+  ``features/rollups/`` (``price``, ``options``, ``corporate``);
 - has a ``config/site/rollups.toml`` section exactly when it takes parameters, and the file
   loads through the one settings loader;
 - reads only inputs ``algotrade.data.feature_inputs`` knows how to read, and the
@@ -46,7 +47,7 @@ def test_declaration_is_valid_and_typed(key: str) -> None:
         assert SITE.expressions[rollup.name].materialise and rollup.params is None
         return
     module = Path(str(__import__(rollup.compute.__module__, fromlist=["x"]).__file__))
-    assert module.parent == REPO_ROOT / "src" / "algotrade" / "features" / "rollups"
+    assert module.parent.parent == REPO_ROOT / "src" / "algotrade" / "features" / "rollups"
 
 
 @pytest.mark.parametrize("key", sorted(GROUPS))

@@ -103,12 +103,19 @@ Selectable rollup fields today ([data/layers.md](data/layers.md#rollups-as-built
 | `fundamentals@v2` | `shares_outstanding` (float32); `shares_as_of`, `shares_filed` (date); `shares_source`, `market_cap_status` (str) |
 | `put_wing@v1` | `wing_status` (str); `target_expiry` (date); `target_dte`, `n_unpriced`, `n_strikes`, `wing_oi`, `wing_volume`, `best_put_oi`, `best_put_volume` (int); `wing_spread_pct`, `delta_band_distance`, `best_put_strike`, `best_put_delta`, `best_put_iv`, `best_put_mid`, `best_put_spread_pct`, `best_put_roc` (float32) |
 | `price_moves@v1` | `one_day_move` (float32) |
+| `momentum@v1` | `atr_14`, `rsi_14`, `ret_5d`, `rel_volume`, `high_20d`, `low_20d`, `high_50d`, `low_50d`, `prior_high_20d` (float32) |
+| `swing_levels@v1` | `swing_high`, `swing_low` (float32); `swing_high_date`, `swing_low_date` (date) |
+| `anchored_vwap@v1` | `avwap_earnings` (float32); `avwap_anchor_date` (date) |
+| `oi_walls@v1` | `wall_status` (str); `call_wall`, `put_wall` (float32); `call_wall_oi`, `put_wall_oi` (int) |
 
 Expression features (`feature.<name>`): `liquidity_class` (str: HIGH / MEDIUM / LOW /
 UNKNOWN), `option_tier` (str: A-D), `option_chain_known`, `liquidity_high`,
 `liquidity_medium` (bool), `option_chain_oi`, `option_chain_volume` (int), `div_yield`
 (float32, materialised), `market_cap`, `pct_from_high_52w`, `pct_from_low_52w`,
-`iv_hv_spread`, `iv_hv_ratio` (float), `near_52w` (str: HIGH / LOW / BOTH / NONE).
+`iv_hv_spread`, `iv_hv_ratio`, `atr_pct`, `range_20d_pct`, `dist_to_resistance`,
+`dist_to_support`, `dist_to_resistance_atr`, `dist_to_support_atr` (float), `breakout_20d`,
+`pullback_to_sma20` (bool), `near_52w` (str: HIGH / LOW / BOTH / NONE), `trend_state` (str:
+UPTREND / DOWNTREND / MIXED).
 
 **Superseded fields.** ADR 0023 step 3 replaced `price_stats@v1`, `dividends@v1`,
 `fundamentals@v1`, `iv_history@v1` and `liquidity_class@v1`. A selection naming one of their
@@ -227,7 +234,7 @@ negative interval) and invalid leverage-marker regexes. Every key must also driv
 
 A formula over existing features is a TOML entry, not code (ADR 0023 step 3). Each
 `config/site/features/<theme>.toml` (one per theme: `price`, `volatility`, `fundamentals`,
-`liquidity`) holds one `[name]` per feature:
+`liquidity`, `vrp`, `swing`) holds one `[name]` per feature:
 
 | Key | Meaning |
 |---|---|

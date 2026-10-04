@@ -12,7 +12,7 @@ import pytest
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.framework.runner import compute_one
-from algotrade.features.rollups.ibkr_iv import GROUP, IbkrIvParams, compute
+from algotrade.features.rollups.options.ibkr_iv import GROUP, IbkrIvParams, compute
 from algotrade.features.site import site_features
 from algotrade.storage.configs.files import FileConfigStore
 from tests.conftest import REPO_ROOT

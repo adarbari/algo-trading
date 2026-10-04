@@ -27,7 +27,7 @@ import pandas as pd
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature, Licence
-from algotrade.features.rollups.iv_history import IvHistoryParams, history
+from algotrade.features.rollups.options.iv_history import IvHistoryParams, history
 
 NAME = "ibkr_iv"
 VERSION = 1

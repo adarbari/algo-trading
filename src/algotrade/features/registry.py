@@ -2,7 +2,7 @@
 feature they declare, and the group versions they superseded.
 
 Add a group by declaring ``GROUP`` (with its ``FEATURES``) in
-``features/rollups/<name>.py`` and listing it here; the ``rollups`` ingestion task, the
+``features/rollups/<kind>/<name>.py`` and listing it here; the ``rollups`` ingestion task, the
 selection catalogue, the feature catalogue (``features.catalogue``) and the fitness tests pick
 it up from this registry. The order is computed (``framework.graph.dependency_order``): a
 group that reads another group's table comes after it. A group may read a materialised
@@ -24,17 +24,21 @@ from collections.abc import Mapping
 from algotrade.features.framework.declaration import FeatureGroup, Superseded
 from algotrade.features.framework.feature import Feature
 from algotrade.features.framework.graph import dependency_order
-from algotrade.features.rollups import (
-    dividends,
-    earnings,
-    fundamentals,
+from algotrade.features.rollups.corporate import dividends, earnings, fundamentals
+from algotrade.features.rollups.options import (
     ibkr_iv,
     iv30,
     iv_history,
+    oi_walls,
     option_liquidity,
+    put_wing,
+)
+from algotrade.features.rollups.price import (
+    anchored_vwap,
+    momentum,
     price_moves,
     price_stats,
-    put_wing,
+    swing_levels,
 )
 
 GROUPS: dict[str, FeatureGroup] = {
@@ -51,6 +55,10 @@ GROUPS: dict[str, FeatureGroup] = {
             fundamentals.GROUP,
             put_wing.GROUP,
             price_moves.GROUP,
+            momentum.GROUP,
+            swing_levels.GROUP,
+            anchored_vwap.GROUP,
+            oi_walls.GROUP,
         ),
         # iv30@v1 and put_wing@v1 read the materialised div_yield@v1 (FeatureSet orders it)
         stored_ok=True,
