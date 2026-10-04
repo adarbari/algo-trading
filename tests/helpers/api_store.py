@@ -163,7 +163,7 @@ def _ideas(writer: StoreWriter) -> None:
         run = start_run(screen_job(config, SITE_USER), END, NOW)
         frame = [
             {"instrument_id": f"EQ:{s}", "decision": d, "score": sc, "rank": rank,
-             "tie_break": None, "tier": "T1" if d == "QUALIFIED" else "", "class": "",
+             "tie_break": None,
              "reasons": "iv rank 40 < 50" if d == "WATCH" else "", "config_id": config, **common,
              "flags": "leveraged_inverse" if (s, config) == ("AAA", "vrp") else ""}
             for s, d, sc, rank in rows

@@ -54,7 +54,7 @@ def test_preview_rows_equal_the_nightly_rows() -> None:
     assert stored is not None
     store = ReadStore(reader, configs(), UserContext(ALICE))
     got = preview(store, {**SCREEN, "id": "big_liquid"})
-    assert {r.tier for r in got.rows} >= {"deep"} and any(r.flags for r in got.rows)
+    assert any(r.flags for r in got.rows)
     assert got.config_hash == nightly.hash  # same spec, same user: the same config
     rows = pd.DataFrame(
         [
@@ -63,8 +63,6 @@ def test_preview_rows_equal_the_nightly_rows() -> None:
                 "rank": r.rank,
                 "decision": r.decision,
                 "score": r.score,
-                "tier": r.tier,
-                "class": r.classification,
                 "flags": ",".join(r.flags),
                 "reasons": "; ".join(r.reasons),
             }
@@ -94,9 +92,7 @@ def test_summary_funnel_and_coverage() -> None:
     assert got.coverage.coverage == "COMPLETE" and got.coverage.selected == 4
     assert got.coverage.base == 5  # the delisted one is seen, not selected
     top = got.rows[0]
-    assert (top.instrument_id, top.symbol, top.decision, top.classification) == (
-        "EQ:AAA", "AAA", "QUALIFIED", "A",
-    )  # fmt: skip
+    assert (top.instrument_id, top.symbol, top.decision) == ("EQ:AAA", "AAA", "QUALIFIED")
     assert top.columns == {"tier": "A"} and [c.outcome for c in top.criteria] == ["PASS", "PASS"]
     assert got.session == DAY and got.user == ALICE and got.screener_id == "draft1"
 

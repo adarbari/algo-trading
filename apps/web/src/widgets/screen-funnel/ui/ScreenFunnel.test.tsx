@@ -18,16 +18,15 @@ vi.mock('@/entities/feature', async (importOriginal) => ({
   }),
 }));
 
-const step = (criterion_id: string, label: string | null, entering: number, remaining: number) => ({
+const step = (criterion_id: string, entering: number, remaining: number) => ({
   criterion_id,
-  label,
   entering,
   remaining,
 });
 const DATA = {
   coverage: { selected: 4203 },
   summary: { skipped: 2416 },
-  funnel: [step('iv30', 'Our 30-day IV', 4203, 486), step('close', null, 486, 45)],
+  funnel: [step('iv30', 4203, 486), step('close', 486, 45)],
 };
 
 beforeEach(() => {
@@ -40,11 +39,7 @@ describe('ScreenFunnel', () => {
     const { container } = render(<ScreenFunnel />);
     const list = screen.getByRole('list', { name: 'Funnel (gating criteria)' });
     const rows = within(list).getAllByRole('listitem');
-    expect(rows.map((r) => r.textContent)).toEqual([
-      'Universe4,203',
-      'Our 30-day IV486',
-      'close45',
-    ]);
+    expect(rows.map((r) => r.textContent)).toEqual(['Universe4,203', 'iv30486', 'close45']);
     expect(screen.getByText('Skipped (missing data, never passed): 2,416')).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });

@@ -25,7 +25,6 @@ export interface Criterion {
   mode: CriterionMode;
   tolerance?: Tolerance | undefined;
   on_miss?: MissDecision | undefined;
-  label?: string | undefined;
 }
 
 type CriteriaTable = Record<string, Record<string, unknown>>;
@@ -72,7 +71,6 @@ function toCriterion(id: string, table: Record<string, unknown>): Criterion {
   if ('value' in table) criterion.value = table['value'];
   if (table['tolerance'] !== undefined) criterion.tolerance = table['tolerance'] as Tolerance;
   if (typeof table['on_miss'] === 'string') criterion.on_miss = table['on_miss'] as MissDecision;
-  if (typeof table['label'] === 'string') criterion.label = table['label'];
   return criterion;
 }
 

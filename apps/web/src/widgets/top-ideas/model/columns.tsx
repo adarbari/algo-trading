@@ -1,6 +1,6 @@
 /**
  * The top-ideas table's columns: rank, ticker, the screeners that picked it (chips, by name),
- * the best decision, score, tier / class, the screeners' stored display values (IV30, HV30,
+ * the best decision, score, the screeners' stored display values (IV30, HV30,
  * IV / HV and the best put: a column appears only when some idea has a value for it), next
  * earnings, the closest expiry in days (flagged when earnings come first) and the watch-outs.
  */
@@ -154,12 +154,6 @@ const BASE: DataTableColumn<Idea>[] = [
     description: 'Score from the screener behind the best decision',
     value: (idea) => idea.best.score,
     format: { kind: 'number', digits: 0 },
-  },
-  {
-    id: 'tier',
-    header: 'Tier / class',
-    value: (idea) => [idea.best.tier, idea.best.klass].filter(Boolean).join(' / ') || null,
-    tone: 'secondary',
   },
   {
     id: 'earnings',

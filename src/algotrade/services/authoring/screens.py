@@ -70,7 +70,7 @@ class ScreenDetail:
     layers: list[str]
     resolved: dict[str, Any] | None
     error: str | None  # why that does not resolve (e.g. a stale pin: rebase)
-    # The rule keys (criteria, tiers, ...) of the working copy resolved through its layers (the
+    # The rule keys (criteria, flags, ...) of the working copy resolved through its layers (the
     # draft when it resolves, else the latest version, else the preset): what the Builder edits.
     working: dict[str, Any] | None = None
 

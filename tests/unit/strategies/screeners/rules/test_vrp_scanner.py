@@ -3,8 +3,7 @@
 catalogue, are not scheduled, and on a
 fixed fixture of rows gives the owner-decided outcomes (docs/screeners/vrp-scanner.md): the
 hard gates reject or skip, liquidity misses are LIQUIDITY_RISK near misses, IBKR IV rank
-only lowers the score, STRONG tier, leveraged / inverse flag, classify by near_52w, ties by
-the IV-HV spread."""
+only lowers the score, leveraged / inverse flag, ties by the IV-HV spread."""
 
 from datetime import date
 from typing import Any
@@ -41,8 +40,8 @@ GOOD: dict[str, Any] = {
 }
 FIXTURE: dict[str, dict[str, Any]] = {
     "EQ:STRONG": GOOD,
-    # meets every gate but below the STRONG tier (spread 0.12, ratio 1.28); wider-than-STRONG
-    # spreads elsewhere decide the tie-break among equal scores
+    # meets every gate with a small spread (0.12, ratio 1.28); wider spreads elsewhere
+    # decide the tie-break among equal scores
     "EQ:BASE": {
         **GOOD,
         "feature.vrp_iv_hv_spread": 0.12,
@@ -60,13 +59,13 @@ FIXTURE: dict[str, dict[str, Any]] = {
     "EQ:MID": {**GOOD, "feature.near_52w": "NONE"},
     "EQ:NOIV": {**GOOD, "feature.vrp_iv30": None},  # neither IBKR nor Cboe: SKIPPED
 }
-EXPECTED = {  # id: (decision, score, tier, class, flags)
-    "EQ:LEV": (Decision.QUALIFIED, 100.0, "STRONG", "HIGH", ("leveraged_inverse",)),
-    "EQ:STRONG": (Decision.QUALIFIED, 100.0, "STRONG", "HIGH", ()),
-    "EQ:BASE": (Decision.QUALIFIED, 100.0, None, "LOW", ()),
-    "EQ:NORANK": (Decision.QUALIFIED, 90.0, "STRONG", "HIGH", ()),
-    "EQ:THIN": (Decision.LIQUIDITY_RISK, 95.0, "STRONG", "HIGH", ()),
-    "EQ:THINOI": (Decision.LIQUIDITY_RISK, 96.0, "STRONG", "HIGH", ()),
+EXPECTED = {  # id: (decision, score, flags)
+    "EQ:LEV": (Decision.QUALIFIED, 100.0, ("leveraged_inverse",)),
+    "EQ:STRONG": (Decision.QUALIFIED, 100.0, ()),
+    "EQ:BASE": (Decision.QUALIFIED, 100.0, ()),
+    "EQ:NORANK": (Decision.QUALIFIED, 90.0, ()),
+    "EQ:THIN": (Decision.LIQUIDITY_RISK, 95.0, ()),
+    "EQ:THINOI": (Decision.LIQUIDITY_RISK, 96.0, ()),
 }
 
 
@@ -100,7 +99,6 @@ def test_preset_resolves_and_validates(preset: ResolvedConfig) -> None:
         "target_oi": "LIQUIDITY_RISK",
     }
     assert not any("earnings" in c.field for c in spec.criteria)  # a column, never a criterion
-    assert spec.classify == "feature.near_52w"
     assert spec.tie_break == "feature.vrp_iv_hv_spread" and spec.tie_break_descending
     assert dict(spec.columns)["next_earnings"] == "rollup.earnings@v1.next_earnings_date"
 
@@ -108,9 +106,9 @@ def test_preset_resolves_and_validates(preset: ResolvedConfig) -> None:
 def test_fixture_outcomes(preset: ResolvedConfig) -> None:
     result = evaluate_screen(preset.screen_spec, FeatureView(DAY, FIXTURE))
     rows = {r.instrument_id: r for r in result.rows}
-    for iid, (decision, score, tier, klass, flags) in EXPECTED.items():
+    for iid, (decision, score, flags) in EXPECTED.items():
         row = rows[iid]
-        assert (row.decision, row.tier, row.klass, row.flags) == (decision, tier, klass, flags), iid
+        assert (row.decision, row.flags) == (decision, flags), iid
         assert row.score == pytest.approx(score), iid
     for iid in ("EQ:ILLIQUID", "EQ:LOWIV", "EQ:LOWRATIO", "EQ:PENNY", "EQ:MID"):
         assert rows[iid].decision is Decision.REJECT, iid

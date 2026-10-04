@@ -40,7 +40,6 @@ class FunnelStep:
     criterion_id: str
     field: str
     mode: str
-    label: str | None
     entering: int
     passed: int
     near: int
@@ -68,8 +67,6 @@ class PreviewRow:
     rank: int
     decision: str
     score: float | None
-    tier: str | None
-    classification: str | None  # the spec's ``classify`` field (``class`` in the results)
     flags: list[str]
     reasons: list[str]
     columns: dict[str, Any]  # display name -> value
@@ -160,7 +157,6 @@ def funnel(spec: ScreenSpec, rows: Sequence[RuleRow]) -> list[FunnelStep]:
                 criterion.id,
                 criterion.field,
                 criterion.mode.value,
-                criterion.label,
                 entering=len(remaining),
                 passed=passed,
                 near=near,
@@ -181,8 +177,6 @@ def _row(row: RuleRow, symbol: str | None) -> PreviewRow:
         rank=row.rank,
         decision=row.decision.value,
         score=row.score,
-        tier=row.tier,
-        classification=row.klass,
         flags=list(row.flags),
         reasons=list(row.reasons),
         columns={name: to_value(value) for name, value in row.columns},

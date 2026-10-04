@@ -38,7 +38,8 @@ KINDS = frozenset({"screener", "strategy"})
 SCHEDULES = frozenset({"nightly"})
 RULES_IMPL = "rules"
 # The rule-screen part of a config (ADR 0029), kept raw here and parsed by
-# ``config.strategy.screen_spec`` after the layers are merged.
+# ``config.strategy.screen_spec`` after the layers are merged. ``tiers`` and ``classify`` are
+# legacy (ADR 0030): accepted so v1 / v2 presets parse, then ignored.
 RULE_SCREEN_KEYS = frozenset(
     {"version", "criteria", "tiers", "flags", "classify", "columns", "rank"}
 )

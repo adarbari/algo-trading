@@ -25,7 +25,7 @@ export function ScreenFunnel() {
     { id: 'universe', label: 'Universe', value: universe },
     ...funnel.map((step) => ({
       id: step.criterion_id,
-      label: described.get(step.criterion_id) ?? step.label ?? step.criterion_id,
+      label: described.get(step.criterion_id) ?? step.criterion_id,
       value: step.remaining,
     })),
   ];

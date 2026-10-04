@@ -19,7 +19,6 @@ class FunnelStep(Schema):
     criterion_id: str
     field: str
     mode: str
-    label: str | None
     entering: int = Field(description="rows that passed or narrowly missed every earlier step")
     passed: int
     near: int
@@ -45,8 +44,6 @@ class PreviewRow(Schema):
     rank: int
     decision: str
     score: float | None
-    tier: str | None
-    classification: str | None = Field(description="the spec's classify field")
     flags: list[str]
     reasons: list[str]
     columns: dict[str, Any]

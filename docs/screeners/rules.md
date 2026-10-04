@@ -54,7 +54,6 @@ value = 50_000_000
 mode = "soft"
 tolerance = { relative = 0.2 }        # 20% of the threshold: $40M-$50M is a near miss
 on_miss = "LIQUIDITY_RISK"
-label = "ADV > $50M"
 
 [criteria.iv_rank]
 field = "rollup.ibkr_iv@v1.iv_rank_252d_ibkr"
@@ -62,9 +61,6 @@ op = "gte"
 value = 0.5
 mode = "score"                        # never gates; a miss only lowers the score
 tolerance = 0.5
-
-[tiers.STRONG]
-all = [{ field = "feature.iv_hv_spread", op = "gte", value = 0.15 }]
 
 [flags.leveraged]
 all = [{ field = "instrument.is_leveraged", op = "eq", value = true }]
@@ -94,7 +90,7 @@ not_null`) plus:
 | `mode` | `hard`, `soft` or `score` | `hard` |
 | `tolerance` | how far a value may miss the threshold and still be a near miss: a number (absolute, in the field's unit) or `{ relative = r }` (r × \|threshold\|). Required for `soft`, optional for `score`, not allowed for `hard`; numeric comparisons only (`gt gte lt lte between`) | |
 | `on_miss` | `soft` only: the decision of a near miss, `WATCH`, `LIQUIDITY_RISK` or `EVENT_RISK` | `WATCH` |
-| `label`, `enabled` | display text; `enabled = false` switches it off (also removes an inherited one) | |
+| `enabled` | `enabled = false` switches it off (also removes an inherited one) | |
 
 | Mode | TRUE | FALSE | Missing data |
 |---|---|---|---|
@@ -130,8 +126,11 @@ The score is clipped to 0 to 100 (clipped at 0; only positive scores), so many h
 REJECT rows are scored too.
 SKIPPED rows have no score. Rows sort by score (descending), then by `[rank] tie_break`
 (descending unless `tie_break_order = "asc"`; missing last), then by instrument id. Then:
-`tiers` (first TRUE group wins), `flags` (TRUE adds the flag, never changes the decision),
-`classify = "<label field>"` (buckets the output), `columns` (values stored with the row).
+`flags` (TRUE adds the flag, never changes the decision) and `columns` (values stored with the
+row). A criterion has no stored name: the Builder reads it from its field, operator and
+threshold ("IV30 ≥ 50%"). `tiers`, `classify` and `label` were removed in
+[ADR 0030](../adr/0030-rule-screener-simplification.md); v1 / v2 presets still carry them and
+they are ignored.
 
 ## Run summary
 
@@ -162,8 +161,8 @@ nothing. It returns the run summary, the decision counts, the funnel (each gatin
 order: rows entering, passing, narrowly missing, failing, missing), the coverage and the top
 rows. The session's field frame is cached in-process, so editing a threshold, mode or
 tolerance re-evaluates in memory (only the edited criterion); a new publish invalidates it.
-Nightly rows go to `results/rule_screen` (one per instrument: decision, score, rank, tier,
-class, flags, reasons, config id / version / hash),
+Nightly rows go to `results/rule_screen` (one per instrument: decision, score, rank,
+flags, reasons, config id / version / hash),
 `results/rule_screen_values` (one per criterion: value, PASS / NEAR / FAIL / MISSING / INFO,
 distance, penalty); the run summary is in the run record (`stats["summary"]`). Ideas ranks tickers
 across saved screens: one row per ticker, by the highest-priority screener that picked it,

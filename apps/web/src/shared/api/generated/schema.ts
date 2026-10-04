@@ -1256,8 +1256,6 @@ export interface components {
             failed: number;
             /** Field */
             field: string;
-            /** Label */
-            label: string | null;
             /** Missing */
             missing: number;
             /** Mode */
@@ -1347,8 +1345,6 @@ export interface components {
             decision: string;
             /** Flags */
             flags: string[];
-            /** Klass */
-            klass: string | null;
             /** Reasons */
             reasons: string;
             /** Score */
@@ -1358,8 +1354,6 @@ export interface components {
              * Format: date
              */
             session: string;
-            /** Tier */
-            tier: string | null;
             /** User */
             user: string;
         };
@@ -1797,11 +1791,6 @@ export interface components {
         };
         /** PreviewRow */
         PreviewRow: {
-            /**
-             * Classification
-             * @description the spec's classify field
-             */
-            classification: string | null;
             /** Columns */
             columns: {
                 [key: string]: unknown;
@@ -1822,8 +1811,6 @@ export interface components {
             score: number | null;
             /** Symbol */
             symbol: string | null;
-            /** Tier */
-            tier: string | null;
         };
         /** PreviewSummary */
         PreviewSummary: {
@@ -2080,7 +2067,7 @@ export interface components {
             versions: number[];
             /**
              * Working
-             * @description the working copy's rule keys (criteria, tiers, ...) resolved through its layers: the draft when it resolves, else the latest version, else the preset
+             * @description the working copy's rule keys (criteria, flags, ...) resolved through its layers: the draft when it resolves, else the latest version, else the preset
              */
             working?: {
                 [key: string]: unknown;

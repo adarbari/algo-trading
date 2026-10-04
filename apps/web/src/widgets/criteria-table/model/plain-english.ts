@@ -25,11 +25,7 @@ function valueText(value: unknown, feature: CatalogueFeature | undefined): strin
 }
 
 function clause(criterion: Criterion, feature: CatalogueFeature | undefined): string {
-  const { label } = criterion;
-  // A label that already reads as the whole condition ("IV30 >= 50%", "Price > $5") is the
-  // clause; adding the operator and value again would say it twice ("IV30 >= 50% ≥ 50%").
-  if (label !== undefined && /[<>=\d]/.test(label)) return label;
-  const name = label ?? featureLabel(criterion.field);
+  const name = featureLabel(criterion.field);
   const shape = shapeOf(criterion.op);
   const op = operatorSymbol(criterion.op);
   if (shape === 'none') return `${name} ${criterion.op === 'is_null' ? 'is empty' : 'has a value'}`;

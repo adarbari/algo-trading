@@ -28,7 +28,6 @@ const BASE = {
       mode: 'soft',
       tolerance: { relative: 0.2 },
       on_miss: 'LIQUIDITY_RISK',
-      label: 'ADV',
     },
   },
 };
@@ -49,12 +48,11 @@ describe('criteriaOf', () => {
     expect(criteria[1]).toMatchObject({ mode: 'hard', op: 'gt' });
   });
 
-  it('keeps tolerance, miss decision and label', () => {
+  it('keeps tolerance and miss decision', () => {
     expect(criteriaOf(BASE, { id: 'my' })[1]).toMatchObject({
       mode: 'soft',
       tolerance: { relative: 0.2 },
       on_miss: 'LIQUIDITY_RISK',
-      label: 'ADV',
     });
   });
 

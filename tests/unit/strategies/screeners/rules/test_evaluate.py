@@ -1,5 +1,5 @@
-"""Rule-screen evaluation: decisions incl. SKIPPED, score, rank and tie-break, tiers, flags,
-classify, columns and the run summary."""
+"""Rule-screen evaluation: decisions incl. SKIPPED, score, rank and tie-break, flags,
+columns and the run summary."""
 
 from datetime import date
 from typing import Any
@@ -46,12 +46,7 @@ def spec(**extra: Any) -> ScreenSpec:
                     "tolerance": 0.5,
                 },
             },
-            "tiers": {
-                "STRONG": {"all": [{"field": "spread", "op": "gte", "value": 0.15}]},
-                "BASE": {"all": [{"field": "px", "op": "gt", "value": 0}]},
-            },
             "flags": {"leveraged": {"all": [{"field": "lev", "op": "eq", "value": True}]}},
-            "classify": "near",
             "columns": {"earnings": "earn"},
             "rank": {"tie_break": "spread"},
             **extra,
@@ -97,7 +92,7 @@ def test_decisions() -> None:
     assert skip.decision is Decision.SKIPPED and skip.score is None
     assert skip.reasons == ("no spread", "no adv")
     assert rows["EQ:NORANK"].decision is Decision.QUALIFIED  # score criteria never gate
-    assert rows["EQ:NORANK"].score == 90.0 and rows["EQ:NORANK"].klass is None
+    assert rows["EQ:NORANK"].score == 90.0
 
 
 def test_score_falls_with_more_and_bigger_misses() -> None:
@@ -131,12 +126,11 @@ def test_rank_ties_break_by_column_then_id() -> None:
     assert [r.instrument_id for r in plain.rows][:2] == ["EQ:GOOD", "EQ:GOOD2"]  # by id
 
 
-def test_tiers_flags_classify_columns() -> None:
+def test_flags_columns_and_tie_break() -> None:
     rows = {r.instrument_id: r for r in result().rows}
     good, good2 = rows["EQ:GOOD"], rows["EQ:GOOD2"]
-    assert (good.tier, good2.tier) == ("STRONG", "BASE")  # first TRUE wins
     assert good.flags == ("leveraged",) and good2.flags == ()
-    assert good.klass == "HIGH" and good.columns == (("earnings", "2026-11-01"),)
+    assert good.columns == (("earnings", "2026-11-01"),)
     assert good.tie_break == 0.20
     assert rows["EQ:SKIP"].tie_break is None
 
@@ -184,7 +178,7 @@ def test_a_memo_changes_nothing_and_reevaluates_only_edits() -> None:
     memo: dict[Any, Any] = {}
     view = FeatureView(DAY, ROWS)
     assert evaluate_screen(spec(), view, memo) == result()
-    assert len(memo) == 5  # 4 criteria + the display part (tiers, flags, columns, ...)
+    assert len(memo) == 5  # 4 criteria + the display part (flags, columns, tie-break)
     assert all(len(done) == len(ROWS) for done in memo.values())
     edited = spec(criteria={"price": {"field": "px", "op": "gt", "value": 9}})
     assert evaluate_screen(edited, view, memo) == evaluate_screen(edited, view)

@@ -41,33 +41,6 @@ describe('plainEnglish', () => {
     );
   });
 
-  it('reads a criterion once when its preset label already states the condition', () => {
-    const text = plainEnglish(
-      [
-        criterion({ id: 'iv', label: 'IV30 >= 50%' }),
-        criterion({
-          id: 'px',
-          field: 'rollup.price_stats@v2.close',
-          op: 'gt',
-          value: 5,
-          label: 'Price > $5',
-        }),
-        criterion({
-          id: 'adv',
-          field: 'rollup.price_stats@v2.close',
-          value: 50_000_000,
-          label: 'Stock ADV > $50M',
-        }),
-        criterion({ id: 'named', value: 0.3, label: 'Implied vol' }),
-      ],
-      catalogue,
-      null,
-    );
-    expect(text).toBe(
-      'Find instruments where IV30 >= 50%, Price > $5, Stock ADV > $50M and Implied vol ≥ 30%.',
-    );
-  });
-
   it('writes large dollar amounts compactly', () => {
     const adv = criterion({
       id: 'adv',

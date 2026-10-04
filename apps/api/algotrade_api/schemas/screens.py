@@ -49,8 +49,6 @@ class IdeaPick(Schema):
     config_version: int | None
     user: str
     session: date
-    klass: str | None
-    tier: str | None
     criteria: list[IdeaCriterion]
     columns: dict[str, Any]
     criterion_values: dict[str, Any]

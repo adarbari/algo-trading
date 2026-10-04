@@ -39,8 +39,6 @@ SCREEN: dict[str, Any] = {
             "tolerance": {"relative": 0.5},
         },
     },
-    "classify": f"{LIQ}.put_tier",
-    "tiers": {"deep": {"all": [{"field": f"{LIQ}.chain_oi", "op": "gte", "value": 4000}]}},
     "flags": {"cheap": {"all": [{"field": f"{LIQ}.underlying_price", "op": "lt", "value": 70}]}},
     "columns": {"tier": f"{LIQ}.put_tier"},
     "rank": {"tie_break": f"{LIQ}.underlying_price"},
@@ -114,7 +112,7 @@ def test_rule_screen_writes_both_tables_and_the_summary() -> None:
         "EQ:ETF1",
         "EQ:CCC",
     ]
-    assert by_id.loc["EQ:AAA", "score"] == 100.0 and by_id.loc["EQ:AAA", "class"] == "A"
+    assert by_id.loc["EQ:AAA", "score"] == 100.0
     assert by_id.loc["EQ:BBB", "decision"] == "WATCH" and by_id.loc["EQ:BBB", "near_missed"] == "oi"
     assert by_id.loc["EQ:ETF1", "failed"] == "price"
     assert by_id.loc["EQ:CCC", "missing"] == "price,oi"
@@ -126,8 +124,8 @@ def test_rule_screen_writes_both_tables_and_the_summary() -> None:
     assert len(values) == 4 * 3  # two criteria + one display column per instrument
     oi = values[(values["instrument_id"] == "EQ:BBB") & (values["criterion_id"] == "oi")]
     assert oi.iloc[0][["outcome", "value_num", "normalised"]].tolist() == ["NEAR", 700.0, 0.6]
-    tier = values[(values["mode"] == "column") & (values["instrument_id"] == "EQ:AAA")]
-    assert tier.iloc[0][["outcome", "value_str"]].tolist() == ["INFO", "A"]
+    column = values[(values["mode"] == "column") & (values["instrument_id"] == "EQ:AAA")]
+    assert column.iloc[0][["outcome", "value_str"]].tolist() == ["INFO", "A"]
 
     (record,) = reader.runs("screen-big_liquid-site", DAY)
     assert record.status is RunStatus.COMPLETE and record.stats["summary"] == summary

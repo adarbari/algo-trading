@@ -1,4 +1,4 @@
-"""The rule-screen spec (ADR 0029): criteria, tolerance bands, tiers, flags, classify, columns
+"""The rule-screen spec (ADR 0029, 0030): criteria, tolerance bands, flags, columns
 and the tie-break, as frozen values. Parsed and validated by ``config.strategy.screen_spec``;
 evaluated by ``strategies.screeners.rules``."""
 
@@ -41,7 +41,6 @@ class Criterion:
     mode: Mode = Mode.HARD
     tolerance: Tolerance | None = None
     on_miss: str = "WATCH"  # SOFT near miss only; one of NEAR_MISS_DECISIONS
-    label: str | None = None
 
     @property
     def field(self) -> str:
@@ -55,9 +54,7 @@ class ScreenSpec:
     id: str
     criteria: tuple[Criterion, ...]
     version: int | None = None
-    tiers: tuple[tuple[str, Group], ...] = ()  # ordered: the first TRUE wins
     flags: tuple[tuple[str, Group], ...] = ()
-    classify: str | None = None  # a label field that buckets the output
     columns: tuple[tuple[str, str], ...] = ()  # display name -> field
     tie_break: str | None = None  # field sorting rows with equal scores
     tie_break_descending: bool = True
@@ -65,8 +62,8 @@ class ScreenSpec:
     def fields(self) -> tuple[str, ...]:
         """Every field the screen reads, sorted (what the view must hold)."""
         names = {c.field for c in self.criteria}
-        for _, group in (*self.tiers, *self.flags):
+        for _, group in self.flags:
             names.update(r.field for r in group.rules())
         names.update(f for _, f in self.columns)
-        names.update(f for f in (self.classify, self.tie_break) if f)
+        names.update(f for f in (self.tie_break,) if f)
         return tuple(sorted(names))

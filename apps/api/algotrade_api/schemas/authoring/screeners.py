@@ -30,7 +30,7 @@ class ScreenerDetail(Schema):
     error: str | None = Field(description="why that does not resolve (e.g. rebase needed)")
     working: dict[str, Any] | None = Field(
         None,
-        description="the working copy's rule keys (criteria, tiers, ...) resolved through its "
+        description="the working copy's rule keys (criteria, flags, ...) resolved through its "
         "layers: the draft when it resolves, else the latest version, else the preset",
     )
 

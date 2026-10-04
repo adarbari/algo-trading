@@ -1285,17 +1285,6 @@
             "title": "Field",
             "type": "string"
           },
-          "label": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Label"
-          },
           "missing": {
             "title": "Missing",
             "type": "integer"
@@ -1322,7 +1311,6 @@
           "criterion_id",
           "field",
           "mode",
-          "label",
           "entering",
           "passed",
           "near",
@@ -1575,17 +1563,6 @@
             "title": "Flags",
             "type": "array"
           },
-          "klass": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Klass"
-          },
           "reasons": {
             "title": "Reasons",
             "type": "string"
@@ -1606,17 +1583,6 @@
             "title": "Session",
             "type": "string"
           },
-          "tier": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tier"
-          },
           "user": {
             "title": "User",
             "type": "string"
@@ -1630,8 +1596,6 @@
           "config_version",
           "user",
           "session",
-          "klass",
-          "tier",
           "criteria",
           "columns",
           "criterion_values",
@@ -2744,18 +2708,6 @@
       },
       "PreviewRow": {
         "properties": {
-          "classification": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "the spec's classify field",
-            "title": "Classification"
-          },
           "columns": {
             "additionalProperties": true,
             "title": "Columns",
@@ -2815,17 +2767,6 @@
               }
             ],
             "title": "Symbol"
-          },
-          "tier": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tier"
           }
         },
         "required": [
@@ -2834,8 +2775,6 @@
           "rank",
           "decision",
           "score",
-          "tier",
-          "classification",
           "flags",
           "reasons",
           "columns",
@@ -3674,7 +3613,7 @@
                 "type": "null"
               }
             ],
-            "description": "the working copy's rule keys (criteria, tiers, ...) resolved through its layers: the draft when it resolves, else the latest version, else the preset",
+            "description": "the working copy's rule keys (criteria, flags, ...) resolved through its layers: the draft when it resolves, else the latest version, else the preset",
             "title": "Working"
           }
         },

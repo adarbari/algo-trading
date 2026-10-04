@@ -34,7 +34,6 @@ SPEC = parse_screen_spec(
                 "tolerance": 1.0,
             },
         },
-        "tiers": {"T": {"all": [{"field": "b", "op": "gte", "value": 1.5}]}},
         "flags": {"f": {"any": [{"field": "d", "op": "gt", "value": 0.5}]}},
         "rank": {"tie_break": "d"},
     },
