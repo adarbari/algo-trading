@@ -20,7 +20,10 @@ While writing:
   (mirrored under `tests/`).
 - Verify narrow first: the mirrored test file, then the gate for what you touched
   (`make arch`, `make layout`, `make ownership`, `make dupes`, `make filelen`; web:
-  `npm run lint` and `npm run test` in `apps/web`). Pipe long output through `tail`.
+  `npm run lint` and `npm run test` in `apps/web`), or `make changed` for both at once. Pipe
+  long output through `tail`. Run `make check` once, before you push.
+- Check a web page through its text and accessibility tree first; take a screenshot only
+  for a visual state those cannot show, once, at reduced scale.
 
 Stop and hand back to the caller, with what you found, instead of continuing if any of
 these is true (these need the `architect` agent or the main session):
@@ -32,5 +35,7 @@ these is true (these need the `architect` agent or the main session):
   atomic publish or locks, or the IBKR read-only boundary.
 - The same check has failed twice after your fixes.
 
-Finish with: files changed, checks run and their result, and anything left undone. Do not
-claim a check passed unless you ran it.
+Finish with a hand-back of at most 150 words: the PR link (or files changed), checks run and
+their result, deviations from the brief, and decisions the caller must make. Everything else
+(what the change does, real-data findings, screenshots) goes in the PR description, not the
+hand-back. Do not claim a check passed unless you ran it.

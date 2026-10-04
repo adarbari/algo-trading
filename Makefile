@@ -5,11 +5,12 @@ BIN = $(dir $(PY))
 GOLDEN_URL ?= file://datasets/golden/store
 
 
-.PHONY: install lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update filelen unit property integration e2e test \
+.PHONY: changed install lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update filelen unit property integration e2e test \
         evaluate baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-visual
 
 UV ?= uv
 WORKERS ?= auto
+BASE ?= origin/main
 
 install:         ## library + every app + dev tools into .venv, exactly as locked
 	$(UV) sync --all-packages --locked
@@ -55,7 +56,7 @@ filelen:         ## no file over 1000 lines
 	$(PY) scripts/check_file_length.py
 
 unit:
-	$(PY) -m pytest tests/unit tests/architecture tests/contract tests/libs tests/apps
+	$(PY) -m pytest tests/unit tests/architecture tests/contract tests/libs tests/apps tests/scripts
 
 property:
 	$(PY) -m pytest tests/property
@@ -65,6 +66,11 @@ integration:
 
 e2e:
 	$(PY) -m pytest tests/e2e
+
+changed:         ## narrow first check: mirrored tests of files changed vs origin/main (BASE=...), then the fast gates; `make check` still gates
+	@paths="$$($(PY) scripts/changed_tests.py $(BASE))"; \
+	if [ -n "$$paths" ]; then $(PY) -m pytest -q -x --no-header --tb=short $$paths; else echo "no covering tests changed"; fi
+	@$(MAKE) --no-print-directory arch layout ownership
 
 test:            ## everything, with the coverage gate, one worker per CPU (WORKERS=0 runs serially)
 	$(PY) -m pytest -n $(WORKERS) --cov --cov-report=term --cov-report=xml

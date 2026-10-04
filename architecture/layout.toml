@@ -664,6 +664,10 @@ path = "tests/integration"
 purpose = "a real store and engine across every golden dataset"
 
 [[test_dir]]
+path = "tests/scripts"
+purpose = "tests for the maintenance scripts in scripts/ (check_*, changed_tests)"
+
+[[test_dir]]
 path = "tests/reconciliation"
 purpose = "cross-source reconciliation: our features recomputed from recorded raw inputs vs another source's recorded values (marker reconciliation)"
 
