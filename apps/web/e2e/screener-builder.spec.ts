@@ -100,12 +100,12 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(page.getByText('Rebase on v2')).toBeVisible();
     await expect(page.getByRole('radiogroup', { name: /Mode of/ })).toHaveCount(4);
     await expect(page.getByRole('radio', { name: 'Soft' }).first()).toBeVisible();
-    await expect(page.getByText(/Find instruments in liquid_optionable where/)).toBeVisible();
+    await expect(page.getByText(/Find instruments where/)).toBeVisible();
     // The preview: summary, funnel, rows.
     await expect(
       page.getByRole('list', { name: 'Run summary' }).or(page.getByLabel('Run summary')).first(),
     ).toBeVisible();
-    await expect(page.getByText('Skipped', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Missing data', { exact: true }).first()).toBeVisible();
     await expect(
       page.getByRole('list', { name: 'Funnel (gating criteria)' }).getByRole('listitem'),
     ).toHaveCount(4);

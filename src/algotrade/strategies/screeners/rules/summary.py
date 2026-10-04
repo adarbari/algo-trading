@@ -1,7 +1,6 @@
 """The run summary every rule-screen run reports, preview and nightly (ADR 0029): how many
-passed, the count of each decision, skipped rows by reason (``no <field>``) and the narrow
-misses (rows that missed only within tolerance: which criterion, the value, the threshold
-and by how much)."""
+passed, the count of each decision and the narrow misses (rows that missed only within
+tolerance: which criterion, the value, the threshold and by how much)."""
 
 from collections import Counter
 from collections.abc import Sequence
@@ -33,8 +32,6 @@ class RunSummary:
     rows: int
     passed: int  # QUALIFIED
     decisions: tuple[tuple[str, int], ...]  # sorted by decision
-    skipped: int
-    skipped_reasons: tuple[tuple[str, int], ...]  # each missing field counts once per row
     narrow_misses: tuple[NarrowMiss, ...]  # in rank order, then criterion order
 
     def as_dict(self) -> dict[str, Any]:
@@ -42,16 +39,12 @@ class RunSummary:
             "rows": self.rows,
             "passed": self.passed,
             "decisions": dict(self.decisions),
-            "skipped": self.skipped,
-            "skipped_reasons": dict(self.skipped_reasons),
             "narrow_misses": [m.as_dict() for m in self.narrow_misses],
         }
 
 
 def summarise(rows: Sequence[RuleRow]) -> RunSummary:
     decisions = Counter(r.decision.value for r in rows)
-    skipped = [r for r in rows if r.decision is Decision.SKIPPED]
-    reasons = Counter(reason for r in skipped for reason in r.reasons)
     narrow = tuple(
         NarrowMiss(
             row.instrument_id,
@@ -71,7 +64,5 @@ def summarise(rows: Sequence[RuleRow]) -> RunSummary:
         rows=len(rows),
         passed=decisions.get(Decision.QUALIFIED.value, 0),
         decisions=tuple(sorted(decisions.items())),
-        skipped=len(skipped),
-        skipped_reasons=tuple(sorted(reasons.items())),
         narrow_misses=narrow,
     )

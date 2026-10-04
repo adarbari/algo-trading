@@ -88,11 +88,21 @@ def test_decisions() -> None:
     assert rows["EQ:THIN"].decision is Decision.LIQUIDITY_RISK  # most severe near miss
     assert rows["EQ:REJECT"].decision is Decision.REJECT  # hard is strict
     assert rows["EQ:FAR"].decision is Decision.REJECT  # soft beyond its band fails like hard
-    skip = rows["EQ:SKIP"]
-    assert skip.decision is Decision.SKIPPED and skip.score is None
+    skip = rows["EQ:SKIP"]  # no value for two SOFT criteria: points off, never a pass or a skip
+    assert skip.decision is Decision.QUALIFIED and skip.score == 80.0
     assert skip.reasons == ("no spread", "no adv")
     assert rows["EQ:NORANK"].decision is Decision.QUALIFIED  # score criteria never gate
     assert rows["EQ:NORANK"].score == 90.0
+
+
+def test_a_missing_hard_value_rejects_and_a_missing_soft_one_only_costs_points() -> None:
+    """ADR 0030: missing data never passes and never skips."""
+    row = {k: v for k, v in GOOD.items() if k != "px"}
+    got = {
+        r.instrument_id: r for r in evaluate_screen(spec(), FeatureView(DAY, {"EQ:X": row})).rows
+    }
+    assert got["EQ:X"].decision is Decision.REJECT and got["EQ:X"].reasons == ("no px",)
+    assert got["EQ:X"].score == 0.0
 
 
 def test_score_falls_with_more_and_bigger_misses() -> None:
@@ -113,9 +123,9 @@ def test_rank_ties_break_by_column_then_id() -> None:
         "EQ:WATCH",
         "EQ:NORANK",
         "EQ:THIN",
+        "EQ:SKIP",
         "EQ:REJECT",  # REJECT and FAR both clip to 0: the wider spread sorts first
         "EQ:FAR",
-        "EQ:SKIP",
     ]
     assert [r.rank for r in result().rows] == list(range(1, 9))
     ascending = evaluate_screen(
@@ -137,22 +147,15 @@ def test_flags_columns_and_tie_break() -> None:
 
 def test_summary() -> None:
     summary = result().summary
-    assert summary.rows == 8 and summary.passed == 3 and summary.skipped == 1
-    assert dict(summary.decisions) == {
-        "LIQUIDITY_RISK": 1,
-        "QUALIFIED": 3,
-        "REJECT": 2,
-        "SKIPPED": 1,
-        "WATCH": 1,
-    }
-    assert dict(summary.skipped_reasons) == {"no adv": 1, "no spread": 1}
+    assert summary.rows == 8 and summary.passed == 4
+    assert dict(summary.decisions) == {"LIQUIDITY_RISK": 1, "QUALIFIED": 4, "REJECT": 2, "WATCH": 1}
     misses = [(m.instrument_id, m.criterion_id) for m in summary.narrow_misses]
     assert misses == [("EQ:WATCH", "spread"), ("EQ:THIN", "spread"), ("EQ:THIN", "adv")]
     watch = summary.narrow_misses[0]
     assert (watch.value, watch.threshold) == (0.09, 0.10)
     assert watch.distance == pytest.approx(0.01) and watch.normalised == pytest.approx(0.5)
     out = summary.as_dict()
-    assert out["passed"] == 3 and out["narrow_misses"][0]["criterion_id"] == "spread"
+    assert out["passed"] == 4 and out["narrow_misses"][0]["criterion_id"] == "spread"
 
 
 def test_screener_contract_and_registry() -> None:

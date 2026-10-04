@@ -19,12 +19,14 @@ class FunnelStep(Schema):
     criterion_id: str
     field: str
     mode: str
-    entering: int = Field(description="rows that passed or narrowly missed every earlier step")
+    entering: int = Field(description="rows still in after every earlier step")
     passed: int
     near: int
     failed: int
     missing: int
-    remaining: int = Field(description="passed + near: what the next step sees")
+    remaining: int = Field(
+        description="what the next step sees: passed + near (+ no value, for a soft step)"
+    )
 
 
 class CriterionValue(Schema):
@@ -63,8 +65,10 @@ class NarrowMiss(Schema):
 class PreviewSummary(Schema):
     rows: int
     passed: int
-    skipped: int
-    skipped_reasons: dict[str, int]
+    missing: int = Field(
+        description="rows with no value for a gating criterion where the funnel reached it"
+    )
+    missing_reasons: dict[str, int] = Field(description="`no <field>` -> rows")
     narrow_misses: list[NarrowMiss]
 
 

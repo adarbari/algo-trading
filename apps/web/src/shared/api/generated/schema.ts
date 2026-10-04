@@ -1249,7 +1249,7 @@ export interface components {
             criterion_id: string;
             /**
              * Entering
-             * @description rows that passed or narrowly missed every earlier step
+             * @description rows still in after every earlier step
              */
             entering: number;
             /** Failed */
@@ -1266,7 +1266,7 @@ export interface components {
             passed: number;
             /**
              * Remaining
-             * @description passed + near: what the next step sees
+             * @description what the next step sees: passed + near (+ no value, for a soft step)
              */
             remaining: number;
         };
@@ -1814,18 +1814,24 @@ export interface components {
         };
         /** PreviewSummary */
         PreviewSummary: {
+            /**
+             * Missing
+             * @description rows with no value for a gating criterion where the funnel reached it
+             */
+            missing: number;
+            /**
+             * Missing Reasons
+             * @description `no <field>` -> rows
+             */
+            missing_reasons: {
+                [key: string]: number;
+            };
             /** Narrow Misses */
             narrow_misses: components["schemas"]["NarrowMiss"][];
             /** Passed */
             passed: number;
             /** Rows */
             rows: number;
-            /** Skipped */
-            skipped: number;
-            /** Skipped Reasons */
-            skipped_reasons: {
-                [key: string]: number;
-            };
         };
         /** PriceComparison */
         PriceComparison: {

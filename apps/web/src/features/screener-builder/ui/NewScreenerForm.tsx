@@ -1,8 +1,8 @@
 /**
- * Start a screener: name it (1-64 of a-z, 0-9, _ and -) and pick the universe it screens; a blank
- * draft is saved under the name and the Builder opens it.
+ * Start a screener: name it (1-64 of a-z, 0-9, _ and -); a draft with the base gates is saved under
+ * the name and the Builder opens it.
  */
-import { Button, Field, Input, Select, Stack } from '@algotrade/ui';
+import { Button, Field, Input, Stack } from '@algotrade/ui';
 import { useState } from 'react';
 
 import { errorDetail } from '@/shared/api';
@@ -17,23 +17,10 @@ export interface NewScreenerFormProps {
   onCancel: () => void;
 }
 
-/** Offered when no screener names a universe yet: the site's liquid optionable one. */
-const FALLBACK_SELECTION = 'liquid_optionable';
-
 export function NewScreenerForm({ onCreated, onCancel }: NewScreenerFormProps) {
   const screeners = useScreeners();
   const mine = useMyScreeners();
-  const selections = [
-    ...new Set(
-      (screeners.data ?? []).flatMap((s) =>
-        s.selection && s.selection !== 'inline' ? [s.selection] : [],
-      ),
-    ),
-  ];
-  if (selections.length === 0) selections.push(FALLBACK_SELECTION);
   const [id, setId] = useState('');
-  const [chosen, setSelection] = useState<string | null>(null);
-  const selection = chosen ?? selections[0] ?? FALLBACK_SELECTION;
   const create = useCreateScreener();
   const taken =
     (screeners.data ?? []).some((s) => s.config_id === id && s.scope !== 'site') ||
@@ -48,7 +35,7 @@ export function NewScreenerForm({ onCreated, onCancel }: NewScreenerFormProps) {
   const canCreate = isScreenId(id) && !taken;
   const submit = () => {
     create.mutate(
-      { id, document: blankDocument(id, selection) },
+      { id, document: blankDocument(id) },
       {
         onSuccess: () => {
           onCreated(id);
@@ -73,17 +60,6 @@ export function NewScreenerForm({ onCreated, onCancel }: NewScreenerFormProps) {
           autoComplete="off"
           spellCheck={false}
         />
-      </Field>
-      <Field label="Universe" hint="The selection this screener runs over">
-        {selections.length > 0 ? (
-          <Select
-            options={selections.map((s) => ({ value: s, label: s }))}
-            value={selection}
-            onValueChange={setSelection}
-          />
-        ) : (
-          <Input value={selection} onValueChange={setSelection} mono />
-        )}
       </Field>
       <Stack direction="row" gap={2}>
         <Button variant="primary" onClick={submit} disabled={!canCreate} loading={create.isPending}>

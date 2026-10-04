@@ -25,7 +25,7 @@ const step = (criterion_id: string, entering: number, remaining: number) => ({
 });
 const DATA = {
   coverage: { selected: 4203 },
-  summary: { skipped: 2416 },
+  summary: { missing: 2416 },
   funnel: [step('iv30', 4203, 486), step('close', 486, 45)],
 };
 
@@ -40,7 +40,7 @@ describe('ScreenFunnel', () => {
     const list = screen.getByRole('list', { name: 'Funnel (gating criteria)' });
     const rows = within(list).getAllByRole('listitem');
     expect(rows.map((r) => r.textContent)).toEqual(['Universe4,203', 'iv30486', 'close45']);
-    expect(screen.getByText('Skipped (missing data, never passed): 2,416')).toBeInTheDocument();
+    expect(screen.getByText('No value for a gating criterion: 2,416')).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 

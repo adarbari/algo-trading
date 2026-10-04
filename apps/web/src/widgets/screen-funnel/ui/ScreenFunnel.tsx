@@ -38,7 +38,7 @@ export function ScreenFunnel() {
       errorMessage={preview.error ?? 'The preview failed.'}
       footer={
         preview.data
-          ? `Skipped (missing data, never passed): ${preview.data.summary.skipped.toLocaleString('en-US')}`
+          ? `No value for a gating criterion: ${preview.data.summary.missing.toLocaleString('en-US')}`
           : undefined
       }
     >

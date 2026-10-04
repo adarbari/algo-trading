@@ -24,6 +24,8 @@ from algotrade.config.site.settings import (
 )
 from algotrade.config.strategy.catalog import FieldCatalog
 from algotrade.config.strategy.schema import (
+    EVERY_INSTRUMENT,
+    RULES_IMPL,
     Group,
     Rule,
     Selection,
@@ -254,6 +256,8 @@ def resolve(
         layers.append("run-overrides")
     config = parse_strategy(document, "/".join(layers[-1:]) or config_id)
     selection = _selection(config.selection, user, load, layers)
+    if selection is None and config.impl == RULES_IMPL:
+        selection = EVERY_INSTRUMENT
     if config.selection_overrides is not None:
         if selection is None:
             raise ConfigurationError(f"{config_id}: selection_overrides need a base selection")

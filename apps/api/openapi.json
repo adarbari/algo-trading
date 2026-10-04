@@ -1273,7 +1273,7 @@
             "type": "string"
           },
           "entering": {
-            "description": "rows that passed or narrowly missed every earlier step",
+            "description": "rows still in after every earlier step",
             "title": "Entering",
             "type": "integer"
           },
@@ -1302,7 +1302,7 @@
             "type": "integer"
           },
           "remaining": {
-            "description": "passed + near: what the next step sees",
+            "description": "what the next step sees: passed + near (+ no value, for a soft step)",
             "title": "Remaining",
             "type": "integer"
           }
@@ -2785,6 +2785,19 @@
       },
       "PreviewSummary": {
         "properties": {
+          "missing": {
+            "description": "rows with no value for a gating criterion where the funnel reached it",
+            "title": "Missing",
+            "type": "integer"
+          },
+          "missing_reasons": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "`no <field>` -> rows",
+            "title": "Missing Reasons",
+            "type": "object"
+          },
           "narrow_misses": {
             "items": {
               "$ref": "#/components/schemas/NarrowMiss"
@@ -2799,24 +2812,13 @@
           "rows": {
             "title": "Rows",
             "type": "integer"
-          },
-          "skipped": {
-            "title": "Skipped",
-            "type": "integer"
-          },
-          "skipped_reasons": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "title": "Skipped Reasons",
-            "type": "object"
           }
         },
         "required": [
           "rows",
           "passed",
-          "skipped",
-          "skipped_reasons",
+          "missing",
+          "missing_reasons",
           "narrow_misses"
         ],
         "title": "PreviewSummary",

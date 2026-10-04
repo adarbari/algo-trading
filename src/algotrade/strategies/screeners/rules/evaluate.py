@@ -101,7 +101,7 @@ def _row(
     return RuleRow(
         instrument_id=instrument,
         decision=decision,
-        score=score(decision, results),
+        score=score(results),
         rank=0,
         reasons=reasons,
         results=results,

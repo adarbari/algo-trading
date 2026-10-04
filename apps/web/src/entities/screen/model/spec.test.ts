@@ -56,8 +56,18 @@ describe('criteriaOf', () => {
     });
   });
 
+  it('opens a blank draft with the base gates as hard criteria', () => {
+    const criteria = criteriaOf(null, blankDocument('x'));
+    expect(criteria.map((c) => [c.id, c.mode])).toEqual([
+      ['security_type', 'hard'],
+      ['status', 'hard'],
+      ['optionable', 'hard'],
+    ]);
+    expect(criteria[0]).toMatchObject({ op: 'in', value: ['COMMON_STOCK', 'ADR', 'ETF'] });
+  });
+
   it('reads a draft with nothing resolved', () => {
-    expect(criteriaOf(null, blankDocument('x', 'all'))).toEqual([]);
+    expect(criteriaOf(null, { id: 'x' })).toEqual([]);
   });
 });
 

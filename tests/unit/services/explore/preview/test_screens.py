@@ -76,12 +76,9 @@ def test_preview_rows_equal_the_nightly_rows() -> None:
 
 def test_summary_funnel_and_coverage() -> None:
     got = preview(preview_store())
-    assert got.decisions == {"QUALIFIED": 1, "REJECT": 1, "SKIPPED": 1, "WATCH": 1}
-    assert got.summary.passed == 1 and got.summary.skipped == 1
-    assert got.summary.skipped_reasons == {
-        f"no {LIQ}.chain_oi": 1,
-        f"no {LIQ}.underlying_price": 1,
-    }
+    assert got.decisions == {"QUALIFIED": 1, "REJECT": 2, "WATCH": 1}  # CCC: no price: REJECT
+    assert got.summary.passed == 1 and got.summary.missing == 1
+    assert got.summary.missing_reasons == {f"no {LIQ}.underlying_price": 1}
     (miss,) = got.summary.narrow_misses
     assert (miss.instrument_id, miss.criterion_id, miss.distance) == ("EQ:BBB", "oi", 300)
     price, oi = got.funnel

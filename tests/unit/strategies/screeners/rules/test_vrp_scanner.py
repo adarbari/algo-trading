@@ -2,8 +2,8 @@
 (pinned, ``extends = "vrp_scanner@1"``) and v2 (the latest) resolve and validate against the
 catalogue, are not scheduled, and on a
 fixed fixture of rows gives the owner-decided outcomes (docs/screeners/vrp-scanner.md): the
-hard gates reject or skip, liquidity misses are LIQUIDITY_RISK near misses, IBKR IV rank
-only lowers the score, leveraged / inverse flag, ties by the IV-HV spread."""
+hard gates reject (a missing value too), liquidity misses are LIQUIDITY_RISK near misses,
+IBKR IV rank only lowers the score, leveraged / inverse flag, ties by the IV-HV spread."""
 
 from datetime import date
 from typing import Any
@@ -57,7 +57,10 @@ FIXTURE: dict[str, dict[str, Any]] = {
     "EQ:LOWRATIO": {**GOOD, "feature.vrp_iv_hv_ratio": 1.24},
     "EQ:PENNY": {**GOOD, "rollup.price_stats@v2.close": 5.0},  # price must be > $5
     "EQ:MID": {**GOOD, "feature.near_52w": "NONE"},
-    "EQ:NOIV": {**GOOD, "feature.vrp_iv30": None},  # neither IBKR nor Cboe: SKIPPED
+    "EQ:NOIV": {
+        **GOOD,
+        "feature.vrp_iv30": None,
+    },  # neither IBKR nor Cboe: a missing HARD value is a REJECT
 }
 EXPECTED = {  # id: (decision, score, flags)
     "EQ:LEV": (Decision.QUALIFIED, 100.0, ("leveraged_inverse",)),
@@ -110,15 +113,14 @@ def test_fixture_outcomes(preset: ResolvedConfig) -> None:
         row = rows[iid]
         assert (row.decision, row.flags) == (decision, flags), iid
         assert row.score == pytest.approx(score), iid
-    for iid in ("EQ:ILLIQUID", "EQ:LOWIV", "EQ:LOWRATIO", "EQ:PENNY", "EQ:MID"):
+    for iid in ("EQ:ILLIQUID", "EQ:LOWIV", "EQ:LOWRATIO", "EQ:PENNY", "EQ:MID", "EQ:NOIV"):
         assert rows[iid].decision is Decision.REJECT, iid
-    assert rows["EQ:NOIV"].decision is Decision.SKIPPED
-    assert rows["EQ:NOIV"].reasons == ("no feature.vrp_iv30",)
+    assert rows["EQ:NOIV"].reasons == ("no feature.vrp_iv30",) and rows["EQ:NOIV"].score == 0.0
     order = [r.instrument_id for r in result.rows][:6]
     # the 100s by IV-HV spread, then the near misses (96, 95), then no IBKR IV rank (90)
     assert order == ["EQ:LEV", "EQ:STRONG", "EQ:BASE", "EQ:THINOI", "EQ:THIN", "EQ:NORANK"]
     summary = result.summary
-    assert summary.passed == 4 and dict(summary.skipped_reasons) == {"no feature.vrp_iv30": 1}
+    assert summary.passed == 4
     assert {m.criterion_id for m in summary.narrow_misses} == {"adv", "target_oi"}
 
 
@@ -193,5 +195,5 @@ def test_v2_fixture_outcomes(preset_v2: ResolvedConfig) -> None:
         assert (row.decision, row.flags) == (Decision.QUALIFIED, flags), iid
         assert row.score == pytest.approx(score), iid
     assert rows["EQ:D20"].score > rows["EQ:D25"].score > rows["EQ:NOPUT"].score
-    assert result.summary.passed == len(FIXTURE_V2) and not result.summary.skipped
+    assert result.summary.passed == len(FIXTURE_V2)
     assert not result.summary.narrow_misses  # score criteria never make a near miss decision

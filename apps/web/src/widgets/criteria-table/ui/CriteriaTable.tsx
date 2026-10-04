@@ -23,8 +23,7 @@ export function CriteriaTable() {
   const catalogue = useFeatureCatalogue();
   const [formula, setFormula] = useState(false);
   const features = catalogue.data ?? [];
-  const { selection } = builder;
-  const sentence = plainEnglish(builder.criteria, features, selection);
+  const sentence = plainEnglish(builder.criteria, features);
   const state =
     builder.status === 'loading' ? 'loading' : builder.status === 'error' ? 'error' : 'ready';
 
@@ -94,12 +93,9 @@ export function CriteriaTable() {
             order={builder.tieBreak.order}
             onChange={builder.setTieBreak}
           />
-          {selection && (
-            <Text
-              size="sm"
-              tone="secondary"
-            >{`Universe: ${selection}. The preview runs on the latest closed session.`}</Text>
-          )}
+          <Text size="sm" tone="secondary">
+            The preview runs on the latest closed session.
+          </Text>
         </Stack>
       </Panel>
       <FormulaFeatureDialog

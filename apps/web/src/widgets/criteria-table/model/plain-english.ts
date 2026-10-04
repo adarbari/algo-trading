@@ -41,11 +41,10 @@ const join = (parts: readonly string[]): string =>
     ? (parts[0] ?? '')
     : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1) ?? ''}`;
 
-/** "Find instruments in <universe> where A and B; a near miss on C is tolerated; D only raises the score." */
+/** "Find instruments where A and B; a near miss on C is tolerated; D only raises the score." */
 export function plainEnglish(
   criteria: readonly Criterion[],
   catalogue: readonly CatalogueFeature[],
-  selection: string | null,
 ): string | null {
   const ready = criteria.filter(
     (c) => c.field !== '' && (c.value !== undefined || shapeOf(c.op) === 'none'),
@@ -61,9 +60,7 @@ export function plainEnglish(
         ),
       );
   const hard = text('hard');
-  const sentences = [
-    `Find instruments${selection ? ` in ${selection}` : ''}${hard.length > 0 ? ` where ${join(hard)}` : ''}.`,
-  ];
+  const sentences = [`Find instruments${hard.length > 0 ? ` where ${join(hard)}` : ''}.`];
   const soft = text('soft');
   if (soft.length > 0) sentences.push(`A near miss on ${join(soft)} is tolerated and flagged.`);
   const score = text('score');

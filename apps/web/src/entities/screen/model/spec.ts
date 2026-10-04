@@ -55,9 +55,23 @@ export function toDocument(source: Readonly<Record<string, unknown>>, id: string
   return { id, ...kept };
 }
 
-/** A blank draft: an empty rule screen over `selection`. */
-export function blankDocument(id: string, selection: string): ScreenDocument {
-  return { id, kind: 'screener', impl: 'rules', selection, criteria: {} };
+/**
+ * Who a new screener screens (ADR 0030): a rule screen has no selection, so it opens with the
+ * base gates as criteria. They are ordinary criteria: edit or remove any of them.
+ */
+const BASE_CRITERIA: CriteriaTable = {
+  security_type: {
+    field: 'instrument.security_type',
+    op: 'in',
+    value: ['COMMON_STOCK', 'ADR', 'ETF'],
+  },
+  status: { field: 'instrument.status', op: 'eq', value: 'ACTIVE' },
+  optionable: { field: 'instrument.optionable', op: 'eq', value: true },
+};
+
+/** A blank draft: a rule screen with the base gates. */
+export function blankDocument(id: string): ScreenDocument {
+  return { id, kind: 'screener', impl: 'rules', criteria: structuredClone(BASE_CRITERIA) };
 }
 
 function toCriterion(id: string, table: Record<string, unknown>): Criterion {

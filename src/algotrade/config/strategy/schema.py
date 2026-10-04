@@ -16,6 +16,7 @@ from algotrade.core.model.predicates import (
 )
 
 __all__ = [
+    "EVERY_INSTRUMENT",
     "KINDS",
     "NO_VALUE_OPS",
     "OPS",
@@ -57,6 +58,11 @@ class Selection:
         return Selection(
             self.name, Group("all", (self.where, extra)), self.max_instruments, self.order_by
         )
+
+
+# A rule screen names no selection (ADR 0030): it runs over every instrument of the snapshot and
+# its first criteria say who is screened.
+EVERY_INSTRUMENT = Selection("all", Group("all", ()))
 
 
 @dataclass(frozen=True)

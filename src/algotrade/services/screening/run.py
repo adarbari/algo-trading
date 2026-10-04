@@ -80,7 +80,7 @@ def screen_rules(
     features: FeatureSet,
 ) -> tuple[ScreenRun, RuleScreenResult, tuple[str, ...]]:
     """A rule screen over the selected instruments: the spec's fields read for the session
-    (missing values stay missing: their rows are SKIPPED), evaluated once, then audited.
+    (missing values stay missing: a HARD criterion rejects the row), evaluated once, then audited.
     Also returns the tables that had no rows for the session."""
     screener = RuleScreener(config.screen_spec)
     ids = list(selected.instruments)
@@ -182,7 +182,7 @@ def run_screener(
         # The universe came from a snapshot after the session: results carry survivorship bias.
         "universe_pre_snapshot": universe.pre_snapshot,
     }
-    if rules is not None:  # the run summary (ADR 0029): passed, skipped, narrow misses
+    if rules is not None:  # the run summary (ADR 0029): passed, decisions, narrow misses
         audit["summary"] = rules.summary.as_dict()
         audit["missing_tables"] = list(missing_tables)
     version = rules.spec.version if rules else None

@@ -6,7 +6,9 @@
 
 A rule screen is a screener written as TOML instead of Python. The web Builder edits the same
 file. It obeys the [screener contract](README.md#contract-all-screeners): one row per
-instrument of the selection, a shared `Decision`, fail closed, a coverage audit.
+instrument of the day's universe snapshot, a shared `Decision`, fail closed, a coverage audit.
+There is no selection ([ADR 0030](../adr/0030-rule-screener-simplification.md)): who is screened
+is a list of `hard` criteria like any other (security type, `ACTIVE`, optionable).
 
 ## Where it lives
 
@@ -31,8 +33,12 @@ id = "high_iv_near_extreme"
 kind = "screener"
 impl = "rules"
 version = 2
-selection = "liquid_optionable"      # who is screened
 schedule = "nightly"                  # omit to run only on request
+
+[criteria.optionable]                 # who is screened is a criterion too
+field = "instrument.optionable"
+op = "eq"
+value = true
 
 [criteria.price]
 field = "rollup.price_stats@v2.close"
@@ -94,21 +100,23 @@ not_null`) plus:
 
 | Mode | TRUE | FALSE | Missing data |
 |---|---|---|---|
-| `hard` | passes | **REJECT** | row **SKIPPED** (`no <field>`) |
-| `soft` | passes | within tolerance: near miss (`on_miss`, WATCH at best); beyond: **REJECT** | row **SKIPPED** (`no <field>`) |
+| `hard` | passes | **REJECT** | **REJECT** (`no <field>`), penalty 100 |
+| `soft` | passes | within tolerance: near miss (`on_miss`, WATCH at best); beyond: **REJECT** | the row stays in; full near-miss penalty (10) and `no <field>` listed in the reasons |
 | `score` | passes | lowers the score only | lowers the score only (full penalty) |
 
-Missing data never passes: a value that is absent, NaN or of the wrong type for the op is
-missing.
+Missing data never passes and never skips a row: a value that is absent, NaN or of the wrong
+type for the op is missing. A `hard` criterion with no value is a fail; the other two only
+cost points.
 
 ## Decision
 
-1. Any `hard` or `soft` criterion missing → `SKIPPED` (not processed; counts against
-   coverage; reasons `no <field>`).
-2. Any `hard` FALSE, or `soft` FALSE beyond its tolerance → `REJECT`.
-3. Any near miss → the most severe near-miss `on_miss`: `EVENT_RISK` > `LIQUIDITY_RISK` >
+1. Any `hard` FALSE or missing, or `soft` FALSE beyond its tolerance → `REJECT` (reasons
+   include `no <field>`).
+2. Any near miss → the most severe near-miss `on_miss`: `EVENT_RISK` > `LIQUIDITY_RISK` >
    `WATCH`; every reason is listed.
-4. Otherwise `QUALIFIED`.
+3. Otherwise `QUALIFIED` (a `soft` criterion with no value is listed in the reasons).
+
+`SKIPPED` is no longer produced; stored rows from before ADR 0030 still carry it.
 
 ## Score
 
@@ -118,13 +126,13 @@ miss subtracts a penalty:
 | Miss | Penalty |
 |---|---|
 | near miss (`soft` within tolerance, `score` within tolerance) | `10 × distance / tolerance` (0 to 10) |
-| `score` beyond its tolerance, without a tolerance, or missing | 10 |
-| `hard` FALSE, `soft` beyond tolerance | 100 |
+| `score` beyond its tolerance, without a tolerance, or missing; `soft` missing | 10 |
+| `hard` FALSE or missing, `soft` beyond tolerance | 100 |
 
 `distance` is how far the value is from the threshold (from the nearer bound for `between`).
 The score is clipped to 0 to 100 (clipped at 0; only positive scores), so many hard fails tie at 0.
 REJECT rows are scored too.
-SKIPPED rows have no score. Rows sort by score (descending), then by `[rank] tie_break`
+Rows sort by score (descending), then by `[rank] tie_break`
 (descending unless `tie_break_order = "asc"`; missing last), then by instrument id. Then:
 `flags` (TRUE adds the flag, never changes the decision) and `columns` (values stored with the
 row). A criterion has no stored name: the Builder reads it from its field, operator and
@@ -135,7 +143,7 @@ they are ignored.
 ## Run summary
 
 Every run, preview and nightly, reports: how many rows passed (QUALIFIED), the count of each
-decision, the skipped rows counted by reason (`no <field>`), and the **narrow misses**: rows
+decision, and the **narrow misses**: rows
 that missed only within tolerance, with each criterion, the value, the threshold and the
 distance.
 

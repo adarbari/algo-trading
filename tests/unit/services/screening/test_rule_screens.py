@@ -89,16 +89,10 @@ def test_rule_screen_writes_both_tables_and_the_summary() -> None:
     reader, writer = seeded()
     config = resolve_config(configs(), "big_liquid", UserContext(SITE_USER))
     outcome = run_screener(reader, writer, config, DAY, now=T0)
-    assert outcome.run.coverage is RunCoverage.COMPLETE  # 3 of 4 processed >= 50%
-    assert outcome.audit["decisions"] == {
-        "QUALIFIED": 1,
-        "WATCH": 1,
-        "SKIPPED": 1,
-        "REJECT": 1,
-    }
+    assert outcome.run.coverage is RunCoverage.COMPLETE  # every row is decided: none is skipped
+    assert outcome.audit["decisions"] == {"QUALIFIED": 1, "WATCH": 1, "REJECT": 2}
     summary = outcome.audit["summary"]
-    assert summary["passed"] == 1 and summary["skipped"] == 1
-    assert summary["skipped_reasons"] == {f"no {LIQ}.chain_oi": 1, f"no {LIQ}.underlying_price": 1}
+    assert summary["passed"] == 1 and "skipped" not in summary
     (miss,) = summary["narrow_misses"]
     assert (miss["instrument_id"], miss["criterion_id"], miss["distance"]) == ("EQ:BBB", "oi", 300)
     assert outcome.audit["config_version"] == 4

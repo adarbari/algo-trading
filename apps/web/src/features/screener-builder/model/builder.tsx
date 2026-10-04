@@ -55,8 +55,6 @@ export interface ScreenerBuilder {
   preset: { id: string; version: number | null } | null;
   document: ScreenDocument;
   criteria: Criterion[];
-  /** The universe (named selection) the screen runs over, if known. */
-  selection: string | null;
   dirty: boolean;
   /** The newest version: finalising saves version `nextVersion`. */
   nextVersion: number;
@@ -81,16 +79,6 @@ export function useScreenerBuilder(): ScreenerBuilder {
   const builder = useContext(Context);
   if (!builder) throw new Error('useScreenerBuilder needs a ScreenerBuilderProvider');
   return builder;
-}
-
-/** The named universe: the draft's own `selection`, else the resolved config's. */
-function selectionOf(
-  document: ScreenDocument,
-  resolved: Readonly<Record<string, unknown>> | null | undefined,
-): string | null {
-  if (typeof document['selection'] === 'string') return document['selection'];
-  const selection = resolved?.['selection'] as { name?: unknown } | null | undefined;
-  return typeof selection?.name === 'string' ? selection.name : null;
 }
 
 /** The server's working document: the draft, else the latest version, else (a preset) a copy of it. */
@@ -164,7 +152,6 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
     preset,
     document,
     criteria,
-    selection: selectionOf(document, detail.data?.resolved),
     dirty: edited !== null,
     nextVersion: (detail.data?.latest ?? 0) + 1,
     tieBreak: tieBreakOf(base, document),
