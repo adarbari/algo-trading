@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-112 stored features in 12 groups, in dependency order; 32 expression features.
+112 stored features in 12 groups, in dependency order; 34 expression features.
 
 ## `option_liquidity@v1`
 
@@ -264,6 +264,8 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | `dist_to_support` | expression | float | decimal | open | 0 .. 1 | How far the nearest confirmed swing low below the close is: (close - swing_low) / close, 0.05 is 5% below | no confirmed swing low below the close in the last 252 sessions (e.g. at a one-year low), or no swing_levels row | `(price_stats.close - swing_levels.swing_low) / price_stats.close` | virtual |
 | `dist_to_resistance_atr` | expression | float | ratio | open | >= 0 | Distance to resistance in ATRs: (swing_high - close) / atr_14 | dist_to_resistance is null, atr_14 is null (fewer than 15 consecutive bars), or atr_14 is 0 | `(swing_levels.swing_high - price_stats.close) / momentum.atr_14` | virtual |
 | `dist_to_support_atr` | expression | float | ratio | open | >= 0 | Distance to support in ATRs: (close - swing_low) / atr_14 | dist_to_support is null, atr_14 is null (fewer than 15 consecutive bars), or atr_14 is 0 | `(price_stats.close - swing_levels.swing_low) / momentum.atr_14` | virtual |
+| `breakout_20d` | expression | bool | flag | open |  | A 20-session breakout on volume: close above the highest high of the 20 sessions before today (prior_high_20d) and rel_volume above 1.5 (params.min_rel_volume) | neither condition is false and one is unknown (prior_high_20d or rel_volume null: a gap among the last 21 sessions, or a shorter history) | `price_stats.close > momentum.prior_high_20d and momentum.rel_volume > min_rel_volume` (min_rel_volume = 1.5) | virtual |
+| `pullback_to_sma20` | expression | bool | flag | open |  | A pullback in an uptrend: trend_state UPTREND and the close within 1 ATR (params.atr_multiple) of SMA20, above or below it (edges included) | neither condition is false and one is unknown (trend_state, sma_20 or atr_14 null) | `trend_state == "UPTREND" and abs(price_stats.close - price_stats.sma_20) <= atr_multiple * momentum.atr_14` (atr_multiple = 1.0) | virtual |
 
 ### `volatility.toml`
 

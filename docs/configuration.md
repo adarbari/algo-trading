@@ -111,8 +111,9 @@ UNKNOWN), `option_tier` (str: A-D), `option_chain_known`, `liquidity_high`,
 `liquidity_medium` (bool), `option_chain_oi`, `option_chain_volume` (int), `div_yield`
 (float32, materialised), `market_cap`, `pct_from_high_52w`, `pct_from_low_52w`,
 `iv_hv_spread`, `iv_hv_ratio`, `atr_pct`, `range_20d_pct`, `dist_to_resistance`,
-`dist_to_support`, `dist_to_resistance_atr`, `dist_to_support_atr` (float), `near_52w` (str:
-HIGH / LOW / BOTH / NONE), `trend_state` (str: UPTREND / DOWNTREND / MIXED).
+`dist_to_support`, `dist_to_resistance_atr`, `dist_to_support_atr` (float), `breakout_20d`,
+`pullback_to_sma20` (bool), `near_52w` (str: HIGH / LOW / BOTH / NONE), `trend_state` (str:
+UPTREND / DOWNTREND / MIXED).
 
 **Superseded fields.** ADR 0023 step 3 replaced `price_stats@v1`, `dividends@v1`,
 `fundamentals@v1`, `iv_history@v1` and `liquidity_class@v1`. A selection naming one of their

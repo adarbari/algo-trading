@@ -359,3 +359,54 @@ def test_swing_distances_to_resistance_and_support(fs: FeatureSet) -> None:
     assert out.loc["EQ:TOP", "dist_to_support"] == pytest.approx(0.1)
     assert pd.isna(out.loc["EQ:NOATR", "dist_to_support_atr"])  # no ATR yet
     assert out.loc["EQ:NOATR", "dist_to_resistance"] == pytest.approx(0.05)
+
+
+def test_swing_breakout_and_pullback_rules(fs: FeatureSet) -> None:
+    ids = [
+        "EQ:BREAK",
+        "EQ:QUIET",
+        "EQ:INSIDE",
+        "EQ:NOVOL",
+        "EQ:PULL",
+        "EQ:EDGE",
+        "EQ:FAR",
+        "EQ:MIX",
+    ]
+    stats = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            # UPTREND needs close > sma_50 > sma_200: sma_50 90, sma_200 80 for every row
+            "close": [111.0, 111.0, 109.0, 111.0, 101.5, 98.0, 103.0, 101.0],
+            "sma_20": [100.0] * 8,
+            "sma_50": [90.0] * 7 + [102.0],  # EQ:MIX: close below SMA50: MIXED
+            "sma_200": [80.0] * 8,
+        }
+    )
+    mom = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "prior_high_20d": [110.0, 110.0, 110.0, 110.0] + [120.0] * 4,
+            "rel_volume": [1.8, 1.2, 3.0, np.nan] + [1.0] * 4,
+            "atr_14": [2.0] * 8,
+        }
+    )
+    frames = {PRICE_STATS: stats.astype("float32", errors="ignore"), MOMENTUM: mom}
+    out = fs.evaluate(frames, ["breakout_20d", "pullback_to_sma20"]).set_index("instrument_id")
+    assert out["breakout_20d"].to_dict() == {
+        "EQ:BREAK": True,  # 111 > 110 on 1.8x volume
+        "EQ:QUIET": False,  # volume only 1.2x
+        "EQ:INSIDE": False,  # below the prior high: false whatever the volume
+        "EQ:NOVOL": None,  # above the prior high, volume unknown
+        "EQ:PULL": False,
+        "EQ:EDGE": False,
+        "EQ:FAR": False,
+        "EQ:MIX": False,
+    }
+    pull = out["pullback_to_sma20"].to_dict()
+    assert pull["EQ:PULL"] is True  # |101.5 - 100| <= 2
+    assert pull["EQ:EDGE"] is True  # 2 below SMA20: the edge counts
+    assert pull["EQ:FAR"] is False  # 3 above: more than 1 ATR
+    assert pull["EQ:MIX"] is False  # not an uptrend
+    assert pull["EQ:BREAK"] is False  # 11 above SMA20

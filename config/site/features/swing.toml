@@ -71,3 +71,24 @@ description = "Distance to support in ATRs: (close - swing_low) / atr_14"
 null_meaning = "dist_to_support is null, atr_14 is null (fewer than 15 consecutive bars), or atr_14 is 0"
 valid_range = [0, inf]
 version = 1
+
+[breakout_20d]
+expr = "price_stats.close > momentum.prior_high_20d and momentum.rel_volume > min_rel_volume"
+params = { min_rel_volume = 1.5 }  # volume above 1.5x the prior 20-session average
+dtype = "bool"
+unit = "flag"
+description = "A 20-session breakout on volume: close above the highest high of the 20 sessions before today (prior_high_20d) and rel_volume above 1.5 (params.min_rel_volume)"
+null_meaning = "neither condition is false and one is unknown (prior_high_20d or rel_volume null: a gap among the last 21 sessions, or a shorter history)"
+version = 1
+
+[pullback_to_sma20]
+expr = '''
+trend_state == "UPTREND"
+and abs(price_stats.close - price_stats.sma_20) <= atr_multiple * momentum.atr_14
+'''
+params = { atr_multiple = 1.0 }  # how near SMA20 counts, in ATRs, either side (edges included)
+dtype = "bool"
+unit = "flag"
+description = "A pullback in an uptrend: trend_state UPTREND and the close within 1 ATR (params.atr_multiple) of SMA20, above or below it (edges included)"
+null_meaning = "neither condition is false and one is unknown (trend_state, sma_20 or atr_14 null)"
+version = 1
