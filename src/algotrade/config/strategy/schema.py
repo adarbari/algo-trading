@@ -6,40 +6,42 @@ from typing import Any
 
 from algotrade.config.user import validate_id
 from algotrade.core.model.errors import ConfigurationError
-
-OPS = frozenset(
-    {"eq", "ne", "in", "not_in", "gt", "gte", "lt", "lte", "between", "is_null", "not_null"}
+from algotrade.core.model.predicates import (
+    NO_VALUE_OPS,
+    OPS,
+    Group,
+    Rule,
+    RuleValue,
+    Scalar,
 )
-NO_VALUE_OPS = frozenset({"is_null", "not_null"})
+
+__all__ = [
+    "KINDS",
+    "NO_VALUE_OPS",
+    "OPS",
+    "RULES_IMPL",
+    "RULE_SCREEN_KEYS",
+    "SCHEDULES",
+    "Group",
+    "Rule",
+    "RuleValue",
+    "Scalar",
+    "Selection",
+    "StrategyConfig",
+    "parse_group",
+    "parse_rule",
+    "parse_selection",
+    "parse_strategy",
+]
+
 KINDS = frozenset({"screener", "strategy"})
 SCHEDULES = frozenset({"nightly"})
-
-type Scalar = str | int | float | bool
-type RuleValue = Scalar | tuple[Scalar, ...] | None
-
-
-@dataclass(frozen=True)
-class Rule:
-    field: str
-    op: str
-    value: RuleValue = None
-
-    def describe(self) -> str:
-        return f"{self.field} {self.op}" + ("" if self.op in NO_VALUE_OPS else f" {self.value!r}")
-
-
-@dataclass(frozen=True)
-class Group:
-    """``all`` (AND), ``any`` (OR) or ``not`` over rules and nested groups."""
-
-    kind: str  # "all" | "any" | "not"
-    children: tuple["Rule | Group", ...]
-
-    def rules(self) -> list[Rule]:
-        out: list[Rule] = []
-        for child in self.children:
-            out.extend([child] if isinstance(child, Rule) else child.rules())
-        return out
+RULES_IMPL = "rules"
+# The rule-screen part of a config (ADR 0029), kept raw here and parsed by
+# ``config.strategy.screen_spec`` after the layers are merged.
+RULE_SCREEN_KEYS = frozenset(
+    {"version", "criteria", "tiers", "flags", "classify", "columns", "rank"}
+)
 
 
 @dataclass(frozen=True)
@@ -67,6 +69,7 @@ class StrategyConfig:
     schedule: str | None = None
     exports: tuple[str, ...] = ()
     settings: Mapping[str, Any] = field(default_factory=dict)  # screening / backtest overrides
+    rules: Mapping[str, Any] = field(default_factory=dict)  # RULE_SCREEN_KEYS, impl "rules" only
 
 
 def _fail(path: str, message: str) -> ConfigurationError:
@@ -149,6 +152,7 @@ def parse_strategy(raw: Mapping[str, Any], path: str) -> StrategyConfig:
         "screening",
         "backtest",
         "extends",
+        *RULE_SCREEN_KEYS,
     }
     unknown = set(raw) - allowed
     if unknown:
@@ -177,6 +181,11 @@ def parse_strategy(raw: Mapping[str, Any], path: str) -> StrategyConfig:
     if not isinstance(exports, list) or not all(isinstance(e, str) for e in exports):
         raise _fail(f"{path}.exports", "expected a list of export names")
     settings = {k: raw[k] for k in ("screening", "backtest") if k in raw}
+    rules = {k: raw[k] for k in sorted(RULE_SCREEN_KEYS) if k in raw}
+    if raw["impl"] == RULES_IMPL and "criteria" not in rules:
+        raise _fail(path, "a rule screen (impl = 'rules') needs [criteria]")
+    if rules and raw["impl"] != RULES_IMPL:
+        raise _fail(path, f"{sorted(rules)} belong to rule screens (impl = 'rules') only")
     return StrategyConfig(
         id=cid,
         kind=raw["kind"],
@@ -189,4 +198,5 @@ def parse_strategy(raw: Mapping[str, Any], path: str) -> StrategyConfig:
         schedule=schedule,
         exports=tuple(exports),
         settings=settings,
+        rules=rules,
     )

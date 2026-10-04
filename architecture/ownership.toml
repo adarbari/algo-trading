@@ -450,6 +450,23 @@ detect = [
 ]
 
 [[responsibility]]
+id = "three-valued-predicate"
+description = "Evaluate Rule / Group predicates over named fields with three-valued (Kleene) logic: missing, NaN or wrong-typed values are UNKNOWN, never a pass; shared by selections and rule screens"
+owner = ["src/algotrade/core/model/predicates.py"]
+allowed = [
+    "src/algotrade/engines/selection/evaluate.py",  # the selection's per-rule funnel audit evaluates each top-level child
+]
+section = "docs/configuration.md#selections"
+detect = [{ call = "evaluate_rule" }, { call = "evaluate_group" }]
+
+[[responsibility]]
+id = "screen-spec"
+description = "Parse and validate a rule screen (ADR 0029): criteria with HARD / SOFT (tolerance band) / SCORE modes, tiers, flags, classify, columns, tie-break; fail closed against the field catalogue; the pure ScreenSpec values"
+owner = ["src/algotrade/config/strategy/screen_spec.py", "src/algotrade/core/model/screen_spec.py"]
+section = "docs/screeners/rules.md#criteria"
+detect = [{ call = "parse_screen_spec" }, { call = "Criterion" }, { call = "Tolerance" }]
+
+[[responsibility]]
 id = "screen-execution"
 description = "Run a configured screen (select, screen, audit, write results); nightly submits `screen` jobs (workflows/nightly/screens.py)"
 owner = ["src/algotrade/services/screening/run.py", "src/algotrade/services/jobs/handlers.py"]

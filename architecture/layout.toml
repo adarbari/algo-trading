@@ -65,7 +65,7 @@ contracts = ["Layout: core subpackages are pure (no pandas, pyarrow, storage or 
 
 [[dir]]
 path = "src/algotrade/core/model"
-purpose = "domain value objects: types, instruments, option contracts, field names, ids, errors"
+purpose = "domain value objects: types, instruments, option contracts, field names, ids, errors, three-valued predicates, the rule-screen spec"
 contracts = ["Layout: core model and time are the base of core (they never import views or validation)"]
 
 [[dir]]
@@ -94,7 +94,7 @@ contracts = ["Layout: site settings never import strategy configs (resolve layer
 
 [[dir]]
 path = "src/algotrade/config/strategy"
-purpose = "strategy / screener configs and selections: schema, layer resolution, field catalog"
+purpose = "strategy / screener configs and selections: schema, layer resolution, field catalog, rule-screen spec parser"
 
 [[dir]]
 path = "src/algotrade/storage"

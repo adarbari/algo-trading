@@ -1,6 +1,6 @@
 """Use case: resolve configs from the ``ConfigStore`` and find scheduled ones."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from algotrade.config.env import user_id
@@ -39,21 +39,23 @@ def resolve_config(
     user: UserContext,
     overrides: Mapping[str, Any] | None = None,
 ) -> ResolvedConfig:
-    """``config_id`` for ``user``; its selection may name the user's own features, which
-    then join the config hash (``ResolvedConfig.features``)."""
+    """``config_id`` for ``user``; its selection (and a rule screen's criteria) may name the
+    user's own features, which then join the config hash (``ResolvedConfig.features``)."""
     fs = catalogue(store, user.user_id)
     resolved = resolve(config_id, user, store.load, overrides, catalog_of(fs))
-    return resolved.with_features(user_features_read(fs, resolved.selection))
+    spec_fields = resolved.screen_spec.fields() if resolved.config.rules else ()
+    return resolved.with_features(user_features_read(fs, resolved.selection, spec_fields))
 
 
 def user_features_read(
-    fs: FeatureSet, selection: Selection | None
+    fs: FeatureSet, selection: Selection | None, extra: Sequence[str] = ()
 ) -> tuple[FeatureDefinition, ...]:
-    """The user features ``selection`` names, and the user features those read, in
-    dependency order."""
+    """The user features ``selection`` (and the ``extra`` fields) name, and the user features
+    those read, in dependency order."""
     fields = [r.field for r in selection.where.rules()] if selection else []
     if selection is not None and selection.order_by:
         fields.append(selection.order_by)
+    fields.extend(extra)
     todo = [f.removeprefix(FEATURE_FIELD_PREFIX) for f in fields if is_feature_field(f)]
     seen: set[str] = set()
     while todo:
