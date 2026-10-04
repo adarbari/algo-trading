@@ -20,7 +20,7 @@ jobs:
   # Which side a pull request touches (docs/ci.md). main (push, post-merge re-test) runs all.
   changes:
     name: Changed areas
-    runs-on: [self-hosted, macOS, ARM64] # the owner's Mac (docs/ci.md): no Actions minutes
+    runs-on: ubuntu-latest
     outputs:
       python: ${{ steps.areas.outputs.python }}
       web: ${{ steps.areas.outputs.web }}
@@ -49,11 +49,11 @@ jobs:
     name: Lint, types, boundaries, ownership, duplicates, file length, strategy evaluation
     needs: [changes]
     if: needs.changes.outputs.python == 'true'
-    runs-on: [self-hosted, macOS, ARM64] # the owner's Mac (docs/ci.md): no Actions minutes
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
-        with: { python-version: "3.12", enable-cache: false } # uv's own cache persists on the Mac
+        with: { python-version: "3.12", enable-cache: true }
       - run: uv sync --all-packages --locked
       - run: make lock-check
       - run: make lint
@@ -75,7 +75,7 @@ jobs:
   test:
     name: Tests (py${{ matrix.python }})
     needs: [changes]
-    runs-on: [self-hosted, macOS, ARM64] # the owner's Mac (docs/ci.md): no Actions minutes
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -84,7 +84,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
-        with: { python-version: "${{ matrix.python }}", enable-cache: false } # uv's own cache persists on the Mac
+        with: { python-version: "${{ matrix.python }}", enable-cache: true }
+      - uses: actions/cache@v6
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-py${{ matrix.python }}-${{ hashFiles('uv.lock') }}
       - run: uv sync --all-packages --locked
       # Hypothesis keeps failing examples here and replays them first on the next run.
       - uses: actions/cache@v6
@@ -93,14 +97,13 @@ jobs:
           path: .hypothesis
           key: hypothesis-${{ runner.os }}-py${{ matrix.python }}-${{ github.run_id }}
           restore-keys: hypothesis-${{ runner.os }}-py${{ matrix.python }}-
-      # Two jobs share the Mac's 10 cores: 5 workers each, not 10 each (docs/ci.md).
-      - name: Unit + architecture + property + integration + e2e (coverage gate 90%, 5 workers)
+      - name: Unit + architecture + property + integration + e2e (coverage gate 90%, one worker per CPU)
         if: needs.changes.outputs.python == 'true'
-        run: make test WORKERS=5
+        run: make test
       # A web-only change still answers to the layout rules (architecture/layout.toml [[web_dir]]).
       - name: Architecture only (the change is web-only)
         if: needs.changes.outputs.python != 'true'
-        run: .venv/bin/python -m pytest -q -n 5 tests/architecture
+        run: .venv/bin/python -m pytest -q -n auto tests/architecture
       - uses: actions/upload-artifact@v7
         if: matrix.python == '3.12' && needs.changes.outputs.python == 'true'
         with: { name: coverage, path: coverage.xml }
@@ -109,43 +112,37 @@ jobs:
     name: Web (lint, types, unit, design system, build, Storybook, e2e, screenshots)
     needs: [changes]
     if: needs.changes.outputs.web == 'true'
-    runs-on: [self-hosted, macOS, ARM64] # the owner's Mac (docs/ci.md): no Actions minutes
+    runs-on: ubuntu-latest
+    # The official Playwright image: browsers and fonts identical to the screenshot baselines
+    # (apps/web/scripts/in-playwright-docker.sh uses the same image locally). Its tag must
+    # match @playwright/test in apps/web/package-lock.json (checked below).
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    defaults:
+      run:
+        working-directory: apps/web
+    env:
+      CI: "1"
     steps:
       - uses: actions/checkout@v7
-      # Everything runs in the official Playwright image (Linux, browsers and fonts identical
-      # to the screenshot baselines; apps/web/scripts/in-playwright-docker.sh is the same
-      # locally), tagged by the locked @playwright/test, so the two cannot drift.
-      # The checkout is mounted read-only and cloned inside the container, so nothing Docker
-      # owns ever sits in the runner's workspace (a volume mounted there blocked the next
-      # checkout's cleanup). node_modules and the npm cache are Docker volumes per runner, and
-      # the container is named per runner: one left by a cancelled job is removed first.
-      - name: npm audit, generated files fresh, ds:check, lint, types, unit, build, Storybook, e2e, screenshots + axe
-        env:
-          NAME: algotrade-web-${{ runner.name }}
-          OUT: ${{ runner.temp }}/web-reports
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: actions/cache@v6
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('apps/web/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
+      - run: npm ci --no-fund --no-audit
+      - name: No high or critical advisories in shipped dependencies (dev tooling is reported, not gated)
+        run: npm audit --omit=dev --audit-level=high && { npm audit --audit-level=high || true; }
+      - name: Playwright image matches the locked @playwright/test
         run: |
-          docker rm -f "$NAME" >/dev/null 2>&1 || true
-          rm -rf "$OUT" && mkdir -p "$OUT"
-          version=$(jq -r '.packages["node_modules/@playwright/test"].version' apps/web/package-lock.json)
-          # 5 of the Mac's 10 cores, like the 5 test workers: Node (Vitest, Playwright) sizes its
-          # worker pools to what it sees, so two jobs never ask for 20 cores (docs/ci.md).
-          docker run --rm --init --ipc=host -e CI=1 --name "$NAME" --cpuset-cpus=0-4 \
-            -v "$PWD":/src:ro -v "$OUT":/out \
-            -v "$NAME-node-modules":/work/apps/web/node_modules \
-            -v "$NAME-npm-cache":/root/.npm \
-            "mcr.microsoft.com/playwright:v$version-noble" \
-            bash -euo pipefail -c '
-              git config --global --add safe.directory "*"
-              git clone -q /src /tmp/repo && cp -a /tmp/repo/. /work/ && cd /work/apps/web
-              trap "cp -r playwright-report test-results /out/ 2>/dev/null || true" EXIT
-              npm ci --no-fund --no-audit
-              # high/critical advisories in shipped dependencies fail; dev tooling is reported
-              npm audit --omit=dev --audit-level=high && { npm audit --audit-level=high || true; }
-              npm run check
-              npm run visual -- --fully-parallel  # one story per worker, not one file per worker'
-      - name: Remove the container if the job was cancelled or failed mid-run
-        if: always()
-        run: docker rm -f "algotrade-web-${{ runner.name }}" >/dev/null 2>&1 || true
+          locked=$(node -p "require('@playwright/test/package.json').version")
+          test "$locked" = "1.63.0" || { echo "bump the web job's container image to v$locked-noble"; exit 1; }
+      - name: Generated files fresh, ds:check, lint, types, unit, build, Storybook, e2e
+        run: npm run check
+      - name: Screenshots + axe (light and dark) over every design-system story
+        run: npm run visual -- --fully-parallel  # one story per worker, not one file per worker
       - uses: actions/upload-artifact@v7
         if: failure()
-        with: { name: playwright-report, path: "${{ runner.temp }}/web-reports", if-no-files-found: ignore }
+        with: { name: playwright-report, path: "apps/web/playwright-report\napps/web/test-results", if-no-files-found: ignore }
