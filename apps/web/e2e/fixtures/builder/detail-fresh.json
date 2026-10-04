@@ -1,0 +1,23 @@
+{
+  "screener_id": "fresh",
+  "user": "abhinav",
+  "draft": {
+    "id": "fresh",
+    "kind": "screener",
+    "impl": "rules",
+    "selection": "liquid_optionable",
+    "criteria": {}
+  },
+  "draft_error": "fresh.criteria: needs at least one enabled criterion",
+  "versions": [],
+  "latest": null,
+  "schedule": null,
+  "preset": null,
+  "hash": null,
+  "layers": [],
+  "resolved": null,
+  "error": null,
+  "working": {
+    "criteria": {}
+  }
+}

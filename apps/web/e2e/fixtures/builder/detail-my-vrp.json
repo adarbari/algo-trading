@@ -1,0 +1,72 @@
+{
+  "screener_id": "my-vrp",
+  "user": "abhinav",
+  "draft": {
+    "id": "my-vrp",
+    "extends": "vrp_scanner@1",
+    "criteria": {
+      "iv30": {
+        "value": 0.45
+      }
+    }
+  },
+  "draft_error": null,
+  "versions": [1],
+  "latest": 1,
+  "schedule": "nightly",
+  "preset": {
+    "preset_id": "vrp_scanner",
+    "pinned": 1,
+    "current": 2,
+    "rebase_available": true
+  },
+  "hash": "h-my-vrp",
+  "layers": ["site/vrp_scanner@1", "abhinav/my-vrp"],
+  "resolved": {
+    "id": "my-vrp",
+    "kind": "screener",
+    "impl": "rules",
+    "selection": {
+      "name": "liquid_optionable",
+      "where": {}
+    }
+  },
+  "error": null,
+  "working": {
+    "version": 1,
+    "criteria": {
+      "iv30": {
+        "field": "rollup.iv30@v1.iv30",
+        "op": "gte",
+        "value": 0.45,
+        "mode": "hard",
+        "label": "Our 30-day IV"
+      },
+      "spread": {
+        "field": "feature.iv_hv_spread",
+        "op": "gte",
+        "value": 0.1,
+        "mode": "soft",
+        "tolerance": 0.02,
+        "label": "IV minus HV"
+      },
+      "adv": {
+        "field": "rollup.price_stats@v2.adv_usd_20d",
+        "op": "gte",
+        "value": 50000000,
+        "mode": "soft",
+        "tolerance": {
+          "relative": 0.2
+        },
+        "on_miss": "LIQUIDITY_RISK",
+        "label": "20-day dollar volume"
+      },
+      "close": {
+        "field": "rollup.price_stats@v2.close",
+        "op": "gt",
+        "value": 5,
+        "mode": "hard"
+      }
+    }
+  }
+}

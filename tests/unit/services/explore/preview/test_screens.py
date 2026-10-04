@@ -152,7 +152,10 @@ def test_preview_never_writes() -> None:
     [
         (criterion(DRAFT, "oi", tolerance=-1), r"criteria\.oi\.tolerance"),
         (criterion(DRAFT, "price", op="near"), r"criteria\.price"),
-        (criterion(DRAFT, "price", field="rollup.nope@v1.x"), "criteria: unknown field"),
+        (
+            criterion(DRAFT, "price", field="rollup.nope@v1.x"),
+            "criteria.price.field: unknown field",
+        ),
         ({**DRAFT, "impl": "short_premium_liquidity"}, "impl"),
     ],
 )

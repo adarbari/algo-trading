@@ -28,6 +28,11 @@ class ScreenerDetail(Schema):
     layers: list[str]
     resolved: dict[str, Any] | None
     error: str | None = Field(description="why that does not resolve (e.g. rebase needed)")
+    working: dict[str, Any] | None = Field(
+        None,
+        description="the working copy's rule keys (criteria, tiers, ...) resolved through its "
+        "layers: the draft when it resolves, else the latest version, else the preset",
+    )
 
 
 class ScreenerVersion(Schema):

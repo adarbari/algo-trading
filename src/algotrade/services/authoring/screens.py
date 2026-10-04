@@ -69,6 +69,9 @@ class ScreenDetail:
     layers: list[str]
     resolved: dict[str, Any] | None
     error: str | None  # why that does not resolve (e.g. a stale pin: rebase)
+    # The rule keys (criteria, tiers, ...) of the working copy resolved through its layers (the
+    # draft when it resolves, else the latest version, else the preset): what the Builder edits.
+    working: dict[str, Any] | None = None
 
 
 def preset_pin(writer: ConfigWriter, document: Mapping[str, Any] | None) -> PresetPin | None:
@@ -78,14 +81,6 @@ def preset_pin(writer: ConfigWriter, document: Mapping[str, Any] | None) -> Pres
     site = config_document(writer.load, "site", preset)
     current = site[1].get("version") if site else None
     return PresetPin(preset, pinned, current if isinstance(current, int) else None)
-
-
-def _error(fn: Any) -> str | None:
-    try:
-        fn()
-    except ConfigurationError as exc:
-        return str(exc)
-    return None
 
 
 def screen_detail(writer: ConfigWriter, user: str, name: str) -> ScreenDetail:
@@ -103,8 +98,12 @@ def screen_detail(writer: ConfigWriter, user: str, name: str) -> ScreenDetail:
     except ConfigurationError as exc:
         error = str(exc)
     draft_error = None
+    working = dict(resolved.config.rules) if resolved else None
     if draft is not None:
-        draft_error = _error(lambda: validate(writer, who, name, draft))
+        try:
+            working = dict(validate(writer, who, name, draft).config.rules)
+        except ConfigurationError as exc:
+            draft_error = str(exc)
     return ScreenDetail(
         screener_id=name,
         user=who.user_id,
@@ -118,6 +117,7 @@ def screen_detail(writer: ConfigWriter, user: str, name: str) -> ScreenDetail:
         layers=list(resolved.layers) if resolved else [],
         resolved=resolved.canonical() if resolved else None,
         error=error,
+        working=working,
     )
 
 

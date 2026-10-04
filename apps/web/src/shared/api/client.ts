@@ -14,12 +14,21 @@ export const api = createClient<paths>({ baseUrl: apiBaseUrl });
 /** An HTTP error from the API, carrying the status and the server's `detail`. */
 export class ApiError extends Error {
   readonly status: number;
+  /** The server's message alone (what a user reads), without the status prefix. */
+  readonly detail: string;
 
   constructor(status: number, detail: string) {
-    super(`API ${status}: ${detail}`);
+    super(`API ${String(status)}: ${detail}`);
     this.name = 'ApiError';
     this.status = status;
+    this.detail = detail;
   }
+}
+
+/** The message to show a user for a failed request: the server's detail, else the error's text. */
+export function errorDetail(error: unknown): string {
+  if (error instanceof ApiError) return error.detail;
+  return error instanceof Error ? error.message : String(error);
 }
 
 interface FetchResult<T> {

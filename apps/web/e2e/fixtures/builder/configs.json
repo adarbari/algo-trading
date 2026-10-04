@@ -1,0 +1,32 @@
+[
+  {
+    "config_id": "vrp_scanner",
+    "scope": "site",
+    "kind": "screener",
+    "impl": "rules",
+    "schedule": null,
+    "selection": "liquid_optionable",
+    "hash": "h-vrp_scanner",
+    "error": null
+  },
+  {
+    "config_id": "short_premium_liquidity",
+    "scope": "site",
+    "kind": "screener",
+    "impl": "short_premium_liquidity",
+    "schedule": null,
+    "selection": "liquid_optionable",
+    "hash": "h-short_premium_liquidity",
+    "error": null
+  },
+  {
+    "config_id": "my-vrp",
+    "scope": "abhinav",
+    "kind": "screener",
+    "impl": "rules",
+    "schedule": "nightly",
+    "selection": "liquid_optionable",
+    "hash": "h-my-vrp",
+    "error": null
+  }
+]

@@ -1,0 +1,21 @@
+{
+  "expr": "rollup.iv30@v1.iv30 - rollup.price_stats@v2.hv30",
+  "type": "num",
+  "dtype": "float32",
+  "categories": null,
+  "inputs": ["rollup.iv30@v1.iv30", "rollup.price_stats@v2.hv30"],
+  "licence": "open",
+  "session": "2026-10-02",
+  "rows": 11427,
+  "non_null": 3600,
+  "sample": [
+    {
+      "instrument_id": "EQ:AAPL",
+      "value": 0.12
+    },
+    {
+      "instrument_id": "EQ:MSFT",
+      "value": 0.08
+    }
+  ]
+}

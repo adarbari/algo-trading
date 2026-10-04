@@ -1,0 +1,158 @@
+{
+  "screener_id": "my-vrp",
+  "user": "abhinav",
+  "config_hash": "h",
+  "session": "2026-10-02",
+  "last_closed": "2026-10-02",
+  "summary": {
+    "rows": 4203,
+    "passed": 2,
+    "skipped": 2416,
+    "skipped_reasons": {
+      "no rollup.iv30@v1.iv30": 2300,
+      "no feature.iv_hv_spread": 116
+    },
+    "narrow_misses": [
+      {
+        "instrument_id": "EQ:KO",
+        "criterion_id": "spread",
+        "field": "feature.iv_hv_spread",
+        "value": 9.1,
+        "threshold": 10,
+        "distance": 0.9,
+        "normalised": 0.45
+      },
+      {
+        "instrument_id": "EQ:XOM",
+        "criterion_id": "adv",
+        "field": "rollup.price_stats@v2.adv_usd_20d",
+        "value": 41000000,
+        "threshold": 50000000,
+        "distance": 9000000,
+        "normalised": 0.9
+      }
+    ]
+  },
+  "decisions": {
+    "QUALIFIED": 2,
+    "WATCH": 1,
+    "LIQUIDITY_RISK": 1,
+    "REJECT": 1780,
+    "SKIPPED": 2416
+  },
+  "funnel": [
+    {
+      "criterion_id": "iv30",
+      "field": "rollup.iv30@v1.iv30",
+      "mode": "hard",
+      "label": "Our 30-day IV",
+      "entering": 4203,
+      "passed": 486,
+      "near": 0,
+      "failed": 1301,
+      "missing": 2416,
+      "remaining": 486
+    },
+    {
+      "criterion_id": "spread",
+      "field": "feature.iv_hv_spread",
+      "mode": "soft",
+      "label": "IV minus HV",
+      "entering": 486,
+      "passed": 212,
+      "near": 3,
+      "failed": 271,
+      "missing": 0,
+      "remaining": 215
+    },
+    {
+      "criterion_id": "close",
+      "field": "rollup.price_stats@v2.close",
+      "mode": "hard",
+      "label": null,
+      "entering": 215,
+      "passed": 45,
+      "near": 0,
+      "failed": 170,
+      "missing": 0,
+      "remaining": 45
+    }
+  ],
+  "coverage": {
+    "coverage": "PARTIAL",
+    "base": 4203,
+    "selected": 4203,
+    "processed": 1787,
+    "skipped": 2416,
+    "coverage_pct": 0.425,
+    "min_coverage": 0.9,
+    "selection": {},
+    "missing_tables": [],
+    "pre_snapshot": false,
+    "universe_snapshot": "2026-10-02"
+  },
+  "total": 4203,
+  "rows": [
+    {
+      "instrument_id": "EQ:AAPL",
+      "symbol": "AAPL",
+      "rank": 1,
+      "decision": "QUALIFIED",
+      "score": 92,
+      "tier": null,
+      "classification": null,
+      "flags": ["leveraged"],
+      "reasons": [],
+      "columns": {
+        "next_earnings": "2026-10-29"
+      },
+      "criteria": []
+    },
+    {
+      "instrument_id": "EQ:MSFT",
+      "symbol": "MSFT",
+      "rank": 2,
+      "decision": "QUALIFIED",
+      "score": 88,
+      "tier": null,
+      "classification": null,
+      "flags": [],
+      "reasons": [],
+      "columns": {
+        "next_earnings": "2026-10-27"
+      },
+      "criteria": []
+    },
+    {
+      "instrument_id": "EQ:KO",
+      "symbol": "KO",
+      "rank": 3,
+      "decision": "WATCH",
+      "score": 79,
+      "tier": null,
+      "classification": null,
+      "flags": [],
+      "reasons": ["spread within tolerance"],
+      "columns": {
+        "next_earnings": "2026-10-21"
+      },
+      "criteria": []
+    },
+    {
+      "instrument_id": "EQ:XOM",
+      "symbol": "XOM",
+      "rank": 4,
+      "decision": "LIQUIDITY_RISK",
+      "score": 70,
+      "tier": null,
+      "classification": null,
+      "flags": [],
+      "reasons": ["adv within tolerance"],
+      "columns": {
+        "next_earnings": "2026-10-30"
+      },
+      "criteria": []
+    }
+  ],
+  "cached": false
+}
