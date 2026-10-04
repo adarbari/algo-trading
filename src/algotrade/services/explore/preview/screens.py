@@ -89,7 +89,7 @@ class NarrowMissRow:
 class PreviewSummary:
     rows: int
     passed: int
-    missing: int  # rows whose gating value was missing where the funnel reached it
+    missing: int  # gating values missing where the funnel reached them (a row counts per criterion)
     missing_reasons: dict[str, int]  # ``no <field>`` -> rows
     narrow_misses: list[NarrowMissRow]
 
@@ -237,7 +237,7 @@ def preview_screen(
     view = FeatureView(session, {i: frame.view.row(i) for i in ids})
     result = RuleScreener(rules).evaluate(view, frame.memo_for())
     run = rule_run(result, ids, screening)
-    run = settle_coverage(run, selected, frame.universe, session, screening)
+    run = settle_coverage(run, selected, frame.universe, session, screening, frame.missing)
     symbols = frame.symbols
     top = result.rows[: max(0, min(limit, MAX_PAGE_SIZE))]
     summary = result.summary

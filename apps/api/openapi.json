@@ -2666,7 +2666,7 @@
             "type": "boolean"
           },
           "processed": {
-            "description": "rows not SKIPPED",
+            "description": "rows evaluated (none is skipped since ADR 0030)",
             "title": "Processed",
             "type": "integer"
           },
@@ -2681,6 +2681,7 @@
             "type": "object"
           },
           "skipped": {
+            "description": "always 0 for a rule screen; kept for stored runs",
             "title": "Skipped",
             "type": "integer"
           },
@@ -2792,7 +2793,7 @@
       "PreviewSummary": {
         "properties": {
           "missing": {
-            "description": "rows with no value for a gating criterion where the funnel reached it",
+            "description": "gating values missing where the funnel reached them, per row and criterion",
             "title": "Missing",
             "type": "integer"
           },

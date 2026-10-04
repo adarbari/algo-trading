@@ -66,7 +66,7 @@ class PreviewSummary(Schema):
     rows: int
     passed: int
     missing: int = Field(
-        description="rows with no value for a gating criterion where the funnel reached it"
+        description="gating values missing where the funnel reached them, per row and criterion"
     )
     missing_reasons: dict[str, int] = Field(description="`no <field>` -> rows")
     narrow_misses: list[NarrowMiss]
@@ -76,8 +76,8 @@ class PreviewCoverage(Schema):
     coverage: str = Field(description="COMPLETE, PARTIAL, UNIVERSE_INCOMPLETE or EMPTY_SELECTION")
     base: int = Field(description="instruments the selection saw")
     selected: int
-    processed: int = Field(description="rows not SKIPPED")
-    skipped: int
+    processed: int = Field(description="rows evaluated (none is skipped since ADR 0030)")
+    skipped: int = Field(description="always 0 for a rule screen; kept for stored runs")
     coverage_pct: float = Field(description="processed / selected")
     min_coverage: float = Field(description="below this the run is PARTIAL")
     selection: dict[str, Any] = Field(description="the selection's audit")

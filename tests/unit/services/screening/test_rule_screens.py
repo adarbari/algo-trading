@@ -63,7 +63,7 @@ def configs(**screen: Any) -> MemoryConfigStore:
     )
 
 
-def seeded() -> tuple[StoreReader, StoreWriter]:
+def seeded(features_stored: bool = True) -> tuple[StoreReader, StoreWriter]:
     backend = MemoryBackend()
     writer = StoreWriter(backend)
     universe = universe_rows(["AAA", "BBB", "CCC"], last_verified="2026-10-01")
@@ -79,10 +79,22 @@ def seeded() -> tuple[StoreReader, StoreWriter]:
         {"instrument_id": "EQ:BBB", "underlying_price": 60.0, "chain_oi": 700, "put_tier": "C"},
         {"instrument_id": "EQ:ETF1", "underlying_price": 40.0, "chain_oi": 5000, "put_tier": "B"},
     ]
-    writer.write_table(
-        "rollups/instrument/option_liquidity@v1", DAY, "f1", stamped(features, DAY, "f1")
-    )
+    if features_stored:
+        writer.write_table(
+            "rollups/instrument/option_liquidity@v1", DAY, "f1", stamped(features, DAY, "f1")
+        )
     return StoreReader(backend), writer
+
+
+def test_a_missing_rollup_table_is_a_partial_run_not_a_clean_one() -> None:
+    """ADR 0030: every row would read as missing data and a HARD criterion rejects it; the run
+    must not come out COMPLETE (it used to, by skipping every row)."""
+    reader, writer = seeded(features_stored=False)
+    config = resolve_config(configs(), "big_liquid", UserContext(SITE_USER))
+    outcome = run_screener(reader, writer, config, DAY, now=T0)
+    assert outcome.run.coverage is RunCoverage.PARTIAL
+    assert outcome.audit["missing_tables"] == ["rollups/instrument/option_liquidity@v1"]
+    assert set(outcome.audit["decisions"]) == {"REJECT"}
 
 
 def test_rule_screen_writes_both_tables_and_the_summary() -> None:

@@ -1769,7 +1769,7 @@ export interface components {
             pre_snapshot: boolean;
             /**
              * Processed
-             * @description rows not SKIPPED
+             * @description rows evaluated (none is skipped since ADR 0030)
              */
             processed: number;
             /** Selected */
@@ -1781,7 +1781,10 @@ export interface components {
             selection: {
                 [key: string]: unknown;
             };
-            /** Skipped */
+            /**
+             * Skipped
+             * @description always 0 for a rule screen; kept for stored runs
+             */
             skipped: number;
             /**
              * Universe Snapshot
@@ -1834,7 +1837,7 @@ export interface components {
         PreviewSummary: {
             /**
              * Missing
-             * @description rows with no value for a gating criterion where the funnel reached it
+             * @description gating values missing where the funnel reached them, per row and criterion
              */
             missing: number;
             /**
