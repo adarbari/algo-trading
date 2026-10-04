@@ -35,3 +35,39 @@ categories = ["HIGH", "LOW", "BOTH", "NONE"]
 description = "Where the close sits in its 52-week range: HIGH within 10% (params.within) of the high, LOW within 10% of the low, BOTH (a narrow range), else NONE"
 null_meaning = "the 52-week high or low is unknown (pct_from_high_52w or pct_from_low_52w is null)"
 version = 1
+
+[dist_52w]
+expr = "min(-pct_from_high_52w, pct_from_low_52w)"
+dtype = "float"
+unit = "decimal"
+description = "Distance to the nearer 52-week extreme: the smaller of (high - close) / high and (close - low) / low (0 at an extreme)"
+null_meaning = "the 52-week high or low is unknown (pct_from_high_52w or pct_from_low_52w is null)"
+valid_range = [0, inf]
+version = 1
+
+[pct_vs_sma_20]
+expr = "price_stats.close / price_stats.sma_20 - 1"
+dtype = "float"
+unit = "decimal"
+description = "Close / 20-session moving average - 1"
+null_meaning = "price_stats sma_20 is null (a gap among the last 20 sessions, or a shorter history), or no price_stats row"
+valid_range = [-1, inf]
+version = 1
+
+[pct_vs_sma_50]
+expr = "price_stats.close / price_stats.sma_50 - 1"
+dtype = "float"
+unit = "decimal"
+description = "Close / 50-session moving average - 1"
+null_meaning = "price_stats sma_50 is null (a gap among the last 50 sessions, or a shorter history), or no price_stats row"
+valid_range = [-1, inf]
+version = 1
+
+[pct_vs_sma_200]
+expr = "price_stats.close / price_stats.sma_200 - 1"
+dtype = "float"
+unit = "decimal"
+description = "Close / 200-session moving average - 1"
+null_meaning = "price_stats sma_200 is null (a gap among the last 200 sessions, or a shorter history), or no price_stats row"
+valid_range = [-1, inf]
+version = 1

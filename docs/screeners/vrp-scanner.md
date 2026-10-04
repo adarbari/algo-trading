@@ -1,9 +1,14 @@
 # Daily Stock Identifier — IV / HV Volatility Premium Scanner
 
-> **Status in this repo:** specification for roadmap phase 2b; not implemented yet. The
-> universe audit, fail-closed rules and decision categories are already part of the
-> screener contract (`strategies/screeners/base.py`, `engines/screening/runner.py`). See
-> [README](README.md) for how each section maps onto the architecture.
+> **Status in this repo:** a site rule-screen preset,
+> `config/site/presets/screeners/vrp_scanner/v1.toml` (not scheduled; run it from the Builder
+> preview or as a `screen` job), over the expression features in `config/site/features/vrp.toml`
+> (`vrp_iv30`, `vrp_iv30_source`, `vrp_iv_hv_spread`, `vrp_iv_hv_ratio`) and `price.toml`
+> (`dist_52w`, `pct_vs_sma_20/50/200`). Not yet features, so not in v1: the large one-day move
+> flag, the closest option expiry's DTE column (Ideas computes it on read), the `vrp_setup`
+> label, liquidity at the 8-15 delta strikes (v1 uses the target expiry's 0.15-0.40 delta put
+> OI and the short put's spread). See [README](README.md) for how each section maps onto the
+> architecture.
 
 ## Owner decisions (2026-10-03)
 

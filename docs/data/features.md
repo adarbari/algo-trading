@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-81 stored features in 8 groups, in dependency order; 17 expression features.
+81 stored features in 8 groups, in dependency order; 25 expression features.
 
 ## `option_liquidity@v1`
 
@@ -189,6 +189,10 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | `pct_from_high_52w` | expression | float | decimal | open | -1 .. 0 | Close / 52-week high - 1 (at or below 0) | price_stats high_52w is null (fewer than 240 bars in the last 252 sessions), or no price_stats row | `price_stats.close / price_stats.high_52w - 1` | virtual |
 | `pct_from_low_52w` | expression | float | decimal | open | >= 0 | Close / 52-week low - 1 (at or above 0) | price_stats low_52w is null (fewer than 240 bars in the last 252 sessions), or no price_stats row | `price_stats.close / price_stats.low_52w - 1` | virtual |
 | `near_52w` | label | str | category | open | HIGH, LOW, BOTH, NONE | Where the close sits in its 52-week range: HIGH within 10% (params.within) of the high, LOW within 10% of the low, BOTH (a narrow range), else NONE | the 52-week high or low is unknown (pct_from_high_52w or pct_from_low_52w is null) | `if(pct_from_high_52w >= -within and pct_from_low_52w <= within, "BOTH", if(pct_from_high_52w >= -within, "HIGH", if(pct_from_low_52w <= within, "LOW", "NONE")))` (within = 0.1) | virtual |
+| `dist_52w` | expression | float | decimal | open | >= 0 | Distance to the nearer 52-week extreme: the smaller of (high - close) / high and (close - low) / low (0 at an extreme) | the 52-week high or low is unknown (pct_from_high_52w or pct_from_low_52w is null) | `min(-pct_from_high_52w, pct_from_low_52w)` | virtual |
+| `pct_vs_sma_20` | expression | float | decimal | open | >= -1 | Close / 20-session moving average - 1 | price_stats sma_20 is null (a gap among the last 20 sessions, or a shorter history), or no price_stats row | `price_stats.close / price_stats.sma_20 - 1` | virtual |
+| `pct_vs_sma_50` | expression | float | decimal | open | >= -1 | Close / 50-session moving average - 1 | price_stats sma_50 is null (a gap among the last 50 sessions, or a shorter history), or no price_stats row | `price_stats.close / price_stats.sma_50 - 1` | virtual |
+| `pct_vs_sma_200` | expression | float | decimal | open | >= -1 | Close / 200-session moving average - 1 | price_stats sma_200 is null (a gap among the last 200 sessions, or a shorter history), or no price_stats row | `price_stats.close / price_stats.sma_200 - 1` | virtual |
 
 ### `volatility.toml`
 
@@ -199,6 +203,15 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | `iv_rank` | expression | float | decimal | personal | 0 .. 1 | IV rank over 252 sessions: IBKR's (ibkr_iv) where it has one, else ours (iv_history); iv_rank_source says which | neither has a rank: both rank statuses are UNKNOWN (under 60 sessions of IV), there is no IV today, or every IV in the window is equal | `coalesce(ibkr_iv.iv_rank_252d_ibkr, iv_history.iv_rank_252d)` | virtual |
 | `iv_percentile` | expression | float | decimal | personal | 0 .. 1 | IV percentile over 252 sessions: IBKR's (ibkr_iv) where it has one, else ours (iv_history); iv_rank_source says which | neither has a percentile: both rank statuses are UNKNOWN, there is no IV today, or no earlier IV | `coalesce(ibkr_iv.iv_percentile_252d_ibkr, iv_history.iv_percentile_252d)` | virtual |
 | `iv_rank_source` | label | str | category | personal | ibkr, ours | Where iv_rank and iv_percentile came from: ibkr (IBKR's IV history) or ours (iv_history, from Cboe chains) | iv_rank is null (neither source has a rank) | `if(not is_null(ibkr_iv.iv_rank_252d_ibkr), "ibkr", if(not is_null(iv_history.iv_rank_252d), "ours", null))` | virtual |
+
+### `vrp.toml`
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Formula | Stored |
+|---|---|---|---|---|---|---|---|---|---|
+| `vrp_iv30` | expression | float | decimal | personal | 0 .. 5 | The VRP gate's IV30: the lower of IBKR's (ibkr_iv) and Cboe's (iv30.iv30_cboe) when both exist, else whichever exists; vrp_iv30_source says which | neither IBKR nor Cboe has an IV30 for the session | `min(coalesce(ibkr_iv.iv30_ibkr, iv30.iv30_cboe), coalesce(iv30.iv30_cboe, ibkr_iv.iv30_ibkr))` | virtual |
+| `vrp_iv30_source` | label | str | category | personal | ibkr, cboe | Where vrp_iv30 came from: ibkr or cboe (the lower one when both exist; ibkr on a tie) | vrp_iv30 is null (neither source has an IV30) | `if(is_null(vrp_iv30), null, if(is_null(iv30.iv30_cboe), "ibkr", if(is_null(ibkr_iv.iv30_ibkr), "cboe", if(ibkr_iv.iv30_ibkr <= iv30.iv30_cboe, "ibkr", "cboe"))))` | virtual |
+| `vrp_iv_hv_spread` | expression | float | decimal | personal | -5 .. 5 | vrp_iv30 minus HV30 (price_stats): the VRP scanner's volatility premium | vrp_iv30 or hv30 is null (no IV30 from IBKR or Cboe, or a gap in the last 31 sessions) | `vrp_iv30 - price_stats.hv30` | virtual |
+| `vrp_iv_hv_ratio` | expression | float | ratio | personal | >= 0 | vrp_iv30 / HV30 (price_stats): plain ratio, no HV30 floor (owner decision 2026-10-03) | vrp_iv30 or hv30 is null, or hv30 is 0 | `vrp_iv30 / price_stats.hv30` | virtual |
 
 ## Superseded groups
 

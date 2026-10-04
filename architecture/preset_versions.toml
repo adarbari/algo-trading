@@ -6,3 +6,4 @@
 # Format: "<id>/v<N>.toml" = "<sha256>"
 
 [versions]
+"vrp_scanner/v1.toml" = "9985ddc31bd67c653639b7040a535bfd89019e49e005503a8570af13badf81f6"

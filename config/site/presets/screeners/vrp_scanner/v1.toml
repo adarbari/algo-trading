@@ -1,0 +1,135 @@
+# VRP scanner: liquid names whose implied vol is materially richer than realised vol while
+# the price sits near a 52-week extreme (docs/screeners/vrp-scanner.md, "Owner decisions
+# (2026-10-03)"; rule screens: docs/screeners/rules.md, ADR 0029). An identification layer,
+# not a trade signal. Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+# Not scheduled: run it on request (preview, a `screen` job) or schedule a user copy.
+id = "vrp_scanner"
+kind = "screener"
+impl = "rules"
+version = 1
+selection = "liquid_optionable"   # the daily universe snapshot: active optionable stocks, ADRs, ETFs
+classify = "feature.near_52w"     # buckets the output: HIGH, LOW, BOTH
+
+# ---------------------------------------------------------------- core gates (HARD; funnel order)
+[criteria.iv30]
+field = "feature.vrp_iv30"        # lower of IBKR and Cboe IV30; missing -> SKIPPED (no IV30)
+op = "gte"
+value = 0.50                      # the owner may lower it to 0.40
+label = "IV30 >= 50%"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+label = "Price > $5"
+
+[criteria.iv_hv_spread]
+field = "feature.vrp_iv_hv_spread"
+op = "gte"
+value = 0.10
+label = "IV30 - HV30 >= 10 pts"
+
+[criteria.iv_hv_ratio]
+field = "feature.vrp_iv_hv_ratio"  # plain IV30 / HV30, no HV30 floor
+op = "gte"
+value = 1.25
+label = "IV30 / HV30 >= 1.25"
+
+[criteria.near_52w]
+field = "feature.near_52w"
+op = "in"
+value = ["HIGH", "LOW", "BOTH"]
+label = "Within 10% of the 52W high or low"
+
+# ----------------------------------------------- liquidity (SOFT: flag a near miss, don't reject)
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+label = "Stock ADV > $50M"
+
+[criteria.option_volume]
+field = "feature.option_chain_volume"
+op = "gte"
+value = 1_000
+mode = "soft"
+tolerance = { relative = 0.5 }    # 500-1,000 contracts is a near miss
+on_miss = "LIQUIDITY_RISK"
+label = "Option volume > 1,000 / day"
+
+[criteria.target_oi]
+field = "rollup.option_liquidity@v1.put_zone_oi"   # target expiry, 0.15-0.40 delta puts
+op = "gte"
+value = 1_000
+mode = "soft"
+tolerance = { relative = 0.5 }
+on_miss = "LIQUIDITY_RISK"
+label = "Target-expiry put OI > 1,000"
+
+# ------------------------------------------------------- score only (a miss lowers the score)
+[criteria.iv_rank]
+field = "rollup.ibkr_iv@v1.iv_rank_252d_ibkr"   # IBKR's only; missing -> no points
+op = "gte"
+value = 0.5
+mode = "score"
+tolerance = 0.5
+label = "IBKR IV rank >= 50%"
+
+[criteria.spread]
+field = "rollup.option_liquidity@v1.put_spread_pct"
+op = "lte"
+value = 0.15
+mode = "score"
+tolerance = 0.10
+label = "Short-put bid/ask < 15% of mid"
+
+[criteria.execution]
+field = "feature.option_tier"
+op = "in"
+value = ["A", "B"]
+mode = "score"
+label = "Option execution tier A or B"
+
+[tiers.STRONG]
+all = [
+  { field = "feature.vrp_iv_hv_spread", op = "gte", value = 0.15 },
+  { field = "feature.vrp_iv_hv_ratio", op = "gte", value = 1.30 },
+]
+
+[flags.leveraged_inverse]
+any = [
+  { field = "instrument.is_leveraged", op = "eq", value = true },
+  { field = "instrument.is_inverse", op = "eq", value = true },
+]
+
+[columns]
+close = "rollup.price_stats@v2.close"
+iv30 = "feature.vrp_iv30"
+iv30_source = "feature.vrp_iv30_source"
+hv20 = "rollup.price_stats@v2.hv20"
+hv30 = "rollup.price_stats@v2.hv30"
+iv_hv_spread = "feature.vrp_iv_hv_spread"
+iv_hv_ratio = "feature.vrp_iv_hv_ratio"
+iv_rank_ibkr = "rollup.ibkr_iv@v1.iv_rank_252d_ibkr"
+high_52w = "rollup.price_stats@v2.high_52w"
+pct_from_high_52w = "feature.pct_from_high_52w"
+low_52w = "rollup.price_stats@v2.low_52w"
+pct_from_low_52w = "feature.pct_from_low_52w"
+dist_52w = "feature.dist_52w"
+ret_20d = "rollup.price_stats@v2.ret_20d"
+ret_60d = "rollup.price_stats@v2.ret_60d"
+vs_sma_20 = "feature.pct_vs_sma_20"
+vs_sma_50 = "feature.pct_vs_sma_50"
+vs_sma_200 = "feature.pct_vs_sma_200"
+next_earnings = "rollup.earnings@v1.next_earnings_date"
+days_to_earnings = "rollup.earnings@v1.days_to_earnings"
+adv_usd = "rollup.price_stats@v2.adv_usd_20d"
+option_volume = "feature.option_chain_volume"
+target_oi = "rollup.option_liquidity@v1.put_zone_oi"
+put_spread_pct = "rollup.option_liquidity@v1.put_spread_pct"
+
+[rank]
+tie_break = "feature.vrp_iv_hv_spread"

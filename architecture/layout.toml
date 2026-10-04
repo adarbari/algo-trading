@@ -753,6 +753,14 @@ path = "config/site/presets/strategies"
 purpose = "strategy and screener presets: kind, impl, params, selection, schedule"
 
 [[config_dir]]
+path = "config/site/presets/screeners"
+purpose = "rule-screen presets (ADR 0029): one folder per preset id, no files of its own"
+
+[[config_dir]]
+path = "config/site/presets/screeners/*"
+purpose = "one rule-screen preset's immutable versions v<N>.toml (sha256-locked in architecture/preset_versions.toml)"
+
+[[config_dir]]
 path = "config/site/overrides"
 purpose = "curated CSV overrides read by the settings loader (e.g. leveraged_etfs.csv)"
 
