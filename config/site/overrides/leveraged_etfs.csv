@@ -23,3 +23,26 @@ TMV,-3,ICE US Treasury 20+ Year,Direxion Daily 20+ Year Treasury Bear 3X
 # ProShares cut them to 1.5x and -0.5x in 2018.
 UVXY,1.5,S&P 500 VIX Short-Term Futures,ProShares Ultra VIX Short-Term Futures ETF
 SVXY,-0.5,S&P 500 VIX Short-Term Futures,ProShares Short VIX Short-Term Futures ETF
+# Owner review 2026-10-03 of the 21 ETFs the name rules left UNKNOWN. Leverage is the net
+# exposure; notes say when it is not a fixed daily multiple.
+AIQD,-3,Solactive US AI,MicroSectors -3x Short AI ETN
+CLIX,1.5,Online retail long / stores short,ProShares Long Online/Short Stores ETF (1.5x)
+CRSH,-1,TSLA,YieldMax Short TSLA Option Income (synthetic short via options)
+DIPS,-1,NVDA,YieldMax Short NVDA Option Income (synthetic short via options)
+DWSH,-1,US equities (active short),AdvisorShares Dorsey Wright Short ETF
+ELOL,2,TSLA + SPCX,Leverage Shares 100% TSLA and 100% SPCX (200% gross long)
+FIAT,-1,COIN,YieldMax Short COIN Option Income (synthetic short via options)
+HDGE,-1,US equities (active short),Ranger Equity Bear ETF
+ISBG,2,Bitcoin + gold,IncomeSTKd 1x Bitcoin and 1x Gold (stacked 200%)
+ISSB,2,US stocks + Bitcoin,IncomeSTKd 1x US Stocks and 1x Bitcoin (stacked 200%)
+MSOX,2,MSOS,AdvisorShares MSOS Daily Leveraged ETF (2x)
+MST,2,MSTR,Defiance Leveraged Long + Income MSTR (1.5x-2.0x; upper bound recorded)
+QBER,1,S&P 500 puts + T-bills,TrueShares Quarterly Bear Hedge (no conventional leverage; mostly T-bills + puts)
+QBUL,1,S&P 500,TrueShares Quarterly Bull Hedge (unleveraged)
+RFIX,1,Long-dated rates,Simplify Bond Bull ETF (convex duration via OTC receiver swaptions; not a fixed multiple)
+SHRT,-0.5,US equities long/short,Gotham Short Strategies (~100% long / 150% short: 250% gross; -50% net)
+SLTY,-1,US equities (inverse),YieldMax Ultra Short Option Income (inverse-like; not a fixed multiple)
+UPAR,1.7,Risk parity multi-asset,UPAR Ultra Risk Parity ETF (~1.6x-1.8x total exposure)
+VYLD,-1,VIX short-term futures,Inverse VIX Short-Term Futures ETN
+WNTR,-1,MSTR,YieldMax Short MSTR Option Income (synthetic short via options)
+YQQQ,-1,Nasdaq-100,YieldMax Short N100 Option Income (synthetic short via options)
