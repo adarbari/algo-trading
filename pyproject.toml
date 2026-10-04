@@ -94,6 +94,8 @@ pythonpath = ["."]
 markers = [
     "e2e: end-to-end tests that exercise the CLI against the golden datasets",
     "slow: tests that take more than a few seconds",
+    "allow_localhost: the test may connect to a loopback server it starts itself (tests/conftest.py blocks all other sockets)",
+    "allow_network: the test may open real network connections (tests/conftest.py)",
     "reconciliation: our features recomputed from recorded raw inputs vs another source's recorded values",
 ]
 filterwarnings = ["error"]

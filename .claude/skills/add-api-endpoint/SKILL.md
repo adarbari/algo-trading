@@ -24,10 +24,11 @@ read-only").
    snapshot, adjustments, event dates).
 2. **Query.** Add a function to `services/explore/<area>.py` (a new area: a new module there;
    the folder holds at most 10). It takes the `ReadStore`, resolves `?date=` with
-   `partition_for` (latest on or before; 404 before the first partition) or
+   `partition_for` (latest on or before; none yet = empty result) or
    `data.reference.snapshot`, raises `NotFoundError` for unknown ids, pages large lists with
    `paginate`, and returns a frozen dataclass of JSON-safe values (`record` / `records`).
-   All pandas work happens here, never in the route.
+   All pandas work happens here, never in the route. **"No data yet" is a 200 with an empty
+   result (and the session), never a 404**; 404 only for an unknown id / resource.
 3. **Schema.** Add a pydantic model to `apps/api/algotrade_api/schemas/<area>.py` deriving
    from `Schema` (`from_attributes`), with the same field names as the dataclass. Typed
    fields wherever the shape is fixed (the TS client is generated from them); `dict[str, Any]`
@@ -42,7 +43,8 @@ read-only").
    `tests/apps/api/test_main.py` (the 1-second budget on golden data).
 6. **OpenAPI.** `.venv/bin/python scripts/export_openapi.py`, commit `apps/api/openapi.json`
    (the `test_committed_openapi_is_up_to_date` test fails otherwise), then regenerate the web
-   client from it in `apps/web`.
+   client from it in `apps/web` (`npm run api:generate`). On a merge conflict in either
+   generated file never hand-merge: take main's version and regenerate.
 7. **Docs.** The endpoint table in `docs/architecture.md` section 12. A new kind of endpoint
    (a write, a job submission, auth) is a decision: write an ADR first.
 8. `make check`.

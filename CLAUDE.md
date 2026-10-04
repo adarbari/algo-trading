@@ -69,7 +69,8 @@ the owner; never re-implement it elsewhere. A new responsibility needs an entry 
 the same PR** (`.claude/skills/add-responsibility`). The ownership ratchet
 (`architecture/known_violations.toml`) is **at zero**: any violation fails CI, and a fitness
 test forbids parking new ones there or adding pending contracts. A genuine exception needs an
-ADR and an `allowed` entry with the reason. The dupes ratchet (`architecture/dupes_baseline.txt`)
+ADR and an `allowed` entry with the reason. **Never game a check** (e.g. reordering fields to
+dodge `make dupes`): fix the structure, or justify the exception in the PR. The dupes ratchet (`architecture/dupes_baseline.txt`)
 only shrinks (`make dupes-update`).
 
 | Responsibility | Owner |
@@ -189,7 +190,9 @@ the skill with the fix.
 4. **Tests mirror src**: `src/algotrade/<path>/x.py` → `tests/unit/<path>/` (apps:
    `tests/apps/<app>/<path>/`; enforced by the layout tests). Coverage gate is
    90%. Storage backends must pass `tests/contract/storage/`. Vendor adapters are tested
-   against recorded responses; CI never calls the network.
+   against recorded responses; CI never calls the network: a root autouse fixture
+   (`tests/conftest.py`) refuses real sockets; a test that needs a localhost server is marked
+   `@pytest.mark.allow_localhost`.
 5. **UTC, timezone-aware datetimes only.** `session_date` is the trading day. No `print`
    outside CLI/app entry points.
 6. **Never hand-edit** `datasets/golden/*` or `benchmarks/baseline.json`. Use
@@ -206,6 +209,12 @@ the skill with the fix.
     bypass. GitHub has no required checks, so a manual merge lands before CI finishes; only
     the workflow merges, and only on green. The repo is public: CI runs on
     GitHub-hosted runners only, never self-hosted ones (`docs/ci.md`).
+    **No stacked PRs into a branch that will be deleted**: squash-merge deletes the base and
+    GitHub closes the stacked PR (#99, #103). Branch from `main`; if stacking is unavoidable,
+    label the stacked PR `no-automerge` and retarget it to `main` before its base merges.
+    **Generated files** (`apps/api/openapi.json`, `apps/web/src/shared/api/generated/*`): on a
+    merge conflict never hand-merge; take main's, then regenerate (`scripts/export_openapi.py`,
+    `npm run api:generate`).
 
 ## Workflows: use the matching skill
 
@@ -221,6 +230,11 @@ the skill with the fix.
 | New responsibility, or moving one between modules | `.claude/skills/add-responsibility` |
 | New API endpoint | `.claude/skills/add-api-endpoint` |
 | A decision that changes architecture | `.claude/skills/write-adr` |
+
+Worktrees: `scripts/worktree.sh <branch> [base]` makes `../algo-trading-<slug>` off
+`origin/main` (links `.venv`, writes `worktree.env` with the worktree's absolute `PYTHONPATH`,
+`npm ci`); `source` that file; `--remove` cleans up. Never `--no-verify` / `SKIP=`: the hooks
+work in a worktree.
 
 Commands (need `uv`): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make layout`, `make evaluate`, `make baseline`, `make features-doc`.
 Web (need Node 24): `make web-install`, `make web-check` (part of `make check`), `make web-visual` (screenshots, Docker); in `apps/web`: `npm run dev|storybook|check|visual:update`.
@@ -248,8 +262,18 @@ gates every change whatever wrote it, a change in an `architect` area gets an `a
 review of the diff before it is finished, and an agent that hits ambiguity or fails the same
 check twice escalates one tier instead of retrying.
 
+Shared machine: at most 2 agents at once, and `pytest -n 2`, `vitest --maxWorkers=2`
+(overload caused false timeouts on #94 / #95 / #98).
+
 Token habits (every session):
 
+- **One fresh session per work item**; batch related bugs into it. Sonnet for scoped fixes,
+  Opus for design, storage, IBKR, point-in-time and engine work. Plan before code on new work.
+  Do not keep a session waiting on CI: close it when its PR is up. Spin side issues off as
+  separate tasks.
+- **Ingestion / backfill runs longer than ~2 h run detached** (`nohup` script writing a status
+  file under `var/logs/`; README "Long runs"), never as a tool background command (killed at
+  its limit).
 - **Grep, then read the lines you need.** Long docs (`docs/architecture.md`,
   `docs/configuration.md`, `docs/data/layers.md`) are read by section; owners by grepping
   `architecture/ownership.toml`; the feature catalogue `docs/data/features.md` by grep.

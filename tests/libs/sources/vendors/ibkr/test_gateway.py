@@ -144,6 +144,7 @@ def test_a_gateway_whose_api_is_not_ready_is_a_session_error() -> None:
         gw.connect()
 
 
+@pytest.mark.allow_localhost
 def test_reachable_checks_the_port_without_the_api() -> None:
     with socket.socket() as server:
         server.bind(("127.0.0.1", 0))

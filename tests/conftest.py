@@ -1,4 +1,6 @@
+import ipaddress
 import os
+import socket
 from pathlib import Path
 
 import pytest
@@ -69,3 +71,48 @@ def _no_live_vendor_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     """Tests never reach live vendors, even if a developer's .env holds real keys."""
     monkeypatch.setenv("ALGOTRADE_MASSIVE_API_KEY", "")
     monkeypatch.setenv("ALGOTRADE_SEC_CONTACT", "")
+
+
+def _is_loopback(host: object) -> bool:
+    if host in ("localhost", b"localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(
+            host.decode() if isinstance(host, bytes) else str(host)
+        ).is_loopback
+    except ValueError:
+        return False
+
+
+@pytest.fixture(autouse=True)
+def _block_network(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """CI never calls the network: a real socket connection fails the test. Unix sockets are
+    fine; ``@pytest.mark.allow_localhost`` allows loopback (a test's own server);
+    ``@pytest.mark.allow_network`` allows anything."""
+    if request.node.get_closest_marker("allow_network"):
+        return
+    loopback_ok = request.node.get_closest_marker("allow_localhost") is not None
+    real_connect, real_connect_ex = socket.socket.connect, socket.socket.connect_ex
+
+    def _check(sock: socket.socket, address: object) -> None:
+        if sock.family == getattr(socket, "AF_UNIX", None):
+            return
+        host = address[0] if isinstance(address, tuple) and address else address
+        if loopback_ok and _is_loopback(host):
+            return
+        sock.close()  # a client that only catches OSError would leak it
+        raise RuntimeError(
+            f"network blocked in tests: connect to {address!r}; mark the test "
+            "@pytest.mark.allow_localhost (own loopback server) or use a recorded fixture"
+        )
+
+    def connect(self: socket.socket, address: object) -> None:
+        _check(self, address)
+        real_connect(self, address)
+
+    def connect_ex(self: socket.socket, address: object) -> int:
+        _check(self, address)
+        return real_connect_ex(self, address)
+
+    monkeypatch.setattr(socket.socket, "connect", connect)
+    monkeypatch.setattr(socket.socket, "connect_ex", connect_ex)
