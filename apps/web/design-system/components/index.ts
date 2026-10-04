@@ -73,6 +73,7 @@ export {
 export { Select, type SelectOption, type SelectProps } from './Select';
 export { ShareBar, type ShareBarProps } from './ShareBar';
 export { Skeleton, type SkeletonProps } from './Skeleton';
+export { SortableList, type SortableItemState, type SortableListProps } from './SortableList';
 export { Sparkline, type SparklineProps, type SparklineTone } from './Sparkline';
 export { StackedBar, type StackedBarProps, type StackedBarSegment } from './StackedBar';
 export { StatStrip, type StatItem, type StatStripProps } from './StatStrip';

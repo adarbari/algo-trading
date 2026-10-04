@@ -1,0 +1,76 @@
+/* SortableList: bordered rows, each a drag handle plus the caller's content. */
+.root {
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  min-width: 0;
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-1);
+  border: var(--border-width-thin) solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  transition-duration: var(--duration-fast);
+  transition-property: background-color, border-color;
+  transition-timing-function: var(--easing-standard);
+}
+
+.item[data-dragging],
+.item[data-grabbed] {
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-soft);
+}
+
+.handle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--size-icon-lg) + var(--space-2));
+  height: var(--density-control-height);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.handle:hover {
+  background: var(--color-row);
+  color: var(--color-text);
+}
+
+.handle:disabled {
+  background: transparent;
+  color: var(--color-muted);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.item[data-dragging] .handle {
+  cursor: grabbing;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
