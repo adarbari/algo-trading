@@ -33,6 +33,7 @@ from algotrade.storage.backends.run_selection import (
 )
 from algotrade.storage.locks import ThreadLock
 from algotrade.storage.runs import RunRecord, run_session
+from algotrade.storage.tables.schemas import require_retention
 
 Key = tuple[str, date]  # (table, session_date)
 _PENDING = "pending"
@@ -196,12 +197,18 @@ class MemoryTables:
             return len(keys)
 
     def purge_before(self, table: str, cutoff: date) -> int:
+        require_retention(table)
         with self._index_lock:
-            keys = [k for k in self._partitions if k[0] == table and k[1] < cutoff]
+            busy = {k for writes in self._pending.values() for k in writes}
+            keys = [
+                k for k in self._partitions if k[0] == table and k[1] < cutoff and k not in busy
+            ]
             for key in keys:
                 del self._partitions[key]
-            for frame_key in [k for k in self._frames if k[0][0] == table and k[0][1] < cutoff]:
-                del self._frames[frame_key]
+                for frame_key in [f for f in self._frames if f[0] == key]:
+                    del self._frames[frame_key]
+            if keys:
+                self._seq += 1  # committed like a run: a read sees all of the purge or none
             return len(keys)
 
     def dates(self, table: str, own_run: str | None = None) -> list[date]:

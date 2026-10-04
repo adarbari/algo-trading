@@ -25,6 +25,7 @@ Every file is written to a unique temp file in its directory and renamed into pl
 import json
 import os
 import secrets
+import shutil
 import tempfile
 import threading
 from collections.abc import Iterable, Iterator
@@ -278,6 +279,28 @@ class Commits:
         for run_id in old:
             self.abort_run(run_id)
         return len(old)
+
+    def purge(self, directories: list[Path]) -> int:
+        """Delete committed partitions (retention), committed like a run: under the commit
+        lock (no commit, abort or recovery in between; a read pinned to an older sequence
+        retries), each index removed under its lock before its files, then the published
+        sequence moves on so readers and caches keyed on it see the purge. A partition a
+        pending run has written to is kept (purged on a later pass). -> partitions deleted."""
+        with held(self._commit_lock()):
+            self._recover()
+            busy = {
+                self._dir(item["table"], item["date"])
+                for run_id in self.pending_runs()
+                for item in self.journal(run_id).values()
+            }
+            gone = [d for d in directories if d not in busy]
+            for directory in gone:
+                with held(index_lock(directory)):  # no write is mid-way in the partition
+                    (directory / INDEX).unlink(missing_ok=True)  # unindexed first
+                shutil.rmtree(directory, ignore_errors=True)
+            if gone:
+                atomic_write(self.base / "seq", str(self.published() + 1).encode())
+            return len(gone)
 
     def _forget(self, run_id: str) -> None:
         with self._guard:

@@ -94,7 +94,9 @@ last step; `apps/ingestion/.../tasks/maintenance/purge.py`) or, for staging, by 
   for the same resume. What is never resumed is purged after `staging_retention_days` (14).
 - **Live quotes.** `live/option_quotes` (what the API recorded, ADR 0028) keeps
   `live_retention_days` (7) of session partitions; `purge-raw` deletes older ones
-  (`tables.purge_before`, stats `live_partitions_removed`).
+  (`tables.purge_before`, stats `live_partitions_removed`). Only a table whose `TableSpec`
+  declares `retention_days` can be purged (any other raises); a purge is committed like a
+  run (ADR 0022).
 - **Uncommitted table writes** a crashed run left (ADR 0022) are purged after
   `staging_retention_days` too.
 

@@ -285,12 +285,57 @@ def test_size_and_drop_a_table(backend: Backend) -> None:
     assert reader.table("catalog/demo", D1) is not None
 
 
-def test_purge_before_deletes_only_older_partitions_of_one_table(backend: Backend) -> None:
+LIVE = "live/option_quotes"
+
+
+def live_rows(day: date, strike: float = 100.0) -> list[dict[str, object]]:
+    ts = pd.Timestamp(day, tz="UTC")
+    row = {"instrument_id": f"OPT:A:{strike}", "underlying_id": "EQ:A", "expiry": day, "ts": ts,
+           "right": "C", "strike": strike, "bid": 1.0}  # fmt: skip
+    return [row]
+
+
+def test_purge_before_deletes_only_older_partitions_of_a_table_with_retention(
+    backend: Backend,
+) -> None:
     writer, reader = StoreWriter(backend), StoreReader(backend)
     for day in (D1, D2):
-        writer.write_table(TABLE, day, "r1", stamped(rows({"EQ:A": 1.0}), day, "r1"))
+        writer.write_table(LIVE, day, "r1", stamped(live_rows(day), day, "r1"))
         writer.write_table("catalog/demo", day, "r1", stamped(rows({"EQ:A": 1.0}), day, "r1"))
-    assert writer.purge_table_before(TABLE, D1) == 0  # the cutoff day itself is kept
-    assert writer.purge_table_before(TABLE, D2) == 1
-    assert reader.dates(TABLE) == [D2] and reader.table(TABLE, D1) is None
+    assert writer.purge_table_before(LIVE, D1) == 0  # the cutoff day itself is kept
+    assert writer.purge_table_before(LIVE, D2) == 1
+    assert reader.dates(LIVE) == [D2] and reader.table(LIVE, D1) is None
     assert reader.dates("catalog/demo") == [D1, D2]
+
+
+def test_purging_a_table_without_retention_raises(backend: Backend) -> None:
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    writer.write_table(TABLE, D1, "r1", stamped(rows({"EQ:A": 1.0}), D1, "r1"))
+    for table in (TABLE, "chains/option_quotes", "catalog/demo"):
+        with pytest.raises(DataValidationError, match="no retention declared"):
+            writer.purge_table_before(table, D2)
+        with pytest.raises(DataValidationError, match="no retention declared"):
+            backend.tables.purge_before(table, D2)
+    assert reader.table(TABLE, D1) is not None  # nothing deleted
+
+
+def test_a_purge_is_committed_whole_and_leaves_pending_runs_alone(backend: Backend) -> None:
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    day0 = D1 - timedelta(1)
+    for day in (day0, D1):
+        writer.write_table(LIVE, day, "old", stamped(live_rows(day), day, "old"))
+    # a run still pending in an old partition (D1) and a new one (D2)
+    for day in (D1, D2):
+        rows_ = stamped(live_rows(day, 105.0), day, "open")
+        writer.write_table(LIVE, day, "open", rows_, pending=True)
+    before = reader.visible_seq()
+    assert writer.purge_table_before(LIVE, D2) == 1  # day0; D1 holds a pending write
+    assert reader.visible_seq() > before  # caches keyed on the sequence invalidate
+    assert writer.purge_table_before(LIVE, day0) == 0
+    assert reader.visible_seq() == before + 1  # nothing purged: the sequence stays
+    assert reader.table(LIVE, day0) is None and day0 not in reader.dates(LIVE)
+    assert reader.table_range(LIVE, day0, D2) is not None  # no error, no dangling entries
+    assert writer.commit_run("open", T0) == 2  # the pending run commits untouched
+    after = reader.table(LIVE, D1)
+    assert after is not None and sorted(after["strike"]) == [100.0, 105.0]
+    assert reader.table(LIVE, D2) is not None

@@ -53,6 +53,11 @@ snapshot came from an unfinished run and disagreed with the symbol history.
 - Kept: chains staging and resume (staged items publish into the pending run at the end),
   restating runs, merge vs snapshot, the one-ingest-run lock.
 
+Retention deletes (`purge_before`, only for tables whose spec declares `retention_days`:
+today `live/option_quotes`, ADR 0028) are committed like a run: under the commit lock, each
+index removed under its lock before the files, then the published sequence advanced;
+partitions a pending run wrote to are kept.
+
 ## Consequences
 - A failed build leaves the previous snapshot in force; re-running the build supersedes it.
 - Cross-call consistency: two separate reads at `as_of = None` can straddle a commit; a

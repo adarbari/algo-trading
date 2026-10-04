@@ -66,6 +66,7 @@ from algotrade.storage.backends.run_selection import (
 )
 from algotrade.storage.locks import FileLock, held
 from algotrade.storage.runs import RunRecord, run_session
+from algotrade.storage.tables.schemas import require_retention
 
 
 def _parquet_bytes(frame: pd.DataFrame) -> bytes:
@@ -246,14 +247,15 @@ class LocalTables:
         return len(days)
 
     def purge_before(self, table: str, cutoff: date) -> int:
+        """Retention (``require_retention``), committed like a run (``Commits.purge``)."""
+        require_retention(table)
         base = self.root / table
         days = [
             d
             for d in (sorted(base.glob("date=*")) if base.exists() else [])
             if date.fromisoformat(d.name.removeprefix("date=")) < cutoff
         ]
-        self._remove(days)
-        return len(days)
+        return self.commits.purge(days)
 
     @staticmethod
     def _remove(days: list[Path]) -> None:

@@ -27,7 +27,8 @@ CONFIGS = FileConfigStore(REPO_ROOT / "config")
 
 
 def ibkr(fake: FakeIB) -> IbkrSource:
-    gateway = IbkrMarketData(GatewayConfig("127.0.0.1", 4002, 18), ib_factory=lambda: fake)
+    config = GatewayConfig("127.0.0.1", 9, 18)  # port 9: never the real gateway
+    gateway = IbkrMarketData(config, ib_factory=lambda: fake)
     return IbkrSource(gateway)
 
 
@@ -42,11 +43,12 @@ def test_the_feed_reads_quotes_through_the_read_only_facade_on_its_thread() -> N
         quotes={("20261120", 230.0, "C"): (5.0, 5.2), ("20261120", 230.0, "P"): (4.0, 4.1)}
     )
     source = ibkr(fake)
+    source.probe = lambda: None  # type: ignore[method-assign]  # no TCP check: no real gateway
     feed = live.SessionQuoteFeed(SessionThread(source), IbkrSettings(market_data_type=3))
     frame = feed.quotes("AAPL", EXPIRY, [230.0])
     assert frame["bid"].tolist() == [5.0, 4.0] and feed.market_data_type == 3
     feed.quotes("AAPL", EXPIRY, [230.0])
-    assert fake.calls.count("client.connect 127.0.0.1:4002 id=18") == 1  # one session, kept
+    assert fake.calls.count("client.connect 127.0.0.1:9 id=18") == 1  # one session, kept
     feed.close()
     assert fake.calls[-1] == "disconnect"
     assert set(source.gateway.calls) <= MARKET_DATA_CALLS | CLIENT_CALLS

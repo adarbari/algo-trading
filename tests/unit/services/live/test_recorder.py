@@ -36,8 +36,8 @@ def test_quote_session_is_the_exchange_session_or_the_last_one() -> None:
 def test_submitted_snapshots_are_written_stamped_and_committed() -> None:
     backend = MemoryBackend()
     recorder = LiveRecorder(LiveWriter(backend), clock=lambda: FRIDAY)
-    assert recorder.submit(snapshot(FRIDAY))
-    assert recorder.submit(snapshot(SATURDAY, 105.0))
+    # one submit (one batch, one run): two submits may be drained as one batch or two
+    assert recorder.submit(pd.concat([snapshot(FRIDAY), snapshot(SATURDAY, 105.0)]))
     assert not recorder.submit(snapshot(FRIDAY).iloc[0:0])  # nothing to record
     recorder.flush()
     frame = live_option_quotes(StoreReader(backend), date(2026, 10, 2))
@@ -49,6 +49,7 @@ def test_submitted_snapshots_are_written_stamped_and_committed() -> None:
     recorder.flush()  # a second run in the same second gets its own id
     again = live_option_quotes(StoreReader(backend), date(2026, 10, 2))
     assert again is not None and len(again) == 3 and again["run_id"].nunique() == 2
+    assert recorder.written == 2
     recorder.close()
 
 

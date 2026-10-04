@@ -53,7 +53,9 @@ class TableSpec:
     are rejected on write); the common and key columns of an open-ended one (the producer
     defines the rest). Writes cast to the declared types and fail on uncastable data.
     ``runs`` says how a partition's runs combine on read (``RUN_MODES``); ``key``, when set,
-    is the table key (``table_key``) instead of the grain's default."""
+    is the table key (``table_key``) instead of the grain's default. ``retention_days``, when
+    set, is the default retention window: only such tables may have old partitions purged
+    (``purge_before``); every other table is history, kept forever."""
 
     name: str
     grain: str
@@ -62,6 +64,7 @@ class TableSpec:
     columns: tuple[Column, ...] = ()
     runs: str = "snapshot"
     key: tuple[str, ...] = ()
+    retention_days: int | None = None
 
     def __post_init__(self) -> None:
         if self.runs not in RUN_MODES:
@@ -88,8 +91,12 @@ def _fixed(
     *columns: str,
     runs: str = "snapshot",
     key: tuple[str, ...] = (),
+    retention_days: int | None = None,
 ) -> TableSpec:
-    spec = TableSpec(name, grain, required, columns=_columns(*columns), runs=runs, key=key)
+    spec = TableSpec(
+        name, grain, required, columns=_columns(*columns), runs=runs, key=key,
+        retention_days=retention_days,
+    )  # fmt: skip
     undeclared = [c for c in (*COMMON, *required, *key) if spec.column(c) is None]
     if undeclared:
         raise ValueError(f"{name}: required columns without a type: {undeclared}")
@@ -288,6 +295,7 @@ LIVE_OPTION_QUOTES = _fixed(
     "conid int64",
     "market_data_type int64",
     runs="merge",
+    retention_days=7,  # [sources] live_retention_days overrides the window
 )
 # L2: the Treasury par yield curve, one partition per curve date, one row per tenor
 # (``instrument_id`` = ``RATE:UST-<tenor>``). Rates are decimals; ADR 0021 has the conventions.
@@ -468,3 +476,12 @@ def table_key(spec: TableSpec, columns: Iterable[object]) -> list[str]:
 def bar_problems(frame: pd.DataFrame) -> list[str]:
     """OHLCV sanity checks on a bars frame (``core.validation.bars.ohlcv_problems``)."""
     return ohlcv_problems(*(frame[col].to_numpy(dtype=np.float64) for col in FIELDS))
+
+
+def require_retention(table: str) -> int:
+    """``table``'s retention window; ``DataValidationError`` for a table kept forever (only
+    tables that declare ``retention_days`` may have partitions purged)."""
+    days = spec_for(table).retention_days
+    if days is None:
+        raise DataValidationError(table, ["no retention declared: its partitions are never purged"])
+    return days
