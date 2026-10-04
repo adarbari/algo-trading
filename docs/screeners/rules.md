@@ -1,6 +1,7 @@
 # Rule screens (`impl = "rules"`)
 
-> **Status:** spec ([ADR 0029](../adr/0029-rule-screener.md), accepted); being implemented.
+> **Status:** engine implemented (`strategies/screeners/rules/`, nightly `screen` jobs);
+> Builder, preview and Ideas to come ([ADR 0029](../adr/0029-rule-screener.md)).
 
 A rule screen is a screener written as TOML instead of Python. The web Builder edits the same
 file. It obeys the [screener contract](README.md#contract-all-screeners): one row per
@@ -117,7 +118,8 @@ miss subtracts a penalty:
 | `hard` FALSE, `soft` beyond tolerance | 100 |
 
 `distance` is how far the value is from the threshold (from the nearer bound for `between`).
-The score is not clipped: REJECT rows are scored too, so near misses sort above clear fails.
+The score is clipped to 0 to 100 (clipped at 0; only positive scores), so many hard fails tie at 0.
+REJECT rows are scored too.
 SKIPPED rows have no score. Rows sort by score (descending), then by `[rank] tie_break`
 (descending unless `tie_break_order = "asc"`; missing last), then by instrument id. Then:
 `tiers` (first TRUE group wins), `flags` (TRUE adds the flag, never changes the decision),
@@ -149,6 +151,6 @@ The Builder's preview runs the same `evaluate_screen` as the nightly `screen` jo
 latest closed session and saves nothing. Nightly rows go to `results/rule_screen` (one per
 instrument: decision, score, rank, tier, class, flags, reasons, config id / version / hash),
 `results/rule_screen_values` (one per criterion: value, PASS / NEAR / FAIL / MISSING / INFO,
-distance, penalty) and `results/rule_screen_summary` (the run summary). Ideas ranks tickers
+distance, penalty); the run summary is in the run record (`stats["summary"]`). Ideas ranks tickers
 across saved screens: one row per ticker, by the highest-priority screener that picked it,
 then score.

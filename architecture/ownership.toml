@@ -456,6 +456,7 @@ description = "Evaluate Rule / Group predicates over named fields with three-val
 owner = ["src/algotrade/core/model/predicates.py"]
 allowed = [
     "src/algotrade/engines/selection/evaluate.py",  # the selection's per-rule funnel audit evaluates each top-level child
+    "src/algotrade/strategies/screeners/rules/*",  # rule screens evaluate criteria, tiers and flags with it
 ]
 section = "docs/configuration.md#selections"
 detect = [{ call = "evaluate_rule" }, { call = "evaluate_group" }]
@@ -468,9 +469,20 @@ section = "docs/screeners/rules.md#criteria"
 detect = [{ call = "parse_screen_spec" }, { call = "Criterion" }, { call = "Tolerance" }]
 
 [[responsibility]]
+id = "rule-screen-evaluation"
+description = "Evaluate a rule screen (ADR 0029): each criterion's outcome, distance and penalty (HARD / SOFT tolerance band / SCORE), the row decision incl. SKIPPED, the distance score, rank and tie-break, tiers / flags / classify / columns, and the run summary (passed, skipped by reason, narrow misses)"
+owner = ["src/algotrade/strategies/screeners/rules/*"]
+section = "docs/screeners/rules.md#decision"
+detect = [{ call = "evaluate_screen" }, { call = "evaluate_criterion" }, { call = "summarise" }]
+
+[[responsibility]]
 id = "screen-execution"
 description = "Run a configured screen (select, screen, audit, write results); nightly submits `screen` jobs (workflows/nightly/screens.py)"
-owner = ["src/algotrade/services/screening/run.py", "src/algotrade/services/jobs/handlers.py"]
+owner = [
+    "src/algotrade/services/screening/run.py",
+    "src/algotrade/services/screening/rule_results.py",  # a rule screen's result frames
+    "src/algotrade/services/jobs/handlers.py",
+]
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
 detect = [{ call = "run_screener" }]
 
@@ -620,6 +632,16 @@ note = "derived from IBKR market data: personal-use licence (ADR 0028)"
 name = "rollups/daily/*"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "none produced yet (phase 6); rollups are computed only by the rollups task"
+
+[[table]]
+name = "results/rule_screen"
+owner = "src/algotrade/storage/tables/result_writer.py"
+note = "every rule screen's rows (ADR 0029), framed by services/screening/rule_results.py, written by services/screening/run.py"
+
+[[table]]
+name = "results/rule_screen_values"
+owner = "src/algotrade/storage/tables/result_writer.py"
+note = "every rule screen's per-criterion values (ADR 0029), published with results/rule_screen"
 
 [[table]]
 name = "results/*"
