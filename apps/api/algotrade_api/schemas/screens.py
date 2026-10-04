@@ -42,15 +42,15 @@ class IdeaCriterion(Schema):
 
 
 class IdeaPick(Schema):
-    config_id: str
-    user: str
-    config_version: int | None
-    session: date
     decision: str
     score: float | None
-    tier: str | None
-    klass: str | None
     reasons: str
+    config_id: str
+    config_version: int | None
+    user: str
+    session: date
+    klass: str | None
+    tier: str | None
     criteria: list[IdeaCriterion]
     columns: dict[str, Any]
 

@@ -1352,15 +1352,15 @@
           }
         },
         "required": [
-          "config_id",
-          "user",
-          "config_version",
-          "session",
           "decision",
           "score",
-          "tier",
-          "klass",
           "reasons",
+          "config_id",
+          "config_version",
+          "user",
+          "session",
+          "klass",
+          "tier",
           "criteria",
           "columns"
         ],
