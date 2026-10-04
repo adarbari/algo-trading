@@ -1,0 +1,27 @@
+{
+  "name": "feature.liquidity_class",
+  "dtype": "str",
+  "session": "2026-10-02",
+  "count": 12602,
+  "nulls": 1,
+  "quantiles": {},
+  "histogram": [],
+  "categories": [
+    {
+      "value": "LOW",
+      "count": 12168
+    },
+    {
+      "value": "UNKNOWN",
+      "count": 289
+    },
+    {
+      "value": "MEDIUM",
+      "count": 100
+    },
+    {
+      "value": "HIGH",
+      "count": 44
+    }
+  ]
+}

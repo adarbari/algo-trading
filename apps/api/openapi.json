@@ -4207,6 +4207,24 @@
               "description": "symbol or company name contains",
               "title": "Q"
             }
+          },
+          {
+            "description": "has listed options",
+            "in": "query",
+            "name": "optionable",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "has listed options",
+              "title": "Optionable"
+            }
           }
         ],
         "responses": {
@@ -5619,6 +5637,24 @@
               ],
               "description": "symbol or company name contains",
               "title": "Q"
+            }
+          },
+          {
+            "description": "has listed options",
+            "in": "query",
+            "name": "optionable",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "has listed options",
+              "title": "Optionable"
             }
           }
         ],

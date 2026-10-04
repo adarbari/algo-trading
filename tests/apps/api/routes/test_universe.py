@@ -26,6 +26,8 @@ def test_universe_filters(client: TestClient) -> None:
     assert _symbols(client.get("/universe?sector=technology").json()) == ["AAA"]
     assert _symbols(client.get("/universe?q=bb").json()) == ["BBB"]
     assert _symbols(client.get("/universe?security_type=ETF").json()) == []
+    assert _symbols(client.get("/universe?optionable=false").json()) == []
+    assert _symbols(client.get("/universe?optionable=true").json()) == ["AAA", "BBB", "BULL", "CCC"]
 
 
 def test_universe_pages(client: TestClient) -> None:

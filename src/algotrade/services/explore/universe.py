@@ -55,6 +55,7 @@ class UniverseFilter:
     sector: str | None = None
     liquidity_class: str | None = None
     q: str | None = None  # symbol or company name contains (case-insensitive)
+    optionable: bool | None = None  # listed options (the universe snapshot's flag)
 
 
 @dataclass(frozen=True)
@@ -81,6 +82,8 @@ def _filtered(frame: pd.DataFrame, f: UniverseFilter) -> pd.DataFrame:
         keep &= _same(frame["liquidity_class"], f.liquidity_class)
     if f.leveraged is not None:
         keep &= frame["is_leveraged"].astype("boolean").eq(f.leveraged).fillna(False)
+    if f.optionable is not None:
+        keep &= frame["optionable"].astype("boolean").eq(f.optionable).fillna(False)
     if f.q:
         text = frame["symbol"].astype("string") + " " + frame["company_name"].astype("string")
         keep &= text.str.contains(f.q, case=False, regex=False).fillna(False)

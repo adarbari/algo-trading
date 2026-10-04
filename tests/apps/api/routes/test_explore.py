@@ -50,6 +50,8 @@ def test_ticker_table_filters_pages_and_defaults(client: TestClient) -> None:
     body = client.get("/explore/tickers", params={"leveraged": "true"}).json()
     assert [r["symbol"] for r in body["page"]["items"]] == ["BULL"]
     assert (body["sort"], body["columns"]) == ("symbol", [])
+    params = {"optionable": "false", "leveraged": "true"}
+    assert client.get("/explore/tickers", params=params).json()["page"]["items"] == []
     paged = client.get("/explore/tickers", params={"size": 1, "page": 2}).json()
     assert [r["symbol"] for r in paged["page"]["items"]] == ["BBB"]
 

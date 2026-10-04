@@ -1,0 +1,51 @@
+{
+  "name": "instrument.security_type",
+  "dtype": "str",
+  "session": "2026-10-02",
+  "count": 13295,
+  "nulls": 0,
+  "quantiles": {},
+  "histogram": [],
+  "categories": [
+    {
+      "value": "ETF",
+      "count": 5730
+    },
+    {
+      "value": "COMMON_STOCK",
+      "count": 5354
+    },
+    {
+      "value": "WARRANT",
+      "count": 436
+    },
+    {
+      "value": "PREFERRED",
+      "count": 427
+    },
+    {
+      "value": "ADR",
+      "count": 380
+    },
+    {
+      "value": "CEF",
+      "count": 332
+    },
+    {
+      "value": "UNIT",
+      "count": 307
+    },
+    {
+      "value": "NOTE",
+      "count": 159
+    },
+    {
+      "value": "RIGHT",
+      "count": 125
+    },
+    {
+      "value": "ETN",
+      "count": 45
+    }
+  ]
+}
