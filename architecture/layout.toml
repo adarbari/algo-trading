@@ -117,7 +117,7 @@ contracts = ["Parquet / Arrow I/O lives only in storage backends"]
 
 [[dir]]
 path = "src/algotrade/storage/configs"
-purpose = "config documents only: the ConfigStore protocol and its file / memory stores"
+purpose = "config documents only: the ConfigStore protocol and its file / memory stores; the ConfigWriter (writer.py: user drafts, immutable versions, schedules, user features)"
 contracts = [
     "Layout: config documents and market tables stay separate (storage.configs never imports them)",
 ]
@@ -200,12 +200,20 @@ purpose = "use cases (the backend's interface for apps); shared helpers: configs
 [[dir]]
 path = "src/algotrade/services/backtests"
 purpose = "use case: run a configured backtest, record its run and results"
-contracts = ["Layout: use-case packages are independent (backtests, screening)"]
+contracts = ["Layout: use-case packages are independent (backtests, screening, authoring)"]
 
 [[dir]]
 path = "src/algotrade/services/screening"
 purpose = "use case: run a screener over the universe, record the run, export its rows"
-contracts = ["Layout: use-case packages are independent (backtests, screening)"]
+contracts = ["Layout: use-case packages are independent (backtests, screening, authoring)"]
+
+[[dir]]
+path = "src/algotrade/services/authoring"
+purpose = "use case: author L4 user configs (ADR 0029): rule-screen drafts, immutable versions, preset copy / rebase, schedule switch, user features; the only config writer the API calls"
+contracts = [
+    "Layout: use-case packages are independent (backtests, screening, authoring)",
+    "Config writes go only through services.authoring (ADR 0029)",
+]
 
 [[dir]]
 path = "src/algotrade/services/evaluation"
@@ -274,8 +282,17 @@ path = "apps/api/algotrade_api/routes"
 purpose = "one FastAPI router per area: parse parameters, call one explore query, map it to a schema"
 
 [[dir]]
+path = "apps/api/algotrade_api/routes/authoring"
+purpose = "the routes that write (ADR 0029): user rule screens and user features, each calling one services.authoring use case"
+contracts = ["Config writes go only through services.authoring (ADR 0029)"]
+
+[[dir]]
 path = "apps/api/algotrade_api/schemas"
 purpose = "pydantic response models per area: the public contract (OpenAPI -> the web client)"
+
+[[dir]]
+path = "apps/api/algotrade_api/schemas/authoring"
+purpose = "request bodies and responses of the config-writing routes (ADR 0029)"
 
 # --------------------------------------------------------------------------- ingestion app
 

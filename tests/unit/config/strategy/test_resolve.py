@@ -236,3 +236,38 @@ def test_configs_never_hold_secrets(doc: dict) -> None:  # type: ignore[type-arg
 def test_secret_like_run_overrides_are_rejected() -> None:
     with pytest.raises(ConfigurationError, match=r"run-overrides\.params\.token"):
         resolve("scr", UserContext(SITE_USER), store().load, overrides={"params": {"token": 1}})
+
+
+def test_extends_pins_a_preset_version() -> None:
+    preset = {
+        "id": "p",
+        "kind": "screener",
+        "impl": "rules",
+        "selection": "active",
+        "version": 3,
+        "criteria": {"active": ACTIVE},
+    }
+    s = store({("site", "screeners", "p"): preset, ("u1", "screeners", "mine"): {"extends": "p@3"}})
+    r = resolve("mine", UserContext("u1"), s.load)
+    assert r.layers[:2] == ("site/screeners/p", "u1/screeners/mine")
+    stale = store(
+        {
+            ("site", "screeners", "p"): preset | {"version": 4},
+            ("u1", "screeners", "mine"): {"extends": "p@3"},
+        }
+    )
+    with pytest.raises(ConfigurationError, match="rebase"):
+        resolve("mine", UserContext("u1"), stale.load)
+
+
+@pytest.mark.parametrize("extends", ["p@", "p@0", "p@x", "P", 3, "p@3@4"])
+def test_bad_extends_fails_closed(extends: object) -> None:
+    s = store({("u1", "strategies", "mine"): {"extends": extends}})
+    with pytest.raises(ConfigurationError):
+        resolve("mine", UserContext("u1"), s.load)
+
+
+def test_an_id_under_both_kinds_is_ambiguous() -> None:
+    s = store({("site", "screeners", "scr"): {"id": "scr"}})
+    with pytest.raises(ConfigurationError, match="both"):
+        resolve("scr", UserContext(SITE_USER), s.load)

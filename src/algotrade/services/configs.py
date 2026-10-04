@@ -6,7 +6,7 @@ from typing import Any
 from algotrade.config.env import user_id
 from algotrade.config.site.settings import FeatureDefinition
 from algotrade.config.strategy.catalog import FieldCatalog
-from algotrade.config.strategy.resolve import ResolvedConfig, resolve
+from algotrade.config.strategy.resolve import CONFIG_KINDS, ResolvedConfig, resolve
 from algotrade.config.strategy.schema import Selection
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.fields import FEATURE_FIELD_PREFIX, is_feature_field
@@ -74,8 +74,14 @@ def scheduled(store: ConfigStore, schedule: str = "nightly") -> list[ResolvedCon
     owners = [SITE_USER, *store.users()]
     for owner in owners:
         scope = "site" if owner == SITE_USER else owner
-        for config_id in store.names(scope, "strategies"):
+        for config_id in config_ids(store, scope):
             resolved = resolve_config(store, config_id, UserContext(owner))
             if resolved.config.schedule == schedule:
                 runs.append(resolved)
     return runs
+
+
+def config_ids(store: ConfigStore, scope: str) -> list[str]:
+    """Every strategy / screener config id in ``scope`` (``CONFIG_KINDS``; a user's rule
+    screens count once finalised), sorted and unique."""
+    return sorted({n for kind in CONFIG_KINDS for n in store.names(scope, kind)})

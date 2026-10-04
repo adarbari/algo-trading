@@ -1,4 +1,5 @@
-"""Request dependencies: the API settings, the read-only store, the local user, and the
+"""Request dependencies: the API settings, the read-only store, the config writer (ADR
+0029: user configs only, through ``services.authoring``), the user a write is for, and the
 query parameters several routes share (universe filters, comma-separated lists).
 
 Settings come from the environment through ``algotrade.config.env`` (the one reader):
@@ -13,6 +14,7 @@ from fastapi import Depends, Query, Request
 
 from algotrade.config.env import config_dir, data_url, user_id
 from algotrade.config.user import DEFAULT_USER, UserContext
+from algotrade.services.authoring.scope import ConfigWriter, open_writer
 from algotrade.services.explore.store import ReadStore, open_store
 from algotrade.services.explore.universe import UniverseFilter
 
@@ -38,6 +40,9 @@ class ApiSettings:
     def open(self) -> ReadStore:
         return open_store(self.data_url, self.config_dir, UserContext(self.user))
 
+    def open_writer(self) -> ConfigWriter:
+        return open_writer(self.config_dir)
+
 
 def get_store(request: Request) -> ReadStore:
     """The store ``create_app`` opened (read-only; shared by every request)."""
@@ -45,6 +50,27 @@ def get_store(request: Request) -> ReadStore:
 
 
 Store = Annotated[ReadStore, Depends(get_store)]
+
+
+def get_writer(request: Request) -> ConfigWriter:
+    """The config writer ``create_app`` opened (user configs only; ADR 0029)."""
+    return cast(ConfigWriter, request.app.state.writer)
+
+
+Writer = Annotated[ConfigWriter, Depends(get_writer)]
+
+
+def write_user(
+    store: Store,
+    user: Annotated[
+        str | None, Query(description="whose configs (a label until auth; default the API's)")
+    ] = None,
+) -> str:
+    """``?user=`` (validated by ``services.authoring``), else the API's user."""
+    return user if user is not None else store.user.user_id
+
+
+User = Annotated[str, Depends(write_user)]
 
 
 def universe_filter(

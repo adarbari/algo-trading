@@ -12,15 +12,25 @@ config/site/                        L3: reviewed via PR, versioned by git
   defaults.toml                     [screening] and [backtest] defaults
   presets/selections/<id>.toml      shared selections
   presets/strategies/<id>.toml      shared strategy / screener configs
+  presets/screeners/<id>.toml       rule-screen presets, carrying version = N (ADR 0029)
 config/users/<user_id>/             L4: git-ignored locally; a DB behind ConfigStore later
   selections/<id>.toml
   strategies/<id>.toml
   features/<theme>.toml             the user's expression features (always virtual)
+  screeners/<id>/draft.toml         a rule screen's working copy (never run)
+  screeners/<id>/v<N>.toml          finalised versions: immutable; the latest (max N) runs
+  screeners/<id>/schedule.toml      the schedule switch (separate from finalise)
 ```
 
 The location comes from `ALGOTRADE_CONFIG_DIR` (default `./config`) or `--config-dir`. Only
 `storage/configs/files.py` knows this layout; everything else uses the `ConfigStore`
-protocol (`load(scope, kind, name)`, `names`, `users`).
+protocol (`load(scope, kind, name)`, `names`, `users`). A config id is found under the kind
+`strategies` or `screeners` (both is an error); a user's `screeners` document is their latest
+version with the schedule switch applied. User configs are **written** only by
+`services/authoring` through `ConfigWriter` (`storage/configs/writer.py`; atomic files, a
+version is never overwritten), which the API calls (ADR 0029): save / discard a draft,
+finalise it (validated fail closed), copy a preset, rebase, switch the schedule, save a user
+feature.
 
 ## Objects (`src/algotrade/config/`, pure, no I/O)
 
@@ -51,7 +61,9 @@ built-in defaults  <  L3 site (defaults.toml + preset)  <  L4 user config  <  ru
 
 - **Find the document.** A user config with the same id overrides the site preset of that id;
   `extends = "<preset id>"` builds a new id on top of a preset; a user-only config needs no
-  preset. The `site` user (scheduled site presets) never reads user documents.
+  preset. `extends = "<preset id>@<N>"` pins the preset's `version = N`: when the site preset
+  moves on, the config fails closed (`... rebase onto it`) until the user rebases (results
+  never change silently). The `site` user (scheduled site presets) never reads user documents.
 - **Merge.** Tables merge deeply; lists are replaced.
 - **Selection.** A preset name resolves user-first, then site. A user either **narrows** the
   preset with `selection_overrides` (AND-ed with the preset's rules, so later preset fixes

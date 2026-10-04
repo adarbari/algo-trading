@@ -34,11 +34,16 @@ from algotrade.config.strategy.schema import (
 from algotrade.config.strategy.screen_spec import check_screen_spec, screen_spec
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.ids import validate_id
 from algotrade.core.model.screen_spec import ScreenSpec
 
 # (scope, kind, name) -> document; scope is "site" or a user id;
-# kind is "defaults", "strategies" or "selections".
+# kind is "defaults", "selections" or one of CONFIG_KINDS.
 type DocumentLoader = Callable[[str, str, str], Mapping[str, Any] | None]
+
+# Where a strategy / screener config is found: ``strategies`` (one file per id) or
+# ``screeners`` (rule screens, ADR 0029: a site preset, or a user's latest finalised version).
+CONFIG_KINDS = ("strategies", "screeners")
 
 BUILTIN_DEFAULTS: Mapping[str, Any] = {
     "screening": {"min_coverage": 0.98, "max_universe_age_days": 45},
@@ -153,22 +158,56 @@ def fingerprint(payload: Mapping[str, Any]) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
+def config_document(
+    load: DocumentLoader, scope: str, config_id: str
+) -> tuple[str, Mapping[str, Any]] | None:
+    """``(kind, document)`` of ``config_id`` in ``scope`` (one of ``CONFIG_KINDS``); an id
+    under both kinds is ambiguous and fails closed."""
+    found = [(k, d) for k in CONFIG_KINDS if (d := load(scope, k, config_id)) is not None]
+    if len(found) > 1:
+        raise ConfigurationError(f"{scope}/{config_id}: defined as both a strategy and a screener")
+    return found[0] if found else None
+
+
+def parse_extends(value: Any, path: str) -> tuple[str, int | None]:
+    """``"<preset>"`` or ``"<preset>@<N>"`` (pinned to the preset's ``version = N``)."""
+    if not isinstance(value, str):
+        raise ConfigurationError(f"{path}.extends: expected '<preset>' or '<preset>@<version>'")
+    name, at, pin = value.partition("@")
+    validate_id("preset", name)
+    if not at:
+        return name, None
+    if not pin.isdigit() or int(pin) < 1 or len(pin) > 9:
+        raise ConfigurationError(f"{path}.extends: {value!r}: the version is a positive integer")
+    return name, int(pin)
+
+
 def _strategy_document(
     config_id: str, user: UserContext, load: DocumentLoader
 ) -> tuple[dict[str, Any], list[str]]:
-    user_doc = load(user.user_id, "strategies", config_id) if user.user_id != SITE_USER else None
-    base_id = str(user_doc.get("extends", config_id)) if user_doc else config_id
-    site_doc = load("site", "strategies", base_id)
+    own = config_document(load, user.user_id, config_id) if user.user_id != SITE_USER else None
+    user_kind, user_doc = own if own else ("strategies", None)
+    where = f"{user.user_id}/{user_kind}/{config_id}"
+    base_id, pin = (config_id, None)
+    if user_doc and "extends" in user_doc:
+        base_id, pin = parse_extends(user_doc["extends"], where)
+    site = config_document(load, "site", base_id)
+    site_kind, site_doc = site if site else ("strategies", None)
     if user_doc and "extends" in user_doc and site_doc is None:
         raise ConfigurationError(f"{user.user_id}/{config_id}: extends unknown preset {base_id!r}")
     if user_doc is None and site_doc is None:
         raise ConfigurationError(f"unknown config {config_id!r} for user {user.user_id!r}")
-    layers = [f"site/strategies/{base_id}"] if site_doc else []
+    if pin is not None and site_doc is not None and site_doc.get("version") != pin:
+        raise ConfigurationError(
+            f"{where}: pinned to {base_id}@{pin} but the site preset is at "
+            f"v{site_doc.get('version')}: rebase onto it (results never change silently)"
+        )
+    layers = [f"site/{site_kind}/{base_id}"] if site_doc else []
     merged = dict(site_doc or {})
     if user_doc:
         merged = deep_merge(merged, {k: v for k, v in user_doc.items() if k != "extends"})
         merged["id"] = config_id
-        layers.append(f"{user.user_id}/strategies/{config_id}")
+        layers.append(where)
     return merged, layers
 
 

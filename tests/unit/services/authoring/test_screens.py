@@ -1,0 +1,108 @@
+"""Drafts, finalise (fail closed, immutable versions), detail and the schedule switch."""
+
+from typing import Any
+
+import pytest
+
+from algotrade.core.model.errors import ConfigurationError
+from algotrade.services.authoring import screens
+from algotrade.services.authoring.scope import ConflictError, ScreenNotFoundError
+from algotrade.services.configs import scheduled
+from algotrade.storage.configs.writer import MemoryConfigWriter, VersionExistsError
+
+OWN: dict[str, Any] = {
+    "kind": "screener",
+    "impl": "rules",
+    "selection": "all_active",
+    "criteria": {"price": {"field": "rollup.price_stats@v2.close", "op": "gt", "value": 10}},
+}
+
+
+def test_save_draft_sets_id_and_drops_managed_keys(writer: MemoryConfigWriter) -> None:
+    stored = screens.save_draft(
+        writer, "alice", "mine", OWN | {"version": 9, "schedule": "nightly"}
+    )
+    assert stored == {"id": "mine", **OWN}
+    assert writer.draft("alice", "mine") == stored
+    with pytest.raises(ConfigurationError, match="id"):
+        screens.save_draft(writer, "alice", "mine", {"id": "other"})
+    with pytest.raises(ConfigurationError, match="secret"):
+        screens.save_draft(writer, "alice", "mine", {"api_key": "x"})
+    assert screens.discard_draft(writer, "alice", "mine") is True
+
+
+def test_finalise_numbers_versions_and_removes_the_draft(writer: MemoryConfigWriter) -> None:
+    screens.save_draft(writer, "alice", "mine", OWN)
+    first = screens.finalise(writer, "alice", "mine")
+    assert first.version == 1 and first.hash
+    assert writer.draft("alice", "mine") is None
+    screens.save_draft(writer, "alice", "mine", OWN | {"criteria": {"price": {"value": 20}}})
+    with pytest.raises(ConfigurationError):  # a criterion without field / op
+        screens.finalise(writer, "alice", "mine")
+    assert writer.versions("alice", "mine") == [1]  # nothing written
+    screens.save_draft(writer, "alice", "mine", OWN)
+    assert screens.finalise(writer, "alice", "mine").version == 2
+    assert writer.version("alice", "mine", 1) == {"id": "mine", **OWN, "version": 1}
+
+
+@pytest.mark.parametrize(
+    "document",
+    [
+        OWN | {"criteria": {"p": {"field": "rollup.nope@v1.x", "op": "gt", "value": 1}}},
+        OWN | {"criteria": {"p": {"field": "instrument.status", "op": "gt", "value": 1}}},
+        OWN | {"impl": "short_premium_liquidity", "criteria": None},
+        {"kind": "strategy", "impl": "buy_and_hold", "selection": "all_active"},
+        OWN | {"selection": "nope"},
+        OWN | {"criteria": {"p": {"field": "feature.not_mine", "op": "gt", "value": 1}}},
+    ],
+)
+def test_finalise_fails_closed(writer: MemoryConfigWriter, document: dict[str, Any]) -> None:
+    document = {k: v for k, v in document.items() if v is not None}
+    screens.save_draft(writer, "alice", "mine", document)
+    with pytest.raises(ConfigurationError):
+        screens.finalise(writer, "alice", "mine")
+    assert writer.versions("alice", "mine") == []
+    assert writer.draft("alice", "mine") is not None
+
+
+def test_finalise_needs_a_draft_and_reports_a_race(
+    writer: MemoryConfigWriter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with pytest.raises(ScreenNotFoundError):
+        screens.finalise(writer, "alice", "mine")
+    screens.save_draft(writer, "alice", "mine", OWN)
+
+    def taken(*args: object) -> None:
+        raise VersionExistsError("v1 exists")
+
+    monkeypatch.setattr(writer, "add_version", taken)
+    with pytest.raises(ConflictError):
+        screens.finalise(writer, "alice", "mine")
+
+
+def test_detail_versions_and_schedule(writer: MemoryConfigWriter) -> None:
+    with pytest.raises(ScreenNotFoundError):
+        screens.screen_detail(writer, "alice", "mine")
+    preset = screens.screen_detail(writer, "alice", "vrp")  # an uncopied site preset
+    assert preset.versions == [] and preset.layers[0] == "site/screeners/vrp"
+    with pytest.raises(ScreenNotFoundError):
+        screens.set_schedule(writer, "alice", "mine", "nightly")
+    screens.save_draft(writer, "alice", "mine", OWN)
+    screens.finalise(writer, "alice", "mine")
+    screens.save_draft(writer, "alice", "mine", OWN | {"selection": "nope"})
+    detail = screens.screen_detail(writer, "alice", "mine")
+    assert (detail.versions, detail.latest, detail.schedule) == ([1], 1, None)
+    assert detail.draft_error and "nope" in detail.draft_error
+    assert detail.error is None and detail.resolved and detail.resolved["schedule"] is None
+    assert [v.version for v in screens.screen_versions(writer, "alice", "mine")] == [1]
+    assert [r.config.id for r in scheduled(writer) if r.user.user_id == "alice"] == []
+    assert screens.set_schedule(writer, "alice", "mine", "nightly") == "nightly"
+    assert [r.config.id for r in scheduled(writer) if r.user.user_id == "alice"] == ["mine"]
+    with pytest.raises(ConfigurationError, match="schedule"):
+        screens.set_schedule(writer, "alice", "mine", "hourly")
+
+
+@pytest.mark.parametrize("user", ["site", "../etc", "Bob"])
+def test_users_are_strict_labels_never_the_site(writer: MemoryConfigWriter, user: str) -> None:
+    with pytest.raises(ConfigurationError):
+        screens.save_draft(writer, user, "mine", OWN)

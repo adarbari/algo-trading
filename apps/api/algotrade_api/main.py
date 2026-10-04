@@ -1,5 +1,6 @@
 """The app factory: routers, CORS for the local web dev server, and error handlers that map
-library errors to HTTP (not found -> 404, bad configuration or parameters -> 400)."""
+library errors to HTTP (not found -> 404, bad configuration or parameters -> 400, a write
+that clashes with what exists -> 409)."""
 
 import json
 
@@ -8,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
+from algotrade.services.authoring.scope import ConfigWriter, ConflictError, ScreenNotFoundError
 from algotrade.services.explore.store import NotFoundError, ReadStore
 from algotrade_api import __version__
 from algotrade_api.deps import ApiSettings
@@ -24,22 +26,35 @@ def _bad_request(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
-def create_app(settings: ApiSettings, store: ReadStore | None = None) -> FastAPI:
-    """The API over ``store`` (default: the store and configs ``settings`` name)."""
+def _conflict(request: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+
+def create_app(
+    settings: ApiSettings, store: ReadStore | None = None, writer: ConfigWriter | None = None
+) -> FastAPI:
+    """The API over ``store`` (default: the store and configs ``settings`` name); user
+    configs are written through ``writer`` (default: the files under ``settings.config_dir``)."""
     app = FastAPI(
         title=TITLE,
         version=__version__,
-        description="Read-only API over the algotrade stores (ADR 0024).",
+        description=(
+            "Read-only API over the algotrade stores (ADR 0024); it writes only user configs "
+            "and user features, through services.authoring (ADR 0029)."
+        ),
     )
     app.state.store = store if store is not None else settings.open()
+    app.state.writer = writer if writer is not None else settings.open_writer()
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),
-        allow_methods=["GET"],
+        allow_methods=["GET", "PUT", "POST", "DELETE"],
         allow_headers=["*"],
     )
     app.add_exception_handler(NotFoundError, _not_found)
     app.add_exception_handler(MissingDataError, _not_found)
+    app.add_exception_handler(ScreenNotFoundError, _not_found)
+    app.add_exception_handler(ConflictError, _conflict)
     app.add_exception_handler(ConfigurationError, _bad_request)
     for router in ROUTERS:
         app.include_router(router)
