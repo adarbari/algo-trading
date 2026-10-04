@@ -587,6 +587,20 @@
         "title": "ConfigSummary",
         "type": "object"
       },
+      "CopyBody": {
+        "properties": {
+          "preset": {
+            "description": "the site rule-screen preset to extend (pinned)",
+            "title": "Preset",
+            "type": "string"
+          }
+        },
+        "required": [
+          "preset"
+        ],
+        "title": "CopyBody",
+        "type": "object"
+      },
       "Distribution": {
         "properties": {
           "categories": {
@@ -647,6 +661,40 @@
           "categories"
         ],
         "title": "Distribution",
+        "type": "object"
+      },
+      "Draft": {
+        "properties": {
+          "document": {
+            "additionalProperties": true,
+            "title": "Document",
+            "type": "object"
+          },
+          "screener_id": {
+            "title": "Screener Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "screener_id",
+          "document"
+        ],
+        "title": "Draft",
+        "type": "object"
+      },
+      "DraftBody": {
+        "properties": {
+          "document": {
+            "additionalProperties": true,
+            "description": "the screen's TOML keys as JSON (version and schedule are managed)",
+            "title": "Document",
+            "type": "object"
+          }
+        },
+        "required": [
+          "document"
+        ],
+        "title": "DraftBody",
         "type": "object"
       },
       "EquityPoint": {
@@ -1013,6 +1061,29 @@
           "commission"
         ],
         "title": "Fill",
+        "type": "object"
+      },
+      "Finalised": {
+        "properties": {
+          "hash": {
+            "title": "Hash",
+            "type": "string"
+          },
+          "screener_id": {
+            "title": "Screener Id",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "screener_id",
+          "version",
+          "hash"
+        ],
+        "title": "Finalised",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -1588,6 +1659,50 @@
         "title": "Page[dict[str, Any]]",
         "type": "object"
       },
+      "PresetPin": {
+        "properties": {
+          "current": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the site preset's version now",
+            "title": "Current"
+          },
+          "pinned": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the preset version the screen extends",
+            "title": "Pinned"
+          },
+          "preset_id": {
+            "title": "Preset Id",
+            "type": "string"
+          },
+          "rebase_available": {
+            "title": "Rebase Available",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "preset_id",
+          "pinned",
+          "current",
+          "rebase_available"
+        ],
+        "title": "PresetPin",
+        "type": "object"
+      },
       "PriceComparison": {
         "properties": {
           "adjustment": {
@@ -1888,6 +2003,93 @@
         "title": "RunItem",
         "type": "object"
       },
+      "SavedFeature": {
+        "properties": {
+          "dtype": {
+            "title": "Dtype",
+            "type": "string"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "inputs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Inputs",
+            "type": "array"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "theme": {
+            "title": "Theme",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "field",
+          "theme",
+          "dtype",
+          "kind",
+          "inputs"
+        ],
+        "title": "SavedFeature",
+        "type": "object"
+      },
+      "Schedule": {
+        "properties": {
+          "schedule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule"
+          },
+          "screener_id": {
+            "title": "Screener Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "screener_id",
+          "schedule"
+        ],
+        "title": "Schedule",
+        "type": "object"
+      },
+      "ScheduleBody": {
+        "properties": {
+          "schedule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "\"nightly\", or null to switch it off",
+            "title": "Schedule"
+          }
+        },
+        "required": [
+          "schedule"
+        ],
+        "title": "ScheduleBody",
+        "type": "object"
+      },
       "ScreenConfig": {
         "properties": {
           "config": {
@@ -2049,6 +2251,160 @@
           "values"
         ],
         "title": "ScreenRow",
+        "type": "object"
+      },
+      "ScreenerDetail": {
+        "properties": {
+          "draft": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the Builder's working copy",
+            "title": "Draft"
+          },
+          "draft_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "why the draft would not finalise",
+            "title": "Draft Error"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "why that does not resolve (e.g. rebase needed)",
+            "title": "Error"
+          },
+          "hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the latest version (else the site preset) resolved",
+            "title": "Hash"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          },
+          "layers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Layers",
+            "type": "array"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PresetPin"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resolved": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved"
+          },
+          "schedule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule"
+          },
+          "screener_id": {
+            "title": "Screener Id",
+            "type": "string"
+          },
+          "user": {
+            "title": "User",
+            "type": "string"
+          },
+          "versions": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "screener_id",
+          "user",
+          "draft",
+          "draft_error",
+          "versions",
+          "latest",
+          "schedule",
+          "preset",
+          "hash",
+          "layers",
+          "resolved",
+          "error"
+        ],
+        "title": "ScreenerDetail",
+        "type": "object"
+      },
+      "ScreenerVersion": {
+        "properties": {
+          "document": {
+            "additionalProperties": true,
+            "title": "Document",
+            "type": "object"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "document"
+        ],
+        "title": "ScreenerVersion",
         "type": "object"
       },
       "Step": {
@@ -2375,6 +2731,121 @@
         "title": "UniverseRow",
         "type": "object"
       },
+      "UserFeatureBody": {
+        "properties": {
+          "categories": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categories"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "dtype": {
+            "title": "Dtype",
+            "type": "string"
+          },
+          "expr": {
+            "title": "Expr",
+            "type": "string"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "name": {
+            "description": "the feature's name: selected as feature.<name>",
+            "title": "Name",
+            "type": "string"
+          },
+          "null_meaning": {
+            "title": "Null Meaning",
+            "type": "string"
+          },
+          "params": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "boolean"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Params"
+          },
+          "theme": {
+            "default": "builder",
+            "description": "config/users/<u>/features/<theme>.toml",
+            "title": "Theme",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "valid_range": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid Range"
+          }
+        },
+        "required": [
+          "name",
+          "expr",
+          "dtype",
+          "unit",
+          "description",
+          "null_meaning"
+        ],
+        "title": "UserFeatureBody",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -2474,7 +2945,7 @@
     }
   },
   "info": {
-    "description": "Read-only API over the algotrade stores (ADR 0024).",
+    "description": "Read-only API over the algotrade stores (ADR 0024); it writes only user configs and user features, through services.authoring (ADR 0029).",
     "title": "algotrade API",
     "version": "0.1.0"
   },
@@ -3503,6 +3974,67 @@
         ]
       }
     },
+    "/features/user": {
+      "post": {
+        "operationId": "save_user_feature_features_user_post",
+        "parameters": [
+          {
+            "description": "whose configs (a label until auth; default the API's)",
+            "in": "query",
+            "name": "user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "whose configs (a label until auth; default the API's)",
+              "title": "User"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserFeatureBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedFeature"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save User Feature",
+        "tags": [
+          "features"
+        ]
+      }
+    },
     "/features/{name}/distribution": {
       "get": {
         "operationId": "distribution_features__name__distribution_get",
@@ -3898,6 +4430,511 @@
         "summary": "Features",
         "tags": [
           "instruments"
+        ]
+      }
+    },
+    "/screeners/{screener_id}": {
+      "get": {
+        "operationId": "screener_screeners__screener_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "screener_id",
+            "required": true,
+            "schema": {
+              "title": "Screener Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "whose configs (a label until auth; default the API's)",
+            "in": "query",
+            "name": "user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "whose configs (a label until auth; default the API's)",
+              "title": "User"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenerDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Screener",
+        "tags": [
+          "screeners"
+        ]
+      }
+    },
+    "/screeners/{screener_id}/copy": {
+      "post": {
+        "operationId": "copy_screeners__screener_id__copy_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "screener_id",
+            "required": true,
+            "schema": {
+              "title": "Screener Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "whose configs (a label until auth; default the API's)",
+            "in": "query",
+            "name": "user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "whose configs (a label until auth; default the API's)",
+              "title": "User"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CopyBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Draft"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Copy",
+        "tags": [
+          "screeners"
+        ]
+      }
+    },
+    "/screeners/{screener_id}/draft": {
+      "delete": {
+        "operationId": "discard_draft_screeners__screener_id__draft_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "screener_id",
+            "required": true,
+            "schema": {
+              "title": "Screener Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "whose configs (a label until auth; default the API's)",
+            "in": "query",
+            "name": "user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "whose configs (a label until auth; default the API's)",
+              "title": "User"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Discard Draft",
+        "tags": [
+          "screeners"
+        ]
+      },
+      "put": {
+        "operationId": "save_draft_screeners__screener_id__draft_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "screener_id",
+            "required": true,
+            "schema": {
+              "title": "Screener Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "whose configs (a label until auth; default the API's)",
+            "in": "query",
+            "name": "user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "whose configs (a label until auth; default the API's)",
+              "title": "User"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Draft"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Draft",
+        "tags": [
+          "screeners"
+        ]
+      }
+    },
+    "/screeners/{screener_id}/finalise": {
+      "post": {
+        "operationId": "finalise_screeners__screener_id__finalise_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "screener_id",
+            "required": true,
+            "schema": {
+              "title": "Screener Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "whose configs (a label until auth; default the API's)",
+            "in": "query",
+            "name": "user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "whose configs (a label until auth; default the API's)",
+              "title": "User"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Finalised"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Finalise",
+        "tags": [
+          "screeners"
+        ]
+      }
+    },
+    "/screeners/{screener_id}/rebase": {
+      "post": {
+        "operationId": "rebase_screeners__screener_id__rebase_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "screener_id",
+            "required": true,
+            "schema": {
+              "title": "Screener Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "whose configs (a label until auth; default the API's)",
+            "in": "query",
+            "name": "user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "whose configs (a label until auth; default the API's)",
+              "title": "User"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Draft"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rebase",
+        "tags": [
+          "screeners"
+        ]
+      }
+    },
+    "/screeners/{screener_id}/schedule": {
+      "put": {
+        "operationId": "schedule_screeners__screener_id__schedule_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "screener_id",
+            "required": true,
+            "schema": {
+              "title": "Screener Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "whose configs (a label until auth; default the API's)",
+            "in": "query",
+            "name": "user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "whose configs (a label until auth; default the API's)",
+              "title": "User"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Schedule"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Schedule",
+        "tags": [
+          "screeners"
+        ]
+      }
+    },
+    "/screeners/{screener_id}/versions": {
+      "get": {
+        "operationId": "versions_screeners__screener_id__versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "screener_id",
+            "required": true,
+            "schema": {
+              "title": "Screener Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "whose configs (a label until auth; default the API's)",
+            "in": "query",
+            "name": "user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "whose configs (a label until auth; default the API's)",
+              "title": "User"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScreenerVersion"
+                  },
+                  "title": "Response Versions Screeners  Screener Id  Versions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Versions",
+        "tags": [
+          "screeners"
         ]
       }
     },

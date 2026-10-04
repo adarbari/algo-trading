@@ -11,13 +11,15 @@ instrument of the selection, a shared `Decision`, fail closed, a coverage audit.
 
 | File | What |
 |---|---|
-| `config/site/presets/screeners/<id>.toml` | site preset, changed by PR, carries `version = N`; visible and editable in the Builder |
+| `config/site/presets/screeners/<id>/v<N>.toml` | site preset versions, added by PR, immutable (hash-locked in `architecture/preset_versions.toml`); the latest is the highest N; visible and editable in the Builder |
 | `config/users/<u>/screeners/<id>/draft.toml` | the Builder's working copy (autosaved, never run nightly) |
 | `config/users/<u>/screeners/<id>/v<N>.toml` | a finalised version: immutable; the latest is the highest N |
+| `config/users/<u>/screeners/<id>/schedule.toml` | the schedule switch (not part of a version, not in the config hash) |
 
 Finalise validates the spec (fields exist in the catalogue, types match, user features
 resolve) and refuses to save an invalid one. Finalising does not schedule: the nightly
-schedule (`schedule = "nightly"`) is a separate switch.
+schedule (`schedule = "nightly"`) is a separate switch, kept outside the versioned document
+and the config hash (the hash says what a screen computes, not when it runs).
 
 ## Example
 
@@ -143,7 +145,8 @@ value = 0.40                              # override one threshold, keep the res
 enabled = false                           # drop an inherited criterion
 ```
 
-Criteria merge by id; a user screen pins the preset version it extends.
+Criteria merge by id; a user screen pins the preset version it extends. A pinned version
+always resolves (preset versions are immutable); rebasing onto a newer version is optional.
 
 ## Preview and results
 

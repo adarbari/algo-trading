@@ -1,0 +1,8 @@
+# Site rule-screen preset versions are immutable (ADR 0029): a user screen pinned to
+# `extends = "<id>@<N>"` must always compute the same thing. Every
+# config/site/presets/screeners/<id>/v<N>.toml is listed here with the sha256 of its bytes;
+# tests/architecture/test_structure.py fails if a listed file changes or disappears, or a
+# version file is not listed. To change a preset, add v<N+1>.toml and its line here.
+# Format: "<id>/v<N>.toml" = "<sha256>"
+
+[versions]

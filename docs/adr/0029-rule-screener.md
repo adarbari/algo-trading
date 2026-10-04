@@ -55,13 +55,19 @@ for the (read-only) API to save them, and a result shape that is the same for ev
   on a non-numeric op, or a tolerance on a HARD criterion is an error, never a silent pass.
 
 ### Versioned configs
-- Site presets: `config/site/presets/screeners/<id>.toml`, reviewed by PR, carrying
-  `version = N`. User screens: `config/users/<u>/screeners/<id>/v<N>.toml` (finalised,
+- Site presets: `config/site/presets/screeners/<id>/v<N>.toml`, reviewed by PR, versioned
+  like user screens: a version file is **immutable** (its sha256 is recorded in
+  `architecture/preset_versions.toml`; a fitness test fails if it changes or disappears), a
+  change is a new `v<N+1>.toml`, and the latest is the highest N. User screens: `config/users/<u>/screeners/<id>/v<N>.toml` (finalised,
   immutable; latest = highest N) and `draft.toml` (the Builder's autosaved working copy),
   behind `ConfigStore` and a new `ConfigWriter` (a DB backend can replace the files later
   under the same protocol).
 - Criteria merge by id (a user overrides one threshold; `enabled = false` removes one).
-  `extends = "<preset>@<N>"` pins a preset version; the UI offers "rebase on vN+1".
+  `extends = "<preset>@<N>"` pins a preset version, which always resolves (it never
+  changes); rebasing is optional: the UI shows "rebase on vM" when a newer version exists.
+- The nightly schedule is a per-screen switch (`config/users/<u>/screeners/<id>/schedule.toml`),
+  outside the versioned document and **outside the config hash**: the hash identifies what a
+  screen computes, so toggling the schedule keeps results comparable across runs.
 - Every result row and run record carries `config_version` next to `user_id`, `config_id`
   and `config_hash`.
 

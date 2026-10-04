@@ -95,6 +95,7 @@ only shrinks (`make dupes-update`).
 | Session / exchange calendar (holidays, early closes, last closed session) | `core/time/calendar.py`; never compute weekdays elsewhere |
 | Which runs of a partition a read sees (`snapshot`: latest; `merge`, all `events/*` + `instruments/id_map`, `instruments/symbol_history`: union, latest per key, from the latest restating run) | `storage/backends/run_selection.py`, per `TableSpec.runs` (ADR 0007) |
 | HTTP (FastAPI routers, response schemas, CORS, error mapping); read-only queries pages show | `apps/api/algotrade_api/` (routes call one query each); `services/explore/` (ADR 0024) |
+| Writing user configs (rule-screen drafts, immutable versions, preset copy / rebase, schedule switch, user features) | `services/authoring/` + `storage/configs/writer.py` (`ConfigWriter`); the API's only write path, `routes/authoring/` (ADR 0029) |
 | Three-valued predicates (`Rule` / `Group`, Kleene logic; missing never passes); the rule-screen spec (parse, validate, catalogue check) | `core/model/predicates.py`; `core/model/screen_spec.py` + `config/strategy/screen_spec.py` (ADR 0029) |
 | Table schemas (columns, declared types, validation); Parquet / Arrow I/O | `storage/tables/schemas.py`; `storage/backends/` (`arrow.py`: casts, `schema_version`, row groups) |
 | Each stored table | exactly one producing module (`[[table]]` in the registry) |
@@ -153,7 +154,7 @@ docstring, and mirror it in tests. Never park code in a neighbouring folder
 (pure), `config/{site,strategy}`, `storage/{tables,backends,configs}`, `quant/`, `data/`,
 `features/{framework,rollups,expressions}`, `strategies/{trading,screeners}`,
 `engines/{backtest,screening,selection}`, `analytics/`,
-`services/{backtests,screening,evaluation,jobs,explore}`. API app: `routes/`, `schemas/`.
+`services/{backtests,screening,evaluation,jobs,explore,authoring}`. API app: `routes/`, `schemas/`.
 Vendor sources (`libs/sources/algotrade_sources/`): `framework/`, `vendors/<vendor>/`,
 `fixtures/`. Ingestion app: `cli/`, `ops/`, `tasks/{framework,<domain>}`,
 `workflows/nightly/`.
@@ -221,7 +222,7 @@ the skill with the fix.
 Commands (need `uv`): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make layout`, `make evaluate`, `make baseline`, `make features-doc`.
 Web (need Node 24): `make web-install`, `make web-check` (part of `make check`), `make web-visual` (screenshots, Docker); in `apps/web`: `npm run dev|storybook|check|visual:update`.
 Ingestion: `algotrade-ingest universe|universe-build|company-details|shares|earnings|bars|rates|corporate-actions|chains|rollups|verify|screen|nightly|report|quality|schedule|purge-raw|retire-features|migrate-ids|golden`, or `algotrade-ingest run <task>` for any registry task, e.g. `run ibkr-contracts`, `run ibkr-iv --from D1 --to D2 [--limit N]` (the resumable IBKR IV backfill; see `README.md`).
-API: `algotrade-api [--reload]` (read-only, 127.0.0.1:8000); after a route / schema change run
+API: `algotrade-api [--reload]` (read-only except user configs via `services/authoring`, 127.0.0.1:8000); after a route / schema change run
 `scripts/export_openapi.py` and commit `apps/api/openapi.json`.
 Configs: site presets in `config/site/` (reviewed via PR); user configs in `config/users/<id>/`
 (git-ignored). Check one with `algotrade-backtest [--user U] config validate|show <id>`; a

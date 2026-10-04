@@ -328,6 +328,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/features/user": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save User Feature */
+        post: operations["save_user_feature_features_user_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -405,6 +422,126 @@ export interface paths {
         };
         /** Features */
         get: operations["features_instruments__instrument_id__features_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/screeners/{screener_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Screener */
+        get: operations["screener_screeners__screener_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/screeners/{screener_id}/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copy */
+        post: operations["copy_screeners__screener_id__copy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/screeners/{screener_id}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save Draft */
+        put: operations["save_draft_screeners__screener_id__draft_put"];
+        post?: never;
+        /** Discard Draft */
+        delete: operations["discard_draft_screeners__screener_id__draft_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/screeners/{screener_id}/finalise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finalise */
+        post: operations["finalise_screeners__screener_id__finalise_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/screeners/{screener_id}/rebase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rebase */
+        post: operations["rebase_screeners__screener_id__rebase_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/screeners/{screener_id}/schedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Schedule */
+        put: operations["schedule_screeners__screener_id__schedule_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/screeners/{screener_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Versions */
+        get: operations["versions_screeners__screener_id__versions_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -707,6 +844,14 @@ export interface components {
              */
             selection: string | null;
         };
+        /** CopyBody */
+        CopyBody: {
+            /**
+             * Preset
+             * @description the site rule-screen preset to extend (pinned)
+             */
+            preset: string;
+        };
         /** Distribution */
         Distribution: {
             /**
@@ -742,6 +887,25 @@ export interface components {
              * Format: date
              */
             session: string;
+        };
+        /** Draft */
+        Draft: {
+            /** Document */
+            document: {
+                [key: string]: unknown;
+            };
+            /** Screener Id */
+            screener_id: string;
+        };
+        /** DraftBody */
+        DraftBody: {
+            /**
+             * Document
+             * @description the screen's TOML keys as JSON (version and schedule are managed)
+             */
+            document: {
+                [key: string]: unknown;
+            };
         };
         /** EquityPoint */
         EquityPoint: {
@@ -890,6 +1054,15 @@ export interface components {
             side: string;
             /** Ts */
             ts: string;
+        };
+        /** Finalised */
+        Finalised: {
+            /** Hash */
+            hash: string;
+            /** Screener Id */
+            screener_id: string;
+            /** Version */
+            version: number;
         };
         /** Health */
         Health: {
@@ -1091,6 +1264,23 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** PresetPin */
+        PresetPin: {
+            /**
+             * Current
+             * @description the site preset's version now
+             */
+            current: number | null;
+            /**
+             * Pinned
+             * @description the preset version the screen extends
+             */
+            pinned: number | null;
+            /** Preset Id */
+            preset_id: string;
+            /** Rebase Available */
+            rebase_available: boolean;
+        };
         /** PriceComparison */
         PriceComparison: {
             /** Adjustment */
@@ -1241,6 +1431,36 @@ export interface components {
              */
             status: string;
         };
+        /** SavedFeature */
+        SavedFeature: {
+            /** Dtype */
+            dtype: string;
+            /** Field */
+            field: string;
+            /** Inputs */
+            inputs: string[];
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+            /** Theme */
+            theme: string;
+        };
+        /** Schedule */
+        Schedule: {
+            /** Schedule */
+            schedule: string | null;
+            /** Screener Id */
+            screener_id: string;
+        };
+        /** ScheduleBody */
+        ScheduleBody: {
+            /**
+             * Schedule
+             * @description "nightly", or null to switch it off
+             */
+            schedule: string | null;
+        };
         /** ScreenConfig */
         ScreenConfig: {
             config: components["schemas"]["ConfigSummary"];
@@ -1250,6 +1470,57 @@ export interface components {
             latest_session: string | null;
             /** Latest Status */
             latest_status: string | null;
+        };
+        /** ScreenerDetail */
+        ScreenerDetail: {
+            /**
+             * Draft
+             * @description the Builder's working copy
+             */
+            draft: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Draft Error
+             * @description why the draft would not finalise
+             */
+            draft_error: string | null;
+            /**
+             * Error
+             * @description why that does not resolve (e.g. rebase needed)
+             */
+            error: string | null;
+            /**
+             * Hash
+             * @description the latest version (else the site preset) resolved
+             */
+            hash: string | null;
+            /** Latest */
+            latest: number | null;
+            /** Layers */
+            layers: string[];
+            preset: components["schemas"]["PresetPin"] | null;
+            /** Resolved */
+            resolved: {
+                [key: string]: unknown;
+            } | null;
+            /** Schedule */
+            schedule: string | null;
+            /** Screener Id */
+            screener_id: string;
+            /** User */
+            user: string;
+            /** Versions */
+            versions: number[];
+        };
+        /** ScreenerVersion */
+        ScreenerVersion: {
+            /** Document */
+            document: {
+                [key: string]: unknown;
+            };
+            /** Version */
+            version: number;
         };
         /** ScreenResults */
         ScreenResults: {
@@ -1389,6 +1660,40 @@ export interface components {
             security_type: string | null;
             /** Symbol */
             symbol: string | null;
+        };
+        /** UserFeatureBody */
+        UserFeatureBody: {
+            /** Categories */
+            categories?: string[] | null;
+            /** Description */
+            description: string;
+            /** Dtype */
+            dtype: string;
+            /** Expr */
+            expr: string;
+            /** Kind */
+            kind?: string | null;
+            /**
+             * Name
+             * @description the feature's name: selected as feature.<name>
+             */
+            name: string;
+            /** Null Meaning */
+            null_meaning: string;
+            /** Params */
+            params?: {
+                [key: string]: number | string | boolean;
+            } | null;
+            /**
+             * Theme
+             * @description config/users/<u>/features/<theme>.toml
+             * @default builder
+             */
+            theme: string;
+            /** Unit */
+            unit: string;
+            /** Valid Range */
+            valid_range?: (number | null)[] | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -2022,6 +2327,42 @@ export interface operations {
             };
         };
     };
+    save_user_feature_features_user_post: {
+        parameters: {
+            query?: {
+                /** @description whose configs (a label until auth; default the API's) */
+                user?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserFeatureBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedFeature"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_health_get: {
         parameters: {
             query?: never;
@@ -2167,6 +2508,288 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FeatureSeries"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    screener_screeners__screener_id__get: {
+        parameters: {
+            query?: {
+                /** @description whose configs (a label until auth; default the API's) */
+                user?: string | null;
+            };
+            header?: never;
+            path: {
+                screener_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenerDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    copy_screeners__screener_id__copy_post: {
+        parameters: {
+            query?: {
+                /** @description whose configs (a label until auth; default the API's) */
+                user?: string | null;
+            };
+            header?: never;
+            path: {
+                screener_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CopyBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_draft_screeners__screener_id__draft_put: {
+        parameters: {
+            query?: {
+                /** @description whose configs (a label until auth; default the API's) */
+                user?: string | null;
+            };
+            header?: never;
+            path: {
+                screener_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discard_draft_screeners__screener_id__draft_delete: {
+        parameters: {
+            query?: {
+                /** @description whose configs (a label until auth; default the API's) */
+                user?: string | null;
+            };
+            header?: never;
+            path: {
+                screener_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    finalise_screeners__screener_id__finalise_post: {
+        parameters: {
+            query?: {
+                /** @description whose configs (a label until auth; default the API's) */
+                user?: string | null;
+            };
+            header?: never;
+            path: {
+                screener_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Finalised"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rebase_screeners__screener_id__rebase_post: {
+        parameters: {
+            query?: {
+                /** @description whose configs (a label until auth; default the API's) */
+                user?: string | null;
+            };
+            header?: never;
+            path: {
+                screener_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    schedule_screeners__screener_id__schedule_put: {
+        parameters: {
+            query?: {
+                /** @description whose configs (a label until auth; default the API's) */
+                user?: string | null;
+            };
+            header?: never;
+            path: {
+                screener_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schedule"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    versions_screeners__screener_id__versions_get: {
+        parameters: {
+            query?: {
+                /** @description whose configs (a label until auth; default the API's) */
+                user?: string | null;
+            };
+            header?: never;
+            path: {
+                screener_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenerVersion"][];
                 };
             };
             /** @description Validation Error */

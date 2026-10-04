@@ -302,7 +302,9 @@ source_modules = ["algotrade.services.explore"]
 forbidden_modules = [
     "algotrade.storage.tables.writers",
     "algotrade.storage.tables.result_writer",
+    "algotrade.storage.configs.writer",
     "algotrade.services.jobs",
+    "algotrade.services.authoring",
 ]
 allow_indirect_imports = true  # the backtest / screen use cases' naming helpers sit beside their writers
 
@@ -529,6 +531,35 @@ source_modules = ["algotrade.config.site"]
 forbidden_modules = ["algotrade.config.strategy"]
 
 [[tool.importlinter.contracts]]
-name = "Layout: use-case packages are independent (backtests, screening)"
+name = "Layout: use-case packages are independent (backtests, screening, authoring)"
 type = "independence"
-modules = ["algotrade.services.backtests", "algotrade.services.screening"]
+modules = ["algotrade.services.backtests", "algotrade.services.screening", "algotrade.services.authoring"]
+
+# ---- ADR 0029: user configs are written only through services.authoring (the API calls it).
+[[tool.importlinter.contracts]]
+name = "Config writes go only through services.authoring (ADR 0029)"
+type = "forbidden"
+source_modules = [
+    "algotrade_api",
+    "algotrade_ingestion",
+    "algotrade_backtest",
+    "algotrade.analytics",
+    "algotrade.config",
+    "algotrade.core",
+    "algotrade.data",
+    "algotrade.engines",
+    "algotrade.features",
+    "algotrade.quant",
+    "algotrade.strategies",
+    "algotrade.services.backtests",
+    "algotrade.services.configs",
+    "algotrade.services.evaluation",
+    "algotrade.services.explore",
+    "algotrade.services.features",
+    "algotrade.services.jobs",
+    "algotrade.services.screening",
+    "algotrade.storage.tables",
+    "algotrade.storage.backends",
+]
+forbidden_modules = ["algotrade.storage.configs.writer"]
+allow_indirect_imports = true  # the API reaches the writer only through services.authoring

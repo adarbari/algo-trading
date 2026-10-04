@@ -7,10 +7,8 @@ from typing import Any
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.configs import resolve_config
+from algotrade.services.configs import config_ids, resolve_config
 from algotrade.services.explore.store import NotFoundError, ReadStore
-
-KIND = "strategies"  # config documents of both kinds (strategy, screener) live here
 
 
 @dataclass(frozen=True)
@@ -44,7 +42,7 @@ def _summary(store: ReadStore, config_id: str, scope: str) -> ConfigSummary:
 def config_list(store: ReadStore, kind: str | None = None) -> list[ConfigSummary]:
     """Site presets, then the user's own configs (``kind``: only strategies or screeners)."""
     scopes = ["site", *([store.user.user_id] if store.user.user_id != SITE_USER else [])]
-    out = [_summary(store, n, s) for s in scopes for n in store.configs.names(s, KIND)]
+    out = [_summary(store, n, s) for s in scopes for n in config_ids(store.configs, s)]
     return [c for c in out if kind is None or c.kind == kind]
 
 

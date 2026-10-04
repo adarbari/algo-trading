@@ -469,6 +469,13 @@ section = "docs/screeners/rules.md#criteria"
 detect = [{ call = "parse_screen_spec" }, { call = "Criterion" }, { call = "Tolerance" }]
 
 [[responsibility]]
+id = "config-authoring"
+description = "Write L4 user configs (ADR 0029): a rule screen's draft, finalise into an immutable v<N> (validated fail closed), copy a site preset pinned to its version and rebase, the schedule switch, named user expression features; the ConfigWriter (atomic, user-scoped files) behind the ConfigStore protocol"
+owner = ["src/algotrade/services/authoring/*", "src/algotrade/storage/configs/writer.py"]
+section = "docs/adr/0029-rule-screener.md#versioned-configs"
+detect = [{ call = "add_version" }, { call = "save_features" }]
+
+[[responsibility]]
 id = "rule-screen-evaluation"
 description = "Evaluate a rule screen (ADR 0029): each criterion's outcome, distance and penalty (HARD / SOFT tolerance band / SCORE), the row decision incl. SKIPPED, the distance score, rank and tie-break, tiers / flags / classify / columns, and the run summary (passed, skipped by reason, narrow misses)"
 owner = ["src/algotrade/strategies/screeners/rules/*"]
