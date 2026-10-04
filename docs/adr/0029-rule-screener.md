@@ -39,8 +39,8 @@ for the (read-only) API to save them, and a result shape that is the same for ev
   subtracts its penalty: a near miss (SOFT or SCORE) `10 × distance / tolerance` (at most 10;
   a SCORE miss beyond its tolerance, without one, or with missing data costs the full 10); a
   HARD fail or a SOFT fail beyond tolerance a fixed 100. More misses and bigger margins score
-  lower; the score is not clipped (REJECT rows are scored, so near misses sort above clear
-  fails). Ties sort by a configurable secondary column (`[rank] tie_break`, descending by
+  lower; the score is clipped to [0, 100] (clipped at 0; only positive scores; REJECT rows
+  are scored, so many hard fails tie at 0). Ties (incl. many 0s and 100s) sort by a configurable secondary column (`[rank] tie_break`, descending by
   default; the VRP preset uses the IV−HV spread), then by instrument id. Replaces linear-ramp
   weights: one rule ("distance from the threshold") instead of a ramp per criterion,
   deterministic, independent of the rest of the run (unlike cross-sectional percentiles).
@@ -98,7 +98,7 @@ cold, <= 200 ms warm for ~10k instruments x <= 25 fields.
 ### Owner decisions (2026-10-03)
 1. Missing data on a HARD or SOFT criterion → SKIPPED (`no <field>`), never a pass.
 2. SOFT is a tolerance band; HARD is strict; SCORE never gates.
-3. Score: 100 minus normalised distance penalties; REJECT rows are scored; ties by a
+3. Score: 100 minus normalised distance penalties, clipped to [0, 100]; REJECT rows are scored; ties by a
    configurable secondary column.
 4. Several near misses → one category by precedence EVENT_RISK > LIQUIDITY_RISK > WATCH, with
    every reason listed.

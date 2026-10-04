@@ -2,8 +2,9 @@
 
 Order: a gating criterion MISSING -> SKIPPED (reasons ``no <field>``); else a gating FAIL ->
 REJECT; else a near miss -> the most severe near-miss ``on_miss`` (EVENT_RISK >
-LIQUIDITY_RISK > WATCH); else QUALIFIED. The score is 100 minus every penalty (not clipped,
-so REJECT rows sort by how badly they missed); SKIPPED rows have none.
+LIQUIDITY_RISK > WATCH); else QUALIFIED. The score is 100 minus every penalty, clipped to
+[0, 100] (never negative; many hard fails tie at 0 and sort by the tie-break column, then
+instrument id); SKIPPED rows have none.
 """
 
 from collections.abc import Sequence
@@ -36,4 +37,4 @@ def score(decision: Decision, results: Sequence[CriterionResult]) -> float | Non
     if decision is Decision.SKIPPED:
         return None
     total = FULL_SCORE - sum(r.penalty for r in results)
-    return round(total, _DIGITS) + 0.0  # + 0.0: never -0.0
+    return round(min(FULL_SCORE, max(0.0, total)), _DIGITS) + 0.0  # + 0.0: never -0.0

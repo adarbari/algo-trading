@@ -104,9 +104,10 @@ def test_score_falls_with_more_and_bigger_misses() -> None:
     rows = {r.instrument_id: r for r in result().rows}
     assert rows["EQ:WATCH"].score == pytest.approx(95.0)
     assert rows["EQ:THIN"].score == pytest.approx(95.0 - 10 * 5 / 10)
-    assert rows["EQ:REJECT"].score == pytest.approx(100 - 100 - 2.5)  # REJECT rows are scored
+    assert rows["EQ:REJECT"].score == 0.0  # 100 - 100 - 2.5 clipped at 0: only positive scores
     assert rows["EQ:FAR"].score == pytest.approx(0.0)
-    assert rows["EQ:REJECT"].score < rows["EQ:FAR"].score < rows["EQ:THIN"].score  # type: ignore[operator]
+    assert rows["EQ:REJECT"].score <= rows["EQ:FAR"].score < rows["EQ:THIN"].score  # type: ignore[operator]
+    assert all(r.score is None or 0.0 <= r.score <= 100.0 for r in rows.values())
 
 
 def test_rank_ties_break_by_column_then_id() -> None:
@@ -117,8 +118,8 @@ def test_rank_ties_break_by_column_then_id() -> None:
         "EQ:WATCH",
         "EQ:NORANK",
         "EQ:THIN",
+        "EQ:REJECT",  # REJECT and FAR both clip to 0: the wider spread sorts first
         "EQ:FAR",
-        "EQ:REJECT",
         "EQ:SKIP",
     ]
     assert [r.rank for r in result().rows] == list(range(1, 9))

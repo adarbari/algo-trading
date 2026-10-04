@@ -2,6 +2,7 @@
 
 import math
 from datetime import date
+from itertools import pairwise
 
 from hypothesis import given
 from hypothesis import strategies as st
@@ -65,7 +66,7 @@ def test_missing_gating_data_is_skipped_never_passed(data: dict) -> None:  # typ
         if r.decision is Decision.SKIPPED:
             assert r.score is None and all(reason.startswith("no ") for reason in r.reasons)
         else:
-            assert r.score is not None and r.score <= 100.0
+            assert r.score is not None and 0.0 <= r.score <= 100.0
         if r.decision is Decision.QUALIFIED:
             assert all(x.outcome is Outcome.PASS for x in r.results if x.gating)
 
@@ -75,6 +76,13 @@ def test_scores_order_rows_and_full_marks_mean_every_threshold_met(data: dict) -
     result = evaluate_screen(SPEC, FeatureView(DAY, data))
     scores = [r.score for r in result.rows if r.score is not None]
     assert scores == sorted(scores, reverse=True)
+    assert all(0.0 <= x <= 100.0 for x in scores)
+    scored = [r for r in result.rows if r.score is not None]
+    for a, b in pairwise(scored):  # ties (many 0s / 100s): tie-break column, then id
+        if a.score == b.score:
+            ka = (a.tie_break is None, -(a.tie_break or 0.0), a.instrument_id)
+            kb = (b.tie_break is None, -(b.tie_break or 0.0), b.instrument_id)
+            assert ka <= kb
     for r in result.rows:
         met = all(x.outcome is Outcome.PASS for x in r.results)
         if r.score is not None:
