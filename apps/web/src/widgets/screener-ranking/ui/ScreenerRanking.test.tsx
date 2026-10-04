@@ -21,6 +21,7 @@ const data: IdeasData = {
   screeners: [
     {
       id: 'vrp-scanner',
+      name: 'VRP scanner',
       user: 'abhinav',
       version: 3,
       qualified: 14,
@@ -29,15 +30,17 @@ const data: IdeasData = {
         { symbol: 'MSFT', score: 79 },
       ],
     },
-    { id: 'near-low', user: 'abhinav', version: null, qualified: 0, top: [] },
+    { id: 'near-low', name: 'near-low', user: 'abhinav', version: null, qualified: 0, top: [] },
   ],
 };
+
+const onNew = vi.fn();
 
 function setup() {
   return render(
     <ToastProvider>
       <TestQueryProvider>
-        <ScreenerRanking />
+        <ScreenerRanking onNewScreener={onNew} />
       </TestQueryProvider>
     </ToastProvider>,
   );
@@ -52,7 +55,7 @@ describe('ScreenerRanking', () => {
     const { container } = setup();
     expect(screen.getByRole('heading', { name: 'Your screeners' })).toBeInTheDocument();
     const items = screen.getAllByRole('listitem');
-    expect(items[0]).toHaveTextContent('vrp-scanner');
+    expect(items[0]).toHaveTextContent('VRP scanner');
     expect(items[0]).toHaveTextContent('AAPL 84 · MSFT 79');
     expect(items[0]).toHaveTextContent('14');
     expect(items[1]).toHaveTextContent('No picks');

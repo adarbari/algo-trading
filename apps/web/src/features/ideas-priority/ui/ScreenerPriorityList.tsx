@@ -15,7 +15,7 @@ export function ScreenerPriorityList({ screeners }: { screeners: readonly Screen
       label="Screener priority"
       items={screeners}
       getKey={(s) => s.id}
-      getLabel={(s) => s.id}
+      getLabel={(s) => s.name}
       renderItem={(screener, { index }) => <ScreenerRow screener={screener} rank={index + 1} />}
       onReorder={(next) => {
         save.mutate(next.map((s) => s.id));

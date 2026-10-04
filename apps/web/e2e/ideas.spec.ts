@@ -38,11 +38,13 @@ for (const theme of ['dark', 'light'] as const) {
     await page.evaluate((t) => {
       document.documentElement.setAttribute('data-theme', t);
     }, theme);
-    await expect(page.getByRole('heading', { level: 1, name: 'Ideas' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Ideas for Fri 2 Oct' }),
+    ).toBeVisible();
     await expect(screeners(page).getByRole('listitem')).toHaveCount(3);
-    await expect(screeners(page).getByRole('listitem').first()).toContainText('vrp-scanner');
+    await expect(screeners(page).getByRole('listitem').first()).toContainText('VRP scanner');
     const aapl = grid(page).getByRole('row', { name: /AAPL/ });
-    await expect(aapl).toContainText('short-premium-liquidity');
+    await expect(aapl).toContainText('Short premium liquidity');
     await expect(aapl).toContainText('Earnings first');
     await expect(grid(page).getByRole('row', { name: /NVDA/ })).not.toContainText('Earnings first');
     await expectAccessible(page);
@@ -55,6 +57,25 @@ test('filters by decision', async ({ page }) => {
   await page.getByRole('button', { name: 'Event risk' }).click();
   await expect(grid(page).getByRole('row', { name: /TSLA/ })).toBeVisible();
   await expect(grid(page).getByRole('row', { name: /AAPL/ })).toHaveCount(0);
+});
+
+test('shows the stored display values and the watch-outs', async ({ page }) => {
+  await page.goto('/ideas');
+  const headers = await grid(page).getByRole('columnheader').allTextContents();
+  expect(headers.join(' | ')).toMatch(/IV30.*HV30.*IV \/ HV.*Put strike.*Put ROC/);
+  const aapl = grid(page).getByRole('row', { name: /AAPL/ });
+  await expect(aapl).toContainText('31.0%');
+  await expect(aapl).toContainText('1.49');
+  await expect(aapl).toContainText('Earnings before expiry');
+  await expect(grid(page).getByRole('row', { name: /KO/ })).toContainText('Leveraged / inverse');
+  await expect(grid(page).getByRole('row', { name: /KO/ })).toContainText('Liquidity risk');
+  await expect(grid(page).getByRole('row', { name: /TSLA/ })).toContainText('Large move');
+});
+
+test('+ New screener opens the Builder', async ({ page }) => {
+  await page.goto('/ideas');
+  await page.getByRole('button', { name: '+ New screener' }).click();
+  await expect(page).toHaveURL(/\/screeners\/new$/);
 });
 
 test('opens a ticker and a compare set in Explore', async ({ page }) => {
@@ -77,12 +98,12 @@ test('opens a ticker and a compare set in Explore', async ({ page }) => {
 test('reordering the screeners saves the new priority', async ({ page }) => {
   const mock = await mockIdeasApi(page);
   await page.goto('/ideas');
-  await page.getByRole('button', { name: 'Reorder vrp-scanner' }).focus();
+  await page.getByRole('button', { name: 'Reorder VRP scanner' }).focus();
   await page.keyboard.press('Space');
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Space');
   await expect(screeners(page).getByRole('listitem').first()).toContainText(
-    'short-premium-liquidity',
+    'Short premium liquidity',
   );
   await expect
     .poll(() => mock.saved)
@@ -92,10 +113,10 @@ test('reordering the screeners saves the new priority', async ({ page }) => {
 test('a failed save puts the order back and says so', async ({ page }) => {
   await mockIdeasApi(page, { failSave: true });
   await page.goto('/ideas');
-  await page.getByRole('button', { name: 'Reorder vrp-scanner' }).focus();
+  await page.getByRole('button', { name: 'Reorder VRP scanner' }).focus();
   await page.keyboard.press('Space');
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Space');
   await expect(page.getByText('Could not save the screener order')).toBeVisible();
-  await expect(screeners(page).getByRole('listitem').first()).toContainText('vrp-scanner');
+  await expect(screeners(page).getByRole('listitem').first()).toContainText('VRP scanner');
 });

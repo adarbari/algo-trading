@@ -19,7 +19,17 @@
           "klass": "A",
           "reasons": "",
           "criteria": [],
-          "columns": {}
+          "columns": {
+            "iv30": 0.31,
+            "hv30": 0.21,
+            "iv_hv_ratio": 1.49,
+            "put_strike": 205,
+            "put_delta": -0.25,
+            "put_premium": 2.1,
+            "put_roc": 0.019
+          },
+          "flags": [],
+          "criterion_values": {}
         },
         {
           "config_id": "short-premium-liquidity",
@@ -32,7 +42,9 @@
           "klass": "A",
           "reasons": "",
           "criteria": [],
-          "columns": {}
+          "columns": {},
+          "flags": [],
+          "criterion_values": {}
         }
       ],
       "next_earnings_date": "2026-10-29",
@@ -56,7 +68,13 @@
           "klass": "B",
           "reasons": "",
           "criteria": [],
-          "columns": {}
+          "columns": {
+            "iv30": 0.28,
+            "hv30": 0.2,
+            "iv_hv_ratio": 1.42
+          },
+          "flags": [],
+          "criterion_values": {}
         }
       ],
       "next_earnings_date": "2026-10-28",
@@ -80,7 +98,9 @@
           "klass": "A",
           "reasons": "",
           "criteria": [],
-          "columns": {}
+          "columns": {},
+          "flags": [],
+          "criterion_values": {}
         },
         {
           "config_id": "vrp-scanner",
@@ -93,7 +113,9 @@
           "klass": "A",
           "reasons": "",
           "criteria": [],
-          "columns": {}
+          "columns": {},
+          "flags": [],
+          "criterion_values": {}
         }
       ],
       "next_earnings_date": "2026-11-19",
@@ -111,13 +133,15 @@
           "config_version": 3,
           "user": "abhinav",
           "session": "2026-10-02",
-          "decision": "WATCH",
+          "decision": "LIQUIDITY_RISK",
           "score": 66.0,
           "tier": "A",
           "klass": "A",
           "reasons": "ADV below target",
           "criteria": [],
-          "columns": {}
+          "columns": {},
+          "flags": ["leveraged_inverse"],
+          "criterion_values": {}
         }
       ],
       "next_earnings_date": "2026-10-21",
@@ -141,7 +165,9 @@
           "klass": "B",
           "reasons": "Earnings in 6 sessions",
           "criteria": [],
-          "columns": {}
+          "columns": {},
+          "flags": ["large_move"],
+          "criterion_values": {}
         }
       ],
       "next_earnings_date": "2026-10-08",
@@ -165,13 +191,35 @@
           "klass": "A",
           "reasons": "",
           "criteria": [],
-          "columns": {}
+          "columns": {},
+          "flags": [],
+          "criterion_values": {}
         }
       ],
       "next_earnings_date": null,
       "days_to_earnings": null,
       "closest_expiry_dte": 8,
       "earnings_before_expiry": null
+    }
+  ],
+  "screeners": [
+    {
+      "config_id": "vrp-scanner",
+      "user": "abhinav",
+      "name": "VRP scanner",
+      "version": 3
+    },
+    {
+      "config_id": "short-premium-liquidity",
+      "user": "abhinav",
+      "name": "Short premium liquidity",
+      "version": 3
+    },
+    {
+      "config_id": "post-earnings-iv-crush",
+      "user": "abhinav",
+      "name": "Post-earnings IV crush",
+      "version": 3
     }
   ]
 }

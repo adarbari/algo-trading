@@ -92,10 +92,17 @@ def test_strategy_validation() -> None:
         ({**base, "schedule": "hourly"}, "schedule"),
         ({**base, "exports": "csv"}, "exports"),
         ({**base, "bogus": 1}, "unknown keys"),
+        ({**base, "name": " "}, "display name"),
         ({**base, "id": "../etc"}, "invalid config id"),
     ]:
         with pytest.raises(ConfigurationError, match=message):
             parse_strategy(raw, "c")
+
+
+def test_a_config_may_carry_a_display_name() -> None:
+    raw = {"id": "c", "kind": "screener", "impl": "x", "name": "My scan"}
+    assert parse_strategy(raw, "c").name == "My scan"
+    assert parse_strategy({k: v for k, v in raw.items() if k != "name"}, "c").name is None
 
 
 def test_user_context_validates_ids() -> None:

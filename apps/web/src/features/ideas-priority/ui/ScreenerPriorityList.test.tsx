@@ -19,6 +19,7 @@ const PUT = vi.mocked(api.PUT);
 
 const screener = (id: string, qualified: number): ScreenerSummary => ({
   id,
+  name: id,
   user: 'abhinav',
   version: 1,
   qualified,
@@ -30,6 +31,7 @@ const cached: IdeasResponse = {
   session: '2026-10-02',
   priority: ['vrp', 'liq'],
   total: 0,
+  screeners: [],
   items: [],
 };
 const key = queryKeys.ideas.top(200);

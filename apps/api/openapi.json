@@ -1559,9 +1559,21 @@
             "title": "Criteria",
             "type": "array"
           },
+          "criterion_values": {
+            "additionalProperties": true,
+            "title": "Criterion Values",
+            "type": "object"
+          },
           "decision": {
             "title": "Decision",
             "type": "string"
+          },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Flags",
+            "type": "array"
           },
           "klass": {
             "anyOf": [
@@ -1621,9 +1633,53 @@
           "klass",
           "tier",
           "criteria",
-          "columns"
+          "columns",
+          "criterion_values",
+          "flags"
         ],
         "title": "IdeaPick",
+        "type": "object"
+      },
+      "IdeaScreener": {
+        "properties": {
+          "config_id": {
+            "title": "Config Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "config_id",
+          "user",
+          "name",
+          "version"
+        ],
+        "title": "IdeaScreener",
         "type": "object"
       },
       "Ideas": {
@@ -1642,6 +1698,13 @@
             "title": "Priority",
             "type": "array"
           },
+          "screeners": {
+            "items": {
+              "$ref": "#/components/schemas/IdeaScreener"
+            },
+            "title": "Screeners",
+            "type": "array"
+          },
           "session": {
             "format": "date",
             "title": "Session",
@@ -1655,6 +1718,7 @@
         "required": [
           "session",
           "priority",
+          "screeners",
           "total",
           "items"
         ],

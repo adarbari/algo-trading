@@ -26,7 +26,13 @@ beforeEach(() => {
 describe('useIdeas', () => {
   it('fetches /ideas and shapes it', async () => {
     GET.mockResolvedValue({
-      data: { session: '2026-10-02', priority: ['vrp'], total: 0, items: [] },
+      data: {
+        session: '2026-10-02',
+        priority: ['vrp'],
+        total: 0,
+        screeners: [{ config_id: 'vrp', user: 'abhinav', name: 'VRP scanner', version: 1 }],
+        items: [],
+      },
       response: new Response(null, { status: 200 }),
     });
     const { result } = renderHook(() => useIdeas(), { wrapper });
@@ -34,7 +40,9 @@ describe('useIdeas', () => {
       expect(result.current.isSuccess).toBe(true);
     });
     expect(GET).toHaveBeenCalledWith('/ideas', { params: { query: { limit: IDEAS_LIMIT } } });
-    expect(result.current.data?.screeners.map((s) => s.id)).toEqual(['vrp']);
+    expect(result.current.data?.screeners.map((s) => [s.id, s.name])).toEqual([
+      ['vrp', 'VRP scanner'],
+    ]);
   });
 
   it('surfaces an API error', async () => {

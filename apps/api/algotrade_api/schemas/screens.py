@@ -53,6 +53,8 @@ class IdeaPick(Schema):
     tier: str | None
     criteria: list[IdeaCriterion]
     columns: dict[str, Any]
+    criterion_values: dict[str, Any]
+    flags: list[str]
 
 
 class Idea(Schema):
@@ -66,8 +68,16 @@ class Idea(Schema):
     earnings_before_expiry: bool | None
 
 
+class IdeaScreener(Schema):
+    config_id: str
+    user: str | None
+    name: str
+    version: int | None
+
+
 class Ideas(Schema):
     session: date
     priority: list[str]
+    screeners: list[IdeaScreener]
     total: int
     items: list[Idea]

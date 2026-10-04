@@ -14,12 +14,19 @@ const pick = (config_id: string, decision: string, score: number | null) => ({
   reasons: '',
   criteria: [],
   columns: {},
+  criterion_values: {},
+  flags: [],
 });
 
 const response: IdeasResponse = {
   session: '2026-10-02',
   priority: ['vrp', 'liq', 'unused'],
   total: 3,
+  screeners: [
+    { config_id: 'vrp', user: 'abhinav', name: 'VRP scanner', version: 2 },
+    { config_id: 'liq', user: 'abhinav', name: 'liq', version: 2 },
+    { config_id: 'unused', user: null, name: 'Unused one', version: null },
+  ],
   items: [
     {
       rank: 1,
@@ -78,6 +85,63 @@ describe('toIdeasData', () => {
     expect(data.screeners[0]).toMatchObject({ qualified: 1, top: [{ symbol: 'AAPL', score: 84 }] });
     expect(data.screeners[1]).toMatchObject({ qualified: 0, user: 'abhinav', version: 2 });
     expect(data.screeners[2]).toMatchObject({ qualified: 0, top: [], version: null });
+  });
+});
+
+describe('display values and watch-outs', () => {
+  const rich: IdeasResponse = {
+    ...response,
+    items: [
+      {
+        rank: 1,
+        instrument_id: 'EQ:A',
+        symbol: 'AAPL',
+        next_earnings_date: '2026-10-29',
+        days_to_earnings: 27,
+        closest_expiry_dte: 36,
+        earnings_before_expiry: true,
+        picks: [
+          {
+            ...pick('liq', 'LIQUIDITY_RISK', 60),
+            flags: ['leveraged_inverse', 'large_move'],
+            columns: { iv30: 0.3, hv30: 0.2 },
+            criterion_values: { iv30: 0.99, adv: 4.5e7 },
+          },
+          {
+            ...pick('vrp', 'QUALIFIED', 84),
+            flags: ['large_move', 'odd_flag'],
+            columns: { iv30: 0.31, put_roc: 0.019, note: 'x' },
+          },
+        ],
+      },
+    ],
+  };
+  const [idea] = toIdeasData(rich).ideas;
+
+  it('takes each value from the best pick that has it, columns before criterion values', () => {
+    expect(idea?.metrics).toEqual({
+      iv30: 0.31,
+      put_roc: 0.019,
+      note: 'x',
+      hv30: 0.2,
+      adv: 4.5e7,
+    });
+  });
+
+  it('lists each watch-out once, with the earnings-before-expiry flag', () => {
+    expect(idea?.watchOut.map((w) => w.label)).toEqual([
+      'Large move',
+      'Odd flag',
+      'Leveraged / inverse',
+      'Liquidity risk',
+      'Earnings before expiry',
+    ]);
+  });
+
+  it('names the screeners', () => {
+    const data = toIdeasData(rich);
+    expect(data.screeners.map((s) => s.name)).toEqual(['VRP scanner', 'liq', 'Unused one']);
+    expect(idea?.picks.map((p) => p.screenerName)).toEqual(['VRP scanner', 'liq']);
   });
 });
 

@@ -28,6 +28,7 @@ export function TopIdeas({ onCompare, onOpen }: TopIdeasProps) {
   const [filters, setFilters] = useState<IdeaFilters>(NO_FILTERS);
   const [selected, setSelected] = useState<string[]>([]);
   const all = useMemo(() => ideas.data?.ideas ?? [], [ideas.data]);
+  const columns = useMemo(() => ideaColumns(all), [all]);
   const rows = useMemo(() => filterIdeas(all, filters), [all, filters]);
   const symbols = selected.flatMap((id) => {
     const symbol = all.find((idea) => idea.instrumentId === id)?.symbol;
@@ -76,7 +77,7 @@ export function TopIdeas({ onCompare, onOpen }: TopIdeasProps) {
     >
       <DataTable<Idea>
         label="Top ideas"
-        columns={ideaColumns}
+        columns={columns}
         rows={rows}
         getRowId={(idea) => idea.instrumentId}
         getRowLabel={(idea) => idea.symbol ?? idea.instrumentId}

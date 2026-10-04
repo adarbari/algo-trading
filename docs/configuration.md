@@ -39,7 +39,7 @@ feature.
 Rule           { field, op: eq|ne|in|not_in|gt|gte|lt|lte|between|is_null|not_null, value }
 Group          { all: [Rule|Group] } | { any: [Rule|Group] } | { not: Rule|Group }
 Selection      { name, where: Group, max_instruments?, order_by? }   # top-N by a field
-StrategyConfig { id, kind: screener|strategy, impl, params, selection (preset name or inline),
+StrategyConfig { id, name? (display name; the id when absent; not hashed), kind: screener|strategy, impl, params, selection (preset name or inline),
                  selection_overrides?, schedule?: nightly, exports?: [...],
                  screening?: {...}, backtest?: {...}, extends? (user configs),
                  rule screens (impl = "rules"): version?, criteria, tiers?, flags?,

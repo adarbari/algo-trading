@@ -2,18 +2,24 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
+import { expectNoA11yViolations } from '@/shared/lib/testing';
+
 import { IdeasPage } from './IdeasPage';
 
 const widgets = vi.hoisted(() => ({ ranking: vi.fn(), top: vi.fn() }));
 
 vi.mock('@/widgets/screener-ranking', async () => {
-  const { Text } = await import('@algotrade/ui');
+  const { Button } = await import('@algotrade/ui');
   return {
-    ScreenerRanking: () => {
-      widgets.ranking();
-      return <Text>screener ranking</Text>;
+    ScreenerRanking: (props: { onNewScreener: () => void }) => {
+      widgets.ranking(props);
+      return <Button onClick={props.onNewScreener}>new screener</Button>;
     },
   };
+});
+vi.mock('@/widgets/ideas-heading', async () => {
+  const { Heading } = await import('@algotrade/ui');
+  return { IdeasHeading: () => <Heading level={1}>Ideas for Fri 2 Oct</Heading> };
 });
 vi.mock('@/widgets/top-ideas', async () => {
   const { Button } = await import('@algotrade/ui');
@@ -50,12 +56,17 @@ describe('IdeasPage', () => {
     const user = userEvent.setup();
     const onCompare = vi.fn();
     const onOpen = vi.fn();
-    render(<IdeasPage onCompare={onCompare} onOpen={onOpen} />);
-    expect(screen.getByRole('heading', { level: 1, name: 'Ideas' })).toBeInTheDocument();
-    expect(screen.getByText('screener ranking')).toBeInTheDocument();
+    const onNewScreener = vi.fn();
+    const { container } = render(
+      <IdeasPage onCompare={onCompare} onOpen={onOpen} onNewScreener={onNewScreener} />,
+    );
+    expect(screen.getByRole('heading', { level: 1, name: 'Ideas for Fri 2 Oct' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'new screener' }));
+    expect(onNewScreener).toHaveBeenCalledOnce();
     await user.click(screen.getByRole('button', { name: 'compare' }));
     expect(onCompare).toHaveBeenCalledWith({ sel: 'AAPL,MSFT', focus: 'AAPL' });
     await user.click(screen.getByRole('button', { name: 'open' }));
     expect(onOpen).toHaveBeenCalledWith('KO');
+    await expectNoA11yViolations(container);
   });
 });

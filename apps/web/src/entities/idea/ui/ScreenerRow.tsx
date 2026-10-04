@@ -17,7 +17,7 @@ export function ScreenerRow({ screener, rank }: { screener: ScreenerSummary; ran
       <Stack direction="row" gap={3} align="center">
         <Mono tone="muted">{rank}</Mono>
         <Stack gap={0}>
-          <Text weight="medium">{screener.id}</Text>
+          <Text weight="medium">{screener.name}</Text>
           {meta ? (
             <Text size="xs" tone="muted">
               {meta}
