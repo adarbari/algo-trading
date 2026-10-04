@@ -15,8 +15,8 @@ Before writing:
   `architecture/layout.toml` with a grep. Extend the owner; never re-implement it.
 
 Work in a worktree (`scripts/worktree.sh <branch>`, then `source worktree.env`) when the
-main checkout is busy; never `--no-verify` / `SKIP=`. On a shared machine run `pytest -n 2`
-and `vitest --maxWorkers=2`.
+main checkout is busy; never `--no-verify` / `SKIP=`. On the shared machine run
+`make check WORKERS=2 WEB_WORKERS=2` (and `pytest -n 2` when running tests directly).
 
 While writing:
 

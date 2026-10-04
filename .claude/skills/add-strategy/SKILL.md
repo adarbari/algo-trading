@@ -12,12 +12,7 @@ Data loading, adjustment, selection, sizing, costs and run records are owned els
 (`architecture/ownership.toml`); reuse them through `services/backtests/run.py`, never copy
 them. Shared signal maths belongs in one helper: `make dupes` must pass.
 
-0. **Where it goes:** look the kind up in the "Where does this go?" table (CLAUDE.md,
-   Directory layout) and its folder in `architecture/layout.toml`. Here:
-   `strategies/trading/`; shared maths in `quant/`. If no folder fits, add one for the new
-   kind (`.claude/skills/add-responsibility`, step 3); never park code in a neighbouring
-   folder. Tests go in the mirrored folder; run `make layout` and plan a split if the folder
-   is at 8+ modules.
+0. **Where it goes:** `strategies/trading/`; shared maths in `quant/` (`grep -n purpose architecture/layout.toml`); no fit: new folder, `add-responsibility` step 3. Tests mirror it; if a folder is at 8+ modules, plan the split (`make layout`).
 1. **Location:** one module in `src/algotrade/strategies/trading/`. Subclass `Strategy`
    (`strategies/trading/base.py`): `warmup_bars`, `on_bar(view) -> target weights | None`,
    `params()`. The view is `core/views/market_view.py` (`MarketView`); weights and errors

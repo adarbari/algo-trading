@@ -10,7 +10,7 @@ high_52w - 1`, a HIGH / LOW label from thresholds, `shares x close`.) Then it is
 **expression feature: a TOML entry, no code** (ADR 0023 step 3):
 
 1. Add `[name]` to the theme file in `config/site/features/` (`price.toml`,
-   `volatility.toml`, `fundamentals.toml`, `liquidity.toml`; a new theme is a new file):
+   `volatility.toml`, `fundamentals.toml`, `liquidity.toml`, `vrp.toml`; a new theme is a new file):
    `expr`, `dtype`, `unit`, `description`, `null_meaning`, and as needed `kind = "label"` +
    `categories`, `valid_range = [min, max]` (`inf` open; a flag, never a clip), `params = {...}`
    (thresholds as named constants), `version` (bump it when the formula changes). The language
@@ -53,15 +53,7 @@ Never read storage or `algotrade.data` inside a group (import-linter enforces it
 loader under `features/`, and never write a new task for a group. `make ownership` and
 `make dupes` must pass.
 
-0. **Where it goes:** look the kind up in the "Where does this go?" table (CLAUDE.md,
-   Directory layout) and its folder in `architecture/layout.toml`. Here: a new feature of an
-   existing group → that group's module (a new stored column = a new group version, step 6);
-   a new group → `features/rollups/<name>.py`; a new input table's read → its owner in
-   `src/algotrade/data/` plus an entry in `data/feature_inputs.py` (`INPUTS`), never a loader
-   under `features/`; pure maths → `quant/`. If no folder fits, add one for the new kind
-   (`.claude/skills/add-responsibility`, step 3); never park code in a neighbouring folder.
-   Tests go in the mirrored folder (`tests/unit/features/rollups/test_<name>.py`; inputs:
-   `tests/unit/data/`); run `make layout` and plan a split if the folder is at 8+ modules.
+0. **Where it goes:** a feature of an existing group goes in that group's module (a new stored column = a new group version, step 6); a new group in `features/rollups/<name>.py`; a new input table's read in its owner in `src/algotrade/data/` plus an `INPUTS` entry in `data/feature_inputs.py`; pure maths in `quant/` (`grep -n purpose architecture/layout.toml`); no fit: new folder, `add-responsibility` step 3. Tests mirror it; if a folder is at 8+ modules, plan the split (`make layout`).
 1. **Declare its features** in `src/algotrade/features/rollups/<name>.py`: `FEATURES = (
    Feature(name, dtype, unit, description, null_meaning, kind, valid_range=..., categories=...,
    inputs=...), ...)` (`features/framework/feature.py`): `dtype` one of `float32 | float | int |

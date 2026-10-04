@@ -1,7 +1,7 @@
 # ADR 0005: Ingestion is the only writer of market and feature data
 
 **Status:** accepted (2026-10-02); amended 2026-10-03 by ADR 0027 (vendor SDKs, credentials
-handling and source adapters now live in the shared package `libs/sources`, `algotrade_sources`)
+handling and source adapters now live in the shared package `libs/sources`, `algotrade_sources`); amended by ADR 0028 (the API's one write: its live-quote log, `live/option_quotes`)
 
 ## Context
 If several apps write data, nobody owns its quality and backtests stop being reproducible.

@@ -312,5 +312,7 @@ With PR 4 the catalogue covers every v1 screen (Ideas, Screener builder, Explore
 ## Before any screen is built
 
 Tokens and mockups are approved by the owner first (done 2026-10-03: Ideas, Screener
-builder, Explore, Ingestion). Only then is the component catalogue built, and only after
-that the app.
+builder, Explore, Ingestion). A new mockup is needed only for a new screen/page or a visual
+pattern in no approved mockup (a new chart type, layout or navigation pattern); a component
+in an approved mockup, or built purely from existing tokens and primitives, needs none (its
+PR carries stories, light/dark screenshots and axe; the owner reviews it there).

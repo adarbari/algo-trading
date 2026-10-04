@@ -8,7 +8,7 @@ description: Add a new responsibility (a kind of work some module must own) or m
 Read first: ADR 0019 (`docs/adr/0019-ownership-and-boundaries.md`),
 `architecture/ownership.toml` and `architecture/layout.toml` (ADR 0020, directory layout).
 
-**The ownership ratchet is at zero** (since restructure PR 6): `make ownership` fails on any
+**The ownership ratchet is at zero**: `make ownership` fails on any
 hit outside an owner, `architecture/known_violations.toml` must stay empty, and no
 `[[pending_contract]]` may exist (`tests/architecture/test_ownership.py` asserts both). There
 is no "park it in the ratchet" option: extend the owner, narrow a wrong detect rule, or, for
@@ -27,8 +27,8 @@ a genuine exception, write an ADR and list the module in `allowed` with the reas
    (`string_prefix`). Run `make ownership`; it must report no new hits. If a rule hits
    legitimate code, narrow the rule or add the module to `allowed` with a comment saying
    why. Never add the hit to `known_violations.toml`.
-3. **Where does the code go?** Look the kind up in the "Where does this go?" table
-   (CLAUDE.md, Directory layout) and `architecture/layout.toml` (every directory under
+3. **Where does the code go?** Look the kind up in `architecture/layout.toml`
+   (`grep -n purpose`; (every directory under
    `src/`, `apps/`, `tests/`, `config/`, `docs/`, with its purpose; one kind of thing per
    folder). Put the module in the folder whose purpose fits, named for what it does (never
    `utils` / `helpers` / `common` / `misc` / `shared`: `[banned_module_names]`). Run
@@ -43,8 +43,7 @@ a genuine exception, write an ADR and list the module in `allowed` with the reas
    - the mirrored test folder (`tests/unit/<path>/`, `tests/libs/sources/<path>/` or `tests/apps/<app>/<path>/`, with an
      `__init__.py`); a new non-mirrored test bucket (helpers, a contract suite) is a
      `[[test_dir]]`; a new config or docs folder a `[[config_dir]]` / `[[docs_dir]]`;
-   - the "Where does this go?" row in `CLAUDE.md` if it is a new kind of code, and an
-     addendum to ADR 0020 (`docs/adr/0020-directory-layout.md`) when the top-level structure
+   - an addendum to ADR 0020 (`docs/adr/0020-directory-layout.md`) when the top-level structure
      changes (a new top-level library package, app folder or test suite).
    Splitting a folder: move modules into kind subfolders, update imports and
    `architecture/ownership.toml` paths, and move the tests to mirror (no re-export shims).
@@ -57,7 +56,7 @@ a genuine exception, write an ADR and list the module in `allowed` with the reas
    as an import-linter contract (`make arch`), never as a pending entry.
 6. **Boundary change?** If the new owner crosses a layer or app boundary, or a rule R1-R5
    changes, write an ADR (`.claude/skills/write-adr`) and update `docs/architecture.md`
-   section 14 and the Ownership table in `CLAUDE.md`.
+   section 14 (`CLAUDE.md` points to the toml, no table to update).
 7. **Site settings:** a new key in `config/site/*.toml` gets a typed field in
    `src/algotrade/config/site/settings.py` (the one loader, with validation and an error path) and
    must drive code (`tests/architecture/test_ownership.py`). Environment variables are read

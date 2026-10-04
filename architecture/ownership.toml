@@ -15,7 +15,7 @@
 #                   string / string_prefix a string literal (docstrings ignored)
 #
 # scripts/check_ownership.py reports hits outside owner/target_owner/allowed. The ratchet
-# (architecture/known_violations.toml) is EMPTY since restructure PR 6: any hit fails CI.
+# (architecture/known_violations.toml) is EMPTY: any hit fails CI.
 # An exception needs an ADR, and then belongs in `allowed` (with the reason), never the ratchet.
 
 doc = "docs/adr/0019-ownership-and-boundaries.md"

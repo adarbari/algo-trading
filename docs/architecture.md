@@ -51,8 +51,9 @@ versus planned. Detail lives in companion docs:
 
 ### Build status
 
-| Area | Built | Planned (phase) |
-|---|---|---|
+See [roadmap.md](roadmap.md) (phase tables and Now / Next) for what is built; this document describes the target.
+
+---|---|---|
 | Apps | `apps/ingestion`, `apps/backtest`, `apps/api` v1 (read-only, ADR 0024); `apps/web` skeleton + harness (ADR 0025: layers, design-system package, final tokens + layout primitives, placeholder routes) | API writes (submit jobs) (4), `apps/web` screens (5, after mockup approval) |
 | L1 | `instruments/reference` from the Nasdaq Trader + SPY universe builder (or universe CSVs) with FIGI / CIK and vendor security types (Massive), `instruments/symbol_history`, FIGI-based `instrument_id` + `instruments/id_map` + `SymbolResolver` (ADR 0018), company details (SEC EDGAR), `events/reference_change` (incl. `ticker_changed`, `id_changed`) + `events/index_change`, rollups `option_liquidity@v1`, `price_stats@v2`, `earnings@v1` (the rollup framework, 2b.2; v2 since ADR 0023 step 3), `InstrumentView` reader | `iv_history` rollup (2b.3) and the liquidity class (an expression feature since ADR 0023 step 3); `fundamentals@v2` + `instruments/shares` from SEC company facts (2b.4) |
 | L2 | `chains/*` (Cboe), `events/earnings` (Nasdaq), `bars/1d` + `events/split` + `events/dividend` (Massive, unadjusted; adjusted at read time), `rates/treasury` (U.S. Treasury par yield curve), golden data | live Massive run awaits the API key (1); intraday bars + `rollups/daily/*` (6) |
@@ -86,7 +87,7 @@ vendor responses, run and job records); above them sit outputs (results, per use
 | # | Rule | ADR |
 |---|---|---|
 | 1 | Apps are separate processes and packages in one repo. They **never import each other**; they share only the library and storage. | [0004](adr/0004-apps-and-shared-libraries.md) |
-| 2 | **Only `apps/ingestion` writes** market and rollup data. Everyone else reads. Vendor SDKs and credentials live only in ingestion. | [0005](adr/0005-ingestion-is-the-only-writer.md) |
+| 2 | **Only `apps/ingestion` writes** market and rollup data. The API writes only user configs ([0029](adr/0029-rule-screener.md)) and its live-quote log ([0028](adr/0028-ibkr-enrichment-source.md)). Everyone else reads. Vendor SDKs live in `libs/sources` ([0027](adr/0027-vendor-sources-shared-package.md)); credentials are read only through `config.env`. | [0005](adr/0005-ingestion-is-the-only-writer.md) |
 | 3 | Storage is organised by **data grain and layer** behind repository interfaces. Parquet on local disk today (DuckDB-readable; a DuckDB query engine is planned); backends swap via `ALGOTRADE_DATA_URL`. | [0006](adr/0006-storage-grains-and-adapters.md), [0016](adr/0016-four-data-layers.md) |
 | 4 | All market and rollup data is **point-in-time**: every row records when it happened *and* when we learned it. | [0007](adr/0007-point-in-time-data.md) |
 | 5 | **Backtests only read from stores.** They never call a vendor. Missing data is an error that names the ingestion job to run. | [0008](adr/0008-backtests-read-only-from-stores.md) |
@@ -285,7 +286,7 @@ and an HTML part (inline styles only, no images or external assets).
 
 ## 7. Consistency and concurrency
 
-- **Writers:** only ingestion writes market and rollup data. Every file is written to a unique
+- **Writers:** only ingestion writes market and rollup data (the API writes only user configs and its live-quote log, ADRs 0029 / 0028). Every file is written to a unique
   temp file in its directory and renamed into place; a run replaces only its own partition.
   The per-partition run index (`_runs.json`) is updated under a file lock, so two runs writing
   the same partition at once (threads or processes) are both indexed (contract-tested).
@@ -355,7 +356,7 @@ Extra contracts:
 | `analytics/` | Metrics and report formatting from equity curves + fills. | core |
 | `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. `selection/`: three-valued evaluation with a per-rule audit; `schedule.py`, the rebalance sessions and the audit of each change. `backtest/universe.py`: the tradable set per bar (fixed, or from a rebalance schedule; exits on removal). | strategies, config, analytics, core |
 | `services/` | Use cases: `backtests/`, `screening/` (run + `exports`), `jobs/`, `evaluation/`; shared by several: `configs`, `selection`, golden `datasets`, `views` (FeatureView builder), `features` (expression features on read: only the stored columns they need). | everything below except `storage.tables.writers` and `storage.tables.readers` (through `data/`) |
-| `libs/sources` (`algotrade_sources`, ADR 0027) | Vendor sources as a shared package: `framework/` (protocols, HTTP with retries, pacing, the source registry), `vendors/<vendor>/`, `fixtures/` (synthetic/golden). Vendor SDKs (`ib_async`, `openpyxl`) are declared here. Used by ingestion (batch); the API may use it later for live, read-only reads; backtests and the library never import it. | core, quant, `config.env` only (import-linter) |
+| `libs/sources` (`algotrade_sources`, ADR 0027) | Vendor sources as a shared package: `framework/` (protocols, HTTP with retries, pacing, the source registry), `vendors/<vendor>/`, `fixtures/` (synthetic/golden). Vendor SDKs (`ib_async`, `openpyxl`) are declared here. Used by ingestion (batch); the API uses it for live, read-only quotes (ADR 0028); backtests and the library never import it. | core, quant, `config.env` only (import-linter) |
 | `apps/ingestion` | Depends on `algotrade-sources`; `tasks/` (`framework/`: `IngestRun` in `run.py` and the task registry; one module per dataset in `reference/`, `market/`, `derived/`, `maintenance/`); nightly workflow (`workflows/nightly/`: ordered, isolated registry tasks, catch-up, screens as jobs, notification); `cli/` (`algotrade-ingest`); `ops/` (schedule). | library |
 | `apps/api` | `algotrade-api` (ADR 0024): `main.py` (app factory, CORS, error handlers), `routes/` (one router per area), `schemas/` (pydantic response models = the OpenAPI contract), `deps.py` (settings, store, user). Routes call one `services.explore` query each. | `services.explore`, `config`, `core` only (import-linter) |
 | `apps/backtest` | `algotrade-backtest` (`algotrade` alias): datasets list, backtest (golden dataset or config, via jobs), evaluate, config validate/show. Reads only through `data/`. | library |
@@ -363,7 +364,7 @@ Extra contracts:
 ### Directory layout (ADR 0020)
 
 One folder holds one kind of thing. `architecture/layout.toml` declares every directory under
-`src/`, `libs/` and `apps/` with a one-line purpose and the import-linter contracts that enforce its
+`src/`, `libs/`, `apps/`, `tests/`, `config/` and `docs/` with a one-line purpose and the import-linter contracts that enforce its
 rule; `tests/architecture/test_layout.py` fails on a module in an undeclared directory, on a
 directory with more than 10 modules (no exceptions), on a contract name that does not exist,
 and on a package whose `__init__.py` has no docstring. The library:
