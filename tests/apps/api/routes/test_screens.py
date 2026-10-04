@@ -43,7 +43,8 @@ def test_ideas_one_row_per_ticker_ranked_with_every_pick(client: TestClient) -> 
     assert first["picks"][0]["tier"] == "T1"
     assert first["picks"][1]["columns"] == {"spread": 0.05}
     assert (first["next_earnings_date"], first["days_to_earnings"]) == ("2022-12-01", 6)
-    assert first["closest_expiry_dte"] is None
+    assert first["closest_expiry_dte"] == 30  # the nearest stored expiry (2022-12-23)
+    assert first["earnings_before_expiry"] is True  # earnings 2022-12-01
     assert second["symbol"] == "BBB"
     near = second["picks"][0]
     assert near["reasons"] == "iv rank 40 < 50"

@@ -32,6 +32,25 @@ def option_quotes(
     return frame[wanted].reset_index(drop=True)
 
 
+def chain_expiries(
+    reader: StoreReader,
+    session: date,
+    underlying_ids: Sequence[str],
+    as_of: datetime | None = None,
+) -> dict[str, list[date]]:
+    """Distinct listed expiries (sorted) per underlying in ``session``'s stored chains, in one
+    column-pruned read; an underlying without a stored chain is absent."""
+    frame = reader.table_range(
+        OPTION_QUOTES, session, session, as_of, columns=["underlying_id", "expiry"]
+    )
+    if frame is None or frame.empty:
+        return {}
+    frame = frame[frame["underlying_id"].astype(str).isin(list(underlying_ids))]
+    expiry = pd.to_datetime(frame["expiry"]).dt.date
+    found = pd.DataFrame({"u": frame["underlying_id"].astype(str), "e": expiry}).drop_duplicates()
+    return {str(u): sorted(g["e"]) for u, g in found.groupby("u")}
+
+
 def underlying_quotes(
     reader: StoreReader,
     session: date,

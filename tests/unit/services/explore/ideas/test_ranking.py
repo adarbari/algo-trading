@@ -1,8 +1,10 @@
 from datetime import UTC, date, datetime, timedelta
 
+import pandas as pd
 import pytest
 
 from algotrade.config.user import UserContext
+from algotrade.features.rollups import earnings
 from algotrade.services.explore.ideas.ranking import ideas_for, top_ideas
 from algotrade.services.explore.store import NotFoundError, store_over
 from algotrade.storage.backends.memory import MemoryBackend
@@ -101,3 +103,51 @@ def test_priority_is_read_from_the_users_preferences(writer: Stored) -> None:
     assert ideas.priority == ["b", "a"]
     assert [i.instrument_id for i in ideas.items] == ["EQ:BBB", "EQ:AAA"]
     assert ideas_for(store, None, None, 10).priority == []
+
+
+def _chain(writer: Stored, session: date, expiries: dict[str, list[date]]) -> None:
+    ts = pd.Timestamp(T)
+    rows = [
+        {"instrument_id": f"OPT:{u}{n}", "underlying_id": f"EQ:{u}", "ts": ts, "expiry": e,
+         "right": "P", "strike": 100.0, "bid": 1.0, "ask": 1.1, "volume": 1.0,
+         "open_interest": 1.0, "iv": 0.3, "delta": -0.3}
+        for u, days in expiries.items() for n, e in enumerate(days)
+    ]  # fmt: skip
+    writer.write_table("chains/option_quotes", session, "ch", stamped(rows, session, "ch"))
+
+
+def _earnings(writer: Stored, session: date, when: dict[str, date]) -> None:
+    rows = [
+        {"instrument_id": f"EQ:{s}", "next_earnings_date": d, "days_to_earnings": 3}
+        for s, d in when.items()
+    ]
+    writer.write_table(earnings.GROUP.table, session, "er", stamped(rows, session, "er"))
+
+
+def test_closest_expiry_dte_is_the_nearest_on_or_after_the_session(writer: Stored) -> None:
+    _write(writer, D2, "r", "a", [("AAA", "QUALIFIED", 9.0, None), ("BBB", "QUALIFIED", 8.0, None)])
+    _chain(
+        writer, D2, {"AAA": [date(2026, 9, 25), D2, date(2026, 10, 9)], "BBB": [date(2026, 10, 16)]}
+    )
+    _earnings(writer, D2, {"AAA": date(2026, 10, 9), "BBB": date(2026, 10, 20)})
+    got = {i.symbol: i for i in top_ideas(StoreReader(writer.backend), None, "local", [], 10).items}
+    assert (got["AAA"].closest_expiry_dte, got["AAA"].earnings_before_expiry) == (0, False)
+    assert (got["BBB"].closest_expiry_dte, got["BBB"].earnings_before_expiry) == (15, False)
+    _earnings(writer, D2, {"AAA": D2, "BBB": date(2026, 10, 16)})
+    got = {i.symbol: i for i in top_ideas(StoreReader(writer.backend), None, "local", [], 10).items}
+    assert got["AAA"].earnings_before_expiry is True and got["BBB"].earnings_before_expiry is True
+
+
+def test_no_chain_or_no_earnings_gives_null(writer: Stored) -> None:
+    _write(writer, D2, "r", "a", [("AAA", "QUALIFIED", 9.0, None), ("BBB", "QUALIFIED", 8.0, None)])
+    _chain(writer, D2, {"AAA": [date(2026, 10, 9)]})
+    got = {i.symbol: i for i in top_ideas(StoreReader(writer.backend), None, "local", [], 10).items}
+    assert (got["AAA"].closest_expiry_dte, got["AAA"].earnings_before_expiry) == (8, None)
+    assert (got["BBB"].closest_expiry_dte, got["BBB"].earnings_before_expiry) == (None, None)
+
+
+def test_a_later_chain_is_not_visible(writer: Stored) -> None:
+    _write(writer, D2, "r", "a", [("AAA", "QUALIFIED", 9.0, None)])
+    _chain(writer, date(2026, 10, 2), {"AAA": [date(2026, 10, 9)]})
+    only = top_ideas(StoreReader(writer.backend), None, "local", [], 10).items[0]
+    assert only.closest_expiry_dte is None

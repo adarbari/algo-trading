@@ -7,9 +7,11 @@ before the date. A screen is never recomputed here. A ticker is *picked* by a sc
 its decision is not REJECT, SKIPPED or UNKNOWN.
 
 Display context comes from the stored rollups on the newest session they cover: the next
-earnings date and sessions to it (``earnings@v1``). ``closest_expiry_dte`` is null: no rollup
-stores the closest listed expiry yet (``option_liquidity@v1`` stores the *target* expiry's
-``target_dte``, a different thing).
+earnings date and sessions to it (``earnings@v1``). The closest listed expiry is read on the fly
+for the shown tickers from the session's stored chains (one pruned read, nothing later is
+visible): the nearest expiry on or after the session, and its DTE in calendar days from the
+session (``option_liquidity@v1``'s ``target_dte`` convention, but for the nearest expiry, not the
+target one). ``earnings_before_expiry`` is true when the next earnings date is on or before it.
 """
 
 from collections.abc import Sequence
@@ -21,6 +23,7 @@ import pandas as pd
 
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.data import StoreReader
+from algotrade.data.chains import chain_expiries
 from algotrade.data.reference import resolver, snapshot
 from algotrade.data.rollups import rollup_on
 from algotrade.features.rollups import earnings
@@ -67,7 +70,8 @@ class Idea:
     picks: list[Pick]  # highest-priority screener first
     next_earnings_date: date | None
     days_to_earnings: int | None
-    closest_expiry_dte: int | None  # not stored yet (see the module doc)
+    closest_expiry_dte: int | None  # None: no stored chain for the session
+    earnings_before_expiry: bool | None  # None: no earnings date or no chain
 
 
 @dataclass(frozen=True)
@@ -254,8 +258,12 @@ def top_ideas(
         raise NotFoundError(f"{RULE_SCREEN}: no results stored")
     names = resolver(reader, session)
     context = _earnings(reader, session)
+    expiries = chain_expiries(reader, session, shown)
     items = []
     for n, iid in enumerate(shown, start=1):
         when, days = context.get(iid, (None, None))
-        items.append(Idea(n, iid, names.symbol_for(iid), picks[iid], when, days, None))
+        nearest = next((e for e in expiries.get(iid, []) if e >= session), None)
+        dte = None if nearest is None else (nearest - session).days
+        before = None if nearest is None or when is None else when <= nearest
+        items.append(Idea(n, iid, names.symbol_for(iid), picks[iid], when, days, dte, before))
     return Ideas(session, list(priority), len(ranked), items)
