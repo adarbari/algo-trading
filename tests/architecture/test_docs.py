@@ -80,3 +80,19 @@ def test_every_agent_is_listed_in_agent_instructions() -> None:
     text = (REPO_ROOT / "CLAUDE.md").read_text()
     unlisted = [p.stem for p in AGENTS.glob("*.md") if f"`{p.stem}`" not in text]
     assert not unlisted, f"add these agents to the CLAUDE.md agents table: {unlisted}"
+
+
+CLAUDE_MD_MAX_LINES = 300
+
+
+def test_claude_md_stays_short_enough_to_read_every_session() -> None:
+    """Detail belongs in the matching skill or doc, with a one-line pointer here."""
+    lines = len((REPO_ROOT / "CLAUDE.md").read_text().splitlines())
+    assert lines <= CLAUDE_MD_MAX_LINES, f"CLAUDE.md is {lines} lines (max {CLAUDE_MD_MAX_LINES})"
+
+
+def test_roadmap_opens_with_a_short_now_next_section() -> None:
+    text = (DOCS / "roadmap.md").read_text().splitlines()
+    assert text[2].startswith("## Now / Next"), "the pickup list goes at the very top"
+    end = next(i for i, line in enumerate(text[3:], 3) if line.startswith("## ") or line == "---")
+    assert end - 2 <= 25, "Now / Next must stay at most 25 lines"

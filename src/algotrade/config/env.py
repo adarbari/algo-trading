@@ -26,7 +26,34 @@ IBKR_CLIENT_ID = "ALGOTRADE_IBKR_CLIENT_ID"
 # The API's live option quotes (ADR 0028) connect with their own client id, never ingestion's.
 IBKR_API_CLIENT_ID = "ALGOTRADE_IBKR_API_CLIENT_ID"  # default: ALGOTRADE_IBKR_CLIENT_ID + 1
 
-__all__ = ["api_credential", "config_dir", "credential", "data_url", "load_dotenv", "user_id"]
+# Keys a working checkout needs in .env (values never leave this module): the vendor key and the
+# SEC fair-access contact. Everything else is optional or defaulted. `make doctor` lists them.
+MASSIVE_API_KEY = "ALGOTRADE_MASSIVE_API_KEY"
+SEC_CONTACT = "ALGOTRADE_SEC_CONTACT"
+REQUIRED_KEYS = (MASSIVE_API_KEY, SEC_CONTACT)
+
+__all__ = [
+    "REQUIRED_KEYS",
+    "api_credential",
+    "config_dir",
+    "credential",
+    "data_url",
+    "dotenv_keys",
+    "load_dotenv",
+    "user_id",
+]
+
+
+def dotenv_keys(path: Path = Path(".env")) -> set[str]:
+    """The NAMES of the keys that have a non-empty value in the .env file or the environment
+    (never the values: for `make doctor`)."""
+    found = {k for k in REQUIRED_KEYS if credential(k)}
+    if path.exists():
+        for raw in path.read_text().splitlines():
+            key, sep, value = raw.strip().partition("=")
+            if sep and not key.startswith("#") and value.strip().strip("\"'"):
+                found.add(key.strip())
+    return found
 
 
 def load_dotenv(path: Path = Path(".env")) -> None:

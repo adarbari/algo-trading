@@ -5,12 +5,18 @@ BIN = $(dir $(PY))
 GOLDEN_URL ?= file://datasets/golden/store
 
 
-.PHONY: changed install lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update filelen unit property integration e2e test \
+.PHONY: changed install doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update filelen unit property integration e2e test \
         evaluate baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-real web-visual
 
 UV ?= uv
 WORKERS ?= auto
 BASE ?= origin/main
+
+doctor:          ## is this machine ready? (uv, Node 24, Docker, gh, venv, web deps, .env keys, store); prints the fix for each failure
+	@$(if $(wildcard $(PY)),$(PY),python3) scripts/doctor.py
+
+status:          ## PRs + CI, running ingest jobs, last nightly, store latest session, dev servers (~15 lines, read-only)
+	@$(if $(wildcard $(PY)),$(PY),python3) scripts/status.py
 
 install:         ## library + every app + dev tools into .venv, exactly as locked
 	$(UV) sync --all-packages --locked

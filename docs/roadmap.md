@@ -1,5 +1,26 @@
 # Roadmap
 
+## Now / Next
+
+The pickup list a fresh session reads first. A PR that opens or closes an item updates it.
+
+**Running** (check `make status`; verified 2026-10-04 09:19: no ingest process alive)
+- IBKR IV history backfill, detached `var/logs/ibkr-iv-backfill.sh` (status `var/logs/ibkr-iv-backfill.status`; needs IB Gateway paper :4002, client 17, Mac awake). Its script has ended: chunk 1 exit=1, chunks 2-3 exit=0 within a second, `ibkr_iv@v1` rollups exit=0. Treat the history as unverified: check coverage, then re-run the chunk (re-running resumes).
+- VRP v2 feature backfill `var/logs/vrp-v2-rollups.sh` (`put_wing@v1`, `price_moves@v1`, waits for the ingest lock): finished, exit=0.
+
+**Next**
+- API endpoints that return 404 "nothing stored" on an empty store return 200 with an empty body.
+- Split crowded folders by area: `apps/api` routes/ + schemas/, `services/explore/`.
+- API schemas built from domain types, not mirrored field lists.
+- VRP live spread check in the UI via `GET /chains/{id}/live`.
+- Flaky tests: preview timing under load, smoke axe admin light, one builder e2e.
+
+**Facts**
+- IBKR fundamentals are not permitted on this account (error 10358): share-class counts stay SEC.
+- Owner screener / VRP decisions: ADR 0029 and `docs/screeners/vrp-scanner.md`.
+
+---
+
 Each phase is one or more PRs, merged only with CI green. Update the status column as work
 lands. The target state of every item is described in [architecture.md](architecture.md).
 
