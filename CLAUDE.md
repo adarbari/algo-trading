@@ -1,7 +1,9 @@
 # Working in this repo (for humans and AI agents)
 
 This file is the entry point. The decisions below are **settled**; do not re-open them
-without writing an ADR. Fresh session: run `/start` (`make doctor` + `make status` + the roadmap pickup list).
+without writing an ADR. Fresh session: run `/start` (`make doctor` + `make status` + the roadmap pickup list); end with
+`/wrap-up`. Note owner corrections and rule-preventable errors as you go; propose them via
+`.claude/skills/capture-learning` (checked for overlap and contradiction) before the PR.
 Read in this order:
 
 1. `docs/architecture.md`: target architecture + the rules enforced on today's code
@@ -231,6 +233,7 @@ the skill with the fix.
 | New responsibility, or moving one between modules | `.claude/skills/add-responsibility` |
 | New API endpoint | `.claude/skills/add-api-endpoint` |
 | A decision that changes architecture | `.claude/skills/write-adr` |
+| A lesson from this session (owner correction, rule-preventable error) | `.claude/skills/capture-learning` |
 
 Worktrees: `scripts/worktree.sh <branch> [base]` makes `../algo-trading-<slug>` off
 `origin/main` (links `.venv`, writes `worktree.env` with the worktree's absolute `PYTHONPATH`,
