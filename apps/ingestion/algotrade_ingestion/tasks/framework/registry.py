@@ -464,11 +464,14 @@ TASKS: dict[str, Task] = {
         ),
         Task(
             "purge-raw",
-            "delete raw vendor responses and unfinished-run scratch older than N days",
+            "delete raw vendor responses, unfinished-run scratch and old live quotes after N days",
             purge,
             (),  # deletes raw files and scratch; produces no table
             _purge,
-            settings="sources.toml raw_retention_days (+ per section), staging_retention_days",
+            settings=(
+                "sources.toml raw_retention_days (+ per section), staging_retention_days,"
+                " live_retention_days"
+            ),
             params=(
                 Param("session", ("--date",), date.fromisoformat, "reference date"),
                 Param(

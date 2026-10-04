@@ -192,6 +192,7 @@ class IbkrSettings:
 class SourcesSettings:
     raw_retention_days: int = 90
     staging_retention_days: int = 14
+    live_retention_days: int = 7  # live/option_quotes partitions older than this are purged
     vendors: Mapping[str, VendorSettings] = field(default_factory=dict)  # by section name
     cboe_workers: int = 4
     cboe_priority_symbols: tuple[str, ...] = ()  # fetched first (with S&P 500 members)
@@ -227,7 +228,9 @@ class SourcesSettings:
         d = cls()
         root = Table(doc, where)
         sections = [k for k in root.names() if isinstance(root.raw(k), Mapping)]
-        root.only(["raw_retention_days", "staging_retention_days", *sections])
+        root.only(
+            ["raw_retention_days", "staging_retention_days", "live_retention_days", *sections]
+        )
         http = root.table(
             "http",
             [
@@ -264,6 +267,7 @@ class SourcesSettings:
             staging_retention_days=root.integer(
                 "staging_retention_days", d.staging_retention_days, 1
             ),
+            live_retention_days=root.integer("live_retention_days", d.live_retention_days, 1),
             vendors={name: _vendor(t, name not in OFF_BY_DEFAULT) for name, t in vendors.items()},
             cboe_workers=_extra(vendors, "cboe").integer("workers", d.cboe_workers, 1),
             cboe_priority_symbols=tuple(

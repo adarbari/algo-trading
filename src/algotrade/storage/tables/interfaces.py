@@ -107,6 +107,11 @@ class TableStore(Protocol):
         deleted."""
         ...
 
+    def purge_before(self, table: str, cutoff: date) -> int:
+        """Delete the committed partitions of ``table`` dated before ``cutoff`` (every run):
+        retention for tables that are not kept forever (``live/*``); -> partitions deleted."""
+        ...
+
 
 class RawStore(Protocol):
     """Vendor responses exactly as received (ADR 0006), kept for a retention window."""

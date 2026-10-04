@@ -195,6 +195,15 @@ class MemoryTables:
                 del self._frames[frame_key]
             return len(keys)
 
+    def purge_before(self, table: str, cutoff: date) -> int:
+        with self._index_lock:
+            keys = [k for k in self._partitions if k[0] == table and k[1] < cutoff]
+            for key in keys:
+                del self._partitions[key]
+            for frame_key in [k for k in self._frames if k[0][0] == table and k[0][1] < cutoff]:
+                del self._frames[frame_key]
+            return len(keys)
+
     def dates(self, table: str, own_run: str | None = None) -> list[date]:
         with self._index_lock:
             keys = set(self._partitions) | set(self._pending.get(own_run or "", {}))

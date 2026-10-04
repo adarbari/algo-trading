@@ -134,4 +134,6 @@ volume and IB's model IV / delta arrive.
   revisiting this ADR.
 - The API is no longer strictly read-only: it appends the live quotes it served to `live/*`
   (and nothing else). `live/option_quotes` grows with use (a few hundred rows a minute at
-  most while a page refreshes); a retention step for it is a later change.
+  most while a page refreshes), so it is kept for 7 days (`sources.toml live_retention_days`,
+  default 7): the nightly `purge-raw` task deletes its partitions dated before
+  `session - 7` (`TableStore.purge_before`); no other table is touched.

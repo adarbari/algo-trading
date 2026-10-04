@@ -283,3 +283,14 @@ def test_size_and_drop_a_table(backend: Backend) -> None:
     assert reader.dates(TABLE) == [] and reader.table(TABLE, D2) is None
     assert writer.table_size(TABLE) == 0 and reader.table_names() == ["catalog/demo"]
     assert reader.table("catalog/demo", D1) is not None
+
+
+def test_purge_before_deletes_only_older_partitions_of_one_table(backend: Backend) -> None:
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    for day in (D1, D2):
+        writer.write_table(TABLE, day, "r1", stamped(rows({"EQ:A": 1.0}), day, "r1"))
+        writer.write_table("catalog/demo", day, "r1", stamped(rows({"EQ:A": 1.0}), day, "r1"))
+    assert writer.purge_table_before(TABLE, D1) == 0  # the cutoff day itself is kept
+    assert writer.purge_table_before(TABLE, D2) == 1
+    assert reader.dates(TABLE) == [D2] and reader.table(TABLE, D1) is None
+    assert reader.dates("catalog/demo") == [D1, D2]

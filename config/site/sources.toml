@@ -3,6 +3,8 @@
 raw_retention_days = 90          # raw vendor responses older than this are purged nightly
                                  # (a vendor section may set its own raw_retention_days)
 staging_retention_days = 14      # scratch left by unfinished runs (no resume after this) is purged nightly
+live_retention_days = 7          # live/option_quotes (the API's recorded live quotes, ADR 0028) older
+                                 # than this are purged nightly (purge-raw)
 
 # Each vendor section: `enabled` (off: its sources are not built and tasks needing them are
 # skipped), its pacing, shared by every worker thread and every process on this machine

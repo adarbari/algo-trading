@@ -241,12 +241,26 @@ class LocalTables:
     def drop(self, table: str) -> int:
         base = self.root / table
         days = sorted(base.glob("date=*")) if base.exists() else []
+        self._remove(days)
+        shutil.rmtree(base, ignore_errors=True)
+        return len(days)
+
+    def purge_before(self, table: str, cutoff: date) -> int:
+        base = self.root / table
+        days = [
+            d
+            for d in (sorted(base.glob("date=*")) if base.exists() else [])
+            if date.fromisoformat(d.name.removeprefix("date=")) < cutoff
+        ]
+        self._remove(days)
+        return len(days)
+
+    @staticmethod
+    def _remove(days: list[Path]) -> None:
         for day in days:
             with held(index_lock(day)):  # no write or commit is mid-way in the partition
                 (day / INDEX).unlink(missing_ok=True)  # unindexed first: readers see nothing
             shutil.rmtree(day)
-        shutil.rmtree(base, ignore_errors=True)
-        return len(days)
 
 
 def _read_file(path: Path, filters: list[Any] | None, columns: Sequence[str] | None) -> pa.Table:

@@ -1,5 +1,6 @@
-"""Retention: delete raw vendor responses, unfinished-run scratch, and the uncommitted table
-writes of runs that crashed (ADR 0022), older than N days.
+"""Retention: delete raw vendor responses, unfinished-run scratch, the uncommitted table
+writes of runs that crashed (ADR 0022) and old ``live/option_quotes`` partitions (the API's
+recorded live quotes, ADR 0028; ``live_retention_days``, 7), older than N days.
 
 Windows default to ``config/site/sources.toml``: raw responses are kept per raw source for
 its section's ``raw_retention_days`` (``ctx.raw_sections``, from the source registry, maps
@@ -13,6 +14,7 @@ from collections.abc import Mapping
 from datetime import UTC, date, datetime, time, timedelta
 
 from algotrade.config.site.settings import SourcesSettings
+from algotrade.data.chains import LIVE_OPTION_QUOTES
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 
@@ -46,7 +48,8 @@ def purge(
     staging_keep_days: int | None = None,
 ) -> RunRecord:
     """Purge each raw source's files dated before ``session - <its window>``, staging runs
-    before ``session - staging_keep_days``, and uncommitted table writes last made before then."""
+    before ``session - staging_keep_days``, uncommitted table writes last made before then, and
+    ``live/option_quotes`` partitions before ``session - live_retention_days``."""
     raw = ctx.writer.raw
     windows = raw_keep_days(ctx.settings, raw.sources(), ctx.raw_sections, keep_days)
     staging_days = (
@@ -63,6 +66,10 @@ def purge(
             raw_files_removed=sum(removed.values()),
             raw_files_removed_by_source=removed,
             staging_runs_removed=ctx.writer.staging.purge_before(staging_cutoff),
+            live_partitions_removed=ctx.writer.purge_table_before(
+                LIVE_OPTION_QUOTES, session - timedelta(ctx.settings.live_retention_days)
+            ),
+            live_keep_days=ctx.settings.live_retention_days,
             keep_days=ctx.settings.raw_retention_days if keep_days is None else keep_days,
             raw_keep_days=windows,
             staging_keep_days=staging_days,
