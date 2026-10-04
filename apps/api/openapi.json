@@ -1786,6 +1786,7 @@
                 "type": "null"
               }
             ],
+            "description": "how far from the threshold, in the field's unit",
             "title": "Distance"
           },
           "field": {
@@ -1805,6 +1806,7 @@
                 "type": "null"
               }
             ],
+            "description": "distance / tolerance width, 0..1",
             "title": "Normalised"
           },
           "threshold": {
@@ -1816,6 +1818,7 @@
                 "type": "null"
               }
             ],
+            "description": "the threshold missed (nearer bound: between)",
             "title": "Threshold"
           },
           "value": {
@@ -2352,22 +2355,27 @@
       "PreviewCoverage": {
         "properties": {
           "base": {
+            "description": "instruments the selection saw",
             "title": "Base",
             "type": "integer"
           },
           "coverage": {
+            "description": "COMPLETE, PARTIAL, UNIVERSE_INCOMPLETE or EMPTY_SELECTION",
             "title": "Coverage",
             "type": "string"
           },
           "coverage_pct": {
+            "description": "processed / selected",
             "title": "Coverage Pct",
             "type": "number"
           },
           "min_coverage": {
+            "description": "below this the run is PARTIAL",
             "title": "Min Coverage",
             "type": "number"
           },
           "missing_tables": {
+            "description": "tables with no rows for the session",
             "items": {
               "type": "string"
             },
@@ -2375,10 +2383,12 @@
             "type": "array"
           },
           "pre_snapshot": {
+            "description": "the reference snapshot is after the session",
             "title": "Pre Snapshot",
             "type": "boolean"
           },
           "processed": {
+            "description": "rows not SKIPPED",
             "title": "Processed",
             "type": "integer"
           },
@@ -2388,6 +2398,7 @@
           },
           "selection": {
             "additionalProperties": true,
+            "description": "the selection's audit",
             "title": "Selection",
             "type": "object"
           },

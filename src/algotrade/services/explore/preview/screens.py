@@ -21,7 +21,7 @@ from algotrade.core.model.screen_spec import ScreenSpec
 from algotrade.core.time.calendar import last_closed_session
 from algotrade.core.views.feature_view import FeatureView
 from algotrade.services.configs import resolve_rule_draft
-from algotrade.services.explore.preview.frame import FieldFrame, field_frame
+from algotrade.services.explore.preview.frame import field_frame
 from algotrade.services.explore.store import BARS, MAX_PAGE_SIZE, ReadStore, partition_for
 from algotrade.services.features import config_features
 from algotrade.services.screening.run import rule_run, settle_coverage
@@ -174,14 +174,6 @@ def funnel(spec: ScreenSpec, rows: Sequence[RuleRow]) -> list[FunnelStep]:
     return steps
 
 
-def _symbols(frame: FieldFrame) -> dict[str, str]:
-    universe = frame.universe.frame
-    if "symbol" not in universe:
-        return {}
-    pairs = zip(universe["instrument_id"].astype(str), universe["symbol"], strict=True)
-    return {i: str(s) for i, s in pairs if to_value(s) is not None}
-
-
 def _row(row: RuleRow, symbol: str | None) -> PreviewRow:
     return PreviewRow(
         instrument_id=row.instrument_id,
@@ -248,7 +240,7 @@ def preview_screen(
     result = RuleScreener(rules).evaluate(view, frame.memo_for())
     run = rule_run(result, ids, screening)
     run = settle_coverage(run, selected, frame.universe, session, screening)
-    symbols = _symbols(frame)
+    symbols = frame.symbols
     top = result.rows[: max(0, min(limit, MAX_PAGE_SIZE))]
     summary = result.summary
     return ScreenPreview(
