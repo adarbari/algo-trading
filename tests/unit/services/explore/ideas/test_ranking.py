@@ -151,3 +151,39 @@ def test_a_later_chain_is_not_visible(writer: Stored) -> None:
     _chain(writer, date(2026, 10, 2), {"AAA": [date(2026, 10, 9)]})
     only = top_ideas(StoreReader(writer.backend), None, "local", [], 10).items[0]
     assert only.closest_expiry_dte is None
+
+
+def _values(writer: Stored, config: str, rows: list[tuple]) -> None:
+    frame = [
+        {"instrument_id": f"EQ:{s}", "user_id": "site", "config_id": config, "criterion_id": c,
+         "field": f"feature.{c}", "mode": "column" if o == "INFO" else "hard", "value_num": v,
+         "value_str": None, "outcome": o, "distance": None, "normalised": None, "penalty": None}
+        for s, c, o, v in rows
+    ]  # fmt: skip
+    writer.write_result("rule_screen_values", D2, "r", stamped(frame, D2, "r"))
+
+
+def test_picks_carry_columns_criterion_values_and_flags(writer: Stored) -> None:
+    _write(writer, D2, "r", "a", [("AAA", "QUALIFIED", 9.0, None)])
+    _values(writer, "a", [("AAA", "iv30", "INFO", 0.62), ("AAA", "iv30", "PASS", 0.62),
+                          ("AAA", "adv", "NEAR", 4.5e7)])  # fmt: skip
+    pick = top_ideas(StoreReader(writer.backend), None, "local", [], 10).items[0].picks[0]
+    assert pick.columns == {"iv30": 0.62}
+    assert pick.criterion_values == {"iv30": 0.62, "adv": 4.5e7}
+    assert pick.flags == []
+
+
+def test_screeners_list_names_versions_and_priority(writer: Stored) -> None:
+    _write(writer, D2, "r1", "a", [("AAA", "QUALIFIED", 50.0, None)])
+    _write(writer, D2, "r2", "b", [("BBB", "QUALIFIED", 10.0, None)])
+    docs = {
+        ("site", "screeners", "a"): {"name": "Alpha scan"},
+        ("me", "preferences", "preferences"): {"ideas": {"priority": ["gone", "b"]}},
+    }
+    store = store_over(writer.backend, MemoryConfigStore(docs), UserContext("local"))
+    got = ideas_for(store, None, "me", 10).screeners
+    assert [(s.config_id, s.name, s.user, s.version) for s in got] == [
+        ("gone", "gone", None, None),
+        ("b", "b", "site", 1),
+        ("a", "Alpha scan", "site", 1),
+    ]

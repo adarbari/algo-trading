@@ -6,6 +6,10 @@ import { decisionsPresent, filterIdeas, NO_FILTERS } from './filters';
 
 const pick = (decision: string): IdeaPick => ({
   screenerId: 's',
+  screenerName: 'S',
+  flags: [],
+  columns: {},
+  criterionValues: {},
   user: 'u',
   version: 1,
   decision,
@@ -24,6 +28,8 @@ const idea = (symbol: string, decision: string, days: number | null): Idea => ({
   daysToEarnings: days,
   closestExpiryDte: null,
   earningsBeforeExpiry: false,
+  metrics: {},
+  watchOut: [],
 });
 
 const ideas = [idea('A', 'QUALIFIED', 30), idea('B', 'WATCH', 3), idea('C', 'QUALIFIED', null)];

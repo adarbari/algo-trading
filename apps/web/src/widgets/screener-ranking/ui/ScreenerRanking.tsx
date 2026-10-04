@@ -2,12 +2,17 @@
  * "Your screeners": the user's screeners in priority order with what each found; drag to
  * reorder (saved at once, the ideas below re-rank).
  */
-import { Panel } from '@algotrade/ui';
+import { Button, Panel } from '@algotrade/ui';
 
 import { ScreenerPriorityList } from '@/features/ideas-priority';
 import { useIdeas } from '@/entities/idea';
 
-export function ScreenerRanking() {
+export interface ScreenerRankingProps {
+  /** Open the screener Builder for a new screener. */
+  onNewScreener: () => void;
+}
+
+export function ScreenerRanking({ onNewScreener }: ScreenerRankingProps) {
   const ideas = useIdeas();
   const screeners = ideas.data?.screeners ?? [];
   const state =
@@ -27,6 +32,11 @@ export function ScreenerRanking() {
       emptyMessage="No screener has picked anything yet. Finalise a screener to see its ideas here."
       errorMessage="The screeners failed to load."
       onRetry={() => void ideas.refetch()}
+      footer={
+        <Button variant="ghost" onClick={onNewScreener}>
+          + New screener
+        </Button>
+      }
     >
       <ScreenerPriorityList screeners={screeners} />
     </Panel>

@@ -42,6 +42,11 @@ def test_ideas_one_row_per_ticker_ranked_with_every_pick(client: TestClient) -> 
     ]
     assert first["picks"][0]["tier"] == "T1"
     assert first["picks"][1]["columns"] == {"spread": 0.05}
+    assert first["picks"][1]["criterion_values"] == {"iv30": 0.62}
+    assert (first["picks"][0]["flags"], first["picks"][1]["flags"]) == ([], ["leveraged_inverse"])
+    assert body["screeners"] == [
+        {"config_id": c, "user": "site", "name": c, "version": 1} for c in ("premium", "vrp")
+    ]
     assert (first["next_earnings_date"], first["days_to_earnings"]) == ("2022-12-01", 6)
     assert first["closest_expiry_dte"] == 30  # the nearest stored expiry (2022-12-23)
     assert first["earnings_before_expiry"] is True  # earnings 2022-12-01

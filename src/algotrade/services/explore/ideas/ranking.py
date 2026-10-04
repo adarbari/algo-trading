@@ -12,6 +12,11 @@ for the shown tickers from the session's stored chains (one pruned read, nothing
 visible): the nearest expiry on or after the session, and its DTE in calendar days from the
 session (``option_liquidity@v1``'s ``target_dte`` convention, but for the nearest expiry, not the
 target one). ``earnings_before_expiry`` is true when the next earnings date is on or before it.
+
+Each pick carries its screener's stored display columns (the ``INFO`` rows of
+``rule_screen_values``), the values of its criteria and its flags; ``Ideas.screeners`` lists
+the screeners with their display name (the config's ``name``, else its id) and version. The
+two stored tables are read column-pruned.
 """
 
 from collections.abc import Sequence
@@ -34,6 +39,21 @@ from algotrade.storage.tables.schemas import result_table
 RULE_SCREEN = result_table("rule_screen")
 RULE_SCREEN_VALUES = result_table("rule_screen_values")
 PREFERENCES = "preferences"
+SCREEN_COLUMNS = (
+    "user_id", "config_id", "config_version", "decision", "score", "tie_break", "tier", "class",
+    "flags", "reasons",
+)  # fmt: skip
+VALUE_COLUMNS = (
+    "user_id",
+    "config_id",
+    "criterion_id",
+    "mode",
+    "field",
+    "outcome",
+    "value_num",
+    "value_str",
+    "distance",
+)  # fmt: skip  (the table's key columns stay: runs merge by key)
 LOOKBACK = 20  # newest rule_screen sessions scanned for each config's latest run
 NOT_PICKED = frozenset({"REJECT", "SKIPPED", "UNKNOWN"})
 
@@ -60,6 +80,8 @@ class Pick:
     reasons: str
     criteria: list[PickCriterion]  # the criteria that did not pass
     columns: dict[str, Any]  # the screen's display columns
+    criterion_values: dict[str, Any]  # criterion id -> the value it was judged on
+    flags: list[str]  # the screen's flags that hold (e.g. leveraged_inverse)
 
 
 @dataclass(frozen=True)
@@ -75,9 +97,18 @@ class Idea:
 
 
 @dataclass(frozen=True)
+class IdeaScreener:
+    config_id: str
+    user: str | None  # None: no stored run in the window
+    name: str  # display name: the config's ``name``, else its id
+    version: int | None
+
+
+@dataclass(frozen=True)
 class Ideas:
     session: date  # the newest session any screen contributed
     priority: list[str]
+    screeners: list[IdeaScreener]  # priority order, then any other screener with picks
     total: int
     items: list[Idea]
 
@@ -92,7 +123,36 @@ def screener_priority(store: ReadStore, user: str) -> list[str]:
 def ideas_for(store: ReadStore, on: date | None, user: str | None, limit: int) -> Ideas:
     """``top_ideas`` for ``user`` (default: the store's) and their stored screener priority."""
     who = UserContext(user).user_id if user else store.user.user_id
-    return top_ideas(store.reader, on, who, screener_priority(store, who), limit)
+    found = top_ideas(store.reader, on, who, screener_priority(store, who), limit)
+    names = {s.config_id: _display_name(store, who, s.config_id) for s in found.screeners}
+    return replace(
+        found, screeners=[replace(s, name=names[s.config_id] or s.name) for s in found.screeners]
+    )
+
+
+def _display_name(store: ReadStore, user: str, config_id: str) -> str | None:
+    """The ``name`` of the user's screener ``config_id``, else of the site preset it extends."""
+    for scope in dict.fromkeys([user, SITE_USER]):
+        doc = store.configs.load(scope, "screeners", config_id) or {}
+        if isinstance(doc.get("name"), str) and doc["name"].strip():
+            return str(doc["name"]).strip()
+    return None
+
+
+def _screeners(frames: list[pd.DataFrame], priority: Sequence[str]) -> list[IdeaScreener]:
+    """The screeners with a stored run, listed ids first (best first), then the rest by id."""
+    seen: dict[str, IdeaScreener] = {}
+    for frame in frames:
+        first = frame.iloc[0]
+        version = to_value(first.get("config_version"))
+        cid = str(first["config_id"])
+        seen[cid] = IdeaScreener(
+            cid, str(first["user_id"]), cid, None if version is None else int(version)
+        )
+    listed = list(dict.fromkeys(priority))
+    return [seen.get(c) or IdeaScreener(c, None, c, None) for c in listed] + [
+        seen[c] for c in sorted(seen) if c not in listed
+    ]
 
 
 def _latest_runs(reader: StoreReader, on: date | None, user: str) -> list[pd.DataFrame]:
@@ -105,7 +165,7 @@ def _latest_runs(reader: StoreReader, on: date | None, user: str) -> list[pd.Dat
         )
     latest: dict[tuple[str, str], pd.DataFrame] = {}
     for session in reversed(sessions[-LOOKBACK:]):
-        frame = reader.table(RULE_SCREEN, session)
+        frame = reader.table_range(RULE_SCREEN, session, session, None, None, SCREEN_COLUMNS)
         if frame is None or frame.empty:
             continue
         frame = frame[frame["user_id"].isin([user, SITE_USER])]
@@ -145,6 +205,8 @@ def _pick(row: dict[str, Any]) -> Pick:
         reasons=str(to_value(row.get("reasons")) or ""),
         criteria=[],
         columns={},
+        criterion_values={},
+        flags=[f for f in str(to_value(row.get("flags")) or "").split(",") if f],
     )
 
 
@@ -178,8 +240,13 @@ def _details(
     wanted = sorted(picks)
     out: dict[tuple[str, str], pd.DataFrame] = {}
     for session in {p.session for ps in picks.values() for p in ps}:
-        frame = reader.table(RULE_SCREEN_VALUES, session, None, wanted)
-        if frame is None or frame.empty:
+        frame = reader.table_range(
+            RULE_SCREEN_VALUES, session, session, None, wanted, VALUE_COLUMNS
+        )
+        if frame is None:
+            continue
+        frame = frame[frame["instrument_id"].isin(wanted)]  # the read prunes row groups only
+        if frame.empty:
             continue
         for (owner, config_id), rows in frame.groupby(["user_id", "config_id"]):
             out[(f"{owner}/{config_id}", str(session))] = rows
@@ -195,13 +262,17 @@ def _attach_values(reader: StoreReader, picks: dict[str, list[Pick]]) -> dict[st
             rows = values.get((f"{p.user}/{p.config_id}", str(p.session)))
             criteria: list[PickCriterion] = []
             columns: dict[str, Any] = {}
+            judged: dict[str, Any] = {}
             if rows is not None:
                 for r in rows[rows["instrument_id"] == iid].to_dict("records"):
                     num, text = to_value(r.get("value_num")), to_value(r.get("value_str"))
                     value = num if num is not None else text
                     if r["outcome"] == "INFO":
                         columns[str(r["criterion_id"])] = value
-                    elif r["outcome"] in ("NEAR", "FAIL", "MISSING"):
+                        continue
+                    if value is not None:
+                        judged[str(r["criterion_id"])] = value
+                    if r["outcome"] in ("NEAR", "FAIL", "MISSING"):
                         criteria.append(
                             PickCriterion(
                                 str(r["criterion_id"]),
@@ -211,7 +282,7 @@ def _attach_values(reader: StoreReader, picks: dict[str, list[Pick]]) -> dict[st
                                 _float(r.get("distance")),
                             )
                         )
-            filled.append(replace(p, criteria=criteria, columns=columns))
+            filled.append(replace(p, criteria=criteria, columns=columns, criterion_values=judged))
         done[iid] = filled
     return done
 
@@ -266,4 +337,4 @@ def top_ideas(
         dte = None if nearest is None else (nearest - session).days
         before = None if nearest is None or when is None else when <= nearest
         items.append(Idea(n, iid, names.symbol_for(iid), picks[iid], when, days, dte, before))
-    return Ideas(session, list(priority), len(ranked), items)
+    return Ideas(session, list(priority), _screeners(frames, priority), len(ranked), items)

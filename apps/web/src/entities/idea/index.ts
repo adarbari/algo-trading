@@ -6,10 +6,12 @@ export {
   toIdeasData,
   type DecisionTone,
   type Idea,
+  type IdeaMetric,
   type IdeaPick,
   type IdeasData,
   type IdeasResponse,
   type ScreenerSummary,
+  type WatchOut,
 } from './model/idea';
 export { DecisionBadge } from './ui/DecisionBadge';
 export { ScreenerRow } from './ui/ScreenerRow';

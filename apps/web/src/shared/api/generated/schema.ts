@@ -1319,8 +1319,14 @@ export interface components {
             config_version: number | null;
             /** Criteria */
             criteria: components["schemas"]["IdeaCriterion"][];
+            /** Criterion Values */
+            criterion_values: {
+                [key: string]: unknown;
+            };
             /** Decision */
             decision: string;
+            /** Flags */
+            flags: string[];
             /** Klass */
             klass: string | null;
             /** Reasons */
@@ -1343,6 +1349,8 @@ export interface components {
             items: components["schemas"]["Idea"][];
             /** Priority */
             priority: string[];
+            /** Screeners */
+            screeners: components["schemas"]["IdeaScreener"][];
             /**
              * Session
              * Format: date
@@ -1350,6 +1358,17 @@ export interface components {
             session: string;
             /** Total */
             total: number;
+        };
+        /** IdeaScreener */
+        IdeaScreener: {
+            /** Config Id */
+            config_id: string;
+            /** Name */
+            name: string;
+            /** User */
+            user: string | null;
+            /** Version */
+            version: number | null;
         };
         /** IdeasPriority */
         IdeasPriority: {

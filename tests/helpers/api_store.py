@@ -164,7 +164,8 @@ def _ideas(writer: StoreWriter) -> None:
         frame = [
             {"instrument_id": f"EQ:{s}", "decision": d, "score": sc, "rank": rank,
              "tie_break": None, "tier": "T1" if d == "QUALIFIED" else "", "class": "",
-             "reasons": "iv rank 40 < 50" if d == "WATCH" else "", "config_id": config, **common}
+             "reasons": "iv rank 40 < 50" if d == "WATCH" else "", "config_id": config, **common,
+             "flags": "leveraged_inverse" if (s, config) == ("AAA", "vrp") else ""}
             for s, d, sc, rank in rows
         ]  # fmt: skip
         writer.write_result("rule_screen", END, run.run_id, stamped(frame, END, run.run_id))
@@ -175,6 +176,9 @@ def _ideas(writer: StoreWriter) -> None:
             {"instrument_id": "EQ:AAA", "user_id": SITE_USER, "config_id": "vrp",
              "criterion_id": "spread", "field": "spread", "mode": "column", "value_num": 0.05,
              "outcome": "INFO"},
+            {"instrument_id": "EQ:AAA", "user_id": SITE_USER, "config_id": "vrp",
+             "criterion_id": "iv30", "field": "feature.vrp_iv30", "mode": "HARD",
+             "value_num": 0.62, "outcome": "PASS"},
         ]  # fmt: skip
         if config == "vrp":
             frame_values = stamped(values, END, run.run_id)

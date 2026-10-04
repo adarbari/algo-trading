@@ -1,13 +1,115 @@
 /**
- * The top-ideas table's columns: rank, ticker, the screeners that picked it (chips), the best
- * decision, score, tier / class, next earnings, and the closest expiry in days (flagged when
- * earnings come first).
+ * The top-ideas table's columns: rank, ticker, the screeners that picked it (chips, by name),
+ * the best decision, score, tier / class, the screeners' stored display values (IV30, HV30,
+ * IV / HV and the best put: a column appears only when some idea has a value for it), next
+ * earnings, the closest expiry in days (flagged when earnings come first) and the watch-outs.
  */
-import { Chip, Mono, Stack, StatusBadge, type DataTableColumn } from '@algotrade/ui';
+import {
+  Chip,
+  Mono,
+  Stack,
+  StatusBadge,
+  type DataTableColumn,
+  type ValueFormat,
+} from '@algotrade/ui';
 
 import { DecisionBadge, type Idea } from '@/entities/idea';
 
-export const ideaColumns: DataTableColumn<Idea>[] = [
+/** A display value a screener may store (`[columns]` or a criterion id), shown when present. */
+interface MetricColumn {
+  key: string;
+  header: string;
+  description: string;
+  format: ValueFormat;
+}
+
+const METRIC_COLUMNS: readonly MetricColumn[] = [
+  {
+    key: 'iv30',
+    header: 'IV30',
+    description: '30-day implied volatility',
+    format: { kind: 'percent' },
+  },
+  {
+    key: 'hv30',
+    header: 'HV30',
+    description: '30-day historical volatility',
+    format: { kind: 'percent' },
+  },
+  {
+    key: 'iv_hv_ratio',
+    header: 'IV / HV',
+    description: 'IV30 over HV30',
+    format: { kind: 'number', digits: 2 },
+  },
+  {
+    key: 'put_strike',
+    header: 'Put strike',
+    description: 'Best put: strike',
+    format: { kind: 'currency' },
+  },
+  {
+    key: 'put_delta',
+    header: 'Put delta',
+    description: 'Best put: delta',
+    format: { kind: 'number', digits: 2 },
+  },
+  {
+    key: 'put_premium',
+    header: 'Put premium',
+    description: 'Best put: premium',
+    format: { kind: 'currency' },
+  },
+  {
+    key: 'put_roc',
+    header: 'Put ROC',
+    description: 'Best put: return on capital',
+    format: { kind: 'percent' },
+  },
+];
+
+const numeric = (idea: Idea, key: string): number | null => {
+  const value = idea.metrics[key];
+  return typeof value === 'number' ? value : null;
+};
+
+function metricColumns(ideas: readonly Idea[]): DataTableColumn<Idea>[] {
+  return METRIC_COLUMNS.filter((m) => ideas.some((idea) => numeric(idea, m.key) !== null)).map(
+    (m) => ({
+      id: m.key,
+      header: m.header,
+      description: m.description,
+      value: (idea) => numeric(idea, m.key),
+      format: m.format,
+    }),
+  );
+}
+
+const watchOutColumn: DataTableColumn<Idea> = {
+  id: 'watch-out',
+  header: 'Watch out',
+  description: 'Leveraged / inverse, large move, liquidity risk, earnings before expiry',
+  value: (idea) => idea.watchOut.length,
+  width: 'lg',
+  grow: true,
+  cell: ({ row }) => (
+    <Stack direction="row" gap={1} wrap>
+      {row.watchOut.map((w) => (
+        <StatusBadge key={w.id} tone="warning">
+          {w.label}
+        </StatusBadge>
+      ))}
+    </Stack>
+  ),
+};
+
+/** The columns for these ideas (the display-value columns depend on what screeners stored). */
+export function ideaColumns(ideas: readonly Idea[]): DataTableColumn<Idea>[] {
+  const [front, back] = [BASE.slice(0, 6), BASE.slice(6)];
+  return [...front, ...metricColumns(ideas), ...back, watchOutColumn];
+}
+
+const BASE: DataTableColumn<Idea>[] = [
   {
     id: 'rank',
     header: '#',
@@ -34,7 +136,7 @@ export const ideaColumns: DataTableColumn<Idea>[] = [
     cell: ({ row }) => (
       <Stack direction="row" gap={1} wrap>
         {row.picks.map((pick) => (
-          <Chip key={pick.screenerId} label={pick.screenerId} />
+          <Chip key={pick.screenerId} label={pick.screenerName} />
         ))}
       </Stack>
     ),
