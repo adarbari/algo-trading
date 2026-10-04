@@ -5,7 +5,44 @@
 > screener contract (`strategies/screeners/base.py`, `engines/screening/runner.py`). See
 > [README](README.md) for how each section maps onto the architecture.
 
-**Version:** 1.3  
+## Owner decisions (2026-10-03)
+
+These take precedence over the original spec below wherever they differ. The scanner will be
+a rule-screen preset ([rules.md](rules.md), [ADR 0029](../adr/0029-rule-screener.md)); the
+mapping follows.
+
+| Topic | Decision |
+|---|---|
+| IV30 gate | HARD, default **50%**, editable in the UI (the owner may lower it to 40%) |
+| IV30 source for the gate | the **lower** of IBKR's and Cboe's IV30 when both exist, else whichever exists, else UNKNOWN; our own IV30 is not used for the gate |
+| IV rank | IBKR's only; a SCORE criterion (missing → 0 points, never blocks) |
+| ROC | premium / (strike × 100), cash-secured |
+| Portfolio correlation | no correlation penalty |
+| Leveraged / inverse ETFs | included and flagged |
+| Earnings | **not a criterion**; results show the next quarterly earnings date and the DTE of the closest option expiry |
+| IV/HV ratio | HV30 floor of 15% in the denominator |
+| Output | screener results + Ideas (no email) |
+| Universe | our daily universe snapshot (not the monthly CSVs) |
+
+### Mapping to the rule-screen preset
+
+| Spec | Preset criterion / output |
+|---|---|
+| IV30 >= 50% | hard `feature.vrp_iv30 gte 0.50` (UI-editable); new site feature `vrp_iv30 = min(coalesce(ibkr_iv.iv30_ibkr, iv30.iv30_cboe), coalesce(iv30.iv30_cboe, ibkr_iv.iv30_ibkr))`: the lower of the two, whichever exists, else null (UNKNOWN) |
+| IV-HV >= 10 pts (weight 30), IV/HV >= 1.25 (weight 20) | hard `feature.vrp_iv_hv_spread gte 0.10`, hard `feature.vrp_iv_hv_ratio gte 1.25`; new site features over `vrp_iv30` and `price_stats.hv30`, the ratio dividing by `max(hv30, 0.15)` |
+| Stronger tier 15 pts / 1.30 | `tiers.STRONG` |
+| Within 10% of the 52W high / low; NEAR_HIGH / NEAR_LOW / BOTH | hard `feature.near_52w in [HIGH, LOW, BOTH]`; `classify = "feature.near_52w"`; weight 15 on distance to the extreme (reverse ramp) |
+| IV rank (0-10) | score `rollup.ibkr_iv@v1.iv_rank_252d_ibkr`, weight 10; missing → 0 points |
+| Price > $5 | hard `rollup.price_stats@v2.close gt 5` |
+| ADV > $50M, option volume / OI > 1,000, spread < 15% ("flag, don't reject") | soft, `on_miss = WATCH` (options too thin: `on_miss = LIQUIDITY_RISK`); liquidity and execution scores (0-10 each) as score criteria |
+| Earnings < 14 days, event risk (0-5) | **dropped** (owner decision); `columns`: `rollup.earnings@v1.next_earnings_date` and a new feature, the closest option expiry's DTE |
+| Low HV, leveraged / inverse ETF, > 10% one-day gap | `flags` (`instrument.is_leveraged`) |
+| Momentum context, setup class | `columns` + a site label feature `vrp_setup` |
+| Universe audit, "no qualified" only when COMPLETE | selection over the daily universe snapshot; the existing runner audit |
+| Option follow-up ROC | premium / (strike × 100), cash-secured; no correlation penalty |
+| Gaps (later) | liquidity at the 8-15 delta strikes, gap-move feature, catalysts (FDA etc.) |
+
+**Version:** 1.3\
 **Purpose:** Daily identification of liquid stocks with unusually rich implied volatility relative to realized volatility, while the underlying is positioned near a meaningful 52-week extreme.
 
 ## Core thesis
@@ -13,6 +50,9 @@
 Find stocks where option IV appears materially richer than realized volatility **and** price is close to a 52-week high or low. The scanner is an identification layer, not an automatic trade signal. Candidates must pass liquidity, event, and option-market quality checks before a short-premium trade is considered.
 
 ## Universe coverage — STATIC MONTHLY MASTER UNIVERSE (STOCKS + ADRs + ETFs)
+
+> Owner decision 2026-10-03: the preset screens our daily universe snapshot; the CSV
+> procedure below is the original spec.
 
 The daily scan must use the monthly master universe files **`optionable_us_stock_universe.csv`**, **`optionable_us_etf_universe.csv`**, and any current pending/review universe explicitly supplied for the run as authoritative inputs. The scanner now includes **U.S.-listed common stocks, ADRs/depositary receipts, and ETFs**, including leveraged/inverse ETFs when present in the supplied universe. Do **not** rebuild the optionable universe every day and do not substitute a hand-picked watchlist or a top-N screener.
 
@@ -167,7 +207,7 @@ Flag rather than automatically reject exceptional candidates that fail one liqui
 ## Event-risk filters
 
 Flag or exclude:
-- Earnings within **14 days** for the standard short-put screen
+- Earnings within **14 days** for the standard short-put screen (owner decision 2026-10-03: not a criterion; shown as a column)
 - Major known binary events such as FDA decisions, major litigation decisions, merger votes, or other scheduled catalysts
 - Recent extraordinary gap moves that make HV30 unstable
 
@@ -196,12 +236,12 @@ Classify the setup as:
 
 Use a transparent score rather than a black-box prediction.
 
-**Volatility premium (0–30)** — larger IV-HV spread scores higher.  
-**IV/HV ratio (0–20)** — higher ratio scores higher subject to a reasonable HV floor.  
-**52W positioning (0–15)** — stronger proximity scores higher.  
-**IV percentile/rank (0–10)** — higher percentile scores higher.  
-**Liquidity (0–10)** — higher dollar volume, option volume and OI score higher.  
-**Option execution quality (0–10)** — tighter spreads and stronger OI score higher.  
+**Volatility premium (0–30)** — larger IV-HV spread scores higher.\
+**IV/HV ratio (0–20)** — higher ratio scores higher subject to a reasonable HV floor.\
+**52W positioning (0–15)** — stronger proximity scores higher.\
+**IV percentile/rank (0–10)** — higher percentile scores higher.\
+**Liquidity (0–10)** — higher dollar volume, option volume and OI score higher.\
+**Option execution quality (0–10)** — tighter spreads and stronger OI score higher.\
 **Event risk (0–5)** — fewer near-term binary events score higher.
 
 Use the score for sorting only; it is not a probability of profit.
@@ -281,9 +321,9 @@ For candidates surviving stock-level screening and catalyst review:
 - **30–60 DTE**
 - Target approximately **8–15 delta puts**
 - Compare premium, delta, IV, OI, bid/ask, DTE and capital/margin requirement
-- Calculate **premium / margin capital ROC**
+- Calculate **premium / margin capital ROC** (owner decision 2026-10-03: premium / (strike × 100), cash-secured)
 - Estimate assignment exposure and downside loss at multiple underlying drawdowns
-- Apply correlation penalties against the existing portfolio
+- Apply correlation penalties against the existing portfolio (owner decision 2026-10-03: none)
 
 ## Risk flags
 
@@ -300,10 +340,10 @@ Automatically flag:
 
 ## Daily decision categories
 
-**QUALIFIED — REVIEW OPTION CHAIN** — all core gates pass.  
-**WATCH — ONE GATE MISSED** — interesting setup but one specified criterion fails.  
-**EVENT RISK — DO NOT STANDARDIZE** — volatility premium may be event-driven.  
-**LIQUIDITY RISK** — stock or options market is too thin for normal sizing.  
+**QUALIFIED — REVIEW OPTION CHAIN** — all core gates pass.\
+**WATCH — ONE GATE MISSED** — interesting setup but one specified criterion fails.\
+**EVENT RISK — DO NOT STANDARDIZE** — volatility premium may be event-driven.\
+**LIQUIDITY RISK** — stock or options market is too thin for normal sizing.\
 **REJECT** — materially fails the core setup.
 
 ## Fail-closed / data-integrity rules
