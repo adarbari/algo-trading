@@ -214,3 +214,75 @@ def test_moved_features_reproduce_v1_on_golden_data(
     classes = pd.concat([liquidity_class_v1(ps, None, day) for day in sessions])
     assert (got["liquidity_class"].droplevel(0).to_numpy() == classes.to_numpy()).all()
     assert set(classes) <= {"LOW", "UNKNOWN"}  # golden data has no option chains
+
+
+def test_vrp_iv30_is_the_lower_source_and_its_ratios(fs: FeatureSet) -> None:
+    ids = ["EQ:BOTH", "EQ:IBLOW", "EQ:CBOE", "EQ:IBKR", "EQ:NONE", "EQ:FLAT"]
+    stats = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "hv30": [0.4, 0.4, 0.4, np.nan, 0.4, 0.0],
+        }
+    ).astype({"hv30": "float32"})
+    cboe = pd.DataFrame(
+        {
+            "instrument_id": ["EQ:BOTH", "EQ:IBLOW", "EQ:CBOE", "EQ:NONE", "EQ:FLAT"],
+            "session_date": END,
+            "iv30_cboe": [0.55, 0.70, 0.60, np.nan, 0.5],
+        }
+    )
+    ibkr = pd.DataFrame(
+        {"instrument_id": ["EQ:BOTH", "EQ:IBLOW", "EQ:IBKR"], "session_date": END}
+    ).assign(iv30_ibkr=np.array([0.65, 0.50, 0.80], dtype="float32"))
+    frames = {
+        PRICE_STATS: stats,
+        "rollups/instrument/iv30@v1": cboe,
+        "rollups/instrument/ibkr_iv@v1": ibkr,
+    }
+    names = ["vrp_iv30", "vrp_iv30_source", "vrp_iv_hv_spread", "vrp_iv_hv_ratio"]
+    out = fs.evaluate(frames, names).set_index("instrument_id")
+    iv = out["vrp_iv30"]
+    assert iv["EQ:BOTH"] == pytest.approx(0.55)  # the lower of the two
+    assert iv["EQ:IBLOW"] == pytest.approx(0.50)
+    assert iv["EQ:CBOE"] == pytest.approx(0.60)  # whichever exists
+    assert iv["EQ:IBKR"] == pytest.approx(0.80)
+    assert pd.isna(iv["EQ:NONE"])  # neither: UNKNOWN
+    assert out["vrp_iv30_source"].to_dict() == {
+        "EQ:BOTH": "cboe",
+        "EQ:IBLOW": "ibkr",
+        "EQ:CBOE": "cboe",
+        "EQ:IBKR": "ibkr",
+        "EQ:NONE": None,
+        "EQ:FLAT": "cboe",
+    }
+    assert out.loc["EQ:BOTH", "vrp_iv_hv_spread"] == pytest.approx(0.15)
+    assert out.loc["EQ:BOTH", "vrp_iv_hv_ratio"] == pytest.approx(0.55 / 0.4)
+    assert pd.isna(out.loc["EQ:IBKR", "vrp_iv_hv_spread"])  # no HV30
+    assert pd.isna(out.loc["EQ:FLAT", "vrp_iv_hv_ratio"])  # HV30 0: missing, no floor
+    assert out.loc["EQ:FLAT", "vrp_iv_hv_spread"] == pytest.approx(0.5)
+    assert {fs.expressions[n].feature.licence for n in names} == {"personal"}  # IBKR input
+
+
+def test_distance_to_52w_extreme_and_moving_averages(fs: FeatureSet) -> None:
+    stats = pd.DataFrame(
+        {
+            "instrument_id": ["EQ:A", "EQ:B", "EQ:C"],
+            "session_date": END,
+            "close": [95.0, 52.0, 30.0],
+            "high_52w": [100.0, 100.0, np.nan],
+            "low_52w": [50.0, 50.0, 20.0],
+            "sma_20": [100.0, 40.0, 30.0],
+            "sma_50": [95.0, np.nan, 25.0],
+            "sma_200": [50.0, 52.0, 60.0],
+        }
+    ).astype("float32", errors="ignore")
+    names = ["dist_52w", "pct_vs_sma_20", "pct_vs_sma_50", "pct_vs_sma_200"]
+    out = fs.evaluate({PRICE_STATS: stats}, names).set_index("instrument_id")
+    assert out.loc["EQ:A", "dist_52w"] == pytest.approx(0.05)  # 5% under the high
+    assert out.loc["EQ:B", "dist_52w"] == pytest.approx(0.04)  # 4% over the low
+    assert pd.isna(out.loc["EQ:C", "dist_52w"])  # no 52-week high
+    assert out.loc["EQ:A", "pct_vs_sma_20"] == pytest.approx(-0.05)
+    assert out.loc["EQ:B", "pct_vs_sma_20"] == pytest.approx(0.3)
+    assert pd.isna(out.loc["EQ:B", "pct_vs_sma_50"])
+    assert out.loc["EQ:C", "pct_vs_sma_200"] == pytest.approx(-0.5)
