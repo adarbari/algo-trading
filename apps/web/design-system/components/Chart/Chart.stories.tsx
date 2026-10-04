@@ -61,6 +61,15 @@ export const WithVolume: Story = {
   args: { type: 'area', volume: aaplVolume, range: '2Y', height: 'lg' },
 };
 
+/** Hundreds of millions of shares: the volume axis reads 800M, the price axis stays currency. */
+export const WithLargeVolume: Story = {
+  args: {
+    volume: aaplVolume.map((p) => ({ ...p, value: p.value * 10 })),
+    range: '1Y',
+    height: 'lg',
+  },
+};
+
 /** The table fallback: the same numbers in a DataTable. */
 export const TableView: Story = {
   args: { label: 'AAPL, MSFT and NVDA', series: [aapl, msft, nvda], rebase: true, range: '3M' },
