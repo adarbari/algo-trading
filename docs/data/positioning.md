@@ -442,8 +442,8 @@ and Parquet size per new table, and the backfill time per stored chain session.
 
 ## Implementation notes (for OP1 to OP4, not decisions)
 
-- `src/algotrade/features/rollups/` holds 10 modules, the layout cap: split it by kind before
-  the first OP group (`add-responsibility`, `layout.toml`).
+- `src/algotrade/features/rollups/` is split by kind (`price/`, `options/`, `corporate/`); OP
+  groups go in `options/`, which has room under the 10-module cap.
 - The per-contract IV fill and Greeks (Shared rules) are one new responsibility used by `gex`,
   `skew` and later `put_wing`'s `our_deltas`: one owner module, an `ownership.toml` entry, no
   copies (`make dupes`). The pdf-only gamma belongs in `quant/` (architect review).

@@ -8,7 +8,7 @@ import pytest
 
 from algotrade.features.framework.runner import compute_one, compute_sessions
 from algotrade.features.registry import GROUPS
-from algotrade.features.rollups import price_moves as pm
+from algotrade.features.rollups.price import price_moves as pm
 from tests.helpers.rollup_store import END, series, store, write_bars, write_split
 
 F32 = 2e-7

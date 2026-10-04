@@ -51,7 +51,7 @@ import pandas as pd
 from algotrade.core.model.options import standard_monthly_expiries
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature, Range
-from algotrade.features.rollups.iv30 import (  # the same input tables, read the same way
+from algotrade.features.rollups.options.iv30 import (  # the same input tables, read the same way
     DIVIDENDS,
     OPTIONS,
     RATES,

@@ -206,9 +206,10 @@ range; every feature is listed in the generated **[feature catalogue](features.m
   (each a table plus a lookback in exchange sessions, required or optional), params (a frozen
   dataclass of defaults, or none), its `FEATURES` (`features/framework/feature.py`: one
   `Feature` per output column, in stored order), and a pure
-  `compute(inputs, session, params) -> frame`. Groups live in `features/rollups/<name>.py`
-  and import only `core`, `quant`, numpy and pandas (import-linter); the registry is
-  `features/registry.py` (`GROUPS`, `FEATURES`, `feature(name)` for descriptions and units).
+  `compute(inputs, session, params) -> frame`. Groups live in
+  `features/rollups/<kind>/<name>.py` (`price/`, `options/`, `corporate/`) and import only
+  `core`, `quant`, numpy and pandas (import-linter); the registry is `features/registry.py`
+  (`GROUPS`, `FEATURES`, `feature(name)` for descriptions and units).
 - **Inputs** are asked of `algotrade.data` by table name (`data/feature_inputs.py`,
   `load_input`; each table's read lives in its `data` owner), never storage or a domain reader,
   once per chunk of up to 126 sessions. `compute` sees only rows on or before its session

@@ -9,8 +9,9 @@ import pandas as pd
 import pytest
 
 from algotrade.features.framework.runner import compute_in_memory, compute_one
-from algotrade.features.rollups import dividends, price_stats
-from algotrade.features.rollups.dividends import GROUP, DividendParams
+from algotrade.features.rollups.corporate import dividends
+from algotrade.features.rollups.corporate.dividends import GROUP, DividendParams
+from algotrade.features.rollups.price import price_stats
 from algotrade.features.site import site_features
 from algotrade.storage.configs.files import FileConfigStore
 from tests.conftest import REPO_ROOT

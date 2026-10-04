@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from algotrade.config.user import UserContext
-from algotrade.features.rollups import earnings
+from algotrade.features.rollups.corporate import earnings
 from algotrade.services.explore.ideas.ranking import ideas_for, top_ideas
 from algotrade.services.explore.store import store_over
 from algotrade.storage.backends.memory import MemoryBackend

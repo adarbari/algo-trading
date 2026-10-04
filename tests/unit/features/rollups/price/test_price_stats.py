@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 from algotrade.features.framework.runner import compute_one, compute_sessions
-from algotrade.features.rollups import price_stats as ps
+from algotrade.features.rollups.price import price_stats as ps
 from tests.helpers.rollup_store import END, series, store, write_bars, write_split
 
 P = ps.PriceStatsParams()

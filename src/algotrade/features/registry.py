@@ -2,7 +2,7 @@
 feature they declare, and the group versions they superseded.
 
 Add a group by declaring ``GROUP`` (with its ``FEATURES``) in
-``features/rollups/<name>.py`` and listing it here; the ``rollups`` ingestion task, the
+``features/rollups/<kind>/<name>.py`` and listing it here; the ``rollups`` ingestion task, the
 selection catalogue, the feature catalogue (``features.catalogue``) and the fitness tests pick
 it up from this registry. The order is computed (``framework.graph.dependency_order``): a
 group that reads another group's table comes after it. A group may read a materialised
@@ -24,18 +24,15 @@ from collections.abc import Mapping
 from algotrade.features.framework.declaration import FeatureGroup, Superseded
 from algotrade.features.framework.feature import Feature
 from algotrade.features.framework.graph import dependency_order
-from algotrade.features.rollups import (
-    dividends,
-    earnings,
-    fundamentals,
+from algotrade.features.rollups.corporate import dividends, earnings, fundamentals
+from algotrade.features.rollups.options import (
     ibkr_iv,
     iv30,
     iv_history,
     option_liquidity,
-    price_moves,
-    price_stats,
     put_wing,
 )
+from algotrade.features.rollups.price import price_moves, price_stats
 
 GROUPS: dict[str, FeatureGroup] = {
     g.key: g

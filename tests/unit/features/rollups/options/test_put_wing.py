@@ -15,7 +15,7 @@ from hypothesis import strategies as st
 
 from algotrade.features.framework.runner import compute_one
 from algotrade.features.registry import GROUPS
-from algotrade.features.rollups import put_wing as pw
+from algotrade.features.rollups.options import put_wing as pw
 from algotrade.quant.black_scholes import greeks
 from tests.helpers.rollup_store import END, chain_rows, store, write_chains, write_curve
 

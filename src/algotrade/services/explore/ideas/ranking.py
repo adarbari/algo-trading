@@ -31,7 +31,7 @@ from algotrade.data import StoreReader
 from algotrade.data.chains import chain_expiries
 from algotrade.data.reference import resolver, snapshot
 from algotrade.data.rollups import rollup_on
-from algotrade.features.rollups import earnings
+from algotrade.features.rollups.corporate import earnings
 from algotrade.services.explore.store import ReadStore
 from algotrade.services.views import to_value
 from algotrade.storage.tables.schemas import result_table

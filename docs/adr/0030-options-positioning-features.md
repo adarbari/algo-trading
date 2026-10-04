@@ -46,5 +46,5 @@ contract a customer or a dealer holds.
   history to backfill.
 - The nightly rollups step grows by an estimated 30 to 40 s; `nightly-footprint.md` is
   re-measured after OP1 and OP3.
-- `features/rollups/` is at its 10-module cap and must be split by kind before the first
-  group lands; the shared per-contract pricing step gets one owner in `ownership.toml`.
+- `features/rollups/` is split by kind; the groups go in `features/rollups/options/`; the
+  shared per-contract pricing step gets one owner in `ownership.toml`.
