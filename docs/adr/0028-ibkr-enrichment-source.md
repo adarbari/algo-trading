@@ -123,6 +123,20 @@ volume and IB's model IV / delta arrive.
   backtests never do (live rows are not point-in-time history of the stored chain), and like
   every IBKR-derived value they carry the personal-use licence.
 
+### Share-class share counts: not available from IBKR (probed 2026-10-03)
+Question (PR C): can IBKR give class-level share counts (BRK.A / BRK.B, GOOG / GOOGL) to take
+precedence over the SEC company total in `instruments/shares`? Probe on the paper login
+(client id 18, 5 read-only requests): `qualifyContracts` (BRK B, GOOGL) resolved both;
+`reqFundamentalData(ReportSnapshot)` for each and `reqMktData` generic tick 258
+(fundamental ratios) on BRK B all failed with IB error 10358 "Fundamentals data is not
+allowed" (empty answers). IB's Reuters/Refinitiv fundamentals are not entitled on this
+account, and contract details carry no share counts. **Decision: no IBKR share-count
+ingestion.** `instruments/shares` stays SEC-only (company facts; every class of a CIK gets
+the CIK's facts). `reqFundamentalData` was added to the facade's allowlist only for the
+probe and was not committed: the allowlist is unchanged. Revisit only if the owner adds a
+fundamentals entitlement (and then check its licence for personal use), or with another
+class-level source.
+
 ## Consequences
 - IV rank is available from day one for names IB covers, labelled `ibkr`; ours remains the
   fallback and the cross-check, labelled `ours`.
