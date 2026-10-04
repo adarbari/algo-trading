@@ -17,7 +17,7 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 
 **Facts**
 - IBKR fundamentals are not permitted on this account (error 10358): share-class counts stay SEC.
-- Owner screener / VRP decisions: ADR 0029 and `docs/screeners/vrp-scanner.md`.
+- Owner screener / VRP decisions: ADR 0029, ADR 0030 (rule screens: no selection, missing data never skips, no tiers / classify / labels; `vrp_scanner` v3) and `docs/screeners/vrp-scanner.md`. A v3 run stores a row per snapshot instrument (about 11.4k, was about 4.2k).
 - Harness audit: last 2026-10-04 (`/audit-harness`; `/start` flags when older than 30 days; fixes log: [history.md](history.md)).
 
 ---

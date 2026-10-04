@@ -34,37 +34,9 @@ describe('plainEnglish', () => {
         criterion({ id: 'iv2', mode: 'score', value: 0.4 }),
       ],
       catalogue,
-      'liquid_optionable',
     );
     expect(text).toBe(
-      'Find instruments in liquid_optionable where IV30 ≥ 50%. A near miss on Close > $5 is tolerated and flagged. Prefer IV30 ≥ 40%; missing these only lowers the score.',
-    );
-  });
-
-  it('reads a criterion once when its preset label already states the condition', () => {
-    const text = plainEnglish(
-      [
-        criterion({ id: 'iv', label: 'IV30 >= 50%' }),
-        criterion({
-          id: 'px',
-          field: 'rollup.price_stats@v2.close',
-          op: 'gt',
-          value: 5,
-          label: 'Price > $5',
-        }),
-        criterion({
-          id: 'adv',
-          field: 'rollup.price_stats@v2.close',
-          value: 50_000_000,
-          label: 'Stock ADV > $50M',
-        }),
-        criterion({ id: 'named', value: 0.3, label: 'Implied vol' }),
-      ],
-      catalogue,
-      null,
-    );
-    expect(text).toBe(
-      'Find instruments where IV30 >= 50%, Price > $5, Stock ADV > $50M and Implied vol ≥ 30%.',
+      'Find instruments where IV30 ≥ 50%. A near miss on Close > $5 is tolerated and flagged. Prefer IV30 ≥ 40%; missing these only lowers the score.',
     );
   });
 
@@ -75,16 +47,15 @@ describe('plainEnglish', () => {
       op: 'gte',
       value: 50_000_000,
     });
-    expect(plainEnglish([adv], catalogue, null)).toBe('Find instruments where Close ≥ $50M.');
+    expect(plainEnglish([adv], catalogue)).toBe('Find instruments where Close ≥ $50M.');
   });
 
   it('says nothing until a criterion is complete', () => {
-    expect(plainEnglish([criterion({ id: 'a', field: '' })], catalogue, null)).toBeNull();
+    expect(plainEnglish([criterion({ id: 'a', field: '' })], catalogue)).toBeNull();
     expect(
       plainEnglish(
         [criterion({ id: 'a', op: 'gte' }), { id: 'b', field: 'x', op: 'gte', mode: 'hard' }],
         catalogue,
-        null,
       ),
     ).toContain('IV30');
   });

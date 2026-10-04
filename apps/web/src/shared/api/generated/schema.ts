@@ -1249,15 +1249,13 @@ export interface components {
             criterion_id: string;
             /**
              * Entering
-             * @description rows that passed or narrowly missed every earlier step
+             * @description rows still in after every earlier step
              */
             entering: number;
             /** Failed */
             failed: number;
             /** Field */
             field: string;
-            /** Label */
-            label: string | null;
             /** Missing */
             missing: number;
             /** Mode */
@@ -1268,7 +1266,7 @@ export interface components {
             passed: number;
             /**
              * Remaining
-             * @description passed + near: what the next step sees
+             * @description what the next step sees: passed + near (+ no value, for a soft step)
              */
             remaining: number;
         };
@@ -1347,8 +1345,6 @@ export interface components {
             decision: string;
             /** Flags */
             flags: string[];
-            /** Klass */
-            klass: string | null;
             /** Reasons */
             reasons: string;
             /** Score */
@@ -1358,8 +1354,6 @@ export interface components {
              * Format: date
              */
             session: string;
-            /** Tier */
-            tier: string | null;
             /** User */
             user: string;
         };
@@ -1775,7 +1769,7 @@ export interface components {
             pre_snapshot: boolean;
             /**
              * Processed
-             * @description rows not SKIPPED
+             * @description rows evaluated (none is skipped since ADR 0030)
              */
             processed: number;
             /** Selected */
@@ -1787,7 +1781,10 @@ export interface components {
             selection: {
                 [key: string]: unknown;
             };
-            /** Skipped */
+            /**
+             * Skipped
+             * @description always 0 for a rule screen; kept for stored runs
+             */
             skipped: number;
             /**
              * Universe Snapshot
@@ -1798,47 +1795,64 @@ export interface components {
         /** PreviewRow */
         PreviewRow: {
             /**
-             * Classification
-             * @description the spec's classify field
+             * Columns
+             * @description the screen's display columns: name -> value
              */
-            classification: string | null;
-            /** Columns */
             columns: {
                 [key: string]: unknown;
             };
             /** Criteria */
             criteria: components["schemas"]["CriterionValue"][];
-            /** Decision */
+            /**
+             * Decision
+             * @description QUALIFIED, WATCH, LIQUIDITY_RISK, EVENT_RISK or REJECT
+             */
             decision: string;
-            /** Flags */
+            /**
+             * Flags
+             * @description warnings that never change the decision
+             */
             flags: string[];
             /** Instrument Id */
             instrument_id: string;
-            /** Rank */
+            /**
+             * Rank
+             * @description 1 = best: score, then the tie-break, then instrument id
+             */
             rank: number;
-            /** Reasons */
+            /**
+             * Reasons
+             * @description why the decision is not QUALIFIED (`no <field>` too)
+             */
             reasons: string[];
-            /** Score */
+            /**
+             * Score
+             * @description 100 minus the penalties, clipped to 0..100
+             */
             score: number | null;
             /** Symbol */
             symbol: string | null;
-            /** Tier */
-            tier: string | null;
         };
         /** PreviewSummary */
         PreviewSummary: {
+            /**
+             * Missing
+             * @description gating values missing where the funnel reached them, per row and criterion
+             */
+            missing: number;
+            /**
+             * Missing Reasons
+             * @description `no <field>` -> rows
+             */
+            missing_reasons: {
+                [key: string]: number;
+            };
             /** Narrow Misses */
             narrow_misses: components["schemas"]["NarrowMiss"][];
             /** Passed */
             passed: number;
             /** Rows */
             rows: number;
-            /** Skipped */
-            skipped: number;
-            /** Skipped Reasons */
-            skipped_reasons: {
-                [key: string]: number;
-            };
         };
         /** PriceComparison */
         PriceComparison: {
@@ -2080,7 +2094,7 @@ export interface components {
             versions: number[];
             /**
              * Working
-             * @description the working copy's rule keys (criteria, tiers, ...) resolved through its layers: the draft when it resolves, else the latest version, else the preset
+             * @description the working copy's rule keys (criteria, flags, ...) resolved through its layers: the draft when it resolves, else the latest version, else the preset
              */
             working?: {
                 [key: string]: unknown;

@@ -1,7 +1,7 @@
 /**
- * The preview's run summary: how many rows passed, how many were skipped and why (missing data
- * never passes), the decision counts and the narrow misses (rows that missed only within a
- * tolerance, with the rule and the distance).
+ * The preview's run summary: how many rows passed, how many had no value for a gating criterion
+ * and for which field (missing data never passes), the decision counts and the narrow misses
+ * (rows that missed only within a tolerance, with the rule and the distance).
  */
 import { Banner, Disclosure, KeyValue, Panel, Stack, StatStrip, Text } from '@algotrade/ui';
 
@@ -21,7 +21,7 @@ function Summary({ preview }: { preview: ScreenPreview }) {
   const { summary, coverage } = preview;
   const symbols = new Map(preview.rows.map((row) => [row.instrument_id, row.symbol]));
   const groups = narrowMissGroups(summary.narrow_misses);
-  const reasons = Object.entries(summary.skipped_reasons).sort((a, b) => b[1] - a[1]);
+  const reasons = Object.entries(summary.missing_reasons).sort((a, b) => b[1] - a[1]);
   return (
     <Stack gap={3}>
       <StatStrip
@@ -30,10 +30,10 @@ function Summary({ preview }: { preview: ScreenPreview }) {
           { label: 'Screened', value: coverage.selected, format: { kind: 'number' } },
           { label: 'Passed', value: summary.passed, format: { kind: 'number' }, tone: 'positive' },
           {
-            label: 'Skipped',
-            value: summary.skipped,
+            label: 'Missing data',
+            value: summary.missing,
             format: { kind: 'number' },
-            sub: 'data missing',
+            sub: 'no value',
           },
           {
             label: 'Coverage',
@@ -65,12 +65,12 @@ function Summary({ preview }: { preview: ScreenPreview }) {
       )}
       {reasons.length > 0 && (
         <Disclosure
-          label="Skipped"
-          count={summary.skipped.toLocaleString('en-US')}
+          label="Missing data"
+          count={summary.missing.toLocaleString('en-US')}
           countTone="warning"
         >
           <KeyValue
-            label="Skipped by reason"
+            label="Missing data by field"
             items={reasons.map(([reason, n]) => ({
               label: reason,
               value: n.toLocaleString('en-US'),

@@ -1,6 +1,6 @@
 # ADR 0015: Configs, selections and users
 
-**Status:** accepted (2026-10-03). Implemented in phase 0.5. Amends [0013](0013-universe.md).
+**Status:** accepted (2026-10-03). Implemented in phase 0.5. Amends [0013](0013-universe.md). Rule screens no longer name a selection ([0030](0030-rule-screener-simplification.md)).
 Spec: [docs/configuration.md](../configuration.md).
 
 ## Context

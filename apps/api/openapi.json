@@ -1273,7 +1273,7 @@
             "type": "string"
           },
           "entering": {
-            "description": "rows that passed or narrowly missed every earlier step",
+            "description": "rows still in after every earlier step",
             "title": "Entering",
             "type": "integer"
           },
@@ -1284,17 +1284,6 @@
           "field": {
             "title": "Field",
             "type": "string"
-          },
-          "label": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Label"
           },
           "missing": {
             "title": "Missing",
@@ -1313,7 +1302,7 @@
             "type": "integer"
           },
           "remaining": {
-            "description": "passed + near: what the next step sees",
+            "description": "what the next step sees: passed + near (+ no value, for a soft step)",
             "title": "Remaining",
             "type": "integer"
           }
@@ -1322,7 +1311,6 @@
           "criterion_id",
           "field",
           "mode",
-          "label",
           "entering",
           "passed",
           "near",
@@ -1575,17 +1563,6 @@
             "title": "Flags",
             "type": "array"
           },
-          "klass": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Klass"
-          },
           "reasons": {
             "title": "Reasons",
             "type": "string"
@@ -1606,17 +1583,6 @@
             "title": "Session",
             "type": "string"
           },
-          "tier": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tier"
-          },
           "user": {
             "title": "User",
             "type": "string"
@@ -1630,8 +1596,6 @@
           "config_version",
           "user",
           "session",
-          "klass",
-          "tier",
           "criteria",
           "columns",
           "criterion_values",
@@ -2702,7 +2666,7 @@
             "type": "boolean"
           },
           "processed": {
-            "description": "rows not SKIPPED",
+            "description": "rows evaluated (none is skipped since ADR 0030)",
             "title": "Processed",
             "type": "integer"
           },
@@ -2717,6 +2681,7 @@
             "type": "object"
           },
           "skipped": {
+            "description": "always 0 for a rule screen; kept for stored runs",
             "title": "Skipped",
             "type": "integer"
           },
@@ -2744,20 +2709,9 @@
       },
       "PreviewRow": {
         "properties": {
-          "classification": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "the spec's classify field",
-            "title": "Classification"
-          },
           "columns": {
             "additionalProperties": true,
+            "description": "the screen's display columns: name -> value",
             "title": "Columns",
             "type": "object"
           },
@@ -2769,10 +2723,12 @@
             "type": "array"
           },
           "decision": {
+            "description": "QUALIFIED, WATCH, LIQUIDITY_RISK, EVENT_RISK or REJECT",
             "title": "Decision",
             "type": "string"
           },
           "flags": {
+            "description": "warnings that never change the decision",
             "items": {
               "type": "string"
             },
@@ -2784,10 +2740,12 @@
             "type": "string"
           },
           "rank": {
+            "description": "1 = best: score, then the tie-break, then instrument id",
             "title": "Rank",
             "type": "integer"
           },
           "reasons": {
+            "description": "why the decision is not QUALIFIED (`no <field>` too)",
             "items": {
               "type": "string"
             },
@@ -2803,6 +2761,7 @@
                 "type": "null"
               }
             ],
+            "description": "100 minus the penalties, clipped to 0..100",
             "title": "Score"
           },
           "symbol": {
@@ -2815,17 +2774,6 @@
               }
             ],
             "title": "Symbol"
-          },
-          "tier": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tier"
           }
         },
         "required": [
@@ -2834,8 +2782,6 @@
           "rank",
           "decision",
           "score",
-          "tier",
-          "classification",
           "flags",
           "reasons",
           "columns",
@@ -2846,6 +2792,19 @@
       },
       "PreviewSummary": {
         "properties": {
+          "missing": {
+            "description": "gating values missing where the funnel reached them, per row and criterion",
+            "title": "Missing",
+            "type": "integer"
+          },
+          "missing_reasons": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "description": "`no <field>` -> rows",
+            "title": "Missing Reasons",
+            "type": "object"
+          },
           "narrow_misses": {
             "items": {
               "$ref": "#/components/schemas/NarrowMiss"
@@ -2860,24 +2819,13 @@
           "rows": {
             "title": "Rows",
             "type": "integer"
-          },
-          "skipped": {
-            "title": "Skipped",
-            "type": "integer"
-          },
-          "skipped_reasons": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "title": "Skipped Reasons",
-            "type": "object"
           }
         },
         "required": [
           "rows",
           "passed",
-          "skipped",
-          "skipped_reasons",
+          "missing",
+          "missing_reasons",
           "narrow_misses"
         ],
         "title": "PreviewSummary",
@@ -3674,7 +3622,7 @@
                 "type": "null"
               }
             ],
-            "description": "the working copy's rule keys (criteria, tiers, ...) resolved through its layers: the draft when it resolves, else the latest version, else the preset",
+            "description": "the working copy's rule keys (criteria, flags, ...) resolved through its layers: the draft when it resolves, else the latest version, else the preset",
             "title": "Working"
           }
         },

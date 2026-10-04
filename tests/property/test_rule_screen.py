@@ -8,6 +8,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from algotrade.config.strategy.screen_spec import parse_screen_spec
+from algotrade.core.model.screen_spec import Mode
 from algotrade.core.views.feature_view import FeatureView
 from algotrade.strategies.screeners import Decision
 from algotrade.strategies.screeners.rules import Outcome, evaluate_screen
@@ -34,7 +35,6 @@ SPEC = parse_screen_spec(
                 "tolerance": 1.0,
             },
         },
-        "tiers": {"T": {"all": [{"field": "b", "op": "gte", "value": 1.5}]}},
         "flags": {"f": {"any": [{"field": "d", "op": "gt", "value": 0.5}]}},
         "rank": {"tie_break": "d"},
     },
@@ -59,16 +59,17 @@ def test_same_input_same_output_whatever_the_row_order(data: dict, rnd) -> None:
 
 
 @given(rows)
-def test_missing_gating_data_is_skipped_never_passed(data: dict) -> None:  # type: ignore[type-arg]
+def test_missing_data_never_passes_and_never_skips(data: dict) -> None:  # type: ignore[type-arg]
     for r in evaluate_screen(SPEC, FeatureView(DAY, data)).rows:
-        gating_missing = any(x.gating and x.outcome is Outcome.MISSING for x in r.results)
-        assert (r.decision is Decision.SKIPPED) == gating_missing
-        if r.decision is Decision.SKIPPED:
-            assert r.score is None and all(reason.startswith("no ") for reason in r.reasons)
-        else:
-            assert r.score is not None and 0.0 <= r.score <= 100.0
-        if r.decision is Decision.QUALIFIED:
-            assert all(x.outcome is Outcome.PASS for x in r.results if x.gating)
+        assert r.decision is not Decision.SKIPPED
+        assert r.score is not None and 0.0 <= r.score <= 100.0
+        if any(x.outcome is Outcome.MISSING and x.criterion.mode is Mode.HARD for x in r.results):
+            assert r.decision is Decision.REJECT  # a HARD criterion with no value is a fail
+        if r.decision is Decision.QUALIFIED:  # nothing missed, bar a SOFT value that is absent
+            for x in (x for x in r.results if x.gating):
+                assert x.outcome is Outcome.PASS or (
+                    x.outcome is Outcome.MISSING and x.criterion.mode is Mode.SOFT
+                )
 
 
 @given(rows)

@@ -35,14 +35,11 @@ def spec_doc(**extra: Any) -> dict[str, Any]:
                 "value": 1000,
                 "mode": "score",
                 "tolerance": {"relative": 0.5},
-                "label": "OI",
             },
         },
-        "tiers": {"STRONG": {"all": [{**SPREAD, "value": 0.15}]}, "BASE": {"all": [IV30]}},
         "flags": {
             "leveraged": {"all": [{"field": "instrument.is_leveraged", "op": "eq", "value": True}]}
         },
-        "classify": "rollup.vol@v1.near",
         "columns": {"symbol": "instrument.symbol"},
         "rank": {"tie_break": "rollup.vol@v1.spread"},
         **extra,
@@ -58,15 +55,13 @@ def test_parse_full_spec_keeps_order_and_modes() -> None:
     assert spread.mode is Mode.SOFT and spread.tolerance == Tolerance(0.02)
     assert spread.on_miss == "LIQUIDITY_RISK"
     assert oi.tolerance == Tolerance(0.5, relative=True) and oi.tolerance.width(1000) == 500
-    assert oi.label == "OI" and not oi.mode.gating and spread.mode.gating
-    assert [name for name, _ in spec.tiers] == ["STRONG", "BASE"]
-    assert spec.version == 3 and spec.classify == "rollup.vol@v1.near"
+    assert not oi.mode.gating and spread.mode.gating
+    assert spec.version == 3
     assert spec.tie_break == "rollup.vol@v1.spread" and spec.tie_break_descending
     assert spec.fields() == (
         "instrument.is_leveraged",
         "instrument.symbol",
         "rollup.vol@v1.iv30",
-        "rollup.vol@v1.near",
         "rollup.vol@v1.oi",
         "rollup.vol@v1.spread",
     )
@@ -115,7 +110,6 @@ def test_disabled_criterion_is_dropped_and_asc_tie_break() -> None:
         ({**SPREAD, "on_miss": "WATCH"}, "only a soft criterion"),
         ({**SPREAD, "mode": "soft", "tolerance": 1, "on_miss": "REJECT"}, "must be one of"),
         ({**SPREAD, "enabled": "no"}, "true or false"),
-        ({**SPREAD, "label": 3}, "expected a string"),
         ({**SPREAD, "weight": 3}, "unknown keys"),
         ({"field": "x"}, "op must be one of"),
     ],
@@ -135,10 +129,9 @@ def test_criterion_errors_name_the_path(criterion: dict[str, Any], message: str)
         ({"criteria": {"Bad Id": IV30}}, "invalid criterion id"),
         ({"criteria": {"c": IV30}, "version": 0}, "positive integer"),
         ({"criteria": {"c": IV30}, "version": "2"}, "positive integer"),
-        ({"criteria": {"c": IV30}, "tiers": {"a b": {"all": [IV30]}}}, "A-Za-z"),
-        ({"criteria": {"c": IV30}, "tiers": {"T": [IV30]}}, "expected a table"),
+        ({"criteria": {"c": IV30}, "flags": {"a b": {"all": [IV30]}}}, "A-Za-z"),
+        ({"criteria": {"c": IV30}, "flags": {"T": [IV30]}}, "expected a table"),
         ({"criteria": {"c": IV30}, "columns": {"x": 3}}, "field name"),
-        ({"criteria": {"c": IV30}, "classify": ""}, "field name"),
         ({"criteria": {"c": IV30}, "rank": {"tie_break_order": "up"}}, "'asc' or 'desc'"),
         ({"criteria": {"c": IV30}, "rank": {"by": "x"}}, "unknown keys"),
     ],
@@ -168,7 +161,7 @@ def test_spec_errors(doc: dict[str, Any], message: str) -> None:
             "does not fit",
         ),
         (
-            {"criteria": {"c": IV30}, "tiers": {"T": {"all": [{**IV30, "field": "x.y"}]}}},
+            {"criteria": {"c": IV30}, "flags": {"T": {"all": [{**IV30, "field": "x.y"}]}}},
             "unknown field",
         ),
         (
@@ -176,7 +169,6 @@ def test_spec_errors(doc: dict[str, Any], message: str) -> None:
             "does not fit",
         ),
         ({"criteria": {"c": IV30}, "columns": {"x": "instrument.nope"}}, "unknown field"),
-        ({"criteria": {"c": IV30}, "classify": "rollup.vol@v1.iv30"}, "label"),
         ({"criteria": {"c": IV30}, "rank": {"tie_break": "instrument.symbol"}}, "numeric"),
     ],
 )
@@ -200,15 +192,24 @@ def test_tolerance_needs_a_numeric_field_type() -> None:
         check_screen_spec(spec, catalog, "s")
 
 
+def test_legacy_tiers_classify_and_label_parse_and_are_ignored() -> None:
+    """v1 / v2 presets are immutable and still carry them (ADR 0030)."""
+    legacy = {
+        "criteria": {"c": {**IV30, "label": "IV30 >= 50%"}},
+        "tiers": {"STRONG": {"all": [IV30]}},
+        "classify": "rollup.vol@v1.near",
+    }
+    spec = parse_screen_spec("vrp", legacy, "vrp")
+    assert spec == parse_screen_spec("vrp", {"criteria": {"c": IV30}}, "vrp")
+
+
 def test_strategy_keeps_rule_keys_only_for_rule_screens() -> None:
     base = {"id": "vrp", "kind": "screener", "impl": "rules"}
     config = parse_strategy({**base, **spec_doc()}, "vrp")
     assert set(config.rules) == {
         "version",
         "criteria",
-        "tiers",
         "flags",
-        "classify",
         "columns",
         "rank",
     }

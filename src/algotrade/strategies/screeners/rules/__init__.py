@@ -1,6 +1,6 @@
-"""The rule screener (ADR 0029): criteria (HARD / SOFT tolerance band / SCORE), decision incl.
-SKIPPED, distance-from-threshold score, tiers / flags / classify / columns and the run
-summary. Pure: reads only a ``FeatureView`` and a ``ScreenSpec``."""
+"""The rule screener (ADR 0029, 0030): criteria (HARD / SOFT tolerance band / SCORE), the
+decision (missing data never passes and never skips), distance-from-threshold score, flags /
+columns and the run summary. Pure: reads only a ``FeatureView`` and a ``ScreenSpec``."""
 
 from algotrade.strategies.screeners.rules.criteria import CriterionResult, Outcome
 from algotrade.strategies.screeners.rules.evaluate import RuleScreenResult, evaluate_screen

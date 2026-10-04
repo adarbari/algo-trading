@@ -49,7 +49,6 @@ def test_ideas_one_row_per_ticker_ranked_with_every_pick(client: TestClient) -> 
         ("premium", "QUALIFIED"),
         ("vrp", "QUALIFIED"),
     ]
-    assert first["picks"][0]["tier"] == "T1"
     assert first["picks"][1]["columns"] == {"spread": 0.05}
     assert first["picks"][1]["criterion_values"] == {"iv30": 0.62}
     assert (first["picks"][0]["flags"], first["picks"][1]["flags"]) == ([], ["leveraged_inverse"])

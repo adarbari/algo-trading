@@ -5,6 +5,7 @@ export {
   PREVIEW_DEBOUNCE_MS,
   type ScreenerBuilder,
 } from './model/builder';
+export { describeCriterion } from './model/describe';
 export {
   allowsTolerance,
   fieldKind,

@@ -42,9 +42,9 @@ Selection      { name, where: Group, max_instruments?, order_by? }   # top-N by 
 StrategyConfig { id, name? (display name; the id when absent; not hashed), kind: screener|strategy, impl, params, selection (preset name or inline),
                  selection_overrides?, schedule?: nightly, exports?: [...],
                  screening?: {...}, backtest?: {...}, extends? (user configs),
-                 rule screens (impl = "rules"): version?, criteria, tiers?, flags?,
-                 classify?, columns?, rank? }
-ScreenSpec     { criteria (HARD / SOFT + tolerance / SCORE), tiers, flags, ... }  # rules.md
+                 rule screens (impl = "rules"): version?, criteria, flags?,
+                 columns?, rank? }
+ScreenSpec     { criteria (HARD / SOFT + tolerance / SCORE), flags, columns, rank }  # rules.md
 ResolvedConfig { config, selection, settings, user, layers, hash }
 UserContext    { user_id }   # a validated label: [a-z0-9_-]{1,64}
 ```

@@ -1,10 +1,9 @@
 """The site VRP scanner preset (``config/site/presets/screeners/vrp_scanner/v<N>.toml``): v1
-(pinned, ``extends = "vrp_scanner@1"``) and v2 (the latest) resolve and validate against the
-catalogue, are not scheduled, and on a
+and v2 (pinned, ``extends = "vrp_scanner@N"``) and v3 (the latest) resolve and validate against
+the catalogue, are not scheduled, and on a
 fixed fixture of rows gives the owner-decided outcomes (docs/screeners/vrp-scanner.md): the
-hard gates reject or skip, liquidity misses are LIQUIDITY_RISK near misses, IBKR IV rank
-only lowers the score, STRONG tier, leveraged / inverse flag, classify by near_52w, ties by
-the IV-HV spread."""
+hard gates reject (a missing value too), liquidity misses are LIQUIDITY_RISK near misses,
+IBKR IV rank only lowers the score, leveraged / inverse flag, ties by the IV-HV spread."""
 
 from datetime import date
 from typing import Any
@@ -41,8 +40,8 @@ GOOD: dict[str, Any] = {
 }
 FIXTURE: dict[str, dict[str, Any]] = {
     "EQ:STRONG": GOOD,
-    # meets every gate but below the STRONG tier (spread 0.12, ratio 1.28); wider-than-STRONG
-    # spreads elsewhere decide the tie-break among equal scores
+    # meets every gate with a small spread (0.12, ratio 1.28); wider spreads elsewhere
+    # decide the tie-break among equal scores
     "EQ:BASE": {
         **GOOD,
         "feature.vrp_iv_hv_spread": 0.12,
@@ -58,15 +57,18 @@ FIXTURE: dict[str, dict[str, Any]] = {
     "EQ:LOWRATIO": {**GOOD, "feature.vrp_iv_hv_ratio": 1.24},
     "EQ:PENNY": {**GOOD, "rollup.price_stats@v2.close": 5.0},  # price must be > $5
     "EQ:MID": {**GOOD, "feature.near_52w": "NONE"},
-    "EQ:NOIV": {**GOOD, "feature.vrp_iv30": None},  # neither IBKR nor Cboe: SKIPPED
+    "EQ:NOIV": {
+        **GOOD,
+        "feature.vrp_iv30": None,
+    },  # neither IBKR nor Cboe: a missing HARD value is a REJECT
 }
-EXPECTED = {  # id: (decision, score, tier, class, flags)
-    "EQ:LEV": (Decision.QUALIFIED, 100.0, "STRONG", "HIGH", ("leveraged_inverse",)),
-    "EQ:STRONG": (Decision.QUALIFIED, 100.0, "STRONG", "HIGH", ()),
-    "EQ:BASE": (Decision.QUALIFIED, 100.0, None, "LOW", ()),
-    "EQ:NORANK": (Decision.QUALIFIED, 90.0, "STRONG", "HIGH", ()),
-    "EQ:THIN": (Decision.LIQUIDITY_RISK, 95.0, "STRONG", "HIGH", ()),
-    "EQ:THINOI": (Decision.LIQUIDITY_RISK, 96.0, "STRONG", "HIGH", ()),
+EXPECTED = {  # id: (decision, score, flags)
+    "EQ:LEV": (Decision.QUALIFIED, 100.0, ("leveraged_inverse",)),
+    "EQ:STRONG": (Decision.QUALIFIED, 100.0, ()),
+    "EQ:BASE": (Decision.QUALIFIED, 100.0, ()),
+    "EQ:NORANK": (Decision.QUALIFIED, 90.0, ()),
+    "EQ:THIN": (Decision.LIQUIDITY_RISK, 95.0, ()),
+    "EQ:THINOI": (Decision.LIQUIDITY_RISK, 96.0, ()),
 }
 
 
@@ -79,6 +81,13 @@ def preset() -> ResolvedConfig:
 
 @pytest.fixture(scope="module")
 def preset_v2() -> ResolvedConfig:
+    pinned = {"id": "pinned_v2", "extends": "vrp_scanner@2"}
+    return resolve_rule_draft(STORE, "pinned_v2", UserContext("tester"), pinned)
+
+
+@pytest.fixture(scope="module")
+def preset_v3() -> ResolvedConfig:
+    """The bare id resolves the latest version."""
     return resolve_config(STORE, "vrp_scanner", UserContext("site"))
 
 
@@ -100,7 +109,6 @@ def test_preset_resolves_and_validates(preset: ResolvedConfig) -> None:
         "target_oi": "LIQUIDITY_RISK",
     }
     assert not any("earnings" in c.field for c in spec.criteria)  # a column, never a criterion
-    assert spec.classify == "feature.near_52w"
     assert spec.tie_break == "feature.vrp_iv_hv_spread" and spec.tie_break_descending
     assert dict(spec.columns)["next_earnings"] == "rollup.earnings@v1.next_earnings_date"
 
@@ -108,19 +116,18 @@ def test_preset_resolves_and_validates(preset: ResolvedConfig) -> None:
 def test_fixture_outcomes(preset: ResolvedConfig) -> None:
     result = evaluate_screen(preset.screen_spec, FeatureView(DAY, FIXTURE))
     rows = {r.instrument_id: r for r in result.rows}
-    for iid, (decision, score, tier, klass, flags) in EXPECTED.items():
+    for iid, (decision, score, flags) in EXPECTED.items():
         row = rows[iid]
-        assert (row.decision, row.tier, row.klass, row.flags) == (decision, tier, klass, flags), iid
+        assert (row.decision, row.flags) == (decision, flags), iid
         assert row.score == pytest.approx(score), iid
-    for iid in ("EQ:ILLIQUID", "EQ:LOWIV", "EQ:LOWRATIO", "EQ:PENNY", "EQ:MID"):
+    for iid in ("EQ:ILLIQUID", "EQ:LOWIV", "EQ:LOWRATIO", "EQ:PENNY", "EQ:MID", "EQ:NOIV"):
         assert rows[iid].decision is Decision.REJECT, iid
-    assert rows["EQ:NOIV"].decision is Decision.SKIPPED
-    assert rows["EQ:NOIV"].reasons == ("no feature.vrp_iv30",)
+    assert rows["EQ:NOIV"].reasons == ("no feature.vrp_iv30",) and rows["EQ:NOIV"].score == 0.0
     order = [r.instrument_id for r in result.rows][:6]
     # the 100s by IV-HV spread, then the near misses (96, 95), then no IBKR IV rank (90)
     assert order == ["EQ:LEV", "EQ:STRONG", "EQ:BASE", "EQ:THINOI", "EQ:THIN", "EQ:NORANK"]
     summary = result.summary
-    assert summary.passed == 4 and dict(summary.skipped_reasons) == {"no feature.vrp_iv30": 1}
+    assert summary.passed == 4
     assert {m.criterion_id for m in summary.narrow_misses} == {"adv", "target_oi"}
 
 
@@ -195,5 +202,70 @@ def test_v2_fixture_outcomes(preset_v2: ResolvedConfig) -> None:
         assert (row.decision, row.flags) == (Decision.QUALIFIED, flags), iid
         assert row.score == pytest.approx(score), iid
     assert rows["EQ:D20"].score > rows["EQ:D25"].score > rows["EQ:NOPUT"].score
-    assert result.summary.passed == len(FIXTURE_V2) and not result.summary.skipped
+    assert result.summary.passed == len(FIXTURE_V2)
     assert not result.summary.narrow_misses  # score criteria never make a near miss decision
+
+
+# ---------------------------------------------------------------------------------------- v3
+BASE_V3: dict[str, Any] = {
+    **GOOD_V2,
+    "instrument.security_type": "COMMON_STOCK",
+    "instrument.status": "ACTIVE",
+    "instrument.optionable": True,
+    "feature.dist_52w": 0.04,
+}
+FIXTURE_V3: dict[str, dict[str, Any]] = {
+    "EQ:STRONG": BASE_V3,
+    "EQ:ETF": {**BASE_V3, "instrument.security_type": "ETF"},
+    "EQ:LOW": {**BASE_V3, "feature.dist_52w": 0.10, "feature.near_52w": "LOW"},  # on the edge
+    "EQ:NOADV": {**BASE_V3, "rollup.price_stats@v2.adv_usd_20d": None},  # SOFT: points only
+    "EQ:NOTOPT": {**BASE_V3, "instrument.optionable": False},
+    "EQ:DEAD": {**BASE_V3, "instrument.status": "DELISTED"},
+    "EQ:PREF": {**BASE_V3, "instrument.security_type": "PREFERRED"},
+    "EQ:NOTYPE": {**BASE_V3, "instrument.security_type": None},
+    "EQ:MID": {**BASE_V3, "feature.dist_52w": 0.15},
+    "EQ:NOIV": {**BASE_V3, "feature.vrp_iv30": None},
+}
+
+
+def test_v3_has_no_selection_and_opens_with_the_base_gates(preset_v3: ResolvedConfig) -> None:
+    spec = preset_v3.screen_spec
+    assert spec.version == 3 and preset_v3.config.schedule is None
+    assert preset_v3.config.selection is None
+    assert preset_v3.selection is not None and preset_v3.selection.name == "all"  # every instrument
+    assert not preset_v3.selection.where.children
+    gates = [(c.id, c.field, c.mode.value) for c in spec.criteria[:8]]
+    assert gates == [
+        ("security_type", "instrument.security_type", "hard"),
+        ("status", "instrument.status", "hard"),
+        ("optionable", "instrument.optionable", "hard"),
+        ("iv30", "feature.vrp_iv30", "hard"),
+        ("price", "rollup.price_stats@v2.close", "hard"),
+        ("iv_hv_spread", "feature.vrp_iv_hv_spread", "hard"),
+        ("iv_hv_ratio", "feature.vrp_iv_hv_ratio", "hard"),
+        ("near_52w", "feature.dist_52w", "hard"),
+    ]
+    near = next(c for c in spec.criteria if c.id == "near_52w")
+    assert (near.rule.op, near.rule.value) == ("lte", 0.10)
+    ops = {c.id: c.rule.op for c in spec.criteria}
+    assert [i for i, op in ops.items() if op == "in"] == ["security_type", "execution"]  # text only
+    assert {k: dict(spec.columns)[k] for k in ("near_52w", "pct_from_high_52w")} == {
+        "near_52w": "feature.near_52w",
+        "pct_from_high_52w": "feature.pct_from_high_52w",
+    }
+
+
+def test_v3_fixture_outcomes(preset_v3: ResolvedConfig) -> None:
+    result = evaluate_screen(preset_v3.screen_spec, FeatureView(DAY, FIXTURE_V3))
+    rows = {r.instrument_id: r for r in result.rows}
+    for iid in ("EQ:STRONG", "EQ:ETF", "EQ:LOW"):  # an ETF qualifies; 10% is inside the gate
+        assert (rows[iid].decision, rows[iid].score) == (Decision.QUALIFIED, 100.0), iid
+    noadv = rows["EQ:NOADV"]  # no ADV: never a pass, never a skip, points off
+    assert noadv.decision is Decision.QUALIFIED and noadv.score == 90.0
+    assert noadv.reasons == ("no rollup.price_stats@v2.adv_usd_20d",)
+    for iid in ("EQ:NOTOPT", "EQ:DEAD", "EQ:PREF", "EQ:NOTYPE", "EQ:MID", "EQ:NOIV"):
+        assert rows[iid].decision is Decision.REJECT, iid
+    assert rows["EQ:NOTYPE"].reasons == ("no instrument.security_type",)
+    assert rows["EQ:NOIV"].reasons == ("no feature.vrp_iv30",)
+    assert result.summary.passed == 4
+    assert dict(result.summary.decisions) == {"QUALIFIED": 4, "REJECT": 6}

@@ -23,6 +23,7 @@ from algotrade.core.model.screen_spec import (
     Tolerance,
 )
 
+# ``label`` is legacy (ADR 0030): accepted so v1 / v2 presets parse, then ignored.
 _CRITERION_KEYS = frozenset(
     {"field", "op", "value", "mode", "tolerance", "on_miss", "label", "enabled"}
 )
@@ -94,10 +95,7 @@ def parse_criterion(cid: str, raw: Mapping[str, Any], path: str) -> Criterion | 
         raise _fail(f"{path}.on_miss", "only a soft criterion has a near-miss decision")
     if on_miss not in NEAR_MISS_DECISIONS:
         raise _fail(f"{path}.on_miss", f"must be one of {list(NEAR_MISS_DECISIONS)}")
-    label = raw.get("label")
-    if label is not None and not isinstance(label, str):
-        raise _fail(f"{path}.label", "expected a string")
-    return Criterion(cid, rule, mode, tolerance, on_miss, label)
+    return Criterion(cid, rule, mode, tolerance, on_miss)
 
 
 def _groups(raw: Any, path: str) -> tuple[tuple[str, Group], ...]:
@@ -148,15 +146,12 @@ def parse_screen_spec(config_id: str, raw: Mapping[str, Any], path: str) -> Scre
         (name, _field(f, f"{path}.columns.{name}"))
         for name, f in _table(raw.get("columns", {}), f"{path}.columns").items()
     )
-    classify = raw.get("classify")
     tie_break, descending = _rank(raw.get("rank", {}), f"{path}.rank")
     return ScreenSpec(
         id=config_id,
         criteria=criteria,
         version=version,
-        tiers=_groups(raw.get("tiers", {}), f"{path}.tiers"),
         flags=_groups(raw.get("flags", {}), f"{path}.flags"),
-        classify=None if classify is None else _field(classify, f"{path}.classify"),
         columns=columns,
         tie_break=tie_break,
         tie_break_descending=descending,
@@ -178,15 +173,10 @@ def check_screen_spec(spec: ScreenSpec, catalog: FieldCatalog, path: str) -> Non
         catalog.check(Group("all", (criterion.rule,)), f"{where}.value")
         if criterion.tolerance is not None and kind not in _NUMERIC_TYPES:
             raise _fail(f"{where}.tolerance", f"a tolerance needs a number, not {kind}")
-    for section, groups in (("tiers", spec.tiers), ("flags", spec.flags)):
-        for name, group in groups:
-            catalog.check(group, f"{path}.{section}.{name}")
+    for name, group in spec.flags:
+        catalog.check(group, f"{path}.flags.{name}")
     for name, field_name in spec.columns:
         catalog.check_field(field_name, f"{path}.columns.{name}")
-    if spec.classify is not None:
-        kind = catalog.check_field(spec.classify, f"{path}.classify")
-        if kind != "str":
-            raise _fail(f"{path}.classify", f"needs a label (str) field, not {kind}")
     if spec.tie_break is not None:
         kind = catalog.check_field(spec.tie_break, f"{path}.rank.tie_break")
         if kind not in _NUMERIC_TYPES:

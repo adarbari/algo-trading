@@ -20,8 +20,6 @@ export interface IdeaPick {
   version: number | null;
   decision: string;
   score: number | null;
-  tier: string | null;
-  klass: string | null;
   reasons: string;
   /** The screener's display columns for the ticker. */
   columns: Record<string, unknown>;
@@ -156,8 +154,6 @@ function toPick(
     version: pick.config_version,
     decision: pick.decision,
     score: pick.score,
-    tier: pick.tier,
-    klass: pick.klass,
     reasons: pick.reasons,
   };
 }

@@ -1,5 +1,5 @@
-"""One instrument's rule-screen result: decision, score, rank, criterion results, tier,
-class, flags and display columns (what ``results/rule_screen*`` store)."""
+"""One instrument's rule-screen result: decision, score, rank, criterion results,
+flags and display columns (what ``results/rule_screen*`` store)."""
 
 from dataclasses import dataclass
 
@@ -17,8 +17,6 @@ class RuleRow:
     reasons: tuple[str, ...]
     results: tuple[CriterionResult, ...]  # one per criterion, in spec order
     tie_break: float | None = None
-    tier: str | None = None
-    klass: str | None = None
     flags: tuple[str, ...] = ()
     columns: tuple[tuple[str, FieldValue], ...] = ()  # (display name, value)
 

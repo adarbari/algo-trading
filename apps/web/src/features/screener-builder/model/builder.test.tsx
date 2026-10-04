@@ -35,7 +35,7 @@ const detail = (patch: Record<string, unknown> = {}) => ({
   preset: { preset_id: 'vrp', pinned: 1, current: 1, rebase_available: false },
   hash: 'h',
   layers: [],
-  resolved: { selection: { name: 'all_active' } },
+  resolved: {},
   error: null,
   working: WORKING,
   ...patch,
@@ -48,7 +48,7 @@ function Probe() {
     <>
       <Text>{`status ${b.status} preset ${b.preset?.id ?? 'none'} dirty ${String(b.dirty)} next v${String(b.nextVersion)}`}</Text>
       <Text>{`criteria ${b.criteria.map((c) => `${c.id}=${String(c.value)}`).join(',')}`}</Text>
-      <Text>{`universe ${b.selection ?? 'none'} idle ${String(b.preview.idle)} error ${b.errorCriterion ?? 'none'}`}</Text>
+      <Text>{`idle ${String(b.preview.idle)} error ${b.errorCriterion ?? 'none'}`}</Text>
       <Button
         onClick={() => {
           const first = b.criteria[0];
@@ -126,7 +126,7 @@ describe('ScreenerBuilderProvider', () => {
     setup();
     expect(await screen.findByText('criteria iv30=0.5,close=5')).toBeInTheDocument();
     expect(screen.getByText('status ready preset none dirty false next v2')).toBeInTheDocument();
-    expect(screen.getByText(/universe all_active idle false/)).toBeInTheDocument();
+    expect(screen.getByText(/idle false/)).toBeInTheDocument();
     await waitFor(() => {
       expect(POST).toHaveBeenCalledTimes(1);
     });

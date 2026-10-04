@@ -16,6 +16,7 @@ from algotrade.core.model.predicates import (
 )
 
 __all__ = [
+    "EVERY_INSTRUMENT",
     "KINDS",
     "NO_VALUE_OPS",
     "OPS",
@@ -38,7 +39,8 @@ KINDS = frozenset({"screener", "strategy"})
 SCHEDULES = frozenset({"nightly"})
 RULES_IMPL = "rules"
 # The rule-screen part of a config (ADR 0029), kept raw here and parsed by
-# ``config.strategy.screen_spec`` after the layers are merged.
+# ``config.strategy.screen_spec`` after the layers are merged. ``tiers`` and ``classify`` are
+# legacy (ADR 0030): accepted so v1 / v2 presets parse, then ignored.
 RULE_SCREEN_KEYS = frozenset(
     {"version", "criteria", "tiers", "flags", "classify", "columns", "rank"}
 )
@@ -56,6 +58,11 @@ class Selection:
         return Selection(
             self.name, Group("all", (self.where, extra)), self.max_instruments, self.order_by
         )
+
+
+# A rule screen names no selection (ADR 0030): it runs over every instrument of the snapshot and
+# its first criteria say who is screened.
+EVERY_INSTRUMENT = Selection("all", Group("all", ()))
 
 
 @dataclass(frozen=True)

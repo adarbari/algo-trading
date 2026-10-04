@@ -14,8 +14,6 @@ const pick = (decision: string): IdeaPick => ({
   version: 1,
   decision,
   score: 1,
-  tier: null,
-  klass: null,
   reasons: '',
 });
 const idea = (symbol: string, decision: string, days: number | null): Idea => ({

@@ -54,7 +54,7 @@ def test_preview_rows_equal_the_nightly_rows() -> None:
     assert stored is not None
     store = ReadStore(reader, configs(), UserContext(ALICE))
     got = preview(store, {**SCREEN, "id": "big_liquid"})
-    assert {r.tier for r in got.rows} >= {"deep"} and any(r.flags for r in got.rows)
+    assert any(r.flags for r in got.rows)
     assert got.config_hash == nightly.hash  # same spec, same user: the same config
     rows = pd.DataFrame(
         [
@@ -63,8 +63,6 @@ def test_preview_rows_equal_the_nightly_rows() -> None:
                 "rank": r.rank,
                 "decision": r.decision,
                 "score": r.score,
-                "tier": r.tier,
-                "class": r.classification,
                 "flags": ",".join(r.flags),
                 "reasons": "; ".join(r.reasons),
             }
@@ -78,12 +76,9 @@ def test_preview_rows_equal_the_nightly_rows() -> None:
 
 def test_summary_funnel_and_coverage() -> None:
     got = preview(preview_store())
-    assert got.decisions == {"QUALIFIED": 1, "REJECT": 1, "SKIPPED": 1, "WATCH": 1}
-    assert got.summary.passed == 1 and got.summary.skipped == 1
-    assert got.summary.skipped_reasons == {
-        f"no {LIQ}.chain_oi": 1,
-        f"no {LIQ}.underlying_price": 1,
-    }
+    assert got.decisions == {"QUALIFIED": 1, "REJECT": 2, "WATCH": 1}  # CCC: no price: REJECT
+    assert got.summary.passed == 1 and got.summary.missing == 1
+    assert got.summary.missing_reasons == {f"no {LIQ}.underlying_price": 1}
     (miss,) = got.summary.narrow_misses
     assert (miss.instrument_id, miss.criterion_id, miss.distance) == ("EQ:BBB", "oi", 300)
     price, oi = got.funnel
@@ -94,11 +89,29 @@ def test_summary_funnel_and_coverage() -> None:
     assert got.coverage.coverage == "COMPLETE" and got.coverage.selected == 4
     assert got.coverage.base == 5  # the delisted one is seen, not selected
     top = got.rows[0]
-    assert (top.instrument_id, top.symbol, top.decision, top.classification) == (
-        "EQ:AAA", "AAA", "QUALIFIED", "A",
-    )  # fmt: skip
+    assert (top.instrument_id, top.symbol, top.decision) == ("EQ:AAA", "AAA", "QUALIFIED")
     assert top.columns == {"tier": "A"} and [c.outcome for c in top.criteria] == ["PASS", "PASS"]
     assert got.session == DAY and got.user == ALICE and got.screener_id == "draft1"
+
+
+def test_a_screen_with_no_selection_runs_over_every_instrument() -> None:
+    """ADR 0030: who is screened is a criterion; the funnel starts at the whole snapshot."""
+    store = preview_store()
+    status = {"field": "instrument.status", "op": "eq", "value": "ACTIVE"}
+    base = {k: v for k, v in DRAFT.items() if k != "selection"}
+    everyone = preview(store, base)
+    assert everyone.coverage.base == everyone.coverage.selected == everyone.total == 5
+    assert everyone.coverage.selection["selection"] == "all"
+    gated = preview(store, {**base, "criteria": {"status": status, **base["criteria"]}})
+    first, price, oi = gated.funnel
+    assert (first.criterion_id, first.entering, first.failed, first.remaining) == (
+        "status",
+        5,
+        1,
+        4,
+    )
+    assert (price.entering, oi.entering) == (4, 2)  # the same funnel as with the selection
+    assert gated.decisions == {"QUALIFIED": 1, "REJECT": 3, "WATCH": 1}
 
 
 def test_limit_trims_rows_not_the_summary() -> None:
