@@ -1,0 +1,37 @@
+# Swing levels and momentum (the SW track; definitions and worked examples in
+# docs/data/swing.md). Formulas over price_stats@v2, momentum@v1 and swing_levels@v1, computed
+# on read. The language and the keys: docs/configuration.md "Expression features". Changing a
+# formula or a param: bump its version.
+
+[atr_pct]
+expr = "momentum.atr_14 / price_stats.close"
+dtype = "float"
+unit = "decimal"
+description = "Wilder ATR(14) as a fraction of the close: 0.02 is a typical daily range of 2%"
+null_meaning = "atr_14 is null (fewer than 15 consecutive bars), or no momentum or price_stats row"
+valid_range = [0, inf]
+version = 1
+
+[range_20d_pct]
+expr = "(momentum.high_20d - momentum.low_20d) / price_stats.close"
+dtype = "float"
+unit = "decimal"
+description = "Width of the 20-session high-low channel as a fraction of the close: (high_20d - low_20d) / close"
+null_meaning = "high_20d or low_20d is null (a gap among the last 20 sessions, or a shorter history)"
+valid_range = [0, inf]
+version = 1
+
+[trend_state]
+kind = "label"
+expr = '''
+if(is_null(price_stats.sma_50) or is_null(price_stats.sma_200), null,
+   if(price_stats.close > price_stats.sma_50 and price_stats.sma_50 > price_stats.sma_200, "UPTREND",
+      if(price_stats.close < price_stats.sma_50 and price_stats.sma_50 < price_stats.sma_200, "DOWNTREND",
+         "MIXED")))
+'''
+dtype = "str"
+unit = "category"
+categories = ["UPTREND", "DOWNTREND", "MIXED"]
+description = "UPTREND when close > SMA50 > SMA200, DOWNTREND when close < SMA50 < SMA200, else MIXED (an equality is MIXED)"
+null_meaning = "sma_50 or sma_200 is null (a gap among the last 50 / 200 sessions, or a shorter history), or no price_stats row"
+version = 1

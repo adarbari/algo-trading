@@ -286,3 +286,42 @@ def test_distance_to_52w_extreme_and_moving_averages(fs: FeatureSet) -> None:
     assert out.loc["EQ:B", "pct_vs_sma_20"] == pytest.approx(0.3)
     assert pd.isna(out.loc["EQ:B", "pct_vs_sma_50"])
     assert out.loc["EQ:C", "pct_vs_sma_200"] == pytest.approx(-0.5)
+
+
+MOMENTUM = "rollups/instrument/momentum@v1"
+
+
+def test_swing_atr_pct_range_and_trend_state(fs: FeatureSet) -> None:
+    ids = ["EQ:UP", "EQ:DOWN", "EQ:MIX", "EQ:TIE", "EQ:NEW"]
+    stats = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "close": [105.0, 90.0, 105.0, 100.0, 50.0],
+            "sma_50": [100.0, 95.0, 95.0, 100.0, 48.0],
+            "sma_200": [95.0, 100.0, 100.0, 90.0, np.nan],
+        }
+    ).astype("float32", errors="ignore")
+    mom = pd.DataFrame(
+        {
+            "instrument_id": ids[:4],
+            "session_date": END,
+            "atr_14": [2.1, 1.8, np.nan, 0.0],
+            "high_20d": [110.0, 99.0, 106.0, 100.0],
+            "low_20d": [100.0, 89.0, np.nan, 100.0],
+        }
+    ).astype("float32", errors="ignore")
+    names = ["atr_pct", "range_20d_pct", "trend_state"]
+    out = fs.evaluate({PRICE_STATS: stats, MOMENTUM: mom}, names).set_index("instrument_id")
+    assert out.loc["EQ:UP", "atr_pct"] == pytest.approx(2.1 / 105, rel=1e-6)
+    assert out.loc["EQ:UP", "range_20d_pct"] == pytest.approx(10 / 105, rel=1e-6)
+    assert out.loc["EQ:TIE", "atr_pct"] == 0.0 and out.loc["EQ:TIE", "range_20d_pct"] == 0.0
+    assert pd.isna(out.loc["EQ:MIX", "atr_pct"]) and pd.isna(out.loc["EQ:MIX", "range_20d_pct"])
+    assert pd.isna(out.loc["EQ:NEW", "atr_pct"])  # no momentum row
+    assert out["trend_state"].to_dict() == {
+        "EQ:UP": "UPTREND",  # 105 > 100 > 95
+        "EQ:DOWN": "DOWNTREND",  # 90 < 95 < 100
+        "EQ:MIX": "MIXED",  # close above SMA50, SMA50 below SMA200
+        "EQ:TIE": "MIXED",  # close equals SMA50
+        "EQ:NEW": None,  # no SMA200 yet: unknown, not MIXED
+    }

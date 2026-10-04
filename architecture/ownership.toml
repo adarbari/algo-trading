@@ -678,6 +678,10 @@ name = "rollups/instrument/price_moves@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
+name = "rollups/instrument/momentum@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
 name = "rollups/daily/*"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "none produced yet (phase 6); rollups are computed only by the rollups task"

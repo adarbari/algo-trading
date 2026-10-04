@@ -34,10 +34,12 @@ def write_bars(
     volume: Mapping[str, Sequence[float]] | None = None,
     skip: Mapping[str, Sequence[int]] | None = None,
     opens: Mapping[str, Sequence[float]] | None = None,
+    highs: Mapping[str, Sequence[float]] | None = None,
+    lows: Mapping[str, Sequence[float]] | None = None,
 ) -> list[date]:
     """One bar per session for each instrument, the last on ``end``; open = previous close
-    (or ``opens``), high / low 1% around. ``skip``: session indexes with no bar.
-    -> the sessions."""
+    (or ``opens``), high / low 1% around (or ``highs`` / ``lows``). ``skip``: session indexes
+    with no bar. -> the sessions."""
     n = max(len(c) for c in closes.values())
     days = sessions_ending(end, n)
     for i, day in enumerate(days):
@@ -56,8 +58,8 @@ def write_bars(
                     "instrument_id": iid,
                     "ts": pd.Timestamp(day, tz="UTC") + pd.Timedelta(hours=20),
                     "open": opened,
-                    "high": max(opened, close) * 1.01,
-                    "low": min(opened, close) * 0.99,
+                    "high": _given(highs, iid, i - offset, max(opened, close) * 1.01),
+                    "low": _given(lows, iid, i - offset, min(opened, close) * 0.99),
                     "close": close,
                     "volume": vol,
                 }
@@ -65,6 +67,10 @@ def write_bars(
         if rows:
             writer.write_table("bars/1d", day, f"bars-{day}", stamped(rows, day, f"bars-{day}"))
     return days
+
+
+def _given(values: Mapping[str, Sequence[float]] | None, iid: str, i: int, default: float) -> float:
+    return float(values[iid][i]) if values and iid in values else default
 
 
 def write_split(writer: StoreWriter, iid: str, ex_date: date, ratio: float, stored: date) -> None:

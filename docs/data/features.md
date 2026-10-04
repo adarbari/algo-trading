@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-99 stored features in 10 groups, in dependency order; 25 expression features.
+108 stored features in 11 groups, in dependency order; 28 expression features.
 
 ## `option_liquidity@v1`
 
@@ -115,6 +115,22 @@ The largest one-day close-to-close move over the last 20 sessions. Stored as `ro
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
 | `one_day_move` | window | float32 | decimal | open | >= 0 | Largest absolute one-day close-to-close return over the last 20 sessions (split-adjusted as of the session): 0.12 is a 12% move up or down | a session among the last 21 has no close (a gap), or the history is shorter | `bars/1d.close` |
+
+## `momentum@v1`
+
+Wilder ATR and RSI (14), 5-session return, relative volume and the 20 / 50-session high-low channel. Stored as `rollups/instrument/momentum@v1`; reads `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `atr_14` | window | float32 | usd_per_share | open | >= 0 | Wilder average true range (14): seeded with the mean of the first 14 true ranges, then (13 x ATR + TR) / 14, over the consecutive bars ending on the session (at most the last 150 sessions); TR = max(high - low, \|high - previous close\|, \|low - previous close\|) | fewer than 15 consecutive bars ending on the session (a gap among the last 15 sessions, or a shorter history) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
+| `rsi_14` | window | float32 | pct_points | open | 0 .. 100 | Wilder RSI (14) of close changes over the same run as atr_14: 100 - 100 / (1 + average gain / average loss); 100 when there was no loss | fewer than 15 consecutive bars ending on the session (a gap among the last 15 sessions, or a shorter history); or the close never moved over the run (no gain and no loss: 0/0) | `bars/1d.close` |
+| `ret_5d` | window | float32 | decimal | open | >= -1 | Close / close 5 sessions earlier - 1 | a session among the last 6 has no bar (a gap), or the history is shorter | `bars/1d.close` |
+| `rel_volume` | window | float32 | ratio | open | >= 0 | The session's volume / the mean volume of the 20 sessions before it (the session excluded): 1.8 is 80% above normal; 0 on a day without trades | a session among the last 21 has no bar (a gap), or the history is shorter; or those 20 sessions had no volume at all | `bars/1d.volume` |
+| `high_20d` | window | float32 | usd_per_share | open | >= 0 | Highest daily high over the last 20 sessions, the session included | a session among the last 20 has no bar (a gap), or the history is shorter | `bars/1d.high` |
+| `low_20d` | window | float32 | usd_per_share | open | >= 0 | Lowest daily low over the last 20 sessions, the session included | a session among the last 20 has no bar (a gap), or the history is shorter | `bars/1d.low` |
+| `high_50d` | window | float32 | usd_per_share | open | >= 0 | Highest daily high over the last 50 sessions, the session included | a session among the last 50 has no bar (a gap), or the history is shorter | `bars/1d.high` |
+| `low_50d` | window | float32 | usd_per_share | open | >= 0 | Lowest daily low over the last 50 sessions, the session included | a session among the last 50 has no bar (a gap), or the history is shorter | `bars/1d.low` |
+| `prior_high_20d` | window | float32 | usd_per_share | open | >= 0 | Highest daily high over the 20 sessions before the session (the session excluded): the level a breakout close must clear | a session among the 20 before the session has no bar (a gap), or the history is shorter | `bars/1d.high` |
 
 ## `dividends@v2`
 
@@ -225,6 +241,14 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | `pct_vs_sma_20` | expression | float | decimal | open | >= -1 | Close / 20-session moving average - 1 | price_stats sma_20 is null (a gap among the last 20 sessions, or a shorter history), or no price_stats row | `price_stats.close / price_stats.sma_20 - 1` | virtual |
 | `pct_vs_sma_50` | expression | float | decimal | open | >= -1 | Close / 50-session moving average - 1 | price_stats sma_50 is null (a gap among the last 50 sessions, or a shorter history), or no price_stats row | `price_stats.close / price_stats.sma_50 - 1` | virtual |
 | `pct_vs_sma_200` | expression | float | decimal | open | >= -1 | Close / 200-session moving average - 1 | price_stats sma_200 is null (a gap among the last 200 sessions, or a shorter history), or no price_stats row | `price_stats.close / price_stats.sma_200 - 1` | virtual |
+
+### `swing.toml`
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Formula | Stored |
+|---|---|---|---|---|---|---|---|---|---|
+| `atr_pct` | expression | float | decimal | open | >= 0 | Wilder ATR(14) as a fraction of the close: 0.02 is a typical daily range of 2% | atr_14 is null (fewer than 15 consecutive bars), or no momentum or price_stats row | `momentum.atr_14 / price_stats.close` | virtual |
+| `range_20d_pct` | expression | float | decimal | open | >= 0 | Width of the 20-session high-low channel as a fraction of the close: (high_20d - low_20d) / close | high_20d or low_20d is null (a gap among the last 20 sessions, or a shorter history) | `(momentum.high_20d - momentum.low_20d) / price_stats.close` | virtual |
+| `trend_state` | label | str | category | open | UPTREND, DOWNTREND, MIXED | UPTREND when close > SMA50 > SMA200, DOWNTREND when close < SMA50 < SMA200, else MIXED (an equality is MIXED) | sma_50 or sma_200 is null (a gap among the last 50 / 200 sessions, or a shorter history), or no price_stats row | `if(is_null(price_stats.sma_50) or is_null(price_stats.sma_200), null, if(price_stats.close > price_stats.sma_50 and price_stats.sma_50 > price_stats.sma_200, "UPTREND", if(price_stats.close < price_stats.sma_50 and price_stats.sma_50 < price_stats.sma_200, "DOWNTREND", "MIXED")))` | virtual |
 
 ### `volatility.toml`
 
