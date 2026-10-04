@@ -153,7 +153,7 @@ Worktrees: `scripts/worktree.sh <branch> [base]` makes `../algo-trading-<slug>` 
 `npm ci`); `source` that file; `--remove` cleans up. Never `--no-verify` / `SKIP=`: the hooks
 work in a worktree.
 
-Commands (need `uv`; `make doctor` checks the machine, `make status` shows PRs, jobs, store): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make layout`, `make evaluate`, `make baseline`, `make features-doc`.
+Commands (need `uv`; `make doctor` checks the machine, `make status` shows PRs, jobs, store): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make perf` (strict timing budgets; run on an idle machine), `make layout`, `make evaluate`, `make baseline`, `make features-doc`.
 Web (need Node 24): `make web-install`, `make web-check` (part of `make check`), `make web-visual` (screenshots, Docker); in `apps/web`: `npm run dev|storybook|check|visual:update`.
 Ingestion: `algotrade-ingest --help` lists the commands; `algotrade-ingest run <task>` runs any registry task, e.g. `run ibkr-contracts`, `run ibkr-iv --from D1 --to D2 [--limit N]` (the resumable IBKR IV backfill; see `README.md`).
 API: `algotrade-api [--reload]` (127.0.0.1:8000; reads, plus user-config writes via `services/authoring`); after a route / schema change run

@@ -83,6 +83,9 @@ changed:         ## narrow first check: mirrored tests of files changed vs origi
 test:            ## everything, with the coverage gate, one worker per CPU (WORKERS=0 runs serially)
 	$(PY) -m pytest -n $(WORKERS) --cov --cov-report=term --cov-report=xml
 
+perf:            ## strict timing budgets (the `perf` tests), serially; run on an idle machine
+	$(PY) -m pytest -p no:xdist -m perf
+
 datasets-verify: ## committed golden CSVs match their checksums
 	$(BIN)algotrade-ingest golden verify
 
