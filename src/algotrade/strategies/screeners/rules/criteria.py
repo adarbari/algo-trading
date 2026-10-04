@@ -2,9 +2,10 @@
 distance from the threshold and the score penalty (ADR 0029, ``docs/screeners/rules.md``).
 
 Penalties: a near miss (SOFT or SCORE within tolerance) costs ``NEAR_MISS_PENALTY x
-distance / tolerance``; a SCORE miss beyond its tolerance (or without one, or missing) the
-full ``NEAR_MISS_PENALTY``; a HARD fail or a SOFT fail beyond tolerance ``FAIL_PENALTY``.
-Missing data on a gating criterion has no penalty: the row is SKIPPED, never scored.
+distance / tolerance``; a SCORE miss beyond its tolerance (or without one) the full
+``NEAR_MISS_PENALTY``; a HARD fail or a SOFT fail beyond tolerance ``FAIL_PENALTY``.
+Missing data never passes and never skips (ADR 0030): HARD missing is a fail
+(``FAIL_PENALTY``), SOFT and SCORE missing cost the full ``NEAR_MISS_PENALTY``.
 """
 
 from dataclasses import dataclass
@@ -93,7 +94,7 @@ def evaluate_criterion(criterion: Criterion, value: FieldValue) -> CriterionResu
     if truth is True:
         return CriterionResult(criterion, value, Outcome.PASS)
     if truth is None:
-        penalty = 0.0 if criterion.mode.gating else NEAR_MISS_PENALTY
+        penalty = FAIL_PENALTY if criterion.mode is Mode.HARD else NEAR_MISS_PENALTY
         return CriterionResult(criterion, value, Outcome.MISSING, penalty=penalty)
     gap = distance(criterion, value)
     if criterion.mode is Mode.HARD:

@@ -3,7 +3,7 @@ evaluated on the latest closed session by the SAME ``RuleScreener.evaluate`` (``
 the nightly ``screen`` job runs, over the same selection, fields and coverage rules. Saves
 nothing.
 
-``preview_screen`` returns the run summary (passed, skipped by reason, narrow misses), the
+``preview_screen`` returns the run summary (passed, missing data by field, narrow misses), the
 decision counts, the funnel per gating criterion in spec order, the coverage, the session used
 and the top ``limit`` rows. The field frame is cached (``preview.frame``), so an edit that
 keeps the field set re-evaluates in memory.
@@ -17,7 +17,7 @@ from typing import Any
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
-from algotrade.core.model.screen_spec import ScreenSpec
+from algotrade.core.model.screen_spec import Mode, ScreenSpec
 from algotrade.core.time.calendar import last_closed_session
 from algotrade.core.views.feature_view import FeatureView
 from algotrade.services.configs import resolve_rule_draft
@@ -35,12 +35,12 @@ UNMANAGED = ("schedule",)  # when a screen runs never changes what it computes
 @dataclass(frozen=True)
 class FunnelStep:
     """One gating criterion, in spec order: of the rows still in (every earlier gating
-    criterion PASS or NEAR), how many pass, miss narrowly, fail or have no value."""
+    criterion PASS or NEAR, or SOFT with no value), how many pass, miss narrowly, fail or have no
+    value (a HARD criterion rejects it, a SOFT one only costs points: ADR 0030)."""
 
     criterion_id: str
     field: str
     mode: str
-    label: str | None
     entering: int
     passed: int
     near: int
@@ -68,8 +68,6 @@ class PreviewRow:
     rank: int
     decision: str
     score: float | None
-    tier: str | None
-    classification: str | None  # the spec's ``classify`` field (``class`` in the results)
     flags: list[str]
     reasons: list[str]
     columns: dict[str, Any]  # display name -> value
@@ -91,8 +89,8 @@ class NarrowMissRow:
 class PreviewSummary:
     rows: int
     passed: int
-    skipped: int
-    skipped_reasons: dict[str, int]
+    missing: int  # gating values missing where the funnel reached them (a row counts per criterion)
+    missing_reasons: dict[str, int]  # ``no <field>`` -> rows
     narrow_misses: list[NarrowMissRow]
 
 
@@ -155,22 +153,24 @@ def funnel(spec: ScreenSpec, rows: Sequence[RuleRow]) -> list[FunnelStep]:
             continue
         outcomes = [row.results[index].outcome for row in remaining]
         passed, near = outcomes.count(Outcome.PASS), outcomes.count(Outcome.NEAR)
+        keep = {Outcome.PASS, Outcome.NEAR}
+        if criterion.mode is Mode.SOFT:  # no value only costs points: the row stays in
+            keep.add(Outcome.MISSING)
+        kept = [r for r in remaining if r.results[index].outcome in keep]
         steps.append(
             FunnelStep(
                 criterion.id,
                 criterion.field,
                 criterion.mode.value,
-                criterion.label,
                 entering=len(remaining),
                 passed=passed,
                 near=near,
                 failed=outcomes.count(Outcome.FAIL),
                 missing=outcomes.count(Outcome.MISSING),
-                remaining=passed + near,
+                remaining=len(kept),
             )
         )
-        keep = (Outcome.PASS, Outcome.NEAR)
-        remaining = [r for r in remaining if r.results[index].outcome in keep]
+        remaining = kept
     return steps
 
 
@@ -181,8 +181,6 @@ def _row(row: RuleRow, symbol: str | None) -> PreviewRow:
         rank=row.rank,
         decision=row.decision.value,
         score=row.score,
-        tier=row.tier,
-        classification=row.klass,
         flags=list(row.flags),
         reasons=list(row.reasons),
         columns={name: to_value(value) for name, value in row.columns},
@@ -239,10 +237,11 @@ def preview_screen(
     view = FeatureView(session, {i: frame.view.row(i) for i in ids})
     result = RuleScreener(rules).evaluate(view, frame.memo_for())
     run = rule_run(result, ids, screening)
-    run = settle_coverage(run, selected, frame.universe, session, screening)
+    run = settle_coverage(run, selected, frame.universe, session, screening, frame.missing)
     symbols = frame.symbols
     top = result.rows[: max(0, min(limit, MAX_PAGE_SIZE))]
     summary = result.summary
+    steps = funnel(rules, result.rows)
     return ScreenPreview(
         screener_id=name,
         user=who.user_id,
@@ -252,8 +251,8 @@ def preview_screen(
         summary=PreviewSummary(
             rows=summary.rows,
             passed=summary.passed,
-            skipped=summary.skipped,
-            skipped_reasons=dict(summary.skipped_reasons),
+            missing=sum(s.missing for s in steps),
+            missing_reasons={f"no {s.field}": s.missing for s in steps if s.missing},
             narrow_misses=[
                 NarrowMissRow(
                     m.instrument_id,
@@ -268,7 +267,7 @@ def preview_screen(
             ],
         ),
         decisions=dict(summary.decisions),
-        funnel=funnel(rules, result.rows),
+        funnel=steps,
         coverage=PreviewCoverage(
             coverage=run.coverage.value,
             base=selected.base,

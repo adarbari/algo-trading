@@ -341,7 +341,7 @@ RULE_SCREEN = _fixed(
     "score float64",
     "rank int64!",
     "tie_break float64",
-    *_strings("tier", "class", "flags", "reasons", "failed", "near_missed", "missing"),
+    *_strings("flags", "reasons", "failed", "near_missed", "missing"),
     runs="merge",
     key=("user_id", "config_id", "instrument_id"),
 )

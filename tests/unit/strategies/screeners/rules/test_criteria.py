@@ -57,8 +57,9 @@ def test_missing_or_wrong_type_never_passes(value: object) -> None:
     for mode in (Mode.HARD, Mode.SOFT):
         crit = Criterion("c", GTE, mode, Tolerance(0.02) if mode is Mode.SOFT else None)
         result = evaluate_criterion(crit, value)  # type: ignore[arg-type]
-        assert result.outcome is Outcome.MISSING and result.penalty == 0.0
-        assert result.describe() == "no f"
+        assert result.outcome is Outcome.MISSING and result.describe() == "no f"
+        # never a pass, never skipped: a HARD miss is a fail, a SOFT one costs points
+        assert result.penalty == (FAIL_PENALTY if mode is Mode.HARD else NEAR_MISS_PENALTY)
     score = Criterion("c", GTE, Mode.SCORE, Tolerance(0.02))
     assert evaluate_criterion(score, None).penalty == NEAR_MISS_PENALTY
 

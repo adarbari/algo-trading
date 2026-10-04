@@ -34,8 +34,8 @@ def _write(
 ) -> None:
     frame = [
         {"instrument_id": f"EQ:{s}", "user_id": user, "config_id": config, "config_version": 1,
-         "config_hash": "h", "decision": d, "score": sc, "rank": 1, "tie_break": tb, "tier": "",
-         "class": "", "flags": "", "reasons": "", "failed": "", "near_missed": "", "missing": ""}
+         "config_hash": "h", "decision": d, "score": sc, "rank": 1, "tie_break": tb,
+         "flags": "", "reasons": "", "failed": "", "near_missed": "", "missing": ""}
         for s, d, sc, tb in rows
     ]  # fmt: skip
     writer.write_result("rule_screen", day, run, stamped(frame, day, run, knowledge))

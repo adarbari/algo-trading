@@ -19,13 +19,14 @@ class FunnelStep(Schema):
     criterion_id: str
     field: str
     mode: str
-    label: str | None
-    entering: int = Field(description="rows that passed or narrowly missed every earlier step")
+    entering: int = Field(description="rows still in after every earlier step")
     passed: int
     near: int
     failed: int
     missing: int
-    remaining: int = Field(description="passed + near: what the next step sees")
+    remaining: int = Field(
+        description="what the next step sees: passed + near (+ no value, for a soft step)"
+    )
 
 
 class CriterionValue(Schema):
@@ -42,14 +43,12 @@ class CriterionValue(Schema):
 class PreviewRow(Schema):
     instrument_id: str
     symbol: str | None
-    rank: int
-    decision: str
-    score: float | None
-    tier: str | None
-    classification: str | None = Field(description="the spec's classify field")
-    flags: list[str]
-    reasons: list[str]
-    columns: dict[str, Any]
+    rank: int = Field(description="1 = best: score, then the tie-break, then instrument id")
+    decision: str = Field(description="QUALIFIED, WATCH, LIQUIDITY_RISK, EVENT_RISK or REJECT")
+    score: float | None = Field(description="100 minus the penalties, clipped to 0..100")
+    flags: list[str] = Field(description="warnings that never change the decision")
+    reasons: list[str] = Field(description="why the decision is not QUALIFIED (`no <field>` too)")
+    columns: dict[str, Any] = Field(description="the screen's display columns: name -> value")
     criteria: list[CriterionValue]
 
 
@@ -66,8 +65,10 @@ class NarrowMiss(Schema):
 class PreviewSummary(Schema):
     rows: int
     passed: int
-    skipped: int
-    skipped_reasons: dict[str, int]
+    missing: int = Field(
+        description="gating values missing where the funnel reached them, per row and criterion"
+    )
+    missing_reasons: dict[str, int] = Field(description="`no <field>` -> rows")
     narrow_misses: list[NarrowMiss]
 
 
@@ -75,8 +76,8 @@ class PreviewCoverage(Schema):
     coverage: str = Field(description="COMPLETE, PARTIAL, UNIVERSE_INCOMPLETE or EMPTY_SELECTION")
     base: int = Field(description="instruments the selection saw")
     selected: int
-    processed: int = Field(description="rows not SKIPPED")
-    skipped: int
+    processed: int = Field(description="rows evaluated (none is skipped since ADR 0030)")
+    skipped: int = Field(description="always 0 for a rule screen; kept for stored runs")
     coverage_pct: float = Field(description="processed / selected")
     min_coverage: float = Field(description="below this the run is PARTIAL")
     selection: dict[str, Any] = Field(description="the selection's audit")

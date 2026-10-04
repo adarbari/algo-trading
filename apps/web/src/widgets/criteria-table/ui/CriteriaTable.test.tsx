@@ -53,7 +53,6 @@ const setTieBreak = vi.fn();
 const builder = (patch: Record<string, unknown> = {}) => ({
   status: 'ready',
   preset: null,
-  selection: 'liquid_optionable',
   criteria: [
     { id: 'iv30', field: 'rollup.iv30@v1.iv30', op: 'gte', mode: 'hard', value: 0.5 },
     { id: 'close', field: 'rollup.price_stats@v2.close', op: 'gt', mode: 'hard', value: 5 },
@@ -88,14 +87,10 @@ describe('CriteriaTable', () => {
   it('reads the screen back in plain English and lists each criterion', async () => {
     const { container } = setup();
     expect(
-      screen.getByText('Find instruments in liquid_optionable where IV30 ≥ 50% and Close > $5.'),
+      screen.getByText('Find instruments where IV30 ≥ 50% and Close > $5.'),
     ).toBeInTheDocument();
     expect(screen.getAllByRole('radiogroup', { name: /Mode of/ })).toHaveLength(2);
-    expect(
-      screen.getByText(
-        'Universe: liquid_optionable. The preview runs on the latest closed session.',
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText('The preview runs on the latest closed session.')).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 

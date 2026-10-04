@@ -1,6 +1,6 @@
 # ADR 0029: Rule screener, versioned user configs, and API writes through `services/authoring`
 
-**Status:** accepted (2026-10-03; owner decisions folded in). Amends [0024](0024-api.md) (the API may write user
+**Status:** accepted (2026-10-03; owner decisions folded in); amended by [0030](0030-rule-screener-simplification.md) (missing data, tiers / classify / label, no selection). Amends [0024](0024-api.md) (the API may write user
 configs, and only through `services/authoring`). Builds on
 [0015](0015-configs-selections-users.md) (configs, layering, users),
 [0019](0019-ownership-and-boundaries.md) (one owner per responsibility),

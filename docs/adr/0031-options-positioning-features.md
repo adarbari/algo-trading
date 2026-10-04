@@ -1,4 +1,4 @@
-# ADR 0030: Options positioning features are daily chain-derived estimates
+# ADR 0031: Options positioning features are daily chain-derived estimates
 
 **Status:** proposed (2026-10-04, parked: the roadmap schedules the SW track first; revisit before any OP code). Each "Proposed" item
 in [docs/data/positioning.md](../data/positioning.md) is confirmed or changed by the owner

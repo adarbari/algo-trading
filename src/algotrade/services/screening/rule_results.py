@@ -59,8 +59,6 @@ def screen_frame(result: RuleScreenResult, stamp: Stamp) -> pd.DataFrame:
             "score": row.score,
             "rank": row.rank,
             "tie_break": row.tie_break,
-            "tier": row.tier,
-            "class": row.klass,
             "flags": ",".join(row.flags),
             "reasons": "; ".join(row.reasons),
             "failed": _ids(row, "FAIL"),

@@ -9,8 +9,6 @@ const pick = (config_id: string, decision: string, score: number | null) => ({
   session: '2026-10-02',
   decision,
   score,
-  tier: 'A',
-  klass: 'B',
   reasons: '',
   criteria: [],
   columns: {},

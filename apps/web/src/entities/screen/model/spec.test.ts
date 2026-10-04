@@ -28,7 +28,6 @@ const BASE = {
       mode: 'soft',
       tolerance: { relative: 0.2 },
       on_miss: 'LIQUIDITY_RISK',
-      label: 'ADV',
     },
   },
 };
@@ -49,17 +48,26 @@ describe('criteriaOf', () => {
     expect(criteria[1]).toMatchObject({ mode: 'hard', op: 'gt' });
   });
 
-  it('keeps tolerance, miss decision and label', () => {
+  it('keeps tolerance and miss decision', () => {
     expect(criteriaOf(BASE, { id: 'my' })[1]).toMatchObject({
       mode: 'soft',
       tolerance: { relative: 0.2 },
       on_miss: 'LIQUIDITY_RISK',
-      label: 'ADV',
     });
   });
 
+  it('opens a blank draft with the base gates as hard criteria', () => {
+    const criteria = criteriaOf(null, blankDocument('x'));
+    expect(criteria.map((c) => [c.id, c.mode])).toEqual([
+      ['security_type', 'hard'],
+      ['status', 'hard'],
+      ['optionable', 'hard'],
+    ]);
+    expect(criteria[0]).toMatchObject({ op: 'in', value: ['COMMON_STOCK', 'ADR', 'ETF'] });
+  });
+
   it('reads a draft with nothing resolved', () => {
-    expect(criteriaOf(null, blankDocument('x', 'all'))).toEqual([]);
+    expect(criteriaOf(null, { id: 'x' })).toEqual([]);
   });
 });
 

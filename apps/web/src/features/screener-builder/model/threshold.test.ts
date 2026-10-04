@@ -32,6 +32,11 @@ describe('field kinds and operators', () => {
     expect(operatorsFor('number').map((o) => o.value)).toContain('between');
     expect(operatorsFor('bool').map((o) => o.value)).toEqual(['eq', 'ne', 'is_null', 'not_null']);
     expect(opFor('text', 'gte')).toBe('eq');
+    // `in` / `not_in` are for text only (ADR 0030): a number uses a comparison or `between`
+    expect(operatorsFor('number').map((o) => o.value)).not.toContain('in');
+    expect(operatorsFor('text').map((o) => o.value)).toEqual(
+      expect.arrayContaining(['in', 'not_in']),
+    );
     expect(opFor('number', 'lt')).toBe('lt');
   });
 

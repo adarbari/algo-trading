@@ -15,12 +15,12 @@ vi.mock('@/features/screener-builder', async (importOriginal) => ({
 
 const DATA = {
   session: '2026-10-02',
-  decisions: { QUALIFIED: 2, WATCH: 1, REJECT: 1780, SKIPPED: 2416 },
+  decisions: { QUALIFIED: 2, WATCH: 1, REJECT: 4200 },
   coverage: { coverage: 'PARTIAL', selected: 4203, coverage_pct: 0.425, missing_tables: [] },
   summary: {
     passed: 2,
-    skipped: 2416,
-    skipped_reasons: { 'no rollup.iv30@v1.iv30': 2300, 'no feature.iv_hv_spread': 116 },
+    missing: 2416,
+    missing_reasons: { 'no rollup.iv30@v1.iv30': 2300, 'no feature.iv_hv_spread': 116 },
     narrow_misses: [
       {
         instrument_id: 'EQ:KO',
@@ -42,20 +42,20 @@ beforeEach(() => {
 });
 
 describe('ScreenSummary', () => {
-  it('shows what passed, what was skipped and the decisions', async () => {
+  it('shows what passed, what had no value and the decisions', async () => {
     const { container } = render(<ScreenSummary />);
     expect(screen.getByText('Session 2026-10-02')).toBeInTheDocument();
     expect(screen.getByText('4,203')).toBeInTheDocument();
     expect(screen.getByText('42.5%')).toBeInTheDocument();
     expect(screen.getByText('Qualified')).toBeInTheDocument();
-    expect(screen.getByText('1,780')).toBeInTheDocument();
+    expect(screen.getByText('4,200')).toBeInTheDocument();
     expect(screen.getByText('Coverage: partial')).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 
-  it('lists the skipped reasons and the narrow misses with rule and distance', async () => {
+  it('lists the missing-data fields and the narrow misses with rule and distance', async () => {
     render(<ScreenSummary />);
-    await userEvent.click(screen.getByRole('button', { name: /Skipped/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Missing data/ }));
     expect(screen.getByText('no rollup.iv30@v1.iv30')).toBeInTheDocument();
     expect(screen.getByText('2,300')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Narrow misses/ }));

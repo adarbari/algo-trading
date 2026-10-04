@@ -100,12 +100,12 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(page.getByText('Rebase on v2')).toBeVisible();
     await expect(page.getByRole('radiogroup', { name: /Mode of/ })).toHaveCount(4);
     await expect(page.getByRole('radio', { name: 'Soft' }).first()).toBeVisible();
-    await expect(page.getByText(/Find instruments in liquid_optionable where/)).toBeVisible();
+    await expect(page.getByText(/Find instruments where/)).toBeVisible();
     // The preview: summary, funnel, rows.
     await expect(
       page.getByRole('list', { name: 'Run summary' }).or(page.getByLabel('Run summary')).first(),
     ).toBeVisible();
-    await expect(page.getByText('Skipped', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Missing data', { exact: true }).first()).toBeVisible();
     await expect(
       page.getByRole('list', { name: 'Funnel (gating criteria)' }).getByRole('listitem'),
     ).toHaveCount(4);
@@ -301,7 +301,7 @@ test('an inherited tie-break can be cleared in your copy', async ({ page }) => {
   });
 });
 
-test('a new screener starts as a blank draft', async ({ page }) => {
+test('a new screener starts with the base gates as criteria', async ({ page }) => {
   const mock = await mockBuilderApi(page);
   await page.goto('/screeners');
   await page.getByRole('button', { name: '+ New screener' }).click();
@@ -315,12 +315,17 @@ test('a new screener starts as a blank draft', async ({ page }) => {
   expect(mock.drafts[0]?.document).toMatchObject({
     kind: 'screener',
     impl: 'rules',
-    selection: 'liquid_optionable',
+    criteria: {
+      security_type: { field: 'instrument.security_type', op: 'in' },
+      status: { field: 'instrument.status', op: 'eq', value: 'ACTIVE' },
+      optionable: { field: 'instrument.optionable', op: 'eq', value: true },
+    },
   });
+  expect(mock.drafts[0]?.document).not.toHaveProperty('selection'); // ADR 0030
   await expect(page).toHaveURL(/\/screeners\/fresh\/edit/);
-  await expect(page.getByText('No criteria yet')).toBeVisible();
-  await expect(page.getByText('Add a complete criterion to preview').first()).toBeVisible();
+  // The base gates are ordinary criteria: three hard rows to edit or remove, then add more.
+  await expect(page.getByRole('radiogroup', { name: /Mode of/ })).toHaveCount(3);
   await expectAccessible(page);
   await page.getByRole('button', { name: '+ Add criterion' }).click();
-  await expect(page.getByRole('radiogroup', { name: /Mode of/ })).toHaveCount(1);
+  await expect(page.getByRole('radiogroup', { name: /Mode of/ })).toHaveCount(4);
 });

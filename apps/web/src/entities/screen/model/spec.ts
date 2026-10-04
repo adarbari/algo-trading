@@ -25,7 +25,6 @@ export interface Criterion {
   mode: CriterionMode;
   tolerance?: Tolerance | undefined;
   on_miss?: MissDecision | undefined;
-  label?: string | undefined;
 }
 
 type CriteriaTable = Record<string, Record<string, unknown>>;
@@ -56,9 +55,23 @@ export function toDocument(source: Readonly<Record<string, unknown>>, id: string
   return { id, ...kept };
 }
 
-/** A blank draft: an empty rule screen over `selection`. */
-export function blankDocument(id: string, selection: string): ScreenDocument {
-  return { id, kind: 'screener', impl: 'rules', selection, criteria: {} };
+/**
+ * Who a new screener screens (ADR 0030): a rule screen has no selection, so it opens with the
+ * base gates as criteria. They are ordinary criteria: edit or remove any of them.
+ */
+const BASE_CRITERIA: CriteriaTable = {
+  security_type: {
+    field: 'instrument.security_type',
+    op: 'in',
+    value: ['COMMON_STOCK', 'ADR', 'ETF'],
+  },
+  status: { field: 'instrument.status', op: 'eq', value: 'ACTIVE' },
+  optionable: { field: 'instrument.optionable', op: 'eq', value: true },
+};
+
+/** A blank draft: a rule screen with the base gates. */
+export function blankDocument(id: string): ScreenDocument {
+  return { id, kind: 'screener', impl: 'rules', criteria: structuredClone(BASE_CRITERIA) };
 }
 
 function toCriterion(id: string, table: Record<string, unknown>): Criterion {
@@ -72,7 +85,6 @@ function toCriterion(id: string, table: Record<string, unknown>): Criterion {
   if ('value' in table) criterion.value = table['value'];
   if (table['tolerance'] !== undefined) criterion.tolerance = table['tolerance'] as Tolerance;
   if (typeof table['on_miss'] === 'string') criterion.on_miss = table['on_miss'] as MissDecision;
-  if (typeof table['label'] === 'string') criterion.label = table['label'];
   return criterion;
 }
 

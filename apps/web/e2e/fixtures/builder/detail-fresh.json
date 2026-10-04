@@ -5,10 +5,25 @@
     "id": "fresh",
     "kind": "screener",
     "impl": "rules",
-    "selection": "liquid_optionable",
-    "criteria": {}
+    "criteria": {
+      "security_type": {
+        "field": "instrument.security_type",
+        "op": "in",
+        "value": ["COMMON_STOCK", "ADR", "ETF"]
+      },
+      "status": {
+        "field": "instrument.status",
+        "op": "eq",
+        "value": "ACTIVE"
+      },
+      "optionable": {
+        "field": "instrument.optionable",
+        "op": "eq",
+        "value": true
+      }
+    }
   },
-  "draft_error": "fresh.criteria: needs at least one enabled criterion",
+  "draft_error": null,
   "versions": [],
   "latest": null,
   "schedule": null,
@@ -18,6 +33,22 @@
   "resolved": null,
   "error": null,
   "working": {
-    "criteria": {}
+    "criteria": {
+      "security_type": {
+        "field": "instrument.security_type",
+        "op": "in",
+        "value": ["COMMON_STOCK", "ADR", "ETF"]
+      },
+      "status": {
+        "field": "instrument.status",
+        "op": "eq",
+        "value": "ACTIVE"
+      },
+      "optionable": {
+        "field": "instrument.optionable",
+        "op": "eq",
+        "value": true
+      }
+    }
   }
 }

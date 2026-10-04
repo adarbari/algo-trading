@@ -20,8 +20,6 @@ const pick = (config_id: string, decision: string, score: number) => ({
   session: '2026-10-02',
   decision,
   score,
-  tier: 'A',
-  klass: 'B',
   reasons: '',
   criteria: [],
   columns: {},
@@ -99,7 +97,6 @@ describe('TopIdeas', () => {
     expect(within(aapl).getByText('Qualified')).toBeInTheDocument();
     expect(within(aapl).getByText('Earnings first')).toBeInTheDocument();
     expect(within(aapl).getByText('36')).toBeInTheDocument();
-    expect(within(aapl).getByText('A / B')).toBeInTheDocument();
     const ko = within(grid()).getByRole('row', { name: /KO/ });
     expect(within(ko).queryByText('Earnings first')).not.toBeInTheDocument();
     expect(screen.getByText('Session 2026-10-02')).toBeInTheDocument();

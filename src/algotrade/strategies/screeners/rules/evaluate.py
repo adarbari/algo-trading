@@ -3,7 +3,7 @@ the run summary. Pure and deterministic: the same spec and view give the same ro
 same order (preview and nightly call this one function, ADR 0029).
 
 ``memo`` (the preview's warm path): results by criterion (and by the spec's display part:
-tiers, flags, classify, columns, tie-break) and instrument, valid for one view. Each depends
+flags, columns, tie-break) and instrument, valid for one view. Each depends
 only on its part of the spec and the instrument's values, so an edit to one criterion
 re-evaluates only that one; the rows are the same either way."""
 
@@ -11,7 +11,7 @@ from collections.abc import Hashable, Mapping, MutableMapping
 from dataclasses import dataclass
 from typing import Any
 
-from algotrade.core.model.predicates import FieldValue, Group, evaluate_group, is_missing
+from algotrade.core.model.predicates import FieldValue, evaluate_group, is_missing
 from algotrade.core.model.screen_spec import ScreenSpec
 from algotrade.core.views.feature_view import FeatureView
 from algotrade.strategies.screeners.rules.criteria import CriterionResult, evaluate_criterion
@@ -40,29 +40,20 @@ def _known(value: FieldValue) -> FieldValue:
     return None if is_missing(value) else value
 
 
-def _first_true(groups: tuple[tuple[str, Group], ...], row: Mapping[str, FieldValue]) -> str | None:
-    return next((n for n, g in groups if evaluate_group(g, row) is True), None)
-
-
-type _Display = tuple[
-    float | None, str | None, str | None, tuple[str, ...], tuple[tuple[str, FieldValue], ...]
-]
+type _Display = tuple[float | None, tuple[str, ...], tuple[tuple[str, FieldValue], ...]]
 
 
 def _display(spec: ScreenSpec, row: Mapping[str, FieldValue]) -> _Display:
-    """What a row shows besides its criteria: tie-break, tier, class, flags, columns."""
-    klass = row.get(spec.classify) if spec.classify else None
+    """What a row shows besides its criteria: tie-break, flags, columns."""
     return (
         _number(row.get(spec.tie_break)) if spec.tie_break else None,
-        _first_true(spec.tiers, row),
-        klass if isinstance(klass, str) else None,
         tuple(n for n, g in spec.flags if evaluate_group(g, row) is True),
         tuple((name, _known(row.get(f))) for name, f in spec.columns),
     )
 
 
 def _display_key(spec: ScreenSpec) -> tuple[object, ...]:
-    return ("display", spec.tiers, spec.flags, spec.classify, spec.columns, spec.tie_break)
+    return ("display", spec.flags, spec.columns, spec.tie_break)
 
 
 def _results(
@@ -106,17 +97,15 @@ def _row(
     """``known``: memo tables, one per criterion then one for the display (or ``None``)."""
     results = _results(spec, instrument, row, known)
     decision, reasons = decide(results)
-    tie_break, tier, klass, flags, columns = _shown(spec, instrument, row, known)
+    tie_break, flags, columns = _shown(spec, instrument, row, known)
     return RuleRow(
         instrument_id=instrument,
         decision=decision,
-        score=score(decision, results),
+        score=score(results),
         rank=0,
         reasons=reasons,
         results=results,
         tie_break=tie_break,
-        tier=tier,
-        klass=klass,
         flags=flags,
         columns=columns,
     )
@@ -137,7 +126,7 @@ def _ranked(r: RuleRow, rank: int) -> RuleRow:
     """``r`` with its rank (built directly: ``dataclasses.replace`` costs 3x per row)."""
     return RuleRow(
         r.instrument_id, r.decision, r.score, rank, r.reasons, r.results,
-        r.tie_break, r.tier, r.klass, r.flags, r.columns,
+        r.tie_break, r.flags, r.columns,
     )  # fmt: skip
 
 

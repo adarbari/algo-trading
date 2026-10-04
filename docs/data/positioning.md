@@ -2,7 +2,7 @@
 
 The definitions behind roadmap track OP: dealer gamma and delta exposure, walls, chain flow,
 skew and the implied move, all computed nightly from the stored Cboe chains. Decision record:
-[ADR 0030](../adr/0030-options-positioning-features.md). Model and catalogue conventions:
+[ADR 0031](../adr/0031-options-positioning-features.md). Model and catalogue conventions:
 [ADR 0023](../adr/0023-feature-store.md), [features.md](features.md); pricing conventions:
 [ADR 0021](../adr/0021-option-pricing-conventions.md).
 

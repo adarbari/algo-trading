@@ -43,10 +43,9 @@ function setup() {
 }
 
 describe('NewScreenerForm', () => {
-  it('saves a blank draft over the chosen universe and opens it', async () => {
+  it('saves a draft with the base gates and opens it', async () => {
     const { onCreated, container } = setup();
     await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'mine');
-    expect(await screen.findByRole('combobox', { name: 'Universe' })).toHaveValue('vrp_universe');
     await expectNoA11yViolations(container);
     await userEvent.click(screen.getByRole('button', { name: 'Create draft' }));
     await waitFor(() => {
@@ -59,8 +58,15 @@ describe('NewScreenerForm', () => {
           id: 'mine',
           kind: 'screener',
           impl: 'rules',
-          selection: 'vrp_universe',
-          criteria: {},
+          criteria: {
+            security_type: {
+              field: 'instrument.security_type',
+              op: 'in',
+              value: ['COMMON_STOCK', 'ADR', 'ETF'],
+            },
+            status: { field: 'instrument.status', op: 'eq', value: 'ACTIVE' },
+            optionable: { field: 'instrument.optionable', op: 'eq', value: true },
+          },
         },
       },
     });
@@ -79,14 +85,6 @@ describe('NewScreenerForm', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create draft' })).toBeDisabled();
     expect(PUT).not.toHaveBeenCalled();
-  });
-
-  it('falls back to the site universe when no screener names one', async () => {
-    GET.mockResolvedValue({ data: [], response: new Response(null, { status: 200 }) });
-    setup();
-    expect(await screen.findByRole('combobox', { name: 'Universe' })).toHaveValue(
-      'liquid_optionable',
-    );
   });
 
   it('cancels', async () => {

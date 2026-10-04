@@ -10,7 +10,7 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 
 **Next**
 - API endpoints that return 404 "nothing stored" on an empty store return 200 with an empty body.
-- Split crowded folders by area: `apps/api` routes/ + schemas/, `services/explore/`.
+- Split crowded folders by area: `apps/api` routes/ + schemas/, `services/explore/` (`screens/` is split out; the next new area follows it).
 - API schemas built from domain types, not mirrored field lists.
 - VRP live spread check in the UI via `GET /chains/{id}/live`.
 - Swing features (SW, done on `feat/swing-levels-momentum`): check values against a chart on a few names, then backfill `algotrade-ingest rollups --from D --to D --only momentum@v1,swing_levels@v1,anchored_vwap@v1,oi_walls@v1`.
@@ -18,7 +18,7 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 
 **Facts**
 - IBKR fundamentals are not permitted on this account (error 10358): share-class counts stay SEC.
-- Owner screener / VRP decisions: ADR 0029 and `docs/screeners/vrp-scanner.md`.
+- Owner screener / VRP decisions: ADR 0029, ADR 0030 (rule screens: no selection, missing data never skips, no tiers / classify / labels; `vrp_scanner` v3) and `docs/screeners/vrp-scanner.md`. A v3 run stores a row per snapshot instrument (about 11.4k, was about 4.2k).
 - Harness audit: last 2026-10-04 (`/audit-harness`; `/start` flags when older than 30 days; fixes log: [history.md](history.md)).
 
 ---
@@ -100,7 +100,7 @@ repeated: `sma_20/50/200`, `high_52w`, `low_52w`, `ret_20d`, `ret_60d`, `hv20`, 
 **Parked:** the wider options positioning set (gamma and delta exposure, hedge wall, flow
 ratios, skew and rank, implied move, GARCH rank, dark pool / short volume). Drafts kept, not
 scheduled: [data/positioning.md](data/positioning.md) and
-[ADR 0030](adr/0030-options-positioning-features.md) (proposed, not accepted). Revisit when a
+[ADR 0031](adr/0031-options-positioning-features.md) (proposed, not accepted). Revisit when a
 screener needs one of them. If DPI comes back, FINRA daily short-sale volume (published after
 the close, not real time) is the likely source.
 

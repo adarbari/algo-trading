@@ -40,8 +40,7 @@ RULE_SCREEN = result_table("rule_screen")
 RULE_SCREEN_VALUES = result_table("rule_screen_values")
 PREFERENCES = "preferences"
 SCREEN_COLUMNS = (
-    "user_id", "config_id", "config_version", "decision", "score", "tie_break", "tier", "class",
-    "flags", "reasons",
+    "user_id", "config_id", "config_version", "decision", "score", "tie_break", "flags", "reasons",
 )  # fmt: skip
 VALUE_COLUMNS = (
     "user_id",
@@ -75,8 +74,6 @@ class Pick:
     session: date
     decision: str
     score: float | None
-    tier: str | None
-    klass: str | None
     reasons: str
     criteria: list[PickCriterion]  # the criteria that did not pass
     columns: dict[str, Any]  # the screen's display columns
@@ -197,8 +194,6 @@ def _pick(row: dict[str, Any]) -> Pick:
         session=row["_session"],
         decision=str(row["decision"]),
         score=score,
-        tier=_text(row.get("tier")),
-        klass=_text(row.get("class")),
         reasons=str(to_value(row.get("reasons")) or ""),
         criteria=[],
         columns={},

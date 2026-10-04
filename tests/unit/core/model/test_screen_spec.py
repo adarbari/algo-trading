@@ -13,15 +13,13 @@ def test_only_score_mode_never_gates() -> None:
     assert Mode.HARD.gating and Mode.SOFT.gating and not Mode.SCORE.gating
 
 
-def test_fields_cover_criteria_groups_columns_classify_and_tie_break() -> None:
+def test_fields_cover_criteria_flags_columns_and_tie_break() -> None:
     spec = ScreenSpec(
         id="s",
         criteria=(Criterion("a", Rule("f.a", "gt", 1)),),
-        tiers=(("T", Group("all", (Rule("f.t", "eq", 1),))),),
         flags=(("x", Group("not", (Rule("f.a", "eq", 2),))),),
-        classify="f.c",
         columns=(("col", "f.col"),),
         tie_break="f.tb",
     )
-    assert spec.fields() == ("f.a", "f.c", "f.col", "f.t", "f.tb")
+    assert spec.fields() == ("f.a", "f.col", "f.tb")
     assert spec.criteria[0].field == "f.a" and spec.criteria[0].on_miss == "WATCH"

@@ -39,8 +39,6 @@ SCREEN: dict[str, Any] = {
             "tolerance": {"relative": 0.5},
         },
     },
-    "classify": f"{LIQ}.put_tier",
-    "tiers": {"deep": {"all": [{"field": f"{LIQ}.chain_oi", "op": "gte", "value": 4000}]}},
     "flags": {"cheap": {"all": [{"field": f"{LIQ}.underlying_price", "op": "lt", "value": 70}]}},
     "columns": {"tier": f"{LIQ}.put_tier"},
     "rank": {"tie_break": f"{LIQ}.underlying_price"},
@@ -65,7 +63,7 @@ def configs(**screen: Any) -> MemoryConfigStore:
     )
 
 
-def seeded() -> tuple[StoreReader, StoreWriter]:
+def seeded(features_stored: bool = True) -> tuple[StoreReader, StoreWriter]:
     backend = MemoryBackend()
     writer = StoreWriter(backend)
     universe = universe_rows(["AAA", "BBB", "CCC"], last_verified="2026-10-01")
@@ -81,26 +79,32 @@ def seeded() -> tuple[StoreReader, StoreWriter]:
         {"instrument_id": "EQ:BBB", "underlying_price": 60.0, "chain_oi": 700, "put_tier": "C"},
         {"instrument_id": "EQ:ETF1", "underlying_price": 40.0, "chain_oi": 5000, "put_tier": "B"},
     ]
-    writer.write_table(
-        "rollups/instrument/option_liquidity@v1", DAY, "f1", stamped(features, DAY, "f1")
-    )
+    if features_stored:
+        writer.write_table(
+            "rollups/instrument/option_liquidity@v1", DAY, "f1", stamped(features, DAY, "f1")
+        )
     return StoreReader(backend), writer
+
+
+def test_a_missing_rollup_table_is_a_partial_run_not_a_clean_one() -> None:
+    """ADR 0030: every row would read as missing data and a HARD criterion rejects it; the run
+    must not come out COMPLETE (it used to, by skipping every row)."""
+    reader, writer = seeded(features_stored=False)
+    config = resolve_config(configs(), "big_liquid", UserContext(SITE_USER))
+    outcome = run_screener(reader, writer, config, DAY, now=T0)
+    assert outcome.run.coverage is RunCoverage.PARTIAL
+    assert outcome.audit["missing_tables"] == ["rollups/instrument/option_liquidity@v1"]
+    assert set(outcome.audit["decisions"]) == {"REJECT"}
 
 
 def test_rule_screen_writes_both_tables_and_the_summary() -> None:
     reader, writer = seeded()
     config = resolve_config(configs(), "big_liquid", UserContext(SITE_USER))
     outcome = run_screener(reader, writer, config, DAY, now=T0)
-    assert outcome.run.coverage is RunCoverage.COMPLETE  # 3 of 4 processed >= 50%
-    assert outcome.audit["decisions"] == {
-        "QUALIFIED": 1,
-        "WATCH": 1,
-        "SKIPPED": 1,
-        "REJECT": 1,
-    }
+    assert outcome.run.coverage is RunCoverage.COMPLETE  # every row is decided: none is skipped
+    assert outcome.audit["decisions"] == {"QUALIFIED": 1, "WATCH": 1, "REJECT": 2}
     summary = outcome.audit["summary"]
-    assert summary["passed"] == 1 and summary["skipped"] == 1
-    assert summary["skipped_reasons"] == {f"no {LIQ}.chain_oi": 1, f"no {LIQ}.underlying_price": 1}
+    assert summary["passed"] == 1 and "skipped" not in summary
     (miss,) = summary["narrow_misses"]
     assert (miss["instrument_id"], miss["criterion_id"], miss["distance"]) == ("EQ:BBB", "oi", 300)
     assert outcome.audit["config_version"] == 4
@@ -114,7 +118,7 @@ def test_rule_screen_writes_both_tables_and_the_summary() -> None:
         "EQ:ETF1",
         "EQ:CCC",
     ]
-    assert by_id.loc["EQ:AAA", "score"] == 100.0 and by_id.loc["EQ:AAA", "class"] == "A"
+    assert by_id.loc["EQ:AAA", "score"] == 100.0
     assert by_id.loc["EQ:BBB", "decision"] == "WATCH" and by_id.loc["EQ:BBB", "near_missed"] == "oi"
     assert by_id.loc["EQ:ETF1", "failed"] == "price"
     assert by_id.loc["EQ:CCC", "missing"] == "price,oi"
@@ -126,8 +130,8 @@ def test_rule_screen_writes_both_tables_and_the_summary() -> None:
     assert len(values) == 4 * 3  # two criteria + one display column per instrument
     oi = values[(values["instrument_id"] == "EQ:BBB") & (values["criterion_id"] == "oi")]
     assert oi.iloc[0][["outcome", "value_num", "normalised"]].tolist() == ["NEAR", 700.0, 0.6]
-    tier = values[(values["mode"] == "column") & (values["instrument_id"] == "EQ:AAA")]
-    assert tier.iloc[0][["outcome", "value_str"]].tolist() == ["INFO", "A"]
+    column = values[(values["mode"] == "column") & (values["instrument_id"] == "EQ:AAA")]
+    assert column.iloc[0][["outcome", "value_str"]].tolist() == ["INFO", "A"]
 
     (record,) = reader.runs("screen-big_liquid-site", DAY)
     assert record.status is RunStatus.COMPLETE and record.stats["summary"] == summary

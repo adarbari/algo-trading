@@ -7,11 +7,6 @@
   "summary": {
     "rows": 4203,
     "passed": 2,
-    "skipped": 2416,
-    "skipped_reasons": {
-      "no rollup.iv30@v1.iv30": 2300,
-      "no feature.iv_hv_spread": 116
-    },
     "narrow_misses": [
       {
         "instrument_id": "EQ:KO",
@@ -31,21 +26,24 @@
         "distance": 9000000,
         "normalised": 0.9
       }
-    ]
+    ],
+    "missing": 2416,
+    "missing_reasons": {
+      "no rollup.iv30@v1.iv30": 2300,
+      "no feature.iv_hv_spread": 116
+    }
   },
   "decisions": {
     "QUALIFIED": 2,
     "WATCH": 1,
     "LIQUIDITY_RISK": 1,
-    "REJECT": 1780,
-    "SKIPPED": 2416
+    "REJECT": 4196
   },
   "funnel": [
     {
       "criterion_id": "iv30",
       "field": "rollup.iv30@v1.iv30",
       "mode": "hard",
-      "label": "Our 30-day IV",
       "entering": 4203,
       "passed": 486,
       "near": 0,
@@ -57,7 +55,6 @@
       "criterion_id": "spread",
       "field": "feature.iv_hv_spread",
       "mode": "soft",
-      "label": "IV minus HV",
       "entering": 486,
       "passed": 212,
       "near": 3,
@@ -69,7 +66,6 @@
       "criterion_id": "close",
       "field": "rollup.price_stats@v2.close",
       "mode": "hard",
-      "label": null,
       "entering": 215,
       "passed": 45,
       "near": 0,
@@ -99,8 +95,6 @@
       "rank": 1,
       "decision": "QUALIFIED",
       "score": 92,
-      "tier": null,
-      "classification": null,
       "flags": ["leveraged"],
       "reasons": [],
       "columns": {
@@ -114,8 +108,6 @@
       "rank": 2,
       "decision": "QUALIFIED",
       "score": 88,
-      "tier": null,
-      "classification": null,
       "flags": [],
       "reasons": [],
       "columns": {
@@ -129,8 +121,6 @@
       "rank": 3,
       "decision": "WATCH",
       "score": 79,
-      "tier": null,
-      "classification": null,
       "flags": [],
       "reasons": ["spread within tolerance"],
       "columns": {
@@ -144,8 +134,6 @@
       "rank": 4,
       "decision": "LIQUIDITY_RISK",
       "score": 70,
-      "tier": null,
-      "classification": null,
       "flags": [],
       "reasons": ["adv within tolerance"],
       "columns": {
