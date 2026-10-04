@@ -1,11 +1,13 @@
 """The IB Gateway facade is read-only: only market-data calls, a guarded IB object, the API
 handshake instead of ``IB.connect`` (which syncs positions and accounts), paced requests."""
 
+import asyncio
 import socket
 from datetime import date
 from types import SimpleNamespace
 
 import pytest
+from ib_async import IB
 
 from algotrade_sources.framework.base import SessionUnavailableError
 from algotrade_sources.vendors.ibkr.gateway import (
@@ -14,6 +16,7 @@ from algotrade_sources.vendors.ibkr.gateway import (
     GatewayConfig,
     IbkrMarketData,
     ReadOnlyViolationError,
+    _detach_resubscribe,
     ib_symbol,
 )
 from tests.helpers.fake_ib import FakeIB
@@ -259,3 +262,24 @@ def test_option_quotes_stop_waiting_after_the_stream_window() -> None:
     rows = gw.option_quotes("AAPL", date(2026, 11, 20), [230.0])
     assert rows[0]["listed"] and rows[0]["bid"] is None
     assert fake.calls.count("waitOnUpdate") == 1 and fake.calls.count("cancelMktData") == 1
+
+
+def test_a_restored_connection_sends_no_account_request() -> None:
+    """ib_async's IB re-requests the account summary on error 1102 by itself; the facade
+    detaches that reaction, so a connectivity blip sends nothing outside the guard."""
+
+    async def emit_restored(ib: IB) -> list[str]:
+        sent: list[str] = []
+
+        async def record() -> None:
+            sent.append("reqAccountSummary")
+
+        ib.reqAccountSummaryAsync = record  # type: ignore[method-assign]
+        ib.errorEvent.emit(-1, 1102, "Connectivity ... restored - data maintained", None)
+        await asyncio.sleep(0)
+        return sent
+
+    assert asyncio.run(emit_restored(IB())) == ["reqAccountSummary"]  # the library's default
+    sealed = IB()
+    _detach_resubscribe(sealed)
+    assert asyncio.run(emit_restored(sealed)) == []
