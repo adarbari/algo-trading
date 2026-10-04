@@ -82,6 +82,7 @@ def test_every_kind_round_trips_through_raw_json() -> None:
     assert list(params.parsed["strikes"]["strike"]) == [230.0, 235.0]
 
 
+@pytest.mark.allow_localhost
 def test_probe_reports_an_unreachable_gateway() -> None:
     src = IbkrSource(IbkrMarketData(GatewayConfig("127.0.0.1", 1, 1)))
     assert (src.probe() or "").startswith("IB Gateway not reachable on 127.0.0.1:1")

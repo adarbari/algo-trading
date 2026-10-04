@@ -83,6 +83,7 @@ def test_disabled_ibkr_skips_verify_and_the_night_stays_complete() -> None:
 
 
 @pytest.mark.usefixtures("others_fake")
+@pytest.mark.allow_localhost
 def test_an_unreachable_gateway_skips_verify_with_a_warn_and_a_hint() -> None:
     gateway = IbkrMarketData(GatewayConfig("127.0.0.1", 1, 1))  # nothing listens on port 1
     ctx = task_ctx(store(), sources={"ibkr": IbkrSource(gateway)})

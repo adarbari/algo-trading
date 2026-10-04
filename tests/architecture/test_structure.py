@@ -3,10 +3,13 @@
 import ast
 import hashlib
 import re
+import socket
 import subprocess
 import sys
 import tomllib
 from pathlib import Path
+
+import pytest
 
 from tests.conftest import REPO_ROOT
 
@@ -144,3 +147,30 @@ def test_preset_version_check_catches_edits(tmp_path: Path) -> None:
     assert "only v<N>.toml" in problems
     v1.unlink()
     assert any("gone" in p for p in preset_version_problems(tmp_path))
+
+
+# The root conftest blocks real network connections unless a test is marked.
+
+
+def test_a_real_connection_is_refused() -> None:
+    with pytest.raises(RuntimeError, match="network blocked"):
+        socket.create_connection(("93.184.216.34", 80), timeout=1)
+
+
+def test_loopback_is_refused_without_the_mark() -> None:
+    with pytest.raises(RuntimeError, match="network blocked"):
+        socket.create_connection(("127.0.0.1", 9), timeout=1)
+
+
+@pytest.mark.allow_localhost
+def test_a_marked_test_reaches_its_own_loopback_server() -> None:
+    with socket.create_server(("127.0.0.1", 0)) as server:
+        port = server.getsockname()[1]
+        with socket.create_connection(("127.0.0.1", port), timeout=1):
+            pass
+
+
+@pytest.mark.allow_localhost
+def test_localhost_mark_does_not_open_the_internet() -> None:
+    with pytest.raises(RuntimeError, match="network blocked"):
+        socket.create_connection(("93.184.216.34", 80), timeout=1)
