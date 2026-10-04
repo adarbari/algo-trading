@@ -5,11 +5,17 @@ import { expectNoA11yViolations } from '@/shared/lib/testing';
 
 import { ScreenFunnel } from './ScreenFunnel';
 
-const state = vi.hoisted(() => ({ preview: {} }));
+const state = vi.hoisted(() => ({ preview: {}, criteria: [] as unknown[] }));
 
 vi.mock('@/features/screener-builder', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useScreenerBuilder: () => ({ preview: state.preview }),
+  useScreenerBuilder: () => ({ preview: state.preview, criteria: state.criteria }),
+}));
+vi.mock('@/entities/feature', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useFeatureCatalogue: () => ({
+    data: [{ name: 'feature.vrp_iv30', dtype: 'float32', unit: 'decimal', categories: [] }],
+  }),
 }));
 
 const step = (criterion_id: string, label: string | null, entering: number, remaining: number) => ({
@@ -26,6 +32,7 @@ const DATA = {
 
 beforeEach(() => {
   state.preview = { data: DATA, pending: false, error: null, idle: false };
+  state.criteria = [];
 });
 
 describe('ScreenFunnel', () => {
@@ -40,6 +47,18 @@ describe('ScreenFunnel', () => {
     ]);
     expect(screen.getByText('Skipped (missing data, never passed): 2,416')).toBeInTheDocument();
     await expectNoA11yViolations(container);
+  });
+
+  it('names a step from the criterion as edited, not from its stored label', () => {
+    state.criteria = [
+      { id: 'iv30', field: 'feature.vrp_iv30', op: 'gt', value: 1.5, mode: 'hard' },
+    ];
+    render(<ScreenFunnel />);
+    const rows = within(
+      screen.getByRole('list', { name: 'Funnel (gating criteria)' }),
+    ).getAllByRole('listitem');
+    expect(rows[1]?.textContent).toBe('IV30 > 150%486');
+    expect(rows[2]?.textContent).toBe('close45');
   });
 
   it('says when there is no gating criterion', () => {

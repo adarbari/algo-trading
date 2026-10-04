@@ -1,20 +1,31 @@
 /**
  * The funnel of the gating rules: the universe, then how many rows remain after each hard or
- * soft criterion (a near miss stays in). Rows with missing data never pass and are listed apart.
+ * soft criterion (a near miss stays in), each named from its current rule. Rows with missing data
+ * never pass and are listed apart.
  */
 import { BarList, Panel, Text } from '@algotrade/ui';
 
-import { previewPanelState, useScreenerBuilder } from '@/features/screener-builder';
+import { byName, useFeatureCatalogue } from '@/entities/feature';
+import {
+  describeCriterion,
+  previewPanelState,
+  useScreenerBuilder,
+} from '@/features/screener-builder';
 
 export function ScreenFunnel() {
-  const { preview } = useScreenerBuilder();
+  const { preview, criteria } = useScreenerBuilder();
+  const features = byName(useFeatureCatalogue().data ?? []);
+  // A step reads as the criterion as it is now, not as a label stored with an older threshold.
+  const described = new Map(
+    criteria.map((c) => [c.id, describeCriterion(c, features.get(c.field))]),
+  );
   const funnel = preview.data?.funnel ?? [];
   const universe = funnel[0]?.entering ?? preview.data?.coverage.selected ?? 0;
   const items = [
     { id: 'universe', label: 'Universe', value: universe },
     ...funnel.map((step) => ({
       id: step.criterion_id,
-      label: step.label ?? step.criterion_id,
+      label: described.get(step.criterion_id) ?? step.label ?? step.criterion_id,
       value: step.remaining,
     })),
   ];

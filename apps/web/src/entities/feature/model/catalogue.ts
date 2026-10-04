@@ -36,6 +36,10 @@ const NAMES: Readonly<Record<string, string>> = {
   'feature.market_cap': 'Market cap',
   'feature.div_yield': 'Dividend yield',
   'rollup.earnings@v1.days_to_earnings': 'Next earnings',
+  'feature.vrp_iv30': 'IV30',
+  'feature.vrp_iv_hv_spread': 'IV30 − HV30',
+  'feature.vrp_iv_hv_ratio': 'IV30 / HV30',
+  'feature.dist_52w': 'Distance to 52w high or low',
 };
 
 /** The column part of a field name: `rollup.iv30@v1.iv30` -> `iv30`. */
