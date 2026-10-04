@@ -35,6 +35,15 @@ class ScreenerDetail(Schema):
     )
 
 
+class ScreenerListItem(Schema):
+    screener_id: str
+    status: str = Field(description="FINAL (has a finalised version) or DRAFT (a draft only)")
+    latest: int | None
+    has_draft: bool = Field(description="a working copy exists (beside a finalised version too)")
+    schedule: str | None
+    preset_id: str | None = Field(description="the site preset the screen extends")
+
+
 class ScreenerVersion(Schema):
     version: int
     document: dict[str, Any]

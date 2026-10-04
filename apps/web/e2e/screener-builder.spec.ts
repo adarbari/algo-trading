@@ -45,11 +45,12 @@ test('the list shows your screeners and the site presets', async ({ page }) => {
   ).toHaveAttribute('aria-current', 'page');
   const mine = page.getByRole('grid', { name: 'Your screeners' });
   await expect(mine.getByRole('row', { name: /my-vrp/ })).toContainText('Nightly');
+  await expect(mine.getByRole('row', { name: /my-vrp/ })).toContainText('v1 + draft');
+  // A draft that was never finalized is listed too.
+  await expect(mine.getByRole('row', { name: /idea-draft/ })).toContainText('DRAFT');
   const presets = page.getByRole('grid', { name: 'Site presets' });
   await expect(
-    presets
-      .getByRole('row', { name: /vrp_scanner/ })
-      .getByRole('button', { name: 'Copy to my screeners' }),
+    presets.getByRole('row', { name: /vrp_scanner/ }).getByRole('button', { name: 'Open' }),
   ).toBeVisible();
   await expect(presets.getByRole('row', { name: /short_premium_liquidity/ })).toContainText(
     'Python',
@@ -70,7 +71,7 @@ for (const theme of ['dark', 'light'] as const) {
     }, theme);
     await expect(page.getByRole('heading', { level: 1, name: 'my-vrp' })).toBeVisible();
     await expect(page.getByText('DRAFT v2', { exact: true })).toBeVisible();
-    await expect(page.getByText('based on preset vrp_scanner v1')).toBeVisible();
+    await expect(page.getByText('Your copy of vrp_scanner v1')).toBeVisible();
     await expect(page.getByText('Rebase on v2')).toBeVisible();
     await expect(page.getByRole('radiogroup', { name: /Mode of/ })).toHaveCount(4);
     await expect(page.getByRole('radio', { name: 'Soft' }).first()).toBeVisible();
@@ -194,7 +195,7 @@ test('a formula that does not check says why', async ({ page }) => {
   await expectAccessible(page);
 });
 
-test('a site preset opens read-only and is copied to the user', async ({ page }) => {
+test('a preset is copied to a named screener from the list', async ({ page }) => {
   const mock = await mockBuilderApi(page);
   await page.goto('/screeners');
   await page
@@ -208,12 +209,71 @@ test('a site preset opens read-only and is copied to the user', async ({ page })
   await dialog.getByRole('button', { name: 'Copy' }).click();
   await expect.poll(() => mock.copies).toEqual([{ id: 'my-copy', preset: 'vrp_scanner' }]);
   await expect(page).toHaveURL(/\/screeners\/my-copy\/edit/);
-  await expect(page.getByText('based on preset vrp_scanner v2')).toBeVisible();
+  await expect(page.getByText('Your copy of vrp_scanner v2')).toBeVisible();
+});
 
+for (const theme of ['dark', 'light'] as const) {
+  test(`a preset opens with its live preview, no copy yet (${theme})`, async ({ page }) => {
+    const errors = collectErrors(page);
+    const mock = await mockBuilderApi(page);
+    await page.goto('/screeners/vrp_scanner/edit');
+    await page.evaluate((t) => {
+      document.documentElement.setAttribute('data-theme', t);
+    }, theme);
+    await expect(page.getByRole('heading', { level: 1, name: 'vrp_scanner' })).toBeVisible();
+    await expect(page.getByText('Site preset', { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('grid', { name: 'Preview results' })).toBeVisible();
+    await expect(page.getByRole('radiogroup', { name: /Mode of/ })).toHaveCount(4);
+    // Nothing is locked, and nothing was copied by looking.
+    await expect(page.getByRole('button', { name: '+ Add criterion' })).toBeEnabled();
+    expect(mock.copies).toEqual([]);
+    expect(mock.previews[0]).toMatchObject({ id: 'vrp_scanner', extends: 'vrp_scanner@2' });
+    await expectAccessible(page);
+    expect(errors).toEqual([]);
+  });
+}
+
+test('the first edit of a preset makes your copy, which you change, rerun and finalize', async ({
+  page,
+}) => {
+  const mock = await mockBuilderApi(page);
   await page.goto('/screeners/vrp_scanner/edit');
-  await expect(page.getByText('Site preset', { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Copy to my screeners' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '+ Add criterion' })).toBeDisabled();
+  await expect(page.getByRole('grid', { name: 'Preview results' })).toBeVisible();
+  const before = mock.previews.length;
+  const threshold = page.getByRole('spinbutton', { name: 'Threshold' }).first();
+  await threshold.fill('60');
+  await threshold.press('Enter');
+  await expect.poll(() => mock.copies).toEqual([{ id: 'vrp_scanner', preset: 'vrp_scanner' }]);
+  await expect(page.getByText('Your copy of vrp_scanner v2')).toBeVisible();
+  await expect(page.getByText('DRAFT v1 · unsaved changes')).toBeVisible();
+  // The edit reruns the preview on the copy's document.
+  await expect.poll(() => mock.previews.length).toBeGreaterThan(before);
+  expect(mock.previews.at(-1)).toMatchObject({
+    extends: 'vrp_scanner@2',
+    criteria: { iv30: { value: 0.6 } },
+  });
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect.poll(() => mock.drafts.length).toBe(1);
+  expect(mock.drafts[0]?.document).toMatchObject({ extends: 'vrp_scanner@2' });
+  await page.getByRole('button', { name: 'Finalize v1' }).click();
+  await expect.poll(() => mock.finalised).toEqual(['vrp_scanner']);
+  expect(mock.copies).toHaveLength(1);
+});
+
+test('an inherited tie-break can be cleared in your copy', async ({ page }) => {
+  const mock = await mockBuilderApi(page);
+  await page.goto('/screeners/vrp_scanner/edit');
+  await expect(page.getByRole('combobox', { name: 'Feature or formula' }).last()).toHaveValue(
+    'feature.iv_hv_spread',
+  );
+  await page.getByRole('button', { name: 'Clear tie-break' }).click();
+  await expect(page.getByRole('button', { name: 'Clear tie-break' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect.poll(() => mock.drafts.length).toBe(1);
+  expect(mock.drafts[0]?.document).toMatchObject({
+    extends: 'vrp_scanner@2',
+    rank: { tie_break: '' },
+  });
 });
 
 test('a new screener starts as a blank draft', async ({ page }) => {

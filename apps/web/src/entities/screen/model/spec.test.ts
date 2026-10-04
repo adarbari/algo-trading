@@ -114,6 +114,15 @@ describe('editing the document', () => {
     });
     expect(withTieBreak(doc, null, 'desc')['rank']).toEqual({});
   });
+
+  it('clears a tie-break a preset sets with an empty one, and reads it as none', () => {
+    const copy = withTieBreak({ id: 'my', extends: 'vrp@1' }, null, 'desc');
+    expect(copy['rank']).toEqual({ tie_break: '' });
+    expect(tieBreakOf({ rank: { tie_break: 'a', tie_break_order: 'asc' } }, copy).field).toBeNull();
+    // Choosing another one afterwards changes it.
+    const changed = withTieBreak(copy, 'b', 'asc');
+    expect(tieBreakOf({ rank: { tie_break: 'a' } }, changed)).toEqual({ field: 'b', order: 'asc' });
+  });
 });
 
 describe('isComplete and previewDocument', () => {

@@ -76,6 +76,9 @@ next_earnings = "rollup.earnings@v1.next_earnings_date"
 tie_break = "feature.iv_hv_spread"    # sorts rows with equal scores; descending by default
 ```
 
+A copy of a preset clears an inherited tie-break with `tie_break = ""` (a user layer cannot
+delete a key); changing it is setting another field.
+
 Field names are catalogue names (`instrument.*`, `rollup.<group>@vN.*`, `feature.<name>`;
 see `GET /features` and [docs/data/features.md](../data/features.md)). A formula is never
 written inline: make it a user feature (`config/users/<u>/features/`) and use

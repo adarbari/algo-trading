@@ -123,7 +123,9 @@ def _rank(raw: Any, path: str) -> tuple[str | None, bool]:
     order = table.get("tie_break_order", "desc")
     if order not in ("asc", "desc"):
         raise _fail(f"{path}.tie_break_order", "must be 'asc' or 'desc'")
-    tie_break = _field(table["tie_break"], f"{path}.tie_break") if "tie_break" in table else None
+    # An empty tie_break clears one inherited from a preset (a user layer cannot delete a key).
+    named = "tie_break" in table and table["tie_break"] != ""
+    tie_break = _field(table["tie_break"], f"{path}.tie_break") if named else None
     return tie_break, order == "desc"
 
 

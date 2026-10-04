@@ -46,8 +46,10 @@ def test_draft_save_load_discard(writer: Any) -> None:
     assert writer.draft("alice", "mine") == DOC
     assert writer.load("alice", "screeners", "mine") is None  # a draft never runs
     assert writer.names("alice", "screeners") == []
+    assert writer.drafts("alice") == ["mine"] and writer.drafts("bob") == []
     assert writer.discard_draft("alice", "mine") is True
     assert writer.discard_draft("alice", "mine") is False
+    assert writer.drafts("alice") == []
 
 
 def test_versions_are_immutable_and_latest_wins(writer: Any) -> None:

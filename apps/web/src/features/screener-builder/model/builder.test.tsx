@@ -46,7 +46,7 @@ function Probe() {
   const b = useScreenerBuilder();
   return (
     <>
-      <Text>{`status ${b.status} readOnly ${String(b.readOnly)} dirty ${String(b.dirty)} next v${String(b.nextVersion)}`}</Text>
+      <Text>{`status ${b.status} preset ${b.preset?.id ?? 'none'} dirty ${String(b.dirty)} next v${String(b.nextVersion)}`}</Text>
       <Text>{`criteria ${b.criteria.map((c) => `${c.id}=${String(c.value)}`).join(',')}`}</Text>
       <Text>{`universe ${b.selection ?? 'none'} idle ${String(b.preview.idle)} error ${b.errorCriterion ?? 'none'}`}</Text>
       <Button
@@ -56,6 +56,13 @@ function Probe() {
         }}
       >
         edit
+      </Button>
+      <Button
+        onClick={() => {
+          b.setTieBreak(null, 'desc');
+        }}
+      >
+        clear tie-break
       </Button>
       <Button
         onClick={() => {
@@ -118,7 +125,7 @@ describe('ScreenerBuilderProvider', () => {
   it('shows the draft resolved through its preset, and previews it', async () => {
     setup();
     expect(await screen.findByText('criteria iv30=0.5,close=5')).toBeInTheDocument();
-    expect(screen.getByText('status ready readOnly false dirty false next v2')).toBeInTheDocument();
+    expect(screen.getByText('status ready preset none dirty false next v2')).toBeInTheDocument();
     expect(screen.getByText(/universe all_active idle false/)).toBeInTheDocument();
     await waitFor(() => {
       expect(POST).toHaveBeenCalledTimes(1);
@@ -220,16 +227,96 @@ describe('ScreenerBuilderProvider', () => {
     expect(screen.getByText(/dirty false next v2/)).toBeInTheDocument();
   });
 
-  it('shows a preset that was not copied read-only, without a preview', async () => {
-    GET.mockImplementation(((path: string) =>
-      Promise.resolve(
-        ok(detail({ draft: null, versions: [], latest: null, preset: null, path })),
-      )) as never);
-    setup();
-    expect(await screen.findByText(/readOnly true/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'edit' }));
-    expect(screen.getByText(/dirty false/)).toBeInTheDocument();
-    expect(POST).not.toHaveBeenCalled();
+  describe('a site preset not copied yet', () => {
+    const PRESET = { preset_id: 'my', pinned: null, current: 4, rebase_available: false };
+    beforeEach(() => {
+      GET.mockImplementation((() =>
+        Promise.resolve(
+          ok(detail({ draft: null, versions: [], latest: null, preset: PRESET })),
+        )) as never);
+      POST.mockImplementation(((path: string) =>
+        Promise.resolve(
+          path === '/screeners/{screener_id}/copy'
+            ? ok({ screener_id: 'my', document: { id: 'my', extends: 'my@4' } }, 201)
+            : ok(PREVIEW),
+        )) as never);
+    });
+    const calls = (path: string) =>
+      (POST.mock.calls as unknown as [string, unknown][]).filter(([p]) => p === path);
+
+    it('previews as it is, at once, without making a copy', async () => {
+      setup();
+      expect(await screen.findByText(/preset my dirty false/)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(calls('/screeners/preview')).toHaveLength(1);
+      });
+      expect(calls('/screeners/preview')[0]?.[1]).toMatchObject({
+        body: { spec: { id: 'my', extends: 'my@4' } },
+      });
+      expect(calls('/screeners/{screener_id}/copy')).toHaveLength(0);
+    });
+
+    it('the first edit makes the pinned copy once, and carries on in it', async () => {
+      setup();
+      await screen.findByText(/preset my/);
+      await userEvent.click(screen.getByRole('button', { name: 'edit' }));
+      await userEvent.click(screen.getByRole('button', { name: 'add' }));
+      expect(screen.getByText(/dirty true/)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(calls('/screeners/{screener_id}/copy')).toHaveLength(1);
+      });
+      expect(calls('/screeners/{screener_id}/copy')[0]?.[1]).toMatchObject({
+        params: { path: { screener_id: 'my' } },
+        body: { preset: 'my' },
+      });
+      await userEvent.click(screen.getByRole('button', { name: 'save' }));
+      await waitFor(() => {
+        expect(PUT).toHaveBeenCalledTimes(1);
+      });
+      expect(PUT.mock.calls[0]?.[1]).toMatchObject({
+        body: { document: { id: 'my', extends: 'my@4', criteria: { iv30: { value: 0.6 } } } },
+      });
+    });
+
+    it('drops the edit when the copy cannot be made', async () => {
+      POST.mockImplementation(((path: string) =>
+        Promise.resolve(
+          path === '/screeners/{screener_id}/copy'
+            ? { error: { detail: 'taken' }, response: new Response(null, { status: 409 }) }
+            : ok(PREVIEW),
+        )) as never);
+      setup();
+      await screen.findByText(/preset my/);
+      await userEvent.click(screen.getByRole('button', { name: 'edit' }));
+      await waitFor(() => {
+        expect(screen.getByText(/dirty false/)).toBeInTheDocument();
+      });
+    });
+
+    it('clears the tie-break the preset sets, as an empty one in the copy', async () => {
+      GET.mockImplementation((() =>
+        Promise.resolve(
+          ok(
+            detail({
+              draft: null,
+              versions: [],
+              latest: null,
+              preset: PRESET,
+              working: { ...WORKING, rank: { tie_break: 'feature.spread' } },
+            }),
+          ),
+        )) as never);
+      setup();
+      await screen.findByText(/preset my/);
+      await userEvent.click(screen.getByRole('button', { name: 'clear tie-break' }));
+      await userEvent.click(screen.getByRole('button', { name: 'save' }));
+      await waitFor(() => {
+        expect(PUT).toHaveBeenCalledTimes(1);
+      });
+      expect(PUT.mock.calls[0]?.[1]).toMatchObject({
+        body: { document: { extends: 'my@4', rank: { tie_break: '' } } },
+      });
+    });
   });
 
   it('names the criterion a preview error comes from', async () => {

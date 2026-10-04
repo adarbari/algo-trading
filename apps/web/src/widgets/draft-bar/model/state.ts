@@ -6,12 +6,12 @@ export interface DraftState {
 }
 
 export function draftState(builder: {
-  readOnly: boolean;
+  preset: unknown;
   dirty: boolean;
   nextVersion: number;
   detail: { draft?: unknown; latest: number | null } | undefined;
 }): DraftState {
-  if (builder.readOnly) return { label: 'Site preset', tone: 'neutral' };
+  if (builder.preset && !builder.dirty) return { label: 'Site preset', tone: 'neutral' };
   const draft = `DRAFT v${String(builder.nextVersion)}`;
   if (builder.dirty) return { label: `${draft} · unsaved changes`, tone: 'warning' };
   if (builder.detail?.draft) return { label: draft, tone: 'accent' };

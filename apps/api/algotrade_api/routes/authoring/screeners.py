@@ -13,10 +13,17 @@ from algotrade_api.schemas.authoring.screeners import (
     Schedule,
     ScheduleBody,
     ScreenerDetail,
+    ScreenerListItem,
     ScreenerVersion,
 )
 
 router = APIRouter(prefix="/screeners", tags=["screeners"])
+
+
+@router.get("")
+def screeners(writer: Writer, user: User) -> list[ScreenerListItem]:
+    """The user's screens: finalised ones and draft-only ones (status DRAFT)."""
+    return [ScreenerListItem.model_validate(s) for s in screens.list_screens(writer, user)]
 
 
 @router.get("/{screener_id}")

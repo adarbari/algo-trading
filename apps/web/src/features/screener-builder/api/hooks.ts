@@ -16,6 +16,7 @@ function useRefresh(id: string) {
       client.invalidateQueries({ queryKey: queryKeys.screeners.detail(id) }),
       client.invalidateQueries({ queryKey: queryKeys.screeners.versions(id) }),
       client.invalidateQueries({ queryKey: queryKeys.screeners.list() }),
+      client.invalidateQueries({ queryKey: queryKeys.screeners.mine() }),
     ]);
 }
 
@@ -56,6 +57,32 @@ export function useDiscardDraft(id: string) {
       toast.show({
         tone: 'negative',
         title: 'Could not discard the draft',
+        description: errorDetail(error),
+      });
+    },
+  });
+}
+
+/**
+ * Makes the user's copy of the site preset `id` (POST /screeners/{id}/copy, pinned to its current
+ * version) as a draft of the same name: the first edit of a preset does it, transparently.
+ */
+export function useCopyOwnPreset(id: string) {
+  const refresh = useRefresh(id);
+  const toast = useToast();
+  return useMutation({
+    mutationFn: () =>
+      unwrap(
+        api.POST('/screeners/{screener_id}/copy', {
+          params: { path: { screener_id: id } },
+          body: { preset: id },
+        }),
+      ),
+    onSuccess: () => refresh(),
+    onError: (error) => {
+      toast.show({
+        tone: 'negative',
+        title: 'Could not make your copy',
         description: errorDetail(error),
       });
     },

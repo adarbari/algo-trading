@@ -1,14 +1,15 @@
 /**
- * The screeners: the user's own (open to edit) and the site presets (view, or "Copy to my
- * screeners", which pins the preset's version). Python screeners are listed but built in code.
+ * The screeners: the user's own (finalized and draft-only: open to edit) and the site presets
+ * (open to see the live preview, or "Copy to my screeners", which pins the preset's version).
+ * Python screeners are listed but built in code.
  */
 import { DataTable, Panel, Stack } from '@algotrade/ui';
 import { useMemo, useState } from 'react';
 
-import { useScreeners, type ScreenerSummary } from '@/entities/screen';
+import { useMyScreeners, useScreeners, type ScreenerSummary } from '@/entities/screen';
 import { CopyPresetDialog } from '@/features/screener-copy';
 
-import { screenerColumns } from '../model/columns';
+import { myColumns, presetColumns, type MyScreener } from '../model/columns';
 
 export interface ScreenerListProps {
   /** Open a screener in the Builder. */
@@ -16,51 +17,61 @@ export interface ScreenerListProps {
 }
 
 export function ScreenerList({ onOpen }: ScreenerListProps) {
-  const screeners = useScreeners();
+  const configs = useScreeners();
+  const mine = useMyScreeners();
   const [copying, setCopying] = useState<string | null>(null);
-  const columns = useMemo(() => screenerColumns({ onOpen, onCopy: setCopying }), [onOpen]);
-  const all = screeners.data ?? [];
-  const mine = all.filter((s) => s.scope !== 'site');
+  const actions = useMemo(() => ({ onOpen, onCopy: setCopying }), [onOpen]);
+  const presetCols = useMemo(() => presetColumns(actions), [actions]);
+  const myCols = useMemo(() => myColumns(actions), [actions]);
+  const all = configs.data ?? [];
   const presets = all.filter((s) => s.scope === 'site');
-  const state =
-    screeners.isError && !screeners.data ? 'error' : screeners.isPending ? 'loading' : 'ready';
-  const table = (label: string, rows: ScreenerSummary[], empty: string) => (
-    <DataTable<ScreenerSummary>
-      label={label}
-      columns={columns}
-      rows={rows}
-      getRowId={(s) => `${s.scope}/${s.config_id}`}
-      getRowLabel={(s) => s.config_id}
-      defaultSort={{ columnId: 'name', direction: 'asc' }}
-      emptyMessage={empty}
-    />
-  );
+  const resolved = new Map(all.filter((s) => s.scope !== 'site').map((s) => [s.config_id, s]));
+  const own: MyScreener[] = (mine.data ?? []).map((s) => ({
+    ...s,
+    selection: resolved.get(s.screener_id)?.selection ?? null,
+    error: resolved.get(s.screener_id)?.error ?? null,
+  }));
+  const stateOf = (query: { isError: boolean; isPending: boolean; data: unknown }) =>
+    query.isError && !query.data ? 'error' : query.isPending ? 'loading' : 'ready';
   return (
     <Stack gap={4}>
       <Panel
         title="Your screeners"
-        description="Finalized screeners; a draft appears here once it is finalized"
+        description="Finalized screeners and drafts; a copy of a preset appears here once you edit it"
         flush
-        state={state}
+        state={stateOf(mine)}
         loadingLabel="Loading screeners…"
         errorMessage="The screeners failed to load."
-        onRetry={() => void screeners.refetch()}
+        onRetry={() => void mine.refetch()}
       >
-        {table(
-          'Your screeners',
-          mine,
-          'You have no finalized screener yet. Create one, or copy a preset.',
-        )}
+        <DataTable<MyScreener>
+          label="Your screeners"
+          columns={myCols}
+          rows={own}
+          getRowId={(s) => s.screener_id}
+          getRowLabel={(s) => s.screener_id}
+          defaultSort={{ columnId: 'name', direction: 'asc' }}
+          emptyMessage="You have no screener yet. Create one, or open a preset and change it."
+        />
       </Panel>
       <Panel
         title="Site presets"
-        description="Changed by pull request; copy one to make it yours"
+        description="Open one to see its live preview; change anything and a copy becomes yours"
         flush
-        state={state}
+        state={stateOf(configs)}
         loadingLabel="Loading presets…"
         errorMessage="The presets failed to load."
+        onRetry={() => void configs.refetch()}
       >
-        {table('Site presets', presets, 'No site screener presets.')}
+        <DataTable<ScreenerSummary>
+          label="Site presets"
+          columns={presetCols}
+          rows={presets}
+          getRowId={(s) => s.config_id}
+          getRowLabel={(s) => s.config_id}
+          defaultSort={{ columnId: 'name', direction: 'asc' }}
+          emptyMessage="No site screener presets."
+        />
       </Panel>
       {copying && (
         <CopyPresetDialog

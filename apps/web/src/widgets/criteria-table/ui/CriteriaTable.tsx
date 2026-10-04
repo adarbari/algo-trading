@@ -27,7 +27,6 @@ export function CriteriaTable() {
   const sentence = plainEnglish(builder.criteria, features, selection);
   const state =
     builder.status === 'loading' ? 'loading' : builder.status === 'error' ? 'error' : 'ready';
-  const locked = builder.readOnly;
 
   return (
     <Stack gap={3}>
@@ -67,14 +66,12 @@ export function CriteriaTable() {
                   builder.removeCriterion(criterion.id);
                 }}
                 error={builder.errorCriterion === criterion.id ? builder.preview.error : null}
-                disabled={locked}
               />
             </Stack>
           ))}
           <Stack direction="row" gap={2} align="center" wrap>
             <Button
               variant="dashed"
-              disabled={locked}
               onClick={() => {
                 builder.addCriterion();
               }}
@@ -83,7 +80,6 @@ export function CriteriaTable() {
             </Button>
             <Button
               variant="dashed"
-              disabled={locked}
               onClick={() => {
                 setFormula(true);
               }}
@@ -97,7 +93,6 @@ export function CriteriaTable() {
             field={builder.tieBreak.field}
             order={builder.tieBreak.order}
             onChange={builder.setTieBreak}
-            disabled={locked}
           />
           {selection && (
             <Text

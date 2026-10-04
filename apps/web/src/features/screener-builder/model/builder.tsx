@@ -3,7 +3,7 @@
  * state (draft, versions, preset pin), the working document with its unsaved edits, the
  * criteria, the 300 ms debounced live preview, and the draft actions (save, discard).
  */
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import {
   criteriaOf,
@@ -27,7 +27,7 @@ import {
 import { errorDetail } from '@/shared/api';
 import { useDebounced } from '@/shared/lib';
 
-import { useDiscardDraft, useSaveDraft } from '../api/hooks';
+import { useCopyOwnPreset, useDiscardDraft, useSaveDraft } from '../api/hooks';
 
 /** The live preview waits this long after the last edit. */
 export const PREVIEW_DEBOUNCE_MS = 300;
@@ -48,8 +48,11 @@ export interface ScreenerBuilder {
   error: Error | null;
   retry: () => void;
   detail: ScreenerDetail | undefined;
-  /** A site preset not yet copied: shown, not edited. */
-  readOnly: boolean;
+  /**
+   * A site preset the user has not copied yet: shown with its live preview; the first edit makes
+   * their copy (a draft pinned to its version) and carries on in it.
+   */
+  preset: { id: string; version: number | null } | null;
   document: ScreenDocument;
   criteria: Criterion[];
   /** The universe (named selection) the screen runs over, if known. */
@@ -90,7 +93,7 @@ function selectionOf(
   return typeof selection?.name === 'string' ? selection.name : null;
 }
 
-/** The server's working document: the draft, else the latest version, else none. */
+/** The server's working document: the draft, else the latest version, else (a preset) a copy of it. */
 function useSource(id: string) {
   const detail = useScreener(id);
   const hasDraft = Boolean(detail.data?.draft);
@@ -98,28 +101,38 @@ function useSource(id: string) {
   const versions = useScreenerVersions(id, Boolean(detail.data) && !hasDraft && hasVersions);
   const draft = detail.data?.draft;
   const latest = hasVersions ? versions.data?.at(-1) : undefined;
+  const untouched = detail.data?.preset ?? null;
+  const asPreset = !draft && !hasVersions && untouched ? untouched : null;
   const source = useMemo<ScreenDocument | null>(() => {
     if (draft) return toDocument(draft, id);
-    return latest ? toDocument(latest.document, id) : null;
-  }, [draft, latest, id]);
+    if (latest) return toDocument(latest.document, id);
+    if (asPreset) {
+      const pin = asPreset.current === null ? '' : `@${String(asPreset.current)}`;
+      return { id, extends: `${asPreset.preset_id}${pin}` };
+    }
+    return null;
+  }, [draft, latest, asPreset, id]);
   const waiting = detail.isPending || (!hasDraft && hasVersions && versions.isPending);
   const failed = detail.isError ? detail.error : versions.isError ? versions.error : null;
-  return { detail, source, waiting, failed, hasDraft, hasVersions };
+  return { detail, source, waiting, failed, hasDraft, hasVersions, asPreset };
 }
 
 export function ScreenerBuilderProvider({ id, children }: { id: string; children: ReactNode }) {
-  const { detail, source, waiting, failed, hasDraft, hasVersions } = useSource(id);
+  const { detail, source, waiting, failed, hasDraft, asPreset } = useSource(id);
   const [edited, setEdited] = useState<ScreenDocument | null>(null);
   const save = useSaveDraft(id);
   const discard = useDiscardDraft(id);
+  const copy = useCopyOwnPreset(id);
+  // The copy in flight, so a save or discard waits for it (it makes the draft they write to).
+  const copying = useRef<Promise<unknown> | null>(null);
 
   const base = detail.data?.working ?? null;
-  const readOnly = !waiting && !failed && !source && !hasDraft && !hasVersions;
+  const preset = asPreset ? { id: asPreset.preset_id, version: asPreset.current } : null;
   const document = useMemo<ScreenDocument>(() => edited ?? source ?? { id }, [edited, source, id]);
   const criteria = useMemo(() => criteriaOf(base, document), [base, document]);
 
   const spec = useMemo(() => previewDocument(document), [document]);
-  const runnable = !readOnly && criteriaOf(base, spec).some((c) => c.field !== '');
+  const runnable = criteriaOf(base, spec).some((c) => c.field !== '');
   // Edits wait out the debounce; a freshly loaded or saved draft previews at once.
   const live = useDebounced(spec, PREVIEW_DEBOUNCE_MS, edited === null);
   const preview = useScreenPreview(runnable ? live : null);
@@ -127,9 +140,17 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
   const settled = live === spec;
 
   const edit = (next: ScreenDocument) => {
-    if (!readOnly) setEdited(next);
+    setEdited(next);
+    if (preset && copying.current === null) {
+      copying.current = copy.mutateAsync().catch(() => {
+        // The toast says why; the edit is dropped so the next one tries again.
+        copying.current = null;
+        setEdited(null);
+      });
+    }
   };
   const saved = async () => {
+    await copying.current;
     if (edited) await save.mutateAsync(edited);
     setEdited(null);
   };
@@ -140,7 +161,7 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
     error: failed ?? null,
     retry: () => void detail.refetch(),
     detail: detail.data,
-    readOnly,
+    preset,
     document,
     criteria,
     selection: selectionOf(document, detail.data?.resolved),
@@ -170,7 +191,10 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
     },
     save: saved,
     discard: async () => {
-      if (hasDraft) await discard.mutateAsync();
+      await copying.current;
+      if (hasDraft || copying.current !== null) await discard.mutateAsync();
+      copying.current = null;
+      copy.reset();
       setEdited(null);
     },
     saving: save.isPending,

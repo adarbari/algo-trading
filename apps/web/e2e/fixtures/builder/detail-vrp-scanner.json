@@ -6,7 +6,12 @@
   "versions": [],
   "latest": null,
   "schedule": null,
-  "preset": null,
+  "preset": {
+    "preset_id": "vrp_scanner",
+    "pinned": null,
+    "current": 2,
+    "rebase_available": false
+  },
   "hash": "h-vrp",
   "layers": ["site/vrp_scanner"],
   "resolved": {
@@ -54,6 +59,10 @@
         "value": 5,
         "mode": "hard"
       }
+    },
+    "rank": {
+      "tie_break": "feature.iv_hv_spread",
+      "tie_break_order": "desc"
     }
   }
 }

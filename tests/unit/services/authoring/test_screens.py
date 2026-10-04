@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.authoring import screens
+from algotrade.services.authoring import presets, screens
 from algotrade.services.authoring.scope import ConflictError, ScreenNotFoundError
 from algotrade.services.configs import scheduled
 from algotrade.storage.configs.writer import MemoryConfigWriter, VersionExistsError
@@ -107,3 +107,47 @@ def test_detail_versions_and_schedule(writer: MemoryConfigWriter) -> None:
 def test_users_are_strict_labels_never_the_site(writer: MemoryConfigWriter, user: str) -> None:
     with pytest.raises(ConfigurationError):
         screens.save_draft(writer, user, "mine", OWN)
+
+
+def test_list_screens_has_finalised_and_draft_only_screens(writer: MemoryConfigWriter) -> None:
+    assert screens.list_screens(writer, "alice") == []
+    screens.save_draft(writer, "alice", "mine", OWN)
+    screens.finalise(writer, "alice", "mine")
+    screens.save_draft(writer, "alice", "mine", OWN)  # a working copy beside v1
+    screens.save_draft(writer, "alice", "vrp", {"extends": "vrp@3"})  # same id as the preset
+    listed = {s.screener_id: s for s in screens.list_screens(writer, "alice")}
+    assert list(listed) == ["mine", "vrp"]
+    assert (listed["mine"].status, listed["mine"].latest, listed["mine"].has_draft) == (
+        "FINAL",
+        1,
+        True,
+    )
+    assert (listed["vrp"].status, listed["vrp"].latest, listed["vrp"].preset_id) == (
+        "DRAFT",
+        None,
+        "vrp",
+    )
+    assert screens.list_screens(writer, "bob") == []
+
+
+def test_a_copy_may_share_its_presets_id_and_clear_the_tie_break(
+    writer: MemoryConfigWriter,
+) -> None:
+    presets.copy_preset(writer, "alice", "vrp", "vrp")
+    detail = screens.screen_detail(writer, "alice", "vrp")
+    assert detail.draft == {"id": "vrp", "extends": "vrp@3"} and detail.draft_error is None
+    cleared = {"extends": "vrp@3", "rank": {"tie_break": ""}}
+    screens.save_draft(writer, "alice", "vrp", cleared)
+    assert screens.finalise(writer, "alice", "vrp").version == 1
+
+
+def test_an_uncopied_preset_names_itself_and_its_version(writer: MemoryConfigWriter) -> None:
+    detail = screens.screen_detail(writer, "alice", "vrp")
+    assert detail.draft is None and detail.versions == []
+    assert detail.preset is not None
+    assert (detail.preset.preset_id, detail.preset.pinned, detail.preset.current) == (
+        "vrp",
+        None,
+        3,
+    )
+    assert not detail.preset.rebase_available

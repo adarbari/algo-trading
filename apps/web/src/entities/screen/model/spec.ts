@@ -7,6 +7,7 @@
 import type { components } from '@/shared/api';
 
 export type ScreenerDetail = components['schemas']['ScreenerDetail'];
+export type ScreenerListItem = components['schemas']['ScreenerListItem'];
 export type ScreenerSummary = components['schemas']['ConfigSummary'];
 export type PresetPin = components['schemas']['PresetPin'];
 
@@ -180,7 +181,9 @@ export function tieBreakOf(
   document: ScreenDocument,
 ): { field: string | null; order: 'asc' | 'desc' } {
   const rank = { ...plainTable(base?.['rank']), ...plainTable(document['rank']) };
-  const field = typeof rank['tie_break'] === 'string' ? rank['tie_break'] : null;
+  // An empty tie_break in the draft clears the one the preset sets.
+  const field =
+    typeof rank['tie_break'] === 'string' && rank['tie_break'] !== '' ? rank['tie_break'] : null;
   return { field, order: rank['tie_break_order'] === 'asc' ? 'asc' : 'desc' };
 }
 
@@ -190,7 +193,10 @@ function plainTable(value: unknown): Record<string, unknown> {
     : {};
 }
 
-/** The document with its tie-break column set (`null` clears it). */
+/**
+ * The document with its tie-break column set. `null` clears it: dropped from a screen of its
+ * own, set to "" in a copy of a preset (which may set one: a user layer cannot delete a key).
+ */
 export function withTieBreak(
   document: ScreenDocument,
   field: string | null,
@@ -198,8 +204,9 @@ export function withTieBreak(
 ): ScreenDocument {
   const rank = { ...plainTable(document['rank']) };
   if (field === null) {
-    delete rank['tie_break'];
     delete rank['tie_break_order'];
+    if (document['extends'] === undefined) delete rank['tie_break'];
+    else rank['tie_break'] = '';
   } else {
     rank['tie_break'] = field;
     rank['tie_break_order'] = order;

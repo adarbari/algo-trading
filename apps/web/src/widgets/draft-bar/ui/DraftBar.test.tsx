@@ -25,7 +25,7 @@ const save = vi.fn(() => Promise.resolve());
 const discard = vi.fn(() => Promise.resolve());
 const builder = (patch: Record<string, unknown> = {}, detail: Record<string, unknown> = {}) => ({
   id: 'my-vrp',
-  readOnly: false,
+  preset: null,
   dirty: false,
   saving: false,
   discarding: false,
@@ -46,15 +46,13 @@ const builder = (patch: Record<string, unknown> = {}, detail: Record<string, unk
 });
 
 function setup() {
-  const onOpen = vi.fn();
-  const view = render(
+  return render(
     <ToastProvider>
       <TestQueryProvider>
-        <DraftBar onOpen={onOpen} />
+        <DraftBar />
       </TestQueryProvider>
     </ToastProvider>,
   );
-  return { onOpen, ...view };
 }
 
 beforeEach(() => {
@@ -69,7 +67,7 @@ describe('DraftBar', () => {
     const { container } = setup();
     expect(screen.getByRole('heading', { level: 1, name: 'my-vrp' })).toBeInTheDocument();
     expect(screen.getByText('DRAFT v2')).toBeInTheDocument();
-    expect(screen.getByText('based on preset vrp v1')).toBeInTheDocument();
+    expect(screen.getByText('Your copy of vrp v1')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Run nightly' })).toBeChecked();
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Finalize v2' })).toBeEnabled();
@@ -114,17 +112,40 @@ describe('DraftBar', () => {
     expect(screen.getByRole('button', { name: 'Rebase on v2' })).toBeDisabled();
   });
 
-  it('shows a preset that was not copied read-only with Copy to my screeners', async () => {
-    state.builder = builder(
-      { readOnly: true },
-      { draft: null, versions: [], latest: null, schedule: null, preset: null },
+  const untouched = () =>
+    builder(
+      { preset: { id: 'vrp', version: 3 } },
+      {
+        draft: null,
+        versions: [],
+        latest: null,
+        schedule: null,
+        preset: { preset_id: 'vrp', pinned: null, current: 3, rebase_available: false },
+      },
     );
-    const { onOpen } = setup();
+
+  it('shows a preset as it is, with the same actions: no read-only mode', async () => {
+    state.builder = untouched();
+    const { container } = setup();
     expect(screen.getAllByText('Site preset')).toHaveLength(2); // the badge and the banner title
-    expect(screen.queryByRole('button', { name: 'Save draft' })).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Copy to my screeners' }));
-    expect(screen.getByRole('dialog', { name: 'Copy to my screeners' })).toBeInTheDocument();
-    expect(onOpen).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(/This is the site preset v3 with its live preview/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Your copy of/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Copy to my screeners' })).toBeNull();
+    await expectNoA11yViolations(container);
+  });
+
+  it('says it is your copy as soon as the first edit is made', () => {
+    state.builder = {
+      ...untouched(),
+      dirty: true,
+    };
+    setup();
+    expect(screen.getByText('Your copy of vrp v3')).toBeInTheDocument();
+    expect(screen.getByText('DRAFT v2 · unsaved changes')).toBeInTheDocument();
+    expect(screen.queryByText(/This is the site preset/)).toBeNull();
   });
 
   it('warns when the saved draft would not finalize', () => {

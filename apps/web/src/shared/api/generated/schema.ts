@@ -502,6 +502,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/screeners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Screeners
+         * @description The user's screens: finalised ones and draft-only ones (status DRAFT).
+         */
+        get: operations["screeners_screeners_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/screeners/{screener_id}": {
         parameters: {
             query?: never;
@@ -2050,6 +2070,30 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** ScreenerListItem */
+        ScreenerListItem: {
+            /**
+             * Has Draft
+             * @description a working copy exists (beside a finalised version too)
+             */
+            has_draft: boolean;
+            /** Latest */
+            latest: number | null;
+            /**
+             * Preset Id
+             * @description the site preset the screen extends
+             */
+            preset_id: string | null;
+            /** Schedule */
+            schedule: string | null;
+            /** Screener Id */
+            screener_id: string;
+            /**
+             * Status
+             * @description FINAL (has a finalised version) or DRAFT (a draft only)
+             */
+            status: string;
+        };
         /** ScreenerVersion */
         ScreenerVersion: {
             /** Document */
@@ -3224,6 +3268,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IdeasPriority"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    screeners_screeners_get: {
+        parameters: {
+            query?: {
+                /** @description whose configs (a label until auth; default the API's) */
+                user?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenerListItem"][];
                 };
             };
             /** @description Validation Error */

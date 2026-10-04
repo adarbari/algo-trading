@@ -1,29 +1,29 @@
 /**
  * The Builder's header: the screener's name, its state (DRAFT vN, unsaved changes), the preset it
- * is based on, and Discard / Save draft / Finalize; the nightly schedule is a separate switch
- * beside them. A newer preset version shows the rebase banner; a site preset not yet copied is
- * shown read-only with "Copy to my screeners".
+ * is a copy of ("Your copy of vrp_scanner v1"), and Discard / Save draft / Finalize; the nightly
+ * schedule is a separate switch beside them. A newer preset version shows the rebase banner. A
+ * site preset not yet copied is shown as it is (its live preview runs); the first edit makes the
+ * user's copy, so there is no separate read-only mode.
  */
 import { Banner, Button, Heading, Mono, Stack, StatusBadge, Text } from '@algotrade/ui';
-import { useState } from 'react';
-
-import { CopyPresetDialog } from '@/features/screener-copy';
 import { useScreenerBuilder } from '@/features/screener-builder';
 import { FinaliseButton, RebaseBanner, ScheduleToggle } from '@/features/screener-finalise';
 
 import { draftState } from '../model/state';
 
-export interface DraftBarProps {
-  /** Open another screener's Builder (after copying a preset). */
-  onOpen: (id: string) => void;
-}
-
-export function DraftBar({ onOpen }: DraftBarProps) {
+export function DraftBar() {
   const builder = useScreenerBuilder();
-  const [copying, setCopying] = useState(false);
   const { detail } = builder;
   const state = draftState(builder);
-  const preset = detail?.preset ?? null;
+  const pin = detail?.preset ?? null;
+  const untouched = builder.preset !== null && !builder.dirty;
+  // The preset this screen is a copy of: its pin, or (the first edit, the copy in flight) the preset.
+  const copyOf = builder.preset
+    ? { id: builder.preset.id, version: builder.preset.version }
+    : pin
+      ? { id: pin.preset_id, version: pin.pinned }
+      : null;
+  const version = (v: number | null) => (v === null ? '' : ` v${String(v)}`);
 
   return (
     <Stack gap={3}>
@@ -35,68 +35,56 @@ export function DraftBar({ onOpen }: DraftBarProps) {
               <Mono size="xl">{builder.id}</Mono>
             </Heading>
             <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
-            {preset && (
+            {copyOf && !untouched && (
               <Text size="sm" tone="muted">
-                {`based on preset ${preset.preset_id}${preset.pinned === null ? '' : ` v${String(preset.pinned)}`}`}
+                {`Your copy of ${copyOf.id}${version(copyOf.version)}`}
               </Text>
             )}
           </Stack>
         </Stack>
-        {builder.readOnly ? (
+        <Stack direction="row" gap={2} align="center" wrap>
+          <ScheduleToggle
+            screenerId={builder.id}
+            schedule={detail?.schedule ?? null}
+            finalised={(detail?.versions.length ?? 0) > 0}
+          />
           <Button
-            variant="primary"
+            disabled={!builder.dirty && !detail?.draft}
+            loading={builder.discarding}
             onClick={() => {
-              setCopying(true);
+              void builder.discard();
             }}
           >
-            Copy to my screeners
+            Discard
           </Button>
-        ) : (
-          <Stack direction="row" gap={2} align="center" wrap>
-            <ScheduleToggle
-              screenerId={builder.id}
-              schedule={detail?.schedule ?? null}
-              finalised={(detail?.versions.length ?? 0) > 0}
-            />
-            <Button
-              disabled={!builder.dirty && !detail?.draft}
-              loading={builder.discarding}
-              onClick={() => {
-                void builder.discard();
-              }}
-            >
-              Discard
-            </Button>
-            <Button
-              disabled={!builder.dirty}
-              loading={builder.saving}
-              onClick={() => {
-                void builder.save().catch(() => undefined);
-              }}
-            >
-              Save draft
-            </Button>
-            <FinaliseButton
-              screenerId={builder.id}
-              version={builder.nextVersion}
-              prepare={builder.save}
-              disabled={builder.criteria.length === 0 || (!builder.dirty && !detail?.draft)}
-            />
-          </Stack>
-        )}
+          <Button
+            disabled={!builder.dirty}
+            loading={builder.saving}
+            onClick={() => {
+              void builder.save().catch(() => undefined);
+            }}
+          >
+            Save draft
+          </Button>
+          <FinaliseButton
+            screenerId={builder.id}
+            version={builder.nextVersion}
+            prepare={builder.save}
+            disabled={builder.criteria.length === 0 || (!builder.dirty && !detail?.draft)}
+          />
+        </Stack>
       </Stack>
-      {builder.readOnly && (
+      {untouched && (
         <Banner tone="info" title="Site preset">
-          Presets are changed by pull request. Copy it to your screeners to edit a pinned copy; the
-          preview needs a copy too.
+          {`This is the site preset${version(builder.preset?.version ?? null)} with its live preview. Change anything and a copy of it becomes yours (pinned to this version); the preset itself changes only by pull request.`}
         </Banner>
       )}
-      {preset?.rebase_available && preset.pinned !== null && preset.current !== null && (
+      {pin?.rebase_available && pin.pinned !== null && pin.current !== null && (
         <RebaseBanner
           screenerId={builder.id}
-          preset={preset.preset_id}
-          pinned={preset.pinned}
-          current={preset.current}
+          preset={pin.preset_id}
+          pinned={pin.pinned}
+          current={pin.current}
           disabled={builder.dirty}
         />
       )}
@@ -105,12 +93,6 @@ export function DraftBar({ onOpen }: DraftBarProps) {
           {detail.draft_error}
         </Banner>
       )}
-      <CopyPresetDialog
-        preset={builder.id}
-        open={copying}
-        onOpenChange={setCopying}
-        onCopied={onOpen}
-      />
     </Stack>
   );
 }

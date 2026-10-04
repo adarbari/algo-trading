@@ -7,7 +7,7 @@ import { useState } from 'react';
 
 import { errorDetail } from '@/shared/api';
 
-import { blankDocument, isScreenId, useScreeners } from '@/entities/screen';
+import { blankDocument, isScreenId, useMyScreeners, useScreeners } from '@/entities/screen';
 
 import { useCreateScreener } from '../api/hooks';
 
@@ -22,6 +22,7 @@ const FALLBACK_SELECTION = 'liquid_optionable';
 
 export function NewScreenerForm({ onCreated, onCancel }: NewScreenerFormProps) {
   const screeners = useScreeners();
+  const mine = useMyScreeners();
   const selections = [
     ...new Set(
       (screeners.data ?? []).flatMap((s) =>
@@ -34,7 +35,9 @@ export function NewScreenerForm({ onCreated, onCancel }: NewScreenerFormProps) {
   const [chosen, setSelection] = useState<string | null>(null);
   const selection = chosen ?? selections[0] ?? FALLBACK_SELECTION;
   const create = useCreateScreener();
-  const taken = (screeners.data ?? []).some((s) => s.config_id === id);
+  const taken =
+    (screeners.data ?? []).some((s) => s.config_id === id && s.scope !== 'site') ||
+    (mine.data ?? []).some((s) => s.screener_id === id);
   const idError =
     id !== '' && !isScreenId(id)
       ? 'Use 1-64 of a-z, 0-9, _ and -.'
