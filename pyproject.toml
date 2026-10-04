@@ -89,10 +89,11 @@ ignore_missing_imports = true
 # ---------------------------------------------------------------- pytest
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
+addopts = "-ra -m 'not perf' --strict-markers --strict-config --import-mode=importlib"
 pythonpath = ["."]
 markers = [
     "e2e: end-to-end tests that exercise the CLI against the golden datasets",
+    "perf: strict timing budgets that fail on a loaded machine; excluded by default, run with `make perf` (or `-m perf`) on an idle machine",
     "slow: tests that take more than a few seconds",
     "allow_localhost: the test may connect to a loopback server it starts itself (tests/conftest.py blocks all other sockets)",
     "allow_network: the test may open real network connections (tests/conftest.py)",

@@ -3,13 +3,12 @@
 fields. CPU time, not wall time: tests run in parallel, so waiting for a CPU is noise; and
 measured with coverage paused, since line tracing slows pure Python 2-3x.
 
-The budgets are for the host the API runs on (``make test`` there). Shared CI runners are both
-slower and noisy on this pure-Python path (warm p95 306 ms, then 490 ms for faster code, vs
-~80 ms locally), so with ``$CI`` set the test keeps two machine-independent guards instead: a
-5x ceiling (a catastrophic regression) and warm at most half of cold by median (the cache and
-the memo work)."""
+The strict budgets are the ``perf`` test, run on an idle machine (``make perf``); they fail
+whenever the machine is loaded, so the default run (``make test``, CI) excludes ``perf``. The
+default run keeps two machine-independent guards instead: a 5x ceiling (a catastrophic
+regression) and warm at most half of cold by median (the cache and the memo work). Shared CI
+runners are slower and noisy on this path (warm p95 306 ms, then 490 ms, vs ~80 ms locally)."""
 
-import os
 import sys
 import time
 from collections.abc import Callable, Iterator
@@ -31,8 +30,8 @@ from tests.helpers.stored_frames import reference_rows, stamped, universe_rows
 
 pytestmark = pytest.mark.slow
 
-RUNNER = 5.0 if os.environ.get("CI") else 1.0  # shared CI runners: a ceiling (see above)
-COLD, WARM = 1.0 * RUNNER, 0.2 * RUNNER  # p95 budgets in CPU seconds
+COLD, WARM = 1.0, 0.2  # p95 budgets in CPU seconds (the perf test)
+LOOSE = 5.0  # the default run's ceiling multiple (see above)
 
 DAY = date(2026, 10, 2)
 N = 5_000
@@ -133,9 +132,7 @@ def timings(run: Callable[[], object], times: int) -> list[float]:
     return taken
 
 
-def test_cold_and_warm_previews_meet_the_budget(
-    sized: tuple[StoreReader, MemoryConfigStore],
-) -> None:
+def measure(sized: tuple[StoreReader, MemoryConfigStore]) -> tuple[list[float], list[float]]:
     reader, configs = sized
     user = UserContext("alice")
     fields = {SPEC["criteria"][c]["field"] for c in SPEC["criteria"]}
@@ -158,7 +155,24 @@ def test_cold_and_warm_previews_meet_the_budget(
         assert got.cached
         return got
 
-    colds, warms = timings(cold, 5), timings(warm, 20)
+    return timings(cold, 5), timings(warm, 20)
+
+
+def test_cold_and_warm_previews_stay_within_a_loose_ceiling(
+    sized: tuple[StoreReader, MemoryConfigStore],
+) -> None:
+    colds, warms = measure(sized)
+    cold_p95, warm_p95 = float(np.percentile(colds, 95)), float(np.percentile(warms, 95))
+    assert cold_p95 <= COLD * LOOSE, f"cold p95 {cold_p95:.3f}s (ceiling {COLD * LOOSE}s)"
+    assert warm_p95 <= WARM * LOOSE, f"warm p95 {warm_p95:.3f}s (ceiling {WARM * LOOSE}s)"
+    assert np.median(warms) <= 0.5 * np.median(colds), (colds, warms)
+
+
+@pytest.mark.perf
+def test_cold_and_warm_previews_meet_the_budget(
+    sized: tuple[StoreReader, MemoryConfigStore],
+) -> None:
+    colds, warms = measure(sized)
     cold_p95, warm_p95 = float(np.percentile(colds, 95)), float(np.percentile(warms, 95))
     assert cold_p95 <= COLD, f"cold p95 {cold_p95:.3f}s (budget {COLD}s)"
     assert warm_p95 <= WARM, f"warm p95 {warm_p95:.3f}s (budget {WARM}s)"
