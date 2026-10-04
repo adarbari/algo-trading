@@ -1,10 +1,11 @@
 # Working in this repo (for humans and AI agents)
 
 This file is the entry point. The decisions below are **settled**; do not re-open them
-without writing an ADR. Read in this order:
+without writing an ADR. Fresh session: run `/start` (`make doctor` + `make status` + the roadmap pickup list).
+Read in this order:
 
 1. `docs/architecture.md`: target architecture + the rules enforced on today's code
-2. `docs/roadmap.md`: which phase we are in and the open decisions
+2. `docs/roadmap.md`, **"Now / Next" at the top first** (running jobs, next items, facts; a PR that opens or closes one updates it), then the phase table and open decisions
 3. The spec for your area: `docs/data/layers.md`, `docs/configuration.md`,
    `docs/data/storage.md`, `docs/data/instruments.md`,
    `docs/data/vendors.md`, `docs/ui/architecture.md`, `docs/ui/design-system.md`,
@@ -236,7 +237,7 @@ Worktrees: `scripts/worktree.sh <branch> [base]` makes `../algo-trading-<slug>` 
 `npm ci`); `source` that file; `--remove` cleans up. Never `--no-verify` / `SKIP=`: the hooks
 work in a worktree.
 
-Commands (need `uv`): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make layout`, `make evaluate`, `make baseline`, `make features-doc`.
+Commands (need `uv`; `make doctor` checks the machine, `make status` shows PRs, jobs, store): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make layout`, `make evaluate`, `make baseline`, `make features-doc`.
 Web (need Node 24): `make web-install`, `make web-check` (part of `make check`), `make web-visual` (screenshots, Docker); in `apps/web`: `npm run dev|storybook|check|visual:update`.
 Ingestion: `algotrade-ingest universe|universe-build|company-details|shares|earnings|bars|rates|corporate-actions|chains|rollups|verify|screen|nightly|report|quality|schedule|purge-raw|retire-features|migrate-ids|golden`, or `algotrade-ingest run <task>` for any registry task, e.g. `run ibkr-contracts`, `run ibkr-iv --from D1 --to D2 [--limit N]` (the resumable IBKR IV backfill; see `README.md`).
 API: `algotrade-api [--reload]` (read-only except user configs via `services/authoring`, 127.0.0.1:8000); after a route / schema change run

@@ -1,5 +1,5 @@
 # apps/web build and test output (sources and lockfile are committed)
-node_modules/
+node_modules
 dist/
 storybook-static/
 playwright-report/
