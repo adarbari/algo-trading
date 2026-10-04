@@ -230,6 +230,11 @@ purpose = "the Ideas list (ADR 0029): one row per ticker over every rule screen'
 contracts = ["Explore queries are read-only: no writers, no jobs (ADR 0024)"]
 
 [[dir]]
+path = "src/algotrade/services/explore/screens"
+purpose = "read-only queries about rule screens: the screener configs with their latest run, and a screen's saved results for a session"
+contracts = ["Explore queries are read-only: no writers, no jobs (ADR 0024)"]
+
+[[dir]]
 path = "src/algotrade/services/explore/preview"
 purpose = "read-only dry runs of unsaved Builder input (ADR 0029): a draft rule screen previewed with the nightly evaluator on the latest closed session (cached field frame), a formula type checked and sampled"
 contracts = ["Explore queries are read-only: no writers, no jobs (ADR 0024)"]
@@ -305,12 +310,20 @@ purpose = "the routes that write (ADR 0029): user rule screens and user features
 contracts = ["Config writes go only through services.authoring (ADR 0029)"]
 
 [[dir]]
+path = "apps/api/algotrade_api/routes/screens"
+purpose = "the screens area's read routes: a screen's configs and results, and the Ideas list; each calls one services.explore query"
+
+[[dir]]
 path = "apps/api/algotrade_api/routes/preview"
 purpose = "read-only dry-run routes over unsaved Builder input (ADR 0029): POST bodies, never a write; each calls one services.explore.preview query"
 
 [[dir]]
 path = "apps/api/algotrade_api/schemas"
 purpose = "pydantic response models per area: the public contract (OpenAPI -> the web client)"
+
+[[dir]]
+path = "apps/api/algotrade_api/schemas/screens"
+purpose = "response models of the screens area: a screen's configs and results, and the Ideas list"
 
 [[dir]]
 path = "apps/api/algotrade_api/schemas/preview"
