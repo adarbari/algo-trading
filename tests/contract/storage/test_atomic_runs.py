@@ -238,7 +238,9 @@ def test_a_concurrent_reader_sees_a_commit_whole_or_not_at_all(
         done.set()
         thread.join()
     torn = [s for s in seen if s[0] != len(DAYS) or len(s[1]) != 1]
-    assert len(seen) > 40 and not torn, torn[:3]
+    # How many reads overlap the commits depends on machine load; the overtaking cases are
+    # pinned deterministically by the tests below (pinned_read).
+    assert seen and not torn, torn[:3]
 
 
 def test_result_runs_publish_together_or_not_at_all(backend: Backend) -> None:

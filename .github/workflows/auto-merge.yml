@@ -28,7 +28,7 @@ concurrency:
 jobs:
   sweep:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.event == 'pull_request'
-    runs-on: [self-hosted, macOS, ARM64] # the owner's Mac (docs/ci.md): no Actions minutes
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7 # default branch only; PR code is never checked out here
       - name: Merge every open PR that passed CI
