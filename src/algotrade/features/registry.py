@@ -32,7 +32,7 @@ from algotrade.features.rollups.options import (
     option_liquidity,
     put_wing,
 )
-from algotrade.features.rollups.price import momentum, price_moves, price_stats
+from algotrade.features.rollups.price import momentum, price_moves, price_stats, swing_levels
 
 GROUPS: dict[str, FeatureGroup] = {
     g.key: g
@@ -49,6 +49,7 @@ GROUPS: dict[str, FeatureGroup] = {
             put_wing.GROUP,
             price_moves.GROUP,
             momentum.GROUP,
+            swing_levels.GROUP,
         ),
         # iv30@v1 and put_wing@v1 read the materialised div_yield@v1 (FeatureSet orders it)
         stored_ok=True,

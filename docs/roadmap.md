@@ -93,8 +93,8 @@ repeated: `sma_20/50/200`, `high_52w`, `low_52w`, `ret_20d`, `ret_60d`, `hv20`, 
 |---|---|---|
 | SW0 | Spec [data/swing.md](data/swing.md): definitions, worked examples, null rules; `features/rollups/` split by kind (`price/`, `options/`, `corporate/`) so the new groups need no `price_stats` re-version | **done** |
 | SW1 | Momentum and volatility: `atr_14`, `atr_pct`, `rsi_14`, `ret_5d`, `rel_volume` (volume / 20-day average), `high_20d`, `low_20d`, `high_50d`, `low_50d`, `range_20d_pct`, `trend_state` (group `momentum@v1` + expression features in `config/site/features/swing.toml`) | **done** |
-| SW2 | Levels: `swing_high`, `swing_low` (most recent pivots), `dist_to_resistance`, `dist_to_support` (percent and in ATR) | next |
-| SW3 | Setups as expression features: `breakout_20d`, `pullback_to_sma20` | later |
+| SW2 | Levels: `swing_high`, `swing_low` (most recent pivots), `dist_to_resistance`, `dist_to_support` (percent and in ATR) (group `swing_levels@v1` with pivot dates; distances are expression features) | **done** |
+| SW3 | Setups as expression features: `breakout_20d`, `pullback_to_sma20` | next |
 | SW4 | `avwap_earnings` (VWAP anchored to the last earnings date) and OI-based `call_wall` / `put_wall` (strike with the most call OI above spot, the most put OI below spot; Cboe OI is end of day) | later |
 
 **Parked:** the wider options positioning set (gamma and delta exposure, hedge wall, flow

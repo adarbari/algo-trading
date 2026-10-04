@@ -325,3 +325,37 @@ def test_swing_atr_pct_range_and_trend_state(fs: FeatureSet) -> None:
         "EQ:TIE": "MIXED",  # close equals SMA50
         "EQ:NEW": None,  # no SMA200 yet: unknown, not MIXED
     }
+
+
+SWING = "rollups/instrument/swing_levels@v1"
+
+
+def test_swing_distances_to_resistance_and_support(fs: FeatureSet) -> None:
+    ids = ["EQ:A", "EQ:TOP", "EQ:NOATR"]
+    stats = pd.DataFrame({"instrument_id": ids, "session_date": END, "close": [102.0, 50.0, 20.0]})
+    levels = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "swing_high": [104.0, np.nan, 21.0],  # EQ:TOP is at a one-year high
+            "swing_low": [97.0, 45.0, 19.0],
+        }
+    )
+    mom = pd.DataFrame({"instrument_id": ids, "session_date": END, "atr_14": [2.0, 1.0, np.nan]})
+    names = [
+        "dist_to_resistance",
+        "dist_to_support",
+        "dist_to_resistance_atr",
+        "dist_to_support_atr",
+    ]
+    frames = {PRICE_STATS: stats.astype({"close": "float32"}), SWING: levels, MOMENTUM: mom}
+    out = fs.evaluate(frames, names).set_index("instrument_id")
+    assert out.loc["EQ:A", "dist_to_resistance"] == pytest.approx(2 / 102)  # 0.0196
+    assert out.loc["EQ:A", "dist_to_support"] == pytest.approx(5 / 102)
+    assert out.loc["EQ:A", "dist_to_resistance_atr"] == pytest.approx(1.0)
+    assert out.loc["EQ:A", "dist_to_support_atr"] == pytest.approx(2.5)
+    assert pd.isna(out.loc["EQ:TOP", "dist_to_resistance"])  # no resistance: unknown, not 0
+    assert pd.isna(out.loc["EQ:TOP", "dist_to_resistance_atr"])
+    assert out.loc["EQ:TOP", "dist_to_support"] == pytest.approx(0.1)
+    assert pd.isna(out.loc["EQ:NOATR", "dist_to_support_atr"])  # no ATR yet
+    assert out.loc["EQ:NOATR", "dist_to_resistance"] == pytest.approx(0.05)

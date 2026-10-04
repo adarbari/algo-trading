@@ -92,7 +92,7 @@ nightly and stored point-in-time:
 
 ```
 bars/1m ──► rollups/daily/session_stats@v1 ──┐
-bars/1d ─────────────────────────────────────┼─► rollups/instrument/price_stats@v2   (52w hi/lo, MAs, HV, ADV), price_moves@v1, momentum@v1
+bars/1d ─────────────────────────────────────┼─► rollups/instrument/price_stats@v2   (52w hi/lo, MAs, HV, ADV), price_moves@v1, momentum@v1, swing_levels@v1
 chains/* ────────────────────────────────────┼─► rollups/instrument/option_liquidity@v1, put_wing@v1, iv30@v1 ─► iv_history@v2 ─┐
 volatility/ibkr_iv30 ────────────────────────┼─► rollups/instrument/ibkr_iv@v1 ──────────────────────────────────┴─► iv_rank (+ source)
 events/earnings ─────────────────────────────┴─► rollups/instrument/earnings@v1     (next date, days to it)
@@ -255,6 +255,7 @@ readable until `algotrade-ingest retire-features --group <name>@v1` deletes them
 | `put_wing@v1` | `wing_status` (OK / OUTSIDE_BAND / NO_SPOT / NO_CHAIN / NO_EXPIRY / NO_STRIKE), `target_expiry` + `target_dte` (nearest 45 days in 30..60, standard monthlies first), `n_unpriced`; band totals of the puts with OUR \|delta\| in 0.08..0.15 (`n_strikes`, `wing_oi`, `wing_volume`, `wing_spread_pct`); the best put among 0.05..0.35 delta, nearest the band then by cash-secured ROC (`delta_band_distance`, `best_put_strike`, `_delta`, `_iv`, `_mid`, `_oi`, `_volume`, `_spread_pct`, `_roc`) | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `div_yield@v1` | built |
 | `price_moves@v1` | `one_day_move`: the largest \|close-to-close return\| over the last 20 sessions | `bars/1d` split-adjusted as of the session, 20 sessions back | built |
 | `momentum@v1` | `atr_14`, `rsi_14` (Wilder, 150-session warm-up), `ret_5d`, `rel_volume` (vs the 20 sessions before), `high_20d`, `low_20d`, `high_50d`, `low_50d`, `prior_high_20d` ([swing.md](swing.md)) | `bars/1d` split-adjusted as of the session, 149 sessions back | built |
+| `swing_levels@v1` | `swing_high` / `swing_high_date` (resistance: the most recent confirmed swing high above the close), `swing_low` / `swing_low_date` (support); pivots 5 bars each side, confirmed 5 sessions later ([swing.md](swing.md)) | `bars/1d` split-adjusted as of the session, 251 sessions back | built |
 
 **`fundamentals@v2` rules.** Among facts FILED on or before the session: the latest cover
 count (`dei`; latest filed, then latest period end, so an amendment wins) while the company
