@@ -13,7 +13,7 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 - Split crowded folders by area: `apps/api` routes/ + schemas/, `services/explore/`.
 - API schemas built from domain types, not mirrored field lists.
 - VRP live spread check in the UI via `GET /chains/{id}/live`.
-- Swing levels and momentum features (SW track below): SW0 spec first (pivot width, rules, where the columns live), then SW1-SW4.
+- Swing levels and momentum features (SW track below): spec in [data/swing.md](data/swing.md); SW1-SW4.
 - Flaky tests: preview timing under load, smoke axe admin light, one builder e2e.
 
 **Facts**
@@ -91,8 +91,8 @@ repeated: `sma_20/50/200`, `high_52w`, `low_52w`, `ret_20d`, `ret_60d`, `hv20`, 
 
 | # | Delivers | Status |
 |---|---|---|
-| SW0 | Pin the few open choices in a short spec (`docs/data/swing.md`): pivot width (proposed 5 bars each side), ATR smoothing (Wilder), RSI period 14, breakout rule (close above the prior 20-day high with `rel_volume` above 1.5), pullback rule (uptrend and close within 1 ATR of SMA20), `trend_state` rule (close > SMA50 > SMA200). Also the home for the new columns: `features/rollups/` is at its 10-module cap, so either split it first or extend `price_stats` (a re-version, `v3`, cascades to its dependents) | next |
-| SW1 | Momentum and volatility: `atr_14`, `atr_pct`, `rsi_14`, `ret_5d`, `rel_volume` (volume / 20-day average), `high_20d`, `low_20d`, `high_50d`, `low_50d`, `range_20d_pct`, `trend_state` | later |
+| SW0 | Spec [data/swing.md](data/swing.md): definitions, worked examples, null rules; `features/rollups/` split by kind (`price/`, `options/`, `corporate/`) so the new groups need no `price_stats` re-version | **done** |
+| SW1 | Momentum and volatility: `atr_14`, `atr_pct`, `rsi_14`, `ret_5d`, `rel_volume` (volume / 20-day average), `high_20d`, `low_20d`, `high_50d`, `low_50d`, `range_20d_pct`, `trend_state` | next |
 | SW2 | Levels: `swing_high`, `swing_low` (most recent pivots), `dist_to_resistance`, `dist_to_support` (percent and in ATR) | later |
 | SW3 | Setups as expression features: `breakout_20d`, `pullback_to_sma20` | later |
 | SW4 | `avwap_earnings` (VWAP anchored to the last earnings date) and OI-based `call_wall` / `put_wall` (strike with the most call OI above spot, the most put OI below spot; Cboe OI is end of day) | later |

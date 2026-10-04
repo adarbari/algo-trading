@@ -809,7 +809,7 @@ kind = "log"
 
 [[docs_dir]]
 path = "docs/data"
-purpose = "data specs: layers, storage, instruments, vendors, nightly footprint, feature catalogue, options positioning"
+purpose = "data specs: layers, storage, instruments, vendors, nightly footprint, feature catalogue, options positioning, swing levels"
 
 [[docs_dir]]
 path = "docs/screeners"
