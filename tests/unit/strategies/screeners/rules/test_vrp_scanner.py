@@ -1,5 +1,6 @@
-"""The site VRP scanner preset (``config/site/presets/screeners/vrp_scanner/v1.toml``): it
-resolves and validates against the catalogue as the site user, is not scheduled, and on a
+"""The site VRP scanner preset (``config/site/presets/screeners/vrp_scanner/v<N>.toml``): v1
+(pinned, ``extends = "vrp_scanner@1"``) and v2 (the latest) resolve and validate against the
+catalogue, are not scheduled, and on a
 fixed fixture of rows gives the owner-decided outcomes (docs/screeners/vrp-scanner.md): the
 hard gates reject or skip, liquidity misses are LIQUIDITY_RISK near misses, IBKR IV rank
 only lowers the score, STRONG tier, leveraged / inverse flag, classify by near_52w, ties by
@@ -13,13 +14,14 @@ import pytest
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.user import UserContext
 from algotrade.core.views.feature_view import FeatureView
-from algotrade.services.configs import resolve_config
+from algotrade.services.configs import resolve_config, resolve_rule_draft
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.strategies.screeners import Decision
 from algotrade.strategies.screeners.rules import evaluate_screen
 from tests.conftest import REPO_ROOT
 
 DAY = date(2026, 10, 2)
+STORE = FileConfigStore(REPO_ROOT / "config")
 
 GOOD: dict[str, Any] = {
     "feature.vrp_iv30": 0.60,
@@ -70,7 +72,14 @@ EXPECTED = {  # id: (decision, score, tier, class, flags)
 
 @pytest.fixture(scope="module")
 def preset() -> ResolvedConfig:
-    return resolve_config(FileConfigStore(REPO_ROOT / "config"), "vrp_scanner", UserContext("site"))
+    """v1, pinned the way a user's copy pins it (the bare id resolves the latest version)."""
+    pinned = {"id": "pinned_v1", "extends": "vrp_scanner@1"}
+    return resolve_rule_draft(STORE, "pinned_v1", UserContext("tester"), pinned)
+
+
+@pytest.fixture(scope="module")
+def preset_v2() -> ResolvedConfig:
+    return resolve_config(STORE, "vrp_scanner", UserContext("site"))
 
 
 def test_preset_resolves_and_validates(preset: ResolvedConfig) -> None:
@@ -113,3 +122,78 @@ def test_fixture_outcomes(preset: ResolvedConfig) -> None:
     summary = result.summary
     assert summary.passed == 4 and dict(summary.skipped_reasons) == {"no feature.vrp_iv30": 1}
     assert {m.criterion_id for m in summary.narrow_misses} == {"adv", "target_oi"}
+
+
+# ---------------------------------------------------------------------------------------- v2
+WING = "rollup.put_wing@v1"
+GOOD_V2: dict[str, Any] = {
+    **{k: v for k, v in GOOD.items() if "option_liquidity" not in k},
+    f"{WING}.delta_band_distance": 0.0,
+    f"{WING}.best_put_oi": 3_000,
+    f"{WING}.best_put_volume": 2_000,
+    f"{WING}.best_put_spread_pct": 0.08,
+    f"{WING}.best_put_strike": 40.0,
+    f"{WING}.target_expiry": date(2026, 11, 20),
+    "rollup.price_moves@v1.one_day_move": 0.04,
+}
+PUT_FIELDS = ("delta_band_distance", "best_put_oi", "best_put_volume", "best_put_spread_pct")
+FIXTURE_V2: dict[str, dict[str, Any]] = {
+    "EQ:STRONG": GOOD_V2,
+    "EQ:D20": {**GOOD_V2, f"{WING}.delta_band_distance": 0.05},  # best put 20 delta
+    "EQ:D25": {**GOOD_V2, f"{WING}.delta_band_distance": 0.10},  # best put 25 delta
+    "EQ:THINOI": {**GOOD_V2, f"{WING}.best_put_oi": 500},
+    "EQ:WIDE": {**GOOD_V2, f"{WING}.best_put_spread_pct": 0.20},
+    "EQ:GAPPY": {**GOOD_V2, "rollup.price_moves@v1.one_day_move": 0.13},  # flag only
+    "EQ:NOMOVE": {**GOOD_V2, "rollup.price_moves@v1.one_day_move": None},  # unknown: no flag
+    "EQ:NOPUT": {**GOOD_V2, **{f"{WING}.{f}": None for f in PUT_FIELDS}},  # never filtered
+}
+EXPECTED_V2 = {  # id: (score, flags)
+    "EQ:STRONG": (100.0, ()),
+    "EQ:GAPPY": (100.0, ("large_move",)),
+    "EQ:NOMOVE": (100.0, ()),
+    "EQ:D20": (97.5, ()),
+    "EQ:WIDE": (100 - 10 * 0.05 / 0.15, ()),
+    "EQ:D25": (95.0, ()),
+    "EQ:THINOI": (95.0, ()),
+    "EQ:NOPUT": (60.0, ()),
+}
+
+
+def test_v2_resolves_with_scored_put_criteria(preset_v2: ResolvedConfig) -> None:
+    spec = preset_v2.screen_spec
+    assert spec.version == 2 and preset_v2.config.schedule is None  # on request, like v1
+    assert preset_v2.config.name == "VRP"
+    modes = {c.id: c.mode.value for c in spec.criteria}
+    assert {k: v for k, v in modes.items() if v == "soft"} == {"adv": "soft"}
+    put = {c.id: (c.field, c.rule.op, c.rule.value) for c in spec.criteria if WING in c.field}
+    assert put == {
+        "delta_closeness": (f"{WING}.delta_band_distance", "lte", 0),
+        "put_open_interest": (f"{WING}.best_put_oi", "gt", 1_000),
+        "put_trading_volume": (f"{WING}.best_put_volume", "gt", 1_000),
+        "put_bid_ask": (f"{WING}.best_put_spread_pct", "lt", 0.15),
+    }
+    assert all(modes[c] == "score" for c in put)  # OI, volume, spread, delta: never gates
+    assert not any("option_liquidity" in c.field for c in spec.criteria)
+    assert [name for name, _ in spec.flags] == ["large_move", "leveraged_inverse"]
+    columns = dict(spec.columns)
+    assert {k: columns[k] for k in ("put_strike", "put_delta", "put_premium", "put_roc")} == {
+        "put_strike": f"{WING}.best_put_strike",
+        "put_delta": f"{WING}.best_put_delta",
+        "put_premium": f"{WING}.best_put_mid",
+        "put_roc": f"{WING}.best_put_roc",
+    }
+    assert columns["put_expiry"] == f"{WING}.target_expiry"
+    # a put column never shares a name with a criterion over another field
+    assert not {c for c in columns if c.startswith("put_")} & set(modes)
+
+
+def test_v2_fixture_outcomes(preset_v2: ResolvedConfig) -> None:
+    result = evaluate_screen(preset_v2.screen_spec, FeatureView(DAY, FIXTURE_V2))
+    rows = {r.instrument_id: r for r in result.rows}
+    for iid, (score, flags) in EXPECTED_V2.items():
+        row = rows[iid]
+        assert (row.decision, row.flags) == (Decision.QUALIFIED, flags), iid
+        assert row.score == pytest.approx(score), iid
+    assert rows["EQ:D20"].score > rows["EQ:D25"].score > rows["EQ:NOPUT"].score
+    assert result.summary.passed == len(FIXTURE_V2) and not result.summary.skipped
+    assert not result.summary.narrow_misses  # score criteria never make a near miss decision

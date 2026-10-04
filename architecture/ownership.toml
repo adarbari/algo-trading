@@ -670,6 +670,14 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "derived from IBKR market data: personal-use licence (ADR 0028)"
 
 [[table]]
+name = "rollups/instrument/put_wing@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
+name = "rollups/instrument/price_moves@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
 name = "rollups/daily/*"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "none produced yet (phase 6); rollups are computed only by the rollups task"

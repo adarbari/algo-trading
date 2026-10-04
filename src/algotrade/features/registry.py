@@ -32,7 +32,9 @@ from algotrade.features.rollups import (
     iv30,
     iv_history,
     option_liquidity,
+    price_moves,
     price_stats,
+    put_wing,
 )
 
 GROUPS: dict[str, FeatureGroup] = {
@@ -47,8 +49,11 @@ GROUPS: dict[str, FeatureGroup] = {
             iv_history.GROUP,
             ibkr_iv.GROUP,
             fundamentals.GROUP,
+            put_wing.GROUP,
+            price_moves.GROUP,
         ),
-        stored_ok=True,  # iv30@v1 reads the materialised div_yield@v1 (FeatureSet orders it)
+        # iv30@v1 and put_wing@v1 read the materialised div_yield@v1 (FeatureSet orders it)
+        stored_ok=True,
     )
 }
 # Every feature by key (``<group>.<column>@v<N>``), in group (dependency) then column order.

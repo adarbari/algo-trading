@@ -1,14 +1,46 @@
 # Daily Stock Identifier — IV / HV Volatility Premium Scanner
 
-> **Status in this repo:** a site rule-screen preset,
-> `config/site/presets/screeners/vrp_scanner/v1.toml` (not scheduled; run it from the Builder
+> **Status in this repo:** a site rule-screen preset (not scheduled; run it from the Builder
 > preview or as a `screen` job), over the expression features in `config/site/features/vrp.toml`
 > (`vrp_iv30`, `vrp_iv30_source`, `vrp_iv_hv_spread`, `vrp_iv_hv_ratio`) and `price.toml`
-> (`dist_52w`, `pct_vs_sma_20/50/200`). Not yet features, so not in v1: the large one-day move
-> flag, the closest option expiry's DTE column (Ideas computes it on read), the `vrp_setup`
-> label, liquidity at the 8-15 delta strikes (v1 uses the target expiry's 0.15-0.40 delta put
-> OI and the short put's spread). See [README](README.md) for how each section maps onto the
-> architecture.
+> (`dist_52w`, `pct_vs_sma_20/50/200`). The latest version is
+> `config/site/presets/screeners/vrp_scanner/v2.toml`; `v1.toml` stays as it was (immutable;
+> user copies pinned to `vrp_scanner@1` keep computing it).
+>
+> - **v1** measured option liquidity with `option_liquidity@v1` (the target expiry's
+>   0.15-0.40 delta put OI, chain-wide option volume, the short put's spread).
+> - **v2** (`name = "VRP"`) picks the trade the "Option-trade follow-up" below describes and
+>   scores it, never gates on it (owner decisions 2026-10-04 below). The rollup `put_wing@v1`
+>   takes the expiry closest to 45 days within 30-60 (standard monthlies first, where open
+>   interest concentrates) and, among its puts with OUR |delta| (ADR 0021) in 0.05-0.35, the
+>   **best put**: nearest the 8-15 delta band (`delta_band_distance`, 0 inside, else the
+>   distance to the nearer edge), then the highest ROC = premium / (strike x 100). SCORE
+>   criteria: delta closeness (full points at 0, none at 0.20), the best put's OI > 1,000,
+>   volume > 1,000 and stored bid/ask < 15% of mid; a missing value only costs points. The
+>   columns `put_strike`, `put_expiry`, `put_delta`, `put_premium`, `put_roc` (plus OI,
+>   volume, stored spread, band distance, band totals) identify the contract, so the UI can
+>   fetch its live IBKR quote (`GET /chains/{id}/live`) during market hours: the spread is
+>   judged live, not on the stored after-close quote. Flag `large_move` when
+>   `price_moves@v1.one_day_move` (the largest |1-day close-to-close return| over 20
+>   sessions, split-adjusted) > 10%.
+> - Not yet features: the closest option expiry's DTE column (Ideas computes it on read), the
+>   `vrp_setup` label.
+>
+> **Backfill (owner, after merge):** chains are stored from 2026-10-02 only, so the new
+> groups are cheap to fill: `algotrade-ingest rollups --from 2026-10-02 --to <last session>
+> --only put_wing@v1,price_moves@v1` (`price_moves@v1` can go further back with the bars).
+> Until then every v2 row loses the put criteria's points (they are scores, so nothing is
+> skipped) and the put columns are empty.
+>
+> See [README](README.md) for how each section maps onto the architecture.
+
+## Owner decisions (2026-10-04, v2)
+
+| Topic | Decision |
+|---|---|
+| Option liquidity | OI / volume / spread **scored, not gated** (owner 2026-10-04): SCORE criteria on the best put; the spread is judged on a live quote during market hours, never on the stored after-close one as a gate |
+| Strike choice | delta closeness **scored** (owner 2026-10-04): the best put is the 0.05-0.35 delta put nearest 8-15 delta, then by ROC; a 20 delta best put scores higher than a 25 delta one and both still score; nothing is filtered on delta |
+| Display | `put_strike`, `put_expiry`, `put_delta`, `put_premium`, `put_roc` (the Ideas page's columns); preset name "VRP" |
 
 ## Owner decisions (2026-10-03)
 
@@ -48,7 +80,7 @@ mapping follows.
 | Momentum context, setup class | `columns` + a site label feature `vrp_setup` |
 | Universe audit, "no qualified" only when COMPLETE | selection over the daily universe snapshot; the existing runner audit |
 | Option follow-up ROC | premium / (strike × 100), cash-secured; no correlation penalty |
-| Gaps (later) | liquidity at the 8-15 delta strikes, gap-move feature, catalysts (FDA etc.) |
+| Gaps (later) | catalysts (FDA etc.); the 8-15 delta put, its liquidity (scored) and the gap-move flag are in v2 (`put_wing@v1`, `price_moves@v1`) |
 
 **Version:** 1.3\
 **Purpose:** Daily identification of liquid stocks with unusually rich implied volatility relative to realized volatility, while the underlying is positioned near a meaningful 52-week extreme.
