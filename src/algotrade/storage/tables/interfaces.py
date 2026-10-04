@@ -42,6 +42,12 @@ class TableStore(Protocol):
         """Publish every pending write of ``run_id`` at once; -> partitions published."""
         ...
 
+    def visible_seq(self) -> int:
+        """The latest committed publish sequence (0 before any commit). Read-only: never
+        recovers or writes. It rises with every commit that publishes a partition and with
+        nothing else, so it is the cache-validity signal for readers (ADR 0022)."""
+        ...
+
     def abort_run(self, run_id: str) -> int:
         """Drop the pending writes of ``run_id`` (and their files); -> partitions dropped."""
         ...
