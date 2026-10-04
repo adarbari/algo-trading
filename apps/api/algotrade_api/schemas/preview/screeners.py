@@ -58,9 +58,9 @@ class NarrowMiss(Schema):
     criterion_id: str
     field: str
     value: Any
-    threshold: float | None
-    distance: float | None
-    normalised: float | None
+    threshold: float | None = Field(description="the threshold missed (nearer bound: between)")
+    distance: float | None = Field(description="how far from the threshold, in the field's unit")
+    normalised: float | None = Field(description="distance / tolerance width, 0..1")
 
 
 class PreviewSummary(Schema):
@@ -72,16 +72,16 @@ class PreviewSummary(Schema):
 
 
 class PreviewCoverage(Schema):
-    coverage: str
-    base: int
+    coverage: str = Field(description="COMPLETE, PARTIAL, UNIVERSE_INCOMPLETE or EMPTY_SELECTION")
+    base: int = Field(description="instruments the selection saw")
     selected: int
-    processed: int
+    processed: int = Field(description="rows not SKIPPED")
     skipped: int
-    coverage_pct: float
-    min_coverage: float
-    selection: dict[str, Any]
-    missing_tables: list[str]
-    pre_snapshot: bool
+    coverage_pct: float = Field(description="processed / selected")
+    min_coverage: float = Field(description="below this the run is PARTIAL")
+    selection: dict[str, Any] = Field(description="the selection's audit")
+    missing_tables: list[str] = Field(description="tables with no rows for the session")
+    pre_snapshot: bool = Field(description="the reference snapshot is after the session")
     universe_snapshot: date
 
 
