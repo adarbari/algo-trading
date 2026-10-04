@@ -24,6 +24,10 @@ export const queryKeys = {
     prices: (ids: readonly string[], from: string | null) =>
       ['explore', 'prices', ids, from] as const,
   },
+  ideas: {
+    all: () => ['ideas'] as const,
+    top: (limit: number) => ['ideas', 'top', limit] as const,
+  },
   instruments: {
     detail: (id: string) => ['instruments', id] as const,
     bars: (id: string, from: string | null) => ['instruments', id, 'bars', from] as const,

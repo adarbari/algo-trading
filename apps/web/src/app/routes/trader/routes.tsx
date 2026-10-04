@@ -6,12 +6,13 @@ import { TRADER } from '../../workspaces';
 import { placeholderRoute } from '../section-route';
 
 import { exploreRoute } from './explore-route';
+import { ideasRoute } from './ideas-route';
 import { traderRoute } from './layout-route';
 
 export { traderRoute } from './layout-route';
 
 export const traderRoutes = traderRoute.addChildren([
-  placeholderRoute(traderRoute, TRADER, '/ideas', 'ideas'),
+  ideasRoute,
   placeholderRoute(traderRoute, TRADER, '/screeners', 'screeners'),
   exploreRoute,
   placeholderRoute(traderRoute, TRADER, '/backtests', 'backtests'),
