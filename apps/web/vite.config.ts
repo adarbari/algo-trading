@@ -23,7 +23,7 @@ export default defineConfig({
     // the web app calls them under /api, which the dev server strips and proxies.
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8000',
+        target: process.env['API_PROXY_TARGET'] ?? 'http://127.0.0.1:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },

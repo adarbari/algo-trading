@@ -69,9 +69,7 @@ function setup(
 describe('CriterionRow', () => {
   it('shows the feature, its description and unit, the operator and the threshold', async () => {
     const { container } = setup();
-    expect(screen.getByRole('combobox', { name: 'Feature or formula' })).toHaveValue(
-      'rollup.iv30@v1.iv30',
-    );
+    expect(screen.getByRole('combobox', { name: 'Feature or formula' })).toHaveValue('IV30');
     expect(screen.getByText(/Our 30-day IV · fraction/)).toBeInTheDocument();
     expect(screen.getByRole('spinbutton', { name: 'Threshold' })).toHaveValue('50.0');
     expect(screen.getByRole('radio', { name: 'Hard' })).toBeChecked();

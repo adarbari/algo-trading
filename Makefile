@@ -6,7 +6,7 @@ GOLDEN_URL ?= file://datasets/golden/store
 
 
 .PHONY: changed install lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update filelen unit property integration e2e test \
-        evaluate baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-visual
+        evaluate baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-real web-visual
 
 UV ?= uv
 WORKERS ?= auto
@@ -105,10 +105,13 @@ web-install: $(WEB)/node_modules/.package-lock.json  ## web deps + the Playwrigh
 web-check: $(WEB)/node_modules/.package-lock.json  ## generated files fresh, ds:check, lint, types, unit, build, storybook, e2e
 	cd $(WEB) && $(NPM) run check
 
+web-real: $(WEB)/node_modules/.package-lock.json golden-store  ## real-app smoke: Vite dev + the real API, empty and golden stores, every route
+	cd $(WEB) && ALGOTRADE_PY=$(abspath $(PY)) npx playwright test -c playwright.real.config.ts
+
 web-visual:      ## screenshots + axe over every story, in the CI Linux image (needs Docker)
 	cd $(WEB) && $(NPM) run visual:docker
 
-check: lock-check lint typecheck arch layout ownership dupes filelen datasets-verify test evaluate web-check
+check: lock-check lint typecheck arch layout ownership dupes filelen datasets-verify test evaluate web-check web-real
 
 nightly:
 	HYPOTHESIS_PROFILE=nightly $(PY) -m pytest tests/property

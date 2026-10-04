@@ -29,7 +29,7 @@ export function ScreenerRanking({ onNewScreener }: ScreenerRankingProps) {
       description="drag to reorder"
       state={state}
       loadingLabel="Loading screeners…"
-      emptyMessage="No screener has picked anything yet. Finalise a screener to see its ideas here."
+      emptyMessage="No screener has run yet. Run a screener from Screeners to see its ideas here."
       errorMessage="The screeners failed to load."
       onRetry={() => void ideas.refetch()}
       footer={

@@ -7,6 +7,7 @@ import { useMemo } from 'react';
 
 import {
   featureGroup,
+  featureLabel,
   isOwn,
   isPersonal,
   unitLabel,
@@ -21,6 +22,8 @@ export function featureOptions(catalogue: readonly CatalogueFeature[]): Combobox
     return {
       value: feature.name,
       label: feature.name,
+      // The closed input reads as a name, not the long dotted id (that is its tooltip).
+      inputLabel: featureLabel(feature.name),
       description: parts.filter(Boolean).join(' · '),
       ...(badge ? { badge } : {}),
       group: featureGroup(feature),

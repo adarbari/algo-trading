@@ -18,6 +18,10 @@ export interface ComboboxOption {
   value: string;
   /** The main text ("iv30@v1.iv30"). */
   label: string;
+  /** What the closed input shows once this option is chosen, when the label is too technical or
+   * too long for it ("Last close" for "rollup.price_stats@v2.close"); the full label is the
+   * input's tooltip. Default: the label. */
+  inputLabel?: string;
   /** Secondary text under the label ("Our 30-day ATM implied volatility"). */
   description?: string;
   /** A short kind badge ("formula", "catalogue", "ETF"). */
@@ -211,7 +215,10 @@ export function Combobox({
   const sections = sectionsOf(shown);
 
   return (
-    <div className={styles.combobox}>
+    <div
+      className={styles.combobox}
+      title={selected?.inputLabel && query === null ? selected.label : undefined}
+    >
       <Input
         role="combobox"
         aria-label={ariaLabel}
@@ -219,7 +226,7 @@ export function Combobox({
         aria-controls={listId}
         aria-autocomplete="list"
         aria-activedescendant={open && active >= 0 ? optionId(active) : undefined}
-        value={query ?? selected?.label ?? ''}
+        value={query ?? selected?.inputLabel ?? selected?.label ?? ''}
         onValueChange={(text) => {
           setQuery(text);
           setOpen(true);
@@ -233,7 +240,7 @@ export function Combobox({
         }}
         onBlur={close}
         placeholder={placeholder}
-        mono={mono}
+        mono={mono && (query !== null || !selected?.inputLabel)}
         size={size}
         invalid={invalid}
         disabled={disabled}

@@ -1706,9 +1706,16 @@
             "type": "array"
           },
           "session": {
-            "format": "date",
-            "title": "Session",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session"
           },
           "total": {
             "title": "Total",

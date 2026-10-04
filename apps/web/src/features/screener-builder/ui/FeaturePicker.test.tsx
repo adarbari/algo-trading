@@ -46,4 +46,11 @@ describe('FeaturePicker', () => {
     expect(onChange).toHaveBeenCalledWith('feature.vol_gap');
     await expectNoA11yViolations(container);
   });
+
+  it('shows the chosen feature by its readable name, the full id as the tooltip', () => {
+    render(<FeaturePicker catalogue={CATALOGUE} value="rollup.iv30@v1.iv30" onChange={vi.fn()} />);
+    const input = screen.getByRole('combobox', { name: 'Feature or formula' });
+    expect(input).toHaveValue('IV30');
+    expect(input.closest('[title]')).toHaveAttribute('title', 'rollup.iv30@v1.iv30');
+  });
 });

@@ -6,7 +6,7 @@ import pytest
 from algotrade.config.user import UserContext
 from algotrade.features.rollups import earnings
 from algotrade.services.explore.ideas.ranking import ideas_for, top_ideas
-from algotrade.services.explore.store import NotFoundError, store_over
+from algotrade.services.explore.store import store_over
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.tables.readers import StoreReader
@@ -80,8 +80,14 @@ def test_latest_run_per_config_and_session_bound(writer: Stored) -> None:
     assert [i.instrument_id for i in latest.items] == ["EQ:CCC"]  # run2 only
     earlier = top_ideas(reader, D1, "local", [], 10)
     assert [i.instrument_id for i in earlier.items] == ["EQ:AAA"]
-    with pytest.raises(NotFoundError):
-        top_ideas(reader, date(2020, 1, 1), "local", [], 10)
+    before = top_ideas(reader, date(2020, 1, 1), "local", ["a"], 10)  # nothing stored by then
+    assert (before.session, before.items, before.screeners, before.total) == (None, [], [], 0)
+    assert before.priority == ["a"]
+
+
+def test_an_empty_store_is_no_ideas_not_an_error(writer: Stored) -> None:
+    empty = top_ideas(StoreReader(writer.backend), None, "local", [], 10)
+    assert (empty.session, empty.items, empty.total) == (None, [], 0)
 
 
 def test_rejected_and_skipped_are_not_picks_and_users_screen_wins(writer: Stored) -> None:
