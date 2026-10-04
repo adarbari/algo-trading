@@ -118,7 +118,8 @@ miss subtracts a penalty:
 | `hard` FALSE, `soft` beyond tolerance | 100 |
 
 `distance` is how far the value is from the threshold (from the nearer bound for `between`).
-The score is not clipped: REJECT rows are scored too, so near misses sort above clear fails.
+The score is clipped to 0 to 100 (clipped at 0; only positive scores), so many hard fails tie at 0.
+REJECT rows are scored too.
 SKIPPED rows have no score. Rows sort by score (descending), then by `[rank] tie_break`
 (descending unless `tie_break_order = "asc"`; missing last), then by instrument id. Then:
 `tiers` (first TRUE group wins), `flags` (TRUE adds the flag, never changes the decision),
