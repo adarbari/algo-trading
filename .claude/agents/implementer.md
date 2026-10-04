@@ -38,4 +38,5 @@ these is true (these need the `architect` agent or the main session):
 Finish with a hand-back of at most 150 words: the PR link (or files changed), checks run and
 their result, deviations from the brief, and decisions the caller must make. Everything else
 (what the change does, real-data findings, screenshots) goes in the PR description, not the
-hand-back. Do not claim a check passed unless you ran it.
+hand-back. Do not claim a check passed unless you ran it. Never merge a PR or enable
+auto-merge yourself (`gh pr merge`): the repo's workflow merges on green (CLAUDE.md rule 10).

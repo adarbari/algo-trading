@@ -201,7 +201,10 @@ the skill with the fix.
 9. Before finishing any change, run `make check`.
 10. **PRs auto-merge** (squash, branch deleted) once every CI check on the latest commit
     passes (`.github/workflows/auto-merge.yml`). Open work in progress as a draft, or label
-    it `no-automerge`, to keep it open for review. The repo is public: CI runs on
+    it `no-automerge`, to keep it open for review. **Never merge yourself**: no
+    `gh pr merge` (with or without `--auto`), no enabling GitHub auto-merge, no admin
+    bypass. GitHub has no required checks, so a manual merge lands before CI finishes; only
+    the workflow merges, and only on green. The repo is public: CI runs on
     GitHub-hosted runners only, never self-hosted ones (`docs/ci.md`).
 
 ## Workflows: use the matching skill
