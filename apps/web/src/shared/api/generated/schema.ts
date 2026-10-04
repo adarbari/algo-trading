@@ -1003,18 +1003,12 @@ export interface components {
             criterion_id: string;
             /** Field */
             field: string;
-            /**
-             * Mode
-             * @description hard, soft or score, as the screen states it
-             */
+            /** Mode */
             mode: string;
         };
         /** CriterionResult */
         CriterionResult: {
-            /**
-             * Outcome
-             * @description PASS, NEAR, FAIL or MISSING
-             */
+            /** Outcome */
             outcome: string;
             /** Value */
             value: number | string | null;
@@ -1725,7 +1719,7 @@ export interface components {
             /** Total */
             total: number;
         };
-        /** Page[ScreenTableRow] */
+        /** Page */
         Page_ScreenTableRow_: {
             /** Items */
             items: components["schemas"]["ScreenTableRow"][];
@@ -2263,47 +2257,26 @@ export interface components {
         };
         /** ScreenTable */
         ScreenTable: {
-            /**
-             * Changes
-             * @description new / dropped counts, before any filter
-             */
+            /** Changes */
             changes: {
                 [key: string]: number;
             };
-            /**
-             * Column Names
-             * @description the screen's display columns, in its order
-             */
+            /** Column Names */
             column_names: string[];
             /** Config Id */
             config_id: string;
-            /**
-             * Criteria
-             * @description the screen's criteria, in its order
-             */
+            /** Criteria */
             criteria: components["schemas"]["CriterionHeader"][];
-            /**
-             * Decisions
-             * @description every decision of the run, before any filter
-             */
+            /** Decisions */
             decisions: {
                 [key: string]: number;
             };
-            /**
-             * Feature Columns
-             * @description the requested catalogue features, in order
-             */
+            /** Feature Columns */
             feature_columns: string[];
-            /**
-             * Missing
-             * @description tables with no partition for the session (their features are null)
-             */
+            /** Missing */
             missing: string[];
             page: components["schemas"]["Page_ScreenTableRow_"];
-            /**
-             * Previous Session
-             * @description null: the screen has no earlier run
-             */
+            /** Previous Session */
             previous_session: string | null;
             /** Run Id */
             run_id: string;
@@ -2317,31 +2290,19 @@ export interface components {
         };
         /** ScreenTableRow */
         ScreenTableRow: {
-            /**
-             * Change
-             * @description new or dropped against the previous run (null: same, or no previous run)
-             */
+            /** Change */
             change: string | null;
-            /**
-             * Columns
-             * @description the screen's display columns
-             */
+            /** Columns */
             columns: {
                 [key: string]: unknown;
             };
-            /**
-             * Criteria
-             * @description criterion id -> what it judged
-             */
+            /** Criteria */
             criteria: {
                 [key: string]: components["schemas"]["CriterionResult"];
             };
             /** Decision */
             decision: string;
-            /**
-             * Features
-             * @description the requested catalogue features, by name
-             */
+            /** Features */
             features: {
                 [key: string]: unknown;
             };
@@ -2351,15 +2312,9 @@ export interface components {
             instrument_id: string;
             /** Name */
             name: string | null;
-            /**
-             * Previous Decision
-             * @description the decision in the previous run (null: none, or not in it)
-             */
+            /** Previous Decision */
             previous_decision: string | null;
-            /**
-             * Rank
-             * @description 1 = best: score, then the tie-break, then the instrument id
-             */
+            /** Rank */
             rank: number;
             /** Reasons */
             reasons: string;

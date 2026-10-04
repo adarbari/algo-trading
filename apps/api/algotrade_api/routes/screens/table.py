@@ -1,13 +1,13 @@
-"""``GET /screens/{id}/table``: a rule screen's latest run as a review table (ADR 0031)."""
+"""``GET /screens/{id}/table``: a rule screen's latest run as a review table (ADR 0031). The
+response is the query's own dataclass (no mirrored schema; pydantic reads it directly)."""
 
 from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Query
 
-from algotrade.services.explore.screens.table import screen_table
+from algotrade.services.explore.screens.table import ScreenTable, screen_table
 from algotrade_api.deps import Store, name_list
-from algotrade_api.schemas.screens.table import ScreenTable
 
 router = APIRouter(prefix="/screens", tags=["screens"])
 
@@ -37,7 +37,6 @@ def table(
     page: Annotated[int, Query(ge=1)] = 1,
     size: Annotated[int, Query(ge=1, le=1000)] = 100,
 ) -> ScreenTable:
-    found = screen_table(
+    return screen_table(
         store, config_id, on, name_list(decision), change, q, name_list(columns), sort, page, size
     )
-    return ScreenTable.model_validate(found)

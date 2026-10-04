@@ -646,7 +646,6 @@
             "type": "string"
           },
           "mode": {
-            "description": "hard, soft or score, as the screen states it",
             "title": "Mode",
             "type": "string"
           }
@@ -662,7 +661,6 @@
       "CriterionResult": {
         "properties": {
           "outcome": {
-            "description": "PASS, NEAR, FAIL or MISSING",
             "title": "Outcome",
             "type": "string"
           },
@@ -2569,7 +2567,7 @@
           "page",
           "size"
         ],
-        "title": "Page[ScreenTableRow]",
+        "title": "Page",
         "type": "object"
       },
       "Page_UniverseRow_": {
@@ -3585,12 +3583,10 @@
             "additionalProperties": {
               "type": "integer"
             },
-            "description": "new / dropped counts, before any filter",
             "title": "Changes",
             "type": "object"
           },
           "column_names": {
-            "description": "the screen's display columns, in its order",
             "items": {
               "type": "string"
             },
@@ -3602,7 +3598,6 @@
             "type": "string"
           },
           "criteria": {
-            "description": "the screen's criteria, in its order",
             "items": {
               "$ref": "#/components/schemas/CriterionHeader"
             },
@@ -3613,12 +3608,10 @@
             "additionalProperties": {
               "type": "integer"
             },
-            "description": "every decision of the run, before any filter",
             "title": "Decisions",
             "type": "object"
           },
           "feature_columns": {
-            "description": "the requested catalogue features, in order",
             "items": {
               "type": "string"
             },
@@ -3626,7 +3619,6 @@
             "type": "array"
           },
           "missing": {
-            "description": "tables with no partition for the session (their features are null)",
             "items": {
               "type": "string"
             },
@@ -3646,7 +3638,6 @@
                 "type": "null"
               }
             ],
-            "description": "null: the screen has no earlier run",
             "title": "Previous Session"
           },
           "run_id": {
@@ -3691,12 +3682,10 @@
                 "type": "null"
               }
             ],
-            "description": "new or dropped against the previous run (null: same, or no previous run)",
             "title": "Change"
           },
           "columns": {
             "additionalProperties": true,
-            "description": "the screen's display columns",
             "title": "Columns",
             "type": "object"
           },
@@ -3704,7 +3693,6 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/CriterionResult"
             },
-            "description": "criterion id -> what it judged",
             "title": "Criteria",
             "type": "object"
           },
@@ -3714,7 +3702,6 @@
           },
           "features": {
             "additionalProperties": true,
-            "description": "the requested catalogue features, by name",
             "title": "Features",
             "type": "object"
           },
@@ -3749,11 +3736,9 @@
                 "type": "null"
               }
             ],
-            "description": "the decision in the previous run (null: none, or not in it)",
             "title": "Previous Decision"
           },
           "rank": {
-            "description": "1 = best: score, then the tie-break, then the instrument id",
             "title": "Rank",
             "type": "integer"
           },
