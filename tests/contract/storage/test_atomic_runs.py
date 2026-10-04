@@ -364,3 +364,20 @@ def test_a_dropped_version_is_recorded_in_the_index(tmp_path: Path) -> None:
     assert sorted(p.name for p in directory.glob("run=*.parquet")) == sorted(
         local_index.run_file("resumed", e) for e in (entry, entry.prev)
     )
+
+
+def test_visible_seq_rises_only_when_a_commit_publishes(backend: Backend) -> None:
+    tables = backend.tables
+    start = tables.visible_seq()
+    pending_two_tables(backend)  # pending writes change nothing
+    assert tables.visible_seq() == start
+    tables.commit_run("r1", COMMIT)
+    published = tables.visible_seq()
+    assert published > start
+    tables.write(A, D2, "r2", value("r2", 3.0, D2), pending=True)
+    tables.abort_run("r2")  # a failed run publishes nothing
+    assert tables.commit_run("r3", COMMIT) == 0  # nor does a commit without writes
+    assert tables.visible_seq() == published
+    pending_two_tables(backend, "r4", 5.0)
+    tables.commit_run("r4", COMMIT + timedelta(minutes=1))
+    assert tables.visible_seq() > published

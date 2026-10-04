@@ -90,6 +90,10 @@ class MemoryTables:
                 self._frames[(key, run_id, ref)] = frame
             return len(writes)
 
+    def visible_seq(self) -> int:
+        with self._index_lock:
+            return self._seq
+
     def abort_run(self, run_id: str) -> int:
         with self._index_lock:
             self._touched.pop(run_id, None)

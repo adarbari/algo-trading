@@ -62,3 +62,6 @@ snapshot came from an unfinished run and disagreed with the symbol history.
   still `None`.
 - Files of a crashed run stay on disk, invisible, until recovery or retention removes them.
 - The index format gains optional fields; old indexes read unchanged.
+- Readers may key caches on `TableStore.visible_seq()` (the latest committed publish
+  sequence; read-only, no recovery, no writes). It is the only cache-validity signal:
+  never paths or mtimes.

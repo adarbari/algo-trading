@@ -6,6 +6,7 @@ sector / industry and the liquidity class (an expression feature) for the same s
 (``services.features.field_view``).
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -108,19 +109,55 @@ def _universe(
     return frame, universe, list(view.missing)
 
 
+@dataclass(frozen=True)
+class _Computed:
+    """A finished query before paging: what every page of it shares."""
+
+    universe: Universe
+    missing: list[str]
+    rows: list[dict[str, Any]]
+
+
+def _features_key(store: ReadStore) -> str:
+    """The user's catalogue as text: an edited feature file must not hit a stale entry."""
+    features = store_features(store)
+    return repr(sorted((n, repr(e.definition)) for n, e in features.expressions.items()))
+
+
+def _cached(
+    store: ReadStore, query: tuple[Any, ...], compute: Callable[[], _Computed]
+) -> _Computed:
+    """``compute()`` once per (query, user catalogue, published state): a page of a query
+    already computed is sliced from it. The commit sequence is read before computing, so a
+    publish landing meanwhile stores the result under the older key and is never served."""
+    key = (*query, store.user.user_id, _features_key(store), store.reader.visible_seq())
+    hit = store.cache.get(key)
+    if hit is not None:
+        return hit  # type: ignore[no-any-return]
+    done = compute()
+    store.cache.put(key, done)
+    return done
+
+
 def universe_page(
     store: ReadStore, on: date | None, filters: UniverseFilter, page: int, size: int
 ) -> UniversePage:
     """The universe for ``on`` (the latest snapshot when None), filtered, sorted by symbol."""
-    frame, universe, missing = _universe(store, on, [])
-    frame = _filtered(frame, filters).sort_values("symbol", kind="stable")
+
+    def compute() -> _Computed:
+        frame, universe, missing = _universe(store, on, [])
+        frame = _filtered(frame, filters).sort_values("symbol", kind="stable")
+        return _Computed(universe, missing, records(frame[list(COLUMNS)]))
+
+    done = _cached(store, ("universe", on, filters), compute)
+    universe = done.universe
     return UniversePage(
         session=on or universe.snapshot_date,
         snapshot_date=universe.snapshot_date,
         pre_snapshot=universe.pre_snapshot,
         version=universe.version,
-        missing=missing,
-        page=paginate(records(frame[list(COLUMNS)]), page, size),
+        missing=done.missing,
+        page=paginate(done.rows, page, size),
     )
 
 
@@ -165,17 +202,23 @@ def ticker_table(
     """The universe for ``on`` as tickers x ``columns`` (catalogue field names: reference,
     company, rollup and expression-feature values for the session), filtered, sorted."""
     wanted = checked_columns(store, columns)
-    frame, universe, missing = _universe(store, on, wanted)
     order = sort or "symbol"
-    frame = _sorted(_filtered(frame, filters)[[*TICKER_BASE, *wanted]], order)
+
+    def compute() -> _Computed:
+        frame, universe, missing = _universe(store, on, wanted)
+        frame = _sorted(_filtered(frame, filters)[[*TICKER_BASE, *wanted]], order)
+        return _Computed(universe, missing, records(frame))
+
+    done = _cached(store, ("tickers", on, filters, tuple(wanted), order), compute)
+    universe = done.universe
     return TickerTable(
         session=on or universe.snapshot_date,
         snapshot_date=universe.snapshot_date,
         pre_snapshot=universe.pre_snapshot,
         columns=wanted,
         sort=order,
-        missing=missing,
-        page=paginate(records(frame), page, size),
+        missing=done.missing,
+        page=paginate(done.rows, page, size),
     )
 
 
