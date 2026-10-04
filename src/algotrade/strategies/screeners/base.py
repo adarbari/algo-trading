@@ -17,6 +17,12 @@ class Decision(StrEnum):
     LIQUIDITY_RISK = "LIQUIDITY_RISK"
     REJECT = "REJECT"
     UNKNOWN = "UNKNOWN"  # data missing or stale: fail closed, never counted as processed
+    SKIPPED = "SKIPPED"  # a rule screen's gating criterion has no data (ADR 0029): not processed
+
+    @property
+    def processed(self) -> bool:
+        """False for the fail-closed outcomes (UNKNOWN, SKIPPED): they lower coverage."""
+        return self not in (Decision.UNKNOWN, Decision.SKIPPED)
 
 
 @dataclass(frozen=True)

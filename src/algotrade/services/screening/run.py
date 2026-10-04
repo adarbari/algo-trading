@@ -1,4 +1,8 @@
-"""Use case: run a registered screener for a session date and save an audited result."""
+"""Use case: run a registered screener for a session date and save an audited result.
+
+A rule screen (``impl = "rules"``, ADR 0029) reads its spec's fields, is evaluated once by
+``strategies.screeners.rules`` and writes ``results/rule_screen`` + ``rule_screen_values``
+atomically; its run summary goes into the run record (``stats["summary"]``)."""
 
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
@@ -9,13 +13,17 @@ from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.data.reference import Universe, load_universe
-from algotrade.engines.screening.runner import RunCoverage, ScreenRun, run_screen
+from algotrade.engines.screening.runner import RunCoverage, ScreenRun, audit_rows, run_screen
+from algotrade.engines.selection.evaluate import SelectionResult
+from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.features import config_features
-from algotrade.services.selection import select
+from algotrade.services.screening.rule_results import Stamp, rule_frames
+from algotrade.services.selection import fields_view, select
 from algotrade.services.views import feature_view
 from algotrade.storage.runs import start_run
 from algotrade.storage.tables.result_writer import ResultWriter
 from algotrade.strategies.screeners.registry import create_screener
+from algotrade.strategies.screeners.rules import RULES, RuleScreener, RuleScreenResult
 
 
 def run_job_name(config_id: str, user: str) -> str:
@@ -30,6 +38,7 @@ class ScreenOutcome:
     run: ScreenRun
     universe: Universe
     audit: dict[str, object]
+    rules: RuleScreenResult | None = None  # a rule screen's ranked rows and run summary
 
 
 def rows_frame(run: ScreenRun, session_date: date, run_id: str, now: datetime) -> pd.DataFrame:
@@ -62,6 +71,49 @@ def _with_coverage(run: ScreenRun, coverage: RunCoverage) -> ScreenRun:
     )
 
 
+def screen_rules(
+    reader: StoreReader,
+    config: ResolvedConfig,
+    session_date: date,
+    selected: SelectionResult,
+    features: FeatureSet,
+) -> tuple[ScreenRun, RuleScreenResult, tuple[str, ...]]:
+    """A rule screen over the selected instruments: the spec's fields read for the session
+    (missing values stay missing: their rows are SKIPPED), evaluated once, then audited.
+    Also returns the tables that had no rows for the session."""
+    screener = RuleScreener(config.screen_spec)
+    ids = list(selected.instruments)
+    view, source = fields_view(reader, screener.spec.fields(), session_date, ids, features=features)
+    result = screener.evaluate(view)
+    run = audit_rows(
+        RULES, [r.screen_row() for r in result.rows], ids, config.screening.min_coverage
+    )
+    return run, result, source.missing
+
+
+def _write(
+    writer: ResultWriter,
+    config: ResolvedConfig,
+    run: ScreenRun,
+    rules: RuleScreenResult | None,
+    stamp: Stamp,
+) -> None:
+    if not run.rows:
+        return
+    if rules is None:
+        frame = rows_frame(run, stamp.session_date, stamp.run_id, stamp.knowledge_ts)
+        frame["user_id"], frame["config_id"], frame["config_hash"] = (
+            stamp.user_id,
+            stamp.config_id,
+            stamp.config_hash,
+        )
+        writer.write_result(config.config.impl, stamp.session_date, stamp.run_id, frame)
+        return
+    with writer.publishing(stamp.run_id, stamp.knowledge_ts):  # both tables or neither
+        for name, frame in rule_frames(rules, stamp).items():
+            writer.write_result(name, stamp.session_date, stamp.run_id, frame, pending=True)
+
+
 def run_screener(
     reader: StoreReader,
     writer: ResultWriter,
@@ -76,11 +128,17 @@ def run_screener(
     if config.selection is None:
         raise ConfigurationError(f"{config.config.id}: a screener needs a selection")
     screening = config.screening
-    screener = create_screener(config.config.impl, **dict(config.config.params))
     universe = load_universe(reader, session_date)
-    selected = select(reader, config.selection, session_date, features=config_features(config))
-    view = feature_view(reader, screener.requires, session_date, selected.instruments)
-    run = run_screen(screener, view, list(selected.instruments), screening.min_coverage)
+    features = config_features(config)
+    selected = select(reader, config.selection, session_date, features=features)
+    rules: RuleScreenResult | None = None
+    missing_tables: tuple[str, ...] = ()
+    if config.config.impl == RULES:
+        run, rules, missing_tables = screen_rules(reader, config, session_date, selected, features)
+    else:
+        screener = create_screener(config.config.impl, params=config.config.params)
+        view = feature_view(reader, screener.requires, session_date, selected.instruments)
+        run = run_screen(screener, view, list(selected.instruments), screening.min_coverage)
     if selected.empty:
         run = _with_coverage(run, RunCoverage.EMPTY_SELECTION)
     elif run.coverage is RunCoverage.COMPLETE and universe.is_stale(
@@ -95,6 +153,7 @@ def run_screener(
         "user": user,
         "config_id": config.config.id,
         "config_hash": config.hash,
+        "config_version": rules.spec.version if rules else None,
         "config_layers": list(config.layers),
         "selection": selected.as_dict(),
         "universe_snapshot": universe.snapshot_date.isoformat(),
@@ -106,14 +165,12 @@ def run_screener(
         # The universe came from a snapshot after the session: results carry survivorship bias.
         "universe_pre_snapshot": universe.pre_snapshot,
     }
-    if run.rows:
-        frame = rows_frame(run, session_date, run_id, now)
-        frame["user_id"], frame["config_id"], frame["config_hash"] = (
-            user,
-            config.config.id,
-            config.hash,
-        )
-        writer.write_result(config.config.impl, session_date, run_id, frame)
+    if rules is not None:  # the run summary (ADR 0029): passed, skipped, narrow misses
+        audit["summary"] = rules.summary.as_dict()
+        audit["missing_tables"] = list(missing_tables)
+    version = rules.spec.version if rules else None
+    stamp = Stamp(session_date, run_id, now, user, config.config.id, config.hash, version)
+    _write(writer, config, run, rules, stamp)
     complete = run.coverage is RunCoverage.COMPLETE
     writer.save_run(record.finish(now, complete=complete, stats=audit))
-    return ScreenOutcome(run_id, session_date, run, universe, audit)
+    return ScreenOutcome(run_id, session_date, run, universe, audit, rules)

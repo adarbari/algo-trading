@@ -4,7 +4,7 @@ import pytest
 
 from algotrade.core.model.errors import AlgoTradeError
 from algotrade.core.views.feature_view import FeatureView
-from algotrade.engines.screening.runner import RunCoverage, run_screen
+from algotrade.engines.screening.runner import RunCoverage, audit_rows, run_screen
 from algotrade.strategies.screeners.base import Decision, Screener, ScreenRow
 
 DAY = date(2026, 10, 2)
@@ -67,3 +67,20 @@ def test_screener_must_cover_universe_exactly_once() -> None:
         run_screen(dup, view(ids), ids)
     with pytest.raises(AlgoTradeError, match="exactly the universe"):
         run_screen(Fixed({}), view(["EQ:A"]), ids)
+
+
+def test_skipped_rows_are_not_processed_and_audit_rows_checks_coverage() -> None:
+    ids = ["EQ:A", "EQ:B"]
+    rows = [
+        ScreenRow("EQ:A", Decision.SKIPPED, reasons=("no x",)),
+        ScreenRow("EQ:B", Decision.QUALIFIED),
+    ]
+    run = audit_rows("rules", rows, ids, 0.4)
+    assert run.processed == 1 and run.coverage is RunCoverage.COMPLETE
+    assert run.skipped_reasons() == {"no x": 1}
+    assert not Decision.SKIPPED.processed and Decision.REJECT.processed
+    with pytest.raises(AlgoTradeError, match="one row per"):
+        audit_rows("rules", rows[:1], ids)
+    with pytest.raises(AlgoTradeError, match="twice"):
+        audit_rows("rules", [*rows, rows[0]], ids)
+    assert audit_rows("rules", [], []).coverage is RunCoverage.UNIVERSE_INCOMPLETE

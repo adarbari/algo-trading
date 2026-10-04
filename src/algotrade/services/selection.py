@@ -1,6 +1,7 @@
 """Use case: evaluate a ``Selection`` against point-in-time L1 + rollup data, and expression
 features (``feature.<name>``) computed on read (``services.features``)."""
 
+from collections.abc import Sequence
 from dataclasses import replace
 from datetime import date, datetime
 
@@ -14,6 +15,30 @@ from algotrade.services.features import field_view
 from algotrade.services.views import to_value
 
 
+def fields_view(
+    reader: StoreReader,
+    fields: Sequence[str],
+    session: date,
+    ids: Sequence[str] | None = None,
+    as_of: datetime | None = None,
+    features: FeatureSet | None = None,
+) -> tuple[FeatureView, InstrumentView]:
+    """One row per instrument known on ``session`` (only ``ids``, each with a row even when
+    nothing is known of it, when given), keyed by field name; missing values are left out
+    (UNKNOWN). ``feature.<name>`` fields are computed from the stored features they need.
+    Also the ``InstrumentView`` it came from (``missing`` tables; ``pre_snapshot``)."""
+    view = field_view(reader, session, sorted(set(fields)), ids, as_of=as_of, features=features)
+    columns = [c for c in view.frame.columns if c != "instrument_id"]
+    rows: dict[str, dict[str, FeatureValue]] = {i: {} for i in ids or ()}
+    for record in view.frame.to_dict("records"):
+        values = {c: to_value(record[c]) for c in columns}
+        rows[str(record["instrument_id"])] = {c: v for c, v in values.items() if v is not None}
+    if ids is not None:
+        wanted = set(ids)
+        rows = {i: r for i, r in rows.items() if i in wanted}
+    return FeatureView(session, rows), view
+
+
 def selection_view(
     reader: StoreReader,
     selection: Selection,
@@ -21,19 +46,12 @@ def selection_view(
     as_of: datetime | None = None,
     features: FeatureSet | None = None,
 ) -> tuple[FeatureView, InstrumentView]:
-    """One row per instrument known on ``session``, keyed by field name, plus the
-    ``InstrumentView`` it came from (``missing`` tables stay UNKNOWN; ``pre_snapshot``).
-    ``feature.<name>`` fields are computed from the stored features they need."""
+    """``fields_view`` of the fields ``selection`` reads, for every instrument known on
+    ``session``."""
     fields = {r.field for r in selection.where.rules()}
     if selection.order_by:
         fields.add(selection.order_by)
-    view = field_view(reader, session, sorted(fields), as_of=as_of, features=features)
-    columns = [c for c in view.frame.columns if c != "instrument_id"]
-    rows: dict[str, dict[str, FeatureValue]] = {}
-    for record in view.frame.to_dict("records"):
-        values = {c: to_value(record[c]) for c in columns}
-        rows[str(record["instrument_id"])] = {c: v for c, v in values.items() if v is not None}
-    return FeatureView(session, rows), view
+    return fields_view(reader, sorted(fields), session, as_of=as_of, features=features)
 
 
 def select(
