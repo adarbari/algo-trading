@@ -105,6 +105,8 @@ Selectable rollup fields today ([data/layers.md](data/layers.md#rollups-as-built
 | `price_moves@v1` | `one_day_move` (float32) |
 | `momentum@v1` | `atr_14`, `rsi_14`, `ret_5d`, `rel_volume`, `high_20d`, `low_20d`, `high_50d`, `low_50d`, `prior_high_20d` (float32) |
 | `swing_levels@v1` | `swing_high`, `swing_low` (float32); `swing_high_date`, `swing_low_date` (date) |
+| `anchored_vwap@v1` | `avwap_earnings` (float32); `avwap_anchor_date` (date) |
+| `oi_walls@v1` | `wall_status` (str); `call_wall`, `put_wall` (float32); `call_wall_oi`, `put_wall_oi` (int) |
 
 Expression features (`feature.<name>`): `liquidity_class` (str: HIGH / MEDIUM / LOW /
 UNKNOWN), `option_tier` (str: A-D), `option_chain_known`, `liquidity_high`,

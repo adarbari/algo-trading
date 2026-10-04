@@ -255,7 +255,7 @@ def wing_row(puts: pd.DataFrame, p: PutWingParams) -> dict[str, object]:
     }
 
 
-def _spots(underlyings: pd.DataFrame | None) -> pd.Series:
+def positive_spots(underlyings: pd.DataFrame | None) -> pd.Series:
     """Positive underlying prices by instrument id."""
     if underlyings is None or underlyings.empty:
         return pd.Series(dtype=float)
@@ -278,7 +278,7 @@ def compute(inputs: Inputs, session: date, p: PutWingParams) -> pd.DataFrame:
     assert options is not None and curve_rows is not None  # required inputs
     curve = YieldCurve.from_days(curve_rows["tenor_days"], curve_rows["rate_cont"])
     underlyings = inputs.get(UNDERLYINGS)
-    spots = _spots(underlyings)
+    spots = positive_spots(underlyings)
     quoted = set() if underlyings is None else set(underlyings["instrument_id"].astype(str))
     options = options.assign(underlying_id=options["underlying_id"].astype(str))
     puts = options[options["right"].astype(str) == "P"]

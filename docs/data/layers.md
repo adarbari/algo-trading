@@ -92,9 +92,10 @@ nightly and stored point-in-time:
 
 ```
 bars/1m ──► rollups/daily/session_stats@v1 ──┐
-bars/1d ─────────────────────────────────────┼─► rollups/instrument/price_stats@v2   (52w hi/lo, MAs, HV, ADV), price_moves@v1, momentum@v1, swing_levels@v1
-chains/* ────────────────────────────────────┼─► rollups/instrument/option_liquidity@v1, put_wing@v1, iv30@v1 ─► iv_history@v2 ─┐
-volatility/ibkr_iv30 ────────────────────────┼─► rollups/instrument/ibkr_iv@v1 ──────────────────────────────────┴─► iv_rank (+ source)
+bars/1d ─────────────────────────────────────┼─► rollups/instrument/price_stats@v2   (52w hi/lo, MAs, HV, ADV), price_moves@v1, momentum@v1, swing_levels@v1,
+                                                   anchored_vwap@v1 (+ events/earnings)
+chains/* ────────────────────────────────────┼─► rollups/instrument/option_liquidity@v1, put_wing@v1, oi_walls@v1, iv30@v1 ─► iv_history@v2 ─┐
+volatility/ibkr_iv30 ────────────────────────┼─► rollups/instrument/ibkr_iv@v1 ───────────────────────────────────────────────┴─► iv_rank (+ source)
 events/earnings ─────────────────────────────┴─► rollups/instrument/earnings@v1     (next date, days to it)
 ```
 
@@ -256,6 +257,8 @@ readable until `algotrade-ingest retire-features --group <name>@v1` deletes them
 | `price_moves@v1` | `one_day_move`: the largest \|close-to-close return\| over the last 20 sessions | `bars/1d` split-adjusted as of the session, 20 sessions back | built |
 | `momentum@v1` | `atr_14`, `rsi_14` (Wilder, 150-session warm-up), `ret_5d`, `rel_volume` (vs the 20 sessions before), `high_20d`, `low_20d`, `high_50d`, `low_50d`, `prior_high_20d` ([swing.md](swing.md)) | `bars/1d` split-adjusted as of the session, 149 sessions back | built |
 | `swing_levels@v1` | `swing_high` / `swing_high_date` (resistance: the most recent confirmed swing high above the close), `swing_low` / `swing_low_date` (support); pivots 5 bars each side, confirmed 5 sessions later ([swing.md](swing.md)) | `bars/1d` split-adjusted as of the session, 251 sessions back | built |
+| `anchored_vwap@v1` | `avwap_earnings` (VWAP of the typical price from the last earnings anchor session: the report day, or the next session for a report after the close), `avwap_anchor_date` | `events/earnings` snapshots (read as `earnings@v1` reads them), `bars/1d` split-adjusted as of the session, 126 sessions back | built |
+| `oi_walls@v1` | `wall_status` (OK / PARTIAL / NO_OI / NO_SPOT / NO_CHAIN / NO_EXPIRY), `call_wall` + `call_wall_oi` (most call OI at or above spot), `put_wall` + `put_wall_oi` (most put OI at or below spot); OI summed across expiries 1..60 days out, ties nearer spot | the session's `chains/option_quotes`, `chains/underlying_quotes` | built |
 
 **`fundamentals@v2` rules.** Among facts FILED on or before the session: the latest cover
 count (`dei`; latest filed, then latest period end, so an amendment wins) while the company

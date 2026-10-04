@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-112 stored features in 12 groups, in dependency order; 34 expression features.
+119 stored features in 14 groups, in dependency order; 34 expression features.
 
 ## `option_liquidity@v1`
 
@@ -142,6 +142,27 @@ Resistance and support: the most recent confirmed swing high above and swing low
 | `swing_high_date` | window | date | date | open |  | The session of that swing high | no confirmed swing high above the close among the last 252 sessions (e.g. the close is at a 252-session high), or fewer than 11 bars in a row | `bars/1d.high`, `bars/1d.close` |
 | `swing_low` | window | float32 | usd_per_share | open | >= 0 | Support: the low of the most recent swing low below the close (a bar whose low is strictly below the 5 lows before it and at most the 5 after it, confirmed 5 sessions later) | no confirmed swing low below the close among the last 252 sessions (e.g. the close is at a 252-session low), or fewer than 11 bars in a row | `bars/1d.low`, `bars/1d.close` |
 | `swing_low_date` | window | date | date | open |  | The session of that swing low | no confirmed swing low below the close among the last 252 sessions (e.g. the close is at a 252-session low), or fewer than 11 bars in a row | `bars/1d.low`, `bars/1d.close` |
+
+## `anchored_vwap@v1`
+
+VWAP anchored to the last earnings report (from the reaction session through the session). Stored as `rollups/instrument/anchored_vwap@v1`; reads `events/earnings`, `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `avwap_earnings` | window | float32 | usd_per_share | open | >= 0 | Volume-weighted average of the typical price (high + low + close) / 3 from the last earnings anchor session through the session (the anchor: the report date, or the next session for a report after the close) | no report known on the session anchors on or before it within the last 126 sessions (no earlier report stored, or the last one is older); or fewer than 2 sessions from the anchor through the session, a session in that range without a bar, or no volume in it | `events/earnings.ts`, `events/earnings.time`, `bars/1d.high`, `bars/1d.low`, `bars/1d.close`, `bars/1d.volume` |
+| `avwap_anchor_date` | window | date | date | open |  | The session avwap_earnings is anchored on: the last report date (pre-market or unknown time) or the session after it (after the close) | no report known on the session anchors on or before it within the last 126 sessions (no earlier report stored, or the last one is older) | `events/earnings.ts`, `events/earnings.time` |
+
+## `oi_walls@v1`
+
+Call and put walls: the strikes with the most open interest at or above / at or below spot, summed across expiries 1..60 days out (end-of-day OI). Stored as `rollups/instrument/oi_walls@v1`; reads `chains/option_quotes`, `chains/underlying_quotes` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `wall_status` | label | str | category | open | OK, PARTIAL, NO_OI, NO_SPOT, NO_CHAIN, NO_EXPIRY | OK (both walls), PARTIAL (one wall), NO_OI (no open interest on either side), or the first failing step: NO_SPOT, NO_CHAIN (no quotes), NO_EXPIRY (none 1..60 days out) | never | `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/option_quotes.open_interest`, `chains/underlying_quotes.price` |
+| `call_wall` | chain | float32 | usd_per_share | open | >= 0 | Call wall: the strike at or above spot with the most call open interest, summed across expiries 1..60 calendar days out (end-of-day OI; ties: nearer spot) | no call with open interest above 0 at a strike at or above spot 1..60 days out, or wall_status NO_SPOT, NO_CHAIN or NO_EXPIRY | `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/option_quotes.open_interest`, `chains/underlying_quotes.price` |
+| `call_wall_oi` | chain | int | count | open | >= 1 | Call open interest at the call wall, summed across expiries 1..60 days out | no call with open interest above 0 at a strike at or above spot 1..60 days out, or wall_status NO_SPOT, NO_CHAIN or NO_EXPIRY | `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/option_quotes.open_interest`, `chains/underlying_quotes.price` |
+| `put_wall` | chain | float32 | usd_per_share | open | >= 0 | Put wall: the strike at or below spot with the most put open interest, summed across expiries 1..60 calendar days out (end-of-day OI; ties: nearer spot) | no put with open interest above 0 at a strike at or below spot 1..60 days out, or wall_status NO_SPOT, NO_CHAIN or NO_EXPIRY | `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/option_quotes.open_interest`, `chains/underlying_quotes.price` |
+| `put_wall_oi` | chain | int | count | open | >= 1 | Put open interest at the put wall, summed across expiries 1..60 days out | no put with open interest above 0 at a strike at or below spot 1..60 days out, or wall_status NO_SPOT, NO_CHAIN or NO_EXPIRY | `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/option_quotes.open_interest`, `chains/underlying_quotes.price` |
 
 ## `dividends@v2`
 
