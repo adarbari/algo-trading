@@ -6,8 +6,8 @@ description: Add or change an endpoint of the API (apps/api; reads, plus user-co
 # Add an API endpoint
 
 Read first: ADR 0024 (`docs/adr/0024-api.md`), `docs/architecture.md` section 12 (API) and an
-existing area end to end (`services/explore/screens.py` → `schemas/screens.py` →
-`routes/screens.py` → `tests/apps/api/routes/test_screens.py`). Admin-only endpoints go under
+existing area end to end (`services/explore/screens/results.py` → `schemas/screens/results.py` →
+`routes/screens/results.py` → `tests/apps/api/routes/screens/test_results.py`). Admin-only endpoints go under
 the `/admin/` prefix (`routes/admin.py`) so role-gating can attach to it later.
 
 **Ownership check (ADR 0019):** `http-api` is `apps/api/algotrade_api/*` (routes, schemas,
@@ -23,7 +23,7 @@ read-only").
    Do not read storage partitions ad hoc in services when a domain rule is involved (which
    snapshot, adjustments, event dates).
 2. **Query.** Add a function to `services/explore/<area>.py` (a new area: a new module there; `services/explore/`, `routes/` and `schemas/` are at
-   the 10-module cap, so **split the folder by area first** (roadmap Next) or `make layout` fails). It takes the `ReadStore`, resolves `?date=` with
+   the 10-module cap, so a new area is a subfolder of its own (`screens/` is the model), or `make layout` fails). It takes the `ReadStore`, resolves `?date=` with
    `partition_for` (latest on or before; none yet = empty result) or
    `data.reference.snapshot`, raises `NotFoundError` for unknown ids, pages large lists with
    `paginate`, and returns a frozen dataclass of JSON-safe values (`record` / `records`).

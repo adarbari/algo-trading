@@ -10,7 +10,7 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 
 **Next**
 - API endpoints that return 404 "nothing stored" on an empty store return 200 with an empty body.
-- Split crowded folders by area: `apps/api` routes/ + schemas/, `services/explore/`.
+- Split crowded folders by area: `apps/api` routes/ + schemas/, `services/explore/` (`screens/` is split out; the next new area follows it).
 - API schemas built from domain types, not mirrored field lists.
 - VRP live spread check in the UI via `GET /chains/{id}/live`.
 - Flaky tests: preview timing under load, smoke axe admin light, one builder e2e.

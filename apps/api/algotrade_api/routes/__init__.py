@@ -14,12 +14,13 @@ from algotrade_api.routes import (
     health,
     instruments,
     runs,
-    screens,
     universe,
 )
 from algotrade_api.routes.authoring import preferences, screeners, user_features
 from algotrade_api.routes.preview import features as feature_check
 from algotrade_api.routes.preview import screeners as screen_preview
+from algotrade_api.routes.screens import ideas
+from algotrade_api.routes.screens import results as screen_results
 
 ROUTERS: tuple[APIRouter, ...] = (
     health.router,
@@ -31,11 +32,11 @@ ROUTERS: tuple[APIRouter, ...] = (
     user_features.router,
     feature_check.router,
     features.router,
-    screens.router,
+    screen_results.router,
     screen_preview.router,
     screeners.router,
     preferences.router,
-    screens.ideas_router,
+    ideas.router,
     backtests.router,
     configs.router,
     admin.router,
