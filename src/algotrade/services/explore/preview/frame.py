@@ -8,6 +8,7 @@ import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date
+from functools import cached_property
 
 from algotrade.config.site.settings import FeatureDefinition
 from algotrade.config.strategy.schema import Selection
@@ -18,6 +19,7 @@ from algotrade.engines.selection.evaluate import SelectionResult, evaluate_selec
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.explore.store import ResultCache
 from algotrade.services.selection import fields_view
+from algotrade.services.views import to_value
 from algotrade.strategies.screeners.rules.evaluate import ScreenMemo
 
 PREVIEW = "preview"
@@ -50,6 +52,15 @@ class FieldFrame:
             )
             self.selections[selection] = found
         return found
+
+    @cached_property
+    def symbols(self) -> dict[str, str]:
+        """Ticker by instrument id (from the universe snapshot), built once per frame."""
+        frame = self.universe.frame
+        if "symbol" not in frame:
+            return {}
+        pairs = zip(frame["instrument_id"].astype(str), frame["symbol"], strict=True)
+        return {i: str(s) for i, s in pairs if to_value(s) is not None}
 
     def memo_for(self) -> ScreenMemo:
         """The memo, emptied first once it holds ``MAX_MEMO`` criteria (many edits)."""

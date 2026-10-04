@@ -9,6 +9,7 @@ Missing data on a gating criterion has no penalty: the row is SKIPPED, never sco
 
 from dataclasses import dataclass
 from enum import StrEnum
+from functools import cached_property
 
 from algotrade.core.model.predicates import FieldValue, evaluate_rule, is_missing
 from algotrade.core.model.screen_spec import Criterion, Mode
@@ -49,6 +50,10 @@ class CriterionResult:
 
     def describe(self) -> str:
         """A reason line, e.g. ``spread near miss: 0.09, needs gte 0.1 (by 0.01)``."""
+        return self._reason
+
+    @cached_property
+    def _reason(self) -> str:  # built once per result (a memoised result is reused)
         if self.outcome is Outcome.MISSING:
             return f"no {self.criterion.field}"
         rule = self.criterion.rule

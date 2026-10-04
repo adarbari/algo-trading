@@ -1505,15 +1505,24 @@ export interface components {
         NarrowMiss: {
             /** Criterion Id */
             criterion_id: string;
-            /** Distance */
+            /**
+             * Distance
+             * @description how far from the threshold, in the field's unit
+             */
             distance: number | null;
             /** Field */
             field: string;
             /** Instrument Id */
             instrument_id: string;
-            /** Normalised */
+            /**
+             * Normalised
+             * @description distance / tolerance width, 0..1
+             */
             normalised: number | null;
-            /** Threshold */
+            /**
+             * Threshold
+             * @description the threshold missed (nearer bound: between)
+             */
             threshold: number | null;
             /** Value */
             value: unknown;
@@ -1698,23 +1707,47 @@ export interface components {
         };
         /** PreviewCoverage */
         PreviewCoverage: {
-            /** Base */
+            /**
+             * Base
+             * @description instruments the selection saw
+             */
             base: number;
-            /** Coverage */
+            /**
+             * Coverage
+             * @description COMPLETE, PARTIAL, UNIVERSE_INCOMPLETE or EMPTY_SELECTION
+             */
             coverage: string;
-            /** Coverage Pct */
+            /**
+             * Coverage Pct
+             * @description processed / selected
+             */
             coverage_pct: number;
-            /** Min Coverage */
+            /**
+             * Min Coverage
+             * @description below this the run is PARTIAL
+             */
             min_coverage: number;
-            /** Missing Tables */
+            /**
+             * Missing Tables
+             * @description tables with no rows for the session
+             */
             missing_tables: string[];
-            /** Pre Snapshot */
+            /**
+             * Pre Snapshot
+             * @description the reference snapshot is after the session
+             */
             pre_snapshot: boolean;
-            /** Processed */
+            /**
+             * Processed
+             * @description rows not SKIPPED
+             */
             processed: number;
             /** Selected */
             selected: number;
-            /** Selection */
+            /**
+             * Selection
+             * @description the selection's audit
+             */
             selection: {
                 [key: string]: unknown;
             };
