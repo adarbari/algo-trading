@@ -83,6 +83,19 @@ class _Guarded:
         return getattr(self._target, name)
 
 
+def _detach_resubscribe(raw: Any) -> None:
+    """Remove ``IB``'s own reaction to "connectivity restored" (error 1102).
+
+    ``ib_async.IB`` subscribes ``_onError`` to its ``errorEvent``; on 1102 it re-requests the
+    account summary by itself, outside ``_Guarded``. Seen on a long backfill (a gateway
+    connectivity blip): an account request the facade never made. Detached, a reconnect sends
+    nothing; market-data subscriptions are re-established by the gateway ("data maintained").
+    """
+    event, handler = getattr(raw, "errorEvent", None), getattr(raw, "_onError", None)
+    if event is not None and handler is not None:
+        event -= handler
+
+
 @dataclass(frozen=True)
 class GatewayConfig:
     host: str
@@ -156,6 +169,7 @@ class IbkrMarketData:
         if not self.config.readonly:
             raise ReadOnlyViolationError("refusing to connect: the IBKR facade only runs read-only")
         raw = self.ib_factory()
+        _detach_resubscribe(raw)
         ib = _Guarded(raw, MARKET_DATA_CALLS, self.calls)
         client = _Guarded(raw.client, CLIENT_CALLS, self.calls)
         self.general.wait()

@@ -123,7 +123,7 @@ the skill with the fix.
     passes (`.github/workflows/auto-merge.yml`). Open work in progress as a draft, or label
     it `no-automerge`, to keep it open for review. **Never merge yourself**: no
     `gh pr merge` (with or without `--auto`), no enabling GitHub auto-merge, no admin
-    bypass. GitHub has no required checks, so a manual merge lands before CI finishes; only
+    bypass. Branch protection on `main` requires the CI checks (admins included); only
     the workflow merges, and only on green. The repo is public: CI runs on
     GitHub-hosted runners only, never self-hosted ones (`docs/ci.md`).
     **No stacked PRs into a branch that will be deleted**: squash-merge deletes the base and
