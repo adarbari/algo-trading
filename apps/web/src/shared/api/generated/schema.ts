@@ -1127,6 +1127,8 @@ export interface components {
             closest_expiry_dte: number | null;
             /** Days To Earnings */
             days_to_earnings: number | null;
+            /** Earnings Before Expiry */
+            earnings_before_expiry: boolean | null;
             /** Instrument Id */
             instrument_id: string;
             /** Next Earnings Date */

@@ -63,6 +63,7 @@ class Idea(Schema):
     next_earnings_date: date | None
     days_to_earnings: int | None
     closest_expiry_dte: int | None
+    earnings_before_expiry: bool | None
 
 
 class Ideas(Schema):

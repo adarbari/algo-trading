@@ -1170,6 +1170,17 @@
             ],
             "title": "Days To Earnings"
           },
+          "earnings_before_expiry": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earnings Before Expiry"
+          },
           "instrument_id": {
             "title": "Instrument Id",
             "type": "string"
@@ -1216,7 +1227,8 @@
           "picks",
           "next_earnings_date",
           "days_to_earnings",
-          "closest_expiry_dte"
+          "closest_expiry_dte",
+          "earnings_before_expiry"
         ],
         "title": "Idea",
         "type": "object"
