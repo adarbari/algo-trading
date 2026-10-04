@@ -144,7 +144,7 @@ describe('CriterionRow', () => {
         categories: [],
       },
       response: new Response(null, { status: 200 }),
-    } as never);
+    });
     setup();
     expect(api.GET).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: /Distribution/ }));

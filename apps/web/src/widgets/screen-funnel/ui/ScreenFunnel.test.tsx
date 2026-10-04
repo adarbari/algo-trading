@@ -5,7 +5,7 @@ import { expectNoA11yViolations } from '@/shared/lib/testing';
 
 import { ScreenFunnel } from './ScreenFunnel';
 
-const state = vi.hoisted(() => ({ preview: {} as Record<string, unknown> }));
+const state = vi.hoisted(() => ({ preview: {} }));
 
 vi.mock('@/features/screener-builder', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),

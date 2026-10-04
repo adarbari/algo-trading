@@ -7,11 +7,9 @@ import { useEffect, useState } from 'react';
 
 export function useDebounced<T>(value: T, delayMs: number, immediate = false): T {
   const [debounced, setDebounced] = useState(value);
+  if (immediate && debounced !== value) setDebounced(value);
   useEffect(() => {
-    if (immediate) {
-      setDebounced(value);
-      return undefined;
-    }
+    if (immediate) return undefined;
     const timer = setTimeout(() => {
       setDebounced(value);
     }, delayMs);

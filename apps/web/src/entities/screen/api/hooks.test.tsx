@@ -38,7 +38,7 @@ describe('useScreeners', () => {
       ok([
         { config_id: 'a', kind: 'screener' },
         { config_id: 's', kind: 'strategy' },
-      ]) as never,
+      ]),
     );
     const { result } = renderHook(() => useScreeners(), { wrapper });
     await waitFor(() => {
@@ -51,7 +51,7 @@ describe('useScreeners', () => {
 
 describe('useScreener and its versions', () => {
   it('reads one screen by id, and nothing without one', async () => {
-    GET.mockResolvedValue(ok({ screener_id: 'my' }) as never);
+    GET.mockResolvedValue(ok({ screener_id: 'my' }));
     const { result } = renderHook(() => useScreener('my'), { wrapper });
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
@@ -64,7 +64,7 @@ describe('useScreener and its versions', () => {
   });
 
   it('reads the versions only when asked', async () => {
-    GET.mockResolvedValue(ok([]) as never);
+    GET.mockResolvedValue(ok([]));
     const off = renderHook(() => useScreenerVersions('my', false), { wrapper });
     expect(off.result.current.fetchStatus).toBe('idle');
     const on = renderHook(() => useScreenerVersions('my'), { wrapper });
@@ -76,7 +76,7 @@ describe('useScreener and its versions', () => {
 
 describe('useScreenPreview', () => {
   it('posts the draft with the row limit and does nothing without one', async () => {
-    POST.mockResolvedValue(ok({ rows: [] }) as never);
+    POST.mockResolvedValue(ok({ rows: [] }));
     const { result } = renderHook(() => useScreenPreview({ id: 'my', criteria: {} }), { wrapper });
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
@@ -92,7 +92,7 @@ describe('useScreenPreview', () => {
     POST.mockResolvedValue({
       error: { detail: 'my.criteria.a.field: bad' },
       response: new Response(null, { status: 400 }),
-    } as never);
+    });
     const { result } = renderHook(() => useScreenPreview({ id: 'my' }), { wrapper });
     await waitFor(() => {
       expect(result.current.isError).toBe(true);

@@ -8,7 +8,7 @@ import { expectNoA11yViolations } from '@/shared/lib/testing';
 
 import { DraftBar } from './DraftBar';
 
-const state = vi.hoisted(() => ({ builder: {} as Record<string, unknown> }));
+const state = vi.hoisted(() => ({ builder: {} }));
 
 vi.mock('@/features/screener-builder', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -91,7 +91,7 @@ describe('DraftBar', () => {
     POST.mockResolvedValue({
       data: { screener_id: 'my-vrp', version: 2, hash: 'h' },
       response: new Response(null, { status: 200 }),
-    } as never);
+    });
     setup();
     await userEvent.click(screen.getByRole('button', { name: 'Finalize v2' }));
     expect(await screen.findByText('Finalised v2')).toBeInTheDocument();

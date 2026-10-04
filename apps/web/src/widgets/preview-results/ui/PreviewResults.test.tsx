@@ -6,7 +6,7 @@ import { expectNoA11yViolations, stubElementSize } from '@/shared/lib/testing';
 
 import { PreviewResults } from './PreviewResults';
 
-const state = vi.hoisted(() => ({ preview: {} as Record<string, unknown> }));
+const state = vi.hoisted(() => ({ preview: {} }));
 
 vi.mock('@/features/screener-builder', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),

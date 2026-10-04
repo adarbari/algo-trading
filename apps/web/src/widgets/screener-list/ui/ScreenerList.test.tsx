@@ -13,18 +13,26 @@ vi.mock('@/entities/screen', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useScreeners: hooks.useScreeners,
 }));
-vi.mock('@/features/screener-copy', () => ({
-  CopyPresetDialog: ({ preset, onCopied }: { preset: string; onCopied: (id: string) => void }) => (
-    <button
-      type="button"
-      onClick={() => {
-        onCopied(`my-${preset}`);
-      }}
-    >
-      {`finish copy of ${preset}`}
-    </button>
-  ),
-}));
+vi.mock('@/features/screener-copy', async () => {
+  const { Button } = await import('@algotrade/ui');
+  return {
+    CopyPresetDialog: ({
+      preset,
+      onCopied,
+    }: {
+      preset: string;
+      onCopied: (id: string) => void;
+    }) => (
+      <Button
+        onClick={() => {
+          onCopied(`my-${preset}`);
+        }}
+      >
+        {`finish copy of ${preset}`}
+      </Button>
+    ),
+  };
+});
 
 stubElementSize();
 

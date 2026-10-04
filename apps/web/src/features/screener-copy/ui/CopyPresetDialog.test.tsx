@@ -34,7 +34,7 @@ describe('CopyPresetDialog', () => {
     POST.mockResolvedValue({
       data: { screener_id: 'mine', document: {} },
       response: new Response(null, { status: 201 }),
-    } as never);
+    });
     const { onCopied, baseElement } = setup();
     const name = screen.getByRole('textbox', { name: 'Name of your copy' });
     expect(name).toHaveValue('my-vrp_scanner');
@@ -55,7 +55,7 @@ describe('CopyPresetDialog', () => {
     POST.mockResolvedValue({
       error: { detail: 'u already has a config' },
       response: new Response(null, { status: 409 }),
-    } as never);
+    });
     const { onCopied } = setup();
     await userEvent.click(screen.getByRole('button', { name: 'Copy' }));
     expect(await screen.findByText('u already has a config')).toBeInTheDocument();

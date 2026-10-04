@@ -8,7 +8,7 @@ import { expectNoA11yViolations, fakeQuery } from '@/shared/lib/testing';
 
 import { CriteriaTable } from './CriteriaTable';
 
-const state = vi.hoisted(() => ({ builder: {} as Record<string, unknown>, catalogue: vi.fn() }));
+const state = vi.hoisted(() => ({ builder: {}, catalogue: vi.fn() }));
 
 vi.mock('@/features/screener-builder', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -126,7 +126,7 @@ describe('CriteriaTable', () => {
         inputs: [],
       },
       response: new Response(null, { status: 201 }),
-    } as never);
+    });
     setup();
     await userEvent.click(screen.getByRole('button', { name: '+ Add formula feature' }));
     expect(screen.getByRole('dialog', { name: 'Add formula feature' })).toBeInTheDocument();

@@ -51,7 +51,8 @@ function Probe() {
       <Text>{`universe ${b.selection ?? 'none'} idle ${String(b.preview.idle)} error ${b.errorCriterion ?? 'none'}`}</Text>
       <Button
         onClick={() => {
-          b.setCriterion({ ...b.criteria[0]!, value: 0.6 });
+          const first = b.criteria[0];
+          if (first) b.setCriterion({ ...first, value: 0.6 });
         }}
       >
         edit
@@ -108,7 +109,7 @@ beforeEach(() => {
         ? ok([{ version: 1, document: { id: 'my', version: 1 } }])
         : ok(detail()),
     )) as never);
-  POST.mockResolvedValue(ok(PREVIEW) as never);
+  POST.mockResolvedValue(ok(PREVIEW));
   PUT.mockResolvedValue(ok({ screener_id: 'my', document: {} }) as never);
   DELETE.mockResolvedValue({ response: new Response(null, { status: 204 }) } as never);
 });
@@ -235,7 +236,7 @@ describe('ScreenerBuilderProvider', () => {
     POST.mockResolvedValue({
       error: { detail: 'my.criteria.close.field: unknown field' },
       response: new Response(null, { status: 400 }),
-    } as never);
+    });
     setup();
     expect(await screen.findByText(/error close/)).toBeInTheDocument();
   });
@@ -244,7 +245,7 @@ describe('ScreenerBuilderProvider', () => {
     GET.mockResolvedValue({
       error: { detail: 'no screen' },
       response: new Response(null, { status: 404 }),
-    } as never);
+    });
     setup();
     expect(await screen.findByText(/status error/)).toBeInTheDocument();
   });

@@ -63,7 +63,7 @@ describe('FinaliseButton', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Finalize v1' }));
     expect(POST).not.toHaveBeenCalled();
-    POST.mockResolvedValue(fail('my.criteria.a.field: unknown field') as never);
+    POST.mockResolvedValue(fail('my.criteria.a.field: unknown field'));
     rerender(
       <ToastProvider>
         <TestQueryProvider>
@@ -124,7 +124,7 @@ describe('ScheduleToggle', () => {
 
 describe('RebaseBanner', () => {
   it('offers the newer preset version and rebases', async () => {
-    POST.mockResolvedValue(ok({ screener_id: 'my', document: {} }) as never);
+    POST.mockResolvedValue(ok({ screener_id: 'my', document: {} }));
     const { container } = wrap(
       <RebaseBanner screenerId="my" preset="vrp" pinned={1} current={2} />,
     );

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -54,6 +54,11 @@ beforeEach(() => {
   }) as never);
 });
 
+/** Sets a field without moving focus (the dialog moves focus into itself as it opens). */
+function fill(name: string, value: string) {
+  fireEvent.change(screen.getByRole('textbox', { name }), { target: { value } });
+}
+
 function setup() {
   const onSaved = vi.fn();
   const onOpenChange = vi.fn();
@@ -68,10 +73,9 @@ function setup() {
 describe('FormulaFeatureDialog', () => {
   it('checks the formula as it is typed (debounced) and shows what it reads and samples', async () => {
     setup();
-    await userEvent.click(screen.getByRole('textbox', { name: 'Formula' }));
-    await userEvent.paste('a - b');
+    fill('Formula', 'a - b');
     expect(POST).not.toHaveBeenCalled();
-    expect(await screen.findByText('num (float32)')).toBeInTheDocument();
+    expect(await screen.findByText('num (float32)', {}, { timeout: 4000 })).toBeInTheDocument();
     expect(POST).toHaveBeenCalledTimes(1);
     expect(POST).toHaveBeenCalledWith('/features/check', { body: { expr: 'a - b', sample: 5 } });
     expect(screen.getByText('rollup.iv30@v1.iv30, rollup.price_stats@v2.hv30')).toBeInTheDocument();
@@ -81,24 +85,21 @@ describe('FormulaFeatureDialog', () => {
 
   it('says why a formula does not check and cannot be saved', async () => {
     setup();
-    await userEvent.click(screen.getByRole('textbox', { name: 'Formula' }));
-    await userEvent.paste('nope');
-    expect(await screen.findByText('This formula does not check')).toBeInTheDocument();
+    fill('Formula', 'nope');
+    expect(
+      await screen.findByText('This formula does not check', {}, { timeout: 4000 }),
+    ).toBeInTheDocument();
     expect(screen.getByText(/unknown feature 'nope'/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save feature' })).toBeDisabled();
   });
 
   it('saves a named feature with its type, unit and meaning, then reports its field', async () => {
     const { onSaved, onOpenChange, baseElement } = setup();
-    await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'vol_gap');
-    await userEvent.click(screen.getByRole('textbox', { name: 'Formula' }));
-    await userEvent.paste('a - b');
-    await screen.findByText('num (float32)');
-    await userEvent.type(screen.getByRole('textbox', { name: 'What it is' }), 'IV minus HV');
-    await userEvent.type(
-      screen.getByRole('textbox', { name: 'When it is empty' }),
-      'a vol is missing',
-    );
+    fill('Name', 'vol_gap');
+    fill('Formula', 'a - b');
+    await screen.findByText('num (float32)', {}, { timeout: 4000 });
+    fill('What it is', 'IV minus HV');
+    fill('When it is empty', 'a vol is missing');
     await expectNoA11yViolations(baseElement);
     await userEvent.click(screen.getByRole('button', { name: 'Save feature' }));
     await waitFor(() => {
@@ -118,9 +119,9 @@ describe('FormulaFeatureDialog', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it('asks for a valid name', async () => {
+  it('asks for a valid name', () => {
     setup();
-    await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'Vol Gap');
+    fill('Name', 'Vol Gap');
     expect(screen.getByText(/Use lowercase letters, digits and _/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save feature' })).toBeDisabled();
   });

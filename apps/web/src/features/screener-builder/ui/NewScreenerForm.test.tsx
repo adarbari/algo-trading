@@ -24,11 +24,11 @@ beforeEach(() => {
       { config_id: 'taken', scope: 'u', kind: 'screener', selection: 'inline' },
     ],
     response: new Response(null, { status: 200 }),
-  } as never);
+  });
   PUT.mockResolvedValue({
     data: { screener_id: 'mine', document: {} },
     response: new Response(null, { status: 200 }),
-  } as never);
+  });
 });
 
 function setup() {
@@ -82,7 +82,7 @@ describe('NewScreenerForm', () => {
   });
 
   it('falls back to the site universe when no screener names one', async () => {
-    GET.mockResolvedValue({ data: [], response: new Response(null, { status: 200 }) } as never);
+    GET.mockResolvedValue({ data: [], response: new Response(null, { status: 200 }) });
     setup();
     expect(await screen.findByRole('combobox', { name: 'Universe' })).toHaveValue(
       'liquid_optionable',
