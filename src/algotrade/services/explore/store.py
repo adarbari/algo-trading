@@ -66,6 +66,11 @@ class ReadStore:
     user: UserContext
     kind: str = "memory"  # the storage URL scheme (file, memory)
     cache: ResultCache = field(default_factory=ResultCache, compare=False, repr=False)
+    # The Builder preview's field frames (``explore.preview.frame``): large, few, kept apart
+    # so page queries never evict the frame an edit re-evaluates.
+    preview_cache: ResultCache = field(
+        default_factory=lambda: ResultCache(4), compare=False, repr=False
+    )
 
 
 def open_store(data_url: str, config_dir: str | Path, user: UserContext) -> ReadStore:

@@ -7,13 +7,15 @@ from algotrade.config.env import user_id
 from algotrade.config.site.settings import FeatureDefinition
 from algotrade.config.strategy.catalog import FieldCatalog
 from algotrade.config.strategy.resolve import CONFIG_KINDS, ResolvedConfig, resolve
-from algotrade.config.strategy.schema import Selection
+from algotrade.config.strategy.schema import RULES_IMPL, Selection
 from algotrade.config.user import SITE_USER, UserContext
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.fields import FEATURE_FIELD_PREFIX, is_feature_field
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.registry import catalogue_columns
 from algotrade.services.features import catalogue
-from algotrade.storage.configs.store import ConfigStore
+from algotrade.storage.configs.files import SCREENERS
+from algotrade.storage.configs.store import ConfigStore, OverlayConfigStore, screen_document
 
 
 def default_user(fallback: str) -> UserContext:
@@ -45,6 +47,25 @@ def resolve_config(
     resolved = resolve(config_id, user, store.load, overrides, catalog_of(fs))
     spec_fields = resolved.screen_spec.fields() if resolved.config.rules else ()
     return resolved.with_features(user_features_read(fs, resolved.selection, spec_fields))
+
+
+def resolve_rule_draft(
+    store: ConfigStore,
+    name: str,
+    user: UserContext,
+    document: Mapping[str, Any],
+    schedule: str | None = None,
+) -> ResolvedConfig:
+    """``document`` (a draft, not stored) resolved as ``user``'s rule screen ``name``, exactly
+    as it would run: layers, selection, the ``ScreenSpec`` and the catalogue (incl. the user's
+    features). A ``ConfigurationError`` naming the path unless it is a valid rule screen.
+    Authoring validates drafts with it; the Builder's preview evaluates them with it."""
+    draft = screen_document(document, schedule)
+    overlay = OverlayConfigStore(store, {(user.user_id, SCREENERS, name): draft})
+    resolved = resolve_config(overlay, name, user)
+    if resolved.config.kind != "screener" or resolved.config.impl != RULES_IMPL:
+        raise ConfigurationError(f"{user.user_id}/{name}: not a rule screen (impl = 'rules')")
+    return resolved
 
 
 def user_features_read(

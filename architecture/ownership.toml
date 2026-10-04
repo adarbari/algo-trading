@@ -523,6 +523,13 @@ owner = ["src/algotrade/services/explore/ideas/ranking.py"]
 section = "docs/adr/0029-rule-screener.md#owner-decisions-2026-10-03"
 detect = [{ call = "top_ideas" }]
 
+[[responsibility]]
+id = "screen-preview"
+description = "The Builder's dry runs (ADR 0029): an unsaved rule-screen draft resolved for a user and evaluated by the nightly evaluate_screen on the latest closed session (summary, funnel, coverage, top rows; the field frame cached per session, fields, user features and visible_seq), and a formula type checked and sampled; never writes"
+owner = ["src/algotrade/services/explore/preview/*"]
+section = "docs/adr/0029-rule-screener.md#preview--nightly"
+detect = [{ call = "field_frame" }, { call = "preview_session" }]
+
 # --------------------------------------------------------------------------- stored tables
 # Every stored table has exactly one producing owner (tests/architecture/test_ownership.py),
 # and every ingestion task in tasks/framework/registry.py declares exactly the tables its module produces.

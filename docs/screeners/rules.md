@@ -150,9 +150,14 @@ always resolves (preset versions are immutable); rebasing onto a newer version i
 
 ## Preview and results
 
-The Builder's preview runs the same `evaluate_screen` as the nightly `screen` job on the
-latest closed session and saves nothing. Nightly rows go to `results/rule_screen` (one per
-instrument: decision, score, rank, tier, class, flags, reasons, config id / version / hash),
+The Builder's preview (`POST /screeners/preview`, `services/explore/preview/screens.py`) runs
+the same `evaluate_screen` as the nightly `screen` job on the latest closed session and saves
+nothing. It returns the run summary, the decision counts, the funnel (each gating criterion in
+order: rows entering, passing, narrowly missing, failing, missing), the coverage and the top
+rows. The session's field frame is cached in-process, so editing a threshold, mode or
+tolerance re-evaluates in memory (only the edited criterion); a new publish invalidates it.
+Nightly rows go to `results/rule_screen` (one per instrument: decision, score, rank, tier,
+class, flags, reasons, config id / version / hash),
 `results/rule_screen_values` (one per criterion: value, PASS / NEAR / FAIL / MISSING / INFO,
 distance, penalty); the run summary is in the run record (`stats["summary"]`). Ideas ranks tickers
 across saved screens: one row per ticker, by the highest-priority screener that picked it,

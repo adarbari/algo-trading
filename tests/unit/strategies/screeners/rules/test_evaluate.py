@@ -178,3 +178,16 @@ def test_screener_contract_and_registry() -> None:
 def test_decide_without_misses_is_qualified() -> None:
     assert decide(()) == (Decision.QUALIFIED, ())
     assert Outcome.INFO.value == "INFO"
+
+
+def test_a_memo_changes_nothing_and_reevaluates_only_edits() -> None:
+    memo: dict[Any, Any] = {}
+    view = FeatureView(DAY, ROWS)
+    assert evaluate_screen(spec(), view, memo) == result()
+    assert len(memo) == 5  # 4 criteria + the display part (tiers, flags, columns, ...)
+    assert all(len(done) == len(ROWS) for done in memo.values())
+    edited = spec(criteria={"price": {"field": "px", "op": "gt", "value": 9}})
+    assert evaluate_screen(edited, view, memo) == evaluate_screen(edited, view)
+    assert len(memo) == 6  # one new criterion; the old results stay valid for this view
+    shown = spec(columns={"spread": "spread"})
+    assert evaluate_screen(shown, view, memo) == evaluate_screen(shown, view)

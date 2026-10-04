@@ -93,7 +93,7 @@ identity arrives.
 - Pages (results, Ideas) read stored rows for sessions <= `?date=` and never recompute.
 
 ### Preview == nightly
-Preview (`services/explore/screen_preview.py`, on the latest closed session only) and the nightly `screen` job
+Preview (`services/explore/preview/screens.py`, on the latest closed session only) and the nightly `screen` job
 (`services/screening/run.py`) call the same `evaluate_screen(spec, view)`; a test asserts
 equal rows for a fixed session. Preview writes nothing. Its warm path is an in-process LRU of
 the session's field frame keyed by (session, field set, user-feature hash, store

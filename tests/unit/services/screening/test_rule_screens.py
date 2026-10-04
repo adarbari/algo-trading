@@ -40,6 +40,8 @@ SCREEN: dict[str, Any] = {
         },
     },
     "classify": f"{LIQ}.put_tier",
+    "tiers": {"deep": {"all": [{"field": f"{LIQ}.chain_oi", "op": "gte", "value": 4000}]}},
+    "flags": {"cheap": {"all": [{"field": f"{LIQ}.underlying_price", "op": "lt", "value": 70}]}},
     "columns": {"tier": f"{LIQ}.put_tier"},
     "rank": {"tie_break": f"{LIQ}.underlying_price"},
 }

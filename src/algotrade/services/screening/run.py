@@ -9,6 +9,7 @@ from datetime import UTC, date, datetime
 
 import pandas as pd
 
+from algotrade.config.site.settings import ScreeningSettings
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
@@ -85,10 +86,31 @@ def screen_rules(
     ids = list(selected.instruments)
     view, source = fields_view(reader, screener.spec.fields(), session_date, ids, features=features)
     result = screener.evaluate(view)
-    run = audit_rows(
-        RULES, [r.screen_row() for r in result.rows], ids, config.screening.min_coverage
-    )
-    return run, result, source.missing
+    return rule_run(result, ids, config.screening), result, source.missing
+
+
+def rule_run(result: RuleScreenResult, ids: list[str], screening: ScreeningSettings) -> ScreenRun:
+    """A rule screen's rows audited against the selected ``ids`` (one row each) and graded."""
+    rows = [r.screen_row() for r in result.rows]
+    return audit_rows(RULES, rows, ids, screening.min_coverage)
+
+
+def settle_coverage(
+    run: ScreenRun,
+    selected: SelectionResult,
+    universe: Universe,
+    session_date: date,
+    screening: ScreeningSettings,
+) -> ScreenRun:
+    """The run's final coverage: ``EMPTY_SELECTION`` when the selection matched nothing, and
+    ``UNIVERSE_INCOMPLETE`` when a complete run read a universe older than allowed."""
+    if selected.empty:
+        return _with_coverage(run, RunCoverage.EMPTY_SELECTION)
+    if run.coverage is RunCoverage.COMPLETE and universe.is_stale(
+        session_date, screening.max_universe_age_days
+    ):
+        return _with_coverage(run, RunCoverage.UNIVERSE_INCOMPLETE)
+    return run
 
 
 def _write(
@@ -139,12 +161,7 @@ def run_screener(
         screener = create_screener(config.config.impl, params=config.config.params)
         view = feature_view(reader, screener.requires, session_date, selected.instruments)
         run = run_screen(screener, view, list(selected.instruments), screening.min_coverage)
-    if selected.empty:
-        run = _with_coverage(run, RunCoverage.EMPTY_SELECTION)
-    elif run.coverage is RunCoverage.COMPLETE and universe.is_stale(
-        session_date, screening.max_universe_age_days
-    ):
-        run = _with_coverage(run, RunCoverage.UNIVERSE_INCOMPLETE)
+    run = settle_coverage(run, selected, universe, session_date, screening)
     user = config.user.user_id
     record = start_run(run_job_name(config.config.id, user), session_date, now)
     run_id = record.run_id

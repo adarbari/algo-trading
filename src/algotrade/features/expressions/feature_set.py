@@ -30,7 +30,7 @@ import pandas as pd
 from algotrade.config.site.settings import FeatureDefinition
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.fields import ROLLUP_TABLE_PREFIX
-from algotrade.features.expressions.definitions import Expression, build_expressions
+from algotrade.features.expressions.definitions import Expression, build_expressions, formula_type
 from algotrade.features.expressions.evaluator import (
     KIND_OF,
     evaluate_formula,
@@ -38,6 +38,7 @@ from algotrade.features.expressions.evaluator import (
     to_column,
 )
 from algotrade.features.expressions.frame import join
+from algotrade.features.expressions.functions import Type
 from algotrade.features.framework.columns import conform
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, Superseded
 from algotrade.features.framework.feature import Feature
@@ -88,6 +89,10 @@ class FeatureSet:
             raise ConfigurationError(f"{stored[0]}: not a (virtual) user feature")
         added = build_expressions(definitions, self.code, base=self.expressions)
         return FeatureSet(self.code, {**self.expressions, **added}, self.superseded)
+
+    def formula_type(self, expr: str, where: str = "expr") -> Type:
+        """The type of a free-standing formula over this catalogue (``ExpressionError``)."""
+        return formula_type(expr, self.code, self.expressions, where)
 
     # ------------------------------------------------------------------ lookups
     def feature(self, name: str) -> Feature | None:
