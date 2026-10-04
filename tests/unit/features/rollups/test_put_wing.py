@@ -1,7 +1,8 @@
 """``put_wing@v1`` on synthetic chains priced by ``quant.black_scholes`` at a known vol: the
 target expiry, OUR delta (the feed's is ignored), the |delta| band with both edges included,
-the aggregates, the best put by cash-secured ROC, every status with its nulls, point in time
-through the runner, and properties on random chains."""
+the band totals, the best put (nearest the band, then cash-secured ROC) and its band
+distance, every status with its nulls, point in time through the runner, and properties on
+random chains."""
 
 from dataclasses import replace
 from datetime import date, timedelta
@@ -21,9 +22,9 @@ from tests.helpers.rollup_store import END, chain_rows, store, write_chains, wri
 P = pw.PutWingParams()
 E25, E35, E45, E50, E65 = (END + timedelta(days=d) for d in (25, 35, 45, 50, 65))
 STRIKES = tuple(range(50, 101))
-NULL_WHEN_NO_STRIKE = (
-    "wing_oi", "wing_volume", "wing_spread_pct", "best_put_strike", "best_put_delta",
-    "best_put_iv", "best_put_mid", "best_put_oi", "best_put_roc",
+BEST = (
+    "delta_band_distance", "best_put_strike", "best_put_delta", "best_put_iv", "best_put_mid",
+    "best_put_oi", "best_put_volume", "best_put_spread_pct", "best_put_roc",
 )  # fmt: skip
 
 
@@ -75,9 +76,25 @@ def test_our_delta_band_and_best_put_by_roc() -> None:
     assert out["best_put_iv"] == pytest.approx(0.4, abs=1e-6)
     assert out["best_put_mid"] == pytest.approx(want["mid"][best], rel=1e-6)
     assert out["best_put_roc"] == pytest.approx(roc[best], rel=1e-6)
-    assert out["best_put_oi"] == 500
+    assert (out["best_put_oi"], out["best_put_volume"]) == (500, 10)
+    assert out["delta_band_distance"] == 0
+    assert out["best_put_spread_pct"] == pytest.approx(0.02 / want["mid"][best], rel=1e-6)
     spreads = 0.02 / want["mid"]
     assert out["wing_spread_pct"] == pytest.approx(float(np.median(spreads)), rel=1e-6)
+
+
+def test_without_a_band_strike_the_nearest_candidate_wins_and_reports_its_distance() -> None:
+    """Strikes 90 and 92.5 only: no 8-15 delta put, so the best put is the candidate nearest
+    the band (90, |delta| ~0.20), not the higher-ROC 92.5 (~0.25); band totals are 0."""
+    rows = chain_rows("EQ:A", END, 100.0, {E45: 0.4}, 0.04, strikes=(90, 92.5))
+    out = run(rows, {"EQ:A": 100.0}).loc["EQ:A"]
+    g = greeks(100.0, np.array([90.0, 92.5]), 45 / 365, 0.04, 0.0, 0.4, False)
+    size = np.abs(g.delta)
+    assert P.delta_hi < size[0] < size[1] <= P.search_hi
+    assert (out["wing_status"], out["best_put_strike"]) == ("OUTSIDE_BAND", 90.0)
+    assert out["delta_band_distance"] == pytest.approx(size[0] - P.delta_hi, abs=1e-6)
+    assert (out["n_strikes"], out["wing_oi"], out["wing_volume"]) == (0, 0, 0)
+    assert pd.isna(out["wing_spread_pct"])
 
 
 def test_the_feeds_delta_is_ignored_and_dividends_move_ours() -> None:
@@ -134,23 +151,46 @@ def _wing(deltas: list[float], **columns: list[float]) -> pd.DataFrame:
 
 
 @pytest.mark.parametrize(
-    ("delta", "qualifies"),
+    ("delta", "status", "distance"),
     [
-        (-0.08, True),
-        (-0.15, True),
-        (-0.0799999, False),
-        (-0.1500001, False),
-        (-0.115, True),
-        (-0.05, False),
-        (-0.30, False),
-        (float("nan"), False),
+        (-0.08, "OK", 0.0),
+        (-0.15, "OK", 0.0),
+        (-0.115, "OK", 0.0),
+        (-0.0799999, "OUTSIDE_BAND", 1e-7),
+        (-0.1500001, "OUTSIDE_BAND", 1e-7),
+        (-0.05, "OUTSIDE_BAND", 0.03),  # the search range's edges are candidates
+        (-0.35, "OUTSIDE_BAND", 0.20),
+        (-0.0499999, "NO_STRIKE", None),
+        (-0.3500001, "NO_STRIKE", None),
+        (float("nan"), "NO_STRIKE", None),
     ],
 )
-def test_delta_band_edges_are_included(delta: float, qualifies: bool) -> None:
+def test_delta_band_and_search_edges_are_included(
+    delta: float, status: str, distance: float | None
+) -> None:
     row = pw.wing_row(_wing([delta]), P)
-    assert row["n_strikes"] == int(qualifies)
-    assert row["wing_status"] == ("OK" if qualifies else "NO_STRIKE")
+    assert row["wing_status"] == status
+    assert row["n_strikes"] == int(status == "OK")
     assert row["n_unpriced"] == int(np.isnan(delta))
+    if distance is None:
+        assert "delta_band_distance" not in row and "best_put_strike" not in row
+    else:
+        assert row["delta_band_distance"] == pytest.approx(distance, abs=1e-9)
+
+
+def test_closeness_to_the_band_ranks_before_roc() -> None:
+    """20 delta beats 25 delta whatever the ROC; inside the band the highest ROC wins."""
+    out_of_band = _wing([-0.25, -0.20], strike=[95.0, 90.0], mid=[3.0, 1.0])
+    assert pw.wing_row(out_of_band, P)["best_put_strike"] == 90.0
+    assert pw.wing_row(out_of_band, P)["delta_band_distance"] == pytest.approx(0.05)
+    inside = _wing([-0.09, -0.14, -0.30], strike=[80.0, 85.0, 95.0], mid=[0.8, 1.7, 9.0])
+    row = pw.wing_row(inside, P)
+    assert (row["best_put_strike"], row["delta_band_distance"]) == (85.0, 0.0)  # 2% > 1%
+    assert pw.band_distance(pd.Series([0.04, 0.08, 0.2]), P).round(9).tolist() == [
+        0.04,
+        0.0,
+        0.05,
+    ]
 
 
 def test_best_put_ties_higher_oi_then_lower_strike() -> None:
@@ -170,7 +210,7 @@ def test_statuses_and_nulls() -> None:
         *chain_rows("EQ:NOSPOT", END, 100.0, {E45: 0.4}, 0.04, strikes=STRIKES),
         *calls_only,
         *chain_rows("EQ:NEAR", END, 100.0, {E25: 0.4, E65: 0.4}, 0.04, strikes=STRIKES),
-        *chain_rows("EQ:ATM", END, 100.0, {E45: 0.4}, 0.04, strikes=(95, 100, 105)),
+        *chain_rows("EQ:ATM", END, 100.0, {E45: 0.4}, 0.04, strikes=(100, 105)),  # |delta| > 0.35
         *chain_rows("EQ:ONESIDED", END, 100.0, {E45: 0.4}, 0.04, strikes=STRIKES, spread=50.0),
     ]
     spots = dict.fromkeys(("EQ:OK", "EQ:CALLS", "EQ:NEAR", "EQ:ATM", "EQ:ONESIDED"), 100.0)
@@ -188,8 +228,8 @@ def test_statuses_and_nulls() -> None:
     assert no_target.drop(columns="wing_status").isna().all().all()
     for iid in ("EQ:ATM", "EQ:ONESIDED"):
         row = out.loc[iid]
-        assert row["target_expiry"] == E45 and row["n_strikes"] == 0
-        assert row[list(NULL_WHEN_NO_STRIKE)].isna().all()
+        assert row["target_expiry"] == E45 and row["n_strikes"] == row["wing_oi"] == 0
+        assert row[[*BEST, "wing_spread_pct"]].isna().all()
     assert out.loc["EQ:ONESIDED", "n_unpriced"] == len(STRIKES)  # bid floored at 0
     assert out.loc["EQ:ATM", "n_unpriced"] == 0
 
@@ -219,6 +259,8 @@ def test_params_validate() -> None:
         replace(P, dte_min=50)
     with pytest.raises(ValueError, match="delta_lo"):
         replace(P, delta_lo=0.2)
+    with pytest.raises(ValueError, match="search_hi"):
+        replace(P, search_hi=0.1)
     narrow = run(
         chain_rows("EQ:A", END, 100.0, {E45: 0.4}, 0.04, strikes=STRIKES),
         {"EQ:A": 100.0},
@@ -238,8 +280,9 @@ def test_params_validate() -> None:
 def test_properties_on_random_chains(
     spot: float, sigma: float, rate: float, dte: int, seed: int
 ) -> None:
-    """Qualifying puts are exactly those whose model delta is in the band; the best put has
-    the highest ROC among them; aggregates bound the best; row order never matters."""
+    """Band strikes are exactly those whose model delta is in the band; the best put is in
+    the search range, nearest the band, with the highest ROC among equally near puts; row
+    order never matters."""
     expiry = END + timedelta(days=dte)
     strikes = tuple(np.round(np.linspace(spot * 0.3, spot, 60), 2))
     rows = chain_rows("EQ:R", END, spot, {expiry: sigma}, rate, strikes=strikes, spread=0.0)
@@ -257,13 +300,19 @@ def test_properties_on_random_chains(
     inside = priced & (size >= P.delta_lo + 1e-6) & (size <= P.delta_hi - 1e-6)
     maybe = priced & (size >= P.delta_lo - 1e-6) & (size <= P.delta_hi + 1e-6)
     assert int(inside.sum()) <= out["n_strikes"] <= int(maybe.sum())
-    if out["wing_status"] == "OK":
-        assert -P.delta_hi - 1e-9 <= out["best_put_delta"] <= -P.delta_lo + 1e-9
+    found = priced & (size >= P.search_lo - 1e-6) & (size <= P.search_hi + 1e-6)
+    if out["wing_status"] in ("OK", "OUTSIDE_BAND"):
+        assert P.search_lo - 1e-9 <= -out["best_put_delta"] <= P.search_hi + 1e-9
         assert out["best_put_roc"] == pytest.approx(
             out["best_put_mid"] / out["best_put_strike"], rel=1e-6
         )
-        assert out["best_put_roc"] >= float(np.max((g.price / k)[inside], initial=0)) * (1 - 1e-5)
-        assert out["best_put_oi"] <= out["wing_oi"]
-        assert 0 <= out["wing_spread_pct"] <= 2
+        distance = pw.band_distance(pd.Series(size[found]), P).to_numpy()
+        assert out["delta_band_distance"] == pytest.approx(distance.min(), abs=1e-5)
+        assert (out["wing_status"] == "OK") == (out["delta_band_distance"] == 0)
+        if out["wing_status"] == "OK":
+            best_roc = float(np.max((g.price / k)[inside], initial=0))
+            assert out["best_put_roc"] >= best_roc * (1 - 1e-5)
+            assert out["best_put_oi"] <= out["wing_oi"]
+            assert 0 <= out["wing_spread_pct"] <= 2
     else:
         assert out["wing_status"] == "NO_STRIKE" and not inside.any()

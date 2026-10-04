@@ -47,10 +47,12 @@ stale_days = 400         # shares whose period ended longer ago than this are ST
                          # 10-Q filers report every ~3 months, 20-F filers once a year
 
 ["put_wing@v1"]          # the VRP scanner's short-put wing (docs/screeners/vrp-scanner.md);
-                         # the DTE window and delta band are part of v1: changing them is v2
+                         # the DTE window and delta bands are part of v1: changing them is v2
 dte_target = 45          # target expiry: the one closest to this many calendar days ...
 dte_min = 30             # ... among those dte_min..dte_max days out (ties: the earlier)
 dte_max = 60
-delta_lo = 0.08          # qualifying puts: delta_lo <= |our delta| <= delta_hi (edges included)
+delta_lo = 0.08          # target band: delta_lo <= |our delta| <= delta_hi (edges included)
 delta_hi = 0.15
+search_lo = 0.05         # candidates for the best put: search_lo <= |our delta| <= search_hi
+search_hi = 0.35
 prefer_monthly = true    # standard monthlies in the window first (where OI concentrates), else any

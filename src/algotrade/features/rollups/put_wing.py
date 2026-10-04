@@ -1,21 +1,30 @@
-"""``put_wing@v1``: the 8-15 delta puts of the 30-60 day expiry a short-put seller would sell.
+"""``put_wing@v1``: the short put to sell at the 30-60 day expiry, aiming for 8-15 delta.
 
-The VRP scanner's option-trade follow-up (``docs/screeners/vrp-scanner.md``): per underlying
-and session, the expiry closest to ``dte_target`` (45) calendar days among those
-``dte_min..dte_max`` (30..60) days out (ties: the earlier), the standard monthlies first when
-``prefer_monthly`` (open interest concentrates there; a weekly nearer 45 days is usually
-thin), else any listed expiry; and at that expiry the puts whose
-OUR delta has ``delta_lo <= |delta| <= delta_hi`` (0.08..0.15, both edges included): how many
-strikes, their open interest, volume and median relative spread, and the best of them by
-cash-secured return on capital, ROC = premium / (strike x 100) per contract = mid / strike.
+The VRP scanner's option-trade follow-up (``docs/screeners/vrp-scanner.md``; owner decision
+2026-10-04: delta closeness is scored, not gated). Per underlying and session:
+
+- **Target expiry**: the expiry closest to ``dte_target`` (45) calendar days among those
+  ``dte_min..dte_max`` (30..60) days out (ties: the earlier), the standard monthlies first when
+  ``prefer_monthly`` (open interest concentrates there; a weekly nearer 45 days is usually
+  thin), else any listed expiry.
+- **Candidates**: its puts whose OUR |delta| is in ``search_lo..search_hi`` (0.05..0.35).
+- **Best put**: the candidate closest to the target band ``delta_lo..delta_hi`` (0.08..0.15,
+  edges included), i.e. the smallest ``delta_band_distance`` (0 inside the band, else the
+  distance to the nearer edge), then the highest cash-secured ROC = premium / (strike x 100)
+  per contract = mid / strike, then the higher open interest, then the lower strike. So a
+  chain without an 8-15 delta strike still has a best put (say 20 delta, distance 0.05), and a
+  screen scores the distance instead of rejecting it.
+- **Band totals**: strikes, open interest and volume of the puts inside the band, and their
+  median relative spread.
 
 Our delta (ADR 0021; the feed's ``delta`` column is a cross-check only): each two-sided put
 (bid > 0, ask > bid) at the target expiry has its mid inverted with ``quant.implied_vol``
 (``t = days / 365``, ``r`` from the Treasury curve the session sees at ``t``, ``q`` from
 ``div_yield@v1``, 0 when unknown, ``S`` the underlying quote's price), and its delta is the
 Black-Scholes-Merton put delta at that vol (``quant.black_scholes.greeks``). A put without a
-two-sided quote or whose inversion fails has no delta: it never qualifies and is counted in
-``n_unpriced``.
+two-sided quote or whose inversion fails has no delta: it is never a candidate and is counted
+in ``n_unpriced``. Spreads are the stored (end-of-day, possibly after-hours) quote's: judge
+the trade's spread on a live quote (the best put's strike and expiry identify it).
 
 Inputs: the session's ``chains/option_quotes`` (required), ``rates/treasury`` (required),
 ``chains/underlying_quotes`` and ``div_yield@v1``. One row per underlying with a chain or an
@@ -24,13 +33,13 @@ underlying quote. ``wing_status``, first failing step wins:
     NO_SPOT       no positive underlying price
     NO_CHAIN      no put quotes for the underlying
     NO_EXPIRY     no put expiry dte_min..dte_max days out
-    NO_STRIKE     the target expiry has no put with our |delta| in the band
-    OK
+    NO_STRIKE     no put at the target expiry with our |delta| in search_lo..search_hi
+    OUTSIDE_BAND  a best put, but none in the target band (delta_band_distance > 0)
+    OK            the best put is in the target band
 
-Ties for the best put: the higher open interest, then the lower strike. Parameters:
-``PutWingParams`` (``config/site/rollups.toml ["put_wing@v1"]``). The windows and the band
-(45 in 30..60, 0.08..0.15) are named in the feature descriptions and ``best_put_delta``'s
-valid range: changing them is a new version, like a window named in a column.
+Parameters: ``PutWingParams`` (``config/site/rollups.toml ["put_wing@v1"]``). The windows and
+bands are named in the feature descriptions and valid ranges: changing them is a new version,
+like a window named in a column.
 """
 
 from dataclasses import dataclass
@@ -41,7 +50,7 @@ import pandas as pd
 
 from algotrade.core.model.options import standard_monthly_expiries
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
-from algotrade.features.framework.feature import Feature
+from algotrade.features.framework.feature import Feature, Range
 from algotrade.features.rollups.iv30 import (  # the same input tables, read the same way
     DIVIDENDS,
     OPTIONS,
@@ -54,20 +63,31 @@ from algotrade.quant.rates import DAYS_PER_YEAR, YieldCurve
 
 NAME = "put_wing"
 VERSION = 1
-STATUSES = ("OK", "NO_SPOT", "NO_CHAIN", "NO_EXPIRY", "NO_STRIKE")
+STATUSES = ("OK", "OUTSIDE_BAND", "NO_SPOT", "NO_CHAIN", "NO_EXPIRY", "NO_STRIKE")
 
 _Q = tuple(f"{OPTIONS}.{c}" for c in ("bid", "ask", "strike", "expiry", "right"))
 _PRICING = (*_Q, f"{UNDERLYINGS}.price", f"{RATES}.rate_cont", "div_yield@v1")
+_OI, _VOL = f"{OPTIONS}.open_interest", f"{OPTIONS}.volume"
 _NO_TARGET = "no target expiry (wing_status NO_SPOT, NO_CHAIN or NO_EXPIRY)"
-_NO_STRIKE = (
-    f"no put with our |delta| in 0.08..0.15 at the target expiry (NO_STRIKE), or {_NO_TARGET}"
+_NO_BEST = (
+    "no put at the target expiry with our |delta| in 0.05..0.35 (NO_STRIKE), or " + _NO_TARGET
 )
+_NO_BAND = "no put with our |delta| in 0.08..0.15 at the target expiry, or " + _NO_TARGET
+
+
+def _best(name: str, dtype: str, unit: str, text: str, rng: Range, *inputs: str) -> Feature:
+    return Feature(
+        f"best_put_{name}", dtype, unit, f"The best put's {text}", _NO_BEST, "chain",
+        valid_range=rng, inputs=inputs or _PRICING,
+    )  # fmt: skip
+
 
 FEATURES = (
     Feature(
         "wing_status", "str", "category",
-        "OK, or the first failing step: NO_SPOT, NO_CHAIN (no puts), NO_EXPIRY (none 30..60 "
-        "days out), NO_STRIKE (no put with our |delta| in 0.08..0.15 at the target expiry)",
+        "OK (best put in 0.08..0.15 |delta|), OUTSIDE_BAND (best put in 0.05..0.35 but not the "
+        "band), or the first failing step: NO_SPOT, NO_CHAIN (no puts), NO_EXPIRY (none "
+        "30..60 days out), NO_STRIKE (no put with our |delta| in 0.05..0.35)",
         "never", "label", categories=STATUSES, inputs=_PRICING,
     ),
     Feature(
@@ -82,55 +102,52 @@ FEATURES = (
         _NO_TARGET, "chain", valid_range=(30, 60), inputs=(f"{OPTIONS}.expiry",),
     ),
     Feature(
-        "n_strikes", "int", "count",
-        "Strikes at the target expiry whose put has our |delta| in 0.08..0.15 (edges included)",
-        _NO_TARGET, "chain", valid_range=(0, None), inputs=_PRICING,
-    ),
-    Feature(
         "n_unpriced", "int", "count",
         "Puts at the target expiry without our delta (no two-sided quote, or the implied-vol "
-        "inversion failed): never counted as qualifying",
+        "inversion failed): never candidates",
         _NO_TARGET, "chain", valid_range=(0, None), inputs=_PRICING,
     ),
     Feature(
-        "wing_oi", "int", "count", "Open interest across the qualifying puts",
-        _NO_STRIKE, "chain", valid_range=(0, None), inputs=(*_PRICING, f"{OPTIONS}.open_interest"),
+        "n_strikes", "int", "count",
+        "Strikes at the target expiry whose put has our |delta| in 0.08..0.15 (edges "
+        "included); 0 when none",
+        _NO_TARGET, "chain", valid_range=(0, None), inputs=_PRICING,
     ),
     Feature(
-        "wing_volume", "int", "count", "Volume across the qualifying puts",
-        _NO_STRIKE, "chain", valid_range=(0, None), inputs=(*_PRICING, f"{OPTIONS}.volume"),
+        "wing_oi", "int", "count",
+        "Open interest across the puts in the 0.08..0.15 band; 0 when none",
+        _NO_TARGET, "chain", valid_range=(0, None), inputs=(*_PRICING, _OI),
+    ),
+    Feature(
+        "wing_volume", "int", "count",
+        "Volume across the puts in the 0.08..0.15 band; 0 when none",
+        _NO_TARGET, "chain", valid_range=(0, None), inputs=(*_PRICING, _VOL),
     ),
     Feature(
         "wing_spread_pct", "float32", "decimal",
-        "Median (ask - bid) / mid across the qualifying puts",
-        _NO_STRIKE, "chain", valid_range=(0, 2), inputs=_PRICING,
+        "Median (ask - bid) / mid across the puts in the 0.08..0.15 band (stored quote)",
+        _NO_BAND, "chain", valid_range=(0, 2), inputs=_PRICING,
     ),
     Feature(
-        "best_put_strike", "float32", "usd_per_share",
-        "The qualifying put with the highest ROC (ties: higher OI, then lower strike): strike",
-        _NO_STRIKE, "chain", valid_range=(0, None), inputs=_PRICING,
+        "delta_band_distance", "float32", "ratio",
+        "How far the best put's |delta| is from the 0.08..0.15 band: 0 inside, else the "
+        "distance to the nearer edge (0.20 delta: 0.05)",
+        _NO_BEST, "chain", valid_range=(0, 0.2), inputs=_PRICING,
     ),
-    Feature(
-        "best_put_delta", "float32", "ratio", "The best put's delta (ours, negative)",
-        _NO_STRIKE, "chain", valid_range=(-0.15, -0.08), inputs=_PRICING,
-    ),
-    Feature(
-        "best_put_iv", "float32", "decimal", "The best put's implied vol (ours, from the mid)",
-        _NO_STRIKE, "chain", valid_range=(0, 5), inputs=_PRICING,
-    ),
-    Feature(
-        "best_put_mid", "float32", "usd_per_share", "The best put's mid, (bid + ask) / 2",
-        _NO_STRIKE, "chain", valid_range=(0, None), inputs=(f"{OPTIONS}.bid", f"{OPTIONS}.ask"),
-    ),
-    Feature(
-        "best_put_oi", "int", "count", "The best put's open interest",
-        _NO_STRIKE, "chain", valid_range=(0, None), inputs=(f"{OPTIONS}.open_interest",),
-    ),
-    Feature(
-        "best_put_roc", "float32", "decimal",
-        "The best put's cash-secured return on capital: premium / (strike x 100) = mid / strike",
-        _NO_STRIKE, "chain", valid_range=(0, 1), inputs=_PRICING,
-    ),
+    _best("strike", "float32", "usd_per_share",
+          "strike: the candidate nearest the band, then the highest ROC (ties: higher OI, "
+          "then lower strike)", (0, None)),
+    _best("delta", "float32", "ratio", "delta (ours, negative)", (-0.35, -0.05)),
+    _best("iv", "float32", "decimal", "implied vol (ours, from the mid)", (0, 5)),
+    _best("mid", "float32", "usd_per_share", "mid, (bid + ask) / 2: the premium per share",
+          (0, None), f"{OPTIONS}.bid", f"{OPTIONS}.ask"),
+    _best("oi", "int", "count", "open interest", (0, None), _OI),
+    _best("volume", "int", "count", "volume", (0, None), _VOL),
+    _best("spread_pct", "float32", "decimal",
+          "(ask - bid) / mid on the stored quote (judge the trade on a live one)", (0, 2),
+          f"{OPTIONS}.bid", f"{OPTIONS}.ask"),
+    _best("roc", "float32", "decimal",
+          "cash-secured return on capital: premium / (strike x 100) = mid / strike", (0, 1)),
 )  # fmt: skip
 COLUMNS = column_types(FEATURES)
 
@@ -140,15 +157,17 @@ class PutWingParams:
     dte_target: int = 45
     dte_min: int = 30
     dte_max: int = 60
-    delta_lo: float = 0.08  # |delta| band, both edges included
+    delta_lo: float = 0.08  # the target |delta| band, both edges included
     delta_hi: float = 0.15
+    search_lo: float = 0.05  # candidates: search_lo <= |delta| <= search_hi
+    search_hi: float = 0.35
     prefer_monthly: bool = True  # standard monthlies in the window first, else any expiry
 
     def __post_init__(self) -> None:
         if not 1 <= self.dte_min <= self.dte_target <= self.dte_max:
             raise ValueError("need 1 <= dte_min <= dte_target <= dte_max")
-        if not 0 < self.delta_lo <= self.delta_hi < 1:
-            raise ValueError("need 0 < delta_lo <= delta_hi < 1")
+        if not 0 < self.search_lo <= self.delta_lo <= self.delta_hi <= self.search_hi < 1:
+            raise ValueError("need 0 < search_lo <= delta_lo <= delta_hi <= search_hi < 1")
 
 
 def target_expiries(puts: pd.DataFrame, p: PutWingParams) -> pd.Series:
@@ -189,32 +208,49 @@ def our_deltas(puts: pd.DataFrame, curve: YieldCurve) -> pd.DataFrame:
     return puts.assign(mid=mid, iv=iv, delta=delta)
 
 
+def band_distance(size: pd.Series, p: PutWingParams) -> pd.Series:
+    """0 for an |delta| inside ``delta_lo..delta_hi``, else the distance to the nearer edge."""
+    return (p.delta_lo - size).clip(lower=0) + (size - p.delta_hi).clip(lower=0)
+
+
 def wing_row(puts: pd.DataFrame, p: PutWingParams) -> dict[str, object]:
-    """The aggregate columns for one underlying from its target expiry's priced puts
-    (``strike``, ``bid``, ``ask``, ``mid``, ``iv``, ``delta``, ``open_interest``, ``volume``)."""
+    """The columns for one underlying from its target expiry's priced puts (``strike``,
+    ``bid``, ``ask``, ``mid``, ``iv``, ``delta``, ``open_interest``, ``volume``)."""
     size = puts["delta"].abs()
-    row: dict[str, object] = {"n_unpriced": int(puts["delta"].isna().sum())}
-    wing = puts[(size >= p.delta_lo) & (size <= p.delta_hi)]
-    row["n_strikes"] = int(wing["strike"].nunique())
-    if wing.empty:
+    oi, volume = puts["open_interest"].fillna(0), puts["volume"].fillna(0)
+    spread = (puts["ask"] - puts["bid"]) / puts["mid"]
+    band = (size >= p.delta_lo) & (size <= p.delta_hi)
+    row: dict[str, object] = {
+        "n_unpriced": int(puts["delta"].isna().sum()),
+        "n_strikes": int(puts.loc[band, "strike"].nunique()),
+        "wing_oi": int(oi[band].sum()),
+        "wing_volume": int(volume[band].sum()),
+        "wing_spread_pct": float(spread[band].median()) if band.any() else None,
+    }
+    found = (size >= p.search_lo) & (size <= p.search_hi)
+    if not found.any():
         return {**row, "wing_status": "NO_STRIKE"}
-    oi = wing["open_interest"].fillna(0)
-    roc = wing["mid"] / wing["strike"]
-    ranked = wing.assign(roc=roc, oi=oi).sort_values(
-        ["roc", "oi", "strike"], ascending=[False, False, True]
+    candidates = puts[found].assign(
+        distance=band_distance(size[found], p),
+        roc=puts["mid"] / puts["strike"],
+        oi=oi,
+        volume=volume,
+        spread=spread,
     )
-    best = ranked.iloc[0]
+    best = candidates.sort_values(
+        ["distance", "roc", "oi", "strike"], ascending=[True, False, False, True]
+    ).iloc[0]
     return {
         **row,
-        "wing_status": "OK",
-        "wing_oi": int(oi.sum()),
-        "wing_volume": int(wing["volume"].fillna(0).sum()),
-        "wing_spread_pct": float(((wing["ask"] - wing["bid"]) / wing["mid"]).median()),
+        "wing_status": "OK" if best["distance"] == 0 else "OUTSIDE_BAND",
+        "delta_band_distance": float(best["distance"]),
         "best_put_strike": float(best["strike"]),
         "best_put_delta": float(best["delta"]),
         "best_put_iv": float(best["iv"]),
         "best_put_mid": float(best["mid"]),
         "best_put_oi": int(best["oi"]),
+        "best_put_volume": int(best["volume"]),
+        "best_put_spread_pct": float(best["spread"]),
         "best_put_roc": float(best["roc"]),
     }
 
@@ -276,8 +312,8 @@ def compute(inputs: Inputs, session: date, p: PutWingParams) -> pd.DataFrame:
 GROUP = FeatureGroup(
     NAME,
     VERSION,
-    "The 8-15 delta puts (our delta) of the expiry nearest 45 days: strikes, OI, volume, "
-    "spread and the best put by cash-secured ROC",
+    "The short put at the expiry nearest 45 days: the one nearest 8-15 delta (our delta), "
+    "then by cash-secured ROC; band OI, volume and spread",
     (
         Input(OPTIONS),
         Input(RATES),

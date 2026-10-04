@@ -1,14 +1,17 @@
-# VRP scanner v2: v1 (docs/screeners/vrp-scanner.md, "Owner decisions (2026-10-03)"; rule
-# screens: docs/screeners/rules.md, ADR 0029) with the option-trade follow-up's liquidity
-# measured where the trade is: the 8-15 delta puts (our delta) of the expiry nearest 45 days
-# (rollup put_wing@v1), a large one-day move flag (rollup price_moves@v1) and the best put's
-# strike / delta / premium / ROC as columns. An identification layer, not a trade signal.
+# VRP scanner v2: v1 (docs/screeners/vrp-scanner.md, "Owner decisions"; rule screens:
+# docs/screeners/rules.md, ADR 0029) with the option-trade follow-up: the best short put at
+# the expiry nearest 45 days (rollup put_wing@v1: nearest 8-15 delta, our delta, then ROC),
+# scored, never gated (owner 2026-10-04): its closeness to the 8-15 delta band, its open
+# interest, volume and stored spread. The spread is judged live (the put's strike and expiry
+# are columns, for the live IBKR quote during market hours). A large one-day move flag
+# (rollup price_moves@v1). An identification layer, not a trade signal.
 # Immutable: change it by adding v3.toml (architecture/preset_versions.toml). v1 stays as is.
 # Not scheduled: run it on request (preview, a `screen` job) or schedule a user copy.
 id = "vrp_scanner"
 kind = "screener"
 impl = "rules"
 version = 2
+name = "VRP"
 selection = "liquid_optionable"   # the daily universe snapshot: active optionable stocks, ADRs, ETFs
 classify = "feature.near_52w"     # buckets the output: HIGH, LOW, BOTH
 
@@ -53,37 +56,41 @@ tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
 on_miss = "LIQUIDITY_RISK"
 label = "Stock ADV > $50M"
 
-# The option liquidity at the target strikes: the target expiry's puts with our |delta| in
-# 0.08..0.15 (put_wing@v1). No qualifying strike (or no chain) -> missing -> SKIPPED: an
-# option chain that cannot be validated is never labelled qualified.
-[criteria.wing_oi]
-field = "rollup.put_wing@v1.wing_oi"
+# ------------------------------------------------------- score only (a miss lowers the score)
+# The best put (put_wing@v1). Nothing here filters: a missing value (no chain, no put in
+# 0.05..0.35 delta) only costs the criterion's points.
+[criteria.delta_closeness]
+field = "rollup.put_wing@v1.delta_band_distance"   # 0 inside 8-15 delta
+op = "lte"
+value = 0
+mode = "score"
+tolerance = 0.20                  # linear: full points at 0, none at 0.20 (20 delta: 0.05 off)
+label = "Best put near 8-15 delta"
+
+[criteria.put_open_interest]
+field = "rollup.put_wing@v1.best_put_oi"
 op = "gt"
 value = 1_000
-mode = "soft"
-tolerance = { relative = 0.5 }    # 500-1,000 contracts is a near miss
-on_miss = "LIQUIDITY_RISK"
-label = "OI > 1,000 at the 8-15 delta target strikes"
+mode = "score"
+tolerance = { relative = 1.0 }    # linear from 0 to 1,000 contracts
+label = "Best put OI > 1,000"
 
-[criteria.wing_volume]
-field = "rollup.put_wing@v1.wing_volume"
+[criteria.put_trading_volume]
+field = "rollup.put_wing@v1.best_put_volume"
 op = "gt"
 value = 1_000
-mode = "soft"
-tolerance = { relative = 0.5 }    # 500-1,000 contracts is a near miss
-on_miss = "LIQUIDITY_RISK"
-label = "Option volume > 1,000 at the target strikes"
+mode = "score"
+tolerance = { relative = 1.0 }
+label = "Best put volume > 1,000"
 
-[criteria.wing_spread]
-field = "rollup.put_wing@v1.wing_spread_pct"
+[criteria.put_bid_ask]
+field = "rollup.put_wing@v1.best_put_spread_pct"   # the stored quote: confirm it live
 op = "lt"
 value = 0.15
-mode = "soft"
-tolerance = 0.05                  # a median spread of 15-20% of mid is a near miss
-on_miss = "LIQUIDITY_RISK"
-label = "Bid/ask < 15% of mid at the target strikes (median)"
+mode = "score"
+tolerance = 0.15                  # linear from 15% to 30% of mid
+label = "Best put bid/ask < 15% of mid (stored quote)"
 
-# ------------------------------------------------------- score only (a miss lowers the score)
 [criteria.iv_rank]
 field = "rollup.ibkr_iv@v1.iv_rank_252d_ibkr"   # IBKR's only; missing -> no points
 op = "gte"
@@ -138,17 +145,20 @@ days_to_earnings = "rollup.earnings@v1.days_to_earnings"
 adv_usd = "rollup.price_stats@v2.adv_usd_20d"
 option_volume = "feature.option_chain_volume"
 one_day_move = "rollup.price_moves@v1.one_day_move"
-target_expiry = "rollup.put_wing@v1.target_expiry"
-target_dte = "rollup.put_wing@v1.target_dte"
+put_strike = "rollup.put_wing@v1.best_put_strike"     # with put_expiry: the contract to quote live
+put_expiry = "rollup.put_wing@v1.target_expiry"
+put_dte = "rollup.put_wing@v1.target_dte"
+put_delta = "rollup.put_wing@v1.best_put_delta"
+put_premium = "rollup.put_wing@v1.best_put_mid"
+put_roc = "rollup.put_wing@v1.best_put_roc"
+put_oi = "rollup.put_wing@v1.best_put_oi"
+put_volume = "rollup.put_wing@v1.best_put_volume"
+put_spread_pct = "rollup.put_wing@v1.best_put_spread_pct"
+put_delta_band_distance = "rollup.put_wing@v1.delta_band_distance"
+put_status = "rollup.put_wing@v1.wing_status"
 wing_strikes = "rollup.put_wing@v1.n_strikes"
 wing_oi = "rollup.put_wing@v1.wing_oi"
 wing_volume = "rollup.put_wing@v1.wing_volume"
-wing_spread_pct = "rollup.put_wing@v1.wing_spread_pct"
-best_put_strike = "rollup.put_wing@v1.best_put_strike"
-best_put_delta = "rollup.put_wing@v1.best_put_delta"
-best_put_premium = "rollup.put_wing@v1.best_put_mid"
-best_put_oi = "rollup.put_wing@v1.best_put_oi"
-best_put_roc = "rollup.put_wing@v1.best_put_roc"
 
 [rank]
 tie_break = "feature.vrp_iv_hv_spread"

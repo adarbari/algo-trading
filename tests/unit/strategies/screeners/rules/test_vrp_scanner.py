@@ -128,68 +128,72 @@ def test_fixture_outcomes(preset: ResolvedConfig) -> None:
 WING = "rollup.put_wing@v1"
 GOOD_V2: dict[str, Any] = {
     **{k: v for k, v in GOOD.items() if "option_liquidity" not in k},
-    f"{WING}.wing_oi": 3_000,
-    f"{WING}.wing_volume": 2_000,
-    f"{WING}.wing_spread_pct": 0.08,
+    f"{WING}.delta_band_distance": 0.0,
+    f"{WING}.best_put_oi": 3_000,
+    f"{WING}.best_put_volume": 2_000,
+    f"{WING}.best_put_spread_pct": 0.08,
+    f"{WING}.best_put_strike": 40.0,
+    f"{WING}.target_expiry": date(2026, 11, 20),
     "rollup.price_moves@v1.one_day_move": 0.04,
 }
+PUT_FIELDS = ("delta_band_distance", "best_put_oi", "best_put_volume", "best_put_spread_pct")
 FIXTURE_V2: dict[str, dict[str, Any]] = {
     "EQ:STRONG": GOOD_V2,
+    "EQ:D20": {**GOOD_V2, f"{WING}.delta_band_distance": 0.05},  # best put 20 delta
+    "EQ:D25": {**GOOD_V2, f"{WING}.delta_band_distance": 0.10},  # best put 25 delta
+    "EQ:THINOI": {**GOOD_V2, f"{WING}.best_put_oi": 500},
+    "EQ:WIDE": {**GOOD_V2, f"{WING}.best_put_spread_pct": 0.20},
     "EQ:GAPPY": {**GOOD_V2, "rollup.price_moves@v1.one_day_move": 0.13},  # flag only
-    "EQ:NOMOVE": {**GOOD_V2, "rollup.price_moves@v1.one_day_move": None},  # flag unknown: none
-    "EQ:THINOI": {**GOOD_V2, f"{WING}.wing_oi": 800},  # within 50% of 1,000
-    "EQ:THINVOL": {**GOOD_V2, f"{WING}.wing_volume": 600},
-    "EQ:WIDE": {**GOOD_V2, f"{WING}.wing_spread_pct": 0.18},  # 15-20%: near miss
-    "EQ:EDGEOI": {**GOOD_V2, f"{WING}.wing_oi": 1_000},  # "> 1,000": exactly 1,000 misses
-    "EQ:VERYWIDE": {**GOOD_V2, f"{WING}.wing_spread_pct": 0.30},  # beyond the band
-    "EQ:NOWING": {  # no 8-15 delta strike: missing -> SKIPPED, never a pass
-        **GOOD_V2,
-        f"{WING}.wing_oi": None,
-        f"{WING}.wing_volume": None,
-        f"{WING}.wing_spread_pct": None,
-    },
+    "EQ:NOMOVE": {**GOOD_V2, "rollup.price_moves@v1.one_day_move": None},  # unknown: no flag
+    "EQ:NOPUT": {**GOOD_V2, **{f"{WING}.{f}": None for f in PUT_FIELDS}},  # never filtered
+}
+EXPECTED_V2 = {  # id: (score, flags)
+    "EQ:STRONG": (100.0, ()),
+    "EQ:GAPPY": (100.0, ("large_move",)),
+    "EQ:NOMOVE": (100.0, ()),
+    "EQ:D20": (97.5, ()),
+    "EQ:WIDE": (100 - 10 * 0.05 / 0.15, ()),
+    "EQ:D25": (95.0, ()),
+    "EQ:THINOI": (95.0, ()),
+    "EQ:NOPUT": (60.0, ()),
 }
 
 
-def test_v2_resolves_with_put_wing_liquidity(preset_v2: ResolvedConfig) -> None:
+def test_v2_resolves_with_scored_put_criteria(preset_v2: ResolvedConfig) -> None:
     spec = preset_v2.screen_spec
     assert spec.version == 2 and preset_v2.config.schedule is None  # on request, like v1
-    soft = {
-        c.id: (c.field, c.rule.op, c.rule.value, c.on_miss)
-        for c in spec.criteria
-        if c.mode.value == "soft"
+    assert preset_v2.config.name == "VRP"
+    modes = {c.id: c.mode.value for c in spec.criteria}
+    assert {k: v for k, v in modes.items() if v == "soft"} == {"adv": "soft"}
+    put = {c.id: (c.field, c.rule.op, c.rule.value) for c in spec.criteria if WING in c.field}
+    assert put == {
+        "delta_closeness": (f"{WING}.delta_band_distance", "lte", 0),
+        "put_open_interest": (f"{WING}.best_put_oi", "gt", 1_000),
+        "put_trading_volume": (f"{WING}.best_put_volume", "gt", 1_000),
+        "put_bid_ask": (f"{WING}.best_put_spread_pct", "lt", 0.15),
     }
-    assert soft == {
-        "adv": ("rollup.price_stats@v2.adv_usd_20d", "gte", 50_000_000, "LIQUIDITY_RISK"),
-        "wing_oi": (f"{WING}.wing_oi", "gt", 1_000, "LIQUIDITY_RISK"),
-        "wing_volume": (f"{WING}.wing_volume", "gt", 1_000, "LIQUIDITY_RISK"),
-        "wing_spread": (f"{WING}.wing_spread_pct", "lt", 0.15, "LIQUIDITY_RISK"),
-    }
+    assert all(modes[c] == "score" for c in put)  # OI, volume, spread, delta: never gates
     assert not any("option_liquidity" in c.field for c in spec.criteria)
     assert [name for name, _ in spec.flags] == ["large_move", "leveraged_inverse"]
     columns = dict(spec.columns)
-    assert columns["best_put_strike"] == f"{WING}.best_put_strike"
-    assert columns["best_put_delta"] == f"{WING}.best_put_delta"
-    assert columns["best_put_premium"] == f"{WING}.best_put_mid"
-    assert columns["best_put_roc"] == f"{WING}.best_put_roc"
+    assert {k: columns[k] for k in ("put_strike", "put_delta", "put_premium", "put_roc")} == {
+        "put_strike": f"{WING}.best_put_strike",
+        "put_delta": f"{WING}.best_put_delta",
+        "put_premium": f"{WING}.best_put_mid",
+        "put_roc": f"{WING}.best_put_roc",
+    }
+    assert columns["put_expiry"] == f"{WING}.target_expiry"
+    # a put column never shares a name with a criterion over another field
+    assert not {c for c in columns if c.startswith("put_")} & set(modes)
 
 
 def test_v2_fixture_outcomes(preset_v2: ResolvedConfig) -> None:
     result = evaluate_screen(preset_v2.screen_spec, FeatureView(DAY, FIXTURE_V2))
     rows = {r.instrument_id: r for r in result.rows}
-    assert rows["EQ:STRONG"].decision is Decision.QUALIFIED and rows["EQ:STRONG"].flags == ()
-    assert rows["EQ:GAPPY"].decision is Decision.QUALIFIED
-    assert rows["EQ:GAPPY"].flags == ("large_move",)
-    assert rows["EQ:NOMOVE"].decision is Decision.QUALIFIED and rows["EQ:NOMOVE"].flags == ()
-    for iid in ("EQ:THINOI", "EQ:THINVOL", "EQ:WIDE", "EQ:EDGEOI"):
-        assert rows[iid].decision is Decision.LIQUIDITY_RISK, iid
-    assert rows["EQ:VERYWIDE"].decision is Decision.REJECT
-    assert rows["EQ:NOWING"].decision is Decision.SKIPPED
-    assert rows["EQ:NOWING"].reasons[0] == f"no {WING}.wing_oi"
-    misses = {m.instrument_id: m.criterion_id for m in result.summary.narrow_misses}
-    assert misses == {
-        "EQ:THINOI": "wing_oi",
-        "EQ:THINVOL": "wing_volume",
-        "EQ:WIDE": "wing_spread",
-        "EQ:EDGEOI": "wing_oi",
-    }
+    for iid, (score, flags) in EXPECTED_V2.items():
+        row = rows[iid]
+        assert (row.decision, row.flags) == (Decision.QUALIFIED, flags), iid
+        assert row.score == pytest.approx(score), iid
+    assert rows["EQ:D20"].score > rows["EQ:D25"].score > rows["EQ:NOPUT"].score
+    assert result.summary.passed == len(FIXTURE_V2) and not result.summary.skipped
+    assert not result.summary.narrow_misses  # score criteria never make a near miss decision
