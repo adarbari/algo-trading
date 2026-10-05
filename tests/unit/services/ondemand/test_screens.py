@@ -8,6 +8,7 @@ import pytest
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.services.explore.store import NotFoundError
 from algotrade.services.ondemand.screens import READY, OnDemandScreens, RunRequest
+from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.locks import held
 from tests.helpers.ondemand_store import DAY, SCREEN, SNAPSHOT, seeded_backend, site_configs
 
@@ -95,5 +96,14 @@ def test_a_run_waits_for_the_ingest_lock(runner: OnDemandScreens) -> None:
                 "running",
             )
         assert wait(ondemand, request).state == "complete"
+    finally:
+        ondemand.close()
+
+
+def test_nothing_can_be_screened_before_any_data_is_stored() -> None:
+    ondemand = OnDemandScreens(MemoryBackend(), site_configs())
+    try:
+        with pytest.raises(NotFoundError, match="no data"):
+            ondemand.request("big_liquid", SITE)
     finally:
         ondemand.close()
