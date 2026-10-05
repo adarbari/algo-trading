@@ -1,0 +1,194 @@
+{
+  "config_id": "vrp_scanner",
+  "user": "site",
+  "session": "2026-10-02",
+  "previous_session": "2026-10-01",
+  "run_id": "run-1",
+  "decisions": {
+    "QUALIFIED": 3,
+    "WATCH": 1,
+    "LIQUIDITY_RISK": 1,
+    "REJECT": 4198
+  },
+  "changes": {
+    "new": 2,
+    "dropped": 1
+  },
+  "criteria": [
+    {
+      "criterion_id": "security_type",
+      "field": "instrument.security_type",
+      "mode": "hard"
+    },
+    {
+      "criterion_id": "iv30",
+      "field": "rollup.iv30@v1.iv30",
+      "mode": "hard"
+    },
+    {
+      "criterion_id": "iv_hv_ratio",
+      "field": "feature.iv_hv_ratio",
+      "mode": "hard"
+    }
+  ],
+  "column_names": ["spread"],
+  "feature_columns": [],
+  "missing": [],
+  "page": {
+    "items": [
+      {
+        "rank": 1,
+        "instrument_id": "EQ:DKNG",
+        "symbol": "DKNG",
+        "name": "DraftKings Inc.",
+        "decision": "QUALIFIED",
+        "score": 90,
+        "reasons": "",
+        "flags": [],
+        "change": "new",
+        "previous_decision": null,
+        "criteria": {
+          "security_type": {
+            "value": "COMMON_STOCK",
+            "outcome": "PASS"
+          },
+          "iv30": {
+            "value": 0.61,
+            "outcome": "PASS"
+          },
+          "iv_hv_ratio": {
+            "value": 1.22,
+            "outcome": "PASS"
+          }
+        },
+        "columns": {
+          "spread": 0.11
+        },
+        "features": {}
+      },
+      {
+        "rank": 2,
+        "instrument_id": "EQ:SOXS",
+        "symbol": "SOXS",
+        "name": "Direxion Daily Semiconductor Bear 3X",
+        "decision": "QUALIFIED",
+        "score": 90,
+        "reasons": "iv_hv_ratio 1.08 below 1.25 (within tolerance)",
+        "flags": ["leveraged_inverse"],
+        "change": null,
+        "previous_decision": "QUALIFIED",
+        "criteria": {
+          "security_type": {
+            "value": "COMMON_STOCK",
+            "outcome": "PASS"
+          },
+          "iv30": {
+            "value": 1.11,
+            "outcome": "PASS"
+          },
+          "iv_hv_ratio": {
+            "value": 1.08,
+            "outcome": "NEAR"
+          }
+        },
+        "columns": {
+          "spread": 0.04
+        },
+        "features": {}
+      },
+      {
+        "rank": 3,
+        "instrument_id": "EQ:UVXY",
+        "symbol": "UVXY",
+        "name": "ProShares Ultra VIX Short-Term Futures",
+        "decision": "QUALIFIED",
+        "score": 81,
+        "reasons": "",
+        "flags": [],
+        "change": "new",
+        "previous_decision": null,
+        "criteria": {
+          "security_type": {
+            "value": "COMMON_STOCK",
+            "outcome": "PASS"
+          },
+          "iv30": {
+            "value": 0.8,
+            "outcome": "PASS"
+          },
+          "iv_hv_ratio": {
+            "value": 1.69,
+            "outcome": "PASS"
+          }
+        },
+        "columns": {
+          "spread": 0.33
+        },
+        "features": {}
+      },
+      {
+        "rank": 4,
+        "instrument_id": "EQ:CHTR",
+        "symbol": "CHTR",
+        "name": "Charter Communications",
+        "decision": "LIQUIDITY_RISK",
+        "score": 80,
+        "reasons": "put open interest 410 below 1000",
+        "flags": [],
+        "change": null,
+        "previous_decision": "LIQUIDITY_RISK",
+        "criteria": {
+          "security_type": {
+            "value": "COMMON_STOCK",
+            "outcome": "PASS"
+          },
+          "iv30": {
+            "value": 0.68,
+            "outcome": "PASS"
+          },
+          "iv_hv_ratio": {
+            "value": 1.22,
+            "outcome": "PASS"
+          }
+        },
+        "columns": {
+          "spread": 0.12
+        },
+        "features": {}
+      },
+      {
+        "rank": 5,
+        "instrument_id": "EQ:RKT",
+        "symbol": "RKT",
+        "name": "Rocket Companies",
+        "decision": "WATCH",
+        "score": 72,
+        "reasons": "iv_hv_ratio 0.90 below 1.25",
+        "flags": [],
+        "change": null,
+        "previous_decision": "QUALIFIED",
+        "criteria": {
+          "security_type": {
+            "value": "COMMON_STOCK",
+            "outcome": "PASS"
+          },
+          "iv30": {
+            "value": 0.62,
+            "outcome": "PASS"
+          },
+          "iv_hv_ratio": {
+            "value": 0.9,
+            "outcome": "FAIL"
+          }
+        },
+        "columns": {
+          "spread": 0.21
+        },
+        "features": {}
+      }
+    ],
+    "total": 5,
+    "page": 1,
+    "size": 1000
+  }
+}

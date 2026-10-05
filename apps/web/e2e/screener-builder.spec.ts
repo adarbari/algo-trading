@@ -83,7 +83,7 @@ for (const width of [800, 1024, 1280]) {
       expect(fits, `${name} fits its cell`).toBe(true);
     }
     await row.getByRole('button', { name: 'Open' }).click();
-    await expect(page).toHaveURL(/\/screeners\/vrp_scanner\/edit$/);
+    await expect(page).toHaveURL(/\/screeners\/vrp_scanner$/);
   });
 }
 

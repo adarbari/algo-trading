@@ -12,15 +12,17 @@ import { CopyPresetDialog } from '@/features/screener-copy';
 import { myColumns, presetColumns, type MyScreener } from '../model/columns';
 
 export interface ScreenerListProps {
-  /** Open a screener in the Builder. */
+  /** Open a screener's results. */
   onOpen: (id: string) => void;
+  /** Open a screener in the Builder (a new copy opens there: it has no run yet). */
+  onEdit: (id: string) => void;
 }
 
-export function ScreenerList({ onOpen }: ScreenerListProps) {
+export function ScreenerList({ onOpen, onEdit }: ScreenerListProps) {
   const configs = useScreeners();
   const mine = useMyScreeners();
   const [copying, setCopying] = useState<string | null>(null);
-  const actions = useMemo(() => ({ onOpen, onCopy: setCopying }), [onOpen]);
+  const actions = useMemo(() => ({ onOpen, onEdit, onCopy: setCopying }), [onOpen, onEdit]);
   const presetCols = useMemo(() => presetColumns(actions), [actions]);
   const myCols = useMemo(() => myColumns(actions), [actions]);
   const all = configs.data ?? [];
@@ -82,7 +84,7 @@ export function ScreenerList({ onOpen }: ScreenerListProps) {
           }}
           onCopied={(id) => {
             setCopying(null);
-            onOpen(id);
+            onEdit(id);
           }}
         />
       )}

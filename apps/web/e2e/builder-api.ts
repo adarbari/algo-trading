@@ -43,6 +43,10 @@ export interface BuilderMock {
   rebased: string[];
   checks: string[];
   features: Json[];
+  /** The query of every GET /screens/{id}/table. */
+  tables: Record<string, string>[];
+  /** Every PUT of a screener view. */
+  views: { id: string; view: Json }[];
 }
 
 export async function mockBuilderApi(
@@ -59,11 +63,14 @@ export async function mockBuilderApi(
     rebased: [],
     checks: [],
     features: [],
+    tables: [],
+    views: [],
   };
   const details: Record<string, Json> = Object.fromEntries(
     Object.entries(DETAILS).map(([id, detail]) => [id, structuredClone(detail)]),
   );
 
+  const saved: Record<string, Json> = {}; // the views a flow saved, read back by the next GET
   const detailOf = (id: string): Json | null => details[id] ?? null;
   // Your screens: one finalised with a working copy, one draft only; copies and new drafts join.
   const own = new Set(['my-vrp']);
@@ -136,6 +143,25 @@ export async function mockBuilderApi(
         },
         201,
       );
+    }
+    const table = /^\/screens\/([^/]+)\/table$/.exec(path);
+    if (table && method === 'GET') {
+      mock.tables.push(Object.fromEntries(url.searchParams));
+      const id = decodeURIComponent(table[1] ?? '');
+      return id === 'vrp_scanner'
+        ? json({ ...fixture('table.json'), config_id: id })
+        : json({ detail: `no results of ${id} stored` }, 404);
+    }
+    const viewOf = /^\/preferences\/screeners\/([^/]+)\/view$/.exec(path);
+    if (viewOf) {
+      const id = decodeURIComponent(viewOf[1] ?? '');
+      if (method === 'PUT') {
+        const view = body();
+        mock.views.push({ id, view });
+        saved[id] = { screener_id: id, saved: true, ...view };
+        return json(saved[id]);
+      }
+      return json(saved[id] ?? { ...fixture('view.json'), screener_id: id });
     }
     const match = /^\/screeners\/([^/]+)(?:\/(\w+))?$/.exec(path);
     if (!match) return route.fallback();

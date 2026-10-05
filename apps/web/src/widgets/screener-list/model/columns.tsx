@@ -8,7 +8,10 @@ import { Button, Stack, StatusBadge, type DataTableColumn } from '@algotrade/ui'
 import type { ScreenerListItem, ScreenerSummary } from '@/entities/screen';
 
 export interface ScreenerActions {
+  /** Open a screener's results. */
   onOpen: (id: string) => void;
+  /** Open a screener in the Builder. */
+  onEdit: (id: string) => void;
   onCopy: (preset: string) => void;
 }
 
@@ -137,13 +140,21 @@ export function myColumns(actions: ScreenerActions): DataTableColumn<MyScreener>
       value: () => null,
       sortable: false,
       hideable: false,
-      width: 'md',
+      width: 'xl',
       cell: ({ row }) => (
         <Stack direction="row" gap={2} justify="end">
           <Button
             size="sm"
             onClick={() => {
               actions.onOpen(row.screener_id);
+            }}
+          >
+            Results
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              actions.onEdit(row.screener_id);
             }}
           >
             Edit

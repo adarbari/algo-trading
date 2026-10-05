@@ -4,13 +4,15 @@ import { Button, Heading, Stack, Text } from '@algotrade/ui';
 import { ScreenerList } from '@/widgets/screener-list';
 
 export interface ScreenersPageProps {
-  /** Open a screener in the Builder. */
+  /** Open a screener's results. */
   onOpen: (id: string) => void;
+  /** Open a screener in the Builder. */
+  onEdit: (id: string) => void;
   /** Start a new screener. */
   onNew: () => void;
 }
 
-export function ScreenersPage({ onOpen, onNew }: ScreenersPageProps) {
+export function ScreenersPage({ onOpen, onEdit, onNew }: ScreenersPageProps) {
   return (
     <Stack gap={3}>
       <Stack direction="row" gap={3} align="center" justify="between" wrap>
@@ -25,7 +27,7 @@ export function ScreenersPage({ onOpen, onNew }: ScreenersPageProps) {
           + New screener
         </Button>
       </Stack>
-      <ScreenerList onOpen={onOpen} />
+      <ScreenerList onOpen={onOpen} onEdit={onEdit} />
     </Stack>
   );
 }
