@@ -2784,7 +2784,7 @@
         "properties": {
           "limit": {
             "default": 50,
-            "description": "how many top rows to return",
+            "description": "the fewest top rows; every row not rejected comes too (up to 1000)",
             "maximum": 1000.0,
             "minimum": 0.0,
             "title": "Limit",

@@ -53,7 +53,7 @@ export function useScreenerVersions(id: string | null, enabled = true) {
   });
 }
 
-/** How many top rows the preview returns. */
+/** The fewest top rows the preview returns (it returns every row not rejected besides). */
 export const PREVIEW_ROWS = 50;
 
 /**

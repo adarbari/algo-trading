@@ -120,6 +120,12 @@ def test_limit_trims_rows_not_the_summary() -> None:
     assert sum(got.decisions.values()) == 4
 
 
+def test_every_row_not_rejected_is_returned_past_the_limit() -> None:
+    got = preview(preview_store(), limit=1)
+    assert [r.decision for r in got.rows] == ["QUALIFIED", "WATCH"]
+    assert [r.decision for r in preview(preview_store(), limit=0).rows] == ["QUALIFIED", "WATCH"]
+
+
 def test_threshold_edits_reuse_the_field_frame_and_a_publish_invalidates() -> None:
     store = preview_store()
     first = preview(store)

@@ -12,7 +12,12 @@ from algotrade_api.schemas.health import Schema
 class PreviewBody(BaseModel):
     spec: dict[str, Any] = Field(description="the draft rule screen (as the Builder holds it)")
     user: str | None = Field(None, description="whose catalogue and presets (default the API's)")
-    limit: int = Field(50, ge=0, le=1000, description="how many top rows to return")
+    limit: int = Field(
+        50,
+        ge=0,
+        le=1000,
+        description="the fewest top rows; every row not rejected comes too (up to 1000)",
+    )
 
 
 class FunnelStep(Schema):

@@ -5,8 +5,9 @@ nothing.
 
 ``preview_screen`` returns the run summary (passed, missing data by field, narrow misses), the
 decision counts, the funnel per gating criterion in spec order, the coverage, the session used
-and the top ``limit`` rows. The field frame is cached (``preview.frame``), so an edit that
-keeps the field set re-evaluates in memory.
+and the top rows: every row that is not rejected and at least ``limit`` (at most
+``MAX_PAGE_SIZE``), so a screen with more picks than ``limit`` still shows each one. The field
+frame is cached (``preview.frame``), so an edit that keeps the field set re-evaluates in memory.
 """
 
 from collections.abc import Mapping, Sequence
@@ -26,6 +27,7 @@ from algotrade.services.explore.store import BARS, MAX_PAGE_SIZE, ReadStore, par
 from algotrade.services.features import config_features
 from algotrade.services.screening.run import rule_run, settle_coverage
 from algotrade.services.views import to_value
+from algotrade.strategies.screeners.base import Decision
 from algotrade.strategies.screeners.rules import Outcome, RuleRow, RuleScreener
 
 DRAFT_ID = "preview"  # the screen id of a draft that names none
@@ -239,7 +241,8 @@ def preview_screen(
     run = rule_run(result, ids, screening)
     run = settle_coverage(run, selected, frame.universe, session, screening, frame.missing)
     symbols = frame.symbols
-    top = result.rows[: max(0, min(limit, MAX_PAGE_SIZE))]
+    kept = sum(1 for r in result.rows if r.decision is not Decision.REJECT)  # ranked first
+    top = result.rows[: max(0, min(max(limit, kept), MAX_PAGE_SIZE))]
     summary = result.summary
     steps = funnel(rules, result.rows)
     return ScreenPreview(
