@@ -162,8 +162,9 @@ the skill with the fix.
 
 Worktrees: `scripts/worktree.sh <branch> [base]` makes `../algo-trading-<slug>` off
 `origin/main` (links `.venv`, writes `worktree.env` with the worktree's absolute `PYTHONPATH`,
-`npm ci`); `source` that file; `--remove` cleans up. Never `--no-verify` / `SKIP=`: the hooks
-work in a worktree.
+runs its own `npm ci`); `source` that file; `--remove` cleans up. Never symlink `node_modules`
+to main's: `make check`'s `npm ci` through the link empties main's. Never `--no-verify` /
+`SKIP=`: the hooks work in a worktree.
 
 Commands (need `uv`; `make doctor` checks the machine, `make status` shows PRs, jobs, store): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make perf` (strict timing budgets; run on an idle machine), `make layout`, `make evaluate`, `make baseline`, `make features-doc`.
 Web (need Node 24): `make web-install`, `make web-check` (part of `make check`), `make web-visual` (screenshots, Docker); in `apps/web`: `npm run dev|storybook|check|visual:update`.
