@@ -19,6 +19,7 @@ from algotrade_sources.framework.http import RetryPolicy
 from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource
 from algotrade_sources.vendors.ibkr.gateway import GatewayConfig, IbkrMarketData
 from algotrade_sources.vendors.ibkr.market_data import IbkrSource
+from algotrade_sources.vendors.ishares.etf_holdings import IsharesHoldings
 from algotrade_sources.vendors.massive.bars import MassiveDailyBars
 from algotrade_sources.vendors.massive.corporate_actions import MassiveCorporateActions
 from algotrade_sources.vendors.massive.tickers import MassiveTickers
@@ -26,6 +27,8 @@ from algotrade_sources.vendors.nasdaq.earnings import NasdaqEarningsSource
 from algotrade_sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts
 from algotrade_sources.vendors.sec.edgar import SecSubmissions, SecTickerMap
+from algotrade_sources.vendors.sec.nport_holdings import NportHoldings
+from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource
 from algotrade_sources.vendors.treasury.par_yields import TreasuryParYields
 from tests.conftest import GOLDEN_DIR, REPO_ROOT
@@ -69,6 +72,41 @@ def nasdaq_trader() -> Adapter:
 def spy_holdings() -> Adapter:
     payload = universe_payloads.spy(["AAPL"])
     return SpyHoldingsSource(http_for(lambda url: payload)), FetchRequest("SPY")
+
+
+def ssga_holdings() -> Adapter:
+    files = FIXTURES / "ssga"
+    payloads = {"fundfinder": (files / "fundfinder.json").read_bytes()}
+    xlk = (files / "holdings-daily-us-en-xlk.xlsx").read_bytes()
+    source = SsgaHoldings(
+        http_for(lambda url: payloads["fundfinder"] if "fundfinder" in url else xlk)
+    )
+    return source, FetchRequest("XLK")
+
+
+def ishares_holdings() -> Adapter:
+    files = FIXTURES / "ishares"
+    screener = (files / "product-screener.json").read_bytes()
+    ivv = (files / "IVV_latest-holdings.csv").read_bytes()
+    source = IsharesHoldings(http_for(lambda url: screener if "screener" in url else ivv))
+    return source, FetchRequest("IVV")
+
+
+def sec_nport_holdings() -> Adapter:
+    files = FIXTURES / "sec"
+    funds = (files / "company_tickers_mf.json").read_bytes()
+    submissions = (files / "submissions_vanguard_index_funds.json").read_bytes()
+    header = (files / "nport_header_0000036405-26-000480.html").read_bytes()
+    report = (files / "nport_total_stock_market_trimmed.xml").read_bytes()
+
+    def transport(url: str) -> bytes:
+        if "company_tickers_mf" in url:
+            return funds
+        if "submissions" in url:
+            return submissions
+        return header if url.endswith("index-headers.html") else report
+
+    return NportHoldings(http_for(transport)), FetchRequest("VTI")
 
 
 def nasdaq_earnings() -> Adapter:
@@ -132,6 +170,9 @@ ADAPTERS: dict[str, Callable[[], Adapter]] = {
     "ibkr": ibkr,
     "nasdaq_trader": nasdaq_trader,
     "spy_holdings": spy_holdings,
+    "ssga_holdings": ssga_holdings,
+    "ishares_holdings": ishares_holdings,
+    "sec_nport_holdings": sec_nport_holdings,
 }
 
 

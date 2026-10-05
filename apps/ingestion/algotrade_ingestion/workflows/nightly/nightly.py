@@ -61,6 +61,8 @@ NIGHTLY: tuple[Step, ...] = (
     Step("universe-build", latest_only=True),
     Step("company-details", latest_only=True),
     Step("shares", latest_only=True),
+    # What each ETF holds (ADR 0034): issuer files, a weekly slot per fund (~100 funds a night).
+    Step("etf-holdings", requires=universe_exists, latest_only=True),
     Step("earnings"),
     Step("bars"),
     Step("rates"),

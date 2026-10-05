@@ -82,6 +82,7 @@ ENDPOINTS = (
     "/instruments/AAA/bars",
     "/instruments/AAA/events",
     "/instruments/AAA/features",
+    "/instruments/BULL/holdings",
     "/chains/AAA",
     "/chains/AAA/live?expiry=2022-12-23",
     "/features",

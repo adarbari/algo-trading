@@ -310,6 +310,31 @@ TREASURY_RATES = _fixed(
     "rate_par float64!",
     "rate_cont float64!",
 )
+# L2: what an ETF holds (ADR 0034): one row per fund x holding x as-of date, the largest
+# ``[etf_holdings] keep_top`` holdings of the fund's file, ranked by weight (1 = largest).
+# ``as_of`` is the issuer's holdings date; the partition is the session of the run that read
+# it. Runs are increments (a few funds each), so they merge on (fund, as_of, rank); a later
+# run of the same as_of may hold fewer holdings, so readers take each fund's rows from its
+# latest run (``data.funds.holdings``). ``weight`` is a fraction of the fund (negative for
+# shorts); ``holding_id`` is the holding's instrument when its ticker resolves to a universe
+# instrument; ``holdings_count`` counts every line of the issuer's file, not only those kept.
+ETF_HOLDINGS = _fixed(
+    "holdings/etf",
+    "holdings",
+    ("instrument_id", "as_of", "rank", "holding_name", "weight", "holdings_count"),
+    "instrument_id string!",
+    "symbol string",
+    "as_of date!",
+    "rank int64!",
+    *_strings("holding_symbol", "holding_id"),
+    "holding_name string!",
+    "weight float64!",
+    *_strings("asset_class", "sector", "identifier"),
+    "shares float64",
+    "holdings_count int64!",
+    runs="merge",
+    key=("instrument_id", "as_of", "rank"),
+)
 # Live verification (ADR 0026): our values vs another source's, one row per instrument and
 # check for a session. ``status`` is PASS / WARN / FAIL / NA; ``diff`` is in the check's
 # tolerance unit (relative or absolute, per ``note``).
@@ -393,6 +418,7 @@ KNOWN: dict[str, TableSpec] = {
         RULE_SCREEN,
         RULE_SCREEN_VALUES,
         LIVE_OPTION_QUOTES,
+        ETF_HOLDINGS,
     )
 }
 # Open-ended tables: the producing rollup, event source, catalogue or screener defines the

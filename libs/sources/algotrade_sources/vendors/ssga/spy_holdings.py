@@ -6,44 +6,36 @@ disclaimer text. Tickers use the same style as Nasdaq Trader (``BRK.B``). Non-se
 (cash ``-``, identifiers that are not tickers) are skipped and counted.
 """
 
-import io
 import re
-from datetime import date, datetime
+from datetime import date
 
 import pandas as pd
 
 from algotrade_sources.framework.base import FetchRequest, Normalized
 from algotrade_sources.framework.http import Http
+from algotrade_sources.vendors.ssga.workbook import read_workbook
 
 SOURCE = "ssga_spy"
 DATASET = "spy_holdings"
 URL = "https://www.ssga.com/us/en/intermediary/library-content/products/fund-data/etfs/us/holdings-daily-us-en-spy.xlsx"
 _TICKER = re.compile(r"^[A-Z]{1,5}(\.[A-Z])?$")
-_AS_OF = re.compile(r"As of (\d{2}-[A-Za-z]{3}-\d{4})")
 
 
 def parse_holdings(payload: bytes) -> tuple[pd.DataFrame, date | None, int]:
     """-> (holdings with ``symbol``, ``name``, ``weight``; the as-of date; skipped lines)."""
-    import openpyxl  # noqa: PLC0415 - algotrade-sources-only dependency, loaded where needed
-
-    sheet = openpyxl.load_workbook(io.BytesIO(payload), read_only=True, data_only=True).active
-    rows = [r for r in sheet.iter_rows(values_only=True) if any(v is not None for v in r)]
-    as_of = None
-    for row in rows[:6]:
-        match = _AS_OF.search(" ".join(str(v) for v in row if v))
-        if match:
-            as_of = datetime.strptime(match.group(1), "%d-%b-%Y").date()  # noqa: DTZ007
-    header = next(i for i, r in enumerate(rows) if r[0] == "Name" and r[1] == "Ticker")
+    book = read_workbook(payload)
+    if "Ticker" not in book.table.columns:
+        raise ValueError("SPY holdings workbook has no Name / Ticker table")
     holdings, skipped = [], 0
-    for row in rows[header + 1 :]:
-        if row[1] is None:  # disclaimer text after the table
-            break
-        ticker = str(row[1]).strip().upper()
-        if not _TICKER.match(ticker):
+    for name, ticker, weight in zip(
+        book.table["Name"], book.table["Ticker"], book.table["Weight"], strict=True
+    ):
+        symbol = str(ticker).strip().upper()
+        if not _TICKER.match(symbol):
             skipped += 1
             continue
-        holdings.append({"symbol": ticker, "name": row[0], "weight": float(row[4] or 0.0)})
-    return pd.DataFrame(holdings, columns=["symbol", "name", "weight"]), as_of, skipped
+        holdings.append({"symbol": symbol, "name": name, "weight": float(weight or 0.0)})
+    return pd.DataFrame(holdings, columns=["symbol", "name", "weight"]), book.as_of, skipped
 
 
 class SpyHoldingsSource:

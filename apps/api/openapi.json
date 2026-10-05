@@ -855,6 +855,62 @@
         "title": "EquityPoint",
         "type": "object"
       },
+      "EtfHoldings": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "instrument_id": {
+            "title": "Instrument Id",
+            "type": "string"
+          },
+          "is_etf": {
+            "title": "Is Etf",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Holding"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "instrument_id",
+          "is_etf",
+          "as_of",
+          "source",
+          "total",
+          "items"
+        ],
+        "title": "EtfHoldings",
+        "type": "object"
+      },
       "ExpressionCheck": {
         "properties": {
           "categories": {
@@ -1418,6 +1474,65 @@
           "versions"
         ],
         "title": "Health",
+        "type": "object"
+      },
+      "Holding": {
+        "properties": {
+          "asset_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Class"
+          },
+          "instrument_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument Id"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "number"
+          }
+        },
+        "required": [
+          "rank",
+          "name",
+          "symbol",
+          "instrument_id",
+          "weight",
+          "asset_class"
+        ],
+        "title": "Holding",
         "type": "object"
       },
       "Idea": {
@@ -6320,6 +6435,79 @@
         "summary": "Features",
         "tags": [
           "instruments"
+        ]
+      }
+    },
+    "/instruments/{instrument_id}/holdings": {
+      "get": {
+        "operationId": "holdings_instruments__instrument_id__holdings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instrument_id",
+            "required": true,
+            "schema": {
+              "title": "Instrument Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "holdings to return",
+            "in": "query",
+            "name": "top",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "description": "holdings to return",
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Top",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EtfHoldings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Holdings",
+        "tags": [
+          "funds"
         ]
       }
     },

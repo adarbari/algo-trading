@@ -96,6 +96,9 @@ def test_missing_files_fall_back_to_defaults() -> None:
         ({"http": {"error_window": 0}}, r"error_window: expected an integer >= 1"),
         ({"http": {"max_error_rate": 2}}, r"max_error_rate: expected a fraction"),
         ({"http": {"pace": 1}}, r"\[http\]: unknown keys \['pace'\]"),
+        ({"etf_holdings": {"keep_top": -1}}, r"\[etf_holdings\] keep_top: expected an integer"),
+        ({"etf_holdings": {"fallback_scope": "some"}}, r"\[etf_holdings\] fallback_scope"),
+        ({"etf_holdings": {"refresh": 7}}, r"\[etf_holdings\]: unknown keys \['refresh'\]"),
     ],
 )
 def test_sources_errors_name_the_key(doc: dict[str, Any], message: str) -> None:
@@ -282,6 +285,18 @@ def test_the_committed_figi_overrides_file_loads() -> None:
 def test_figi_override_errors_name_the_line(rows: list[dict[str, str]], message: str) -> None:
     with pytest.raises(ConfigurationError, match=message):
         load_universe(figi_store(rows))
+
+
+def test_etf_holdings_settings_and_the_issuer_sections() -> None:
+    sources = SourcesSettings.from_document(site("sources"))
+    assert (sources.etf_refresh_days, sources.etf_keep_top) == (7, 100)
+    assert sources.etf_fallback_scope == "optionable"
+    for issuer in ("ssga", "ishares"):  # State Street also serves SPY's membership file
+        assert sources.vendor(issuer).enabled and sources.vendor(issuer).raw_retention_days == 14
+    document = {"etf_holdings": {"refresh_days": 3, "keep_top": 0, "fallback_scope": "all"}}
+    custom = SourcesSettings.from_document(document)
+    assert (custom.etf_refresh_days, custom.etf_keep_top) == (3, 0)
+    assert custom.etf_fallback_scope == "all"
 
 
 def test_ibkr_and_verification_settings() -> None:

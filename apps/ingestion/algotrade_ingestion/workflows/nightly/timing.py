@@ -24,6 +24,7 @@ UNITS: Mapping[str, str] = {
     "universe-build": "instruments",
     "company-details": "CIKs",
     "shares": "CIKs",
+    "etf-holdings": "funds",
     "earnings": "dates",
     "bars": "sessions",
     "rates": "years",
@@ -36,6 +37,7 @@ UNITS: Mapping[str, str] = {
 RESULT_ITEMS: Mapping[str, str] = {
     "company-details": "requested",
     "shares": "requested",
+    "etf-holdings": "requested",
     "universe-build": "covered",
 }
 

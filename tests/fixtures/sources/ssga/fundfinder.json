@@ -1,0 +1,1074 @@
+{
+ "data": {
+  "fundType": [
+   {
+    "key": "etfs",
+    "name": "ETFs",
+    "size": 4
+   }
+  ],
+  "funds": {
+   "etfs": {
+    "datas": [
+     {
+      "domicile": "US",
+      "fundName": "SPDR\u00ae Gold Shares",
+      "fundTicker": "GLD\u00ae",
+      "fundUri": "/us/en/intermediary/etfs/spdr-gold-shares-gld",
+      "ter": [
+       "0.40%",
+       0.4
+      ],
+      "nav": [
+       "$384.13",
+       384.13
+      ],
+      "aum": [
+       "$142,166.00 M",
+       142166.0
+      ],
+      "asOfDate": [
+       "Oct 02 2026",
+       "2026-10-02"
+      ],
+      "fundNamePerf": "NAV",
+      "PerfAsOf": [
+       "Aug 31 2026",
+       "2026-08-31"
+      ],
+      "mo1": [
+       "13.28%",
+       13.28
+      ],
+      "qtd": [
+       "-12.72%",
+       -12.72
+      ],
+      "ytd": [
+       "5.64%",
+       5.64
+      ],
+      "yr1": [
+       "32.54%",
+       32.54
+      ],
+      "yr3": [
+       "32.38%",
+       32.38
+      ],
+      "yr5": [
+       "19.76%",
+       19.76
+      ],
+      "yr10": [
+       "12.84%",
+       12.84
+      ],
+      "sinceInception": [
+       "10.86%",
+       10.86
+      ],
+      "inceptionDate": [
+       "Nov 18 2004",
+       "2004-11-18"
+      ],
+      "PerfAsOf_1": [
+       "Jun 30 2026",
+       "2026-06-30"
+      ],
+      "mo1_1": [
+       "-11.47%",
+       -11.47
+      ],
+      "qtd_1": [
+       "-12.72%",
+       -12.72
+      ],
+      "ytd_1": [
+       "-6.73%",
+       -6.73
+      ],
+      "yr1_1": [
+       "21.99%",
+       21.99
+      ],
+      "yr3_1": [
+       "27.64%",
+       27.64
+      ],
+      "yr5_1": [
+       "17.48%",
+       17.48
+      ],
+      "yr10_1": [
+       "11.34%",
+       11.34
+      ],
+      "sinceInception_1": [
+       "10.32%",
+       10.32
+      ],
+      "primaryExchange": "NYSE ARCA",
+      "closePrice": [
+       "$380.14",
+       380.14
+      ],
+      "bidAsk": [
+       "$380.19",
+       380.19
+      ],
+      "premiumDiscount": [
+       "0.03%",
+       0.03
+      ],
+      "documentPdf": [
+       {
+        "docType": "Factsheet",
+        "docs": [
+         {
+          "language": "",
+          "name": "Factsheet",
+          "path": "/library-content/products/factsheets/etfs/us/factsheet-us-en-gld.pdf",
+          "canDownload": true
+         }
+        ]
+       },
+       {
+        "docType": "Prospectus",
+        "docs": [
+         {
+          "language": "",
+          "name": "Prospectus",
+          "path": "https://connect.rightprospectus.com/SSGA/TADF/78463v107/P?site=FundsOld&SPV=true",
+          "canDownload": false,
+          "docViewer": "/us/en/intermediary/resources/doc-viewer#gld&prospectus"
+         }
+        ]
+       },
+       {
+        "docType": "Navhist",
+        "docs": [
+         {
+          "language": "",
+          "name": "NAV History",
+          "path": "/library-content/products/fund-data/etfs/us/navhist-us-en-gld.xlsx",
+          "canDownload": true
+         }
+        ]
+       },
+       {
+        "docType": "Supplements",
+        "docs": [
+         {
+          "language": "",
+          "name": "Monthly Gold Monitor",
+          "path": "/library-content/products/fund-docs/etfs/us/insights-investment-ideas/monthly-gold-monitor.pdf",
+          "canDownload": true
+         },
+         {
+          "language": "",
+          "name": "GLD FAQ",
+          "path": "/library-content/products/fund-docs/etfs/us/tax-documents/gld-faq.pdf",
+          "canDownload": true
+         },
+         {
+          "language": "",
+          "name": "Fed tightening should not alter gold\u2019s structural story",
+          "path": "/library-content/products/fund-docs/etfs/us/insights-investment-ideas/fed-tightening-should-not-alter-golds-structural-story.pdf",
+          "canDownload": true
+         }
+        ]
+       }
+      ],
+      "fundFilter": "GLD",
+      "keywords": "SPDR\u00ae Gold Shares, GLD, Alternative, GLD US, US78463V1070, 78463V107, Commodities & CTAs",
+      "otherFund": [
+       {
+        "fundNamePerf": "Market Value",
+        "fundTicker": "GLD\u00ae",
+        "PerfAsOf": "Aug 31 2026",
+        "ter": "0.40%",
+        "mo1": "9.93%",
+        "qtd": "-14.39%",
+        "ytd": "3.06%",
+        "yr1": "28.41%",
+        "yr3": "31.37%",
+        "yr5": "19.19%",
+        "yr10": "12.58%",
+        "sinceInception": "10.72%",
+        "inceptionDate": "Nov 18 2004",
+        "PerfAsOf_1": "Jun 30 2026",
+        "mo1_1": "-11.68%",
+        "qtd_1": "-14.39%",
+        "ytd_1": "-7.05%",
+        "yr1_1": "20.85%",
+        "yr3_1": "27.34%",
+        "yr5_1": "17.33%",
+        "yr10_1": "11.27%",
+        "sinceInception_1": "10.28%",
+        "num": 13
+       }
+      ],
+      "perfIndex": [
+       {
+        "fundName": "Benchmark",
+        "glossary": "LBMA Gold Price PM",
+        "fundTicker": "-",
+        "ter": "-",
+        "PerfAsOf": "Aug 31 2026",
+        "mo1": "13.32%",
+        "qtd": "-12.64%",
+        "ytd": "4.46%",
+        "yr1": "33.06%",
+        "yr3": "32.90%",
+        "yr5": "20.24%",
+        "yr10": "13.29%",
+        "sinceInception": "11.30%",
+        "inceptionDate": "Nov 18 2004",
+        "PerfAsOf_1": "Jun 30 2026",
+        "mo1_1": "-11.44%",
+        "qtd_1": "-12.64%",
+        "ytd_1": "-7.82%",
+        "yr1_1": "22.47%",
+        "yr3_1": "28.14%",
+        "yr5_1": "17.94%",
+        "yr10_1": "11.78%",
+        "sinceInception_1": "10.75%",
+        "num": 13
+       }
+      ]
+     },
+     {
+      "domicile": "US",
+      "fundName": "State Street\u00ae SPDR\u00ae Bloomberg 1-3 Month T-Bill ETF",
+      "fundTicker": "BIL",
+      "fundUri": "/us/en/intermediary/etfs/state-street-spdr-bloomberg-1-3-month-t-bill-etf-bil",
+      "ter": [
+       "0.1353%",
+       0.1353
+      ],
+      "nav": [
+       "$91.43",
+       91.43
+      ],
+      "aum": [
+       "$50,701.51 M",
+       50701.51
+      ],
+      "asOfDate": [
+       "Oct 02 2026",
+       "2026-10-02"
+      ],
+      "fundNamePerf": "NAV",
+      "PerfAsOf": [
+       "Aug 31 2026",
+       "2026-08-31"
+      ],
+      "mo1": [
+       "0.28%",
+       0.28
+      ],
+      "qtd": [
+       "0.61%",
+       0.61
+      ],
+      "ytd": [
+       "2.36%",
+       2.36
+      ],
+      "yr1": [
+       "3.70%",
+       3.7
+      ],
+      "yr3": [
+       "4.51%",
+       4.51
+      ],
+      "yr5": [
+       "3.59%",
+       3.59
+      ],
+      "yr10": [
+       "2.26%",
+       2.26
+      ],
+      "sinceInception": [
+       "1.39%",
+       1.39
+      ],
+      "inceptionDate": [
+       "May 25 2007",
+       "2007-05-25"
+      ],
+      "PerfAsOf_1": [
+       "Jun 30 2026",
+       "2026-06-30"
+      ],
+      "mo1_1": [
+       "0.29%",
+       0.29
+      ],
+      "qtd_1": [
+       "0.88%",
+       0.88
+      ],
+      "ytd_1": [
+       "1.74%",
+       1.74
+      ],
+      "yr1_1": [
+       "3.83%",
+       3.83
+      ],
+      "yr3_1": [
+       "4.59%",
+       4.59
+      ],
+      "yr5_1": [
+       "3.46%",
+       3.46
+      ],
+      "yr10_1": [
+       "2.20%",
+       2.2
+      ],
+      "sinceInception_1": [
+       "1.37%",
+       1.37
+      ],
+      "primaryExchange": "NYSE ARCA",
+      "closePrice": [
+       "$91.43",
+       91.43
+      ],
+      "bidAsk": [
+       "$91.42",
+       91.42
+      ],
+      "premiumDiscount": [
+       "0.00%",
+       0.0
+      ],
+      "documentPdf": [
+       {
+        "docType": "Factsheet",
+        "docs": [
+         {
+          "language": "",
+          "name": "Factsheet",
+          "path": "/library-content/products/factsheets/etfs/us/factsheet-us-en-bil.pdf",
+          "canDownload": true
+         }
+        ]
+       },
+       {
+        "docType": "Prospectus",
+        "docs": [
+         {
+          "language": "",
+          "name": "Prospectus",
+          "path": "https://connect.rightprospectus.com/SSGA/TADF/78468R663/P?site=FundsOld&SPV=true",
+          "canDownload": false,
+          "docViewer": "/us/en/intermediary/resources/doc-viewer#bil&prospectus"
+         }
+        ]
+       },
+       {
+        "docType": "Summary-prospectus",
+        "docs": [
+         {
+          "language": "",
+          "name": "Summary Prospectus",
+          "path": "https://connect.rightprospectus.com/SSGA/TADF/78468R663/SP?site=FundsOld&SPV=true",
+          "canDownload": false,
+          "docViewer": "/us/en/intermediary/resources/doc-viewer#bil&summary-prospectus"
+         }
+        ]
+       },
+       {
+        "docType": "Semi-annual-report",
+        "docs": [
+         {
+          "language": "",
+          "name": "Semi-Annual Report",
+          "path": "https://connect.rightprospectus.com/SSGA/TVT/78468R663/SAR?site=Funds&SPV=true",
+          "canDownload": false,
+          "docViewer": "/us/en/intermediary/resources/doc-viewer#bil&semi-annual-report"
+         }
+        ]
+       },
+       {
+        "docType": "Annual-report",
+        "docs": [
+         {
+          "language": "",
+          "name": "Annual Report",
+          "path": "https://connect.rightprospectus.com/SSGA/TVT/78468R663/AR?site=Funds&SPV=true",
+          "canDownload": false,
+          "docViewer": "/us/en/intermediary/resources/doc-viewer#bil&annual-report"
+         }
+        ]
+       },
+       {
+        "docType": "Sai",
+        "docs": [
+         {
+          "language": "",
+          "name": "SAI",
+          "path": "https://connect.rightprospectus.com/SSGA/TADF/78468R663/S?site=FundsOld&SPV=true",
+          "canDownload": false,
+          "docViewer": "/us/en/intermediary/resources/doc-viewer#bil&sai"
+         }
+        ]
+       },
+       {
+        "docType": "Navhist",
+        "docs": [
+         {
+          "language": "",
+          "name": "NAV History",
+          "path": "/library-content/products/fund-data/etfs/us/navhist-us-en-bil.xlsx",
+          "canDownload": true
+         }
+        ]
+       },
+       {
+        "docType": "Holdings-daily",
+        "docs": [
+         {
+          "language": "",
+          "name": "Daily Holdings",
+          "path": "/library-content/products/fund-data/etfs/us/holdings-daily-us-en-bil.xlsx",
+          "canDownload": true
+         }
+        ]
+       },
+       {
+        "docType": "Semi-annual-n-csr",
+        "docs": [
+         {
+          "language": "EN",
+          "name": "Semi Annual Financial Statements and Other Information",
+          "path": "https://connect.rightprospectus.com/SSGA/TADF/78468R663/NSRS?site=FundsOld&SPV=true",
+          "canDownload": false,
+          "docViewer": "/us/en/intermediary/resources/doc-viewer#bil&semi-annual-financial-statements-and-other-information"
+         }
+        ]
+       },
+       {
+        "docType": "Annual-n-csr",
+        "docs": [
+         {
+          "language": "",
+          "name": "Annual Financial Statements and Other Information",
+          "path": "https://connect.rightprospectus.com/SSGA/TADF/78468R663/NCSR?site=FundsOld&SPV=true",
+          "canDownload": false,
+          "docViewer": "/us/en/intermediary/resources/doc-viewer#bil&annual-n-csr"
+         }
+        ]
+       }
+      ],
+      "fundFilter": "BIL",
+      "keywords": "State Street\u00ae SPDR\u00ae Bloomberg 1-3 Month T-Bill ETF, BIL, Fixed Income, BIL US, US78468R6633, 78468R663, Treasury and Government, Investment Grade",
+      "otherFund": [
+       {
+        "fundNamePerf": "Market Value",
+        "fundTicker": "BIL",
+        "PerfAsOf": "Aug 31 2026",
+        "ter": "0.1353%",
+        "mo1": "0.28%",
+        "qtd": "0.61%",
+        "ytd": "2.37%",
+        "yr1": "3.71%",
+        "yr3": "4.49%",
+        "yr5": "3.59%",
+        "yr10": "2.27%",
+        "sinceInception": "1.39%",
+        "inceptionDate": "May 25 2007",
+        "PerfAsOf_1": "Jun 30 2026",
+        "mo1_1": "0.28%",
+        "qtd_1": "0.88%",
+        "ytd_1": "1.74%",
+        "yr1_1": "3.82%",
+        "yr3_1": "4.58%",
+        "yr5_1": "3.46%",
+        "yr10_1": "2.20%",
+        "sinceInception_1": "1.37%",
+        "num": 13
+       }
+      ],
+      "perfIndex": [
+       {
+        "fundName": "Benchmark",
+        "glossary": "Bloomberg 1-3 Month U.S. Treasury Bill Index",
+        "fundTicker": "-",
+        "ter": "-",
+        "PerfAsOf": "Aug 31 2026",
+        "mo1": "0.29%",
+        "qtd": "0.63%",
+        "ytd": "2.45%",
+        "yr1": "3.84%",
+        "yr3": "4.64%",
+        "yr5": "3.74%",
+        "yr10": "2.41%",
+        "sinceInception": "1.51%",
+        "inceptionDate": "May 25 2007",
+        "PerfAsOf_1": "Jun 30 2026",
+        "mo1_1": "0.30%",
+        "qtd_1": "0.92%",
+        "ytd_1": "1.81%",
+        "yr1_1": "3.96%",
+        "yr3_1": "4.74%",
+        "yr5_1": "3.61%",
+        "yr10_1": "2.35%",
+        "sinceInception_1": "1.49%",
+        "num": 13
+       }
+      ]
+     },
+     {
+      "domicile": "US",
+      "fundName": "State Street\u00ae SPDR\u00ae Dow Jones Industrial Average\u00ae ETF Trust",
+      "fundTicker": "DIA",
+      "fundUri": "/us/en/intermediary/etfs/state-street-spdr-dow-jones-industrial-average-etf-trust-dia",
+      "ter": [
+       "0.16%",
+       0.16
+      ],
+      "nav": [
+       "$510.99",
+       510.99
+      ],
+      "aum": [
+       "$45,193.69 M",
+       45193.69
+      ],
+      "asOfDate": [
+       "Oct 02 2026",
+       "2026-10-02"
+      ],
+      "fundNamePerf": "NAV",
+      "PerfAsOf": [
+       "Aug 31 2026",
+       "2026-08-31"
+      ],
+      "mo1": [
+       "1.45%",
+       1.45
+      ],
+      "qtd": [
+       "1.83%",
+       1.83
+      ],
+      "ytd": [
+       "11.52%",
+       11.52
+      ],
+      "yr1": [
+       "18.26%",
+       18.26
+      ],
+      "yr3": [
+       "17.03%",
+       17.03
+      ],
+      "yr5": [
+       "10.35%",
+       10.35
+      ],
+      "yr10": [
+       "13.34%",
+       13.34
+      ],
+      "sinceInception": [
+       "9.21%",
+       9.21
+      ],
+      "inceptionDate": [
+       "Jan 14 1998",
+       "1998-01-14"
+      ],
+      "PerfAsOf_1": [
+       "Jun 30 2026",
+       "2026-06-30"
+      ],
+      "mo1_1": [
+       "2.57%",
+       2.57
+      ],
+      "qtd_1": [
+       "13.18%",
+       13.18
+      ],
+      "ytd_1": [
+       "9.52%",
+       9.52
+      ],
+      "yr1_1": [
+       "20.28%",
+       20.28
+      ],
+      "yr3_1": [
+       "16.85%",
+       16.85
+      ],
+      "yr5_1": [
+       "10.56%",
+       10.56
+      ],
+      "yr10_1": [
+       "13.49%",
+       13.49
+      ],
+      "sinceInception_1": [
+       "9.19%",
+       9.19
+      ],
+      "primaryExchange": "NYSE ARCA",
+      "closePrice": [
+       "$511.10",
+       511.1
+      ],
+      "bidAsk": [
+       "$511.03",
+       511.03
+      ],
+      "premiumDiscount": [
+       "0.01%",
+       0.01
+      ],
+      "documentPdf": [
+       {
+        "docType": "Factsheet",
+        "docs": [
+         {
+          "language": "",
+          "name": "Factsheet",
+          "path": "/library-content/products/factsheets/etfs/us/factsheet-us-en-dia.pdf",
+          "canDownload": true
+         }
+        ]
+       },
+       {
+        "docType": "Prospectus",
+        "docs": [
+         {
+          "language": "",
+          "name": "Prospectus",
+          "path": "https://connect.rightprospectus.com/SSGA/TADF/78467X109/P?site=FundsOld&SPV=true",
+          "canDownload": false,
+          "docViewer": "/us/en/intermediary/resources/doc-viewer#dia&prospectus"
+         }
+        ]
+       },
+       {
+        "docType": "Semi-annual-report",
+        "docs": [
+         {
+          "language": "",
+          "name": "Semi-Annual Report",
+          "path": "https://connect.rightprospectus.com/SSGA/TVT/78467X109/SAR?site=Funds&SPV=true",
+          "canDownload": false,
+          "docViewer": "/us/en/intermediary/resources/doc-viewer#dia&semi-annual-report"
+         }
+        ]
+       },
+       {
+        "docType": "Annual-report",
+        "docs": [
+         {
+          "language": "",
+          "name": "Annual Report",
+          "path": "https://connect.rightprospectus.com/SSGA/TVT/78467X109/AR?site=Funds&SPV=true",
+          "canDownload": false,
+          "docViewer": "/us/en/intermediary/resources/doc-viewer#dia&annual-report"
+         }
+        ]
+       },
+       {
+        "docType": "Navhist",
+        "docs": [
+         {
+          "language": "",
+          "name": "NAV History",
+          "path": "/library-content/products/fund-data/etfs/us/navhist-us-en-dia.xlsx",
+          "canDownload": true
+         }
+        ]
+       },
+       {
+        "docType": "Holdings-daily",
+        "docs": [
+         {
+          "language": "",
+          "name": "Daily Holdings",
+          "path": "/library-content/products/fund-data/etfs/us/holdings-daily-us-en-dia.xlsx",
+          "canDownload": true
+         }
+        ]
+       }
+      ],
+      "fundFilter": "DIA",
+      "keywords": "State Street\u00ae SPDR\u00ae Dow Jones Industrial Average\u00ae ETF Trust, DIA, Equity, US78467X1090, 78467X109, Core",
+      "otherFund": [
+       {
+        "fundNamePerf": "Market Value",
+        "fundTicker": "DIA",
+        "PerfAsOf": "Aug 31 2026",
+        "ter": "0.16%",
+        "mo1": "1.46%",
+        "qtd": "1.89%",
+        "ytd": "11.53%",
+        "yr1": "18.28%",
+        "yr3": "17.04%",
+        "yr5": "10.36%",
+        "yr10": "13.34%",
+        "sinceInception": "9.18%",
+        "inceptionDate": "Jan 14 1998",
+        "PerfAsOf_1": "Jun 30 2026",
+        "mo1_1": "2.53%",
+        "qtd_1": "13.17%",
+        "ytd_1": "9.46%",
+        "yr1_1": "20.30%",
+        "yr3_1": "16.85%",
+        "yr5_1": "10.56%",
+        "yr10_1": "13.48%",
+        "sinceInception_1": "9.17%",
+        "num": 13
+       }
+      ],
+      "perfIndex": [
+       {
+        "fundName": "Benchmark",
+        "glossary": "Dow Jones Industrial Average\u00ae",
+        "fundTicker": "-",
+        "ter": "-",
+        "PerfAsOf": "Aug 31 2026",
+        "mo1": "1.47%",
+        "qtd": "1.85%",
+        "ytd": "11.79%",
+        "yr1": "18.62%",
+        "yr3": "17.29%",
+        "yr5": "10.56%",
+        "yr10": "13.53%",
+        "sinceInception": "9.36%",
+        "inceptionDate": "Jan 14 1998",
+        "PerfAsOf_1": "Jun 30 2026",
+        "mo1_1": "2.71%",
+        "qtd_1": "13.38%",
+        "ytd_1": "9.76%",
+        "yr1_1": "20.65%",
+        "yr3_1": "17.10%",
+        "yr5_1": "10.78%",
+        "yr10_1": "13.68%",
+        "sinceInception_1": "9.35%",
+        "num": 13
+       }
+      ]
+     },
+     {
+      "domicile": "US",
+      "fundName": "State Street\u00ae Technology Select Sector SPDR\u00ae ETF",
+      "fundTicker": "XLK",
+      "fundUri": "/us/en/intermediary/etfs/state-street-technology-select-sector-spdr-etf-xlk",
+      "ter": [
+       "0.08%",
+       0.08
+      ],
+      "nav": [
+       "$199.82",
+       199.82
+      ],
+      "aum": [
+       "$130,243.92 M",
+       130243.92
+      ],
+      "asOfDate": [
+       "Oct 02 2026",
+       "2026-10-02"
+      ],
+      "fundNamePerf": "NAV",
+      "PerfAsOf": [
+       "Aug 31 2026",
+       "2026-08-31"
+      ],
+      "mo1": [
+       "6.37%",
+       6.37
+      ],
+      "qtd": [
+       "-2.15%",
+       -2.15
+      ],
+      "ytd": [
+       "29.83%",
+       29.83
+      ],
+      "yr1": [
+       "42.85%",
+       42.85
+      ],
+      "yr3": [
+       "29.39%",
+       29.39
+      ],
+      "yr5": [
+       "19.50%",
+       19.5
+      ],
+      "yr10": [
+       "24.30%",
+       24.3
+      ],
+      "sinceInception": [
+       "10.69%",
+       10.69
+      ],
+      "inceptionDate": [
+       "Dec 16 1998",
+       "1998-12-16"
+      ],
+      "PerfAsOf_1": [
+       "Jun 30 2026",
+       "2026-06-30"
+      ],
+      "mo1_1": [
+       "-0.13%",
+       -0.13
+      ],
+      "qtd_1": [
+       "43.48%",
+       43.48
+      ],
+      "ytd_1": [
+       "32.68%",
+       32.68
+      ],
+      "yr1_1": [
+       "51.24%",
+       51.24
+      ],
+      "yr3_1": [
+       "30.74%",
+       30.74
+      ],
+      "yr5_1": [
+       "21.78%",
+       21.78
+      ],
+      "yr10_1": [
+       "25.57%",
+       25.57
+      ],
+      "sinceInception_1": [
+       "10.84%",
+       10.84
+      ],
+      "primaryExchange": "NYSE ARCA",
+      "closePrice": [
+       "$199.81",
+       199.81
+      ],
+      "bidAsk": [
+       "$199.85",
+       199.85
+      ],
+      "premiumDiscount": [
+       "0.02%",
+       0.02
+      ],
+      "documentPdf": [
+       {
+        "docType": "Factsheet",
+        "docs": [
+         {
+          "language": "",
+          "name": "Factsheet",
+          "path": "/library-content/products/factsheets/etfs/us/factsheet-us-en-xlk.pdf",
+          "canDownload": true
+         }
+        ]
+       },
+       {
+        "docType": "Prospectus",
+        "docs": [
+         {
+          "language": "",
+          "name": "Prospectus",
+          "path": "https://connect.rightprospectus.com/SSGA/TADF/81369Y803/P?site=FundsOld&SPV=true",
+          "canDownload": false,
+          "docViewer": "/us/en/intermediary/resources/doc-viewer#xlk&prospectus"
+         }
+        ]
+       },
+       {
+        "docType": "Summary-prospectus",
+        "docs": [
+         {
+          "language": "",
+          "name": "Summary Prospectus",
+          "path": "https://connect.rightprospectus.com/SSGA/TADF/81369Y803/SP?site=FundsOld&SPV=true",
+          "canDownload": false,
+          "docViewer": "/us/en/intermediary/resources/doc-viewer#xlk&summary-prospectus"
+         }
+        ]
+       },
+       {
+        "docType": "Semi-annual-report",
+        "docs": [
+         {
+          "language": "",
+          "name": "Semi-Annual Report",
+          "path": "https://connect.rightprospectus.com/SSGA/TVT/81369Y803/SAR?site=Funds&SPV=true",
+          "canDownload": false,
+          "docViewer": "/us/en/intermediary/resources/doc-viewer#xlk&semi-annual-report"
+         }
+        ]
+       },
+       {
+        "docType": "Annual-report",
+        "docs": [
+         {
+          "language": "",
+          "name": "Annual Report",
+          "path": "https://connect.rightprospectus.com/SSGA/TVT/81369Y803/AR?site=Funds&SPV=true",
+          "canDownload": false,
+          "docViewer": "/us/en/intermediary/resources/doc-viewer#xlk&annual-report"
+         }
+        ]
+       },
+       {
+        "docType": "Sai",
+        "docs": [
+         {
+          "language": "",
+          "name": "SAI",
+          "path": "https://connect.rightprospectus.com/SSGA/TADF/81369Y803/S?site=FundsOld&SPV=true",
+          "canDownload": false,
+          "docViewer": "/us/en/intermediary/resources/doc-viewer#xlk&sai"
+         }
+        ]
+       },
+       {
+        "docType": "Navhist",
+        "docs": [
+         {
+          "language": "",
+          "name": "NAV History",
+          "path": "/library-content/products/fund-data/etfs/us/navhist-us-en-xlk.xlsx",
+          "canDownload": true
+         }
+        ]
+       },
+       {
+        "docType": "Holdings-daily",
+        "docs": [
+         {
+          "language": "",
+          "name": "Daily Holdings",
+          "path": "/library-content/products/fund-data/etfs/us/holdings-daily-us-en-xlk.xlsx",
+          "canDownload": true
+         }
+        ]
+       },
+       {
+        "docType": "Supplements",
+        "docs": [
+         {
+          "language": "",
+          "name": "Select Your Sectors",
+          "path": "/master/na/en/role-master/capabilities/equities/sector-investing/select-sector-etfs",
+          "canDownload": false
+         }
+        ]
+       },
+       {
+        "docType": "Semi-annual-n-csr",
+        "docs": [
+         {
+          "language": "",
+          "name": "Semi Annual Financial Statements and Other Information",
+          "path": "https://connect.rightprospectus.com/SSGA/TADF/81369Y803/NSRS?site=FundsOld&SPV=true",
+          "canDownload": false,
+          "docViewer": "/us/en/intermediary/resources/doc-viewer#xlk&semi-annual-financial-statements-and-other-information"
+         }
+        ]
+       },
+       {
+        "docType": "Annual-n-csr",
+        "docs": [
+         {
+          "language": "",
+          "name": "Annual Financial Statements and Other Information",
+          "path": "https://connect.rightprospectus.com/SSGA/TADF/81369Y803/NCSR?site=FundsOld&SPV=true",
+          "canDownload": false,
+          "docViewer": "/us/en/intermediary/resources/doc-viewer#xlk&annual-n-csr"
+         }
+        ]
+       }
+      ],
+      "fundFilter": "XLK",
+      "keywords": "State Street\u00ae Technology Select Sector SPDR\u00ae ETF, XLK, Equity, XLK US, US81369Y8030, 81369Y803, Core, Sectors & Industries",
+      "otherFund": [
+       {
+        "fundNamePerf": "Market Value",
+        "fundTicker": "XLK",
+        "PerfAsOf": "Aug 31 2026",
+        "ter": "0.08%",
+        "mo1": "6.35%",
+        "qtd": "-2.09%",
+        "ytd": "29.82%",
+        "yr1": "42.80%",
+        "yr3": "29.39%",
+        "yr5": "19.49%",
+        "yr10": "24.30%",
+        "sinceInception": "10.69%",
+        "inceptionDate": "Dec 16 1998",
+        "PerfAsOf_1": "Jun 30 2026",
+        "mo1_1": "-0.23%",
+        "qtd_1": "43.45%",
+        "ytd_1": "32.59%",
+        "yr1_1": "51.22%",
+        "yr3_1": "30.73%",
+        "yr5_1": "21.77%",
+        "yr10_1": "25.56%",
+        "sinceInception_1": "10.84%",
+        "num": 13
+       }
+      ],
+      "perfIndex": [
+       {
+        "fundName": "Benchmark",
+        "glossary": "Technology Select Sector Index",
+        "fundTicker": "-",
+        "ter": "-",
+        "PerfAsOf": "Aug 31 2026",
+        "mo1": "6.37%",
+        "qtd": "-2.13%",
+        "ytd": "29.88%",
+        "yr1": "42.95%",
+        "yr3": "29.50%",
+        "yr5": "19.61%",
+        "yr10": "24.47%",
+        "sinceInception": "10.89%",
+        "inceptionDate": "Dec 16 1998",
+        "PerfAsOf_1": "Jun 30 2026",
+        "mo1_1": "-0.13%",
+        "qtd_1": "43.49%",
+        "ytd_1": "32.71%",
+        "yr1_1": "51.34%",
+        "yr3_1": "30.85%",
+        "yr5_1": "21.89%",
+        "yr10_1": "25.75%",
+        "sinceInception_1": "11.05%",
+        "num": 13
+       }
+      ]
+     }
+    ]
+   }
+  }
+ },
+ "msg": "success",
+ "status": 200
+}

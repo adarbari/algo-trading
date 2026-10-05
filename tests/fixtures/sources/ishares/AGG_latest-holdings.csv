@@ -1,0 +1,15 @@
+iShares Core U.S. Aggregate Bond ETF
+Fund Holdings as of,"Oct 02, 2026"
+Inception Date,"Sep 22, 2003"
+Shares Outstanding,"1,441,300,000.00"
+Stock,"-"
+Bond,"-"
+Cash,"-"
+Other,"-"
+
+Name,Sector,Asset Class,Market Value,Weight (%),Notional Value,Par Value,CUSIP,ISIN,SEDOL,Location,Exchange,Currency,Duration,YTM (%),FX Rate,Maturity,Coupon (%),Mod. Duration,Yield to Call (%),Yield to Worst (%),Real Duration,Real YTM (%),Market Currency,Accrual Date,Effective Date
+"BLACKROCK CASH CL INST SL AGENCY","Cash and/or Derivatives","Money Market","4,461,355,149.14","3.28","4,461,355,149.14","4,460,909,058.00","066922519","US0669225197","BKGRT85","United States","-","USD","0.09","3.79","1.00","-","3.90","0.23","-","3.79","0.19","3.79","USD","-","Feb 04, 2009"
+"TREASURY NOTE","Treasury","Fixed Income","544,257,365.91","0.40","544,257,365.91","559,636,000.00","91282CGQ8","US91282CGQ87","BMTY6J7","United States","-","USD","3.13","5.00","1.00","Feb 28, 2030","4.00","3.13","-","5.00","3.13","5.00","USD","Feb 28, 2023","Feb 28, 2023"
+"TREASURY NOTE","Treasury","Fixed Income","543,311,088.45","0.40","543,311,088.45","563,326,000.00","91282CMM0","US91282CMM00","BRXZ4W0","United States","-","USD","6.78","5.24","1.00","Feb 15, 2035","4.63","6.78","-","5.24","6.78","5.24","USD","Feb 15, 2025","Feb 18, 2025"
+"TREASURY NOTE (OLD)","Treasury","Fixed Income","542,058,968.25","0.40","542,058,968.25","571,197,000.00","91282CQQ7","US91282CQQ77","BSHW963","United States","-","USD","7.54","5.28","1.00","May 15, 2036","4.38","7.55","-","5.28","7.55","5.28","USD","May 15, 2026","May 15, 2026"
+"TREASURY NOTE","Treasury","Fixed Income","541,147,892.83","0.40","541,147,892.83","568,556,000.00","91282CLW9","US91282CLW90","BRK14Z4","United States","-","USD","6.61","5.23","1.00","Nov 15, 2034","4.25","6.61","-","5.23","6.61","5.23","USD","Nov 15, 2024","Nov 15, 2024"

@@ -381,6 +381,7 @@ type = "independence"
 modules = [
     "algotrade_sources.vendors.cboe",
     "algotrade_sources.vendors.ibkr",
+    "algotrade_sources.vendors.ishares",
     "algotrade_sources.vendors.massive",
     "algotrade_sources.vendors.nasdaq",
     "algotrade_sources.vendors.sec",

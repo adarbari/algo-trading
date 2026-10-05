@@ -31,6 +31,7 @@ KEY_COUNTS: Mapping[str, tuple[str, ...]] = {
     "universe-build": ("covered", "delisted_carried"),
     "company-details": ("rows", "requested", "fetched", "failed_count", "deferred_by_limit"),
     "shares": ("rows", "requested", "with_facts", "no_facts", "failed_count", "deferred_by_limit"),
+    "etf-holdings": ("rows", "requested", "read", "no_file", "failed_count", "deferred_by_limit"),
     "earnings": ("rows", "companies", "reported", "unresolved"),
     "rates": ("curves", "latest"),
     "corporate-actions": ("events/split", "events/dividend", "unresolved"),

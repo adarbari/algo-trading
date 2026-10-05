@@ -25,7 +25,7 @@ from algotrade_ingestion.tasks.maintenance.golden import load_golden
 from algotrade_sources.framework.base import FixtureSource
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.rollup_store import chain_rows, write_chains, write_dividends, write_split
-from tests.helpers.stored_frames import stamped, universe_rows
+from tests.helpers.stored_frames import holdings_rows, stamped, universe_rows
 
 END = date(2022, 11, 23)  # the last golden session
 PREVIOUS = date(2022, 11, 22)
@@ -111,6 +111,20 @@ def _market(writer: StoreWriter) -> None:
             ("CCC", "div_yield", "NA", None),
         )
     ])  # fmt: skip
+
+
+def _holdings(writer: StoreWriter) -> None:
+    """What the ETF (BULL) holds: an older read, then the latest one (12 of 40 lines kept)."""
+    older = [("AAA", "AAA Corp", 0.6), ("OLD", "Old Holding", 0.4)]
+    _write(writer, "holdings/etf", holdings_rows("EQ:BULL", date(2022, 11, 18), older), PREVIOUS)
+    linked = {"AAA": "EQ:AAA", "BBB": "EQ:BBB"}
+    lines: list[tuple[str | None, str, float]] = [
+        ("AAA", "AAA Corp", 0.25), ("BBB", "BBB Corp", 0.20), ("CAT", "Caterpillar", 0.10),
+        (None, "US Dollar", 0.05),
+        *((f"T{i:02d}", f"Tail {i}", 0.03) for i in range(8)),
+    ]  # fmt: skip
+    rows = holdings_rows("EQ:BULL", date(2022, 11, 22), lines, total=40, linked=linked)
+    _write(writer, "holdings/etf", rows, END)
 
 
 def _runs(writer: StoreWriter) -> None:
@@ -240,6 +254,7 @@ def api_store(source: FixtureSource) -> tuple[ReadStore, dict[str, str]]:
     _reference(writer)
     _rollups(writer)
     _market(writer)
+    _holdings(writer)
     _runs(writer)
     _screen(writer)
     _ideas(writer)

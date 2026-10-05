@@ -1,0 +1,1289 @@
+{
+ "239623": {
+  "aladdinAssetClass": "Equity",
+  "aladdinAssetClassCode": "43511",
+  "aladdinCountry": "Broad",
+  "aladdinCountryCode": "43771",
+  "aladdinMarketType": "Developed",
+  "aladdinMarketTypeCode": "43513",
+  "aladdinRegion": "Global",
+  "aladdinRegionCode": "43520",
+  "aladdinSubAssetClass": "Large/Mid Cap",
+  "aladdinSubAssetClassCode": "43581",
+  "cleanDuration": null,
+  "cusip": "464287465",
+  "dailyPerformanceYearToDate": {
+   "d": "10.11",
+   "r": 10.107599263497503
+  },
+  "effectiveDuration": "-",
+  "fees": {
+   "d": "0.32",
+   "r": 0.32
+  },
+  "fundName": "iShares MSCI EAFE ETF",
+  "fxHedgedYield": "-",
+  "glsDoc": "-",
+  "inceptionDate": {
+   "d": "Aug 14, 2001",
+   "r": 20010814
+  },
+  "investmentStyle": "[Index]",
+  "investmentStyleCode": "[44342]",
+  "investorClassName": " ",
+  "isin": "US4642874659",
+  "localExchangeTicker": "EFA",
+  "mgt": {
+   "d": "0.31",
+   "r": 0.31
+  },
+  "modelOad": "-",
+  "navAmount": {
+   "d": "103.91",
+   "r": 103.90828
+  },
+  "navAmountAsOf": {
+   "d": "Oct 02, 2026",
+   "r": 20261002
+  },
+  "navAnnualisedAsOf": {
+   "d": "Sep 30, 2026",
+   "r": 20260930
+  },
+  "navFiveYearAnnualized": {
+   "d": "9.30",
+   "r": 9.297477
+  },
+  "navOneYearAnnualized": {
+   "d": "14.71",
+   "r": 14.713189
+  },
+  "navPerfAsOf": {
+   "d": "Sep 30, 2026",
+   "r": 20260930
+  },
+  "navSinceInceptionAnnualized": {
+   "d": "6.41",
+   "r": 6.414341
+  },
+  "navTenYearAnnualized": {
+   "d": "8.99",
+   "r": 8.989577
+  },
+  "navThreeYearAnnualized": {
+   "d": "18.30",
+   "r": 18.29884
+  },
+  "navYearToDate": {
+   "d": "9.95",
+   "r": 9.950593
+  },
+  "netr": {
+   "d": "0.32",
+   "r": 0.32
+  },
+  "oneWeekSecYield": "-",
+  "oneWeekUnsubsidizedSecYield": "-",
+  "optionAdjustedSpread": {
+   "d": "0.00",
+   "r": -0.0002
+  },
+  "optionAdjustedSpreadAsOf": {
+   "d": "Oct 01, 2026",
+   "r": 20261001
+  },
+  "portfolioId": 239623,
+  "priceFiveYearAnnualized": {
+   "d": "9.32",
+   "r": 9.31959
+  },
+  "priceOneYearAnnualized": {
+   "d": "21.48",
+   "r": 21.476523
+  },
+  "priceSinceInceptionAnnualized": {
+   "d": "6.58",
+   "r": 6.578506
+  },
+  "priceTenYearAnnualized": {
+   "d": "9.49",
+   "r": 9.488169
+  },
+  "priceThreeYearAnnualized": {
+   "d": "18.19",
+   "r": 18.187144
+  },
+  "priceYearAsOf": {
+   "d": "Aug 31, 2026",
+   "r": 20260831
+  },
+  "priceYearToDate": {
+   "d": "13.65",
+   "r": 13.65094
+  },
+  "productPageUrl": "/us/products/239623/ishares-msci-eafe-etf",
+  "productType": "ISHARES_FUND_DATA",
+  "productView": [
+   "etf"
+  ],
+  "quarterlyNavAsOf": {
+   "d": "Sep 30, 2026",
+   "r": 20260930
+  },
+  "quarterlyNavFiveYearAnnualized": {
+   "d": "9.30",
+   "r": 9.297477
+  },
+  "quarterlyNavOneYearAnnualized": {
+   "d": "14.71",
+   "r": 14.713189
+  },
+  "quarterlyNavSinceInceptionAnnualized": {
+   "d": "6.41",
+   "r": 6.414341
+  },
+  "quarterlyNavTenYearAnnualized": {
+   "d": "8.99",
+   "r": 8.989577
+  },
+  "quarterlyNavThreeYearAnnualized": {
+   "d": "18.30",
+   "r": 18.29884
+  },
+  "quarterlyNavYearToDate": {
+   "d": "9.95",
+   "r": 9.950593
+  },
+  "quarterlyPriceAsOf": {
+   "d": "Jun 30, 2026",
+   "r": 20260630
+  },
+  "quarterlyPriceFiveYearAnnualized": {
+   "d": "9.06",
+   "r": 9.063433
+  },
+  "quarterlyPriceOneYearAnnualized": {
+   "d": "20.19",
+   "r": 20.185005
+  },
+  "quarterlyPriceSinceInceptionAnnualized": {
+   "d": "6.48",
+   "r": 6.480165
+  },
+  "quarterlyPriceTenYearAnnualized": {
+   "d": "9.60",
+   "r": 9.603958
+  },
+  "quarterlyPriceThreeYearAnnualized": {
+   "d": "16.34",
+   "r": 16.339833
+  },
+  "quarterlyPriceYearToDate": {
+   "d": "9.87",
+   "r": 9.874915
+  },
+  "sedol": "-",
+  "ter": {
+   "d": "0.32",
+   "r": 0.32
+  },
+  "thirtyDaySecYield": {
+   "d": "2.08",
+   "r": 2.0753
+  },
+  "thirtyDaySecYieldAsOf": {
+   "d": "Aug 31, 2026",
+   "r": 20260831
+  },
+  "totalNetAssets": {
+   "d": "76,809,000,640",
+   "r": 76809000640.41
+  },
+  "totalNetAssetsFund": {
+   "d": "76,809,000,640",
+   "r": 76809000640.41
+  },
+  "totalNetAssetsFundAsOf": {
+   "d": "Oct 02, 2026",
+   "r": 20261002
+  },
+  "twelveMonTrlYield": {
+   "d": "3.09",
+   "r": 3.09443842544095
+  },
+  "twelveMonTrlYieldAsOf": {
+   "d": "Aug 31, 2026",
+   "r": 20260831
+  },
+  "unsubsidizedYield": {
+   "d": "2.08",
+   "r": 2.0753
+  },
+  "weightedAvgYieldToMaturity": "-",
+  "yieldToWorst": null,
+  "yieldToWorstAsOf": null,
+  "productRange": [
+   [
+    "International Equity",
+    "Geography",
+    "Developed Markets"
+   ],
+   [
+    "International Equity",
+    "Geography",
+    "Broad"
+   ]
+  ],
+  "productRangeCode": [
+   [
+    "77",
+    "78",
+    "81"
+   ],
+   [
+    "77",
+    "78",
+    "84"
+   ]
+  ],
+  "aladdinEsgClassification": "-",
+  "aladdinEsgClassificationCode": "-",
+  "esg.suiteCategory": "-",
+  "esg.suiteCategoryCode": "-",
+  "ter_ocf": {
+   "d": "0.32",
+   "r": 0.32
+  },
+  "modelOad_effectiveDuration": "-",
+  "bidPrice": "-"
+ },
+ "239710": {
+  "aladdinAssetClass": "Equity",
+  "aladdinAssetClassCode": "43511",
+  "aladdinCountry": "United States",
+  "aladdinCountryCode": "43632",
+  "aladdinMarketType": "Developed",
+  "aladdinMarketTypeCode": "43513",
+  "aladdinRegion": "North America",
+  "aladdinRegionCode": "43512",
+  "aladdinSubAssetClass": "Small Cap",
+  "aladdinSubAssetClassCode": "43615",
+  "cleanDuration": null,
+  "cusip": "464287655",
+  "dailyPerformanceYearToDate": {
+   "d": "15.09",
+   "r": 15.094283013685143
+  },
+  "effectiveDuration": "-",
+  "fees": {
+   "d": "0.19",
+   "r": 0.19
+  },
+  "fundName": "iShares Russell 2000 ETF",
+  "fxHedgedYield": "-",
+  "glsDoc": "-",
+  "inceptionDate": {
+   "d": "May 22, 2000",
+   "r": 20000522
+  },
+  "investmentStyle": "[Index]",
+  "investmentStyleCode": "[44342]",
+  "investorClassName": "US Class",
+  "isin": "US4642876555",
+  "localExchangeTicker": "IWM",
+  "mgt": {
+   "d": "0.19",
+   "r": 0.19
+  },
+  "modelOad": "-",
+  "navAmount": {
+   "d": "281.48",
+   "r": 281.483109
+  },
+  "navAmountAsOf": {
+   "d": "Oct 02, 2026",
+   "r": 20261002
+  },
+  "navAnnualisedAsOf": {
+   "d": "Sep 30, 2026",
+   "r": 20260930
+  },
+  "navFiveYearAnnualized": {
+   "d": "6.22",
+   "r": 6.217915
+  },
+  "navOneYearAnnualized": {
+   "d": "16.06",
+   "r": 16.063627
+  },
+  "navPerfAsOf": {
+   "d": "Sep 30, 2026",
+   "r": 20260930
+  },
+  "navSinceInceptionAnnualized": {
+   "d": "8.35",
+   "r": 8.347909
+  },
+  "navTenYearAnnualized": {
+   "d": "9.75",
+   "r": 9.7462
+  },
+  "navThreeYearAnnualized": {
+   "d": "17.59",
+   "r": 17.585408
+  },
+  "navYearToDate": {
+   "d": "13.62",
+   "r": 13.61831
+  },
+  "netr": {
+   "d": "0.19",
+   "r": 0.19
+  },
+  "oneWeekSecYield": "-",
+  "oneWeekUnsubsidizedSecYield": "-",
+  "optionAdjustedSpread": {
+   "d": "0.00",
+   "r": -0.00272
+  },
+  "optionAdjustedSpreadAsOf": {
+   "d": "Oct 01, 2026",
+   "r": 20261001
+  },
+  "portfolioId": 239710,
+  "priceFiveYearAnnualized": {
+   "d": "6.73",
+   "r": 6.729459
+  },
+  "priceOneYearAnnualized": {
+   "d": "26.28",
+   "r": 26.284085
+  },
+  "priceSinceInceptionAnnualized": {
+   "d": "8.60",
+   "r": 8.595786
+  },
+  "priceTenYearAnnualized": {
+   "d": "10.46",
+   "r": 10.461807
+  },
+  "priceThreeYearAnnualized": {
+   "d": "17.32",
+   "r": 17.31863
+  },
+  "priceYearAsOf": {
+   "d": "Aug 31, 2026",
+   "r": 20260831
+  },
+  "priceYearToDate": {
+   "d": "19.90",
+   "r": 19.899926
+  },
+  "productPageUrl": "/us/products/239710/ishares-russell-2000-etf",
+  "productType": "ISHARES_FUND_DATA",
+  "productView": [
+   "etf"
+  ],
+  "quarterlyNavAsOf": {
+   "d": "Sep 30, 2026",
+   "r": 20260930
+  },
+  "quarterlyNavFiveYearAnnualized": {
+   "d": "6.22",
+   "r": 6.217915
+  },
+  "quarterlyNavOneYearAnnualized": {
+   "d": "16.06",
+   "r": 16.063627
+  },
+  "quarterlyNavSinceInceptionAnnualized": {
+   "d": "8.35",
+   "r": 8.347909
+  },
+  "quarterlyNavTenYearAnnualized": {
+   "d": "9.75",
+   "r": 9.7462
+  },
+  "quarterlyNavThreeYearAnnualized": {
+   "d": "17.59",
+   "r": 17.585408
+  },
+  "quarterlyNavYearToDate": {
+   "d": "13.62",
+   "r": 13.61831
+  },
+  "quarterlyPriceAsOf": {
+   "d": "Jun 30, 2026",
+   "r": 20260630
+  },
+  "quarterlyPriceFiveYearAnnualized": {
+   "d": "6.87",
+   "r": 6.874233
+  },
+  "quarterlyPriceOneYearAnnualized": {
+   "d": "40.68",
+   "r": 40.676699
+  },
+  "quarterlyPriceSinceInceptionAnnualized": {
+   "d": "8.75",
+   "r": 8.745416
+  },
+  "quarterlyPriceTenYearAnnualized": {
+   "d": "11.53",
+   "r": 11.531661
+  },
+  "quarterlyPriceThreeYearAnnualized": {
+   "d": "18.46",
+   "r": 18.461609
+  },
+  "quarterlyPriceYearToDate": {
+   "d": "22.56",
+   "r": 22.559564
+  },
+  "sedol": "-",
+  "ter": {
+   "d": "0.19",
+   "r": 0.19
+  },
+  "thirtyDaySecYield": {
+   "d": "1.09",
+   "r": 1.0903
+  },
+  "thirtyDaySecYieldAsOf": {
+   "d": "Aug 31, 2026",
+   "r": 20260831
+  },
+  "totalNetAssets": {
+   "d": "79,026,382,936",
+   "r": 79026382935.82
+  },
+  "totalNetAssetsFund": {
+   "d": "79,026,382,936",
+   "r": 79026382935.82
+  },
+  "totalNetAssetsFundAsOf": {
+   "d": "Oct 02, 2026",
+   "r": 20261002
+  },
+  "twelveMonTrlYield": {
+   "d": "0.90",
+   "r": 0.903451
+  },
+  "twelveMonTrlYieldAsOf": {
+   "d": "Aug 31, 2026",
+   "r": 20260831
+  },
+  "unsubsidizedYield": {
+   "d": "1.09",
+   "r": 1.0903
+  },
+  "weightedAvgYieldToMaturity": "-",
+  "yieldToWorst": null,
+  "yieldToWorstAsOf": null,
+  "productRange": [
+   [
+    "US Equity Size & Style",
+    "Russell"
+   ]
+  ],
+  "productRangeCode": [
+   [
+    "59",
+    "61"
+   ]
+  ],
+  "aladdinEsgClassification": "-",
+  "aladdinEsgClassificationCode": "-",
+  "esg.suiteCategory": "-",
+  "esg.suiteCategoryCode": "-",
+  "ter_ocf": {
+   "d": "0.19",
+   "r": 0.19
+  },
+  "modelOad_effectiveDuration": "-",
+  "bidPrice": "-"
+ },
+ "239726": {
+  "aladdinAssetClass": "Equity",
+  "aladdinAssetClassCode": "43511",
+  "aladdinCountry": "United States",
+  "aladdinCountryCode": "43632",
+  "aladdinMarketType": "Developed",
+  "aladdinMarketTypeCode": "43513",
+  "aladdinRegion": "North America",
+  "aladdinRegionCode": "43512",
+  "aladdinSubAssetClass": "Large Cap",
+  "aladdinSubAssetClassCode": "43580",
+  "cleanDuration": null,
+  "cusip": "464287200",
+  "dailyPerformanceYearToDate": {
+   "d": "13.78",
+   "r": 13.779689126254155
+  },
+  "effectiveDuration": "-",
+  "fees": {
+   "d": "0.03",
+   "r": 0.03
+  },
+  "fundName": "iShares Core S&P 500 ETF",
+  "fxHedgedYield": "-",
+  "glsDoc": "-",
+  "inceptionDate": {
+   "d": "May 15, 2000",
+   "r": 20000515
+  },
+  "investmentStyle": "[Index]",
+  "investmentStyleCode": "[44342]",
+  "investorClassName": " ",
+  "isin": "US4642872000",
+  "localExchangeTicker": "IVV",
+  "mgt": {
+   "d": "0.03",
+   "r": 0.03
+  },
+  "modelOad": "-",
+  "navAmount": {
+   "d": "772.83",
+   "r": 772.828063
+  },
+  "navAmountAsOf": {
+   "d": "Oct 02, 2026",
+   "r": 20261002
+  },
+  "navAnnualisedAsOf": {
+   "d": "Sep 30, 2026",
+   "r": 20260930
+  },
+  "navFiveYearAnnualized": {
+   "d": "13.76",
+   "r": 13.75838
+  },
+  "navOneYearAnnualized": {
+   "d": "15.71",
+   "r": 15.708411
+  },
+  "navPerfAsOf": {
+   "d": "Sep 30, 2026",
+   "r": 20260930
+  },
+  "navSinceInceptionAnnualized": {
+   "d": "8.42",
+   "r": 8.420506
+  },
+  "navTenYearAnnualized": {
+   "d": "15.30",
+   "r": 15.29747
+  },
+  "navThreeYearAnnualized": {
+   "d": "22.85",
+   "r": 22.850859
+  },
+  "navYearToDate": {
+   "d": "12.72",
+   "r": 12.722486
+  },
+  "netr": {
+   "d": "0.03",
+   "r": 0.03
+  },
+  "oneWeekSecYield": "-",
+  "oneWeekUnsubsidizedSecYield": "-",
+  "optionAdjustedSpread": {
+   "d": "0.00",
+   "r": -0.00082
+  },
+  "optionAdjustedSpreadAsOf": {
+   "d": "Oct 01, 2026",
+   "r": 20261001
+  },
+  "portfolioId": 239726,
+  "priceFiveYearAnnualized": {
+   "d": "12.76",
+   "r": 12.760976
+  },
+  "priceOneYearAnnualized": {
+   "d": "20.30",
+   "r": 20.297099
+  },
+  "priceSinceInceptionAnnualized": {
+   "d": "8.46",
+   "r": 8.461666
+  },
+  "priceTenYearAnnualized": {
+   "d": "15.35",
+   "r": 15.345347
+  },
+  "priceThreeYearAnnualized": {
+   "d": "21.03",
+   "r": 21.027726
+  },
+  "priceYearAsOf": {
+   "d": "Aug 31, 2026",
+   "r": 20260831
+  },
+  "priceYearToDate": {
+   "d": "13.13",
+   "r": 13.129217
+  },
+  "productPageUrl": "/us/products/239726/ishares-core-sp-500-etf",
+  "productType": "ISHARES_FUND_DATA",
+  "productView": [
+   "etf"
+  ],
+  "quarterlyNavAsOf": {
+   "d": "Sep 30, 2026",
+   "r": 20260930
+  },
+  "quarterlyNavFiveYearAnnualized": {
+   "d": "13.76",
+   "r": 13.75838
+  },
+  "quarterlyNavOneYearAnnualized": {
+   "d": "15.71",
+   "r": 15.708411
+  },
+  "quarterlyNavSinceInceptionAnnualized": {
+   "d": "8.42",
+   "r": 8.420506
+  },
+  "quarterlyNavTenYearAnnualized": {
+   "d": "15.30",
+   "r": 15.29747
+  },
+  "quarterlyNavThreeYearAnnualized": {
+   "d": "22.85",
+   "r": 22.850859
+  },
+  "quarterlyNavYearToDate": {
+   "d": "12.72",
+   "r": 12.722486
+  },
+  "quarterlyPriceAsOf": {
+   "d": "Jun 30, 2026",
+   "r": 20260630
+  },
+  "quarterlyPriceFiveYearAnnualized": {
+   "d": "13.33",
+   "r": 13.328589
+  },
+  "quarterlyPriceOneYearAnnualized": {
+   "d": "22.05",
+   "r": 22.054092
+  },
+  "quarterlyPriceSinceInceptionAnnualized": {
+   "d": "8.40",
+   "r": 8.399571
+  },
+  "quarterlyPriceTenYearAnnualized": {
+   "d": "15.44",
+   "r": 15.441326
+  },
+  "quarterlyPriceThreeYearAnnualized": {
+   "d": "20.49",
+   "r": 20.493501
+  },
+  "quarterlyPriceYearToDate": {
+   "d": "9.92",
+   "r": 9.922074
+  },
+  "sedol": "-",
+  "ter": {
+   "d": "0.03",
+   "r": 0.03
+  },
+  "thirtyDaySecYield": {
+   "d": "0.94",
+   "r": 0.9379
+  },
+  "thirtyDaySecYieldAsOf": {
+   "d": "Aug 31, 2026",
+   "r": 20260831
+  },
+  "totalNetAssets": {
+   "d": "888,288,575,656",
+   "r": 888288575656.26
+  },
+  "totalNetAssetsFund": {
+   "d": "888,288,575,656",
+   "r": 888288575656.26
+  },
+  "totalNetAssetsFundAsOf": {
+   "d": "Oct 02, 2026",
+   "r": 20261002
+  },
+  "twelveMonTrlYield": {
+   "d": "1.06",
+   "r": 1.062588
+  },
+  "twelveMonTrlYieldAsOf": {
+   "d": "Aug 31, 2026",
+   "r": 20260831
+  },
+  "unsubsidizedYield": {
+   "d": "0.94",
+   "r": 0.9379
+  },
+  "weightedAvgYieldToMaturity": "-",
+  "yieldToWorst": null,
+  "yieldToWorstAsOf": null,
+  "productRange": [
+   [
+    "Core",
+    "Equity"
+   ],
+   [
+    "US Equity Size & Style",
+    "S&P"
+   ]
+  ],
+  "productRangeCode": [
+   [
+    "2",
+    "3"
+   ],
+   [
+    "59",
+    "60"
+   ]
+  ],
+  "esg.alternatives": [
+   315917,
+   286007,
+   314365
+  ],
+  "aladdinEsgClassification": "-",
+  "aladdinEsgClassificationCode": "-",
+  "esg.suiteCategory": "-",
+  "esg.suiteCategoryCode": "-",
+  "ter_ocf": {
+   "d": "0.03",
+   "r": 0.03
+  },
+  "modelOad_effectiveDuration": "-",
+  "bidPrice": "-"
+ },
+ "239855": {
+  "aladdinAssetClass": "Commodity",
+  "aladdinAssetClassCode": "43525",
+  "aladdinCountry": "Broad",
+  "aladdinCountryCode": "43771",
+  "aladdinMarketType": "Developed",
+  "aladdinMarketTypeCode": "43513",
+  "aladdinRegion": "Global",
+  "aladdinRegionCode": "43520",
+  "aladdinSubAssetClass": "Precious Metals",
+  "aladdinSubAssetClassCode": "43608",
+  "cleanDuration": null,
+  "cusip": "46428Q109",
+  "dailyPerformanceYearToDate": {
+   "d": "-15.55",
+   "r": -15.545954644274593
+  },
+  "effectiveDuration": "-",
+  "fees": {
+   "d": "0.50",
+   "r": 0.5
+  },
+  "fundName": "iShares Silver Trust",
+  "fxHedgedYield": "-",
+  "glsDoc": "-",
+  "inceptionDate": {
+   "d": "Apr 21, 2006",
+   "r": 20060421
+  },
+  "investmentStyle": "[Index]",
+  "investmentStyleCode": "[44342]",
+  "investorClassName": " ",
+  "isin": "US46428Q1094",
+  "localExchangeTicker": "SLV",
+  "mgt": {
+   "d": "0.50",
+   "r": 0.5
+  },
+  "modelOad": "-",
+  "navAmount": {
+   "d": "55.12",
+   "r": 55.119018
+  },
+  "navAmountAsOf": {
+   "d": "Oct 02, 2026",
+   "r": 20261002
+  },
+  "navAnnualisedAsOf": {
+   "d": "Sep 30, 2026",
+   "r": 20260930
+  },
+  "navFiveYearAnnualized": {
+   "d": "22.44",
+   "r": 22.4407
+  },
+  "navOneYearAnnualized": {
+   "d": "30.86",
+   "r": 30.863
+  },
+  "navPerfAsOf": {
+   "d": "Sep 30, 2026",
+   "r": 20260930
+  },
+  "navSinceInceptionAnnualized": {
+   "d": "7.64",
+   "r": 7.6357
+  },
+  "navTenYearAnnualized": {
+   "d": "11.56",
+   "r": 11.5586
+  },
+  "navThreeYearAnnualized": {
+   "d": "37.38",
+   "r": 37.3805
+  },
+  "navYearToDate": {
+   "d": "-15.97",
+   "r": -15.966
+  },
+  "netr": {
+   "d": "0.50",
+   "r": 0.5
+  },
+  "oneWeekSecYield": "-",
+  "oneWeekUnsubsidizedSecYield": "-",
+  "optionAdjustedSpread": {
+   "d": "0.00",
+   "r": 0.0
+  },
+  "optionAdjustedSpreadAsOf": {
+   "d": "Oct 01, 2026",
+   "r": 20261001
+  },
+  "portfolioId": 239855,
+  "priceFiveYearAnnualized": {
+   "d": "22.12",
+   "r": 22.1189
+  },
+  "priceOneYearAnnualized": {
+   "d": "66.15",
+   "r": 66.151
+  },
+  "priceSinceInceptionAnnualized": {
+   "d": "8.15",
+   "r": 8.1531
+  },
+  "priceTenYearAnnualized": {
+   "d": "13.00",
+   "r": 12.9959
+  },
+  "priceThreeYearAnnualized": {
+   "d": "39.00",
+   "r": 38.9992
+  },
+  "priceYearAsOf": {
+   "d": "Aug 31, 2026",
+   "r": 20260831
+  },
+  "priceYearToDate": {
+   "d": "-6.66",
+   "r": -6.66
+  },
+  "productPageUrl": "/us/products/239855/ishares-silver-trust-fund",
+  "productType": "ISHARES_FUND_DATA",
+  "productView": [
+   "etf"
+  ],
+  "quarterlyNavAsOf": {
+   "d": "Sep 30, 2026",
+   "r": 20260930
+  },
+  "quarterlyNavFiveYearAnnualized": {
+   "d": "22.44",
+   "r": 22.4407
+  },
+  "quarterlyNavOneYearAnnualized": {
+   "d": "30.86",
+   "r": 30.863
+  },
+  "quarterlyNavSinceInceptionAnnualized": {
+   "d": "7.64",
+   "r": 7.6357
+  },
+  "quarterlyNavTenYearAnnualized": {
+   "d": "11.56",
+   "r": 11.5586
+  },
+  "quarterlyNavThreeYearAnnualized": {
+   "d": "37.38",
+   "r": 37.3805
+  },
+  "quarterlyNavYearToDate": {
+   "d": "-15.97",
+   "r": -15.966
+  },
+  "quarterlyPriceAsOf": {
+   "d": "Jun 30, 2026",
+   "r": 20260630
+  },
+  "quarterlyPriceFiveYearAnnualized": {
+   "d": "17.16",
+   "r": 17.1621
+  },
+  "quarterlyPriceOneYearAnnualized": {
+   "d": "62.97",
+   "r": 62.969
+  },
+  "quarterlyPriceSinceInceptionAnnualized": {
+   "d": "7.60",
+   "r": 7.5971
+  },
+  "quarterlyPriceTenYearAnnualized": {
+   "d": "11.58",
+   "r": 11.5832
+  },
+  "quarterlyPriceThreeYearAnnualized": {
+   "d": "36.79",
+   "r": 36.791
+  },
+  "quarterlyPriceYearToDate": {
+   "d": "-17.00",
+   "r": -16.998
+  },
+  "sedol": "-",
+  "ter": {
+   "d": "0.50",
+   "r": 0.5
+  },
+  "thirtyDaySecYield": "-",
+  "thirtyDaySecYieldAsOf": "-",
+  "totalNetAssets": {
+   "d": "30,111,519,613",
+   "r": 30111519613.25
+  },
+  "totalNetAssetsFund": {
+   "d": "30,111,519,613",
+   "r": 30111519613.25
+  },
+  "totalNetAssetsFundAsOf": {
+   "d": "Oct 02, 2026",
+   "r": 20261002
+  },
+  "twelveMonTrlYield": "-",
+  "twelveMonTrlYieldAsOf": "-",
+  "unsubsidizedYield": "-",
+  "weightedAvgYieldToMaturity": "-",
+  "yieldToWorst": null,
+  "yieldToWorstAsOf": null,
+  "productRange": [
+   [
+    "Commodities",
+    "Metals Strategy"
+   ]
+  ],
+  "productRangeCode": [
+   [
+    "93",
+    "94"
+   ]
+  ],
+  "aladdinEsgClassification": "-",
+  "aladdinEsgClassificationCode": "-",
+  "esg.suiteCategory": "-",
+  "esg.suiteCategoryCode": "-",
+  "ter_ocf": {
+   "d": "0.50",
+   "r": 0.5
+  },
+  "modelOad_effectiveDuration": "-",
+  "bidPrice": "-"
+ },
+ "239458": {
+  "aladdinAssetClass": "Fixed Income",
+  "aladdinAssetClassCode": "43515",
+  "aladdinCountry": "United States",
+  "aladdinCountryCode": "43632",
+  "aladdinMarketType": "Developed",
+  "aladdinMarketTypeCode": "43513",
+  "aladdinRegion": "North America",
+  "aladdinRegionCode": "43512",
+  "aladdinSubAssetClass": "Multi Sectors",
+  "aladdinSubAssetClassCode": "43588",
+  "cleanDuration": {
+   "d": "5.71",
+   "r": 5.7113
+  },
+  "cusip": "464287226",
+  "dailyPerformanceYearToDate": {
+   "d": "-2.80",
+   "r": -2.796665758103296
+  },
+  "effectiveDuration": {
+   "d": "5.70",
+   "r": 5.70108
+  },
+  "fees": {
+   "d": "0.03",
+   "r": 0.03
+  },
+  "fundName": "iShares Core U.S. Aggregate Bond ETF",
+  "fxHedgedYield": {
+   "d": "5.50",
+   "r": 5.5
+  },
+  "glsDoc": "-",
+  "inceptionDate": {
+   "d": "Sep 22, 2003",
+   "r": 20030922
+  },
+  "investmentStyle": "[Index]",
+  "investmentStyleCode": "[44342]",
+  "investorClassName": " ",
+  "isin": "US4642872265",
+  "localExchangeTicker": "AGG",
+  "mgt": {
+   "d": "0.03",
+   "r": 0.03
+  },
+  "modelOad": {
+   "d": "5.71",
+   "r": 5.7113
+  },
+  "navAmount": {
+   "d": "94.20",
+   "r": 94.200416
+  },
+  "navAmountAsOf": {
+   "d": "Oct 02, 2026",
+   "r": 20261002
+  },
+  "navAnnualisedAsOf": {
+   "d": "Sep 30, 2026",
+   "r": 20260930
+  },
+  "navFiveYearAnnualized": {
+   "d": "-0.64",
+   "r": -0.64
+  },
+  "navOneYearAnnualized": {
+   "d": "-1.87",
+   "r": -1.87
+  },
+  "navPerfAsOf": {
+   "d": "Sep 30, 2026",
+   "r": 20260930
+  },
+  "navSinceInceptionAnnualized": {
+   "d": "2.95",
+   "r": 2.95
+  },
+  "navTenYearAnnualized": {
+   "d": "1.11",
+   "r": 1.11
+  },
+  "navThreeYearAnnualized": {
+   "d": "4.05",
+   "r": 4.05
+  },
+  "navYearToDate": {
+   "d": "-2.84",
+   "r": -2.84
+  },
+  "netr": {
+   "d": "0.03",
+   "r": 0.03
+  },
+  "oneWeekSecYield": "-",
+  "oneWeekUnsubsidizedSecYield": "-",
+  "optionAdjustedSpread": {
+   "d": "30.46",
+   "r": 30.45898
+  },
+  "optionAdjustedSpreadAsOf": {
+   "d": "Oct 01, 2026",
+   "r": 20261001
+  },
+  "portfolioId": 239458,
+  "priceFiveYearAnnualized": {
+   "d": "-0.28",
+   "r": -0.28
+  },
+  "priceOneYearAnnualized": {
+   "d": "1.90",
+   "r": 1.9
+  },
+  "priceSinceInceptionAnnualized": {
+   "d": "3.08",
+   "r": 3.08
+  },
+  "priceTenYearAnnualized": {
+   "d": "1.37",
+   "r": 1.37
+  },
+  "priceThreeYearAnnualized": {
+   "d": "4.07",
+   "r": 4.07
+  },
+  "priceYearAsOf": {
+   "d": "Aug 31, 2026",
+   "r": 20260831
+  },
+  "priceYearToDate": {
+   "d": "-0.18",
+   "r": -0.18
+  },
+  "productPageUrl": "/us/products/239458/ishares-core-total-us-bond-market-etf",
+  "productType": "ISHARES_FUND_DATA",
+  "productView": [
+   "etf"
+  ],
+  "quarterlyNavAsOf": {
+   "d": "Sep 30, 2026",
+   "r": 20260930
+  },
+  "quarterlyNavFiveYearAnnualized": {
+   "d": "-0.64",
+   "r": -0.64
+  },
+  "quarterlyNavOneYearAnnualized": {
+   "d": "-1.87",
+   "r": -1.87
+  },
+  "quarterlyNavSinceInceptionAnnualized": {
+   "d": "2.95",
+   "r": 2.95
+  },
+  "quarterlyNavTenYearAnnualized": {
+   "d": "1.11",
+   "r": 1.11
+  },
+  "quarterlyNavThreeYearAnnualized": {
+   "d": "4.05",
+   "r": 4.05
+  },
+  "quarterlyNavYearToDate": {
+   "d": "-2.84",
+   "r": -2.84
+  },
+  "quarterlyPriceAsOf": {
+   "d": "Jun 30, 2026",
+   "r": 20260630
+  },
+  "quarterlyPriceFiveYearAnnualized": {
+   "d": "0.08",
+   "r": 0.08
+  },
+  "quarterlyPriceOneYearAnnualized": {
+   "d": "3.79",
+   "r": 3.79
+  },
+  "quarterlyPriceSinceInceptionAnnualized": {
+   "d": "3.14",
+   "r": 3.14
+  },
+  "quarterlyPriceTenYearAnnualized": {
+   "d": "1.50",
+   "r": 1.5
+  },
+  "quarterlyPriceThreeYearAnnualized": {
+   "d": "4.17",
+   "r": 4.17
+  },
+  "quarterlyPriceYearToDate": {
+   "d": "0.74",
+   "r": 0.74
+  },
+  "sedol": "-",
+  "ter": {
+   "d": "0.03",
+   "r": 0.03
+  },
+  "thirtyDaySecYield": {
+   "d": "5.05",
+   "r": 5.0498
+  },
+  "thirtyDaySecYieldAsOf": {
+   "d": "Oct 01, 2026",
+   "r": 20261001
+  },
+  "totalNetAssets": {
+   "d": "135,771,060,221",
+   "r": 135771060220.94
+  },
+  "totalNetAssetsFund": {
+   "d": "135,771,060,221",
+   "r": 135771060220.94
+  },
+  "totalNetAssetsFundAsOf": {
+   "d": "Oct 02, 2026",
+   "r": 20261002
+  },
+  "twelveMonTrlYield": {
+   "d": "4.55",
+   "r": 4.5458
+  },
+  "twelveMonTrlYieldAsOf": {
+   "d": "Oct 01, 2026",
+   "r": 20261001
+  },
+  "unsubsidizedYield": {
+   "d": "5.05",
+   "r": 5.0471
+  },
+  "weightedAvgYieldToMaturity": {
+   "d": "5.50",
+   "r": 5.5
+  },
+  "yieldToWorst": {
+   "d": "5.50",
+   "r": 5.5
+  },
+  "yieldToWorstAsOf": {
+   "d": "Oct 01, 2026",
+   "r": 20261001
+  },
+  "productRange": [
+   [
+    "Core",
+    "Fixed Income"
+   ],
+   [
+    "Fixed Income",
+    "Duration",
+    "Broad"
+   ],
+   [
+    "Fixed Income",
+    "Sector",
+    "Multi-sector"
+   ]
+  ],
+  "productRangeCode": [
+   [
+    "2",
+    "4"
+   ],
+   [
+    "8",
+    "9",
+    "13"
+   ],
+   [
+    "8",
+    "16",
+    "23"
+   ]
+  ],
+  "esg.alternatives": [
+   305252
+  ],
+  "aladdinEsgClassification": "-",
+  "aladdinEsgClassificationCode": "-",
+  "esg.suiteCategory": "-",
+  "esg.suiteCategoryCode": "-",
+  "ter_ocf": {
+   "d": "0.03",
+   "r": 0.03
+  },
+  "modelOad_effectiveDuration": {
+   "d": "5.71",
+   "r": 5.7113
+  },
+  "bidPrice": "-"
+ }
+}

@@ -83,6 +83,24 @@ class DirectorySource(Source, Protocol):
 
 
 @runtime_checkable
+class HoldingsSource(Source, Protocol):
+    """An issuer's published ETF holdings: one adapter per issuer behind one shape.
+
+    The request ``directory_key`` returns ``parsed["funds"]`` (``symbol``, ``name``): the ETFs
+    the issuer publishes today. Any other request key is one of those tickers; it returns
+    ``parsed["holdings"]`` (columns ``HOLDING_COLUMNS`` in ``framework/holdings.py``, weights
+    as fractions of the fund) with ``session_date`` set to the issuer's as-of date. A fund the
+    issuer has no file for is ``fetch`` -> ``None``. ``cadence_days`` is how often the issuer's
+    data changes (1: daily files; SEC N-PORT: quarterly), so tasks never reread sooner.
+    ``scope_limited`` marks a universe-wide fallback that costs a lot to read for every fund
+    (N-PORT: thousands of funds, megabytes each): tasks read it only for the funds in scope."""
+
+    directory_key: str
+    cadence_days: int
+    scope_limited: bool
+
+
+@runtime_checkable
 class Throttled(Protocol):
     """A source whose vendor can be asked to pause (all processes share the pause)."""
 

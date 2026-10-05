@@ -1,0 +1,15 @@
+iShares MSCI EAFE ETF
+Fund Holdings as of,"Oct 01, 2026"
+Inception Date,"Aug 14, 2001"
+Shares Outstanding,"739,200,000.00"
+Stock,"-"
+Bond,"-"
+Cash,"-"
+Other,"-"
+
+Ticker,Name,Sector,Asset Class,Market Value,Weight (%),Notional Value,Quantity,Price,Location,Exchange,Currency,FX Rate,Market Currency,Accrual Date
+"ASML","ASML HOLDING","Information Technology","Equity","2,490,977,754.91","3.27","2,490,977,754.91","1,384,630.00","1,799.01","Netherlands","Euronext Amsterdam","USD","0.89","EUR","-"
+"HSBA","HSBC HOLDINGS PLC","Financials","Equity","1,162,491,296.79","1.53","1,162,491,296.79","61,236,969.00","18.98","United Kingdom","London Stock Exchange","USD","0.76","GBP","Jan 01, 1998"
+"ROP","ROCHE PS PAR AG","Health Care","Equity","1,052,875,130.91","1.38","1,052,875,130.91","2,506,235.00","420.10","Switzerland","SIX Swiss Exchange","USD","0.83","CHF","-"
+"SHEL","SHELL","Energy","Equity","977,965,986.20","1.28","977,965,986.20","20,626,761.00","47.41","United Kingdom","London Stock Exchange","USD","0.76","GBP","-"
+"NOVN","NOVARTIS AG","Health Care","Equity","927,472,964.94","1.22","927,472,964.94","6,526,327.00","142.11","Switzerland","SIX Swiss Exchange","USD","0.83","CHF","-"

@@ -9,6 +9,7 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 - VRP v2 feature backfill `var/logs/vrp-v2-rollups.sh` (`put_wing@v1`, `price_moves@v1`, waits for the ingest lock): finished, exit=0.
 
 **Next**
+- ETF holdings (ADR 0034, proposed, owner review): after merge run `algotrade-ingest etf-holdings` once (reads the ~1,140 covered funds: about 1.5 hours, extrapolated from the sample, mostly SEC header lookups; or let the nightly's weekly slots fill it), then the Overview tab renders `<HoldingsPanel symbol onSelectSymbol>` (`widgets/holdings-panel`) for ETFs. Confirm State Street's and iShares' terms of use allow the automated downloads.
 - API endpoints that return 404 "nothing stored" on an empty store return 200 with an empty body.
 - Split crowded folders by area: `apps/api` routes/ + schemas/, `services/explore/` (`screens/` is split out; the next new area follows it).
 - API schemas built from domain types, not mirrored field lists.

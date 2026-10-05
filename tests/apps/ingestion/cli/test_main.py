@@ -10,7 +10,9 @@ from algotrade_ingestion.cli import main as cli
 from algotrade_sources.framework.http import RetryPolicy
 from algotrade_sources.framework.registry import build_sources
 from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource
+from algotrade_sources.vendors.ishares.etf_holdings import IsharesHoldings
 from algotrade_sources.vendors.nasdaq.earnings import NasdaqEarningsSource
+from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from algotrade_sources.vendors.treasury.par_yields import TreasuryParYields
 from tests.apps.ingestion.tasks.market.test_option_chains import FakeFeed
 from tests.conftest import REPO_ROOT
@@ -55,6 +57,14 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     )
     use_source(monkeypatch, "cboe", CboeOptionsSource(http_for(feed, policy)))
     use_source(monkeypatch, "treasury", TreasuryParYields(http_for(treasury_feed, policy)))
+    fixtures = REPO_ROOT / "tests" / "fixtures" / "sources"
+    use_source(  # the issuers' fund lists: none of them lists this universe's one ETF
+        monkeypatch,
+        "ssga_holdings",
+        SsgaHoldings(http_for(lambda url: (fixtures / "ssga" / "fundfinder.json").read_bytes())),
+    )
+    screener = (fixtures / "ishares" / "product-screener.json").read_bytes()
+    use_source(monkeypatch, "ishares_holdings", IsharesHoldings(http_for(lambda url: screener)))
     (tmp_path / "stocks.csv").write_text(
         f"ticker,company_name,security_type,last_verified\nAAPL,Apple,COMMON_STOCK,{DAY}\n"
     )

@@ -15,6 +15,7 @@ the grains below. A few others are needed for a trading system.
 | **event** | something that happened to an instrument at a point in time | splits, dividends, earnings dates, symbol changes, index adds and removes, futures first-notice and expiry dates | irregular |
 | **bar(interval)** | an instrument × a time bucket | `1d` = ticker-day OHLCV; `1h`, `5m`, `1m` = ticker-day-time | nightly (`1d`), intraday later |
 | **curve** | a curve date × a tenor | `rates/treasury`: the Treasury par yield curve, one partition per curve date (ADR 0021) | daily |
+| **holdings** | an ETF × a holding × the issuer's as-of date | `holdings/etf`: the largest holdings of each fund with weights, the fund's total line count and the instrument each ticker resolves to (ADR 0034; one producer, the `etf-holdings` task) | weekly per fund |
 | **verification** | an instrument × a check, for a session | `verification/ibkr`: ours vs IBKR's value, diff, tolerance, PASS / WARN / FAIL / NA (ADR 0026; one producer, the `verify` task) | nightly (latest session) |
 | **chain snapshot** | a derivative contract × an observation time | end-of-day option chain: bid, ask, last, volume, open interest, IV, Greeks | nightly |
 | **tick** | a single trade or quote | trades, NBBO quotes | reserved; not planned on free data |
@@ -104,7 +105,7 @@ Implemented tables (layers per [layers.md](layers.md)):
 L1 `instruments/reference`, `instruments/symbol_history`, `instruments/id_map` (symbol id →
 FIGI id upgrades, ADR 0018), `instruments/company`; L2 `bars/<interval>` (1d, 1h, 30m, 15m, 5m, 1m; OHLCV
 sanity-checked on write), `chains/underlying_quotes`, `chains/option_quotes`,
-`chains/status`, `events/<type>`, `rates/treasury` (one partition per curve date); rollups `rollups/daily/*` and `rollups/instrument/*`
+`chains/status`, `events/<type>`, `rates/treasury` (one partition per curve date), `holdings/etf` (ETF holdings, runs merge); rollups `rollups/daily/*` and `rollups/instrument/*`
 (e.g. `rollups/instrument/option_liquidity@v1`); `universe`; `catalog/*`; `results/<name>`;
 the fixed rule-screen results `results/rule_screen` and `results/rule_screen_values` (ADR 0029).
 ## Column types and schema version
@@ -163,6 +164,7 @@ builds on: `table`, `table_range` (date range, each partition resolved point-in-
 | `data/prices.py` | `bars`, `load_price_data` (+ `adjust_bars`) | bars by session date; splits / dividends applied at read time |
 | `data/events.py` | `read_events` | by **event date** (`ts`) from any partition (each partition's runs already merged), latest `knowledge_ts` per event key |
 | `data/chains.py` | `option_quotes` (filter by `underlying_ids`), `underlying_quotes`, `chain_status` | one session's chain snapshot |
+| `data/funds/holdings.py` | `etf_holdings`, `holdings_status`, `known_cusips` | a fund's rows of its latest `as_of` on or before the date, from the run that stored that date last (a shorter re-read leaves no stale ranks); reads the 550 days before the date |
 
 Every read takes `as_of`, a **version pin** (ADR 0007): only runs known at `as_of` count.
 Backtests pass their launch time and record it with the run ids read.
@@ -180,6 +182,7 @@ into the same session, a `migrate_ids` rewrite). Each table declares in its `Tab
 | `snapshot` | `universe`, `instruments/reference`, `instruments/company`, `bars/<interval>` (a re-fetch replaces the session), `chains/*`, `rates/treasury`, `rollups/*`, `catalog/*`, `results/*` (except the rule-screen tables) | the one run with the latest `knowledge_ts` <= `as_of` (ties: run id) |
 | `merge` | `events/*` (`dividend`, `split`, `earnings`, `reference_change`, `index_change`, …) | the union of every run with `knowledge_ts` <= `as_of`, from the latest **restating** run on; per table key (`instrument_id`, `ts`, + `change`) the latest run's row wins |
 | `merge` | `results/rule_screen` (key `user_id`, `config_id`, `instrument_id`), `results/rule_screen_values` (+ `mode`, `criterion_id`) | as above: every rule-screen config and user shares a session's partition. A rerun never removes a row an earlier run wrote, so readers take a config's rows of its latest run (`run_id` from the run record) |
+| `merge` | `holdings/etf` (key `instrument_id`, `as_of`, `rank`) | as above; a later run of the same `as_of` may hold fewer ranks, so `data.funds.holdings` takes each fund's rows from the latest run |
 | `merge` | `instruments/id_map` (key `old_id`, `new_id`), `instruments/symbol_history` (key `figi`, `symbol`, `valid_from`) | as above, on the table's own key (`TableSpec.key`). Both are cumulative and a build only adds to them (an upgrade, an opened or closed row), so a re-run that saw less cannot hide what an earlier run of the session recorded (2026-10-03: a 3-row id map hid 10,817 upgrades) |
 
 - **Restating runs**: `StoreWriter.write_table(..., restates=True)` (used by

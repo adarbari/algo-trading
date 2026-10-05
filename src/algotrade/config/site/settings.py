@@ -108,6 +108,7 @@ VENDOR_EXTRAS = {
     "massive": ("corporate_actions_window",),
     "sec_edgar": ("refresh_days", "facts_refresh_days"),
     "treasury": ("lookback_days",),
+    "etf_holdings": ("refresh_days", "keep_top", "fallback_scope"),
     "ibkr": (
         "historical_min_interval_s",
         "market_data_type",
@@ -122,6 +123,7 @@ VENDOR_EXTRAS = {
         *("live_cache_s", "live_strikes", "live_max_strikes", "live_timeout_s", "live_retry_s"),
     ),
 }
+ETF_FALLBACK_SCOPES = ("optionable", "all", "off")  # [etf_holdings] fallback_scope
 # Vendors that stay off unless their section says ``enabled = true`` (a missing section or key
 # means disabled): IBKR needs the owner's gateway, set up read-only (ADR 0026).
 OFF_BY_DEFAULT = ("ibkr",)
@@ -202,6 +204,9 @@ class SourcesSettings:
     sec_refresh_days: int = 30
     sec_facts_refresh_days: int = 30
     treasury_lookback_days: int = 10
+    etf_refresh_days: int = 7  # [etf_holdings]: refetch a fund's holdings once per window
+    etf_keep_top: int = 100  # holdings stored per fund, largest weights first (0: all)
+    etf_fallback_scope: str = "optionable"  # which funds SEC N-PORT reads: optionable, all, off
     http_max_retry_s: float = 300.0
     http_breaker_failures: int = 10
     limits_dir: str = "var/run/limits"
@@ -287,6 +292,13 @@ class SourcesSettings:
             ),
             treasury_lookback_days=_extra(vendors, "treasury").integer(
                 "lookback_days", d.treasury_lookback_days, 1
+            ),
+            etf_refresh_days=_extra(vendors, "etf_holdings").integer(
+                "refresh_days", d.etf_refresh_days, 0
+            ),
+            etf_keep_top=_extra(vendors, "etf_holdings").integer("keep_top", d.etf_keep_top, 0),
+            etf_fallback_scope=_extra(vendors, "etf_holdings").choice(
+                "fallback_scope", d.etf_fallback_scope, ETF_FALLBACK_SCOPES
             ),
             http_max_retry_s=http.number("max_retry_s", d.http_max_retry_s, 0),
             http_breaker_failures=http.integer("breaker_failures", d.http_breaker_failures, 1),
