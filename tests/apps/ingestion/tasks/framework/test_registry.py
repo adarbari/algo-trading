@@ -20,6 +20,7 @@ from algotrade_ingestion.tasks.market import (
     etf_holdings,
     option_chains,
 )
+from algotrade_ingestion.tasks.profile import descriptions
 from algotrade_ingestion.workflows.nightly import nightly as pipeline
 from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from tests.helpers.ingest_fakes import FIXED, http_for, task_ctx
@@ -45,6 +46,7 @@ def calls(monkeypatch: pytest.MonkeyPatch) -> Calls:
         (bars, "ingest_daily_bars"),
         (option_chains, "ingest_option_chains"),
         (etf_holdings, "ingest_etf_holdings"),
+        (descriptions, "ingest_descriptions"),
     ):
         monkeypatch.setattr(module, fn, fake)
     monkeypatch.setattr(option_chains, "select_underlyings", lambda reader, d, s: list(s))
@@ -187,3 +189,21 @@ def test_every_task_declares_a_description_and_sessions_where_needed() -> None:
         if spec.name not in ("migrate-ids", "golden-load"):
             assert "session" in names, spec.name
     assert Path("datasets/golden") == registry.GOLDEN_DIR
+
+
+def test_descriptions_reads_every_source_it_declares(calls: Calls) -> None:
+    """The CLI builds only the sources a task declares (``optional_sources``): the series source
+    the ETF path matches funds with was left out once, and no run used it."""
+    names = {
+        "massive_overview": "mo",
+        "sec_fund_tickers": "ft",
+        "sec_fund_objectives": "fo",
+        "sec_fund_series": "fs",
+    }
+    assert set(names) <= set(task("descriptions").optional_sources)
+    c = task_ctx(StoreWriter(MemoryBackend()), sources=names, settings=SETTINGS)
+    run_task("descriptions", c, {"session": DAY})
+    wired = calls.args[-1][1]
+    assert (wired.overview, wired.fund_tickers, wired.fund_objectives, wired.fund_series) == (
+        "mo", "ft", "fo", "fs",
+    )  # fmt: skip
