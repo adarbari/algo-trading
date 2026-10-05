@@ -5,13 +5,19 @@ session), [ADR 0037](../adr/0037-domain-read-model-served-by-graphql.md) (a doma
 served by GraphQL) and [ADR 0038](../adr/0038-catalogue-named-values.md) (catalogue-named
 values). Skills: `.claude/skills/add-domain-object`, `.claude/skills/add-graphql-field`.
 
-**What exists now (read-model PR 1).** The decisions, this spec, the empty packages
+**What exists now (read-model PRs 1-2).** The decisions, this spec, the packages
 `src/algotrade/services/read/{,instruments,screens,ops}` and
 `apps/api/algotrade_api/graphql/{,types}` (declared in `architecture/layout.toml`, guarded by
 two import-linter contracts), the ownership entries, the REST GET allow-list
 (`architecture/rest_allowlist.toml`) and the web derivation list
 (`architecture/web_forbidden_derivations.toml`), and the `strawberry-graphql[fastapi]`
-dependency of `apps/api`. **No read goes through the read model yet**: pages still read
+dependency of `apps/api`. PR 2 added the session plumbing: `read/session.py`
+(`resolve_session`, `Session`, the table grains `grain_of`, `NotFoundError`), `read/values.py`
+(`Unknown`, `UnknownCode`, `to_scalar`; `services/views.to_value` imports it) and
+`read/context.py` (`ReadContext`, `open_context`, `partition`, `ResultCache`; explore's
+`store.py` re-exports `NotFoundError` and `ResultCache`), plus READ 2 in
+`tests/architecture/api/test_read_model.py`. **No loader and no page read goes through the
+read model yet**: pages still read
 `services/explore` over REST until the PR that moves their area (the
 [migration plan](#migration-plan)). Until PR 4 lands, a new page read follows the old path
 (`services/explore` + a REST GET) **only if the owner explicitly asks**; otherwise do the next
@@ -127,6 +133,11 @@ Rules by **table grain** (the only place grain decides anything):
 | incremental | `instruments/description` | the latest stored row per instrument (text, not a fact) |
 | range | bars, feature series | `[start, end]` given explicitly; never "latest" |
 
+`session.grain_of(table)` is this table in code (range is a read shape, not a table grain, so
+it has no entry); `partition` refuses a table of another grain or with no declared grain
+(`ValueError`), so a loader cannot read a snapshot or event table by exact date by mistake. A
+table a loader needs that is not listed gets its grain here and in `GRAINS` first.
+
 Retired when their last caller moves: `explore/store.partition_for` and `latest_session`,
 `data/rollups.rollup_row` in reads, `explore/features._expression_values` / `_values`,
 `ranking._latest_runs` / `_earnings`, `results.run_rows`'s owner-fallback loop,
@@ -136,7 +147,8 @@ generic read (R1 unchanged); what goes is each consumer deciding which partition
 
 ### Settled details for PR 2 (do not re-decide)
 
-- **`NotFoundError`** moves to `services/read/context.py`; `services/explore/store.py`
+- **`NotFoundError`** moves to `services/read/context.py` (importable from there; defined in
+  `session.py`, which raises it, to avoid an import cycle); `services/explore/store.py`
   re-exports it (`from algotrade.services.read.context import NotFoundError`) until explore is
   deleted. `services/read` never imports `services/explore`.
 - **`ReadContext`** fields, exactly: `reader: StoreReader`, `configs: ConfigStore`,
@@ -227,7 +239,7 @@ query IdeasPage($date: Date, $limit: Int!, $names: [FeatureName!]!) {
 ## What stays REST
 
 `architecture/rest_allowlist.toml` lists every GET route; it **only shrinks**
-(`tests/architecture/test_structure.py::test_rest_get_routes_are_allowlisted` and
+(`tests/architecture/api/test_rest_allowlist.py::test_rest_get_routes_are_allowlisted` and
 `test_rest_allowlist_only_shrinks`; `make rest-allowlist-update` lowers the committed count).
 
 | Stays REST | Why |
@@ -281,8 +293,8 @@ never a `DataTableColumn` literal (ESLint, PR 7). View preferences go through on
 
 | # | Rule | Mechanism | Status |
 |---|---|---|---|
-| READ 1 | Only `services/read/session.py` decides which partition a read sees | ownership `session-resolution` (`partition_for`, `latest_session`, `latest_date`, `rollup_row`, `resolve_session`) | **on**: explore is today's owner, `session.py` the target; any other caller fails now |
-| READ 2 | Only `services/read/**` reads session partitions for display | `test_read_model.py::test_only_loaders_read_partitions` (AST) | PR 2 (scoped to `services/read` callers), widened to all of `src/` and `apps/` in PR 10 |
+| READ 1 | Only `services/read/session.py` decides which partition a read sees | ownership `session-resolution` (`partition_for`, `latest_session`, `latest_date`, `rollup_row`, `resolve_session`) | **on**: owners `session.py`, `context.py` (`open_context`) and explore (until its modules are deleted); any other caller fails now |
+| READ 2 | Only `services/read/**` reads session partitions for display | `tests/architecture/api/test_read_model.py::test_only_loaders_read_partitions` (AST) | **on**, scoped to `services/read` (only `session.py` / `context.py` pick or read a partition); widened to all of `src/` and `apps/` in PR 10 |
 | READ 3 | GraphQL types are thin | import-linter "GraphQL types are thin" | **on** (empty package); `test_resolvers_call_one_loader` in PR 4 |
 | READ 4 | The read model is read-only | import-linter "Read model is read-only" | **on** |
 | READ 5 | No new REST GET for stored data | `architecture/rest_allowlist.toml` + two tests | **on** |
@@ -304,19 +316,19 @@ never a `DataTableColumn` literal (ESLint, PR 7). View preferences go through on
 The ownership ratchet stays at zero throughout: no violation is parked, no rule is narrowed to
 pass. How each entry holds today:
 
-- **`session-resolution`**: full detect rules on. `services/explore/*` is listed as the current
-  `owner` (it is where the six rules live today) with `target_owner`
-  `services/read/session.py`; `data/reference.py` (the snapshot primitive) and
+- **`session-resolution`**: full detect rules on. Owners `services/read/session.py`,
+  `services/read/context.py` (`open_context` resolves once per request) and, until its modules
+  are deleted, `services/explore/*` (where the six rules live today); `data/reference.py` (the snapshot primitive) and
   `services/ondemand/screens.py` (a write that runs a screen for the latest session, ADR 0036
   decision 5) are `allowed`. Each explore module drops out as PRs 4-10 delete it; PR 10 leaves
-  `session.py` as the only owner.
+  `session.py` and `context.py` as the only owners.
 - **`domain-read-model`**: the `rollups/instrument/` literal rule is on (producers, the
   catalogue prefix, the table schema and screener inputs are `allowed` with reasons). The
   `chain_expiries` rule is **deferred to PR 5**: its only caller outside `data/` is
   `explore/ideas/ranking.py`, which PR 5 deletes; PR 5 adds the rule.
-- **`scalar-coercion`**: `to_value` / `to_scalar` call rules on; owner `services/views.py`
-  (where `to_value` lives), target `services/read/values.py`; today's callers of the one
-  coercion are `allowed` (explore, screening exports, selection). The
+- **`scalar-coercion`**: `to_value` / `to_scalar` call rules on; owner `services/read/values.py`
+  (`to_scalar`); `services/views.py` is `allowed` (it imports it back as `to_value`), as are
+  today's callers of the one coercion (explore, screening exports, selection). The
   `call_regex = "^_(float|text|num)$"` re-implementation rule is **deferred to PR 8**: it hits
   `ranking._float/_text` (deleted in PR 5), `screens/table._text` (deleted in PR 8) and
   screening's `exports._text` / `rule_results._num` (switched to `to_scalar` in PR 8); PR 8
@@ -325,8 +337,8 @@ pass. How each entry holds today:
 - **`graphql-schema`**: `import strawberry` outside `apps/api/algotrade_api/graphql/*` fails now.
 - **`explore-queries`**: `target_owner = services/read/*` while moving; removed in PR 10.
 
-`tests/architecture/` is at its 10-module cap: PR 2 splits it by kind (or adds the READ tests to
-an existing module of the same kind) before adding `test_read_model.py`.
+`tests/architecture/` was at its 10-module cap: PR 2 split the API surface and read-model
+fitness tests into `tests/architecture/api/` (`test_rest_allowlist.py`, `test_read_model.py`).
 
 ## Migration plan
 

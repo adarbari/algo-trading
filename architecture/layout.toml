@@ -791,6 +791,10 @@ path = "tests/architecture"
 purpose = "fitness tests: layout, ownership, structure, docs, registries"
 
 [[test_dir]]
+path = "tests/architecture/api"
+purpose = "fitness tests for the API surface and the read model"
+
+[[test_dir]]
 path = "tests/contract"
 purpose = "contract suites every implementation of a protocol must pass, one folder per protocol"
 holds = "folders"

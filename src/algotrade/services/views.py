@@ -1,30 +1,17 @@
 """Build the ``FeatureView`` screeners consume from stored feature tables and expression
-features (computed on read: ``services.features``)."""
+features (computed on read: ``services.features``). ``to_value`` is the read model's one
+scalar coercion (``services.read.values.to_scalar``), imported back so runs and reads agree."""
 
-import math
 from collections.abc import Sequence
 from datetime import date, datetime
-from typing import Any
-
-import pandas as pd
 
 from algotrade.core.views.feature_view import FeatureValue, FeatureView
 from algotrade.data import StoreReader
 from algotrade.services.features import read_expressions
+from algotrade.services.read.values import to_scalar as to_value
 from algotrade.storage.tables.schemas import COMMON
 
-
-def to_value(value: Any) -> FeatureValue:
-    """Normalise pandas/numpy scalars into plain FeatureView values."""
-    if value is None or (isinstance(value, float) and math.isnan(value)) or value is pd.NaT:
-        return None
-    if isinstance(value, (pd.Timestamp, datetime, date)):
-        return value.isoformat()
-    if hasattr(value, "item"):
-        return to_value(value.item())
-    if isinstance(value, (bool, int, float, str)):
-        return value
-    return str(value)
+__all__ = ["feature_view", "to_value"]
 
 
 def feature_view(

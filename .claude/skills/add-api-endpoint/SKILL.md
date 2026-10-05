@@ -8,7 +8,7 @@ description: Add or change a REST endpoint of the API (apps/api): writes (user c
 **First: is it a read for a page?** (Anything a page shows from stored data: values, lists,
 details, counts, a table.) Then **stop: it is a GraphQL field, use
 `.claude/skills/add-graphql-field`** (ADR 0037; `docs/api/read-model.md`). A new `GET` serving
-stored data fails `tests/architecture/test_structure.py::test_rest_get_routes_are_allowlisted`
+stored data fails `tests/architecture/api/test_rest_allowlist.py::test_rest_get_routes_are_allowlisted`
 (`architecture/rest_allowlist.toml` only shrinks). The one exception is "Legacy page reads"
 at the end, and only when the owner explicitly asks.
 
