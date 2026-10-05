@@ -28,7 +28,12 @@ export function ScoreBreakdown({ row, labelOf = (id) => id }: ScoreBreakdownProp
       label={`How ${symbol} scored ${shown}`}
       placement="bottom-end"
       trigger={(props) => (
-        <Button {...props} variant="ghost" size="sm" aria-label={`Score ${shown}: how it was worked out`}>
+        <Button
+          {...props}
+          variant="ghost"
+          size="sm"
+          aria-label={`Score ${shown}: how it was worked out`}
+        >
           {shown}
         </Button>
       )}
