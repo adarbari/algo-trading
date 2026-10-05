@@ -103,14 +103,19 @@ def cusip_of(identifier: object) -> str | None:
     return None
 
 
+type Bridge = tuple[str, str]  # (ticker, instrument id) as written when the line was stored
+
+
 def known_cusips(
     reader: StoreReader, through: date, exclude_sources: Collection[str] = ()
-) -> dict[str, str]:
-    """CUSIP -> ticker for stored equity lines that resolved to a universe instrument
-    (``holding_id``) and came from an issuer that prints tickers with its CUSIPs (State
-    Street's equity funds, not ``exclude_sources``, the ones that borrow tickers): the bridge to
-    tickers for issuers that print only CUSIPs and ISINs (SEC N-PORT). A foreign line (the
-    local ticker T of Telus is not AT&T) never resolves, so it never enters the map."""
+) -> dict[str, Bridge]:
+    """CUSIP -> (ticker, instrument id) for stored equity lines that resolved to a universe
+    instrument (``holding_id``) and came from an issuer that prints tickers with its CUSIPs
+    (State Street's equity funds, not ``exclude_sources``, the ones that borrow tickers): the
+    bridge to the universe for issuers that print only CUSIPs and ISINs (SEC N-PORT). It keeps
+    the instrument id written with the line, never re-resolves the ticker (a recycled ticker
+    names another company today), and a foreign line (the local ticker T of Telus is not AT&T)
+    never resolves, so it never enters the map. The latest row of a CUSIP wins."""
     frame = _stored(reader, through, None)
     if frame is None or frame.empty:
         return {}
@@ -120,10 +125,12 @@ def known_cusips(
         & frame["holding_id"].notna()
         & (frame["asset_class"] == "Equity")
         & ~frame["source"].isin(list(exclude_sources))
-    ]
-    out: dict[str, str] = {}
-    for identifier, symbol in zip(known["identifier"], known["holding_symbol"], strict=True):
+    ].sort_values("knowledge_ts", kind="stable")
+    out: dict[str, Bridge] = {}
+    for identifier, symbol, holding_id in zip(
+        known["identifier"], known["holding_symbol"], known["holding_id"], strict=True
+    ):
         cusip = cusip_of(identifier)
         if cusip is not None:
-            out[cusip] = str(symbol)
+            out[cusip] = (str(symbol), str(holding_id))
     return out

@@ -236,10 +236,15 @@ Pacing and cost: `[ssga]` and `[ishares]` 1 s between requests, SEC 0.2 s; raw f
 14 days (SEC 7; this includes SPY's membership file, which was kept 90 days before `[ssga]`
 existed: the membership lives in the tables). Each fund is read once a week on its own slot day
 (`[etf_holdings] refresh_days`), N-PORT funds once per 90 days at most, funds an issuer lists
-but has no file for once a window. The nightly reads at most `[etf_holdings] per_night` (100)
-funds, new and stalest first, after bars and chains, so the first pass takes about 12 nights;
-the CLI is uncapped. A new read replaces a fund's rows only if it passes the sanity checks
-(ADR 0035 decision 6); otherwise last read's rows stay and the run is PARTIAL. N-PORT data is
+but has no file for once a window. The nightly reads at most `[etf_holdings] per_night` (200)
+funds from one due list across all issuers (never read first, then the oldest read first), after
+bars and chains, so the first pass takes 6 weekday nights; in steady state a daily-file fund is
+read every 7 to 8 days and an N-PORT fund every ~91 days; the CLI is uncapped. A new read
+replaces a fund's rows only if it passes the sanity checks (ADR 0035 decision 6); otherwise
+last read's rows stay and the run is PARTIAL. A rejected fund waits 2 days (N-PORT 30) before
+it is read again, a collapsed position count that three reads agree on is accepted, and
+`--force` accepts a read with the checks off. `[ssga] etf_files = false` turns off only the
+SPDR fund files; SPY's S&P 500 membership file follows `[ssga] enabled`. N-PORT data is
 public 60 to 150 days after its period (a 90-day slot can add up to 90 more); stored rows carry
 `filed` and are hidden from reads before it.
 Backfill by hand: `algotrade-ingest etf-holdings [--limit N] [--symbols SPY,QQQ] [--force]`.

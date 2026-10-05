@@ -125,7 +125,10 @@ def test_known_cusips_pair_tickers_with_their_security_ids() -> None:
     rows[0]["identifier"] = "037833100"
     rows[2]["identifier"] = "CASH_USD"
     reader = store((S1, "r1", rows, at(S1)))
-    assert known_cusips(reader, S3) == {"037833100": "AAA", "900000002": "BBB"}
+    assert known_cusips(reader, S3) == {
+        "037833100": ("AAA", "EQ:AAA"),
+        "900000002": ("BBB", "EQ:BBB"),
+    }
 
 
 def test_a_line_that_did_not_resolve_never_feeds_the_cusip_map() -> None:
@@ -136,7 +139,7 @@ def test_a_line_that_did_not_resolve_never_feeds_the_cusip_map() -> None:
     )
     rows[0]["identifier"] = "87971M103"
     reader = store((S1, "r1", rows, at(S1)))
-    assert known_cusips(reader, S3) == {"900000002": "AAA"}
+    assert known_cusips(reader, S3) == {"900000002": ("AAA", "EQ:AAA")}
 
 
 def test_lines_of_excluded_sources_and_other_asset_classes_do_not_feed_the_map() -> None:

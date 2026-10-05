@@ -91,8 +91,17 @@ def number(raw: object) -> float | None:
 
 
 def is_position(asset_class: object) -> bool:
-    """Whether a line is a position in a security (not cash, a future, an FX or repo line)."""
-    return str(asset_class or "").strip().lower() not in NOT_A_POSITION
+    """Whether a line is a position in a security (not cash, a future, an FX or repo line;
+    ``Cash``, ``Cash Collateral and Margins`` and the like all start with ``cash``)."""
+    kind = str(asset_class or "").strip().lower()
+    return kind not in NOT_A_POSITION and not kind.startswith("cash")
+
+
+def is_cusip(text: object) -> bool:
+    """A U.S. or Canadian CUSIP: nine characters starting with a digit (a CINS, which starts
+    with a letter, is a foreign security)."""
+    value = str(text or "").strip().upper()
+    return len(value) == 9 and value.isalnum() and value[0].isdigit()
 
 
 def fraction(percent: object) -> float | None:

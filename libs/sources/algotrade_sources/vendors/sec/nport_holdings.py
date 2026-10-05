@@ -214,13 +214,13 @@ class NportHoldings:
             funds = funds_frame((t, series) for t, (_, series) in parse_funds(payload).items())
             return Normalized(None, {}, parsed={"funds": funds})
         as_of, series, rows = parse_report(payload)
-        if not rows or as_of is None:
-            return None
+        if as_of is None or not rows:
+            raise ValueError(f"{request.key}: the report has no period date or no holdings")
         # The report is public from its filing date (months after the period). A replay from
         # raw has no filing list, so it assumes the filing deadline, 60 days after the period.
         filed = self._filed.get(series or "") or as_of + timedelta(days=FILING_LAG_DAYS)
         holdings = holdings_frame(rows).assign(filed=filed)
         if holdings.empty:
-            return None
+            raise ValueError(f"{request.key}: no line of the report has a readable weight")
         notes = {"unreadable_lines": len(rows) - len(holdings)}
         return Normalized(as_of, {}, notes=notes, parsed={"holdings": holdings})

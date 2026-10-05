@@ -65,6 +65,8 @@ from algotrade_sources.framework.base import DirectorySource, FetchRequest, Sour
 TASK = "universe_build"
 HISTORY = "instruments/symbol_history"
 REFERENCE = "instruments/reference"
+SP500_TRACKED = 100  # a previous snapshot with fewer members is not a real index list
+SP500_MIN_SHARE = 0.9  # fewer than this share of the last snapshot's members is a bad file
 
 
 @dataclass(frozen=True)
@@ -200,6 +202,19 @@ def write_figi_review(reader: StoreReader, session: date, path: Path) -> int:
     return len(rows)
 
 
+def check_sp500(members: int, previous: pd.DataFrame | None) -> None:
+    """Fail the build, publishing nothing (so no removal events), when the S&P 500 list lost
+    more than 10% of the last snapshot's members: a cut-short file, not an index change."""
+    before = (
+        0 if previous is None or "in_sp500" not in previous else int(previous["in_sp500"].sum())
+    )
+    if before >= SP500_TRACKED and members < SP500_MIN_SHARE * before:
+        raise ValueError(
+            f"the S&P 500 list has {members} members, the last snapshot {before}: "
+            "a cut-short file would remove them all; nothing was published"
+        )
+
+
 def _known(reader: StoreReader, table: str, session: date) -> pd.DataFrame | None:
     """Cumulative state as known now: ``table`` for ``session`` itself when an earlier run
     wrote it (a re-run builds on it), else the latest earlier session."""
@@ -249,6 +264,7 @@ def _build(
 ) -> None:
     session = run.session
     sp500 = set(parsed["sp500"]["symbol"])
+    check_sp500(len(sp500), _previous(reader, REFERENCE, session))
     reference, disagreements, assigned = build_reference(
         listings,
         set(optionable["symbol"]),

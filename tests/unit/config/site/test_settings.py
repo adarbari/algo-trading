@@ -107,6 +107,9 @@ def test_missing_files_fall_back_to_defaults() -> None:
         ({"etf_holdings": {"keep_top": -1}}, r"\[etf_holdings\] keep_top: expected an integer"),
         ({"etf_holdings": {"fallback_scope": "some"}}, r"\[etf_holdings\] fallback_scope"),
         ({"etf_holdings": {"per_night": -1}}, r"\[etf_holdings\] per_night: expected an integer"),
+        ({"etf_holdings": {"min_interval_s": 1}}, r"\[etf_holdings\]: unknown keys"),
+        ({"etf_holdings": {"raw_retention_days": 3}}, r"\[etf_holdings\]: unknown keys"),
+        ({"ssga": {"etf_files": "no"}}, r"\[ssga\] etf_files: expected true or false"),
         ({"etf_holdings": {"refresh": 7}}, r"\[etf_holdings\]: unknown keys \['refresh'\]"),
     ],
 )
@@ -298,7 +301,7 @@ def test_figi_override_errors_name_the_line(rows: list[dict[str, str]], message:
 
 def test_etf_holdings_settings_and_the_issuer_sections() -> None:
     sources = SourcesSettings.from_document(site("sources"))
-    assert (sources.etf.refresh_days, sources.etf.keep_top, sources.etf.per_night) == (7, 100, 100)
+    assert (sources.etf.refresh_days, sources.etf.keep_top, sources.etf.per_night) == (7, 100, 200)
     assert sources.etf.fallback_scope == "optionable"
     for issuer in ("ssga", "ishares"):  # State Street also serves SPY's membership file
         assert sources.vendor(issuer).enabled and sources.vendor(issuer).raw_retention_days == 14

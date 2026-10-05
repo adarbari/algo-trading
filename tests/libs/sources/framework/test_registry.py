@@ -106,6 +106,17 @@ def test_an_old_file_that_switched_spy_holdings_off_does_not_switch_it_back_on(
     assert built.skipped["spy_holdings"] == "[ssga] is disabled in sources.toml"
 
 
+def test_the_spdr_fund_files_have_their_own_switch_and_spy_membership_stays_on(
+    tmp_path: Path,
+) -> None:
+    doc = {**SITE_SOURCES, "ssga": {**SITE_SOURCES["ssga"], "etf_files": False}}
+    built = build_sources(settings(doc), ENV.get, ["spy_holdings", "ssga_holdings"], tmp_path)
+    assert set(built.sources) == {"spy_holdings"}
+    assert built.skipped["ssga_holdings"] == "[ssga] etf_files is false in sources.toml"
+    off = {**SITE_SOURCES, "ssga": {**SITE_SOURCES["ssga"], "enabled": False}}
+    assert not build_sources(settings(off), ENV.get, ["spy_holdings"], tmp_path).sources
+
+
 def test_every_source_has_a_sources_toml_section_and_a_limiter_key() -> None:
     for name, spec in SOURCES.items():
         assert spec.name == name

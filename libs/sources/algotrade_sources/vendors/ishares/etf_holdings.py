@@ -70,15 +70,19 @@ def parse_csv(payload: bytes) -> tuple[date | None, list[dict[str, str]]]:
     for row in rows[:6]:
         if len(row) >= 2 and row[0].startswith("Fund Holdings as of"):
             as_of = datetime.strptime(row[1].strip(), "%b %d, %Y").date()  # noqa: DTZ007
+    if as_of is None:  # a changed "Fund Holdings as of" line is a layout change
+        raise ValueError("the file does not say what date it is as of")
     header = next((i for i, r in enumerate(rows) if "Weight (%)" in r), None)
     if header is None:
-        return as_of, []
+        raise ValueError("the file has no table with a Weight (%) column")
     names = rows[header]
     lines = []
     for row in rows[header + 1 :]:
         if len(row) < len(names):  # blank line or disclaimer text after the table
             break
         lines.append(dict(zip(names, row, strict=False)))
+    if not lines:
+        raise ValueError("the file's table has no lines")
     return as_of, lines
 
 
@@ -99,6 +103,22 @@ def line_weights(lines: list[dict[str, str]]) -> list[float | None]:
     ):
         return published
     return [*derived]
+
+
+MAX_ZERO_SHARE = 0.25  # more lines than this published as 0.00% (a bond fund): no judging
+
+
+def published_sum(lines: list[dict[str, str]]) -> float | None:
+    """The sum of the file's own ``Weight (%)`` column as a fraction, when it can be judged: two
+    decimals round most lines of a bond fund to 0.00 (AGG's 13k lines sum to 82%), so it is
+    reported only when few lines are zero. A file cut short sums to less than 100%, which the
+    market-value weights (they always add up to 100% of what is left) cannot show."""
+    published = [fraction(line.get("Weight (%)")) for line in lines]
+    readable = [w for w in published if w is not None]
+    zeros = sum(1 for w in readable if w == 0)
+    if len(readable) < len(lines) or zeros > MAX_ZERO_SHARE * len(lines):
+        return None
+    return sum(readable)
 
 
 class IsharesHoldings:
@@ -130,8 +150,7 @@ class IsharesHoldings:
             funds = funds_frame((t, name) for t, (name, _) in parse_screener(payload).items())
             return Normalized(None, {}, parsed={"funds": funds})
         as_of, lines = parse_csv(payload)
-        if not lines or as_of is None:
-            return None
+        assert as_of is not None  # parse_csv raises without a date
         weights = line_weights(lines)
         rows = []
         for line, weight in zip(lines, weights, strict=True):
@@ -155,6 +174,9 @@ class IsharesHoldings:
             )
         holdings = holdings_frame(rows)
         if holdings.empty:
-            return None
+            raise ValueError("no line of the file has a readable weight")
         notes = {"unreadable_lines": len(rows) - len(holdings)}
+        published = published_sum(lines)
+        if published is not None:
+            notes["published_weight_bp"] = round(published * 10_000)
         return Normalized(as_of, {}, notes=notes, parsed={"holdings": holdings})

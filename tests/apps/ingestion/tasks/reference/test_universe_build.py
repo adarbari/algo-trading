@@ -11,6 +11,7 @@ from algotrade_ingestion.tasks.reference.universe_build import (
     UniverseSettings,
     UniverseSources,
     build_universe,
+    check_sp500,
     review_rows,
 )
 from algotrade_sources.framework.http import RetryPolicy
@@ -171,6 +172,41 @@ def test_review_rows_list_only_active_unknown_leverage() -> None:
     assert review_rows(frame) == [
         {"symbol": "HDGE", "leverage": "", "tracks": "", "notes": "Ranger Equity Bear Bear ETF"}
     ]
+
+
+def test_a_cut_short_sp500_file_fails_the_build_and_publishes_no_removals() -> None:
+    """A file that lost 10% of the members would emit hundreds of index removals."""
+    import pytest  # noqa: PLC0415
+
+    names = [f"A{a}{b}" for a in "ABCDEFGHIJ" for b in "ABCDEFGHIJKL"]  # 120 listed stocks
+    listed = fx.nasdaq([(n, f"{n} Common Stock", "N", "N") for n in names])
+    backend = MemoryBackend()
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+
+    def day(members: list[str]) -> UniverseSources:
+        return sources(
+            listed, fx.other([("SPY", "SPDR", "P", "Y")]), fx.options([names[0]]), fx.spy(members)
+        )
+
+    assert build_universe(task_ctx(writer, reader, CLOCK), day(names), SETTINGS, D1).stats[
+        "sp500_members"
+    ] == len(names)
+    with pytest.raises(ValueError, match="S&P 500 list has 100 members, the last snapshot 120"):
+        build_universe(task_ctx(writer, reader, CLOCK), day(names[:100]), SETTINGS, D2)
+    assert reader.table("events/index_change", D2) is None  # nothing was published
+    ok = build_universe(task_ctx(writer, reader, CLOCK), day(names[:110]), SETTINGS, D2)
+    assert ok.stats["events"]["index_change"] == {"sp500_removed": 10}  # a 10% change is real
+
+
+def test_the_sp500_floor_only_applies_with_a_real_previous_snapshot() -> None:
+    import pandas as pd  # noqa: PLC0415
+
+    check_sp500(3, None)  # the first build has nothing to compare with
+    tiny = pd.DataFrame({"in_sp500": [True] * 50})
+    check_sp500(1, tiny)  # test-sized universes are not index lists
+    real = pd.DataFrame({"in_sp500": [True] * 500})
+    check_sp500(450, real)
+    check_sp500(500, pd.DataFrame({"instrument_id": []}))  # no in_sp500 column yet
 
 
 def test_an_empty_listing_file_fails_closed() -> None:

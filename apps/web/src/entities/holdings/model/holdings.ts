@@ -35,9 +35,15 @@ export function toRows(holdings: EtfHoldings): HoldingRow[] {
   }));
 }
 
-/** The share of the fund the listed holdings make up (a fraction). */
+/** The share of the fund the listed holdings make up, by size (a fraction): a short or swap
+ * line counts for how big it is, so an inverse fund does not read as negative. */
 export function shownWeight(holdings: EtfHoldings): number {
-  return holdings.items.reduce((sum, h) => sum + h.weight, 0);
+  return holdings.items.reduce((sum, h) => sum + Math.abs(h.weight), 0);
+}
+
+/** Whether any listed line is short (a negative weight). */
+export function hasShort(holdings: EtfHoldings): boolean {
+  return holdings.items.some((h) => h.weight < 0);
 }
 
 const SOURCES: Readonly<Record<string, string>> = {

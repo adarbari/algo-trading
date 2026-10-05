@@ -26,7 +26,14 @@ from typing import Any, Protocol
 
 from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.config.site.holdings import KEYS as ETF_KEYS
-from algotrade.config.site.holdings import LEGACY_SECTIONS, EtfHoldingsSettings
+from algotrade.config.site.holdings import (
+    LEGACY_SECTIONS,
+    OWN_KEYS_ONLY,
+    VENDOR_FLAGS,
+    EtfHoldingsSettings,
+)
+from algotrade.config.site.ibkr import IbkrSettings as IbkrSettings  # noqa: PLC0414 - re-export
+from algotrade.config.site.ibkr import load_ibkr
 from algotrade.config.user import SITE_USER
 from algotrade.core.model.errors import ConfigurationError
 
@@ -111,6 +118,7 @@ VENDOR_EXTRAS = {
     "sec_edgar": ("refresh_days", "facts_refresh_days", "fund_quarters"),
     "treasury": ("lookback_days",),
     "etf_holdings": ETF_KEYS,
+    **VENDOR_FLAGS,
     "ibkr": (
         "historical_min_interval_s",
         "market_data_type",
@@ -128,8 +136,6 @@ VENDOR_EXTRAS = {
 # Vendors that stay off unless their section says ``enabled = true`` (a missing section or key
 # means disabled): IBKR needs the owner's gateway, set up read-only (ADR 0026).
 OFF_BY_DEFAULT = ("ibkr",)
-# IB market data types: 1 live (needs a subscription), 3 delayed (free, 15-20 minutes).
-IBKR_MARKET_DATA_TYPES = (1, 2, 3, 4)
 
 
 class SiteDocuments(Protocol):
@@ -160,36 +166,7 @@ class VendorSettings:
     max_interval_s: float | None = None
     start_interval_s: float | None = None
     raw_retention_days: int | None = None
-
-
-@dataclass(frozen=True)
-class IbkrSettings:
-    """``[ibkr]`` beyond ``enabled`` / ``min_interval_s`` (the IB Gateway session; host, port
-    and client id come from the environment, ``config/env.py``). Pacing follows IBKR's rules:
-    every message waits ``min_interval_s`` (50 messages/s), every historical-data request also
-    waits ``historical_min_interval_s`` (>= 0; default 10 s = 60 requests per 10 minutes, the
-    rule IBKR documents for bars of 30 s or less; daily bars are soft throttled, so the owner
-    may trial a shorter gap while watching timeouts and error 162)."""
-
-    historical_min_interval_s: float = 10.0
-    market_data_type: int = 3  # 1 live, 3 delayed
-    connect_timeout_s: float = 10.0
-    request_timeout_s: float = 60.0
-    stream_wait_s: float = 4.0  # how long a streamed tick (dividends) may take to arrive
-    # IBKR enrichment (ADR 0028): contract ids, IB's IV history and the nightly IV snapshot
-    contracts_refresh_days: int = 30  # re-resolve each conid once per window (spread by key)
-    contracts_batch: int = 25  # contracts qualified per request
-    iv_batch: int = 50  # IV streams open together (under the account's market-data lines)
-    iv_history_days: int = 730  # calendar days of IV history a backfill fetches per underlying
-    iv_backfill_per_night: int = 100  # underlyings without IV history the nightly backfills
-    # The API's live option quotes (ADR 0028): cache, strikes per request, failing fast
-    live_cache_s: float = (
-        60.0  # an answer is reused for this long (per underlying, expiry, strikes)
-    )
-    live_strikes: int = 10  # strikes nearest the underlying asked for when none are named
-    live_max_strikes: int = 20  # most strikes one request may name (x 2 rights = contracts)
-    live_timeout_s: float = 20.0  # longest a request waits for IB Gateway before the fallback
-    live_retry_s: float = 30.0  # after the gateway fails, requests fall back at once this long
+    switches: Mapping[str, bool] = field(default_factory=dict)  # VENDOR_FLAGS: more on/off keys
 
 
 @dataclass(frozen=True)
@@ -223,7 +200,7 @@ class SourcesSettings:
     max_chain_fetch_failures: float = 0.05
     max_chain_stale_share: float = 0.20
     max_verify_failures: float = 0.10
-    ibkr: IbkrSettings = IbkrSettings()
+    ibkr: IbkrSettings = field(default_factory=IbkrSettings)
     etf: EtfHoldingsSettings = field(default_factory=EtfHoldingsSettings)  # [etf_holdings]
 
     def vendor(self, section: str) -> VendorSettings:
@@ -278,7 +255,10 @@ class SourcesSettings:
             ),
             live_retention_days=root.integer("live_retention_days", d.live_retention_days, 1),
             vendors=_renamed(
-                {name: _vendor(t, name not in OFF_BY_DEFAULT) for name, t in vendors.items()}
+                {
+                    name: _vendor(t, name not in OFF_BY_DEFAULT, VENDOR_FLAGS.get(name, ()))
+                    for name, t in vendors.items()
+                }
             ),
             cboe_workers=_extra(vendors, "cboe").integer("workers", d.cboe_workers, 1),
             cboe_priority_symbols=tuple(
@@ -324,7 +304,7 @@ class SourcesSettings:
                 "max_chain_stale_share", d.max_chain_stale_share
             ),
             max_verify_failures=quality.fraction("max_verify_failures", d.max_verify_failures),
-            ibkr=_ibkr(_extra(vendors, "ibkr")),
+            ibkr=load_ibkr(_extra(vendors, "ibkr")),
             etf=EtfHoldingsSettings.from_table(_extra(vendors, "etf_holdings")),
         )
 
@@ -337,44 +317,15 @@ def _renamed(vendors: dict[str, VendorSettings]) -> dict[str, VendorSettings]:
     return vendors
 
 
-def _ibkr(section: Table) -> IbkrSettings:
-    d = IbkrSettings()
-    kind = section.integer("market_data_type", d.market_data_type, 1)
-    if kind not in IBKR_MARKET_DATA_TYPES:
-        raise ConfigurationError(
-            f"{section.where} market_data_type: expected 1 (live), 2 (frozen), 3 (delayed) "
-            f"or 4 (delayed frozen), got {kind}"
-        )
-    return IbkrSettings(
-        historical_min_interval_s=section.number(
-            "historical_min_interval_s", d.historical_min_interval_s, 0
-        ),
-        market_data_type=kind,
-        connect_timeout_s=section.number("connect_timeout_s", d.connect_timeout_s, 0),
-        request_timeout_s=section.number("request_timeout_s", d.request_timeout_s, 0),
-        stream_wait_s=section.number("stream_wait_s", d.stream_wait_s, 0),
-        contracts_refresh_days=section.integer(
-            "contracts_refresh_days", d.contracts_refresh_days, 0
-        ),
-        contracts_batch=section.integer("contracts_batch", d.contracts_batch, 1),
-        iv_batch=section.integer("iv_batch", d.iv_batch, 1),
-        iv_history_days=section.integer("iv_history_days", d.iv_history_days, 1),
-        iv_backfill_per_night=section.integer("iv_backfill_per_night", d.iv_backfill_per_night, 0),
-        live_cache_s=section.number("live_cache_s", d.live_cache_s, 0),
-        live_strikes=section.integer("live_strikes", d.live_strikes, 1),
-        live_max_strikes=section.integer("live_max_strikes", d.live_max_strikes, 1),
-        live_timeout_s=section.number("live_timeout_s", d.live_timeout_s, 0),
-        live_retry_s=section.number("live_retry_s", d.live_retry_s, 0),
-    )
-
-
 def _vendor_keys(section: str) -> tuple[str, ...]:
+    if section in OWN_KEYS_ONLY:
+        return OWN_KEYS_ONLY[section]
     if section in FIXED_PACE:
         return tuple(k for k in VENDOR_KEYS if k not in ADAPTIVE_KEYS)
     return VENDOR_KEYS
 
 
-def _vendor(section: Table, enabled: bool = True) -> VendorSettings:
+def _vendor(section: Table, enabled: bool = True, extra: tuple[str, ...] = ()) -> VendorSettings:
     floor = section.number("min_interval_s", None, 0)
     ceiling = section.number("max_interval_s", None, 0)
     start = section.number("start_interval_s", None, 0)
@@ -395,6 +346,7 @@ def _vendor(section: Table, enabled: bool = True) -> VendorSettings:
         max_interval_s=ceiling,
         start_interval_s=start,
         raw_retention_days=_optional_integer(section, "raw_retention_days", 1),
+        switches={key: section.boolean(key, True) for key in extra},
     )
 
 

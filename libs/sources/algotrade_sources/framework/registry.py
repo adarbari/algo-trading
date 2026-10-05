@@ -76,6 +76,9 @@ class VendorConfig(Protocol):
     @property
     def start_interval_s(self) -> float | None: ...
 
+    @property
+    def switches(self) -> Mapping[str, bool]: ...
+
 
 class IbkrOptions(Protocol):
     """``[ibkr]`` beyond enabled / min_interval_s (``config.site.settings.IbkrSettings``)."""
@@ -145,6 +148,7 @@ class SourceSpec:
     headers: Callable[[str | None], dict[str, str]] = _no_headers  # from the env value
     tries: int = 7
     not_found: Callable[[HttpError], bool] | None = None  # vendor's "no such object" errors
+    switch: str | None = None  # a further on/off key of the section that must not be false
 
 
 def _bearer(key: str | None) -> dict[str, str]:
@@ -175,7 +179,7 @@ SOURCES: dict[str, SourceSpec] = {
         SourceSpec("cboe", "cboe", "cboe", CboeOptionsSource, not_found=missing_chain),
         SourceSpec("nasdaq_trader", "nasdaq_trader", "nasdaqtrader", NasdaqTraderSource),
         SourceSpec("spy_holdings", "ssga", "ssga", SpyHoldingsSource, 1.0),
-        SourceSpec("ssga_holdings", "ssga", "ssga", SsgaHoldings, 1.0),
+        SourceSpec("ssga_holdings", "ssga", "ssga", SsgaHoldings, 1.0, switch="etf_files"),
         SourceSpec(
             "ishares_holdings", "ishares", "ishares", IsharesHoldings, 1.0, not_found=no_file
         ),
@@ -290,6 +294,9 @@ class Built:
 def unavailable(spec: SourceSpec | SessionSpec, settings: RegistrySettings, env: Env) -> str | None:
     if not settings.vendor(spec.section).enabled:
         return f"[{spec.section}] is disabled in sources.toml"
+    switch = None if isinstance(spec, SessionSpec) else spec.switch
+    if switch and not settings.vendor(spec.section).switches.get(switch, True):
+        return f"[{spec.section}] {switch} is false in sources.toml"
     names = spec.env_vars if isinstance(spec, SessionSpec) else (spec.env_var,)
     for name in names:
         if name is not None and env(name) is None:
