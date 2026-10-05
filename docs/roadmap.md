@@ -9,7 +9,7 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 
 **Next**
 - ETF holdings (ADR 0035, accepted): after merge run `algotrade-ingest etf-holdings` once (reads the ~1,140 covered funds, plus the non-optionable N-PORT funds with a 20-session dollar volume of $5M or more, up to ~900 (`fallback_scope = "liquid"`, `fallback_min_adv_usd`): about 1.5 hours per 1,140, extrapolated from the sample, mostly SEC header lookups; or let the nightly fill it, 200 funds a night, 6 weekday nights), then the Overview tab renders `<HoldingsPanel symbol onSelectSymbol>` (`widgets/holdings-panel`) for ETFs.
-- ETF descriptions for funds with no SEC prospectus objective: SPY, DIA, GLD, SLV, USO, IBIT, SOXL and the like (unit trusts, commodity and crypto trusts, some leveraged funds); 246 of the 1,464 ETFs trading $5M or more a day have none (2026-10-05). Needs a second source (issuer fund pages) and an ADR.
+- ETF descriptions for funds with no SEC prospectus objective: SPY, DIA, GLD, SLV, USO, IBIT, SOXL and the like (unit trusts, commodity and crypto trusts, some leveraged funds); 246 of the 1,464 ETFs trading $5M or more a day have none (2026-10-05). The SEC series match closes 83 of them; the rest need issuer pages (iShares and State Street page text for IBIT, SLV, SPY, DIA; ProShares and Direxion 497K or pages for SOXL, TSLL, UVXY) and an ADR.
 - Optional IBKR pace trial: `[ibkr] historical_min_interval_s` 5, then 3, watching timeouts and error 162 (the backfill ran at 10 s, IV only, about 6 names a minute). The nightly keeps the history current (100 names a night of any new gap).
 - API endpoints that return 404 "nothing stored" on an empty store return 200 with an empty body.
 - Split crowded folders by area: `apps/api` routes/ + schemas/, `services/explore/` (`screens/` is split out; the next new area follows it).
@@ -17,7 +17,7 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 - VRP live spread check in the UI via `GET /chains/{id}/live`.
 - Company financials (`financials@v1`, `feature.pe_ratio`, `feature.revenue_growth_yoy`; Explore Overview reads them): after merge run `algotrade-ingest shares --force` (about 30 to 40 minutes, resumable), then `algotrade-ingest rollups --from 2024-10-03 --to <last session> --only financials@v1` (a few seconds a session, estimated), and spot-check a few names ([vendors.md](data/vendors.md) "SEC EDGAR company facts").
 - Flaky tests: preview timing under load, smoke axe admin light, one builder e2e.
-- Descriptions (ADR 0034, accepted): after merge run `algotrade-ingest descriptions --only funds` (ETFs, ~2 min), then stocks in chunks (`descriptions --limit 300`, ~1 h each, S&P 500 first, each run holds the ingest lock; the nightly adds 100). Then the Overview tab reads `reference.description` from `GET /instruments/{id}`.
+- Descriptions (ADR 0034, accepted): after merge run `algotrade-ingest descriptions --only funds --force` (ETFs, ~2 min; `--force` rereads the 6 quarters so the ~870 ETFs matched through the SEC series file get their text, 83 of the 246 liquid gaps), then stocks in chunks (`descriptions --limit 300`, ~1 h each, S&P 500 first, each run holds the ingest lock; the nightly adds 100). Then the Overview tab reads `reference.description` from `GET /instruments/{id}`.
 
 **Facts**
 - IBKR fundamentals are not permitted on this account (error 10358): share-class counts stay SEC.

@@ -130,6 +130,7 @@ about 21 minutes longer: keep hand runs to about 300 stocks (about an hour).
 | File | Used for |
 |---|---|
 | `https://www.sec.gov/files/company_tickers_mf.json` (1.2 MB) | fund ticker to series id (`S000...`) and class id |
+| `https://www.sec.gov/files/investment/data/other/investment-company-series-class-information/investment-company-series-class-<year>.csv` (8 MB, yearly, `SecFundSeries`) | every registered series and share class with series / class names, class ticker and trust CIK: the ETFs the map above misses are matched by ticker or by name (`tasks/profile/fund_series.py`, ADR 0034) |
 | `https://www.sec.gov/files/dera/data/mutual-fund-prospectus-risk/return-summary-data-sets/<year>q<n>_rr1.zip` (~80 MB, 640k facts) | `txt.tsv` tag `ObjectivePrimaryTextBlock` per series, `sub.tsv` for the filing date and form |
 
 A fund is in a quarter's file only if it filed a prospectus then, so the task reads the last

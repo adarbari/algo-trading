@@ -5,16 +5,19 @@ import io
 import zipfile
 from datetime import date
 
+import pandas as pd
 import pytest
 
 from algotrade_sources.framework.base import FetchRequest
 from algotrade_sources.framework.http import HttpError, RetryPolicy
 from algotrade_sources.vendors.sec.fund_objectives import (
     SecFundObjectives,
+    SecFundSeries,
     SecFundTickerMap,
     clean_text,
     parse_fund_tickers,
     parse_objectives,
+    parse_series_classes,
     shorten,
 )
 from tests.conftest import REPO_ROOT
@@ -23,6 +26,7 @@ from tests.helpers.ingest_fakes import http_for
 FIXTURES = REPO_ROOT / "tests" / "fixtures" / "sources" / "sec"
 ZIP = (FIXTURES / "rr1_2026q2_sample.zip").read_bytes()
 FUNDS = (FIXTURES / "company_tickers_mf_sample.json").read_bytes()
+SERIES = (FIXTURES / "investment_company_series_class_sample.csv").read_bytes()  # real rows
 
 
 def test_objectives_are_the_latest_clean_text_per_series() -> None:
@@ -170,4 +174,50 @@ def test_sources_fetch_their_files_and_report_missing_quarters() -> None:
 def test_a_request_key_must_be_a_quarter(key: str) -> None:
     source = SecFundObjectives(http_for(lambda url: b"", RetryPolicy(tries=1)))
     with pytest.raises(ValueError, match="quarter"):
+        source.fetch(FetchRequest(key))
+
+
+def test_series_classes_are_one_row_per_share_class() -> None:
+    frame = parse_series_classes(SERIES).set_index("class_id")
+    assert len(frame) == 5
+    vanguard = frame.loc["C000046842"]
+    assert (vanguard["series_id"], vanguard["class_ticker"]) == ("S000002562", "BLV")
+    assert vanguard["series_name"] == "Vanguard Long-Term Bond Index Fund"
+    assert vanguard["cik"] == "0000794105"  # the trust, padded
+    corgi = frame.loc["C000275551"]
+    assert pd.isna(corgi["class_ticker"]) and corgi["class_name"] == "Corgi TPL 2x Daily ETF"
+
+
+def test_a_series_file_with_a_renamed_column_is_a_layout_change() -> None:
+    renamed = SERIES.replace(b"Series ID", b"Series Identifier", 1)
+    with pytest.raises(ValueError, match="no column"):
+        parse_series_classes(renamed)
+
+
+def test_a_row_without_a_series_id_is_dropped() -> None:
+    header = SERIES.splitlines()[0]
+    bad = header + b"\n811-00000,0000000001,X TRUST,30,,No Series,C000000001,No Series,,,,,,\n"
+    assert parse_series_classes(bad).empty
+
+
+def test_the_series_file_of_a_year_not_published_yet_is_read_from_the_year_before() -> None:
+    urls: list[str] = []
+
+    def transport(url: str) -> bytes:
+        urls.append(url)
+        if url.endswith("-2027.csv"):
+            raise HttpError(404)
+        return SERIES
+
+    source = SecFundSeries(http_for(transport, RetryPolicy(tries=1)))
+    payload = source.fetch(FetchRequest("2027"))
+    assert payload == SERIES and [u[-8:] for u in urls] == ["2027.csv", "2026.csv"]
+    normalized = source.normalize(FetchRequest("2027"), payload)
+    assert normalized is not None and len(normalized.parsed["series"]) == 5
+
+
+@pytest.mark.parametrize("key", ["2026q2", "26", "../x", "latest"])
+def test_the_series_request_key_must_be_a_year(key: str) -> None:
+    source = SecFundSeries(http_for(lambda url: b"", RetryPolicy(tries=1)))
+    with pytest.raises(ValueError, match="year"):
         source.fetch(FetchRequest(key))
