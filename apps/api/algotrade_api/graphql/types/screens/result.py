@@ -9,7 +9,7 @@ from strawberry.scalars import JSON
 
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.screens import results
-from algotrade_api.graphql.types.instrument import Instrument
+from algotrade_api.graphql.types.instruments.instrument import Instrument
 
 
 @strawberry.type(

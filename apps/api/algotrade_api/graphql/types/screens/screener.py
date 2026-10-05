@@ -11,7 +11,7 @@ from strawberry.types import Info
 
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.screens import runs, screeners
-from algotrade_api.graphql.types.feature import Unknown
+from algotrade_api.graphql.types.instruments.feature import Unknown
 
 
 @strawberry.type(description="How many rows of a run got one decision")

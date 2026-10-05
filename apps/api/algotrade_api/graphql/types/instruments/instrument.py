@@ -12,7 +12,7 @@ from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments import identity
 from algotrade_api.graphql.limits import MAX_NAMES, MaxItems
 from algotrade_api.graphql.scalars import FeatureName
-from algotrade_api.graphql.types.feature import FeatureValue
+from algotrade_api.graphql.types.instruments.feature import FeatureValue
 
 
 @strawberry.type(

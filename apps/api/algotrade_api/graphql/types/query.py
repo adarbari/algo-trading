@@ -14,11 +14,11 @@ from algotrade.services.read.instruments import identity
 from algotrade.services.read.screens import ideas, screeners, views
 from algotrade_api.graphql.context import RequestContext
 from algotrade_api.graphql.limits import MAX_PAGE, MaxItems
-from algotrade_api.graphql.types.ideas import Ideas
-from algotrade_api.graphql.types.instrument import Instrument
-from algotrade_api.graphql.types.screener import Screener
+from algotrade_api.graphql.types.instruments.instrument import Instrument
+from algotrade_api.graphql.types.screens.ideas import Ideas
+from algotrade_api.graphql.types.screens.screener import Screener
+from algotrade_api.graphql.types.screens.view import TableView
 from algotrade_api.graphql.types.session import Session
-from algotrade_api.graphql.types.view import TableView
 
 Day = Annotated[
     dt.date | None,

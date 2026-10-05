@@ -26,7 +26,7 @@ loaders `read/instruments/{identity,features,catalogue}.py` (`load_instrument`,
 6, 7, 9 and WEB 2, 5, 6 are on. **PR 5 moved Ideas**: `read/screens/{screeners,runs,results,ideas,views}.py`
 (`Screener` per id as the user sees it, `runs.load_latest_runs` THE latest-run rule: exact
 session, else `NOT_RUN`; `ScreenResult`; `Ideas` with per-screener `picked` and `top` over the
-whole run; `TableView`), `types/{screener,result,ideas,view}.py`, `Query.{ideas,screeners,view}`,
+whole run; `TableView`), `types/screens/{screener,result,ideas,view}.py` (PR 5 split `types/` by area: `instruments/`, `screens/`), `Query.{ideas,screeners,view}`,
 the `screener_latest_run` dataloader, `identity.load_instruments` (one identity read for a
 table's rows) and `partition(ctx, table, columns, instruments)`; the Ideas page reads one
 `IdeasPage` query with its facts by name (`entities/idea/model/facts.ts`); `ideas/ranking.py`,
@@ -198,7 +198,7 @@ generic read (R1 unchanged); what goes is each consumer deciding which partition
   typing) rejected.
 - **Where**: `apps/api/algotrade_api/graphql/`: `schema.py` (schema + router factory),
   `context.py` (`get_context` -> `ReadContext` via `services.read.context.open_context`),
-  `scalars.py`, `errors.py`, `loaders.py`, and `types/<object>.py` (one per domain object).
+  `scalars.py`, `errors.py`, `loaders.py`, and `types/<area>/<object>.py` (one per domain object, by area as the read model: `instruments/`, `screens/`; `types/` holds `query.py` and `session.py`).
 - **Thin resolvers**: a `types/*.py` module imports only `strawberry`, `algotrade.services.read.*`,
   `algotrade.core`, `algotrade.config` and sibling types (import-linter "GraphQL types are thin",
   enforced now). A resolver reads `info.context`, calls **one** loader or one dataloader

@@ -9,10 +9,10 @@ import strawberry
 
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.screens import ideas
-from algotrade_api.graphql.types.feature import Unknown
-from algotrade_api.graphql.types.instrument import Instrument
-from algotrade_api.graphql.types.result import ScreenResult
-from algotrade_api.graphql.types.screener import Screener, ScreenerRun
+from algotrade_api.graphql.types.instruments.feature import Unknown
+from algotrade_api.graphql.types.instruments.instrument import Instrument
+from algotrade_api.graphql.types.screens.result import ScreenResult
+from algotrade_api.graphql.types.screens.screener import Screener, ScreenerRun
 
 
 @strawberry.type(

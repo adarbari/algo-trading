@@ -10,7 +10,7 @@ Read first (by section): `docs/api/read-model.md` ("Catalogue feature or typed f
 
 ## Step 0: what exists today (check, do not assume)
 
-Run `ls apps/api/algotrade_api/graphql apps/api/algotrade_api/graphql/types src/algotrade/services/read`.
+Run `ls apps/api/algotrade_api/graphql apps/api/algotrade_api/graphql/types/* src/algotrade/services/read`.
 
 | You see | Meaning | Do |
 |---|---|---|
@@ -51,7 +51,7 @@ Verify: `.venv/bin/python -m pytest tests/unit/services/read -q -x` then `make a
 
 ## Step 4: the resolver (no logic)
 
-In `apps/api/algotrade_api/graphql/types/<object>.py`:
+In `apps/api/algotrade_api/graphql/types/<area>/<object>.py` (`<area>` mirrors the read model: `instruments/`, `screens/`; `types/` itself holds only `query.py` and `session.py`):
 
 ```python
 @strawberry.field
