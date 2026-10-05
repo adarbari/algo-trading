@@ -56,7 +56,15 @@ export interface DataTableColumn<TRow> {
   mono?: boolean;
   /** Text colour of plain cells: `default`, `secondary` or `muted`. */
   tone?: 'default' | 'secondary' | 'muted';
+  /** Tints a cell from its row (a criterion's near miss or miss); no tint when `undefined`. */
+  fill?: (row: TRow) => DataTableFill | undefined;
 }
+
+/**
+ * A tint behind a cell: `warning` (a near miss) or `negative` (a miss). The cell's text still says
+ * what it is (the value, or a "Why" column beside it), so colour never carries the meaning alone.
+ */
+export type DataTableFill = 'warning' | 'negative';
 
 /** The TanStack features the DataTable registers (module scope: stable across renders). */
 export const features = tableFeatures({

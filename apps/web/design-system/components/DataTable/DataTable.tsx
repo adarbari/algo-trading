@@ -461,6 +461,7 @@ export function DataTable<TRow extends RowData>({
                           role="gridcell"
                           data-align={alignOf(column)}
                           data-mono={column.mono || undefined}
+                          data-fill={column.fill?.(row.original)}
                           data-tone={
                             column.cell
                               ? undefined
