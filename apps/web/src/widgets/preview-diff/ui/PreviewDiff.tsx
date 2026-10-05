@@ -5,6 +5,7 @@
  * longer list of picks is compared by what it shows.
  */
 import { Banner, Button } from '@algotrade/ui';
+import { useEffect } from 'react';
 
 import { useScreenerBuilder } from '@/features/screener-builder';
 import {
@@ -23,13 +24,46 @@ export interface PreviewDiffProps {
 
 const names = (symbols: readonly string[]) => symbols.join(', ');
 
-export function PreviewDiff({ id, onReview }: PreviewDiffProps) {
+/**
+ * The changes the unsaved criteria would make against the saved run, with the sessions compared
+ * (null: nothing unsaved, no saved run to compare with, or no preview yet).
+ */
+export function usePreviewChanges(id: string) {
   const builder = useScreenerBuilder();
   const saved = useScreenTable(id, { decisions: DEFAULT_DECISIONS, columns: [] });
   const preview = builder.preview.data;
   if (!builder.dirty || !saved.data || !preview) return null;
   const savedPicks: PickedRow[] = saved.data.page.items;
-  const { enter, exit } = previewChanges(savedPicks, preview.rows);
+  return {
+    ...previewChanges(savedPicks, preview.rows),
+    previewSession: preview.session,
+    savedSession: saved.data.session,
+  };
+}
+
+/** Tells the page which saved picks the unsaved criteria would drop (for the results grid). */
+export function PreviewChangesReporter({
+  id,
+  onChange,
+}: {
+  id: string;
+  onChange: (leaving: ReadonlySet<string>) => void;
+}) {
+  const changes = usePreviewChanges(id);
+  const leaving = changes?.exit.join(',') ?? '';
+  useEffect(() => {
+    onChange(new Set(leaving === '' ? [] : leaving.split(',')));
+    return () => {
+      onChange(new Set());
+    };
+  }, [leaving, onChange]);
+  return null;
+}
+
+export function PreviewDiff({ id, onReview }: PreviewDiffProps) {
+  const changes = usePreviewChanges(id);
+  if (!changes) return null;
+  const { enter, exit } = changes;
   const message =
     enter.length === 0 && exit.length === 0
       ? 'The same tickers are picked.'
@@ -40,7 +74,7 @@ export function PreviewDiff({ id, onReview }: PreviewDiffProps) {
   return (
     <Banner
       tone="info"
-      title={`Unsaved changes: preview on ${preview.session}, against the saved run of ${saved.data.session}`}
+      title={`Unsaved changes: preview on ${changes.previewSession}, against the saved run of ${changes.savedSession}`}
       actions={
         onReview ? (
           <Button size="sm" onClick={onReview}>

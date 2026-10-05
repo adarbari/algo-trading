@@ -58,6 +58,8 @@ export interface ScreenerResultsProps {
   /** Instrument ids hidden for now. */
   dismissed: ReadonlySet<string>;
   onShowDismissed: () => void;
+  /** Symbols the unsaved criteria would drop from the picks (marked in the grid). */
+  leaving?: ReadonlySet<string>;
   /** What to show beside the table for the row under review (its detail, chart, ...). */
   renderDetail?: (focus: { row: ScreenTableRow; table: ScreenTable }) => ReactNode;
 }
@@ -89,6 +91,7 @@ export function ScreenerResults({
   onDismiss,
   dismissed,
   onShowDismissed,
+  leaving,
   renderDetail,
 }: ScreenerResultsProps) {
   const [viewName, setViewName] = useState<string | null>(null); // null: the default view
@@ -152,7 +155,10 @@ export function ScreenerResults({
     !view.isPending,
   );
   const data = table.data;
-  const tableColumns = useMemo(() => (data ? resultColumns(data, known) : []), [data, known]);
+  const tableColumns = useMemo(
+    () => (data ? resultColumns(data, known, leaving) : []),
+    [data, known, leaving],
+  );
   const rows = useMemo(
     () => (data?.page.items ?? []).filter((row) => !dismissed.has(row.instrument_id)),
     [data, dismissed],
@@ -276,7 +282,7 @@ export function ScreenerResults({
               <Stack direction="row" gap={2} align="center" wrap>
                 <Text size="sm" tone="muted">
                   {data
-                    ? `${count(data.page.total)} of ${count(Object.values(data.decisions).reduce((a, b) => a + b, 0))} rows`
+                    ? `${count(data.page.total)} shown · ${count(Object.values(data.decisions).reduce((a, b) => a + b, 0))} in the run`
                     : 'Loading rows…'}
                 </Text>
                 {dismissed.size > 0 ? (

@@ -14,7 +14,7 @@ import { ScreenerBuilderProvider } from '@/features/screener-builder';
 import { CriteriaTable } from '@/widgets/criteria-table';
 import { DraftBar } from '@/widgets/draft-bar';
 import { PickDetail } from '@/widgets/pick-detail';
-import { PreviewDiff } from '@/widgets/preview-diff';
+import { PreviewChangesReporter, PreviewDiff } from '@/widgets/preview-diff';
 import { PriceChartPanel } from '@/widgets/price-chart-panel';
 import { ScreenerResults } from '@/widgets/screener-results';
 
@@ -39,6 +39,7 @@ export function ScreenerResultsPage({
   const [compared, setCompared] = useState<readonly string[]>([]);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
   const [range, setRange] = useState<ChartRange>('1Y');
+  const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = useState(false);
   const [builderStarted, setBuilderStarted] = useState(false); // its preview runs once asked for
   const edit = () => {
@@ -80,6 +81,7 @@ export function ScreenerResultsPage({
       </Stack>
       {builderStarted && (
         <ScreenerBuilderProvider id={id} key={id}>
+          <PreviewChangesReporter id={id} onChange={setLeaving} />
           {!editing && <PreviewDiff id={id} onReview={edit} />}
           <Drawer
             open={editing}
@@ -117,6 +119,7 @@ export function ScreenerResultsPage({
           hide(row.instrument_id);
         }}
         dismissed={dismissed}
+        leaving={leaving}
         onShowDismissed={() => {
           setDismissed(new Set());
         }}

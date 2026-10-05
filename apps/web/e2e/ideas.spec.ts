@@ -4,9 +4,9 @@
  * earnings-before-expiry flag, decision filters, opening tickers in Explore, reordering the
  * screeners (saved, and rolled back with a toast when the save fails), accessibility.
  */
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
+import { expectAccessible } from './a11y';
 import { mockIdeasApi } from './ideas-api';
 import { mockApi } from './mock-api';
 
@@ -17,11 +17,6 @@ function collectErrors(page: Page): string[] {
     if (msg.type() === 'error') errors.push(msg.text());
   });
   return errors;
-}
-
-async function expectAccessible(page: Page): Promise<void> {
-  const axe = await new AxeBuilder({ page }).analyze();
-  expect(axe.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
 }
 
 const grid = (page: Page) => page.getByRole('grid', { name: 'Top ideas' });
