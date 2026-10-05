@@ -27,8 +27,10 @@ that was never run, or changed since it last ran, can only be run from the CLI.
    the Ideas list and the nightly's "new / dropped" comparison all see it.
 4. **The API's write path is narrow.** A dedicated library entry (`services/ondemand`, like
    `services.live` in ADR 0028) hosts a local job runner whose only job kind is `screen`,
-   holds the store's writer lock around each run so it never interleaves with an ingestion
-   run, and writes only result tables and run records through `ResultWriter`. Market and
+   does not wait for an ingestion run (a backfill holds the ingest lock for hours; a screen
+   reads committed data and publishes its results atomically under the store's commit lock,
+   ADR 0022), marks jobs a stopped process left running as failed on start, and writes only
+   result tables and run records through `ResultWriter`. Market and
    feature data stay ingestion's alone (ADR 0005).
 
 ## Consequences

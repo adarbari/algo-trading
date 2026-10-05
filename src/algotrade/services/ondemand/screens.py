@@ -4,9 +4,12 @@ version has already run for it.
 The API's one result-writing path, narrow like the live recorder's (ADR 0028): a local job
 runner whose only kind is ``screen`` (the same job the nightly submits, so a run stores
 ``results/rule_screen*`` and a run record exactly as the nightly does and everything that reads
-them sees it), each run holding the store's ingest lock so it never interleaves with an
-ingestion run (it waits for one, its job ``queued`` or ``running`` meanwhile). Nothing here
-writes market or feature data (ADR 0005).
+them sees it). It does not wait for an ingestion run: a screen reads only committed data and
+publishes its results atomically (ADR 0022, under the store's commit lock), so it cannot
+interleave with an ingestion run, and a backfill that holds the ingest lock for hours must not
+hold a request for as long. Nothing here writes market or feature data (ADR 0005). Jobs left
+queued or running by a stopped API process are marked failed on the next start, so a request
+for the same work runs again instead of waiting on a job that is gone.
 
 A request resolves the screener for the user (their own finalised screen, else a site preset),
 picks the session (``on``, else the latest with bars), and answers ``ready`` at once when a run
@@ -14,10 +17,8 @@ of this config hash for that session is stored (COMPLETE or PARTIAL); otherwise 
 job (the same work already in flight is the same job) and answers its state.
 """
 
-from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import date
-from typing import Any
+from datetime import date, timedelta
 
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
@@ -25,10 +26,8 @@ from algotrade.data import StoreReader
 from algotrade.services.configs import config_ids, resolve_config
 from algotrade.services.explore.store import NotFoundError, latest_session
 from algotrade.services.jobs.api import open_runner
-from algotrade.services.jobs.exclusive import INGEST_LOCK, exclusive_run
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.services.jobs.models import JobRecord, JobStatus
-from algotrade.services.jobs.runner import JobContext, JobKind
 from algotrade.services.screening.run import run_job_name
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.factory import open_backend
@@ -39,6 +38,7 @@ from algotrade.storage.tables.result_writer import ResultWriter
 KIND = "screen"
 READY = "ready"  # results for this version and session are already stored
 STORED = (JobStatus.COMPLETE, JobStatus.PARTIAL)
+STALE = timedelta(minutes=30)  # a screen takes minutes: older, still "running", is a dead job
 
 
 @dataclass(frozen=True)
@@ -51,16 +51,6 @@ class RunRequest:
     error: str | None  # why a failed run failed
 
 
-def _locked(kind: JobKind, backend: Backend) -> JobKind:
-    """``kind`` holding the store's writer lock while it runs (waiting for an ingestion run)."""
-
-    def handler(params: Mapping[str, Any], context: JobContext) -> Mapping[str, Any]:
-        with exclusive_run(backend, INGEST_LOCK, wait=True):
-            return kind.handler(params, context)
-
-    return JobKind(handler, kind.identity)
-
-
 class OnDemandScreens:
     """Requests and tracks screen runs over one store (``backend``) and its configs."""
 
@@ -69,8 +59,9 @@ class OnDemandScreens:
         self._reader = StoreReader(backend)
         self._runs = ResultWriter(backend)
         resources = {"reader": self._reader, "writer": self._runs, "configs": configs}
-        handlers = {KIND: _locked(LIBRARY_HANDLERS[KIND], backend)}
+        handlers = {KIND: LIBRARY_HANDLERS[KIND]}
         self._jobs = open_runner(self._runs.runs_backend, handlers, resources, workers)
+        self._jobs.recover(STALE, (KIND,))
 
     def _owner(self, config_id: str, user: UserContext) -> UserContext:
         """Whose run it is: the user's own screener, else the site preset (a shared run)."""

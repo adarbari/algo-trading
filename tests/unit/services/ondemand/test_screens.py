@@ -1,7 +1,8 @@
 """A screener run on request: the latest session unless it has run, stored like the nightly's,
-under the writer lock, for the right owner (ADR 0033)."""
+without waiting for ingestion, for the right owner (ADR 0033)."""
 
 import time
+from datetime import timedelta
 
 import pytest
 
@@ -10,6 +11,7 @@ from algotrade.services.explore.store import NotFoundError
 from algotrade.services.ondemand.screens import READY, OnDemandScreens, RunRequest
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.locks import held
+from algotrade.storage.runs import RunStatus
 from tests.helpers.ondemand_store import DAY, SCREEN, SNAPSHOT, seeded_backend, site_configs
 
 
@@ -84,20 +86,38 @@ def test_only_a_screener_can_be_run_and_a_job_belongs_to_its_screener(
     wait(runner, started)
 
 
-def test_a_run_waits_for_the_ingest_lock(runner: OnDemandScreens) -> None:
+def test_a_run_does_not_wait_for_an_ingestion_run() -> None:
+    """A backfill can hold the ingest lock for hours: a request must still be answered."""
     store = seeded_backend()
     ondemand = OnDemandScreens(store, site_configs())
     try:
         with held(store.lock("ingest")):
             request = ondemand.request("big_liquid", SITE, DAY)
-            time.sleep(0.2)
-            assert ondemand.status("big_liquid", request.job_id or "").state in (
-                "queued",
-                "running",
-            )
-        assert wait(ondemand, request).state == "complete"
+            assert wait(ondemand, request, timeout=5).state == "complete"
     finally:
         ondemand.close()
+
+
+def test_a_job_left_running_by_a_stopped_process_is_run_again() -> None:
+    store = seeded_backend()
+    first = OnDemandScreens(store, site_configs())
+    try:
+        stuck = first.request("big_liquid", SITE, DAY)
+        wait(first, stuck)
+    finally:
+        first.close()
+    # Simulate the process dying mid-run: the job record says running, long ago.
+    job = first._runs.load_run(stuck.job_id or "")
+    assert job is not None
+    job.status = RunStatus.RUNNING
+    job.finished_at = None
+    job.started_at = job.started_at - timedelta(hours=2)
+    first._runs.save_run(job)
+    second = OnDemandScreens(store, site_configs())
+    try:
+        assert second.status("big_liquid", stuck.job_id or "").state == "failed"
+    finally:
+        second.close()
 
 
 def test_nothing_can_be_screened_before_any_data_is_stored() -> None:
