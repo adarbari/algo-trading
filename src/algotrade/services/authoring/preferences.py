@@ -4,7 +4,8 @@ a screener's results, ``screeners.<id>.view`` (columns, sort, decisions shown) a
 ones, ``screeners.<id>.views.<name>``. Every id must be
 a screen the user can run (their own or a site preset) and listed once, and every column a
 feature of the user's catalogue, so a stale or mistyped name is never saved. A view belongs to
-the user, never to a screener version: saving one changes no screen and no hash."""
+the user, never to a screener version: saving one changes no screen and no hash. Deleting a
+screener forgets it here (``forget_screener``)."""
 
 import re
 from collections.abc import Sequence
@@ -34,6 +35,23 @@ def save_ideas_priority(writer: ConfigWriter, user: str, priority: Sequence[str]
     current["ideas"] = {**dict(current.get("ideas") or {}), "priority": ids}
     writer.save_preferences(who, current)
     return ids
+
+
+def forget_screener(writer: ConfigWriter, user: str, name: str) -> None:
+    """Drop ``name`` from ``user``'s preferences: ``ideas.priority`` and ``screeners.<name>``."""
+    current: dict[str, Any] = dict(writer.load(user, PREFERENCES, PREFERENCES) or {})
+    ideas = dict(current.get("ideas") or {})
+    views = dict(current.get("screeners") or {})
+    priority = list(ideas.get("priority") or [])
+    if name not in priority and name not in views:
+        return
+    if "priority" in ideas:
+        ideas["priority"] = [i for i in priority if i != name]
+        current["ideas"] = ideas
+    views.pop(name, None)
+    if "screeners" in current:
+        current["screeners"] = views
+    writer.save_preferences(user, current)
 
 
 MAX_COLUMNS = 40

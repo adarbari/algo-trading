@@ -35,6 +35,19 @@ vi.mock('@/features/screener-copy', async () => {
   };
 });
 
+vi.mock('@/features/screener-delete', async () => {
+  const { Button } = await import('@algotrade/ui');
+  return {
+    DeleteScreenerDialog: ({
+      screenerId,
+      onDeleted,
+    }: {
+      screenerId: string;
+      onDeleted: () => void;
+    }) => <Button onClick={onDeleted}>{`confirm delete of ${screenerId}`}</Button>,
+  };
+});
+
 stubElementSize();
 
 const screener = (
@@ -128,6 +141,15 @@ describe('ScreenerList', () => {
       }),
     );
     expect(onOpen).toHaveBeenLastCalledWith('vrp_scanner');
+  });
+
+  it('deletes one of your screeners after a confirmation; presets have no Delete', async () => {
+    setup();
+    const presets = within(screen.getByRole('grid', { name: 'Site presets' }));
+    expect(presets.queryByRole('button', { name: /Delete/ })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete my-vrp' }));
+    await userEvent.click(screen.getByRole('button', { name: 'confirm delete of my-vrp' }));
+    expect(screen.queryByRole('button', { name: 'confirm delete of my-vrp' })).toBeNull();
   });
 
   it('copies a preset and opens the copy', async () => {

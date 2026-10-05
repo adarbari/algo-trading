@@ -1,6 +1,7 @@
 /**
  * The screeners: the user's own (finalized and draft-only: open to edit) and the site presets
  * (open to see the live preview, or "Copy to my screeners", which pins the preset's version).
+ * Your own can be deleted (after a confirmation).
  * Python screeners are listed but built in code.
  */
 import { DataTable, Panel, Stack } from '@algotrade/ui';
@@ -8,6 +9,7 @@ import { useMemo, useState } from 'react';
 
 import { useMyScreeners, useScreeners, type ScreenerSummary } from '@/entities/screen';
 import { CopyPresetDialog } from '@/features/screener-copy';
+import { DeleteScreenerDialog } from '@/features/screener-delete';
 
 import { myColumns, presetColumns, type MyScreener } from '../model/columns';
 
@@ -22,7 +24,11 @@ export function ScreenerList({ onOpen, onEdit }: ScreenerListProps) {
   const configs = useScreeners();
   const mine = useMyScreeners();
   const [copying, setCopying] = useState<string | null>(null);
-  const actions = useMemo(() => ({ onOpen, onEdit, onCopy: setCopying }), [onOpen, onEdit]);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const actions = useMemo(
+    () => ({ onOpen, onEdit, onCopy: setCopying, onDelete: setDeleting }),
+    [onOpen, onEdit],
+  );
   const presetCols = useMemo(() => presetColumns(actions), [actions]);
   const myCols = useMemo(() => myColumns(actions), [actions]);
   const all = configs.data ?? [];
@@ -85,6 +91,18 @@ export function ScreenerList({ onOpen, onEdit }: ScreenerListProps) {
           onCopied={(id) => {
             setCopying(null);
             onEdit(id);
+          }}
+        />
+      )}
+      {deleting && (
+        <DeleteScreenerDialog
+          screenerId={deleting}
+          open
+          onOpenChange={(open) => {
+            if (!open) setDeleting(null);
+          }}
+          onDeleted={() => {
+            setDeleting(null);
           }}
         />
       )}

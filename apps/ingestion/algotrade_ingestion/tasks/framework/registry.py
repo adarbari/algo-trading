@@ -268,6 +268,7 @@ def _descriptions(ctx: TaskContext, p: Params) -> RunRecord:
         s.descriptions_refresh_days,
         s.sec_fund_quarters,
         s.cboe_priority_symbols,
+        ctx.sources.get("sec_fund_series"),
     )
     return descriptions.ingest_descriptions(
         ctx,

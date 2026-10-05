@@ -98,6 +98,12 @@ const HTTP_LIBRARIES = [
   'superagent',
   'node-fetch',
   'cross-fetch',
+  // GraphQL clients (ADR 0037): the one transport is gql() in src/shared/api/graphql.ts over
+  // fetch and TanStack Query; Apollo / urql would add a second cache and are not used at all.
+  'graphql-request',
+  '@apollo/client',
+  'urql',
+  '@urql/core',
 ];
 const CSS_IN_JS = [
   'styled-components',

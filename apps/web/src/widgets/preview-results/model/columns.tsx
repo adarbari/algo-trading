@@ -12,7 +12,7 @@ import {
   featureLabel,
   type CatalogueFeature,
 } from '@/entities/feature';
-import { ScreenDecisionBadge, type PreviewRow } from '@/entities/screen';
+import { ScoreBreakdown, ScreenDecisionBadge, type PreviewRow } from '@/entities/screen';
 
 type CriterionValue = PreviewRow['criteria'][number];
 
@@ -66,6 +66,10 @@ export function previewColumns(
       fill: (row) => FILL[of(row)?.outcome ?? ''],
     };
   });
+  const labelOf = (id: string, field: string): string => {
+    const feature = catalogue.get(field);
+    return feature ? featureLabel(feature.name) : humanise(id);
+  };
   const known = byColumn(catalogue);
   const shown = new Set(criterionColumn.map((c) => c.header));
   const displayColumn = extra.flatMap((name): DataTableColumn<PreviewRow>[] => {
@@ -108,9 +112,10 @@ export function previewColumns(
     {
       id: 'score',
       header: 'Score',
-      description: 'For sorting only: 100 minus the penalties of each miss',
+      description: 'For sorting only: 100 minus the penalties of each miss. Click it to see why.',
       value: (row) => row.score,
       format: { kind: 'number', digits: 0 },
+      cell: ({ row }) => <ScoreBreakdown row={row} labelOf={labelOf} />,
     },
     ...criterionColumn,
     ...displayColumn,

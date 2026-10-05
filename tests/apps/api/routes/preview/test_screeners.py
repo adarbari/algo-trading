@@ -29,7 +29,8 @@ def test_preview_evaluates_an_unsaved_draft(client: TestClient) -> None:
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["screener_id"] == "my_draft" and body["session"] == "2022-11-23"
-    assert body["total"] >= len(body["rows"]) and len(body["rows"]) <= 2
+    kept = sum(n for d, n in body["decisions"].items() if d != "REJECT")
+    assert len(body["rows"]) == min(body["total"], max(2, kept))  # every pick, at least 2
     assert [s["criterion_id"] for s in body["funnel"]] == ["price", "vol"]
     assert sum(body["decisions"].values()) == body["total"] == body["coverage"]["selected"]
     first = body["rows"][0]

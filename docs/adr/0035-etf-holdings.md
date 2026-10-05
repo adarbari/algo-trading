@@ -12,7 +12,7 @@ holdings and the date they are as of. Only SPY's holdings were fetched, as a mem
 |---|---|---|---|
 | State Street (SPDR) daily workbook, one URL per fund, listed by its public fund finder | 181 SPDR ETFs: SPY, the sector funds, DIA, MDY, bond and international funds | 1 day | use |
 | iShares `latest-holdings.csv` on each fund page, listed by the product screener | 526 listed funds (480 in our universe); the metal trusts (SLV) have no file | 1 day | use |
-| ProShares `accounts.profunds.com/etfdata/psdlyhld.csv`, linked from its data-downloads page | one daily CSV for 173 ProShares funds: the VIX futures funds (UVXY, SVXY, VIXY), leveraged and inverse funds with their futures and swaps. No weight column, no robots.txt on the host | 1 day | use (amendment 2026-10-05) |
+| ProShares `accounts.profunds.com/etfdata/psdlyhld.csv`, linked from its data-downloads page | one daily CSV for 173 ProShares funds: the VIX futures funds (UVXY, SVXY, VIXY), leveraged and inverse funds with their futures and swaps. No weight column, no robots.txt on the host | 1 day | use (amendment 2026-10-05; the owner accepted its terms for personal, non-commercial use only) |
 | SEC N-PORT-P (`data.sec.gov` + `Archives`), series from `company_tickers_mf.json` | every registered fund: Vanguard, Invesco QQQ, Schwab, ARK, most others. Not unit trusts (SPY, DIA) or commodity and crypto trusts | 60 to 150 days, quarterly | use as fallback |
 | Vanguard fund pages | a single-page app; its data API answers HTML, no file | n/a | skip (N-PORT covers it) |
 | Invesco `dng-api.invesco.com` | HTTP 406 for a non-browser client | n/a | skip; we do not impersonate a browser (N-PORT covers QQQ) |

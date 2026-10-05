@@ -1,5 +1,5 @@
-"""``/screeners/{id}``: read, draft, finalise, copy and rebase a user's rule screen (a finalised
-screen runs nightly; ADR 0033).
+"""``/screeners/{id}``: read, draft, finalise, copy, rebase and delete a user's rule screen (a
+finalised screen runs nightly, ADR 0033; a deleted one is archived).
 ``?user=`` names the user (a label until identity arrives; default ``ALGOTRADE_USER``)."""
 
 from fastapi import APIRouter
@@ -28,6 +28,14 @@ def screeners(writer: Writer, user: User) -> list[ScreenerListItem]:
 @router.get("/{screener_id}")
 def screener(writer: Writer, user: User, screener_id: str) -> ScreenerDetail:
     return ScreenerDetail.model_validate(screens.screen_detail(writer, user, screener_id))
+
+
+@router.delete("/{screener_id}", status_code=204)
+def delete_screener(writer: Writer, user: User, screener_id: str) -> None:
+    """Delete the user's screen: its draft and versions are archived (off the list and the
+    nightly; stored runs stay). 404 when the user has no such screen (a site preset is changed
+    only by pull request)."""
+    screens.delete_screen(writer, user, screener_id)
 
 
 @router.get("/{screener_id}/versions")

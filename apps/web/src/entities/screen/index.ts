@@ -51,6 +51,8 @@ export {
   type Tolerance,
 } from './model/spec';
 export { ScreenDecisionBadge } from './ui/ScreenDecisionBadge';
+export { ScoreBreakdown } from './ui/ScoreBreakdown';
+export { scoreBreakdown, type ScoreLine } from './model/score';
 export {
   DEFAULT_DECISIONS,
   orderedDecisions,

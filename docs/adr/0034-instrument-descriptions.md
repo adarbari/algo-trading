@@ -67,6 +67,18 @@ alike. Nothing stores one. Checked live on 2026-10-04 with the repo's Massive ke
   file no such exhibit (commodity and currency trusts, unit trusts such as SPY, ETNs). Stocks
   reach 100% of the Massive-known tickers after the backfill; warrants, units, rights,
   preferreds and notes get none.
+- Amendment (2026-10-05): the SEC fund map misses ~970 ETFs whose objective is in the quarters
+  already read, so the yearly series / class file (`investment-company-series-class-<year>.csv`,
+  8 MB) matches them by ticker (`Class Ticker` names one series) or else by name (the ETF's name
+  equals the name of exactly one series or share class, ignoring case, `&` and punctuation; no
+  word is dropped and a name fitting two series is not matched). Measured on the 1,463 ETFs
+  without a description: 918 matched (39 by ticker, 879 by name; 8 names fit two series and
+  were skipped), 868 of them have an objective in the quarters already read, which is 868 new
+  descriptions and 83 of the 246 liquid gaps (ADV of $5M or more). The file is optional: if it
+  cannot be read the ticker map decides alone and the run is PARTIAL. The funds still without
+  text are the ones in the map whose annual prospectus is missing from the data sets (Direxion,
+  ProShares: SOXL, TSLL) and the trusts in neither file (SPY, GLD, IBIT). The matches appear on
+  the next forced reread (`descriptions --only funds --force`).
 - Time to fill: ETFs in one run (about 90 seconds for 6 quarters, ~0.5 GB downloaded, kept as
   raw for 7 days); stocks 5.7k requests, about 20 hours, or 57 nights at the default cap.
 - The owner approved Massive's terms for showing its descriptions.

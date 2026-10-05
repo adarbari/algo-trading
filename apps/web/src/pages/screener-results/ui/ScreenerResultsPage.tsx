@@ -27,6 +27,8 @@ export interface ScreenerResultsPageProps {
   onOpenTicker: (symbol: string) => void;
   /** Open the tickers added to the compare set in Explore. */
   onCompare: (symbols: readonly string[]) => void;
+  /** The screener was deleted: back to the list. */
+  onDeleted: () => void;
 }
 
 export function ScreenerResultsPage({
@@ -34,6 +36,7 @@ export function ScreenerResultsPage({
   onEdit,
   onOpenTicker,
   onCompare,
+  onDeleted,
 }: ScreenerResultsPageProps) {
   const [focusId, setFocusId] = useState<string | null>(null);
   const [compared, setCompared] = useState<readonly string[]>([]);
@@ -98,7 +101,7 @@ export function ScreenerResultsPage({
             }
           >
             <Stack gap={3}>
-              <DraftBar compact />
+              <DraftBar compact onDeleted={onDeleted} />
               <PreviewDiff id={id} />
               <CriteriaTable />
             </Stack>

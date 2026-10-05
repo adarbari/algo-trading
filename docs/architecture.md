@@ -517,6 +517,15 @@ nightly step, coverage per screen (alert below 98%), selection size per config (
 
 ## 12. API
 
+**Target (ADRs [0036](adr/0036-session-strictness-for-reads.md),
+[0037](adr/0037-domain-read-model-served-by-graphql.md), [0038](adr/0038-catalogue-named-values.md);
+spec [api/read-model.md](api/read-model.md)):** every page read serves exactly one resolved
+session, comes from a domain read object in `src/algotrade/services/read/` and is served by
+GraphQL (`apps/api/algotrade_api/graphql/`, `POST /graphql`); per-instrument values are
+catalogue features read by name; REST keeps writes, job polling, health, live quotes, the
+preview POSTs and files (`architecture/rest_allowlist.toml`, shrink-only). The ten-PR migration
+is in the spec; until each area moves, the REST surface below serves it.
+
 [ADR 0024](adr/0024-api.md). `apps/api` is the web app's only backend: a read-only FastAPI
 (`algotrade-api` → uvicorn on 127.0.0.1:8000, `--reload` for development) over
 `services/explore/`. It reads the store at `ALGOTRADE_DATA_URL` and the configs at
@@ -543,7 +552,7 @@ web (apps/web) ──HTTP/JSON──▶ routes/<area>.py ──one call──▶
 | screens | `/screens` (screener configs + schedule + latest run); `/screens/{config_id}/results?date&decision&page&size` (+ audit); `/screens/{config_id}/table?date&decision&change&q&columns&sort&page&size` (a rule screen's run as a review table: criteria, display columns, features, new / dropped; ADR 0032) |
 | backtests | `/backtests`; `/backtests/{run_id}` (metrics, selection, data versions, rebalances, equity curve, fills) |
 | configs | `/configs`; `/configs/{id}` (resolved: layers + hash) |
-| preview (POST, read-only dry runs; `routes/preview/` → `services/explore/preview/`) | `POST /screeners/preview {spec, user, limit}` (an unsaved rule-screen draft evaluated by the nightly `evaluate_screen` on the latest closed session: summary, decisions, funnel per gating criterion, coverage, top rows; field frame cached per session, fields, user features and `visible_seq`; an invalid draft → 400 naming its path); `POST /features/check {expr, user, sample}` (a formula's type, inputs and licence, sampled on the latest session its inputs have) |
+| preview (POST, read-only dry runs; `routes/preview/` → `services/explore/preview/`) | `POST /screeners/preview {spec, user, limit}` (an unsaved rule-screen draft evaluated by the nightly `evaluate_screen` on the latest closed session: summary, decisions, funnel per gating criterion, coverage, the top rows (every row not rejected, at least `limit`, at most 1000); field frame cached per session, fields, user features and `visible_seq`; an invalid draft → 400 naming its path); `POST /features/check {expr, user, sample}` (a formula's type, inputs and licence, sampled on the latest session its inputs have) |
 | admin (Admin workspace only; role-gating attaches to `/admin/`) | `/admin/ingestion/completeness?sessions=10` (dataset × session: present vs expected rows, COMPLETE / PARTIAL / MISSING / CARRIED, run ids); `/admin/ingestion/{dataset}/{session}` (drill-down: items not OK grouped by reason with examples, the runs); `/admin/runs/nightly?limit=` (per session: status, steps with status / duration / counts); `/admin/runs/{run_id}` (items by status, failures grouped by reason, stats); `/admin/runs/{run_id}/items` (every item with its status code); `/admin/quality?date=` (the latest data-quality checks: PASS / WARN / FAIL with detail); `/admin/verification/ibkr?date=` (the live verification vs IBKR: counts by status and check, failing rows); `/admin/review/figi`, `/admin/review/leveraged` (the owner's curation lists) |
 
 Errors: unknown id / no data for the date → 404; bad configuration → 400; bad parameters →
@@ -593,7 +602,11 @@ doing it. The ratchet `architecture/known_violations.toml` is empty: any hit fai
 | which runs of a partition a read sees (`snapshot` / `merge`, restating runs; ADR 0007) | `storage/backends/run_selection.py` |
 | Parquet / Arrow I/O (casting to declared types, schema version, row groups) | `storage/backends/` (`arrow.py` shared by every backend) |
 | HTTP: routers, response schemas, CORS, error mapping, the ASGI server (ADR 0024) | `apps/api/algotrade_api/` |
-| read-only queries pages show (which partition a `?date=` sees, pages, JSON-safe rows) | `services/explore/` |
+| read-only queries pages show (pages, JSON-safe rows) | `services/explore/`, moving to `services/read/` (read-model track) |
+| which partition a read sees: one resolved session, exact for session-grain tables (ADR 0036) | today `services/explore/`; target `services/read/session.py` |
+| domain read objects and their loaders (ADR 0037) | `services/read/<area>/` |
+| scalar coercion of stored values (one way for reads and runs) | `services/views.py` (`to_value`); target `services/read/values.py` |
+| the GraphQL read layer: schema, scalars, dataloaders, thin types (ADR 0037) | `apps/api/algotrade_api/graphql/` |
 
 ### Typed settings and schemas (R6)
 

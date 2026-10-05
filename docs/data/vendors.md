@@ -130,6 +130,7 @@ about 21 minutes longer: keep hand runs to about 300 stocks (about an hour).
 | File | Used for |
 |---|---|
 | `https://www.sec.gov/files/company_tickers_mf.json` (1.2 MB) | fund ticker to series id (`S000...`) and class id |
+| `https://www.sec.gov/files/investment/data/other/investment-company-series-class-information/investment-company-series-class-<year>.csv` (8 MB, yearly, `SecFundSeries`) | every registered series and share class with series / class names, class ticker and trust CIK: the ETFs the map above misses are matched by ticker or by name (`tasks/profile/fund_series.py`, ADR 0034) |
 | `https://www.sec.gov/files/dera/data/mutual-fund-prospectus-risk/return-summary-data-sets/<year>q<n>_rr1.zip` (~80 MB, 640k facts) | `txt.tsv` tag `ObjectivePrimaryTextBlock` per series, `sub.tsv` for the filing date and form |
 
 A fund is in a quarter's file only if it filed a prospectus then, so the task reads the last
@@ -192,7 +193,7 @@ second or slower.
 | Issuer | What we read | Coverage | Lag |
 |---|---|---|---|
 | State Street (SPDR), `[ssga]` | The public fund finder (`/bin/v1/ssmp/fund/fundfinder?country=us&language=en&role=intermediary&product=etfs&ui=fund-finder`, 0.85 MB) lists each fund's `Holdings-daily` workbook path; one `.xlsx` per fund (20 to 190 KB). Equity funds: Name, Ticker, Identifier (CUSIP), SEDOL, Weight, Sector, Shares Held, Local Currency; bond funds: no ticker, ISIN, Par Value | 181 of the 183 US SPDR ETFs: SPY, XL*, DIA, MDY, SPYG... (not GLD, GLDM) | 1 day |
-| iShares, `[ishares]` | The product screener JSON (`/us/product-screener/product-screener-v3.1.jsn?...`, 1.9 MB) maps 526 tickers to fund pages; each page offers `<page>/latest-holdings.csv` (a schema.org DataDownload; 0.1 to 4 MB). Weights have two decimals, so the adapter uses each line's share of the market values when they agree; foreign lines print local tickers (Roche as `ROP`) | 526 listed funds; metal trusts (SLV) answer HTTP 400 | 1 day |
+| iShares, `[ishares]` | The product screener JSON (`/us/product-screener/product-screener-v3.1.jsn?...`, 1.9 MB) maps 526 tickers to fund pages; each page offers `<page>/latest-holdings.csv` (a schema.org DataDownload; 0.1 to 4 MB). Funds that overlay futures (IJH, IJR) publish `Market Weight` and `Notional Weight` instead of `Weight (%)`: the adapter reads `Market Weight` (it adds up to 100%; the futures line has none and is dropped). Weights have two decimals, so the adapter uses each line's share of the market values when they agree; foreign lines print local tickers (Roche as `ROP`) | 526 listed funds; metal trusts (SLV) answer HTTP 400 | 1 day |
 | ProShares, `[proshares]` | `accounts.profunds.com/etfdata/psdlyhld.csv` (1.8 MB, linked from `proshares.com/resources/data-downloads`; preamble, then `Fund Ticker, Fund Name, Security Ticker, Security Sedol, Security Description, Coupon, Maturity Date, Shares/Contracts, Exposure Value (Notional + G/L), Market Value`): 173 funds, 20k lines, `AS OF` date in the second row. No weights: share of gross exposure (ADR 0035). Futures and swaps carry no ticker; a line with a ticker is an equity or ETF | UVXY, SVXY, VIXY and the other ProShares funds N-PORT lags or misses | 1 day |
 | SEC N-PORT, `[sec_edgar]` | `files/company_tickers_mf.json` (ticker to trust CIK and series), `data.sec.gov/submissions/CIK<cik>.json` (the trust's N-PORT-P list), the filing's `-index-headers.html` (names its series; the list does not), then `primary_doc.xml` (0.1 to 4 MB: name, CUSIP / ISIN, `pctVal` per line; no tickers) | Every registered fund: Vanguard, Invesco QQQ, Schwab, ARK... Not unit trusts (SPY, DIA) or commodity / crypto trusts | 60 to 150 days, quarterly |
 
@@ -229,7 +230,8 @@ their terms of use for these public files (2026-10-05). ProShares' host (`accoun
 has no robots.txt (404) and `proshares.com/robots.txt` does not disallow `/resources`; the file
 is linked from ProShares' own data-downloads page, whose terms say the content is for
 information, education and non-commercial purposes: this project is personal and non-commercial.
-The owner is asked to confirm that in the PR that added it (ADR 0035 amendment).
+The owner accepted ProShares' terms on that basis, for personal, non-commercial use only
+(2026-10-05; ADR 0035 amendment): the data must not be redistributed or used commercially.
 `enabled = false` in `[ssga]`, `[ishares]` or `[proshares]` turns an issuer off.
 
 Linking: a holding's ticker becomes an instrument id through `SymbolResolver`, only for lines

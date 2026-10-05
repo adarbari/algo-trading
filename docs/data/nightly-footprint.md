@@ -107,7 +107,7 @@ to end:
 | `sec_nport` / nport_holdings | the fund list + ~5 funds | ~0.23 MB + ~18 KB each (measured, max 0.27 MB); kept 7 days with the other SEC sources |
 | `massive` / tickers, grouped_daily, corporate_actions | 1 + 1 + 2 | ~0.9 MB (grouped daily 0.3, tickers 0.25, corporate-action window ~0.35) |
 | `massive` / ticker_overview | one per stock asked, up to 100 | ~0.15 MB (1.5 KB each, gzipped) |
-| `sec_edgar` / fund_objectives + company_tickers_mf | the night a new quarter is published: 1 zip + 1 map; the first run reads 6 quarters | ~80 MB per quarter zip (first run ~0.5 GB), kept 7 days; the map ~0.5 MB |
+| `sec_edgar` / fund_objectives + company_tickers_mf + fund_series | the night a new quarter is published: 1 zip + 1 map + 1 series file; the first run reads 6 quarters | ~80 MB per quarter zip (first run ~0.5 GB), kept 7 days; the map ~0.5 MB; the series file ~8 MB |
 | `nasdaq_earnings` / earnings_calendar | 67 (one per calendar day, 7 back and 60 ahead) | ~0.27 MB |
 | `sec_edgar` / company_tickers + submissions + companyfacts | 1 + the CIKs due a refresh (about 1/30 of companies a night, each for submissions and company facts) | ~30 MB (~36 KB per submission and ~115 KB per company-facts file, measured on the 2026-10-02 full load: 6,280 + 6,032 files, 116 + 690 MB), kept 7 days |
 

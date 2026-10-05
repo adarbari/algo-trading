@@ -29,7 +29,11 @@ from algotrade_sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
 from algotrade_sources.vendors.proshares.etf_holdings import ProsharesHoldings
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts
 from algotrade_sources.vendors.sec.edgar import SecSubmissions, SecTickerMap
-from algotrade_sources.vendors.sec.fund_objectives import SecFundObjectives, SecFundTickerMap
+from algotrade_sources.vendors.sec.fund_objectives import (
+    SecFundObjectives,
+    SecFundSeries,
+    SecFundTickerMap,
+)
 from algotrade_sources.vendors.sec.nport_holdings import NportHoldings
 from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource
@@ -159,6 +163,11 @@ def sec_fund_objectives() -> Adapter:
     return SecFundObjectives(http_for(lambda url: payload)), FetchRequest("2026q2")
 
 
+def sec_fund_series() -> Adapter:
+    series = (FIXTURES / "sec" / "investment_company_series_class_sample.csv").read_bytes()
+    return SecFundSeries(http_for(lambda url: series)), FetchRequest("2026")
+
+
 def sec_tickers() -> Adapter:
     payload = sec_payloads.tickers([(320193, "Apple Inc.", "AAPL", "Nasdaq")])
     return SecTickerMap(http_for(lambda url: payload)), FetchRequest("tickers")
@@ -185,6 +194,7 @@ ADAPTERS: dict[str, Callable[[], Adapter]] = {
     "massive_overview": massive_overview,
     "sec_fund_tickers": sec_fund_tickers,
     "sec_fund_objectives": sec_fund_objectives,
+    "sec_fund_series": sec_fund_series,
     "sec_tickers": sec_tickers,
     "sec_submissions": sec_submissions,
     "sec_company_facts": sec_company_facts,

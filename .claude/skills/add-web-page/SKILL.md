@@ -13,16 +13,30 @@ No new HTML: pages, widgets, features and entities only compose `@algotrade/ui`.
    section is a new entry there plus a route in its workspace group
    (`src/app/routes/trader/` or `src/app/routes/admin/`). Each folder kind is declared in
    `architecture/layout.toml` (`[[web_dir]]`); a new kind of folder is declared first.
-1. **API first.** If the page needs data the API lacks, add the endpoint to `apps/api`, commit
-   its `apps/api/openapi.json`, then in `apps/web` run `npm run api:generate` (CI fails if the
-   generated schema is stale). Add a query key factory in `src/shared/api/query-keys.ts`. Only
-   `src/shared/api` talks HTTP.
+1. **Data first: the entity's GraphQL operation** (ADR 0037; `.claude/skills/add-graphql-field`).
+   Page reads are GraphQL: the operation in the entity's `api/`, fragments from other entities
+   through their `index.ts`, per-instrument values as `features(names: [feature('<name>')])`
+   (ADR 0038), then `npm run api:generate`. REST (`add-api-endpoint`) only for a write or a
+   job. **Today's state:** the GraphQL layer arrives in read-model PR 4
+   (`docs/api/read-model.md` "Migration plan"); until then, and until the page's area has
+   moved, a new page read uses the old REST path only if the owner explicitly asks for that
+   path ("use the legacy path"; a feature request is not: name the read-model PR that
+   delivers it and ask); otherwise do the next migration PR first. On the legacy path too,
+   a per-instrument value comes as `features['<catalogue name>']`, never a new typed field
+   (`add-api-endpoint` "Legacy page reads"; a test fails it). Only `src/shared/api` talks HTTP.
 2. **Entities** (`src/entities/<entity>/`): the domain model types (from the generated
-   schema), read hooks (`useQuery` + `api.GET` via `unwrap`), and view components composing
-   `@algotrade/ui`. Export them from `index.ts`. Reuse an existing entity before adding one.
+   types), read hooks (`useQuery` over `gql()` with `queryKeys.gql(...)`; legacy REST hooks use
+   `api.GET` via `unwrap`), and view components composing `@algotrade/ui`. Export them from
+   `index.ts`. Reuse an existing entity before adding one. Render what the server sends: no
+   fact derived from raw rows, no browser "today" against stored dates, no counts from a page
+   (`architecture/web_forbidden_derivations.toml`, checked by `test_layout_web.py`).
 3. **Features** (`src/features/<feature>/`): a user action or flow with its state (filters,
    builder, mutations). Imports entities and shared; never another feature.
 4. **Widgets** (`src/widgets/<widget>/`): a page section composing features and entities.
+   **Tables use `widgets/feature-table` with the column factories in
+   `entities/feature/model/columns.tsx`; never a `DataTableColumn` literal** (ADR 0038; both
+   arrive in read-model PR 7; until then a table keeps its widget's `model/columns.tsx`, and
+   PR 7 replaces every one of them).
 5. **Page** (`src/pages/<page>/`): composes widgets / features with primitives (`Stack`,
    `Text`); receives route params as props; no logic, no styling, no Query, no router.
    Export it from `index.ts`; add `<Page>.test.tsx`.

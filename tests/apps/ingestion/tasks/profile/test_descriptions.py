@@ -28,7 +28,11 @@ from algotrade_ingestion.tasks.profile.descriptions import (
 )
 from algotrade_sources.framework.http import HttpError, RetryPolicy
 from algotrade_sources.vendors.massive.overview import MassiveOverview
-from algotrade_sources.vendors.sec.fund_objectives import SecFundObjectives, SecFundTickerMap
+from algotrade_sources.vendors.sec.fund_objectives import (
+    SecFundObjectives,
+    SecFundSeries,
+    SecFundTickerMap,
+)
 from tests.conftest import REPO_ROOT
 from tests.helpers.ingest_fakes import http_for, task_ctx
 from tests.helpers.payloads import massive as massive_payloads
@@ -39,6 +43,7 @@ CLOCK = lambda: datetime(2026, 10, 2, 22, tzinfo=UTC)  # noqa: E731
 SEC = REPO_ROOT / "tests" / "fixtures" / "sources" / "sec"
 ZIP = (SEC / "rr1_2026q2_sample.zip").read_bytes()
 FUNDS = (SEC / "company_tickers_mf_sample.json").read_bytes()
+SERIES = (SEC / "investment_company_series_class_sample.csv").read_bytes()
 TEXT = {"AAPL": "Apple makes phones.", "KO": "Coca-Cola sells drinks.", "ZZZ": "Zed does things."}
 
 
@@ -66,7 +71,13 @@ class FakeMassive:
 
 
 class FakeSec:
-    def __init__(self, published: tuple[str, ...] = ("2026q2",), zipped: bytes = ZIP) -> None:
+    def __init__(
+        self,
+        published: tuple[str, ...] = ("2026q2",),
+        zipped: bytes = ZIP,
+        series_down: bool = False,
+    ) -> None:
+        self.series_down = series_down
         self.urls: list[str] = []
         self.published = published
         self.zipped = zipped
@@ -75,6 +86,10 @@ class FakeSec:
         self.urls.append(url)
         if url.endswith(".json"):
             return FUNDS
+        if url.endswith(".csv"):
+            if self.series_down:
+                raise HttpError(500)
+            return SERIES
         if not any(q in url for q in self.published):
             raise HttpError(404)
         return self.zipped
@@ -84,7 +99,11 @@ class FakeSec:
 
 
 def sources(
-    massive: FakeMassive | None, sec: FakeSec | None, per_night: int = 100, refresh_days: int = 365
+    massive: FakeMassive | None,
+    sec: FakeSec | None,
+    per_night: int = 100,
+    refresh_days: int = 365,
+    with_series: bool = False,
 ) -> DescriptionSources:
     policy = RetryPolicy(tries=1)
     return DescriptionSources(
@@ -95,6 +114,7 @@ def sources(
         refresh_days,
         fund_quarters=2,
         priority_symbols=("ZZZ",),
+        fund_series=SecFundSeries(http_for(sec, policy)) if sec and with_series else None,
     )
 
 
@@ -102,7 +122,7 @@ STOCKS = ("AAPL", "KO", "ZZZ", "GONE")
 ETFS = ("VOO", "BLV", "FJP", "MNVR", "QQQ", "SPY")
 
 
-def store() -> tuple[StoreWriter, StoreReader]:
+def store(named: tuple[tuple[str, str], ...] = ()) -> tuple[StoreWriter, StoreReader]:
     """Reference on DAY: four stocks (AAPL and KO in the S&P 500, ZZZ pinned), six ETFs
     (SPY is not in the SEC fund map, QQQ has no objective in the recorded quarter), a warrant."""
     writer = StoreWriter(MemoryBackend())
@@ -120,6 +140,12 @@ def store() -> tuple[StoreWriter, StoreReader]:
          "security_type": "COMMON_STOCK", "status": "ACTIVE", "is_etf": True, "in_sp500": False},
         {"instrument_id": "EQ:WARR", "symbol": "WARR", "asset_class": "EQ", "multiplier": 1.0,
          "security_type": "WARRANT", "status": "ACTIVE", "is_etf": False, "in_sp500": False}
+    ]  # fmt: skip
+    rows += [
+        {"instrument_id": f"EQ:{s}", "symbol": s, "name": name, "asset_class": "EQ",
+         "multiplier": 1.0, "security_type": "ETF", "status": "ACTIVE", "is_etf": True,
+         "in_sp500": False}
+        for s, name in named
     ]  # fmt: skip
     writer.write_table("instruments/reference", DAY, "u", stamped(rows, DAY, "u"))
     return writer, StoreReader(writer._backend)
@@ -450,3 +476,38 @@ def test_a_forced_fund_read_replaces_text_that_reads_differently_whatever_its_da
     ingest_descriptions(later, sources(None, sec), nxt, only="funds", force=True)
     got = descriptions(reader).set_index("symbol").loc["VOO"]
     assert got["description"].startswith("Vanguard 500 Index Fund (the Fund) seeks")
+
+
+NAMED = (("CRGI", "Corgi TPL 2x Daily ETF"), ("BITQ", "Bitwise Crypto Industry Innovators ETF"))
+
+
+def test_an_etf_the_ticker_map_misses_is_described_through_its_sec_series() -> None:
+    writer, reader = store(named=NAMED)  # CRGI is in no ticker map; BITQ is under two series
+    record = run(writer, reader, sources(None, FakeSec(), with_series=True), only="funds")
+    assert record.status is RunStatus.COMPLETE
+    assert record.items["fund_series"] == "OK: 5 share classes"
+    assert record.stats["fund_matched"] == {"by_ticker": 0, "by_name": 1, "ambiguous": 1}
+    got = descriptions(reader).set_index("symbol")
+    assert got.loc["CRGI", "description"].startswith("The Corgi TPL 2x Daily ETF")
+    assert got.loc["CRGI", "description_source"] == FUND_TEXT
+    assert "BITQ" not in got.index  # the name fits two series: no guess
+    assert {"VOO", "BLV", "FJP", "MNVR"} <= set(got.index)  # the map's funds are unchanged
+
+
+def test_without_the_series_source_the_ticker_map_alone_decides() -> None:
+    writer, reader = store(named=NAMED)
+    record = run(writer, reader, sources(None, FakeSec()), only="funds")
+    assert "fund_series" not in record.items and "fund_matched" not in record.stats
+    assert "CRGI" not in set(descriptions(reader)["symbol"])
+
+
+def test_a_series_file_that_cannot_be_read_costs_the_matches_not_the_run() -> None:
+    writer, reader = store(named=NAMED)
+    record = run(
+        writer, reader, sources(None, FakeSec(series_down=True), with_series=True), only="funds"
+    )
+    assert record.status is RunStatus.PARTIAL and record.items["fund_series"].startswith(
+        "FETCH_ERROR"
+    )
+    got = descriptions(reader).set_index("symbol")
+    assert "CRGI" not in got.index and {"VOO", "BLV", "FJP", "MNVR"} <= set(got.index)
