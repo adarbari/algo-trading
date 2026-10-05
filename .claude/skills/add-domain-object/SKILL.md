@@ -16,7 +16,7 @@ Run `ls src/algotrade/services/read src/algotrade/services/read/* apps/api/algot
 |---|---|---|
 | only `__init__.py` files | read-model PR 1 state (superseded: PR 2 landed 2026-10) | you are on an old branch: rebase on `origin/main` |
 | `session.py`, `values.py`, `context.py`, but no `apps/api/algotrade_api/graphql/schema.py` | an old branch (PR 2 state) | rebase on `origin/main` |
-| `graphql/schema.py`, `read/instruments/{identity,features,catalogue}.py` exist | **today**: PR 4 landed (Instrument, FeatureValue, FeatureInfo on GraphQL); the next object is the one the next RM PR names (RM5: `read/screens/*`) | all steps |
+| `graphql/schema.py`, `read/instruments/{identity,features,catalogue}.py`, `read/screens/*` exist | **today**: PRs 4-5 landed (Instrument, FeatureValue, FeatureInfo; Screener, ScreenerRun, ScreenResult, Ideas, TableView on GraphQL); the next object is the one the next RM PR names (RM6: `read/instruments/{events,chains,holdings,prices,series}.py`) | all steps |
 
 Check the object is not already planned: `grep -n "<ObjectName>" docs/api/read-model.md`. If
 the spec's object table names it, build exactly that row (identity, fields, tables, module).

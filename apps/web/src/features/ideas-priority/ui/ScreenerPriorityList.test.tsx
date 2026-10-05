@@ -4,7 +4,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { IdeasResponse, ScreenerSummary } from '@/entities/idea';
+import { IDEAS_OPERATION, type IdeasResponse, type ScreenerSummary } from '@/entities/idea';
 import { api, queryKeys } from '@/shared/api';
 import { expectNoA11yViolations } from '@/shared/lib/testing';
 
@@ -17,24 +17,37 @@ vi.mock('@/shared/api', async (importOriginal) => {
 
 const PUT = vi.mocked(api.PUT);
 
-const screener = (id: string, qualified: number): ScreenerSummary => ({
+const screener = (id: string, picked: number): ScreenerSummary => ({
   id,
   name: id,
-  user: 'abhinav',
+  owner: 'abhinav',
   version: 1,
-  qualified,
+  picked,
+  notRun: null,
   top: [{ symbol: 'AAPL', score: 84 }],
 });
 const SCREENERS = [screener('vrp', 3), screener('liq', 5)];
 
+const served = (id: string) => ({
+  screener: { id, name: id, owner: 'abhinav', version: 1 },
+  run: { runId: `run-${id}`, configVersion: 1 },
+  notRun: null,
+  picked: 1,
+  top: [],
+});
 const cached: IdeasResponse = {
-  session: '2026-10-02',
-  priority: ['vrp', 'liq'],
-  total: 0,
-  screeners: [],
-  items: [],
+  ideas: {
+    session: '2026-10-02',
+    priority: ['vrp', 'liq'],
+    total: 0,
+    screeners: [served('vrp'), served('liq')],
+    items: [],
+  },
 };
-const key = queryKeys.ideas.top(200);
+const key = queryKeys.gql(IDEAS_OPERATION, { limit: 200, names: [] });
+const priorityOf = (data: IdeasResponse | undefined) => data?.ideas?.priority;
+const orderOf = (data: IdeasResponse | undefined) =>
+  data?.ideas?.screeners.map((s) => s.screener.id);
 
 function setup() {
   const client = new QueryClient({
@@ -67,7 +80,7 @@ describe('ScreenerPriorityList', () => {
     const { container } = setup();
     expect(screen.getByRole('list', { name: 'Screener priority' })).toBeInTheDocument();
     expect(screen.getByText('vrp')).toBeInTheDocument();
-    expect(screen.getAllByText('qualified')).toHaveLength(2);
+    expect(screen.getAllByText('picked')).toHaveLength(2);
     await expectNoA11yViolations(container);
   });
 
@@ -78,7 +91,8 @@ describe('ScreenerPriorityList', () => {
     await moveFirstDown();
     expect(PUT).toHaveBeenCalledWith('/preferences/ideas', { body: { priority: ['liq', 'vrp'] } });
     await waitFor(() => {
-      expect(client.getQueryData<IdeasResponse>(key)?.priority).toEqual(['liq', 'vrp']);
+      expect(priorityOf(client.getQueryData<IdeasResponse>(key))).toEqual(['liq', 'vrp']);
+      expect(orderOf(client.getQueryData<IdeasResponse>(key))).toEqual(['liq', 'vrp']);
     });
     resolve({
       data: { priority: ['liq', 'vrp'] },
@@ -97,6 +111,6 @@ describe('ScreenerPriorityList', () => {
     const { client } = setup();
     await moveFirstDown();
     expect(await screen.findByText('Could not save the screener order')).toBeInTheDocument();
-    expect(client.getQueryData<IdeasResponse>(key)?.priority).toEqual(['vrp', 'liq']);
+    expect(priorityOf(client.getQueryData<IdeasResponse>(key))).toEqual(['vrp', 'liq']);
   });
 });

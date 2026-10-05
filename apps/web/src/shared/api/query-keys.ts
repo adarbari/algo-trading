@@ -7,6 +7,8 @@ export const queryKeys = {
   /** A GraphQL operation: its name and variables (every GraphQL read is keyed this way). */
   gql: (operationName: string, variables: Readonly<Record<string, unknown>>) =>
     ['gql', operationName, variables] as const,
+  /** Every cached response of one GraphQL operation, whatever its variables (invalidation). */
+  gqlAll: (operationName: string) => ['gql', operationName] as const,
   admin: {
     all: () => ['admin'] as const,
     completeness: (sessions: number) => ['admin', 'ingestion', 'completeness', sessions] as const,
@@ -26,10 +28,6 @@ export const queryKeys = {
       ['explore', 'compare', ids, features] as const,
     prices: (ids: readonly string[], from: string | null) =>
       ['explore', 'prices', ids, from] as const,
-  },
-  ideas: {
-    all: () => ['ideas'] as const,
-    top: (limit: number) => ['ideas', 'top', limit] as const,
   },
   screeners: {
     all: () => ['screeners'] as const,

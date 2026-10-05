@@ -3,16 +3,17 @@ import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { api } from '@/shared/api';
+import { gql, GraphQLRequestError } from '@/shared/api';
 
+import { IDEA_FEATURES } from '../model/facts';
 import { IDEAS_LIMIT, useIdeas } from './hooks';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
-  return { ...actual, api: { GET: vi.fn() } };
+  return { ...actual, gql: vi.fn() };
 });
 
-const GET = vi.mocked(api.GET);
+const GQL = vi.mocked(gql);
 
 function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -20,40 +21,46 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 beforeEach(() => {
-  GET.mockReset();
+  GQL.mockReset();
 });
 
 describe('useIdeas', () => {
-  it('fetches /ideas and shapes it', async () => {
-    GET.mockResolvedValue({
-      data: {
+  it('asks the IdeasPage operation for the ideas and their facts, and shapes it', async () => {
+    GQL.mockResolvedValue({
+      ideas: {
         session: '2026-10-02',
         priority: ['vrp'],
         total: 0,
-        screeners: [{ config_id: 'vrp', user: 'abhinav', name: 'VRP scanner', version: 1 }],
+        screeners: [
+          {
+            screener: { id: 'vrp', name: 'VRP scanner', owner: 'abhinav', version: 1 },
+            run: null,
+            notRun: { code: 'NOT_RUN', detail: 'vrp (abhinav) has no run' },
+            picked: 0,
+            top: [],
+          },
+        ],
         items: [],
       },
-      response: new Response(null, { status: 200 }),
     });
     const { result } = renderHook(() => useIdeas(), { wrapper });
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
-    expect(GET).toHaveBeenCalledWith('/ideas', { params: { query: { limit: IDEAS_LIMIT } } });
-    expect(result.current.data?.screeners.map((s) => [s.id, s.name])).toEqual([
-      ['vrp', 'VRP scanner'],
+    const [document, variables] = GQL.mock.calls[0] ?? [];
+    expect(String(document)).toContain('query IdeasPage');
+    expect(variables).toEqual({ limit: IDEAS_LIMIT, names: IDEA_FEATURES });
+    expect(result.current.data?.screeners.map((s) => [s.id, s.notRun])).toEqual([
+      ['vrp', 'vrp (abhinav) has no run'],
     ]);
   });
 
-  it('surfaces an API error', async () => {
-    GET.mockResolvedValue({
-      error: { detail: 'no session' },
-      response: new Response(null, { status: 404 }),
-    });
+  it('surfaces a GraphQL error', async () => {
+    GQL.mockRejectedValue(new GraphQLRequestError([{ message: 'boom' }]));
     const { result } = renderHook(() => useIdeas(), { wrapper });
     await waitFor(() => {
       expect(result.current.isError).toBe(true);
     });
-    expect(result.current.error).toMatchObject({ status: 404 });
+    expect(result.current.error).toMatchObject({ codes: ['INTERNAL'] });
   });
 });

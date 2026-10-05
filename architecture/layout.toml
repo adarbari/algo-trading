@@ -244,11 +244,6 @@ purpose = "read-only queries for apps that show data (the API): one module per a
 contracts = ["Explore queries are read-only: no writers, no jobs (ADR 0024)"]
 
 [[dir]]
-path = "src/algotrade/services/explore/ideas"
-purpose = "the Ideas list (ADR 0029): one row per ticker over every rule screen's stored results, ranked by the user's screener priority"
-contracts = ["Explore queries are read-only: no writers, no jobs (ADR 0024)"]
-
-[[dir]]
 path = "src/algotrade/services/explore/screens"
 purpose = "read-only queries about rule screens: the screener configs with their latest run, and a screen's saved results for a session"
 contracts = ["Explore queries are read-only: no writers, no jobs (ADR 0024)"]

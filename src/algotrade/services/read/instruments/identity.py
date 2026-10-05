@@ -8,7 +8,7 @@ sees (``data.reference``: latest on or before the session, else the earliest, fl
 ``instrument_id`` or a ticker, resolved through that snapshot's ``SymbolResolver`` (ADR 0018);
 neither known is no such instrument (``None``), never an error."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -44,12 +44,6 @@ def _text(value: Any) -> str | None:
     return (found.strip() or None) if isinstance(found, str) else None
 
 
-def _first(frame: pd.DataFrame | None) -> Mapping[str, Any]:
-    if frame is None or frame.empty:
-        return {}
-    return {str(k): v for k, v in frame.iloc[0].items()}
-
-
 def _descriptions(ctx: ReadContext) -> pd.DataFrame:
     """Every stored description with text: the table is read once per publish (a year of
     nightly increments is hundreds of small files, ~1 s), not once per page."""
@@ -75,15 +69,44 @@ def resolve_id(ctx: ReadContext, key: str) -> str | None:
 def load_instrument(ctx: ReadContext, key: str) -> Instrument | None:
     """The instrument ``key`` names for ``ctx.session`` (see ``resolve_id``), else ``None``."""
     iid = resolve_id(ctx, key)
-    if iid is None:
-        return None
-    reference = _first(instruments(ctx.reader, ctx.session.date, [iid]))
-    company = _first(companies(ctx.reader, ctx.session.date, [iid]))
-    stored = _descriptions(ctx)
-    text = _first(stored[stored["instrument_id"] == iid])
-    security_type = _text(reference.get("security_type"))
+    return None if iid is None else load_instruments(ctx, [iid]).get(iid)
+
+
+def load_instruments(ctx: ReadContext, instrument_ids: Sequence[str]) -> dict[str, Instrument]:
+    """The instruments of ``instrument_ids`` the session's reference snapshot has, by id, in
+    one read (an id it does not have is left out): a table's rows name theirs this way."""
     snapshot = ctx.session.reference_snapshot
-    assert snapshot is not None  # resolve_id found the instrument in it
+    wanted = list(dict.fromkeys(instrument_ids))
+    if snapshot is None or not wanted:
+        return {}
+    reference = _by_id(instruments(ctx.reader, ctx.session.date, wanted))
+    company = _by_id(companies(ctx.reader, ctx.session.date, wanted))
+    stored = _descriptions(ctx)
+    texts = _by_id(stored[stored["instrument_id"].isin(set(reference))])
+    return {
+        iid: _instrument(iid, row, company.get(iid, {}), texts.get(iid, {}), snapshot)
+        for iid, row in reference.items()
+    }
+
+
+def _by_id(frame: pd.DataFrame | None) -> dict[str, Mapping[str, Any]]:
+    """The first row of each instrument in ``frame``, by id."""
+    if frame is None or frame.empty:
+        return {}
+    first = frame.drop_duplicates("instrument_id", keep="first")
+    return {
+        str(r["instrument_id"]): {str(k): v for k, v in r.items()} for r in first.to_dict("records")
+    }
+
+
+def _instrument(
+    iid: str,
+    reference: Mapping[str, Any],
+    company: Mapping[str, Any],
+    text: Mapping[str, Any],
+    snapshot: date,
+) -> Instrument:
+    security_type = _text(reference.get("security_type"))
     return Instrument(
         instrument_id=iid,
         symbol=str(reference["symbol"]),

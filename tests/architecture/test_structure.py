@@ -190,8 +190,6 @@ TYPED_FACT_FIELDS = {
     ("instruments", "Bar", "close"): "keep: a bar of a price series (range grain)",
     ("instruments", "LiveOptionChain", "underlying_price"): "keep: a live quote (ADR 0028)",
     ("instruments", "LiveOptionQuote", "close"): "keep: a live quote (ADR 0028)",
-    ("screens.ideas", "Idea", "days_to_earnings"): "retire in read-model PR 5 (Ideas on GraphQL)",
-    ("screens.ideas", "Idea", "next_earnings_date"): "retire in read-model PR 5 (Ideas on GraphQL)",
 }
 
 

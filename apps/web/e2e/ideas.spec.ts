@@ -1,8 +1,9 @@
 /**
  * Trader > Ideas end to end, against the production build with the API mocked from
- * fixtures shaped like GET /ideas (ideas-api.ts): the ranked table with its screener chips and
- * earnings-before-expiry flag, decision filters, opening tickers in Explore, reordering the
- * screeners (saved, and rolled back with a toast when the save fails), accessibility.
+ * fixtures shaped like the `IdeasPage` GraphQL response (ideas-api.ts): the ranked table with
+ * its screener chips, earnings (next, else the last date) and earnings-before-expiry flag,
+ * decision filters, opening tickers in Explore, reordering the screeners (saved, and rolled
+ * back with a toast when the save fails), accessibility.
  */
 import { expect, test, type Page } from '@playwright/test';
 
@@ -42,6 +43,8 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(aapl).toContainText('Short premium liquidity');
     await expect(aapl).toContainText('Earnings first');
     await expect(grid(page).getByRole('row', { name: /NVDA/ })).not.toContainText('Earnings first');
+    await expect(grid(page).getByRole('row', { name: /NVDA/ })).toContainText('Last 27 Aug');
+    await expect(aapl).toContainText('Thu 29 Oct');
     await expectAccessible(page);
     expect(errors).toEqual([]);
   });

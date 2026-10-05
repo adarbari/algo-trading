@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Idea, IdeaPick } from '@/entities/idea';
+import { IDEA_FACTS, type Idea, type IdeaPick } from '@/entities/idea';
 
-import { decisionsPresent, filterIdeas, NO_FILTERS } from './filters';
+import { decisionsPresent, EARNINGS_SOON_LABEL, filterIdeas, NO_FILTERS } from './filters';
 
 const pick = (decision: string): IdeaPick => ({
   screenerId: 's',
@@ -10,22 +10,23 @@ const pick = (decision: string): IdeaPick => ({
   flags: [],
   columns: {},
   criterionValues: {},
-  user: 'u',
-  version: 1,
   decision,
   score: 1,
   reasons: '',
 });
+const sessions = (n: number | null) => ({
+  name: IDEA_FACTS.sessionsToEarnings,
+  value: n,
+  unknown: n === null ? { code: 'NULL' as const, detail: 'no report date' } : null,
+  info: { format: 'NUMBER' as const },
+});
 const idea = (symbol: string, decision: string, days: number | null): Idea => ({
-  instrumentId: `EQ:${symbol}`,
+  instrumentId: `id-${symbol}`,
   symbol,
   rank: 1,
   picks: [pick(decision)],
   best: pick(decision),
-  nextEarningsDate: null,
-  daysToEarnings: days,
-  closestExpiryDte: null,
-  earningsBeforeExpiry: false,
+  facts: { [IDEA_FACTS.sessionsToEarnings]: sessions(days) },
   metrics: {},
   watchOut: [],
 });
@@ -42,9 +43,10 @@ describe('filterIdeas', () => {
     expect(kept.map((i) => i.symbol)).toEqual(['B']);
   });
 
-  it('hides earnings within 14 days, keeping unknown dates', () => {
+  it('hides earnings within 14 sessions, keeping unknown dates', () => {
     const kept = filterIdeas(ideas, { ...NO_FILTERS, hideEarningsSoon: true });
     expect(kept.map((i) => i.symbol)).toEqual(['A', 'C']);
+    expect(EARNINGS_SOON_LABEL).toBe('Hide earnings within 14 sessions');
   });
 
   it('lists the decisions present once each', () => {

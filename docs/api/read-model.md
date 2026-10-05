@@ -5,7 +5,7 @@ session), [ADR 0037](../adr/0037-domain-read-model-served-by-graphql.md) (a doma
 served by GraphQL) and [ADR 0038](../adr/0038-catalogue-named-values.md) (catalogue-named
 values). Skills: `.claude/skills/add-domain-object`, `.claude/skills/add-graphql-field`.
 
-**What exists now (read-model PRs 1-2).** The decisions, this spec, the packages
+**What exists now (read-model PRs 1-5).** The decisions, this spec, the packages
 `src/algotrade/services/read/{,instruments,screens,ops}` and
 `apps/api/algotrade_api/graphql/{,types}` (declared in `architecture/layout.toml`, guarded by
 two import-linter contracts), the ownership entries, the REST GET allow-list
@@ -23,7 +23,14 @@ loaders `read/instruments/{identity,features,catalogue}.py` (`load_instrument`,
 `types/{query,session,instrument,feature}.py` at `POST /graphql`, the snapshot
 `apps/api/schema.graphql`, the web codegen (`apps/web/codegen.ts`, `shared/api/graphql.ts`,
 `generated/{graphql,catalogue.ts}`) and the Explore Overview on `useInstrumentFacts`; READ 3,
-6, 7, 9 and WEB 2, 5, 6 are on. Every other page still reads `services/explore` over REST until
+6, 7, 9 and WEB 2, 5, 6 are on. **PR 5 moved Ideas**: `read/screens/{screeners,runs,results,ideas,views}.py`
+(`Screener` per id as the user sees it, `runs.load_latest_runs` THE latest-run rule: exact
+session, else `NOT_RUN`; `ScreenResult`; `Ideas` with per-screener `picked` and `top` over the
+whole run; `TableView`), `types/{screener,result,ideas,view}.py`, `Query.{ideas,screeners,view}`,
+the `screener_latest_run` dataloader, `identity.load_instruments` (one identity read for a
+table's rows) and `partition(ctx, table, columns, instruments)`; the Ideas page reads one
+`IdeasPage` query with its facts by name (`entities/idea/model/facts.ts`); `ideas/ranking.py`,
+`GET /ideas` and `summarise()` are gone. Every other page still reads `services/explore` over REST until
 the PR that moves its area (the [migration plan](#migration-plan)): a new page read is a
 GraphQL field (`add-graphql-field`) in the area's migration PR.
 
@@ -57,7 +64,7 @@ The rule ([ADR 0038](../adr/0038-catalogue-named-values.md)), quoted by the skil
 > and the `instrument.<col>` reference facts the catalogue already exposes (`in_sp500`,
 > `is_leveraged`, `sector`, ...). Read **by catalogue name only**, never as a typed field.
 
-**Every API surface, REST legacy reads included.** Never add a response field named like a catalogue column (e.g. `last_earnings_date` on `Idea`), not even "for now": return a `features: dict[str, Any]` keyed by catalogue name. Enforced by `tests/architecture/test_structure.py::test_no_typed_catalogue_fields_in_api_schemas` (`TYPED_FACT_FIELDS` lists today's exceptions and only shrinks; PR 5 removes the two `Idea` entries).
+**Every API surface, REST legacy reads included.** Never add a response field named like a catalogue column (e.g. `last_earnings_date` on `Idea`), not even "for now": return a `features: dict[str, Any]` keyed by catalogue name. Enforced by `tests/architecture/test_structure.py::test_no_typed_catalogue_fields_in_api_schemas` (`TYPED_FACT_FIELDS` lists today's exceptions and only shrinks; PR 5 removed the two `Idea` entries).
 
 Decided grey zone: `optionable` is a catalogue field (`instrument.optionable`); a chain's
 `status` (OK / NO_CHAIN / STALE) is typed on `OptionChain` (it describes the pull);
@@ -88,10 +95,10 @@ Owner folder `src/algotrade/services/read/` (ownership `domain-read-model`). Eve
 | Holdings | (`fundId`, `asOf`) | `asOf, source, total, items` | `holdings/etf` | `read/instruments/holdings.py` | `explore/funds/holdings` |
 | PriceSeries / FeatureSeries | (`instrumentId`, range) | bars; `[{session, values}]` | `bars/1d` + actions; rollups | `read/instruments/{prices,series}.py` | `instrument_bars`, `compare_prices`, `instrument_features` |
 | FeatureTable | (query) | `columns, rows: [[JSON]], unknown, total, page, size, missing` (columnar) | FeatureValues + identity | `read/instruments/table.py` | `universe.ticker_table`, `universe_page`, `compare_features` |
-| Screener | (`owner`, `configId`) | `id, owner, scope, name, version, hash, criteria, displayColumns, latestRun, notRun, runs` | configs, run records | `read/screens/screeners.py` | `results.screen_configs`, ranking's `_screeners` |
-| ScreenerRun | `runId` | `screener, session, status, knowledgeTs, decisions, changes, previousSession, audit, results(...)` | `results/rule_screen` exact session | `read/screens/runs.py` (`latest_run`: THE rule) | `results.run_rows`, `ranking._latest_runs`, `table._previous` |
-| ScreenResult | (`runId`, `instrumentId`) | `rank, instrument, decision, score, reasons, flags, change, previousDecision, criteria, columns` | `results/rule_screen*` | `read/screens/results.py` | `table.ScreenTableRow`, `ranking.Pick` |
-| Ideas / Idea | (`user`, `session`) | `session, priority, screeners[{screener, run?, notRun?, picked}], total, items[{rank, instrument, picks}]` | ScreenerRun + ScreenResult | `read/screens/ideas.py` | `ideas/ranking.py` |
+| Screener | (`owner`, `configId`) | `id, owner, scope, name, version, hash, latestRun, notRun` (PR 5; `criteria, displayColumns, runs` with PR 8/9). One per id: the user's own finalised config, else the site preset; rule screens only | configs, run records | `read/screens/screeners.py` | `results.screen_configs`, ranking's `_screeners` |
+| ScreenerRun | `runId` | `runId, configId, owner, session, status, knowledgeTs, configVersion, decisions, picked` (PR 5; `changes, previousSession, audit, results(...)` with PR 8) | `results/rule_screen` exact session | `read/screens/runs.py` (`load_latest_runs` / `latest_run`: THE rule) | `results.run_rows`, `ranking._latest_runs`, `table._previous` |
+| ScreenResult | (`runId`, `instrumentId`) | `rank, instrument, decision, score, tieBreak, reasons, flags, criteria, columns` (PR 5; `change, previousDecision` with PR 8) | `results/rule_screen*` | `read/screens/results.py` | `table.ScreenTableRow`, `ranking.Pick` |
+| Ideas / Idea | (`user`, `session`) | `session, priority, screeners[{screener, run?, notRun?, picked, top}], total, items[{rank, instrumentId, instrument, picks}]` | ScreenerRun + ScreenResult | `read/screens/ideas.py` | `ideas/ranking.py` (deleted in PR 5) |
 | TableView | (`user`, `scope`, `name?`) | `columns, sort, decisions, names` | `preferences.toml` | `read/screens/views.py` | `explore/screens/view.py` |
 | Backtest, IngestRun, NightlyRun, QualityCheck | `runId` / `session` | as today | run records | `read/ops/*` | `explore/{backtests,runs,ingestion}.py` |
 
@@ -250,6 +257,25 @@ generic read (R1 unchanged); what goes is each consumer deciding which partition
     api:generate` runs both web generators (OpenAPI types, GraphQL codegen).
   - The resolved `Session` is cached in the result cache keyed on `visible_seq` (the ~26
     `dates()` calls run once per publish, not per request).
+- **Settled in PR 5** (do not re-decide):
+  - A `Screener` is a config, one per id as the user sees it: their own finalised config, else
+    the site preset (resolved as its owner, like the run that stored it). Results stored for an
+    id with no config (an archived screen) are no screener. Rule screens only: the legacy
+    `short_premium_liquidity` impl stays on REST `/screens` until PR 8.
+  - THE latest-run rule (`runs.load_latest_runs`): the owner's rows of the config in
+    `results/rule_screen` for exactly the session, of the run with the latest `knowledge_ts`.
+    No run: `NOT_RUN`, never an older session and never the site's run of an id the user owns.
+    `ScreenerRun.status` is the run record's (`complete`, `partial`; null without a record).
+  - Ideas ranking is unchanged otherwise: priority place (unlisted screeners share the last
+    place), then score, tie-break, screener id; `Ideas.screeners[].top` (the run's 3 best picks
+    by rank) keeps the ranking panel's "best finds" a server fact.
+  - The Ideas Earnings cell (`widgets/top-ideas/model/facts.ts`): `next_earnings_date`, else
+    muted "Last <d MMM>" from `last_earnings_date`, else "Unknown"; the reason is the tooltip.
+    The earnings filter counts `days_to_earnings` in sessions ("Hide earnings within 14
+    sessions"). IV30 is `feature.vrp_iv30` by name; the screens' other display columns are
+    their stored values.
+  - `Query.view(scope, name)` takes no `date` (preferences, not session data). Codegen maps the
+    `DateTime` scalar to `string`.
 - **Web**: `@graphql-codegen/cli` client preset (`apps/web/codegen.ts`, documents
   `src/**/*.{ts,tsx}`, `fragmentMasking: true`) over TanStack Query; the one transport is
   `gql(document, variables)` in `src/shared/api/graphql.ts`; query keys
@@ -303,7 +329,7 @@ browser clock outside `src/shared/lib/date/`, and building `EQ:` ids. The others
 | next / last earnings from `events/earnings` (`nextAndLast`, `nextEarningsDate`) | `rollup.earnings@v1.{next,last}_earnings_date` | **on** (PR 4; only `entities/instrument/model/events.ts` names `events/earnings`) |
 | days to earnings, DTE, earnings before expiry | `rollup.earnings@v1.days_to_earnings`, `rollup.nearest_expiry@v1.dte`, `feature.earnings_before_expiry` | PR 6 |
 | "today" / `new Date()` against stored dates | `session.date` from the response | now (`new Date()`); PR 6 (`todayIso()`: the overview's use went in PR 4, the features panel's range start is the last) |
-| per-screener counts, top-N from a page (`summarise`) | `Ideas.screeners[].picked`, `ScreenerRun.decisions` | PR 5 |
+| per-screener counts, top-N from a page (`summarise`) | `Ideas.screeners[].picked` / `.top`, `ScreenerRun.decisions` | **on** (PR 5) |
 | picked / not picked from a decision string | `ScreenResult.change` | PR 8 |
 | symbol from an instrument id, or the reverse | `Instrument.symbol` | now |
 | new / dropped between runs | `ScreenResult.change` | PR 8 |
@@ -339,7 +365,7 @@ never a `DataTableColumn` literal (ESLint, PR 7). View preferences go through on
 | READ 7 | Every GraphQL object mirrors a read dataclass | `test_types_mirror_read_model` | **on**; it is why `scripts/check_dupes.py` skips `graphql/types/` (ADR 0037: the mirror is by design) |
 | READ 8 | One scalar coercion | ownership `scalar-coercion` (`to_value`, `to_scalar`) | **on** for new callers; the `_float/_text/_num` re-implementation rule in PR 8 |
 | READ 9 | Per-instrument stored values are catalogue features | `test_no_typed_feature_fields` (GraphQL types) + `test_no_typed_catalogue_fields_in_api_schemas` (REST) | **on** |
-| READ 10 | A fact computed in a read is a feature first | ownership `domain-read-model` (`rollups/instrument/` literals); `chain_expiries` rule | **on** (literals); `chain_expiries` in PR 5 |
+| READ 10 | A fact computed in a read is a feature first | ownership `domain-read-model` (`rollups/instrument/` literals); `chain_expiries` rule | **on** (literals; `chain_expiries` since PR 5) |
 | WEB 1 | Only `shared/api` talks HTTP; no Apollo / urql / graphql-request | ESLint `HTTP_LIBRARIES` | **on** |
 | WEB 2 | GraphQL documents only through the generated `graphql()` tag | ESLint ban of `graphql-tag` / `graphql` outside `shared/api/generated/graphql` | **on** |
 | WEB 3 | No browser-derived facts | `web_forbidden_derivations.toml` | **on** (clean patterns); the rest per the table above |
@@ -361,8 +387,8 @@ pass. How each entry holds today:
   `session.py` and `context.py` as the only owners.
 - **`domain-read-model`**: the `rollups/instrument/` literal rule is on (producers, the
   catalogue prefix, the table schema and screener inputs are `allowed` with reasons). The
-  `chain_expiries` rule is **deferred to PR 5**: its only caller outside `data/` is
-  `explore/ideas/ranking.py`, which PR 5 deletes; PR 5 adds the rule.
+  `chain_expiries` rule is on since PR 5 (which deleted its last read-time caller,
+  `explore/ideas/ranking.py`): only `data/` and the producing feature group call it.
 - **`scalar-coercion`**: `to_value` / `to_scalar` call rules on; owner `services/read/values.py`
   (`to_scalar`); `services/views.py` is `allowed` (it imports it back as `to_value`), as are
   today's callers of the one coercion (explore, screening exports, selection). The
@@ -416,4 +442,4 @@ after the object graph because they need the columnar type and the factories.
   `# type: ignore[misc]` to `graphql/types/*` only, capped by a fitness test.
 - **Performance**: add `IdeasPage`, `ExploreDetail`, `Table` to the 1 s budget in
   `tests/apps/api/test_main.py` (`OPERATIONS`) as PRs 5-7 add them; PR 4 added
-  `InstrumentFacts` (the Overview).
+  `InstrumentFacts` (the Overview), PR 5 `IdeasPage`.

@@ -1,17 +1,36 @@
 import { describe, expect, it } from 'vitest';
 
+import type { IdeasResponse } from '@/entities/idea';
+
 import { withPriority } from './priority';
 
+const screener = (id: string) => ({
+  screener: { id, name: id, owner: 'me', version: 1 },
+  run: null,
+  notRun: null,
+  picked: 0,
+  top: [],
+});
+
 describe('withPriority', () => {
-  it('replaces only the priority', () => {
-    const response = {
-      session: '2026-10-02',
-      priority: ['a', 'b'],
-      total: 0,
-      screeners: [],
-      items: [],
+  it('takes the new priority and orders the screeners by it, the unlisted last', () => {
+    const response: IdeasResponse = {
+      ideas: {
+        session: '2026-10-02',
+        priority: ['a', 'b'],
+        total: 0,
+        screeners: [screener('a'), screener('b'), screener('c')],
+        items: [],
+      },
     };
-    expect(withPriority(response, ['b', 'a'])).toEqual({ ...response, priority: ['b', 'a'] });
-    expect(response.priority).toEqual(['a', 'b']);
+    const next = withPriority(response, ['b', 'a']);
+    expect(next.ideas?.priority).toEqual(['b', 'a']);
+    expect(next.ideas?.screeners.map((s) => s.screener.id)).toEqual(['b', 'a', 'c']);
+    expect(response.ideas?.priority).toEqual(['a', 'b']);
+  });
+
+  it('leaves an empty response alone', () => {
+    const empty: IdeasResponse = { ideas: null };
+    expect(withPriority(empty, ['a'])).toBe(empty);
   });
 });

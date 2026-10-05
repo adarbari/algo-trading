@@ -1,5 +1,26 @@
+"""
+What one criterion judged: the value (null: missing), PASS / NEAR / FAIL / MISSING and, for a near miss or a fail, how far from passing
+"""
+type CriterionResult {
+  id: String!
+  field: String!
+  mode: String!
+  outcome: String!
+  value: JSON
+  distance: Float
+}
+
 """Date (isoformat)"""
 scalar Date
+
+"""Date with time (isoformat)"""
+scalar DateTime
+
+"""How many rows of a run got one decision"""
+type DecisionCount {
+  decision: String!
+  count: Int!
+}
 
 """How a client shows a feature's value"""
 enum FeatureFormat {
@@ -49,6 +70,36 @@ type FeatureValue {
   info: FeatureInfo!
 }
 
+"""A ticker some screener picked: its picks, best screener first"""
+type Idea {
+  rank: Int!
+  instrumentId: String!
+  instrument: Instrument
+  picks: [ScreenResult!]!
+}
+
+"""
+One of the user's screeners on the Ideas page: its run for the session (else `notRun`: NOT_RUN), how many tickers it picked and its best picks, over the run
+"""
+type IdeaScreener {
+  screener: Screener!
+  run: ScreenerRun
+  notRun: Unknown
+  picked: Int!
+  top: [ScreenResult!]!
+}
+
+"""
+The ideas for the session: `screeners` in the user's priority order (then the rest by id), `items` the first `limit` of `total` picked tickers
+"""
+type Ideas {
+  session: Date!
+  priority: [String!]!
+  screeners: [IdeaScreener!]!
+  total: Int!
+  items: [Idea!]!
+}
+
 """
 An instrument as the session's reference snapshot has it. Per-session values (prices, earnings dates, flags, ...) are catalogue features: `features(names)`
 """
@@ -95,6 +146,90 @@ type Query {
     """
     date: Date = null
   ): Instrument
+
+  """
+  The tickers the user's screeners picked in the session, ranked by their screener priority then score (the first `limit`); a screener with no run for the session is listed NOT_RUN. Null: nothing stored
+  """
+  ideas(
+    limit: Int! = 50
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): Ideas
+
+  """
+  Every rule screen the user sees (their own config, else the site preset), by id; each with its run for the session
+  """
+  screeners(
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): [Screener!]!
+
+  """
+  The user's saved view of the screener `scope`'s results (the default view, or the one called `name`); null: a screener the user does not see, or nothing stored yet
+  """
+  view(scope: String!, name: String = null): TableView
+}
+
+"""One of the screen's display columns for the instrument"""
+type ResultColumn {
+  name: String!
+  value: JSON
+}
+
+"""
+One instrument's row of a screener's run; `instrument` is null when the session's reference snapshot does not have it
+"""
+type ScreenResult {
+  runId: String!
+  configId: String!
+  instrumentId: String!
+  instrument: Instrument
+  rank: Int!
+  decision: String!
+  score: Float
+  tieBreak: Float
+  reasons: String!
+  flags: [String!]!
+  criteria: [CriterionResult!]!
+  columns: [ResultColumn!]!
+}
+
+"""
+A rule screen as the user sees it (their own config, else the site preset): `owner` is whose runs are its; `latestRun` its run for the session, else `notRun` says why (NOT_RUN)
+"""
+type Screener {
+  id: String!
+  owner: String!
+  scope: String!
+  name: String!
+  version: Int
+  hash: String!
+
+  """Its run for the session; null: not run for it (see `notRun`)"""
+  latestRun: ScreenerRun
+
+  """Why it has no run for the session (NOT_RUN); null: it has one"""
+  notRun: Unknown
+}
+
+"""
+A screener's run for the session: whose, which version ran, its run record's status, and every decision with its count over the whole run (`picked`: the tickers it picked)
+"""
+type ScreenerRun {
+  runId: String!
+  configId: String!
+  owner: String!
+  session: Date!
+  status: String
+  knowledgeTs: DateTime!
+  configVersion: Int
+  decisions: [DecisionCount!]!
+  picked: Int!
 }
 
 """
@@ -109,6 +244,19 @@ type Session {
   preSnapshot: Boolean!
   present: [String!]!
   missing: [String!]!
+}
+
+"""
+A user's saved view of a table (`scope`: a screener id); `saved` false: nothing saved, the page applies its defaults
+"""
+type TableView {
+  scope: String!
+  name: String
+  saved: Boolean!
+  columns: [String!]!
+  sort: String
+  decisions: [String!]!
+  names: [String!]!
 }
 
 """A value not known for the session: why, and where it looked"""
