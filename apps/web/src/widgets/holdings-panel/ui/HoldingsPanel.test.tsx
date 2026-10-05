@@ -101,6 +101,36 @@ describe('HoldingsPanel', () => {
     expect(screen.queryByRole('grid')).not.toBeInTheDocument();
   });
 
+  it('counts a short line by its size and says so, for an inverse fund', () => {
+    hooks.useEtfHoldings.mockReturnValue(
+      fakeQuery({
+        ...HOLDINGS,
+        items: [
+          {
+            rank: 1,
+            name: 'Total Return Swap',
+            symbol: null,
+            instrument_id: null,
+            weight: -0.8,
+            asset_class: 'Derivative',
+          },
+          {
+            rank: 2,
+            name: 'T-Bill',
+            symbol: null,
+            instrument_id: null,
+            weight: 0.1,
+            asset_class: 'Cash',
+          },
+        ],
+      }),
+    );
+    render(<HoldingsPanel symbol="SQQQ" />);
+    expect(
+      screen.getByText(/90\.0% of the fund by size, short lines included/),
+    ).toBeInTheDocument();
+  });
+
   it('says a non-ETF is not an ETF rather than that nothing is stored', () => {
     hooks.useEtfHoldings.mockReturnValue(
       fakeQuery({ ...HOLDINGS, is_etf: false, as_of: null, source: null, total: 0, items: [] }),

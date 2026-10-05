@@ -83,8 +83,9 @@ def test_a_bond_fund_has_cusips_and_no_tickers() -> None:
     assert holdings["shares"].iloc[0] == pytest.approx(4460909058.0)
 
 
-def test_text_without_a_table_is_nothing() -> None:
-    assert source().normalize(FetchRequest("IVV"), b"<html>no csv here</html>") is None
+def test_text_without_a_table_is_a_parse_failure_not_an_empty_read() -> None:
+    with pytest.raises(ValueError, match="what date"):
+        source().normalize(FetchRequest("IVV"), b"<html>no csv here</html>")
 
 
 def test_fetch_goes_through_the_screener_to_the_fund_page() -> None:
@@ -160,6 +161,27 @@ def test_an_unlisted_line_is_not_a_us_listing() -> None:
     normalized = source().normalize(FetchRequest("TEST"), payload)
     assert normalized is not None
     assert list(normalized.parsed["holdings"]["us_listed"]) == [True, False]
+
+
+def test_a_renamed_weight_column_or_date_line_is_a_parse_failure_not_an_empty_read() -> None:
+    good = csv_file(("AAA", "Equity", "100.00", "100.00", "NYSE"))
+    with pytest.raises(ValueError, match="Weight"):
+        source().normalize(FetchRequest("TEST"), good.replace(b"Weight (%)", b"Wt (%)"))
+    with pytest.raises(ValueError, match="what date"):
+        source().normalize(FetchRequest("TEST"), good.replace(b"Fund Holdings as of", b"Holdings"))
+    with pytest.raises(ValueError, match="no lines"):
+        source().normalize(FetchRequest("TEST"), csv_file())
+
+
+def test_the_files_own_weights_are_reported_when_they_can_be_judged() -> None:
+    """Market-value weights always add up to 100%; the published column is what shows that a
+    file was cut short. A bond fund (most lines 0.00%) cannot be judged by it."""
+    equity = csv_file(*[(f"A{i}", "Equity", "10.00", "2.00", "NYSE") for i in range(40)])
+    normalized = source().normalize(FetchRequest("TEST"), equity)
+    assert normalized is not None and normalized.notes["published_weight_bp"] == 8000  # 80%
+    bonds = csv_file(*[(f"B{i}", "Fixed Income", "1.00", "0.00", "-") for i in range(40)])
+    bonds_read = source().normalize(FetchRequest("TEST"), bonds)
+    assert bonds_read is not None and "published_weight_bp" not in bonds_read.notes
 
 
 def test_http_400_means_no_file() -> None:

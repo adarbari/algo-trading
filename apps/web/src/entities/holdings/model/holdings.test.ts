@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { shownWeight, sourceLabel, toRows, type EtfHoldings } from './holdings';
+import { hasShort, shownWeight, sourceLabel, toRows, type EtfHoldings } from './holdings';
 
 const HOLDINGS: EtfHoldings = {
   instrument_id: 'EQ:FUND',
@@ -38,8 +38,14 @@ describe('holdings model', () => {
     ]);
   });
 
-  it('adds up the shown weights', () => {
+  it('adds up the shown weights by size, and sees a short line', () => {
     expect(shownWeight(HOLDINGS)).toBeCloseTo(0.85);
+    const items = HOLDINGS.items
+      .slice(0, 2)
+      .map((item, i) => (i === 0 ? { ...item, weight: -0.9 } : item));
+    const inverse = { ...HOLDINGS, items };
+    expect(shownWeight(inverse)).toBeCloseTo(1.15);
+    expect([hasShort(HOLDINGS), hasShort(inverse)]).toEqual([false, true]);
     expect(shownWeight({ ...HOLDINGS, items: [] })).toBe(0);
   });
 

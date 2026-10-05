@@ -9,6 +9,7 @@ from algotrade_sources.framework.holdings import (
     funds_frame,
     holding_ticker,
     holdings_frame,
+    is_cusip,
     is_position,
     number,
 )
@@ -74,6 +75,18 @@ def test_lines_rank_by_the_size_of_their_weight_and_unreadable_ones_are_dropped(
     frame = holdings_frame(rows)
     assert list(frame["holding_name"]) == ["Swap", "Short", "Long"]  # Broken is not a 0% line
     assert list(frame["weight"]) == [-0.9, -0.3, 0.2]  # the sign is kept
+
+
+def test_every_cash_label_is_not_a_position_and_a_cusip_starts_with_a_digit() -> None:
+    labels = [
+        "Cash Collateral and Margins",
+        "Cash Collateral and Margin",
+        "Cash and/or Derivatives",
+    ]
+    assert not any(is_position(k) for k in labels)
+    ids = ("037833100", "87971M103", "G54950103", "US0378331005", "CASH_USD", None)
+    # A CUSIP or a CINS (Linde): nine characters; an ISIN, a cash id and a blank are neither.
+    assert [is_cusip(c) for c in ids] == [True, True, True, False, False, False]
 
 
 def test_cash_futures_and_fx_lines_are_not_positions() -> None:

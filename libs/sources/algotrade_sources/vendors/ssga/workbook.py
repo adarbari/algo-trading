@@ -24,7 +24,8 @@ class Workbook:
 
 
 def read_workbook(payload: bytes) -> Workbook:
-    """Parse the sheet; the table ends at the first line without a weight (the disclaimers)."""
+    """Parse the sheet; the table ends at the first line with only a first cell (the disclaimers).
+    A line without a weight stays (the caller drops it): a blank cell must not cut the table."""
     import openpyxl  # noqa: PLC0415 - algotrade-sources-only dependency, loaded where needed
 
     sheet = openpyxl.load_workbook(io.BytesIO(payload), read_only=True, data_only=True).active
@@ -39,13 +40,13 @@ def read_workbook(payload: bytes) -> Workbook:
     header = next((i for i, r in enumerate(rows) if r[0] == "Name"), None)
     if header is None:
         raise ValueError("the workbook has no table (no row starting with Name)")
-    names = [str(v) for v in rows[header] if v is not None]
-    if "Weight" not in names:  # a changed layout is a parse failure, never a guess
-        raise ValueError(f"the workbook's table has no Weight column (columns: {names})")
-    weight = names.index("Weight")
+    # Columns by their position in the raw row (an empty header cell does not shift the others).
+    columns = {str(v): i for i, v in enumerate(rows[header]) if v is not None}
+    if "Weight" not in columns:  # a changed layout is a parse failure, never a guess
+        raise ValueError(f"the workbook's table has no Weight column (columns: {list(columns)})")
     body = []
     for row in rows[header + 1 :]:
-        if row[weight] is None:  # disclaimer text after the table
+        if all(v is None for v in row[1:]):  # disclaimer text after the table
             break
-        body.append(row[: len(names)])
-    return Workbook(fund, as_of, pd.DataFrame(body, columns=names))
+        body.append([row[i] if i < len(row) else None for i in columns.values()])
+    return Workbook(fund, as_of, pd.DataFrame(body, columns=list(columns)))

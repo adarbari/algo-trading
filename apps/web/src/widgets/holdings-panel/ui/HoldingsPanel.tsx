@@ -8,6 +8,7 @@ import { DataTable, formatValue, Panel } from '@algotrade/ui';
 import { useMemo } from 'react';
 
 import {
+  hasShort,
   shownWeight,
   sourceLabel,
   toRows,
@@ -34,7 +35,9 @@ export function HoldingsPanel({ symbol, onSelectSymbol }: HoldingsPanelProps) {
   const columns = useMemo(() => holdingColumns(onSelectSymbol), [onSelectSymbol]);
   const empty = data !== undefined && rows.length === 0;
   const description =
-    data && !empty ? summary(data.total, rows.length, shownWeight(data), data.as_of) : undefined;
+    data && !empty
+      ? summary(data.total, rows.length, shownWeight(data), hasShort(data), data.as_of)
+      : undefined;
   const source = data ? sourceLabel(data.source) : null;
   return (
     <Panel
@@ -73,8 +76,17 @@ export function HoldingsPanel({ symbol, onSelectSymbol }: HoldingsPanelProps) {
   );
 }
 
-function summary(total: number, shown: number, weight: number, asOf: string | null): string {
+function summary(
+  total: number,
+  shown: number,
+  weight: number,
+  short: boolean,
+  asOf: string | null,
+): string {
   const share = formatValue(weight, { kind: 'percent', digits: 1 }).text;
+  const size = short
+    ? `${share} of the fund by size, short lines included`
+    : `${share} of the fund`;
   const date = asOf ? ` · as of ${formatValue(asOf, { kind: 'date' }).text}` : '';
-  return `Top ${number(shown)} of ${number(total)} holdings · ${share} of the fund${date}`;
+  return `Top ${number(shown)} of ${number(total)} holdings · ${size}${date}`;
 }

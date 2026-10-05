@@ -118,5 +118,6 @@ def test_unreadable_weights_are_dropped_not_read_as_zero() -> None:
     assert len(normalized.parsed["holdings"]) == 4
 
 
-def test_a_fund_with_no_report_is_nothing() -> None:
-    assert source().normalize(FetchRequest("VTI"), REPORT.replace(b"invstOrSec", b"other")) is None
+def test_a_report_without_holdings_is_a_parse_failure_not_an_empty_read() -> None:
+    with pytest.raises(ValueError, match="no holdings"):
+        source().normalize(FetchRequest("VTI"), REPORT.replace(b"invstOrSec", b"other"))

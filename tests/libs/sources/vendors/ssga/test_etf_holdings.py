@@ -3,11 +3,13 @@
 import io
 from datetime import date
 
+import openpyxl
 import pytest
 
 from algotrade_sources.framework.base import FetchRequest, HoldingsSource
 from algotrade_sources.framework.holdings import HOLDING_COLUMNS
 from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings, parse_finder
+from algotrade_sources.vendors.ssga.spy_holdings import parse_holdings
 from algotrade_sources.vendors.ssga.workbook import read_workbook
 from tests.conftest import REPO_ROOT
 from tests.helpers.ingest_fakes import http_for
@@ -16,6 +18,9 @@ FIXTURES = REPO_ROOT / "tests" / "fixtures" / "sources" / "ssga"
 FINDER = (FIXTURES / "fundfinder.json").read_bytes()
 XLK = (FIXTURES / "holdings-daily-us-en-xlk.xlsx").read_bytes()
 BIL = (FIXTURES / "holdings-daily-us-en-bil.xlsx").read_bytes()
+# SPY's recorded workbook (2026-10-01), cut to a few big lines and the companies listed here but
+# domiciled abroad, whose security ids are CINS codes (Linde G54950103, Chubb H1467J104).
+SPY = (FIXTURES / "holdings-daily-us-en-spy-foreign-domiciled.xlsx").read_bytes()
 
 
 def source(urls: list[str] | None = None) -> SsgaHoldings:
@@ -87,8 +92,6 @@ def test_a_fund_fetch_reads_the_directory_first_when_it_has_not() -> None:
 
 
 def workbook(header: str = "Weight", weight: object = 1.5, name: str = "Name") -> bytes:
-    import openpyxl  # noqa: PLC0415
-
     book = openpyxl.Workbook()
     sheet = book.active
     sheet.append(["Fund Name:", "SPDR Test"])
@@ -121,6 +124,143 @@ def test_a_weight_that_does_not_read_drops_the_line_and_is_counted() -> None:
     holdings = normalized.parsed["holdings"]
     assert list(holdings["holding_name"]) == ["ALPHA INC"]  # BETA is not a 0% holding
     assert holdings["filed"].isna().all()  # a daily file is public on its own date
+
+
+def sheet(rows: list[list[object]], date_line: str = "As of 01-Oct-2026") -> bytes:
+    book = openpyxl.Workbook()
+    book.active.append(["Fund Name:", "SPDR Test"])
+    book.active.append(["Ticker Symbol:", "XLK"])
+    book.active.append(["Holdings:", date_line])
+    for row in rows:
+        book.active.append(row)
+    out = io.BytesIO()
+    book.save(out)
+    return out.getvalue()
+
+
+HEADER = [
+    "Name",
+    "Ticker",
+    "Identifier",
+    "SEDOL",
+    "Weight",
+    "Sector",
+    "Shares Held",
+    "Local Currency",
+]
+DISCLAIMER = ["Past performance is not a reliable indicator of future performance."]
+
+
+def test_a_blank_weight_does_not_cut_the_table_or_the_sp500_list() -> None:
+    """The table used to end at the first blank Weight, so one blank on the 3rd line left 2 of 500
+    S&P 500 members (and removal events for the rest)."""
+    rows = [
+        HEADER,
+        ["A INC", "AAA", "037833100", "x", 30.0, "-", 1.0, "USD"],
+        ["B INC", "BBB", "594918104", "x", 30.0, "-", 1.0, "USD"],
+        ["C INC", "CCC", "67066G104", "x", None, "-", 1.0, "USD"],
+        ["D INC", "DDD", "023135106", "x", 40.0, "-", 1.0, "USD"],
+        DISCLAIMER,
+    ]
+    holdings, _, _ = parse_holdings(sheet(rows))
+    assert list(holdings["symbol"]) == ["AAA", "BBB", "CCC", "DDD"]  # membership needs no weight
+    normalized = source().normalize(FetchRequest("XLK"), sheet(rows))
+    assert normalized is not None and normalized.notes["unreadable_lines"] == 1
+    assert list(normalized.parsed["holdings"]["holding_symbol"]) == ["DDD", "AAA", "BBB"]
+
+
+def test_an_empty_header_cell_does_not_shift_the_columns() -> None:
+    gap = [
+        "Name",
+        "Ticker",
+        "Identifier",
+        "SEDOL",
+        None,
+        "Weight",
+        "Sector",
+        "Shares Held",
+        "Local Currency",
+    ]
+    rows = [
+        gap,
+        ["A INC", "AAA", "037833100", "x", None, 60.0, "-", 1.0, "USD"],
+        ["B INC", "BBB", "594918104", "x", None, 40.0, "-", 1.0, "USD"],
+        DISCLAIMER,
+    ]
+    normalized = source().normalize(FetchRequest("XLK"), sheet(rows))
+    assert normalized is not None
+    assert list(normalized.parsed["holdings"]["weight"]) == [0.6, 0.4]
+    assert list(parse_holdings(sheet(rows))[0]["symbol"]) == ["AAA", "BBB"]
+
+
+def test_a_workbook_that_does_not_say_its_date_is_a_parse_failure() -> None:
+    rows = [HEADER, ["A INC", "AAA", "037833100", "x", 100.0, "-", 1.0, "USD"], DISCLAIMER]
+    with pytest.raises(ValueError, match="date it is as of"):
+        source().normalize(FetchRequest("XLK"), sheet(rows, date_line="no date here"))
+    with pytest.raises(ValueError, match="no lines"):
+        source().normalize(FetchRequest("XLK"), sheet([HEADER, DISCLAIMER]))
+
+
+def test_money_market_futures_and_cash_lines_are_not_equity_positions() -> None:
+    rows = [
+        HEADER,
+        ["A INC", "AAA", "037833100", "x", 90.0, "-", 1.0, "USD"],
+        ["STATE STREET MONEY MARKET FUND", "-", "-", "x", 4.0, "-", 1.0, "USD"],
+        ["S&P 500 E-MINI FUTURE DEC26", "-", "-", "x", 1.0, "-", 1.0, "USD"],
+        ["U.S. Dollar", "-", "CASH_USD", "x", 5.0, "-", 1.0, "USD"],
+        DISCLAIMER,
+    ]
+    holdings = source().normalize(FetchRequest("XLK"), sheet(rows)).parsed["holdings"]  # type: ignore[union-attr]
+    kinds = dict(zip(holdings["holding_name"], holdings["asset_class"], strict=True))
+    assert kinds == {
+        "A INC": "Equity",
+        "STATE STREET MONEY MARKET FUND": "Money Market",
+        "S&P 500 E-MINI FUTURE DEC26": "Futures",
+        "U.S. Dollar": "Cash",
+    }
+
+
+def test_us_listed_companies_domiciled_abroad_are_linked_in_the_recorded_spy_workbook() -> None:
+    """They print a CINS (letter first), not a CUSIP; the first version of the US-listing rule
+    required a digit and unlinked ~29 S&P 500 members (Linde, Accenture, Chubb, Medtronic...)."""
+    normalized = source().normalize(FetchRequest("SPY"), SPY)
+    assert normalized is not None
+    holdings = normalized.parsed["holdings"]
+    listed = dict(zip(holdings["holding_symbol"], holdings["us_listed"], strict=True))
+    abroad = ["LIN", "ACN", "ETN", "CB", "MDT", "TT", "JCI", "AON", "TEL", "NXPI", "STX", "RCL"]
+    assert all(listed[t] for t in [*abroad, "GRMN", "NVDA", "AAPL", "T"])
+    ids = dict(zip(holdings["holding_symbol"], holdings["identifier"], strict=True))
+    assert (ids["LIN"], ids["CB"], ids["NXPI"]) == ("G54950103", "H1467J104", "N6596X109")
+
+
+def test_a_line_priced_in_another_currency_is_not_a_us_listing() -> None:
+    rows = [
+        HEADER,
+        ["A INC", "AAA", "037833100", "x", 40.0, "-", 1.0, "USD"],
+        ["ROCHE", "ROP", "H69293217", "x", 30.0, "-", 1.0, "CHF"],  # Roper's ticker, Roche's CINS
+        ["TELUS", "T", "87971M103", "x", 30.0, "-", 1.0, "CAD"],  # AT&T's ticker, a Canadian line
+        DISCLAIMER,
+    ]
+    holdings = source().normalize(FetchRequest("XLK"), sheet(rows)).parsed["holdings"]  # type: ignore[union-attr]
+    assert dict(zip(holdings["holding_symbol"], holdings["us_listed"], strict=True)) == {
+        "AAA": True,
+        "ROP": False,
+        "T": False,
+    }
+
+
+def test_a_company_called_future_is_not_a_futures_line() -> None:
+    rows = [
+        HEADER,
+        ["FUTURE PLC", "FUTR", "G37005101", "x", 50.0, "-", 1.0, "USD"],
+        ["SWEEP MONEY MARKET", "-", "-", "x", 50.0, "-", 1.0, "USD"],
+        DISCLAIMER,
+    ]
+    holdings = source().normalize(FetchRequest("XLK"), sheet(rows)).parsed["holdings"]  # type: ignore[union-attr]
+    assert dict(zip(holdings["holding_name"], holdings["asset_class"], strict=True)) == {
+        "FUTURE PLC": "Equity",
+        "SWEEP MONEY MARKET": "Money Market",
+    }
 
 
 def test_a_file_for_another_fund_is_rejected() -> None:

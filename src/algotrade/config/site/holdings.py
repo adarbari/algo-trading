@@ -11,6 +11,8 @@ from algotrade.config.site.fields import Table
 
 FALLBACK_SCOPES = ("optionable", "all", "off")
 KEYS = ("refresh_days", "keep_top", "fallback_scope", "per_night")
+OWN_KEYS_ONLY = {"etf_holdings": ("enabled",)}  # no pacing or retention of its own
+VENDOR_FLAGS = {"ssga": ("etf_files",)}  # [ssga] etf_files = false: SPY membership stays on
 # Sections that were renamed: a file with only the old one keeps its on/off switch under the new
 # name (pacing is not inherited: the old SPY file ran unpaced, the new section paces every file).
 LEGACY_SECTIONS = {"ssga": "spy_holdings"}
@@ -22,7 +24,7 @@ class EtfHoldingsSettings:
 
     refresh_days: int = 7  # refetch a fund's holdings once per window (spread by ticker)
     keep_top: int = 100  # holdings stored per fund, largest weights first (0: all)
-    per_night: int = 100  # funds the nightly reads per night, new and stalest first (0: no cap)
+    per_night: int = 200  # funds the nightly reads per night, new and stalest first (0: no cap)
     fallback_scope: str = "optionable"  # which funds SEC N-PORT is read for: optionable, all, off
 
     @classmethod

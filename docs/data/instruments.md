@@ -103,6 +103,11 @@ job when `config/site/universe.toml` has `source = "nasdaq_trader"`):
 5. Writes `events/reference_change` (added, removed, renamed, type / optionable / exchange
    changed) and `events/index_change` (S&P 500 adds and removes). S&P members that match no
    listing make the run PARTIAL.
+6. Checks the S&P 500 list against the last snapshot (100 or more members): under 90% of its
+   members, or more than 12 joining or leaving, is a cut-short or changed file, not an index
+   change. The flags of the last snapshot are then kept, no `index_change` event is written, the
+   rest of the build goes through and the run is PARTIAL (`sp500_held` in its stats).
+   `universe-build --accept-sp500` applies a list that really is that different.
 
 Leverage: resolved as in "Flagging leveraged and inverse ETFs" above (override → name parsed
 → exclusions → no marker → `needs_review`); the run stats count each `leverage_source`.

@@ -14,6 +14,7 @@ from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.market.etf_holdings import (
     HoldingsSources,
     Previous,
+    Problem,
     fund_frame,
     positions,
     sanity_problem,
@@ -51,7 +52,7 @@ def first_read_then(files: Mapping[str, bytes]) -> tuple[StoreWriter, RunRecord,
     writer, sources = world()
     first = run(writer, sources)
     again = HoldingsSources([ssga(files=files), ishares(), nport()], 7, 100, "optionable", False)
-    return writer, first, run(writer, again, LATER, force=True)
+    return writer, first, run(writer, again, LATER)
 
 
 def test_a_truncated_file_that_still_parses_keeps_last_reads_rows() -> None:
@@ -115,6 +116,10 @@ def test_an_n_port_report_is_not_shown_before_it_was_filed() -> None:
     assert holdings(writer, "VTI", date(2026, 8, 27)).empty  # public on the 28th, not before
 
 
+def problem_text(problem: Problem | None) -> str:
+    return "" if problem is None else problem.text
+
+
 def frame(*lines: tuple[str, float, str]) -> pd.DataFrame:
     return holdings_frame(
         {"holding_name": n, "weight": w, "asset_class": k, "us_listed": False} for n, w, k in lines
@@ -129,15 +134,15 @@ def test_sanity_checks_in_isolation() -> None:
     both = frame(("A", 0.6, "Equity"), ("B", 0.4, "Equity"))
     one = frame(("A", 0.7, "Equity"))
     assert sanity_problem(both, DAY, None, False, True) is None
-    assert "add up to 70.0%" in (sanity_problem(one, DAY, None, False, True) or "")
+    assert "add up to 70.0%" in problem_text(sanity_problem(one, DAY, None, False, True))
     assert sanity_problem(one, DAY, None, True, True) is None  # geared
     assert sanity_problem(one, DAY, None, False, False) is None  # N-PORT
-    assert "2 positions, was 100" in (
-        sanity_problem(both, DAY, Previous(DAY, 100), False, True) or ""
+    assert "2 positions, was 100" in problem_text(
+        sanity_problem(both, DAY, Previous(DAY, 100), False, True)
     )
     assert sanity_problem(both, DAY, Previous(DAY, 3), False, True) is None  # small funds vary
     older = sanity_problem(both, date(2026, 9, 1), Previous(DAY, 2), False, True)
-    assert "older than" in (older or "")
+    assert "older than" in problem_text(older)
     assert sanity_problem(both, DAY, Previous(DAY, 2), False, True) is None  # same date, same size
 
 
@@ -170,7 +175,7 @@ def test_a_cusip_printed_for_a_foreign_line_never_links_a_later_line() -> None:
         "EQ:F", "F", DAY, lines, 100, resolver, {}
     )  # a foreign line never fed the map
     assert unmapped["holding_id"].isna().all() and unmapped["holding_symbol"].isna().all()
-    mapped = fund_frame("EQ:F", "F", DAY, lines, 100, resolver, {"87971M103": "T"})
+    mapped = fund_frame("EQ:F", "F", DAY, lines, 100, resolver, {"87971M103": ("T", "EQ:ATT")})
     equity = mapped[mapped["asset_class"] == "Equity"].iloc[0]
     bond = mapped[mapped["asset_class"] == "Fixed Income"].iloc[0]
     assert equity["holding_id"] == "EQ:ATT" and pd.isna(bond["holding_id"])  # equity lines only

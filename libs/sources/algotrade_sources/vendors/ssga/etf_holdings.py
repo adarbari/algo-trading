@@ -17,6 +17,7 @@ from algotrade_sources.framework.holdings import (
     funds_frame,
     holding_ticker,
     holdings_frame,
+    is_cusip,
     number,
 )
 from algotrade_sources.framework.http import Http
@@ -51,6 +52,23 @@ def parse_finder(payload: bytes) -> dict[str, tuple[str, str]]:
     return out
 
 
+_FUTURE = re.compile(r"\b(FUTURES?|E-MINI)\b", re.IGNORECASE)
+_MONEY_MARKET = re.compile(r"MONEY MARKET|LIQUID RESERVES|\bSTIF\b|SWEEP", re.IGNORECASE)
+
+
+def asset_class(name: str | None, identifier: str | None, bonds: bool, ticker: str | None) -> str:
+    """The workbook has no asset class column: cash by its ``CASH_*`` id, futures and money
+    market sweeps by their names (a heuristic, only for lines with no ticker: a company called
+    Future PLC is not a future), else the fund's kind."""
+    if (identifier or "").upper().startswith("CASH"):
+        return "Cash"
+    if ticker is None and _FUTURE.search(name or ""):
+        return "Futures"
+    if ticker is None and _MONEY_MARKET.search(name or ""):
+        return "Money Market"
+    return "Fixed Income" if bonds else "Equity"
+
+
 class SsgaHoldings:
     """Implements ``base.HoldingsSource``. Request keys: ``directory``, or a SPDR ticker."""
 
@@ -83,30 +101,37 @@ class SsgaHoldings:
         if book.fund is not None and book.fund != request.key.upper():
             raise ValueError(f"{request.key}: the file is for {book.fund}")
         table = book.table
-        if table.empty or book.as_of is None:
-            return None
+        if book.as_of is None:  # a changed "Holdings: As of ..." line is a layout change
+            raise ValueError(f"{request.key}: the workbook does not say what date it is as of")
+        if table.empty:
+            raise ValueError(f"{request.key}: the workbook's table has no lines")
         bonds = "Maturity" in table.columns
         size = "Par Value" if bonds else "Shares Held"
         rows = []
         for line in table.to_dict("records"):
             ticker = holding_ticker(line.get("Ticker"))
             identifier = clean_text(line.get("Identifier"))
-            cash = (identifier or "").upper().startswith("CASH")
+            kind = asset_class(clean_text(line.get("Name")), identifier, bonds, ticker)
             rows.append(
                 {
                     "holding_symbol": ticker,
                     "holding_name": clean_text(line.get("Name")),
                     "weight": fraction(line.get("Weight")),
-                    "asset_class": "Cash" if cash else "Fixed Income" if bonds else "Equity",
+                    "asset_class": kind,
                     "sector": clean_text(line.get("Sector")),
                     "shares": number(line.get(size)),
-                    "identifier": None if cash else identifier,
-                    "us_listed": ticker is not None and line.get("Local Currency") == "USD",
+                    "identifier": None if kind == "Cash" else identifier,
+                    # The file has no exchange or country: a USD equity line with a ticker and
+                    # a CUSIP or CINS (companies domiciled abroad but listed here print a CINS).
+                    "us_listed": ticker is not None
+                    and kind == "Equity"
+                    and line.get("Local Currency") == "USD"
+                    and is_cusip(identifier),
                     "filed": None,
                 }
             )
         holdings = holdings_frame(rows)
         if holdings.empty:
-            return None
+            raise ValueError(f"{request.key}: no line of the workbook has a readable weight")
         notes = {"unreadable_lines": len(rows) - len(holdings)}
         return Normalized(book.as_of, {}, notes=notes, parsed={"holdings": holdings})

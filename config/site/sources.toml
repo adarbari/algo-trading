@@ -45,6 +45,7 @@ min_interval_s = 0.0
 [ssga]                           # State Street: SPY holdings (S&P 500 membership) and the daily
 enabled = true                   # holdings file of every SPDR ETF (etf-holdings). robots.txt allows
 min_interval_s = 1.0             # /library-content/products/fund-data; one file per request, polite pace
+etf_files = true                 # false: no SPDR fund files (SPY's membership file stays on `enabled`)
 raw_retention_days = 14          # holdings files are re-read weekly; the table keeps the data (SPY's
                                  # membership file is in this section too: 14 days, was 90)
 
@@ -58,9 +59,20 @@ enabled = true                   # false: the nightly skips the step (an explici
 refresh_days = 7                 # refetch a fund's holdings once per this many days, spread over the
                                  # window by ticker (SEC N-PORT funds: quarterly data, so they are
                                  # only refetched once per 90 days)
-per_night = 100                  # funds the NIGHTLY reads per night (new and stalest first), so the first
-                                 # nights read a slice, not all ~1,140 (~1.5 h); 0 = no cap. The CLI
-                                 # (`algotrade-ingest etf-holdings`) is uncapped unless --limit says so.
+per_night = 200                  # funds the NIGHTLY reads per night: one list across issuers, never read
+                                 # first, then the oldest read first. The first pass over ~1,140 funds takes
+                                 # 6 weekday nights (the daily files are ~4 min per 200 at 1 s a request;
+                                 # the first N-PORT nights add up to 400 header lookups per trust, tens of
+                                 # minutes each); in steady state ~700
+                                 # reads a week (661 daily-file funds weekly + 480 N-PORT funds every 90
+                                 # days) against 1,000 capacity: a daily-file fund is read every 7 to 8
+                                 # days, an N-PORT fund every ~91 days (simulated over a year: at 100 a
+                                 # night the daily-file funds stretch to 18 days, at 150 to 12).
+                                 # Every issuer with funds due gets at least 20% of the slots, and a fund
+                                 # whose read failed waits 1, 2, 4 ... days (max 30; N-PORT 30), so one
+                                 # broken issuer cannot take the cap.
+                                 # 0 = no cap. The CLI (`algotrade-ingest etf-holdings`) is uncapped
+                                 # unless --limit says so.
 keep_top = 100                   # store this many holdings per fund, largest weights first
                                  # (0: all; the fund's total count is stored on every row)
 fallback_scope = "optionable"    # which funds SEC N-PORT (months-old, quarterly) is read for: the

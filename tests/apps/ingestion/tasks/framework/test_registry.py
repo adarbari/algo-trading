@@ -134,7 +134,7 @@ def test_the_nightly_reads_a_slice_of_funds_and_the_cli_reads_everything(calls: 
         return calls.args[-1][4]
 
     assert limit_of({}) is None  # `algotrade-ingest etf-holdings`: every fund due
-    assert limit_of({"nightly": True}) == 100  # [etf_holdings] per_night
+    assert limit_of({"nightly": True}) == 200  # [etf_holdings] per_night
     assert limit_of({"nightly": True, "limit": 7}) == 7  # an explicit limit wins
     uncapped = SourcesSettings.from_document({"etf_holdings": {"per_night": 0}})
     assert limit_of({"nightly": True}, uncapped) is None  # 0: no cap

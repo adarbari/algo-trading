@@ -65,6 +65,9 @@ from algotrade_sources.framework.base import DirectorySource, FetchRequest, Sour
 TASK = "universe_build"
 HISTORY = "instruments/symbol_history"
 REFERENCE = "instruments/reference"
+SP500_TRACKED = 100  # a previous snapshot with fewer members is not a real index list
+SP500_MIN_SHARE = 0.9  # fewer than this share of the last snapshot's members is a bad file
+SP500_MAX_CHANGE = 12  # more members than this joining or leaving in one day is a bad file
 
 
 @dataclass(frozen=True)
@@ -200,6 +203,33 @@ def write_figi_review(reader: StoreReader, session: date, path: Path) -> int:
     return len(rows)
 
 
+def check_sp500(members: set[str], known: pd.DataFrame | None) -> tuple[str, set[str]] | None:
+    """``None`` when the S&P 500 list can be applied; else (why, the members to keep).
+
+    A list implausibly unlike the last snapshot is a cut-short or changed file, not an index
+    change: fewer than ``SP500_MIN_SHARE`` of its members, or more than ``SP500_MAX_CHANGE``
+    joining or leaving. The build then keeps the last snapshot's flags (so no membership event
+    is emitted), carries on with everything else and is PARTIAL; ``--accept-sp500`` applies a
+    list that really is that different. Without a snapshot of 100+ members there is nothing to
+    compare with (a first build, a test-sized universe)."""
+    if known is None or not {"in_sp500", "symbol"} <= set(known.columns):
+        return None
+    flagged = known["in_sp500"].fillna(False).astype(bool)
+    before = set(known.loc[flagged, "symbol"])
+    if len(before) < SP500_TRACKED:
+        return None
+    left, joined = before - members, members - before
+    big = max(len(left), len(joined)) > SP500_MAX_CHANGE
+    if len(members) >= SP500_MIN_SHARE * len(before) and not big:
+        return None
+    why = (
+        f"the S&P 500 list has {len(members)} members, the last snapshot {len(before)} "
+        f"({len(left)} left, {len(joined)} joined): not applied, membership kept as it was; "
+        "--accept-sp500 applies it"
+    )
+    return why, before
+
+
 def _known(reader: StoreReader, table: str, session: date) -> pd.DataFrame | None:
     """Cumulative state as known now: ``table`` for ``session`` itself when an earlier run
     wrote it (a re-run builds on it), else the latest earlier session."""
@@ -223,7 +253,11 @@ def session_upgrades(id_map: pd.DataFrame, session: date) -> pd.DataFrame:
 
 
 def build_universe(
-    ctx: TaskContext, sources: UniverseSources, settings: UniverseSettings, session: date
+    ctx: TaskContext,
+    sources: UniverseSources,
+    settings: UniverseSettings,
+    session: date,
+    accept_sp500: bool = False,
 ) -> RunRecord:
     with IngestRun(ctx, TASK, session) as run:
         trader = sources.nasdaq_trader
@@ -234,7 +268,8 @@ def build_universe(
         if sources.tickers is not None:
             parsed.update(_fetch(run, sources.tickers, "active"))
         listings = pd.concat([parsed[k] for k in trader.listing_keys], ignore_index=True)
-        _build(run, ctx.reader, listings, parsed[trader.options_key], parsed, settings, trader.name)
+        options = parsed[trader.options_key]
+        _build(run, ctx.reader, listings, options, parsed, settings, trader.name, accept_sp500)
     return run.record
 
 
@@ -246,9 +281,16 @@ def _build(
     parsed: dict[str, pd.DataFrame],
     settings: UniverseSettings,
     source: str,
+    accept_sp500: bool = False,
 ) -> None:
     session = run.session
     sp500 = set(parsed["sp500"]["symbol"])
+    in_file = len(sp500)
+    held = None if accept_sp500 else check_sp500(sp500, _known(reader, REFERENCE, session))
+    if held is not None:
+        why, sp500 = held
+        run.partial(why)
+        run.stats["sp500_held"] = why
     reference, disagreements, assigned = build_reference(
         listings,
         set(optionable["symbol"]),
@@ -307,7 +349,7 @@ def _build(
         .to_dict(),
         "covered": len(universe),
         "optionable_covered": int(universe["optionable"].sum()),
-        "sp500_members": len(sp500),
+        "sp500_members": in_file,
         "sp500_unmatched": unmatched,
         "leverage": {
             s: int(reference["leverage_source"].eq(s).sum()) for s in LEVERAGE_SOURCES

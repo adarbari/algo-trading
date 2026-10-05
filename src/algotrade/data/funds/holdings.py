@@ -80,37 +80,44 @@ def etf_holdings(
 
 
 def holdings_status(reader: StoreReader, through: date) -> pd.DataFrame:
-    """One row per fund with stored holdings: ``instrument_id``, ``as_of`` and
-    ``holdings_count`` (of its latest stored read) and ``fetched_on`` (the latest session any
-    run stored it in)."""
+    """One row per fund with stored holdings: ``instrument_id``, ``as_of``, ``holdings_count``
+    and ``source`` (the issuer adapter) of its latest stored read, and ``fetched_on`` (the
+    latest session any run stored it in)."""
     frame = _stored(reader, through, None)
-    columns = ["instrument_id", "as_of", "holdings_count", "fetched_on"]
+    columns = ["instrument_id", "as_of", "holdings_count", "source", "fetched_on"]
     if frame is None or frame.empty:
         return pd.DataFrame({c: [] for c in columns})
     fetched = pd.to_datetime(frame["session_date"]).dt.date.groupby(frame["instrument_id"]).max()
     latest = _latest_per_fund(frame).groupby("instrument_id").first()
-    out = latest[["as_of", "holdings_count"]].assign(fetched_on=fetched).reset_index()
+    out = latest[["as_of", "holdings_count", "source"]].assign(fetched_on=fetched).reset_index()
     return out[columns]
 
 
 def cusip_of(identifier: object) -> str | None:
-    """The 9-character CUSIP inside a CUSIP or a U.S./Canadian ISIN (``US0378331005``)."""
+    """The 9-character CUSIP or CINS inside a security id, or a U.S./Canadian ISIN
+    (``US0378331005``). A CINS (letter first: Linde ``G54950103``) is looked up too; it only
+    links when a State Street line with a ticker in USD printed it (``known_cusips``)."""
     text = str(identifier or "").strip().upper()
-    if len(text) == 9 and text.isalnum() and text[0].isdigit():  # letters first: a CINS, foreign
+    if len(text) == 9 and text.isalnum():
         return text
     if len(text) == 12 and text[:2] in ("US", "CA") and text.isalnum():
         return text[2:11]
     return None
 
 
+type Bridge = tuple[str, str]  # (ticker, instrument id) as written when the line was stored
+
+
 def known_cusips(
     reader: StoreReader, through: date, exclude_sources: Collection[str] = ()
-) -> dict[str, str]:
-    """CUSIP -> ticker for stored equity lines that resolved to a universe instrument
-    (``holding_id``) and came from an issuer that prints tickers with its CUSIPs (State
-    Street's equity funds, not ``exclude_sources``, the ones that borrow tickers): the bridge to
-    tickers for issuers that print only CUSIPs and ISINs (SEC N-PORT). A foreign line (the
-    local ticker T of Telus is not AT&T) never resolves, so it never enters the map."""
+) -> dict[str, Bridge]:
+    """CUSIP -> (ticker, instrument id) for stored equity lines that resolved to a universe
+    instrument (``holding_id``) and came from an issuer that prints tickers with its CUSIPs
+    (State Street's equity funds, not ``exclude_sources``, the ones that borrow tickers): the
+    bridge to the universe for issuers that print only CUSIPs and ISINs (SEC N-PORT). It keeps
+    the instrument id written with the line, never re-resolves the ticker (a recycled ticker
+    names another company today), and a foreign line (the local ticker T of Telus is not AT&T)
+    never resolves, so it never enters the map. The latest row of a CUSIP wins."""
     frame = _stored(reader, through, None)
     if frame is None or frame.empty:
         return {}
@@ -120,10 +127,12 @@ def known_cusips(
         & frame["holding_id"].notna()
         & (frame["asset_class"] == "Equity")
         & ~frame["source"].isin(list(exclude_sources))
-    ]
-    out: dict[str, str] = {}
-    for identifier, symbol in zip(known["identifier"], known["holding_symbol"], strict=True):
+    ].sort_values("knowledge_ts", kind="stable")
+    out: dict[str, Bridge] = {}
+    for identifier, symbol, holding_id in zip(
+        known["identifier"], known["holding_symbol"], known["holding_id"], strict=True
+    ):
         cusip = cusip_of(identifier)
         if cusip is not None:
-            out[cusip] = str(symbol)
+            out[cusip] = (str(symbol), str(holding_id))
     return out
