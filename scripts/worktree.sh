@@ -7,8 +7,9 @@
 # The worktree is ../algo-trading-<branch-slug> (slash -> dash) next to the main checkout.
 # Create: symlinks .venv to the main checkout's (so pre-commit hooks work; never --no-verify
 # or SKIP=), writes worktree.env (git-ignored) with the absolute PYTHONPATH of THIS worktree
-# (so layout / import-linter resolve it, not main), and runs `npm ci` in apps/web (only links
-# node_modules when the lockfiles are identical). Then: `source <worktree>/worktree.env`.
+# (so layout / import-linter resolve it, not main), and runs its own `npm ci` in apps/web.
+# Never symlink node_modules: `make check` runs `npm ci`, which through a link empties main's
+# install (breaking its dev server and every linked worktree). Then: `source <wt>/worktree.env`.
 set -euo pipefail
 
 dry=0 remove=0 args=()
@@ -16,7 +17,7 @@ for a in "$@"; do
   case "$a" in
     --dry-run) dry=1 ;;
     --remove) remove=1 ;;
-    -h | --help) sed -n '2,11p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,12p' "$0"; exit 0 ;;
     *) args+=("$a") ;;
   esac
 done
@@ -49,6 +50,7 @@ if [ "$remove" = 1 ]; then
     echo "refusing: $wt has $ahead unpushed commit(s)" >&2; exit 1
   fi
   [ -L "$wt/.venv" ] && run rm "$wt/.venv"
+  # legacy: older worktrees linked node_modules to main's; drop the link, never main's install
   [ -L "$wt/apps/web/node_modules" ] && run rm "$wt/apps/web/node_modules"
   run rm -f "$wt/worktree.env"
   run git -C "$main" worktree remove "$wt"
@@ -67,10 +69,6 @@ else
   printf 'export PYTHONPATH=%s\n' "$pp" >"$wt/worktree.env"
 fi
 
-if [ "$dry" = 1 ] || ! cmp -s "$main/apps/web/package-lock.json" "$wt/apps/web/package-lock.json"; then
-  run npm ci --prefix "$wt/apps/web"
-elif [ -d "$main/apps/web/node_modules" ]; then
-  run ln -s "$main/apps/web/node_modules" "$wt/apps/web/node_modules"
-fi
+run npm ci --prefix "$wt/apps/web"
 
 echo "ready: source $wt/worktree.env && cd $wt"
