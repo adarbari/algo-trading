@@ -76,7 +76,9 @@ describe('ExplorePage', () => {
     const onSearchChange = vi.fn();
     render(<ExplorePage search={{ sel: 'AAPL' }} onSearchChange={onSearchChange} />);
     expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
-    expect(widgets.overview).toHaveBeenLastCalledWith(expect.objectContaining({ symbol: 'AAPL' }));
+    expect(widgets.overview).toHaveBeenLastCalledWith(
+      expect.objectContaining({ symbol: 'AAPL', fund: expect.anything() as unknown }),
+    );
     await user.click(screen.getByRole('tab', { name: 'Compare' }));
     expect(onSearchChange).toHaveBeenLastCalledWith({ tab: 'compare' });
   });
