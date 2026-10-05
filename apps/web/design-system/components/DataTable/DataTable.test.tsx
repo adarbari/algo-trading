@@ -238,4 +238,16 @@ describe('DataTable', () => {
     const { container } = render(<Selectable columnPicker />);
     await expectNoA11yViolations(container);
   });
+
+  it('tints a cell from its row, with the value still readable', async () => {
+    const fill = (r: TickerRow) =>
+      r.symbol === rows[0]?.symbol ? ('warning' as const) : undefined;
+    const tinted = columns.map((c) => (c.id === 'iv30' ? { ...c, fill } : c));
+    const { container } = render(<Table columns={tinted} />);
+    const cells = container.querySelectorAll('[data-fill]');
+    expect(cells).toHaveLength(1);
+    expect(cells[0]).toHaveAttribute('data-fill', 'warning');
+    expect(cells[0]?.textContent).toMatch(/%/);
+    await expectNoA11yViolations(container);
+  });
 });

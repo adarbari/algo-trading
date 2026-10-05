@@ -228,6 +228,21 @@ type Story = StoryObj<typeof meta>;
 /** Screener preview: formatted numbers, a badge slot, sorted by score. */
 export const Default: Story = {};
 
+/** A criterion's near miss (warning) and miss (down) tint the cell; the value still reads as text. */
+export const NearMisses: Story = {
+  args: {
+    columns: screenColumns.map((column) => {
+      if (column.id === 'ratio') {
+        return { ...column, fill: (row: ScreenRow) => (row.ratio < 1.3 ? 'warning' : undefined) };
+      }
+      if (column.id === 'spread') {
+        return { ...column, fill: (row: ScreenRow) => (row.spread < 12 ? 'down' : undefined) };
+      }
+      return column;
+    }),
+  },
+};
+
 /** Explore ticker list: selection (controlled), two-line rows, toolbar and column picker. */
 export const Selection: Story = {
   render: () => <TickerTable rows={smallUniverse} initialSelected={['AAPL', 'MSFT', 'NVDA']} />,

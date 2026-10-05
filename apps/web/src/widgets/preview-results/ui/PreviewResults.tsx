@@ -1,15 +1,16 @@
 /**
  * The preview's top rows (latest closed session): decision counts in the title, decision filter
- * chips, score and the screen's own columns. Click a row to open the ticker in Explore.
+ * chips, score, each criterion (tinted when missed) and the screen's own columns. Click a row to open the ticker in Explore.
  */
 import { Chip, DataTable, Panel, Stack } from '@algotrade/ui';
 import { useMemo, useState } from 'react';
 
+import { byName, useFeatureCatalogue } from '@/entities/feature';
 import { decisionCounts, extraColumns, type PreviewRow } from '@/entities/screen';
 import { decisionLabel } from '@/entities/idea';
 import { previewPanelState, useScreenerBuilder } from '@/features/screener-builder';
 
-import { previewColumns } from '../model/columns';
+import { criterionColumns, previewColumns } from '../model/columns';
 
 export interface PreviewResultsProps {
   /** Open a ticker in Explore. */
@@ -25,7 +26,12 @@ export function PreviewResults({ onOpen }: PreviewResultsProps) {
       (data?.rows ?? []).filter((r) => decisions.length === 0 || decisions.includes(r.decision)),
     [data, decisions],
   );
-  const columns = useMemo(() => previewColumns(extraColumns(data?.rows ?? [])), [data]);
+  const catalogue = useFeatureCatalogue();
+  const known = useMemo(() => byName(catalogue.data ?? []), [catalogue.data]);
+  const columns = useMemo(
+    () => previewColumns(criterionColumns(data?.rows ?? []), extraColumns(data?.rows ?? []), known),
+    [data, known],
+  );
   const counts = data ? decisionCounts(data) : [];
   const title = counts.length
     ? `Preview · ${counts
@@ -74,6 +80,7 @@ export function PreviewResults({ onOpen }: PreviewResultsProps) {
         }}
         emptyMessage="No row has this decision."
         visibleRows={12}
+        columnPicker
       />
     </Panel>
   );

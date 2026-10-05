@@ -23,6 +23,10 @@ const LABELS: Readonly<Record<string, string>> = {
   'feature.div_yield': 'Div yield',
   'feature.liquidity_class': 'Liquidity',
   'instrument.sector': 'Sector',
+  'feature.vrp_iv30': 'IV30',
+  'feature.vrp_iv_hv_spread': 'IV − HV',
+  'feature.vrp_iv_hv_ratio': 'IV/HV',
+  'feature.dist_52w': 'Dist. 52w',
 };
 
 /** Longer names for the compare table's dimension column. */

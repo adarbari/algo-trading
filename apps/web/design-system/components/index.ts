@@ -25,6 +25,7 @@ export {
   type ColumnWidth,
   type DataTableCellContext,
   type DataTableColumn,
+  type DataTableFill,
   type DataTableProps,
   type DataTableSort,
 } from './DataTable';
