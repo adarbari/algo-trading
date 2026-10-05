@@ -157,11 +157,12 @@ live_timeout_s = 20              # longest a request waits for IB Gateway before
 live_retry_s = 30                # after the gateway fails, requests fall back at once this long
 raw_retention_days = 30          # raw IBKR responses (JSON) kept for replays of a verification
 
-[quality]                        # data-quality thresholds for the nightly checks
-max_bar_count_drop = 0.10        # FAIL if today's bar count falls >10% vs the previous session
-max_universe_change = 0.05       # FAIL on a >5% day-over-day change in coverage
-max_chain_fetch_failures = 0.05  # FAIL if over 5% of optionable names failed to fetch (FETCH_ERROR,
+[quality]                        # acceptance thresholds of the nightly steps (ADR 0039): outside them the step FAILS
+max_bar_count_drop = 0.10        # bars: FAIL if the session's bar count falls >10% vs the previous session
+max_bar_unresolved = 0.01        # bars: FAIL if over 1% of the session's bars have a ticker the resolver did not know
+max_universe_change = 0.05       # universe-build: FAIL on a >5% day-over-day change in coverage
+max_chain_fetch_failures = 0.02  # chains: FAIL if over 2% of optionable names failed to fetch (FETCH_ERROR,
                                  # incl. an open circuit, or never attempted)
-max_chain_stale_share = 0.20     # WARN if over 20% of chains are STALE_DATA (the feed served an
-                                 # older session; screens treat those names as UNKNOWN)
+max_chain_stale_share = 0.20     # chains: FAIL if over 20% of chains are STALE_DATA (the feed served an
+                                 # older session; a later retry usually gets the session's chains)
 max_verify_failures = 0.10       # verification vs IBKR: FAIL if over 10% of checks FAIL (any FAIL: WARN)

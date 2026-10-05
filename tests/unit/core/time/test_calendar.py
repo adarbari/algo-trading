@@ -32,6 +32,7 @@ NYSE_HOLIDAYS = {
     ],
     2025: [
         date(2025, 1, 1),
+        date(2025, 1, 9),  # special closure: national day of mourning (President Carter)
         date(2025, 1, 20),
         date(2025, 2, 17),
         date(2025, 4, 18),
@@ -171,3 +172,8 @@ def test_sessions_ending_and_sessions_to() -> None:
     assert sessions_to(date(2026, 11, 25), date(2026, 11, 30)) == 2
     assert sessions_to(date(2026, 11, 25), date(2026, 11, 25)) == 0
     assert sessions_to(date(2026, 11, 25), date(2026, 11, 1)) == 0
+
+
+def test_special_closures_are_not_sessions() -> None:
+    assert not is_session(date(2025, 1, 9)) and not is_session(date(2018, 12, 5))
+    assert is_session(date(2025, 1, 8)) and is_session(date(2025, 1, 10))

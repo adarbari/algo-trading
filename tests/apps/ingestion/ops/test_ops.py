@@ -9,7 +9,7 @@ from algotrade.config.site.settings import SourcesSettings, load_sources
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
-from algotrade.storage.runs import RunStatus
+from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.ops.schedule import LABEL, nightly_plist
 from algotrade_ingestion.tasks.maintenance.quality import run_quality
@@ -79,9 +79,14 @@ def seed(
     universe_d1: int,
     universe_d2: int,
     chains: list[str] | None = None,
+    unresolved: int | None = None,
 ) -> StoreReader:
     backend = MemoryBackend()
     w = StoreWriter(backend)
+    if unresolved is not None:  # the bars run for D2 and how many tickers it could not resolve
+        run = RunRecord("daily_bars-x", "daily_bars", D2, CLOCK(), RunStatus.COMPLETE, CLOCK())
+        run.stats = {"unresolved": unresolved}
+        w.save_run(run)
     w.write_table("bars/1d", D1, "b1", bars(D1, bars_d1))
     if bars_d2 is not None:
         w.write_table("bars/1d", D2, "b2", bars(D2, bars_d2))
@@ -130,14 +135,15 @@ def chain_check(chains: list[str], name: str) -> dict[str, str]:
 
 
 def test_chain_fetch_failures_up_to_the_threshold_pass() -> None:
-    check = chain_check(["OK"] * 19 + [CIRCUIT], "chains_fetch")  # 5%: not over 5%
+    check = chain_check(["OK"] * 49 + [CIRCUIT], "chains_fetch")  # 2%: not over 2%
     assert check["status"] == "PASS" and check["run"] == RunStatus.COMPLETE.value
+    assert chain_check(["OK"] * 19 + [CIRCUIT], "chains_fetch")["status"] == "FAIL"  # 5%
 
 
-def test_stale_chains_warn_but_do_not_fail_the_run() -> None:
+def test_stale_chains_over_the_share_fail() -> None:
     chains = ["OK"] * 13 + ["STALE_DATA: chain is for 2026-10-01"] * 5 + ["NO_CHAIN"] * 2
     check = chain_check(chains, "chains_stale")  # 25% stale > 20%
-    assert check["status"] == "WARN" and check["run"] == RunStatus.COMPLETE.value
+    assert check["status"] == "FAIL" and check["run"] == RunStatus.PARTIAL.value
     assert (
         "OK 13, STALE_DATA 5, NO_CHAIN 2, NO_STANDARD_SERIES 0, fetch failures 0"
         in (check["detail"])
@@ -154,16 +160,22 @@ def test_chain_thresholds_come_from_sources_toml() -> None:
     reader = seed(1000, 1000, 100, 100, ["OK"] * 18 + ["FETCH_ERROR: x", "STALE_DATA: x"])
     ctx = task_ctx(StoreWriter(MemoryBackend()), reader, CLOCK, settings=settings)
     result = {c["name"]: c["status"] for c in run_quality(ctx, D2).stats["checks"]}
-    assert (result["chains_fetch"], result["chains_stale"]) == ("PASS", "WARN")
+    assert (result["chains_fetch"], result["chains_stale"]) == ("PASS", "FAIL")
+
+
+def test_unresolved_bars_over_the_share_fail() -> None:
+    assert checks(seed(1000, 1000, 100, 100, unresolved=10))["bars_resolved"] == "PASS"  # 1%
+    assert checks(seed(1000, 1000, 100, 100, unresolved=11))["bars_resolved"] == "FAIL"
+    assert "bars_resolved" not in checks(seed(1000, 1000, 100, 100))  # no bars run recorded
 
 
 def test_quality_on_an_empty_store() -> None:
     result = checks(StoreReader(MemoryBackend()))
     assert result == {
         "universe_present": "FAIL",
-        "bars_present": "WARN",
-        "chains_present": "WARN",
-        "earnings_present": "WARN",
+        "bars_present": "FAIL",
+        "chains_present": "FAIL",
+        "earnings_present": "FAIL",
     }
 
 

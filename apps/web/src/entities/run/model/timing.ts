@@ -22,7 +22,10 @@ export function stepTimings(run: NightlyRun): StepTiming[] {
     .sort((a, b) => b.durationS - a.durationS || a.name.localeCompare(b.name));
 }
 
-/** Steps that did not complete (status other than COMPLETE), in recorded order. */
+// A step that is done: SUCCEEDED (ADR 0039) or COMPLETE in records written before it.
+const DONE = new Set(['COMPLETE', 'SUCCEEDED']);
+
+/** Steps that did not complete (not SUCCEEDED / COMPLETE), in recorded order. */
 export function incompleteSteps(run: NightlyRun): string[] {
-  return run.steps.filter((s) => s.status.toUpperCase() !== 'COMPLETE').map((s) => s.name);
+  return run.steps.filter((s) => !DONE.has(s.status.toUpperCase())).map((s) => s.name);
 }

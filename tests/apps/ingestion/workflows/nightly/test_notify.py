@@ -107,14 +107,26 @@ def test_mac_notifier_alerts_only_when_not_complete(monkeypatch: pytest.MonkeyPa
     ]
 
 
-def test_message_lists_steps_that_did_not_complete() -> None:
+def test_message_lists_critical_steps_that_did_not_succeed() -> None:
+    steps = {
+        "bars": {"status": "FAILED", "critical": True},
+        "rollups": {"status": "NOT_RUN", "critical": True},
+        "shares": {"status": "FAILED", "critical": False},  # optional: a warning in the report
+        "chains": {"status": "PARTIAL"},  # a record from before ADR 0039: counts as critical
+    }
     summary = {
         "status": "FAILED",
-        "sessions": [],
-        "runs": [],
-        "steps": {"purge-raw": {"status": "FAILED"}},
+        "sessions": ["2026-10-01"],
+        "catch_up": {"held": ["2026-10-02"]},
+        "runs": [{"session": "2026-10-01", "steps": steps}],
+        "steps": {"purge-raw": {"status": "FAILED", "critical": False}},
     }
-    assert notify.message(summary) == "FAILED (no session): purge-raw failed"
+    assert notify.message(summary) == (
+        "FAILED (2026-10-01): bars failed; chains partial; rollups not_run; held back: 2026-10-02"
+    )
+    assert notify.message({"status": "SUCCEEDED", "sessions": [], "runs": []}) == (
+        "SUCCEEDED (no session)"
+    )
 
 
 def test_email_config_from_the_environment_only() -> None:

@@ -8,7 +8,9 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
 
 - ``bars/1d``          ``prices.session_bars``: split-adjusted as of each session (never total
                        return), the session plus ``lookback`` earlier sessions; ``None`` when
-                       the session has no bars stored
+                       the session has no bars stored; ``MissingDataError`` when a session in
+                       the window (on or after the first stored one) has no bars: a rollup
+                       never computes over a gap (ADR 0039)
 - ``events/earnings``  ``events.stored_events``: every calendar snapshot stored on or before
                        the session (what was known then); ``None`` when there is none
 - ``chains/*``         ``chains``: the session's own partition, read per session (chains are
@@ -83,6 +85,7 @@ def _days(values: pd.Series) -> np.ndarray:
 @dataclass(frozen=True)
 class _Bars:
     bars: SessionBars | None
+    stored: frozenset[date] = frozenset()  # every session with a bars partition
 
     def at(self, session: date, lookback: int) -> pd.DataFrame | None:
         if self.bars is None:
@@ -90,6 +93,17 @@ class _Bars:
         window = self.bars.window(sessions_before(session, lookback), session)
         if window.empty or window["session_date"].iloc[-1] != session:
             return None
+        first = min(self.stored)
+        missing = [
+            d for d in sessions_ending(session, lookback + 1) if d >= first and d not in self.stored
+        ]
+        if missing:
+            days = ", ".join(d.isoformat() for d in missing)
+            raise MissingDataError(
+                "bars/1d",
+                f"no bars for {days} in the {lookback + 1}-session window of {session}",
+                f"algotrade-ingest bars --date {missing[0].isoformat()}",
+            )
         return window
 
 
@@ -97,8 +111,8 @@ def _bars(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loade
     try:
         loaded = session_bars(reader, sessions_before(sessions[0], lookback), sessions[-1])
     except MissingDataError:
-        loaded = None
-    return _Bars(loaded)
+        return _Bars(None)
+    return _Bars(loaded, frozenset(reader.dates("bars/1d")))
 
 
 @dataclass(frozen=True)

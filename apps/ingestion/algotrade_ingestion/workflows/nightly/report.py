@@ -25,7 +25,7 @@ from algotrade_ingestion.workflows.nightly.timing import (
     vendor_pacing,
 )
 
-BAD_STEPS = ("FAILED", "PARTIAL", "BLOCKED")
+BAD_STEPS = ("FAILED", "NOT_RUN", "PARTIAL", "BLOCKED")  # PARTIAL / BLOCKED: before ADR 0039
 # Key counts per step (result keys); other steps show their top-level numbers.
 KEY_COUNTS: Mapping[str, tuple[str, ...]] = {
     "universe-build": ("covered", "delisted_carried"),
@@ -82,7 +82,7 @@ class StepLine:
     duration_s: float
     counts: tuple[tuple[str, Any], ...] = ()  # key counts from the step result
     items: tuple[tuple[str, int], ...] = ()  # per-item status counts, most common first
-    note: str = ""  # SKIPPED / BLOCKED reason or FAILED error
+    note: str = ""  # why it FAILED, was NOT_RUN, SKIPPED or WAIVED, or its error
 
 
 @dataclass(frozen=True)
@@ -126,14 +126,15 @@ class Report:
     warnings: tuple[str, ...]
     steps: tuple[StepLine, ...]
     failures: tuple[FailureGroup, ...]
-    checks: tuple[Check, ...]  # quality checks that did not PASS
+    checks: tuple[Check, ...]  # acceptance checks that did not PASS
     screens: tuple[ScreenLine, ...]
     rollups: tuple[tuple[str, str, int, int], ...]  # session, rollup, rows, no_input sessions
     hints: tuple[str, ...] = field(default=())
     timings: tuple[StepTiming, ...] = ()  # run timing per step (timing.py)
     pacing: tuple[PacingLine, ...] = ()  # vendor limiters per step (requests, 429s, waits)
     max_duration_s: float | None = None  # [alerts] max_duration_minutes
-    catch_up_dropped: tuple[str, ...] = ()  # missed sessions over the catch-up cap
+    catch_up_held: tuple[str, ...] = ()  # sessions held back behind a failed one
+    catch_up_waiting: tuple[str, ...] = ()  # pending sessions over the cap, for the next run
     verification: tuple[VerificationLine, ...] = ()  # the verify step per session
 
     @property
@@ -146,7 +147,7 @@ class Report:
         return known[-1] if known else None
 
     def subject(self) -> str:
-        """``[algotrade] 2026-10-02 nightly: COMPLETE · chains 3,624 OK · 0 failures``."""
+        """``[algotrade] 2026-10-02 nightly: SUCCEEDED · chains 3,624 OK · 0 failures``."""
         ends = (self.sessions[0], self.sessions[-1]) if self.sessions else ()
         when = "..".join(dict.fromkeys(ends)) or "no session"
         parts = [f"[algotrade] {when} nightly: {self.status}"]
@@ -268,8 +269,8 @@ def _verification(session: str, step: Mapping[str, Any]) -> list[VerificationLin
     ]
 
 
-def _checks(session: str, result: Any) -> list[Check]:
-    checks = result.get("checks", []) if isinstance(result, Mapping) else []
+def _checks(session: str, holder: Any) -> list[Check]:
+    checks = holder.get("checks", []) if isinstance(holder, Mapping) else []
     return [
         Check(session, str(c.get("name")), str(c.get("status")), str(c.get("detail", "")))
         for c in checks
@@ -406,7 +407,8 @@ def build_report(
         )
         if record is not None and name != "quality":  # checks are listed with their detail
             failures += _groups(session, name, record, labels, max_examples)
-        checks += _checks(session, result) if name == "quality" else []
+        checks += _checks(session, step)  # acceptance checks on the step (ADR 0039)
+        checks += _checks(session, result) if name == "quality" else []  # before ADR 0039
         screens += _screens(session, result) if name == "screens" else []
         rollups += _rollups(session, result) if name == "rollups" else []
         verification += _verification(session, step) if name == "verify" else []
@@ -427,7 +429,8 @@ def build_report(
         screens=tuple(screens),
         rollups=tuple(rollups),
         max_duration_s=max_duration_s,
-        catch_up_dropped=tuple((summary.get("catch_up") or {}).get("dropped", [])),
+        catch_up_held=tuple((summary.get("catch_up") or {}).get("held", [])),
+        catch_up_waiting=tuple((summary.get("catch_up") or {}).get("waiting", [])),
         verification=tuple(verification),
     )
     items = {key: len(r.items) for key, r in records.items() if r.items}

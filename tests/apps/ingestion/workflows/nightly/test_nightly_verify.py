@@ -1,4 +1,4 @@
-"""Nightly and IBKR: ``verify`` runs after the screens for the latest session only;
+"""Nightly and IBKR: ``verify`` runs after the screens for the latest session only (optional);
 ``ibkr-contracts`` and ``ibkr-iv`` run after the chains and before the rollups (latest session
 only); all are SKIPPED with a WARN (never FAILED) when ``[ibkr]`` is disabled or the gateway is
 not reachable; the email gets a "Verification vs IBKR" section and IBKR IV coverage."""
@@ -15,6 +15,7 @@ from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.framework import registry
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
+from algotrade_ingestion.workflows.nightly import nightly as nightly_module
 from algotrade_ingestion.workflows.nightly.nightly import FINALLY, NIGHTLY, SCREENS, run_nightly
 from algotrade_ingestion.workflows.nightly.render import render_html, render_text
 from algotrade_ingestion.workflows.nightly.report import build_report
@@ -39,7 +40,8 @@ def _complete(name: str) -> Any:
 
 @pytest.fixture
 def others_fake(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Every nightly task but ``verify`` is a fake that completes."""
+    """Every nightly task but the IBKR ones is a fake that completes; no acceptance checks."""
+    monkeypatch.setattr(nightly_module, "NIGHTLY", tuple(replace(s, accept=()) for s in NIGHTLY))
     for step in (*NIGHTLY, *FINALLY):
         if step.name not in (SCREENS, *IBKR_STEPS):
             spec = registry.TASKS[step.name]
@@ -53,10 +55,12 @@ def store() -> StoreWriter:
     return writer
 
 
-def test_verify_runs_after_screens_before_quality_latest_only() -> None:
+def test_verify_runs_after_screens_latest_only_and_optional() -> None:
     names = [s.name for s in NIGHTLY]
-    assert names.index(SCREENS) < names.index("verify") < names.index("quality")
-    assert next(s for s in NIGHTLY if s.name == "verify").latest_only
+    assert names.index(SCREENS) < names.index("verify")
+    verify = next(s for s in NIGHTLY if s.name == "verify")
+    assert verify.latest_only and not verify.critical
+    assert not any(s.critical for s in NIGHTLY if s.name.startswith("ibkr-"))
 
 
 def test_ibkr_enrichment_runs_after_chains_before_rollups_latest_only() -> None:
@@ -76,10 +80,11 @@ def test_disabled_ibkr_skips_verify_and_the_night_stays_complete() -> None:
         assert first["status"] == "SKIPPED" and "latest closed session" in first["reason"]
         assert last == {
             "status": "SKIPPED",
+            "critical": False,
             "duration_s": 0.0,
             "reason": "skipped: [ibkr] is disabled in sources.toml",
         }
-    assert summary["status"] == "COMPLETE"
+    assert summary["status"] == "SUCCEEDED"
 
 
 @pytest.mark.usefixtures("others_fake")
@@ -89,7 +94,7 @@ def test_an_unreachable_gateway_skips_verify_with_a_warn_and_a_hint() -> None:
     ctx = task_ctx(store(), sources={"ibkr": IbkrSource(gateway)})
     summary = run_nightly(ctx, Plan([D]))
     steps = summary["runs"][0]["steps"]
-    assert summary["status"] == "COMPLETE"
+    assert summary["status"] == "SUCCEEDED"
     for name in IBKR_STEPS:
         assert steps[name]["status"] == "SKIPPED", name
         assert steps[name]["reason"].startswith("skipped: WARN: IB Gateway not reachable on 12")

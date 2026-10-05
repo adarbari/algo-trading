@@ -78,9 +78,9 @@ def test_nightly_is_an_ordered_list_of_registry_tasks() -> None:
     names = [s.name for s in (*NIGHTLY, *FINALLY)]
     assert [n for n in names if n != SCREENS and n not in TASKS] == []
     assert len(set(names)) == len(names)
-    assert NIGHTLY[-1].name == "quality" and [s.name for s in FINALLY] == ["purge-raw"]
-    for step in NIGHTLY:
-        assert set(step.blocked_by) <= set(names[: names.index(step.name)]), step.name
+    assert [s.name for s in FINALLY] == ["purge-raw"]
+    for step in NIGHTLY:  # a step needs only steps declared before it (ADR 0039)
+        assert set(step.needs) <= set(names[: names.index(step.name)]), step.name
 
 
 def test_every_nightly_step_has_a_status_in_the_result() -> None:
@@ -97,5 +97,5 @@ def test_every_nightly_step_has_a_status_in_the_result() -> None:
     assert list(steps) == [s.name for s in NIGHTLY]
     assert list(summary["steps"]) == [s.name for s in FINALLY]
     for step in [*steps.values(), *summary["steps"].values()]:
-        assert step["status"] in ("COMPLETE", "PARTIAL", "FAILED", "SKIPPED", "BLOCKED")
-        assert "duration_s" in step
+        assert step["status"] in ("SUCCEEDED", "FAILED", "NOT_RUN", "SKIPPED", "WAIVED")
+        assert "duration_s" in step and isinstance(step["critical"], bool)

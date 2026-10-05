@@ -37,5 +37,7 @@ describe('stepTimings', () => {
 
   it('lists the steps that did not complete', () => {
     expect(incompleteSteps(run)).toEqual(['chains', 'x']);
+    const adr39 = { ...run, steps: [step('bars', 'SUCCEEDED', 1), step('rollups', 'NOT_RUN', 0)] };
+    expect(incompleteSteps(adr39)).toEqual(['rollups']);
   });
 });

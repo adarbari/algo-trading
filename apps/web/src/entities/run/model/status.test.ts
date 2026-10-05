@@ -11,6 +11,9 @@ describe('status tones', () => {
     expect(statusTone('FETCH_ERROR: HTTP 403')).toBe('negative');
     expect(statusTone('FAIL')).toBe('negative');
     expect(statusTone('NO_CHAIN')).toBe('neutral');
+    expect(statusTone('SUCCEEDED')).toBe('positive');
+    expect(statusTone('WAIVED')).toBe('warning');
+    expect(statusTone('NOT_RUN')).toBe('negative');
     expect(segmentTone('NO_CHAIN')).toBe('muted');
     expect(segmentTone('OK')).toBe('positive');
   });
