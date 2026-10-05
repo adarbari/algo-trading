@@ -6,6 +6,7 @@
  */
 import {
   Box,
+  Button,
   Chip,
   DataTable,
   Panel,
@@ -21,7 +22,9 @@ import { byName, useFeatureCatalogue } from '@/entities/feature';
 import { decisionLabel } from '@/entities/idea';
 import {
   orderedDecisions,
+  runMessage,
   shownDecisions,
+  useRunScreener,
   useSaveScreenerView,
   useScreenerView,
   useScreenTable,
@@ -59,6 +62,7 @@ const count = (n: number) => n.toLocaleString('en-US');
 export function ScreenerResults({ id, onOpen }: ScreenerResultsProps) {
   const view = useScreenerView(id);
   const save = useSaveScreenerView(id);
+  const runner = useRunScreener(id);
   const catalogue = useFeatureCatalogue();
   const known = useMemo(() => byName(catalogue.data ?? []), [catalogue.data]);
 
@@ -119,8 +123,18 @@ export function ScreenerResults({ id, onOpen }: ScreenerResultsProps) {
           : undefined
       }
       flush
+      actions={
+        <Stack direction="row" gap={2} align="center" wrap>
+          <Text size="sm" tone="muted">
+            {runner.error ? 'The run could not be started' : runMessage(runner.run)}
+          </Text>
+          <Button size="sm" loading={runner.running} onClick={runner.start}>
+            Run now
+          </Button>
+        </Stack>
+      }
       state={state}
-      emptyMessage="No run stored for this screener yet. Edit its criteria to preview what it would pick."
+      emptyMessage="No run stored for this screener yet. Run it now to see what it picks."
       errorMessage="The results failed to load."
       onRetry={() => void table.refetch()}
       footer={

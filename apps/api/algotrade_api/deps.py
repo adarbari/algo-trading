@@ -1,5 +1,6 @@
 """Request dependencies: the API settings, the read-only store, the live quotes (ADR 0028),
-the config writer (ADR 0029: user configs only, through ``services.authoring``), the user a
+the config writer (ADR 0029: user configs only, through ``services.authoring``), the
+on-request screen runner (ADR 0033), the user a
 write is for, and the query parameters several routes share (universe filters, comma-separated
 lists).
 
@@ -15,10 +16,12 @@ from fastapi import Depends, Query, Request
 
 from algotrade.config.env import config_dir, data_url, user_id
 from algotrade.config.user import DEFAULT_USER, UserContext
+from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.authoring.scope import ConfigWriter, open_writer
 from algotrade.services.explore.store import ReadStore, open_store
 from algotrade.services.explore.universe import UniverseFilter
 from algotrade.services.live.quotes import LiveQuotes
+from algotrade.services.ondemand.screens import OnDemandScreens
 
 DEV_ORIGINS = (
     "http://localhost:5173",  # the web app's dev server (Vite)
@@ -82,6 +85,18 @@ def get_live(request: Request) -> LiveQuotes:
 
 
 Live = Annotated[LiveQuotes, Depends(get_live)]
+
+
+def get_ondemand(request: Request) -> OnDemandScreens:
+    """The on-request screen runner ``create_app`` set up (ADR 0033); off in tests and the
+    OpenAPI export unless one is given."""
+    runner = cast(OnDemandScreens | None, request.app.state.ondemand)
+    if runner is None:
+        raise ConfigurationError("on-request runs are off in this app")
+    return runner
+
+
+OnDemand = Annotated[OnDemandScreens, Depends(get_ondemand)]
 
 
 def universe_filter(

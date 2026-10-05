@@ -1,4 +1,5 @@
-"""The service API apps use to run jobs: build a runner, run one job to completion, shut down.
+"""The service API apps use to run jobs: run one job to completion, or (a long-lived app such as
+the API) open a runner and keep it.
 
 Apps (CLIs) never construct a runner themselves (ADR 0019, R5): they call ``run_job``.
 """
@@ -11,6 +12,16 @@ from algotrade.config.user import UserContext
 from algotrade.services.jobs.models import JobRecord
 from algotrade.services.jobs.runner import JobHandler, JobKind, LocalJobRunner
 from algotrade.storage.tables.interfaces import RunStore
+
+
+def open_runner(
+    runs: RunStore,
+    handlers: Mapping[str, JobKind | JobHandler],
+    resources: Mapping[str, Any],
+    workers: int = 2,
+) -> LocalJobRunner:
+    """A local runner to keep for a long-lived process (the caller shuts it down)."""
+    return LocalJobRunner(runs, handlers, resources, workers)
 
 
 def run_job(
