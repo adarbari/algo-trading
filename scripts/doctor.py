@@ -6,6 +6,7 @@ never fail it). Every probe goes through `Probes`, so tests pass fakes. Never pr
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import socket
 import subprocess
@@ -29,6 +30,12 @@ def _run(cmd: list[str], cwd: Path | None = None) -> tuple[int, str]:
     return p.returncode, (p.stdout + p.stderr).strip()
 
 
+def _main_checkout(repo: Path = REPO) -> Path:
+    """The main checkout (the one owning ``.git``), also when ``repo`` is a worktree."""
+    rc, out = _run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=repo)
+    return Path(out).parent if rc == 0 and out else repo
+
+
 def _port_open(host: str, port: int) -> bool:
     try:
         with socket.create_connection((host, port), timeout=0.5):
@@ -47,6 +54,7 @@ class Probes:
     port_open: Callable[[str, int], bool] = _port_open
     env_keys: Callable[[], set[str]] = field(default=set)
     data_url: Callable[[], str] = field(default=lambda: "file://./var/data")
+    main: Callable[[], Path] = _main_checkout
     required: tuple[str, ...] = ()
 
 
@@ -127,6 +135,56 @@ def check_venv(p: Probes) -> list[Result]:
     return out
 
 
+# The venv interpreter a script runs: its shebang, or the `exec` line uv writes for long paths.
+_VENV_PYTHON = re.compile(r"(/[^\s\"']*/\.venv/bin/python[\w.]*)")
+
+
+def _in_main(path: str, main: Path) -> bool:
+    """Whether ``path`` belongs to the main checkout itself, not a worktree: under ``main``,
+    not under ``.claude/worktrees/`` (Claude agent worktrees nest there) and with no ``.git``
+    (a worktree's marker) between it and ``main``."""
+    target = Path(path)
+    if not target.is_relative_to(main) or target.is_relative_to(main / ".claude" / "worktrees"):
+        return False
+    return not any(
+        (d / ".git").exists() for d in target.parents if d.is_relative_to(main) and d != main
+    )
+
+
+def check_venv_paths(p: Probes) -> Result:
+    """The main checkout's venv runs the main checkout's code. Worktrees link `.venv` to it, so
+    `uv sync` / `make install` in one rewrites the editable `.pth` files and the `bin/`
+    shebangs to the worktree: launchd's nightly and the API then run an unmerged branch."""
+    main = p.main()
+    venv = main / ".venv"
+    site = sorted(venv.glob("lib/python*/site-packages/_editable_impl_algotrade*.pth"))
+    bad = [
+        f"{pth.name} -> {line}"
+        for pth in site
+        for line in pth.read_text().splitlines()
+        if line.strip() and not line.startswith(("import", "#")) and not _in_main(line, main)
+    ]
+    scripts = sorted((venv / "bin").iterdir()) if (venv / "bin").is_dir() else []
+    for script in scripts:
+        if script.is_symlink() or not script.is_file():
+            continue
+        with script.open("rb") as f:
+            head = f.read(512)
+        if head.startswith(b"#!"):
+            found = _VENV_PYTHON.findall(head.decode(errors="replace"))
+            bad += [f"bin/{script.name} -> {py}" for py in found[:1] if not _in_main(py, main)]
+    if bad:
+        shown = "; ".join(bad[:3]) + (f" (+{len(bad) - 3} more)" if len(bad) > 3 else "")
+        return Result(
+            FAIL,
+            "venv paths",
+            f"the shared venv points outside the main checkout {main}: {shown}"
+            " (the nightly and the API run that code)",
+            f"cd {main} && uv sync --all-packages --locked",
+        )
+    return Result(OK, "venv paths", f"editable installs and scripts point at {main}")
+
+
 def _lock_versions(path: Path) -> dict[str, tuple[str, bool]]:
     pkgs = json.loads(path.read_text()).get("packages", {})
     return {k: (v.get("version", ""), bool(v.get("optional"))) for k, v in pkgs.items() if k}
@@ -193,6 +251,7 @@ def run_checks(p: Probes) -> list[Result]:
         check_docker(p),
         check_gh(p),
         *check_venv(p),
+        check_venv_paths(p),
         check_node_modules(p),
         check_env(p),
         check_ibkr(p),

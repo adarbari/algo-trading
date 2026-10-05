@@ -8,8 +8,11 @@
 # Create: symlinks .venv to the main checkout's (so pre-commit hooks work; never --no-verify
 # or SKIP=), writes worktree.env (git-ignored) with the absolute PYTHONPATH of THIS worktree
 # (so layout / import-linter resolve it, not main), and runs its own `npm ci` in apps/web.
-# Never symlink node_modules: `make check` runs `npm ci`, which through a link empties main's
-# install (breaking its dev server and every linked worktree). Then: `source <wt>/worktree.env`.
+# Never `uv sync` / `make install` in it: through the link that rewrites main's venv (which
+# the nightly and API run) to this worktree's code; `make install` refuses, `make doctor`
+# flags it. Never symlink node_modules: `make check` runs `npm ci`, which through a link
+# empties main's install (breaking its dev server and every linked worktree).
+# Then: `source <wt>/worktree.env`.
 set -euo pipefail
 
 dry=0 remove=0 args=()
@@ -17,7 +20,7 @@ for a in "$@"; do
   case "$a" in
     --dry-run) dry=1 ;;
     --remove) remove=1 ;;
-    -h | --help) sed -n '2,12p' "$0"; exit 0 ;;
+    -h | --help) sed -n '2,15p' "$0"; exit 0 ;;
     *) args+=("$a") ;;
   esac
 done

@@ -37,6 +37,8 @@ closed one already has a COMPLETE / PARTIAL nightly it prints ``nothing to do: <
 already ingested`` and exits 0 without taking the lock, writing a run record or notifying;
 while another ingest run holds the lock it prints one line and exits 3, also without
 notifying. ``--force`` runs anyway (the last closed session again when nothing is missing).
+``nightly`` refuses to start (exit 2) on code imported from a git worktree
+(``ops/checkout.py``).
 """
 
 import argparse
@@ -65,6 +67,7 @@ from algotrade_ingestion.cli.commands import (
     run_job,
     run_task_command,
 )
+from algotrade_ingestion.ops.checkout import ensure_main_checkout
 from algotrade_ingestion.ops.schedule import (
     DEFAULT_TIME,
     DEFAULT_WATCHDOG_MINUTES,
@@ -289,6 +292,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     backend = open_backend(data_url())
     try:
+        if args.command == "nightly":  # never an unmerged branch against the real store
+            ensure_main_checkout()
         if not writes(args):
             return _dispatch(args, StoreReader(backend), StoreWriter(backend))
         if scheduled_nightly(args):  # before the lock: a no-op must not wait or write
