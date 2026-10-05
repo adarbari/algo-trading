@@ -159,6 +159,8 @@ def _holdings_issuers(ctx: TaskContext) -> list[HoldingsSource]:
 
 
 def _no_holdings_source(ctx: TaskContext) -> str | None:
+    if not ctx.settings.vendor("etf_holdings").enabled:
+        return "skipped: [etf_holdings] is disabled in sources.toml"
     if _holdings_issuers(ctx):
         return None
     reasons = sorted({ctx.unavailable.get(n, f"{n} is not configured") for n in HOLDINGS_ISSUERS})

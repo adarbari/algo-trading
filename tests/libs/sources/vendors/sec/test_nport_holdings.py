@@ -82,7 +82,7 @@ def test_normalize_orders_by_weight_and_sets_the_report_date() -> None:
 def test_a_funds_filing_is_found_by_reading_headers_newest_first_and_cached() -> None:
     urls: list[str] = []
     src = source(urls)
-    assert isinstance(src, HoldingsSource) and src.cadence_days == 30
+    assert isinstance(src, HoldingsSource) and src.cadence_days == 90 and src.scope_limited
     assert src.fetch(FetchRequest("directory")) == FUNDS
     assert src.fetch(FetchRequest("vti")) == REPORT
     headers = [u for u in urls if u.endswith("-index-headers.html")]

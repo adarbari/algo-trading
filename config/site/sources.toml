@@ -53,6 +53,7 @@ min_interval_s = 1.0
 raw_retention_days = 14
 
 [etf_holdings]                   # the etf-holdings task (tasks/market/etf_holdings.py)
+enabled = true                   # false: the nightly skips the step (an explicit run still works)
 refresh_days = 7                 # refetch a fund's holdings once per this many days, spread over the
                                  # window by ticker (SEC N-PORT funds: quarterly data, so they are
                                  # only refetched once per 90 days)
