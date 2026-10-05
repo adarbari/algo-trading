@@ -153,7 +153,12 @@ def _shares(ctx: TaskContext, p: Params) -> RunRecord:
     return shares.ingest_shares(ctx, sources, session_of(p), bool(p.get("force")), p.get("limit"))
 
 
-HOLDINGS_ISSUERS = ("ssga_holdings", "ishares_holdings", "sec_nport_holdings")  # priority order
+HOLDINGS_ISSUERS = (
+    "ssga_holdings",
+    "ishares_holdings",
+    "proshares_holdings",
+    "sec_nport_holdings",
+)  # priority order
 
 
 def _holdings_issuers(ctx: TaskContext) -> list[HoldingsSource]:
