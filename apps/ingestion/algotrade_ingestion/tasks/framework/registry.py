@@ -255,7 +255,12 @@ def _symbols(p: Params) -> list[str]:
     return [s.strip() for s in str(p.get("symbols") or "").split(",") if s.strip()]
 
 
-DESCRIPTION_SOURCES = ("massive_overview", "sec_fund_tickers", "sec_fund_objectives")
+DESCRIPTION_SOURCES = (
+    "massive_overview",
+    "sec_fund_tickers",
+    "sec_fund_objectives",
+    "sec_fund_series",
+)  # every source the task may read: the CLI builds only the ones a task declares
 
 
 def _descriptions(ctx: TaskContext, p: Params) -> RunRecord:
