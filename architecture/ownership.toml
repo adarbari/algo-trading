@@ -289,7 +289,7 @@ allowed = [
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#r3-tasks-get-sources-from-the-registry"
 detect = [
-    { import = "algotrade_sources", except = ["algotrade_sources.framework.base", "algotrade_sources.framework.registry", "algotrade_sources.framework.session_thread"] },
+    { import = "algotrade_sources", except = ["algotrade_sources.framework.base", "algotrade_sources.framework.holdings", "algotrade_sources.framework.registry", "algotrade_sources.framework.session_thread"] },
     { string = "nasdaqlisted" },
     { string = "otherlisted" },
     { string = "dividends" },
