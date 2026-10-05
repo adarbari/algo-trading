@@ -85,7 +85,6 @@ ENDPOINTS = (
     "/screens",
     "/screens/short_premium_liquidity/results",
     "/screens/vrp_scanner/table?columns=rollup.price_stats@v2.hv20",
-    "/ideas",
     "/backtests",
     "/configs",
     "/configs/sma_trend",
@@ -114,9 +113,9 @@ def test_every_endpoint_answers_within_a_second_on_golden_data(
     assert min(timings) < 1.0, f"{path} took {min(timings):.2f}s (best of 3: {timings})"
 
 
-# The pages' main GraphQL operations (read-model PRs 4-7 add theirs: IdeasPage, ExploreDetail,
-# Table). InstrumentFacts: the Explore Overview pane; the detail tabs' (read-model PR 6):
-# events, bars, feature history, the option chain and one expiry's quotes, an ETF's holdings
+# The pages' main GraphQL operations. InstrumentFacts: the Explore Overview pane; IdeasPage:
+# the Ideas page (apps/web/src/entities/idea/api); the detail tabs' (read-model PR 6): events,
+# bars, feature history, the option chain and one expiry's quotes, an ETF's holdings
 # (apps/web/src/entities/{instrument,chain,holdings}/api).
 INSTRUMENT_FACTS = """query InstrumentFacts($key: String!, $names: [FeatureName!]!) {
   session { date isLatest missing }
@@ -137,6 +136,32 @@ OVERVIEW_NAMES = [
     "feature.iv_rank", "feature.div_yield", "rollup.earnings@v1.next_earnings_date",
     "rollup.earnings@v1.last_earnings_date", "rollup.earnings@v1.days_to_earnings",
     "rollup.earnings@v1.earnings_time",
+]  # fmt: skip
+IDEAS_PAGE = """query IdeasPage($limit: Int!, $names: [FeatureName!]!) {
+  ideas(limit: $limit) {
+    session priority total
+    screeners {
+      screener { id name owner version } run { runId configVersion } notRun { code detail }
+      picked top { instrumentId score instrument { symbol } }
+    }
+    items {
+      rank instrumentId
+      instrument {
+        symbol
+        features(names: $names) {
+          name value unknown { code detail } info { format unit dtype nullMeaning }
+        }
+      }
+      picks {
+        configId decision score reasons flags criteria { id value } columns { name value }
+      }
+    }
+  }
+}"""
+IDEA_NAMES = [
+    "rollup.earnings@v1.next_earnings_date", "rollup.earnings@v1.last_earnings_date",
+    "rollup.earnings@v1.days_to_earnings", "rollup.nearest_expiry@v1.dte",
+    "feature.earnings_before_expiry", "feature.vrp_iv30",
 ]  # fmt: skip
 DETAIL = {
     "InstrumentEvents": "query InstrumentEvents($key: String!) { instrument(key: $key) { "
@@ -178,6 +203,7 @@ OPERATIONS = {
         {"key": "AAA", "expiry": "2022-12-23", "date": "2022-11-23"},
     ),
     "EtfHoldings": (DETAIL["EtfHoldings"], {"key": "BULL", "top": 10}),
+    "IdeasPage": (IDEAS_PAGE, {"limit": 200, "names": IDEA_NAMES}),
 }
 
 

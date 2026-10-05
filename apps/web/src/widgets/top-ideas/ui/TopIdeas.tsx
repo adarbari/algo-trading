@@ -1,7 +1,7 @@
 /**
  * "Top ideas": one row per ticker with every screener that picked it, ranked by the user's
- * screener priority then score. Filter by decision, hide near-term earnings, tick tickers to
- * compare them in Explore, or click one to open it there.
+ * screener priority then score (on the server). Filter by decision, hide earnings within 14
+ * sessions, tick tickers to compare them in Explore, or click one to open it there.
  */
 import { Button, Chip, DataTable, Panel, Stack, Text } from '@algotrade/ui';
 import { useMemo, useState } from 'react';
@@ -12,7 +12,7 @@ import { decisionLabel, useIdeas, type Idea } from '@/entities/idea';
 import { ideaColumns } from '../model/columns';
 import {
   decisionsPresent,
-  EARNINGS_SOON_DAYS,
+  EARNINGS_SOON_LABEL,
   filterIdeas,
   NO_FILTERS,
   type IdeaFilters,
@@ -45,13 +45,15 @@ export function TopIdeas({ onCompare, onOpen, onOpenScreener, onScreeners }: Top
       decisions: on ? [...f.decisions, decision] : f.decisions.filter((d) => d !== decision),
     }));
   };
-  // No session: no screener has stored results yet (not an error: the API answers 200, empty).
+  // Nothing stored yet (`ideas: null`), or no screener ran for the session (each NOT_RUN):
+  // not an error, an empty panel that says so.
+  const ran = ideas.data?.screeners.some((s) => s.notRun === null) ?? false;
   const state =
     ideas.isError && !ideas.data
       ? 'error'
       : ideas.isPending
         ? 'loading'
-        : ideas.data.session === null
+        : ideas.data.session === null || !ran
           ? 'empty'
           : 'ready';
 
@@ -64,7 +66,11 @@ export function TopIdeas({ onCompare, onOpen, onOpenScreener, onScreeners }: Top
       loadingLabel="Loading ideas…"
       emptyMessage={
         <Stack gap={2} align="start">
-          <Text tone="muted">No screener has run yet, so there are no ideas.</Text>
+          <Text tone="muted">
+            {ideas.data?.session
+              ? 'No screener has run for this session, so there are no ideas.'
+              : 'No screener has run yet, so there are no ideas.'}
+          </Text>
           <Button variant="primary" onClick={onScreeners}>
             Go to Screeners
           </Button>
@@ -85,7 +91,7 @@ export function TopIdeas({ onCompare, onOpen, onOpenScreener, onScreeners }: Top
             />
           ))}
           <Chip
-            label={`Hide earnings < ${EARNINGS_SOON_DAYS}d`}
+            label={EARNINGS_SOON_LABEL}
             selected={filters.hideEarningsSoon}
             onSelectedChange={(on) => {
               setFilters((f) => ({ ...f, hideEarningsSoon: on }));

@@ -50,6 +50,14 @@ export type EtfHoldingsQueryVariables = Exact<{
 
 export type EtfHoldingsQuery = { instrument: { instrumentId: string, isEtf: boolean, holdings: { asOf: string | null, source: string | null, total: number, items: Array<{ rank: number, name: string, symbol: string | null, weight: number, assetClass: string | null, instrument: { symbol: string } | null }> } | null } | null };
 
+export type IdeasPageQueryVariables = Exact<{
+  limit: number;
+  names: Array<string> | string;
+}>;
+
+
+export type IdeasPageQuery = { ideas: { session: string, priority: Array<string>, total: number, screeners: Array<{ picked: number, screener: { id: string, name: string, owner: string, version: number | null }, run: { runId: string, configVersion: number | null } | null, notRun: { code: UnknownCode, detail: string } | null, top: Array<{ instrumentId: string, score: number | null, instrument: { symbol: string } | null }> }>, items: Array<{ rank: number, instrumentId: string, instrument: { symbol: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, detail: string } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null, picks: Array<{ configId: string, decision: string, score: number | null, reasons: string, flags: Array<string>, criteria: Array<{ id: string, value: unknown }>, columns: Array<{ name: string, value: unknown }> }> }> } | null };
+
 export type InstrumentFactsQueryVariables = Exact<{
   key: string;
   names: Array<string> | string;
@@ -191,6 +199,75 @@ export const EtfHoldingsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<EtfHoldingsQuery, EtfHoldingsQueryVariables>;
+export const IdeasPageDocument = new TypedDocumentString(`
+    query IdeasPage($limit: Int!, $names: [FeatureName!]!) {
+  ideas(limit: $limit) {
+    session
+    priority
+    total
+    screeners {
+      screener {
+        id
+        name
+        owner
+        version
+      }
+      run {
+        runId
+        configVersion
+      }
+      notRun {
+        code
+        detail
+      }
+      picked
+      top {
+        instrumentId
+        score
+        instrument {
+          symbol
+        }
+      }
+    }
+    items {
+      rank
+      instrumentId
+      instrument {
+        symbol
+        features(names: $names) {
+          name
+          value
+          unknown {
+            code
+            detail
+          }
+          info {
+            format
+            unit
+            dtype
+            nullMeaning
+          }
+        }
+      }
+      picks {
+        configId
+        decision
+        score
+        reasons
+        flags
+        criteria {
+          id
+          value
+        }
+        columns {
+          name
+          value
+        }
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<IdeasPageQuery, IdeasPageQueryVariables>;
 export const InstrumentFactsDocument = new TypedDocumentString(`
     query InstrumentFacts($key: String!, $names: [FeatureName!]!) {
   session {

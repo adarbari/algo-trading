@@ -4,7 +4,8 @@ read only through one, so a list of N parents costs one read, not N (no N+1).
 Each is keyed ``(instrument_id, *arguments)``; a batch makes one loader call per distinct
 arguments for all the instruments that asked them (``features``: one ``load_feature_values``
 per distinct ``names``), off the event loop. A loader's error is the result of each key in its
-call. ``screener_latest_run`` arrives with read-model PR 5 (the screens read model)."""
+call. ``screener_latest_run``: keyed ``(owner, config_id)``; one ``load_latest_runs`` call (one
+read of the session's screen results) per batch."""
 
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from datetime import date
@@ -27,6 +28,7 @@ from algotrade.services.read.instruments.holdings import Holdings, load_holdings
 from algotrade.services.read.instruments.identity import Instrument, load_instruments
 from algotrade.services.read.instruments.prices import Adjustment, PriceSeries, load_prices
 from algotrade.services.read.instruments.series import FeatureSeries, load_series
+from algotrade.services.read.screens.runs import LatestRun, RunKey, load_latest_runs
 
 FeatureKey = tuple[str, tuple[str, ...]]  # (instrument_id, catalogue names in the order asked)
 EventKey = tuple[str, date | None, date | None]  # (instrument_id, start, end)
@@ -72,6 +74,11 @@ def _feature_values(
     return batched(load_feature_values, ctx, keys)
 
 
+async def _latest_runs(ctx: ReadContext, keys: Sequence[RunKey]) -> list[LatestRun]:
+    found = await to_thread.run_sync(load_latest_runs, ctx, keys)
+    return [found[key] for key in keys]
+
+
 class Loaders:
     """The dataloaders of one request, over its ``ReadContext`` (one session)."""
 
@@ -91,3 +98,8 @@ class Loaders:
         self.holdings: DataLoader[HoldingsKey, Holdings | None] = _loader(load_holdings, ctx)
         self.prices: DataLoader[PriceKey, PriceSeries] = _loader(load_prices, ctx)
         self.series: DataLoader[SeriesKey, FeatureSeries] = _loader(load_series, ctx)
+
+        async def latest_runs(keys: list[RunKey]) -> list[LatestRun]:
+            return await _latest_runs(ctx, keys)
+
+        self.screener_latest_run: DataLoader[RunKey, LatestRun] = DataLoader(load_fn=latest_runs)

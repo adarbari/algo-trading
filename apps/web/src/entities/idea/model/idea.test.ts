@@ -1,118 +1,157 @@
 import { describe, expect, it } from 'vitest';
 
-import { decisionLabel, decisionTone, toIdeasData, type IdeasResponse } from './idea';
+import { IDEA_FACTS } from './facts';
+import {
+  decisionLabel,
+  decisionTone,
+  earningsBeforeExpiry,
+  factOf,
+  NO_IDEAS,
+  toIdeasData,
+  type IdeasResponse,
+} from './idea';
 
-const pick = (config_id: string, decision: string, score: number | null) => ({
-  config_id,
-  config_version: 2,
-  user: 'abhinav',
-  session: '2026-10-02',
+type Served = NonNullable<IdeasResponse['ideas']>;
+type Item = Served['items'][number];
+type Pick = Item['picks'][number];
+
+const pick = (configId: string, decision: string, score: number | null): Pick => ({
+  configId,
   decision,
   score,
   reasons: '',
-  criteria: [],
-  columns: {},
-  criterion_values: {},
   flags: [],
+  criteria: [],
+  columns: [],
+});
+
+const value = (name: string, v: unknown) => ({
+  name,
+  value: v,
+  unknown: null,
+  info: { format: 'DATE' as const, unit: null, dtype: 'date', nullMeaning: '' },
+});
+
+const item = (
+  rank: number,
+  symbol: string | null,
+  picks: Pick[],
+  facts = [value('x', 1)],
+): Item => ({
+  rank,
+  instrumentId: `id-${String(rank)}`,
+  instrument: symbol === null ? null : { symbol, features: facts },
+  picks,
+});
+
+const screener = (id: string, name: string, notRun = false): Served['screeners'][number] => ({
+  screener: { id, name, owner: 'abhinav', version: 3 },
+  run: notRun ? null : { runId: `run-${id}`, configVersion: 2 },
+  notRun: notRun ? { code: 'NOT_RUN', detail: `${id} has no run for 2026-10-02` } : null,
+  picked: notRun ? 0 : 7,
+  top: notRun ? [] : [{ instrumentId: 'id-1', score: 84, instrument: { symbol: 'AAPL' } }],
 });
 
 const response: IdeasResponse = {
-  session: '2026-10-02',
-  priority: ['vrp', 'liq', 'unused'],
-  total: 3,
-  screeners: [
-    { config_id: 'vrp', user: 'abhinav', name: 'VRP scanner', version: 2 },
-    { config_id: 'liq', user: 'abhinav', name: 'liq', version: 2 },
-    { config_id: 'unused', user: null, name: 'Unused one', version: null },
-  ],
-  items: [
-    {
-      rank: 1,
-      instrument_id: 'EQ:A',
-      symbol: 'AAPL',
-      picks: [pick('liq', 'WATCH', 60), pick('vrp', 'QUALIFIED', 84), pick('new', 'WATCH', 10)],
-      next_earnings_date: '2026-10-29',
-      days_to_earnings: 27,
-      closest_expiry_dte: 36,
-      earnings_before_expiry: true,
-    },
-    {
-      rank: 2,
-      instrument_id: 'EQ:M',
-      symbol: null,
-      picks: [pick('liq', 'EVENT_RISK', null)],
-      next_earnings_date: null,
-      days_to_earnings: null,
-      closest_expiry_dte: null,
-      earnings_before_expiry: null,
-    },
-    {
-      rank: 3,
-      instrument_id: 'EQ:Z',
-      symbol: 'ZZZ',
-      picks: [],
-      next_earnings_date: null,
-      days_to_earnings: null,
-      closest_expiry_dte: null,
-      earnings_before_expiry: null,
-    },
-  ],
+  ideas: {
+    session: '2026-10-02',
+    priority: ['vrp', 'liq'],
+    total: 3,
+    screeners: [
+      screener('vrp', 'VRP scanner'),
+      screener('liq', 'liq'),
+      screener('gone', 'Gone', true),
+    ],
+    items: [
+      item(
+        1,
+        'AAPL',
+        [pick('vrp', 'WATCH', 60), pick('liq', 'QUALIFIED', 84)],
+        [
+          value(IDEA_FACTS.nextEarnings, '2026-10-29'),
+          value(IDEA_FACTS.earningsBeforeExpiry, true),
+        ],
+      ),
+      item(2, null, [pick('liq', 'EVENT_RISK', null)]),
+      item(3, 'ZZZ', []),
+    ],
+  },
 };
 
 describe('toIdeasData', () => {
   const data = toIdeasData(response);
 
-  it('orders each idea’s picks by priority and takes the best decision', () => {
+  it('keeps the server order of picks and takes the best decision', () => {
     const [first] = data.ideas;
-    expect(first?.picks.map((p) => p.screenerId)).toEqual(['vrp', 'liq', 'new']);
-    expect(first?.best).toMatchObject({ screenerId: 'vrp', decision: 'QUALIFIED', score: 84 });
-    expect(first?.earningsBeforeExpiry).toBe(true);
+    expect(first?.picks.map((p) => p.screenerId)).toEqual(['vrp', 'liq']);
+    expect(first?.best).toMatchObject({ screenerId: 'liq', decision: 'QUALIFIED', score: 84 });
+    expect(first && factOf(first, IDEA_FACTS.nextEarnings)?.value).toBe('2026-10-29');
+    expect(first && earningsBeforeExpiry(first)).toBe(true);
   });
 
-  it('keeps nulls and drops an idea nobody picked', () => {
-    expect(data.ideas.map((i) => i.instrumentId)).toEqual(['EQ:A', 'EQ:M']);
-    expect(data.ideas[1]).toMatchObject({
-      symbol: null,
-      closestExpiryDte: null,
-      earningsBeforeExpiry: false,
+  it('keeps an instrument the snapshot lacks and drops an idea nobody picked', () => {
+    expect(data.ideas.map((i) => i.instrumentId)).toEqual(['id-1', 'id-2']);
+    const second = data.ideas[1];
+    expect(second?.symbol).toBeNull();
+    expect(second && earningsBeforeExpiry(second)).toBe(false);
+  });
+
+  it('lists the screeners as served, with the run counts and why one did not run', () => {
+    expect(data.screeners.map((s) => s.id)).toEqual(['vrp', 'liq', 'gone']);
+    expect(data.screeners[0]).toMatchObject({
+      picked: 7,
+      notRun: null,
+      version: 2,
+      top: [{ symbol: 'AAPL', score: 84 }],
+    });
+    expect(data.screeners[2]).toMatchObject({
+      picked: 0,
+      notRun: 'gone has no run for 2026-10-02',
+      version: 3,
+      top: [],
     });
   });
 
-  it('lists screeners in priority order, then any other picker, with counts and top picks', () => {
-    expect(data.screeners.map((s) => s.id)).toEqual(['vrp', 'liq', 'unused', 'new']);
-    expect(data.screeners[0]).toMatchObject({ qualified: 1, top: [{ symbol: 'AAPL', score: 84 }] });
-    expect(data.screeners[1]).toMatchObject({ qualified: 0, user: 'abhinav', version: 2 });
-    expect(data.screeners[2]).toMatchObject({ qualified: 0, top: [], version: null });
+  it('reads nothing stored as no ideas', () => {
+    expect(toIdeasData({ ideas: null })).toEqual(NO_IDEAS);
   });
 });
 
 describe('display values and watch-outs', () => {
   const rich: IdeasResponse = {
-    ...response,
-    items: [
-      {
-        rank: 1,
-        instrument_id: 'EQ:A',
-        symbol: 'AAPL',
-        next_earnings_date: '2026-10-29',
-        days_to_earnings: 27,
-        closest_expiry_dte: 36,
-        earnings_before_expiry: true,
-        picks: [
-          {
-            ...pick('liq', 'LIQUIDITY_RISK', 60),
-            flags: ['leveraged_inverse', 'large_move'],
-            columns: { iv30: 0.3, hv30: 0.2 },
-            criterion_values: { iv30: 0.99, adv: 4.5e7 },
-          },
-          {
-            ...pick('vrp', 'QUALIFIED', 84),
-            flags: ['large_move', 'odd_flag'],
-            columns: { iv30: 0.31, put_roc: 0.019, note: 'x' },
-          },
-        ],
-      },
-    ],
+    ideas: {
+      ...(response.ideas as Served),
+      items: [
+        item(
+          1,
+          'AAPL',
+          [
+            {
+              ...pick('liq', 'LIQUIDITY_RISK', 60),
+              flags: ['leveraged_inverse', 'large_move'],
+              columns: [
+                { name: 'iv30', value: 0.3 },
+                { name: 'hv30', value: 0.2 },
+              ],
+              criteria: [
+                { id: 'iv30', value: 0.99 },
+                { id: 'adv', value: 4.5e7 },
+              ],
+            },
+            {
+              ...pick('vrp', 'QUALIFIED', 84),
+              flags: ['large_move', 'odd_flag'],
+              columns: [
+                { name: 'iv30', value: 0.31 },
+                { name: 'put_roc', value: 0.019 },
+                { name: 'note', value: 'x' },
+              ],
+            },
+          ],
+          [value(IDEA_FACTS.earningsBeforeExpiry, true)],
+        ),
+      ],
+    },
   };
   const [idea] = toIdeasData(rich).ideas;
 
@@ -126,20 +165,18 @@ describe('display values and watch-outs', () => {
     });
   });
 
-  it('lists each watch-out once, with the earnings-before-expiry flag', () => {
+  it('lists each watch-out once, with the served earnings-before-expiry flag', () => {
     expect(idea?.watchOut.map((w) => w.label)).toEqual([
-      'Large move',
-      'Odd flag',
       'Leveraged / inverse',
+      'Large move',
       'Liquidity risk',
+      'Odd flag',
       'Earnings before expiry',
     ]);
   });
 
   it('names the screeners', () => {
-    const data = toIdeasData(rich);
-    expect(data.screeners.map((s) => s.name)).toEqual(['VRP scanner', 'liq', 'Unused one']);
-    expect(idea?.picks.map((p) => p.screenerName)).toEqual(['VRP scanner', 'liq']);
+    expect(idea?.picks.map((p) => p.screenerName)).toEqual(['liq', 'VRP scanner']);
   });
 });
 

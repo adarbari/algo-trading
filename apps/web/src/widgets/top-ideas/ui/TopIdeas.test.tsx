@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { toIdeasData, type IdeasData, type IdeasResponse } from '@/entities/idea';
+import { IDEA_FACTS, toIdeasData, type IdeasData, type IdeasResponse } from '@/entities/idea';
 import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib/testing';
 
 import { TopIdeas } from './TopIdeas';
@@ -13,66 +13,91 @@ vi.mock('@/entities/idea', async (importOriginal) => ({
   useIdeas: hooks.useIdeas,
 }));
 
-const pick = (config_id: string, decision: string, score: number) => ({
-  config_id,
-  config_version: 1,
-  user: 'abhinav',
-  session: '2026-10-02',
+type Served = NonNullable<IdeasResponse['ideas']>;
+type Item = Served['items'][number];
+
+const pick = (configId: string, decision: string, score: number) => ({
+  configId,
   decision,
   score,
   reasons: '',
-  criteria: [],
-  columns: {},
-  criterion_values: {},
-  flags: [],
+  flags: [] as string[],
+  criteria: [] as { id: string; value: unknown }[],
+  columns: [] as { name: string; value: unknown }[],
+});
+const fact = (name: string, value: unknown, format: 'DATE' | 'NUMBER' | 'PERCENT' | 'FLAG') => ({
+  name,
+  value,
+  unknown: value === null ? { code: 'NULL' as const, detail: `${name} is null` } : null,
+  info: { format, unit: format === 'PERCENT' ? 'decimal' : null, dtype: 'float', nullMeaning: '' },
+});
+const facts = (
+  next: string | null,
+  sessions: number | null,
+  dte: number | null,
+  first: boolean | null,
+  iv: number | null = null,
+  last: string | null = null,
+) => [
+  fact(IDEA_FACTS.nextEarnings, next, 'DATE'),
+  fact(IDEA_FACTS.lastEarnings, last, 'DATE'),
+  fact(IDEA_FACTS.sessionsToEarnings, sessions, 'NUMBER'),
+  fact(IDEA_FACTS.expiryDte, dte, 'NUMBER'),
+  fact(IDEA_FACTS.earningsBeforeExpiry, first, 'FLAG'),
+  fact(IDEA_FACTS.iv30, iv, 'PERCENT'),
+];
+const item = (
+  rank: number,
+  symbol: string,
+  picks: ReturnType<typeof pick>[],
+  features: ReturnType<typeof facts>,
+): Item => ({ rank, instrumentId: `id-${symbol}`, instrument: { symbol, features }, picks });
+const screener = (id: string, name: string) => ({
+  screener: { id, name, owner: 'abhinav', version: 1 },
+  run: { runId: `run-${id}`, configVersion: 1 },
+  notRun: null,
+  picked: 3,
+  top: [],
 });
 
 const response: IdeasResponse = {
-  session: '2026-10-02',
-  priority: ['vrp', 'liq'],
-  total: 3,
-  screeners: [
-    { config_id: 'vrp', user: 'abhinav', name: 'VRP scanner', version: 1 },
-    { config_id: 'liq', user: 'abhinav', name: 'Liquidity', version: 1 },
-  ],
-  items: [
-    {
-      rank: 1,
-      instrument_id: 'EQ:A',
-      symbol: 'AAPL',
-      picks: [
-        {
-          ...pick('vrp', 'QUALIFIED', 84),
-          columns: { iv30: 0.31, hv30: 0.21, iv_hv_ratio: 1.49, put_roc: 0.019 },
-        },
-        pick('liq', 'QUALIFIED', 91),
-      ],
-      next_earnings_date: '2026-10-29',
-      days_to_earnings: 27,
-      closest_expiry_dte: 36,
-      earnings_before_expiry: true,
-    },
-    {
-      rank: 2,
-      instrument_id: 'EQ:K',
-      symbol: 'KO',
-      picks: [{ ...pick('liq', 'WATCH', 66), flags: ['leveraged_inverse'] }],
-      next_earnings_date: '2026-10-08',
-      days_to_earnings: 6,
-      closest_expiry_dte: 8,
-      earnings_before_expiry: false,
-    },
-    {
-      rank: 3,
-      instrument_id: 'EQ:S',
-      symbol: 'SPY',
-      picks: [pick('liq', 'QUALIFIED', 88)],
-      next_earnings_date: null,
-      days_to_earnings: null,
-      closest_expiry_dte: null,
-      earnings_before_expiry: null,
-    },
-  ],
+  ideas: {
+    session: '2026-10-02',
+    priority: ['vrp', 'liq'],
+    total: 4,
+    screeners: [screener('vrp', 'VRP scanner'), screener('liq', 'Liquidity')],
+    items: [
+      item(
+        1,
+        'AAPL',
+        [
+          {
+            ...pick('vrp', 'QUALIFIED', 84),
+            columns: [
+              { name: 'hv30', value: 0.21 },
+              { name: 'iv_hv_ratio', value: 1.49 },
+              { name: 'put_roc', value: 0.019 },
+            ],
+          },
+          pick('liq', 'QUALIFIED', 91),
+        ],
+        facts('2026-10-29', 19, 36, true, 0.31),
+      ),
+      item(
+        2,
+        'KO',
+        [{ ...pick('liq', 'WATCH', 66), flags: ['leveraged_inverse'] }],
+        facts('2026-10-08', 4, 8, false),
+      ),
+      item(3, 'SPY', [pick('liq', 'QUALIFIED', 88)], facts(null, null, null, null)),
+      item(
+        4,
+        'MRVL',
+        [pick('vrp', 'QUALIFIED', 70)],
+        facts(null, null, 15, null, null, '2026-08-27'),
+      ),
+    ],
+  },
 };
 const data = toIdeasData(response);
 
@@ -99,6 +124,17 @@ describe('TopIdeas', () => {
     const aapl = within(grid()).getByRole('row', { name: /AAPL/ });
     await userEvent.click(within(aapl).getByRole('button', { name: 'VRP scanner' }));
     expect(onOpenScreener).toHaveBeenCalledWith('vrp');
+  });
+
+  it('shows the next earnings, else a muted last date, else Unknown', () => {
+    const { grid } = setup();
+    expect(within(grid()).getByRole('row', { name: /AAPL/ })).toHaveTextContent('Thu 29 Oct');
+    expect(within(grid()).getByRole('row', { name: /MRVL/ })).toHaveTextContent('Last 27 Aug');
+    const spy = within(grid()).getByRole('row', { name: /SPY/ });
+    expect(within(spy).getAllByText('Unknown')[0]).toHaveAttribute(
+      'title',
+      'not known for this session',
+    );
   });
 
   it('shows each ticker with its screeners, decision, score, earnings and expiry flag', async () => {
@@ -143,7 +179,7 @@ describe('TopIdeas', () => {
     await user.click(screen.getByRole('button', { name: 'Watch' }));
     expect(screen.queryByRole('row', { name: /AAPL/ })).not.toBeInTheDocument();
     expect(screen.getByRole('row', { name: /KO/ })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Hide earnings < 14d' }));
+    await user.click(screen.getByRole('button', { name: 'Hide earnings within 14 sessions' }));
     expect(screen.getByText('No idea matches these filters.')).toBeInTheDocument();
   });
 
@@ -170,6 +206,12 @@ describe('TopIdeas', () => {
     expect(screen.getByText('No screener picked anything in this session.')).toBeInTheDocument();
     await expectNoA11yViolations(empty.container);
     empty.unmount();
+
+    const notRun = data.screeners.map((s) => ({ ...s, notRun: 'no run for 2026-10-02' }));
+    hooks.useIdeas.mockReturnValue(fakeQuery<IdeasData>({ ...data, ideas: [], screeners: notRun }));
+    const idle = setup();
+    expect(screen.getByText(/No screener has run for this session/)).toBeInTheDocument();
+    idle.unmount();
 
     hooks.useIdeas.mockReturnValue(fakeQuery<IdeasData>({ ...data, session: null, ideas: [] }));
     const none = setup();

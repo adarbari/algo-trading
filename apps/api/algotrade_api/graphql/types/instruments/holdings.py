@@ -12,9 +12,11 @@ from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments import holdings
 
 if TYPE_CHECKING:
-    from algotrade_api.graphql.types.instrument import Instrument
+    from algotrade_api.graphql.types.instruments.instrument import Instrument
 
-LazyInstrument = Annotated["Instrument", strawberry.lazy("algotrade_api.graphql.types.instrument")]
+LazyInstrument = Annotated[
+    "Instrument", strawberry.lazy("algotrade_api.graphql.types.instruments.instrument")
+]
 
 
 @strawberry.type(
@@ -47,7 +49,7 @@ class Holding:
         "the universe)"
     )
     async def instrument(self, info: Info) -> LazyInstrument | None:
-        from algotrade_api.graphql.types.instrument import Instrument  # noqa: PLC0415
+        from algotrade_api.graphql.types.instruments.instrument import Instrument  # noqa: PLC0415
 
         found = await self.ctx.loaders.instruments.load((self.instrument_id or "",))
         return Instrument.of(found, self.ctx) if found is not None else None
