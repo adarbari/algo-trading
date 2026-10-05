@@ -7,7 +7,8 @@ Historical requests can be scripted to go wrong like ``ib_async`` does (``faults
 symbol, one fault per request in order): every fault returns an EMPTY bar list, as
 ``ib_async`` does with ``RaiseRequestErrors`` off. ``"timeout"`` takes the request timeout
 (on ``clock``, which the facade reads); ``"pacing"`` emits error 162 pacing violation for the
-request, ``"no-data"`` IB's error 162 "query returned no data", ``"1100"`` the connectivity
+request, ``"no-data"`` IB's error 162 "query returned no data", ``"denied"`` error 162 "No
+market data permissions" (a retry cannot fix it), ``"1100"`` the connectivity
 loss (request id -1, then 1102 restored); ``"flap"`` the same loss but the bars still come.
 """
 
@@ -21,6 +22,8 @@ from typing import Any
 Bar = tuple[date, float, float, float, float, float]  # date, open, high, low, close, volume
 PACING = "Historical Market Data Service error message:Historical data request pacing violation"
 NO_DATA = "Historical Market Data Service error message:HMDS query returned no data: X@SMART"
+DENIED = "Historical Market Data Service error message:No market data permissions for X"
+ERROR_162 = {"pacing": PACING, "no-data": NO_DATA, "denied": DENIED}
 
 
 class FakeEvent:
@@ -137,8 +140,8 @@ class FakeIB:
                 return bars
         elif fault == "timeout":
             self.skew += float(kwargs.get("timeout") or 60.0)
-        elif fault in ("pacing", "no-data"):
-            self.errorEvent.emit(req_id, 162, PACING if fault == "pacing" else NO_DATA, contract)
+        elif fault in ERROR_162:
+            self.errorEvent.emit(req_id, 162, ERROR_162[fault], contract)
         if fault is not None:
             bars.clear()
         return bars

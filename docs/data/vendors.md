@@ -268,7 +268,9 @@ gives replaces a free source, and what derives from it carries `licence = person
   request and raises a retryable error for a timeout, an error of that request (162 pacing
   violation, ...) or a lost connection (1100, HMDS farm down); the backfill retries a name
   3 times (30 s then 60 s back-off on the shared limiter), then records it `FETCH_ERROR`
-  (pending: the next run or a resume fetches it) and stops after 5 such names in a row.
+  (pending: the next run or a resume fetches it; later runs try such names after every
+  untried one) and stops after 5 such names in a row. An error a retry cannot fix (no
+  permissions, no security definition) is `FETCH_ERROR` at once, without retries.
   `NO_DATA` (done for good) only when IB answered with no bars (or its own 162 "query
   returned no data"). A run that cannot connect is PARTIAL, never COMPLETE, and still
   publishes what a resumed run had staged.
@@ -276,7 +278,8 @@ gives replaces a free source, and what derives from it carries `licence = person
   on a paper login (checked 2026-10-03: AAPL, SPY, MSFT answered within 1 s; HV can lag, so a
   batch waits up to `stream_wait_s` for both). ~4.2k names in batches of 50: a few minutes.
   The snapshot is written to the session; a later history backfill of that session replaces
-  it (runs merge per instrument, latest wins), its HV included (history rows have none).
+  it (runs merge per instrument, latest wins), keeping the snapshot's HV (history rows have
+  no HV of their own).
 - **Features**: `ibkr_iv@v1` (IV30 / HV30 and the 252-session rank, percentile and status on
   IB's IV, the `iv_history@v2` rules); `iv_rank` / `iv_percentile` prefer it and fall back to
   ours, `iv_rank_source` says which (`config/site/features/volatility.toml`).

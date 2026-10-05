@@ -51,8 +51,8 @@ i.e. 60 per 10 minutes) for every historical request, the live verification's in
 
 - A **backfill** (`algotrade-ingest run ibkr-iv --from D1 --to D2`) makes ONE request per
   underlying for the whole range: the IV only (amended 2026-10-05: the HV history was read by
-  nothing but `hv30_ibkr` itself; HV now comes only from the nightly snapshot, so history
-  rows leave it null). At 10 s each the ~4.2k optionable names take **about 12 hours**, the
+  nothing but `hv30_ibkr` itself; HV now comes only from the nightly snapshot; a history row
+  keeps the HV of a stored snapshot it replaces, else leaves it null). At 10 s each the ~4.2k optionable names take **about 12 hours**, the
   most liquid first. A request IB does not answer (timeout, error 162, connection lost) is
   retried and then left pending, never recorded as no data. It is resumable
   per underlying, within a run (`resume`) and across runs (an underlying whose history an

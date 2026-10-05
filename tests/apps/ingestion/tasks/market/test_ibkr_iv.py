@@ -236,8 +236,41 @@ def test_the_backfill_stops_after_names_failing_in_a_row() -> None:
     record = backfill_ivs(ctx, ibkr_source(ib), START, SESSION)
     assert len(record.items) == STOP_AFTER_FAILED  # the rest were not even asked
     assert record.status is RunStatus.PARTIAL
-    assert record.stats["partial"][0].startswith(f"backfill stopped: {STOP_AFTER_FAILED} names")
+    assert record.stats["partial"][0].startswith(
+        f"backfill stopped: IB did not answer {STOP_AFTER_FAILED} names in a row"
+    )
     assert record.stats["backfill_pending"] == len(names)
+    # names a retry cannot fix (no permissions) are not retried and never stop the run
+    ctx, _ = market(names)
+    ib = fake(names)
+    ib.faults = {n: ["denied"] for n in names}
+    denied = backfill_ivs(ctx, ibkr_source(ib), START, SESSION)
+    assert len(ib.requests) == len(names) == len(denied.items)  # one request each
+    assert all(v.startswith("FETCH_ERROR: ") for v in denied.items.values())
+    assert "partial" not in denied.stats
+
+
+def test_names_earlier_runs_could_not_fetch_go_last() -> None:
+    ctx, _ = market(["A", "B", "C"])
+    ib = fake(["A", "B", "C"])
+    ib.faults = {"A": ["denied"]}
+    backfill_ivs(ctx, ibkr_source(ib), START, SESSION, limit=1)  # A fails
+    ib = fake(["A", "B", "C"])
+    later = backfill_ivs(ctx, ibkr_source(ib), START, SESSION + timedelta(days=3))
+    assert [r["symbol"] for r in ib.requests] == ["B", "C", "A"]  # A no longer blocks B, C
+    assert later.status is RunStatus.COMPLETE
+
+
+def test_a_history_row_keeps_the_hv_of_the_snapshot_it_replaces() -> None:
+    ctx, reader = market(["A"], iv_backfill_per_night=0)
+    day = SESSION
+    nightly_ivs(ctx, ibkr_source(fake(["A"], vols={"A": (0.5, 0.33)}), stream_wait_s=0.01), day)
+    assert ibkr_iv30(reader, day, day)["hv30_ibkr"].tolist() == [0.33]  # the snapshot
+    backfill_ivs(ctx, ibkr_source(fake(["A"])), START, SESSION)
+    rows = ibkr_iv30(reader, START, SESSION).set_index("session_date")
+    assert set(rows["source_kind"]) == {"history"}  # the history replaced the snapshot
+    assert rows.loc[day, "hv30_ibkr"] == 0.33 and rows.loc[day, "iv30_ibkr"] == 0.24
+    assert rows["hv30_ibkr"].drop(day).isna().all()  # no snapshot, no HV
 
 
 class CrashOnClose(IbkrSource):
@@ -287,9 +320,9 @@ def write_liquidity(
         for s, (_, put, call) in rows.items() if put is not None
     ]  # fmt: skip
     writer.write_table("rollups/instrument/price_stats@v2", day, "r", stamped(prices, day, "r"))
-    writer.write_table(
-        "rollups/instrument/option_liquidity@v1", day, "r", stamped(options, day, "r")
-    )
+    if options:  # none: the table has no partition that day
+        table = "rollups/instrument/option_liquidity@v1"
+        writer.write_table(table, day, "r", stamped(options, day, "r"))
 
 
 def test_the_backfill_fetches_the_most_liquid_names_first() -> None:
@@ -310,6 +343,11 @@ def test_the_backfill_fetches_the_most_liquid_names_first() -> None:
     order = ["BIG", "MID", "HALF", "RICH", "LOW", "AAA", "ZNONE"]
     assert [r["symbol"] for r in ib.requests] == order
     assert record.stats["backfill_liquid"] == 3
+    ctx, _ = market(names)  # only price_stats stored that day: tiers unknown, ADV still orders
+    write_liquidity(ctx.writer, {"LOW": (1e7, None, None), "BIG": (2e8, None, None)})
+    ib = fake(names)
+    backfill_ivs(ctx, ibkr_source(ib), START, SESSION)
+    assert [r["symbol"] for r in ib.requests][:2] == ["BIG", "LOW"]
     ctx, _ = market(names)  # --limit takes the head of that order, --symbols narrows it
     write_liquidity(ctx.writer, {"BIG": (2e8, "A", "A"), "LOW": (1e7, "D", "D")})
     ib = fake(names)

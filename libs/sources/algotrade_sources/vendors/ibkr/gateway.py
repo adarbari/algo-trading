@@ -34,9 +34,10 @@ Unanswered is not empty: ``ib_async`` returns an empty bar list on a request tim
 an IB error (``RaiseRequestErrors`` is off), the same as a genuine "no data". The facade
 watches IB's error events while a historical request is in flight and times it, and raises
 ``TransientFetchError`` (retryable) for a timeout, an error of that request (error 162
-pacing violation, a cancelled query, ...) or a lost connection (error 1100, HMDS farm down).
-Only an empty answer without any of these, or IB's own error 162 "query returned no data",
-is an empty result.
+pacing violation, a cancelled query, ...) or a lost connection (error 1100, HMDS farm down),
+and a plain ``LookupError`` (not retried; still not "no data") for an error a retry cannot
+fix (``refused``: no security definition, no market data permissions). Only an empty answer
+without any of these, or IB's own error 162 "query returned no data", is an empty result.
 """
 
 import math
@@ -78,6 +79,10 @@ CONNECTIVITY_ERRORS = frozenset({1100, 1300, 2105, 2110})
 NO_DATA_ERROR = 162  # "Historical Market Data Service error": no data, or pacing / other
 NO_DATA_TEXT = "no data"  # in 162's message when IB answered "query returned no data"
 TIMEOUT_SLACK_S = 1.0  # an empty answer this close to the request timeout is the timeout
+# Request errors a retry cannot fix: no security definition (200), market data not
+# subscribed (354, 10090); and 162 naming missing permissions. Not transient: no retry.
+REFUSED_ERRORS = frozenset({200, 354, 10090})
+REFUSED_TEXT = "permission"
 EASTERN = "US/Eastern"  # IB's time zone name for an end date's 23:59:59
 
 
@@ -105,6 +110,20 @@ def _informational(code: int) -> bool:
     return code == 165 or 2100 <= code < 2200
 
 
+def _mine(rid: int, req_id: int | None) -> bool:
+    return rid != -1 and (req_id is None or rid == req_id)
+
+
+def refused(errors: Sequence[tuple[int, int, str]], req_id: int | None) -> str | None:
+    """A request error retrying cannot fix (``REFUSED_ERRORS``, a 162 about permissions)."""
+    for rid, code, message in errors:
+        if _mine(rid, req_id) and (
+            code in REFUSED_ERRORS or (code == NO_DATA_ERROR and REFUSED_TEXT in message.lower())
+        ):
+            return f"IB error {code}: {message}"
+    return None
+
+
 def unanswered(
     errors: Sequence[tuple[int, int, str]], req_id: int | None, elapsed: float, timeout: float
 ) -> str | None:
@@ -118,7 +137,7 @@ def unanswered(
             if code in CONNECTIVITY_ERRORS:
                 return f"IB error {code} while the request was in flight: {message}"
             continue
-        if (req_id is not None and rid != req_id) or _informational(code):
+        if not _mine(rid, req_id) or _informational(code):
             continue
         if code == NO_DATA_ERROR and NO_DATA_TEXT in message.lower():
             continue  # IB's own "query returned no data": a genuine empty answer
@@ -335,8 +354,10 @@ class IbkrMarketData:
         finally:
             self._errors = None
         if not bars:
-            why = unanswered(errors, getattr(bars, "reqId", None), self.clock() - started, timeout)
-            if why is not None:
+            req_id, elapsed = getattr(bars, "reqId", None), self.clock() - started
+            if (why := refused(errors, req_id)) is not None:
+                raise LookupError(f"IBKR {what} {contract.symbol}: {why}")  # not retried
+            if (why := unanswered(errors, req_id, elapsed, timeout)) is not None:
                 raise TransientFetchError(f"IBKR {what} {contract.symbol}: {why}")
         return [
             {

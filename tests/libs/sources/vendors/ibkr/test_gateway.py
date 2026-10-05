@@ -18,6 +18,7 @@ from algotrade_sources.vendors.ibkr.gateway import (
     ReadOnlyViolationError,
     _detach_resubscribe,
     ib_symbol,
+    refused,
     unanswered,
 )
 from tests.helpers.fake_ib import FakeIB
@@ -314,6 +315,14 @@ def test_an_unanswered_history_request_is_a_transient_error_not_empty(fault: str
     assert not set(FORBIDDEN) & set(fake.calls)
 
 
+def test_an_error_a_retry_cannot_fix_is_not_transient_and_not_empty() -> None:
+    fake = FakeIB(iv={"AAPL": BARS}, faults={"AAPL": ["denied"]})
+    gw, _ = history_gateway(fake)
+    with pytest.raises(LookupError, match="No market data permissions") as raised:
+        gw.volatility_history("AAPL", date(2026, 10, 1), SESSION, conid=1004)
+    assert not isinstance(raised.value, TransientFetchError)
+
+
 @pytest.mark.parametrize("fault", ["no-data", None])
 def test_a_genuine_empty_history_is_empty(fault: str | None) -> None:
     fake = FakeIB(bars={"AAPL": BARS}, faults={"AAPL": [fault]} if fault else {})
@@ -340,6 +349,10 @@ def test_unanswered_reads_only_this_requests_errors_and_real_failures() -> None:
     assert unanswered([pacing], None, 0.1, 60.0) is not None  # request id unknown: any counts
     assert unanswered([lost], 7, 0.1, 60.0) == "IB error 1100 while the request was in flight: lost"
     assert unanswered([], 7, 59.5, 60.0) is not None and unanswered([], 7, 1.0, 0.0) is None
+    assert (
+        refused([(7, 200, "No security definition")], 7) == "IB error 200: No security definition"
+    )
+    assert refused([(8, 200, "x"), pacing, lost], 7) is None
 
 
 def test_cool_down_holds_the_historical_limiter_and_close_stops_listening() -> None:
