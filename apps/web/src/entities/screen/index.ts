@@ -3,6 +3,7 @@ export {
   PREVIEW_ROWS,
   useMyScreeners,
   useRunScreener,
+  useDeleteScreenerView,
   useSaveScreenerView,
   useScreener,
   useScreenerView,
@@ -10,6 +11,7 @@ export {
   useScreenerVersions,
   useScreenPreview,
   useScreeners,
+  type ViewContent,
 } from './api/hooks';
 export {
   decisionCounts,

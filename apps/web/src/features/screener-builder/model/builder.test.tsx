@@ -117,7 +117,7 @@ beforeEach(() => {
     )) as never);
   POST.mockResolvedValue(ok(PREVIEW));
   PUT.mockResolvedValue(ok({ screener_id: 'my', document: {} }) as never);
-  DELETE.mockResolvedValue({ response: new Response(null, { status: 204 }) } as never);
+  DELETE.mockResolvedValue({ response: new Response(null, { status: 204 }) });
 });
 
 describe('ScreenerBuilderProvider', () => {
