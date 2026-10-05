@@ -37,6 +37,7 @@ describe('formatValue', () => {
   it('formats calendar dates without a time-zone shift', () => {
     expect(text('2026-10-02', { kind: 'date' })).toBe('2 Oct 2026');
     expect(text('2026-10-02', { kind: 'date', style: 'weekday' })).toBe('Fri 2 Oct');
+    expect(text('2026-08-27', { kind: 'date', style: 'day' })).toBe('27 Aug');
     expect(text('2026-10-02', { kind: 'date', style: 'iso' })).toBe('2026-10-02');
     expect(text('not a date', { kind: 'date' })).toBe(MISSING);
   });

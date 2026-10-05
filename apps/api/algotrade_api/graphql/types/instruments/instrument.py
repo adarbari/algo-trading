@@ -14,11 +14,11 @@ from algotrade.services.read.instruments import identity
 from algotrade.services.read.instruments.prices import Adjustment
 from algotrade_api.graphql.limits import MAX_NAMES, MAX_PAGE, MaxItems
 from algotrade_api.graphql.scalars import FeatureName
-from algotrade_api.graphql.types.chain import OptionChain
-from algotrade_api.graphql.types.event import Event
-from algotrade_api.graphql.types.feature import FeatureValue
-from algotrade_api.graphql.types.holdings import Holdings
-from algotrade_api.graphql.types.series import FeatureSeries, PriceSeries
+from algotrade_api.graphql.types.instruments.chain import OptionChain
+from algotrade_api.graphql.types.instruments.event import Event
+from algotrade_api.graphql.types.instruments.feature import FeatureValue
+from algotrade_api.graphql.types.instruments.holdings import Holdings
+from algotrade_api.graphql.types.instruments.series import FeatureSeries, PriceSeries
 
 
 @strawberry.type(

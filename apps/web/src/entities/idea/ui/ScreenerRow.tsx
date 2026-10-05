@@ -1,6 +1,7 @@
 /**
  * One screener in the priority list: its rank, name, where it comes from, its best finds and
- * how many tickers it qualified.
+ * how many tickers its run picked (both counted by the server over the whole run), or that it
+ * did not run for the session (and why).
  */
 import { Mono, Stack, Text } from '@algotrade/ui';
 
@@ -9,9 +10,15 @@ import type { ScreenerSummary } from '../model/idea';
 const score = (value: number | null) => (value === null ? '—' : value.toFixed(0));
 
 export function ScreenerRow({ screener, rank }: { screener: ScreenerSummary; rank: number }) {
-  const meta = [screener.user, screener.version === null ? null : `v${screener.version}`]
+  const meta = [screener.owner, screener.version === null ? null : `v${screener.version}`]
     .filter(Boolean)
     .join(' · ');
+  const finds =
+    screener.notRun !== null
+      ? 'Not run for this session'
+      : screener.top.length > 0
+        ? screener.top.map((t) => `${t.symbol} ${score(t.score)}`).join(' · ')
+        : 'No picks';
   return (
     <Stack direction="row" gap={3} align="center" justify="between">
       <Stack direction="row" gap={3} align="center">
@@ -23,17 +30,21 @@ export function ScreenerRow({ screener, rank }: { screener: ScreenerSummary; ran
               {meta}
             </Text>
           ) : null}
-          <Text size="xs" tone="secondary">
-            {screener.top.length > 0
-              ? screener.top.map((t) => `${t.symbol} ${score(t.score)}`).join(' · ')
-              : 'No picks'}
+          <Text
+            size="xs"
+            tone={screener.notRun !== null ? 'muted' : 'secondary'}
+            {...(screener.notRun === null ? {} : { title: screener.notRun })}
+          >
+            {finds}
           </Text>
         </Stack>
       </Stack>
       <Stack gap={0} align="end">
-        <Mono weight="medium">{screener.qualified}</Mono>
+        <Mono weight="medium" tone={screener.notRun !== null ? 'muted' : 'default'}>
+          {screener.notRun !== null ? '—' : screener.picked}
+        </Mono>
         <Text size="xs" tone="muted">
-          qualified
+          {screener.notRun !== null ? 'not run' : 'picked'}
         </Text>
       </Stack>
     </Stack>

@@ -244,11 +244,6 @@ purpose = "read-only queries for apps that show data (the API): one module per a
 contracts = ["Explore queries are read-only: no writers, no jobs (ADR 0024)"]
 
 [[dir]]
-path = "src/algotrade/services/explore/ideas"
-purpose = "the Ideas list (ADR 0029): one row per ticker over every rule screen's stored results, ranked by the user's screener priority"
-contracts = ["Explore queries are read-only: no writers, no jobs (ADR 0024)"]
-
-[[dir]]
 path = "src/algotrade/services/explore/screens"
 purpose = "read-only queries about rule screens: the screener configs with their latest run, and a screen's saved results for a session"
 contracts = ["Explore queries are read-only: no writers, no jobs (ADR 0024)"]
@@ -383,7 +378,17 @@ contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037
 
 [[dir]]
 path = "apps/api/algotrade_api/graphql/types"
-purpose = "GraphQL object types, one module per domain read object: fields mapped by one .of() classmethod, resolvers that call one loader or dataloader"
+purpose = "GraphQL object types, one module per domain read object, split by area (instruments/, screens/); here only the Query root and Session: fields mapped by one .of() classmethod, resolvers that call one loader or dataloader"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/graphql/types/instruments"
+purpose = "GraphQL types at instrument grain (mirrors services/read/instruments): Instrument, FeatureValue / FeatureInfo / Unknown and the instrument's detail objects"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/graphql/types/screens"
+purpose = "GraphQL types over stored screen results (mirrors services/read/screens): Screener, ScreenerRun, ScreenResult, Ideas, TableView"
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 # --------------------------------------------------------------------------- ingestion app

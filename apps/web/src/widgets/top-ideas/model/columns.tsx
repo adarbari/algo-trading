@@ -1,20 +1,31 @@
 /**
- * The top-ideas table's columns: rank, ticker, the screeners that picked it (by name; each opens
- * that screener's results),
- * the best decision, score, the screeners' stored display values (IV30, HV30,
- * IV / HV and the best put: a column appears only when some idea has a value for it), next
- * earnings, the closest expiry in days (flagged when earnings come first) and the watch-outs.
+ * The top-ideas table's columns: rank, ticker, the screeners that picked it (by name; each
+ * opens that screener's results), the best decision, score, the served facts for the session
+ * (next earnings, else when the last one was; days to the nearest expiry, flagged when the
+ * server says earnings come first; IV30), the screeners' stored display values (HV30, IV / HV
+ * and the best put) and the watch-outs. A fact or display-value column appears only when some
+ * idea has a value for it.
  */
 import {
   Button,
   Mono,
   Stack,
   StatusBadge,
+  Text,
   type DataTableColumn,
   type ValueFormat,
 } from '@algotrade/ui';
 
-import { DecisionBadge, type Idea } from '@/entities/idea';
+import { valueFormat } from '@/entities/feature';
+import {
+  DecisionBadge,
+  earningsBeforeExpiry,
+  factOf,
+  IDEA_FACTS,
+  type Idea,
+} from '@/entities/idea';
+
+import { dteReason, earningsCell, expiryDte, iv30, nextEarnings } from './facts';
 
 /** A display value a screener may store (`[columns]` or a criterion id), shown when present. */
 interface MetricColumn {
@@ -25,12 +36,6 @@ interface MetricColumn {
 }
 
 const METRIC_COLUMNS: readonly MetricColumn[] = [
-  {
-    key: 'iv30',
-    header: 'IV30',
-    description: '30-day implied volatility',
-    format: { kind: 'percent' },
-  },
   {
     key: 'hv30',
     header: 'HV30',
@@ -69,22 +74,82 @@ const METRIC_COLUMNS: readonly MetricColumn[] = [
   },
 ];
 
+/** A tooltip only when there is something to say (props are exact: no `title: undefined`). */
+const titled = (title: string | undefined) => (title === undefined ? {} : { title });
+
+/** The one display-column rule: a column is shown when some idea has a value for it. */
+export function anyValue(ideas: readonly Idea[], value: (idea: Idea) => unknown): boolean {
+  return ideas.some((idea) => value(idea) !== null && value(idea) !== undefined);
+}
+
 const numeric = (idea: Idea, key: string): number | null => {
   const value = idea.metrics[key];
   return typeof value === 'number' ? value : null;
 };
 
 function metricColumns(ideas: readonly Idea[]): DataTableColumn<Idea>[] {
-  return METRIC_COLUMNS.filter((m) => ideas.some((idea) => numeric(idea, m.key) !== null)).map(
-    (m) => ({
-      id: m.key,
-      header: m.header,
-      description: m.description,
-      value: (idea) => numeric(idea, m.key),
-      format: m.format,
-    }),
-  );
+  return METRIC_COLUMNS.filter((m) => anyValue(ideas, (idea) => numeric(idea, m.key))).map((m) => ({
+    id: m.key,
+    header: m.header,
+    description: m.description,
+    value: (idea) => numeric(idea, m.key),
+    format: m.format,
+  }));
 }
+
+/** IV30 as the server formats it (`info.format` of the first idea that has one). */
+function ivColumns(ideas: readonly Idea[]): DataTableColumn<Idea>[] {
+  const served = ideas.map((idea) => factOf(idea, IDEA_FACTS.iv30)).find((v) => v?.info);
+  if (!served || !anyValue(ideas, iv30)) return [];
+  return [
+    {
+      id: 'iv30',
+      header: 'IV30',
+      description: "30-day implied volatility (the VRP gate's: the lower of IBKR's and Cboe's)",
+      value: iv30,
+      format: valueFormat(served.info),
+    },
+  ];
+}
+
+const earningsColumn: DataTableColumn<Idea> = {
+  id: 'earnings',
+  header: 'Earnings',
+  description: 'The next earnings date; muted: none scheduled, when the last one was',
+  value: nextEarnings,
+  format: { kind: 'date', style: 'weekday' },
+  cell: ({ row }) => {
+    const shown = earningsCell(row);
+    return (
+      <Text size="sm" tone={shown.muted ? 'muted' : 'default'} {...titled(shown.title)}>
+        {shown.text}
+      </Text>
+    );
+  },
+};
+
+const dteColumn: DataTableColumn<Idea> = {
+  id: 'dte',
+  header: 'Expiry DTE',
+  description:
+    'Calendar days to the nearest listed expiry; flagged when earnings come on or before it',
+  value: expiryDte,
+  format: { kind: 'number' },
+  width: 'md',
+  cell: ({ row, formatted }) =>
+    earningsBeforeExpiry(row) ? (
+      <Stack direction="row" gap={2} align="center" justify="end">
+        <StatusBadge tone="warning" icon="alert" title="Earnings fall on or before this expiry">
+          Earnings first
+        </StatusBadge>
+        <Mono>{formatted.text}</Mono>
+      </Stack>
+    ) : (
+      <Mono tone={expiryDte(row) === null ? 'muted' : 'default'} {...titled(dteReason(row))}>
+        {formatted.text}
+      </Mono>
+    ),
+};
 
 const watchOutColumn: DataTableColumn<Idea> = {
   id: 'watch-out',
@@ -103,18 +168,6 @@ const watchOutColumn: DataTableColumn<Idea> = {
     </Stack>
   ),
 };
-
-/** The columns for these ideas (the display-value columns depend on what screeners stored). */
-export function ideaColumns(
-  ideas: readonly Idea[],
-  onOpenScreener: (screenerId: string) => void,
-): DataTableColumn<Idea>[] {
-  const base = BASE.map((column) =>
-    column.id === 'screeners' ? screenersColumn(onOpenScreener) : column,
-  );
-  const [front, back] = [base.slice(0, 6), base.slice(6)];
-  return [...front, ...metricColumns(ideas), ...back, watchOutColumn];
-}
 
 /** The screeners that picked the ticker, each a button to that screener's results. */
 const screenersColumn = (onOpenScreener: (screenerId: string) => void): DataTableColumn<Idea> => ({
@@ -142,7 +195,7 @@ const screenersColumn = (onOpenScreener: (screenerId: string) => void): DataTabl
   ),
 });
 
-const BASE: DataTableColumn<Idea>[] = [
+const FRONT: DataTableColumn<Idea>[] = [
   {
     id: 'rank',
     header: '#',
@@ -159,14 +212,9 @@ const BASE: DataTableColumn<Idea>[] = [
     mono: true,
     hideable: false,
   },
-  {
-    id: 'screeners',
-    header: 'Screeners',
-    description: 'Every screener that picked the ticker, highest priority first',
-    value: (idea) => idea.picks.length,
-    width: 'lg',
-    grow: true,
-  },
+];
+
+const DECISION: DataTableColumn<Idea>[] = [
   {
     id: 'decision',
     header: 'Decision',
@@ -181,30 +229,21 @@ const BASE: DataTableColumn<Idea>[] = [
     value: (idea) => idea.best.score,
     format: { kind: 'number', digits: 0 },
   },
-  {
-    id: 'earnings',
-    header: 'Earnings',
-    description: 'The next earnings date',
-    value: (idea) => idea.nextEarningsDate,
-    format: { kind: 'date', style: 'weekday' },
-  },
-  {
-    id: 'dte',
-    header: 'Expiry DTE',
-    description: 'Days to the closest listed expiry; flagged when earnings come on or before it',
-    value: (idea) => idea.closestExpiryDte,
-    format: { kind: 'number' },
-    width: 'md',
-    cell: ({ row, formatted }) =>
-      row.earningsBeforeExpiry ? (
-        <Stack direction="row" gap={2} align="center" justify="end">
-          <StatusBadge tone="warning" icon="alert" title="Earnings fall on or before this expiry">
-            Earnings first
-          </StatusBadge>
-          <Mono>{formatted.text}</Mono>
-        </Stack>
-      ) : (
-        <Mono tone={row.closestExpiryDte === null ? 'muted' : 'default'}>{formatted.text}</Mono>
-      ),
-  },
 ];
+
+/** The columns for these ideas (the IV and display-value columns depend on what is served). */
+export function ideaColumns(
+  ideas: readonly Idea[],
+  onOpenScreener: (screenerId: string) => void,
+): DataTableColumn<Idea>[] {
+  return [
+    ...FRONT,
+    screenersColumn(onOpenScreener),
+    ...DECISION,
+    earningsColumn,
+    dteColumn,
+    ...ivColumns(ideas),
+    ...metricColumns(ideas),
+    watchOutColumn,
+  ];
+}

@@ -41,6 +41,11 @@ regex = "todayIso\\("
 reason = "compare stored dates with `session.date` from the response, not the browser's today"
 allowed = ["src/shared/lib/date/", "src/entities/explore/model/freshness.ts", "src/entities/instrument/model/range.ts"]  # the wall clock itself, data freshness, chart range ends
 
+# Enabled in PR 5 (Ideas counts and best picks come from the server, over the whole run):
+[[pattern]]
+regex = "=== 'QUALIFIED'\\)\\.length|summarise\\("
+reason = "per-screener counts and top-N are population facts: ask for Ideas.screeners[].picked / .top, ScreenerRun.decisions"
+
 # Enabled in PR 6 (each listed expiry's days come with the chain: OptionExpiry.days):
 [[pattern]]
 regex = "daysBetween\\("
@@ -49,10 +54,6 @@ allowed = ["src/shared/lib/date/", "src/entities/explore/model/freshness.ts"]  #
 
 # ---------------------------------------------------------------------------- pending
 
-# pending, enable in PR 5 (Ideas counts come from the server):
-# [[pattern]]
-# regex = "=== 'QUALIFIED'\\)\\.length|summarise\\("
-# reason = "per-screener counts and top-N are population facts: ask for Ideas.screeners[].picked / ScreenerRun.decisions"
 
 # pending, enable in PR 7 (FeatureTable.total):
 # [[pattern]]

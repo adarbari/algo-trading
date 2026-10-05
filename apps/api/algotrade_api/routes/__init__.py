@@ -19,7 +19,6 @@ from algotrade_api.routes import (
 from algotrade_api.routes.authoring import preferences, screeners, user_features
 from algotrade_api.routes.preview import features as feature_check
 from algotrade_api.routes.preview import screeners as screen_preview
-from algotrade_api.routes.screens import ideas
 from algotrade_api.routes.screens import results as screen_results
 from algotrade_api.routes.screens import run as screen_run
 from algotrade_api.routes.screens import table as screen_table
@@ -41,7 +40,6 @@ ROUTERS: tuple[APIRouter, ...] = (
     screeners.router,
     preferences.router,
     screener_view.router,
-    ideas.router,
     backtests.router,
     configs.router,
     admin.router,

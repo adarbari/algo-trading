@@ -124,6 +124,23 @@ def test_an_older_partition_exists_and_is_ignored(stored: tuple[StoreWriter, Sto
     )
 
 
+def test_partition_prunes_columns_and_instruments(stored: tuple[StoreWriter, StoreReader]) -> None:
+    writer, reader = stored
+    rows = [{"instrument_id": i, "days_to_earnings": n, "next_earnings_date": None}
+            for i, n in (("EQ:AAA", 3), ("EQ:BBB", 5))]  # fmt: skip
+    write_rows(writer, EARNINGS, D2, rows)
+    ctx = open_for(reader, D2)
+    frame = partition(ctx, EARNINGS, ["days_to_earnings"], ["EQ:BBB"])
+    assert isinstance(frame, pd.DataFrame)
+    assert frame["instrument_id"].tolist() == ["EQ:BBB"]
+    assert "next_earnings_date" not in frame.columns
+    none = partition(ctx, EARNINGS, ["days_to_earnings"], ["EQ:ZZZ"])  # stored, none asked
+    assert isinstance(none, pd.DataFrame) and none.empty
+    assert partition(open_for(reader, date(2026, 10, 2)), EARNINGS, ["x"]) == Unknown(
+        UnknownCode.NO_PARTITION, f"{EARNINGS} has no partition for 2026-10-02"
+    )
+
+
 @pytest.mark.parametrize(
     "table", ["instruments/reference", "events/earnings", "holdings/etf", "instruments/description"]
 )

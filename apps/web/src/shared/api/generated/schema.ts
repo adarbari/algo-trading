@@ -400,23 +400,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/ideas": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Top */
-        get: operations["top_ideas_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/preferences/ideas": {
         parameters: {
             query?: never;
@@ -1235,94 +1218,6 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
-        };
-        /** Idea */
-        Idea: {
-            /** Closest Expiry Dte */
-            closest_expiry_dte: number | null;
-            /** Days To Earnings */
-            days_to_earnings: number | null;
-            /** Earnings Before Expiry */
-            earnings_before_expiry: boolean | null;
-            /** Instrument Id */
-            instrument_id: string;
-            /** Next Earnings Date */
-            next_earnings_date: string | null;
-            /** Picks */
-            picks: components["schemas"]["IdeaPick"][];
-            /** Rank */
-            rank: number;
-            /** Symbol */
-            symbol: string | null;
-        };
-        /** IdeaCriterion */
-        IdeaCriterion: {
-            /** Criterion Id */
-            criterion_id: string;
-            /** Distance */
-            distance: number | null;
-            /** Field */
-            field: string;
-            /** Outcome */
-            outcome: string;
-            /** Value */
-            value: number | string | null;
-        };
-        /** IdeaPick */
-        IdeaPick: {
-            /** Columns */
-            columns: {
-                [key: string]: unknown;
-            };
-            /** Config Id */
-            config_id: string;
-            /** Config Version */
-            config_version: number | null;
-            /** Criteria */
-            criteria: components["schemas"]["IdeaCriterion"][];
-            /** Criterion Values */
-            criterion_values: {
-                [key: string]: unknown;
-            };
-            /** Decision */
-            decision: string;
-            /** Flags */
-            flags: string[];
-            /** Reasons */
-            reasons: string;
-            /** Score */
-            score: number | null;
-            /**
-             * Session
-             * Format: date
-             */
-            session: string;
-            /** User */
-            user: string;
-        };
-        /** Ideas */
-        Ideas: {
-            /** Items */
-            items: components["schemas"]["Idea"][];
-            /** Priority */
-            priority: string[];
-            /** Screeners */
-            screeners: components["schemas"]["IdeaScreener"][];
-            /** Session */
-            session: string | null;
-            /** Total */
-            total: number;
-        };
-        /** IdeaScreener */
-        IdeaScreener: {
-            /** Config Id */
-            config_id: string;
-            /** Name */
-            name: string;
-            /** User */
-            user: string | null;
-            /** Version */
-            version: number | null;
         };
         /** IdeasPriority */
         IdeasPriority: {
@@ -3058,41 +2953,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Health"];
-                };
-            };
-        };
-    };
-    top_ideas_get: {
-        parameters: {
-            query?: {
-                /** @description default: the latest */
-                date?: string | null;
-                limit?: number;
-                /** @description default: the API's user (a label until auth) */
-                user?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Ideas"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

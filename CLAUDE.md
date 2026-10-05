@@ -72,7 +72,7 @@ purpose). The non-obvious cases:
 | A feature derived from a personal-use source (IBKR) | its group in `features/rollups/` with `licence="personal"` on each `Feature`; expression features over it inherit the licence (ADR 0028) |
 | Comparing our data with a live source (verification check) | `apps/ingestion/.../tasks/verification/` (`checks.py`) |
 | A read object or loader a page needs | `src/algotrade/services/read/<area>/` (`add-domain-object`) |
-| A GraphQL field | `apps/api/algotrade_api/graphql/types/<object>.py` (`add-graphql-field`) |
+| A GraphQL field | `apps/api/algotrade_api/graphql/types/<area>/<object>.py` (`add-graphql-field`) |
 | A REST write, job, live or file endpoint | `apps/api/algotrade_api/{routes,schemas}/` (`add-api-endpoint`); page reads stay in `services/explore/` only until their area moves (`docs/api/read-model.md`) |
 | Web: component / page / feature | see Web UI below and `docs/ui/architecture.md` |
 

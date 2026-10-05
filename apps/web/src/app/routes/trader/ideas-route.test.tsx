@@ -1,7 +1,7 @@
 /**
  * The Ideas panels against the app's real query client and the real hook (only HTTP is faked):
  * whatever the API answers, the panel ends in data, empty or error, never "Loading…" for good.
- * A first-run store answers 200 with no session (an older API answered 404).
+ * A first-run store answers `ideas: null` (nothing stored); a request error settles at once.
  */
 import { QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ToastProvider } from '@algotrade/ui';
 
-import { api } from '@/shared/api';
+import { gql, GraphQLRequestError } from '@/shared/api';
 import { IdeasPage } from '@/pages/trader-ideas';
 import { stubElementSize } from '@/shared/lib/testing';
 
@@ -17,10 +17,10 @@ import { createQueryClient } from '../../providers/query-client';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
-  return { ...actual, api: { GET: vi.fn() } };
+  return { ...actual, gql: vi.fn() };
 });
 
-const GET = vi.mocked(api.GET);
+const GQL = vi.mocked(gql);
 stubElementSize();
 
 function setup() {
@@ -41,15 +41,12 @@ function setup() {
 }
 
 beforeEach(() => {
-  GET.mockReset();
+  GQL.mockReset();
 });
 
 describe('the Ideas page with the real query client', () => {
   it('says no screener has run yet, with a link to Screeners, when nothing is stored', async () => {
-    GET.mockResolvedValue({
-      data: { session: null, priority: [], screeners: [], total: 0, items: [] },
-      response: new Response(null, { status: 200 }),
-    });
+    GQL.mockResolvedValue({ ideas: null });
     setup();
     expect(await screen.findByText(/No screener has run yet, so there/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Go to Screeners' })).toBeInTheDocument();
@@ -57,15 +54,14 @@ describe('the Ideas page with the real query client', () => {
     expect(screen.queryByText('Loading screeners…')).not.toBeInTheDocument();
   });
 
-  it('settles on the error state at once for a 404, without waiting on a retry', async () => {
-    GET.mockResolvedValue({
-      error: { detail: 'results/rule_screen: nothing stored' },
-      response: new Response(null, { status: 404 }),
-    });
+  it('settles on the error state at once for a request error, without waiting on a retry', async () => {
+    GQL.mockRejectedValue(
+      new GraphQLRequestError([{ message: 'no', extensions: { code: 'BAD_REQUEST' } }]),
+    );
     setup();
     expect(
       await screen.findByText('The ideas failed to load.', {}, { timeout: 500 }),
     ).toBeVisible();
-    expect(GET).toHaveBeenCalledTimes(1);
+    expect(GQL).toHaveBeenCalledTimes(1);
   });
 });
