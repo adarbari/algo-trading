@@ -19,9 +19,13 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        later one, e.g. a declared future ex-date), with ``event_date``; an
                        empty frame when there are none
 - ``instruments/shares``
-                       ``shares.share_facts``: every stored share-count fact FILED on or before
-                       the session (point in time by filing date), sorted by ``filed``;
-                       ``None`` when there is none
+                       ``shares.share_facts``: every stored share-count and financial (revenue,
+                       net income, diluted EPS) fact FILED on or before the session (point in
+                       time by filing date), sorted by ``filed``; ``None`` when there is none
+- ``instruments/reference``
+                       ``reference.instruments``: the snapshot the session sees, only
+                       ``instrument_id`` and ``security_type`` (read per session); ``None`` when
+                       there is none
 - ``rates/treasury``   ``rates.curve_as_rows``: the curve the session sees (latest on or before;
                        ``curve_date`` and ``pre_snapshot`` added); ``None`` when none is stored
 - ``volatility/ibkr_iv30``
@@ -50,6 +54,7 @@ from algotrade.data.events import events_by_event_date, stored_events
 from algotrade.data.prices import SessionBars, session_bars
 from algotrade.data.rates import TABLE as TREASURY
 from algotrade.data.rates import curve_as_rows
+from algotrade.data.reference import instruments
 from algotrade.data.rollups import rollup_rows
 from algotrade.data.shares import TABLE as SHARES
 from algotrade.data.shares import share_facts
@@ -164,6 +169,14 @@ def _events_by_date(table: str) -> Loader:
     return load
 
 
+def _security_types(reader: StoreReader, session: date) -> pd.DataFrame | None:
+    try:
+        frame = instruments(reader, session)
+    except MissingDataError:
+        return None
+    return frame[["instrument_id", "security_type"]] if "security_type" in frame.columns else None
+
+
 def _ibkr_vols(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
     frame = ibkr_iv30(reader, sessions_before(sessions[0], lookback), sessions[-1])
     return _Window(frame, _days(frame["session_date"]), need_session=True)
@@ -196,6 +209,7 @@ INPUTS: Mapping[str, Loader] = {
     "events/split": _events_by_date("events/split"),
     TREASURY: _partition(curve_as_rows),
     SHARES: _share_facts,
+    "instruments/reference": _partition(_security_types),
     IBKR_IV30: _ibkr_vols,
 }
 

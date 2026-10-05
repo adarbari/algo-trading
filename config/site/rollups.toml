@@ -46,6 +46,11 @@ min_provisional = 60     # sessions with an IBKR IV before the rank is shown (PR
 stale_days = 400         # shares whose period ended longer ago than this are STALE (no market cap);
                          # 10-Q filers report every ~3 months, 20-F filers once a year
 
+["financials@v1"]
+stale_days = 480         # the oldest TTM period ended longer ago than this: STALE (still shown, no P/E);
+                         # a 10-K-only or 20-F filer is up to ~15 months behind just before its next annual report
+history_days = 1100      # facts whose period ended earlier are not read (two TTMs need ~2.3 years)
+
 ["put_wing@v1"]          # the VRP scanner's short-put wing (docs/screeners/vrp-scanner.md);
                          # the DTE window and delta bands are part of v1: changing them is v2
 dte_target = 45          # target expiry: the one closest to this many calendar days ...
