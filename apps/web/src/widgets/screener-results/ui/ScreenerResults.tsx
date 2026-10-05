@@ -9,13 +9,14 @@ import {
   Button,
   Chip,
   DataTable,
+  Grid,
   Panel,
   SearchInput,
   Stack,
   Text,
   type DataTableSort,
 } from '@algotrade/ui';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { FeaturePicker } from '@/features/column-picker';
 import { byName, useFeatureCatalogue } from '@/entities/feature';
@@ -29,6 +30,7 @@ import {
   useScreenerView,
   useScreenTable,
   type ScreenChange,
+  type ScreenTable,
   type ScreenTableRow,
 } from '@/entities/screen';
 
@@ -37,8 +39,21 @@ import { resultColumns } from '../model/columns';
 export interface ScreenerResultsProps {
   /** The screener whose latest run is shown. */
   id: string;
-  /** Open a ticker in Explore. */
+  /** Open a ticker in Explore (Enter on the row under review). */
   onOpen: (symbol: string) => void;
+  /** The row under review (instrument id); null or not in the list: the first row. */
+  focusId: string | null;
+  /** The row under review changed (a click, or j / k and the arrows). */
+  onFocusChange: (row: ScreenTableRow) => void;
+  /** `c` on the row under review. */
+  onToggleCompare: (row: ScreenTableRow) => void;
+  /** `x` on the row under review: hide it for now. */
+  onDismiss: (row: ScreenTableRow) => void;
+  /** Instrument ids hidden for now. */
+  dismissed: ReadonlySet<string>;
+  onShowDismissed: () => void;
+  /** What to show beside the table for the row under review (its detail, chart, ...). */
+  renderDetail?: (focus: { row: ScreenTableRow; table: ScreenTable }) => ReactNode;
 }
 
 const SEARCH_DELAY_MS = 300;
@@ -59,7 +74,17 @@ const formatSort = (sort: DataTableSort | null): string | null =>
 
 const count = (n: number) => n.toLocaleString('en-US');
 
-export function ScreenerResults({ id, onOpen }: ScreenerResultsProps) {
+export function ScreenerResults({
+  id,
+  onOpen,
+  focusId,
+  onFocusChange,
+  onToggleCompare,
+  onDismiss,
+  dismissed,
+  onShowDismissed,
+  renderDetail,
+}: ScreenerResultsProps) {
   const view = useScreenerView(id);
   const save = useSaveScreenerView(id);
   const runner = useRunScreener(id);
@@ -110,11 +135,15 @@ export function ScreenerResults({ id, onOpen }: ScreenerResultsProps) {
   );
   const data = table.data;
   const tableColumns = useMemo(() => (data ? resultColumns(data, known) : []), [data, known]);
-  const rows: readonly ScreenTableRow[] = data?.page.items ?? [];
+  const rows = useMemo(
+    () => (data?.page.items ?? []).filter((row) => !dismissed.has(row.instrument_id)),
+    [data, dismissed],
+  );
+  const focusRow = rows.find((row) => row.instrument_id === focusId) ?? rows[0] ?? null;
   const noRun = table.isError && !data;
   const state = noRun ? 'empty' : table.isError && !data ? 'error' : 'ready';
 
-  return (
+  const results = (
     <Panel
       title="Results"
       description={
@@ -196,6 +225,10 @@ export function ScreenerResults({ id, onOpen }: ScreenerResultsProps) {
             setSort(next);
             persist({ sort: next });
           }}
+          activateOnClick={false}
+          activeRowId={focusRow?.instrument_id ?? null}
+          onActiveRowChange={onFocusChange}
+          rowKeys={{ c: onToggleCompare, x: onDismiss }}
           onRowActivate={(row) => {
             if (row.symbol) onOpen(row.symbol);
           }}
@@ -208,6 +241,11 @@ export function ScreenerResults({ id, onOpen }: ScreenerResultsProps) {
                   ? `${count(data.page.total)} of ${count(Object.values(data.decisions).reduce((a, b) => a + b, 0))} rows`
                   : 'Loading rows…'}
               </Text>
+              {dismissed.size > 0 ? (
+                <Button size="sm" variant="ghost" onClick={onShowDismissed}>
+                  {`${count(dismissed.size)} hidden · Show`}
+                </Button>
+              ) : null}
               <FeaturePicker
                 label="Add column"
                 icon="plus"
@@ -222,5 +260,12 @@ export function ScreenerResults({ id, onOpen }: ScreenerResultsProps) {
         />
       </Stack>
     </Panel>
+  );
+  if (!renderDetail) return results;
+  return (
+    <Grid columns="main-aside" gap={4} collapse="lg" align="start">
+      {results}
+      {data && focusRow ? renderDetail({ row: focusRow, table: data }) : null}
+    </Grid>
   );
 }

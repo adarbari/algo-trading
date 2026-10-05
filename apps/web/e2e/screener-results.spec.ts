@@ -41,8 +41,8 @@ for (const theme of ['dark', 'light'] as const) {
     }, theme);
     await expect(page.getByRole('heading', { level: 1, name: 'vrp_scanner' })).toBeVisible();
     await expect(page.getByText('Run 2026-10-02 · changes since 2026-10-01')).toBeVisible();
-    const dkng = grid(page).getByRole('row', { name: /DKNG/ });
-    await expect(dkng).toContainText('DraftKings Inc.');
+    const dkng = grid(page).getByRole('row', { name: /AAPL/ });
+    await expect(dkng).toContainText('Apple Inc.');
     await expect(dkng).toContainText('61.0%'); // IV30 in the catalogue's unit
     await expect(dkng).toContainText('new');
     // SOXS missed IV/HV within tolerance: its cell is tinted, the value is still text.
@@ -60,7 +60,7 @@ for (const theme of ['dark', 'light'] as const) {
 test('decision chips filter the run and the view is saved as yours', async ({ page }) => {
   const mock = await mockBuilderApi(page);
   await page.goto('/screeners/vrp_scanner');
-  await expect(grid(page).getByRole('row', { name: /DKNG/ })).toBeVisible();
+  await expect(grid(page).getByRole('row', { name: /AAPL/ })).toBeVisible();
   expect(mock.tables.at(-1)?.['decision']).toBe('QUALIFIED,WATCH,LIQUIDITY_RISK,EVENT_RISK');
   await page.getByRole('button', { name: /^Liquidity risk/ }).click();
   await expect
@@ -81,8 +81,51 @@ test('sorting is saved too, and a ticker opens in Explore', async ({ page }) => 
     .getByRole('button', { name: /^Score/ })
     .click();
   await expect.poll(() => mock.views.at(-1)?.view['sort']).toBe('-score');
-  await grid(page).getByRole('row', { name: /DKNG/ }).click();
-  await expect(page).toHaveURL(/\/explore\?.*focus=DKNG/);
+  await grid(page).getByRole('row', { name: /AAPL/ }).click();
+  await grid(page).press('Enter'); // a click reviews the row; Enter opens it
+  await expect(page).toHaveURL(/\/explore\?.*focus=AAPL/);
+});
+
+test('the row under review has its detail and chart beside the table, moved with j and k', async ({
+  page,
+}) => {
+  await mockBuilderApi(page);
+  await page.goto('/screeners/vrp_scanner');
+  const detail = page.getByRole('region', { name: 'AAPL', exact: true });
+  await expect(detail).toBeVisible(); // the first row is under review from the start
+  await expect(detail).toContainText('new since the previous run');
+  await expect(detail).toContainText('Passed');
+  await expect(page.getByRole('region', { name: /AAPL · price/ })).toBeVisible();
+  await grid(page).focus();
+  await page.keyboard.press('j'); // the focused grid starts on the first row; j moves on
+  await expect(page.getByRole('region', { name: 'SOXS', exact: true })).toContainText('Near miss');
+  await page.keyboard.press('k');
+  await expect(page.getByRole('region', { name: 'AAPL', exact: true })).toBeVisible();
+});
+
+test('c adds to the compare set, x hides a row for now, Enter opens Explore', async ({ page }) => {
+  await mockBuilderApi(page);
+  await page.goto('/screeners/vrp_scanner');
+  await grid(page).focus();
+  await page.keyboard.press('c'); // AAPL
+  await page.keyboard.press('j');
+  await page.keyboard.press('c'); // SOXS
+  await expect(page.getByRole('button', { name: 'Compare 2 in Explore' })).toBeVisible();
+  await page.keyboard.press('x'); // hide SOXS
+  await expect(grid(page).getByRole('row', { name: /SOXS/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '1 hidden · Show' })).toBeVisible();
+  await page.getByRole('button', { name: '1 hidden · Show' }).click();
+  await expect(grid(page).getByRole('row', { name: /SOXS/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Compare 2 in Explore' }).click();
+  await expect(page).toHaveURL(/\/explore\?.*sel=AAPL%2CSOXS/);
+});
+
+test('Enter on the row under review opens it in Explore', async ({ page }) => {
+  await mockBuilderApi(page);
+  await page.goto('/screeners/vrp_scanner');
+  await grid(page).focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/explore\?.*focus=AAPL/);
 });
 
 test('a screener with no run says so, and Run now runs it and shows the results', async ({
@@ -96,7 +139,7 @@ test('a screener with no run says so, and Run now runs it and shows the results'
   await page.getByRole('button', { name: 'Run now' }).click();
   await expect(page.getByText('Running for 2026-10-02…')).toBeVisible();
   await expect(page.getByText('Updated for 2026-10-02')).toBeVisible();
-  await expect(grid(page).getByRole('row', { name: /DKNG/ })).toBeVisible();
+  await expect(grid(page).getByRole('row', { name: /AAPL/ })).toBeVisible();
   expect(mock.runs).toEqual(['my-vrp']);
 });
 
