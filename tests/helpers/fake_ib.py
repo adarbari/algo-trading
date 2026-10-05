@@ -2,15 +2,53 @@
 
 It also has order and account methods (``placeOrder``, ``reqPositions``, ...) that record a
 call if ever reached: tests assert they never are (the facade's guard blocks them first).
+
+Historical requests can be scripted to go wrong like ``ib_async`` does (``faults``: per
+symbol, one fault per request in order): every fault returns an EMPTY bar list, as
+``ib_async`` does with ``RaiseRequestErrors`` off. ``"timeout"`` takes the request timeout
+(on ``clock``, which the facade reads); ``"pacing"`` emits error 162 pacing violation for the
+request, ``"no-data"`` IB's error 162 "query returned no data", ``"denied"`` error 162 "No
+market data permissions" (a retry cannot fix it), ``"1100"`` the connectivity
+loss (request id -1, then 1102 restored); ``"flap"`` the same loss but the bars still come.
 """
 
-from collections.abc import Mapping, Sequence
+import time
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from types import SimpleNamespace
 from typing import Any
 
 Bar = tuple[date, float, float, float, float, float]  # date, open, high, low, close, volume
+PACING = "Historical Market Data Service error message:Historical data request pacing violation"
+NO_DATA = "Historical Market Data Service error message:HMDS query returned no data: X@SMART"
+DENIED = "Historical Market Data Service error message:No market data permissions for X"
+ERROR_162 = {"pacing": PACING, "no-data": NO_DATA, "denied": DENIED}
+
+
+class FakeEvent:
+    """``ib_async``'s ``Event`` as far as the facade uses it: ``+=``, ``-=``, ``emit``."""
+
+    def __init__(self) -> None:
+        self.handlers: list[Callable[..., Any]] = []
+
+    def __iadd__(self, handler: Callable[..., Any]) -> "FakeEvent":
+        self.handlers.append(handler)
+        return self
+
+    def __isub__(self, handler: Callable[..., Any]) -> "FakeEvent":
+        self.handlers = [h for h in self.handlers if h != handler]
+        return self
+
+    def emit(self, *args: Any) -> None:
+        for handler in list(self.handlers):
+            handler(*args)
+
+
+class FakeBars(list[Any]):
+    """``ib_async.BarDataList``: a list of bars that knows its request id."""
+
+    reqId: int = 0  # noqa: N815
 
 
 @dataclass
@@ -48,12 +86,19 @@ class FakeIB:
     hv: Mapping[str, Sequence[Bar]] = field(default_factory=dict)  # HISTORICAL_VOLATILITY
     vols: Mapping[str, tuple[float, float]] = field(default_factory=dict)  # ticks 106, 104
     connect_error: Exception | None = None
+    faults: Mapping[str, list[str]] = field(default_factory=dict)  # symbol -> faults, in order
     calls: list[str] = field(default_factory=list)
     requests: list[dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.client = FakeClient(self.calls, self.connect_error)
         self._streams: list[SimpleNamespace] = []
+        self.errorEvent = FakeEvent()
+        self.skew = 0.0  # seconds a scripted timeout added to ``clock``
+
+    def clock(self) -> float:
+        """The monotonic clock plus the time scripted timeouts took (the facade's clock)."""
+        return time.monotonic() + self.skew
 
     # ---------------------------------------------------------------- market data
 
@@ -77,13 +122,29 @@ class FakeIB:
     def reqHistoricalData(self, contract: Any, **kwargs: Any) -> list[Any]:  # noqa: N802
         self.calls.append("reqHistoricalData")
         self.requests.append({"symbol": contract.symbol, **kwargs})
+        req_id = len(self.requests)
         table = {"OPTION_IMPLIED_VOLATILITY": self.iv, "HISTORICAL_VOLATILITY": self.hv}.get(
             kwargs["whatToShow"], self.bars
         )
-        return [
+        bars = FakeBars(
             SimpleNamespace(date=d, open=o, high=h, low=lo, close=c, volume=v)
             for d, o, h, lo, c, v in table.get(contract.symbol, ())
-        ]
+        )
+        bars.reqId = req_id
+        queue = self.faults.get(contract.symbol)
+        fault = queue.pop(0) if queue else None
+        if fault in ("1100", "flap"):
+            self.errorEvent.emit(-1, 1100, "Connectivity between IB and TWS has been lost.", None)
+            self.errorEvent.emit(-1, 1102, "Connectivity ... restored - data maintained.", None)
+            if fault == "flap":
+                return bars
+        elif fault == "timeout":
+            self.skew += float(kwargs.get("timeout") or 60.0)
+        elif fault in ERROR_162:
+            self.errorEvent.emit(req_id, 162, ERROR_162[fault], contract)
+        if fault is not None:
+            bars.clear()
+        return bars
 
     def reqMktData(self, contract: Any, ticks: str, snapshot: bool, regulatory: bool) -> Any:  # noqa: N802
         self.calls.append(f"reqMktData {ticks}")
