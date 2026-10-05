@@ -108,6 +108,12 @@ export function DrilldownPanel({ selected }: DrilldownPanelProps) {
           onRetry={() => void detail.refetch()}
           retrying={detail.isFetching}
         />
+      ) : !data ? (
+        <EmptyState
+          compact
+          title="Not a dataset of the grid"
+          description={`${cell.dataset} is not tracked for completeness.`}
+        />
       ) : (
         <Stack gap={4}>
           <StackedBar
@@ -116,8 +122,8 @@ export function DrilldownPanel({ selected }: DrilldownPanelProps) {
                 ? `Items of ${run.job}, ${weekday(cell.session)}`
                 : `Rows, ${weekday(cell.session)}`
             }
-            segments={statusSegments(detail.data, run)}
-            {...(run ? {} : data?.cell.expected ? { total: data.cell.expected } : {})}
+            segments={statusSegments(data, run)}
+            {...(run ? {} : data.cell.expected ? { total: data.cell.expected } : {})}
             emptyMessage="No rows or items recorded for this cell."
           />
           {isChains(cell.dataset) && (
@@ -138,12 +144,12 @@ export function DrilldownPanel({ selected }: DrilldownPanelProps) {
             <Text size="sm" tone="muted">
               Issues, grouped
             </Text>
-            {detail.data.groups.length === 0 ? (
+            {data.groups.length === 0 ? (
               <StatusBadge tone="positive" icon="check">
                 No issues recorded
               </StatusBadge>
             ) : (
-              detail.data.groups.map((g, i) => <Issue key={g.reason} group={g} open={i === 0} />)
+              data.groups.map((g, i) => <Issue key={g.reason} group={g} open={i === 0} />)
             )}
           </Stack>
           <Stack direction="row" gap={2} wrap>
@@ -155,7 +161,7 @@ export function DrilldownPanel({ selected }: DrilldownPanelProps) {
             >
               Open run record
             </Button>
-            <DownloadItemsButton runId={run?.run_id ?? null} />
+            <DownloadItemsButton runId={run?.runId ?? null} />
             <Tooltip content="Coming with the jobs API: the API is read-only for now.">
               {(props) => (
                 <Button {...props} variant="primary" icon="refresh" disabled>
@@ -164,7 +170,7 @@ export function DrilldownPanel({ selected }: DrilldownPanelProps) {
               )}
             </Tooltip>
           </Stack>
-          <RunRecordDrawer runId={run?.run_id ?? null} open={drawer} onOpenChange={setDrawer} />
+          <RunRecordDrawer runId={run?.runId ?? null} open={drawer} onOpenChange={setDrawer} />
         </Stack>
       )}
     </Panel>

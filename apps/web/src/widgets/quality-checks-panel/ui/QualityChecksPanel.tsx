@@ -1,4 +1,7 @@
-/** The latest data-quality checks (PASS / WARN / FAIL) with what each measured, in a table. */
+/**
+ * The latest session's data-quality checks (PASS / WARN / FAIL) with what each measured, in a
+ * table; the session's NOT_RUN reason when it has no data-quality run.
+ */
 import {
   DataTable,
   EmptyState,
@@ -9,7 +12,6 @@ import {
   type DataTableColumn,
 } from '@algotrade/ui';
 
-import { ApiError } from '@/shared/api';
 import { RunStatusBadge, useQualityChecks, type QualityCheck } from '@/entities/run';
 
 const RANK: Record<string, number> = { FAIL: 0, WARN: 1, PASS: 2 };
@@ -36,26 +38,20 @@ const COLUMNS: DataTableColumn<QualityCheck>[] = [
 
 export function QualityChecksPanel() {
   const quality = useQualityChecks();
-  const report = quality.data;
-  const title = report
-    ? `Quality checks · ${formatValue(report.session, { kind: 'date', style: 'weekday' }).text}`
+  const served = quality.data;
+  const report = served && !served.unknown ? served : null;
+  const title = served
+    ? `Quality checks · ${formatValue(served.session, { kind: 'date', style: 'weekday' }).text}`
     : 'Quality checks';
-  const missing = quality.error instanceof ApiError && quality.error.status === 404;
   return (
     <Panel
       title={title}
-      description={report && `run ${report.status}`}
-      actions={report && <RunStatusBadge status={report.status} />}
+      description={report?.status ? `run ${report.status}` : undefined}
+      actions={report?.status && <RunStatusBadge status={report.status} />}
       flush={Boolean(report)}
     >
       {quality.isPending ? (
         <Skeleton variant="table" rows={5} columns={3} label="Loading quality checks…" />
-      ) : missing ? (
-        <EmptyState
-          compact
-          title="No quality checks yet"
-          description="The nightly run records them after ingesting a session."
-        />
       ) : quality.isError ? (
         <ErrorState
           compact
@@ -64,14 +60,24 @@ export function QualityChecksPanel() {
           onRetry={() => void quality.refetch()}
           retrying={quality.isFetching}
         />
+      ) : !report ? (
+        <EmptyState
+          compact
+          title="No quality checks for this session"
+          description={
+            served?.unknown
+              ? `${served.unknown.detail}. The nightly run records them after ingesting a session.`
+              : 'The nightly run records them after ingesting a session.'
+          }
+        />
       ) : (
         <DataTable
           label="Quality checks"
           columns={COLUMNS}
-          rows={report?.checks ?? []}
+          rows={report.checks}
           getRowId={(c) => c.name}
           defaultSort={{ columnId: 'status', direction: 'asc' }}
-          visibleRows={Math.max(report?.checks.length ?? 0, 3)}
+          visibleRows={Math.max(report.checks.length, 3)}
           emptyMessage="The run recorded no checks."
         />
       )}

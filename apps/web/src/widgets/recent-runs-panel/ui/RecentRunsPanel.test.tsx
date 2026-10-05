@@ -4,24 +4,28 @@ import axe from 'axe-core';
 import type { ReactNode } from 'react';
 import { afterAll, beforeAll, expect, vi } from 'vitest';
 
-import { api, TestQueryProvider } from '@/shared/api';
+import { gql, TestQueryProvider } from '@/shared/api';
 
 vi.mock('@/shared/api', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  api: { GET: vi.fn() },
+  gql: vi.fn(),
 }));
 
-/** Answers `api.GET(path)` from `routes` (a missing path is a 404, `null` an error 500). */
-function serve(routes: Record<string, unknown>) {
-  vi.mocked(api.GET).mockImplementation(((path: string) => {
-    const data = routes[path];
-    const status = data === undefined ? 404 : data === null ? 500 : 200;
-    return Promise.resolve(
-      status === 200
-        ? { data, response: new Response(null, { status }) }
-        : { error: { detail: `failed ${path}` }, response: new Response(null, { status }) },
-    );
-  }) as never);
+/** A `serve` value: the operation fails (an HTTP or GraphQL error). */
+const FAIL = Symbol('fail');
+
+/**
+ * Answers `gql(document)` with `fields[<the operation's Query field>]`: a missing field is
+ * null (nothing stored, no such thing), `FAIL` an error.
+ */
+function serve(fields: Record<string, unknown>) {
+  vi.mocked(gql).mockImplementation((document: unknown) => {
+    const field = /\{\s*(\w+)/.exec(String(document))?.[1] ?? '';
+    const data = fields[field];
+    return data === FAIL
+      ? Promise.reject(new Error(`${field} failed`))
+      : Promise.resolve({ [field]: data ?? null });
+  });
 }
 
 function renderWith(ui: ReactNode) {
@@ -59,21 +63,21 @@ import { describe, it } from 'vitest';
 
 import { RecentRunsPanel } from './RecentRunsPanel';
 
-const step = (name: string, status: string, duration_s: number) => ({
+const step = (name: string, status: string, durationS: number) => ({
   name,
   status,
-  duration_s,
+  durationS,
   reason: null,
   error: null,
   counts: {},
 });
-const run = (run_id: string, started_at: string, duration_s: number, chains: number) => ({
-  run_id,
+const run = (runId: string, startedAt: string, durationS: number, chains: number) => ({
+  runId,
   session: '2026-10-02',
   status: 'partial',
-  started_at,
-  finished_at: null,
-  duration_s,
+  startedAt,
+  finishedAt: null,
+  durationS,
   steps: [step('chains', 'PARTIAL', chains), step('earnings', 'COMPLETE', 84)],
   problems: ['steps not complete: chains'],
 });
@@ -81,7 +85,7 @@ const run = (run_id: string, started_at: string, duration_s: number, chains: num
 describe('RecentRunsPanel', () => {
   it('lists runs and shows the timing of the chosen one', async () => {
     serve({
-      '/admin/runs/nightly': [
+      nightlyRuns: [
         run('n2', '2026-10-03T13:26:00Z', 1560, 1237),
         run('n1', '2026-10-03T11:01:00Z', 332, 18.5),
       ],
@@ -102,7 +106,7 @@ describe('RecentRunsPanel', () => {
   });
 
   it('says when there are no runs', async () => {
-    serve({ '/admin/runs/nightly': [] });
+    serve({ nightlyRuns: [] });
     renderWith(<RecentRunsPanel />);
     expect(await screen.findByText('No nightly runs yet')).toBeInTheDocument();
   });

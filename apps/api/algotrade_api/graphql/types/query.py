@@ -2,9 +2,11 @@
 argument (default: the latest with bars), opens the request's read context for it once
 (``info.context.read``) and hands it to the objects it returns (ADR 0036: every value below
 is for exactly that session). Fields over configs and run records (the catalogue, configs,
-backtests, the user's screens) are not session data: they take no ``date`` and read the
-request's session-free context (``info.context.stores()``), so they answer on a store with no
-market data yet."""
+backtests, the user's screens, the nightly runs and run records) are not session data: they
+take no ``date`` and read the request's session-free context (``info.context.stores()``), so
+they answer on a store with no market data yet. The Admin reads about a session (its quality
+checks and verification, the completeness window ending at it, one completeness cell, the
+review lists over its reference snapshot) take ``date`` like any other."""
 
 import datetime as dt
 from typing import Annotated
@@ -15,7 +17,7 @@ from strawberry.types import Info
 
 from algotrade.services.read.instruments import catalogue, distribution, identity
 from algotrade.services.read.instruments import table as tables
-from algotrade.services.read.ops import backtests, configs
+from algotrade.services.read.ops import backtests, configs, ingestion, quality, review, runs
 from algotrade.services.read.screens import documents, ideas, screeners, views
 from algotrade_api.graphql.context import RequestContext
 from algotrade_api.graphql.limits import MAX_NAMES, MAX_PAGE, MaxItems
@@ -26,6 +28,10 @@ from algotrade_api.graphql.types.instruments.instrument import Instrument
 from algotrade_api.graphql.types.instruments.table import FeatureTable
 from algotrade_api.graphql.types.ops.backtest import Backtest, BacktestDetail
 from algotrade_api.graphql.types.ops.config import Config
+from algotrade_api.graphql.types.ops.ingestion import CellDetail, Completeness
+from algotrade_api.graphql.types.ops.quality import QualityReport, Verification
+from algotrade_api.graphql.types.ops.review import ReviewList
+from algotrade_api.graphql.types.ops.run import NightlyRun, RunDetail, RunItem
 from algotrade_api.graphql.types.screens.document import ScreenDetail, ScreenListing, ScreenVersion
 from algotrade_api.graphql.types.screens.ideas import Ideas
 from algotrade_api.graphql.types.screens.screener import Screener
@@ -40,6 +46,8 @@ Day = Annotated[
     ),
 ]
 Ctx = Info[RequestContext, None]
+MAX_RUNS = 100  # nightlyRuns(limit)
+MAX_SESSIONS = 60  # completeness(sessions)
 
 
 @strawberry.type(description="Reads for the web app, each for one session (ADR 0036)")
@@ -213,3 +221,100 @@ class Query:
         ctx = info.context.stores()
         found = documents.load_screen_versions(ctx, screener_id) if ctx is not None else ()
         return [ScreenVersion.of(v) for v in found]
+
+    # ---------------------------------------------------------------- Admin (read-model PR 10)
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The `limit` most recent nightly session runs, newest first",
+        extensions=[MaxItems("limit", MAX_RUNS)],
+    )
+    def nightly_runs(self, info: Ctx, limit: int = 10) -> list[NightlyRun]:
+        ctx = info.context.stores()
+        found = runs.load_nightly_runs(ctx, limit) if ctx is not None else ()
+        return [NightlyRun.of(r) for r in found]
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The run record `runId` (any job): items summarised, failures grouped by "
+        "reason; null: no such run"
+    )
+    def run(self, info: Ctx, run_id: str) -> RunDetail | None:
+        ctx = info.context.stores()
+        found = runs.load_run(ctx, run_id) if ctx is not None else None
+        return RunDetail.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="Every item of the run `runId` with its status, by key; null: no such run"
+    )
+    def run_items(self, info: Ctx, run_id: str) -> list[RunItem] | None:
+        ctx = info.context.stores()
+        found = runs.load_run_items(ctx, run_id) if ctx is not None else None
+        return [RunItem.of(i) for i in found] if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The session's data-quality checks (NOT_RUN when it has no data-quality "
+        "run); null: nothing stored"
+    )
+    def quality(self, info: Ctx, date: Day = None) -> QualityReport | None:
+        ctx = info.context.read(date)
+        found = quality.load_quality(ctx) if ctx is not None else None
+        return QualityReport.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The session's live verification vs IBKR (NO_PARTITION when it did not "
+        "run for the session); null: nothing stored"
+    )
+    async def verification(self, info: Ctx, date: Day = None) -> Verification | None:
+        ctx = info.context.read(date)
+        # Off the event loop: a parquet read and a group-by.
+        found = (
+            await to_thread.run_sync(quality.load_verification, ctx) if ctx is not None else None
+        )
+        return Verification.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="Ingestion completeness: every dataset x the last `sessions` exchange "
+        "sessions ending at the session; null: nothing stored",
+        extensions=[MaxItems("sessions", MAX_SESSIONS)],
+    )
+    async def completeness(
+        self, info: Ctx, sessions: int = 10, date: Day = None
+    ) -> Completeness | None:
+        ctx = info.context.read(date)
+        # Off the event loop: one partition read per dataset and session of the window.
+        found = (
+            await to_thread.run_sync(ingestion.load_completeness, ctx, sessions)
+            if ctx is not None
+            else None
+        )
+        return Completeness.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="One completeness cell, `dataset` on the session `date`, with the reasons "
+        "behind it; null: a dataset the grid does not list"
+    )
+    async def ingestion_cell(self, info: Ctx, dataset: str, date: dt.date) -> CellDetail | None:
+        ctx = info.context.read(date)
+        found = (
+            await to_thread.run_sync(ingestion.load_cell_detail, ctx, dataset)
+            if ctx is not None
+            else None
+        )
+        return CellDetail.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="Listings marked for FIGI review (the universe build's list on or before "
+        "the session, else its reference snapshot); null: nothing stored"
+    )
+    def figi_review(self, info: Ctx, date: Day = None) -> ReviewList | None:
+        ctx = info.context.read(date)
+        found = review.load_figi_review(ctx) if ctx is not None else None
+        return ReviewList.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="Active ETFs in the session's reference snapshot whose leverage the rules "
+        "could not classify; null: nothing stored"
+    )
+    def leverage_review(self, info: Ctx, date: Day = None) -> ReviewList | None:
+        ctx = info.context.read(date)
+        found = review.load_leverage_review(ctx) if ctx is not None else None
+        return ReviewList.of(found) if found is not None else None

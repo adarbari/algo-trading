@@ -1,7 +1,7 @@
 # REST GET allow-list (ADR 0037; docs/api/read-model.md "What stays REST"). SHRINK-ONLY.
 #
 # Page reads move to GraphQL (POST /graphql) over the read model; REST keeps writes, job
-# polling, health, live quotes, the preview POSTs, files and (until read-model PR 10) admin.
+# polling, health, live quotes, the preview POSTs and files (admin moved in read-model PR 10).
 # Every GET route the API serves must be listed here, and the list may only get shorter:
 #
 #   - tests/architecture/api/test_rest_allowlist.py::test_rest_get_routes_are_allowlisted fails on a GET
@@ -19,7 +19,7 @@
 #   keep       true: stays REST by design (health, job polling, live quotes); false: retires
 #   retire_in  the read-model PR that moves it to GraphQL and removes this entry
 
-max_get_routes = 16
+max_get_routes = 7
 
 # ---------------------------------------------------------------------------- stays REST
 
@@ -66,59 +66,3 @@ method = "GET"
 path = "/preferences/screeners/{screener_id}/view"
 keep = false
 retire_in = "PR 8"
-
-# ---------------------------------------------------------------------------- PR 10: admin
-
-[[route]]
-method = "GET"
-path = "/admin/runs/nightly"
-keep = false
-retire_in = "PR 10"
-
-[[route]]
-method = "GET"
-path = "/admin/runs/{run_id}"
-keep = false
-retire_in = "PR 10"
-
-[[route]]
-method = "GET"
-path = "/admin/runs/{run_id}/items"
-keep = false
-retire_in = "PR 10"
-
-[[route]]
-method = "GET"
-path = "/admin/review/figi"
-keep = false
-retire_in = "PR 10"
-
-[[route]]
-method = "GET"
-path = "/admin/review/leveraged"
-keep = false
-retire_in = "PR 10"
-
-[[route]]
-method = "GET"
-path = "/admin/ingestion/completeness"
-keep = false
-retire_in = "PR 10"
-
-[[route]]
-method = "GET"
-path = "/admin/ingestion/{dataset}/{session}"
-keep = false
-retire_in = "PR 10"
-
-[[route]]
-method = "GET"
-path = "/admin/quality"
-keep = false
-retire_in = "PR 10"
-
-[[route]]
-method = "GET"
-path = "/admin/verification/ibkr"
-keep = false
-retire_in = "PR 10"

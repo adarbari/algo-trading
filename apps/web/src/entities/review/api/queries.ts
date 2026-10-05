@@ -1,18 +1,45 @@
-/** Read hooks for the owner's review lists: FIGI conflicts and leveraged ETFs to curate. */
+/**
+ * Read hooks for the owner's review lists over GraphQL (`Query.{figiReview,leverageReview}`;
+ * ADR 0037): FIGI conflicts and leveraged ETFs to curate, for the latest session's snapshot.
+ */
 import { useQuery } from '@tanstack/react-query';
 
-import { api, queryKeys, unwrap } from '@/shared/api';
+import { gql, graphql, queryKeys } from '@/shared/api';
 
+const FigiReview = graphql(`
+  query FigiReview {
+    figiReview {
+      session
+      source
+      items
+    }
+  }
+`);
+
+const LeverageReview = graphql(`
+  query LeverageReview {
+    leverageReview {
+      session
+      source
+      items
+    }
+  }
+`);
+
+/** Null: nothing stored. */
 export function useFigiReview() {
   return useQuery({
-    queryKey: queryKeys.admin.figiReview(),
-    queryFn: () => unwrap(api.GET('/admin/review/figi')),
+    queryKey: queryKeys.gql('FigiReview', {}),
+    queryFn: () => gql(FigiReview, {}),
+    select: (data) => data.figiReview,
   });
 }
 
+/** Null: nothing stored. */
 export function useLeveragedReview() {
   return useQuery({
-    queryKey: queryKeys.admin.leveragedReview(),
-    queryFn: () => unwrap(api.GET('/admin/review/leveraged')),
+    queryKey: queryKeys.gql('LeverageReview', {}),
+    queryFn: () => gql(LeverageReview, {}),
+    select: (data) => data.leverageReview,
   });
 }

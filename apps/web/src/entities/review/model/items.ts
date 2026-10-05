@@ -3,9 +3,16 @@ import type { ReviewItem, ReviewList } from './types';
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
 
-export function reviewItems(list: ReviewList): ReviewItem[] {
-  return list.items.map((row) => ({
-    symbol: text(row['symbol']) || text(row['instrument_id']),
-    detail: text(row['note']) || text(row['name']),
-  }));
+function record(value: unknown): Readonly<Record<string, unknown>> {
+  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
+}
+
+export function reviewItems(list: ReviewList | null | undefined): ReviewItem[] {
+  return (list?.items ?? []).map((item) => {
+    const row = record(item);
+    return {
+      symbol: text(row['symbol']) || text(row['instrument_id']),
+      detail: text(row['note']) || text(row['name']),
+    };
+  });
 }

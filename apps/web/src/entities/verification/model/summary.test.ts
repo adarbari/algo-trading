@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { failedShare, failingChecks, statusCounts } from './summary';
+import { failedShare, failingChecks, statusCounts, toVerification } from './summary';
 import type { Verification } from './types';
 
 // Shaped like the real run of 2026-10-02 (6 instruments, 2 FAIL on the low).
 const run: Verification = {
   session: '2026-10-02',
-  run_ids: ['verify_ibkr-2026-10-02-20261003T183522Z'],
+  runIds: ['verify_ibkr-2026-10-02-20261003T183522Z'],
   instruments: 6,
   counts: { PASS: 42, WARN: 0, FAIL: 2, NA: 12 },
-  by_check: [{ check: 'low', counts: { PASS: 2, WARN: 0, FAIL: 2, NA: 0 } }],
+  byCheck: [{ check: 'low', counts: { PASS: 2, WARN: 0, FAIL: 2, NA: 0 } }],
   failing: [
     {
       instrument_id: 'EQ:BBG000BDTBL9',
@@ -23,9 +23,23 @@ const run: Verification = {
       note: 'rel diff; worst session 2025-12-22 of 260 compared',
     },
   ],
+  unknown: null,
 };
 
 describe('verification summary', () => {
+  it('narrows the served JSON to records, dropping what is not a count', () => {
+    const served = {
+      ...run,
+      counts: { PASS: 1, FAIL: 'x' },
+      byCheck: [{ check: 'low', counts: null }],
+      failing: [run.failing[0], 'not a row'],
+    };
+    const v = toVerification(served);
+    expect(v.counts).toEqual({ PASS: 1 });
+    expect(v.byCheck).toEqual([{ check: 'low', counts: {} }]);
+    expect(v.failing).toEqual([run.failing[0], {}]);
+  });
+
   it('counts statuses and the failed share of graded checks', () => {
     expect(statusCounts({ ...run, counts: { PASS: 1 } })).toEqual({
       PASS: 1,

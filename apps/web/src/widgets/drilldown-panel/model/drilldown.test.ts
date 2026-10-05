@@ -6,20 +6,20 @@ import type { RunDetail } from '@/entities/run';
 import { examplesText, fetchTiers, primaryRun, statusSegments } from './drilldown';
 
 const run = (
-  run_id: string,
+  runId: string,
   job: string,
-  items_total: number,
+  itemsTotal: number,
   extra: Partial<RunDetail> = {},
 ): RunDetail => ({
-  run_id,
+  runId,
   job,
   session: '2026-10-02',
   status: 'partial',
-  started_at: '2026-10-03T09:35:02Z',
-  finished_at: '2026-10-03T09:55:00Z',
-  duration_s: 1198,
-  items_total,
-  items_by_status: { OK: 3624, STALE_DATA: 515, NO_CHAIN: 63 },
+  startedAt: '2026-10-03T09:35:02Z',
+  finishedAt: '2026-10-03T09:55:00Z',
+  durationS: 1198,
+  itemsTotal,
+  itemsByStatus: { OK: 3624, STALE_DATA: 515, NO_CHAIN: 63 },
   failures: [],
   stats: {},
   ...extra,
@@ -33,7 +33,7 @@ const detail: CellDetail = {
     present: 3623,
     expected: 4203,
     basis: 'optionable universe, fetch OK',
-    run_ids: [],
+    runIds: [],
   },
   job: 'option_chains',
   groups: [],
@@ -46,8 +46,8 @@ const detail: CellDetail = {
 
 describe('drill-down model', () => {
   it('explains the cell with the latest run of its job that has items', () => {
-    expect(primaryRun(detail)?.run_id).toBe('chains-1');
-    expect(primaryRun({ ...detail, job: 'other' })?.run_id).toBe('chains-2');
+    expect(primaryRun(detail)?.runId).toBe('chains-1');
+    expect(primaryRun({ ...detail, job: 'other' })?.runId).toBe('chains-2');
   });
 
   it('splits the run items by status, else present vs missing rows', () => {

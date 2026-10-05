@@ -1,5 +1,5 @@
 /**
- * The latest live verification vs IBKR: checks by status (a StackedBar), the failing checks
+ * The latest session's live verification vs IBKR: checks by status (a StackedBar), the failing checks
  * (ours vs IBKR's value, the difference and tolerance), and the counts per check on demand.
  */
 import {
@@ -16,7 +16,6 @@ import {
   type DataTone,
 } from '@algotrade/ui';
 
-import { ApiError } from '@/shared/api';
 import { RunStatusBadge } from '@/entities/run';
 import {
   failedShare,
@@ -79,14 +78,14 @@ const BY_CHECK: DataTableColumn<CheckCounts>[] = [
 
 export function VerificationPanel() {
   const verification = useVerification();
-  const v = verification.data;
-  const missing = verification.error instanceof ApiError && verification.error.status === 404;
+  const served = verification.data;
+  const v = served && !served.unknown ? served : null;
   const share = v ? failedShare(v) : null;
   return (
     <Panel
       title={
-        v
-          ? `Verification vs IBKR · ${formatValue(v.session, { kind: 'date', style: 'weekday' }).text}`
+        served
+          ? `Verification vs IBKR · ${formatValue(served.session, { kind: 'date', style: 'weekday' }).text}`
           : 'Verification vs IBKR'
       }
       description={
@@ -96,12 +95,6 @@ export function VerificationPanel() {
     >
       {verification.isPending ? (
         <Skeleton lines={4} label="Loading the verification…" />
-      ) : missing ? (
-        <EmptyState
-          compact
-          title="No verification run yet"
-          description="The nightly verify step compares a sample with IBKR when IB Gateway is reachable."
-        />
       ) : verification.isError ? (
         <ErrorState
           compact
@@ -110,7 +103,13 @@ export function VerificationPanel() {
           onRetry={() => void verification.refetch()}
           retrying={verification.isFetching}
         />
-      ) : v ? (
+      ) : !v ? (
+        <EmptyState
+          compact
+          title="No verification for this session"
+          description="The nightly verify step compares a sample with IBKR when IB Gateway is reachable."
+        />
+      ) : (
         <Stack gap={4}>
           <StackedBar
             label="Verification checks by status"
@@ -139,18 +138,18 @@ export function VerificationPanel() {
           )}
           <Disclosure
             label="Checks by status"
-            count={formatValue(v.by_check.length, { kind: 'number' }).text}
+            count={formatValue(v.byCheck.length, { kind: 'number' }).text}
           >
             <DataTable
               label="Verification checks by status"
               columns={BY_CHECK}
-              rows={v.by_check}
+              rows={v.byCheck}
               getRowId={(c) => c.check}
-              visibleRows={Math.min(v.by_check.length, 12)}
+              visibleRows={Math.min(v.byCheck.length, 12)}
             />
           </Disclosure>
         </Stack>
-      ) : null}
+      )}
     </Panel>
   );
 }

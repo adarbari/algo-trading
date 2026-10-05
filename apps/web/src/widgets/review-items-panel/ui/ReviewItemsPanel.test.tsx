@@ -4,24 +4,28 @@ import axe from 'axe-core';
 import type { ReactNode } from 'react';
 import { afterAll, beforeAll, expect, vi } from 'vitest';
 
-import { api, TestQueryProvider } from '@/shared/api';
+import { gql, TestQueryProvider } from '@/shared/api';
 
 vi.mock('@/shared/api', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  api: { GET: vi.fn() },
+  gql: vi.fn(),
 }));
 
-/** Answers `api.GET(path)` from `routes` (a missing path is a 404, `null` an error 500). */
-function serve(routes: Record<string, unknown>) {
-  vi.mocked(api.GET).mockImplementation(((path: string) => {
-    const data = routes[path];
-    const status = data === undefined ? 404 : data === null ? 500 : 200;
-    return Promise.resolve(
-      status === 200
-        ? { data, response: new Response(null, { status }) }
-        : { error: { detail: `failed ${path}` }, response: new Response(null, { status }) },
-    );
-  }) as never);
+/** A `serve` value: the operation fails (an HTTP or GraphQL error). */
+const FAIL = Symbol('fail');
+
+/**
+ * Answers `gql(document)` with `fields[<the operation's Query field>]`: a missing field is
+ * null (nothing stored, no such thing), `FAIL` an error.
+ */
+function serve(fields: Record<string, unknown>) {
+  vi.mocked(gql).mockImplementation((document: unknown) => {
+    const field = /\{\s*(\w+)/.exec(String(document))?.[1] ?? '';
+    const data = fields[field];
+    return data === FAIL
+      ? Promise.reject(new Error(`${field} failed`))
+      : Promise.resolve({ [field]: data ?? null });
+  });
 }
 
 function renderWith(ui: ReactNode) {
@@ -62,12 +66,12 @@ import { ReviewItemsPanel } from './ReviewItemsPanel';
 describe('ReviewItemsPanel', () => {
   it('counts each list and shows its items on demand', async () => {
     serve({
-      '/admin/review/figi': {
+      figiReview: {
         session: '2026-10-02',
         source: 'universe_build',
         items: [{ symbol: 'MMED', note: 'FIGI shared with MMEDV' }],
       },
-      '/admin/review/leveraged': { session: '2026-10-02', source: 'reference', items: [] },
+      leverageReview: { session: '2026-10-02', source: 'reference', items: [] },
     });
     const { container } = renderWith(<ReviewItemsPanel />);
     const figi = await screen.findByRole('button', { name: /FIGI reviews/ });
@@ -79,8 +83,8 @@ describe('ReviewItemsPanel', () => {
 
   it('shows a list that failed to load', async () => {
     serve({
-      '/admin/review/figi': null,
-      '/admin/review/leveraged': { session: null, source: 'x', items: [] },
+      figiReview: FAIL,
+      leverageReview: { session: null, source: 'x', items: [] },
     });
     renderWith(<ReviewItemsPanel />);
     expect(await screen.findByRole('alert')).toHaveTextContent('FIGI reviews could not load.');

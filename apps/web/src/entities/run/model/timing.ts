@@ -10,14 +10,14 @@ export interface StepTiming {
 }
 
 export function stepTimings(run: NightlyRun): StepTiming[] {
-  const steps = run.steps.filter((s) => s.duration_s !== null);
-  const total = steps.reduce((sum, s) => sum + (s.duration_s ?? 0), 0);
+  const steps = run.steps.filter((s) => s.durationS !== null);
+  const total = steps.reduce((sum, s) => sum + (s.durationS ?? 0), 0);
   return steps
     .map((s) => ({
       name: s.name,
       status: s.status,
-      durationS: s.duration_s ?? 0,
-      share: total > 0 ? (s.duration_s ?? 0) / total : 0,
+      durationS: s.durationS ?? 0,
+      share: total > 0 ? (s.durationS ?? 0) / total : 0,
     }))
     .sort((a, b) => b.durationS - a.durationS || a.name.localeCompare(b.name));
 }

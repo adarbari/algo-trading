@@ -20,8 +20,10 @@ const weekday = (day: string) => formatValue(day, { kind: 'date', style: 'weekda
 const count = (n: number) => formatValue(n, { kind: 'number' }).text;
 const UNAVAILABLE = 'not available';
 
-function qualityStat(report: QualityReport | undefined): StatItem {
-  if (!report) return { id: 'quality', label: 'Quality checks', value: '—', sub: UNAVAILABLE };
+function qualityStat(report: QualityReport | null | undefined): StatItem {
+  if (!report || report.unknown) {
+    return { id: 'quality', label: 'Quality checks', value: '—', sub: UNAVAILABLE };
+  }
   const by = (status: string) => report.checks.filter((c) => c.status === status).length;
   const [pass, warn, fail] = [by('PASS'), by('WARN'), by('FAIL')];
   const parts = [
@@ -48,7 +50,7 @@ function runStat(run: NightlyRun | undefined): StatItem {
   return {
     id: 'run',
     label: `Nightly run · ${weekday(run.session)}`,
-    value: formatDuration(run.duration_s),
+    value: formatDuration(run.durationS),
     tone: run.status === 'complete' ? 'default' : run.status === 'failed' ? 'negative' : 'warning',
     sub: [run.status, longest && `${longest.name} ${share ?? ''} of time`]
       .filter(Boolean)
@@ -102,7 +104,7 @@ export function IngestionSummary() {
     <Stack gap={3}>
       {stale && completeness.data && (
         <Banner asOf={stale} title="Latest session not ingested">
-          The exchange closed {weekday(completeness.data.last_closed)}; the newest stored session is{' '}
+          The exchange closed {weekday(completeness.data.lastClosed)}; the newest stored session is{' '}
           {weekday(stale)}. Check the nightly run below.
         </Banner>
       )}

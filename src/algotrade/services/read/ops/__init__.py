@@ -1,4 +1,3 @@
-"""Read objects over run records (ADR 0037): backtests, ingest and nightly runs, data-quality
-checks and the admin review lists. One loader module per object.
-
-Empty until read-model PRs 9-10 (``docs/api/read-model.md``)."""
+"""Read objects over run records and what is stored (ADR 0037): backtests and configs (PR 9),
+nightly runs and run records, the session's data-quality checks and verification, ingestion
+completeness and the owner's review lists (PR 10). One loader module per kind of object."""

@@ -42,12 +42,13 @@ def _store_facts() -> tuple[str, str]:
     # Lazy: the library may be missing (no venv), and status must still report the rest.
     from algotrade.config.env import config_dir, data_url  # noqa: PLC0415
     from algotrade.config.user import UserContext  # noqa: PLC0415
-    from algotrade.services.explore.runs import nightly_runs  # noqa: PLC0415
     from algotrade.services.explore.store import latest_session, open_store  # noqa: PLC0415
+    from algotrade.services.read.context import open_stores  # noqa: PLC0415
+    from algotrade.services.read.ops.runs import load_nightly_runs  # noqa: PLC0415
 
     store = open_store(data_url(), config_dir(), UserContext("local"))
     latest = latest_session(store.reader)
-    runs = nightly_runs(store, 1)
+    runs = load_nightly_runs(open_stores(store.reader, store.configs, store.user), 1)
     last = f"{runs[0].session} {runs[0].status}" if runs else "none recorded"
     return str(latest) if latest else "empty", last
 

@@ -25,7 +25,7 @@ class UnknownCode(StrEnum):
     NULL = "NULL"  # stored null: see FeatureInfo.nullMeaning
     NOT_IN_CATALOGUE = "NOT_IN_CATALOGUE"  # the name is not in the caller's catalogue
     LICENCE = "LICENCE"  # a personal-licence feature and the caller is not its owner (ADR 0028)
-    NOT_RUN = "NOT_RUN"  # a screener has no run for the session
+    NOT_RUN = "NOT_RUN"  # a screener (or the data-quality check) has no run for the session
     PRE_SNAPSHOT = "PRE_SNAPSHOT"  # identity came from a later snapshot (survivorship)
 
 

@@ -4,24 +4,28 @@ import axe from 'axe-core';
 import type { ReactNode } from 'react';
 import { afterAll, beforeAll, expect, vi } from 'vitest';
 
-import { api, TestQueryProvider } from '@/shared/api';
+import { gql, TestQueryProvider } from '@/shared/api';
 
 vi.mock('@/shared/api', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  api: { GET: vi.fn() },
+  gql: vi.fn(),
 }));
 
-/** Answers `api.GET(path)` from `routes` (a missing path is a 404, `null` an error 500). */
-function serve(routes: Record<string, unknown>) {
-  vi.mocked(api.GET).mockImplementation(((path: string) => {
-    const data = routes[path];
-    const status = data === undefined ? 404 : data === null ? 500 : 200;
-    return Promise.resolve(
-      status === 200
-        ? { data, response: new Response(null, { status }) }
-        : { error: { detail: `failed ${path}` }, response: new Response(null, { status }) },
-    );
-  }) as never);
+/** A `serve` value: the operation fails (an HTTP or GraphQL error). */
+const FAIL = Symbol('fail');
+
+/**
+ * Answers `gql(document)` with `fields[<the operation's Query field>]`: a missing field is
+ * null (nothing stored, no such thing), `FAIL` an error.
+ */
+function serve(fields: Record<string, unknown>) {
+  vi.mocked(gql).mockImplementation((document: unknown) => {
+    const field = /\{\s*(\w+)/.exec(String(document))?.[1] ?? '';
+    const data = fields[field];
+    return data === FAIL
+      ? Promise.reject(new Error(`${field} failed`))
+      : Promise.resolve({ [field]: data ?? null });
+  });
 }
 
 function renderWith(ui: ReactNode) {
@@ -60,10 +64,10 @@ import { VerificationPanel } from './VerificationPanel';
 
 const VERIFICATION = {
   session: '2026-10-02',
-  run_ids: ['verify_ibkr-2026-10-02-20261003T183522Z'],
+  runIds: ['verify_ibkr-2026-10-02-20261003T183522Z'],
   instruments: 6,
   counts: { PASS: 42, WARN: 0, FAIL: 2, NA: 12 },
-  by_check: [{ check: 'low', counts: { PASS: 2, WARN: 0, FAIL: 2, NA: 0 } }],
+  byCheck: [{ check: 'low', counts: { PASS: 2, WARN: 0, FAIL: 2, NA: 0 } }],
   failing: [
     {
       instrument_id: 'EQ:BBG000BDTBL9',
@@ -81,7 +85,7 @@ const VERIFICATION = {
 
 describe('VerificationPanel', () => {
   it('shows counts by status and the failing checks', async () => {
-    serve({ '/admin/verification/ibkr': VERIFICATION });
+    serve({ verification: VERIFICATION });
     const { container } = renderWith(<VerificationPanel />);
     expect(
       await screen.findByRole('grid', { name: 'Failing verification checks' }),
@@ -91,14 +95,21 @@ describe('VerificationPanel', () => {
   });
 
   it('says when nothing failed, and when there is no run', async () => {
-    serve({ '/admin/verification/ibkr': { ...VERIFICATION, failing: [] } });
+    serve({ verification: { ...VERIFICATION, failing: [] } });
     renderWith(<VerificationPanel />);
     expect(await screen.findByText('No failing checks')).toBeInTheDocument();
   });
 
-  it('explains a missing verification run', async () => {
+  it('explains a session the verification did not run for', async () => {
+    const unknown = { code: 'NO_PARTITION', detail: 'verification/ibkr has no partition' };
+    serve({ verification: { ...VERIFICATION, counts: {}, byCheck: [], failing: [], unknown } });
+    renderWith(<VerificationPanel />);
+    expect(await screen.findByText('No verification for this session')).toBeInTheDocument();
+  });
+
+  it('explains an empty store', async () => {
     serve({});
     renderWith(<VerificationPanel />);
-    expect(await screen.findByText('No verification run yet')).toBeInTheDocument();
+    expect(await screen.findByText('No verification for this session')).toBeInTheDocument();
   });
 });

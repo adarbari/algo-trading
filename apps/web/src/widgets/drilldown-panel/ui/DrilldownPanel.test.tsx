@@ -4,24 +4,28 @@ import axe from 'axe-core';
 import type { ReactNode } from 'react';
 import { afterAll, beforeAll, expect, vi } from 'vitest';
 
-import { api, TestQueryProvider } from '@/shared/api';
+import { gql, TestQueryProvider } from '@/shared/api';
 
 vi.mock('@/shared/api', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  api: { GET: vi.fn() },
+  gql: vi.fn(),
 }));
 
-/** Answers `api.GET(path)` from `routes` (a missing path is a 404, `null` an error 500). */
-function serve(routes: Record<string, unknown>) {
-  vi.mocked(api.GET).mockImplementation(((path: string) => {
-    const data = routes[path];
-    const status = data === undefined ? 404 : data === null ? 500 : 200;
-    return Promise.resolve(
-      status === 200
-        ? { data, response: new Response(null, { status }) }
-        : { error: { detail: `failed ${path}` }, response: new Response(null, { status }) },
-    );
-  }) as never);
+/** A `serve` value: the operation fails (an HTTP or GraphQL error). */
+const FAIL = Symbol('fail');
+
+/**
+ * Answers `gql(document)` with `fields[<the operation's Query field>]`: a missing field is
+ * null (nothing stored, no such thing), `FAIL` an error.
+ */
+function serve(fields: Record<string, unknown>) {
+  vi.mocked(gql).mockImplementation((document: unknown) => {
+    const field = /\{\s*(\w+)/.exec(String(document))?.[1] ?? '';
+    const data = fields[field];
+    return data === FAIL
+      ? Promise.reject(new Error(`${field} failed`))
+      : Promise.resolve({ [field]: data ?? null });
+  });
 }
 
 function renderWith(ui: ReactNode) {
@@ -72,13 +76,13 @@ const cell = (
   present,
   expected,
   basis: expected === null ? 'snapshot built' : 'optionable universe, fetch OK',
-  run_ids: ['option_chains-2026-10-02-20261003T093502Z'],
+  runIds: ['option_chains-2026-10-02-20261003T093502Z'],
 });
 
 const COMPLETENESS = {
   sessions: ['2026-10-01', '2026-10-02'],
   datasets: ['bars/1d', 'chains/option_quotes'],
-  last_closed: '2026-10-02',
+  lastClosed: '2026-10-02',
   cells: [
     cell('bars/1d', '2026-10-01', 'COMPLETE', 12594, 12590),
     cell('bars/1d', '2026-10-02', 'COMPLETE', 12601, 12594),
@@ -87,15 +91,15 @@ const COMPLETENESS = {
   ],
 };
 const RUN = {
-  run_id: 'option_chains-2026-10-02-20261003T093502Z',
+  runId: 'option_chains-2026-10-02-20261003T093502Z',
   job: 'option_chains',
   session: '2026-10-02',
   status: 'partial',
-  started_at: '2026-10-03T09:35:02Z',
-  finished_at: '2026-10-03T13:51:00Z',
-  duration_s: 15358,
-  items_total: 4204,
-  items_by_status: { OK: 3624, STALE_DATA: 515, NO_CHAIN: 63, NO_STANDARD_SERIES: 2 },
+  startedAt: '2026-10-03T09:35:02Z',
+  finishedAt: '2026-10-03T13:51:00Z',
+  durationS: 15358,
+  itemsTotal: 4204,
+  itemsByStatus: { OK: 3624, STALE_DATA: 515, NO_CHAIN: 63, NO_STANDARD_SERIES: 2 },
   failures: [],
   stats: { order_tiers: { priority: 536, liquidity: 1840, rest: 1827 } },
 };
@@ -117,10 +121,10 @@ const DETAIL = {
 describe('DrilldownPanel', () => {
   it('drills into the default cell: statuses, tiers, grouped issues, actions', async () => {
     serve({
-      '/admin/ingestion/completeness': COMPLETENESS,
-      '/admin/ingestion/{dataset}/{session}': DETAIL,
-      '/admin/runs/{run_id}': RUN,
-      '/admin/runs/{run_id}/items': [
+      completeness: COMPLETENESS,
+      ingestionCell: DETAIL,
+      run: RUN,
+      runItems: [
         { key: 'EQ:ACIU', code: 'STALE_DATA', status: 'STALE_DATA: chain is for 2026-10-01' },
       ],
     });
@@ -149,7 +153,7 @@ describe('DrilldownPanel', () => {
   });
 
   it('shows the error of a failed drill-down', async () => {
-    serve({ '/admin/ingestion/{dataset}/{session}': null });
+    serve({ ingestionCell: FAIL });
     renderWith(<DrilldownPanel selected={{ dataset: 'bars/1d', session: '2026-10-02' }} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('The drill-down could not load.');
   });

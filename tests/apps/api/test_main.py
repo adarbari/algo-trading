@@ -22,7 +22,8 @@ def test_committed_openapi_is_up_to_date() -> None:
 
 def test_openapi_is_served(client: TestClient) -> None:
     paths = client.get("/openapi.json").json()["paths"]
-    assert "/admin/review/figi" in paths and "/chains/{underlying_id}/live" in paths
+    assert "/health" in paths and "/chains/{underlying_id}/live" in paths
+    assert not [p for p in paths if p.startswith("/admin")]  # Admin reads are GraphQL
 
 
 def test_cors_allows_the_local_web_dev_server(client: TestClient) -> None:
@@ -75,17 +76,10 @@ def test_asgi_app_is_configured_from_the_environment(monkeypatch: pytest.MonkeyP
 
 ENDPOINTS = (
     "/health",
-    "/admin/runs/nightly",
-    "/admin/review/figi",
-    "/admin/review/leveraged",
     "/chains/AAA/live?expiry=2022-12-23",
     "/screens",
     "/screens/short_premium_liquidity/results",
     "/screens/vrp_scanner/table?columns=rollup.price_stats@v2.hv20",
-    "/admin/ingestion/completeness",
-    "/admin/ingestion/chains/option_quotes/2022-11-23",
-    "/admin/quality",
-    "/admin/verification/ibkr",
 )
 
 
@@ -210,6 +204,28 @@ DISTRIBUTION = """query FeatureDistribution($name: FeatureName!) {
   distribution(name: $name) { count nulls quantiles { q value } histogram { lo hi count } }
 }"""
 BACKTESTS = "query Backtests { backtests { runId configId status metrics } }"
+# The Admin Ingestion page's reads (read-model PR 10; apps/web/src/entities/{ingestion,run,
+# verification,review}/api): the completeness grid, one cell, the session's quality checks and
+# verification, the nightly runs, one run record and its items, the review lists.
+RUN_FIELDS = "runId job session status startedAt durationS itemsTotal itemsByStatus stats"
+ADMIN = {
+    "IngestionCompleteness": "query IngestionCompleteness($sessions: Int!) { completeness("
+    "sessions: $sessions) { sessions datasets lastClosed cells { dataset session status present "
+    "expected basis runIds } } }",
+    "IngestionCell": "query IngestionCell($dataset: String!, $date: Date!) { ingestionCell("
+    "dataset: $dataset, date: $date) { job cell { status present expected } groups { reason "
+    f"count examples }} runs {{ {RUN_FIELDS} }} }} }}",
+    "QualityChecks": "query QualityChecks { quality { session runId status checks { name status "
+    "detail } unknown { code } } }",
+    "Verification": "query Verification { verification { session runIds instruments counts "
+    "byCheck { check counts } failing unknown { code } } }",
+    "NightlyRuns": "query NightlyRuns($limit: Int!) { nightlyRuns(limit: $limit) { runId session "
+    "status durationS problems steps { name status durationS } } }",
+    "RunRecord": f"query RunRecord($runId: String!) {{ run(runId: $runId) {{ {RUN_FIELDS} "
+    "failures { reason count examples statuses } } runItems(runId: $runId) { key code status } }",
+    "Review": "query Review { figiReview { session source items } leverageReview { session "
+    "source items } }",
+}
 OPERATIONS = {
     "InstrumentFacts": (INSTRUMENT_FACTS, {"key": "AAA", "names": OVERVIEW_NAMES}),
     "InstrumentEvents": (DETAIL["InstrumentEvents"], {"key": "AAA"}),
@@ -228,6 +244,16 @@ OPERATIONS = {
     "FeatureCatalogue": (CATALOGUE, {}),
     "FeatureDistribution": (DISTRIBUTION, {"name": "rollup.price_stats@v2.hv20"}),
     "Backtests": (BACKTESTS, {}),
+    "IngestionCompleteness": (ADMIN["IngestionCompleteness"], {"sessions": 10}),
+    "IngestionCell": (
+        ADMIN["IngestionCell"],
+        {"dataset": "chains/option_quotes", "date": "2022-11-23"},
+    ),
+    "QualityChecks": (ADMIN["QualityChecks"], {}),
+    "Verification": (ADMIN["Verification"], {}),
+    "NightlyRuns": (ADMIN["NightlyRuns"], {"limit": 10}),
+    "RunRecord": (ADMIN["RunRecord"], {"runId": "nightly-2022-11-23"}),
+    "Review": (ADMIN["Review"], {}),
     "Table": (
         FEATURE_TABLE,
         {"columns": EXPLORE_COLUMNS, "sort": "-feature.iv_hv_ratio", "page": 1, "size": 100},

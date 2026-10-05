@@ -62,6 +62,51 @@ def test_only_loaders_read_partitions() -> None:
     )
 
 
+# The context's inventory reads (what is stored, on dates the caller names): only the ops loader
+# that reports on storage itself (the Admin completeness grid) calls or imports them.
+INVENTORY_READS = {"stored_dates", "partition_on", "snapshot_on"}
+INVENTORY_CALLERS = {READ_MODEL / "context.py", READ_MODEL / "ops" / "ingestion.py"}
+
+
+def inventory_reads(source: str) -> list[tuple[int, str]]:
+    """``(line, name)`` of every call to, or import of, an inventory read in ``source`` (an
+    import catches an alias: ``from ...context import partition_on as p``)."""
+    found = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Call):
+            func = node.func
+            name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", None)
+            if name in INVENTORY_READS:
+                found.append((node.lineno, name))
+        elif isinstance(node, ast.ImportFrom):
+            found += [(node.lineno, a.name) for a in node.names if a.name in INVENTORY_READS]
+    return sorted(found)
+
+
+def test_inventory_reads_only_in_the_completeness_loader() -> None:
+    sources = [*REPO_ROOT.joinpath("src").rglob("*.py"), *REPO_ROOT.joinpath("apps").rglob("*.py")]
+    hits = [
+        f"{path.relative_to(REPO_ROOT)}:{line} {name}"
+        for path in sorted(sources)
+        if path not in INVENTORY_CALLERS
+        for line, name in inventory_reads(path.read_text())
+    ]
+    assert not hits, (
+        f"[READ 2 / ADR 0036] inventory reads outside services/read/ops/ingestion.py: {hits}. "
+        "They report what is stored on dates the caller names (the Admin completeness grid); a "
+        "fact for the session is read with services.read.context.partition(ctx, table)"
+    )
+
+
+def test_the_inventory_check_catches_an_alias() -> None:
+    aliased = (
+        "from algotrade.services.read.context import partition_on as p\n"
+        "def load(ctx):\n"
+        "    return p(ctx, 't', ctx.session.date)\n"
+    )
+    assert inventory_reads(aliased) == [(1, "partition_on")]
+
+
 def test_the_plumbing_exists() -> None:
     assert {p.name for p in READ_MODEL.glob("*.py")} >= PLUMBING
 

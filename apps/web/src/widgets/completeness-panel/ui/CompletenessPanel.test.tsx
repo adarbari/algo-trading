@@ -4,24 +4,28 @@ import axe from 'axe-core';
 import type { ReactNode } from 'react';
 import { afterAll, beforeAll, expect, vi } from 'vitest';
 
-import { api, TestQueryProvider } from '@/shared/api';
+import { gql, TestQueryProvider } from '@/shared/api';
 
 vi.mock('@/shared/api', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  api: { GET: vi.fn() },
+  gql: vi.fn(),
 }));
 
-/** Answers `api.GET(path)` from `routes` (a missing path is a 404, `null` an error 500). */
-function serve(routes: Record<string, unknown>) {
-  vi.mocked(api.GET).mockImplementation(((path: string) => {
-    const data = routes[path];
-    const status = data === undefined ? 404 : data === null ? 500 : 200;
-    return Promise.resolve(
-      status === 200
-        ? { data, response: new Response(null, { status }) }
-        : { error: { detail: `failed ${path}` }, response: new Response(null, { status }) },
-    );
-  }) as never);
+/** A `serve` value: the operation fails (an HTTP or GraphQL error). */
+const FAIL = Symbol('fail');
+
+/**
+ * Answers `gql(document)` with `fields[<the operation's Query field>]`: a missing field is
+ * null (nothing stored, no such thing), `FAIL` an error.
+ */
+function serve(fields: Record<string, unknown>) {
+  vi.mocked(gql).mockImplementation((document: unknown) => {
+    const field = /\{\s*(\w+)/.exec(String(document))?.[1] ?? '';
+    const data = fields[field];
+    return data === FAIL
+      ? Promise.reject(new Error(`${field} failed`))
+      : Promise.resolve({ [field]: data ?? null });
+  });
 }
 
 function renderWith(ui: ReactNode) {
@@ -72,13 +76,13 @@ const cell = (
   present,
   expected,
   basis: expected === null ? 'snapshot built' : 'optionable universe, fetch OK',
-  run_ids: ['option_chains-2026-10-02-20261003T093502Z'],
+  runIds: ['option_chains-2026-10-02-20261003T093502Z'],
 });
 
 const COMPLETENESS = {
   sessions: ['2026-10-01', '2026-10-02'],
   datasets: ['bars/1d', 'chains/option_quotes'],
-  last_closed: '2026-10-02',
+  lastClosed: '2026-10-02',
   cells: [
     cell('bars/1d', '2026-10-01', 'COMPLETE', 12594, 12590),
     cell('bars/1d', '2026-10-02', 'COMPLETE', 12601, 12594),
@@ -89,7 +93,7 @@ const COMPLETENESS = {
 
 describe('CompletenessPanel', () => {
   it('shows the grid, outlines the worst latest cell and reports a selection', async () => {
-    serve({ '/admin/ingestion/completeness': COMPLETENESS });
+    serve({ completeness: COMPLETENESS });
     const onSelect = vi.fn();
     const { container } = renderWith(<CompletenessPanel onSelect={onSelect} />);
     const grid = await screen.findByRole('grid', { name: 'Completeness by dataset and session' });
@@ -101,7 +105,7 @@ describe('CompletenessPanel', () => {
   });
 
   it('shows loading, then an error with retry', async () => {
-    serve({ '/admin/ingestion/completeness': null });
+    serve({ completeness: FAIL });
     renderWith(<CompletenessPanel onSelect={vi.fn()} />);
     expect(screen.getByText('Loading completeness…')).toBeInTheDocument();
     await waitFor(() => {

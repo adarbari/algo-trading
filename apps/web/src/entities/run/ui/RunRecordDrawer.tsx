@@ -41,14 +41,14 @@ const ITEM_COLUMNS: DataTableColumn<RunItem>[] = [
 
 function facts(run: RunDetail): KeyValueItem[] {
   return [
-    { label: 'Run', value: run.run_id, mono: true },
+    { label: 'Run', value: run.runId, mono: true },
     { label: 'Job', value: run.job, mono: true },
     { label: 'Session', value: run.session, format: { kind: 'date', style: 'weekday' } },
     { label: 'Status', value: <RunStatusBadge status={run.status} /> },
-    { label: 'Started', value: `${run.started_at.replace('T', ' ').slice(0, 19)} UTC`, mono: true },
-    { label: 'Duration', value: formatDuration(run.duration_s) },
-    { label: 'Items', value: run.items_total, format: { kind: 'number' } },
-    ...Object.entries(run.items_by_status).map(([code, count]) => ({
+    { label: 'Started', value: `${run.startedAt.replace('T', ' ').slice(0, 19)} UTC`, mono: true },
+    { label: 'Duration', value: formatDuration(run.durationS) },
+    { label: 'Items', value: run.itemsTotal, format: { kind: 'number' } },
+    ...Object.entries(run.itemsByStatus).map(([code, count]) => ({
       id: `status-${code}`,
       label: `${code} items`,
       value: count,
