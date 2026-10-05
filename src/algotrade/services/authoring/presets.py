@@ -12,7 +12,7 @@ from algotrade.services.authoring.scope import (
     author,
     screen_id,
 )
-from algotrade.services.authoring.screens import MANAGED_KEYS, validate
+from algotrade.services.authoring.screens import MANAGED_KEYS, refuse_deleted_id, validate
 from algotrade.storage.configs.writer import ConfigWriter
 
 
@@ -37,6 +37,7 @@ def copy_preset(writer: ConfigWriter, user: str, name: str, preset: str) -> dict
     )
     if exists:
         raise ConflictError(f"{who.user_id} already has a config {name!r}")
+    refuse_deleted_id(writer, who.user_id, name)
     draft: dict[str, Any] = {"id": name, "extends": f"{preset}@{_preset_version(writer, preset)}"}
     validate(writer, who, name, draft)
     writer.save_draft(who.user_id, name, draft)

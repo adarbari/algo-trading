@@ -70,6 +70,12 @@ for the (read-only) API to save them, and a result shape that is the same for ev
   screen computes, so toggling the schedule keeps results comparable across runs.
 - Every result row and run record carries `config_version` next to `user_id`, `config_id`
   and `config_hash`.
+- Deleting a user screen (added 2026-10-05) never erases a version: its folder (draft and
+  versions) moves whole to `config/users/<u>/archive/screeners/<id>-<UTC stamp>/`, so it
+  leaves the list and the nightly while its stored runs stay attributable to the archived
+  versions. The user's preferences forget it (`ideas.priority`, its views), and the id is
+  never reused: runs, ideas and views are keyed by the id, so a new `<id>@1` would inherit
+  the deleted screen's history.
 
 ### API writes (amends ADR 0024)
 The API stays read-only except for **user configs and user features**, which it writes only

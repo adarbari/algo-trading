@@ -32,7 +32,7 @@ beforeEach(() => {
 
 describe('DeleteScreenerButton', () => {
   it('asks first, then deletes the screener and leaves its pages', async () => {
-    DELETE.mockResolvedValue({ response: new Response(null, { status: 204 }) } as never);
+    DELETE.mockResolvedValue({ response: new Response(null, { status: 204 }) });
     const { onDeleted, baseElement } = setup();
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
     const dialog = screen.getByRole('dialog', { name: 'Delete my-vrp?' });
@@ -62,7 +62,7 @@ describe('DeleteScreenerButton', () => {
     DELETE.mockResolvedValue({
       error: { detail: 'no such screen' },
       response: new Response(null, { status: 404, statusText: 'Not Found' }),
-    } as never);
+    });
     const { onDeleted } = setup();
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
     await userEvent.click(screen.getAllByRole('button', { name: 'Delete' }).at(-1) as HTMLElement);

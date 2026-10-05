@@ -63,8 +63,8 @@ def test_delete_archives_the_draft_and_every_version(writer: Any) -> None:
     assert writer.names("alice", "screeners") == [] and writer.drafts("alice") == []
     assert writer.versions("alice", "mine") == [] and writer.draft("alice", "mine") is None
     assert writer.delete_screen("alice", "mine", at) is False
-    writer.add_version("alice", "mine", 1, DOC | {"version": 1})  # the id is free again
-    assert writer.versions("alice", "mine") == [1]
+    assert writer.was_deleted("alice", "mine") and not writer.was_deleted("alice", "min")
+    assert not writer.was_deleted("bob", "mine")
 
 
 def test_a_deleted_screen_is_kept_in_the_archive(tmp_path: Path) -> None:
@@ -75,6 +75,9 @@ def test_a_deleted_screen_is_kept_in_the_archive(tmp_path: Path) -> None:
     kept = tmp_path / "users" / "alice" / "archive" / "screeners" / "mine-20261005T093000000000Z"
     assert sorted(p.name for p in kept.iterdir()) == ["draft.toml", "v1.toml"]
     assert not (tmp_path / "users" / "alice" / "screeners" / "mine").exists()
+    assert writer.was_deleted("alice", "mine") and not FileConfigWriter(tmp_path).was_deleted(
+        "bob", "mine"
+    )
     assert archive_name("mine", datetime(2026, 10, 5, 9, 30, tzinfo=UTC)).startswith("mine-2026")
     with pytest.raises(ConfigurationError, match="timezone"):
         archive_name("mine", datetime(2026, 10, 5))  # noqa: DTZ001 - the naive case under test

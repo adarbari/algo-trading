@@ -9,8 +9,10 @@ the same directory, then a rename (drafts, features) or a hard link that fails i
 the target exists (versions: a ``v<N>.toml`` is never overwritten). Deleting a screen moves its
 whole folder (draft and versions) to ``users/<u>/archive/screeners/<id>-<UTC stamp>/`` in one
 rename: it leaves the list and the nightly, its past runs stay attributable to the archived
-versions, and it can be moved back by hand. The memory writer has the
-same semantics for tests; a DB backend can replace both under the protocol later.
+versions, and it can be moved back by hand. A deleted id is never reused (``was_deleted``):
+runs, ideas and views are keyed by the id, so a new screen of that name would inherit them.
+The memory writer has the same semantics for tests; a DB backend can replace both under the
+protocol later.
 """
 
 import json
@@ -71,6 +73,10 @@ class ConfigWriter(ConfigStore, Protocol):
 
     def delete_screen(self, user: str, name: str, at: datetime) -> bool:
         """Archive the screen (draft and versions) as of ``at``; ``True`` when there was one."""
+        ...
+
+    def was_deleted(self, user: str, name: str) -> bool:
+        """``user`` once deleted a screen ``name`` (it is in the archive)."""
         ...
 
     def save_features(self, user: str, theme: str, document: Mapping[str, Any]) -> None:
@@ -178,6 +184,11 @@ def archive_name(name: str, at: datetime) -> str:
     return f"{validate_id('screener', name)}-{at.astimezone(UTC):%Y%m%dT%H%M%S%fZ}"
 
 
+def _archived_as(name: str) -> re.Pattern[str]:
+    """Matches the archive names of the screen ``name`` (and no other id that starts with it)."""
+    return re.compile(rf"{re.escape(validate_id('screener', name))}-\d{{8}}T\d{{12}}Z")
+
+
 def _version(version: int) -> int:
     if not isinstance(version, int) or isinstance(version, bool) or version < 1:
         raise ConfigurationError(f"invalid version {version!r}: a positive integer")
@@ -256,6 +267,11 @@ class FileConfigWriter(FileConfigStore):
         target.parent.mkdir(parents=True, exist_ok=True)
         source.rename(target)  # atomic on one filesystem; fails if the target exists
         return True
+
+    def was_deleted(self, user: str, name: str) -> bool:
+        base = self.root / "users" / _user(user) / "archive" / SCREENERS
+        pattern = _archived_as(name)
+        return base.is_dir() and any(pattern.fullmatch(p.name) for p in base.iterdir())
 
     def save_features(self, user: str, theme: str, document: Mapping[str, Any]) -> None:
         path = (
@@ -342,6 +358,10 @@ class MemoryConfigWriter(MemoryConfigStore):
             return False
         self.archived[(key[0], archive_name(key[1], at))] = (draft, versions)
         return True
+
+    def was_deleted(self, user: str, name: str) -> bool:
+        pattern = _archived_as(name)
+        return any(u == _user(user) and pattern.fullmatch(n) for u, n in self.archived)
 
     def save_features(self, user: str, theme: str, document: Mapping[str, Any]) -> None:
         self._docs[(_user(user), "features", validate_id("theme", theme))] = _copy(document)

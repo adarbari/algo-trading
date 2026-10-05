@@ -95,6 +95,8 @@ def test_delete_archives_a_screen_and_404s_a_preset(writer_client: TestClient, r
     assert len(list((root / "users" / "alice" / "archive" / "screeners").iterdir())) == 1
     assert c.delete("/screeners/mine?user=alice").status_code == 404
     assert c.delete("/screeners/vrp?user=alice").status_code == 404  # a site preset: by PR
+    reused = c.put("/screeners/mine/draft?user=alice", json={"document": OWN})
+    assert reused.status_code == 409  # a deleted id is never reused
 
 
 def test_list_has_finalised_and_draft_only_screens(writer_client: TestClient) -> None:

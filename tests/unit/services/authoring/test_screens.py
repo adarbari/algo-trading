@@ -160,3 +160,30 @@ def test_an_uncopied_preset_names_itself_and_its_version(writer: MemoryConfigWri
         3,
     )
     assert not detail.preset.rebase_available
+
+
+def test_a_deleted_id_is_never_reused(writer: MemoryConfigWriter) -> None:
+    """Runs, ideas and views are keyed by the id: a new screen must not inherit them."""
+    screens.save_draft(writer, "alice", "mine", OWN)
+    screens.delete_screen(writer, "alice", "mine")
+    with pytest.raises(ConflictError, match="deleted"):
+        screens.save_draft(writer, "alice", "mine", OWN)  # a late save of the open Builder too
+    writer.save_draft("alice", "mine-2", OWN)  # an id that only starts with it is free
+    assert not writer.was_deleted("alice", "mine-2") and not writer.was_deleted("bob", "mine")
+
+
+def test_delete_forgets_the_screener_in_the_preferences(writer: MemoryConfigWriter) -> None:
+    screens.save_draft(writer, "alice", "mine", OWN)
+    screens.finalise(writer, "alice", "mine")
+    writer.save_preferences(
+        "alice",
+        {
+            "ideas": {"priority": ["mine", "vrp"]},
+            "screeners": {"mine": {"view": {"columns": []}}, "vrp": {"view": {"columns": []}}},
+        },
+    )
+    screens.delete_screen(writer, "alice", "mine")
+    assert writer.load("alice", "preferences", "preferences") == {
+        "ideas": {"priority": ["vrp"]},
+        "screeners": {"vrp": {"view": {"columns": []}}},
+    }

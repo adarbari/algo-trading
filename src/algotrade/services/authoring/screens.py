@@ -13,6 +13,7 @@ from algotrade.config.site.fields import reject_secrets
 from algotrade.config.strategy.resolve import ResolvedConfig, config_document, parse_extends
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.services.authoring.preferences import forget_screener
 from algotrade.services.authoring.scope import (
     ConflictError,
     ScreenNotFoundError,
@@ -183,6 +184,8 @@ def save_draft(
     """Store ``document`` as the working copy (autosave: not validated beyond being a
     serialisable, secret-free table; finalise validates). Returns what was stored."""
     who, name = author(user), screen_id(name)
+    if writer.draft(who.user_id, name) is None and not writer.versions(who.user_id, name):
+        refuse_deleted_id(writer, who.user_id, name)
     stored = draft_document(name, document)
     reject_secrets(stored, f"{who.user_id}/screeners/{name}/draft")
     writer.save_draft(who.user_id, name, stored)
@@ -194,13 +197,21 @@ def discard_draft(writer: ConfigWriter, user: str, name: str) -> bool:
     return writer.discard_draft(who.user_id, name)
 
 
+def refuse_deleted_id(writer: ConfigWriter, user: str, name: str) -> None:
+    """A new screen never takes a deleted one's id: its runs, ideas and views are keyed by it."""
+    if writer.was_deleted(user, name):
+        raise ConflictError(f"{user}/{name}: a deleted screener used this name; choose another")
+
+
 def delete_screen(writer: ConfigWriter, user: str, name: str, now: datetime | None = None) -> None:
     """Delete ``user``'s screen ``name``: its draft and every version are archived, so it leaves
-    the list and the nightly (its stored runs stay). A site preset changes only by PR: one the
-    user has not copied is not theirs to delete (``ScreenNotFoundError``)."""
+    the list and the nightly (its stored runs stay), and the user's preferences forget it
+    (``ideas.priority``, its views). A site preset changes only by PR: one the user has not
+    copied is not theirs to delete (``ScreenNotFoundError``)."""
     who, name = author(user), screen_id(name)
     if not writer.delete_screen(who.user_id, name, now or datetime.now(UTC)):
         raise ScreenNotFoundError(f"{who.user_id}/{name}: no such screen of yours to delete")
+    forget_screener(writer, who.user_id, name)
 
 
 @dataclass(frozen=True)
