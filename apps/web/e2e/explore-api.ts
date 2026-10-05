@@ -56,32 +56,23 @@ for (const row of (fixture('compare.json') as { rows: { feature: string; values:
   }
 }
 
+/** The recorded catalogue (`FeatureCatalogue`) by name: a column's info comes from it. */
 const CATALOGUE = new Map(
-  (fixture('features.json') as unknown as Row[]).map((f) => [String(f['name']), f]),
+  (fixture('catalogue.json') as { data: { catalogue: Row[] } }).data.catalogue.map((f) => [
+    String(f['name']),
+    f,
+  ]),
 );
-
-/** The server's display format from a feature's unit and dtype (catalogue.format_of). */
-function formatOf(feature: Row | undefined): string {
-  const unit = feature?.['unit'];
-  const dtype = (feature?.['dtype'] as string | undefined) ?? 'float';
-  if (dtype === 'date' || unit === 'date') return 'DATE';
-  if (dtype === 'bool') return 'FLAG';
-  if (dtype === 'str') return 'TEXT';
-  if (unit === 'decimal') return 'PERCENT';
-  if (unit === 'usd_per_share') return 'CURRENCY';
-  if (unit === 'usd' || unit === 'shares') return 'COMPACT';
-  return 'NUMBER';
-}
 
 function columnInfo(name: string): Json {
   const feature = CATALOGUE.get(name);
   return {
     name,
     description: feature?.['description'] ?? name,
-    format: formatOf(feature),
+    format: feature?.['format'] ?? 'NUMBER',
     unit: feature?.['unit'] ?? null,
     dtype: feature?.['dtype'] ?? 'float',
-    nullMeaning: feature?.['null_meaning'] ?? '',
+    nullMeaning: feature?.['nullMeaning'] ?? '',
     licence: feature?.['licence'] ?? 'open',
     scope: feature?.['scope'] ?? 'site',
   };

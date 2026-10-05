@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { IDEA_FACTS } from './facts';
-import {
-  earningsBeforeExpiry,
-  factOf,
-  NO_IDEAS,
-  toIdeasData,
-  type IdeasResponse,
-} from './idea';
+import { earningsBeforeExpiry, factOf, NO_IDEAS, toIdeasData, type IdeasResponse } from './idea';
 
 type Served = NonNullable<IdeasResponse['ideas']>;
 type Item = Served['items'][number];
