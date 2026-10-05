@@ -50,7 +50,7 @@ screens); on the night a new quarter of SEC fund data appears it also downloads 
 | company details | `instruments/company` | an instrument with a known company (full snapshot) | ~7.5k *est.* (instruments with a CIK) | ~0.3 MB *est.* | `cik`, `name`, `entity_type`, `sic`, `sic_description`, `sector`, `industry`, `state_of_incorporation`, `fiscal_year_end`, `website`, `fetched_on`, … |
 | shares | `instruments/shares` | a new share-count fact or a `checked` marker, per instrument of each CIK refetched (~1/30 of CIKs a night) | ~250 markers + new facts *est.* (backfill: ~1.5M rows *est.*) | small *est.* | `cik`, `concept`, `period_end`, `filed`, `form`, `accn`, `shares`, `fetched_on`, … |
 | descriptions | `instruments/description` | a stock or ADR described or refreshed (at most `[massive] descriptions_per_night`, 100), or an ETF whose prospectus objective is new or newer | ~100 stocks; ETFs only when a quarter is read (first run ~4.3k, then a few hundred a quarter *est.*) | ~0.06 MB for 100 stocks (640 B/row); ~0.19 MB for the 4.3k ETFs, once (measured) | `symbol`, `description`, `description_source`, `homepage_url`, `total_employees`, `filed`, `accn`, `fetched_on` |
-| earnings | `events/earnings` | a company × report date in the next 60 days | ~4.4k | ~0.06 MB | `earnings_date`, `time`, `fiscal_quarter`, `eps_forecast`, `estimates`, `eps_reported`, `surprise_pct` |
+| earnings | `events/earnings` | a company × report date in the last 7 and the next 60 days | ~4.4k | ~0.06 MB | `earnings_date`, `time`, `fiscal_quarter`, `eps_forecast`, `estimates`, `eps_reported`, `surprise_pct` |
 | bars | `bars/1d` | an instrument × session, unadjusted OHLCV | ~10.7k | ~0.42 MB (39 B/row) | `ts`, `open`, `high`, `low`, `close`, `volume`, `vwap`, `trades` |
 | corporate actions | `events/split`, `events/dividend` | a split / dividend in the window −7…+30 days | ~5k dividends, ~150 splits | ~0.06 MB | split: `split_from`, `split_to`, `ratio`; dividend: `cash_amount`, `pay_date`, `record_date`, `frequency`, … |
 | chains | **`chains/option_quotes`** | an option contract × session | **~1.5M** | **~55 MB** (measured 37 B/row) | `underlying_id`, `ts`, `root`, `expiry`, `right`, `strike`, `last`, `bid`, `ask`, `bid_size`, `ask_size`, `volume`, `open_interest`, `iv`, `delta`, `gamma`, `vega`, `theta`, `rho`, `theo` |
@@ -79,7 +79,7 @@ Screener CSV exports go to `--export-dir` (outside the store) and are not counte
 | `massive` / tickers, grouped_daily, corporate_actions | 1 + 1 + 2 | ~0.9 MB (grouped daily 0.3, tickers 0.25, corporate-action window ~0.35) |
 | `massive` / ticker_overview | one per stock asked, up to 100 | ~0.15 MB (1.5 KB each, gzipped) |
 | `sec_edgar` / fund_objectives + company_tickers_mf | the night a new quarter is published: 1 zip + 1 map; the first run reads 6 quarters | ~80 MB per quarter zip (first run ~0.5 GB), kept 7 days; the map ~0.5 MB |
-| `nasdaq_earnings` / earnings_calendar | 60 (one per calendar day ahead) | ~0.25 MB |
+| `nasdaq_earnings` / earnings_calendar | 67 (one per calendar day, 7 back and 60 ahead) | ~0.27 MB |
 | `sec_edgar` / company_tickers + submissions + companyfacts | 1 + the CIKs due a refresh (about 1/30 of companies a night, each for submissions and company facts) | ~30 MB (~36 KB per submission and ~115 KB per company-facts file, measured on the 2026-10-02 full load: 6,280 + 6,032 files, 116 + 690 MB), kept 7 days |
 
 **About 125 MB of raw responses per night**, ~70% of it Cboe chains. Retention is per source

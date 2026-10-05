@@ -15,7 +15,7 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 - VRP live spread check in the UI via `GET /chains/{id}/live`.
 - Swing features (SW, done on `feat/swing-levels-momentum`): check values against a chart on a few names, then backfill `algotrade-ingest rollups --from D --to D --only momentum@v1,swing_levels@v1,anchored_vwap@v1,oi_walls@v1`.
 - Flaky tests: preview timing under load, smoke axe admin light, one builder e2e.
-- Descriptions (ADR 0034, PR on `feat/company-description`, held for owner review): after merge run `algotrade-ingest descriptions --only funds` (ETFs, ~2 min), then stocks in chunks (`descriptions --limit 600`, ~2 h each, S&P 500 first; the nightly adds 100). Then the Overview tab reads `reference.description` from `GET /instruments/{id}`.
+- Descriptions (ADR 0034, accepted): after merge run `algotrade-ingest descriptions --only funds` (ETFs, ~2 min), then stocks in chunks (`descriptions --limit 600`, ~2 h each, S&P 500 first; the nightly adds 100). Then the Overview tab reads `reference.description` from `GET /instruments/{id}`.
 
 **Facts**
 - IBKR fundamentals are not permitted on this account (error 10358): share-class counts stay SEC.

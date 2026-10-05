@@ -43,7 +43,9 @@ def calls(monkeypatch: pytest.MonkeyPatch) -> Calls:
     return fake
 
 
-SETTINGS = SourcesSettings(actions_window=(-3, 10), earnings_days=20, cboe_workers=8)
+SETTINGS = SourcesSettings(
+    actions_window=(-3, 10), earnings_days=20, earnings_lookback_days=7, cboe_workers=8
+)
 SOURCES: dict[str, Any] = {
     "massive_corporate_actions": "ca",
     "nasdaq_earnings": "ea",
@@ -59,10 +61,15 @@ def ctx() -> Any:
 def test_settings_defaults_are_applied_by_the_task(calls: Calls) -> None:
     run_task("corporate-actions", ctx(), {"session": DAY})
     assert calls.args[-1][2:5] == (DAY, date(2026, 9, 29), date(2026, 10, 12))
-    run_task("earnings", ctx(), {"session": DAY})
-    assert calls.args[-1][1:4] == ("ea", DAY, None) and calls.args[-1][4] == {"days": 20}
+    run_task("earnings", ctx(), {"session": DAY})  # the last week too: 7 back + 20 ahead
+    assert calls.args[-1][1:4] == ("ea", DAY, date(2026, 9, 25))
+    assert calls.args[-1][4] == {"days": 27}
     run_task("earnings", ctx(), {"session": DAY, "days": 5})
-    assert calls.args[-1][4] == {"days": 5}
+    assert calls.args[-1][4] == {"days": 12}
+    run_task("earnings", ctx(), {"session": DAY, "start": date(2026, 7, 1), "days": 95})
+    assert calls.args[-1][1:4] == ("ea", DAY, date(2026, 7, 1)) and calls.args[-1][4] == {
+        "days": 95
+    }
     run_task("chains", ctx(), {"session": DAY, "symbols": "spy, aapl"})
     _, source, underlyings, _, config, _ = calls.args[-1]
     assert (source, underlyings, config.workers) == ("cb", ["spy", " aapl"], 8)

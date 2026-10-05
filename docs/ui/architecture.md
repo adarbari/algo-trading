@@ -71,8 +71,9 @@ and a `beforeLoad` guard (`app/workspaces/guard.ts`, the one place role gating w
 | ADMIN | Ingestion `/admin/ingestion`, Screener runs & sharing `/admin/screener-runs`, Users & configs `/admin/users` |
 
 Explore is one page (ticker table with feature-catalogue columns, multi-select compare, detail
-tabs Compare / Chart / Options / Features / Events / Screener hits), not separate universe,
-instrument, chain and feature pages. Unbuilt sections render the placeholder page.
+tabs Overview / Compare / Chart / Options / Features / Events / Screener hits; one ticker opens
+on Overview, a compare set of two or more on Compare), not separate universe, instrument, chain
+and feature pages. Unbuilt sections render the placeholder page.
 
 ## Rules and how they are enforced
 

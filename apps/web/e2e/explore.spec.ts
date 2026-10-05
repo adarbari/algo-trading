@@ -4,9 +4,9 @@
  * and detail tabs, URL state (shareable links), accessibility in dark and light, and that the
  * 11k-row table stays responsive (search and scrolling).
  */
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
+import { expectAccessible } from './a11y';
 import { mockApi } from './mock-api';
 
 const COMPARE = '/explore?sel=AAPL,MSFT,NVDA';
@@ -24,11 +24,6 @@ async function useTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
   await page.evaluate((t) => {
     document.documentElement.setAttribute('data-theme', t);
   }, theme);
-}
-
-async function expectAccessible(page: Page): Promise<void> {
-  const axe = await new AxeBuilder({ page }).analyze();
-  expect(axe.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
 }
 
 const tickers = (page: Page) => page.getByRole('grid', { name: 'Tickers' });
@@ -78,6 +73,23 @@ for (const theme of ['dark', 'light'] as const) {
     expect(errors).toEqual([]);
   });
 }
+
+test('one ticker opens on its overview', async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto('/explore?sel=AAPL');
+  await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(page.getByRole('heading', { name: 'AAPL · overview' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'AAPL headline numbers' })).toContainText(
+    'Market cap',
+  );
+  await page.getByRole('tab', { name: 'Compare' }).click();
+  await expect(page).toHaveURL(/tab=compare/);
+  await expectAccessible(page);
+  expect(errors).toEqual([]);
+});
 
 test('the tabs, the compare set and the columns live in the URL', async ({ page }) => {
   const errors = collectErrors(page);

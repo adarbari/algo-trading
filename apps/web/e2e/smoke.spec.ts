@@ -3,9 +3,9 @@
  * ADMIN workspace is reachable, the top bar's workspace switch and section links navigate, and
  * both workspaces are accessible in dark (the default) and light.
  */
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
+import { expectAccessible } from './a11y';
 import { mockApi } from './mock-api';
 
 function collectErrors(page: Page): string[] {
@@ -22,11 +22,6 @@ async function useTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
   await page.evaluate((t) => {
     document.documentElement.setAttribute('data-theme', t);
   }, theme);
-}
-
-async function expectAccessible(page: Page): Promise<void> {
-  const axe = await new AxeBuilder({ page }).analyze();
-  expect(axe.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
 }
 
 // Every page the smoke test opens gets its API answered from recorded fixtures.

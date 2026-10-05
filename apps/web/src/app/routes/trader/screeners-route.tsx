@@ -5,6 +5,7 @@
  */
 import { createRoute, useNavigate } from '@tanstack/react-router';
 
+import { compareSearch } from '@/features/idea-compare';
 import { NewScreenerPage, ScreenerBuilderPage } from '@/pages/screener-builder';
 import { ScreenerResultsPage } from '@/pages/screener-results';
 import { ScreenersPage } from '@/pages/trader-screeners';
@@ -44,6 +45,10 @@ function ScreenerResultsRoute() {
       onOpenTicker={(symbol) =>
         void navigate({ to: '/explore', search: { sel: symbol, focus: symbol } })
       }
+      onCompare={(symbols) => {
+        const search = compareSearch(symbols);
+        if (search) void navigate({ to: '/explore', search });
+      }}
     />
   );
 }

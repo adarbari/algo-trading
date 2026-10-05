@@ -38,9 +38,9 @@
     "items": [
       {
         "rank": 1,
-        "instrument_id": "EQ:DKNG",
-        "symbol": "DKNG",
-        "name": "DraftKings Inc.",
+        "instrument_id": "EQ:AAPL",
+        "symbol": "AAPL",
+        "name": "Apple Inc.",
         "decision": "QUALIFIED",
         "score": 90,
         "reasons": "",

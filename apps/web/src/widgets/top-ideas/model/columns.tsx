@@ -1,11 +1,12 @@
 /**
- * The top-ideas table's columns: rank, ticker, the screeners that picked it (chips, by name),
+ * The top-ideas table's columns: rank, ticker, the screeners that picked it (by name; each opens
+ * that screener's results),
  * the best decision, score, the screeners' stored display values (IV30, HV30,
  * IV / HV and the best put: a column appears only when some idea has a value for it), next
  * earnings, the closest expiry in days (flagged when earnings come first) and the watch-outs.
  */
 import {
-  Chip,
+  Button,
   Mono,
   Stack,
   StatusBadge,
@@ -104,10 +105,42 @@ const watchOutColumn: DataTableColumn<Idea> = {
 };
 
 /** The columns for these ideas (the display-value columns depend on what screeners stored). */
-export function ideaColumns(ideas: readonly Idea[]): DataTableColumn<Idea>[] {
-  const [front, back] = [BASE.slice(0, 6), BASE.slice(6)];
+export function ideaColumns(
+  ideas: readonly Idea[],
+  onOpenScreener: (screenerId: string) => void,
+): DataTableColumn<Idea>[] {
+  const base = BASE.map((column) =>
+    column.id === 'screeners' ? screenersColumn(onOpenScreener) : column,
+  );
+  const [front, back] = [base.slice(0, 6), base.slice(6)];
   return [...front, ...metricColumns(ideas), ...back, watchOutColumn];
 }
+
+/** The screeners that picked the ticker, each a button to that screener's results. */
+const screenersColumn = (onOpenScreener: (screenerId: string) => void): DataTableColumn<Idea> => ({
+  id: 'screeners',
+  header: 'Screeners',
+  description:
+    "Every screener that picked the ticker, highest priority first; each opens that screener's results",
+  value: (idea) => idea.picks.length,
+  width: 'lg',
+  grow: true,
+  cell: ({ row }) => (
+    <Stack direction="row" gap={1} wrap>
+      {row.picks.map((pick) => (
+        <Button
+          key={pick.screenerId}
+          size="sm"
+          onClick={() => {
+            onOpenScreener(pick.screenerId);
+          }}
+        >
+          {pick.screenerName}
+        </Button>
+      ))}
+    </Stack>
+  ),
+});
 
 const BASE: DataTableColumn<Idea>[] = [
   {
@@ -133,13 +166,6 @@ const BASE: DataTableColumn<Idea>[] = [
     value: (idea) => idea.picks.length,
     width: 'lg',
     grow: true,
-    cell: ({ row }) => (
-      <Stack direction="row" gap={1} wrap>
-        {row.picks.map((pick) => (
-          <Chip key={pick.screenerId} label={pick.screenerName} />
-        ))}
-      </Stack>
-    ),
   },
   {
     id: 'decision',

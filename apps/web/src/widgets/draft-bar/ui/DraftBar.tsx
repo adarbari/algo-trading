@@ -11,7 +11,12 @@ import { FinaliseButton, RebaseBanner } from '@/features/screener-finalise';
 
 import { draftState } from '../model/state';
 
-export function DraftBar() {
+export interface DraftBarProps {
+  /** Without the page heading (inside a drawer): the state and the actions only. */
+  compact?: boolean;
+}
+
+export function DraftBar({ compact = false }: DraftBarProps) {
   const builder = useScreenerBuilder();
   const { detail } = builder;
   const state = draftState(builder);
@@ -29,11 +34,13 @@ export function DraftBar() {
     <Stack gap={3}>
       <Stack direction="row" gap={3} align="center" justify="between" wrap>
         <Stack gap={1}>
-          <Text size="sm" tone="muted">{`Screeners / ${builder.id}`}</Text>
+          {!compact && <Text size="sm" tone="muted">{`Screeners / ${builder.id}`}</Text>}
           <Stack direction="row" gap={2} align="baseline" wrap>
-            <Heading level={1}>
-              <Mono size="xl">{builder.id}</Mono>
-            </Heading>
+            {!compact && (
+              <Heading level={1}>
+                <Mono size="xl">{builder.id}</Mono>
+              </Heading>
+            )}
             <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
             {copyOf && !untouched && (
               <Text size="sm" tone="muted">

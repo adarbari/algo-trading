@@ -1,6 +1,7 @@
 # ADR 0034: Instrument descriptions: a capped nightly pull into `instruments/description`
 
-**Status:** proposed (2026-10-05; a new data source decision, held for owner review). Extends
+**Status:** accepted (2026-10-05; owner decision, including Massive's terms and staying on the
+free tier, so the 100 a night cap and the existing pacing stand). Extends
 [0012](0012-data-vendors.md) (Massive and SEC are used for a new dataset) and fills the
 planned `description` column of [layers.md](../data/layers.md) in a table of its own.
 
@@ -60,7 +61,7 @@ alike. Nothing stores one. Checked live on 2026-10-04 with the repo's Massive ke
   preferreds and notes get none.
 - Time to fill: ETFs in one run (about 90 seconds for 6 quarters, ~0.5 GB downloaded, kept as
   raw for 7 days); stocks 5.7k requests, about 20 hours, or 57 nights at the default cap.
-- Massive's terms for showing its descriptions are not verified; this is a personal tool.
+- The owner approved Massive's terms for showing its descriptions.
   Switching the stock source later changes one source, not the table.
 - A fund the SEC fund map lists after its quarter was read stays without text until the next
   forced reread (`--force`); the texts lose some apostrophes in the SEC's XBRL.

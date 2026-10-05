@@ -250,4 +250,49 @@ describe('DataTable', () => {
     expect(cells[0]?.textContent).toMatch(/%/);
     await expectNoA11yViolations(container);
   });
+
+  it('moves the active row with j / k and arrows, reporting each change', async () => {
+    const onActiveRowChange = vi.fn();
+    render(<Table onActiveRowChange={onActiveRowChange} />);
+    screen.getByRole('grid', { name: 'Tickers' }).focus(); // focusing makes the first row active
+    await userEvent.keyboard('jjk');
+    expect(onActiveRowChange.mock.calls.map(([row]) => (row as TickerRow).symbol)).toEqual(
+      [0, 1, 2, 1].map((i) => rows[i]?.symbol),
+    );
+    await userEvent.keyboard('{ArrowUp}');
+    expect(onActiveRowChange).toHaveBeenCalledTimes(5);
+  });
+
+  it("runs the caller's keys on the active row, and leaves j / k to a caller that binds them", async () => {
+    const onC = vi.fn();
+    const onJ = vi.fn();
+    const onActiveRowChange = vi.fn();
+    render(<Table rowKeys={{ c: onC, j: onJ }} onActiveRowChange={onActiveRowChange} />);
+    screen.getByRole('grid', { name: 'Tickers' }).focus();
+    await userEvent.keyboard('{ArrowDown}c');
+    expect(onC).toHaveBeenCalledWith(rows[1]);
+    await userEvent.keyboard('j');
+    expect(onJ).toHaveBeenCalledWith(rows[1]);
+    expect(onActiveRowChange).toHaveBeenCalledTimes(2); // focus, ArrowDown: j did not move it
+  });
+
+  it('can make a click only select the row, and the caller can control the active row', async () => {
+    const onRowActivate = vi.fn();
+    const onActiveRowChange = vi.fn();
+    const target = rows[2];
+    if (!target) throw new Error('rows');
+    const { container } = render(
+      <Table
+        onRowActivate={onRowActivate}
+        activateOnClick={false}
+        onActiveRowChange={onActiveRowChange}
+        activeRowId={rows[0]?.id ?? null}
+      />,
+    );
+    await userEvent.click(screen.getByText(target.symbol));
+    expect(onActiveRowChange).toHaveBeenCalledWith(target);
+    expect(onRowActivate).not.toHaveBeenCalled();
+    const active = container.querySelector('[data-active]');
+    expect(active?.getAttribute('data-row-id')).toBe(rows[0]?.id); // controlled: the caller decides
+  });
 });

@@ -150,10 +150,15 @@ def _shares(ctx: TaskContext, p: Params) -> RunRecord:
 
 
 def _earnings(ctx: TaskContext, p: Params) -> RunRecord:
+    session = session_of(p)
     days = p.get("days") or ctx.settings.earnings_days
-    return earnings.ingest_earnings(
-        ctx, ctx.sources["nasdaq_earnings"], session_of(p), p.get("start"), days=days
-    )
+    start = p.get("start")
+    if start is None:
+        # Also the last week: those reports now carry the reported EPS and surprise, and
+        # `last_earnings_date` stays current. An explicit --start is taken as given.
+        back = ctx.settings.earnings_lookback_days
+        start, days = session - timedelta(days=back), days + back
+    return earnings.ingest_earnings(ctx, ctx.sources["nasdaq_earnings"], session, start, days=days)
 
 
 def _bars(ctx: TaskContext, p: Params) -> RunRecord:

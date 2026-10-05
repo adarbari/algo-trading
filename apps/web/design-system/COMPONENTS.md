@@ -317,7 +317,7 @@ Source: `design-system/components/Combobox`
 
 ### DataTable
 
-DataTable: the generic data grid (screener results, ticker lists, quality checks). Typed columns (header, description, accessor, format, cell slot); single-column sorting with `aria-sort`; numbers right-aligned in tabular figures through the shared formatters (number, percent, `$13.99B`, date, signed delta with up / down tone); a column picker fed by the caller's columns and descriptions; controlled row selection (checkbox column, Shift-click ranges); a sticky header; virtual scrolling with fixed row heights per density (tens of thousands of rows); loading / empty / error states; keyboard navigation (arrows, Page Up / Down, Home / End move the active row, Enter activates it, Space selects it); horizontal scrolling on narrow widths. Built on TanStack Table + Virtual, which stay internal.
+DataTable: the generic data grid (screener results, ticker lists, quality checks). Typed columns (header, description, accessor, format, cell slot); single-column sorting with `aria-sort`; numbers right-aligned in tabular figures through the shared formatters (number, percent, `$13.99B`, date, signed delta with up / down tone); a column picker fed by the caller's columns and descriptions; controlled row selection (checkbox column, Shift-click ranges); a sticky header; virtual scrolling with fixed row heights per density (tens of thousands of rows); loading / empty / error states; keyboard navigation (arrows or j / k, Page Up / Down, Home / End move the active row, Enter activates it, Space selects it, and the caller's own `rowKeys` act on it); the active row can be controlled; horizontal scrolling on narrow widths. Built on TanStack Table + Virtual, which stay internal.
 
 Source: `design-system/components/DataTable`
 
@@ -338,7 +338,11 @@ Source: `design-system/components/DataTable`
 | `selectable` | `boolean` | no | Add the checkbox column. Selection is controlled: pass `selectedIds` and `onSelectionChange`. |
 | `selectedIds` | `readonly string[]` | no |  |
 | `onSelectionChange` | `(ids: string[]) => void` | no |  |
-| `onRowActivate` | `(row: TRow) => void` | no | Enter on the active row, or a click on a row. |
+| `onRowActivate` | `(row: TRow) => void` | no | Enter on the active row, or a click on a row (unless `activateOnClick` is false). |
+| `activateOnClick` | `boolean` | no | A click activates the row (default), or only makes it the active row (`false`). |
+| `activeRowId` | `string \| null` | no | The active (keyboard) row id, when the caller controls it (else the table keeps it). |
+| `onActiveRowChange` | `(row: TRow) => void` | no | The active row changed: arrows, `j` / `k`, Home / End, Page Up / Down, or a click. |
+| `rowKeys` | `Readonly<Record<string, (row: TRow) => void>>` | no | Extra single-character keys for the active row (`c`, `x`), while the grid has focus. |
 | `status` | `'ready' \| 'loading' \| 'error'` | no | `ready` (default), `loading` (placeholder rows) or `error` (shows `errorMessage`). |
 | `errorMessage` | `ReactNode` | no |  |
 | `emptyMessage` | `ReactNode` | no | Shown when there are no rows. |

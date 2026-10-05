@@ -31,7 +31,7 @@ from typing import Any
 import pandas as pd
 
 from algotrade.core.model.fields import DESCRIPTION_TABLE
-from algotrade.data.reference import instruments, stored_descriptions
+from algotrade.data.reference import DESCRIPTION_COLUMNS, instruments, stored_descriptions
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import (
     IngestRun,
@@ -52,17 +52,7 @@ STOCK_TYPES = ("COMMON_STOCK", "ADR")
 ONLY = ("massive", "funds")
 CHECKPOINT_EVERY = 25
 FUNDS = "funds"  # staging key of the ETF rows
-COLUMNS = [
-    "instrument_id",
-    "symbol",
-    "description",
-    "description_source",
-    "homepage_url",
-    "total_employees",
-    "filed",
-    "accn",
-    "fetched_on",
-]
+COLUMNS = list(DESCRIPTION_COLUMNS)  # the table's columns, named once by the reader
 
 
 @dataclass(frozen=True)

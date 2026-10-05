@@ -49,6 +49,7 @@ min_interval_s = 0.0
 [nasdaq_earnings]                # earnings calendar
 enabled = true
 days = 60                        # forward window stored each night
+lookback_days = 7                # plus the last week, which now carries the reported EPS
 min_interval_s = 0.5             # spacing between requests
 
 [massive]                        # daily bars, splits, dividends, identifiers (needs the API key)

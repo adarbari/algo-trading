@@ -37,6 +37,7 @@ def test_the_committed_site_files_load() -> None:
     )
     sources, nightly, universe = load_sources(store), load_nightly(store), load_universe(store)
     assert sources.vendor("massive").min_interval_s == 12.5 and sources.actions_window == (-7, 30)
+    assert (sources.earnings_days, sources.earnings_lookback_days) == (60, 7)
     assert sources.vendor("cboe").enabled and sources.limits_dir == "var/run/limits"
     assert sources.vendor("sec_edgar").raw_retention_days == 7
     assert sources.vendor("cboe").raw_retention_days is None  # the global window
