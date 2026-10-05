@@ -1,4 +1,4 @@
-# ADR 0034: ETF holdings from issuer files, with SEC N-PORT as the universal fallback
+# ADR 0035: ETF holdings from issuer files, with SEC N-PORT as the universal fallback
 
 **Status:** proposed (2026-10-05; a new data source and a new grain, so it needs owner
 review). Extends [0012](0012-data-vendors.md), [0013](0013-universe.md) and

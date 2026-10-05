@@ -29,7 +29,7 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 |---|---|---|---|
 | Ticker universe | Nasdaq Trader symbol directory (`nasdaqlisted.txt`, `otherlisted.txt`, `options.txt`) | — | Official, free, updated daily |
 | S&P 500 membership | SPY daily holdings file (State Street) | — | Membership changes become events |
-| ETF holdings (top holdings and weights per fund) | **Issuer daily files**: State Street SPDR workbooks, iShares CSVs; **SEC N-PORT** for the funds they do not cover (ADR 0034) | Vanguard / Invesco / ARK sites (no usable public file, see below) | Proposed, needs owner review of the terms of use |
+| ETF holdings (top holdings and weights per fund) | **Issuer daily files**: State Street SPDR workbooks, iShares CSVs; **SEC N-PORT** for the funds they do not cover (ADR 0035) | Vanguard / Invesco / ARK sites (no usable public file, see below) | Proposed, needs owner review of the terms of use |
 | Company details (name, SIC, sector, state, fiscal year end) | SEC EDGAR submissions (free; contact email in the user agent) | Massive ticker details | Implemented, phase 1.7 |
 | Shares outstanding (market cap) | SEC EDGAR company facts (XBRL; free; same contact and pacing) | Massive ticker details (`share_class_shares_outstanding`) | Implemented, phase 2b.4 |
 | Daily stock and ETF bars (swing / momentum) | Massive (formerly Polygon) free tier: all US tickers, 2 years history, 5 calls/min; "grouped daily" = whole market in 1 call | Alpaca (free account), IBKR, Yahoo (unofficial, history backfill only) | |
@@ -124,7 +124,7 @@ yet stored. Paced by `[treasury] min_interval_s` (1 s; no published limit). The 
 published after the close, and the bond market keeps its own holidays (Columbus Day,
 Veterans Day), so a session can lack its own curve: `data.rates.curve` uses the latest one.
 
-## ETF holdings (implemented, ADR 0034)
+## ETF holdings (implemented, ADR 0035)
 
 One adapter per issuer behind `HoldingsSource` (`framework/base.py`); the `etf-holdings` task
 reads a fund from the first adapter that lists it. Probed 2026-10-05 with the project

@@ -1,4 +1,4 @@
-"""What each ETF holds -> ``holdings/etf`` (ADR 0034): one row per fund x holding x as-of date.
+"""What each ETF holds -> ``holdings/etf`` (ADR 0035): one row per fund x holding x as-of date.
 
 Issuers are adapters behind one shape (``HoldingsSource``), tried in priority order: the first
 that lists a fund publishes it (State Street's and iShares' daily files, then SEC N-PORT for the

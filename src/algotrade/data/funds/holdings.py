@@ -1,4 +1,4 @@
-"""ETF holdings (``holdings/etf``, ADR 0034): what a fund held on the issuer's latest date.
+"""ETF holdings (``holdings/etf``, ADR 0035): what a fund held on the issuer's latest date.
 
 Rows are stored by the run that read each fund's file (a few funds per run), keyed by fund,
 the issuer's ``as_of`` date and the holding's ``rank``. A fund's holdings are the rows of

@@ -15,7 +15,7 @@ the grains below. A few others are needed for a trading system.
 | **event** | something that happened to an instrument at a point in time | splits, dividends, earnings dates, symbol changes, index adds and removes, futures first-notice and expiry dates | irregular |
 | **bar(interval)** | an instrument × a time bucket | `1d` = ticker-day OHLCV; `1h`, `5m`, `1m` = ticker-day-time | nightly (`1d`), intraday later |
 | **curve** | a curve date × a tenor | `rates/treasury`: the Treasury par yield curve, one partition per curve date (ADR 0021) | daily |
-| **holdings** | an ETF × a holding × the issuer's as-of date | `holdings/etf`: the largest holdings of each fund with weights, the fund's total line count and the instrument each ticker resolves to (ADR 0034; one producer, the `etf-holdings` task) | weekly per fund |
+| **holdings** | an ETF × a holding × the issuer's as-of date | `holdings/etf`: the largest holdings of each fund with weights, the fund's total line count and the instrument each ticker resolves to (ADR 0035; one producer, the `etf-holdings` task) | weekly per fund |
 | **verification** | an instrument × a check, for a session | `verification/ibkr`: ours vs IBKR's value, diff, tolerance, PASS / WARN / FAIL / NA (ADR 0026; one producer, the `verify` task) | nightly (latest session) |
 | **chain snapshot** | a derivative contract × an observation time | end-of-day option chain: bid, ask, last, volume, open interest, IV, Greeks | nightly |
 | **tick** | a single trade or quote | trades, NBBO quotes | reserved; not planned on free data |

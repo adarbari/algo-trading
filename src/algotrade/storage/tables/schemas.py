@@ -310,7 +310,7 @@ TREASURY_RATES = _fixed(
     "rate_par float64!",
     "rate_cont float64!",
 )
-# L2: what an ETF holds (ADR 0034): one row per fund x holding x as-of date, the largest
+# L2: what an ETF holds (ADR 0035): one row per fund x holding x as-of date, the largest
 # ``[etf_holdings] keep_top`` holdings of the fund's file, ranked by weight (1 = largest).
 # ``as_of`` is the issuer's holdings date; the partition is the session of the run that read
 # it. Runs are increments (a few funds each), so they merge on (fund, as_of, rank); a later

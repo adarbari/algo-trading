@@ -133,7 +133,7 @@ purpose = "the domain read API: the only way consumers read market data (R1); fe
 
 [[dir]]
 path = "src/algotrade/data/funds"
-purpose = "reads about what a fund holds: ETF holdings (holdings/etf, ADR 0034), the latest rows per fund and the CUSIP to ticker bridge"
+purpose = "reads about what a fund holds: ETF holdings (holdings/etf, ADR 0035), the latest rows per fund and the CUSIP to ticker bridge"
 
 [[dir]]
 path = "src/algotrade/features"

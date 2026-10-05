@@ -344,7 +344,7 @@ detect = [{ string = "instruments/ibkr_contracts" }, { string = "volatility/ibkr
 
 [[responsibility]]
 id = "etf-holdings"
-description = "What each ETF holds (ADR 0034): the etf-holdings task reads the issuers' daily files and SEC N-PORT through HoldingsSource adapters (first issuer that lists a fund wins), ranks and trims each fund's lines, links tickers to instruments through SymbolResolver and writes holdings/etf; consumers read it only through data.funds.holdings (latest rows per fund) and the explore query behind GET /instruments/{id}/holdings"
+description = "What each ETF holds (ADR 0035): the etf-holdings task reads the issuers' daily files and SEC N-PORT through HoldingsSource adapters (first issuer that lists a fund wins), ranks and trims each fund's lines, links tickers to instruments through SymbolResolver and writes holdings/etf; consumers read it only through data.funds.holdings (latest rows per fund) and the explore query behind GET /instruments/{id}/holdings"
 owner = [
     "apps/ingestion/algotrade_ingestion/tasks/market/etf_holdings.py",
     "src/algotrade/data/funds/holdings.py",
@@ -353,7 +353,7 @@ allowed = [
     "src/algotrade/storage/tables/schemas.py",  # declares the table
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
 ]
-section = "docs/adr/0034-etf-holdings.md#decision"
+section = "docs/adr/0035-etf-holdings.md#decision"
 detect = [{ string = "holdings/etf" }]
 
 [[responsibility]]
