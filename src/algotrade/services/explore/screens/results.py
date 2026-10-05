@@ -1,4 +1,4 @@
-"""Screener configs with their schedule and latest run, and a screen's saved results for a
+"""Screener configs with their latest run, and a screen's saved results for a
 session (rows with decision, score, reasons and values; the run's audit and coverage)."""
 
 from collections import Counter

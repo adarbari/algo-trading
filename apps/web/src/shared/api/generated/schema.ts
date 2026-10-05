@@ -626,23 +626,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/screeners/{screener_id}/schedule": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Schedule */
-        put: operations["schedule_screeners__screener_id__schedule_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/screeners/{screener_id}/versions": {
         parameters: {
             query?: never;
@@ -994,8 +977,6 @@ export interface components {
              * @description strategy | screener (null when it does not resolve)
              */
             kind: string | null;
-            /** Schedule */
-            schedule: string | null;
             /**
              * Scope
              * @description site (a preset) or the user's id
@@ -1102,7 +1083,7 @@ export interface components {
         DraftBody: {
             /**
              * Document
-             * @description the screen's TOML keys as JSON (version and schedule are managed)
+             * @description the screen's TOML keys as JSON (the version is managed)
              */
             document: {
                 [key: string]: unknown;
@@ -2088,21 +2069,6 @@ export interface components {
             /** Theme */
             theme: string;
         };
-        /** Schedule */
-        Schedule: {
-            /** Schedule */
-            schedule: string | null;
-            /** Screener Id */
-            screener_id: string;
-        };
-        /** ScheduleBody */
-        ScheduleBody: {
-            /**
-             * Schedule
-             * @description "nightly", or null to switch it off
-             */
-            schedule: string | null;
-        };
         /** ScreenConfig */
         ScreenConfig: {
             config: components["schemas"]["ConfigSummary"];
@@ -2146,8 +2112,6 @@ export interface components {
             resolved: {
                 [key: string]: unknown;
             } | null;
-            /** Schedule */
-            schedule: string | null;
             /** Screener Id */
             screener_id: string;
             /** User */
@@ -2176,8 +2140,6 @@ export interface components {
              * @description the site preset the screen extends
              */
             preset_id: string | null;
-            /** Schedule */
-            schedule: string | null;
             /** Screener Id */
             screener_id: string;
             /**
@@ -3785,44 +3747,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Draft"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    schedule_screeners__screener_id__schedule_put: {
-        parameters: {
-            query?: {
-                /** @description whose configs (a label until auth; default the API's) */
-                user?: string | null;
-            };
-            header?: never;
-            path: {
-                screener_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ScheduleBody"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Schedule"];
                 };
             };
             /** @description Validation Error */

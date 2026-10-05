@@ -1,4 +1,4 @@
-"""ConfigWriter: drafts, immutable versions, schedules and user features (file + memory)."""
+"""ConfigWriter: drafts, immutable versions and user features (file + memory)."""
 
 import tomllib
 from pathlib import Path
@@ -59,20 +59,11 @@ def test_versions_are_immutable_and_latest_wins(writer: Any) -> None:
         writer.add_version("alice", "mine", 1, {"id": "other"})
     assert writer.version("alice", "mine", 1) == DOC | {"version": 1}
     assert writer.versions("alice", "mine") == [1, 2]
-    assert writer.load("alice", "screeners", "mine") == DOC | {"version": 2, "schedule": None}
+    assert writer.load("alice", "screeners", "mine") == DOC | {"version": 2}
     assert writer.names("alice", "screeners") == ["mine"]
     assert "alice" in writer.users()
     with pytest.raises(ConfigurationError, match="version"):
         writer.add_version("alice", "mine", 0, DOC)
-
-
-def test_schedule_switch_overlays_the_latest_version(writer: Any) -> None:
-    writer.add_version("alice", "mine", 1, DOC | {"version": 1})
-    writer.set_schedule("alice", "mine", "nightly")
-    assert writer.schedule("alice", "mine") == "nightly"
-    assert writer.load("alice", "screeners", "mine")["schedule"] == "nightly"
-    writer.set_schedule("alice", "mine", None)
-    assert writer.schedule("alice", "mine") is None
 
 
 def test_features_are_saved_per_theme(writer: Any) -> None:
@@ -102,9 +93,8 @@ def test_file_layout_and_atomicity(tmp_path: Path) -> None:
     writer = FileConfigWriter(tmp_path)
     writer.save_draft("alice", "mine", DOC)
     writer.add_version("alice", "mine", 1, DOC)
-    writer.set_schedule("alice", "mine", "nightly")
     screen = tmp_path / "users" / "alice" / "screeners" / "mine"
-    assert sorted(p.name for p in screen.iterdir()) == ["draft.toml", "schedule.toml", "v1.toml"]
+    assert sorted(p.name for p in screen.iterdir()) == ["draft.toml", "v1.toml"]
     before = (screen / "v1.toml").read_text()
     with pytest.raises(VersionExistsError):
         writer.add_version("alice", "mine", 1, {"id": "x"})

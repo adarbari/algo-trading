@@ -2,7 +2,7 @@
  * Trader > Screeners end to end, against the production build with the API mocked from
  * fixtures shaped like the authoring and preview endpoints (builder-api.ts): the list with its
  * presets, the Builder (criteria, live debounced preview with summary, funnel and rows, draft
- * save / discard / finalize, the separate schedule switch, rebase, a preview error naming its
+ * save / discard / finalize, rebase, a preview error naming its
  * criterion), adding a formula feature, copying a preset, starting a new screener, accessibility.
  */
 import AxeBuilder from '@axe-core/playwright';
@@ -44,7 +44,6 @@ test('the list shows your screeners and the site presets', async ({ page }) => {
       .getByRole('link', { name: 'Screeners' }),
   ).toHaveAttribute('aria-current', 'page');
   const mine = page.getByRole('grid', { name: 'Your screeners' });
-  await expect(mine.getByRole('row', { name: /my-vrp/ })).toContainText('Nightly');
   await expect(mine.getByRole('row', { name: /my-vrp/ })).toContainText('v1 + draft');
   // A draft that was never finalized is listed too.
   await expect(mine.getByRole('row', { name: /idea-draft/ })).toContainText('DRAFT');
@@ -164,15 +163,13 @@ test('discarding the draft goes back to the saved version', async ({ page }) => 
   await expect(page.getByText('v1 · finalized')).toBeVisible();
 });
 
-test('the nightly schedule is its own switch', async ({ page }) => {
-  const mock = await mockBuilderApi(page);
+test('there is no schedule switch: a finalised screen runs nightly (ADR 0033)', async ({
+  page,
+}) => {
+  await mockBuilderApi(page);
   await page.goto('/screeners/my-vrp/edit');
-  const nightly = page.getByRole('checkbox', { name: 'Run nightly' });
-  await expect(nightly).toBeChecked();
-  await nightly.click();
-  await expect(nightly).not.toBeChecked();
-  await expect.poll(() => mock.schedules).toEqual([{ id: 'my-vrp', schedule: null }]);
-  expect(mock.finalised).toEqual([]);
+  await expect(page.getByRole('heading', { level: 1, name: 'my-vrp' })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'Run nightly' })).toHaveCount(0);
 });
 
 test('rebasing re-pins the preset and drops the banner', async ({ page }) => {

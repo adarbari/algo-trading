@@ -5,7 +5,6 @@
   "draft_error": null,
   "versions": [],
   "latest": null,
-  "schedule": null,
   "preset": {
     "preset_id": "vrp_scanner",
     "pinned": null,

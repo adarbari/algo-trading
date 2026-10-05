@@ -13,7 +13,6 @@
   "draft_error": null,
   "versions": [1],
   "latest": 1,
-  "schedule": "nightly",
   "preset": {
     "preset_id": "vrp_scanner",
     "pinned": 1,

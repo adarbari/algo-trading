@@ -77,7 +77,7 @@ def test_strategy_validation() -> None:
             "params": {"a": 1},
             "selection": {"name": "inline", "where": {"all": [RULE]}},
             "exports": ["e"],
-            "schedule": "nightly",
+            "schedule": "nightly",  # legacy: accepted and ignored (ADR 0033)
             "screening": {"min_coverage": 0.5},
         },
         "c",
@@ -89,7 +89,6 @@ def test_strategy_validation() -> None:
         ({**base, "impl": 3}, "impl"),
         ({**base, "params": [1]}, "params"),
         ({**base, "selection": 3}, "preset name or a selection table"),
-        ({**base, "schedule": "hourly"}, "schedule"),
         ({**base, "exports": "csv"}, "exports"),
         ({**base, "bogus": 1}, "unknown keys"),
         ({**base, "name": " "}, "display name"),

@@ -45,7 +45,7 @@ from algotrade_ingestion.workflows.nightly.steps import (
     run_isolated,
 )
 
-SCREENS = "screens"  # not an ingestion task: one `screen` job per scheduled screener
+SCREENS = "screens"  # not an ingestion task: one `screen` job per screener
 PURGE = "purge-raw"
 LATEST_ONLY = "latest closed session only (the source serves the current snapshot)"
 

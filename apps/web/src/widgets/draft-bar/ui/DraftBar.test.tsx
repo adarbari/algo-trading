@@ -38,7 +38,6 @@ const builder = (patch: Record<string, unknown> = {}, detail: Record<string, unk
     draft_error: null,
     versions: [1],
     latest: 1,
-    schedule: 'nightly',
     preset: { preset_id: 'vrp', pinned: 1, current: 1, rebase_available: false },
     ...detail,
   },
@@ -68,7 +67,7 @@ describe('DraftBar', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'my-vrp' })).toBeInTheDocument();
     expect(screen.getByText('DRAFT v2')).toBeInTheDocument();
     expect(screen.getByText('Your copy of vrp v1')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Run nightly' })).toBeChecked();
+    expect(screen.queryByRole('checkbox', { name: 'Run nightly' })).toBeNull(); // no switch (ADR 0033)
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Finalize v2' })).toBeEnabled();
     await expectNoA11yViolations(container);
@@ -119,7 +118,6 @@ describe('DraftBar', () => {
         draft: null,
         versions: [],
         latest: null,
-        schedule: null,
         preset: { preset_id: 'vrp', pinned: null, current: 3, rebase_available: false },
       },
     );

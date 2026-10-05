@@ -17,7 +17,6 @@ class ConfigSummary:
     scope: str  # "site" (a preset) or the user's id
     kind: str | None  # strategy | screener (None when it does not resolve)
     impl: str | None
-    schedule: str | None
     selection: str | None  # the named selection, or "inline"
     hash: str | None
     error: str | None  # why the config does not resolve
@@ -31,12 +30,10 @@ def _summary(store: ReadStore, config_id: str, scope: str) -> ConfigSummary:
     try:
         resolved = resolve_config(store.configs, config_id, _owner(scope))
     except ConfigurationError as exc:
-        return ConfigSummary(config_id, scope, None, None, None, None, None, str(exc))
+        return ConfigSummary(config_id, scope, None, None, None, None, str(exc))
     c = resolved.config
     selection = c.selection if isinstance(c.selection, str) or c.selection is None else "inline"
-    return ConfigSummary(
-        config_id, scope, c.kind, c.impl, c.schedule, selection, resolved.hash, None
-    )
+    return ConfigSummary(config_id, scope, c.kind, c.impl, selection, resolved.hash, None)
 
 
 def config_list(store: ReadStore, kind: str | None = None) -> list[ConfigSummary]:
@@ -62,7 +59,7 @@ class ConfigDetail:
     user: str
     hash: str
     layers: list[str]
-    resolved: dict[str, Any]  # kind, impl, params, selection, schedule, exports, settings
+    resolved: dict[str, Any]  # kind, impl, params, selection, exports, settings
 
 
 def config_detail(store: ReadStore, config_id: str) -> ConfigDetail:

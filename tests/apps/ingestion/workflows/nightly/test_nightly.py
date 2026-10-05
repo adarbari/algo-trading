@@ -212,13 +212,12 @@ def test_woke_during_market_hours_ingests_nothing_new(fake: Callable[..., Calls]
 # ----------------------------------------------------------------------------- jobs
 
 
-def _scheduled(*ids: str) -> Callable[..., list[SimpleNamespace]]:
+def _nightly(*ids: str) -> Callable[..., list[SimpleNamespace]]:
     configs = [
         SimpleNamespace(config=SimpleNamespace(id=i, kind="screener"), user=UserContext(u))
         for i, u in ((i, "alice" if i.startswith("a") else SITE_USER) for i in ids)
     ]
-    configs.append(SimpleNamespace(config=SimpleNamespace(id="bt", kind="backtest")))
-    return lambda store, schedule: configs
+    return lambda store: configs
 
 
 def _runner(
@@ -266,7 +265,7 @@ def test_screens_are_submitted_as_jobs(
     fake: Callable[..., Calls], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     fake()
-    monkeypatch.setattr(screens_module, "scheduled", _scheduled("site_one", "a_thin"))
+    monkeypatch.setattr(screens_module, "nightly_screeners", _nightly("site_one", "a_thin"))
     writer = store()
     runner, seen = _runner(writer, _configs(tmp_path), FakeNotifier())
     params = {"session": D.isoformat(), "catch_up": False, "export_dir": "out"}
@@ -287,7 +286,7 @@ def test_failed_screen_jobs_fail_the_step(
     fake: Callable[..., Calls], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     fake()
-    monkeypatch.setattr(screens_module, "scheduled", _scheduled("broken"))
+    monkeypatch.setattr(screens_module, "nightly_screeners", _nightly("broken"))
     writer = store()
     runner, _ = _runner(writer, MemoryConfigStore({}))
     step = screens_module.screen_jobs(runner, MemoryConfigStore({}), None)(D)
@@ -303,7 +302,7 @@ def test_notifies_on_non_complete_and_always_writes_the_summary(
     fake: Callable[..., Calls], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     fake(fail=("bars",))
-    monkeypatch.setattr(screens_module, "scheduled", _scheduled())
+    monkeypatch.setattr(screens_module, "nightly_screeners", _nightly())
     notifier = FakeNotifier()
     runner, _ = _runner(store(), _configs(tmp_path), notifier)
     try:
@@ -325,7 +324,7 @@ def test_delivery_problems_are_warnings_never_failures(
     fake: Callable[..., Calls], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     fake()
-    monkeypatch.setattr(screens_module, "scheduled", _scheduled())
+    monkeypatch.setattr(screens_module, "nightly_screeners", _nightly())
     notifier = FakeNotifier(warning="email not configured: set ALGOTRADE_NOTIFY_EMAIL_TO")
     runner, _ = _runner(store(), _configs(tmp_path), notifier)
     job = runner.run("nightly", {"session": D.isoformat()}, UserContext(SITE_USER))
@@ -347,7 +346,7 @@ def test_a_raising_notifier_is_a_warning(
     fake: Callable[..., Calls], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     fake()
-    monkeypatch.setattr(screens_module, "scheduled", _scheduled())
+    monkeypatch.setattr(screens_module, "nightly_screeners", _nightly())
     runner, _ = _runner(store(), _configs(tmp_path), BrokenNotifier())
     job = runner.run("nightly", {"session": D.isoformat()}, UserContext(SITE_USER))
     runner.shutdown()
@@ -358,7 +357,7 @@ def test_complete_runs_and_disabled_notification_stay_quiet(
     fake: Callable[..., Calls], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     calls = fake()
-    monkeypatch.setattr(screens_module, "scheduled", _scheduled())
+    monkeypatch.setattr(screens_module, "nightly_screeners", _nightly())
     quiet = FakeNotifier()
     runner, _ = _runner(store(), _configs(tmp_path), quiet)
     runner.run("nightly", {"session": D.isoformat()}, UserContext(SITE_USER))

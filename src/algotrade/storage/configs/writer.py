@@ -1,11 +1,11 @@
 """Write access to L4 user configs (ADR 0029): a rule screen's draft, its immutable finalised
-versions and its schedule switch, and a user's expression-feature files.
+versions, and a user's expression-feature files.
 
 ``ConfigWriter`` extends the read-only ``ConfigStore`` protocol, so one object serves the
 resolver (which sees each user screen's latest version) and the writes. Only
 ``services/authoring`` uses it (import-linter). Every write is user-scoped
 (``config/users/<u>/``; never ``site``), keyed by validated ids, and atomic: a temp file in
-the same directory, then a rename (drafts, schedules, features) or a hard link that fails if
+the same directory, then a rename (drafts, features) or a hard link that fails if
 the target exists (versions: a ``v<N>.toml`` is never overwritten). The memory writer has the
 same semantics for tests; a DB backend can replace both under the protocol later.
 """
@@ -25,7 +25,6 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
 from algotrade.storage.configs.files import (
     DRAFT,
-    SCHEDULE,
     SCREENERS,
     SITE,
     FileConfigStore,
@@ -33,7 +32,7 @@ from algotrade.storage.configs.files import (
     read_toml,
     version_file,
 )
-from algotrade.storage.configs.store import ConfigStore, screen_document, split_version
+from algotrade.storage.configs.store import ConfigStore, split_version
 
 MAX_DOCUMENT_BYTES = 64 * 1024  # a config is a few KiB; refuse anything far larger
 
@@ -43,7 +42,7 @@ class VersionExistsError(ConfigurationError):
 
 
 class ConfigWriter(ConfigStore, Protocol):
-    """Drafts, versions and schedules of ``user``'s rule screens; ``user``'s feature files."""
+    """Drafts and versions of ``user``'s rule screens; ``user``'s feature files."""
 
     def draft(self, user: str, name: str) -> dict[str, Any] | None: ...
 
@@ -66,10 +65,6 @@ class ConfigWriter(ConfigStore, Protocol):
     def add_version(self, user: str, name: str, version: int, document: Mapping[str, Any]) -> None:
         """Write ``v<version>``; ``VersionExistsError`` if it exists (never overwritten)."""
         ...
-
-    def schedule(self, user: str, name: str) -> str | None: ...
-
-    def set_schedule(self, user: str, name: str, schedule: str | None) -> None: ...
 
     def save_features(self, user: str, theme: str, document: Mapping[str, Any]) -> None:
         """Replace ``users/<user>/features/<theme>.toml``."""
@@ -175,10 +170,6 @@ def _version(version: int) -> int:
     return version
 
 
-def _schedule_document(schedule: str | None) -> dict[str, Any]:
-    return {} if schedule is None else {"schedule": schedule}
-
-
 # ----------------------------------------------------------------------------- files
 class FileConfigWriter(FileConfigStore):
     """The TOML files under the config root (layout: ``storage/configs/files.py``)."""
@@ -240,13 +231,6 @@ class FileConfigWriter(FileConfigStore):
         path = self.screen_dir(_user(user), name) / version_file(_version(version))
         self._write(user, path, toml_text(document), exclusive=True)
 
-    def schedule(self, user: str, name: str) -> str | None:
-        return self.screen_schedule(_user(user), name)
-
-    def set_schedule(self, user: str, name: str, schedule: str | None) -> None:
-        path = self.screen_dir(_user(user), name) / SCHEDULE
-        self._write(user, path, toml_text(_schedule_document(schedule)))
-
     def save_features(self, user: str, theme: str, document: Mapping[str, Any]) -> None:
         path = (
             self.root / "users" / _user(user) / "features" / f"{validate_id('theme', theme)}.toml"
@@ -264,7 +248,7 @@ def _copy(document: Mapping[str, Any]) -> dict[str, Any]:
 
 
 class MemoryConfigWriter(MemoryConfigStore):
-    """The memory store plus drafts, versions and schedules (tests)."""
+    """The memory store plus drafts and versions (tests)."""
 
     def __init__(
         self,
@@ -274,7 +258,6 @@ class MemoryConfigWriter(MemoryConfigStore):
         super().__init__(documents or {}, overrides)
         self._drafts: dict[tuple[str, str], dict[str, Any]] = {}
         self._versions: dict[tuple[str, str], dict[int, dict[str, Any]]] = {}
-        self._schedules: dict[tuple[str, str], str] = {}
 
     def _screen(self, user: str, name: str) -> tuple[str, str]:
         return _user(user), validate_id("screener", name)
@@ -288,7 +271,7 @@ class MemoryConfigWriter(MemoryConfigStore):
             return None
         if pinned is not None:
             return versions.get(pinned)
-        return screen_document(versions[max(versions)], self._schedules.get((scope, name)))
+        return versions[max(versions)]
 
     def names(self, scope: str, kind: str) -> list[str]:
         if kind != SCREENERS or scope == SITE:
@@ -323,16 +306,6 @@ class MemoryConfigWriter(MemoryConfigStore):
         if _version(version) in versions:
             raise VersionExistsError(f"v{version} exists: versions are immutable")
         versions[version] = _copy(document)
-
-    def schedule(self, user: str, name: str) -> str | None:
-        return self._schedules.get(self._screen(user, name))
-
-    def set_schedule(self, user: str, name: str, schedule: str | None) -> None:
-        key = self._screen(user, name)
-        if schedule is None:
-            self._schedules.pop(key, None)
-        else:
-            self._schedules[key] = schedule
 
     def save_features(self, user: str, theme: str, document: Mapping[str, Any]) -> None:
         self._docs[(_user(user), "features", validate_id("theme", theme))] = _copy(document)

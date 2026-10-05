@@ -1,6 +1,6 @@
 /**
  * Playwright route mock for the Screeners pages (list, new, Builder): the configs list, one
- * screen's detail / versions, draft save and discard, finalise, schedule, copy, rebase, the live
+ * screen's detail / versions, draft save and discard, finalise, copy, rebase, the live
  * preview and the formula check / save, answering from e2e/fixtures/builder/ (shaped from the
  * API's schemas) with a little state so a flow reads back what it wrote. Every call it records
  * is exposed for assertions. Anything else falls through to the other mocks.
@@ -38,7 +38,6 @@ export interface BuilderMock {
   previews: Json[];
   discarded: string[];
   finalised: string[];
-  schedules: { id: string; schedule: unknown }[];
   copies: { id: string; preset: string }[];
   rebased: string[];
   checks: string[];
@@ -58,7 +57,6 @@ export async function mockBuilderApi(
     previews: [],
     discarded: [],
     finalised: [],
-    schedules: [],
     copies: [],
     rebased: [],
     checks: [],
@@ -80,7 +78,6 @@ export async function mockBuilderApi(
       status: 'DRAFT',
       latest: null,
       has_draft: true,
-      schedule: null,
       preset_id: 'vrp_scanner',
     },
     ...[...own].map((id) => {
@@ -92,7 +89,6 @@ export async function mockBuilderApi(
         status: versions.length > 0 ? 'FINAL' : 'DRAFT',
         latest: (detail['latest'] as number | null | undefined) ?? null,
         has_draft: detail['draft'] != null,
-        schedule: (detail['schedule'] as string | null | undefined) ?? null,
         preset_id: preset?.preset_id ?? null,
       };
     }),
@@ -191,7 +187,6 @@ export async function mockBuilderApi(
         user: 'abhinav',
         versions: [],
         latest: null,
-        schedule: null,
         preset: null,
         working: { criteria: {} },
       };
@@ -216,12 +211,6 @@ export async function mockBuilderApi(
         latest: version,
       };
       return json({ screener_id: id, version, hash: 'h-new' });
-    }
-    if (part === 'schedule' && method === 'PUT') {
-      const schedule = body()['schedule'];
-      mock.schedules.push({ id, schedule });
-      details[id] = { ...(detailOf(id) ?? {}), schedule };
-      return json({ screener_id: id, schedule });
     }
     if (part === 'rebase' && method === 'POST') {
       mock.rebased.push(id);

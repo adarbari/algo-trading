@@ -12,7 +12,6 @@ site/presets/screeners/<id>/v<N>.toml      L3 rule-screen preset versions: immut
                                            lock: architecture/preset_versions.toml); latest = max N
 users/<user>/screeners/<id>/v<N>.toml      L4 finalised rule screen: immutable; latest = max N
 users/<user>/screeners/<id>/draft.toml     L4 the Builder's working copy (never loaded to run)
-users/<user>/screeners/<id>/schedule.toml  L4 the schedule switch (``schedule = "nightly"``)
 
 Writes go through ``storage/configs/writer.py`` (``FileConfigWriter``) only (ADR 0029).
 """
@@ -26,12 +25,11 @@ from typing import Any
 
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.ids import validate_id
-from algotrade.storage.configs.store import KINDS, screen_document, split_version
+from algotrade.storage.configs.store import KINDS, split_version
 
 SITE = "site"
 SCREENERS = "screeners"
 DRAFT = "draft.toml"
-SCHEDULE = "schedule.toml"
 _ID_NAME = re.compile(r"[a-z0-9_-]{1,64}")  # core.model.ids: other names are not screens
 _VERSION_FILE = re.compile(r"v([1-9][0-9]{0,8})\.toml")
 
@@ -95,25 +93,14 @@ class FileConfigStore:
         found = (_VERSION_FILE.fullmatch(p.name) for p in directory.iterdir() if p.is_file())
         return sorted(int(m.group(1)) for m in found if m)
 
-    def screen_schedule(self, user: str, name: str) -> str | None:
-        if user == SITE:
-            return None
-        doc = read_toml(self.screen_dir(user, name) / SCHEDULE) or {}
-        value = doc.get("schedule")
-        return value if isinstance(value, str) else None
-
     def _screen(self, scope: str, name: str) -> Mapping[str, Any] | None:
-        """``name`` (latest version) or ``name@N`` (that version); a user's latest carries
-        their schedule switch, a pinned version or a site preset its own."""
+        """``name`` (latest version) or ``name@N`` (that version)."""
         name, pinned = split_version(name)
         versions = self.screen_versions(scope, name)
         version = pinned if pinned is not None else (versions[-1] if versions else None)
         if version is None or version not in versions:
             return None
-        document = read_toml(self.screen_dir(scope, name) / version_file(version)) or {}
-        if scope == SITE or pinned is not None:
-            return document
-        return screen_document(document, self.screen_schedule(scope, name))
+        return read_toml(self.screen_dir(scope, name) / version_file(version)) or {}
 
     def load(self, scope: str, kind: str, name: str) -> Mapping[str, Any] | None:
         if kind == "preferences" and scope == SITE:  # a user's, never the site's

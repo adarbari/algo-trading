@@ -4,7 +4,6 @@
     "scope": "site",
     "kind": "screener",
     "impl": "rules",
-    "schedule": null,
     "selection": "liquid_optionable",
     "hash": "h-vrp_scanner",
     "error": null
@@ -14,7 +13,6 @@
     "scope": "site",
     "kind": "screener",
     "impl": "short_premium_liquidity",
-    "schedule": null,
     "selection": "liquid_optionable",
     "hash": "h-short_premium_liquidity",
     "error": null
@@ -24,7 +22,6 @@
     "scope": "abhinav",
     "kind": "screener",
     "impl": "rules",
-    "schedule": "nightly",
     "selection": "liquid_optionable",
     "hash": "h-my-vrp",
     "error": null

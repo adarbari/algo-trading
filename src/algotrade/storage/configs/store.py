@@ -14,8 +14,8 @@ class ConfigStore(Protocol):
         documents read by ingestion (``universe``, ``sources``, ``rollups``, ...); ``features``
         are expression-feature files (``site/features/<theme>.toml``, or a user's
         ``users/<id>/features/<theme>.toml``). ``screeners`` are versioned rule screens:
-        ``name`` loads the latest version (a user's with their schedule switch applied,
-        ``screen_document``), ``name@N`` exactly version N; drafts are never loaded here."""
+        ``name`` loads the latest version, ``name@N`` exactly version N; drafts are never
+        loaded here."""
         ...
 
     def names(self, scope: str, kind: str) -> list[str]: ...
@@ -35,14 +35,6 @@ def split_version(name: str) -> tuple[str, int | None]:
     if not version.isdigit() or len(version) > 9 or int(version) < 1:
         raise ConfigurationError(f"{name!r}: the version after @ is a positive integer")
     return base, int(version)
-
-
-def screen_document(version: Mapping[str, Any], schedule: str | None) -> dict[str, Any]:
-    """A user rule screen as the resolver sees it: the (immutable) finalised version with the
-    separate schedule switch applied. ``schedule = None`` also clears a schedule inherited
-    from the preset it extends (a user screen runs nightly only when its switch is on). The
-    schedule says when a screen runs, not what it computes: it is not in the config hash."""
-    return {**version, "schedule": schedule}
 
 
 class OverlayConfigStore:
