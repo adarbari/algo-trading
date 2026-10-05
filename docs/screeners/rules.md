@@ -160,8 +160,9 @@ always resolves (preset versions are immutable); rebasing onto a newer version i
 
 ## Preview and results
 
-The Builder's preview (`POST /screeners/preview`, `services/explore/preview/screens.py`) runs
-the same `evaluate_screen` as the nightly `screen` job on the latest closed session and saves
+The Builder's preview (`POST /screeners/preview`, `services/preview/screens.py`) runs
+the same `evaluate_screen` as the nightly `screen` job on the request's session (the latest with
+daily bars, ADR 0036) and saves
 nothing. It returns the run summary, the decision counts, the funnel (each gating criterion in
 order: rows entering, passing, narrowly missing, failing, missing), the coverage and the top
 rows. The session's field frame is cached in-process, so editing a threshold, mode or

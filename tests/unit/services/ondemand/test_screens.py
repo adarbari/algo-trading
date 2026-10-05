@@ -7,8 +7,8 @@ from datetime import timedelta
 import pytest
 
 from algotrade.config.user import SITE_USER, UserContext
-from algotrade.services.explore.store import NotFoundError
 from algotrade.services.ondemand.screens import READY, OnDemandScreens, RunRequest
+from algotrade.services.read.context import NotFoundError
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.locks import held
 from algotrade.storage.runs import RunStatus

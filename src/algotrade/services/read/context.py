@@ -19,6 +19,7 @@ from collections import OrderedDict
 from collections.abc import Hashable, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -31,16 +32,20 @@ from algotrade.services.features import catalogue
 from algotrade.services.read.session import Grain, NotFoundError, Session, grain_of, resolve_session
 from algotrade.services.read.values import Unknown, UnknownCode
 from algotrade.storage.configs.store import ConfigStore
+from algotrade.storage.factory import open_backend, open_config_store
 from algotrade.storage.runs import RunRecord
 
 __all__ = [
+    "ConfigStore",
     "NotFoundError",
     "ReadContext",
     "ResultCache",
     "StoreContext",
+    "StoreReader",
     "Stores",
     "at_session",
     "open_context",
+    "open_read_stores",
     "open_stores",
     "partition",
     "partition_on",
@@ -108,6 +113,12 @@ class StoreContext:
 
 # What a session-free loader takes: a ``StoreContext``, or a ``ReadContext`` (a superset).
 Stores = StoreContext | ReadContext
+
+
+def open_read_stores(data_url: str, config_dir: str | Path) -> tuple[StoreReader, ConfigStore]:
+    """The store at ``data_url`` (read-only) and the configs under ``config_dir``: what an app
+    opens once and opens every request's context over (the API's ``deps.open_store``)."""
+    return StoreReader(open_backend(data_url)), open_config_store(config_dir)
 
 
 def open_stores(

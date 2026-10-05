@@ -1,4 +1,4 @@
-"""The API over the ``explore`` store (tests/conftest.py)."""
+"""The API over the golden ``api_golden`` store (tests/conftest.py)."""
 
 from collections.abc import Callable
 from dataclasses import replace
@@ -8,21 +8,20 @@ import pytest
 from fastapi.testclient import TestClient
 
 from algotrade.config.user import UserContext
-from algotrade.services.explore.store import ReadStore
 from algotrade.storage.configs.files import FileConfigStore
-from algotrade_api.deps import ApiSettings
+from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.main import create_app
 from tests.conftest import REPO_ROOT
 
 
 @pytest.fixture(scope="session")
-def ids(explore: tuple[ReadStore, dict[str, str]]) -> dict[str, str]:
-    return explore[1]
+def ids(api_golden: tuple[ReadStore, dict[str, str]]) -> dict[str, str]:
+    return api_golden[1]
 
 
 @pytest.fixture(scope="session")
-def client(explore: tuple[ReadStore, dict[str, str]]) -> TestClient:
-    return TestClient(create_app(ApiSettings("memory://", "config"), explore[0]))
+def client(api_golden: tuple[ReadStore, dict[str, str]]) -> TestClient:
+    return TestClient(create_app(ApiSettings("memory://", "config"), api_golden[0]))
 
 
 # A user feature of alice's (config/users/alice/features/vol.toml): hv20 in percent.
@@ -37,7 +36,7 @@ null_meaning = "hv20 is null"
 
 @pytest.fixture(scope="session")
 def user_client(
-    explore: tuple[ReadStore, dict[str, str]], tmp_path_factory: pytest.TempPathFactory
+    api_golden: tuple[ReadStore, dict[str, str]], tmp_path_factory: pytest.TempPathFactory
 ) -> Callable[[str], TestClient]:
     """A client for ``user`` (``ALGOTRADE_USER``) over configs where alice has a feature."""
     root: Path = tmp_path_factory.mktemp("configs")
@@ -47,7 +46,7 @@ def user_client(
     (root / "users" / "bob").mkdir()
 
     def client_for(user: str) -> TestClient:
-        store = replace(explore[0], configs=FileConfigStore(root), user=UserContext(user))
+        store = replace(api_golden[0], configs=FileConfigStore(root), user=UserContext(user))
         return TestClient(create_app(ApiSettings("memory://", str(root), user), store))
 
     return client_for

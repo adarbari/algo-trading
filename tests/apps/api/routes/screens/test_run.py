@@ -7,10 +7,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from algotrade.config.user import UserContext
-from algotrade.services.explore.store import store_over
 from algotrade.services.ondemand.screens import OnDemandScreens
 from algotrade_api.deps import ApiSettings
 from algotrade_api.main import create_app
+from tests.helpers.api_store import store_over
 from tests.helpers.ondemand_store import DAY, seeded_backend, site_configs
 
 RUN = "/screens/big_liquid/run"

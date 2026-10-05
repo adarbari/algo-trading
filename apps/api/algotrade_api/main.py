@@ -15,10 +15,10 @@ from fastapi.responses import JSONResponse
 
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.services.authoring.scope import ConfigWriter, ConflictError, ScreenNotFoundError
-from algotrade.services.explore.store import NotFoundError, ReadStore
 from algotrade.services.live.quotes import LiveQuotes
 from algotrade.services.ondemand.screens import OnDemandScreens, open_ondemand
 from algotrade.services.read.context import (
+    NotFoundError,
     ReadContext,
     ResultCache,
     StoreContext,
@@ -26,7 +26,7 @@ from algotrade.services.read.context import (
     open_stores,
 )
 from algotrade_api import __version__
-from algotrade_api.deps import ApiSettings
+from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.graphql.schema import graphql_router
 from algotrade_api.live import no_live, open_live
 from algotrade_api.routes import ROUTERS

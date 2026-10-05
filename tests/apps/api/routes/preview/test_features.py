@@ -5,6 +5,9 @@ from collections.abc import Callable
 
 from fastapi.testclient import TestClient
 
+from algotrade_api.deps import ApiSettings
+from algotrade_api.main import create_app
+
 
 def test_a_formula_is_typed_and_sampled(client: TestClient) -> None:
     body = {"expr": "price_stats.hv20 * 100", "sample": 2}
@@ -21,6 +24,15 @@ def test_a_label_formula_reports_its_categories(client: TestClient) -> None:
     got = client.post("/features/check", json={"expr": 'if(price_stats.close > 10, "hi", "lo")'})
     assert got.status_code == 200, got.text
     assert got.json()["type"] == "str" and got.json()["categories"] == ["hi", "lo"]
+
+
+def test_an_empty_store_checks_without_sampling() -> None:
+    app = create_app(ApiSettings("memory://", "config"))
+    got = TestClient(app).post("/features/check", json={"expr": "price_stats.close > 10"})
+    assert got.status_code == 200, got.text
+    assert (got.json()["session"], got.json()["sample"]) == (None, [])
+    bad = TestClient(app).post("/features/check", json={"expr": "price_stats.nope + 1"})
+    assert bad.status_code == 400
 
 
 def test_a_bad_formula_is_a_400_with_its_position(client: TestClient) -> None:

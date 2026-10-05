@@ -3,13 +3,13 @@ shared result cache, and ``partition``, which reads a session-grain table for ex
 session and never an older partition (ADR 0036 decision 6)."""
 
 from datetime import UTC, date, datetime
+from pathlib import Path
 
 import pandas as pd
 import pytest
 
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
-from algotrade.services.explore import store as explore_store
 from algotrade.services.read import context
 from algotrade.services.read.context import (
     NotFoundError,
@@ -17,6 +17,7 @@ from algotrade.services.read.context import (
     ResultCache,
     at_session,
     open_context,
+    open_read_stores,
     partition,
     partition_on,
     previous_session,
@@ -196,6 +197,7 @@ def test_result_cache_is_a_small_lru() -> None:
     assert (cache.get("a"), cache.get("b"), cache.get("c")) == (1, None, 3)
 
 
-def test_explore_re_exports_the_moved_names() -> None:
-    assert explore_store.NotFoundError is NotFoundError
-    assert explore_store.ResultCache is ResultCache
+def test_open_read_stores_opens_the_store_and_the_configs(tmp_path: Path) -> None:
+    reader, configs = open_read_stores("memory://", tmp_path)
+    assert reader.table_names() == []
+    assert configs.names("local", "screeners") == []

@@ -20,6 +20,7 @@ from algotrade.core.model.fields import COMPANY_TABLE, DESCRIPTION_TABLE, REFERE
 from algotrade.data import StoreReader
 from algotrade.data.funds.holdings import TABLE as HOLDINGS_TABLE
 from algotrade.data.reference import IBKR_CONTRACTS, UNIVERSE_TABLE, snapshot
+from algotrade.storage.tables.schemas import SCHEMA_VERSION
 
 BARS = "bars/1d"
 # The architecture registry at the repo root (the workspace installs this package editable).
@@ -106,6 +107,29 @@ class Session:
     pre_snapshot: bool
     present: tuple[str, ...]
     missing: tuple[str, ...]
+
+
+def latest_session(reader: StoreReader) -> dt.date | None:
+    """The session a read with no date serves: the latest ``bars/1d`` partition, else the
+    latest reference snapshot; None on an empty store. For what is not a page read: the
+    on-request runner's target session (ADR 0033), ``store_info``, ``make status``."""
+    latest = snapshot(reader, BARS) or snapshot(reader, REFERENCE_TABLE)
+    return latest.snapshot_date if latest is not None else None
+
+
+@dataclass(frozen=True)
+class StoreInfo:
+    """How fresh the store is (``GET /health``): the latest session (None: empty), the
+    stored tables and the storage schema version."""
+
+    latest_session: dt.date | None
+    tables: tuple[str, ...]
+    schema_version: str
+
+
+def store_info(reader: StoreReader) -> StoreInfo:
+    """The latest session, the stored tables and the schema version of ``reader``'s store."""
+    return StoreInfo(latest_session(reader), tuple(reader.table_names()), str(SCHEMA_VERSION))
 
 
 def resolve_session(

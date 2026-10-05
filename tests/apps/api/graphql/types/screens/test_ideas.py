@@ -7,12 +7,12 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from algotrade.config.user import UserContext
-from algotrade.services.explore.store import store_over
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade_api.deps import ApiSettings
 from algotrade_api.main import create_app
 from tests.apps.api.graphql.conftest import Graph
+from tests.helpers.api_store import store_over
 
 IDEAS = """query Ideas($limit: Int!, $names: [FeatureName!]!, $date: Date) {
   ideas(limit: $limit, date: $date) {

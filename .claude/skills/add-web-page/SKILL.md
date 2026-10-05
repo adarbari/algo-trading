@@ -17,16 +17,11 @@ No new HTML: pages, widgets, features and entities only compose `@algotrade/ui`.
    Page reads are GraphQL: the operation in the entity's `api/`, fragments from other entities
    through their `index.ts`, per-instrument values as `features(names: [feature('<name>')])`
    (ADR 0038), then `npm run api:generate`. REST (`add-api-endpoint`) only for a write or a
-   job. **Today's state:** the GraphQL layer arrives in read-model PR 4
-   (`docs/api/read-model.md` "Migration plan"); until then, and until the page's area has
-   moved, a new page read uses the old REST path only if the owner explicitly asks for that
-   path ("use the legacy path"; a feature request is not: name the read-model PR that
-   delivers it and ask); otherwise do the next migration PR first. On the legacy path too,
-   a per-instrument value comes as `features['<catalogue name>']`, never a new typed field
-   (`add-api-endpoint` "Legacy page reads"; a test fails it). Only `src/shared/api` talks HTTP.
+   job, live quotes or a preview POST. Every page reads GraphQL (the read-model track is
+   complete); there is no REST read path to extend. Only `src/shared/api` talks HTTP.
 2. **Entities** (`src/entities/<entity>/`): the domain model types (from the generated
-   types), read hooks (`useQuery` over `gql()` with `queryKeys.gql(...)`; legacy REST hooks use
-   `api.GET` via `unwrap`), and view components composing `@algotrade/ui`. Export them from
+   types), read hooks (`useQuery` over `gql()` with `queryKeys.gql(...)`; REST hooks for writes,
+   job polling and live quotes use the typed client via `unwrap`), and view components composing `@algotrade/ui`. Export them from
    `index.ts`. Reuse an existing entity before adding one. Render what the server sends: no
    fact derived from raw rows, no browser "today" against stored dates, no counts from a page
    (`architecture/web_forbidden_derivations.toml`, checked by `test_layout_web.py`).

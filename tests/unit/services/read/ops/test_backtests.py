@@ -5,7 +5,6 @@ a backtest run."""
 import pytest
 
 from algotrade.config.user import UserContext
-from algotrade.services.explore.store import ReadStore
 from algotrade.services.read.context import (
     ReadContext,
     open_context,
@@ -14,17 +13,20 @@ from algotrade.services.read.context import (
 )
 from algotrade.services.read.ops.backtests import load_backtest, load_backtests
 from algotrade.storage.tables.schemas import result_table
+from algotrade_api.deps import ReadStore
 
 
 @pytest.fixture(scope="module")
-def ctx(explore: tuple[ReadStore, dict[str, str]]) -> ReadContext:
-    store = explore[0]
+def ctx(api_golden: tuple[ReadStore, dict[str, str]]) -> ReadContext:
+    store = api_golden[0]
     return open_context(store.reader, store.configs, store.user)
 
 
-def test_the_list_newest_first(ctx: ReadContext, explore: tuple[ReadStore, dict[str, str]]) -> None:
+def test_the_list_newest_first(
+    ctx: ReadContext, api_golden: tuple[ReadStore, dict[str, str]]
+) -> None:
     runs = load_backtests(ctx)
-    assert [r.run_id for r in runs] == [explore[1]["backtest"]]
+    assert [r.run_id for r in runs] == [api_golden[1]["backtest"]]
     run = runs[0]
     assert (run.config_id, run.user, run.status, run.start) == (
         "sma_trend", "local", "complete", "2022-01-03",
@@ -32,8 +34,8 @@ def test_the_list_newest_first(ctx: ReadContext, explore: tuple[ReadStore, dict[
     assert run.metrics == {"sharpe": 1.2} and run.finished_at is not None
 
 
-def test_the_detail(ctx: ReadContext, explore: tuple[ReadStore, dict[str, str]]) -> None:
-    detail = load_backtest(ctx, explore[1]["backtest"])
+def test_the_detail(ctx: ReadContext, api_golden: tuple[ReadStore, dict[str, str]]) -> None:
+    detail = load_backtest(ctx, api_golden[1]["backtest"])
     assert detail is not None
     assert [p.equity for p in detail.equity] == [100000.0, 101000.0]
     assert [p.gross_exposure for p in detail.equity] == [0.0, 0.9]
@@ -46,25 +48,25 @@ def test_the_detail(ctx: ReadContext, explore: tuple[ReadStore, dict[str, str]])
 
 
 def test_not_a_backtest_run_is_none(
-    ctx: ReadContext, explore: tuple[ReadStore, dict[str, str]]
+    ctx: ReadContext, api_golden: tuple[ReadStore, dict[str, str]]
 ) -> None:
     assert load_backtest(ctx, "nope") is None
     assert load_backtest(ctx, ".x") is None
-    assert load_backtest(ctx, explore[1]["nightly"]) is None
+    assert load_backtest(ctx, api_golden[1]["nightly"]) is None
 
 
 def test_run_partition_reads_only_session_grain_tables(
-    ctx: ReadContext, explore: tuple[ReadStore, dict[str, str]]
+    ctx: ReadContext, api_golden: tuple[ReadStore, dict[str, str]]
 ) -> None:
-    run = ctx.reader.run(explore[1]["backtest"])
+    run = ctx.reader.run(api_golden[1]["backtest"])
     assert run is not None
     with pytest.raises(ValueError, match="grain"):
         run_partition(ctx, "instruments/reference", run)
     assert run_partition(ctx, result_table("nothing_stored"), run) is None
 
 
-def test_another_users_run_is_not_theirs(explore: tuple[ReadStore, dict[str, str]]) -> None:
-    store = explore[0]
+def test_another_users_run_is_not_theirs(api_golden: tuple[ReadStore, dict[str, str]]) -> None:
+    store = api_golden[0]
     bob = open_stores(store.reader, store.configs, UserContext("bob"))
     assert load_backtests(bob) == ()  # "local" ran it; bob sees only his and the site's
-    assert load_backtest(bob, explore[1]["backtest"]) is None
+    assert load_backtest(bob, api_golden[1]["backtest"]) is None

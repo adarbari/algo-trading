@@ -3,11 +3,11 @@ then their own), resolved with its hash, or why it does not resolve; ``kind`` fi
 
 from fastapi.testclient import TestClient
 
-from algotrade.services.explore.store import ReadStore, store_over
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade_api.deps import ApiSettings
+from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.main import create_app
 from tests.apps.api.graphql.conftest import Graph
+from tests.helpers.api_store import store_over
 
 CONFIGS = """query C($kind: String) {
   configs(kind: $kind) { configId scope kind impl selection hash error }
@@ -31,10 +31,10 @@ def test_kind_filters(graph: Graph) -> None:
 
 
 def test_configs_answer_on_a_store_with_no_market_data(
-    explore: tuple[ReadStore, dict[str, str]],
+    api_golden: tuple[ReadStore, dict[str, str]],
 ) -> None:
     """Configs are not session data: a fresh store still lists them (and the user's drafts)."""
-    store = explore[0]
+    store = api_golden[0]
     empty = store_over(MemoryBackend(), store.configs, store.user)
     client = TestClient(create_app(ApiSettings("memory://", "config"), empty))
     query = "{ session { date } configs { configId } myScreens { screenerId } backtests { runId } }"

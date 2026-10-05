@@ -7,9 +7,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.explore.store import ReadStore
 from algotrade_api import cli
-from algotrade_api.deps import DEV_ORIGINS, ApiSettings
+from algotrade_api.deps import DEV_ORIGINS, ApiSettings, ReadStore
 from algotrade_api.main import create_app, openapi_json
 
 REPO = Path(__file__).resolve().parents[3]
@@ -35,13 +34,13 @@ def test_cors_allows_the_local_web_dev_server(client: TestClient) -> None:
 
 
 def test_configuration_errors_are_400(
-    explore: tuple[ReadStore, dict[str, str]], monkeypatch: pytest.MonkeyPatch
+    api_golden: tuple[ReadStore, dict[str, str]], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     def broken(*args: object) -> None:
         raise ConfigurationError("bad config")
 
-    monkeypatch.setattr("algotrade.services.explore.preview.screens.preview_screen", broken)
-    app = create_app(ApiSettings("memory://", "config"), explore[0])
+    monkeypatch.setattr("algotrade.services.preview.screens.preview_screen", broken)
+    app = create_app(ApiSettings("memory://", "config"), api_golden[0])
     response = TestClient(app).post("/screeners/preview", json={"spec": {}})
     assert (response.status_code, response.json()) == (400, {"detail": "bad config"})
 

@@ -24,10 +24,10 @@ from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.services.configs import config_ids, resolve_config
-from algotrade.services.explore.store import NotFoundError, latest_session
 from algotrade.services.jobs.api import open_runner
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.services.jobs.models import JobRecord, JobStatus
+from algotrade.services.read.session import NotFoundError, latest_session
 from algotrade.services.screening.run import run_job_name
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.factory import open_backend

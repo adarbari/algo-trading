@@ -277,10 +277,10 @@ source_modules = ["algotrade.core"]
 forbidden_modules = ["pandas"]
 allow_indirect_imports = true
 
-# ---- ADR 0024: the API is a thin, read-only HTTP layer over services.explore.
+# ---- ADR 0024, ADR 0037: the API is a thin HTTP layer; page reads are GraphQL over services.read.
 
 [[tool.importlinter.contracts]]
-name = "API: routes reach the library only through services.explore, config and core (ADR 0024)"
+name = "API: routes reach the library only through services.read, services.preview, services.authoring, config and core (ADR 0024, ADR 0037)"
 type = "forbidden"
 source_modules = ["algotrade_api"]
 forbidden_modules = [
@@ -298,13 +298,13 @@ forbidden_modules = [
     "pandas",
     "numpy",
 ]
-allow_indirect_imports = true  # services.explore reads the stores on the API's behalf
+allow_indirect_imports = true  # services.read and services.preview read the stores on the API's behalf
 # services.live (ADR 0028) is the API's other library entry: live quotes, recorded to live/*.
 
 [[tool.importlinter.contracts]]
-name = "Explore queries are read-only: no writers, no jobs (ADR 0024)"
+name = "Preview is read-only: no writers, no jobs (ADR 0029)"
 type = "forbidden"
-source_modules = ["algotrade.services.explore"]
+source_modules = ["algotrade.services.preview"]
 forbidden_modules = [
     "algotrade.storage.tables.writers",
     "algotrade.storage.tables.result_writer",
@@ -314,7 +314,7 @@ forbidden_modules = [
 ]
 allow_indirect_imports = true  # the backtest / screen use cases' naming helpers sit beside their writers
 
-# ---- ADR 0037: the read model replaces services.explore (read-model PRs 2-10); same rule.
+# ---- ADR 0037: the read model (it replaced services.explore, read-model PRs 2-10b); same rule.
 
 [[tool.importlinter.contracts]]
 name = "Read model is read-only: no writers, no jobs (ADR 0037)"
@@ -327,7 +327,7 @@ forbidden_modules = [
     "algotrade.services.jobs",
     "algotrade.services.authoring",
 ]
-allow_indirect_imports = true  # as for explore: the use cases' naming helpers sit beside their writers
+allow_indirect_imports = true  # as for preview: the use cases' naming helpers sit beside their writers
 
 [[tool.importlinter.contracts]]
 name = "GraphQL types are thin: only services.read, config, core (ADR 0037)"
@@ -340,7 +340,7 @@ forbidden_modules = [
     "algotrade.storage",
     "algotrade.features",
     "algotrade.engines",
-    "algotrade.services.explore",
+    "algotrade.services.preview",
     "algotrade.services.features",
     "algotrade.services.views",
     "algotrade.services.selection",
@@ -611,7 +611,6 @@ source_modules = [
     "algotrade.services.backtests",
     "algotrade.services.configs",
     "algotrade.services.evaluation",
-    "algotrade.services.explore",
     "algotrade.services.features",
     "algotrade.services.jobs",
     "algotrade.services.screening",
