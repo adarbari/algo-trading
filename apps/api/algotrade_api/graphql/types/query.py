@@ -124,9 +124,18 @@ class Query:
         return [Screener.of(s, ctx) for s in found] if ctx is not None else []
 
     @strawberry.field(  # type: ignore[untyped-decorator]
-        description="The user's saved view of the screener `scope`'s results (the default "
-        "view, or the one called `name`); null: a screener the user does not see, or nothing "
-        "stored yet"
+        description="The rule screen `id` as the user sees it (their own config, else the site "
+        "preset), with its run for the session; null: no such screener, or nothing stored"
+    )
+    def screener(self, info: Ctx, id: str, date: Day = None) -> Screener | None:
+        ctx = info.context.read(date)
+        found = screeners.load_screener(ctx, id) if ctx is not None else None
+        return Screener.of(found, ctx) if found is not None and ctx is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The user's saved view of the table `scope` (`screener:<id>`: a "
+        "screener's results; the default view, or the one called `name`); null: a scope of "
+        "no known kind, a screener the user does not see, or nothing stored yet"
     )
     def view(self, info: Ctx, scope: str, name: str | None = None) -> TableView | None:
         ctx = info.context.read(None)

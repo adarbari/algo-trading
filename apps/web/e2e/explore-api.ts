@@ -229,6 +229,29 @@ function graphqlAnswer(operation: Operation): Json | null {
       return fixture('facts-aapl.json');
     case 'InstrumentEvents':
       return fixture('gql-events-aapl.json');
+    case 'InstrumentScreenerHits':
+      return {
+        data: {
+          session: { date: VALUES.session },
+          instrument: {
+            instrumentId,
+            symbol: 'AAPL',
+            screenerHits: [
+              {
+                screener: { id: 'vrp_scanner', name: 'VRP scanner' },
+                result: {
+                  rank: 3,
+                  decision: 'WATCH',
+                  score: 72,
+                  reasons: 'iv_hv_ratio 1.10 below 1.25',
+                  flags: [],
+                  change: 'new',
+                },
+              },
+            ],
+          },
+        },
+      };
     case 'InstrumentPrices':
       return fixture('gql-prices-aapl.json');
     case 'InstrumentFeatureValues':

@@ -19,7 +19,7 @@
 #   keep       true: stays REST by design (health, job polling, live quotes); false: retires
 #   retire_in  the read-model PR that moves it to GraphQL and removes this entry
 
-max_get_routes = 16
+max_get_routes = 12
 
 # ---------------------------------------------------------------------------- stays REST
 
@@ -40,32 +40,6 @@ method = "GET"
 path = "/chains/{underlying_id}/live"
 keep = true
 reason = "live quotes (ADR 0028): latency-bound, records to live/*, bypasses the session model on purpose"
-
-# ---------------------------------------------------------------------------- PR 8: screener results, preview, views
-
-[[route]]
-method = "GET"
-path = "/screens"
-keep = false
-retire_in = "PR 8"
-
-[[route]]
-method = "GET"
-path = "/screens/{config_id}/results"
-keep = false
-retire_in = "PR 8"
-
-[[route]]
-method = "GET"
-path = "/screens/{config_id}/table"
-keep = false
-retire_in = "PR 8"
-
-[[route]]
-method = "GET"
-path = "/preferences/screeners/{screener_id}/view"
-keep = false
-retire_in = "PR 8"
 
 # ---------------------------------------------------------------------------- PR 10: admin
 

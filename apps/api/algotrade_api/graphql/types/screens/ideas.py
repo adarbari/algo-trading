@@ -30,7 +30,7 @@ class IdeaScreener:
     def of(cls, d: ideas.IdeaScreener, ctx: ReadContext) -> Self:
         return cls(
             screener=Screener.of(d.screener, ctx),
-            run=ScreenerRun.of(d.run) if d.run is not None else None,
+            run=ScreenerRun.of(d.run, ctx) if d.run is not None else None,
             not_run=Unknown.of(d.not_run) if d.not_run is not None else None,
             picked=d.picked,
             top=[ScreenResult.of(r, ctx) for r in d.top],

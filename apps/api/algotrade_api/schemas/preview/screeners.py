@@ -1,5 +1,6 @@
 """``POST /screeners/preview``: an unsaved rule-screen draft evaluated on the latest closed
-session (summary, decisions, funnel, coverage, top rows)."""
+session (summary, decisions, funnel, coverage, top rows shaped as the review table's, and the
+changes against the saved run)."""
 
 from datetime import date
 from typing import Any
@@ -48,6 +49,7 @@ class CriterionValue(Schema):
 class PreviewRow(Schema):
     instrument_id: str
     symbol: str | None
+    name: str | None = Field(description="the company or fund name (the universe snapshot's)")
     rank: int = Field(description="1 = best: score, then the tie-break, then instrument id")
     decision: str = Field(description="QUALIFIED, WATCH, LIQUIDITY_RISK, EVENT_RISK or REJECT")
     score: float | None = Field(description="100 minus the penalties, clipped to 0..100")
@@ -91,6 +93,24 @@ class PreviewCoverage(Schema):
     universe_snapshot: date
 
 
+class PreviewChanges(Schema):
+    run_id: str = Field(description="the screener's saved run compared with")
+    session: date = Field(description="its session (the one the draft was evaluated on)")
+    entered: list[str] = Field(description="tickers the draft picks that the run did not")
+    left: list[str] = Field(description="tickers the run picked that the draft does not")
+
+
+class PreviewCriterion(Schema):
+    id: str
+    field: str = Field(description="the catalogue field it judges")
+    mode: str = Field(description="hard, soft or score")
+
+
+class PreviewColumn(Schema):
+    name: str
+    field: str = Field(description="the catalogue field it shows")
+
+
 class ScreenPreview(Schema):
     screener_id: str
     user: str
@@ -102,5 +122,10 @@ class ScreenPreview(Schema):
     funnel: list[FunnelStep]
     coverage: PreviewCoverage
     total: int
+    criteria: list[PreviewCriterion] = Field(description="the draft's, in funnel order")
+    display_columns: list[PreviewColumn] = Field(description="the draft's [columns]")
     rows: list[PreviewRow]
     cached: bool = Field(description="the field frame came from the in-process cache")
+    changes: PreviewChanges | None = Field(
+        description="against the screener's saved run for the session; null: none saved"
+    )

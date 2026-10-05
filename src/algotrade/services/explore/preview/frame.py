@@ -62,6 +62,15 @@ class FieldFrame:
         pairs = zip(frame["instrument_id"].astype(str), frame["symbol"], strict=True)
         return {i: str(s) for i, s in pairs if to_value(s) is not None}
 
+    @cached_property
+    def names(self) -> dict[str, str]:
+        """Company or fund name by instrument id (from the universe snapshot), built once."""
+        frame = self.universe.frame
+        if "company_name" not in frame:
+            return {}
+        pairs = zip(frame["instrument_id"].astype(str), frame["company_name"], strict=True)
+        return {i: str(n) for i, n in pairs if to_value(n) is not None}
+
     def memo_for(self) -> ScreenMemo:
         """The memo, emptied first once it holds ``MAX_MEMO`` criteria (many edits)."""
         if len(self.memo) >= MAX_MEMO:

@@ -5,15 +5,19 @@ earlier one). No run stored for the session is ``NOT_RUN``; an older session's r
 shown (the Ideas 20-session lookback is gone: owner decision, docs/api/read-model.md).
 
 A ticker is *picked* when its decision is not in ``NOT_PICKED`` (REJECT, SKIPPED, UNKNOWN);
-``ScreenerRun.decisions`` and ``picked`` count the whole run, never a page of it."""
+``ScreenerRun.decisions`` and ``picked`` count the whole run, never a page of it. A run is
+compared with the screener's run in the previous stored session of ``results/rule_screen``
+(``load_previous_run``: that date is named explicitly through ``context.previous_session``,
+and the same latest-run rule applies there)."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
+from typing import Any
 
 import pandas as pd
 
-from algotrade.services.read.context import ReadContext, partition
+from algotrade.services.read.context import ReadContext, at_session, partition, previous_session
 from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
 from algotrade.storage.tables.schemas import result_table
 
@@ -43,7 +47,8 @@ class DecisionCount:
 class ScreenerRun:
     """One screener's run for the session. ``status``: its run record's (COMPLETE, PARTIAL,
     ...; None: no record stored); ``config_version``: the version that ran; ``decisions``:
-    every decision of the run with its count (most first); ``picked``: the tickers it picked."""
+    every decision of the run with its count (most first); ``picked``: the tickers it picked;
+    ``audit``: its run record's stats (coverage, the selection's audit; empty: no record)."""
 
     run_id: str
     config_id: str
@@ -54,6 +59,7 @@ class ScreenerRun:
     config_version: int | None
     decisions: tuple[DecisionCount, ...]
     picked: int
+    audit: Mapping[str, Any]
 
 
 @dataclass(frozen=True)
@@ -99,6 +105,7 @@ def _run(ctx: ReadContext, owner: str, config_id: str, rows: pd.DataFrame) -> Sc
             for d, n in sorted(counts.items(), key=lambda dn: (-int(dn[1]), str(dn[0])))
         ),
         picked=int(sum(int(n) for d, n in counts.items() if is_picked(str(d)))),
+        audit={} if record is None else dict(record.stats),
     )
 
 
@@ -140,3 +147,13 @@ def run_rows(ctx: ReadContext, run: ScreenerRun) -> pd.DataFrame:
         & (stored["run_id"] == run.run_id)
     ]
     return mine.sort_values(["rank", "instrument_id"], kind="stable").reset_index(drop=True)
+
+
+def load_previous_run(ctx: ReadContext, run: ScreenerRun) -> ScreenerRun | None:
+    """The same owner's run of ``run``'s screener in the previous stored session of
+    ``results/rule_screen`` (by the latest-run rule there); None: no earlier session, or the
+    screener did not run in it."""
+    day = previous_session(ctx, RULE_SCREEN)
+    if day is None:
+        return None
+    return latest_run(at_session(ctx, day), run.owner, run.config_id).run

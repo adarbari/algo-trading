@@ -39,9 +39,9 @@ def test_configuration_errors_are_400(
     def broken(*args: object) -> None:
         raise ConfigurationError("bad config")
 
-    monkeypatch.setattr("algotrade.services.read.ops.configs.resolve_config", broken)
+    monkeypatch.setattr("algotrade.services.explore.preview.screens.preview_screen", broken)
     app = create_app(ApiSettings("memory://", "config"), explore[0])
-    response = TestClient(app).get("/screens/vrp_scanner/results")
+    response = TestClient(app).post("/screeners/preview", json={"spec": {}})
     assert (response.status_code, response.json()) == (400, {"detail": "bad config"})
 
 
@@ -79,9 +79,6 @@ ENDPOINTS = (
     "/admin/review/figi",
     "/admin/review/leveraged",
     "/chains/AAA/live?expiry=2022-12-23",
-    "/screens",
-    "/screens/short_premium_liquidity/results",
-    "/screens/vrp_scanner/table?columns=rollup.price_stats@v2.hv20",
     "/admin/ingestion/completeness",
     "/admin/ingestion/chains/option_quotes/2022-11-23",
     "/admin/quality",
@@ -203,6 +200,31 @@ CHAIN_NAMES = [
     "rollup.iv30@v1.iv30",
 ]
 HISTORY_NAMES = [n for n in OVERVIEW_NAMES if not n.startswith("instrument.") and "date" not in n]
+# A screener's results (read-model PR 8: apps/web/src/entities/screen/api/results.ts), sorted
+# on a catalogue column over the whole run.
+SCREENER_RESULTS = """query ScreenerResults($id: String!, $decisions: [String!], $change: String,
+  $q: String, $sort: String, $columns: [FeatureName!], $page: Int, $size: Int) {
+  session { date missing }
+  screener(id: $id) {
+    id name criteria { id field mode } displayColumns { name field }
+    notRun { code detail }
+    latestRun {
+      runId session previousSession decisions { decision count } changes { change count }
+      results(decisions: $decisions, change: $change, q: $q, sort: $sort, columns: $columns,
+              page: $page, size: $size) {
+        sort total page size missing
+        columns { name description format unit dtype nullMeaning licence scope }
+        rows unknown
+        results {
+          instrumentId rank decision score reasons flags change previousDecision
+          instrument { instrumentId symbol name }
+          criteria { id field mode outcome value distance }
+          columns { name value }
+        }
+      }
+    }
+  }
+}"""
 # The Builder's and pickers' reads (read-model PR 9): the catalogue, one distribution, the
 # saved backtests.
 CATALOGUE = "query FeatureCatalogue { catalogue { name dtype format unit scope licence } }"
@@ -234,6 +256,15 @@ OPERATIONS = {
     ),
     "CompareTable": (FEATURE_TABLE, {"columns": OVERVIEW_NAMES[9:], "keys": ["AAA", "BULL"]}),
     "ComparePrices": (COMPARE_PRICES, {"keys": ["AAA", "BULL"], "start": "2021-11-23"}),
+    "ScreenerResults": (
+        SCREENER_RESULTS,
+        {
+            "id": "vrp_scanner",
+            "columns": EXPLORE_COLUMNS,
+            "sort": "-feature.iv_hv_ratio",
+            "size": 1000,
+        },
+    ),
 }
 
 

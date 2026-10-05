@@ -10,6 +10,7 @@ const widgets = vi.hoisted(() => ({
   compare: vi.fn(),
   options: vi.fn(),
   overview: vi.fn(),
+  hits: vi.fn(),
 }));
 
 vi.mock('@/widgets/feature-table', async () => {
@@ -36,6 +37,15 @@ vi.mock('@/widgets/overview-panel', async () => {
     OverviewPanel: (props: Record<string, unknown>) => {
       widgets.overview(props);
       return <Text>overview panel</Text>;
+    },
+  };
+});
+vi.mock('@/widgets/screener-hits-panel', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return {
+    ScreenerHitsPanel: (props: Record<string, unknown>) => {
+      widgets.hits(props);
+      return <Text>screener hits</Text>;
     },
   };
 });
@@ -129,7 +139,7 @@ describe('ExplorePage', () => {
     expect(onSearchChange).toHaveBeenLastCalledWith({ sel: 'AAPL,MSFT,KO' });
   });
 
-  it('shows the focused ticker in the detail tabs and the screener placeholder', () => {
+  it('shows the focused ticker in the detail tabs, and its screener hits', () => {
     const { rerender } = render(
       <ExplorePage search={{ tab: 'options', focus: 'NVDA' }} onSearchChange={vi.fn()} />,
     );
@@ -139,6 +149,8 @@ describe('ExplorePage', () => {
     rerender(<ExplorePage search={{ tab: 'chart' }} onSearchChange={vi.fn()} />);
     expect(screen.getByText('No ticker chosen')).toBeInTheDocument();
     rerender(<ExplorePage search={{ tab: 'hits' }} onSearchChange={vi.fn()} />);
-    expect(screen.getByText(/coming with the screener engine/)).toBeInTheDocument();
+    expect(screen.getByText('No ticker chosen')).toBeInTheDocument();
+    rerender(<ExplorePage search={{ tab: 'hits', focus: 'NVDA' }} onSearchChange={vi.fn()} />);
+    expect(widgets.hits).toHaveBeenLastCalledWith({ symbol: 'NVDA' });
   });
 });

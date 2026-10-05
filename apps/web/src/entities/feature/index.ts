@@ -13,11 +13,14 @@ export {
   featureColumn,
   flagsColumn,
   rankColumn,
+  reasonsColumn,
   scoreColumn,
+  screenColumn,
   TICKER_COLUMN,
   tickerColumn,
   type ColumnPlan,
   type CriterionInfo,
+  type ScreenColumnInfo,
 } from './model/columns';
 export {
   tableVariables,

@@ -1,8 +1,9 @@
 /**
  * Read hooks for rule screens: the screener configs (GraphQL `configs`), the user's own screens
  * and one screen's draft, versions and preset pin (GraphQL `myScreens`, `screenDetail`,
- * `screenVersions`; ADR 0037), and the live preview of a draft (a preview POST). The writes stay
- * REST (features/screener-*); after one, `refreshScreens` reads them all again.
+ * `screenVersions`; ADR 0037), the live preview of a draft (a preview POST) and a run on
+ * request. A screener's results are `useScreenerResults` (`./results`). The writes stay REST
+ * (features/screener-*); after one, `refreshScreens` reads them all again.
  */
 import {
   keepPreviousData,
@@ -17,7 +18,8 @@ import { api, gql, graphql, queryKeys, unwrap } from '@/shared/api';
 
 import type { ScreenDocument, ScreenerDetail } from '../model/spec';
 import { isActive } from '../model/run';
-import { tableParams, type ScreenerView, type ScreenTableQuery } from '../model/table';
+
+import { SCREENER_RESULTS_OPERATION } from './results';
 
 const ScreenerConfigs = graphql(`
   query ScreenerConfigs {
@@ -79,7 +81,13 @@ const ScreenVersions = graphql(`
 `);
 
 /** The screen operations, so a write can read them all again. */
-const SCREEN_OPERATIONS = ['ScreenerConfigs', 'MyScreens', 'ScreenDetail', 'ScreenVersions'];
+const SCREEN_OPERATIONS = [
+  'ScreenerConfigs',
+  'MyScreens',
+  'ScreenDetail',
+  'ScreenVersions',
+  SCREENER_RESULTS_OPERATION,
+];
 
 /** Read every screen list and detail again (after a draft, finalise, copy or delete). */
 export async function refreshScreens(client: QueryClient): Promise<void> {
@@ -163,90 +171,19 @@ export function useScreenPreview(document: ScreenDocument | null) {
   });
 }
 
-/**
- * A rule screen's latest run as a review table: filtered, sorted and cut to the first
- * `TABLE_ROWS` rows by the API. The previous table stays on screen while a new one loads.
- * A screen with no stored run answers 404 (no retry).
- */
-export function useScreenTable(id: string, query: ScreenTableQuery, enabled = true) {
-  return useQuery({
-    queryKey: queryKeys.screeners.table(id, { ...query }),
-    queryFn: () =>
-      unwrap(
-        api.GET('/screens/{config_id}/table', {
-          params: { path: { config_id: id }, query: tableParams(query) },
-        }),
-      ),
-    placeholderData: keepPreviousData,
-    enabled,
-    retry: false,
-  });
-}
-
-/** The user's view of a screen's results: the default one, or a named one. */
-export function useScreenerView(id: string, name: string | null = null) {
-  return useQuery({
-    queryKey: queryKeys.screeners.view(id, name),
-    queryFn: () =>
-      unwrap(
-        api.GET('/preferences/screeners/{screener_id}/view', {
-          params: { path: { screener_id: id }, query: { name } },
-        }),
-      ),
-  });
-}
-
-/** A view as saved: the columns added, the sort and the decisions shown. */
-export type ViewContent = Pick<ScreenerView, 'columns' | 'sort' | 'decisions'>;
-
-/** Saves a view (it belongs to the user, not to the screen: no version, no hash). */
-export function useSaveScreenerView(id: string) {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: ({ name, view }: { name: string | null; view: ViewContent }) =>
-      unwrap(
-        api.PUT('/preferences/screeners/{screener_id}/view', {
-          params: { path: { screener_id: id }, query: { name } },
-          body: view,
-        }),
-      ),
-    onSuccess: (saved, { name }) => {
-      client.setQueryData(queryKeys.screeners.view(id, name), saved);
-      // The list of named views changed: every view of this screener carries it.
-      void client.invalidateQueries({
-        queryKey: queryKeys.screeners.views(id),
-        predicate: (query) => query.queryKey[3] !== (name ?? ''),
-      });
-    },
-  });
-}
-
-/** Removes a named view. */
-export function useDeleteScreenerView(id: string) {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: (name: string) =>
-      unwrap(
-        api.DELETE('/preferences/screeners/{screener_id}/view', {
-          params: { path: { screener_id: id }, query: { name } },
-        }),
-      ),
-    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.screeners.views(id) }),
-  });
-}
-
 /** How often a requested run is polled while it is queued or running. */
 export const RUN_POLL_MS = 1500;
 
 /**
  * Run a screener on request (POST /screens/{id}/run) and follow it: the API answers `ready`
  * when this version has already run for the latest session, else starts the nightly's `screen`
- * job; the job is polled until it finishes, and then the screener's tables are fetched again.
+ * job; the job is polled until it finishes, and then the screener's results are read again.
  */
 export function useRunScreener(id: string) {
   const client = useQueryClient();
   const [jobId, setJobId] = useState<string | null>(null);
-  const refresh = () => client.invalidateQueries({ queryKey: queryKeys.screeners.tables(id) });
+  const refresh = () =>
+    client.invalidateQueries({ queryKey: queryKeys.gqlAll(SCREENER_RESULTS_OPERATION) });
   const start = useMutation({
     mutationFn: () =>
       unwrap(api.POST('/screens/{config_id}/run', { params: { path: { config_id: id } } })),

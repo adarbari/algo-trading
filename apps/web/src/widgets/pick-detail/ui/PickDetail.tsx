@@ -25,13 +25,15 @@ import {
   featureFormat,
   featureLabel,
   useFeatureCatalogue,
+  type CriterionInfo,
+  type TableRow,
 } from '@/entities/feature';
-import { DecisionBadge, type CriterionHeader, type ScreenTableRow } from '@/entities/screen';
+import { DecisionBadge, decisionLabel, isShownCriterion } from '@/entities/screen';
 
 export interface PickDetailProps {
-  row: ScreenTableRow;
+  row: TableRow;
   /** The screen's criteria in order (labels, fields); the gates have no row here. */
-  criteria: readonly CriterionHeader[];
+  criteria: readonly CriterionInfo[];
   /** The ticker is in the compare set. */
   compared: boolean;
   onOpen: (symbol: string) => void;
@@ -62,45 +64,45 @@ export function PickDetail({
 }: PickDetailProps) {
   const catalogue = useFeatureCatalogue();
   const known = useMemo(() => byName(catalogue.data ?? []), [catalogue.data]);
-  const symbol = row.symbol ?? row.instrument_id;
-  const items = criteria
-    .filter((c) => !c.field.startsWith('instrument.'))
-    .map((c): KeyValueItem => {
-      const found = row.criteria[c.criterion_id];
-      const feature = known.get(c.field);
-      const outcome = found?.outcome ?? 'MISSING';
-      const shown = found
-        ? formatValue(displayValue(found.value), featureFormat(feature)).text
-        : '—';
-      return {
-        id: c.criterion_id,
-        label: feature ? featureLabel(feature.name) : c.criterion_id,
-        value: (
-          <Stack direction="row" gap={2} align="center" justify="end">
-            <Mono size="sm">{shown}</Mono>
-            <StatusBadge tone={TONE[outcome] ?? 'neutral'}>{WORDS[outcome] ?? outcome}</StatusBadge>
-          </Stack>
-        ),
-      };
-    });
+  const symbol = row.symbol;
+  const items = criteria.filter(isShownCriterion).map((c): KeyValueItem => {
+    const found = row.criteria?.[c.id];
+    const feature = known.get(c.field);
+    const outcome = found?.outcome ?? 'MISSING';
+    const shown = found ? formatValue(displayValue(found.value), featureFormat(feature)).text : '—';
+    return {
+      id: c.id,
+      label: feature ? featureLabel(feature.name) : c.id,
+      value: (
+        <Stack direction="row" gap={2} align="center" justify="end">
+          <Mono size="sm">{shown}</Mono>
+          <StatusBadge tone={TONE[outcome] ?? 'neutral'}>{WORDS[outcome] ?? outcome}</StatusBadge>
+        </Stack>
+      ),
+    };
+  });
   return (
     <Panel
       title={symbol}
-      description={row.name ?? undefined}
-      actions={<DecisionBadge decision={row.decision} />}
+      description={row.name || undefined}
+      actions={row.decision ? <DecisionBadge decision={row.decision} /> : null}
     >
       <Stack gap={3}>
         <Text size="sm" tone="secondary">
           {[
-            row.score === null ? null : `Score ${String(Math.round(row.score))}`,
+            row.score === null || row.score === undefined
+              ? null
+              : `Score ${String(Math.round(row.score))}`,
             row.change === 'new' ? 'new since the previous run' : null,
-            row.change === 'dropped' ? `dropped (was ${row.previous_decision ?? 'n/a'})` : null,
+            row.change === 'dropped'
+              ? `dropped (was ${row.previousDecision ? decisionLabel(row.previousDecision).toLowerCase() : 'n/a'})`
+              : null,
           ]
             .filter(Boolean)
             .join(' · ')}
         </Text>
         {row.reasons ? <Text size="sm">{row.reasons}</Text> : null}
-        {row.flags.length > 0 ? (
+        {row.flags && row.flags.length > 0 ? (
           <Text size="sm" tone="muted">{`Flags: ${row.flags.join(', ')}`}</Text>
         ) : null}
         <KeyValue label="Criteria" items={items} alignValues="end" />

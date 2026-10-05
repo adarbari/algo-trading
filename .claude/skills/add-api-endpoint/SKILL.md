@@ -20,7 +20,7 @@ REST is for (ADR 0037 decision 4):
 | A job submission and its polling | `POST /screens/{id}/run`, `GET /screens/{id}/run/{job_id}` | `services/ondemand` (ADR 0033) |
 | Health | `GET /health` | |
 | Live quotes | `GET /chains/{id}/live` | `services/live` (ADR 0028) |
-| Compute over a request body | `POST /screeners/preview`, `POST /features/check` | `services/explore/preview` (moves with read-model PR 8) |
+| Compute over a request body | `POST /screeners/preview`, `POST /features/check` | `services/explore/preview` (stays REST; its module moves when read-model PR 10 deletes `services/explore`) |
 | A file (export, download) | | the use case that owns the data |
 
 Read first: ADR 0024 (`docs/adr/0024-api.md`, as amended by 0029, 0033, 0037), and one write

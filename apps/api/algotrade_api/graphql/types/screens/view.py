@@ -1,5 +1,6 @@
-"""``TableView``: a user's saved view of a table (today a screener's results): the catalogue
-columns they added, the sort and the decisions shown (``saved`` false: nothing saved)."""
+"""``TableView``: a user's saved view of a table (``scope``: ``screener:<id>`` for a
+screener's results): the catalogue columns they added, the sort and the decisions shown
+(``saved`` false: nothing saved)."""
 
 from typing import Self
 
@@ -9,7 +10,7 @@ from algotrade.services.read.screens import views
 
 
 @strawberry.type(
-    description="A user's saved view of a table (`scope`: a screener id); `saved` false: "
+    description="A user's saved view of a table (`scope`: `screener:<id>`); `saved` false: "
     "nothing saved, the page applies its defaults"
 )
 class TableView:

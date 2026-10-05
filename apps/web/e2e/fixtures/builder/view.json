@@ -1,9 +1,9 @@
 {
-  "screener_id": "vrp_scanner",
+  "scope": "screener:vrp_scanner",
+  "name": null,
   "saved": false,
   "columns": [],
   "sort": null,
   "decisions": [],
-  "name": null,
   "names": []
 }

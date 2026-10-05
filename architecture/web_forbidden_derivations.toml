@@ -57,11 +57,7 @@ allowed = ["src/shared/lib/date/", "src/entities/explore/model/freshness.ts"]  #
 regex = "useUniverseSize"
 reason = "the universe size is FeatureTable.total, not a size=1 page"
 
-# ---------------------------------------------------------------------------- pending
-
-
-
-# pending, enable in PR 8 (picked / not picked from the server):
-# [[pattern]]
-# regex = "NOT_PICKED"
-# reason = "picked / not picked and new / dropped are ScreenResult.change, decided on the server"
+# Enabled in PR 8 (new / dropped and the preview's enter / leave are decided by the server):
+[[pattern]]
+regex = "NOT_PICKED"
+reason = "picked / not picked and new / dropped are ScreenResult.change (a stored run) and the preview's changes.entered / .left, decided on the server"

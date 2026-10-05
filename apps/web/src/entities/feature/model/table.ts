@@ -4,6 +4,7 @@
  * not), the columns' catalogue entries (their format comes from the server), and the query
  * that asks for a page of it (server-side filters, sort and paging).
  */
+import type { PreviewRow } from '@/entities/screen';
 import type { gqlTypes } from '@/shared/api';
 
 import type { UnknownCodeName } from './value';
@@ -43,7 +44,10 @@ type Served = NonNullable<gqlTypes.FeatureTableQuery['table']>;
 /** The catalogue entry of a column, as the table reads it (its format from the server). */
 export type ColumnInfo = Served['columns'][number];
 
-/** A table row: an instrument and its cells; result tables add their typed fields. */
+/**
+ * A table row: an instrument and its cells; a screener's result rows (a stored run, or the
+ * Builder's preview) add their typed fields.
+ */
 export interface TableRow {
   /** The ticker: the row id (selection, the URL) and the key for detail reads. */
   symbol: string;
@@ -59,6 +63,14 @@ export interface TableRow {
   criteria?: Readonly<Record<string, { value: unknown; outcome: string }>> | undefined;
   /** New or dropped since the previous run (decided by the server). */
   change?: string | null | undefined;
+  /** The previous run's decision (null: not in it). */
+  previousDecision?: string | null | undefined;
+  /** The screen's display columns (`[columns]`): name -> the value the run stored. */
+  columns?: Readonly<Record<string, unknown>> | undefined;
+  /** Why the decision is not QUALIFIED. */
+  reasons?: string | undefined;
+  /** A preview row's criteria with their penalties: how its score was worked out. */
+  scoring?: PreviewRow | undefined;
 }
 
 export interface FeatureTableData {

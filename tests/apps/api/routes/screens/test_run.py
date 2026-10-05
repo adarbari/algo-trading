@@ -47,9 +47,10 @@ def test_a_run_is_started_polled_and_then_ready_without_running_again(client: Te
     again = client.post(RUN, params={"date": DAY.isoformat()})
     assert again.status_code == 200
     assert (again.json()["state"], again.json()["job_id"]) == ("ready", None)
-    # The run is in the store: the review table reads it.
-    table = client.get("/screens/big_liquid/table", params={"date": DAY.isoformat()})
-    assert table.status_code == 200 and table.json()["run_id"] == done["run_id"]
+    # The run is in the store: the review table (GraphQL) reads it.
+    query = 'query($d: Date) { screener(id: "big_liquid", date: $d) { latestRun { runId } } }'
+    read = client.post("/graphql", json={"query": query, "variables": {"d": DAY.isoformat()}})
+    assert read.json()["data"]["screener"]["latestRun"]["runId"] == done["run_id"]
 
 
 def test_what_cannot_be_run_is_refused(client: TestClient) -> None:

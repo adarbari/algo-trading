@@ -21,6 +21,7 @@ const criterion = (id: string, outcome: string, penalty: number, normalised: num
 const row = (score: number, criteria: PreviewRow['criteria']): PreviewRow => ({
   instrument_id: 'EQ:KO',
   symbol: 'KO',
+  name: 'Coca-Cola',
   rank: 3,
   decision: 'WATCH',
   score,

@@ -1,26 +1,31 @@
-/** Entity: rule screens (the draft document, its criteria, the live preview and the list). */
+/**
+ * Entity: rule screens (the draft document, its criteria, the live preview, the list, and a
+ * screener's latest run as a review table).
+ */
 export {
   PREVIEW_ROWS,
   forgetScreen,
   refreshScreens,
   useMyScreeners,
   useRunScreener,
-  useDeleteScreenerView,
-  useSaveScreenerView,
   useScreener,
-  useScreenerView,
-  useScreenTable,
   useScreenerVersions,
   useScreenPreview,
   useScreeners,
-  type ViewContent,
 } from './api/hooks';
+export { useScreenerHits, type ScreenerHitsResponse } from './api/hits';
+export {
+  SCREENER_RESULTS_OPERATION,
+  useScreenerResults,
+  type ScreenerResultsResponse,
+} from './api/results';
 export {
   decisionCounts,
   extraColumns,
   narrowMissGroups,
   type FunnelStep,
   type NarrowMiss,
+  type PreviewChanges,
   type PreviewRow,
   type PreviewSummary,
   type ScreenPreview,
@@ -58,15 +63,11 @@ export { ScoreBreakdown } from './ui/ScoreBreakdown';
 export { scoreBreakdown, type ScoreLine } from './model/score';
 export {
   DEFAULT_DECISIONS,
+  isShownCriterion,
   orderedDecisions,
+  resultsVariables,
   shownDecisions,
-  TABLE_ROWS,
-  type CriterionHeader,
   type ScreenChange,
-  type ScreenerView,
-  type ScreenTable,
-  type ScreenTableQuery,
-  type ScreenTableRow,
-} from './model/table';
+  type ScreenResultsQuery,
+} from './model/results';
 export { isActive, runMessage, type ScreenRun } from './model/run';
-export { previewChanges, type PickedRow, type PreviewChanges } from './model/changes';
