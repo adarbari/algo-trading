@@ -255,6 +255,10 @@ purpose = "read-only dry runs of unsaved Builder input (ADR 0029): a draft rule 
 contracts = ["Explore queries are read-only: no writers, no jobs (ADR 0024)"]
 
 [[dir]]
+path = "src/algotrade/services/ondemand"
+purpose = "use case: the API's on-request screen runs (ADR 0033): a local job runner for the `screen` job under the store's writer lock; writes only result tables and run records"
+
+[[dir]]
 path = "src/algotrade/services/live"
 purpose = "use case: the API's live option quotes (ADR 0028): a quote feed with a short cache and the stored chain as the fallback; answers recorded in the background to live/* tables"
 contracts = [

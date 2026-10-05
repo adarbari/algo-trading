@@ -3,10 +3,12 @@
  * and preset pin (GET /screeners/{id}), and the live preview of a draft.
  */
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 
 import { api, queryKeys, unwrap } from '@/shared/api';
 
 import type { ScreenDocument } from '../model/spec';
+import { isActive } from '../model/run';
 import { tableParams, type ScreenerView, type ScreenTableQuery } from '../model/table';
 
 /** Every screener the user sees: site presets and their own (Python and rule screens). */
@@ -120,4 +122,52 @@ export function useSaveScreenerView(id: string) {
       client.setQueryData(queryKeys.screeners.view(id), saved);
     },
   });
+}
+
+/** How often a requested run is polled while it is queued or running. */
+export const RUN_POLL_MS = 1500;
+
+/**
+ * Run a screener on request (POST /screens/{id}/run) and follow it: the API answers `ready`
+ * when this version has already run for the latest session, else starts the nightly's `screen`
+ * job; the job is polled until it finishes, and then the screener's tables are fetched again.
+ */
+export function useRunScreener(id: string) {
+  const client = useQueryClient();
+  const [jobId, setJobId] = useState<string | null>(null);
+  const refresh = () => client.invalidateQueries({ queryKey: queryKeys.screeners.tables(id) });
+  const start = useMutation({
+    mutationFn: () =>
+      unwrap(api.POST('/screens/{config_id}/run', { params: { path: { config_id: id } } })),
+    onSuccess: (run) => {
+      setJobId(run.job_id ?? null);
+      if (!isActive(run)) void refresh();
+    },
+  });
+  const status = useQuery({
+    queryKey: queryKeys.screeners.run(id, jobId ?? ''),
+    queryFn: () =>
+      unwrap(
+        api.GET('/screens/{config_id}/run/{job_id}', {
+          params: { path: { config_id: id, job_id: jobId ?? '' } },
+        }),
+      ),
+    enabled: jobId !== null && isActive(start.data),
+    refetchInterval: (query) => (isActive(query.state.data) ? RUN_POLL_MS : false),
+    retry: false,
+  });
+  const run = status.data ?? start.data;
+  const finished = run !== undefined && !isActive(run);
+  useEffect(() => {
+    if (finished && jobId !== null) void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh only when the run finishes
+  }, [finished, jobId]);
+  return {
+    start: () => {
+      start.mutate();
+    },
+    run,
+    running: start.isPending || isActive(run),
+    error: start.error ?? status.error,
+  };
 }

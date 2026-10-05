@@ -38,6 +38,8 @@ export const queryKeys = {
     table: (id: string, query: Readonly<Record<string, unknown>>) =>
       ['screeners', 'table', id, query] as const,
     view: (id: string) => ['screeners', 'view', id] as const,
+    tables: (id: string) => ['screeners', 'table', id] as const,
+    run: (id: string, jobId: string) => ['screeners', 'run', id, jobId] as const,
   },
   instruments: {
     detail: (id: string) => ['instruments', id] as const,

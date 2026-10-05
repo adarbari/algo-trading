@@ -711,6 +711,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/screens/{config_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run */
+        post: operations["run_screens__config_id__run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/screens/{config_id}/run/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run Status */
+        get: operations["run_status_screens__config_id__run__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/screens/{config_id}/table": {
         parameters: {
             query?: never;
@@ -2065,6 +2099,24 @@ export interface components {
              * @description as recorded, with its detail after a colon
              */
             status: string;
+        };
+        /** RunRequest */
+        RunRequest: {
+            /** Config Id */
+            config_id: string;
+            /** Error */
+            error: string | null;
+            /** Job Id */
+            job_id: string | null;
+            /** Run Id */
+            run_id: string | null;
+            /**
+             * Session
+             * Format: date
+             */
+            session: string;
+            /** State */
+            state: string;
         };
         /** SampleValue */
         SampleValue: {
@@ -3946,6 +3998,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScreenResults"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_screens__config_id__run_post: {
+        parameters: {
+            query?: {
+                /** @description default: the latest session with data */
+                date?: string | null;
+                /** @description default: the API's user (a label until auth) */
+                user?: string | null;
+            };
+            header?: never;
+            path: {
+                config_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunRequest"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_status_screens__config_id__run__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                config_id: string;
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunRequest"];
                 };
             };
             /** @description Validation Error */

@@ -358,6 +358,13 @@ section = "docs/adr/0028-ibkr-enrichment-source.md#live-option-quotes-in-the-api
 detect = [{ string = "live/option_quotes" }, { call = "LiveWriter" }, { call = "SessionThread" }]
 
 [[responsibility]]
+id = "on-request-screen-runs"
+description = "The API's on-request screen runs (ADR 0033): resolve the screener for the user, pick the latest session with data, answer ready when this config version has already run for it, else submit the `screen` job (the nightly's job) to a local runner that holds the store's writer lock; writes only result tables and run records (ResultWriter), never market or feature data"
+owner = ["src/algotrade/services/ondemand/*"]
+section = "docs/adr/0033-screeners-run-nightly-and-on-request.md"
+detect = [{ call = "OnDemandScreens" }]
+
+[[responsibility]]
 id = "secrets-env"
 description = "Read environment variables and the local .env: credentials, the data URL, the config directory, the default user (callers receive values as parameters)"
 owner = ["src/algotrade/config/env.py"]

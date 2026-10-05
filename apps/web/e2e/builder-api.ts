@@ -47,6 +47,8 @@ export interface BuilderMock {
   tables: Record<string, string>[];
   /** Every PUT of a screener view. */
   views: { id: string; view: Json }[];
+  /** The screeners whose run was requested (POST /screens/{id}/run). */
+  runs: string[];
 }
 
 export async function mockBuilderApi(
@@ -65,12 +67,15 @@ export async function mockBuilderApi(
     features: [],
     tables: [],
     views: [],
+    runs: [],
   };
   const details: Record<string, Json> = Object.fromEntries(
     Object.entries(DETAILS).map(([id, detail]) => [id, structuredClone(detail)]),
   );
 
   const saved: Record<string, Json> = {}; // the views a flow saved, read back by the next GET
+  const ran = new Set<string>(); // the screeners whose requested run has finished
+  let polls = 0;
   const detailOf = (id: string): Json | null => details[id] ?? null;
   // Your screens: one finalised with a working copy, one draft only; copies and new drafts join.
   const own = new Set(['my-vrp']);
@@ -148,9 +153,29 @@ export async function mockBuilderApi(
     if (table && method === 'GET') {
       mock.tables.push(Object.fromEntries(url.searchParams));
       const id = decodeURIComponent(table[1] ?? '');
-      return id === 'vrp_scanner'
+      return id === 'vrp_scanner' || ran.has(id)
         ? json({ ...fixture('table.json'), config_id: id })
         : json({ detail: `no results of ${id} stored` }, 404);
+    }
+    const run = /^\/screens\/([^/]+)\/run(?:\/([^/]+))?$/.exec(path);
+    if (run) {
+      const id = decodeURIComponent(run[1] ?? '');
+      const view = (state: string) => ({
+        state,
+        config_id: id,
+        session: '2026-10-02',
+        job_id: 'job-screen-1',
+        run_id: state === 'complete' ? 'run-1' : null,
+        error: null,
+      });
+      if (method === 'POST') {
+        mock.runs.push(id);
+        polls = 0;
+        return route.fulfill({ status: 202, json: view('running') });
+      }
+      polls += 1; // the first poll still sees it running
+      if (polls > 1) ran.add(id);
+      return json(view(polls > 1 ? 'complete' : 'running'));
     }
     const viewOf = /^\/preferences\/screeners\/([^/]+)\/view$/.exec(path);
     if (viewOf) {

@@ -85,14 +85,24 @@ test('sorting is saved too, and a ticker opens in Explore', async ({ page }) => 
   await expect(page).toHaveURL(/\/explore\?.*focus=DKNG/);
 });
 
-test('the Builder is one click away, and a screener with no run says so', async ({ page }) => {
-  await mockBuilderApi(page);
+test('a screener with no run says so, and Run now runs it and shows the results', async ({
+  page,
+}) => {
+  const mock = await mockBuilderApi(page);
   await page.goto('/screeners/my-vrp');
   await expect(
-    page.getByText(
-      'No run stored for this screener yet. Edit its criteria to preview what it would pick.',
-    ),
+    page.getByText('No run stored for this screener yet. Run it now to see what it picks.'),
   ).toBeVisible();
+  await page.getByRole('button', { name: 'Run now' }).click();
+  await expect(page.getByText('Running for 2026-10-02…')).toBeVisible();
+  await expect(page.getByText('Updated for 2026-10-02')).toBeVisible();
+  await expect(grid(page).getByRole('row', { name: /DKNG/ })).toBeVisible();
+  expect(mock.runs).toEqual(['my-vrp']);
+});
+
+test('the Builder is one click away', async ({ page }) => {
+  await mockBuilderApi(page);
+  await page.goto('/screeners/my-vrp');
   await page.getByRole('button', { name: 'Edit criteria' }).click();
   await expect(page).toHaveURL(/\/screeners\/my-vrp\/edit$/);
 });

@@ -14,6 +14,7 @@ from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.services.authoring.scope import ConfigWriter, ConflictError, ScreenNotFoundError
 from algotrade.services.explore.store import NotFoundError, ReadStore
 from algotrade.services.live.quotes import LiveQuotes
+from algotrade.services.ondemand.screens import OnDemandScreens, open_ondemand
 from algotrade_api import __version__
 from algotrade_api.deps import ApiSettings
 from algotrade_api.live import no_live, open_live
@@ -39,15 +40,20 @@ def create_app(
     store: ReadStore | None = None,
     writer: ConfigWriter | None = None,
     live: LiveQuotes | None = None,
+    ondemand: OnDemandScreens | None = None,
 ) -> FastAPI:
     """The API over ``store`` (default: the store and configs ``settings`` name); user
     configs are written through ``writer`` (default: the files under ``settings.config_dir``).
-    ``live``: the live quotes (default: IB Gateway when ``settings.live``, else switched off)."""
+    ``live``: the live quotes (default: IB Gateway when ``settings.live``, else switched off).
+    ``ondemand``: the on-request screen runner (default: over the store when ``settings.live``,
+    the served app; else off: a request answers 400)."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
         app.state.live.close()
+        if app.state.ondemand is not None:
+            app.state.ondemand.close()
 
     app = FastAPI(
         title=TITLE,
@@ -55,7 +61,8 @@ def create_app(
         description=(
             "Read-only API over the algotrade stores (ADR 0024); it writes only user configs "
             "and user features, through services.authoring (ADR 0029), and the live option "
-            "quotes it served, to live/* tables (ADR 0028)."
+            "quotes it served, to live/* tables (ADR 0028); a screener run on request writes its "
+            "results as the nightly does (ADR 0033)."
         ),
         lifespan=lifespan,
     )
@@ -64,6 +71,9 @@ def create_app(
     if live is None:
         live = open_live(settings.data_url, app.state.store.configs) if settings.live else no_live()
     app.state.live = live
+    if ondemand is None and settings.live:
+        ondemand = open_ondemand(settings.data_url, app.state.store.configs)
+    app.state.ondemand = ondemand
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),
