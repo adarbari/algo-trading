@@ -1,5 +1,6 @@
 """One instrument: reference + company + latest features, bars, events and feature series;
-and several side by side (Explore compare: features and rebased prices).
+and several side by side (Explore compare: features and rebased prices). The reference dict
+also carries the instrument's description (``instruments/description``, ADR 0034).
 
 ``key`` is an ``instrument_id`` or a ticker (resolved through the reference snapshot's
 ``SymbolResolver``, ADR 0018), so a page can link by either.
@@ -23,6 +24,7 @@ from algotrade.core.model.fields import (
 from algotrade.data.events import ALL_TIME, read_events
 from algotrade.data.prices import adjusted_bars
 from algotrade.data.reference import (
+    descriptions,
     instruments,
     read_snapshot,
     resolver,
@@ -36,6 +38,7 @@ from algotrade.services.explore.store import (
     BARS,
     NotFoundError,
     ReadStore,
+    cached,
     latest_session,
     partition_for,
     record,
@@ -45,6 +48,9 @@ from algotrade.services.explore.store import (
 from algotrade.services.features import field_view, read_expressions
 
 DEFAULT_SPAN = timedelta(days=365)
+# Columns of ``instruments/description`` shown in the reference dict (None when not stored):
+# what the instrument is about, where the text is from, and the website / head count with it.
+DESCRIPTION_FIELDS = ("description", "description_source", "homepage_url", "total_employees")
 EVENTS_PREFIX = "events/"
 
 
@@ -63,6 +69,16 @@ def resolve_key(store: ReadStore, key: str, on: date | None = None) -> tuple[str
     raise NotFoundError(f"no instrument {key!r} in the reference snapshot {session}")
 
 
+def description_of(store: ReadStore, iid: str) -> dict[str, Any]:
+    """``DESCRIPTION_FIELDS`` of one instrument (None for each when nothing is stored). The
+    table is read once per publish (a year of nightly increments is hundreds of small files,
+    ~1 s), not once per page."""
+    stored = cached(store, ("descriptions",), lambda: descriptions(store.reader))
+    found = stored[stored["instrument_id"] == iid]
+    text = record(found.iloc[0]) if len(found) else {}
+    return {name: text.get(name) for name in DESCRIPTION_FIELDS}
+
+
 @dataclass(frozen=True)
 class InstrumentDetail:
     instrument_id: str
@@ -76,6 +92,7 @@ class InstrumentDetail:
 def instrument_detail(store: ReadStore, key: str, on: date | None = None) -> InstrumentDetail:
     iid, session = resolve_key(store, key, on)
     reference = record(instruments(store.reader, session, [iid]).iloc[0])
+    reference.update(description_of(store, iid))
     try:
         company_rows, _ = read_snapshot(store.reader, COMPANY_TABLE, session, "", None, [iid])
         company = record(company_rows.iloc[0]) if len(company_rows) else None

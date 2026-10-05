@@ -28,7 +28,7 @@ Read in this order, **by section and only when the task needs it** (grep, then r
 - **Long-running work is a job** via `services/jobs`. (ADR 0010)
 - **Configs, selections, users**: layering defaults < site < user < run; site presets in `config/site/`, user configs in `config/users/<id>/`; runs record user + config hash; missing data never passes a selection. (ADR 0015)
 - **Design-system-first UI**: screens use only `@algotrade/ui`; a missing component is added to the design system first; the web app is layered and component-only (Web UI below). (ADRs 0011, 0025)
-- **Vendors**: free first behind the source interface; Cboe chains, IBKR for futures and enrichment (IV rank prefers IBKR, labelled `iv_rank_source`; IBKR-derived features carry `licence = "personal"`); we compute Greeks ourselves. (ADRs 0012, 0014, 0028)
+- **Vendors**: free first behind the source interface; Cboe chains, IBKR for futures and enrichment (IV rank prefers IBKR, labelled `iv_rank_source`; IBKR-derived features carry `licence = "personal"`); we compute Greeks ourselves; descriptions: Massive overview for stocks (capped per night), SEC prospectus objective for ETFs (ADR 0034). (ADRs 0012, 0014, 0028, 0034)
 - **Broker access is read-only**: IBKR only through `algotrade_sources/vendors/ibkr/gateway.py`; no orders, no account functions (fitness test + import-linter). (ADR 0026)
 - **Universe**: S&P 500 + Nasdaq-listed stocks + all ETFs, daily snapshots. (ADR 0013)
 

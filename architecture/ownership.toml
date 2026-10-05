@@ -250,7 +250,7 @@ detect = [
 
 [[responsibility]]
 id = "refresh-scheduling"
-description = "Which keys (CIKs) an incremental reference task refetches on a session: new first, then each once per refresh_days on its own slot day (crc32 of the key), so refreshes spread over the window"
+description = "Which keys (CIKs, instrument ids) an incremental reference or profile task refetches on a session: new first, then each once per refresh_days on its own slot day (crc32 of the key), so refreshes spread over the window"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/reference/refresh.py"]
 section = "docs/data/vendors.md#refreshes-spread-over-the-window"
 detect = [{ call = "crc32" }, { call = "slot_day" }]
@@ -594,6 +594,10 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/reference/company_details.py"
 [[table]]
 name = "instruments/shares"
 owner = "apps/ingestion/algotrade_ingestion/tasks/reference/shares.py"
+
+[[table]]
+name = "instruments/description"
+owner = "apps/ingestion/algotrade_ingestion/tasks/profile/descriptions.py"
 
 [[table]]
 name = "chains/underlying_quotes"

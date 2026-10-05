@@ -63,6 +63,11 @@ def _reference(writer: StoreWriter) -> None:
     _write(writer, "instruments/company", [{
         "instrument_id": "EQ:AAA", **company, "sector": "Technology", "fetched_on": END,
     }])  # fmt: skip
+    _write(writer, "instruments/description", [{
+        "instrument_id": "EQ:AAA", "symbol": "AAA", "description": "AAA makes widgets.",
+        "description_source": "massive_overview", "homepage_url": "https://aaa.example",
+        "total_employees": 1200, "fetched_on": END,
+    }])  # fmt: skip
     _write(writer, "universe", universe_rows(SYMBOLS))
 
 

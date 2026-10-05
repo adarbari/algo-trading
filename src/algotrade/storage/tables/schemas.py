@@ -229,6 +229,23 @@ INSTRUMENT_COMPANY = _fixed(
     *_strings("website", "former_names", "exchanges", "tickers"),
     "fetched_on date",
 )
+# L1: a short plain-text description of what an instrument is about (ADR 0034): a stock's from
+# Massive's ticker overview, an ETF's investment objective from its SEC prospectus. Runs are
+# increments (the rows fetched or changed that run), so they merge; one row per instrument,
+# the latest wins. A row without text is a marker that the vendor was asked on ``fetched_on``.
+INSTRUMENT_DESCRIPTION = _fixed(
+    "instruments/description",
+    "reference",
+    ("instrument_id", "description_source", "fetched_on"),
+    "instrument_id string!",
+    *_strings("symbol", "description", "homepage_url", "accn"),
+    "description_source string!",
+    "total_employees int64",
+    "filed date",
+    "fetched_on date!",
+    runs="merge",
+    key=("instrument_id",),
+)
 # L1: share counts and basic financials (revenue, net income, diluted EPS: ``value`` in
 # ``unit``) from SEC company facts, per instrument (every class of a CIK gets the CIK's
 # facts). Runs are increments (new facts + a ``checked`` marker per fetched CIK), so they
@@ -389,6 +406,7 @@ KNOWN: dict[str, TableSpec] = {
         ID_MAP,
         INSTRUMENT_COMPANY,
         INSTRUMENT_SHARES,
+        INSTRUMENT_DESCRIPTION,
         TREASURY_RATES,
         VERIFICATION_IBKR,
         IBKR_CONTRACTS,

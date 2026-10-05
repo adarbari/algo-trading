@@ -1,1 +1,1 @@
-"""SEC EDGAR: the ticker map, company submissions and the SIC code tables."""
+"""SEC EDGAR: ticker map, submissions, share counts, fund objectives and SIC code tables."""

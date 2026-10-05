@@ -6,6 +6,10 @@ none it falls back to the EARLIEST partition and says so (``pre_snapshot``). Rea
 before the first snapshot therefore works, but uses a list of instruments taken later:
 survivorship bias, which backtests record (ADR 0007, ADR 0019 R1). Everything here that
 reads a snapshot table goes through ``snapshot``.
+
+``instruments/description`` is the exception: it is stored in increments (each run adds the
+descriptions it fetched), not as snapshots, so ``descriptions`` unions every partition and
+keeps the latest stored row per instrument.
 """
 
 import math
@@ -18,6 +22,7 @@ import pandas as pd
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.model.fields import (
     COMPANY_TABLE,
+    DESCRIPTION_TABLE,
     REFERENCE_TABLE,
     field_source,
     instrument_field,
@@ -84,6 +89,47 @@ def instruments(
 ) -> pd.DataFrame:
     """The ``instruments/reference`` snapshot for ``on`` (see ``snapshot``)."""
     return read_snapshot(reader, REFERENCE_TABLE, on, REFERENCE_HINT, as_of, ids)[0]
+
+
+ALL_TIME = (date(1900, 1, 1), date(9999, 12, 31))
+DESCRIPTION_COLUMNS = (
+    "instrument_id",
+    "symbol",
+    "description",
+    "description_source",
+    "homepage_url",
+    "total_employees",
+    "filed",
+    "accn",
+    "fetched_on",
+)
+
+
+def stored_descriptions(
+    reader: StoreReader, ids: Sequence[str] | None = None, as_of: datetime | None = None
+) -> pd.DataFrame:
+    """Every stored description row (``DESCRIPTION_COLUMNS``), the latest version per
+    instrument, markers (no text: the vendor had none) included; empty when none. The
+    ingestion task reads this to see what is already asked."""
+    frame = reader.table_range(DESCRIPTION_TABLE, *ALL_TIME, as_of, ids)
+    if frame is None or frame.empty:
+        return pd.DataFrame(columns=list(DESCRIPTION_COLUMNS))
+    frame = frame.sort_values("knowledge_ts", kind="stable")
+    frame = frame.drop_duplicates("instrument_id", keep="last")
+    frame = frame.reindex(columns=list(DESCRIPTION_COLUMNS))  # all-null columns may be absent
+    for column in ("filed", "fetched_on"):
+        day = pd.to_datetime(frame[column]).dt.date
+        frame[column] = day.astype(object).where(frame[column].notna(), None)
+    return frame.sort_values("instrument_id", kind="stable").reset_index(drop=True)
+
+
+def descriptions(
+    reader: StoreReader, ids: Sequence[str] | None = None, as_of: datetime | None = None
+) -> pd.DataFrame:
+    """The stored descriptions that have text, one row per instrument (``stored_descriptions``
+    without the markers). What the Explore overview shows for a company or fund."""
+    frame = stored_descriptions(reader, ids, as_of)
+    return frame[frame["description"].notna()].reset_index(drop=True)
 
 
 def ibkr_contracts(
