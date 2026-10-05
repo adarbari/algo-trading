@@ -6,6 +6,60 @@ enum Adjustment {
 }
 
 """
+A saved backtest run: `status` complete, partial or failed; `start` / `end` its first and last session; `metrics` (sharpe, cagr, max drawdown, ...)
+"""
+type Backtest {
+  runId: String!
+  configId: String!
+  user: String!
+  status: String!
+  start: String
+  end: Date!
+  startedAt: DateTime!
+  finishedAt: DateTime
+  metrics: JSON!
+}
+
+"""
+A saved run with its config hash, selection audit, `data` (as_of, data_versions, reference_snapshot, survivorship_bias), rebalance evaluations, equity curve and fills
+"""
+type BacktestDetail {
+  summary: Backtest!
+  configHash: String
+  selection: JSON!
+  data: JSON!
+  rebalances: [JSON!]!
+  equity: [EquityPoint!]!
+  fills: [Fill!]!
+}
+
+"""One equal-width histogram bin, `lo` to `hi`"""
+type Bin {
+  lo: Float!
+  hi: Float!
+  count: Int!
+}
+
+"""A value of a non-numeric feature and how many instruments have it"""
+type Category {
+  value: String!
+  count: Int!
+}
+
+"""
+A config the user sees: `scope` site (a preset) or the user's id; `kind` strategy or screener (null when it does not resolve); `selection` the named selection or inline; `error` why it does not resolve
+"""
+type Config {
+  configId: String!
+  scope: String!
+  kind: String
+  impl: String
+  selection: String
+  hash: String
+  error: String
+}
+
+"""
 What one criterion judged: the value (null: missing), PASS / NEAR / FAIL / MISSING and, for a near miss or a fail, how far from passing
 """
 type CriterionResult {
@@ -29,6 +83,13 @@ type DecisionCount {
   count: Int!
 }
 
+"""The portfolio after one bar: equity and gross exposure"""
+type EquityPoint {
+  ts: String!
+  equity: Float
+  grossExposure: Float
+}
+
 """
 A stored event: `table` events/<kind>, `date` the event date (UTC), `values` the row's other columns
 """
@@ -39,6 +100,21 @@ type Event {
   date: Date!
   ts: DateTime!
   values: JSON!
+}
+
+"""
+A catalogue feature across instruments for `session`: `count` instruments with a row (a value or a stored null), `nulls` stored nulls; `quantiles` and 20-bin `histogram` for a number, `categories` (the most frequent values) otherwise; `unknown`: why nothing is counted (not stored for the session)
+"""
+type FeatureDistribution {
+  name: String!
+  session: Date!
+  info: FeatureInfo!
+  count: Int!
+  nulls: Int!
+  quantiles: [Quantile!]!
+  histogram: [Bin!]!
+  categories: [Category!]!
+  unknown: Unknown
 }
 
 """How a client shows a feature's value"""
@@ -96,6 +172,17 @@ type FeatureValue {
   value: JSON
   unknown: Unknown
   info: FeatureInfo!
+}
+
+"""One simulated fill"""
+type Fill {
+  ts: String!
+  instrumentId: String!
+  side: String!
+  quantity: Float
+  price: Float
+  commission: Float
+  multiplier: Float
 }
 
 """
@@ -243,6 +330,16 @@ type OptionQuote {
   rho: Float
 }
 
+"""
+The site preset a screen extends: `pinned` the version it extends (null: not copied yet), `current` the preset's version now
+"""
+type PresetPin {
+  presetId: String!
+  pinned: Int
+  current: Int
+  rebaseAvailable: Boolean!
+}
+
 """One session's daily bar, adjusted"""
 type PriceBar {
   session: Date!
@@ -261,6 +358,12 @@ type PriceSeries {
   start: Date!
   end: Date!
   bars: [PriceBar!]!
+}
+
+"""A quantile of the values: `q` 0.5 is the median"""
+type Quantile {
+  q: Float!
+  value: Float!
 }
 
 """Reads for the web app, each for one session (ADR 0036)"""
@@ -311,12 +414,84 @@ type Query {
   The user's saved view of the screener `scope`'s results (the default view, or the one called `name`); null: a screener the user does not see, or nothing stored yet
   """
   view(scope: String!, name: String = null): TableView
+
+  """
+  The caller's feature catalogue (the site's fields plus their own expression features), in catalogue order
+  """
+  catalogue: [FeatureInfo!]!
+
+  """
+  The catalogue field `name` across instruments for the session; a name outside the caller's catalogue is an UNKNOWN_FEATURE error. Null: nothing stored
+  """
+  distribution(
+    name: FeatureName!
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): FeatureDistribution
+
+  """
+  Every strategy and screener config the user sees: site presets, then their own (`kind`: only `strategy` or `screener`)
+  """
+  configs(kind: String = null): [Config!]!
+
+  """
+  Every saved backtest run of the strategy configs the user sees, newest first
+  """
+  backtests: [Backtest!]!
+
+  """The saved backtest run `runId`; null: no such backtest run"""
+  backtest(runId: String!): BacktestDetail
+
+  """
+  The user's own rule screens: finalised ones and draft-only ones (status DRAFT), by id
+  """
+  myScreens: [ScreenListing!]!
+
+  """
+  The user's screen `screenerId` (or the site preset of that id they have not copied yet): draft, versions, preset pin, working copy. Null: no such screen
+  """
+  screenDetail(screenerId: String!): ScreenDetail
+
+  """The finalised versions of the user's screen `screenerId`, oldest first"""
+  screenVersions(screenerId: String!): [ScreenVersion!]!
 }
 
 """One of the screen's display columns for the instrument"""
 type ResultColumn {
   name: String!
   value: JSON
+}
+
+"""
+A screen of the user (or a preset not copied yet): the `draft` and why it would not finalise (`draftError`), its `versions`, the `preset` it is pinned to, the latest version resolved (`hash`, `layers`, `resolved`, `error`) and `working`, the rule keys the Builder edits
+"""
+type ScreenDetail {
+  screenerId: String!
+  user: String!
+  draft: JSON
+  draftError: String
+  versions: [Int!]!
+  latest: Int
+  preset: PresetPin
+  hash: String
+  layers: [String!]!
+  resolved: JSON
+  error: String
+  working: JSON
+}
+
+"""
+One of the user's screens: `status` FINAL (has a finalised version) or DRAFT (a draft only); `presetId` the site preset it extends
+"""
+type ScreenListing {
+  screenerId: String!
+  status: String!
+  latest: Int
+  hasDraft: Boolean!
+  presetId: String
 }
 
 """
@@ -335,6 +510,12 @@ type ScreenResult {
   flags: [String!]!
   criteria: [CriterionResult!]!
   columns: [ResultColumn!]!
+}
+
+"""A finalised (immutable) version of a screen and its document"""
+type ScreenVersion {
+  version: Int!
+  document: JSON!
 }
 
 """

@@ -185,9 +185,11 @@ def graphql_objects() -> list[type]:
 
 
 def test_the_type_walk_reaches_every_area() -> None:
-    """``types/`` is split by area (``instruments/``, ``screens/``): the checks see them all."""
+    """``types/`` is split by area (``instruments/``, ``screens/``, ``ops/``): the checks see
+    them all."""
     names = {cls.__name__ for cls in graphql_objects()}
-    assert {"Query", "Session", "Instrument", "FeatureValue", "Ideas", "Screener"} <= names
+    areas = {"Instrument", "FeatureValue", "Ideas", "Screener", "ScreenDetail", "Backtest"}
+    assert {"Query", "Session"} | areas <= names
 
 
 def test_types_mirror_read_model() -> None:

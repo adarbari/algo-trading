@@ -1,9 +1,10 @@
 /**
- * Playwright route mock for the Screeners pages (list, new, Builder): the configs list, one
- * screen's detail / versions, draft save and discard, finalise, copy, rebase, the live
- * preview and the formula check / save, answering from e2e/fixtures/builder/ (shaped from the
- * API's schemas) with a little state so a flow reads back what it wrote. Every call it records
- * is exposed for assertions. Anything else falls through to the other mocks.
+ * Playwright route mock for the Screeners pages (list, new, Builder): the GraphQL reads (the
+ * screener configs, the user's screens, one screen's detail / versions), draft save and
+ * discard, finalise, copy, rebase, the live preview and the formula check / save, answering
+ * from e2e/fixtures/builder/ (shaped from the API's schemas) with a little state so a flow reads
+ * back what it wrote. Every call it records is exposed for assertions. Anything else (other
+ * GraphQL operations too) falls through to the other mocks.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -87,25 +88,41 @@ export async function mockBuilderApi(
   const own = new Set(['my-vrp']);
   const listing = (): Json[] => [
     {
-      screener_id: 'idea-draft',
+      screenerId: 'idea-draft',
       status: 'DRAFT',
       latest: null,
-      has_draft: true,
-      preset_id: 'vrp_scanner',
+      hasDraft: true,
+      presetId: 'vrp_scanner',
     },
     ...[...own].map((id) => {
       const detail = details[id] ?? {};
       const versions = (detail['versions'] as number[] | undefined) ?? [];
-      const preset = detail['preset'] as { preset_id: string } | null | undefined;
+      const preset = detail['preset'] as { presetId: string } | null | undefined;
       return {
-        screener_id: id,
+        screenerId: id,
         status: versions.length > 0 ? 'FINAL' : 'DRAFT',
         latest: (detail['latest'] as number | null | undefined) ?? null,
-        has_draft: detail['draft'] != null,
-        preset_id: preset?.preset_id ?? null,
+        hasDraft: detail['draft'] != null,
+        presetId: preset?.presetId ?? null,
       };
     }),
   ];
+  const versionsOf = (id: string): Json[] =>
+    ((detailOf(id)?.['versions'] as number[] | undefined) ?? []).map((version) => ({
+      version,
+      document: { id, extends: 'vrp_scanner@1', version, criteria: { iv30: { value: 0.4 } } },
+    }));
+  /** The screens' GraphQL reads, by operation name; null: not one of them. */
+  const graphqlAnswer = (operation: { query?: string; variables?: Json }): Json | null => {
+    const name = /query\s+(\w+)/.exec(operation.query ?? '')?.[1];
+    const raw = operation.variables?.['id'];
+    const id = typeof raw === 'string' ? raw : '';
+    if (name === 'ScreenerConfigs') return { configs: CONFIGS };
+    if (name === 'MyScreens') return { myScreens: listing() };
+    if (name === 'ScreenDetail') return { screenDetail: detailOf(id) };
+    if (name === 'ScreenVersions') return { screenVersions: versionsOf(id) };
+    return null;
+  };
 
   await page.route('**/api/**', async (route: Route) => {
     const request = route.request();
@@ -115,8 +132,10 @@ export async function mockBuilderApi(
     const body = (): Json => (request.postDataJSON() ?? {}) as Json;
     const json = (data: unknown, status = 200) => route.fulfill({ status, json: data });
 
-    if (path === '/configs' && method === 'GET') return json(CONFIGS);
-    if (path === '/screeners' && method === 'GET') return json(listing());
+    if (path === '/graphql' && method === 'POST') {
+      const data = graphqlAnswer(body());
+      return data === null ? route.fallback() : json({ data });
+    }
     if (path === '/screeners/preview' && method === 'POST') {
       const spec = body()['spec'] as Json;
       mock.previews.push(spec);
@@ -207,39 +226,25 @@ export async function mockBuilderApi(
     const id = decodeURIComponent(match[1] ?? '');
     const part = match[2] ?? '';
 
-    if (part === '' && method === 'GET') {
-      const detail = detailOf(id);
-      return detail ? json(detail) : json({ detail: `no screen ${id}` }, 404);
-    }
-    if (part === 'versions' && method === 'GET') {
-      const detail = detailOf(id);
-      const versions = (detail?.['versions'] as number[] | undefined) ?? [];
-      return json(
-        versions.map((version) => ({
-          version,
-          document: { id, extends: 'vrp_scanner@1', version, criteria: { iv30: { value: 0.4 } } },
-        })),
-      );
-    }
     if (part === 'draft' && method === 'PUT') {
       const document = body()['document'] as Json;
       mock.drafts.push({ id, document });
       own.add(id);
       const detail = detailOf(id) ?? {
-        screener_id: id,
+        screenerId: id,
         user: 'abhinav',
         versions: [],
         latest: null,
         preset: null,
         working: { criteria: {} },
       };
-      details[id] = { ...detail, draft: document, draft_error: null };
+      details[id] = { ...detail, draft: document, draftError: null };
       return json({ screener_id: id, document });
     }
     if (part === 'draft' && method === 'DELETE') {
       mock.discarded.push(id);
       const detail = detailOf(id);
-      if (detail) details[id] = { ...detail, draft: null, draft_error: null };
+      if (detail) details[id] = { ...detail, draft: null, draftError: null };
       if (((detail?.['versions'] as number[] | undefined) ?? []).length === 0) own.delete(id);
       return route.fulfill({ status: 204 });
     }
@@ -262,7 +267,7 @@ export async function mockBuilderApi(
       details[id] = {
         ...detail,
         draft,
-        preset: { preset_id: 'vrp_scanner', pinned: 2, current: 2, rebase_available: false },
+        preset: { presetId: 'vrp_scanner', pinned: 2, current: 2, rebaseAvailable: false },
       };
       return json({ screener_id: id, document: draft });
     }
@@ -273,9 +278,9 @@ export async function mockBuilderApi(
       const draft = { id, extends: `${preset}@2` };
       details[id] = {
         ...structuredClone(DETAILS['vrp_scanner'] ?? {}),
-        screener_id: id,
+        screenerId: id,
         draft,
-        preset: { preset_id: preset, pinned: 2, current: 2, rebase_available: false },
+        preset: { presetId: preset, pinned: 2, current: 2, rebaseAvailable: false },
       };
       return json({ screener_id: id, document: draft }, 201);
     }

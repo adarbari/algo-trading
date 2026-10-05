@@ -3,16 +3,20 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { api, TestQueryProvider } from '@/shared/api';
+import { api, gql, TestQueryProvider } from '@/shared/api';
 
 import { PREVIEW_DEBOUNCE_MS, ScreenerBuilderProvider, useScreenerBuilder } from './builder';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
-  return { ...actual, api: { GET: vi.fn(), POST: vi.fn(), PUT: vi.fn(), DELETE: vi.fn() } };
+  return {
+    ...actual,
+    api: { POST: vi.fn(), PUT: vi.fn(), DELETE: vi.fn() },
+    gql: vi.fn(),
+  };
 });
 
-const GET = vi.mocked(api.GET);
+const GQL = vi.mocked(gql);
 const POST = vi.mocked(api.POST);
 const PUT = vi.mocked(api.PUT);
 const DELETE = vi.mocked(api.DELETE);
@@ -25,13 +29,13 @@ const WORKING = {
   },
 };
 const detail = (patch: Record<string, unknown> = {}) => ({
-  screener_id: 'my',
+  screenerId: 'my',
   user: 'u',
   draft: { id: 'my', extends: 'vrp@1' },
-  draft_error: null,
+  draftError: null,
   versions: [1],
   latest: 1,
-  preset: { preset_id: 'vrp', pinned: 1, current: 1, rebase_available: false },
+  preset: { presetId: 'vrp', pinned: 1, current: 1, rebaseAvailable: false },
   hash: 'h',
   layers: [],
   resolved: {},
@@ -40,6 +44,18 @@ const detail = (patch: Record<string, unknown> = {}) => ({
   ...patch,
 });
 const PREVIEW = { rows: [], summary: {}, funnel: [], decisions: {}, coverage: {}, total: 0 };
+const V1 = [{ version: 1, document: { id: 'my', version: 1 } }];
+
+/** Answers the screen's GraphQL reads: its detail (`screen`) and its versions. */
+function serve(screen: unknown, versions: unknown[] = V1) {
+  GQL.mockImplementation((document: unknown) =>
+    Promise.resolve(
+      String(document).includes('query ScreenVersions')
+        ? { screenVersions: versions }
+        : { screenDetail: screen },
+    ),
+  );
+}
 
 function Probe() {
   const b = useScreenerBuilder();
@@ -108,13 +124,8 @@ function setup() {
 }
 
 beforeEach(() => {
-  for (const mock of [GET, POST, PUT, DELETE]) mock.mockReset();
-  GET.mockImplementation(((path: string) =>
-    Promise.resolve(
-      path.endsWith('/versions')
-        ? ok([{ version: 1, document: { id: 'my', version: 1 } }])
-        : ok(detail()),
-    )) as never);
+  for (const mock of [GQL, POST, PUT, DELETE]) mock.mockReset();
+  serve(detail());
   POST.mockResolvedValue(ok(PREVIEW));
   PUT.mockResolvedValue(ok({ screener_id: 'my', document: {} }) as never);
   DELETE.mockResolvedValue({ response: new Response(null, { status: 204 }) });
@@ -205,34 +216,21 @@ describe('ScreenerBuilderProvider', () => {
   });
 
   it('starts from the latest version when there is no draft', async () => {
-    GET.mockImplementation(((path: string) =>
-      Promise.resolve(
-        path.endsWith('/versions')
-          ? ok([
-              {
-                version: 1,
-                document: {
-                  id: 'my',
-                  version: 1,
-                  extends: 'vrp@1',
-                  criteria: { iv30: { value: 0.4 } },
-                },
-              },
-            ])
-          : ok(detail({ draft: null })),
-      )) as never);
+    serve(detail({ draft: null }), [
+      {
+        version: 1,
+        document: { id: 'my', version: 1, extends: 'vrp@1', criteria: { iv30: { value: 0.4 } } },
+      },
+    ]);
     setup();
     expect(await screen.findByText('criteria iv30=0.4,close=5')).toBeInTheDocument();
     expect(screen.getByText(/dirty false next v2/)).toBeInTheDocument();
   });
 
   describe('a site preset not copied yet', () => {
-    const PRESET = { preset_id: 'my', pinned: null, current: 4, rebase_available: false };
+    const PRESET = { presetId: 'my', pinned: null, current: 4, rebaseAvailable: false };
     beforeEach(() => {
-      GET.mockImplementation((() =>
-        Promise.resolve(
-          ok(detail({ draft: null, versions: [], latest: null, preset: PRESET })),
-        )) as never);
+      serve(detail({ draft: null, versions: [], latest: null, preset: PRESET }));
       POST.mockImplementation(((path: string) =>
         Promise.resolve(
           path === '/screeners/{screener_id}/copy'
@@ -293,18 +291,15 @@ describe('ScreenerBuilderProvider', () => {
     });
 
     it('clears the tie-break the preset sets, as an empty one in the copy', async () => {
-      GET.mockImplementation((() =>
-        Promise.resolve(
-          ok(
-            detail({
-              draft: null,
-              versions: [],
-              latest: null,
-              preset: PRESET,
-              working: { ...WORKING, rank: { tie_break: 'feature.spread' } },
-            }),
-          ),
-        )) as never);
+      serve(
+        detail({
+          draft: null,
+          versions: [],
+          latest: null,
+          preset: PRESET,
+          working: { ...WORKING, rank: { tie_break: 'feature.spread' } },
+        }),
+      );
       setup();
       await screen.findByText(/preset my/);
       await userEvent.click(screen.getByRole('button', { name: 'clear tie-break' }));
@@ -328,10 +323,13 @@ describe('ScreenerBuilderProvider', () => {
   });
 
   it('reports a screen that failed to load', async () => {
-    GET.mockResolvedValue({
-      error: { detail: 'no screen' },
-      response: new Response(null, { status: 404 }),
-    });
+    GQL.mockRejectedValue(new Error('the API is down'));
+    setup();
+    expect(await screen.findByText(/status error/)).toBeInTheDocument();
+  });
+
+  it('reports a screen that does not exist (a null detail)', async () => {
+    serve(null);
     setup();
     expect(await screen.findByText(/status error/)).toBeInTheDocument();
   });

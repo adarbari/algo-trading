@@ -34,7 +34,7 @@ from algotrade.storage.configs.files import (
     SITE,
     FileConfigStore,
     MemoryConfigStore,
-    read_toml,
+    valid_version,
     version_file,
 )
 from algotrade.storage.configs.store import ConfigStore, split_version
@@ -47,25 +47,14 @@ class VersionExistsError(ConfigurationError):
 
 
 class ConfigWriter(ConfigStore, Protocol):
-    """Drafts and versions of ``user``'s rule screens; ``user``'s feature files."""
-
-    def draft(self, user: str, name: str) -> dict[str, Any] | None: ...
+    """Writes drafts and versions of ``user``'s rule screens (read through ``ConfigStore``);
+    ``user``'s feature files and preferences."""
 
     def save_draft(self, user: str, name: str, document: Mapping[str, Any]) -> None: ...
 
     def discard_draft(self, user: str, name: str) -> bool:
         """``True`` when there was a draft."""
         ...
-
-    def drafts(self, user: str) -> list[str]:
-        """The names of ``user``'s screens that have a draft (finalised or not), sorted."""
-        ...
-
-    def versions(self, user: str, name: str) -> list[int]:
-        """Finalised versions, ascending (the latest is the last)."""
-        ...
-
-    def version(self, user: str, name: str, version: int) -> dict[str, Any] | None: ...
 
     def add_version(self, user: str, name: str, version: int, document: Mapping[str, Any]) -> None:
         """Write ``v<version>``; ``VersionExistsError`` if it exists (never overwritten)."""
@@ -189,12 +178,6 @@ def _archived_as(name: str) -> re.Pattern[str]:
     return re.compile(rf"{re.escape(validate_id('screener', name))}-\d{{8}}T\d{{12}}Z")
 
 
-def _version(version: int) -> int:
-    if not isinstance(version, int) or isinstance(version, bool) or version < 1:
-        raise ConfigurationError(f"invalid version {version!r}: a positive integer")
-    return version
-
-
 # ----------------------------------------------------------------------------- files
 class FileConfigWriter(FileConfigStore):
     """The TOML files under the config root (layout: ``storage/configs/files.py``)."""
@@ -226,9 +209,6 @@ class FileConfigWriter(FileConfigStore):
         finally:
             tmp.unlink(missing_ok=True)
 
-    def draft(self, user: str, name: str) -> dict[str, Any] | None:
-        return read_toml(self.screen_dir(_user(user), name) / DRAFT)
-
     def save_draft(self, user: str, name: str, document: Mapping[str, Any]) -> None:
         self._write(user, self.screen_dir(_user(user), name) / DRAFT, toml_text(document))
 
@@ -240,20 +220,8 @@ class FileConfigWriter(FileConfigStore):
             return False
         return True
 
-    def drafts(self, user: str) -> list[str]:
-        scope = _user(user)
-        return [
-            n for n in self.screen_folders(scope) if (self.screen_dir(scope, n) / DRAFT).is_file()
-        ]
-
-    def versions(self, user: str, name: str) -> list[int]:
-        return self.screen_versions(_user(user), name)
-
-    def version(self, user: str, name: str, version: int) -> dict[str, Any] | None:
-        return read_toml(self.screen_dir(_user(user), name) / version_file(_version(version)))
-
     def add_version(self, user: str, name: str, version: int, document: Mapping[str, Any]) -> None:
-        path = self.screen_dir(_user(user), name) / version_file(_version(version))
+        path = self.screen_dir(_user(user), name) / version_file(valid_version(version))
         self._write(user, path, toml_text(document), exclusive=True)
 
     def delete_screen(self, user: str, name: str, at: datetime) -> bool:
@@ -342,12 +310,12 @@ class MemoryConfigWriter(MemoryConfigStore):
         return sorted(self._versions.get(self._screen(user, name), {}))
 
     def version(self, user: str, name: str, version: int) -> dict[str, Any] | None:
-        found = self._versions.get(self._screen(user, name), {}).get(_version(version))
+        found = self._versions.get(self._screen(user, name), {}).get(valid_version(version))
         return None if found is None else _copy(found)
 
     def add_version(self, user: str, name: str, version: int, document: Mapping[str, Any]) -> None:
         versions = self._versions.setdefault(self._screen(user, name), {})
-        if _version(version) in versions:
+        if valid_version(version) in versions:
             raise VersionExistsError(f"v{version} exists: versions are immutable")
         versions[version] = _copy(document)
 

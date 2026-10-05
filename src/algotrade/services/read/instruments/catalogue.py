@@ -21,7 +21,7 @@ from algotrade.core.model.fields import (
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.registry import GROUPS, feature
 from algotrade.services.configs import catalog_of
-from algotrade.services.read.context import ReadContext
+from algotrade.services.read.context import Stores
 
 INSTRUMENT_NULL = "not known for this instrument (UNKNOWN)"
 
@@ -174,6 +174,6 @@ def feature_infos(fs: FeatureSet, names: Sequence[str] | None = None) -> dict[st
     return out
 
 
-def load_catalogue(ctx: ReadContext) -> tuple[FeatureInfo, ...]:
+def load_catalogue(ctx: Stores) -> tuple[FeatureInfo, ...]:
     """The caller's catalogue (``ctx.features``), in catalogue order."""
     return tuple(feature_infos(ctx.features).values())

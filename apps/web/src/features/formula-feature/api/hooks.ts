@@ -1,6 +1,7 @@
 /** Formula features: the type check with sample values (POST /features/check) and saving a named one (POST /features/user). */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { refreshCatalogue } from '@/entities/feature';
 import { api, queryKeys, unwrap } from '@/shared/api';
 
 /** How many sample values the check returns. */
@@ -34,6 +35,6 @@ export function useSaveFormulaFeature() {
   return useMutation({
     mutationFn: (body: FormulaFeatureInput) =>
       unwrap(api.POST('/features/user', { body: { ...body, theme: 'builder' } })),
-    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.features.catalogue() }),
+    onSuccess: () => refreshCatalogue(client),
   });
 }

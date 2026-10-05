@@ -27,7 +27,7 @@ vi.mock('@/entities/instrument', async (importOriginal) => ({
 const IV30 = 'rollup.iv30@v1.iv30';
 const base = {
   source: 'x',
-  null_meaning: '',
+  nullMeaning: '',
   version: 1,
   group: null,
   key: null,
@@ -98,13 +98,13 @@ beforeEach(() => {
   hooks.useFeatureDistribution.mockReturnValue(
     fakeQuery({
       name: IV30,
-      dtype: 'float',
       session: '2026-10-02',
       count: 3625,
       nulls: 1654,
-      quantiles: { '0.5': 0.47 },
+      quantiles: [{ q: 0.5, value: 0.47 }],
       histogram: [{ lo: 0, hi: 1, count: 1971 }],
       categories: [],
+      unknown: null,
     }),
   );
 });

@@ -5,9 +5,10 @@
  */
 import type { ValueFormat } from '@algotrade/ui';
 
-import { feature, type components } from '@/shared/api';
+import { feature, type gqlTypes } from '@/shared/api';
 
-export type CatalogueFeature = components['schemas']['Feature'];
+/** One catalogue field as `Query.catalogue` serves it. */
+export type CatalogueFeature = gqlTypes.FeatureCatalogueQuery['catalogue'][number];
 
 /** Short labels for the features the Explore defaults show (the mockup's headers). */
 const LABELS: Readonly<Record<string, string>> = {

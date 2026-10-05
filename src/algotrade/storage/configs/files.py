@@ -38,6 +38,12 @@ def version_file(version: int) -> str:
     return f"v{version}.toml"
 
 
+def valid_version(version: int) -> int:
+    if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+        raise ConfigurationError(f"invalid version {version!r}: a positive integer")
+    return version
+
+
 def read_toml(path: Path) -> dict[str, Any] | None:
     """The document at ``path``; ``None`` when there is no file."""
     try:
@@ -92,6 +98,21 @@ class FileConfigStore:
             return []
         found = (_VERSION_FILE.fullmatch(p.name) for p in directory.iterdir() if p.is_file())
         return sorted(int(m.group(1)) for m in found if m)
+
+    def draft(self, user: str, name: str) -> dict[str, Any] | None:
+        return read_toml(self.screen_dir(user, name) / DRAFT) if user != SITE else None
+
+    def drafts(self, user: str) -> list[str]:
+        if user == SITE:
+            return []
+        folders = self.screen_folders(user)
+        return [n for n in folders if (self.screen_dir(user, n) / DRAFT).is_file()]
+
+    def versions(self, user: str, name: str) -> list[int]:
+        return self.screen_versions(user, name)
+
+    def version(self, user: str, name: str, version: int) -> dict[str, Any] | None:
+        return read_toml(self.screen_dir(user, name) / version_file(valid_version(version)))
 
     def _screen(self, scope: str, name: str) -> Mapping[str, Any] | None:
         """``name`` (latest version) or ``name@N`` (that version)."""
@@ -166,6 +187,19 @@ class MemoryConfigStore:
     def _screen_versions(self, scope: str, name: str) -> list[int]:
         keys = (n for (s, k, n) in self._docs if (s, k) == (scope, SCREENERS))
         return sorted(v for b, v in map(split_version, keys) if b == name and v is not None)
+
+    def draft(self, user: str, name: str) -> dict[str, Any] | None:
+        return None  # a plain memory store holds no drafts (MemoryConfigWriter does)
+
+    def drafts(self, user: str) -> list[str]:
+        return []
+
+    def versions(self, user: str, name: str) -> list[int]:
+        return self._screen_versions(user, name)
+
+    def version(self, user: str, name: str, version: int) -> dict[str, Any] | None:
+        found = self._docs.get((user, SCREENERS, f"{name}@{valid_version(version)}"))
+        return None if found is None else dict(found)
 
     def names(self, scope: str, kind: str) -> list[str]:
         names = {n for (s, k, n) in self._docs if s == scope and k == kind}

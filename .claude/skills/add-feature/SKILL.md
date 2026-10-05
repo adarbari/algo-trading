@@ -34,7 +34,7 @@ high_52w - 1`, a HIGH / LOW label from thresholds, `shares x close`.) Then it is
 **Site or user?** A formula one person wants for their own screens is a **user feature**:
 the same `[name]` entry in `config/users/<id>/features/<theme>.toml` (git-ignored; ADR 0023
 step 4). It is always virtual (`materialise` is rejected), visible only to that user
-(`feature.<name>` in their selections and configs, Explore columns, `GET /features` with
+(`feature.<name>` in their selections and configs, Explore columns, the GraphQL `catalogue` with
 `scope = "user"`), may read site features but never take a site feature's name, and its
 definition joins the hash of every config that reads it. Check it with
 `algotrade-backtest --user <id> config validate-features` (type, inputs, a sample on the

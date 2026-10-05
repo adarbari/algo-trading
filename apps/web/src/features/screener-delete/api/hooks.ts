@@ -5,6 +5,7 @@
 import { useToast } from '@algotrade/ui';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { forgetScreen, refreshScreens } from '@/entities/screen';
 import { api, ApiError, errorDetail, queryKeys } from '@/shared/api';
 
 export function useDeleteScreener(id: string) {
@@ -19,8 +20,9 @@ export function useDeleteScreener(id: string) {
     },
     onSuccess: () => {
       // Drop the screen's own entries (they would answer 404 now), then refresh the lists.
-      client.removeQueries({ queryKey: queryKeys.screeners.detail(id) });
+      forgetScreen(client, id);
       void client.invalidateQueries({ queryKey: queryKeys.screeners.all() });
+      void refreshScreens(client);
       toast.show({ tone: 'positive', title: `Deleted ${id}` });
     },
     onError: (error) => {

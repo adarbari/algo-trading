@@ -3,7 +3,7 @@ asked for in a request, and ``None`` for a store with nothing to resolve a sessi
 
 from datetime import date
 
-from algotrade.services.read.context import NotFoundError, ReadContext
+from algotrade.services.read.context import NotFoundError, ReadContext, StoreContext
 from algotrade_api.graphql.context import RequestContext, context_getter
 from algotrade_api.graphql.loaders import Loaders
 
@@ -29,3 +29,22 @@ def test_nothing_stored_is_none() -> None:
         raise NotFoundError("nothing stored")
 
     assert RequestContext(opener).read(None) is None
+
+
+def test_the_session_free_context_opens_once_and_needs_no_session(ctx: ReadContext) -> None:
+    def opener(requested: date | None) -> ReadContext:
+        raise NotFoundError("nothing stored")
+
+    stores = StoreContext(ctx.reader, ctx.configs, ctx.user, ctx.features, ctx.cache)
+    opened: list[StoreContext] = []
+
+    def open_stores() -> StoreContext:
+        opened.append(stores)
+        return stores
+
+    request = RequestContext(opener, open_stores)
+    assert request.stores() is stores and request.stores() is stores
+    assert len(opened) == 1 and request.read(None) is None
+    # Without a stores opener: the latest session's read context.
+    assert RequestContext(lambda _: ctx).stores() is not None
+    assert RequestContext(opener).stores() is None

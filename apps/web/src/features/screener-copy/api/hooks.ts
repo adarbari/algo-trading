@@ -1,6 +1,7 @@
 /** Copy a site preset into the user's own screeners (POST /screeners/{name}/copy): pinned to the preset's version. */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { refreshScreens } from '@/entities/screen';
 import { api, queryKeys, unwrap } from '@/shared/api';
 
 export function useCopyPreset(preset: string) {
@@ -13,6 +14,10 @@ export function useCopyPreset(preset: string) {
           body: { preset },
         }),
       ),
-    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.screeners.all() }),
+    onSuccess: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.screeners.all() }),
+        refreshScreens(client),
+      ]),
   });
 }

@@ -23,7 +23,15 @@ loaders `read/instruments/{identity,features,catalogue}.py` (`load_instrument`,
 `types/{query,session,instrument,feature}.py` at `POST /graphql`, the snapshot
 `apps/api/schema.graphql`, the web codegen (`apps/web/codegen.ts`, `shared/api/graphql.ts`,
 `generated/{graphql,catalogue.ts}`) and the Explore Overview on `useInstrumentFacts`; READ 3,
-6, 7, 9 and WEB 2, 5, 6 are on. **PR 6 moved the Explore detail pane**: the loaders
+6, 7, 9 and WEB 2, 5, 6 are on. **PR 9 moved the catalogue, distributions, backtests, configs
+and the Builder's screen reads**: `Query.{catalogue,distribution,configs,backtests,backtest,
+myScreens,screenDetail,screenVersions}` over `read/instruments/distribution.py`,
+`read/ops/{configs,backtests}.py` and `read/screens/documents.py` (types in
+`graphql/types/{instruments,ops,screens}/`); `explore/{features,backtests,configs}.py` and their
+routes are deleted. Fields over configs and run records are not session data: they read a
+session-free `StoreContext` (`context.open_stores`, `RequestContext.stores()`), so they answer
+on a store with no market data yet; the user's drafts and versions are read through the `ConfigStore`
+protocol (the `ConfigWriter` only writes them). **PR 6 moved the Explore detail pane**: the loaders
 `read/instruments/{events,chains,holdings,prices,series}.py` (and `identity.load_instruments`,
 the batch), `Instrument.{events,chain,holdings,prices,series}` with `OptionChain.quotes(expiry)`
 and `Holding.instrument`, each through a per-request dataloader (`graphql/loaders.batched`:
@@ -102,8 +110,8 @@ Owner folder `src/algotrade/services/read/` (ownership `domain-read-model`). Eve
 | Session | `date` | `date, requested, isLatest, latestWithBars, referenceSnapshot, preSnapshot, present, missing` | `bars/1d` (latest), partition lists | `read/session.py` | `explore/store.partition_for`, `latest_session`, preview's store half, ranking's `max(...)` |
 | Instrument | `instrumentId` | `symbol, name, securityType, assetClass, exchange, isEtf, description, referenceSnapshot` | `instruments/reference`, `company`, `description` | `read/instruments/identity.py` | `explore/instruments.resolve_key`, `description_of`; the symbol lookups in results, table, ranking, preview |
 | FeatureValue | (`instrumentId`, `name`, `session`) | `name, value: JSON?, unknown?, info` | `rollups/instrument/*`, expressions, reference columns | `read/instruments/features.py` (wraps `services.features.field_view`) | the features bag, `rollup_row` in chains, `VIEW_FIELDS`, `ticker_columns`, `ranking._earnings` |
-| FeatureInfo | `name` | `kind, source, dtype, format, description, nullMeaning, version, group, key, inputs, unit, range, categories, scope, owner, licence` | registry + user `FeatureSet` | `read/instruments/catalogue.py` (PR 4; explore's REST catalogue maps from it until PR 9) | `explore/features.feature_catalogue` |
-| FeatureDistribution | (`name`, `session`) | `count, nulls, quantiles, histogram, categories` | as FeatureValue | `read/instruments/catalogue.py` | `explore/features.feature_distribution` |
+| FeatureInfo | `name` | `kind, source, dtype, format, description, nullMeaning, version, group, key, inputs, unit, range, categories, scope, owner, licence` | registry + user `FeatureSet` | `read/instruments/catalogue.py` (PR 4; `Query.catalogue` PR 9) | `explore/features.feature_catalogue` (deleted) |
+| FeatureDistribution | (`name`, `session`) | `info, count, nulls, quantiles[{q, value}], histogram, categories, unknown` | as FeatureValue (`load_feature_values` over the session's reference snapshot: `NO_ROW` not counted, `NULL` counted as null, `NO_PARTITION` makes it UNKNOWN) | `read/instruments/distribution.py` (its own module: it reads `features.py`, which reads `catalogue.py`) | `explore/features.feature_distribution` (deleted) |
 | Event | (`instrumentId`, `table`, `ts`) | `kind, date, ts, values` | `events/*` by event date | `read/instruments/events.py` (PR 6) | `explore/instruments.instrument_events` |
 | OptionChain | (`underlyingId`, `session`) | `session, status, expiries[{date, days}], strikes, quotes(expiry)` | `chains/*` exact session | `read/instruments/chains.py` (PR 6) | `explore/chains.option_chain` (minus `our_iv` and the underlying quote: features) |
 | Holdings | (`fundId`, `asOf`) | `asOf, source, total, items[{rank, name, symbol, instrumentId, weight, assetClass, instrument?}]` | `holdings/etf` | `read/instruments/holdings.py` (PR 6) | `explore/funds/holdings` |
@@ -114,7 +122,10 @@ Owner folder `src/algotrade/services/read/` (ownership `domain-read-model`). Eve
 | ScreenResult | (`runId`, `instrumentId`) | `rank, instrument, decision, score, tieBreak, reasons, flags, criteria, columns` (PR 5; `change, previousDecision` with PR 8) | `results/rule_screen*` | `read/screens/results.py` | `table.ScreenTableRow`, `ranking.Pick` |
 | Ideas / Idea | (`user`, `session`) | `session, priority, screeners[{screener, run?, notRun?, picked, top}], total, items[{rank, instrumentId, instrument, picks}]` | ScreenerRun + ScreenResult | `read/screens/ideas.py` | `ideas/ranking.py` (deleted in PR 5) |
 | TableView | (`user`, `scope`, `name?`) | `columns, sort, decisions, names` | `preferences.toml` | `read/screens/views.py` | `explore/screens/view.py` |
-| Backtest, IngestRun, NightlyRun, QualityCheck | `runId` / `session` | as today | run records | `read/ops/*` | `explore/{backtests,runs,ingestion}.py` |
+| Backtest, BacktestDetail | `runId` | `configId, user, status, start, end, startedAt, finishedAt, metrics`; detail: `configHash, selection, data, rebalances, equity[], fills[]` | run records; the run's own `results/backtest_{equity,fills}` partition as of the run (`context.run_partition`) | `read/ops/backtests.py` (PR 9) | `explore/backtests.py` (deleted) |
+| Config | (`scope`, `configId`) | `kind, impl, selection, hash, error` | configs | `read/ops/configs.py` (PR 9) | `explore/configs.py` (deleted) |
+| ScreenListing, ScreenDetail, ScreenVersion | (`user`, `screenerId`) | `status, latest, hasDraft, presetId`; `draft, draftError, versions, preset{presetId, pinned, current, rebaseAvailable}, hash, layers, resolved, error, working`; `version, document` | the user's drafts and versions (`ConfigStore`) | `read/screens/documents.py` (PR 9) | `services/authoring/screens.{screen_detail,list_screens,screen_versions}` |
+| IngestRun, NightlyRun, QualityCheck | `runId` / `session` | as today | run records | `read/ops/*` | `explore/{runs,ingestion}.py` |
 
 `explore`'s `ReadStore`, `ResultCache`, `open_store`, `paginate` and `record(s)` move to
 `read/context.py` and `read/values.py`; `services/explore/` is deleted in PR 10.
@@ -435,7 +446,7 @@ Each PR is independently shippable with `make check` green and updates `docs/roa
 | 6 | Explore detail pane (**done**) | `read/instruments/{events,chains,holdings,prices,series}.py`; `Instrument.{events,chain,holdings,prices,series,screenerHits,description}` (`description` came in PR 4; `screenerHits` needs PR 5's screens read model: it lands with PR 5 or PR 8); `explore/{instruments,chains,funds}` deleted; `/instruments/*`, `/chains/{id}` off the list | the detail pane is one query (per tab) |
 | 7 | FeatureTable + Explore tickers + compare | `read/instruments/table.py` (columnar, server-paged); `Query.table`; `widgets/feature-table`, the column factories (WEB 4); ticker table and compare rebuilt; `explore/universe.py` deleted; `/explore/*`, `/universe` off the list | one page per request (no 12-page fan-out) |
 | 8 | Screener results + preview + views | `ScreenerRun.results`; `features/table-view` (+ `views.<scope>` in `preferences.toml`); screener and preview results on `feature-table`; `explore/screens/*` deleted; `/screens*` and the view GET off the list; the `_float/_text/_num` detect rule; WEB 7 | one table widget renders all four tables |
-| 9 | Catalogue, distribution, backtests, configs | `Query.{catalogue,distribution,backtests}`, screener authoring reads; `explore/{features,backtests,configs}.py` deleted; their GETs off the list | the trader workspace is fully on GraphQL |
+| 9 | Catalogue, distribution, backtests, configs (**done**) | `Query.{catalogue,distribution,backtests}`, screener authoring reads; `explore/{features,backtests,configs}.py` deleted; their GETs off the list | the trader workspace is fully on GraphQL |
 | 10 | Admin and the end of explore | `read/ops/*`; admin entities on GraphQL; `services/explore/` deleted; `explore-queries` removed; READ 2 widens to all of `src/` and `apps/`; `add-api-endpoint` loses its read steps | allow-list = writes, jobs, health, live, preview, files |
 
 Order: PR 4 proves the pipeline (Strawberry, dataloader, codegen, lint) on one pane with little
