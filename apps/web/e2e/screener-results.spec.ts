@@ -1,6 +1,6 @@
 /**
  * Trader > Screeners > one screener (Results) end to end, against the production build with
- * the API mocked from fixtures shaped like GET /screens/{id}/table (builder-api.ts): the latest
+ * the API mocked from fixtures shaped like GraphQL `ScreenerResults` (builder-api.ts): the latest
  * run as a review table (criterion columns in their units, a tinted near miss, new / dropped
  * chips), decision filters and the user's view saved as they change it, the way to the Builder,
  * and the empty state of a screener with no run. Accessibility in both themes.
@@ -39,7 +39,7 @@ for (const theme of ['dark', 'light'] as const) {
     const dkng = grid(page).getByRole('row', { name: /AAPL/ });
     await expect(dkng).toContainText('Apple Inc.');
     await expect(dkng).toContainText('61.0%'); // IV30 in the catalogue's unit
-    await expect(dkng).toContainText('new');
+    await expect(dkng).toContainText('New');
     // SOXS missed IV/HV within tolerance: its cell is tinted, the value is still text.
     await expect(
       grid(page).getByRole('row', { name: /SOXS/ }).locator('[data-fill="warning"]'),
@@ -56,7 +56,12 @@ test('decision chips filter the run and the view is saved as yours', async ({ pa
   const mock = await mockBuilderApi(page);
   await page.goto('/screeners/vrp_scanner');
   await expect(grid(page).getByRole('row', { name: /AAPL/ })).toBeVisible();
-  expect(mock.tables.at(-1)?.['decision']).toBe('QUALIFIED,WATCH,LIQUIDITY_RISK,EVENT_RISK');
+  expect(mock.tables.at(-1)?.['decisions']).toEqual([
+    'QUALIFIED',
+    'WATCH',
+    'LIQUIDITY_RISK',
+    'EVENT_RISK',
+  ]);
   await page.getByRole('button', { name: /^Liquidity risk/ }).click();
   await expect
     .poll(() => mock.views.at(-1))
@@ -65,7 +70,9 @@ test('decision chips filter the run and the view is saved as yours', async ({ pa
       name: null,
       view: { columns: [], sort: null, decisions: ['QUALIFIED', 'WATCH', 'EVENT_RISK'] },
     });
-  await expect.poll(() => mock.tables.at(-1)?.['decision']).toBe('QUALIFIED,WATCH,EVENT_RISK');
+  await expect
+    .poll(() => mock.tables.at(-1)?.['decisions'])
+    .toEqual(['QUALIFIED', 'WATCH', 'EVENT_RISK']);
   await page.getByRole('button', { name: /^New/ }).click();
   await expect.poll(() => mock.tables.at(-1)?.['change']).toBe('new');
 });
@@ -159,7 +166,9 @@ test('a screener with no run says so, and Run now runs it and shows the results'
   const mock = await mockBuilderApi(page);
   await page.goto('/screeners/my-vrp');
   await expect(
-    page.getByText('No run stored for this screener yet. Run it now to see what it picks.'),
+    page.getByText(
+      'No run stored for this screener on 2026-10-02. Run it now to see what it picks.',
+    ),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Run now' }).click();
   await expect(page.getByText('Running for 2026-10-02…')).toBeVisible();

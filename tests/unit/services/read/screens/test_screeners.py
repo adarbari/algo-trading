@@ -1,6 +1,12 @@
 from algotrade.data import StoreReader
 from algotrade.services.read.context import ReadContext
-from algotrade.services.read.screens.screeners import Screener, load_screener, load_screeners
+from algotrade.services.read.screens.screeners import (
+    ScreenColumn,
+    ScreenCriterion,
+    Screener,
+    load_screener,
+    load_screeners,
+)
 from tests.unit.services.read.screens.conftest import context
 
 
@@ -32,3 +38,22 @@ def test_only_rule_screens_that_resolve(reader: StoreReader) -> None:
     assert load_screener(ctx, "broken") is None
     assert load_screener(ctx, "nope") is None
     assert isinstance(load_screener(ctx, "alpha"), Screener)
+
+
+def test_criteria_and_display_columns_in_spec_order(reader: StoreReader) -> None:
+    doc = {
+        "id": "cols", "kind": "screener", "impl": "rules", "version": 1,
+        "selection": "all_active",
+        "criteria": {
+            "price": {"field": "rollup.price_stats@v2.close", "op": "gt", "value": 5},
+            "adv": {"field": "rollup.price_stats@v2.adv_usd_20d", "op": "gte", "value": 1},
+        },
+        "columns": {"close": "rollup.price_stats@v2.close"},
+    }  # fmt: skip
+    found = load_screener(context(reader, {("me", "screeners", "cols@1"): doc}), "cols")
+    assert found is not None
+    assert found.criteria == (
+        ScreenCriterion("price", "rollup.price_stats@v2.close", "hard"),
+        ScreenCriterion("adv", "rollup.price_stats@v2.adv_usd_20d", "hard"),
+    )
+    assert found.display_columns == (ScreenColumn("close", "rollup.price_stats@v2.close"),)

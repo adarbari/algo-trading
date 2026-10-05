@@ -15,8 +15,10 @@ from algotrade.services.read.context import (
     NotFoundError,
     ReadContext,
     ResultCache,
+    at_session,
     open_context,
     partition,
+    previous_session,
 )
 from algotrade.services.read.values import Unknown, UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
@@ -149,6 +151,23 @@ def test_partition_refuses_other_grains(
 ) -> None:
     with pytest.raises(ValueError, match="read it by its own rule"):
         partition(open_for(stored[1]), table)
+
+
+def test_the_previous_session_of_a_table_is_named_explicitly(
+    stored: tuple[StoreWriter, StoreReader],
+) -> None:
+    reader = stored[1]
+    latest = open_for(reader)
+    assert previous_session(latest, "bars/1d") == D1
+    assert previous_session(latest, EARNINGS) == D1
+    assert previous_session(open_for(reader, D1), "bars/1d") is None
+    with pytest.raises(ValueError, match="only session-grain tables"):
+        previous_session(latest, "instruments/reference")
+    earlier = at_session(latest, D1)
+    assert (earlier.session.date, earlier.user, earlier.cache) == (D1, latest.user, latest.cache)
+    assert earlier.loaders is None
+    frame = partition(earlier, EARNINGS)
+    assert isinstance(frame, pd.DataFrame) and frame["days_to_earnings"].tolist() == [3]
 
 
 def test_result_cache_is_a_small_lru() -> None:

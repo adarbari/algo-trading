@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { CriterionHeader, ScreenTableRow } from '@/entities/screen';
+import type { CriterionInfo, TableRow } from '@/entities/feature';
 import { expectNoA11yViolations } from '@/shared/lib/testing';
 
 import { PickDetail } from './PickDetail';
@@ -31,14 +31,14 @@ vi.mock('@/entities/feature', async (importOriginal) => ({
   }),
 }));
 
-const CRITERIA: CriterionHeader[] = [
-  { criterion_id: 'optionable', field: 'instrument.optionable', mode: 'hard' },
-  { criterion_id: 'iv30', field: 'rollup.iv30@v1.iv30', mode: 'hard' },
-  { criterion_id: 'ratio', field: 'feature.iv_hv_ratio', mode: 'soft' },
+const CRITERIA: CriterionInfo[] = [
+  { id: 'optionable', field: 'instrument.optionable', mode: 'hard' },
+  { id: 'iv30', field: 'rollup.iv30@v1.iv30', mode: 'hard' },
+  { id: 'ratio', field: 'feature.iv_hv_ratio', mode: 'soft' },
 ];
-const ROW = {
+const ROW: TableRow = {
   rank: 2,
-  instrument_id: 'EQ:SOXS',
+  instrumentId: 'EQ:SOXS',
   symbol: 'SOXS',
   name: 'Direxion Semiconductor Bear 3X',
   decision: 'QUALIFIED',
@@ -46,15 +46,15 @@ const ROW = {
   reasons: 'ratio 1.08 below 1.25 (within tolerance)',
   flags: ['leveraged_inverse'],
   change: 'new',
-  previous_decision: null,
+  previousDecision: null,
   criteria: {
     optionable: { value: 1, outcome: 'PASS' },
     iv30: { value: 1.11, outcome: 'PASS' },
     ratio: { value: 1.08, outcome: 'NEAR' },
   },
   columns: {},
-  features: {},
-} as unknown as ScreenTableRow;
+  cells: {},
+};
 
 function setup(overrides: Partial<Parameters<typeof PickDetail>[0]> = {}) {
   const handlers = { onOpen: vi.fn(), onToggleCompare: vi.fn(), onDismiss: vi.fn() };
@@ -89,6 +89,11 @@ describe('PickDetail', () => {
     expect(onToggleCompare).toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(onDismiss).toHaveBeenCalled();
+  });
+
+  it('says what a dropped pick was', () => {
+    setup({ row: { ...ROW, change: 'dropped', previousDecision: 'EVENT_RISK', score: null } });
+    expect(screen.getByText('dropped (was event risk)')).toBeInTheDocument();
   });
 
   it('says so when the ticker is already in the compare set', () => {

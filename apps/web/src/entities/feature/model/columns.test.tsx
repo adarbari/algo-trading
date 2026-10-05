@@ -11,7 +11,9 @@ import {
   featureColumn,
   flagsColumn,
   rankColumn,
+  reasonsColumn,
   scoreColumn,
+  screenColumn,
   tickerColumn,
   type ColumnPlan,
 } from './columns';
@@ -85,6 +87,8 @@ describe('column factories', () => {
       featureColumn(CLOSE),
       flagsColumn(),
       changeColumn(),
+      screenColumn({ name: 'close', field: CLOSE.name }, CLOSE),
+      reasonsColumn(),
     ];
     expect(plan.map((c) => c.id)).toEqual([
       'rank',
@@ -95,6 +99,8 @@ describe('column factories', () => {
       CLOSE.name,
       'flags',
       'change',
+      'column:close',
+      'reasons',
     ]);
   });
 
@@ -141,5 +147,39 @@ describe('column factories', () => {
     expect(criterion.fill?.(rows[0] as TableRow)).toBe('warning');
     expect(criterion.fill?.(rows[1] as TableRow)).toBeUndefined();
     expect(criterion.header).toBe('Iv');
+  });
+
+  it('render what a run stored: display columns, why, what it was, who would leave', () => {
+    const stored: TableRow = {
+      ...(rows[0] as TableRow),
+      decision: 'REJECT',
+      change: 'dropped',
+      previousDecision: 'EVENT_RISK',
+      columns: { close: 70.25, ratio: 1.234 },
+      reasons: 'iv30 below 50%',
+    };
+    render(
+      <DataTable
+        columns={[
+          tickerColumn(),
+          decisionColumn(new Set(['MRVL'])),
+          screenColumn({ name: 'close', field: CLOSE.name }, CLOSE),
+          screenColumn({ name: 'iv_hv_ratio', field: 'feature.iv_hv_ratio' }),
+          changeColumn(),
+          reasonsColumn(),
+        ]}
+        rows={[{ ...stored, columns: { close: 70.25, iv_hv_ratio: 1.234 } }]}
+        getRowId={(r) => r.symbol}
+        label="Stored"
+        rowLines={2}
+      />,
+    );
+    const grid = screen.getByRole('grid', { name: 'Stored' });
+    expect(within(grid).getByText('Would leave')).toBeInTheDocument();
+    expect(within(grid).getByText('$70.25')).toBeInTheDocument();
+    expect(within(grid).getByText('1.23')).toBeInTheDocument();
+    expect(within(grid).getByText('Dropped (was event risk)')).toBeInTheDocument();
+    expect(within(grid).getByText('iv30 below 50%')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Iv hv ratio/ })).toBeInTheDocument();
   });
 });

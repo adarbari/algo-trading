@@ -9,6 +9,8 @@ export type PreviewRow = components['schemas']['PreviewRow'];
 export type PreviewSummary = components['schemas']['PreviewSummary'];
 export type NarrowMiss = components['schemas']['NarrowMiss'];
 export type FunnelStep = components['schemas']['FunnelStep'];
+/** The draft against the screener's saved run of the session (decided by the server). */
+export type PreviewChanges = components['schemas']['PreviewChanges'];
 
 /** Decisions in the order the preview lists them. */
 const DECISION_ORDER = ['QUALIFIED', 'WATCH', 'LIQUIDITY_RISK', 'EVENT_RISK', 'REJECT', 'SKIPPED'];

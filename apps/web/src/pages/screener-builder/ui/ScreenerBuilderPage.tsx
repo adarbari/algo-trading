@@ -8,7 +8,7 @@ import { Grid, Stack } from '@algotrade/ui';
 import { ScreenerBuilderProvider } from '@/features/screener-builder';
 import { CriteriaTable } from '@/widgets/criteria-table';
 import { DraftBar } from '@/widgets/draft-bar';
-import { PreviewResults } from '@/widgets/preview-results';
+import { PreviewResults } from '@/widgets/feature-table';
 import { ScreenFunnel } from '@/widgets/screen-funnel';
 import { ScreenSummary } from '@/widgets/screen-summary';
 

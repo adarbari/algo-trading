@@ -1,10 +1,11 @@
 /**
- * Playwright route mock for the Screeners pages (list, new, Builder): the GraphQL reads (the
- * screener configs, the user's screens, one screen's detail / versions), draft save and
- * discard, finalise, copy, rebase, the live preview and the formula check / save, answering
- * from e2e/fixtures/builder/ (shaped from the API's schemas) with a little state so a flow reads
- * back what it wrote. Every call it records is exposed for assertions. Anything else (other
- * GraphQL operations too) falls through to the other mocks.
+ * Playwright route mock for the Screeners pages (list, new, Builder, results): the GraphQL
+ * reads (the screener configs, the user's screens, one screen's detail / versions, a
+ * screener's results, a saved table view), draft save and discard, finalise, copy, rebase,
+ * views saved and removed, a run on request, the live preview and the formula check / save,
+ * answering from e2e/fixtures/builder/ (shaped from the API's schemas) with a little state so a
+ * flow reads back what it wrote. Every call it records is exposed for assertions. Anything else
+ * (other GraphQL operations too) falls through to the other mocks.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -43,8 +44,8 @@ export interface BuilderMock {
   rebased: string[];
   checks: string[];
   features: Json[];
-  /** The query of every GET /screens/{id}/table. */
-  tables: Record<string, string>[];
+  /** The variables of every `ScreenerResults` read. */
+  tables: Json[];
   /** Every PUT of a screener view (`name`: null for the default view). */
   views: { id: string; name: string | null; view: Json }[];
   /** Every DELETE of a named view. */
@@ -75,7 +76,7 @@ export async function mockBuilderApi(
     Object.entries(DETAILS).map(([id, detail]) => [id, structuredClone(detail)]),
   );
 
-  const saved: Record<string, Json> = {}; // the views a flow saved ('id|name'), read back by GET
+  const saved: Record<string, Json> = {}; // the views a flow saved ('id|name'), read back by GraphQL
   const namesOf = (id: string): string[] =>
     Object.keys(saved)
       .filter((key) => key.startsWith(`${id}|`) && key !== `${id}|`)
@@ -121,6 +122,30 @@ export async function mockBuilderApi(
     if (name === 'MyScreens') return { myScreens: listing() };
     if (name === 'ScreenDetail') return { screenDetail: detailOf(id) };
     if (name === 'ScreenVersions') return { screenVersions: versionsOf(id) };
+    if (name === 'ScreenerResults') {
+      mock.tables.push(operation.variables ?? {});
+      const results = fixture('results.json') as { screener: Json };
+      const screener = { ...results.screener, id };
+      return id === 'vrp_scanner' || ran.has(id)
+        ? { ...results, screener }
+        : {
+            ...results,
+            screener: { ...screener, latestRun: null, notRun: { code: 'NOT_RUN', detail: '' } },
+          };
+    }
+    if (name === 'TableView') {
+      const raw = operation.variables?.['scope'];
+      const scope = typeof raw === 'string' ? raw : '';
+      const viewId = scope.replace(/^screener:/, '');
+      const viewName = (operation.variables?.['name'] as string | null | undefined) ?? null;
+      const key = `${viewId}|${viewName ?? ''}`;
+      return {
+        view: {
+          ...(saved[key] ?? { ...fixture('view.json'), scope, name: viewName }),
+          names: namesOf(viewId),
+        },
+      };
+    }
     return null;
   };
 
@@ -172,14 +197,6 @@ export async function mockBuilderApi(
         201,
       );
     }
-    const table = /^\/screens\/([^/]+)\/table$/.exec(path);
-    if (table && method === 'GET') {
-      mock.tables.push(Object.fromEntries(url.searchParams));
-      const id = decodeURIComponent(table[1] ?? '');
-      return id === 'vrp_scanner' || ran.has(id)
-        ? json({ ...fixture('table.json'), config_id: id })
-        : json({ detail: `no results of ${id} stored` }, 404);
-    }
     const run = /^\/screens\/([^/]+)\/run(?:\/([^/]+))?$/.exec(path);
     if (run) {
       const id = decodeURIComponent(run[1] ?? '');
@@ -200,15 +217,15 @@ export async function mockBuilderApi(
       if (polls > 1) ran.add(id);
       return json(view(polls > 1 ? 'complete' : 'running'));
     }
-    const viewOf = /^\/preferences\/screeners\/([^/]+)\/view$/.exec(path);
+    const viewOf = /^\/preferences\/views\/screener:([^/]+)\/view$/.exec(decodeURIComponent(path));
     if (viewOf) {
-      const id = decodeURIComponent(viewOf[1] ?? '');
+      const id = viewOf[1] ?? '';
       const name = url.searchParams.get('name');
       const key = `${id}|${name ?? ''}`;
       if (method === 'PUT') {
         const view = body();
         mock.views.push({ id, name, view });
-        saved[key] = { screener_id: id, name, saved: true, ...view };
+        saved[key] = { scope: `screener:${id}`, name, saved: true, ...view };
         return json({ ...saved[key], names: namesOf(id) });
       }
       if (method === 'DELETE') {
@@ -216,10 +233,6 @@ export async function mockBuilderApi(
         Reflect.deleteProperty(saved, key);
         return json({ names: namesOf(id) });
       }
-      return json({
-        ...(saved[key] ?? { ...fixture('view.json'), screener_id: id, name }),
-        names: namesOf(id),
-      });
     }
     const match = /^\/screeners\/([^/]+)(?:\/(\w+))?$/.exec(path);
     if (!match) return route.fallback();

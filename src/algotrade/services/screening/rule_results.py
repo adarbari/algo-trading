@@ -7,11 +7,12 @@ from datetime import date, datetime
 import pandas as pd
 
 from algotrade.core.model.predicates import FieldValue
+from algotrade.services.views import to_value
+from algotrade.storage.tables.schemas import DISPLAY_COLUMN_MODE
 from algotrade.strategies.screeners.rules import RULES, RuleRow, RuleScreenResult
 
 RULE_SCREEN = "rule_screen"  # results/<name> (storage/tables/schemas.py)
 RULE_SCREEN_VALUES = "rule_screen_values"
-COLUMN_MODE = "column"  # a display column's row in the values table
 
 
 @dataclass(frozen=True)
@@ -36,9 +37,11 @@ class Stamp:
 
 
 def _num(value: FieldValue) -> float | None:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+    """The value as stored in ``value_num`` (None: not a number; a flag is not one)."""
+    found = to_value(value)
+    if isinstance(found, bool) or not isinstance(found, int | float):
         return None
-    return float(value)
+    return float(found)
 
 
 def _str(value: FieldValue) -> str | None:
@@ -96,7 +99,7 @@ def values_frame(result: RuleScreenResult, stamp: Stamp) -> pd.DataFrame:
                     "instrument_id": row.instrument_id,
                     "criterion_id": name,
                     "field": field,
-                    "mode": COLUMN_MODE,
+                    "mode": DISPLAY_COLUMN_MODE,
                     "value_num": _num(value),
                     "value_str": _str(value),
                     "outcome": "INFO",

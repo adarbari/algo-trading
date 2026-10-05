@@ -157,5 +157,12 @@ def test_delete_forgets_the_screener_in_the_preferences(writer: MemoryConfigWrit
     screens.delete_screen(writer, "alice", "mine")
     assert writer.load("alice", "preferences", "preferences") == {
         "ideas": {"priority": ["vrp"]},
-        "screeners": {"vrp": {"view": {"columns": []}}},
+        "views": {"screener:vrp": {"view": {"columns": []}}},  # moved to views (PR 8)
+    }
+    screens.save_draft(writer, "alice", "again", OWN)
+    screens.finalise(writer, "alice", "again")
+    screens.delete_screen(writer, "alice", "again")  # nothing of it saved: nothing written
+    assert writer.load("alice", "preferences", "preferences") == {
+        "ideas": {"priority": ["vrp"]},
+        "views": {"screener:vrp": {"view": {"columns": []}}},
     }

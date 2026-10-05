@@ -1,10 +1,11 @@
 """``Instrument``: who an instrument is for the session (typed identity, ADR 0038), its
 values by catalogue name (``features(names)``) and the objects of its detail pane: events,
-option chain, ETF holdings, price and feature series (ADR 0037), each through the request's
-dataloader for it (a list of instruments reads each once, not once per instrument)."""
+option chain, ETF holdings, price and feature series, the user's screeners that picked it
+(ADR 0037), each through the request's dataloader for it (a list of instruments reads each
+once, not once per instrument)."""
 
 import datetime as dt
-from typing import Self
+from typing import TYPE_CHECKING, Annotated, Self
 
 import strawberry
 from strawberry.types import Info
@@ -19,6 +20,9 @@ from algotrade_api.graphql.types.instruments.event import Event
 from algotrade_api.graphql.types.instruments.feature import FeatureValue
 from algotrade_api.graphql.types.instruments.holdings import Holdings
 from algotrade_api.graphql.types.instruments.series import FeatureSeries, PriceSeries
+
+if TYPE_CHECKING:  # the screens' types name Instrument: resolved lazily (no import cycle)
+    from algotrade_api.graphql.types.screens.hit import ScreenerHit
 
 
 @strawberry.type(
@@ -110,3 +114,15 @@ class Instrument:
     ) -> FeatureSeries:
         found = await self.ctx.loaders.series.load((self.instrument_id, tuple(names), start, end))
         return FeatureSeries.of(found)
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The user's screeners that picked it in the session (each one's run for "
+        "exactly the session), by screener id; empty: none did, or none ran"
+    )
+    async def screener_hits(
+        self, info: Info
+    ) -> list[Annotated["ScreenerHit", strawberry.lazy("algotrade_api.graphql.types.screens.hit")]]:
+        from algotrade_api.graphql.types.screens.hit import ScreenerHit  # noqa: PLC0415
+
+        found = await self.ctx.loaders.screener_hits.load((self.instrument_id,))
+        return [ScreenerHit.of(h, self.ctx) for h in found]

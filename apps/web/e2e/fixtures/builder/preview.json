@@ -100,7 +100,8 @@
       "columns": {
         "next_earnings": "2026-10-29"
       },
-      "criteria": []
+      "criteria": [],
+      "name": "Apple Inc."
     },
     {
       "instrument_id": "EQ:MSFT",
@@ -113,7 +114,8 @@
       "columns": {
         "next_earnings": "2026-10-27"
       },
-      "criteria": []
+      "criteria": [],
+      "name": "Microsoft"
     },
     {
       "instrument_id": "EQ:KO",
@@ -126,7 +128,8 @@
       "columns": {
         "next_earnings": "2026-10-21"
       },
-      "criteria": []
+      "criteria": [],
+      "name": "Coca-Cola"
     },
     {
       "instrument_id": "EQ:XOM",
@@ -139,8 +142,38 @@
       "columns": {
         "next_earnings": "2026-10-30"
       },
-      "criteria": []
+      "criteria": [],
+      "name": "Exxon Mobil"
     }
   ],
-  "cached": false
+  "cached": false,
+  "criteria": [
+    {
+      "id": "iv30",
+      "field": "rollup.iv30@v1.iv30",
+      "mode": "hard"
+    },
+    {
+      "id": "spread",
+      "field": "feature.iv_hv_spread",
+      "mode": "soft"
+    },
+    {
+      "id": "close",
+      "field": "rollup.price_stats@v2.close",
+      "mode": "hard"
+    }
+  ],
+  "display_columns": [
+    {
+      "name": "next_earnings",
+      "field": "rollup.earnings@v1.next_earnings_date"
+    }
+  ],
+  "changes": {
+    "run_id": "run-1",
+    "session": "2026-10-02",
+    "entered": ["KO", "MSFT", "XOM"],
+    "left": ["CHTR", "RKT", "SOXS", "UVXY"]
+  }
 }

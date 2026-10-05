@@ -13,10 +13,10 @@ import { useState } from 'react';
 import { ScreenerBuilderProvider } from '@/features/screener-builder';
 import { CriteriaTable } from '@/widgets/criteria-table';
 import { DraftBar } from '@/widgets/draft-bar';
+import { ScreenerResults } from '@/widgets/feature-table';
 import { PickDetail } from '@/widgets/pick-detail';
 import { PreviewChangesReporter, PreviewDiff } from '@/widgets/preview-diff';
 import { PriceChartPanel } from '@/widgets/price-chart-panel';
-import { ScreenerResults } from '@/widgets/screener-results';
 
 export interface ScreenerResultsPageProps {
   /** The screener shown. */
@@ -84,8 +84,8 @@ export function ScreenerResultsPage({
       </Stack>
       {builderStarted && (
         <ScreenerBuilderProvider id={id} key={id}>
-          <PreviewChangesReporter id={id} onChange={setLeaving} />
-          {!editing && <PreviewDiff id={id} onReview={edit} />}
+          <PreviewChangesReporter onChange={setLeaving} />
+          {!editing && <PreviewDiff onReview={edit} />}
           <Drawer
             open={editing}
             onOpenChange={setEditing}
@@ -102,7 +102,7 @@ export function ScreenerResultsPage({
           >
             <Stack gap={3}>
               <DraftBar compact onDeleted={onDeleted} />
-              <PreviewDiff id={id} />
+              <PreviewDiff />
               <CriteriaTable />
             </Stack>
           </Drawer>
@@ -113,36 +113,34 @@ export function ScreenerResultsPage({
         onOpen={onOpenTicker}
         focusId={focusId}
         onFocusChange={(row) => {
-          setFocusId(row.instrument_id);
+          setFocusId(row.instrumentId);
         }}
         onToggleCompare={(row) => {
-          toggle(row.symbol ?? row.instrument_id);
+          toggle(row.symbol);
         }}
         onDismiss={(row) => {
-          hide(row.instrument_id);
+          hide(row.instrumentId);
         }}
         dismissed={dismissed}
         leaving={leaving}
         onShowDismissed={() => {
           setDismissed(new Set());
         }}
-        renderDetail={({ row, table }) => (
+        renderDetail={({ row, criteria }) => (
           <Stack gap={3}>
             <PickDetail
               row={row}
-              criteria={table.criteria}
-              compared={compared.includes(row.symbol ?? row.instrument_id)}
+              criteria={criteria}
+              compared={compared.includes(row.symbol)}
               onOpen={onOpenTicker}
               onToggleCompare={() => {
-                toggle(row.symbol ?? row.instrument_id);
+                toggle(row.symbol);
               }}
               onDismiss={() => {
-                hide(row.instrument_id);
+                hide(row.instrumentId);
               }}
             />
-            {row.symbol ? (
-              <PriceChartPanel symbol={row.symbol} range={range} onRangeChange={setRange} />
-            ) : null}
+            <PriceChartPanel symbol={row.symbol} range={range} onRangeChange={setRange} />
           </Stack>
         )}
       />

@@ -1,6 +1,6 @@
 /**
- * The one table widget (ADR 0038): instruments x catalogue columns from the feature table,
- * built only from the column factories, with the column picker, sorting and paging.
+ * The universe's (or the instruments asked for) instruments x catalogue columns, from the
+ * feature table (GraphQL `Query.table`), with the column picker, sorting and paging.
  *
  * `sortMode="server"` (the universe): one page per request, filtered, sorted and paged by the
  * server, with the session notes (a stale session, nightly tables missing for it, a universe
@@ -8,24 +8,16 @@
  * the compare set): every row in one request, sorted in the table. A row click focuses the
  * ticker; ticked rows are the caller's selection.
  */
-import {
-  Banner,
-  Box,
-  DataTable,
-  IconButton,
-  Panel,
-  Stack,
-  Text,
-  type DataTableSort,
-  type IconName,
-} from '@algotrade/ui';
-import { useMemo, useState, type ReactNode } from 'react';
+import type { DataTableSort, IconName } from '@algotrade/ui';
+import { useMemo, type ReactNode } from 'react';
 
 import { FeaturePicker } from '@/features/column-picker';
-import { isStale } from '@/entities/explore';
 import { useFeatureTable, type TableFilters, type TableRow } from '@/entities/feature';
 
-import { missingTables, pageCount, tablePlan } from '../model/plan';
+import { usePageOf } from '../model/paging';
+import { pageCount, tablePlan } from '../model/plan';
+
+import { TableFrame } from './TableFrame';
 
 export interface FeatureTableProps {
   /** The panel's title and the grid's name ("Tickers", "Side by side"). */
@@ -86,10 +78,9 @@ export function FeatureTable({
   visibleRows = 16,
 }: FeatureTableProps) {
   const server = sortMode === 'server';
-  const shape = JSON.stringify([columns, keys, filters, server ? sortParam(sort) : null]);
-  // The page belongs to the query: any other query starts on its first page.
-  const [paging, setPaging] = useState({ shape, page: 1 });
-  const page = paging.shape === shape ? paging.page : 1;
+  const [page, setPage] = usePageOf(
+    JSON.stringify([columns, keys, filters, server ? sortParam(sort) : null]),
+  );
   const table = useFeatureTable(
     server
       ? { columns, keys, filters, sort: sortParam(sort), page, size: pageSize }
@@ -99,8 +90,6 @@ export function FeatureTable({
   const data = table.data;
   const plan = useMemo(() => tablePlan(data?.columns ?? []), [data?.columns]);
   const rows: readonly TableRow[] = data?.rows ?? [];
-  const pages = data ? pageCount(data.total, data.size) : 1;
-  const missing = missingTables(data?.missing ?? []);
   const full = maxSelected !== undefined && (selected?.length ?? 0) >= maxSelected;
   const summary = data
     ? [
@@ -112,101 +101,48 @@ export function FeatureTable({
     : table.isPending
       ? 'Loading tickers…'
       : NOTHING_STORED;
-  const goTo = (next: number) => {
-    setPaging({ shape, page: next });
-  };
-  const notes = server && data && (isStale(data.session) || missing.length > 0 || data.preSnapshot);
   return (
-    <Panel
-      title={label}
-      description={data ? `Session ${data.session}` : undefined}
-      flush
-      state={table.isError && !data ? 'error' : 'ready'}
-      errorMessage={`${label} failed to load.`}
-      onRetry={() => void table.refetch()}
-    >
-      <Stack gap={0}>
-        {header || notes ? (
-          <Box padding={3}>
-            <Stack gap={2}>
-              {server && data && isStale(data.session) ? (
-                <Banner asOf={data.session}>
-                  The latest stored session is old: a nightly run may have been missed.
-                </Banner>
-              ) : null}
-              {server && data && (missing.length > 0 || data.preSnapshot) ? (
-                <Banner tone="warning" title="Partial data">
-                  {data.preSnapshot ? 'The universe snapshot is from after this session. ' : ''}
-                  {missing.length > 0
-                    ? `Not stored for ${data.session}: ${missing.join(', ')}. Values from these tables read Unknown.`
-                    : ''}
-                </Banner>
-              ) : null}
-              {header}
-            </Stack>
-          </Box>
-        ) : null}
-        <DataTable<TableRow>
-          label={label}
-          columns={plan}
-          rows={rows}
-          getRowId={(row) => row.symbol}
-          getRowLabel={(row) => row.symbol}
-          rowLines={2}
-          visibleRows={Math.min(visibleRows, Math.max(1, rows.length))}
-          {...(sort !== undefined ? { sort } : {})}
-          {...(onSortChange ? { onSortChange } : {})}
-          sortMode={sortMode}
-          selectable={selected !== undefined}
-          selectedIds={selected ?? []}
-          onSelectionChange={(ids) => {
-            onSelectedChange?.(ids);
-          }}
-          onRowActivate={(row) => {
-            onRowActivate?.(row.symbol);
-          }}
-          status={table.isPending && !data ? 'loading' : 'ready'}
-          emptyMessage={table.data === null ? NOTHING_STORED : emptyMessage}
-          toolbar={
-            <Stack direction="row" gap={2} align="center" wrap>
-              <Text size="sm" tone="muted">
-                {summary}
-              </Text>
-              {server && data && pages > 1 ? (
-                <Stack direction="row" gap={1} align="center">
-                  <IconButton
-                    icon="chevron-left"
-                    label="Previous page"
-                    size="sm"
-                    disabled={page <= 1}
-                    onClick={() => {
-                      goTo(page - 1);
-                    }}
-                  />
-                  <Text size="sm" tone="muted" numeric>
-                    Page {count(page)} of {count(pages)}
-                  </Text>
-                  <IconButton
-                    icon="chevron-right"
-                    label="Next page"
-                    size="sm"
-                    disabled={page >= pages}
-                    onClick={() => {
-                      goTo(page + 1);
-                    }}
-                  />
-                </Stack>
-              ) : null}
-              <FeaturePicker
-                label={pickerLabel}
-                icon={pickerIcon}
-                chosen={columns}
-                onChange={onColumnsChange}
-              />
-            </Stack>
-          }
+    <TableFrame
+      panel={{
+        title: label,
+        description: data ? `Session ${data.session}` : undefined,
+        state: table.isError && !data ? 'error' : 'ready',
+        errorMessage: `${label} failed to load.`,
+        onRetry: () => void table.refetch(),
+      }}
+      notes={server ? data : null}
+      header={header}
+      summary={summary}
+      pager={
+        server && data ? { page, pages: pageCount(data.total, data.size), onPage: setPage } : null
+      }
+      controls={
+        <FeaturePicker
+          label={pickerLabel}
+          icon={pickerIcon}
+          chosen={columns}
+          onChange={onColumnsChange}
         />
-      </Stack>
-    </Panel>
+      }
+      grid={{
+        label,
+        columns: plan,
+        rows,
+        visibleRows: Math.min(visibleRows, Math.max(1, rows.length)),
+        ...(sort !== undefined ? { sort } : {}),
+        ...(onSortChange ? { onSortChange } : {}),
+        sortMode,
+        selectable: selected !== undefined,
+        selectedIds: selected ?? [],
+        onSelectionChange: (ids) => {
+          onSelectedChange?.(ids);
+        },
+        onRowActivate: (row) => {
+          onRowActivate?.(row.symbol);
+        },
+        status: table.isPending && !data ? 'loading' : 'ready',
+        emptyMessage: table.data === null ? NOTHING_STORED : emptyMessage,
+      }}
+    />
   );
 }

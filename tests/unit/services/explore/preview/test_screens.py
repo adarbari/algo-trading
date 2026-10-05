@@ -74,6 +74,28 @@ def test_preview_rows_equal_the_nightly_rows() -> None:
     assert got.total == len(stored)
 
 
+def test_changes_against_the_saved_run_of_the_session() -> None:
+    reader, writer = seeded()
+    preset = resolve_config(configs(), "big_liquid", UserContext("site"))  # presets run as site
+    run_screener(reader, writer, preset, DAY, now=T0)
+    store = ReadStore(reader, configs(), UserContext(ALICE))
+    same = preview(store, {**SCREEN, "id": "big_liquid"})
+    assert same.changes is not None and (same.changes.entered, same.changes.left) == ([], [])
+    assert same.changes.session == DAY and same.changes.run_id
+    stricter = preview(store, criterion({**SCREEN, "id": "big_liquid"}, "price", value=1e9))
+    picked = sorted(
+        r.symbol or r.instrument_id for r in same.rows if r.decision in {"QUALIFIED", "WATCH"}
+    )
+    assert stricter.changes is not None
+    assert (stricter.changes.entered, stricter.changes.left) == ([], picked)
+
+
+def test_a_draft_with_no_saved_run_has_no_changes() -> None:
+    got = preview(preview_store())  # draft1 is not a screener the user has
+    assert got.changes is None
+    assert all(r.name is None or isinstance(r.name, str) for r in got.rows)
+
+
 def test_summary_funnel_and_coverage() -> None:
     got = preview(preview_store())
     assert got.decisions == {"QUALIFIED": 1, "REJECT": 2, "WATCH": 1}  # CCC: no price: REJECT

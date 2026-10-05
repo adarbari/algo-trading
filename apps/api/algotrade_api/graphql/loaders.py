@@ -28,6 +28,7 @@ from algotrade.services.read.instruments.holdings import Holdings, load_holdings
 from algotrade.services.read.instruments.identity import Instrument, load_instruments
 from algotrade.services.read.instruments.prices import Adjustment, PriceSeries, load_prices
 from algotrade.services.read.instruments.series import FeatureSeries, load_series
+from algotrade.services.read.screens.hits import ScreenerHit, load_screener_hits
 from algotrade.services.read.screens.runs import LatestRun, RunKey, load_latest_runs
 
 FeatureKey = tuple[str, tuple[str, ...]]  # (instrument_id, catalogue names in the order asked)
@@ -98,6 +99,9 @@ class Loaders:
         self.holdings: DataLoader[HoldingsKey, Holdings | None] = _loader(load_holdings, ctx)
         self.prices: DataLoader[PriceKey, PriceSeries] = _loader(load_prices, ctx)
         self.series: DataLoader[SeriesKey, FeatureSeries] = _loader(load_series, ctx)
+        self.screener_hits: DataLoader[tuple[str], tuple[ScreenerHit, ...]] = _loader(
+            load_screener_hits, ctx
+        )
 
         async def latest_runs(keys: list[RunKey]) -> list[LatestRun]:
             return await _latest_runs(ctx, keys)

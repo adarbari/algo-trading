@@ -3,14 +3,21 @@
  * these, so a ticker, a decision or a catalogue feature reads the same in every table. A
  * table is a `ColumnPlan`, an ordered list of factory calls; no widget writes a column
  * literal. Each column's `id` is stable and is also the server's sort key for it: `symbol`,
- * `rank`, `decision`, `score`, `flags`, `change`, `criterion:<id>` and the catalogue name of a
- * feature column. A feature column reads its format from the server (`FeatureInfo.format`),
+ * `rank`, `decision`, `score`, `flags`, `change`, `reasons`, `criterion:<id>`, `column:<name>`
+ * (a screen's display column) and the catalogue name of a feature column. A feature column reads its format from the server (`FeatureInfo.format`),
  * never from the feature's name, and shows UNKNOWN with the reason where the session has no
  * value.
  */
-import { Mono, Stack, Text, isNumericFormat, type DataTableColumn } from '@algotrade/ui';
+import {
+  Mono,
+  Stack,
+  StatusBadge,
+  Text,
+  isNumericFormat,
+  type DataTableColumn,
+} from '@algotrade/ui';
 
-import { DecisionBadge, OUTCOME_FILL, decisionLabel } from '@/entities/screen';
+import { DecisionBadge, OUTCOME_FILL, ScoreBreakdown, decisionLabel } from '@/entities/screen';
 
 import { featureLabel, featureMarks, unitLabel } from './catalogue';
 import type { ColumnInfo, TableRow } from './table';
@@ -97,20 +104,38 @@ export function rankColumn(): DataTableColumn<TableRow> {
   };
 }
 
-/** The screen's decision as a badge. */
-export function decisionColumn(): DataTableColumn<TableRow> {
+const NO_TICKERS: ReadonlySet<string> = new Set();
+
+/**
+ * The screen's decision as a badge; a ticker in `leaving` (the unsaved criteria would drop it
+ * from the picks: the server's preview changes) is marked "Would leave".
+ */
+export function decisionColumn(
+  leaving: ReadonlySet<string> = NO_TICKERS,
+): DataTableColumn<TableRow> {
   return {
     id: 'decision',
     header: 'Decision',
     description: "The screen's decision for the ticker",
     value: (row) => row.decision,
     width: 'lg',
-    cell: ({ row }) => (row.decision ? <DecisionBadge decision={row.decision} /> : null),
+    cell: ({ row }) =>
+      row.decision ? (
+        <Stack gap={0}>
+          <DecisionBadge decision={row.decision} />
+          {leaving.has(row.symbol) ? <StatusBadge tone="warning">Would leave</StatusBadge> : null}
+        </Stack>
+      ) : null,
   };
 }
 
-/** The screen's score (for sorting: 100 minus the penalties of each miss). */
-export function scoreColumn(): DataTableColumn<TableRow> {
+/**
+ * The screen's score (for sorting: 100 minus the penalties of each miss); a preview row's
+ * opens how it was worked out (`labelOf` names a criterion: its catalogue label).
+ */
+export function scoreColumn(
+  labelOf?: (criterionId: string, field: string) => string,
+): DataTableColumn<TableRow> {
   return {
     id: 'score',
     header: 'Score',
@@ -118,6 +143,49 @@ export function scoreColumn(): DataTableColumn<TableRow> {
     value: (row) => row.score,
     format: { kind: 'number', digits: 0 },
     width: 'xs',
+    cell: ({ row, formatted }) =>
+      row.scoring ? (
+        <ScoreBreakdown row={row.scoring} {...(labelOf ? { labelOf } : {})} />
+      ) : (
+        <Text numeric>{formatted.text}</Text>
+      ),
+  };
+}
+
+/** Why the decision is not QUALIFIED (the misses), in words. */
+export function reasonsColumn(): DataTableColumn<TableRow> {
+  return {
+    id: 'reasons',
+    header: 'Why',
+    description: 'The misses behind a decision other than QUALIFIED',
+    value: (row) => row.reasons || null,
+    grow: true,
+    tone: 'secondary',
+    sortable: false,
+  };
+}
+
+/** One of a screen's display columns (`[columns]`): the value the run stored for it. */
+export interface ScreenColumnInfo {
+  name: string;
+  /** The catalogue field it shows. */
+  field: string;
+}
+
+/**
+ * A screen's display column, headed and formatted as its feature (`info`, when the catalogue
+ * has it), else by its own name as a number.
+ */
+export function screenColumn(
+  column: ScreenColumnInfo,
+  info?: ColumnInfo,
+): DataTableColumn<TableRow> {
+  return {
+    id: `column:${column.name}`,
+    header: info ? featureLabel(info.name) : decisionLabel(column.name),
+    description: `${info?.description ?? column.field} (the screen's column ${column.name})`,
+    value: (row) => shownValue(row.columns?.[column.name] ?? null),
+    format: info ? valueFormat(info) : { kind: 'number', digits: 2 },
   };
 }
 
@@ -160,13 +228,17 @@ export function criterionColumn(
   };
 }
 
-/** New or dropped since the previous run (the server decides). */
+/** New or dropped since the previous run (the server decides), with what it was before. */
 export function changeColumn(): DataTableColumn<TableRow> {
+  const was = (row: TableRow) =>
+    row.change === 'dropped' && row.previousDecision
+      ? ` (was ${decisionLabel(row.previousDecision).toLowerCase()})`
+      : '';
   return {
     id: 'change',
     header: 'Change',
     description: 'New or dropped since the previous run',
-    value: (row) => (row.change ? decisionLabel(row.change) : null),
+    value: (row) => (row.change ? `${decisionLabel(row.change)}${was(row)}` : null),
     tone: 'secondary',
     width: 'sm',
   };
