@@ -32,6 +32,7 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 | ETF holdings (top holdings and weights per fund) | **Issuer daily files**: State Street SPDR workbooks, iShares CSVs; **SEC N-PORT** for the funds they do not cover (ADR 0035) | Vanguard / Invesco / ARK sites (no usable public file, see below) | Accepted (ADR 0035) |
 | Company details (name, SIC, sector, state, fiscal year end) | SEC EDGAR submissions (free; contact email in the user agent) | Massive ticker details | Implemented, phase 1.7 |
 | Shares outstanding (market cap) | SEC EDGAR company facts (XBRL; free; same contact and pacing) | Massive ticker details (`share_class_shares_outstanding`) | Implemented, phase 2b.4 |
+| Revenue, net income, diluted EPS (TTM, P/E) | SEC EDGAR company facts (the same document and request as the share counts) | none planned | Implemented, `financials@v1` |
 | Daily stock and ETF bars (swing / momentum) | Massive (formerly Polygon) free tier: all US tickers, 2 years history, 5 calls/min; "grouped daily" = whole market in 1 call | Alpaca (free account), IBKR, Yahoo (unofficial, history backfill only) | |
 | IV history / IV rank (enrichment) | **IBKR** (ADR 0028): IB's daily 30-day IV and HV per underlying, years of history; personal-use licence | our IV30 history (from the Cboe chains), the fallback | Implemented: `ibkr_iv@v1`, `iv_rank` with `iv_rank_source` |
 | End-of-day option chains | **Cboe delayed-quotes feed** (ADR 0014): whole chain + Greeks + IV + OI and the underlying's `iv30` in one request per underlying; about 4.2k requests a night | IBKR for a focused list / cross-check; Schwab Trader API (free with account; Greeks; all expiries in one call; 120 req/min); Tradier (needs a brokerage account for Greeks); Alpaca (free indicative feed, history from 2024-02); Massive options (paid, from ~$29/mo; licensed fallback) | No free source covers end-of-day chains for the whole universe with history. **We build our own IV history from day one.** |
@@ -219,12 +220,27 @@ Financials, …; `sources/vendors/sec/sic.py`), falling back to one sector per S
 `https://data.sec.gov/api/xbrl/companyfacts/CIK##########.json`: every non-dimensional XBRL
 fact a company has filed (up to ~5 MB; requested gzip-compressed, ~10x smaller). Same contact
 `User-Agent`, `sec` limiter and `[sec_edgar]` section as the other SEC sources
-(`sources/vendors/sec/company_facts.py`, source `sec_company_facts`). We keep two concepts:
+(`sources/vendors/sec/company_facts.py`, source `sec_company_facts`). We keep five concepts. The
+document is downloaded whole either way, so the three financial ones cost no extra request.
 
 | Concept | Short name | Kept per filing |
 |---|---|---|
 | `dei:EntityCommonStockSharesOutstanding` (cover page, as of a date just before filing) | `dei` | each value; several values for one date are classes (companyfacts drops the class labels) and are summed, `class_values` counts them |
 | `us-gaap:WeightedAverageNumberOfSharesOutstandingBasic` | `weighted_basic` | the filing's current period: latest period end, then the shortest span (comparatives and year-to-date dropped) |
+| `us-gaap:Revenues`, else `RevenueFromContractWithCustomerExcludingAssessedTax`, else `SalesRevenueNet` (USD) | `revenue` | every quarter, half-year, nine-month and annual period (see below); all three tags are kept (`tag`), `financials@v1` prefers them in this order and never subtracts across tags |
+| `us-gaap:NetIncomeLoss` (USD) | `net_income` | the same periods; losses are kept |
+| `us-gaap:EarningsPerShareDiluted` (USD per share) | `eps_diluted` | the same periods; negative values are kept |
+
+**Financials (flows).** Unlike the share counts they are durations, so each row keeps
+`period_start` and `period_end` (a year-to-date and a quarterly fact share an end date), and
+the amount is in `value` with `unit` (`usd`, `usd_per_share`). Only periodic filings count
+(10-K, 10-Q, 20-F, 40-F and their amendments; proxy statements and 8-Ks are dropped) and only
+spans of about 3, 6, 9 or 12 months: the year-to-date facts are how `financials@v1` derives the
+fourth quarter (annual minus nine months). A period is repeated as a comparative in every
+later filing, so we keep the filing that first reported it plus any later filing whose value
+differs (a restatement), per tag. A point-in-time read then sees exactly what was public on each date,
+at about 400 to 500 rows per company instead of several thousand (a full re-parse and an incremental store date every fact the same way). Facts in a currency other than USD
+are ignored, so those issuers have no financials (null, not an error).
 
 Every row keeps `filed` (point in time), `period_end`, `form` and `accn`; amendments (10-K/A)
 are their own rows with a later `filed`. Zero counts are dropped; a 404 (no XBRL facts, most
@@ -238,6 +254,13 @@ Most multi-class issuers no longer tag the cover count, so they fall back to the
 average; Berkshire's last facts are from 2015 (class A equivalents), so BRK.A / BRK.B are
 `STALE` in `fundamentals@v2`, not wrong.
 
+Checked live 2026-10-05 (financials, sessions up to 2026-10-02, scratch copy of the store): AAPL
+TTM revenue $466.8B (four quarters to 2026-06-27, filed 2026-07-31), net income $128.9B, diluted
+EPS 8.71, P/E 38.3; MSFT TTM revenue $331.8B (= its fiscal year to 2026-06-30), EPS 17.96, P/E
+28.8; KO $49.3B, EPS 3.18, P/E 26.9; NVDA $303.0B, EPS 7.91, P/E 29.6, revenue growth 83%;
+RIVN a loss (EPS -2.57), P/E null; SPY no facts. JPM tags quarterly revenue differently, so its
+revenue is annual (`ttm_basis` ANNUAL).
+
 Checked live 2026-10-03 (closes of 2026-10-02): AAPL 14.594B shares (dei, as of 2026-07-17)
 → $4.87T; KO 4.302B (dei, 2026-04-28) → $368.5B; GOOGL / GOOG 12.151B (weighted basic, Q2
 2026) → $4.17T / $4.14T; BRK.B STALE. Four requests took ~0.3 s each.
@@ -246,6 +269,12 @@ Checked live 2026-10-03 (closes of 2026-10-02): AAPL 14.594B shares (dei, as of 
 download: about 30 to 40 minutes, ~1 GB of gzip raw kept 7 days, `[sec_edgar] raw_retention_days`), then
 `algotrade-ingest rollups --from <first session> --to <last session> --only fundamentals@v2`.
 A crashed run resumes where it stopped (same session); `--limit N` splits it into chunks.
+
+**Adding the financials to a store that already has share counts:** a CIK is refetched only
+on its 30-day slot, so run `algotrade-ingest shares --force` once (same cost; only facts not
+stored yet are written), then `algotrade-ingest rollups --from <first session> --to <last
+session> --only financials@v1` (compute alone measured at about 3 s for a synthetic frame of 6000 companies; not yet measured end to end). A CIK
+that has not been refetched yet shows `NO_FACTS` financials.
 
 ### Refreshes spread over the window
 

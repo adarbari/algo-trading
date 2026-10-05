@@ -170,7 +170,7 @@ contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (n
 
 [[dir]]
 path = "src/algotrade/features/rollups/corporate"
-purpose = "feature groups from corporate events and filings (earnings, dividends, share counts): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
+purpose = "feature groups from corporate events and filings (earnings, dividends, share counts, financials): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]

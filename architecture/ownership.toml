@@ -673,6 +673,10 @@ name = "rollups/instrument/fundamentals@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
+name = "rollups/instrument/financials@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
 name = "rollups/instrument/div_yield@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "the materialised expression feature div_yield (config/site/features/fundamentals.toml)"
