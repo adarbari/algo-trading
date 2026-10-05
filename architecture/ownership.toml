@@ -601,7 +601,7 @@ detect = [{ string_prefix = "rollups/instrument/" }, { call = "chain_expiries" }
 
 [[responsibility]]
 id = "scalar-coercion"
-description = "Turn a stored scalar (numpy, pandas, NaN, NaT, dates) into a JSON-safe value, one way for reads and runs (ADR 0037): services/read/values.py to_scalar; services/views.py imports it back as to_value for runs and today's callers. Callers of the one coercion are allowed; re-implementations are not. Deferred rule: { call_regex = \"^_(float|text|num)$\" } catches the private re-implementations (explore ranking._float/_text and screens/table._text, deleted in PRs 5 and 8; screening exports._text and rule_results._num, which PR 8 switches to to_scalar); it is added in PR 8, with allowed entries for the vendor payload parsers in libs/sources and the nightly email renderer, which parse or format text and never coerce stored values"
+description = "Turn a stored scalar (numpy, pandas, NaN, NaT, dates) into a JSON-safe value, one way for reads and runs (ADR 0037): services/read/values.py to_scalar; services/views.py imports it back as to_value for runs and today's callers. Callers of the one coercion are allowed; re-implementations are not: a private _float / _text / _num helper is one (read-model PR 8), except where it parses a vendor payload, formats text or does arithmetic rather than coerce a stored value for display (the allowed entries below say which)"
 owner = ["src/algotrade/services/read/values.py"]
 allowed = [
     "src/algotrade/services/read/*",  # the loaders call the one coercion for every value they return (docs/api/read-model.md "Values and UNKNOWN")
@@ -609,9 +609,14 @@ allowed = [
     "src/algotrade/services/explore/*",  # today's display reads call the one coercion; each module leaves with explore (PRs 4-10)
     "src/algotrade/services/screening/exports.py",  # run exports serialise through the same coercion, so runs and reads agree
     "src/algotrade/services/selection.py",  # the selection's field values, same coercion
+    "src/algotrade/services/screening/rule_results.py",  # the rule-screen writer types value_num through the one coercion (_num calls to_value)
+    "src/algotrade/storage/configs/writer.py",  # _float formats a TOML float literal (text out, not a stored value in)
+    "src/algotrade/features/rollups/options/option_liquidity.py",  # _num is the rollup's arithmetic rule (no open interest / volume counts as 0), not display coercion
+    "libs/sources/algotrade_sources/vendors/*",  # vendor payload parsers (_float / _text read a vendor's JSON, XML or CSV, never a stored value)
+    "apps/ingestion/algotrade_ingestion/workflows/nightly/*",  # the nightly email renderer and its timing lines format run-record stats as text
 ]
 section = "docs/api/read-model.md#values-and-unknown"
-detect = [{ call = "to_value" }, { call = "to_scalar" }]
+detect = [{ call = "to_value" }, { call = "to_scalar" }, { call_regex = "^_(float|text|num)$" }]
 
 [[responsibility]]
 id = "graphql-schema"

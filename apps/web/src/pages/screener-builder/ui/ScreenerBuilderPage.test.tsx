@@ -17,7 +17,7 @@ vi.mock('@/widgets/draft-bar', () => ({ DraftBar: () => <Text>draft bar</Text> }
 vi.mock('@/widgets/criteria-table', () => ({ CriteriaTable: () => <Text>criteria</Text> }));
 vi.mock('@/widgets/screen-summary', () => ({ ScreenSummary: () => <Text>summary</Text> }));
 vi.mock('@/widgets/screen-funnel', () => ({ ScreenFunnel: () => <Text>funnel</Text> }));
-vi.mock('@/widgets/preview-results', async () => {
+vi.mock('@/widgets/feature-table', async () => {
   const { Button } = await import('@algotrade/ui');
   return {
     PreviewResults: ({ onOpen }: { onOpen: (symbol: string) => void }) => (

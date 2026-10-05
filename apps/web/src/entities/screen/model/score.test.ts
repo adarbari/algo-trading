@@ -20,6 +20,7 @@ const c = (id: string, outcome: string, penalty: number, extra: Partial<Criterio
 const row = (score: number | null, criteria: Criterion[]): PreviewRow => ({
   instrument_id: 'EQ:AAA',
   symbol: 'AAA',
+  name: 'AAA Corp',
   rank: 1,
   decision: 'WATCH',
   score,

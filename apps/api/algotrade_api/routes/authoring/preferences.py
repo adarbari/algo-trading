@@ -1,5 +1,6 @@
-"""``PUT /preferences/ideas`` and ``PUT /preferences/screeners/{id}/view``: save the user's
-screener priority and their view of a screener's results (checked before saving)."""
+"""``PUT /preferences/ideas`` and ``PUT`` / ``DELETE /preferences/views/{scope}/view``: save
+the user's screener priority and their views of a table (``scope``: ``screener:<id>`` for a
+screener's results), checked before saving. Reading a view is GraphQL (``Query.view``)."""
 
 from typing import Annotated
 
@@ -10,9 +11,10 @@ from algotrade_api.deps import User, Writer
 from algotrade_api.schemas.authoring.preferences import (
     IdeasPriority,
     IdeasPriorityBody,
-    ScreenerViewBody,
+    TableView,
+    TableViewBody,
+    ViewNames,
 )
-from algotrade_api.schemas.screens.view import ScreenerView, ViewNames
 
 router = APIRouter(prefix="/preferences", tags=["ideas"])
 
@@ -24,19 +26,19 @@ def save_ideas_priority(writer: Writer, user: User, body: IdeasPriorityBody) -> 
 
 
 ViewName = Annotated[
-    str | None, Query(description="a named view (default: the screener's default view)")
+    str | None, Query(description="a named view (default: the table's default view)")
 ]
 
 
-@router.put("/screeners/{screener_id}/view")
-def save_screener_view(
-    writer: Writer, user: User, screener_id: str, body: ScreenerViewBody, name: ViewName = None
-) -> ScreenerView:
-    saved, names = preferences.save_screener_view(
-        writer, user, screener_id, body.columns, body.sort, body.decisions, name
+@router.put("/views/{scope}/view")
+def save_view(
+    writer: Writer, user: User, scope: str, body: TableViewBody, name: ViewName = None
+) -> TableView:
+    saved, names = preferences.save_view(
+        writer, user, scope, body.columns, body.sort, body.decisions, name
     )
-    return ScreenerView(
-        screener_id=screener_id,
+    return TableView(
+        scope=scope,
         name=name,
         saved=True,
         columns=saved["columns"],
@@ -46,11 +48,11 @@ def save_screener_view(
     )
 
 
-@router.delete("/screeners/{screener_id}/view")
-def delete_screener_view(
+@router.delete("/views/{scope}/view")
+def delete_view(
     writer: Writer,
     user: User,
-    screener_id: str,
+    scope: str,
     name: Annotated[str, Query(description="the named view to remove")],
 ) -> ViewNames:
-    return ViewNames(names=preferences.delete_screener_view(writer, user, screener_id, name))
+    return ViewNames(names=preferences.delete_view(writer, user, scope, name))

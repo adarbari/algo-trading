@@ -4,10 +4,13 @@ the nightly ``screen`` job runs, over the same selection, fields and coverage ru
 nothing.
 
 ``preview_screen`` returns the run summary (passed, missing data by field, narrow misses), the
-decision counts, the funnel per gating criterion in spec order, the coverage, the session used
-and the top rows: every row that is not rejected and at least ``limit`` (at most
-``MAX_PAGE_SIZE``), so a screen with more picks than ``limit`` still shows each one. The field
-frame is cached (``preview.frame``), so an edit that keeps the field set re-evaluates in memory.
+decision counts, the funnel per gating criterion in spec order, the coverage, the session used,
+the top rows (every row that is not rejected and at least ``limit``, at most ``MAX_PAGE_SIZE``,
+so a screen with more picks than ``limit`` still shows each one; each with who the instrument
+is, as the review table's rows: one table widget renders both) and, for a screener with a saved
+run for that session, who the draft would pick that the run did not and the reverse
+(``changes``, over every row; picked as ``read.screens.runs.is_picked`` says). The field frame
+is cached (``preview.frame``), so an edit that keeps the field set re-evaluates in memory.
 """
 
 from collections.abc import Mapping, Sequence
@@ -25,6 +28,13 @@ from algotrade.services.configs import resolve_rule_draft
 from algotrade.services.explore.preview.frame import field_frame
 from algotrade.services.explore.store import BARS, MAX_PAGE_SIZE, ReadStore, partition_for
 from algotrade.services.features import config_features
+from algotrade.services.read.context import open_context
+from algotrade.services.read.screens.runs import is_picked, latest_run, run_rows
+from algotrade.services.read.screens.screeners import (
+    ScreenColumn,
+    ScreenCriterion,
+    load_screener,
+)
 from algotrade.services.screening.run import rule_run, settle_coverage
 from algotrade.services.views import to_value
 from algotrade.strategies.screeners.base import Decision
@@ -67,6 +77,7 @@ class CriterionValue:
 class PreviewRow:
     instrument_id: str
     symbol: str | None
+    name: str | None  # the company or fund name (the universe snapshot's)
     rank: int
     decision: str
     score: float | None
@@ -112,6 +123,17 @@ class PreviewCoverage:
 
 
 @dataclass(frozen=True)
+class PreviewChanges:
+    """The draft against the screener's saved run for the same session: the tickers it would
+    pick that the run did not (``entered``) and the reverse (``left``), sorted."""
+
+    run_id: str
+    session: date
+    entered: list[str]
+    left: list[str]
+
+
+@dataclass(frozen=True)
 class ScreenPreview:
     screener_id: str
     user: str
@@ -123,8 +145,11 @@ class ScreenPreview:
     funnel: list[FunnelStep]
     coverage: PreviewCoverage
     total: int  # rows evaluated (one per selected instrument)
+    criteria: list[ScreenCriterion]  # the draft's, in funnel order (the table's headers)
+    display_columns: list[ScreenColumn]  # the draft's ``[columns]``
     rows: list[PreviewRow]  # the top ``limit`` by rank
     cached: bool  # the field frame came from the in-process cache
+    changes: PreviewChanges | None  # None: no saved run of this screener for ``session``
 
 
 def preview_session(store: ReadStore, now: datetime | None = None) -> tuple[date, date]:
@@ -176,10 +201,11 @@ def funnel(spec: ScreenSpec, rows: Sequence[RuleRow]) -> list[FunnelStep]:
     return steps
 
 
-def _row(row: RuleRow, symbol: str | None) -> PreviewRow:
+def _row(row: RuleRow, symbol: str | None, name: str | None) -> PreviewRow:
     return PreviewRow(
         instrument_id=row.instrument_id,
         symbol=symbol,
+        name=name,
         rank=row.rank,
         decision=row.decision.value,
         score=row.score,
@@ -200,6 +226,31 @@ def _row(row: RuleRow, symbol: str | None) -> PreviewRow:
             for r in row.results
         ],
     )
+
+
+def preview_changes(
+    store: ReadStore,
+    who: UserContext,
+    screener_id: str,
+    session: date,
+    rows: Sequence[RuleRow],
+    symbols: Mapping[str, str],
+) -> PreviewChanges | None:
+    """``rows`` (the draft's, every one) against ``screener_id``'s saved run for ``session``
+    (the read model's latest-run rule, as ``who`` sees the screener); None without one."""
+    ctx = open_context(store.reader, store.configs, who, session, store.cache)
+    screener = load_screener(ctx, screener_id)
+    run = None if screener is None else latest_run(ctx, screener.owner, screener_id).run
+    if run is None:
+        return None
+    saved = run_rows(ctx, run)
+    before = {str(i) for i, d in zip(saved["instrument_id"], saved["decision"], strict=True)
+              if is_picked(str(d))}  # fmt: skip
+    after = {r.instrument_id for r in rows if is_picked(r.decision.value)}
+    # Tickers by the frame's universe; one it does not name (snapshot drift) is left out.
+    entered = sorted(symbols[i] for i in after - before if i in symbols)
+    left = sorted(symbols[i] for i in before - after if i in symbols)
+    return PreviewChanges(run.run_id, run.session, entered, left)
 
 
 def preview_screen(
@@ -240,7 +291,7 @@ def preview_screen(
     result = RuleScreener(rules).evaluate(view, frame.memo_for())
     run = rule_run(result, ids, screening)
     run = settle_coverage(run, selected, frame.universe, session, screening, frame.missing)
-    symbols = frame.symbols
+    symbols, names = frame.symbols, frame.names
     kept = sum(1 for r in result.rows if r.decision is not Decision.REJECT)  # ranked first
     top = result.rows[: max(0, min(max(limit, kept), MAX_PAGE_SIZE))]
     summary = result.summary
@@ -285,6 +336,9 @@ def preview_screen(
             universe_snapshot=frame.universe.snapshot_date,
         ),
         total=len(result.rows),
-        rows=[_row(r, symbols.get(r.instrument_id)) for r in top],
+        criteria=[ScreenCriterion(c.id, c.field, c.mode.value) for c in rules.criteria],
+        display_columns=[ScreenColumn(n, f) for n, f in rules.columns],
+        rows=[_row(r, symbols.get(r.instrument_id), names.get(r.instrument_id)) for r in top],
         cached=cached,
+        changes=preview_changes(store, who, name, session, result.rows, symbols),
     )

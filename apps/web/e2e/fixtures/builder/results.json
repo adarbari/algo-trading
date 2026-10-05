@@ -1,0 +1,299 @@
+{
+  "session": {
+    "date": "2026-10-02",
+    "missing": []
+  },
+  "screener": {
+    "id": "vrp_scanner",
+    "name": "VRP scanner",
+    "criteria": [
+      {
+        "id": "security_type",
+        "field": "instrument.security_type",
+        "mode": "hard"
+      },
+      {
+        "id": "iv30",
+        "field": "rollup.iv30@v1.iv30",
+        "mode": "hard"
+      },
+      {
+        "id": "iv_hv_ratio",
+        "field": "feature.iv_hv_ratio",
+        "mode": "hard"
+      }
+    ],
+    "displayColumns": [
+      {
+        "name": "spread",
+        "field": "feature.option_spread_pct"
+      }
+    ],
+    "notRun": null,
+    "latestRun": {
+      "runId": "run-1",
+      "session": "2026-10-02",
+      "previousSession": "2026-10-01",
+      "decisions": [
+        {
+          "decision": "QUALIFIED",
+          "count": 3
+        },
+        {
+          "decision": "WATCH",
+          "count": 1
+        },
+        {
+          "decision": "LIQUIDITY_RISK",
+          "count": 1
+        },
+        {
+          "decision": "REJECT",
+          "count": 4198
+        }
+      ],
+      "changes": [
+        {
+          "change": "new",
+          "count": 2
+        },
+        {
+          "change": "dropped",
+          "count": 1
+        }
+      ],
+      "results": {
+        "sort": "rank",
+        "total": 5,
+        "page": 1,
+        "size": 100,
+        "missing": [],
+        "columns": [],
+        "rows": [[], [], [], [], []],
+        "unknown": [[], [], [], [], []],
+        "results": [
+          {
+            "instrumentId": "EQ:AAPL",
+            "rank": 1,
+            "decision": "QUALIFIED",
+            "score": 90,
+            "reasons": "",
+            "flags": [],
+            "change": "new",
+            "previousDecision": null,
+            "instrument": {
+              "instrumentId": "EQ:AAPL",
+              "symbol": "AAPL",
+              "name": "Apple Inc."
+            },
+            "criteria": [
+              {
+                "id": "security_type",
+                "field": "instrument.security_type",
+                "mode": "hard",
+                "outcome": "PASS",
+                "value": "COMMON_STOCK"
+              },
+              {
+                "id": "iv30",
+                "field": "rollup.iv30@v1.iv30",
+                "mode": "hard",
+                "outcome": "PASS",
+                "value": 0.61
+              },
+              {
+                "id": "iv_hv_ratio",
+                "field": "feature.iv_hv_ratio",
+                "mode": "hard",
+                "outcome": "PASS",
+                "value": 1.22
+              }
+            ],
+            "columns": [
+              {
+                "name": "spread",
+                "value": 0.11
+              }
+            ]
+          },
+          {
+            "instrumentId": "EQ:SOXS",
+            "rank": 2,
+            "decision": "QUALIFIED",
+            "score": 90,
+            "reasons": "iv_hv_ratio 1.08 below 1.25 (within tolerance)",
+            "flags": ["leveraged_inverse"],
+            "change": null,
+            "previousDecision": "QUALIFIED",
+            "instrument": {
+              "instrumentId": "EQ:SOXS",
+              "symbol": "SOXS",
+              "name": "Direxion Daily Semiconductor Bear 3X"
+            },
+            "criteria": [
+              {
+                "id": "security_type",
+                "field": "instrument.security_type",
+                "mode": "hard",
+                "outcome": "PASS",
+                "value": "COMMON_STOCK"
+              },
+              {
+                "id": "iv30",
+                "field": "rollup.iv30@v1.iv30",
+                "mode": "hard",
+                "outcome": "PASS",
+                "value": 1.11
+              },
+              {
+                "id": "iv_hv_ratio",
+                "field": "feature.iv_hv_ratio",
+                "mode": "hard",
+                "outcome": "NEAR",
+                "value": 1.08
+              }
+            ],
+            "columns": [
+              {
+                "name": "spread",
+                "value": 0.04
+              }
+            ]
+          },
+          {
+            "instrumentId": "EQ:UVXY",
+            "rank": 3,
+            "decision": "QUALIFIED",
+            "score": 81,
+            "reasons": "",
+            "flags": [],
+            "change": "new",
+            "previousDecision": null,
+            "instrument": {
+              "instrumentId": "EQ:UVXY",
+              "symbol": "UVXY",
+              "name": "ProShares Ultra VIX Short-Term Futures"
+            },
+            "criteria": [
+              {
+                "id": "security_type",
+                "field": "instrument.security_type",
+                "mode": "hard",
+                "outcome": "PASS",
+                "value": "COMMON_STOCK"
+              },
+              {
+                "id": "iv30",
+                "field": "rollup.iv30@v1.iv30",
+                "mode": "hard",
+                "outcome": "PASS",
+                "value": 0.8
+              },
+              {
+                "id": "iv_hv_ratio",
+                "field": "feature.iv_hv_ratio",
+                "mode": "hard",
+                "outcome": "PASS",
+                "value": 1.69
+              }
+            ],
+            "columns": [
+              {
+                "name": "spread",
+                "value": 0.33
+              }
+            ]
+          },
+          {
+            "instrumentId": "EQ:CHTR",
+            "rank": 4,
+            "decision": "LIQUIDITY_RISK",
+            "score": 80,
+            "reasons": "put open interest 410 below 1000",
+            "flags": [],
+            "change": null,
+            "previousDecision": "LIQUIDITY_RISK",
+            "instrument": {
+              "instrumentId": "EQ:CHTR",
+              "symbol": "CHTR",
+              "name": "Charter Communications"
+            },
+            "criteria": [
+              {
+                "id": "security_type",
+                "field": "instrument.security_type",
+                "mode": "hard",
+                "outcome": "PASS",
+                "value": "COMMON_STOCK"
+              },
+              {
+                "id": "iv30",
+                "field": "rollup.iv30@v1.iv30",
+                "mode": "hard",
+                "outcome": "PASS",
+                "value": 0.68
+              },
+              {
+                "id": "iv_hv_ratio",
+                "field": "feature.iv_hv_ratio",
+                "mode": "hard",
+                "outcome": "PASS",
+                "value": 1.22
+              }
+            ],
+            "columns": [
+              {
+                "name": "spread",
+                "value": 0.12
+              }
+            ]
+          },
+          {
+            "instrumentId": "EQ:RKT",
+            "rank": 5,
+            "decision": "WATCH",
+            "score": 72,
+            "reasons": "iv_hv_ratio 0.90 below 1.25",
+            "flags": [],
+            "change": null,
+            "previousDecision": "QUALIFIED",
+            "instrument": {
+              "instrumentId": "EQ:RKT",
+              "symbol": "RKT",
+              "name": "Rocket Companies"
+            },
+            "criteria": [
+              {
+                "id": "security_type",
+                "field": "instrument.security_type",
+                "mode": "hard",
+                "outcome": "PASS",
+                "value": "COMMON_STOCK"
+              },
+              {
+                "id": "iv30",
+                "field": "rollup.iv30@v1.iv30",
+                "mode": "hard",
+                "outcome": "PASS",
+                "value": 0.62
+              },
+              {
+                "id": "iv_hv_ratio",
+                "field": "feature.iv_hv_ratio",
+                "mode": "hard",
+                "outcome": "FAIL",
+                "value": 0.9
+              }
+            ],
+            "columns": [
+              {
+                "name": "spread",
+                "value": 0.21
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

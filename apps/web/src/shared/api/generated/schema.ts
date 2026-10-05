@@ -107,20 +107,19 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/preferences/screeners/{screener_id}/view": {
+    "/preferences/views/{scope}/view": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** View */
-        get: operations["view_preferences_screeners__screener_id__view_get"];
-        /** Save Screener View */
-        put: operations["save_screener_view_preferences_screeners__screener_id__view_put"];
+        get?: never;
+        /** Save View */
+        put: operations["save_view_preferences_views__scope__view_put"];
         post?: never;
-        /** Delete Screener View */
-        delete: operations["delete_screener_view_preferences_screeners__screener_id__view_delete"];
+        /** Delete View */
+        delete: operations["delete_view_preferences_views__scope__view_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -234,40 +233,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/screens": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Screen Configs */
-        get: operations["screen_configs_screens_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/screens/{config_id}/results": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Results */
-        get: operations["results_screens__config_id__results_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/screens/{config_id}/run": {
         parameters: {
             query?: never;
@@ -302,23 +267,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/screens/{config_id}/table": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Table */
-        get: operations["table_screens__config_id__table_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -342,38 +290,6 @@ export interface components {
              */
             user?: string | null;
         };
-        /** ConfigSummary */
-        ConfigSummary: {
-            /** Config Id */
-            config_id: string;
-            /**
-             * Error
-             * @description why the config does not resolve
-             */
-            error: string | null;
-            /**
-             * Hash
-             * @description fingerprint of the resolved config
-             */
-            hash: string | null;
-            /** Impl */
-            impl: string | null;
-            /**
-             * Kind
-             * @description strategy | screener (null when it does not resolve)
-             */
-            kind: string | null;
-            /**
-             * Scope
-             * @description site (a preset) or the user's id
-             */
-            scope: string;
-            /**
-             * Selection
-             * @description the named selection, or inline
-             */
-            selection: string | null;
-        };
         /** CopyBody */
         CopyBody: {
             /**
@@ -381,22 +297,6 @@ export interface components {
              * @description the site rule-screen preset to extend (pinned)
              */
             preset: string;
-        };
-        /** CriterionHeader */
-        CriterionHeader: {
-            /** Criterion Id */
-            criterion_id: string;
-            /** Field */
-            field: string;
-            /** Mode */
-            mode: string;
-        };
-        /** CriterionResult */
-        CriterionResult: {
-            /** Outcome */
-            outcome: string;
-            /** Value */
-            value: number | string | null;
         };
         /** CriterionValue */
         CriterionValue: {
@@ -666,28 +566,6 @@ export interface components {
             /** Value */
             value: unknown;
         };
-        /** Page[ScreenRow] */
-        Page_ScreenRow_: {
-            /** Items */
-            items: components["schemas"]["ScreenRow"][];
-            /** Page */
-            page: number;
-            /** Size */
-            size: number;
-            /** Total */
-            total: number;
-        };
-        /** Page */
-        Page_ScreenTableRow_: {
-            /** Items */
-            items: components["schemas"]["ScreenTableRow"][];
-            /** Page */
-            page: number;
-            /** Size */
-            size: number;
-            /** Total */
-            total: number;
-        };
         /** PreviewBody */
         PreviewBody: {
             /**
@@ -708,6 +586,40 @@ export interface components {
              * @description whose catalogue and presets (default the API's)
              */
             user?: string | null;
+        };
+        /** PreviewChanges */
+        PreviewChanges: {
+            /**
+             * Entered
+             * @description tickers the draft picks that the run did not
+             */
+            entered: string[];
+            /**
+             * Left
+             * @description tickers the run picked that the draft does not
+             */
+            left: string[];
+            /**
+             * Run Id
+             * @description the screener's saved run compared with
+             */
+            run_id: string;
+            /**
+             * Session
+             * Format: date
+             * @description its session (the one the draft was evaluated on)
+             */
+            session: string;
+        };
+        /** PreviewColumn */
+        PreviewColumn: {
+            /**
+             * Field
+             * @description the catalogue field it shows
+             */
+            field: string;
+            /** Name */
+            name: string;
         };
         /** PreviewCoverage */
         PreviewCoverage: {
@@ -766,6 +678,21 @@ export interface components {
              */
             universe_snapshot: string;
         };
+        /** PreviewCriterion */
+        PreviewCriterion: {
+            /**
+             * Field
+             * @description the catalogue field it judges
+             */
+            field: string;
+            /** Id */
+            id: string;
+            /**
+             * Mode
+             * @description hard, soft or score
+             */
+            mode: string;
+        };
         /** PreviewRow */
         PreviewRow: {
             /**
@@ -789,6 +716,11 @@ export interface components {
             flags: string[];
             /** Instrument Id */
             instrument_id: string;
+            /**
+             * Name
+             * @description the company or fund name (the universe snapshot's)
+             */
+            name: string | null;
             /**
              * Rank
              * @description 1 = best: score, then the tie-break, then instrument id
@@ -868,69 +800,6 @@ export interface components {
             /** Theme */
             theme: string;
         };
-        /** ScreenConfig */
-        ScreenConfig: {
-            config: components["schemas"]["ConfigSummary"];
-            /** Latest Run */
-            latest_run: string | null;
-            /** Latest Session */
-            latest_session: string | null;
-            /** Latest Status */
-            latest_status: string | null;
-        };
-        /** ScreenerView */
-        ScreenerView: {
-            /**
-             * Columns
-             * @description catalogue features added to the table, in order
-             */
-            columns: string[];
-            /**
-             * Decisions
-             * @description decisions shown (empty: the page's default)
-             */
-            decisions: string[];
-            /**
-             * Name
-             * @description the view's name (null: the screener's default view)
-             */
-            name: string | null;
-            /**
-             * Names
-             * @description the user's named views of this screener, sorted
-             */
-            names: string[];
-            /**
-             * Saved
-             * @description false: this view is not saved yet (the page uses defaults)
-             */
-            saved: boolean;
-            /** Screener Id */
-            screener_id: string;
-            /**
-             * Sort
-             * @description a /screens/{id}/table sort (null: the default)
-             */
-            sort: string | null;
-        };
-        /** ScreenerViewBody */
-        ScreenerViewBody: {
-            /**
-             * Columns
-             * @description catalogue features added to the table, in order
-             */
-            columns: string[];
-            /**
-             * Decisions
-             * @description decisions shown (empty: the page's default)
-             */
-            decisions: string[];
-            /**
-             * Sort
-             * @description a /screens/{id}/table sort ('-' prefix: descending); null: default
-             */
-            sort?: string | null;
-        };
         /** ScreenPreview */
         ScreenPreview: {
             /**
@@ -938,13 +807,25 @@ export interface components {
              * @description the field frame came from the in-process cache
              */
             cached: boolean;
+            /** @description against the screener's saved run for the session; null: none saved */
+            changes: components["schemas"]["PreviewChanges"] | null;
             /** Config Hash */
             config_hash: string;
             coverage: components["schemas"]["PreviewCoverage"];
+            /**
+             * Criteria
+             * @description the draft's, in funnel order
+             */
+            criteria: components["schemas"]["PreviewCriterion"][];
             /** Decisions */
             decisions: {
                 [key: string]: number;
             };
+            /**
+             * Display Columns
+             * @description the draft's [columns]
+             */
+            display_columns: components["schemas"]["PreviewColumn"][];
             /** Funnel */
             funnel: components["schemas"]["FunnelStep"][];
             /**
@@ -969,113 +850,61 @@ export interface components {
             /** User */
             user: string;
         };
-        /** ScreenResults */
-        ScreenResults: {
-            /** Audit */
-            audit: {
-                [key: string]: unknown;
-            };
-            /** Config Id */
-            config_id: string;
-            /** Decisions */
-            decisions: {
-                [key: string]: number;
-            };
-            page: components["schemas"]["Page_ScreenRow_"];
-            /** Run Id */
-            run_id: string | null;
+        /** TableView */
+        TableView: {
             /**
-             * Session
-             * Format: date
+             * Columns
+             * @description catalogue features added to the table, in order
              */
-            session: string;
-            /** User */
-            user: string;
-        };
-        /** ScreenRow */
-        ScreenRow: {
-            /** Decision */
-            decision: string;
-            /** Instrument Id */
-            instrument_id: string;
-            /** Reasons */
-            reasons: string | null;
-            /** Score */
-            score: number | null;
-            /** Symbol */
-            symbol: string | null;
-            /** Values */
-            values: {
-                [key: string]: unknown;
-            };
-        };
-        /** ScreenTable */
-        ScreenTable: {
-            /** Changes */
-            changes: {
-                [key: string]: number;
-            };
-            /** Column Names */
-            column_names: string[];
-            /** Config Id */
-            config_id: string;
-            /** Criteria */
-            criteria: components["schemas"]["CriterionHeader"][];
-            /** Decisions */
-            decisions: {
-                [key: string]: number;
-            };
-            /** Feature Columns */
-            feature_columns: string[];
-            /** Missing */
-            missing: string[];
-            page: components["schemas"]["Page_ScreenTableRow_"];
-            /** Previous Session */
-            previous_session: string | null;
-            /** Run Id */
-            run_id: string;
+            columns: string[];
             /**
-             * Session
-             * Format: date
+             * Decisions
+             * @description decisions shown (empty: the page's default)
              */
-            session: string;
-            /** User */
-            user: string;
-        };
-        /** ScreenTableRow */
-        ScreenTableRow: {
-            /** Change */
-            change: string | null;
-            /** Columns */
-            columns: {
-                [key: string]: unknown;
-            };
-            /** Criteria */
-            criteria: {
-                [key: string]: components["schemas"]["CriterionResult"];
-            };
-            /** Decision */
-            decision: string;
-            /** Features */
-            features: {
-                [key: string]: unknown;
-            };
-            /** Flags */
-            flags: string[];
-            /** Instrument Id */
-            instrument_id: string;
-            /** Name */
+            decisions: string[];
+            /**
+             * Name
+             * @description the view's name (null: the table's default view)
+             */
             name: string | null;
-            /** Previous Decision */
-            previous_decision: string | null;
-            /** Rank */
-            rank: number;
-            /** Reasons */
-            reasons: string;
-            /** Score */
-            score: number | null;
-            /** Symbol */
-            symbol: string | null;
+            /**
+             * Names
+             * @description the user's named views of this table, sorted
+             */
+            names: string[];
+            /**
+             * Saved
+             * @description false: this view is not saved yet (the page uses defaults)
+             */
+            saved: boolean;
+            /**
+             * Scope
+             * @description the table: screener:<id> for a screener's results
+             */
+            scope: string;
+            /**
+             * Sort
+             * @description a column id, '-' prefix descending (null: default)
+             */
+            sort: string | null;
+        };
+        /** TableViewBody */
+        TableViewBody: {
+            /**
+             * Columns
+             * @description catalogue features added to the table, in order
+             */
+            columns: string[];
+            /**
+             * Decisions
+             * @description decisions shown (empty: the page's default)
+             */
+            decisions: string[];
+            /**
+             * Sort
+             * @description a column id ('-' prefix: descending); null: the table's default
+             */
+            sort?: string | null;
         };
         /** UserFeatureBody */
         UserFeatureBody: {
@@ -1128,7 +957,7 @@ export interface components {
         ViewNames: {
             /**
              * Names
-             * @description the user's named views of this screener, sorted
+             * @description the user's named views of this table, sorted
              */
             names: string[];
         };
@@ -1321,59 +1150,23 @@ export interface operations {
             };
         };
     };
-    view_preferences_screeners__screener_id__view_get: {
+    save_view_preferences_views__scope__view_put: {
         parameters: {
             query?: {
-                /** @description a named view (default: the default view) */
-                name?: string | null;
-                /** @description default: the API's user (a label until auth) */
-                user?: string | null;
-            };
-            header?: never;
-            path: {
-                screener_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScreenerView"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    save_screener_view_preferences_screeners__screener_id__view_put: {
-        parameters: {
-            query?: {
-                /** @description a named view (default: the screener's default view) */
+                /** @description a named view (default: the table's default view) */
                 name?: string | null;
                 /** @description whose configs (a label until auth; default the API's) */
                 user?: string | null;
             };
             header?: never;
             path: {
-                screener_id: string;
+                scope: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ScreenerViewBody"];
+                "application/json": components["schemas"]["TableViewBody"];
             };
         };
         responses: {
@@ -1383,7 +1176,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ScreenerView"];
+                    "application/json": components["schemas"]["TableView"];
                 };
             };
             /** @description Validation Error */
@@ -1397,7 +1190,7 @@ export interface operations {
             };
         };
     };
-    delete_screener_view_preferences_screeners__screener_id__view_delete: {
+    delete_view_preferences_views__scope__view_delete: {
         parameters: {
             query: {
                 /** @description the named view to remove */
@@ -1407,7 +1200,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                screener_id: string;
+                scope: string;
             };
             cookie?: never;
         };
@@ -1674,62 +1467,6 @@ export interface operations {
             };
         };
     };
-    screen_configs_screens_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScreenConfig"][];
-                };
-            };
-        };
-    };
-    results_screens__config_id__results_get: {
-        parameters: {
-            query?: {
-                date?: string | null;
-                decision?: string | null;
-                page?: number;
-                size?: number;
-            };
-            header?: never;
-            path: {
-                config_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScreenResults"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     run_screens__config_id__run_post: {
         parameters: {
             query?: {
@@ -1785,52 +1522,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunRequest"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    table_screens__config_id__table_get: {
-        parameters: {
-            query?: {
-                /** @description new or dropped since the previous run */
-                change?: string | null;
-                /** @description comma-separated catalogue features to add */
-                columns?: string | null;
-                /** @description default: the latest */
-                date?: string | null;
-                /** @description comma-separated decisions (default: all) */
-                decision?: string | null;
-                page?: number;
-                /** @description ticker or name contains */
-                q?: string | null;
-                size?: number;
-                /** @description rank, score, symbol, name, decision, criterion:<id>, column:<name> or a requested feature; '-' prefix: descending; nulls last (default: rank) */
-                sort?: string | null;
-            };
-            header?: never;
-            path: {
-                config_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScreenTable"];
                 };
             };
             /** @description Validation Error */

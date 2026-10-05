@@ -1,14 +1,18 @@
 """``ScreenResult``: what a screener's run stored for one instrument (rank, decision, score,
-reasons, flags, each criterion's outcome and value, the screen's display columns), and who the
-instrument is (typed identity; its per-session values are ``instrument.features(names)``)."""
+reasons, flags, each criterion's outcome and value, the screen's display columns, what changed
+since the previous run), and who the instrument is (typed identity; its per-session values are
+``instrument.features(names)``); ``ScreenResultPage``: one page of a run as a review table,
+with the catalogue columns the reader added, columnar as a ``FeatureTable``."""
 
 from typing import Self
 
 import strawberry
 from strawberry.scalars import JSON
 
+from algotrade.services.read import values
 from algotrade.services.read.context import ReadContext
-from algotrade.services.read.screens import results
+from algotrade.services.read.screens import results as stored
+from algotrade_api.graphql.types.instruments.feature import FeatureInfo
 from algotrade_api.graphql.types.instruments.instrument import Instrument
 
 
@@ -25,7 +29,7 @@ class CriterionResult:
     distance: float | None
 
     @classmethod
-    def of(cls, d: results.CriterionResult) -> Self:
+    def of(cls, d: stored.CriterionResult) -> Self:
         return cls(
             id=d.id,
             field=d.field,
@@ -42,13 +46,15 @@ class ResultColumn:
     value: JSON | None
 
     @classmethod
-    def of(cls, d: results.ResultColumn) -> Self:
+    def of(cls, d: stored.ResultColumn) -> Self:
         return cls(name=d.name, value=JSON(d.value))
 
 
 @strawberry.type(
     description="One instrument's row of a screener's run; `instrument` is null when the "
-    "session's reference snapshot does not have it"
+    "session's reference snapshot does not have it. `change`: `new` (picked now, not by the "
+    "previous run) or `dropped` (the reverse); null when the same or not compared (Ideas); "
+    "`previousDecision`: the previous run's"
 )
 class ScreenResult:
     run_id: str
@@ -63,9 +69,11 @@ class ScreenResult:
     flags: list[str]
     criteria: list[CriterionResult]
     columns: list[ResultColumn]
+    change: str | None
+    previous_decision: str | None
 
     @classmethod
-    def of(cls, d: results.ScreenResult, ctx: ReadContext) -> Self:
+    def of(cls, d: stored.ScreenResult, ctx: ReadContext) -> Self:
         return cls(
             run_id=d.run_id,
             config_id=d.config_id,
@@ -79,4 +87,50 @@ class ScreenResult:
             flags=list(d.flags),
             criteria=[CriterionResult.of(c) for c in d.criteria],
             columns=[ResultColumn.of(c) for c in d.columns],
+            change=d.change,
+            previous_decision=d.previous_decision,
+        )
+
+
+@strawberry.type(description="How many tickers of a run are `new` or `dropped`")
+class ChangeCount:
+    change: str
+    count: int
+
+    @classmethod
+    def of(cls, d: stored.ChangeCount) -> Self:
+        return cls(change=d.change, count=d.count)
+
+
+@strawberry.type(
+    description="One page of a run's rows matching the filters, in the sort order (`total`: "
+    "every page). `rows[i][j]` is the catalogue column `columns[j]` for `results[i]`, null "
+    "exactly when `unknown[i][j]` says why. `missing`: tables the search and sort read with "
+    "nothing for the session"
+)
+class ScreenResultPage:
+    run_id: str
+    sort: str
+    total: int
+    page: int
+    size: int
+    columns: list[FeatureInfo]
+    results: list[ScreenResult]
+    rows: list[list[JSON | None]]
+    unknown: list[list[values.UnknownCode | None]]
+    missing: list[str]
+
+    @classmethod
+    def of(cls, d: stored.ResultPage, ctx: ReadContext) -> Self:
+        return cls(
+            run_id=d.run_id,
+            sort=d.sort,
+            total=d.total,
+            page=d.page,
+            size=d.size,
+            columns=[FeatureInfo.of(c) for c in d.columns],
+            results=[ScreenResult.of(r, ctx) for r in d.results],
+            rows=[[JSON(v) for v in row] for row in d.rows],
+            unknown=[list(row) for row in d.unknown],
+            missing=list(d.missing),
         )

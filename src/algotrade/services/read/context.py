@@ -2,7 +2,9 @@
 catalogue, the one resolved ``Session``, the result cache), opened by ``open_context``, and
 ``partition``, the only way a loader reads a session-grain table for the request's session
 (ADR 0036 decision 6), and ``run_partition``, a run record's own results (the run names its
-session: an explicit argument, never "latest"). The inventory reads (``stored_dates``,
+session: an explicit argument, never "latest"), and ``previous_session`` / ``at_session``: the
+stored session of a table before the request's and a context for it (a loader comparing with
+the previous run names that date explicitly, ADR 0036). The inventory reads (``stored_dates``,
 ``partition_on``, ``snapshot_on``) report what is stored on dates the caller names: only the ops
 loader that describes storage itself calls them (the Admin completeness grid; READ 2's
 ``test_inventory_reads_only_in_the_completeness_loader``), never a loader of a fact.
@@ -15,7 +17,7 @@ only: another date is a named argument of the loader, never derived."""
 import threading
 from collections import OrderedDict
 from collections.abc import Hashable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from typing import Any
 
@@ -37,10 +39,12 @@ __all__ = [
     "ResultCache",
     "StoreContext",
     "Stores",
+    "at_session",
     "open_context",
     "open_stores",
     "partition",
     "partition_on",
+    "previous_session",
     "run_partition",
     "snapshot_on",
     "stored_dates",
@@ -135,20 +139,42 @@ def open_context(
     resolved session is kept in it until the next publish (resolving lists every expected
     table's partitions: ~26 ``dates()`` calls)."""
     cache = cache if cache is not None else ResultCache()
-    # Read before resolving (ADR 0022); a run's own pending writes do not move visible_seq.
-    key = ("session", requested, reader.own_run, reader.visible_seq())
-    session = cache.get(key)
-    if session is None:
-        session = resolve_session(reader, requested)
-        cache.put(key, session)
     return ReadContext(
         reader=reader,
         configs=configs,
         user=user,
-        session=session,
+        session=_session(reader, requested, cache),
         features=catalogue(configs, user.user_id),
         cache=cache,
     )
+
+
+def _session(reader: StoreReader, requested: date | None, cache: ResultCache) -> Session:
+    """The session ``requested`` resolves to, kept in ``cache`` until the next publish."""
+    # Read before resolving (ADR 0022); a run's own pending writes do not move visible_seq.
+    key = ("session", requested, reader.own_run, reader.visible_seq())
+    session: Session | None = cache.get(key)
+    if session is None:
+        session = resolve_session(reader, requested)
+        cache.put(key, session)
+    return session
+
+
+def previous_session(ctx: ReadContext, table: str) -> date | None:
+    """The latest session before ``ctx.session.date`` with a stored partition of the
+    session-grain ``table`` (None: none). The date a loader comparing with an earlier run
+    names explicitly; never a fallback for a missing partition (ADR 0036)."""
+    grain = grain_of(table)
+    if grain is not Grain.SESSION:
+        raise ValueError(f"{table} is {grain} grain: only session-grain tables have sessions")
+    earlier = [d for d in ctx.reader.dates(table) if d < ctx.session.date]
+    return max(earlier) if earlier else None
+
+
+def at_session(ctx: ReadContext, day: date) -> ReadContext:
+    """``ctx`` for the session ``day`` (an explicit date, e.g. ``previous_session``'s): the
+    same stores, user, catalogue and cache; every read through it is for exactly ``day``."""
+    return replace(ctx, session=_session(ctx.reader, day, ctx.cache), loaders=None)
 
 
 def partition(

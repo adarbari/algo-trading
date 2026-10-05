@@ -35,89 +35,6 @@
         "title": "CheckBody",
         "type": "object"
       },
-      "ConfigSummary": {
-        "properties": {
-          "config_id": {
-            "title": "Config Id",
-            "type": "string"
-          },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "why the config does not resolve",
-            "title": "Error"
-          },
-          "hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "fingerprint of the resolved config",
-            "title": "Hash"
-          },
-          "impl": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Impl"
-          },
-          "kind": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "strategy | screener (null when it does not resolve)",
-            "title": "Kind"
-          },
-          "scope": {
-            "description": "site (a preset) or the user's id",
-            "title": "Scope",
-            "type": "string"
-          },
-          "selection": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "the named selection, or inline",
-            "title": "Selection"
-          }
-        },
-        "required": [
-          "config_id",
-          "scope",
-          "kind",
-          "impl",
-          "selection",
-          "hash",
-          "error"
-        ],
-        "title": "ConfigSummary",
-        "type": "object"
-      },
       "CopyBody": {
         "properties": {
           "preset": {
@@ -130,57 +47,6 @@
           "preset"
         ],
         "title": "CopyBody",
-        "type": "object"
-      },
-      "CriterionHeader": {
-        "properties": {
-          "criterion_id": {
-            "title": "Criterion Id",
-            "type": "string"
-          },
-          "field": {
-            "title": "Field",
-            "type": "string"
-          },
-          "mode": {
-            "title": "Mode",
-            "type": "string"
-          }
-        },
-        "required": [
-          "criterion_id",
-          "field",
-          "mode"
-        ],
-        "title": "CriterionHeader",
-        "type": "object"
-      },
-      "CriterionResult": {
-        "properties": {
-          "outcome": {
-            "title": "Outcome",
-            "type": "string"
-          },
-          "value": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Value"
-          }
-        },
-        "required": [
-          "value",
-          "outcome"
-        ],
-        "title": "CriterionResult",
         "type": "object"
       },
       "CriterionValue": {
@@ -843,68 +709,6 @@
         "title": "NarrowMiss",
         "type": "object"
       },
-      "Page_ScreenRow_": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/ScreenRow"
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "page": {
-            "title": "Page",
-            "type": "integer"
-          },
-          "size": {
-            "title": "Size",
-            "type": "integer"
-          },
-          "total": {
-            "title": "Total",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "items",
-          "total",
-          "page",
-          "size"
-        ],
-        "title": "Page[ScreenRow]",
-        "type": "object"
-      },
-      "Page_ScreenTableRow_": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/ScreenTableRow"
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "page": {
-            "title": "Page",
-            "type": "integer"
-          },
-          "size": {
-            "title": "Size",
-            "type": "integer"
-          },
-          "total": {
-            "title": "Total",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "items",
-          "total",
-          "page",
-          "size"
-        ],
-        "title": "Page",
-        "type": "object"
-      },
       "PreviewBody": {
         "properties": {
           "limit": {
@@ -938,6 +742,64 @@
           "spec"
         ],
         "title": "PreviewBody",
+        "type": "object"
+      },
+      "PreviewChanges": {
+        "properties": {
+          "entered": {
+            "description": "tickers the draft picks that the run did not",
+            "items": {
+              "type": "string"
+            },
+            "title": "Entered",
+            "type": "array"
+          },
+          "left": {
+            "description": "tickers the run picked that the draft does not",
+            "items": {
+              "type": "string"
+            },
+            "title": "Left",
+            "type": "array"
+          },
+          "run_id": {
+            "description": "the screener's saved run compared with",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "session": {
+            "description": "its session (the one the draft was evaluated on)",
+            "format": "date",
+            "title": "Session",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "session",
+          "entered",
+          "left"
+        ],
+        "title": "PreviewChanges",
+        "type": "object"
+      },
+      "PreviewColumn": {
+        "properties": {
+          "field": {
+            "description": "the catalogue field it shows",
+            "title": "Field",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "field"
+        ],
+        "title": "PreviewColumn",
         "type": "object"
       },
       "PreviewCoverage": {
@@ -1017,6 +879,31 @@
         "title": "PreviewCoverage",
         "type": "object"
       },
+      "PreviewCriterion": {
+        "properties": {
+          "field": {
+            "description": "the catalogue field it judges",
+            "title": "Field",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "mode": {
+            "description": "hard, soft or score",
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "field",
+          "mode"
+        ],
+        "title": "PreviewCriterion",
+        "type": "object"
+      },
       "PreviewRow": {
         "properties": {
           "columns": {
@@ -1048,6 +935,18 @@
           "instrument_id": {
             "title": "Instrument Id",
             "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the company or fund name (the universe snapshot's)",
+            "title": "Name"
           },
           "rank": {
             "description": "1 = best: score, then the tie-break, then instrument id",
@@ -1089,6 +988,7 @@
         "required": [
           "instrument_id",
           "symbol",
+          "name",
           "rank",
           "decision",
           "score",
@@ -1276,61 +1176,23 @@
         "title": "SavedFeature",
         "type": "object"
       },
-      "ScreenConfig": {
-        "properties": {
-          "config": {
-            "$ref": "#/components/schemas/ConfigSummary"
-          },
-          "latest_run": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latest Run"
-          },
-          "latest_session": {
-            "anyOf": [
-              {
-                "format": "date",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latest Session"
-          },
-          "latest_status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latest Status"
-          }
-        },
-        "required": [
-          "config",
-          "latest_run",
-          "latest_session",
-          "latest_status"
-        ],
-        "title": "ScreenConfig",
-        "type": "object"
-      },
       "ScreenPreview": {
         "properties": {
           "cached": {
             "description": "the field frame came from the in-process cache",
             "title": "Cached",
             "type": "boolean"
+          },
+          "changes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PreviewChanges"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "against the screener's saved run for the session; null: none saved"
           },
           "config_hash": {
             "title": "Config Hash",
@@ -1339,12 +1201,28 @@
           "coverage": {
             "$ref": "#/components/schemas/PreviewCoverage"
           },
+          "criteria": {
+            "description": "the draft's, in funnel order",
+            "items": {
+              "$ref": "#/components/schemas/PreviewCriterion"
+            },
+            "title": "Criteria",
+            "type": "array"
+          },
           "decisions": {
             "additionalProperties": {
               "type": "integer"
             },
             "title": "Decisions",
             "type": "object"
+          },
+          "display_columns": {
+            "description": "the draft's [columns]",
+            "items": {
+              "$ref": "#/components/schemas/PreviewColumn"
+            },
+            "title": "Display Columns",
+            "type": "array"
           },
           "funnel": {
             "items": {
@@ -1399,337 +1277,16 @@
           "funnel",
           "coverage",
           "total",
+          "criteria",
+          "display_columns",
           "rows",
-          "cached"
+          "cached",
+          "changes"
         ],
         "title": "ScreenPreview",
         "type": "object"
       },
-      "ScreenResults": {
-        "properties": {
-          "audit": {
-            "additionalProperties": true,
-            "title": "Audit",
-            "type": "object"
-          },
-          "config_id": {
-            "title": "Config Id",
-            "type": "string"
-          },
-          "decisions": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "title": "Decisions",
-            "type": "object"
-          },
-          "page": {
-            "$ref": "#/components/schemas/Page_ScreenRow_"
-          },
-          "run_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Run Id"
-          },
-          "session": {
-            "format": "date",
-            "title": "Session",
-            "type": "string"
-          },
-          "user": {
-            "title": "User",
-            "type": "string"
-          }
-        },
-        "required": [
-          "config_id",
-          "user",
-          "session",
-          "run_id",
-          "decisions",
-          "audit",
-          "page"
-        ],
-        "title": "ScreenResults",
-        "type": "object"
-      },
-      "ScreenRow": {
-        "properties": {
-          "decision": {
-            "title": "Decision",
-            "type": "string"
-          },
-          "instrument_id": {
-            "title": "Instrument Id",
-            "type": "string"
-          },
-          "reasons": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reasons"
-          },
-          "score": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Score"
-          },
-          "symbol": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Symbol"
-          },
-          "values": {
-            "additionalProperties": true,
-            "title": "Values",
-            "type": "object"
-          }
-        },
-        "required": [
-          "instrument_id",
-          "symbol",
-          "decision",
-          "score",
-          "reasons",
-          "values"
-        ],
-        "title": "ScreenRow",
-        "type": "object"
-      },
-      "ScreenTable": {
-        "properties": {
-          "changes": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "title": "Changes",
-            "type": "object"
-          },
-          "column_names": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Column Names",
-            "type": "array"
-          },
-          "config_id": {
-            "title": "Config Id",
-            "type": "string"
-          },
-          "criteria": {
-            "items": {
-              "$ref": "#/components/schemas/CriterionHeader"
-            },
-            "title": "Criteria",
-            "type": "array"
-          },
-          "decisions": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "title": "Decisions",
-            "type": "object"
-          },
-          "feature_columns": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Feature Columns",
-            "type": "array"
-          },
-          "missing": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Missing",
-            "type": "array"
-          },
-          "page": {
-            "$ref": "#/components/schemas/Page_ScreenTableRow_"
-          },
-          "previous_session": {
-            "anyOf": [
-              {
-                "format": "date",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Previous Session"
-          },
-          "run_id": {
-            "title": "Run Id",
-            "type": "string"
-          },
-          "session": {
-            "format": "date",
-            "title": "Session",
-            "type": "string"
-          },
-          "user": {
-            "title": "User",
-            "type": "string"
-          }
-        },
-        "required": [
-          "config_id",
-          "user",
-          "session",
-          "previous_session",
-          "run_id",
-          "decisions",
-          "changes",
-          "criteria",
-          "column_names",
-          "feature_columns",
-          "missing",
-          "page"
-        ],
-        "title": "ScreenTable",
-        "type": "object"
-      },
-      "ScreenTableRow": {
-        "properties": {
-          "change": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Change"
-          },
-          "columns": {
-            "additionalProperties": true,
-            "title": "Columns",
-            "type": "object"
-          },
-          "criteria": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/CriterionResult"
-            },
-            "title": "Criteria",
-            "type": "object"
-          },
-          "decision": {
-            "title": "Decision",
-            "type": "string"
-          },
-          "features": {
-            "additionalProperties": true,
-            "title": "Features",
-            "type": "object"
-          },
-          "flags": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Flags",
-            "type": "array"
-          },
-          "instrument_id": {
-            "title": "Instrument Id",
-            "type": "string"
-          },
-          "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "previous_decision": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Previous Decision"
-          },
-          "rank": {
-            "title": "Rank",
-            "type": "integer"
-          },
-          "reasons": {
-            "title": "Reasons",
-            "type": "string"
-          },
-          "score": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Score"
-          },
-          "symbol": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Symbol"
-          }
-        },
-        "required": [
-          "rank",
-          "instrument_id",
-          "symbol",
-          "name",
-          "decision",
-          "score",
-          "reasons",
-          "flags",
-          "change",
-          "previous_decision",
-          "criteria",
-          "columns",
-          "features"
-        ],
-        "title": "ScreenTableRow",
-        "type": "object"
-      },
-      "ScreenerView": {
+      "TableView": {
         "properties": {
           "columns": {
             "description": "catalogue features added to the table, in order",
@@ -1756,11 +1313,11 @@
                 "type": "null"
               }
             ],
-            "description": "the view's name (null: the screener's default view)",
+            "description": "the view's name (null: the table's default view)",
             "title": "Name"
           },
           "names": {
-            "description": "the user's named views of this screener, sorted",
+            "description": "the user's named views of this table, sorted",
             "items": {
               "type": "string"
             },
@@ -1772,8 +1329,9 @@
             "title": "Saved",
             "type": "boolean"
           },
-          "screener_id": {
-            "title": "Screener Id",
+          "scope": {
+            "description": "the table: screener:<id> for a screener's results",
+            "title": "Scope",
             "type": "string"
           },
           "sort": {
@@ -1785,12 +1343,12 @@
                 "type": "null"
               }
             ],
-            "description": "a /screens/{id}/table sort (null: the default)",
+            "description": "a column id, '-' prefix descending (null: default)",
             "title": "Sort"
           }
         },
         "required": [
-          "screener_id",
+          "scope",
           "name",
           "saved",
           "columns",
@@ -1798,10 +1356,10 @@
           "decisions",
           "names"
         ],
-        "title": "ScreenerView",
+        "title": "TableView",
         "type": "object"
       },
-      "ScreenerViewBody": {
+      "TableViewBody": {
         "properties": {
           "columns": {
             "description": "catalogue features added to the table, in order",
@@ -1828,7 +1386,7 @@
                 "type": "null"
               }
             ],
-            "description": "a /screens/{id}/table sort ('-' prefix: descending); null: default",
+            "description": "a column id ('-' prefix: descending); null: the table's default",
             "title": "Sort"
           }
         },
@@ -1836,7 +1394,7 @@
           "columns",
           "decisions"
         ],
-        "title": "ScreenerViewBody",
+        "title": "TableViewBody",
         "type": "object"
       },
       "UserFeatureBody": {
@@ -1997,7 +1555,7 @@
       "ViewNames": {
         "properties": {
           "names": {
-            "description": "the user's named views of this screener, sorted",
+            "description": "the user's named views of this table, sorted",
             "items": {
               "type": "string"
             },
@@ -2297,16 +1855,16 @@
         ]
       }
     },
-    "/preferences/screeners/{screener_id}/view": {
+    "/preferences/views/{scope}/view": {
       "delete": {
-        "operationId": "delete_screener_view_preferences_screeners__screener_id__view_delete",
+        "operationId": "delete_view_preferences_views__scope__view_delete",
         "parameters": [
           {
             "in": "path",
-            "name": "screener_id",
+            "name": "scope",
             "required": true,
             "schema": {
-              "title": "Screener Id",
+              "title": "Scope",
               "type": "string"
             }
           },
@@ -2362,101 +1920,25 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Delete Screener View",
+        "summary": "Delete View",
         "tags": [
           "ideas"
         ]
       },
-      "get": {
-        "operationId": "view_preferences_screeners__screener_id__view_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "screener_id",
-            "required": true,
-            "schema": {
-              "title": "Screener Id",
-              "type": "string"
-            }
-          },
-          {
-            "description": "default: the API's user (a label until auth)",
-            "in": "query",
-            "name": "user",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "default: the API's user (a label until auth)",
-              "title": "User"
-            }
-          },
-          {
-            "description": "a named view (default: the default view)",
-            "in": "query",
-            "name": "name",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "a named view (default: the default view)",
-              "title": "Name"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ScreenerView"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "View",
-        "tags": [
-          "screens"
-        ]
-      },
       "put": {
-        "operationId": "save_screener_view_preferences_screeners__screener_id__view_put",
+        "operationId": "save_view_preferences_views__scope__view_put",
         "parameters": [
           {
             "in": "path",
-            "name": "screener_id",
+            "name": "scope",
             "required": true,
             "schema": {
-              "title": "Screener Id",
+              "title": "Scope",
               "type": "string"
             }
           },
           {
-            "description": "a named view (default: the screener's default view)",
+            "description": "a named view (default: the table's default view)",
             "in": "query",
             "name": "name",
             "required": false,
@@ -2469,7 +1951,7 @@
                   "type": "null"
                 }
               ],
-              "description": "a named view (default: the screener's default view)",
+              "description": "a named view (default: the table's default view)",
               "title": "Name"
             }
           },
@@ -2496,7 +1978,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ScreenerViewBody"
+                "$ref": "#/components/schemas/TableViewBody"
               }
             }
           },
@@ -2507,7 +1989,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ScreenerView"
+                  "$ref": "#/components/schemas/TableView"
                 }
               }
             },
@@ -2524,7 +2006,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Save Screener View",
+        "summary": "Save View",
         "tags": [
           "ideas"
         ]
@@ -2936,129 +2418,6 @@
         ]
       }
     },
-    "/screens": {
-      "get": {
-        "operationId": "screen_configs_screens_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ScreenConfig"
-                  },
-                  "title": "Response Screen Configs Screens Get",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Screen Configs",
-        "tags": [
-          "screens"
-        ]
-      }
-    },
-    "/screens/{config_id}/results": {
-      "get": {
-        "operationId": "results_screens__config_id__results_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "config_id",
-            "required": true,
-            "schema": {
-              "title": "Config Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "date",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "date",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Date"
-            }
-          },
-          {
-            "in": "query",
-            "name": "decision",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Decision"
-            }
-          },
-          {
-            "in": "query",
-            "name": "page",
-            "required": false,
-            "schema": {
-              "default": 1,
-              "minimum": 1,
-              "title": "Page",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "size",
-            "required": false,
-            "schema": {
-              "default": 100,
-              "maximum": 1000,
-              "minimum": 1,
-              "title": "Size",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ScreenResults"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Results",
-        "tags": [
-          "screens"
-        ]
-      }
-    },
     "/screens/{config_id}/run": {
       "post": {
         "operationId": "run_screens__config_id__run_post",
@@ -3184,180 +2543,6 @@
           }
         },
         "summary": "Run Status",
-        "tags": [
-          "screens"
-        ]
-      }
-    },
-    "/screens/{config_id}/table": {
-      "get": {
-        "operationId": "table_screens__config_id__table_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "config_id",
-            "required": true,
-            "schema": {
-              "title": "Config Id",
-              "type": "string"
-            }
-          },
-          {
-            "description": "default: the latest",
-            "in": "query",
-            "name": "date",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "date",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "default: the latest",
-              "title": "Date"
-            }
-          },
-          {
-            "description": "comma-separated decisions (default: all)",
-            "in": "query",
-            "name": "decision",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "comma-separated decisions (default: all)",
-              "title": "Decision"
-            }
-          },
-          {
-            "description": "new or dropped since the previous run",
-            "in": "query",
-            "name": "change",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "new or dropped since the previous run",
-              "title": "Change"
-            }
-          },
-          {
-            "description": "ticker or name contains",
-            "in": "query",
-            "name": "q",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "ticker or name contains",
-              "title": "Q"
-            }
-          },
-          {
-            "description": "comma-separated catalogue features to add",
-            "in": "query",
-            "name": "columns",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "comma-separated catalogue features to add",
-              "title": "Columns"
-            }
-          },
-          {
-            "description": "rank, score, symbol, name, decision, criterion:<id>, column:<name> or a requested feature; '-' prefix: descending; nulls last (default: rank)",
-            "in": "query",
-            "name": "sort",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "rank, score, symbol, name, decision, criterion:<id>, column:<name> or a requested feature; '-' prefix: descending; nulls last (default: rank)",
-              "title": "Sort"
-            }
-          },
-          {
-            "in": "query",
-            "name": "page",
-            "required": false,
-            "schema": {
-              "default": 1,
-              "minimum": 1,
-              "title": "Page",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "size",
-            "required": false,
-            "schema": {
-              "default": 100,
-              "maximum": 1000,
-              "minimum": 1,
-              "title": "Size",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ScreenTable"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Table",
         "tags": [
           "screens"
         ]

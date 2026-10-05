@@ -107,7 +107,9 @@ test('the tabs, the compare set and the columns live in the URL', async ({ page 
   await page.getByRole('tab', { name: 'Features' }).click();
   await expect(page.getByRole('grid', { name: 'AAPL features' })).toBeVisible();
   await page.getByRole('tab', { name: 'Screener hits' }).click();
-  await expect(page.getByText(/coming with the screener engine/)).toBeVisible();
+  const hits = page.getByRole('region', { name: 'Screener hits' });
+  await expect(hits).toContainText('VRP scanner');
+  await expect(hits).toContainText('Watch');
   await page.goto('/explore?cols=feature.market_cap,instrument.sector&sort=-feature.market_cap');
   await expect(tickers(page).getByRole('columnheader', { name: /Mkt cap/ })).toHaveAttribute(
     'aria-sort',

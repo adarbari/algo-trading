@@ -14,6 +14,7 @@ import { HoldingsPanel } from '@/widgets/holdings-panel';
 import { OptionsPanel } from '@/widgets/options-panel';
 import { OverviewPanel } from '@/widgets/overview-panel';
 import { PriceChartPanel } from '@/widgets/price-chart-panel';
+import { ScreenerHitsPanel } from '@/widgets/screener-hits-panel';
 import { CompareSetBar } from '@/features/compare-set';
 
 import { DEFAULT_DIMENSIONS, joinList, type ExploreSearch, type ExploreTab } from '../model/search';
@@ -143,14 +144,8 @@ export function DetailTabs({ search, onSearchChange }: DetailTabsProps) {
           />
         </Stack>
       );
-  } else if (tab === 'hits') {
-    content = (
-      <EmptyState
-        bordered
-        title="Screener hits"
-        description="Which of your screeners flagged this ticker, when and why: coming with the screener engine."
-      />
-    );
+  } else if (tab === 'hits' && focused) {
+    content = <ScreenerHitsPanel symbol={focused} />;
   } else if (!focused) {
     content = (
       <EmptyState

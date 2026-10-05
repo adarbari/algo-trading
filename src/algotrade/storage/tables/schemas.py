@@ -395,6 +395,16 @@ RULE_SCREEN = _fixed(
 )
 # One row per (instrument, criterion) and per display column (``mode = "column"``,
 # ``outcome = "INFO"``): the value, PASS / NEAR / FAIL / MISSING, distance and penalty.
+DISPLAY_COLUMN_MODE = "column"
+
+
+def is_display_column(mode: object) -> bool:
+    """Whether a ``results/rule_screen_values`` row of ``mode`` is one of the screen's display
+    columns (``[columns]``) rather than a criterion's outcome: the one predicate its writer
+    and its readers share."""
+    return mode == DISPLAY_COLUMN_MODE
+
+
 RULE_SCREEN_VALUES = _fixed(
     "results/rule_screen_values",
     "results",

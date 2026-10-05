@@ -8,6 +8,7 @@ from algotrade.services.read.screens.runs import (
     is_picked,
     latest_run,
     load_latest_runs,
+    load_previous_run,
     run_rows,
 )
 from algotrade.services.read.values import Unknown, UnknownCode
@@ -64,3 +65,23 @@ def test_an_earlier_session_reads_its_own_runs(reader: StoreReader) -> None:
 def test_picked_is_every_decision_but_reject_skipped_unknown() -> None:
     assert all(is_picked(d) for d in ("QUALIFIED", "WATCH", "EVENT_RISK", "LIQUIDITY_RISK"))
     assert not any(is_picked(d) for d in ("REJECT", "SKIPPED", "UNKNOWN"))
+
+
+def test_a_run_carries_its_record_stats(ctx: ReadContext) -> None:
+    run = latest_run(ctx, "site", "alpha").run
+    assert run is not None and run.audit == {}  # the record holds no stats
+    beta = latest_run(ctx, "me", "beta").run
+    assert beta is not None and beta.audit == {}  # no record at all
+
+
+def test_the_previous_run_is_the_screeners_run_in_the_previous_session(
+    ctx: ReadContext, reader: StoreReader
+) -> None:
+    alpha = latest_run(ctx, "site", "alpha").run
+    assert alpha is not None
+    previous = load_previous_run(ctx, alpha)
+    assert previous is not None and (previous.run_id, previous.session) == ("r-1", D0)
+    beta = latest_run(ctx, "me", "beta").run
+    assert beta is not None and load_previous_run(ctx, beta) is None  # beta did not run on D0
+    gamma = latest_run(_on(reader, D0), "me", "gamma").run
+    assert gamma is not None and load_previous_run(_on(reader, D0), gamma) is None  # no earlier

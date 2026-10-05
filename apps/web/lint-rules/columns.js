@@ -18,8 +18,6 @@ const FACTORIES = 'src/entities/feature/model/columns.tsx';
 
 // SHRINK-ONLY: each entry is removed by the read-model PR named beside it.
 const PENDING = [
-  'src/widgets/screener-results/model/columns.tsx', // RM8: screener results on feature-table
-  'src/widgets/preview-results/model/columns.tsx', // RM8: preview results on feature-table
   'src/widgets/top-ideas/model/columns.tsx', // RM5: Ideas on GraphQL (top ideas rebuilt)
 ];
 

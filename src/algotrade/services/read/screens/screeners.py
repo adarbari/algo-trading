@@ -21,10 +21,30 @@ SITE_SCOPE = "site"
 
 
 @dataclass(frozen=True)
+class ScreenCriterion:
+    """One criterion of the screen, in spec (funnel) order: the catalogue field it judges and
+    its mode (``hard``, ``soft``, ``score``)."""
+
+    id: str
+    field: str
+    mode: str
+
+
+@dataclass(frozen=True)
+class ScreenColumn:
+    """One of the screen's display columns (``[columns]``): its name and the catalogue field
+    the run stored for it."""
+
+    name: str
+    field: str
+
+
+@dataclass(frozen=True)
 class Screener:
     """A rule screen as the user sees it. ``scope``: where its config lives (``site`` or the
     user's id); ``owner``: whose runs are its (the user's id, or ``site``); ``name``: the
-    config's display name, else its id; ``version``: the config's current version."""
+    config's display name, else its id; ``version``: the config's current version;
+    ``criteria`` and ``display_columns``: the current config's, in spec order."""
 
     id: str
     owner: str
@@ -32,17 +52,22 @@ class Screener:
     name: str
     version: int | None
     hash: str
+    criteria: tuple[ScreenCriterion, ...]
+    display_columns: tuple[ScreenColumn, ...]
 
 
 def _screener(config: ResolvedConfig) -> Screener:
     owner = config.user.user_id
+    spec = config.screen_spec
     return Screener(
         id=config.config.id,
         owner=owner,
         scope=SITE_SCOPE if owner == SITE_USER else owner,
         name=(config.config.name or "").strip() or config.config.id,
-        version=config.screen_spec.version,
+        version=spec.version,
         hash=config.hash,
+        criteria=tuple(ScreenCriterion(c.id, c.field, c.mode.value) for c in spec.criteria),
+        display_columns=tuple(ScreenColumn(n, f) for n, f in spec.columns),
     )
 
 

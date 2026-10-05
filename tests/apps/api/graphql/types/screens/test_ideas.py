@@ -86,14 +86,14 @@ def test_an_earlier_session_has_its_own_runs_and_limit_caps(graph: Graph) -> Non
 def test_screeners_and_a_view(graph: Graph) -> None:
     body = graph(
         "{ screeners { id name latestRun { picked } notRun { code } }"
-        ' view(scope: "vrp_scanner") { scope saved columns names }'
-        ' missing: view(scope: "nope") { scope } }'
+        ' view(scope: "screener:vrp_scanner") { scope saved columns names }'
+        ' missing: view(scope: "screener:nope") { scope } }'
     )
     assert body["data"]["screeners"] == [
         {"id": "vrp_scanner", "name": "VRP", "latestRun": {"picked": 2}, "notRun": None}
     ]
     assert body["data"]["view"] == {
-        "scope": "vrp_scanner", "saved": False, "columns": [], "names": []
+        "scope": "screener:vrp_scanner", "saved": False, "columns": [], "names": []
     }  # fmt: skip
     assert body["data"]["missing"] is None
 

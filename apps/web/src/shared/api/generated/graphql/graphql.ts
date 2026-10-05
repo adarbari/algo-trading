@@ -188,6 +188,13 @@ export type QualityChecksQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type QualityChecksQuery = { quality: { session: string, runId: string | null, status: string | null, finishedAt: string | null, checks: Array<{ name: string, status: string, detail: string }>, unknown: { code: UnknownCode, detail: string } | null } | null };
 
+export type InstrumentScreenerHitsQueryVariables = Exact<{
+  key: string;
+}>;
+
+
+export type InstrumentScreenerHitsQuery = { session: { date: string } | null, instrument: { instrumentId: string, symbol: string, screenerHits: Array<{ screener: { id: string, name: string }, result: { rank: number, decision: string, score: number | null, reasons: string, flags: Array<string>, change: string | null } }> } | null };
+
 export type ScreenerConfigsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -212,10 +219,32 @@ export type ScreenVersionsQueryVariables = Exact<{
 
 export type ScreenVersionsQuery = { screenVersions: Array<{ version: number, document: unknown }> };
 
+export type ScreenerResultsQueryVariables = Exact<{
+  id: string;
+  decisions?: Array<string> | string | null | undefined;
+  change?: string | null | undefined;
+  q?: string | null | undefined;
+  sort?: string | null | undefined;
+  columns?: Array<string> | string | null | undefined;
+  page?: number | null | undefined;
+  size?: number | null | undefined;
+}>;
+
+
+export type ScreenerResultsQuery = { session: { date: string, missing: Array<string> } | null, screener: { id: string, name: string, criteria: Array<{ id: string, field: string, mode: string }>, displayColumns: Array<{ name: string, field: string }>, notRun: { code: UnknownCode, detail: string } | null, latestRun: { runId: string, session: string, previousSession: string | null, decisions: Array<{ decision: string, count: number }>, changes: Array<{ change: string, count: number }>, results: { sort: string, total: number, page: number, size: number, missing: Array<string>, rows: Array<Array<unknown>>, unknown: Array<Array<UnknownCode | null>>, columns: Array<{ name: string, description: string, format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string, licence: string, scope: string }>, results: Array<{ instrumentId: string, rank: number, decision: string, score: number | null, reasons: string, flags: Array<string>, change: string | null, previousDecision: string | null, instrument: { instrumentId: string, symbol: string, name: string } | null, criteria: Array<{ id: string, field: string, mode: string, outcome: string, value: unknown, distance: number | null }>, columns: Array<{ name: string, value: unknown }> }> } } | null } | null };
+
 export type VerificationQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type VerificationQuery = { verification: { session: string, runIds: Array<string>, instruments: number, counts: unknown, failing: Array<unknown>, byCheck: Array<{ check: string, counts: unknown }>, unknown: { code: UnknownCode, detail: string } | null } | null };
+
+export type TableViewQueryVariables = Exact<{
+  scope: string;
+  name?: string | null | undefined;
+}>;
+
+
+export type TableViewQuery = { view: { scope: string, name: string | null, saved: boolean, columns: Array<string>, sort: string | null, decisions: Array<string>, names: Array<string> } | null };
 
 export class TypedDocumentString<TResult, TVariables>
   extends String
@@ -746,6 +775,31 @@ export const QualityChecksDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<QualityChecksQuery, QualityChecksQueryVariables>;
+export const InstrumentScreenerHitsDocument = new TypedDocumentString(`
+    query InstrumentScreenerHits($key: String!) {
+  session {
+    date
+  }
+  instrument(key: $key) {
+    instrumentId
+    symbol
+    screenerHits {
+      screener {
+        id
+        name
+      }
+      result {
+        rank
+        decision
+        score
+        reasons
+        flags
+        change
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<InstrumentScreenerHitsQuery, InstrumentScreenerHitsQueryVariables>;
 export const ScreenerConfigsDocument = new TypedDocumentString(`
     query ScreenerConfigs {
   configs(kind: "screener") {
@@ -801,6 +855,98 @@ export const ScreenVersionsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ScreenVersionsQuery, ScreenVersionsQueryVariables>;
+export const ScreenerResultsDocument = new TypedDocumentString(`
+    query ScreenerResults($id: String!, $decisions: [String!], $change: String, $q: String, $sort: String, $columns: [FeatureName!], $page: Int, $size: Int) {
+  session {
+    date
+    missing
+  }
+  screener(id: $id) {
+    id
+    name
+    criteria {
+      id
+      field
+      mode
+    }
+    displayColumns {
+      name
+      field
+    }
+    notRun {
+      code
+      detail
+    }
+    latestRun {
+      runId
+      session
+      previousSession
+      decisions {
+        decision
+        count
+      }
+      changes {
+        change
+        count
+      }
+      results(
+        decisions: $decisions
+        change: $change
+        q: $q
+        sort: $sort
+        columns: $columns
+        page: $page
+        size: $size
+      ) {
+        sort
+        total
+        page
+        size
+        missing
+        columns {
+          name
+          description
+          format
+          unit
+          dtype
+          nullMeaning
+          licence
+          scope
+        }
+        rows
+        unknown
+        results {
+          instrumentId
+          rank
+          decision
+          score
+          reasons
+          flags
+          change
+          previousDecision
+          instrument {
+            instrumentId
+            symbol
+            name
+          }
+          criteria {
+            id
+            field
+            mode
+            outcome
+            value
+            distance
+          }
+          columns {
+            name
+            value
+          }
+        }
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<ScreenerResultsQuery, ScreenerResultsQueryVariables>;
 export const VerificationDocument = new TypedDocumentString(`
     query Verification {
   verification {
@@ -820,3 +966,16 @@ export const VerificationDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<VerificationQuery, VerificationQueryVariables>;
+export const TableViewDocument = new TypedDocumentString(`
+    query TableView($scope: String!, $name: String) {
+  view(scope: $scope, name: $name) {
+    scope
+    name
+    saved
+    columns
+    sort
+    decisions
+    names
+  }
+}
+    `) as unknown as TypedDocumentString<TableViewQuery, TableViewQueryVariables>;

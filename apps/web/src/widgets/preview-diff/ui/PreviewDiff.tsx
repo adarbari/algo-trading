@@ -1,56 +1,37 @@
 /**
- * What the unsaved criteria would change: the live preview's picks against the saved run's, as
- * "+N enter" and "-N leave" with the tickers. Shown only while the Builder holds unsaved changes
- * and the screener has a saved run to compare with. The preview lists its top rows only, so a
- * longer list of picks is compared by what it shows.
+ * What the unsaved criteria would change: the live preview's picks against the screener's saved
+ * run of the same session, as "+N enter" and "-N leave" with the tickers. The server compares
+ * them over every row (the preview's `changes`); this only says it. Shown only while the
+ * Builder holds unsaved changes and the screener has a saved run for the preview's session.
  */
 import { Banner, Button } from '@algotrade/ui';
 import { useEffect } from 'react';
 
 import { useScreenerBuilder } from '@/features/screener-builder';
-import {
-  DEFAULT_DECISIONS,
-  previewChanges,
-  useScreenTable,
-  type PickedRow,
-} from '@/entities/screen';
 
 export interface PreviewDiffProps {
-  /** The screener whose saved run is the baseline. */
-  id: string;
   /** Review the criteria (shown when the diff is outside the editor). */
   onReview?: () => void;
 }
 
 const names = (symbols: readonly string[]) => symbols.join(', ');
 
-/**
- * The changes the unsaved criteria would make against the saved run, with the sessions compared
- * (null: nothing unsaved, no saved run to compare with, or no preview yet).
- */
-export function usePreviewChanges(id: string) {
+/** The changes the unsaved criteria would make (null: nothing unsaved, or nothing to compare). */
+export function usePreviewChanges() {
   const builder = useScreenerBuilder();
-  const saved = useScreenTable(id, { decisions: DEFAULT_DECISIONS, columns: [] });
-  const preview = builder.preview.data;
-  if (!builder.dirty || !saved.data || !preview) return null;
-  const savedPicks: PickedRow[] = saved.data.page.items;
-  return {
-    ...previewChanges(savedPicks, preview.rows),
-    previewSession: preview.session,
-    savedSession: saved.data.session,
-  };
+  const changes = builder.preview.data?.changes;
+  if (!builder.dirty || !changes) return null;
+  return changes;
 }
 
 /** Tells the page which saved picks the unsaved criteria would drop (for the results grid). */
 export function PreviewChangesReporter({
-  id,
   onChange,
 }: {
-  id: string;
   onChange: (leaving: ReadonlySet<string>) => void;
 }) {
-  const changes = usePreviewChanges(id);
-  const leaving = changes?.exit.join(',') ?? '';
+  const changes = usePreviewChanges();
+  const leaving = changes?.left.join(',') ?? '';
   useEffect(() => {
     onChange(new Set(leaving === '' ? [] : leaving.split(',')));
     return () => {
@@ -60,21 +41,21 @@ export function PreviewChangesReporter({
   return null;
 }
 
-export function PreviewDiff({ id, onReview }: PreviewDiffProps) {
-  const changes = usePreviewChanges(id);
+export function PreviewDiff({ onReview }: PreviewDiffProps) {
+  const changes = usePreviewChanges();
   if (!changes) return null;
-  const { enter, exit } = changes;
+  const { entered, left } = changes;
   const message =
-    enter.length === 0 && exit.length === 0
+    entered.length === 0 && left.length === 0
       ? 'The same tickers are picked.'
       : [
-          `+${String(enter.length)} enter${enter.length > 0 ? `: ${names(enter)}` : ''}.`,
-          `-${String(exit.length)} leave${exit.length > 0 ? `: ${names(exit)}` : ''}.`,
+          `+${String(entered.length)} enter${entered.length > 0 ? `: ${names(entered)}` : ''}.`,
+          `-${String(left.length)} leave${left.length > 0 ? `: ${names(left)}` : ''}.`,
         ].join(' ');
   return (
     <Banner
       tone="info"
-      title={`Unsaved changes: preview on ${changes.previewSession}, against the saved run of ${changes.savedSession}`}
+      title={`Unsaved changes: preview against the saved run of ${changes.session}`}
       actions={
         onReview ? (
           <Button size="sm" onClick={onReview}>

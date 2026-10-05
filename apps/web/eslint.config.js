@@ -6,6 +6,7 @@
  *                    in shared/api, which libraries each layer may use; lightweight-charts only
  *                    in design-system/components/Chart
  *   columns.js       read model WEB 4: table columns only from the column factories
+ *   views.js         read model WEB 7: a table's saved view only through features/table-view
  * Every message names its rule, docs/ui/architecture.md and the skill that explains the fix.
  */
 import { base } from './lint-rules/base.js';
@@ -16,6 +17,7 @@ import {
   chartRestrictions,
   designSystemRestrictions,
 } from './lint-rules/restrictions.js';
+import { viewAdapter } from './lint-rules/views.js';
 
 export default [
   {
@@ -35,4 +37,5 @@ export default [
   designSystemRestrictions,
   chartRestrictions,
   columnFactories,
+  viewAdapter,
 ];

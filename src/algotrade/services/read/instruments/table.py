@@ -148,7 +148,11 @@ def _kept(frame: pd.DataFrame, f: UniverseFilter) -> "pd.Series[bool]":
         if wanted is not None:
             keep &= frame[field].astype("boolean").eq(wanted).fillna(False)
     if f.q:
-        text = frame[_SYMBOL].astype("string") + " " + frame[_NAME].astype("string")
+        text = (
+            frame[_SYMBOL].astype("string").fillna("")
+            + " "
+            + frame[_NAME].astype("string").fillna("")
+        )
         keep &= text.str.contains(f.q.strip(), case=False, regex=False).fillna(False)
     return keep
 
@@ -167,6 +171,26 @@ def _catalogue_key(ctx: ReadContext) -> str:
 
 def _company(name: str) -> bool:
     return not is_feature_field(name) and field_source(name)[0] == COMPANY_TABLE
+
+
+def catalogue_values(
+    ctx: ReadContext, fields: Sequence[str], instrument_ids: Sequence[str] | None
+) -> tuple[pd.DataFrame, tuple[str, ...]]:
+    """``fields`` (catalogue names) for ``instrument_ids`` (None: the reference snapshot) for
+    the session, one row per instrument indexed by id, and the tables with nothing for it (a
+    field its table does not store, or a table with no partition, reads as null; a company
+    snapshot taken after the session is not known on it). What a table's filters and sort
+    read over its whole population (the screen results' too)."""
+    view = field_view(
+        ctx.reader, ctx.session.date, list(fields), instrument_ids, features=ctx.features
+    )
+    frame = view.frame.drop_duplicates("instrument_id").set_index("instrument_id")
+    frame = frame.reindex(columns=list(fields))
+    missing = list(view.missing)
+    if view.company_pre_snapshot:  # taken after the session: not known on it (no lookahead)
+        frame[[n for n in fields if _company(n)]] = None
+        missing.append(COMPANY_TABLE)
+    return frame, tuple(sorted(set(missing)))
 
 
 def _ordered(
@@ -195,20 +219,7 @@ def _ordered(
     column = None if sort is None else sort.removeprefix("-")
     field = _SYMBOL if column == SYMBOL else column
     fields = _fields(f, field)
-    view = field_view(
-        ctx.reader,
-        ctx.session.date,
-        fields,
-        population.ids if keyed else None,
-        features=ctx.features,
-    )
-    # A field its table does not store (or a table with no partition) reads as null.
-    frame = view.frame.drop_duplicates("instrument_id").set_index("instrument_id")
-    frame = frame.reindex(columns=fields)
-    missing = list(view.missing)
-    if view.company_pre_snapshot:  # taken after the session: not known on it (no lookahead)
-        frame[[n for n in fields if _company(n)]] = None
-        missing.append(COMPANY_TABLE)
+    frame, missing = catalogue_values(ctx, fields, population.ids if keyed else None)
     # Population order, only instruments the reference snapshot has (who they are).
     frame = frame.reindex([i for i in population.ids if i in frame.index])
     frame = frame[_kept(frame, f)]
@@ -221,7 +232,7 @@ def _ordered(
             na_position="last",
             kind="stable",
         )
-    found = _Order(tuple(str(i) for i in frame.index), tuple(sorted(set(missing))))
+    found = _Order(tuple(str(i) for i in frame.index), missing)
     ctx.cache.put(key, found)
     return found
 

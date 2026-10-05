@@ -5,7 +5,7 @@ session), [ADR 0037](../adr/0037-domain-read-model-served-by-graphql.md) (a doma
 served by GraphQL) and [ADR 0038](../adr/0038-catalogue-named-values.md) (catalogue-named
 values). Skills: `.claude/skills/add-domain-object`, `.claude/skills/add-graphql-field`.
 
-**What exists now (read-model PRs 1-7, 9, 10a).** The decisions, this spec, the packages
+**What exists now (read-model PRs 1-9, 10a).** The decisions, this spec, the packages
 `src/algotrade/services/read/{,instruments,screens,ops}` and
 `apps/api/algotrade_api/graphql/{,types}` (declared in `architecture/layout.toml`, guarded by
 two import-linter contracts), the ownership entries, the REST GET allow-list
@@ -59,7 +59,29 @@ picker); the Explore ticker table (one page per request) and compare (the chart 
 `ComparePrices` request, the side-by-side values a client-sorted feature table of the compare
 set) on them; WEB 4 on; `explore/{universe,compare}.py`, `/explore/*` and `/universe` deleted
 (the admin review lists moved to `explore/review.py` and `/admin/review/*` until PR 10, which
-owns admin); one `decisions.ts` (labels, tones, `OUTCOME_FILL`) in `entities/screen`. **PR 10a
+owns admin); one `decisions.ts` (labels, tones, `OUTCOME_FILL`) in `entities/screen`. **PR 8
+moved the screener results, the preview's rows and the views**: `Query.screener(id)` with
+`Screener.{criteria,displayColumns}` and `ScreenerRun.{previousSession,changes,audit,
+results(decisions, change, q, sort, columns, page, size)}` over `read/screens/results.py`
+(`load_result_page`: `explore/screens/table.py`'s filter / sort / page, moved; the catalogue
+columns the reader adds come columnar as a `FeatureTable`'s; `load_run_changes` against
+`runs.load_previous_run`, the screener's run in the previous stored session, named through
+`context.previous_session` / `at_session`); `ScreenResult.{change,previousDecision}`;
+`Instrument.screenerHits` (`read/screens/hits.py`, dataloader `screener_hits`); the one
+display-column predicate `storage/tables/schemas.is_display_column` (writer and readers) and,
+on the web, `isShownCriterion` (`entities/screen`); `TableView` scopes generalised to
+`views.<scope>` (`screener:<id>`) in `preferences.toml` (`services/authoring/preferences.py`
+moves a view saved under `screeners.<id>` on the user's next preferences write; the read side
+reads both until then), written by `PUT` / `DELETE /preferences/views/{scope}/view` and read
+only through `features/table-view` (`useTableView(scope)`, `ViewControls`; WEB 7); the
+`widgets/feature-table` renders all four tables (`FeatureTable`, `ScreenerResults`,
+`PreviewResults` on one `TableFrame`; `widgets/{screener-results,preview-results}` deleted) with
+the new factories `screenColumn`, `reasonsColumn` (and `decisionColumn(leaving)`,
+`scoreColumn(labelOf)`); `POST /screeners/preview` stays REST but its rows carry the
+instrument's name, its draft's `criteria` / `display_columns` and `changes` against the saved
+run of the session (`entered` / `left`, decided on the server: the NOT_PICKED entry is on);
+`explore/screens/*`, `/screens`, `/screens/{id}/{results,table}` and the view GET are deleted;
+the `_float/_text/_num` rule is on. **PR 10a
 moved Admin**: `read/ops/{runs,quality,ingestion,review}.py` (`NightlyRun`, `RunDetail`,
 `RunItem`; the session's `QualityReport` and `Verification`; `Completeness` and `CellDetail`;
 `ReviewList`), `types/ops/{run,quality,ingestion,review}.py`, `Query.{nightlyRuns,run,runItems,
@@ -141,11 +163,12 @@ Owner folder `src/algotrade/services/read/` (ownership `domain-read-model`). Eve
 | Holdings | (`fundId`, `asOf`) | `asOf, source, total, items[{rank, name, symbol, instrumentId, weight, assetClass, instrument?}]` | `holdings/etf` | `read/instruments/holdings.py` (PR 6) | `explore/funds/holdings` |
 | PriceSeries / FeatureSeries | (`instrumentId`, range) | `adjustment, start, end, bars[{session, open, high, low, close, volume, vwap}]`; `names, start, end, points[{session, values}]` | `bars/1d` + actions; rollups | `read/instruments/{prices,series}.py` (PR 6) | `instrument_bars`, `instrument_features`, `compare_prices` (PR 7: the compare set's `table(keys) { instruments { prices } }`) |
 | FeatureTable | (query) | `session, universeSnapshot, preSnapshot, columns: [FeatureInfo], instruments: [Instrument], rows: [[JSON]], unknown: [[UnknownCode]], sort, total, page, size, missing` (columnar; `missing`: tables the filters and sort read with nothing for the session, incl. a company snapshot taken after it; the nightly tables: `session.missing`) | FeatureValues + identity, `universe` snapshot | `read/instruments/table.py` (PR 7) | `universe.ticker_table`, `universe_page`, `compare_features` |
-| Screener | (`owner`, `configId`) | `id, owner, scope, name, version, hash, latestRun, notRun` (PR 5; `criteria, displayColumns, runs` with PR 8/9). One per id: the user's own finalised config, else the site preset; rule screens only | configs, run records | `read/screens/screeners.py` | `results.screen_configs`, ranking's `_screeners` |
-| ScreenerRun | `runId` | `runId, configId, owner, session, status, knowledgeTs, configVersion, decisions, picked` (PR 5; `changes, previousSession, audit, results(...)` with PR 8) | `results/rule_screen` exact session | `read/screens/runs.py` (`load_latest_runs` / `latest_run`: THE rule) | `results.run_rows`, `ranking._latest_runs`, `table._previous` |
-| ScreenResult | (`runId`, `instrumentId`) | `rank, instrument, decision, score, tieBreak, reasons, flags, criteria, columns` (PR 5; `change, previousDecision` with PR 8) | `results/rule_screen*` | `read/screens/results.py` | `table.ScreenTableRow`, `ranking.Pick` |
+| Screener | (`owner`, `configId`) | `id, owner, scope, name, version, hash, criteria, displayColumns, latestRun, notRun` (PR 5; `criteria, displayColumns` PR 8). One per id: the user's own finalised config, else the site preset; rule screens only | configs, run records | `read/screens/screeners.py` | `results.screen_configs`, ranking's `_screeners` (both deleted) |
+| ScreenerRun | `runId` | `runId, configId, owner, session, status, knowledgeTs, configVersion, decisions, picked, audit` (PR 5; `audit`, `changes, previousSession, results(...)` PR 8) | `results/rule_screen` exact session; the previous run in the previous stored session | `read/screens/runs.py` (`load_latest_runs` / `latest_run`: THE rule; `load_previous_run`) | `results.run_rows`, `ranking._latest_runs`, `table._previous` (deleted) |
+| ScreenResult | (`runId`, `instrumentId`) | `rank, instrument, decision, score, tieBreak, reasons, flags, criteria, columns, change, previousDecision` (PR 5; `change, previousDecision` PR 8: null when not compared, e.g. Ideas); a page of them: `ScreenResultPage` (`load_result_page`) | `results/rule_screen*` | `read/screens/results.py` | `table.ScreenTableRow`, `ranking.Pick` (deleted) |
+| ScreenerHit | (`instrumentId`, screener) | `screener, result` (the user's screeners that picked it in the session) | as ScreenerRun + ScreenResult | `read/screens/hits.py` (PR 8) | the Explore "Screener hits" placeholder |
 | Ideas / Idea | (`user`, `session`) | `session, priority, screeners[{screener, run?, notRun?, picked, top}], total, items[{rank, instrumentId, instrument, picks}]` | ScreenerRun + ScreenResult | `read/screens/ideas.py` | `ideas/ranking.py` (deleted in PR 5) |
-| TableView | (`user`, `scope`, `name?`) | `columns, sort, decisions, names` | `preferences.toml` | `read/screens/views.py` | `explore/screens/view.py` |
+| TableView | (`user`, `scope`, `name?`) | `columns, sort, decisions, names`; `scope` `screener:<id>` (PR 8: `views.<scope>`) | `preferences.toml` | `read/screens/views.py` | `explore/screens/view.py` (deleted) |
 | Backtest, BacktestDetail | `runId` | `configId, user, status, start, end, startedAt, finishedAt, metrics`; detail: `configHash, selection, data, rebalances, equity[], fills[]` | run records; the run's own `results/backtest_{equity,fills}` partition as of the run (`context.run_partition`) | `read/ops/backtests.py` (PR 9) | `explore/backtests.py` (deleted) |
 | Config | (`scope`, `configId`) | `kind, impl, selection, hash, error` | configs | `read/ops/configs.py` (PR 9) | `explore/configs.py` (deleted) |
 | ScreenListing, ScreenDetail, ScreenVersion | (`user`, `screenerId`) | `status, latest, hasDraft, presetId`; `draft, draftError, versions, preset{presetId, pinned, current, rebaseAvailable}, hash, layers, resolved, error, working`; `version, document` | the user's drafts and versions (`ConfigStore`) | `read/screens/documents.py` (PR 9) | `services/authoring/screens.{screen_detail,list_screens,screen_versions}` |
@@ -264,7 +287,7 @@ generic read (R1 unchanged); what goes is each consumer deciding which partition
   keyed `(owner, config_id)`, `holdings` keyed `(fund_id, top)`; PR 6 adds `chains`
   (`instrument_id`), `quotes` (`(underlying_id, expiry)`), `prices`
   (`(instrument_id, start, end, adjustment)`) and `series` (`(instrument_id, names, start,
-  end)`). A type resolves a child object
+  end)`); PR 8 `screener_hits` (`instrument_id`). A type resolves a child object
   only through a dataloader. Tables (`FeatureTable`, run results, Ideas) are built by
   whole-population loaders, never per row.
 - **Feature values**: `features(names: [FeatureName!]!): [FeatureValue!]!` with
@@ -331,6 +354,21 @@ generic read (R1 unchanged); what goes is each consumer deciding which partition
     their stored values.
   - `Query.view(scope, name)` takes no `date` (preferences, not session data). Codegen maps the
     `DateTime` scalar to `string`.
+- **Settled in PR 8** (do not re-decide):
+  - A run's review table is `Query.screener(id) { latestRun { results(...) } }`: its run for
+    exactly the session (NOT_RUN otherwise: no older run). `change` compares it with the same
+    owner's run in the previous stored session of `results/rule_screen` (the table's previous
+    partition, as before), by the same latest-run rule; none: nothing is new or dropped.
+  - Sort keys are the factories' column ids: `rank`, `score`, `symbol`, `decision`, `change`,
+    `criterion:<id>`, `column:<name>` (a display column) or a catalogue name; missing values
+    last, ties in rank order. The search `q` matches the symbol or name (a missing name no
+    longer hides a row: the Explore table too).
+  - A table view's scope is `<kind>:<id>`; the only kind is `screener` (its results). The web
+    saves the table's default sort as none.
+  - The preview stays a REST POST; it is shaped as the review table (each row's instrument
+    name; the draft's `criteria` and `display_columns`) and carries `changes` against the
+    screener's saved run of the preview's session (the user's view of the screener: their
+    own config, else the preset's site run), over every row rather than the rows shown.
 - **Web**: `@graphql-codegen/cli` client preset (`apps/web/codegen.ts`, documents
   `src/**/*.{ts,tsx}`, `fragmentMasking: true`) over TanStack Query; the one transport is
   `gql(document, variables)` in `src/shared/api/graphql.ts`; query keys
@@ -384,9 +422,9 @@ browser clock outside `src/shared/lib/date/`, and building `EQ:` ids. The others
 | days to earnings, DTE, earnings before expiry | `rollup.earnings@v1.days_to_earnings`, `rollup.nearest_expiry@v1.dte`, `feature.earnings_before_expiry`, `OptionChain.expiries[].days` | **on** (PR 6: `daysBetween(`) |
 | "today" / `new Date()` against stored dates | `session.date` from the response | **on** (`new Date()`; `todayIso()` since PR 6: the features panel's history ends at the values' session) |
 | per-screener counts, top-N from a page (`summarise`) | `Ideas.screeners[].picked` / `.top`, `ScreenerRun.decisions` | **on** (PR 5) |
-| picked / not picked from a decision string | `ScreenResult.change` | PR 8 |
+| picked / not picked from a decision string | `ScreenResult.change`, the preview's `changes` | **on** (PR 8: `NOT_PICKED`) |
 | symbol from an instrument id, or the reverse | `Instrument.symbol` | now |
-| new / dropped between runs | `ScreenResult.change` | PR 8 |
+| new / dropped between runs | `ScreenResult.change` | **on** (PR 8: the server decides; with the entry above) |
 | the universe size via a `size=1` page | `FeatureTable.total` | **on** (PR 7: `useUniverseSize`) |
 | a value's format from the feature's name | `FeatureInfo.format` | **on** by construction (PR 7: `featureColumn(info)` formats from `info.format`; WEB 4 keeps columns in the factories) |
 
@@ -408,14 +446,18 @@ A widget is a `ColumnPlan` (an ordered list of factory calls), never a `DataTabl
 literal (ESLint `algotrade/column-factories`, `apps/web/lint-rules/columns.js`). The rows are
 `TableRow`s (an instrument, its cells by catalogue name, and a result's typed fields); the
 widget sorts on the server (`sortMode="server"`: one page per request, the design system's
-`DataTable` only reports the sort) or in the table (`"client"`: a few keyed rows). Decision
+`DataTable` only reports the sort) or in the table (`"client"`: a few keyed rows; the preview).
+The widget renders all four tables: the Explore tickers and compare (`FeatureTable`), a
+screener's results (`ScreenerResults`) and the Builder's preview (`PreviewResults`). Decision
 labels, tones and the outcome tint (`OUTCOME_FILL`) live once in `entities/screen`
 (`model/decisions.ts`); `entities/idea` imports them. Settled in PR 7: tables whose rows are not
 instruments x catalogue features (an option chain's quotes, events, holdings, one instrument's
 feature list, screeners, admin run records and checks) keep typed structure columns and are
 listed, with the reason, in `columns.js`'s `STRUCTURE`; the instrument tables not migrated yet
-are in its shrink-only `PENDING` (screener results and preview: PR 8; top ideas: PR 5). View
-preferences go through one adapter, `features/table-view` (`useTableView(scope)`, PR 8).
+are in its shrink-only `PENDING` (PR 8 removed screener results and preview; top ideas remains:
+its earnings, expiry and display-value cells are Ideas-specific presentation, so moving it is
+its own change). View preferences go through one adapter, `features/table-view`
+(`useTableView(scope)`, PR 8; WEB 7).
 
 ## Enforcement
 
@@ -428,16 +470,16 @@ preferences go through one adapter, `features/table-view` (`useTableView(scope)`
 | READ 5 | No new REST GET for stored data | `architecture/rest_allowlist.toml` + two tests | **on** |
 | READ 6 | Schema snapshot fresh | `tests/apps/api/graphql/test_schema.py::test_committed_schema_is_up_to_date` | **on** |
 | READ 7 | Every GraphQL object mirrors a read dataclass | `test_types_mirror_read_model` | **on**; it is why `scripts/check_dupes.py` skips `graphql/types/` (ADR 0037: the mirror is by design) |
-| READ 8 | One scalar coercion | ownership `scalar-coercion` (`to_value`, `to_scalar`) | **on** for new callers; the `_float/_text/_num` re-implementation rule in PR 8 |
+| READ 8 | One scalar coercion | ownership `scalar-coercion` (`to_value`, `to_scalar`, `call_regex = "^_(float\|text\|num)$"`) | **on** (the re-implementation rule since PR 8, with `allowed` vendor parsers, text formatters and the option-liquidity arithmetic) |
 | READ 9 | Per-instrument stored values are catalogue features | `test_no_typed_feature_fields` (GraphQL types) + `test_no_typed_catalogue_fields_in_api_schemas` (REST) | **on** |
 | READ 10 | A fact computed in a read is a feature first | ownership `domain-read-model` (`rollups/instrument/` literals); `chain_expiries` rule | **on** (literals; `chain_expiries` since PR 5) |
 | WEB 1 | Only `shared/api` talks HTTP; no Apollo / urql / graphql-request | ESLint `HTTP_LIBRARIES` | **on** |
 | WEB 2 | GraphQL documents only through the generated `graphql()` tag | ESLint ban of `graphql-tag` / `graphql` outside `shared/api/generated/graphql` | **on** |
 | WEB 3 | No browser-derived facts | `web_forbidden_derivations.toml` | **on** (clean patterns); the rest per the table above |
-| WEB 4 | Column defs only from the factories | ESLint `algotrade/column-factories` on `DataTableColumn` outside `entities/feature/model/columns.tsx` (`apps/web/lint-rules/columns.js`) | **on** (PR 7); `PENDING` (shrink-only) lists screener results and preview (PR 8) and top ideas (PR 5) |
+| WEB 4 | Column defs only from the factories | ESLint `algotrade/column-factories` on `DataTableColumn` outside `entities/feature/model/columns.tsx` (`apps/web/lint-rules/columns.js`) | **on** (PR 7); `PENDING` (shrink-only) lists top ideas only since PR 8 |
 | WEB 5 | Feature names typed | ESLint on `rollup.` / `feature.` / `instrument.` literals outside `feature('<name>')` (tests and stories exempt) | **on** |
 | WEB 6 | Generated files fresh | `npm run generated:check` (`schema.ts`, `generated/graphql/**`); `catalogue.ts` by `tests/scripts/test_export_catalogue.py` | **on** |
-| WEB 7 | One view-prefs adapter | ESLint on `/preferences/` outside `features/table-view/api` | PR 8 |
+| WEB 7 | One view-prefs adapter | ESLint `algotrade-views/view-adapter` on a `/preferences/` literal outside `features/table-view/api` (`apps/web/lint-rules/views.js`; `features/ideas-priority/api` allowed: the Ideas priority is not a table view) | **on** (PR 8) |
 
 ### Ownership during the migration
 
@@ -456,12 +498,12 @@ pass. How each entry holds today:
   `explore/ideas/ranking.py`): only `data/` and the producing feature group call it.
 - **`scalar-coercion`**: `to_value` / `to_scalar` call rules on; owner `services/read/values.py`
   (`to_scalar`); `services/views.py` is `allowed` (it imports it back as `to_value`), as are
-  today's callers of the one coercion (explore, screening exports, selection). The
-  `call_regex = "^_(float|text|num)$"` re-implementation rule is **deferred to PR 8**: it hits
-  `ranking._float/_text` (deleted in PR 5), `screens/table._text` (deleted in PR 8) and
-  screening's `exports._text` / `rule_results._num` (switched to `to_scalar` in PR 8); PR 8
-  adds it with `allowed` entries for the vendor payload parsers in `libs/sources` and the
-  nightly email renderer, which parse or format text rather than coerce stored values.
+  today's callers of the one coercion (explore, screening exports and `rule_results`,
+  selection). The `call_regex = "^_(float|text|num)$"` re-implementation rule is **on since
+  PR 8** (`screens/table._text` deleted; `rule_results._num` reads through `to_value`), with
+  `allowed` entries for the vendor payload parsers in `libs/sources`, the nightly email
+  renderer and timing lines, the config writer's TOML float and the option-liquidity rollup's
+  arithmetic, which parse, format or compute rather than coerce stored values.
 - **`graphql-schema`**: `import strawberry` outside `apps/api/algotrade_api/graphql/*` fails now.
 - **`explore-queries`**: `target_owner = services/read/*` while moving; removed in PR 10.
 
@@ -482,7 +524,7 @@ Each PR is independently shippable with `make check` green and updates `docs/roa
 | 5 | Screens read model + Ideas | `read/screens/{screeners,runs,results,ideas,views}.py` (one `latest_run`); `types/{screener,result,ideas,view}.py`; Ideas on the `IdeasPage` query; `summarise()` and `ideas/ranking.py` deleted; `GET /ideas` off the allow-list; the two `Idea` entries out of `TYPED_FACT_FIELDS`; `chain_expiries` detect rule; PR 5 derivation entry | every value in an Ideas row is for `ideas.session.date` or says why not |
 | 6 | Explore detail pane (**done**) | `read/instruments/{events,chains,holdings,prices,series}.py`; `Instrument.{events,chain,holdings,prices,series,screenerHits,description}` (`description` came in PR 4; `screenerHits` needs PR 5's screens read model: it lands with PR 5 or PR 8); `explore/{instruments,chains,funds}` deleted; `/instruments/*`, `/chains/{id}` off the list | the detail pane is one query (per tab) |
 | 7 | FeatureTable + Explore tickers + compare (**done**) | `read/instruments/table.py` (columnar, server-paged); `Query.table`; `widgets/feature-table`, the column factories (WEB 4); ticker table and compare rebuilt; `explore/{universe,compare}.py` deleted (admin review lists to `explore/review.py` until PR 10); `/explore/*`, `/universe` off the list | one page per request (no 12-page fan-out) |
-| 8 | Screener results + preview + views | `ScreenerRun.results`; `features/table-view` (+ `views.<scope>` in `preferences.toml`); screener and preview results on `feature-table`; `explore/screens/*` deleted; `/screens*` and the view GET off the list; the `_float/_text/_num` detect rule; WEB 7 | one table widget renders all four tables |
+| 8 | Screener results + preview + views (**done**) | `ScreenerRun.results`; `features/table-view` (+ `views.<scope>` in `preferences.toml`); screener and preview results on `feature-table`; `explore/screens/*` deleted; `/screens*` and the view GET off the list; the `_float/_text/_num` detect rule; WEB 7; `Instrument.screenerHits` | one table widget renders all four tables |
 | 9 | Catalogue, distribution, backtests, configs (**done**) | `Query.{catalogue,distribution,backtests}`, screener authoring reads; `explore/{features,backtests,configs}.py` deleted; their GETs off the list | the trader workspace is fully on GraphQL |
 | 10a | Admin on GraphQL (**done**) | `read/ops/{runs,quality,ingestion,review}.py`; `types/ops/*`; the Admin entities (ingestion, run, verification, review) on GraphQL; `explore/{runs,ingestion,review}.py`, `routes/{admin,runs}.py` and their schemas deleted; every `/admin` GET off the list | Admin reads no REST |
 | 10b | The end of explore (after PR 8) | `services/explore/` deleted (`store.py` with PR 8's last callers); `explore-queries` removed; READ 2 widens to all of `src/` and `apps/`; `add-api-endpoint` loses its read steps | allow-list = writes, jobs, health, live, preview, files |
@@ -511,7 +553,8 @@ after the object graph because they need the columnar type and the factories.
   `InstrumentFacts` (the Overview), PR 5 `IdeasPage`, PR 6 the detail tabs' operations
   (`InstrumentEvents`, `InstrumentPrices`, `InstrumentHistory`, `OptionChain`, `OptionQuotes`,
   `EtfHoldings`), PR 7 `Table` (the Explore table's `FeatureTable`, sorted on an expression
-  feature), `CompareTable` and `ComparePrices`.
+  feature), `CompareTable` and `ComparePrices`, PR 8 `ScreenerResults` (a run sorted on an
+  expression feature with catalogue columns).
 - **Events are not knowledge-dated** (PR 6): `Instrument.events` reads each event's latest
   stored version by event date, so a read pinned to a past session can show an event or a
   revision stored after it. Bounding it by `knowledge_ts` / stored partition is open; until

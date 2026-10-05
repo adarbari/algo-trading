@@ -56,6 +56,12 @@ type CellDetail {
   runs: [RunDetail!]!
 }
 
+"""How many tickers of a run are `new` or `dropped`"""
+type ChangeCount {
+  change: String!
+  count: Int!
+}
+
 """Rows per status (PASS / WARN / FAIL / NA) of one check"""
 type CheckCounts {
   check: String!
@@ -349,6 +355,11 @@ type Instrument {
   `names` (catalogue features with a history: not instrument.*) per stored session of `start..end` (`end` null: the session's date)
   """
   series(names: [FeatureName!]!, start: Date!, end: Date = null): FeatureSeries!
+
+  """
+  The user's screeners that picked it in the session (each one's run for exactly the session), by screener id; empty: none did, or none ran
+  """
+  screenerHits: [ScreenerHit!]!
 }
 
 """
@@ -535,7 +546,19 @@ type Query {
   ): [Screener!]!
 
   """
-  The user's saved view of the screener `scope`'s results (the default view, or the one called `name`); null: a screener the user does not see, or nothing stored yet
+  The rule screen `id` as the user sees it (their own config, else the site preset), with its run for the session; null: no such screener, or nothing stored
+  """
+  screener(
+    id: String!
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): Screener
+
+  """
+  The user's saved view of the table `scope` (`screener:<id>`: a screener's results; the default view, or the one called `name`); null: a scope of no known kind, a screener the user does not see, or nothing stored yet
   """
   view(scope: String!, name: String = null): TableView
 
@@ -704,6 +727,19 @@ type RunStep {
   counts: JSON!
 }
 
+"""A display column of a screen: its name and catalogue field"""
+type ScreenColumn {
+  name: String!
+  field: String!
+}
+
+"""A criterion of a screen, in funnel order: the field it judges"""
+type ScreenCriterion {
+  id: String!
+  field: String!
+  mode: String!
+}
+
 """
 A screen of the user (or a preset not copied yet): the `draft` and why it would not finalise (`draftError`), its `versions`, the `preset` it is pinned to, the latest version resolved (`hash`, `layers`, `resolved`, `error`) and `working`, the rule keys the Builder edits
 """
@@ -734,7 +770,7 @@ type ScreenListing {
 }
 
 """
-One instrument's row of a screener's run; `instrument` is null when the session's reference snapshot does not have it
+One instrument's row of a screener's run; `instrument` is null when the session's reference snapshot does not have it. `change`: `new` (picked now, not by the previous run) or `dropped` (the reverse); null when the same or not compared (Ideas); `previousDecision`: the previous run's
 """
 type ScreenResult {
   runId: String!
@@ -749,6 +785,24 @@ type ScreenResult {
   flags: [String!]!
   criteria: [CriterionResult!]!
   columns: [ResultColumn!]!
+  change: String
+  previousDecision: String
+}
+
+"""
+One page of a run's rows matching the filters, in the sort order (`total`: every page). `rows[i][j]` is the catalogue column `columns[j]` for `results[i]`, null exactly when `unknown[i][j]` says why. `missing`: tables the search and sort read with nothing for the session
+"""
+type ScreenResultPage {
+  runId: String!
+  sort: String!
+  total: Int!
+  page: Int!
+  size: Int!
+  columns: [FeatureInfo!]!
+  results: [ScreenResult!]!
+  rows: [[JSON]!]!
+  unknown: [[UnknownCode]!]!
+  missing: [String!]!
 }
 
 """A finalised (immutable) version of a screen and its document"""
@@ -758,7 +812,7 @@ type ScreenVersion {
 }
 
 """
-A rule screen as the user sees it (their own config, else the site preset): `owner` is whose runs are its; `latestRun` its run for the session, else `notRun` says why (NOT_RUN)
+A rule screen as the user sees it (their own config, else the site preset): `owner` is whose runs are its; `criteria` and `displayColumns` the current config's; `latestRun` its run for the session, else `notRun` says why (NOT_RUN)
 """
 type Screener {
   id: String!
@@ -767,6 +821,8 @@ type Screener {
   name: String!
   version: Int
   hash: String!
+  criteria: [ScreenCriterion!]!
+  displayColumns: [ScreenColumn!]!
 
   """Its run for the session; null: not run for it (see `notRun`)"""
   latestRun: ScreenerRun
@@ -776,7 +832,15 @@ type Screener {
 }
 
 """
-A screener's run for the session: whose, which version ran, its run record's status, and every decision with its count over the whole run (`picked`: the tickers it picked)
+A screener that picked the instrument in the session (its run for exactly the session), and its result for it
+"""
+type ScreenerHit {
+  screener: Screener!
+  result: ScreenResult!
+}
+
+"""
+A screener's run for the session: whose, which version ran, its run record's status and `audit` (coverage, the selection's audit), and every decision with its count over the whole run (`picked`: the tickers it picked)
 """
 type ScreenerRun {
   runId: String!
@@ -788,6 +852,22 @@ type ScreenerRun {
   configVersion: Int
   decisions: [DecisionCount!]!
   picked: Int!
+  audit: JSON!
+
+  """
+  The session of the previous run it is compared with; null: none (nothing is new or dropped)
+  """
+  previousSession: Date
+
+  """
+  How many tickers are `new` / `dropped` since the previous run, over the whole run; empty: no previous run
+  """
+  changes: [ChangeCount!]!
+
+  """
+  Its rows as a review table: `decisions` (none: all; any case), `change` (`new` / `dropped`) and `q` (the symbol or name contains it) filtered, sorted by `sort` (`rank`, `score`, `symbol`, `decision`, `change`, `criterion:<id>`, `column:<name>` or a catalogue name; `-` prefix: descending; missing values last; default: rank) and paged (`page` from 1, `size` rows), with the catalogue `columns` for the page's rows
+  """
+  results(decisions: [String!] = null, change: String = null, q: String = null, sort: String = null, columns: [FeatureName!] = null, page: Int! = 1, size: Int! = 100): ScreenResultPage!
 }
 
 """One session's values, in the order of `FeatureSeries.names`"""
@@ -811,7 +891,7 @@ type Session {
 }
 
 """
-A user's saved view of a table (`scope`: a screener id); `saved` false: nothing saved, the page applies its defaults
+A user's saved view of a table (`scope`: `screener:<id>`); `saved` false: nothing saved, the page applies its defaults
 """
 type TableView {
   scope: String!

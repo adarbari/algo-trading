@@ -4,7 +4,9 @@ Configs: site presets ``alpha`` (named "Alpha") and ``beta``; ``me`` has its own
 the site's ``beta`` is not one of ``me``'s screeners) and ``gamma`` (never run on D1).
 Results on D1: ``alpha`` (site) ran twice (``r0`` then ``r1``: ``r1`` is the latest),
 ``beta`` ran for ``me`` and for ``site``; on D0 (an older session) ``gamma`` ran, which a D1
-read must never show. ``rule_screen_values`` hold ``alpha``'s criteria and a display column."""
+read must never show, and ``alpha`` ran (``r-1``: AAA REJECT, BBB and CCC QUALIFIED; the run
+D1's ``alpha`` is compared with). ``rule_screen_values`` hold ``alpha``'s criteria and a
+display column."""
 
 from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta
@@ -115,6 +117,9 @@ def backend() -> MemoryBackend:
                ("AAA", "SKIPPED", None, None)])  # fmt: skip
     write_run(w, D1, "rs", "site", "beta", [("CCC", "QUALIFIED", 99.0, None)])
     write_run(w, D0, "rg", "me", "gamma", [("CCC", "QUALIFIED", 80.0, None)])
+    write_run(w, D0, "r-1", "site", "alpha",
+              [("BBB", "QUALIFIED", 90.0, None), ("CCC", "QUALIFIED", 80.0, None),
+               ("AAA", "REJECT", 0.0, None)])  # fmt: skip
     _values(w)
     w.save_run(RunRecord("r1", "screen-alpha-site", D1, T).finish(T))
     return store
