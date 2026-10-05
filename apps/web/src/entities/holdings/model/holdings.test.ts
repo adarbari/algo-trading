@@ -40,8 +40,10 @@ describe('holdings model', () => {
 
   it('adds up the shown weights by size, and sees a short line', () => {
     expect(shownWeight(HOLDINGS)).toBeCloseTo(0.85);
-    const [first, ...rest] = HOLDINGS.items;
-    const inverse = { ...HOLDINGS, items: [{ ...first, weight: -0.9 }, ...rest.slice(0, 1)] };
+    const items = HOLDINGS.items
+      .slice(0, 2)
+      .map((item, i) => (i === 0 ? { ...item, weight: -0.9 } : item));
+    const inverse = { ...HOLDINGS, items };
     expect(shownWeight(inverse)).toBeCloseTo(1.15);
     expect([hasShort(HOLDINGS), hasShort(inverse)]).toEqual([false, true]);
     expect(shownWeight({ ...HOLDINGS, items: [] })).toBe(0);
