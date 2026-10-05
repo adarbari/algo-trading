@@ -59,6 +59,8 @@ export interface FeatureTableProps {
 }
 
 const DEFAULT_PAGE_SIZE = 100;
+/** The server answered with no table: nothing is stored yet to resolve a session from. */
+const NOTHING_STORED = 'Nothing stored yet: tickers appear after the first nightly run.';
 const count = (n: number) => n.toLocaleString('en-US');
 const sortParam = (sort: DataTableSort | null | undefined) =>
   sort ? `${sort.direction === 'desc' ? '-' : ''}${sort.columnId}` : undefined;
@@ -107,7 +109,9 @@ export function FeatureTable({
           ? [`${selected.length} selected${full ? ` (at most ${maxSelected})` : ''}`]
           : []),
       ].join(' · ')
-    : 'Loading tickers…';
+    : table.isPending
+      ? 'Loading tickers…'
+      : NOTHING_STORED;
   const goTo = (next: number) => {
     setPaging({ shape, page: next });
   };
@@ -162,7 +166,7 @@ export function FeatureTable({
             onRowActivate?.(row.symbol);
           }}
           status={table.isPending && !data ? 'loading' : 'ready'}
-          emptyMessage={emptyMessage}
+          emptyMessage={table.data === null ? NOTHING_STORED : emptyMessage}
           toolbar={
             <Stack direction="row" gap={2} align="center" wrap>
               <Text size="sm" tone="muted">

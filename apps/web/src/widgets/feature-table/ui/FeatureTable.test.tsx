@@ -147,6 +147,21 @@ describe('FeatureTable', () => {
     expect(screen.getByRole('button', { name: 'Dimension' })).toBeInTheDocument();
   });
 
+  it('says nothing is stored when the server has no table (an empty store), never loading', () => {
+    hooks.useFeatureTable.mockReturnValue(fakeQuery(null));
+    render(
+      <FeatureTable
+        label="Tickers"
+        columns={[EARN]}
+        onColumnsChange={vi.fn()}
+        sortMode="server"
+        emptyMessage="none"
+      />,
+    );
+    expect(screen.queryByText(/^Loading/)).toBeNull();
+    expect(screen.getAllByText(/Nothing stored yet/).length).toBeGreaterThan(0);
+  });
+
   it('names the tables the session is missing', () => {
     hooks.useFeatureTable.mockReturnValue(
       fakeQuery(served({ missing: ['rollups/instrument/earnings@v1'], preSnapshot: true })),
