@@ -15,7 +15,8 @@ Request keys (``FetchRequest.session_date`` is the session verified):
     option__<SYMBOL>__<YYYY-MM-DD>__<C|P>__<strike>   one option snapshot
     contracts__<SYM>+<SYM>...  IB stock contracts (conid, primary exchange), qualified together
     volhist__<SYMBOL>__<CONID>__<YYYY-MM-DD>   daily IB implied vol (30-day, of the underlying's
-                             options) and historical vol (30-day) from that date to the session
+                             options) from that date to the session (payloads saved before
+                             2026-10-05 also hold IB's 30-day historical vol; both parse)
     vols__<SYM>:<CONID>+...  the underlyings' implied and historical vol now (ticks 106, 104);
                              ``<CONID>`` may be empty (looked up)
     quotes__<SYMBOL>__<YYYY-MM-DD>__<strike>+<strike>...   quotes now (streamed) of the calls
@@ -23,6 +24,9 @@ Request keys (``FetchRequest.session_date`` is the session verified):
 
 Batch keys (``contracts``, ``vols``) can be long: tasks pass a short ``raw_key`` to
 ``IngestRun.fetch``; the payload names every symbol, so it normalises on its own.
+
+A historical request IB did not answer (timeout, pacing or connectivity error) raises the
+facade's ``TransientFetchError``; ``cool_down`` (``Throttled``) holds the historical limiter.
 """
 
 import json
@@ -69,7 +73,8 @@ def _conids(part: str) -> dict[str, int | None]:
 
 
 def _vol_history(data: dict[str, list[dict[str, Any]]]) -> pd.DataFrame:
-    """IB's two daily series -> date, iv30_ibkr, hv30_ibkr (outer join on the date)."""
+    """IB's daily series -> date, iv30_ibkr, hv30_ibkr (outer join on the date; a series the
+    payload lacks, HV since the backfill fetches the IV only, is null)."""
     frames = [
         pd.DataFrame(data.get(what, []), columns=["date", "close"])
         .rename(columns={"close": column})
@@ -111,6 +116,10 @@ class IbkrSource:
 
     def close(self) -> None:
         self.gateway.close()
+
+    def cool_down(self, seconds: float) -> None:
+        """Hold every process's historical requests for ``seconds`` (``Throttled``)."""
+        self.gateway.cool_down(seconds)
 
     # ------------------------------------------------------------------ source
 

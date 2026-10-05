@@ -164,8 +164,9 @@ class IbkrSettings:
     """``[ibkr]`` beyond ``enabled`` / ``min_interval_s`` (the IB Gateway session; host, port
     and client id come from the environment, ``config/env.py``). Pacing follows IBKR's rules:
     every message waits ``min_interval_s`` (50 messages/s), every historical-data request also
-    waits ``historical_min_interval_s`` (60 requests per 10 minutes, and >= 10 s between
-    identical requests)."""
+    waits ``historical_min_interval_s`` (>= 0; default 10 s = 60 requests per 10 minutes, the
+    rule IBKR documents for bars of 30 s or less; daily bars are soft throttled, so the owner
+    may trial a shorter gap while watching timeouts and error 162)."""
 
     historical_min_interval_s: float = 10.0
     market_data_type: int = 3  # 1 live, 3 delayed

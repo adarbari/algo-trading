@@ -343,3 +343,11 @@ whose range covers it (from its session, or its earliest row, to its latest row)
 later snapshot no longer lists was moved or cancelled. `days_to_earnings` is 0 on the report
 day and counts sessions (`core/time/calendar.py`). Sessions before the first stored snapshot
 have no row (UNKNOWN); a backfill does not invent what was not stored then.
+
+Past report dates (for `last_earnings_date` and `anchored_vwap@v1`) are backfilled into the
+latest session's snapshot, never under past sessions: `algotrade-ingest earnings --date
+<latest session> --start <past day> --days <N>` fetches past calendar days (rows with
+`reported` true) into that session's partition, where they merge with its nightly window
+(`events/*` runs merge, ADR 0007), and the snapshot's range then starts at its earliest row.
+They count from that session on; earlier sessions stay UNKNOWN. Done 2026-10-04 for
+2026-03-16..2026-10-02 into the 2026-10-02 snapshot.

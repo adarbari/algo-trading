@@ -102,6 +102,11 @@ def test_no_chain_partition_means_no_rows() -> None:
     assert result.frame is None and result.no_input
 
 
-def test_registered_with_its_params() -> None:
+def test_registered_with_a_fixed_dte_window() -> None:
+    """The window is part of v1: a module constant named in the descriptions, never a
+    ``rollups.toml`` param that could change stored values without a new version."""
     assert GROUPS["oi_walls@v1"].table == "rollups/instrument/oi_walls@v1"
-    assert (ow.GROUP.params.dte_min, ow.GROUP.params.dte_max) == (1, 60)
+    assert ow.GROUP.params is None
+    assert (ow.DTE_MIN, ow.DTE_MAX) == (1, 60)
+    assert "1..60" in ow.GROUP.description
+    assert all("1..60" in f.description for f in ow.FEATURES)

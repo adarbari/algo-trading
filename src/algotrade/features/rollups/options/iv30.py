@@ -256,18 +256,48 @@ def _as_dates(values: pd.Series) -> pd.Series:
     return pd.to_datetime(values).dt.date
 
 
+def _by_id(underlyings: pd.DataFrame, values: pd.Series) -> pd.Series:
+    """``values`` (one per row) by instrument id (str): for an id quoted twice, the row with
+    the latest ``ts`` (ties: the later row), so the result does not depend on staging order."""
+    frame = pd.DataFrame(
+        {"id": underlyings["instrument_id"].astype(str).to_numpy(), "value": values.to_numpy()}
+    )
+    if "ts" in underlyings.columns:
+        frame = frame.iloc[pd.to_datetime(underlyings["ts"]).argsort(kind="stable").to_numpy()]
+    out = frame.drop_duplicates("id", keep="last").set_index("id")["value"]
+    out.index.name = None
+    return out
+
+
+def spot_prices(underlyings: pd.DataFrame | None) -> pd.Series:
+    """The spot captured with the chain (``chains/underlying_quotes.price``) by underlying id,
+    NaN unless positive; an id quoted twice keeps its latest row. The shared spot reader of
+    ``put_wing@v1`` and ``oi_walls@v1`` (via ``positive_spots``); ``option_liquidity@v1`` still
+    reads ``price`` on its own."""
+    if underlyings is None or underlyings.empty:
+        return pd.Series(dtype=float)
+    price = pd.to_numeric(underlyings["price"], errors="coerce")
+    return _by_id(underlyings, price.where(price > 0).astype(float))
+
+
+def positive_spots(underlyings: pd.DataFrame | None) -> pd.Series:
+    """``spot_prices`` of the underlyings with a positive price only."""
+    return spot_prices(underlyings).dropna()
+
+
 def _spots(underlyings: pd.DataFrame | None) -> pd.DataFrame:
-    """``instrument_id``, ``spot`` (NaN unless positive), ``iv30_cboe`` (decimal)."""
+    """``instrument_id``, ``spot`` (``spot_prices``), ``iv30_cboe`` (decimal)."""
     if underlyings is None or underlyings.empty:
         return pd.DataFrame({"instrument_id": [], "spot": [], "iv30_cboe": []}, dtype=float)
-    price = pd.to_numeric(underlyings["price"], errors="coerce")
+    spot = spot_prices(underlyings)
+    cboe = _by_id(underlyings, pd.to_numeric(underlyings["iv30"], errors="coerce") / 100.0)
     return pd.DataFrame(
         {
-            "instrument_id": underlyings["instrument_id"].astype(str).to_numpy(),
-            "spot": price.where(price > 0).to_numpy(dtype=float),
-            "iv30_cboe": pd.to_numeric(underlyings["iv30"], errors="coerce").to_numpy() / 100.0,
+            "instrument_id": spot.index.to_numpy(),
+            "spot": spot.to_numpy(),
+            "iv30_cboe": cboe.to_numpy(),
         }
-    ).drop_duplicates("instrument_id", keep="last")
+    )
 
 
 def _yields(dividends: pd.DataFrame | None, session: date) -> pd.Series:

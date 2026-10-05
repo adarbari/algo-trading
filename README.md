@@ -185,9 +185,10 @@ says which). Everything derived from IBKR is tagged `licence = personal`. Owner 
 ```bash
 # once: contract ids for the whole optionable universe (~4.2k names, a few minutes)
 .venv/bin/algotrade-ingest run ibkr-contracts --date <last session>
-# the IV / HV history backfill: 2 requests per underlying at the historical pace (10 s each),
-# ~20 s per name, ~23 h for all ~4.2k. Resumable: re-run the same command to continue;
-# --limit N caps a run (e.g. --limit 1500 = ~8 h overnight), --symbols A,B for a few names
+# the IV history backfill: 1 request per underlying at the historical pace (10 s each),
+# most liquid first, ~12 h for all ~4.2k. Resumable: re-run the same command to continue
+# (names IB did not answer are retried); --limit N caps a run (e.g. --limit 1500 = ~4 h
+# overnight), --symbols A,B for a few names
 .venv/bin/algotrade-ingest run ibkr-iv --from <2 years ago> --to <last session> --limit 1500
 # then the features for that session
 .venv/bin/algotrade-ingest run rollups --date <last session> --only ibkr_iv@v1
@@ -195,7 +196,7 @@ says which). Everything derived from IBKR is tagged `licence = personal`. Owner 
 
 ### Long runs (ops note)
 
-Anything longer than ~2 h (the IBKR IV backfill is ~8 h per 1500 names) runs detached from
+Anything longer than ~2 h (the IBKR IV backfill is ~4 h per 1500 names) runs detached from
 the agent or terminal session, not as a tool background command (those are killed at their
 limit). A resumable run only loses the batch in flight:
 
@@ -207,7 +208,7 @@ cat var/logs/ibkr-iv.status   # appears when the run ends; tail var/logs/ibkr-iv
 ```
 
 The nightly step continues the backfill on its own, `[ibkr] iv_backfill_per_night = 100`
-names a night (~33 min), so new names fill in without a command; the email's `ibkr-iv` line
+names a night (~17 min), so new names fill in without a command; the email's `ibkr-iv` line
 shows coverage, names still pending and the estimated hours left.
 
 ## API

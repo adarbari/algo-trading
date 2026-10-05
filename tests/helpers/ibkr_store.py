@@ -6,6 +6,7 @@ from datetime import date
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
+from algotrade_sources.framework.http import Pacer
 from algotrade_sources.vendors.ibkr.gateway import GatewayConfig, IbkrMarketData
 from algotrade_sources.vendors.ibkr.market_data import IbkrSource
 from tests.helpers.fake_ib import FakeIB
@@ -29,6 +30,13 @@ def coverage_store(symbols: list[str], session: date = SESSION) -> tuple[StoreWr
     return writer, reader
 
 
-def ibkr_source(fake: FakeIB, stream_wait_s: float = 4.0) -> IbkrSource:
+def ibkr_source(
+    fake: FakeIB, stream_wait_s: float = 4.0, historical: Pacer | None = None
+) -> IbkrSource:
+    """An ``IbkrSource`` over ``fake`` (its ``clock``: scripted timeouts take time);
+    ``historical``: the historical limiter (default: none)."""
     config = GatewayConfig("127.0.0.1", 4002, 1, stream_wait_s=stream_wait_s)
-    return IbkrSource(IbkrMarketData(config, ib_factory=lambda: fake))
+    gateway = IbkrMarketData(config, ib_factory=lambda: fake, clock=fake.clock)
+    if historical is not None:
+        gateway.historical = historical
+    return IbkrSource(gateway)
