@@ -1,0 +1,129 @@
+"""Date (isoformat)"""
+scalar Date
+
+"""How a client shows a feature's value"""
+enum FeatureFormat {
+  PERCENT
+  CURRENCY
+  COMPACT
+  NUMBER
+  DATE
+  FLAG
+  CATEGORY
+  TEXT
+}
+
+"""One catalogue field: what it is and how to show it"""
+type FeatureInfo {
+  name: String!
+  kind: String!
+  source: String!
+  dtype: String!
+  format: FeatureFormat!
+  description: String!
+  nullMeaning: String!
+  version: Int
+  group: String
+  key: String
+  inputs: [String!]!
+  unit: String
+  range: [Float]
+  categories: [String!]!
+  scope: String!
+  owner: String
+  licence: String!
+}
+
+"""
+A catalogue field: instrument.<column>, rollup.<group>@v<N>.<column> or feature.<name> (docs/data/features.md)
+"""
+scalar FeatureName
+
+"""
+A catalogue field's value for one instrument and the session: `value` is null exactly when `unknown` says why; format it with `info.format`
+"""
+type FeatureValue {
+  name: String!
+  value: JSON
+  unknown: Unknown
+  info: FeatureInfo!
+}
+
+"""
+An instrument as the session's reference snapshot has it. Per-session values (prices, earnings dates, flags, ...) are catalogue features: `features(names)`
+"""
+type Instrument {
+  instrumentId: String!
+  symbol: String!
+  name: String!
+  securityType: String
+  assetClass: String!
+  exchange: String
+  isEtf: Boolean!
+  description: String
+  referenceSnapshot: Date!
+
+  """
+  The values of `names` (catalogue fields, in the order asked) for the session; a name outside the caller's catalogue is an UNKNOWN_FEATURE error
+  """
+  features(names: [FeatureName!]!): [FeatureValue!]!
+}
+
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
+"""
+scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
+
+"""Reads for the web app, each for one session (ADR 0036)"""
+type Query {
+  """The session `date` resolves to; null: nothing stored"""
+  session(
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): Session
+
+  """
+  The instrument `key` (an instrument id or a ticker) names in the session's reference snapshot; null: no such instrument
+  """
+  instrument(
+    key: String!
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): Instrument
+}
+
+"""
+The session a read serves: every value in the response is for `date` (ADR 0036). `missing` lists the nightly tables with no partition for it; identity is read from the reference snapshot `referenceSnapshot` (`preSnapshot`: one taken later).
+"""
+type Session {
+  date: Date!
+  requested: Date
+  isLatest: Boolean!
+  latestWithBars: Date
+  referenceSnapshot: Date
+  preSnapshot: Boolean!
+  present: [String!]!
+  missing: [String!]!
+}
+
+"""A value not known for the session: why, and where it looked"""
+type Unknown {
+  code: UnknownCode!
+  detail: String!
+}
+
+"""Why a value is UNKNOWN for the session"""
+enum UnknownCode {
+  NO_PARTITION
+  NO_ROW
+  NULL
+  NOT_IN_CATALOGUE
+  LICENCE
+  NOT_RUN
+  PRE_SNAPSHOT
+}

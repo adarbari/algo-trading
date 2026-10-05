@@ -9,6 +9,7 @@ from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.reference import (
     IBKR_CONTRACTS,
+    companies,
     descriptions,
     ibkr_contracts,
     instrument_terms,
@@ -91,6 +92,23 @@ def test_instruments_and_terms_follow_the_rule() -> None:
         instruments(reader, D1, as_of=T0 - timedelta(days=1))
 
 
+def test_companies_follow_the_snapshot_rule() -> None:
+    writer, reader = store()
+    company = "instruments/company"
+    assert companies(reader, D1) is None  # no company snapshot at all
+    rows = [
+        {"instrument_id": f"EQ:{s}", "symbol": s, "cik": "1", "name": f"{s} Inc", "sic": "3571",
+         "sector": "Technology", "fetched_on": D2}
+        for s in ("A", "B")
+    ]  # fmt: skip
+    writer.write_table(company, D2, "c2", stamped(rows, D2, "c2"))
+    assert companies(reader, D1, ["EQ:A"]) is None  # a later snapshot never stands in
+    found = companies(reader, D2, ["EQ:A"])
+    assert found is not None and list(found["name"]) == ["A Inc"]
+    every = companies(reader, D2 + timedelta(days=3))
+    assert every is not None and len(every) == 2
+
+
 def test_instrument_view_joins_reference_and_session_rollups() -> None:
     writer, reader = store()
     writer.write_table(REF, D1, "r1", stamped(reference({"A": "EQ:A", "B": "EQ:B"}), D1, "r1"))
@@ -108,6 +126,16 @@ def test_instrument_view_joins_reference_and_session_rollups() -> None:
     assert instrument_view(reader, D1, ["rollup.liq@v1.put_tier"]).missing == (
         "rollups/instrument/liq@v1",
     )  # a rollup is read for the session only, never stale
+
+
+def test_instrument_view_flags_a_company_snapshot_taken_after_the_session() -> None:
+    writer, reader = store()
+    writer.write_table(REF, D1, "r1", stamped(reference({"A": "EQ:A"}), D1, "r1"))
+    company = [{"instrument_id": "EQ:A", "symbol": "A", "cik": "1", "name": "A Inc",
+                "sic": "3571", "sector": "Technology", "fetched_on": D2}]  # fmt: skip
+    writer.write_table("instruments/company", D2, "c2", stamped(company, D2, "c2"))
+    assert instrument_view(reader, D1, ["instrument.sector"]).company_pre_snapshot is True
+    assert instrument_view(reader, D2, ["instrument.sector"]).company_pre_snapshot is False
 
 
 def test_instrument_view_before_the_first_snapshot_flags_survivorship() -> None:

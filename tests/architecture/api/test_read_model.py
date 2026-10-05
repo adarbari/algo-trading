@@ -1,6 +1,13 @@
-"""READ 2 (docs/api/read-model.md "Enforcement"): only the read model's session plumbing picks
-or reads a session partition. Loaders read a session-grain table through
-``context.partition(ctx, table)`` for ``ctx.session.date`` (ADR 0036 decision 6): no
+"""The read model's fitness tests (docs/api/read-model.md "Enforcement").
+
+READ 3: GraphQL resolvers are thin (one loader or dataloader call, ``.of()`` wrapping, at most
+a None guard). READ 7: every GraphQL object mirrors a read dataclass (its fields are the
+dataclass's, mapped by one ``of()``). READ 9: no GraphQL type has a field named like a
+catalogue feature (per-instrument values are read by name through ``features(names)``).
+
+READ 2: only the read model's session plumbing picks or reads a session partition. Loaders
+read a session-grain table through ``context.partition(ctx, table)`` for
+``ctx.session.date`` (ADR 0036 decision 6): no
 ``StoreReader.table`` / ``require`` / ``table_range`` (a range read goes through ``data``'s
 range functions with explicit dates), no ``dates`` / ``latest_date``, no ``snapshot``, no
 ``partition_for`` / ``latest_session`` / ``rollup_row`` / ``rollup_on`` of their own.
@@ -9,7 +16,15 @@ Scoped to ``services/read`` callers until read-model PR 10 widens it to all of `
 ``apps/`` (explore and the routes still read partitions until their area moves)."""
 
 import ast
+import dataclasses
+import importlib
+import inspect
+import pkgutil
+import typing
 
+from algotrade.features.registry import FEATURES
+from algotrade.services.features import site_features
+from algotrade_api.graphql import types as graphql_types
 from tests.conftest import REPO_ROOT
 
 READ_MODEL = REPO_ROOT / "src" / "algotrade" / "services" / "read"
@@ -59,3 +74,177 @@ def test_the_check_catches_a_loader_reading_a_partition() -> None:
     )
     assert partition_reads(loader) == [(2, "latest_date"), (3, "snapshot"), (3, "table")]
     assert partition_reads("def load(ctx):\n    return partition(ctx, 't')\n") == []
+
+
+# ---------------------------------------------------------------------------- READ 3
+GRAPHQL = REPO_ROOT / "apps" / "api" / "algotrade_api" / "graphql"
+LOADER_METHODS = {"load", "load_many"}
+
+
+def _is_field(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    for d in node.decorator_list:
+        target = d.func if isinstance(d, ast.Call) else d
+        if isinstance(target, ast.Attribute) and target.attr == "field":
+            return True
+    return False
+
+
+def _is_none_guard(test: ast.expr) -> bool:
+    if isinstance(test, ast.BoolOp):
+        return all(_is_none_guard(v) for v in test.values)
+    return (
+        isinstance(test, ast.Compare)
+        and all(isinstance(op, ast.Is | ast.IsNot) for op in test.ops)
+        and all(isinstance(c, ast.Constant) and c.value is None for c in test.comparators)
+    )
+
+
+def _is_of(node: ast.expr) -> bool:
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "of"
+    )
+
+
+def resolver_problems(source: str) -> list[str]:
+    """What makes the resolvers in ``source`` more than thin, ``"<name>: <why>"``."""
+    found = []
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) or not _is_field(node):
+            continue
+        loads = 0
+        for inner in ast.walk(node):
+            if isinstance(inner, ast.For | ast.AsyncFor | ast.While | ast.If | ast.Try | ast.With):
+                found.append(f"{node.name}: a {type(inner).__name__.lower()} statement")
+            elif isinstance(inner, ast.IfExp) and not _is_none_guard(inner.test):
+                found.append(f"{node.name}: a condition on a value (only `is None` guards)")
+            elif isinstance(inner, ast.ListComp | ast.GeneratorExp | ast.SetComp | ast.DictComp):
+                if not (isinstance(inner, ast.ListComp) and _is_of(inner.elt)):
+                    found.append(f"{node.name}: a comprehension that does more than `.of()`")
+            elif isinstance(inner, ast.Call):
+                func = inner.func
+                name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+                loads += name.startswith("load_") or name in LOADER_METHODS
+        if loads > 1:
+            found.append(
+                f"{node.name}: {loads} loader calls (one loader or dataloader per resolver)"
+            )
+    return found
+
+
+def test_resolvers_call_one_loader() -> None:
+    sources = sorted((GRAPHQL / "types").glob("*.py"))
+    hits = [
+        f"{path.relative_to(REPO_ROOT)}: {problem}"
+        for path in sources
+        for problem in resolver_problems(path.read_text())
+    ]
+    assert not hits, (
+        f"[READ 3 / ADR 0037] resolvers with logic: {hits}. A resolver reads info.context, "
+        "calls one loader (services/read) or one dataloader .load(), and wraps the result with "
+        ".of(); the logic is a loader first (.claude/skills/add-graphql-field step 3-4)"
+    )
+
+
+def test_the_resolver_check_catches_logic() -> None:
+    thick = (
+        "@strawberry.field\n"
+        "def f(self, info):\n"
+        "    rows = load_a(info.context)\n"
+        "    for r in rows:\n"
+        "        pass\n"
+        "    return [r.x for r in rows] if rows else load_b(info.context)\n"
+    )
+    assert resolver_problems(thick) == [
+        "f: a for statement",
+        "f: a condition on a value (only `is None` guards)",
+        "f: a comprehension that does more than `.of()`",
+        "f: 2 loader calls (one loader or dataloader per resolver)",
+    ]
+    thin = (
+        "@strawberry.field(description='x')\n"
+        "async def f(self, info):\n"
+        "    found = await self.ctx.loaders.x.load(1)\n"
+        "    return [X.of(v) for v in found] if found is not None else None\n"
+    )
+    assert resolver_problems(thin) == []
+
+
+# ---------------------------------------------------------------------------- READ 7 / READ 9
+def graphql_objects() -> list[type]:
+    """Every Strawberry object type declared in ``algotrade_api.graphql.types``."""
+    found = []
+    for info in pkgutil.iter_modules(graphql_types.__path__, graphql_types.__name__ + "."):
+        module = importlib.import_module(info.name)
+        for _, cls in inspect.getmembers(module, inspect.isclass):
+            definition = getattr(cls, "__strawberry_definition__", None)
+            if cls.__module__ == module.__name__ and definition is not None:
+                found.append(cls)
+    return found
+
+
+def test_types_mirror_read_model() -> None:
+    problems = []
+    objects = graphql_objects()
+    assert objects, "no GraphQL object types found"
+    for cls in objects:
+        if cls.__name__ == "Query":  # the root: fields only, each a resolver
+            assert all(f.base_resolver for f in cls.__strawberry_definition__.fields)
+            continue
+        of = cls.__dict__.get("of")
+        if not isinstance(of, classmethod):
+            problems.append(f"{cls.__name__}: no of() classmethod (the one mapping)")
+            continue
+        source = typing.get_type_hints(of.__func__).get("d")
+        if source is None or not dataclasses.is_dataclass(source):
+            problems.append(f"{cls.__name__}.of(d): d is not a services.read dataclass")
+            continue
+        if not source.__module__.startswith("algotrade.services.read."):
+            problems.append(f"{cls.__name__}.of(d): {source.__module__} is not the read model")
+        mirrored = {f.name for f in dataclasses.fields(source)}
+        for field in cls.__strawberry_definition__.fields:
+            if field.base_resolver is None and field.python_name not in mirrored:
+                problems.append(
+                    f"{cls.__name__}.{field.python_name}: not a field of {source.__name__}"
+                )
+    assert not problems, (
+        f"[READ 7 / ADR 0037] GraphQL types that do not mirror a read dataclass: {problems}. "
+        "Copy the fields from the services/read dataclass and map them in one of(); anything "
+        "else is a resolver over a loader (.claude/skills/add-graphql-field step 4)"
+    )
+
+
+def test_no_typed_feature_fields() -> None:
+    """Identity (``symbol``, ``name``, ``exchange``, ...) is typed by rule (ADR 0038); a field
+    named like a rollup column or an expression feature is a per-instrument value."""
+    catalogue = {f.name for f in FEATURES.values()} | set(site_features().expressions)
+    hits = sorted(
+        f"{cls.__name__}.{field.python_name}"
+        for cls in graphql_objects()
+        for field in cls.__strawberry_definition__.fields
+        if field.python_name in catalogue
+    )
+    assert not hits, (
+        f"[READ 9 / ADR 0038] GraphQL fields named like catalogue features: {hits}. Read "
+        "per-instrument values by name through `features(names)` (docs/api/read-model.md "
+        "'Catalogue feature or typed field'); never a typed field"
+    )
+
+
+def test_type_ignores_only_on_strawberry_field_decorators() -> None:
+    """Strawberry's ``@strawberry.field(...)`` is untyped under mypy strict even with its
+    plugin; that one ignore is allowed on that decorator in ``graphql/types/`` and nowhere
+    else in the GraphQL layer (docs/api/read-model.md "Risks and tough calls")."""
+    hits = []
+    for path in sorted(GRAPHQL.rglob("*.py")):
+        for number, line in enumerate(path.read_text().splitlines(), 1):
+            if "type: ignore" not in line:
+                continue
+            allowed = (
+                path.parent.name == "types"
+                and line.strip() == "@strawberry.field(  # type: ignore[untyped-decorator]"
+            )
+            if not allowed:
+                hits.append(f"{path.relative_to(REPO_ROOT)}:{number}")
+    assert not hits, f"type: ignore outside the strawberry.field decorators of types/: {hits}"

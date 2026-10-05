@@ -39,7 +39,10 @@ one could pick a different session (ADR 0036).
 - Two contracts and two generators (OpenAPI and SDL) until PR 10; both are snapshots with
   freshness tests, and the REST side only shrinks.
 - Type duplication (dataclass -> `@strawberry.type`) is contained by `.of()`, a fitness test
-  that a type's fields mirror its dataclass, and the SDL snapshot.
+  that a type's fields mirror its dataclass, and the SDL snapshot. GraphQL types mirror read
+  dataclasses by design, so the duplicate-code ratchet (`scripts/check_dupes.py`) skips
+  `apps/api/algotrade_api/graphql/types/`; READ 7 (`test_types_mirror_read_model`) keeps them
+  in sync.
 - Tables are columnar (`FeatureTable.rows: [[JSON]]`), not object lists: per-field resolution
   over 11k rows is too slow.
 - One endpoint returning 200 on errors is harder to debug: operation names and

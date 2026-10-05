@@ -701,7 +701,11 @@ kind = "slice"
 
 [[web_dir]]
 path = "apps/web/src/shared/api/generated"
-purpose = "the TypeScript schema generated from apps/api/openapi.json (npm run api:generate)"
+purpose = "generated API types: schema.ts from apps/api/openapi.json (npm run api:generate), catalogue.ts from the site catalogue (scripts/export_catalogue.py)"
+
+[[web_dir]]
+path = "apps/web/src/shared/api/generated/graphql"
+purpose = "the GraphQL client preset output: typed documents and the graphql() tag, from apps/api/schema.graphql (codegen.ts, npm run api:generate)"
 
 [[web_dir]]
 path = "apps/web/src/shared/lib"

@@ -8,9 +8,14 @@ import {
   unitLabel,
   type CatalogueFeature,
 } from '@/entities/feature';
+import { feature } from '@/shared/api';
 
 /** Reference facts that identify a row already (the ticker column shows them). */
-const IDENTITY = new Set(['instrument.instrument_id', 'instrument.symbol', 'instrument.name']);
+const IDENTITY = new Set<string>([
+  feature('instrument.instrument_id'),
+  feature('instrument.symbol'),
+  feature('instrument.name'),
+]);
 
 /** One option per feature not chosen yet; the description says what it is, in which unit. */
 export function featureOptions(

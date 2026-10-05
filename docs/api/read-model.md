@@ -16,12 +16,16 @@ dependency of `apps/api`. PR 2 added the session plumbing: `read/session.py`
 (`Unknown`, `UnknownCode`, `to_scalar`; `services/views.to_value` imports it) and
 `read/context.py` (`ReadContext`, `open_context`, `partition`, `ResultCache`; explore's
 `store.py` re-exports `NotFoundError` and `ResultCache`), plus READ 2 in
-`tests/architecture/api/test_read_model.py`. **No loader and no page read goes through the
-read model yet**: pages still read
-`services/explore` over REST until the PR that moves their area (the
-[migration plan](#migration-plan)). Until PR 4 lands, a new page read follows the old path
-(`services/explore` + a REST GET) **only if the owner explicitly asks**; otherwise do the next
-migration PR in order first.
+`tests/architecture/api/test_read_model.py`. **PR 4 built the pipeline on one pane**: the
+loaders `read/instruments/{identity,features,catalogue}.py` (`load_instrument`,
+`load_feature_values`, `load_catalogue` with the server-derived `format`), the GraphQL layer
+`apps/api/algotrade_api/graphql/{schema,context,scalars,errors,loaders,limits}.py` and
+`types/{query,session,instrument,feature}.py` at `POST /graphql`, the snapshot
+`apps/api/schema.graphql`, the web codegen (`apps/web/codegen.ts`, `shared/api/graphql.ts`,
+`generated/{graphql,catalogue.ts}`) and the Explore Overview on `useInstrumentFacts`; READ 3,
+6, 7, 9 and WEB 2, 5, 6 are on. Every other page still reads `services/explore` over REST until
+the PR that moves its area (the [migration plan](#migration-plan)): a new page read is a
+GraphQL field (`add-graphql-field`) in the area's migration PR.
 
 ## What is wrong today
 
@@ -77,7 +81,7 @@ Owner folder `src/algotrade/services/read/` (ownership `domain-read-model`). Eve
 | Session | `date` | `date, requested, isLatest, latestWithBars, referenceSnapshot, preSnapshot, present, missing` | `bars/1d` (latest), partition lists | `read/session.py` | `explore/store.partition_for`, `latest_session`, preview's store half, ranking's `max(...)` |
 | Instrument | `instrumentId` | `symbol, name, securityType, assetClass, exchange, isEtf, description, referenceSnapshot` | `instruments/reference`, `company`, `description` | `read/instruments/identity.py` | `explore/instruments.resolve_key`, `description_of`; the symbol lookups in results, table, ranking, preview |
 | FeatureValue | (`instrumentId`, `name`, `session`) | `name, value: JSON?, unknown?, info` | `rollups/instrument/*`, expressions, reference columns | `read/instruments/features.py` (wraps `services.features.field_view`) | the features bag, `rollup_row` in chains, `VIEW_FIELDS`, `ticker_columns`, `ranking._earnings` |
-| FeatureInfo | `name` | `kind, dtype, unit, format, description, nullMeaning, version, group, inputs, range, categories, scope, owner, licence` | registry + user `FeatureSet` | `read/instruments/catalogue.py` | `explore/features.feature_catalogue` |
+| FeatureInfo | `name` | `kind, source, dtype, format, description, nullMeaning, version, group, key, inputs, unit, range, categories, scope, owner, licence` | registry + user `FeatureSet` | `read/instruments/catalogue.py` (PR 4; explore's REST catalogue maps from it until PR 9) | `explore/features.feature_catalogue` |
 | FeatureDistribution | (`name`, `session`) | `count, nulls, quantiles, histogram, categories` | as FeatureValue | `read/instruments/catalogue.py` | `explore/features.feature_distribution` |
 | Event | (`instrumentId`, `table`, `ts`) | `kind, date, values` | `events/*` by event date | `read/instruments/events.py` | `explore/instruments.instrument_events` |
 | OptionChain | (`underlyingId`, `session`) | `status, underlying, expiries, strikes, quotes(expiry)` | `chains/*` exact session | `read/instruments/chains.py` | `explore/chains.option_chain` (minus `our_iv`: a feature) |
@@ -108,6 +112,14 @@ vocabulary. `FeatureValue.value is None` always comes with `unknown` set.
 | `LICENCE` | a `personal`-licence feature and the caller is not its owner (ADR 0028) |
 | `NOT_RUN` | a screener has no run for the session |
 | `PRE_SNAPSHOT` | identity came from a later snapshot (survivorship) |
+
+In PR 4 `features(names)` returns `NO_PARTITION`, `NO_ROW` and `NULL`. A name the caller's
+catalogue lacks is a request error (`UNKNOWN_FEATURE`, naming it) when the client asked for it;
+`NOT_IN_CATALOGUE` is for names the server reads on its own (a saved view's columns, PR 8).
+`LICENCE` waits for a second user (ADR 0028: personal values are hidden from other users once
+there are any). Identity is disclosed, not blanked: `PRE_SNAPSHOT` is reserved for the screens'
+universe (PR 5); `instrument.*` values and `Instrument` say which snapshot through
+`Session.preSnapshot` / `referenceSnapshot`.
 
 `Unknown(code, detail)`: `detail` names the table and session
 (`"rollups/instrument/earnings@v1 has no partition for 2026-10-03"`). `to_scalar(value)` is
@@ -213,6 +225,31 @@ generic read (R1 unchanged); what goes is each consumer deciding which partition
 - **User scoping**: `get_context` builds `UserContext` (today `ALGOTRADE_USER`); catalogue,
   screeners, views and Ideas are scoped by it.
 - **No** mutations (writes stay REST), **no** persisted queries.
+- **Settled in PR 4** (do not re-decide):
+  - The session is each top-level field's `date` argument (default: the latest with bars).
+    `RequestContext.read(date)` (`graphql/context.py`) opens one `ReadContext` per date per
+    request (fields of one operation that pass the same `date` share it and its dataloaders);
+    the objects a field returns carry it (`strawberry.Private`). An empty store (no session to
+    resolve) is a null field, not an error. `get_context` is the router's `context_getter`.
+  - `Query` lives in `types/query.py` (READ 3 covers it); the list caps are a field extension
+    (`limits.MaxItems`, on `features(names)`); the document limits are per-request extension
+    factories (`limits.EXTENSIONS`).
+  - Enums are GraphQL-cased: `FeatureFormat` (`PERCENT`, `CURRENCY`, `COMPACT`, `NUMBER`,
+    `DATE`, `FLAG`, `CATEGORY`, `TEXT`) and `UnknownCode`. `format` comes from `unit` + `dtype`
+    (`catalogue.format_of`): `decimal` -> `PERCENT`, `usd_per_share` -> `CURRENCY`, `usd` /
+    `shares` -> `COMPACT`, `pct_points` and other numbers -> `NUMBER` (`PERCENT` means a
+    fraction). The client picks digits and dollars from `unit` / `dtype`
+    (`entities/feature/model/value.ts`).
+  - `FeatureName` checks the form when the request is parsed (`BAD_REQUEST`); the catalogue
+    check is the loader's (`UnknownFeatureError` -> `UNKNOWN_FEATURE`).
+  - Strawberry's `@strawberry.field(...)` is untyped under mypy strict even with its plugin:
+    `# type: ignore[untyped-decorator]` on that decorator line in `types/` only
+    (`test_type_ignores_only_on_strawberry_field_decorators`).
+  - `catalogue.ts` is written by `scripts/export_catalogue.py` (Python); its freshness test is
+    `tests/scripts/test_export_catalogue.py` (the web CI job has no Python). `npm run
+    api:generate` runs both web generators (OpenAPI types, GraphQL codegen).
+  - The resolved `Session` is cached in the result cache keyed on `visible_seq` (the ~26
+    `dates()` calls run once per publish, not per request).
 - **Web**: `@graphql-codegen/cli` client preset (`apps/web/codegen.ts`, documents
   `src/**/*.{ts,tsx}`, `fragmentMasking: true`) over TanStack Query; the one transport is
   `gql(document, variables)` in `src/shared/api/graphql.ts`; query keys
@@ -263,9 +300,9 @@ browser clock outside `src/shared/lib/date/`, and building `EQ:` ids. The others
 
 | Forbidden in `apps/web/src` | Ask instead | Enabled |
 |---|---|---|
-| next / last earnings from `events/earnings` (`nextAndLast`, `nextEarningsDate`) | `rollup.earnings@v1.{next,last}_earnings_date` | PR 4 |
+| next / last earnings from `events/earnings` (`nextAndLast`, `nextEarningsDate`) | `rollup.earnings@v1.{next,last}_earnings_date` | **on** (PR 4; only `entities/instrument/model/events.ts` names `events/earnings`) |
 | days to earnings, DTE, earnings before expiry | `rollup.earnings@v1.days_to_earnings`, `rollup.nearest_expiry@v1.dte`, `feature.earnings_before_expiry` | PR 6 |
-| "today" / `new Date()` against stored dates | `session.date` from the response | now (`new Date()`); PR 4 / 6 (`todayIso()`) |
+| "today" / `new Date()` against stored dates | `session.date` from the response | now (`new Date()`); PR 6 (`todayIso()`: the overview's use went in PR 4, the features panel's range start is the last) |
 | per-screener counts, top-N from a page (`summarise`) | `Ideas.screeners[].picked`, `ScreenerRun.decisions` | PR 5 |
 | picked / not picked from a decision string | `ScreenResult.change` | PR 8 |
 | symbol from an instrument id, or the reverse | `Instrument.symbol` | now |
@@ -295,20 +332,20 @@ never a `DataTableColumn` literal (ESLint, PR 7). View preferences go through on
 |---|---|---|---|
 | READ 1 | Only `services/read/session.py` decides which partition a read sees | ownership `session-resolution` (`partition_for`, `latest_session`, `latest_date`, `rollup_row`, `resolve_session`) | **on**: owners `session.py`, `context.py` (`open_context`) and explore (until its modules are deleted); any other caller fails now |
 | READ 2 | Only `services/read/**` reads session partitions for display | `tests/architecture/api/test_read_model.py::test_only_loaders_read_partitions` (AST) | **on**, scoped to `services/read` (only `session.py` / `context.py` pick or read a partition); widened to all of `src/` and `apps/` in PR 10 |
-| READ 3 | GraphQL types are thin | import-linter "GraphQL types are thin" | **on** (empty package); `test_resolvers_call_one_loader` in PR 4 |
+| READ 3 | GraphQL types are thin | import-linter "GraphQL types are thin" + `test_resolvers_call_one_loader` | **on** |
 | READ 4 | The read model is read-only | import-linter "Read model is read-only" | **on** |
 | READ 5 | No new REST GET for stored data | `architecture/rest_allowlist.toml` + two tests | **on** |
-| READ 6 | Schema snapshot fresh | `test_committed_schema_is_up_to_date` | PR 4 |
-| READ 7 | Every GraphQL object mirrors a read dataclass | `test_types_mirror_read_model` | PR 4 |
+| READ 6 | Schema snapshot fresh | `tests/apps/api/graphql/test_schema.py::test_committed_schema_is_up_to_date` | **on** |
+| READ 7 | Every GraphQL object mirrors a read dataclass | `test_types_mirror_read_model` | **on**; it is why `scripts/check_dupes.py` skips `graphql/types/` (ADR 0037: the mirror is by design) |
 | READ 8 | One scalar coercion | ownership `scalar-coercion` (`to_value`, `to_scalar`) | **on** for new callers; the `_float/_text/_num` re-implementation rule in PR 8 |
-| READ 9 | Per-instrument stored values are catalogue features | `test_no_typed_feature_fields` | PR 4 |
+| READ 9 | Per-instrument stored values are catalogue features | `test_no_typed_feature_fields` (GraphQL types) + `test_no_typed_catalogue_fields_in_api_schemas` (REST) | **on** |
 | READ 10 | A fact computed in a read is a feature first | ownership `domain-read-model` (`rollups/instrument/` literals); `chain_expiries` rule | **on** (literals); `chain_expiries` in PR 5 |
 | WEB 1 | Only `shared/api` talks HTTP; no Apollo / urql / graphql-request | ESLint `HTTP_LIBRARIES` | **on** |
-| WEB 2 | GraphQL documents only through the generated `graphql()` tag | ESLint ban of `graphql-tag` / `graphql` outside `shared/api/generated/graphql` | PR 4 |
+| WEB 2 | GraphQL documents only through the generated `graphql()` tag | ESLint ban of `graphql-tag` / `graphql` outside `shared/api/generated/graphql` | **on** |
 | WEB 3 | No browser-derived facts | `web_forbidden_derivations.toml` | **on** (clean patterns); the rest per the table above |
 | WEB 4 | Column defs only from the factories | ESLint on `DataTableColumn` outside `entities/feature/model/columns.tsx` | PR 7 |
-| WEB 5 | Feature names typed | ESLint on `rollup.` / `feature.` / `instrument.` literals outside `generated/catalogue.ts` | PR 4 |
-| WEB 6 | Generated files fresh | `npm run generated:check` (`schema.ts`, `generated/graphql/**`, `catalogue.ts`) | PR 4 |
+| WEB 5 | Feature names typed | ESLint on `rollup.` / `feature.` / `instrument.` literals outside `feature('<name>')` (tests and stories exempt) | **on** |
+| WEB 6 | Generated files fresh | `npm run generated:check` (`schema.ts`, `generated/graphql/**`); `catalogue.ts` by `tests/scripts/test_export_catalogue.py` | **on** |
 | WEB 7 | One view-prefs adapter | ESLint on `/preferences/` outside `features/table-view/api` | PR 8 |
 
 ### Ownership during the migration
@@ -378,4 +415,5 @@ after the object graph because they need the columnar type and the factories.
 - **Strawberry under mypy strict**: enable its plugin in PR 4; if it fights `strict`, keep
   `# type: ignore[misc]` to `graphql/types/*` only, capped by a fitness test.
 - **Performance**: add `IdeasPage`, `ExploreDetail`, `Table` to the 1 s budget in
-  `tests/apps/api/test_main.py` as PRs 4-7 add them.
+  `tests/apps/api/test_main.py` (`OPERATIONS`) as PRs 5-7 add them; PR 4 added
+  `InstrumentFacts` (the Overview).

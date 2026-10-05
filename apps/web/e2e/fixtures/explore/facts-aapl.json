@@ -1,0 +1,381 @@
+{
+  "data": {
+    "session": {
+      "date": "2026-10-02",
+      "isLatest": true,
+      "missing": [],
+      "referenceSnapshot": "2026-10-02",
+      "preSnapshot": false
+    },
+    "instrument": {
+      "instrumentId": "EQ:BBG000B9XRY4",
+      "symbol": "AAPL",
+      "name": "Apple Inc.",
+      "securityType": "COMMON_STOCK",
+      "exchange": "NASDAQ",
+      "isEtf": false,
+      "description": "Apple is among the largest companies in the world, with a broad portfolio of hardware and software products targeted at consumers and businesses. Apple's iPhone accounts for the majority of the firm's sales, and Apple's other products, such as the Mac, iPad, and Watch, are designed around the iPhone as the focal point of an expansive software ecosystem. Apple has progressively worked to add new applications, such as streaming video, subscription bundles, and augmented reality. The firm designs its own software and semiconductors and works with subcontractors such as Foxconn and TSMC to build its products and chips. Slightly less than half of Apple's sales come directly through its flagship stores, with the majority coming indirectly through partnerships and distribution.",
+      "referenceSnapshot": "2026-10-02",
+      "features": [
+        {
+          "name": "instrument.sector",
+          "value": "Technology",
+          "unknown": null,
+          "info": {
+            "format": "TEXT",
+            "unit": null,
+            "dtype": "str",
+            "nullMeaning": "not known for this instrument (UNKNOWN)"
+          }
+        },
+        {
+          "name": "instrument.industry",
+          "value": "Electronic Computers",
+          "unknown": null,
+          "info": {
+            "format": "TEXT",
+            "unit": null,
+            "dtype": "str",
+            "nullMeaning": "not known for this instrument (UNKNOWN)"
+          }
+        },
+        {
+          "name": "instrument.website",
+          "value": null,
+          "unknown": {
+            "code": "NULL",
+            "detail": "instrument.website is null for EQ:BBG000B9XRY4 on 2026-10-02"
+          },
+          "info": {
+            "format": "TEXT",
+            "unit": null,
+            "dtype": "str",
+            "nullMeaning": "not known for this instrument (UNKNOWN)"
+          }
+        },
+        {
+          "name": "instrument.in_sp500",
+          "value": true,
+          "unknown": null,
+          "info": {
+            "format": "FLAG",
+            "unit": null,
+            "dtype": "bool",
+            "nullMeaning": "not known for this instrument (UNKNOWN)"
+          }
+        },
+        {
+          "name": "instrument.optionable",
+          "value": true,
+          "unknown": null,
+          "info": {
+            "format": "FLAG",
+            "unit": null,
+            "dtype": "bool",
+            "nullMeaning": "not known for this instrument (UNKNOWN)"
+          }
+        },
+        {
+          "name": "instrument.leverage",
+          "value": 1.0,
+          "unknown": null,
+          "info": {
+            "format": "NUMBER",
+            "unit": null,
+            "dtype": "float",
+            "nullMeaning": "not known for this instrument (UNKNOWN)"
+          }
+        },
+        {
+          "name": "instrument.is_inverse",
+          "value": false,
+          "unknown": null,
+          "info": {
+            "format": "FLAG",
+            "unit": null,
+            "dtype": "bool",
+            "nullMeaning": "not known for this instrument (UNKNOWN)"
+          }
+        },
+        {
+          "name": "instrument.is_leveraged",
+          "value": false,
+          "unknown": null,
+          "info": {
+            "format": "FLAG",
+            "unit": null,
+            "dtype": "bool",
+            "nullMeaning": "not known for this instrument (UNKNOWN)"
+          }
+        },
+        {
+          "name": "instrument.tracks",
+          "value": null,
+          "unknown": {
+            "code": "NULL",
+            "detail": "instrument.tracks is null for EQ:BBG000B9XRY4 on 2026-10-02"
+          },
+          "info": {
+            "format": "TEXT",
+            "unit": null,
+            "dtype": "str",
+            "nullMeaning": "not known for this instrument (UNKNOWN)"
+          }
+        },
+        {
+          "name": "rollup.earnings@v1.next_earnings_date",
+          "value": "2026-10-29",
+          "unknown": null,
+          "info": {
+            "format": "DATE",
+            "unit": "date",
+            "dtype": "date",
+            "nullMeaning": "no report date on or after the session in the calendars stored by then (the row exists for a last date)"
+          }
+        },
+        {
+          "name": "rollup.earnings@v1.last_earnings_date",
+          "value": "2026-07-30",
+          "unknown": null,
+          "info": {
+            "format": "DATE",
+            "unit": "date",
+            "dtype": "date",
+            "nullMeaning": "no earlier report date in the calendars stored by then (they start with the first stored snapshot; a backfill does not invent history)"
+          }
+        },
+        {
+          "name": "rollup.earnings@v1.days_to_earnings",
+          "value": 19.0,
+          "unknown": null,
+          "info": {
+            "format": "NUMBER",
+            "unit": "sessions",
+            "dtype": "int",
+            "nullMeaning": "no report date on or after the session in the calendars stored by then"
+          }
+        },
+        {
+          "name": "rollup.earnings@v1.earnings_time",
+          "value": "unknown",
+          "unknown": null,
+          "info": {
+            "format": "CATEGORY",
+            "unit": "category",
+            "dtype": "str",
+            "nullMeaning": "no report date on or after the session in the calendars stored by then"
+          }
+        },
+        {
+          "name": "rollup.price_stats@v2.close",
+          "value": 333.69000244140625,
+          "unknown": null,
+          "info": {
+            "format": "CURRENCY",
+            "unit": "usd_per_share",
+            "dtype": "float32",
+            "nullMeaning": "never: a row exists only for an instrument with a bar on the session"
+          }
+        },
+        {
+          "name": "feature.market_cap",
+          "value": 4869931991864.5625,
+          "unknown": null,
+          "info": {
+            "format": "COMPACT",
+            "unit": "usd",
+            "dtype": "float",
+            "nullMeaning": "fundamentals market_cap_status is not OK (no count, a stale count, or no close)"
+          }
+        },
+        {
+          "name": "feature.pe_ratio",
+          "value": 38.31113673707834,
+          "unknown": null,
+          "info": {
+            "format": "NUMBER",
+            "unit": "ratio",
+            "dtype": "float",
+            "nullMeaning": "financials eps_diluted_ttm is null or not positive (a loss; ETFs and funds have none), the close is not positive, eps_stale (the EPS TTM ended more than stale_days before the session), or the instrument is an ADR"
+          }
+        },
+        {
+          "name": "rollup.financials@v1.revenue_ttm",
+          "value": 466823000000.0,
+          "unknown": null,
+          "info": {
+            "format": "COMPACT",
+            "unit": "usd",
+            "dtype": "float",
+            "nullMeaning": "no revenue / net income / EPS fact filed by the session (ETFs, funds, no CIK, issuers that report outside USD): NO_FACTS; or neither four consecutive quarters nor a fiscal year of this concept are known"
+          }
+        },
+        {
+          "name": "rollup.fundamentals@v2.shares_outstanding",
+          "value": 14594180096.0,
+          "unknown": null,
+          "info": {
+            "format": "COMPACT",
+            "unit": "shares",
+            "dtype": "float32",
+            "nullMeaning": "no share-count fact filed by the session (ETFs, funds, no CIK): NO_SHARES"
+          }
+        },
+        {
+          "name": "feature.revenue_growth_yoy",
+          "value": 0.14242398286937896,
+          "unknown": null,
+          "info": {
+            "format": "PERCENT",
+            "unit": "decimal",
+            "dtype": "float",
+            "nullMeaning": "revenue_ttm or revenue_ttm_year_ago is null (fewer than two years of reported quarters or fiscal years), or the year-ago revenue is not positive"
+          }
+        },
+        {
+          "name": "rollup.financials@v1.net_income_ttm",
+          "value": 128930000000.0,
+          "unknown": null,
+          "info": {
+            "format": "COMPACT",
+            "unit": "usd",
+            "dtype": "float",
+            "nullMeaning": "no revenue / net income / EPS fact filed by the session (ETFs, funds, no CIK, issuers that report outside USD): NO_FACTS; or neither four consecutive quarters nor a fiscal year of this concept are known"
+          }
+        },
+        {
+          "name": "rollup.financials@v1.eps_diluted_ttm",
+          "value": 8.710000038146973,
+          "unknown": null,
+          "info": {
+            "format": "CURRENCY",
+            "unit": "usd_per_share",
+            "dtype": "float32",
+            "nullMeaning": "no revenue / net income / EPS fact filed by the session (ETFs, funds, no CIK, issuers that report outside USD): NO_FACTS; or neither four consecutive quarters nor a fiscal year of this concept are known"
+          }
+        },
+        {
+          "name": "rollup.price_stats@v2.adv_usd_20d",
+          "value": 13988558848.0,
+          "unknown": null,
+          "info": {
+            "format": "COMPACT",
+            "unit": "usd",
+            "dtype": "float32",
+            "nullMeaning": "a session among the last 20 has no bar (a gap), or the history is shorter"
+          }
+        },
+        {
+          "name": "rollup.price_stats@v2.high_52w",
+          "value": 345.3399963378906,
+          "unknown": null,
+          "info": {
+            "format": "CURRENCY",
+            "unit": "usd_per_share",
+            "dtype": "float32",
+            "nullMeaning": "fewer than min_year_sessions (240) bars among the last year_sessions (252)"
+          }
+        },
+        {
+          "name": "rollup.price_stats@v2.low_52w",
+          "value": 243.4199981689453,
+          "unknown": null,
+          "info": {
+            "format": "CURRENCY",
+            "unit": "usd_per_share",
+            "dtype": "float32",
+            "nullMeaning": "fewer than min_year_sessions (240) bars among the last year_sessions (252)"
+          }
+        },
+        {
+          "name": "feature.pct_from_high_52w",
+          "value": -0.033734852667009596,
+          "unknown": null,
+          "info": {
+            "format": "PERCENT",
+            "unit": "decimal",
+            "dtype": "float",
+            "nullMeaning": "price_stats high_52w is null (fewer than 240 bars in the last 252 sessions), or no price_stats row"
+          }
+        },
+        {
+          "name": "rollup.price_stats@v2.hv30",
+          "value": 0.2116633653640747,
+          "unknown": null,
+          "info": {
+            "format": "PERCENT",
+            "unit": "decimal",
+            "dtype": "float32",
+            "nullMeaning": "a session among the last 31 has no bar (a gap), or the history is shorter"
+          }
+        },
+        {
+          "name": "feature.div_yield",
+          "value": 0.003176600905135274,
+          "unknown": null,
+          "info": {
+            "format": "PERCENT",
+            "unit": "decimal",
+            "dtype": "float32",
+            "nullMeaning": "dividends div_ttm is null (no dividend in the window and too little bar history to call it a non-payer), or the close is not positive"
+          }
+        },
+        {
+          "name": "rollup.dividends@v2.div_ttm",
+          "value": 1.059999942779541,
+          "unknown": null,
+          "info": {
+            "format": "CURRENCY",
+            "unit": "usd_per_share",
+            "dtype": "float32",
+            "nullMeaning": "no dividend in the window and fewer than min_history_days (240) bars among the last 252 sessions (too new, or bars do not cover the window, to call it a non-payer)"
+          }
+        },
+        {
+          "name": "rollup.dividends@v2.last_ex_date",
+          "value": "2026-08-10",
+          "unknown": null,
+          "info": {
+            "format": "DATE",
+            "unit": "date",
+            "dtype": "date",
+            "nullMeaning": "no ex-date in the window (a non-payer, or unknown as for div_ttm)"
+          }
+        },
+        {
+          "name": "rollup.iv30@v1.iv30",
+          "value": 0.24420201425105806,
+          "unknown": null,
+          "info": {
+            "format": "PERCENT",
+            "unit": "decimal",
+            "dtype": "float",
+            "nullMeaning": "iv30_status is neither OK nor SINGLE_EXPIRY (the status says why)"
+          }
+        },
+        {
+          "name": "feature.iv_rank",
+          "value": 0.6283186078071594,
+          "unknown": null,
+          "info": {
+            "format": "PERCENT",
+            "unit": "decimal",
+            "dtype": "float",
+            "nullMeaning": "neither has a rank: both rank statuses are UNKNOWN (under 60 sessions of IV), there is no IV today, or every IV in the window is equal"
+          }
+        },
+        {
+          "name": "feature.iv_hv_ratio",
+          "value": 1.1537283146002868,
+          "unknown": null,
+          "info": {
+            "format": "NUMBER",
+            "unit": "ratio",
+            "dtype": "float",
+            "nullMeaning": "iv30 or hv30 is null, or hv30 is 0"
+          }
+        }
+      ]
+    }
+  }
+}

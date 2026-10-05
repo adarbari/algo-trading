@@ -81,6 +81,8 @@ strict = true
 mypy_path = ["src", "libs/sources", "apps/ingestion", "apps/backtest", "apps/api"]
 packages = ["algotrade", "algotrade_sources", "algotrade_ingestion", "algotrade_backtest", "algotrade_api"]
 warn_unreachable = true
+# Strawberry's types are dataclasses mypy cannot see without it (read-model PR 4).
+plugins = ["strawberry.ext.mypy_plugin"]
 
 [[tool.mypy.overrides]]
 module = ["pyarrow", "pyarrow.*", "openpyxl", "openpyxl.*"]  # no type stubs shipped

@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { displayName, fieldValue, historyOf, type InstrumentDetail } from './detail';
-import { splitRatio, toChartEvents, toTimeline, type InstrumentEvent } from './events';
+import {
+  earningsOn,
+  reportTime,
+  splitRatio,
+  toChartEvents,
+  toTimeline,
+  type InstrumentEvent,
+} from './events';
 import { rangeFrom } from './range';
 
 const events: InstrumentEvent[] = [
@@ -39,6 +46,46 @@ describe('instrument events', () => {
       ['2026-08-10', 'Ex-dividend', '$0.27 cash · paid 13 Aug 2026'],
       ['2024-06-10', 'Split', '10-for-1'],
     ]);
+  });
+
+  it('reads the stored report times, events and rollup alike', () => {
+    // events/earnings stores pre_market / after_hours: a pre-market report is before the open.
+    const preMarket: InstrumentEvent = {
+      table: 'events/earnings',
+      ts: '2026-08-27T00:00:00+00:00',
+      values: { time: 'pre_market', reported: true },
+    };
+    expect(toTimeline([preMarket])[0]?.detail).toBe('before the open');
+    expect([reportTime('pre'), reportTime('after_hours'), reportTime('post')]).toEqual([
+      'before the open',
+      'after the close',
+      'after the close',
+    ]);
+    expect([reportTime('unknown'), reportTime(null)]).toEqual([null, null]);
+  });
+
+  it('finds the report of the date the server names, never another', () => {
+    const reported: InstrumentEvent = {
+      table: 'events/earnings',
+      ts: '2026-08-27T00:00:00+00:00',
+      values: {
+        fiscal_quarter: 'Jul/2026',
+        eps_forecast: 0.5,
+        eps_reported: 0.55,
+        surprise_pct: 10,
+        reported: true,
+      },
+    };
+    expect(earningsOn([...events, reported], '2026-08-27')).toEqual({
+      quarter: 'Jul/2026',
+      epsForecast: 0.5,
+      epsReported: 0.55,
+      surprise: 0.1,
+      reported: true,
+    });
+    expect(earningsOn(events, '2026-10-29')?.epsForecast).toBe(1.98);
+    expect(earningsOn(events, '2026-08-10')).toBeNull(); // a dividend, not a report
+    expect(earningsOn(events, null)).toBeNull();
   });
 
   it('reads split ratios, reverse splits included', () => {

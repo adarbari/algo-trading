@@ -5,45 +5,45 @@
  */
 import type { ValueFormat } from '@algotrade/ui';
 
-import type { components } from '@/shared/api';
+import { feature, type components } from '@/shared/api';
 
 export type CatalogueFeature = components['schemas']['Feature'];
 
 /** Short labels for the features the Explore defaults show (the mockup's headers). */
 const LABELS: Readonly<Record<string, string>> = {
-  'rollup.price_stats@v2.close': 'Close',
-  'rollup.iv30@v1.iv30': 'IV30',
-  'feature.iv_hv_ratio': 'IV/HV',
-  'feature.iv_hv_spread': 'IV − HV',
-  'feature.pct_from_high_52w': 'From high',
-  'rollup.earnings@v1.days_to_earnings': 'Earn.',
-  'rollup.price_stats@v2.hv30': 'HV30',
-  'rollup.price_stats@v2.adv_usd_20d': 'ADV 20d',
-  'feature.market_cap': 'Mkt cap',
-  'feature.div_yield': 'Div yield',
-  'feature.liquidity_class': 'Liquidity',
-  'instrument.sector': 'Sector',
-  'feature.vrp_iv30': 'IV30',
-  'feature.vrp_iv_hv_spread': 'IV − HV',
-  'feature.vrp_iv_hv_ratio': 'IV/HV',
-  'feature.dist_52w': 'Dist. 52w',
+  [feature('rollup.price_stats@v2.close')]: 'Close',
+  [feature('rollup.iv30@v1.iv30')]: 'IV30',
+  [feature('feature.iv_hv_ratio')]: 'IV/HV',
+  [feature('feature.iv_hv_spread')]: 'IV − HV',
+  [feature('feature.pct_from_high_52w')]: 'From high',
+  [feature('rollup.earnings@v1.days_to_earnings')]: 'Earn.',
+  [feature('rollup.price_stats@v2.hv30')]: 'HV30',
+  [feature('rollup.price_stats@v2.adv_usd_20d')]: 'ADV 20d',
+  [feature('feature.market_cap')]: 'Mkt cap',
+  [feature('feature.div_yield')]: 'Div yield',
+  [feature('feature.liquidity_class')]: 'Liquidity',
+  [feature('instrument.sector')]: 'Sector',
+  [feature('feature.vrp_iv30')]: 'IV30',
+  [feature('feature.vrp_iv_hv_spread')]: 'IV − HV',
+  [feature('feature.vrp_iv_hv_ratio')]: 'IV/HV',
+  [feature('feature.dist_52w')]: 'Dist. 52w',
 };
 
 /** Longer names for the compare table's dimension column. */
 const NAMES: Readonly<Record<string, string>> = {
-  'rollup.price_stats@v2.close': 'Last close',
-  'rollup.iv30@v1.iv30': 'IV30 (ours)',
-  'rollup.price_stats@v2.hv30': 'HV30',
-  'feature.iv_hv_spread': 'IV − HV',
-  'feature.pct_from_high_52w': 'From 52w high',
-  'rollup.price_stats@v2.adv_usd_20d': 'Avg dollar volume 20d',
-  'feature.market_cap': 'Market cap',
-  'feature.div_yield': 'Dividend yield',
-  'rollup.earnings@v1.days_to_earnings': 'Next earnings',
-  'feature.vrp_iv30': 'IV30',
-  'feature.vrp_iv_hv_spread': 'IV30 − HV30',
-  'feature.vrp_iv_hv_ratio': 'IV30 / HV30',
-  'feature.dist_52w': 'Distance to 52w high or low',
+  [feature('rollup.price_stats@v2.close')]: 'Last close',
+  [feature('rollup.iv30@v1.iv30')]: 'IV30 (ours)',
+  [feature('rollup.price_stats@v2.hv30')]: 'HV30',
+  [feature('feature.iv_hv_spread')]: 'IV − HV',
+  [feature('feature.pct_from_high_52w')]: 'From 52w high',
+  [feature('rollup.price_stats@v2.adv_usd_20d')]: 'Avg dollar volume 20d',
+  [feature('feature.market_cap')]: 'Market cap',
+  [feature('feature.div_yield')]: 'Dividend yield',
+  [feature('rollup.earnings@v1.days_to_earnings')]: 'Next earnings',
+  [feature('feature.vrp_iv30')]: 'IV30',
+  [feature('feature.vrp_iv_hv_spread')]: 'IV30 − HV30',
+  [feature('feature.vrp_iv_hv_ratio')]: 'IV30 / HV30',
+  [feature('feature.dist_52w')]: 'Distance to 52w high or low',
 };
 
 /** The column part of a field name: `rollup.iv30@v1.iv30` -> `iv30`. */

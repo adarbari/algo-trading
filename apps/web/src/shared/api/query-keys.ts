@@ -4,6 +4,9 @@
  */
 export const queryKeys = {
   health: () => ['health'] as const,
+  /** A GraphQL operation: its name and variables (every GraphQL read is keyed this way). */
+  gql: (operationName: string, variables: Readonly<Record<string, unknown>>) =>
+    ['gql', operationName, variables] as const,
   admin: {
     all: () => ['admin'] as const,
     completeness: (sessions: number) => ['admin', 'ingestion', 'completeness', sessions] as const,

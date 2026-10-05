@@ -6,7 +6,8 @@ lists).
 
 Settings come from the environment through ``algotrade.config.env`` (the one reader):
 ``ALGOTRADE_DATA_URL``, ``ALGOTRADE_CONFIG_DIR`` and ``ALGOTRADE_USER`` (a single local
-user until identity arrives). The store is opened once per app and shared by every request.
+user until identity arrives); ``ALGOTRADE_API_DEBUG=1`` serves the GraphiQL IDE. The store
+is opened once per app and shared by every request.
 """
 
 from dataclasses import dataclass, field
@@ -14,7 +15,7 @@ from typing import Annotated, cast
 
 from fastapi import Depends, Query, Request
 
-from algotrade.config.env import config_dir, data_url, user_id
+from algotrade.config.env import api_debug, config_dir, data_url, user_id
 from algotrade.config.user import DEFAULT_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.authoring.scope import ConfigWriter, open_writer
@@ -38,10 +39,13 @@ class ApiSettings:
     user: str = DEFAULT_USER
     cors_origins: tuple[str, ...] = field(default=DEV_ORIGINS)
     live: bool = False  # read live quotes from IB Gateway (the served app; off in tests)
+    debug: bool = False  # serve the GraphiQL IDE at GET /graphql (local development only)
 
     @classmethod
     def from_env(cls) -> "ApiSettings":
-        return cls(data_url(), str(config_dir()), user_id(DEFAULT_USER), live=True)
+        return cls(
+            data_url(), str(config_dir()), user_id(DEFAULT_USER), live=True, debug=api_debug()
+        )
 
     def open(self) -> ReadStore:
         return open_store(self.data_url, self.config_dir, UserContext(self.user))

@@ -107,7 +107,7 @@ data access, routing, workspace access, env) are `[[web_responsibility]]` entrie
 | `npm run storybook` | the component catalogue on :6006 |
 | `npm run visual:docker` / `make web-visual` | screenshots + axe over every story in the CI Linux image (needs Docker) |
 | `npm run visual:update` | accept screenshot changes (commit the PNGs; reviewers see the diffs) |
-| `npm run tokens`, `components:md`, `api:generate` | regenerate `tokens.css`, `COMPONENTS.md`, the API schema |
+| `npm run tokens`, `components:md`, `api:generate` | regenerate `tokens.css`, `COMPONENTS.md`, the API types (OpenAPI schema and GraphQL codegen) |
 
 ### Real-app smoke (`apps/web/real/`)
 
@@ -132,5 +132,10 @@ A new route is covered by adding its path to `workspaces.ts` (or `EXTRA_ROUTES` 
 (it needs Python and Node), local `make check` runs it after `make web-check`.
 
 The API client's types are generated from `apps/api/openapi.json` (the API's committed contract,
-ADR 0024) into `src/shared/api/generated/schema.ts`; regenerate in the same PR as an API change.
+ADR 0024) into `src/shared/api/generated/schema.ts`, and the GraphQL operations' types from
+`apps/api/schema.graphql` (ADR 0037; `codegen.ts`) into `src/shared/api/generated/graphql/`;
+regenerate in the same PR as an API change. Page reads that moved to the read model go through
+`gql()` (`src/shared/api/graphql.ts`) with documents written with the generated `graphql()`
+tag in each entity's `api/`; site feature names are typed through `feature('<name>')`
+(`generated/catalogue.ts`, `scripts/export_catalogue.py`; docs/api/read-model.md).
 The app calls the API under `/api`; `npm run dev` proxies it to `algotrade-api` on :8000.

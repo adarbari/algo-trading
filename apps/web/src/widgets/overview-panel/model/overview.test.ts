@@ -1,40 +1,77 @@
 import { describe, expect, it } from 'vitest';
 
-import type { InstrumentDetail, InstrumentEvent } from '@/entities/instrument';
+import type { ServedValue } from '@/entities/feature';
+import type { InstrumentEvent } from '@/entities/instrument';
 
 import {
-  earningsFacts,
   earningsGroup,
   exchangeLabel,
   factGroups,
   headlineStats,
-  nextAndLast,
-  nextEarningsDate,
+  missingTables,
+  OVERVIEW_FEATURES,
   profileOf,
+  valuesOf,
+  type FactsInstrument,
 } from './overview';
 
-const detail = (overrides: Partial<InstrumentDetail> = {}): InstrumentDetail => ({
-  instrument_id: 'EQ:AAPL',
-  reference_snapshot: '2026-10-02',
-  reference: {
-    name: 'Apple Inc. - Common Stock',
-    exchange: 'NASDAQ',
-    security_type: 'COMMON_STOCK',
-    is_etf: false,
-    in_sp500: true,
-    optionable: true,
-  },
-  company: { name: 'Apple Inc.', sector: 'Technology', industry: 'Electronic Computers' },
-  features: {
-    'rollup.price_stats@v2.close': 333.69,
-    'feature.market_cap': 4.87e12,
-    'feature.div_yield': 0.0032,
-    'rollup.earnings@v1.next_earnings_date': '2026-10-29',
-    'rollup.earnings@v1.days_to_earnings': 19,
-  },
-  feature_sessions: {},
+type Format = ServedValue['info']['format'];
+
+const known = (name: string, value: unknown, format: Format = 'NUMBER', unit?: string) => ({
+  name,
+  value,
+  unknown: null,
+  info: { format, unit: unit ?? null, dtype: 'float', nullMeaning: 'not known' },
+});
+
+const unknown = (
+  name: string,
+  code: 'NO_PARTITION' | 'NO_ROW' | 'NULL',
+  format: Format = 'NUMBER',
+  nullMeaning = 'not known',
+) => ({
+  name,
+  value: null,
+  unknown: { code, detail: `rollups/instrument/x@v1 has no partition for 2026-10-02` },
+  info: { format, unit: null, dtype: 'date', nullMeaning },
+});
+
+const NEXT = 'rollup.earnings@v1.next_earnings_date';
+const LAST = 'rollup.earnings@v1.last_earnings_date';
+
+const instrument = (
+  features: ServedValue[],
+  overrides: Partial<FactsInstrument> = {},
+): FactsInstrument => ({
+  instrumentId: 'EQ:AAPL',
+  symbol: 'AAPL',
+  name: 'Apple Inc.',
+  securityType: 'COMMON_STOCK',
+  exchange: 'NASDAQ',
+  isEtf: false,
+  description: null,
+  referenceSnapshot: '2026-10-02',
+  features: features as FactsInstrument['features'],
   ...overrides,
 });
+
+const stock = () =>
+  instrument([
+    known('instrument.sector', 'Technology', 'TEXT'),
+    known('instrument.industry', 'Electronic Computers', 'TEXT'),
+    known('instrument.in_sp500', true, 'FLAG'),
+    known('instrument.optionable', true, 'FLAG'),
+    known('rollup.price_stats@v2.close', 333.69, 'CURRENCY'),
+    known('feature.market_cap', 4.87e12, 'COMPACT', 'usd'),
+    unknown('feature.pe_ratio', 'NULL'),
+    unknown('rollup.financials@v1.revenue_ttm', 'NO_PARTITION', 'COMPACT'),
+    known('feature.div_yield', 0.0032, 'PERCENT'),
+    known('feature.pct_from_high_52w', -0.04, 'PERCENT'),
+    known(NEXT, '2026-10-29', 'DATE'),
+    known('rollup.earnings@v1.days_to_earnings', 19),
+    known('rollup.earnings@v1.earnings_time', 'pre', 'CATEGORY'),
+    known(LAST, '2026-07-30', 'DATE'),
+  ]);
 
 const earnings = (ts: string, values: Record<string, unknown>): InstrumentEvent => ({
   table: 'events/earnings',
@@ -44,7 +81,8 @@ const earnings = (ts: string, values: Record<string, unknown>): InstrumentEvent 
 
 describe('profileOf', () => {
   it('names the company, its kind, sector and listing facts', () => {
-    expect(profileOf(detail())).toEqual({
+    const aapl = stock();
+    expect(profileOf(aapl, valuesOf(aapl))).toEqual({
       name: 'Apple Inc.',
       kind: 'Stock',
       isEtf: false,
@@ -58,24 +96,23 @@ describe('profileOf', () => {
   });
 
   it('reads a stored description and describes a leveraged ETF', () => {
-    const profile = profileOf(
-      detail({
-        reference: {
-          name: 'ProShares UltraPro QQQ',
-          security_type: 'ETF',
-          is_etf: true,
-          is_leveraged: true,
-          leverage: 3,
-          tracks: 'Nasdaq-100',
-          description: ' Seeks 3x the daily return of the Nasdaq-100. ',
-        },
-        company: null,
-      }),
+    const tqqq = instrument(
+      [
+        known('instrument.is_leveraged', true, 'FLAG'),
+        known('instrument.leverage', 3),
+        known('instrument.tracks', 'Nasdaq-100', 'TEXT'),
+        unknown('instrument.sector', 'NULL', 'TEXT'),
+      ],
+      {
+        name: 'ProShares UltraPro QQQ',
+        securityType: 'ETF',
+        isEtf: true,
+        description: ' Seeks 3x the daily return of the Nasdaq-100. ',
+      },
     );
-    expect(profile.isEtf).toBe(true);
-    expect(profile.kind).toBe('ETF');
+    const profile = profileOf(tqqq, valuesOf(tqqq));
+    expect([profile.isEtf, profile.kind, profile.sector]).toEqual([true, 'ETF', null]);
     expect(profile.description).toBe('Seeks 3x the daily return of the Nasdaq-100.');
-    expect(profile.sector).toBeNull();
     expect(profile.tags).toEqual(['3x leveraged', 'Tracks Nasdaq-100']);
   });
 });
@@ -88,27 +125,32 @@ describe('exchangeLabel', () => {
 });
 
 describe('headlineStats and factGroups', () => {
-  it('lists only the numbers the store has', () => {
-    const stats = headlineStats(detail(), '2026-10-29');
-    expect(stats.map((s) => s.id)).toEqual(['close', 'market-cap', 'next-earnings']);
-    expect(factGroups(detail()).map((g) => g.id)).toEqual(['dividends']);
+  it('shows stored values with the server format, a missing partition as Unknown, and leaves out what does not apply', () => {
+    const stats = headlineStats(valuesOf(stock()));
+    expect(stats.map((s) => [s.id, s.value])).toEqual([
+      ['close', 333.69],
+      ['market-cap', 4.87e12],
+      ['revenue', 'Unknown'], // no partition for the session: said so
+      ['next', '2026-10-29'], // P/E is null for AAPL here: left out
+    ]);
+    expect(stats[1]?.format).toEqual({ kind: 'currency-compact' });
+    expect(stats[2]?.sub).toMatch(/^not stored for this session/);
+    expect(stats[3]?.sub).toBe('in 19 sessions, before the open');
+    const groups = factGroups(valuesOf(stock()));
+    expect(groups.map((g) => g.id)).toEqual(['range', 'dividends']);
+    expect(groups[0]?.items[0]?.format).toEqual({ kind: 'delta', unit: 'percent' });
+    expect(groups[1]?.items[0]?.format).toEqual({ kind: 'percent' });
   });
 
-  it('shows revenue and P/E as soon as their features are stored', () => {
-    const withFundamentals = detail({
-      features: {
-        'feature.pe_ratio': 31.2,
-        'rollup.financials@v1.revenue_ttm': 4.1e11,
-        'rollup.financials@v1.eps_diluted_ttm': 10.7,
-        'feature.revenue_growth_yoy': 0.06,
-      },
-    });
-    expect(headlineStats(withFundamentals, null).map((s) => s.id)).toEqual(['pe', 'revenue']);
-    expect(factGroups(withFundamentals)[0]?.items.map((i) => i.id)).toEqual(['growth', 'eps']);
+  it('asks for every fact it shows in one request', () => {
+    expect(OVERVIEW_FEATURES).toContain(NEXT);
+    expect(OVERVIEW_FEATURES).toContain('rollup.iv30@v1.iv30');
+    expect(new Set(OVERVIEW_FEATURES).size).toBe(OVERVIEW_FEATURES.length);
+    expect(OVERVIEW_FEATURES.length).toBeLessThanOrEqual(60);
   });
 });
 
-describe('earnings', () => {
+describe('earningsGroup', () => {
   const events = [
     earnings('2026-07-30', {
       reported: true,
@@ -117,38 +159,54 @@ describe('earnings', () => {
       surprise_pct: 12.1,
       time: 'after_hours',
     }),
-    earnings('2026-10-29', {
-      reported: false,
-      eps_forecast: 1.98,
-      fiscal_quarter: 'Sep/2026',
-      time: 'pre_market',
-    }),
+    earnings('2026-10-29', { reported: false, eps_forecast: 1.98, fiscal_quarter: 'Sep/2026' }),
+    // A later report the server did not name: never shown as "next".
+    earnings('2027-01-28', { reported: false, eps_forecast: 2.2 }),
   ];
 
-  it('orders the facts by date and finds the next and the last report', () => {
-    const facts = earningsFacts([...events].reverse());
-    expect(facts.map((f) => f.date)).toEqual(['2026-07-30', '2026-10-29']);
-    const { next, last } = nextAndLast(facts, '2026-10-04');
-    expect(next?.date).toBe('2026-10-29');
-    expect(last?.epsReported).toBe(1.57);
-    expect(last?.surprise).toBeCloseTo(0.121);
-  });
-
-  it('builds the earnings facts with the forecast, reported EPS and surprise', () => {
-    const group = earningsGroup(detail(), events, '2026-10-04');
-    expect(group?.items.map((i) => [i.id, i.value])).toEqual([
+  it('shows the dates the server sent, with the EPS figures stored for exactly those dates', () => {
+    const group = earningsGroup(valuesOf(stock()), events);
+    expect(group.items.map((i) => [i.id, i.value])).toEqual([
       ['next', '2026-10-29'],
       ['forecast', 1.98],
       ['last', '2026-07-30'],
       ['reported', 1.57],
       ['surprise', expect.closeTo(0.121) as unknown],
     ]);
-    expect(group?.items[0]?.hint).toBe('in 19 sessions, Before the open');
+    expect(group.items[1]?.hint).toBe('Quarter Sep/2026');
   });
 
-  it('falls back to the events when the rollup has no dates, and to nothing', () => {
-    const bare = detail({ features: {} });
-    expect(nextEarningsDate(bare, events, '2026-10-04')).toBe('2026-10-29');
-    expect(earningsGroup(bare, [], '2026-10-04')).toBeNull();
+  it('says why the next date is not known, never deriving it from the events', () => {
+    const mrvl = instrument([
+      unknown(NEXT, 'NULL', 'DATE', 'no report date on or after the session'),
+      known(LAST, '2026-08-27', 'DATE'),
+    ]);
+    const group = earningsGroup(valuesOf(mrvl), events);
+    expect(group.items.map((i) => [i.id, i.value, i.hint])).toEqual([
+      ['next', 'Unknown', 'no report date on or after the session'],
+      ['last', '2026-08-27', undefined],
+    ]);
+  });
+
+  it('says the last date is unknown when the rollup has no partition', () => {
+    const bare = instrument([
+      unknown(NEXT, 'NO_PARTITION', 'DATE'),
+      unknown(LAST, 'NO_ROW', 'DATE'),
+    ]);
+    const group = earningsGroup(valuesOf(bare), events);
+    expect(group.items.map((i) => [i.id, i.value])).toEqual([
+      ['next', 'Unknown'],
+      ['last', 'Unknown'],
+    ]);
+    expect(group.items[1]?.hint).toBe('no row for this instrument in this session');
+  });
+});
+
+describe('missingTables', () => {
+  it('names the missing nightly tables briefly', () => {
+    expect(missingTables(['rollups/instrument/earnings@v1', 'bars/1d'])).toEqual([
+      'earnings@v1',
+      'bars/1d',
+    ]);
   });
 });

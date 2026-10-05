@@ -14,8 +14,8 @@ Run `ls apps/api/algotrade_api/graphql apps/api/algotrade_api/graphql/types src/
 
 | You see | Meaning | Do |
 |---|---|---|
-| only `__init__.py` files under `graphql/` | **today** (PR 2 landed: `services/read/{session,values,context}.py` exist): no schema, no `POST /graphql`, no codegen yet (PR 4 builds them, after RM3) | **Stop.** Do the next read-model PR in order (`docs/api/read-model.md` "Migration plan"; `docs/roadmap.md` track RM). A feature request is **not** permission for the old path: reply with the read-model PR that delivers it and ask "track order, or patch the legacy REST read now?" (definition: `add-api-endpoint`, "Legacy page reads"). Only on an explicit "use the legacy path" follow that section, and say so in the PR |
-| `graphql/schema.py`, `apps/api/schema.graphql`, `apps/web/codegen.ts` exist | PR 4 landed | continue |
+| only `__init__.py` files under `graphql/` | an old branch (before PR 4) | rebase on `origin/main` |
+| `graphql/schema.py`, `apps/api/schema.graphql`, `apps/web/codegen.ts` exist | **today**: PR 4 landed (`Query.{session,instrument}`, `Instrument.features(names)`, the `features` dataloader, codegen, `useInstrumentFacts`) | continue |
 | the area's REST GET is still in `architecture/rest_allowlist.toml` | that area has not moved yet | add the field in the area's migration PR (move the area), not beside the REST route |
 
 ## Step 1: which object owns it
@@ -69,6 +69,11 @@ def holdings(self, info: Info, top: int = 10) -> Holdings | None:
 - Never name a field like a catalogue column (`next_earnings_date`, `iv30`, ...): the schema
   test fails it (READ 9).
 
+`@strawberry.field(...)` with arguments is untyped under mypy strict: put
+`# type: ignore[untyped-decorator]` on that decorator line only (a fitness test allows it there
+and nowhere else). A top-level field goes on `Query` in `types/query.py` and takes the session
+as `date: Day = None`; it opens the read context with `info.context.read(date)`.
+
 Verify: `make typecheck arch`.
 
 ## Step 5: the schema snapshot
@@ -84,7 +89,10 @@ In `apps/web`, in the entity's `api/` (`src/entities/<entity>/api/`): write the 
 the generated `graphql()` tag, compose other entities' fragments through their `index.ts`, wrap
 it in a hook: `useQuery({ queryKey: queryKeys.gql('<OperationName>', vars), queryFn: () => gql(Doc, vars) })`.
 Feature names with `feature('<name>')` from `@/shared/api` (a typo fails `tsc`). Then
-`npm run api:generate` (both generators) and commit the generated files. Render
+`npm run api:generate` (both generators) and commit the generated files; a new site feature
+name for `feature()` needs `.venv/bin/python scripts/export_catalogue.py` (CI's Python job checks
+`catalogue.ts` is fresh). A string literal naming a feature outside `feature()` fails ESLint
+(WEB 5); a `graphql` / `graphql-tag` import fails it too (WEB 2). Render
 `unknown.code` where `value` is null; format with `info.format`; never derive a fact the
 server can send (`architecture/web_forbidden_derivations.toml`).
 

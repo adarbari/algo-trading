@@ -1,10 +1,13 @@
-"""The app factory: routers, CORS for the local web dev server, the live quotes (closed when
-the app stops), and error handlers that map library errors to HTTP (not found -> 404, bad
-configuration or parameters -> 400, a write that clashes with what exists -> 409)."""
+"""The app factory: routers, the GraphQL read layer at ``POST /graphql`` (ADR 0037), CORS for
+the local web dev server, the live quotes (closed when the app stops), and error handlers that
+map library errors to HTTP (not found -> 404, bad configuration or parameters -> 400, a write
+that clashes with what exists -> 409)."""
 
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from datetime import date
+from functools import partial
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,8 +18,10 @@ from algotrade.services.authoring.scope import ConfigWriter, ConflictError, Scre
 from algotrade.services.explore.store import NotFoundError, ReadStore
 from algotrade.services.live.quotes import LiveQuotes
 from algotrade.services.ondemand.screens import OnDemandScreens, open_ondemand
+from algotrade.services.read.context import ReadContext, ResultCache, open_context
 from algotrade_api import __version__
 from algotrade_api.deps import ApiSettings
+from algotrade_api.graphql.schema import graphql_router
 from algotrade_api.live import no_live, open_live
 from algotrade_api.routes import ROUTERS
 
@@ -87,7 +92,14 @@ def create_app(
     app.add_exception_handler(ConfigurationError, _bad_request)
     for router in ROUTERS:
         app.include_router(router)
+    app.include_router(graphql_router(_reads(app.state.store), settings.debug))
     return app
+
+
+def _reads(store: ReadStore) -> Callable[[date | None], ReadContext]:
+    """Opens a GraphQL request's read context over ``store`` for a requested session, with
+    one result cache for every request of the app (entries keyed on the published state)."""
+    return partial(open_context, store.reader, store.configs, store.user, cache=ResultCache())
 
 
 def openapi_json() -> str:

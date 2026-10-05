@@ -5,6 +5,8 @@
  */
 import type { ChartRange, DataTableSort } from '@algotrade/ui';
 
+import { feature } from '@/shared/api';
+
 export const EXPLORE_TABS = [
   'overview',
   'compare',
@@ -46,23 +48,23 @@ export interface ExploreSearch {
 
 /** The mockup's columns: close, our IV30, IV / HV, distance from the 52-week high, earnings. */
 export const DEFAULT_COLUMNS: readonly string[] = [
-  'rollup.price_stats@v2.close',
-  'rollup.iv30@v1.iv30',
-  'feature.iv_hv_ratio',
-  'feature.pct_from_high_52w',
-  'rollup.earnings@v1.days_to_earnings',
+  feature('rollup.price_stats@v2.close'),
+  feature('rollup.iv30@v1.iv30'),
+  feature('feature.iv_hv_ratio'),
+  feature('feature.pct_from_high_52w'),
+  feature('rollup.earnings@v1.days_to_earnings'),
 ];
 
 export const DEFAULT_DIMENSIONS: readonly string[] = [
-  'rollup.price_stats@v2.close',
-  'rollup.iv30@v1.iv30',
-  'rollup.price_stats@v2.hv30',
-  'feature.iv_hv_spread',
-  'feature.pct_from_high_52w',
-  'rollup.price_stats@v2.adv_usd_20d',
-  'feature.market_cap',
-  'feature.div_yield',
-  'rollup.earnings@v1.days_to_earnings',
+  feature('rollup.price_stats@v2.close'),
+  feature('rollup.iv30@v1.iv30'),
+  feature('rollup.price_stats@v2.hv30'),
+  feature('feature.iv_hv_spread'),
+  feature('feature.pct_from_high_52w'),
+  feature('rollup.price_stats@v2.adv_usd_20d'),
+  feature('feature.market_cap'),
+  feature('feature.div_yield'),
+  feature('rollup.earnings@v1.days_to_earnings'),
 ];
 
 const RANGES: readonly ChartRange[] = ['3M', '1Y', '2Y', 'All'];

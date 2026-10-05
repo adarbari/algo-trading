@@ -91,6 +91,21 @@ def instruments(
     return read_snapshot(reader, REFERENCE_TABLE, on, REFERENCE_HINT, as_of, ids)[0]
 
 
+def companies(
+    reader: StoreReader,
+    on: date,
+    ids: Sequence[str] | None = None,
+    as_of: datetime | None = None,
+) -> pd.DataFrame | None:
+    """The ``instruments/company`` snapshot on or before ``on`` (``ids``' rows only when
+    given); ``None`` when none was taken by then (a later snapshot never stands in for what a
+    page shows: it would show company facts not known on ``on``)."""
+    snap = snapshot(reader, COMPANY_TABLE, on)
+    if snap is None or snap.pre_snapshot:
+        return None
+    return reader.table(COMPANY_TABLE, snap.snapshot_date, as_of, ids)
+
+
 ALL_TIME = (date(1900, 1, 1), date(9999, 12, 31))
 DESCRIPTION_COLUMNS = (
     "instrument_id",
@@ -188,7 +203,8 @@ class InstrumentView:
     Columns are field names (``instrument.<col>``, ``rollup.<name>@vN.<col>``) plus
     ``instrument_id``. A rollup with no partition for ``session`` is listed in ``missing``
     and its fields are absent, which selections treat as UNKNOWN (never as a pass).
-    ``pre_snapshot``: the reference came from a snapshot after ``session`` (survivorship).
+    ``pre_snapshot``: the reference came from a snapshot after ``session`` (survivorship);
+    ``company_pre_snapshot``: so did the company facts.
     """
 
     session: date
@@ -196,6 +212,7 @@ class InstrumentView:
     frame: pd.DataFrame
     missing: tuple[str, ...]
     pre_snapshot: bool = False
+    company_pre_snapshot: bool = False
 
 
 def instrument_view(
@@ -219,12 +236,14 @@ def instrument_view(
         wanted.setdefault(table, []).append((name, column))
     out = pd.DataFrame({"instrument_id": reference["instrument_id"].astype(str)})
     missing: list[str] = []
+    company_pre = False
     for table, columns in wanted.items():
         if table == REFERENCE_TABLE:
             frame: pd.DataFrame | None = reference
         elif table == COMPANY_TABLE:  # a snapshot table, like the reference
             company = snapshot(reader, table, session)
             frame = reader.table(table, company.snapshot_date, as_of) if company else None
+            company_pre = company is not None and company.pre_snapshot
         else:
             frame = reader.table(table, session, as_of)
         if frame is None:
@@ -236,7 +255,9 @@ def instrument_view(
             if column in frame.columns:
                 picked[name] = frame[column].to_numpy()
         out = out.merge(picked, on="instrument_id", how="left")
-    return InstrumentView(session, ref.snapshot_date, out, tuple(sorted(missing)), ref.pre_snapshot)
+    return InstrumentView(
+        session, ref.snapshot_date, out, tuple(sorted(missing)), ref.pre_snapshot, company_pre
+    )
 
 
 # ---------------------------------------------------------------------- universe

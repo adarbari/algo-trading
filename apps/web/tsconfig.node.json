@@ -19,6 +19,7 @@
   },
   "include": [
     "vite.config.ts",
+    "codegen.ts",
     "playwright.config.ts",
     "playwright.visual.config.ts",
     "playwright.real.config.ts",

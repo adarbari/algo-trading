@@ -605,6 +605,7 @@ id = "scalar-coercion"
 description = "Turn a stored scalar (numpy, pandas, NaN, NaT, dates) into a JSON-safe value, one way for reads and runs (ADR 0037): services/read/values.py to_scalar; services/views.py imports it back as to_value for runs and today's callers. Callers of the one coercion are allowed; re-implementations are not. Deferred rule: { call_regex = \"^_(float|text|num)$\" } catches the private re-implementations (explore ranking._float/_text and screens/table._text, deleted in PRs 5 and 8; screening exports._text and rule_results._num, which PR 8 switches to to_scalar); it is added in PR 8, with allowed entries for the vendor payload parsers in libs/sources and the nightly email renderer, which parse or format text and never coerce stored values"
 owner = ["src/algotrade/services/read/values.py"]
 allowed = [
+    "src/algotrade/services/read/*",  # the loaders call the one coercion for every value they return (docs/api/read-model.md "Values and UNKNOWN")
     "src/algotrade/services/views.py",  # re-exports to_scalar as to_value (runs and today's callers) and coerces the FeatureView through it
     "src/algotrade/services/explore/*",  # today's display reads call the one coercion; each module leaves with explore (PRs 4-10)
     "src/algotrade/services/screening/exports.py",  # run exports serialise through the same coercion, so runs and reads agree

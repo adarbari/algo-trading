@@ -4,7 +4,7 @@
  * user's overrides; the criteria shown are the working copy resolved through its layers (the
  * API's `working`), with the draft's own changes merged on top by id. Pure.
  */
-import type { components } from '@/shared/api';
+import { feature, type components } from '@/shared/api';
 
 export type ScreenerDetail = components['schemas']['ScreenerDetail'];
 export type ScreenerListItem = components['schemas']['ScreenerListItem'];
@@ -61,12 +61,12 @@ export function toDocument(source: Readonly<Record<string, unknown>>, id: string
  */
 const BASE_CRITERIA: CriteriaTable = {
   security_type: {
-    field: 'instrument.security_type',
+    field: feature('instrument.security_type'),
     op: 'in',
     value: ['COMMON_STOCK', 'ADR', 'ETF'],
   },
-  status: { field: 'instrument.status', op: 'eq', value: 'ACTIVE' },
-  optionable: { field: 'instrument.optionable', op: 'eq', value: true },
+  status: { field: feature('instrument.status'), op: 'eq', value: 'ACTIVE' },
+  optionable: { field: feature('instrument.optionable'), op: 'eq', value: true },
 };
 
 /** A blank draft: a rule screen with the base gates. */

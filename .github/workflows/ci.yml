@@ -36,7 +36,7 @@ jobs:
           while IFS= read -r f; do
             case "$f" in
               "") ;;
-              .github/workflows/ci.yml | apps/api/openapi.json) python=true web=true ;;
+              .github/workflows/ci.yml | apps/api/openapi.json | apps/api/schema.graphql) python=true web=true ;;
               apps/web/*) web=true ;;
               *) python=true ;;
             esac
