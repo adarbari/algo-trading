@@ -249,11 +249,6 @@ purpose = "read-only queries about rule screens: the screener configs with their
 contracts = ["Explore queries are read-only: no writers, no jobs (ADR 0024)"]
 
 [[dir]]
-path = "src/algotrade/services/explore/funds"
-purpose = "read-only queries about funds: an ETF's top holdings with weights and links to the universe"
-contracts = ["Explore queries are read-only: no writers, no jobs (ADR 0024)"]
-
-[[dir]]
 path = "src/algotrade/services/explore/preview"
 purpose = "read-only dry runs of unsaved Builder input (ADR 0029): a draft rule screen previewed with the nightly evaluator on the latest closed session (cached field frame), a formula type checked and sampled"
 contracts = ["Explore queries are read-only: no writers, no jobs (ADR 0024)"]
@@ -357,10 +352,6 @@ path = "apps/api/algotrade_api/routes/screens"
 purpose = "the screens area's read routes: a screen's configs and results, and the Ideas list; each calls one services.explore query"
 
 [[dir]]
-path = "apps/api/algotrade_api/routes/funds"
-purpose = "the funds area's read routes: an ETF's holdings (/instruments/{id}/holdings); each calls one services.explore query"
-
-[[dir]]
 path = "apps/api/algotrade_api/routes/preview"
 purpose = "read-only dry-run routes over unsaved Builder input (ADR 0029): POST bodies, never a write; each calls one services.explore.preview query"
 
@@ -371,10 +362,6 @@ purpose = "pydantic response models per area: the public contract (OpenAPI -> th
 [[dir]]
 path = "apps/api/algotrade_api/schemas/screens"
 purpose = "response models of the screens area: a screen's configs and results, and the Ideas list"
-
-[[dir]]
-path = "apps/api/algotrade_api/schemas/funds"
-purpose = "response models of the funds area: an ETF's holdings"
 
 [[dir]]
 path = "apps/api/algotrade_api/schemas/preview"

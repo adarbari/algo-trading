@@ -187,9 +187,8 @@ def test_localhost_mark_does_not_open_the_internet() -> None:
 # an API response (REST legacy reads included). The entries below are the only exceptions;
 # the list only shrinks: removing a field without removing its entry fails too.
 TYPED_FACT_FIELDS = {
-    ("instruments", "Bar", "close"): "keep: a bar of a price series (range grain)",
-    ("instruments", "LiveOptionChain", "underlying_price"): "keep: a live quote (ADR 0028)",
-    ("instruments", "LiveOptionQuote", "close"): "keep: a live quote (ADR 0028)",
+    ("chains", "LiveOptionChain", "underlying_price"): "keep: a live quote (ADR 0028)",
+    ("chains", "LiveOptionQuote", "close"): "keep: a live quote (ADR 0028)",
 }
 
 

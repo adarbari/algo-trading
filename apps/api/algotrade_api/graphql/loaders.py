@@ -1,39 +1,77 @@
 """The dataloaders of one request (ADR 0037): a type resolves a child object or a per-object
 read only through one, so a list of N parents costs one read, not N (no N+1).
 
-``features``: keyed ``(instrument_id, names)``; one ``load_feature_values`` call per distinct
-``names`` across the batch. ``screener_latest_run``: keyed ``(owner, config_id)``; one
-``load_latest_runs`` call (one read of the session's screen results) per batch. The other
-loaders of the spec (``instruments``, ``events``, ``holdings``) arrive with the read-model PRs
-that first need them."""
+Each is keyed ``(instrument_id, *arguments)``; a batch makes one loader call per distinct
+arguments for all the instruments that asked them (``features``: one ``load_feature_values``
+per distinct ``names``), off the event loop. A loader's error is the result of each key in its
+call. ``screener_latest_run``: keyed ``(owner, config_id)``; one ``load_latest_runs`` call (one
+read of the session's screen results) per batch."""
 
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
+from datetime import date
+from functools import partial
+from typing import Any
 
 from anyio import to_thread
 from strawberry.dataloader import DataLoader
 
 from algotrade.services.read.context import ReadContext
+from algotrade.services.read.instruments.chains import (
+    OptionChain,
+    OptionQuote,
+    load_chains,
+    load_quotes,
+)
+from algotrade.services.read.instruments.events import Event, load_events
 from algotrade.services.read.instruments.features import FeatureValue, load_feature_values
+from algotrade.services.read.instruments.holdings import Holdings, load_holdings
+from algotrade.services.read.instruments.identity import Instrument, load_instruments
+from algotrade.services.read.instruments.prices import Adjustment, PriceSeries, load_prices
+from algotrade.services.read.instruments.series import FeatureSeries, load_series
 from algotrade.services.read.screens.runs import LatestRun, RunKey, load_latest_runs
 
 FeatureKey = tuple[str, tuple[str, ...]]  # (instrument_id, catalogue names in the order asked)
+EventKey = tuple[str, date | None, date | None]  # (instrument_id, start, end)
+QuoteKey = tuple[str, date]  # (underlying_id, expiry)
+HoldingsKey = tuple[str, int]  # (fund_id, top)
+PriceKey = tuple[str, date, date | None, Adjustment]  # (instrument_id, start, end, adjustment)
+SeriesKey = tuple[str, tuple[str, ...], date, date | None]  # (instrument_id, names, start, end)
+
+# load(ctx, instrument_ids, *arguments) -> {instrument_id: value} (absent: None)
+Load = Callable[..., Mapping[str, Any]]
 
 
-async def _feature_values(
-    ctx: ReadContext, keys: Sequence[FeatureKey]
-) -> list[tuple[FeatureValue, ...] | BaseException]:
-    by_names: dict[tuple[str, ...], list[str]] = {}
-    for iid, names in keys:
-        by_names.setdefault(names, []).append(iid)
-    found: dict[FeatureKey, tuple[FeatureValue, ...] | BaseException] = {}
-    for names, ids in by_names.items():
-        try:  # off the event loop: the read is parquet and pandas work
-            values = await to_thread.run_sync(load_feature_values, ctx, ids, names)
+async def batched(
+    load: Load, ctx: ReadContext, keys: Sequence[tuple[Any, ...]]
+) -> list[Any | BaseException]:
+    """One ``load`` call per distinct arguments (``key[1:]``) for every instrument that asked
+    them; each key's value, else the error of its call."""
+    by_arguments: dict[tuple[Any, ...], list[str]] = {}
+    for key in keys:
+        by_arguments.setdefault(tuple(key[1:]), []).append(key[0])
+    found: dict[tuple[Any, ...], Any | BaseException] = {}
+    for arguments, ids in by_arguments.items():
+        try:  # off the event loop: the reads are parquet and pandas work
+            values = await to_thread.run_sync(partial(load, ctx, ids, *arguments))
         except Exception as error:  # the error is the result of each key that asked
-            found.update({(iid, names): error for iid in ids})
+            found.update({(iid, *arguments): error for iid in ids})
         else:
-            found.update({(iid, names): values[iid] for iid in ids})
-    return [found[key] for key in keys]
+            found.update({(iid, *arguments): values.get(iid) for iid in ids})
+    return [found[tuple(key)] for key in keys]
+
+
+def _loader[K: tuple[Any, ...], V](load: Load, ctx: ReadContext) -> DataLoader[K, V]:
+    async def load_fn(keys: list[K]) -> list[V | BaseException]:
+        return await batched(load, ctx, keys)
+
+    return DataLoader(load_fn=load_fn)
+
+
+def _feature_values(
+    ctx: ReadContext, keys: Sequence[FeatureKey]
+) -> Awaitable[list[tuple[FeatureValue, ...] | BaseException]]:
+    """The ``features`` batch (kept by name: the tests count its reads)."""
+    return batched(load_feature_values, ctx, keys)
 
 
 async def _latest_runs(ctx: ReadContext, keys: Sequence[RunKey]) -> list[LatestRun]:
@@ -53,6 +91,13 @@ class Loaders:
         self.features: DataLoader[FeatureKey, tuple[FeatureValue, ...]] = DataLoader(
             load_fn=feature_values
         )
+        self.instruments: DataLoader[tuple[str], Instrument | None] = _loader(load_instruments, ctx)
+        self.events: DataLoader[EventKey, tuple[Event, ...]] = _loader(load_events, ctx)
+        self.chains: DataLoader[tuple[str], OptionChain | None] = _loader(load_chains, ctx)
+        self.quotes: DataLoader[QuoteKey, tuple[OptionQuote, ...]] = _loader(load_quotes, ctx)
+        self.holdings: DataLoader[HoldingsKey, Holdings | None] = _loader(load_holdings, ctx)
+        self.prices: DataLoader[PriceKey, PriceSeries] = _loader(load_prices, ctx)
+        self.series: DataLoader[SeriesKey, FeatureSeries] = _loader(load_series, ctx)
 
         async def latest_runs(keys: list[RunKey]) -> list[LatestRun]:
             return await _latest_runs(ctx, keys)

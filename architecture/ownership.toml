@@ -165,10 +165,10 @@ id = "feature-input-loading"
 description = "What a feature group reads, by table name: each input table's point-in-time read for features (from its data owner), slicing per session and lookback, other groups' stored rows with this run's rows winning; features never read storage or a domain reader"
 owner = ["src/algotrade/data/feature_inputs.py"]
 allowed = [
-    # ADR 0024: the API shows stored group rows (a feature's series, a distribution); a
-    # display read, never a feature input
+    # ADR 0024 / 0037: the API shows stored group rows (a distribution; a feature's series in
+    # the read model's FeatureSeries); a display read, never a feature input
     "src/algotrade/services/explore/features.py",
-    "src/algotrade/services/explore/instruments.py",
+    "src/algotrade/services/read/instruments/series.py",
 ]
 section = "docs/adr/0023-feature-store.md#step-2-inputs-through-data"
 detect = [
@@ -345,7 +345,7 @@ detect = [{ string = "instruments/ibkr_contracts" }, { string = "volatility/ibkr
 
 [[responsibility]]
 id = "etf-holdings"
-description = "What each ETF holds (ADR 0035): the etf-holdings task reads the issuers' daily files and SEC N-PORT through HoldingsSource adapters (first issuer that lists a fund wins), ranks and trims each fund's lines, links tickers to instruments through SymbolResolver and writes holdings/etf; consumers read it only through data.funds.holdings (latest rows per fund) and the explore query behind GET /instruments/{id}/holdings"
+description = "What each ETF holds (ADR 0035): the etf-holdings task reads the issuers' daily files and SEC N-PORT through HoldingsSource adapters (first issuer that lists a fund wins), ranks and trims each fund's lines, links tickers to instruments through SymbolResolver and writes holdings/etf; consumers read it only through data.funds.holdings (latest rows per fund) and the read model's Holdings behind Instrument.holdings (services/read/instruments/holdings.py)"
 owner = [
     "apps/ingestion/algotrade_ingestion/tasks/market/etf_holdings.py",
     "src/algotrade/data/funds/holdings.py",

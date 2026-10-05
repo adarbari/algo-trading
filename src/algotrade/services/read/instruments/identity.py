@@ -66,55 +66,45 @@ def resolve_id(ctx: ReadContext, key: str) -> str | None:
     return names.id_for(key) if names.knows(key) else None
 
 
-def load_instrument(ctx: ReadContext, key: str) -> Instrument | None:
-    """The instrument ``key`` names for ``ctx.session`` (see ``resolve_id``), else ``None``."""
-    iid = resolve_id(ctx, key)
-    return None if iid is None else load_instruments(ctx, [iid]).get(iid)
-
-
-def load_instruments(ctx: ReadContext, instrument_ids: Sequence[str]) -> dict[str, Instrument]:
-    """The instruments of ``instrument_ids`` the session's reference snapshot has, by id, in
-    one read (an id it does not have is left out): a table's rows name theirs this way."""
-    snapshot = ctx.session.reference_snapshot
-    wanted = list(dict.fromkeys(instrument_ids))
-    if snapshot is None or not wanted:
-        return {}
-    reference = _by_id(instruments(ctx.reader, ctx.session.date, wanted))
-    company = _by_id(companies(ctx.reader, ctx.session.date, wanted))
-    stored = _descriptions(ctx)
-    texts = _by_id(stored[stored["instrument_id"].isin(set(reference))])
-    return {
-        iid: _instrument(iid, row, company.get(iid, {}), texts.get(iid, {}), snapshot)
-        for iid, row in reference.items()
-    }
-
-
-def _by_id(frame: pd.DataFrame | None) -> dict[str, Mapping[str, Any]]:
+def _by_id(frame: pd.DataFrame | None) -> dict[str, Mapping[Any, Any]]:
     """The first row of each instrument in ``frame``, by id."""
     if frame is None or frame.empty:
         return {}
     first = frame.drop_duplicates("instrument_id", keep="first")
-    return {
-        str(r["instrument_id"]): {str(k): v for k, v in r.items()} for r in first.to_dict("records")
-    }
+    return {str(r["instrument_id"]): r for r in first.to_dict("records")}
 
 
-def _instrument(
-    iid: str,
-    reference: Mapping[str, Any],
-    company: Mapping[str, Any],
-    text: Mapping[str, Any],
-    snapshot: date,
-) -> Instrument:
-    security_type = _text(reference.get("security_type"))
-    return Instrument(
-        instrument_id=iid,
-        symbol=str(reference["symbol"]),
-        name=_text(company.get("name")) or _text(reference.get("name")) or "",
-        security_type=security_type,
-        asset_class=str(reference["asset_class"]),
-        exchange=_text(reference.get("exchange")),
-        is_etf=to_scalar(reference.get("is_etf")) is True or security_type == ETF,
-        description=_text(text.get("description")),
-        reference_snapshot=snapshot,
-    )
+def load_instruments(ctx: ReadContext, instrument_ids: Sequence[str]) -> dict[str, Instrument]:
+    """The instruments of ``instrument_ids`` (ids, not tickers) in the session's reference
+    snapshot, by id: one read of each snapshot table for them all; an id the snapshot does
+    not have is absent."""
+    snapshot = ctx.session.reference_snapshot
+    if snapshot is None or not instrument_ids:
+        return {}
+    ids = list(dict.fromkeys(instrument_ids))
+    references = _by_id(instruments(ctx.reader, ctx.session.date, ids))
+    companies_ = _by_id(companies(ctx.reader, ctx.session.date, ids))
+    stored = _descriptions(ctx)
+    texts = _by_id(stored[stored["instrument_id"].isin(list(references))])
+    out: dict[str, Instrument] = {}
+    for iid, reference in references.items():
+        company, text = companies_.get(iid, {}), texts.get(iid, {})
+        security_type = _text(reference.get("security_type"))
+        out[iid] = Instrument(
+            instrument_id=iid,
+            symbol=str(reference["symbol"]),
+            name=_text(company.get("name")) or _text(reference.get("name")) or "",
+            security_type=security_type,
+            asset_class=str(reference["asset_class"]),
+            exchange=_text(reference.get("exchange")),
+            is_etf=to_scalar(reference.get("is_etf")) is True or security_type == ETF,
+            description=_text(text.get("description")),
+            reference_snapshot=snapshot,
+        )
+    return out
+
+
+def load_instrument(ctx: ReadContext, key: str) -> Instrument | None:
+    """The instrument ``key`` names for ``ctx.session`` (see ``resolve_id``), else ``None``."""
+    iid = resolve_id(ctx, key)
+    return load_instruments(ctx, [iid]).get(iid) if iid is not None else None
