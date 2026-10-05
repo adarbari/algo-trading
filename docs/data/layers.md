@@ -194,18 +194,21 @@ Reads (`data.reference.descriptions`) union every partition and keep the latest 
 instrument; markers are left out of `descriptions` and kept in `stored_descriptions`.
 
 **`instruments/shares`** (SEC company facts, phase 2b.4; increments merged across runs, one row
-per instrument, concept, period end and filing date; `algotrade-ingest shares`)
+per instrument, concept, period start, period end and filing date; `algotrade-ingest shares`)
 
 | Columns | Notes |
 |---|---|
 | `instrument_id`, `symbol`, `cik` | every instrument of a CIK gets the CIK's facts (company totals; companyfacts has no class-specific counts) |
-| `concept`, `tag` | `dei` (cover-page shares outstanding), `weighted_basic` (weighted average basic), or `checked`: a marker that the CIK was fetched on `fetched_on` (no shares; keeps funds without facts from being refetched nightly) |
-| `period_start`, `period_end`, `filed`, `form`, `accn`, `fy`, `fp` | as filed; `filed` is the point-in-time date |
-| `shares`, `class_values` | the count; `class_values` > 1 when several class values of one filing were summed |
+| `concept`, `tag` | share counts: `dei` (cover-page shares outstanding), `weighted_basic` (weighted average basic); financials: `revenue`, `net_income`, `eps_diluted` (`tag` is the us-gaap tag that supplied it); or `checked`: a marker that the CIK was fetched on `fetched_on` (no fact; keeps funds without facts from being refetched nightly) |
+| `period_start`, `period_end`, `filed`, `form`, `accn`, `fy`, `fp` | as filed; `filed` is the point-in-time date. `period_start` is part of the key: a year-to-date and a quarterly fact share an end date (null for `dei` and `checked`) |
+| `shares`, `class_values` | the count (share concepts only); `class_values` > 1 when several class values of one filing were summed |
+| `value`, `unit` | the amount of a financial fact and its unit, `usd` or `usd_per_share` (financial concepts only). A period appears once for the filing that first reported it, plus once per later filing that changed the value (a restatement) |
 | `fetched_on` | when SEC was last asked; drives `facts_refresh_days` |
 
 Reads (`data.shares`) union every partition and keep the latest stored version per key. A fact
-counts from its `filed` date, whichever partition stored it, so a backfill serves history.
+counts from its `filed` date, whichever partition stored it, so a backfill serves history. The
+financial facts only ever add rows to a store that already has share counts: the first
+`algotrade-ingest shares --force` after they shipped stores them and leaves the rest alone.
 
 Selections read the company columns as `instrument.<column>` (`instrument.sector`,
 `instrument.industry`, `instrument.sic`, `instrument.sic_division`, `instrument.website`,
@@ -256,7 +259,7 @@ Per-column meanings, units, ranges and null meanings: [features.md](features.md)
 the v2 groups are stored as 32-bit (`float32`). Columns computed from other columns are
 expression features (`feature.<name>`): `pct_from_high_52w`, `pct_from_low_52w`, `near_52w`,
 `div_yield` (materialised as `rollups/instrument/div_yield@v1`: `iv30@v1` reads it),
-`market_cap`, `iv_hv_spread`, `iv_hv_ratio`, and the liquidity class (`liquidity_class`,
+`market_cap`, `pe_ratio`, `revenue_growth_yoy`, `iv_hv_spread`, `iv_hv_ratio`, and the liquidity class (`liquidity_class`,
 `option_tier`, ...; the former `liquidity_class@v1` group). The v1 tables they replaced stay
 readable until `algotrade-ingest retire-features --group <name>@v1` deletes them.
 
@@ -270,6 +273,7 @@ readable until `algotrade-ingest retire-features --group <name>@v1` deletes them
 | `iv30@v1` | `iv30` (ours), `iv30_cboe`, `iv30_status`, `near_expiry`, `far_expiry`, `atm_strike_near`, `spot`, `rate`, `div_yield`, `n_quotes_used` | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `div_yield@v1` | built |
 | `iv_history@v2` | `iv30`, `iv_rank_252d`, `iv_percentile_252d`, `history_days`, `rank_status` (UNKNOWN / PROVISIONAL / FULL) | `iv30@v1` over 252 sessions | built |
 | `fundamentals@v2` | `shares_outstanding`, `shares_as_of`, `shares_filed`, `shares_source` (dei / weighted_basic), `market_cap_status` (OK / NO_SHARES / STALE / NO_PRICE) | `instruments/shares` (filed on or before the session), `price_stats@v2` close, `events/split`; `stale_days` in `config/site/rollups.toml` | built |
+| `financials@v1` | `revenue_ttm`, `revenue_ttm_year_ago`, `net_income_ttm`, `eps_diluted_ttm`, `revenue_fy`, `revenue_fy_end`, `ttm_as_of`, `ttm_filed`, `ttm_basis` (QUARTERS / ANNUAL), `eps_stale`, `is_adr`, `financials_status` (OK / PARTIAL / NO_TTM / NO_FACTS / STALE) | `instruments/shares` financial concepts (filed on or before the session), `price_stats@v2` (which instruments get a row), `events/split`, `instruments/reference` (security type); `stale_days`, `history_days` in `config/site/rollups.toml` | built |
 | `put_wing@v1` | `wing_status` (OK / OUTSIDE_BAND / NO_SPOT / NO_CHAIN / NO_EXPIRY / NO_STRIKE), `target_expiry` + `target_dte` (nearest 45 days in 30..60, standard monthlies first), `n_unpriced`; band totals of the puts with OUR \|delta\| in 0.08..0.15 (`n_strikes`, `wing_oi`, `wing_volume`, `wing_spread_pct`); the best put among 0.05..0.35 delta, nearest the band then by cash-secured ROC (`delta_band_distance`, `best_put_strike`, `_delta`, `_iv`, `_mid`, `_oi`, `_volume`, `_spread_pct`, `_roc`) | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `div_yield@v1` | built |
 | `price_moves@v1` | `one_day_move`: the largest \|close-to-close return\| over the last 20 sessions | `bars/1d` split-adjusted as of the session, 20 sessions back | built |
 | `momentum@v1` | `atr_14`, `rsi_14` (Wilder, 150-session warm-up), `ret_5d`, `rel_volume` (vs the 20 sessions before), `high_20d`, `low_20d`, `high_50d`, `low_50d`, `prior_high_20d` ([swing.md](swing.md)) | `bars/1d` split-adjusted as of the session, 149 sessions back | built |
@@ -288,6 +292,42 @@ the count is still shown) and `NO_PRICE` have a null market cap. Counts are comp
 so a class's market cap is the total times its own close (fine for GOOGL / GOOG, wrong for
 classes at very different prices, such as BRK.A / BRK.B). One row per instrument with a
 `price_stats@v2` row or a share count.
+
+**`financials@v1` rules.** Among facts FILED on or before the session (a filing counts for
+the session of its filing date, even one made in the evening: the same few-hours look-ahead as
+`fundamentals@v2`), each (concept, tag, period) takes its latest known value (a restatement
+counts from its filing date). Per concept a TTM is: (1) `QUARTERS`: the sum of the last four
+consecutive discrete quarters, when the newest quarter ends on or after the newest fiscal year;
+a discrete quarter is a reported three-month fact (the best revenue tag first), else the
+difference of two year-to-date facts of one fiscal year and **one tag** (6M minus 3M, 9M minus
+6M, and Q4 as the annual figure minus 9M; the 10-K therefore makes Q4 public on its filing
+date). The two facts must have been filed within 150 days of each other, i.e. belong to one
+restatement generation (a restated annual figure is not subtracted from an unrestated nine
+months), and a derived revenue quarter is never negative; otherwise that quarter is unknown and
+the TTM falls back; (2) else `ANNUAL`: the latest fiscal year (a filer that reports only
+annually, or whose quarters do not chain, such as a bank that tags quarterly revenue
+differently); (3) else null. `revenue_ttm_year_ago` is the same TTM one year earlier: the four
+quarters ending 340 to 380 days before the newest one, or the previous fiscal year; null when
+that history has a hole, so `revenue_growth_yoy = revenue_ttm / revenue_ttm_year_ago - 1` is
+never measured over more than a year. `revenue_fy` / `revenue_fy_end` are the latest annual
+revenue fact. `eps_diluted_ttm` sums the quarterly diluted EPS (not strictly additive when the
+share count moves, the usual definition) after dividing each EPS fact by the ratio of every split
+that took effect after the fact's filing date and on or before the session, so it is on the
+same basis as the split-adjusted close. Revenue is stored under `Revenues`,
+`RevenueFromContractWithCustomerExcludingAssessedTax` and `SalesRevenueNet` (all three kept);
+the group prefers them in that order for a period. Statuses: `NO_FACTS` (ETFs, funds, no CIK,
+non-USD issuers; every value null, never an error), `NO_TTM` (facts but no TTM can be formed),
+`PARTIAL` (some of the three), `STALE` (the first TTM present, revenue else net income else EPS,
+ended more than `stale_days`, 480, before the session; values still shown), else `OK`.
+`ttm_as_of`, `ttm_filed` and `ttm_basis` describe that same first TTM (revenue's, normally).
+`eps_stale` says the EPS TTM itself is stale, and `is_adr` that the instrument is an ADR
+(`instruments/reference` security type). The expression feature
+`pe_ratio = close / eps_diluted_ttm` is null when `eps_diluted_ttm` is missing or not positive
+(a negative P/E is not shown), when the close is not positive, when `eps_stale`, and for an ADR:
+an ADR's EPS is per ordinary share and the ADR ratio is not stored. Every instrument of a CIK
+gets the company's figures, which is right for classes with equal economics (GOOGL / GOOG) and
+wrong otherwise. One row per instrument with a `price_stats@v2` row or a financial fact. The
+whole `instruments/shares` table is read once per `rollups` run and filtered per session.
 
 **`price_stats@v2` rules.** Windows are exchange sessions, not "the instrument's last n bars":
 a session without a bar is a gap, and a statistic is null (UNKNOWN), never zero or computed

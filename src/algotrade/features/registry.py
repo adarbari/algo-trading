@@ -24,7 +24,7 @@ from collections.abc import Mapping
 from algotrade.features.framework.declaration import FeatureGroup, Superseded
 from algotrade.features.framework.feature import Feature
 from algotrade.features.framework.graph import dependency_order
-from algotrade.features.rollups.corporate import dividends, earnings, fundamentals
+from algotrade.features.rollups.corporate import dividends, earnings, financials, fundamentals
 from algotrade.features.rollups.options import (
     ibkr_iv,
     iv30,
@@ -53,6 +53,7 @@ GROUPS: dict[str, FeatureGroup] = {
             iv_history.GROUP,
             ibkr_iv.GROUP,
             fundamentals.GROUP,
+            financials.GROUP,
             put_wing.GROUP,
             price_moves.GROUP,
             momentum.GROUP,

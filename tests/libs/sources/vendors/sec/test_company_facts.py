@@ -1,6 +1,8 @@
-"""SEC company facts against a recorded (trimmed) payload: only share counts are kept, one
-cover count per filing (classes summed), one weighted average per filing (its current
-period), amendments as their own rows, zero counts dropped."""
+"""SEC company facts against a recorded (trimmed) payload: share counts are kept, one cover
+count per filing (classes summed), one weighted average per filing (its current period),
+amendments as their own rows, zero counts dropped; and the revenue / net income / diluted EPS
+flows: periodic forms and quarter-to-year spans only, the best revenue tag per period, the
+first filing of a period plus restatements, losses kept."""
 
 import json
 from datetime import date
@@ -10,8 +12,8 @@ import pytest
 from algotrade_sources.framework.base import FetchRequest
 from algotrade_sources.framework.http import HttpError, RetryPolicy
 from algotrade_sources.vendors.sec.company_facts import (
+    FACT_COLUMNS,
     FACTS_URL,
-    SHARE_COLUMNS,
     SecCompanyFacts,
     parse_company_facts,
 )
@@ -22,12 +24,16 @@ FIXTURE = REPO_ROOT / "tests" / "fixtures" / "sources" / "sec" / "companyfacts_C
 PAYLOAD = FIXTURE.read_bytes()
 
 
-def test_keeps_only_share_counts() -> None:
+def test_keeps_share_counts_and_the_flows_and_nothing_else() -> None:
     rows = parse_company_facts(PAYLOAD)
-    assert list(rows.columns) == list(SHARE_COLUMNS)
-    assert set(rows["concept"]) == {"dei", "weighted_basic"}
+    assert list(rows.columns) == list(FACT_COLUMNS)
+    assert set(rows["concept"]) == {"dei", "weighted_basic", "revenue"}  # not the public float
+    counts = rows[rows["concept"] != "revenue"]
+    assert counts["value"].isna().all() and counts["unit"].isna().all()
+    revenue = rows[rows["concept"] == "revenue"].iloc[0]
+    assert (revenue["value"], revenue["unit"], revenue["shares"]) == (95359000000.0, "usd", None)
     assert set(rows["cik"]) == {"0000320193"}
-    assert (rows["shares"] > 0).all()  # the 2009 zero is dropped
+    assert (rows["shares"].dropna() > 0).all()  # the 2009 zero is dropped
 
 
 def test_cover_counts_one_per_filing_classes_summed_amendments_kept() -> None:
@@ -79,6 +85,106 @@ def test_source_fetches_by_padded_cik_and_404_is_none() -> None:
     assert seen == [FACTS_URL.format(cik="0000320193")]
     assert source.fetch(FetchRequest("884394", session_date=date(2026, 10, 2))) is None
     normalized = source.normalize(FetchRequest("320193"), PAYLOAD)
-    assert normalized is not None and len(normalized.parsed["shares"]) == 7
+    assert normalized is not None and len(normalized.parsed["shares"]) == 8
     with pytest.raises(ValueError, match="not a CIK"):
         source.fetch(FetchRequest("AAPL"))
+
+
+def _entry(unit: str, *rows: dict[str, object]) -> dict[str, object]:
+    return {"units": {unit: list(rows)}}
+
+
+def _row(start: str, end: str, val: float, filed: str, form: str = "10-Q", **extra: object):  # type: ignore[no-untyped-def]
+    return {
+        "start": start, "end": end, "val": val, "accn": f"A-{filed}-{form}-{start}", "fy": 2026,
+        "fp": "Q1", "form": form, "filed": filed, **extra,
+    }  # fmt: skip
+
+
+def _financials_doc() -> bytes:
+    q1 = ("2026-01-01", "2026-03-31")
+    doc = {
+        "cik": 1234,
+        "facts": {
+            "us-gaap": {
+                "Revenues": _entry(
+                    "USD",
+                    _row(*q1, 100, "2026-05-01"),
+                    _row(*q1, 100, "2027-05-01"),  # the comparative a year later: dropped
+                    _row(*q1, 110, "2027-08-01", "10-Q/A"),  # a restatement: kept
+                    _row("2026-01-01", "2026-12-31", 500, "2027-02-20", "10-K"),
+                    _row("2026-03-01", "2026-03-31", 30, "2026-05-01"),  # a month: dropped
+                    _row(*q1, 7, "2026-05-02", "8-K"),  # not a periodic filing: dropped
+                    _row(*q1, 8, "2026-05-02", "DEF 14A"),
+                ),
+                "RevenueFromContractWithCustomerExcludingAssessedTax": _entry(
+                    "USD",
+                    _row(*q1, 90, "2026-05-01"),  # Revenues has this period: it wins
+                    _row("2026-04-01", "2026-06-30", 120, "2026-08-01"),  # only here: kept
+                ),
+                "SalesRevenueNet": _entry(
+                    "USD", _row("2020-01-01", "2020-03-31", 60, "2020-05-01")
+                ),
+                "NetIncomeLoss": _entry(
+                    "USD", _row(*q1, -40, "2026-05-01"), {"start": "2026-01-01"}
+                ),  # a loss; a fact without an end or value is dropped
+                "EarningsPerShareDiluted": _entry("USD/shares", _row(*q1, -0.5, "2026-05-01")),
+            }
+        },
+    }
+    doc["facts"]["us-gaap"]["EarningsPerShareBasic"] = _entry(
+        "USD/shares", _row(*q1, 1, "2026-05-01")
+    )  # type: ignore[index]
+    return json.dumps(doc).encode()
+
+
+def test_flows_first_filing_and_restatements_per_tag() -> None:
+    rows = parse_company_facts(_financials_doc())
+    assert list(rows.columns) == list(FACT_COLUMNS)
+    revenue = rows[rows["concept"] == "revenue"].set_index(["tag", "period_start", "filed"])
+    plain, contract = (
+        "us-gaap:Revenues",
+        "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
+    )
+    assert sorted(revenue.index) == [
+        (contract, "2026-01-01", "2026-05-01"),
+        (contract, "2026-04-01", "2026-08-01"),
+        (plain, "2026-01-01", "2026-05-01"),
+        (plain, "2026-01-01", "2027-02-20"),
+        (plain, "2026-01-01", "2027-08-01"),
+        ("us-gaap:SalesRevenueNet", "2020-01-01", "2020-05-01"),
+    ]
+    assert revenue.loc[(plain, "2026-01-01", "2026-05-01"), "value"] == 100.0
+    assert revenue.loc[(contract, "2026-01-01", "2026-05-01"), "value"] == 90.0  # kept, own tag
+    restated = revenue.loc[(plain, "2026-01-01", "2027-08-01")]
+    assert (restated["value"], restated["form"]) == (110.0, "10-Q/A")
+    assert set(revenue["unit"]) == {"usd"} and revenue["shares"].isna().all()
+
+
+def test_a_later_filing_with_another_tag_does_not_hide_the_first_report() -> None:
+    """The point-in-time dating must not depend on whether the whole history is parsed at
+    once: the first report of a period under one tag stays even when a later filing reports
+    the same period under a better tag."""
+    q1 = ("2026-01-01", "2026-03-31")
+    doc = {
+        "cik": 1234,
+        "facts": {
+            "us-gaap": {
+                "Revenues": _entry("USD", _row(*q1, 100, "2027-05-01")),
+                "RevenueFromContractWithCustomerExcludingAssessedTax": _entry(
+                    "USD", _row(*q1, 100, "2026-05-01")
+                ),
+            }
+        },
+    }
+    rows = parse_company_facts(json.dumps(doc).encode())
+    assert sorted(rows["filed"]) == ["2026-05-01", "2027-05-01"]
+
+
+def test_losses_and_eps_are_kept_with_their_units() -> None:
+    rows = parse_company_facts(_financials_doc())
+    loss = rows[rows["concept"] == "net_income"]
+    assert loss["value"].tolist() == [-40.0] and loss["unit"].tolist() == ["usd"]
+    eps = rows[rows["concept"] == "eps_diluted"]
+    assert eps["value"].tolist() == [-0.5] and eps["unit"].tolist() == ["usd_per_share"]
+    assert set(rows["concept"]) == {"revenue", "net_income", "eps_diluted"}  # basic EPS: not kept

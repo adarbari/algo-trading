@@ -1,5 +1,6 @@
-"""``data.shares``: increments union across partitions, the latest stored version per key,
-markers kept apart from facts, facts ordered by filing date."""
+"""``data.shares``: increments union across partitions, the latest stored version per key
+(a year-to-date and a quarterly fact of one end date are two keys), markers kept apart from
+facts, facts ordered by filing date."""
 
 from datetime import UTC, date, datetime
 
@@ -15,7 +16,7 @@ D1, D2 = date(2026, 9, 1), date(2026, 10, 1)
 def row(concept: str, shares: float | None, filed: date | None, fetched: date) -> dict[str, object]:
     return {
         "instrument_id": "EQ:A", "cik": "0000000001", "concept": concept, "shares": shares,
-        "period_end": filed, "filed": filed, "fetched_on": fetched,
+        "period_start": None, "period_end": filed, "filed": filed, "fetched_on": fetched,
     }  # fmt: skip
 
 
@@ -45,3 +46,19 @@ def test_union_latest_version_and_markers() -> None:
     assert list(facts["shares"]) == [11.0, 12.0]
     assert list(facts["filed"]) == [date(2026, 5, 1), date(2026, 8, 1)]
     assert "run_id" not in facts.columns
+
+
+def test_flows_of_one_end_date_are_told_apart_by_their_start() -> None:
+    writer = StoreWriter(MemoryBackend())
+    end, filed = date(2026, 6, 30), date(2026, 8, 4)
+    rows = [
+        {"instrument_id": "EQ:A", "cik": "0000000001", "concept": "revenue", "value": v,
+         "unit": "usd", "period_start": start, "period_end": end, "filed": filed,
+         "fetched_on": D2}
+        for v, start in ((140.0, date(2026, 4, 1)), (270.0, date(2026, 1, 1)))
+    ]  # fmt: skip
+    writer.write_table(TABLE, D2, "r1", stamped(rows, D2, "r1", datetime(2026, 10, 1, tzinfo=UTC)))
+    again = [{**rows[0], "value": 150.0}]  # a restated quarter replaces only its own key
+    writer.write_table(TABLE, D2, "r2", stamped(again, D2, "r2", datetime(2026, 10, 2, tzinfo=UTC)))
+    facts = share_facts(StoreReader(writer._backend))
+    assert sorted(facts["value"]) == [150.0, 270.0]

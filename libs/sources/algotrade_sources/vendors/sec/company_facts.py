@@ -1,7 +1,9 @@
-"""SEC EDGAR company facts: share counts per CIK from XBRL filings (free, no key).
+"""SEC EDGAR company facts: share counts and basic financials per CIK from XBRL filings
+(free, no key).
 
 ``https://data.sec.gov/api/xbrl/companyfacts/CIK##########.json`` holds every
-non-dimensional XBRL fact a company has filed (MBs for a large filer). We keep only two:
+non-dimensional XBRL fact a company has filed (MBs for a large filer). We keep two share
+counts:
 
 - ``dei:EntityCommonStockSharesOutstanding`` (``dei``): the cover-page count as of a date
   shortly before the filing. A filing that reports several values for the same date (one
@@ -12,9 +14,24 @@ non-dimensional XBRL fact a company has filed (MBs for a large filer). We keep o
   Alphabet). Each filing reports several periods (quarter, year to date, prior-year
   comparatives); we keep its current period: the latest ``end``, then the shortest span.
 
+and three flows (``FLOWS``), the inputs of ``financials@v1``:
+
+- ``revenue`` (``us-gaap:Revenues``, ``RevenueFromContractWithCustomerExcludingAssessedTax``
+  and ``SalesRevenueNet``; every tag is kept in ``tag``, ``financials@v1`` ranks them in that
+  order and never subtracts across tags), ``net_income`` (``NetIncomeLoss``) in USD, and
+  ``eps_diluted`` (``EarningsPerShareDiluted``) in USD per share, in ``value`` with ``unit``;
+- only periodic filings (10-K, 10-Q, 20-F, 40-F and their amendments) and only periods of a
+  quarter, half year, nine months or a year (``SPAN_DAYS``): the year-to-date facts are how
+  the fourth quarter is derived (annual minus nine months);
+- a period is reported again as a comparative in later filings: per tag we keep the filing
+  that first reported it and any later filing whose value differs (a restatement), so a
+  point-in-time read sees exactly the values that were public at each date, without the
+  repeats.
+
 Every row keeps ``filed`` (the point-in-time date), ``period_end``, ``form`` and ``accn``.
-Amendments (10-K/A) are separate rows with a later ``filed``. Non-positive counts are
-dropped. A 404 means the CIK has no XBRL facts (common for funds).
+Amendments (10-K/A) are separate rows with a later ``filed``. Non-positive share counts are
+dropped (losses and negative EPS are kept). A 404 means the CIK has no XBRL facts (common
+for funds).
 
 Requests share the ``sec`` limiter and the contact ``User-Agent`` with the other SEC
 sources (``sources/framework/registry.py``; ``[sec_edgar]`` in ``sources.toml``).
@@ -35,7 +52,20 @@ CONCEPTS = {  # our short name -> (taxonomy, XBRL concept)
     "dei": ("dei", "EntityCommonStockSharesOutstanding"),
     "weighted_basic": ("us-gaap", "WeightedAverageNumberOfSharesOutstandingBasic"),
 }
-SHARE_COLUMNS = (
+FLOWS = {  # short name -> (unit key in the document, our unit, us-gaap tags best first)
+    "revenue": (
+        "USD",
+        "usd",
+        ("Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "SalesRevenueNet"),
+    ),
+    "net_income": ("USD", "usd", ("NetIncomeLoss",)),
+    "eps_diluted": ("USD/shares", "usd_per_share", ("EarningsPerShareDiluted",)),
+}
+PERIODIC_FORMS = ("10-K", "10-Q", "20-F", "40-F")  # prefixes: 10-K/A, 10-KT, 10-Q/A ...
+# Days from period start to end of a quarter, half year, nine months and a year (52 / 53-week
+# fiscal years included).
+SPAN_DAYS = ((75, 105), (160, 200), (250, 290), (340, 380))
+FACT_COLUMNS = (
     "cik",
     "concept",
     "tag",
@@ -48,6 +78,8 @@ SHARE_COLUMNS = (
     "fp",
     "shares",
     "class_values",
+    "value",
+    "unit",
 )
 
 
@@ -78,8 +110,31 @@ def _current_period(frame: pd.DataFrame) -> pd.DataFrame:
     return ordered.drop_duplicates("accn", keep="last").assign(class_values=1)
 
 
+def _flow_facts(doc: dict[str, Any], concept: str) -> pd.DataFrame:
+    """One flow's periodic facts: per tag and period the first filing and the restatements
+    only (see the module docstring). Which tag to use is not decided here: that depends on
+    what is known on each date."""
+    unit_key, unit, tags = FLOWS[concept]
+    taxonomy = (doc.get("facts") or {}).get("us-gaap", {})
+    parts = []
+    for tag in tags:
+        rows = ((taxonomy.get(tag) or {}).get("units") or {}).get(unit_key) or []
+        if rows:
+            parts.append(pd.DataFrame(rows).assign(tag=f"us-gaap:{tag}"))
+    columns = ["start", "end", "val", "accn", "fy", "fp", "form", "filed", "tag"]
+    frame = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=columns)
+    frame = frame.reindex(columns=columns).dropna(subset=["start", "end", "val", "accn", "filed"])
+    frame = frame[frame["form"].astype(str).str.startswith(PERIODIC_FORMS)]
+    span = (pd.to_datetime(frame["end"]) - pd.to_datetime(frame["start"])).dt.days
+    frame = frame[pd.concat([span.between(lo, hi) for lo, hi in SPAN_DAYS], axis=1).any(axis=1)]
+    period = ["tag", "start", "end"]
+    frame = frame.sort_values([*period, "filed", "accn"], kind="stable")
+    frame = frame[frame["val"].ne(frame.groupby(period)["val"].shift())]
+    return frame.assign(concept=concept, unit=unit, val=frame["val"].astype(float), class_values=1)
+
+
 def parse_company_facts(payload: bytes) -> pd.DataFrame:
-    """A companyfacts document -> share-count rows (``SHARE_COLUMNS``), sorted by
+    """A companyfacts document -> fact rows (``FACT_COLUMNS``), sorted by
     (concept, filed, period_end)."""
     doc = json.loads(payload)
     cik = pad_cik(doc.get("cik"))
@@ -90,20 +145,25 @@ def parse_company_facts(payload: bytes) -> pd.DataFrame:
         frame = _facts(doc, concept)
         if not frame.empty:
             parts.append(reduce(frame))
+    parts += [flow for c in FLOWS if not (flow := _flow_facts(doc, c)).empty]
     if not parts:
-        return pd.DataFrame(columns=list(SHARE_COLUMNS))
+        return pd.DataFrame(columns=list(FACT_COLUMNS))
     out = pd.concat(parts, ignore_index=True).rename(
-        columns={"start": "period_start", "end": "period_end", "val": "shares"}
+        columns={"start": "period_start", "end": "period_end", "val": "value"}
     )
     out = out.assign(cik=cik)
+    counts = out["concept"].isin(["dei", "weighted_basic"])
+    out["shares"] = out["value"].where(counts)  # a share count is `shares`, a flow is `value`
+    out["value"] = out["value"].where(~counts)
     out.loc[out["concept"] == "dei", "period_start"] = None
     out = out.sort_values(["concept", "filed", "period_end", "accn"], kind="stable")
     out = out.astype(object).where(out.notna(), None)
-    return out[list(SHARE_COLUMNS)].reset_index(drop=True)
+    return out.reindex(columns=list(FACT_COLUMNS)).reset_index(drop=True)
 
 
 class SecCompanyFacts:
-    """One company's share counts. Request key: a CIK (any form, padded to 10 digits)."""
+    """One company's share counts and financials. Request key: a CIK (any form, padded to 10
+    digits)."""
 
     name = SOURCE
     dataset = "companyfacts"

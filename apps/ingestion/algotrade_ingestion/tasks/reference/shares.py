@@ -1,4 +1,6 @@
-"""Share counts from SEC company facts as an L1 table (``instruments/shares``, phase 2b.4).
+"""Share counts and basic financials from SEC company facts as an L1 table
+(``instruments/shares``, phase 2b.4; revenue, net income and diluted EPS added for
+``financials@v1``).
 
 - CIK per instrument: the latest ``instruments/company`` snapshot on or before the session
   (the reference's CIK or the SEC ticker map, chosen by ``company_details``), else the
@@ -72,7 +74,9 @@ def instrument_ciks(reader: StoreReader, session: date) -> pd.DataFrame:
 
 def _rows(facts: pd.DataFrame, members: pd.DataFrame, fetched_on: date) -> pd.DataFrame:
     """One CIK's facts for each of its instruments, plus a ``checked`` marker each."""
-    marker = pd.DataFrame([{"concept": CHECKED, "period_end": None, "filed": None}])
+    marker = pd.DataFrame(
+        [{"concept": CHECKED, "period_start": None, "period_end": None, "filed": None}]
+    )
     out = pd.concat([facts.drop(columns=["cik"], errors="ignore"), marker], ignore_index=True)
     for column in DATES:
         if column in out.columns:
@@ -118,7 +122,7 @@ def _carry(stored: pd.DataFrame, ids: pd.DataFrame, fetched: set[str]) -> pd.Dat
         return stored
     have = set(stored["instrument_id"].astype(str))
     new = ids[~ids["instrument_id"].isin(have) & ~ids["cik"].isin(fetched)]
-    by_cik = stored.drop_duplicates(["cik", "concept", "period_end", "filed"])
+    by_cik = stored.drop_duplicates(["cik", *KEY[1:]])
     by_cik = by_cik.drop(columns=["instrument_id", "symbol"], errors="ignore")
     return new[["instrument_id", "symbol", "cik"]].merge(by_cik, on="cik", how="inner")
 

@@ -1,6 +1,7 @@
 """The shares task: CIK -> instruments (every class), incremental by refresh slot, markers for
 CIKs without facts, only new facts stored, carry to a new class, limit, force, resume."""
 
+import json
 from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
@@ -90,8 +91,14 @@ def test_first_run_maps_facts_to_every_class_and_marks_funds() -> None:
     assert len(googl) == 2 and set(googl["shares"]) == {12151000000.0}
     assert set(googl["cik"]) == {GOOGL_CIK} and set(googl["concept"]) == {"weighted_basic"}
     aapl = facts[facts["instrument_id"] == "EQ:AAPL"]
-    assert len(aapl) == 7 and aapl["filed"].iloc[0] == date(2025, 10, 31)
+    assert len(aapl) == 8 and aapl["filed"].iloc[0] == date(2025, 10, 31)
     assert set(aapl["fy"].dropna()) == {2025, 2026}
+    revenue = aapl[aapl["concept"] == "revenue"].iloc[0]
+    assert (revenue["value"], revenue["unit"], revenue["period_start"]) == (
+        95359000000.0,
+        "usd",
+        date(2025, 12, 28),
+    )
     stored = stored_shares(reader)
     markers = stored[stored["concept"] == "checked"]
     assert set(markers["instrument_id"]) == {"EQ:AAPL", "EQ:GOOGL", "EQ:GOOG", "EQ:SPY"}
@@ -113,7 +120,7 @@ def test_nightly_runs_are_incremental_and_store_only_new_facts() -> None:
     partition = reader.table(TABLE, later)
     assert partition is not None
     assert set(partition["concept"]) == {"checked"}  # nothing new was filed
-    assert len(share_facts(reader)) == 9
+    assert len(share_facts(reader)) == 10
     forced = FakeFacts()
     ingest_shares(task_ctx(writer, reader, CLOCK), sources(forced), later, force=True)
     assert len(forced.urls) == 3
@@ -143,9 +150,9 @@ def test_a_new_class_gets_its_ciks_stored_facts() -> None:
     writer.write_table("instruments/reference", nxt, "u2", pd.concat([reference, row]))
     record = ingest_shares(task_ctx(writer, reader, CLOCK), sources(FakeFacts()), nxt)
     if record.stats["requested"] == 0:  # AAPL's slot is not today: copied, not fetched
-        assert record.stats["carried"] == 7
+        assert record.stats["carried"] == 8
     facts = share_facts(reader)
-    assert len(facts[facts["instrument_id"] == "EQ:AAPL2"]) == 7
+    assert len(facts[facts["instrument_id"] == "EQ:AAPL2"]) == 8
 
 
 def test_resume_skips_ciks_already_fetched() -> None:
@@ -158,4 +165,22 @@ def test_resume_skips_ciks_already_fetched() -> None:
     assert second.run_id == first.run_id  # resumed the unfinished run
     assert [u.rsplit("CIK", 1)[1][:10] for u in fixed.urls] == [GOOGL_CIK]
     assert second.status is RunStatus.COMPLETE
-    assert len(share_facts(reader)) == 9
+    assert len(share_facts(reader)) == 10
+
+
+def test_a_forced_refetch_adds_only_the_financials_to_an_older_store() -> None:
+    """Share counts stored before the financials existed: a refetch stores the new concepts
+    (the keys now include the period start) and nothing that is already there."""
+    writer, reader = store()
+    older = json.loads(PAYLOAD)
+    del older["facts"]["us-gaap"]["Revenues"]
+    first = FakeFacts()
+    first_feed = lambda url: json.dumps(older).encode() if "0000320193" in url else first(url)  # noqa: E731
+    ingest_shares(task_ctx(writer, reader, CLOCK), sources(first_feed), DAY)
+    assert "revenue" not in set(share_facts(reader)["concept"])
+    later = DAY + timedelta(days=1)
+    ingest_shares(task_ctx(writer, reader, CLOCK), sources(FakeFacts()), later, force=True)
+    partition = reader.table(TABLE, later)
+    assert partition is not None
+    fresh = partition[partition["concept"] != "checked"]
+    assert set(fresh["concept"]) == {"revenue"} and len(fresh) == 1  # AAPL's one revenue fact
