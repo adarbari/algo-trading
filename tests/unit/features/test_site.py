@@ -1,8 +1,8 @@
 """The site's expression features (``config/site/features/*.toml``) as ``site_features``
 builds them: the liquidity class reproduces ``liquidity_class@v1`` on its scenarios (each
 threshold decides, the worse option tier counts, unknown inputs give UNKNOWN only when they
-could change the class), the price, volatility and fundamentals formulas, and the moved
-features reproduce their v1 values on golden data."""
+could change the class), the price, volatility, fundamentals and earnings-before-expiry
+formulas, and the moved features reproduce their v1 values on golden data."""
 
 import dataclasses
 
@@ -410,3 +410,53 @@ def test_swing_breakout_and_pullback_rules(fs: FeatureSet) -> None:
     assert pull["EQ:FAR"] is False  # 3 above: more than 1 ATR
     assert pull["EQ:MIX"] is False  # not an uptrend
     assert pull["EQ:BREAK"] is False  # 11 above SMA20
+
+
+def test_earnings_before_expiry_compares_the_two_dates(fs: FeatureSet) -> None:
+    day = pd.Timestamp(END).date()
+    expiry = day + pd.Timedelta(days=7)
+    earnings = pd.DataFrame(
+        {
+            "instrument_id": [
+                "EQ:BEFORE",
+                "EQ:SAME",
+                "EQ:AFTER",
+                "EQ:NOCHAIN",
+                "EQ:LASTONLY",
+                "EQ:PAST",
+            ],
+            "session_date": END,
+            "next_earnings_date": [
+                day + pd.Timedelta(days=2),
+                expiry,
+                expiry + pd.Timedelta(days=1),
+                day,
+                None,  # only a last report date is known
+                day,
+            ],
+        }
+    )
+    chains = pd.DataFrame(
+        {
+            "instrument_id": [
+                "EQ:BEFORE",
+                "EQ:SAME",
+                "EQ:AFTER",
+                "EQ:LASTONLY",
+                "EQ:NOEARN",
+                "EQ:PAST",
+            ],
+            "session_date": END,
+            "expiry_date": [expiry] * 5 + [None],  # EQ:PAST: a chain, every expiry past
+        }
+    )
+    frames = {
+        "rollups/instrument/earnings@v1": earnings,
+        "rollups/instrument/nearest_expiry@v1": chains,
+    }
+    out = fs.evaluate(frames, ["earnings_before_expiry"]).set_index("instrument_id")
+    flags = out["earnings_before_expiry"]
+    assert bool(flags["EQ:BEFORE"]) and bool(flags["EQ:SAME"])  # on the expiry counts
+    assert not bool(flags["EQ:AFTER"])
+    for unknown in ("EQ:NOCHAIN", "EQ:LASTONLY", "EQ:NOEARN", "EQ:PAST"):
+        assert pd.isna(flags[unknown])  # either date unknown: UNKNOWN, never false

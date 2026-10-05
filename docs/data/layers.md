@@ -95,8 +95,8 @@ nightly and stored point-in-time:
 bars/1m ──► rollups/daily/session_stats@v1 ──┐
 bars/1d ─────────────────────────────────────┼─► rollups/instrument/price_stats@v2   (52w hi/lo, MAs, HV, ADV), price_moves@v1, momentum@v1, swing_levels@v1,
                                                    anchored_vwap@v1 (+ events/earnings)
-chains/* ────────────────────────────────────┼─► rollups/instrument/option_liquidity@v1, put_wing@v1, oi_walls@v1, iv30@v1 ─► iv_history@v2 ─┐
-volatility/ibkr_iv30 ────────────────────────┼─► rollups/instrument/ibkr_iv@v1 ───────────────────────────────────────────────┴─► iv_rank (+ source)
+chains/* ────────────────────────────────────┼─► rollups/instrument/option_liquidity@v1, put_wing@v1, oi_walls@v1, nearest_expiry@v1, iv30@v1 ─► iv_history@v2 ─┐
+volatility/ibkr_iv30 ────────────────────────┼─► rollups/instrument/ibkr_iv@v1 ─────────────────────────────────────────────────────────────────────────────────┴─► iv_rank (+ source)
 events/earnings ─────────────────────────────┴─► rollups/instrument/earnings@v1     (next date, days to it)
 ```
 
@@ -281,6 +281,7 @@ readable until `algotrade-ingest retire-features --group <name>@v1` deletes them
 | `swing_levels@v1` | `swing_high` / `swing_high_date` (resistance: the most recent confirmed swing high above the close), `swing_low` / `swing_low_date` (support); pivots 5 bars each side, confirmed 5 sessions later ([swing.md](swing.md)) | `bars/1d` split-adjusted as of the session, 251 sessions back | built |
 | `anchored_vwap@v1` | `avwap_earnings` (VWAP of the typical price from the last earnings anchor session: the report day, or the next session for a report after the close), `avwap_anchor_date` | `events/earnings` snapshots (read as `earnings@v1` reads them), `bars/1d` split-adjusted as of the session, 126 sessions back | built |
 | `oi_walls@v1` | `wall_status` (OK / PARTIAL / NO_OI / NO_SPOT / NO_CHAIN / NO_EXPIRY), `call_wall` + `call_wall_oi` (most call OI at or above spot), `put_wall` + `put_wall_oi` (most put OI at or below spot); OI summed across expiries 1..60 days out, ties nearer spot | the session's `chains/option_quotes`, `chains/underlying_quotes` | built |
+| `nearest_expiry@v1` | `expiry_date` (the nearest listed expiry on or after the session; 0-DTE counts), `dte` (calendar days to it), `sessions_to_expiry` (exchange sessions after the session up to it); a row per underlying with a chain, null when every listed expiry is past. `feature.earnings_before_expiry` (`config/site/features/earnings.toml`) compares it with `earnings@v1.next_earnings_date` | the session's `chains/option_quotes` | built |
 
 **`fundamentals@v2` rules.** Among facts FILED on or before the session: the latest cover
 count (`dei`; latest filed, then latest period end, so an amendment wins) while the company

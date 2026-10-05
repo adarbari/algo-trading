@@ -1,0 +1,13 @@
+# Expression features over the earnings calendar (L3, reviewed via PR; ADR 0023 step 3). Each
+# [name] is one feature: a formula over stored features (group.column), other expression
+# features (by name) and its own params. Computed on read unless materialise = true. The
+# language and the keys: docs/configuration.md "Expression features". Changing a formula:
+# bump its version.
+
+[earnings_before_expiry]
+expr = "earnings.next_earnings_date <= nearest_expiry.expiry_date"
+dtype = "bool"
+unit = "flag"
+description = "Whether the next earnings report (earnings.next_earnings_date) falls on or before the nearest listed option expiry (nearest_expiry.expiry_date): a short option held to that expiry carries the report"
+null_meaning = "the next report date or the nearest expiry is unknown (no report date on or after the session in the stored calendars, or no stored chain with an expiry on or after the session)"
+version = 1

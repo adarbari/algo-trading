@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-131 stored features in 15 groups, in dependency order; 36 expression features.
+134 stored features in 16 groups, in dependency order; 37 expression features.
 
 ## `option_liquidity@v1`
 
@@ -164,6 +164,16 @@ Call and put walls: the strikes with the most open interest at or above / at or 
 | `put_wall` | chain | float32 | usd_per_share | open | >= 0 | Put wall: the strike at or below spot with the most put open interest, summed across expiries 1..60 calendar days out (end-of-day OI; ties: nearer spot) | no put with open interest above 0 at a strike at or below spot 1..60 days out, or wall_status NO_SPOT, NO_CHAIN or NO_EXPIRY | `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/option_quotes.open_interest`, `chains/underlying_quotes.price` |
 | `put_wall_oi` | chain | int | count | open | >= 1 | Put open interest at the put wall, summed across expiries 1..60 days out | no put with open interest above 0 at a strike at or below spot 1..60 days out, or wall_status NO_SPOT, NO_CHAIN or NO_EXPIRY | `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/option_quotes.open_interest`, `chains/underlying_quotes.price` |
 
+## `nearest_expiry@v1`
+
+The nearest listed option expiry on or after the session, its DTE and sessions to it. Stored as `rollups/instrument/nearest_expiry@v1`; reads `chains/option_quotes`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `expiry_date` | chain | date | date | open |  | The nearest listed option expiry on or after the session (0-DTE included), from the session's stored chain | every listed expiry in the session's stored chain is before the session | `chains/option_quotes.expiry` |
+| `dte` | chain | int | days | open | >= 0 | Calendar days from the session to the nearest expiry (0: expires on the session) | every listed expiry in the session's stored chain is before the session | `chains/option_quotes.expiry` |
+| `sessions_to_expiry` | chain | int | sessions | open | >= 0 | Exchange sessions after the session up to the nearest expiry (0: expires on the session) | every listed expiry in the session's stored chain is before the session | `chains/option_quotes.expiry` |
+
 ## `dividends@v2`
 
 Trailing-12-month cash dividends, split-adjusted to the session. Stored as `rollups/instrument/dividends@v2`; reads `rollups/instrument/price_stats@v2`, `events/dividend` (optional), `events/split` (optional).
@@ -261,6 +271,12 @@ IV30 rank and percentile over 252 sessions (provisional after 60). Stored as `ro
 ## Expression features
 
 Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unless stored (materialised, by the `rollups` task after its inputs).
+
+### `earnings.toml`
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Formula | Stored |
+|---|---|---|---|---|---|---|---|---|---|
+| `earnings_before_expiry` | expression | bool | flag | open |  | Whether the next earnings report (earnings.next_earnings_date) falls on or before the nearest listed option expiry (nearest_expiry.expiry_date): a short option held to that expiry carries the report | the next report date or the nearest expiry is unknown (no report date on or after the session in the stored calendars, or no stored chain with an expiry on or after the session) | `earnings.next_earnings_date <= nearest_expiry.expiry_date` | virtual |
 
 ### `fundamentals.toml`
 
