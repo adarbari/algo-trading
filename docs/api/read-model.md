@@ -5,7 +5,7 @@ session), [ADR 0037](../adr/0037-domain-read-model-served-by-graphql.md) (a doma
 served by GraphQL) and [ADR 0038](../adr/0038-catalogue-named-values.md) (catalogue-named
 values). Skills: `.claude/skills/add-domain-object`, `.claude/skills/add-graphql-field`.
 
-**What exists now (read-model PRs 1-9, 10a).** The decisions, this spec, the packages
+**What exists now (the track is complete: read-model PRs 1-10b).** The decisions, this spec, the packages
 `src/algotrade/services/read/{,instruments,screens,ops}` and
 `apps/api/algotrade_api/graphql/{,types}` (declared in `architecture/layout.toml`, guarded by
 two import-linter contracts), the ownership entries, the REST GET allow-list
@@ -15,7 +15,7 @@ dependency of `apps/api`. PR 2 added the session plumbing: `read/session.py`
 (`resolve_session`, `Session`, the table grains `grain_of`, `NotFoundError`), `read/values.py`
 (`Unknown`, `UnknownCode`, `to_scalar`; `services/views.to_value` imports it) and
 `read/context.py` (`ReadContext`, `open_context`, `partition`, `ResultCache`; explore's
-`store.py` re-exports `NotFoundError` and `ResultCache`), plus READ 2 in
+`store.py` re-exported `NotFoundError` and `ResultCache` until PR 10b), plus READ 2 in
 `tests/architecture/api/test_read_model.py`. **PR 4 built the pipeline on one pane**: the
 loaders `read/instruments/{identity,features,catalogue}.py` (`load_instrument`,
 `load_feature_values`, `load_catalogue` with the server-derived `format`), the GraphQL layer
@@ -92,10 +92,16 @@ quality,verification,completeness,ingestionCell,figiReview,leverageReview}`, the
 `routes/{admin,runs}.py` and their schemas are deleted and every `/admin` GET is off the
 allow-list. Run records are session-free (`stores()`); the quality checks and the verification
 are for exactly the session (`NOT_RUN` / `NO_PARTITION`, never an earlier session's, ADR 0036),
-the completeness window ends at it and the review lists read its reference snapshot. Screener
-results, preview and views still read `services/explore` over REST until PR 8; PR 10b then
-deletes `services/explore` (the [migration plan](#migration-plan)). A new page read is a
-GraphQL field (`add-graphql-field`).
+the completeness window ends at it and the review lists read its reference snapshot. **PR 10b
+ended explore**: `services/explore/` is deleted. The Builder's dry runs moved to
+`services/preview/` and take the request's `ReadContext` (the routes' `deps.Context`): the
+draft is previewed, and a formula sampled, on `ctx.session` (no per-input "latest", no "on or
+before the last closed session" of its own); `ReadStore` / `open_store` are API wiring in
+`apps/api/algotrade_api/deps.py` (over `context.open_read_stores`); `latest_session` and
+`store_info` (`GET /health`) are in `read/session.py`, `records` in `read/values.py`; live
+quotes take the request's `ReadContext`; `paginate`, `Page`, `record`, `cached`,
+`partition_for` are gone. `explore-queries` is out of ownership and READ 2 scans every use case
+and the API. A new page read is a GraphQL field (`add-graphql-field`).
 
 ## What is wrong today
 
@@ -177,8 +183,9 @@ Owner folder `src/algotrade/services/read/` (ownership `domain-read-model`). Eve
 | Completeness, CellDetail | (`session`, window); (`dataset`, `session`) | `sessions, datasets, cells[{dataset, session, status, present, expected, basis, runIds}], lastClosed`; `cell, job, groups, runs` | every dataset's partitions on the window's sessions (inventory reads), `chains/status`, universe snapshot, run records | `read/ops/ingestion.py` (PR 10a) | `explore/ingestion.py` (deleted) |
 | ReviewList | (kind, `session`) | `session, source, items: [JSON]` | the `figi_review` of the `universe_build` record on or before the session (never a later one), else the session's reference snapshot; leverage: that snapshot | `read/ops/review.py` (PR 10a) | `explore/review.py` (deleted) |
 
-`explore`'s `ReadStore`, `ResultCache`, `open_store`, `paginate` and `record(s)` move to
-`read/context.py` and `read/values.py`; `services/explore/` is deleted in PR 10.
+`explore`'s `ResultCache` moved to `read/context.py` (PR 2) and `records` to `read/values.py`;
+`ReadStore` / `open_store` became API wiring (`deps.py`); `services/explore/` was deleted in
+PR 10b.
 
 ## Values and UNKNOWN
 
@@ -232,7 +239,8 @@ it has no entry); `partition` refuses a table of another grain or with no declar
 (`ValueError`), so a loader cannot read a snapshot or event table by exact date by mistake. A
 table a loader needs that is not listed gets its grain here and in `GRAINS` first.
 
-Retired when their last caller moves: `explore/store.partition_for` and `latest_session`,
+Retired as their last caller moved (all gone by PR 10b; `latest_session` lives on in
+`read/session.py` for what is not a page read): `explore/store.partition_for` and `latest_session`,
 `data/rollups.rollup_row` in reads, `explore/features._expression_values` / `_values`,
 `ranking._latest_runs` / `_earnings`, `results.run_rows`'s owner-fallback loop,
 `table._previous` (a loader with the explicit prior session), `preview.preview_session`'s store
@@ -463,8 +471,8 @@ its own change). View preferences go through one adapter, `features/table-view`
 
 | # | Rule | Mechanism | Status |
 |---|---|---|---|
-| READ 1 | Only `services/read/session.py` decides which partition a read sees | ownership `session-resolution` (`partition_for`, `latest_session`, `latest_date`, `rollup_row`, `resolve_session`) | **on**: owners `session.py`, `context.py` (`open_context`) and explore (until its modules are deleted); any other caller fails now |
-| READ 2 | Only `services/read/**` reads session partitions for display | `tests/architecture/api/test_read_model.py::test_only_loaders_read_partitions` (AST); `test_inventory_reads_only_in_the_completeness_loader` (the context's inventory reads: `read/ops/ingestion.py` only, calls and imports) | **on**, scoped to `services/read` (only `session.py` / `context.py` pick or read a partition); widened to all of `src/` and `apps/` in PR 10b (after PR 8 deletes the last explore reads) |
+| READ 1 | Only `services/read/session.py` decides which partition a read sees | ownership `session-resolution` (`partition_for`, `latest_session`, `latest_date`, `rollup_row`, `resolve_session`) | **on**: owners `session.py` and `context.py` (`open_context`); explore was an owner until PR 10b deleted it; any other caller fails |
+| READ 2 | Only `services/read/**` reads session partitions for display | `tests/architecture/api/test_read_model.py::test_only_loaders_read_partitions` (AST); `test_inventory_reads_only_in_the_completeness_loader` (the context's inventory reads: `read/ops/ingestion.py` only, calls and imports) | **on**, widened in PR 10b to every use case (`src/algotrade/services/**`) and the API (`apps/api/**`): only `PARTITION_READERS` (`read/session.py`, `read/context.py`, `ondemand/screens.py` and the run-input modules `features.py`, `views.py`, `datasets.py`, each with its reason; shrink-only) pick or read a partition |
 | READ 3 | GraphQL types are thin | import-linter "GraphQL types are thin" + `test_resolvers_call_one_loader` | **on** |
 | READ 4 | The read model is read-only | import-linter "Read model is read-only" | **on** |
 | READ 5 | No new REST GET for stored data | `architecture/rest_allowlist.toml` + two tests | **on** |
@@ -483,29 +491,30 @@ its own change). View preferences go through one adapter, `features/table-view`
 
 ### Ownership during the migration
 
-The ownership ratchet stays at zero throughout: no violation is parked, no rule is narrowed to
-pass. How each entry holds today:
+The ownership ratchet stayed at zero throughout: no violation was parked, no rule was narrowed
+to pass. How each entry held (and, after PR 10b, holds):
 
-- **`session-resolution`**: full detect rules on. Owners `services/read/session.py`,
+- **`session-resolution`**: full detect rules on. Owners were `services/read/session.py`,
   `services/read/context.py` (`open_context` resolves once per request) and, until its modules
-  are deleted, `services/explore/*` (where the six rules live today); `data/reference.py` (the snapshot primitive) and
-  `services/ondemand/screens.py` (a write that runs a screen for the latest session, ADR 0036
-  decision 5) are `allowed`. Each explore module drops out as PRs 4-10 delete it; PR 10 leaves
-  `session.py` and `context.py` as the only owners.
+  were deleted, `services/explore/*` (where the six rules lived); `data/reference.py` (the
+  snapshot primitive) and `services/ondemand/screens.py` (a write that runs a screen for the
+  latest session, ADR 0036 decision 5) are `allowed`. Each explore module dropped out as PRs
+  4-10b deleted it; `session.py` and `context.py` are now the only owners.
 - **`domain-read-model`**: the `rollups/instrument/` literal rule is on (producers, the
   catalogue prefix, the table schema and screener inputs are `allowed` with reasons). The
   `chain_expiries` rule is on since PR 5 (which deleted its last read-time caller,
   `explore/ideas/ranking.py`): only `data/` and the producing feature group call it.
 - **`scalar-coercion`**: `to_value` / `to_scalar` call rules on; owner `services/read/values.py`
   (`to_scalar`); `services/views.py` is `allowed` (it imports it back as `to_value`), as are
-  today's callers of the one coercion (explore, screening exports and `rule_results`,
-  selection). The `call_regex = "^_(float|text|num)$"` re-implementation rule is **on since
+  the callers of the one coercion (explore until PR 10b; `services/preview`, screening exports
+  and `rule_results`, selection). The `call_regex = "^_(float|text|num)$"` re-implementation rule is **on since
   PR 8** (`screens/table._text` deleted; `rule_results._num` reads through `to_value`), with
   `allowed` entries for the vendor payload parsers in `libs/sources`, the nightly email
   renderer and timing lines, the config writer's TOML float and the option-liquidity rollup's
   arithmetic, which parse, format or compute rather than coerce stored values.
 - **`graphql-schema`**: `import strawberry` outside `apps/api/algotrade_api/graphql/*` fails now.
-- **`explore-queries`**: `target_owner = services/read/*` while moving; removed in PR 10.
+- **`explore-queries`**: `target_owner = services/read/*` while moving; removed in PR 10b.
+  `screen-preview` is owned by `services/preview/*` since.
 
 `tests/architecture/` was at its 10-module cap: PR 2 split the API surface and read-model
 fitness tests into `tests/architecture/api/` (`test_rest_allowlist.py`, `test_read_model.py`).
@@ -527,7 +536,7 @@ Each PR is independently shippable with `make check` green and updates `docs/roa
 | 8 | Screener results + preview + views (**done**) | `ScreenerRun.results`; `features/table-view` (+ `views.<scope>` in `preferences.toml`); screener and preview results on `feature-table`; `explore/screens/*` deleted; `/screens*` and the view GET off the list; the `_float/_text/_num` detect rule; WEB 7; `Instrument.screenerHits` | one table widget renders all four tables |
 | 9 | Catalogue, distribution, backtests, configs (**done**) | `Query.{catalogue,distribution,backtests}`, screener authoring reads; `explore/{features,backtests,configs}.py` deleted; their GETs off the list | the trader workspace is fully on GraphQL |
 | 10a | Admin on GraphQL (**done**) | `read/ops/{runs,quality,ingestion,review}.py`; `types/ops/*`; the Admin entities (ingestion, run, verification, review) on GraphQL; `explore/{runs,ingestion,review}.py`, `routes/{admin,runs}.py` and their schemas deleted; every `/admin` GET off the list | Admin reads no REST |
-| 10b | The end of explore (after PR 8) | `services/explore/` deleted (`store.py` with PR 8's last callers); `explore-queries` removed; READ 2 widens to all of `src/` and `apps/`; `add-api-endpoint` loses its read steps | allow-list = writes, jobs, health, live, preview, files |
+| 10b | The end of explore (**done**) | `services/explore/` deleted (preview to `services/preview/` over `ReadContext`; `store.py` split: `ReadStore` to API `deps`, `latest_session` / `store_info` to `read/session.py`, `records` to `read/values.py`); `explore-queries` removed; READ 2 widens to all use cases and the API; `add-api-endpoint` loses its read steps | allow-list = writes, jobs, health, live, preview, files |
 
 Order: PR 4 proves the pipeline (Strawberry, dataloader, codegen, lint) on one pane with little
 logic; PR 5 is the first user-visible fix and deletes the biggest bespoke module; tables come
@@ -544,8 +553,10 @@ after the object graph because they need the columnar type and the factories.
   `NOT_RUN`.
 - **Columnar `FeatureTable`** (`[[JSON]]`) is the honest trade for 11k rows.
 - **User expression features are runtime-checked only** in TS; site features are typed.
-- **Two generators until PR 10** (OpenAPI and GraphQL); generated-file conflicts follow the
-  existing rule (take main's, regenerate).
+- **Two generators** (OpenAPI and GraphQL): resolved in PR 10b. OpenAPI now describes only
+  what stays REST (writes, job polling, health, live quotes, preview POSTs), GraphQL every page
+  read; both stay by design, and generated-file conflicts follow the existing rule (take
+  main's, regenerate).
 - **Strawberry under mypy strict**: enable its plugin in PR 4; if it fights `strict`, keep
   `# type: ignore[misc]` to `graphql/types/*` only, capped by a fitness test.
 - **Performance**: add `IdeasPage`, `ExploreDetail`, `Table` to the 1 s budget in

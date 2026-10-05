@@ -14,13 +14,13 @@ from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.time.calendar import last_closed_session
 from algotrade.services.configs import resolve_config
-from algotrade.services.explore.preview.screens import preview_screen, preview_session
-from algotrade.services.explore.store import ReadStore, store_over
+from algotrade.services.preview.screens import preview_screen
+from algotrade.services.read.context import open_context
 from algotrade.services.screening.run import run_screener
 from algotrade.services.views import to_value
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_sources.framework.base import FixtureSource
-from tests.helpers.api_store import END, NOW, api_store
+from algotrade_api.deps import ReadStore
+from tests.helpers.api_store import NOW
 from tests.helpers.stored_frames import T0, stamped
 from tests.unit.services.screening.test_rule_screens import DAY, LIQ, SCREEN, configs, seeded
 
@@ -38,7 +38,8 @@ def preview_store() -> ReadStore:
 
 
 def preview(store: ReadStore, spec: dict[str, Any] = DRAFT, limit: int = 1000) -> Any:
-    return preview_screen(store, spec, ALICE, limit, on=DAY, now=T0)
+    ctx = open_context(store.reader, store.configs, store.user, DAY, store.cache)
+    return preview_screen(ctx, store.preview_cache, spec, ALICE, limit, now=T0)
 
 
 def criterion(spec: dict[str, Any], cid: str, **changes: Any) -> dict[str, Any]:
@@ -206,28 +207,31 @@ def test_an_invalid_draft_fails_closed_naming_its_path(spec: dict[str, Any], pat
 
 
 def test_a_bad_user_or_id_fails() -> None:
+    store = preview_store()
+    ctx = open_context(store.reader, store.configs, store.user, DAY)
     with pytest.raises(ConfigurationError):
-        preview_screen(preview_store(), DRAFT, "../etc", on=DAY)
+        preview_screen(ctx, store.preview_cache, DRAFT, "../etc")
     with pytest.raises(ConfigurationError):
-        preview_screen(preview_store(), {**DRAFT, "id": "a b"}, ALICE, on=DAY)
+        preview_screen(ctx, store.preview_cache, {**DRAFT, "id": "a b"}, ALICE)
 
 
-def test_the_session_is_the_latest_stored_one_on_or_before_the_last_closed(
-    golden_source: FixtureSource,
-) -> None:
-    store = api_store(golden_source)[0]
-    session, closed = preview_session(store, NOW)
-    assert (session, closed) == (END, last_closed_session(NOW))
-    later = datetime(2026, 10, 2, 23, tzinfo=UTC)  # nothing stored that late: the latest
-    assert preview_session(store, later)[0] == END
+def test_the_session_is_the_contexts() -> None:
+    store = preview_store()
+    ctx = open_context(store.reader, store.configs, store.user)  # no date: the latest
+    got = preview_screen(ctx, store.preview_cache, DRAFT, now=NOW)
+    assert (got.session, got.last_closed) == (ctx.session.date, last_closed_session(NOW))
+    assert ctx.session.is_latest
+    later = datetime(2030, 10, 2, 23, tzinfo=UTC)  # nothing stored that late: still the latest
+    assert preview_screen(ctx, store.preview_cache, DRAFT, now=later).session == got.session
 
 
-def test_the_store_user_is_the_default() -> None:
+def test_the_context_user_is_the_default() -> None:
     store = replace(preview_store(), user=UserContext("bob"))
-    assert preview_screen(store, DRAFT, on=DAY, now=T0).user == "bob"
+    assert preview(store).user == "alice"  # named
+    ctx = open_context(store.reader, store.configs, store.user, DAY)
+    assert preview_screen(ctx, store.preview_cache, DRAFT, now=T0).user == "bob"
 
 
-def test_store_over_has_its_own_preview_cache() -> None:
-    reader, _ = seeded()
-    a = store_over(reader._backend, configs(), UserContext(ALICE))  # type: ignore[attr-defined]
-    assert a.preview_cache is not a.cache
+def test_the_store_has_its_own_preview_cache() -> None:
+    store = preview_store()
+    assert store.preview_cache is not store.cache

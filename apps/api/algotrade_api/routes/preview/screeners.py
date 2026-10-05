@@ -3,14 +3,14 @@ naming the field path)."""
 
 from fastapi import APIRouter
 
-from algotrade.services.explore.preview import screens
-from algotrade_api.deps import Store
+from algotrade.services.preview import screens
+from algotrade_api.deps import Context, Store
 from algotrade_api.schemas.preview.screeners import PreviewBody, ScreenPreview
 
 router = APIRouter(prefix="/screeners", tags=["screeners"])
 
 
 @router.post("/preview")
-def preview(store: Store, body: PreviewBody) -> ScreenPreview:
-    result = screens.preview_screen(store, body.spec, body.user, body.limit)
+def preview(ctx: Context, store: Store, body: PreviewBody) -> ScreenPreview:
+    result = screens.preview_screen(ctx, store.preview_cache, body.spec, body.user, body.limit)
     return ScreenPreview.model_validate(result)

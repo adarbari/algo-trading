@@ -28,11 +28,11 @@ import pandas as pd
 from algotrade.config.site.settings import IbkrSettings
 from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
 from algotrade.data.chains import underlying_quotes
-from algotrade.services.explore.store import NotFoundError, ReadStore, records
 from algotrade.services.live.recorder import Recorder
-from algotrade.services.read.context import open_context
+from algotrade.services.read.context import NotFoundError, ReadContext
 from algotrade.services.read.instruments.chains import load_chains, load_quotes
 from algotrade.services.read.instruments.identity import resolve_id
+from algotrade.services.read.values import records
 
 log = logging.getLogger(__name__)
 
@@ -120,12 +120,12 @@ class LiveQuotes:
         self._lock = threading.Lock()
 
     def chain(
-        self, store: ReadStore, key: str, expiry: date, strikes: Sequence[float] | None = None
+        self, ctx: ReadContext, key: str, expiry: date, strikes: Sequence[float] | None = None
     ) -> LiveOptionChain:
         """The quotes of ``key``'s calls and puts expiring ``expiry`` at ``strikes`` (default:
         the ``live_strikes`` nearest the underlying). ``NotFoundError`` when the stored chain
         has no such underlying or expiry; ``ConfigurationError`` for strikes it does not list."""
-        stored = _stored(store, key, expiry)
+        stored = _stored(ctx, key, expiry)
         wanted = self._strikes(stored, strikes)
         cache_key = (stored.underlying_id, expiry, tuple(wanted))
         now = self._clock()
@@ -196,12 +196,11 @@ def _fresh(answer: LiveOptionChain, now: datetime, options: IbkrSettings) -> boo
     return (now - answer.as_of).total_seconds() < options.live_cache_s
 
 
-def _stored(store: ReadStore, key: str, expiry: date) -> _Stored:
+def _stored(ctx: ReadContext, key: str, expiry: date) -> _Stored:
     """The stored chain's quotes for ``expiry`` for the latest session: the read model's
     chain, exactly what the Options pane shows (``Instrument.chain``), with the underlying's
     quote captured with it. ``NotFoundError`` for an unknown instrument, no chain stored for
     the session, or an expiry it does not list."""
-    ctx = open_context(store.reader, store.configs, store.user, cache=store.cache)
     iid = resolve_id(ctx, key)
     if iid is None:
         raise NotFoundError(f"no instrument {key!r} in the reference snapshot")
@@ -210,7 +209,7 @@ def _stored(store: ReadStore, key: str, expiry: date) -> _Stored:
         raise NotFoundError(f"no option chain for {iid} on {ctx.session.date}")
     if expiry not in {e.date for e in chain.expiries}:
         raise NotFoundError(f"no {expiry} expiry in the chain of {iid} on {chain.session}")
-    rows = underlying_quotes(store.reader, chain.session, [iid])
+    rows = underlying_quotes(ctx.reader, chain.session, [iid])
     under: dict[str, Any] = records(rows)[0] if rows is not None and len(rows) else {}
     price = next((float(under[c]) for c in ("price", "close") if under.get(c) is not None), None)
     taken = datetime.fromisoformat(under["ts"]) if under.get("ts") else None

@@ -6,9 +6,8 @@ import pandas as pd
 from fastapi.testclient import TestClient
 
 from algotrade.config.site.settings import IbkrSettings
-from algotrade.services.explore.store import ReadStore
 from algotrade.services.live.quotes import LiveQuotes
-from algotrade_api.deps import ApiSettings
+from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.main import create_app
 
 
@@ -29,7 +28,7 @@ def test_live_chain_errors(client: TestClient) -> None:
     assert bad.status_code == 400 and "not in the stored chain" in bad.json()["detail"]
 
 
-def test_live_chain_from_a_feed(explore: tuple[ReadStore, dict[str, str]]) -> None:
+def test_live_chain_from_a_feed(api_golden: tuple[ReadStore, dict[str, str]]) -> None:
     class Feed:
         market_data_type = 1
 
@@ -44,7 +43,9 @@ def test_live_chain_from_a_feed(explore: tuple[ReadStore, dict[str, str]]) -> No
             return None
 
     live = LiveQuotes(Feed(), None, IbkrSettings(live_strikes=2))
-    with TestClient(create_app(ApiSettings("memory://", "config"), explore[0], live=live)) as app:
+    with TestClient(
+        create_app(ApiSettings("memory://", "config"), api_golden[0], live=live)
+    ) as app:
         body = app.get("/chains/AAA/live", params={"expiry": "2022-12-23"}).json()
     assert (body["source"], body["status"], body["delayed"]) == ("ibkr", "LIVE", False)
     assert body["strikes"] == [95.0, 100.0] and body["quotes"][0]["last"] == 2.05

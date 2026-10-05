@@ -284,8 +284,8 @@ src/algotrade/  shared library
                 rollups/ (option_liquidity, price_stats, earnings @v1), registry
   analytics/    performance metrics, report formatting
   engines/      backtest/ (loop, risk limits, sizing, simulated broker, portfolio), screening/
-  services/     use cases: backtests/, screening/ (+ exports), jobs/, evaluation/, explore/
-                (read-only queries the API serves); shared helpers
+  services/     use cases: backtests/, screening/ (+ exports), jobs/, evaluation/, read/ (the read model
+                the API serves), preview/ (Builder dry runs); shared helpers
 tests/
   unit/<layer>/ mirrors src; fast, isolated
   contract/     one suite every storage backend must pass

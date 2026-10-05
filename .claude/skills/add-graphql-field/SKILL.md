@@ -8,15 +8,12 @@ description: Give a web page data it needs from the API: a field on the GraphQL 
 Read first (by section): `docs/api/read-model.md` ("Catalogue feature or typed field",
 "GraphQL conventions", "What the browser may not derive"), ADR 0037.
 
-## Step 0: what exists today (check, do not assume)
+## Step 0: what exists
 
-Run `ls apps/api/algotrade_api/graphql apps/api/algotrade_api/graphql/types/* src/algotrade/services/read`.
-
-| You see | Meaning | Do |
-|---|---|---|
-| only `__init__.py` files under `graphql/` | an old branch (before PR 4) | rebase on `origin/main` |
-| `graphql/schema.py`, `apps/api/schema.graphql`, `apps/web/codegen.ts` exist | **today**: PRs 4-5 landed (`Query.{session,instrument,ideas,screeners,view}`, `Instrument.features(names)`, the `features` and `screener_latest_run` dataloaders, codegen, `useInstrumentFacts`, `useIdeas` on `IdeasPage`) | continue |
-| the area's REST GET is still in `architecture/rest_allowlist.toml` | that area has not moved yet | add the field in the area's migration PR (move the area), not beside the REST route |
+The GraphQL layer serves every page read (read-model track complete, PR 10b): `Query` in
+`graphql/schema.py`, types by area under `graphql/types/{instruments,screens,ops}/`,
+dataloaders in `graphql/loaders.py`, the snapshot `apps/api/schema.graphql`, the web
+operations through codegen (`apps/web/codegen.ts`). There is no REST read path to extend.
 
 ## Step 1: which object owns it
 
@@ -61,7 +58,7 @@ def holdings(self, info: Info, top: int = 10) -> Holdings | None:
 
 - One loader call (or one dataloader `.load(...)` for a child object), then `.of()`. At most a
   `None` guard. No loops, no `if` on values, no pandas, no `algotrade.data`, no
-  `services.explore` (import-linter "GraphQL types are thin" fails it).
+  `services.features` / `views` / `selection` (import-linter "GraphQL types are thin" fails it).
 - A new type: `@strawberry.type`, fields copied from the read dataclass (same names, camelCase
   is automatic), one `@classmethod of(cls, d)`.
 - A child object resolved per parent (an instrument per result row) goes through a dataloader

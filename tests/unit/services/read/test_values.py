@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 from algotrade.services import views
-from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
+from algotrade.services.read.values import Unknown, UnknownCode, records, to_scalar
 
 
 @pytest.mark.parametrize(
@@ -40,6 +40,15 @@ def test_to_scalar_is_json_safe(stored: object, plain: object) -> None:
 
 def test_runs_and_reads_share_the_one_coercion() -> None:
     assert views.to_value is to_scalar
+
+
+def test_records_are_json_safe_without_stamps() -> None:
+    frame = pd.DataFrame([{"instrument_id": "X", "v": float("nan"), "n": np.int64(3),
+                           "ts": pd.Timestamp("2026-10-01", tz="UTC"), "run_id": "r",
+                           "session_date": date(2026, 9, 30)}])  # fmt: skip
+    assert records(frame, ["instrument_id"]) == [
+        {"v": None, "n": 3, "ts": "2026-10-01T00:00:00+00:00"}
+    ]
 
 
 def test_unknown_names_its_reason_and_where() -> None:

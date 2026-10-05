@@ -1,5 +1,5 @@
 """``POST /features/check``: a formula type checked against the user's catalogue and sampled
-on the latest session its inputs have."""
+on the request's session (never an older partition of an input)."""
 
 from datetime import date
 
@@ -26,7 +26,12 @@ class ExpressionCheck(Schema):
     categories: list[str] | None
     inputs: list[str]
     licence: str
-    session: date | None = Field(description="the session sampled (None: nothing stored)")
+    session: date | None = Field(
+        description="the session sampled (None: an input has no partition for it, see missing)"
+    )
+    missing: list[str] = Field(
+        description="the inputs' tables with no partition for the session (their values UNKNOWN)"
+    )
     rows: int
     non_null: int
     sample: list[SampleValue]

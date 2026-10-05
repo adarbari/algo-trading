@@ -7,14 +7,13 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from algotrade.config.user import UserContext
-from algotrade.services.explore.store import store_over
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade_api.deps import ApiSettings
 from algotrade_api.graphql.schema import sdl
 from algotrade_api.main import create_app
 from tests.apps.api.graphql.conftest import FACTS, Graph
-from tests.helpers.api_store import END, PREVIOUS
+from tests.helpers.api_store import END, PREVIOUS, store_over
 
 REPO = Path(__file__).resolve().parents[4]
 CLOSE = "rollup.price_stats@v2.close"

@@ -8,9 +8,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from algotrade.config.user import UserContext
-from algotrade.services.explore.store import ReadStore
 from algotrade.storage.configs.writer import FileConfigWriter
-from algotrade_api.deps import ApiSettings
+from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.main import create_app
 from tests.conftest import REPO_ROOT
 
@@ -44,7 +43,7 @@ def root(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def writer_client(explore: tuple[ReadStore, dict[str, str]], root: Path) -> TestClient:
+def writer_client(api_golden: tuple[ReadStore, dict[str, str]], root: Path) -> TestClient:
     writer = FileConfigWriter(root)
-    store = replace(explore[0], configs=writer, user=UserContext("local"))
+    store = replace(api_golden[0], configs=writer, user=UserContext("local"))
     return TestClient(create_app(ApiSettings("memory://", str(root)), store, writer))

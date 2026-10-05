@@ -12,8 +12,9 @@ read a session-grain table through ``context.partition(ctx, table)`` for
 range functions with explicit dates), no ``dates`` / ``latest_date``, no ``snapshot``, no
 ``partition_for`` / ``latest_session`` / ``rollup_row`` / ``rollup_on`` of their own.
 
-Scoped to ``services/read`` callers until read-model PR 10 widens it to all of ``src/`` and
-``apps/`` (explore and the routes still read partitions until their area moves)."""
+Scoped to every use case (``src/algotrade/services/**``) and the API (``apps/api/**``) since
+read-model PR 10b deleted ``services/explore``; ``PARTITION_READERS`` names the few modules
+that may, each with its reason (shrink-only: an entry that no longer reads is removed)."""
 
 import ast
 import dataclasses
@@ -27,9 +28,25 @@ from algotrade.services.features import site_features
 from algotrade_api.graphql import types as graphql_types
 from tests.conftest import REPO_ROOT
 
-READ_MODEL = REPO_ROOT / "src" / "algotrade" / "services" / "read"
+SERVICES = REPO_ROOT / "src" / "algotrade" / "services"
+READ_MODEL = SERVICES / "read"
+API = REPO_ROOT / "apps" / "api"
 # The session plumbing: session.py resolves (and lists present / missing), context.py reads.
 PLUMBING = {"session.py", "context.py"}
+# Modules outside the read model that pick or read a partition, and why (never a page read).
+PARTITION_READERS = {
+    READ_MODEL / "session.py": "the session plumbing: resolves the session (ADR 0036)",
+    READ_MODEL / "context.py": "the session plumbing: reads exactly the session's partition",
+    SERVICES / "ondemand" / "screens.py": "a write: an on-request run targets the latest "
+    "session (ADR 0033), outside read strictness (ADR 0036 decision 5)",
+    SERVICES / "features.py": "run inputs: expression features over a date range the run "
+    "names (screens, backtests); check_user_features (the validate-features CLI only) samples "
+    "the latest date an input has: never a page read",
+    SERVICES / "views.py": "run inputs: the FeatureView a screener evaluates, for the session "
+    "the run names (missing data is an error, ADR 0008)",
+    SERVICES / "datasets.py": "run inputs: the golden dataset catalogue the evaluation suite "
+    "and the backtest CLI read",
+}
 PARTITION_READS = {
     "table", "require", "table_range", "dates", "latest_date", "snapshot", "read_snapshot",
     "partition_for", "latest_session", "rollup_row", "rollup_on",
@@ -49,10 +66,11 @@ def partition_reads(source: str) -> list[tuple[int, str]]:
 
 
 def test_only_loaders_read_partitions() -> None:
+    sources = sorted([*SERVICES.rglob("*.py"), *API.rglob("*.py")])
     hits = [
         f"{path.relative_to(REPO_ROOT)}:{line} {name}()"
-        for path in sorted(READ_MODEL.rglob("*.py"))
-        if path.parent != READ_MODEL or path.name not in PLUMBING
+        for path in sources
+        if path not in PARTITION_READERS
         for line, name in partition_reads(path.read_text())
     ]
     assert not hits, (
@@ -109,6 +127,16 @@ def test_the_inventory_check_catches_an_alias() -> None:
 
 def test_the_plumbing_exists() -> None:
     assert {p.name for p in READ_MODEL.glob("*.py")} >= PLUMBING
+
+
+def test_every_partition_reader_still_reads() -> None:
+    """Shrink-only: an allowed module that no longer picks or reads a partition leaves the set."""
+    idle = [
+        str(path.relative_to(REPO_ROOT))
+        for path in PARTITION_READERS
+        if not path.exists() or not partition_reads(path.read_text())
+    ]
+    assert not idle, f"remove these from PARTITION_READERS (they read no partition): {idle}"
 
 
 def test_the_check_catches_a_loader_reading_a_partition() -> None:

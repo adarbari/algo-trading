@@ -1,4 +1,4 @@
-"""``Query.table`` over ``POST /graphql`` on the golden explore store: the universe x catalogue
+"""``Query.table`` over ``POST /graphql`` on the golden API store: the universe x catalogue
 columns for one session, filtered and sorted server-side, paged, each cell a value or the
 UNKNOWN code saying why; with ``keys``, the instruments asked for (Explore compare); the
 caller's own features, and errors naming what was wrong."""

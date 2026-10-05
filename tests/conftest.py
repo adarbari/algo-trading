@@ -7,10 +7,10 @@ import pytest
 from hypothesis import HealthCheck, settings
 
 from algotrade.data import StoreReader
-from algotrade.services.explore.store import ReadStore
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
+from algotrade_api.deps import ReadStore
 from algotrade_ingestion.tasks.maintenance.golden import load_golden
 from algotrade_ingestion.tasks.reference import reference_diff
 from algotrade_sources.framework.base import FixtureSource
@@ -52,8 +52,8 @@ def golden_reader(golden_source: FixtureSource) -> StoreReader:
 
 
 @pytest.fixture(scope="session")
-def explore(golden_source: FixtureSource) -> tuple[ReadStore, dict[str, str]]:
-    """The golden store plus one session of everything a page shows (API / explore tests)
+def api_golden(golden_source: FixtureSource) -> tuple[ReadStore, dict[str, str]]:
+    """The golden store plus one session of everything a page shows (API and read-model tests)
     -> (the store, the run ids the tests look up)."""
     return api_store(golden_source)
 

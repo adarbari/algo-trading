@@ -12,8 +12,13 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 - ETF holdings (ADR 0035, accepted): after merge run `algotrade-ingest etf-holdings` once (reads the ~1,140 covered funds, plus the non-optionable N-PORT funds with a 20-session dollar volume of $5M or more, up to ~900 (`fallback_scope = "liquid"`, `fallback_min_adv_usd`): about 1.5 hours per 1,140, extrapolated from the sample, mostly SEC header lookups; or let the nightly fill it, 200 funds a night, 6 weekday nights), ProShares funds (173, the VIX funds UVXY / SVXY / VIXY and the leveraged and inverse ones) are read from their daily file by the same run (weights are shares of gross exposure, ADR 0035), then the Overview tab renders `<HoldingsPanel symbol onSelectSymbol>` (`widgets/holdings-panel`) for ETFs.
 - ETF descriptions for funds with no SEC prospectus objective: SPY, DIA, GLD, SLV, USO, IBIT, SOXL and the like (unit trusts, commodity and crypto trusts, some leveraged funds); 246 of the 1,464 ETFs trading $5M or more a day have none (2026-10-05). The SEC series match closes 83 of them; the rest need issuer pages (iShares and State Street page text for IBIT, SLV, SPY, DIA; ProShares and Direxion 497K or pages for SOXL, TSLL, UVXY) and an ADR.
 - Optional IBKR pace trial: `[ibkr] historical_min_interval_s` 5, then 3, watching timeouts and error 162 (the backfill ran at 10 s, IV only, about 6 names a minute). The nightly keeps the history current (100 names a night of any new gap).
+<<<<<<< HEAD
 - **Read-model track (RM, ADRs 0036-0038, [api/read-model.md](api/read-model.md)):** RM1 (decisions + harness), RM2 (session + values: `services/read/{session,values,context}.py`, READ 2), RM3 (stored facts: `nearest_expiry@v1`, `feature.earnings_before_expiry`), RM4 (the GraphQL slice: `POST /graphql`, `Instrument.features(names)`, codegen, the Overview on `useInstrumentFacts`), RM5 (Ideas on GraphQL: `read/screens/*`, one latest-run rule with NOT_RUN, server-side picked counts, the Earnings cell's "Last <date>" fallback: the MRVL fix), RM6 (the Explore detail pane on GraphQL: `Instrument.{events,chain,holdings,prices,series}`, `explore/{instruments,chains,funds}` deleted), RM7 (`Query.table`, `widgets/feature-table`, the column factories and WEB 4; the Explore table one server page per request, compare on it; `explore/{universe,compare}` deleted), RM8 (screener results, the preview's rows and table views on the one table widget: `ScreenerRun.results`, `features/table-view` with `views.<scope>`, `Instrument.screenerHits`, WEB 7; `explore/screens` deleted), RM9 (catalogue, distribution, backtests, configs and the Builder's screen reads on GraphQL) and RM10a (Admin on GraphQL: `read/ops/{runs,quality,ingestion,review}`, every `/admin` GET gone; the quality checks and verification are for exactly the session) done; next RM10b (delete `services/explore`, READ 2 on all code). **R (RM5):** the Ideas Expiry DTE column is UNKNOWN until `nearest_expiry@v1` is backfilled (the RM3 owner action). Do them in order; a new page read uses the old REST path only if the owner asks. Absorbs the old items: 404 on an empty store, splitting `services/explore` / routes / schemas, API types from domain types. **Owner action (RM3):** after merge run `algotrade-ingest rollups --from 2024-10-03 --to <last session> --only nearest_expiry@v1` (only sessions with a stored chain get rows; the store holds chains from 2026-10-02, so this takes seconds); the nightly computes it from then on.
 - **Identity (ID, ADR 0040):** ID1 done (the user registry `config/site/users.toml`, `UsersSettings` with roles, single-user defaults). Next ID2 (`algotrade-api users set-password`, argon2 hashes in `config/users/<id>/credentials.toml`, `POST /auth/{login,logout}`, the signed session cookie from `ALGOTRADE_SESSION_SECRET`), ID3 (every REST and GraphQL request resolves its user and role from the session in `deps.py` / `graphql/context.py`; `?user=` retires; `services/authoring` refuses undeclared users; ops fields require `admin`), ID4 (`Query.viewer`, the design-system `LoginForm`, the login page, `guard.ts` reads the role). Each is one PR; ID2 and ID3 are `architect` areas.
+=======
+- **Read-model track (RM, ADRs 0036-0038, [api/read-model.md](api/read-model.md)): done** (RM1-RM10b; RM10b deleted `services/explore`: the Builder's dry runs are `services/preview` over the request's `ReadContext`, READ 2 covers every use case and the API). Every page reads GraphQL; REST is writes, job polling, health, live quotes and preview POSTs. **R (RM5):** the Ideas Expiry DTE column is UNKNOWN until `nearest_expiry@v1` is backfilled (the RM3 owner action). What the track left open is the [deferred list](#deferred-from-the-rm-track).
+- Nearest expiry (RM3, `nearest_expiry@v1`): after merge run `algotrade-ingest rollups --from 2024-10-03 --to <last session> --only nearest_expiry@v1` (only sessions with a stored chain get rows; the store holds chains from 2026-10-02, so this takes seconds); the nightly computes it from then on.
+>>>>>>> origin/main
 - VRP live spread check in the UI via `GET /chains/{id}/live`.
 - Company financials (`financials@v1`, `feature.pe_ratio`, `feature.revenue_growth_yoy`; Explore Overview reads them): after merge run `algotrade-ingest shares --force` (about 30 to 40 minutes, resumable), then `algotrade-ingest rollups --from 2024-10-03 --to <last session> --only financials@v1` (a few seconds a session, estimated), and spot-check a few names ([vendors.md](data/vendors.md) "SEC EDGAR company facts").
 - Flaky tests: preview timing under load, smoke axe admin light, one builder e2e.
@@ -75,7 +80,27 @@ Plan, rules and enforcement: [api/read-model.md](api/read-model.md) ("Migration 
 | RM8 | Screener results, preview and views on the one table widget; `explore/screens` deleted; `Instrument.screenerHits` | **done** |
 | RM9 | Catalogue, distribution, backtests, configs on GraphQL; screener authoring reads (`myScreens`, `screenDetail`, `screenVersions`); `explore/{features,backtests,configs}` deleted | **done** |
 | RM10a | Admin on GraphQL (`read/ops/{runs,quality,ingestion,review}`, `Query.{nightlyRuns,run,runItems,quality,verification,completeness,ingestionCell,figiReview,leverageReview}`); `explore/{runs,ingestion,review}` and the `/admin` routes deleted | **done** |
-| RM10b | After RM8: `services/explore` deleted, `explore-queries` removed, READ 2 widened to all code | |
+| RM10b | `services/explore` deleted (preview to `services/preview` over `ReadContext`; `ReadStore` to API `deps`), `explore-queries` removed, READ 2 widened to every use case and the API; skills and harness updated | **done** |
+
+### Deferred (from the RM track)
+
+Not part of any RM PR; each is its own work item:
+
+- **Events point in time**: `Instrument.events` reads each event's latest stored version, so a
+  past session can show an event stored after it (read-model.md "Risks"). Branch
+  `feat/events-point-in-time` has the edits written; it needs its checks run and the owner to
+  decide (point-in-time: `architect` review).
+- **Backtests page**: the reads are on GraphQL (RM9); the page needs mockups first.
+- **Options rollups folder split**: `features/rollups/options/` is at 8 of 10 modules; plan the
+  split by kind before the next group.
+- **IB-B licence hiding**: the API hides `personal`-licence features from other users (LV
+  table, IB-B).
+- **Empty distribution on gap sessions**: `Query.distribution` on a session with no partition
+  shows an empty distribution; say UNKNOWN (`NO_PARTITION`) instead.
+- **Ideas list on the feature table**: the top-ideas list still has its own columns (WEB 4
+  `PENDING`); move it to `widgets/feature-table`.
+- **A final Sonnet harness dry run**: brief a Sonnet implementer on a small page read end to end
+  (`add-graphql-field`) and fix the gaps it hits.
 
 ## Live verification (LV): our data against IBKR, read-only (ADR 0026)
 

@@ -9,8 +9,8 @@ description: Add or change a REST endpoint of the API (apps/api): writes (user c
 details, counts, a table.) Then **stop: it is a GraphQL field, use
 `.claude/skills/add-graphql-field`** (ADR 0037; `docs/api/read-model.md`). A new `GET` serving
 stored data fails `tests/architecture/api/test_rest_allowlist.py::test_rest_get_routes_are_allowlisted`
-(`architecture/rest_allowlist.toml` only shrinks). The one exception is "Legacy page reads"
-at the end, and only when the owner explicitly asks.
+(`architecture/rest_allowlist.toml` only shrinks). There is no legacy REST read path any more:
+read-model PR 10b deleted `services/explore`.
 
 REST is for (ADR 0037 decision 4):
 
@@ -20,7 +20,7 @@ REST is for (ADR 0037 decision 4):
 | A job submission and its polling | `POST /screens/{id}/run`, `GET /screens/{id}/run/{job_id}` | `services/ondemand` (ADR 0033) |
 | Health | `GET /health` | |
 | Live quotes | `GET /chains/{id}/live` | `services/live` (ADR 0028) |
-| Compute over a request body | `POST /screeners/preview`, `POST /features/check` | `services/explore/preview` (stays REST; its module moves when read-model PR 10 deletes `services/explore`) |
+| Compute over a request body | `POST /screeners/preview`, `POST /features/check` | `services/preview` (stays REST by design: a dry run over the request's `ReadContext`; the route takes `Context` from `deps`) |
 | A file (export, download) | | the use case that owns the data |
 
 Read first: ADR 0024 (`docs/adr/0024-api.md`, as amended by 0029, 0033, 0037), and one write
@@ -33,7 +33,9 @@ services.authoring"); never import the ingestion or backtest app, storage or `al
 from the API.
 
 1. **Use case.** The write / job / live logic is a function in its owner service
-   (`services/authoring/`, `services/ondemand/`, `services/live/`). A new kind of write (a new
+   (`services/authoring/`, `services/ondemand/`, `services/live/`, `services/preview/`). A
+   function that reads stored data takes the request's `ReadContext` (the route's `Context`
+   dependency), never the app's `ReadStore`, and never picks a partition itself (READ 2). A new kind of write (a new
    table or config the API writes) is a decision: write an ADR first (`write-adr`).
 2. **Schema.** A pydantic model in `apps/api/algotrade_api/schemas/<area>/` deriving from
    `Schema` (`from_attributes`), field names as the dataclass. Request bodies are models too.
@@ -52,31 +54,3 @@ from the API.
    main's and regenerate.
 7. **Docs.** The endpoint table in `docs/architecture.md` section 12.
 8. `make check WORKERS=2 WEB_WORKERS=2`.
-
-## Legacy page reads (only until the area moves; only if the owner explicitly asks)
-
-Until read-model PR 4 (`docs/api/read-model.md` "Migration plan") the GraphQL layer does not
-exist, and until each area's PR its pages still read `services/explore` over REST. A change to
-an existing legacy read (a bug fix, a parameter) follows the old path: the query in
-`services/explore/<area>.py` (frozen dataclass of JSON-safe values via `record(s)`, `paginate`,
-`NotFoundError` for unknown ids, "no data yet" is a 200 with an empty result), its schema and
-thin route, the tests in `tests/apps/api/routes/`, the OpenAPI export. A **new** legacy GET
-also needs the owner's explicit request and an allow-list entry with `keep = false` and
-`retire_in` naming the read-model PR that moves it; otherwise do the migration PR in order.
-Never add `partition_for` / `latest_session` calls outside `services/explore` (ownership
-`session-resolution`).
-
-**What counts as "the owner explicitly asks".** Only words about the path itself: "use the
-legacy / REST path", "don't wait for the read-model track", "patch it now on REST". A feature
-request ("show X on page Y", "add whatever endpoint it needs") is **not** an explicit ask, even
-when it names the page. For a feature request, stop and reply with: the read-model PR that
-delivers it (`docs/api/read-model.md` "Migration plan"), what that PR needs first, and the
-question "do it in track order, or patch the legacy REST read now?". Do not write code until
-the owner answers.
-
-**Even on the legacy path, never add a typed per-instrument fact field** (ADR 0038), e.g.
-`last_earnings_date: date | None` on `Idea`. A per-instrument stored value goes into the
-response as `features: dict[str, Any]` keyed by catalogue name (the `ScreenTableRow.features`
-shape), read through `services.features.field_view` for the request's session; the web reads
-`row.features['rollup.earnings@v1.last_earnings_date']`. If the response has no `features`
-dict yet, add one; do not add the typed field "just for now".

@@ -21,8 +21,8 @@ import pytest
 
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
-from algotrade.services.explore.preview.screens import preview_screen
-from algotrade.services.explore.store import ReadStore
+from algotrade.services.preview.screens import preview_screen
+from algotrade.services.read.context import ResultCache, open_context
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.tables.writers import StoreWriter
@@ -138,20 +138,21 @@ def measure(sized: tuple[StoreReader, MemoryConfigStore]) -> tuple[list[float], 
     fields = {SPEC["criteria"][c]["field"] for c in SPEC["criteria"]}
     assert len(fields | set(SPEC["columns"].values())) >= 20
 
+    ctx = open_context(reader, configs, user, DAY)
+
     def cold() -> object:
-        store = ReadStore(reader, configs, user)  # a fresh cache: the frame is read
-        got = preview_screen(store, SPEC, limit=100, on=DAY)
+        got = preview_screen(ctx, ResultCache(4), SPEC, limit=100)  # a fresh cache: read
         assert not got.cached and got.total == N
         return got
 
-    shared = ReadStore(reader, configs, user)
-    preview_screen(shared, SPEC, on=DAY)
+    shared = ResultCache(4)
+    preview_screen(ctx, shared, SPEC)
     edits = iter(range(10_000))
 
     def warm() -> object:  # a threshold edit: same fields, re-evaluated in memory
         spec = {**SPEC, "criteria": {**SPEC["criteria"], "price": {
             **SPEC["criteria"]["price"], "value": 10 + next(edits) % 50}}}  # fmt: skip
-        got = preview_screen(shared, spec, limit=100, on=DAY)
+        got = preview_screen(ctx, shared, spec, limit=100)
         assert got.cached
         return got
 

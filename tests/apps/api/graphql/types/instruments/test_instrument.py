@@ -1,4 +1,4 @@
-"""The Explore detail pane over ``POST /graphql`` on the golden explore store: an instrument's
+"""The Explore detail pane over ``POST /graphql`` on the golden API store: an instrument's
 events, option chain and quotes, ETF holdings, price and feature series, each for the request's
 session (chains exactly that session, holdings as of the issuer's date it sees), through the
 request's dataloaders (a batch of instruments reads each once)."""
