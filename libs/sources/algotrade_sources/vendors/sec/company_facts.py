@@ -16,15 +16,15 @@ counts:
 
 and three flows (``FLOWS``), the inputs of ``financials@v1``:
 
-- ``revenue`` (``us-gaap:Revenues``, else ``RevenueFromContractWithCustomerExcludingAssessedTax``,
-  else ``SalesRevenueNet``; the best-ranked tag that has the period wins, per period),
-  ``net_income`` (``NetIncomeLoss``) in USD, and ``eps_diluted``
-  (``EarningsPerShareDiluted``) in USD per share, in ``value`` with ``unit``;
+- ``revenue`` (``us-gaap:Revenues``, ``RevenueFromContractWithCustomerExcludingAssessedTax``
+  and ``SalesRevenueNet``; every tag is kept in ``tag``, ``financials@v1`` ranks them in that
+  order and never subtracts across tags), ``net_income`` (``NetIncomeLoss``) in USD, and
+  ``eps_diluted`` (``EarningsPerShareDiluted``) in USD per share, in ``value`` with ``unit``;
 - only periodic filings (10-K, 10-Q, 20-F, 40-F and their amendments) and only periods of a
   quarter, half year, nine months or a year (``SPAN_DAYS``): the year-to-date facts are how
   the fourth quarter is derived (annual minus nine months);
-- a period is reported again as a comparative in later filings: we keep the filing that
-  first reported it and any later filing whose value differs (a restatement), so a
+- a period is reported again as a comparative in later filings: per tag we keep the filing
+  that first reported it and any later filing whose value differs (a restatement), so a
   point-in-time read sees exactly the values that were public at each date, without the
   repeats.
 
@@ -111,23 +111,23 @@ def _current_period(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def _flow_facts(doc: dict[str, Any], concept: str) -> pd.DataFrame:
-    """One flow's periodic facts: the best-ranked tag per period, first filing and
-    restatements only (see the module docstring)."""
+    """One flow's periodic facts: per tag and period the first filing and the restatements
+    only (see the module docstring). Which tag to use is not decided here: that depends on
+    what is known on each date."""
     unit_key, unit, tags = FLOWS[concept]
     taxonomy = (doc.get("facts") or {}).get("us-gaap", {})
     parts = []
-    for rank, tag in enumerate(tags):
+    for tag in tags:
         rows = ((taxonomy.get(tag) or {}).get("units") or {}).get(unit_key) or []
         if rows:
-            parts.append(pd.DataFrame(rows).assign(tag=f"us-gaap:{tag}", rank=rank))
-    columns = ["start", "end", "val", "accn", "fy", "fp", "form", "filed", "tag", "rank"]
+            parts.append(pd.DataFrame(rows).assign(tag=f"us-gaap:{tag}"))
+    columns = ["start", "end", "val", "accn", "fy", "fp", "form", "filed", "tag"]
     frame = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=columns)
     frame = frame.reindex(columns=columns).dropna(subset=["start", "end", "val", "accn", "filed"])
     frame = frame[frame["form"].astype(str).str.startswith(PERIODIC_FORMS)]
     span = (pd.to_datetime(frame["end"]) - pd.to_datetime(frame["start"])).dt.days
     frame = frame[pd.concat([span.between(lo, hi) for lo, hi in SPAN_DAYS], axis=1).any(axis=1)]
-    period = ["start", "end"]
-    frame = frame[frame["rank"] == frame.groupby(period)["rank"].transform("min")]
+    period = ["tag", "start", "end"]
     frame = frame.sort_values([*period, "filed", "accn"], kind="stable")
     frame = frame[frame["val"].ne(frame.groupby(period)["val"].shift())]
     return frame.assign(concept=concept, unit=unit, val=frame["val"].astype(float), class_values=1)

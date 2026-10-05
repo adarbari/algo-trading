@@ -98,7 +98,7 @@ Selectable rollup fields today ([data/layers.md](data/layers.md#rollups-as-built
 | `iv30@v1` | `iv30`, `iv30_cboe`, `atm_strike_near`, `spot`, `rate`, `div_yield` (float); `iv30_status` (str); `near_expiry`, `far_expiry` (date); `n_quotes_used` (int) |
 | `iv_history@v2` | `iv30`, `iv_rank_252d`, `iv_percentile_252d` (float32); `history_days` (int); `rank_status` (str: UNKNOWN / PROVISIONAL / FULL) |
 | `fundamentals@v2` | `shares_outstanding` (float32); `shares_as_of`, `shares_filed` (date); `shares_source`, `market_cap_status` (str) |
-| `financials@v1` | `revenue_ttm`, `revenue_ttm_year_ago`, `net_income_ttm`, `revenue_fy` (float); `eps_diluted_ttm` (float32); `revenue_fy_end`, `ttm_as_of`, `ttm_filed` (date); `ttm_basis`, `financials_status` (str) |
+| `financials@v1` | `revenue_ttm`, `revenue_ttm_year_ago`, `net_income_ttm`, `revenue_fy` (float); `eps_diluted_ttm` (float32); `revenue_fy_end`, `ttm_as_of`, `ttm_filed` (date); `eps_stale`, `is_adr` (bool); `ttm_basis`, `financials_status` (str) |
 | `put_wing@v1` | `wing_status` (str); `target_expiry` (date); `target_dte`, `n_unpriced`, `n_strikes`, `wing_oi`, `wing_volume`, `best_put_oi`, `best_put_volume` (int); `wing_spread_pct`, `delta_band_distance`, `best_put_strike`, `best_put_delta`, `best_put_iv`, `best_put_mid`, `best_put_spread_pct`, `best_put_roc` (float32) |
 | `price_moves@v1` | `one_day_move` (float32) |
 | `momentum@v1` | `atr_14`, `rsi_14`, `ret_5d`, `rel_volume`, `high_20d`, `low_20d`, `high_50d`, `low_50d`, `prior_high_20d` (float32) |

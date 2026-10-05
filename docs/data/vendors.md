@@ -164,7 +164,7 @@ document is downloaded whole either way, so the three financial ones cost no ext
 |---|---|---|
 | `dei:EntityCommonStockSharesOutstanding` (cover page, as of a date just before filing) | `dei` | each value; several values for one date are classes (companyfacts drops the class labels) and are summed, `class_values` counts them |
 | `us-gaap:WeightedAverageNumberOfSharesOutstandingBasic` | `weighted_basic` | the filing's current period: latest period end, then the shortest span (comparatives and year-to-date dropped) |
-| `us-gaap:Revenues`, else `RevenueFromContractWithCustomerExcludingAssessedTax`, else `SalesRevenueNet` (USD) | `revenue` | every quarter, half-year, nine-month and annual period (see below); the best-ranked tag that has the period wins, per period |
+| `us-gaap:Revenues`, else `RevenueFromContractWithCustomerExcludingAssessedTax`, else `SalesRevenueNet` (USD) | `revenue` | every quarter, half-year, nine-month and annual period (see below); all three tags are kept (`tag`), `financials@v1` prefers them in this order and never subtracts across tags |
 | `us-gaap:NetIncomeLoss` (USD) | `net_income` | the same periods; losses are kept |
 | `us-gaap:EarningsPerShareDiluted` (USD per share) | `eps_diluted` | the same periods; negative values are kept |
 
@@ -175,8 +175,8 @@ the amount is in `value` with `unit` (`usd`, `usd_per_share`). Only periodic fil
 spans of about 3, 6, 9 or 12 months: the year-to-date facts are how `financials@v1` derives the
 fourth quarter (annual minus nine months). A period is repeated as a comparative in every
 later filing, so we keep the filing that first reported it plus any later filing whose value
-differs (a restatement). A point-in-time read then sees exactly what was public on each date,
-at about 400 rows per company instead of several thousand. Facts in a currency other than USD
+differs (a restatement), per tag. A point-in-time read then sees exactly what was public on each date,
+at about 400 to 500 rows per company instead of several thousand (a full re-parse and an incremental store date every fact the same way). Facts in a currency other than USD
 are ignored, so those issuers have no financials (null, not an error).
 
 Every row keeps `filed` (point in time), `period_end`, `form` and `accn`; amendments (10-K/A)
@@ -210,7 +210,7 @@ A crashed run resumes where it stopped (same session); `--limit N` splits it int
 **Adding the financials to a store that already has share counts:** a CIK is refetched only
 on its 30-day slot, so run `algotrade-ingest shares --force` once (same cost; only facts not
 stored yet are written), then `algotrade-ingest rollups --from <first session> --to <last
-session> --only financials@v1` (about 3 s a session once ~6k companies have facts). A CIK
+session> --only financials@v1` (compute alone measured at about 3 s for a synthetic frame of 6000 companies; not yet measured end to end). A CIK
 that has not been refetched yet shows `NO_FACTS` financials.
 
 ### Refreshes spread over the window

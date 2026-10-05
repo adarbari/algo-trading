@@ -15,6 +15,7 @@ from algotrade.features.framework.runner import compute_in_memory
 from algotrade.features.registry import catalogue_columns
 from algotrade.features.rollups.corporate.financials import (
     GROUP,
+    TAG_RANK,
     FinancialsParams,
     annual,
     discrete_quarters,
@@ -32,6 +33,12 @@ from tests.helpers.stored_frames import stamped
 STORED = END + timedelta(days=1)  # a backfill stored after every session it serves
 EPOCH = date(1970, 1, 1)
 UNITS = {"revenue": "usd", "net_income": "usd", "eps_diluted": "usd_per_share"}
+TAGS = {
+    "revenue": "us-gaap:Revenues",
+    "net_income": "us-gaap:NetIncomeLoss",
+    "eps_diluted": "us-gaap:EarningsPerShareDiluted",
+}
+CONTRACT = "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax"
 
 
 def day(d: date) -> int:
@@ -42,12 +49,12 @@ def period_end(year: int, month: int) -> date:
     return date(year, month, monthrange(year, month)[1])
 
 
-def fact(iid, concept, start, end, value, filed, form="10-Q"):  # type: ignore[no-untyped-def]
+def fact(iid, concept, start, end, value, filed, form="10-Q", tag=None):  # type: ignore[no-untyped-def]
     return {
         "instrument_id": iid, "symbol": iid[3:], "cik": "0000000001", "concept": concept,
         "period_start": start, "period_end": end, "filed": filed, "form": form,
         "accn": f"{iid}-{concept}-{start}-{end}-{filed}", "value": float(value),
-        "unit": UNITS[concept], "fetched_on": STORED,
+        "unit": UNITS[concept], "tag": tag or TAGS[concept], "fetched_on": STORED,
     }  # fmt: skip
 
 
@@ -78,9 +85,15 @@ def fy(iid, concept, year, value):  # type: ignore[no-untyped-def]
     )
 
 
-def facts_of(rows: list[dict[str, object]]) -> list[tuple[int, int, float, int]]:
+def facts_of(rows: list[dict[str, object]]) -> list[tuple[int, int, float, int, int]]:
     return [
-        (day(r["period_start"]), day(r["period_end"]), r["value"], day(r["filed"]))  # type: ignore[arg-type]
+        (
+            day(r["period_start"]),  # type: ignore[arg-type]
+            day(r["period_end"]),  # type: ignore[arg-type]
+            r["value"],  # type: ignore[arg-type]
+            day(r["filed"]),  # type: ignore[arg-type]
+            TAG_RANK.get(str(r["tag"]), len(TAG_RANK)),
+        )
         for r in rows
     ]
 
@@ -136,9 +149,75 @@ def test_a_broken_quarter_chain_uses_the_latest_fiscal_year() -> None:
     assert total == (480, day(date(2025, 12, 31)), day(date(2026, 2, 13)), True)
 
 
+def _cum(iid, tag, year, rows):  # type: ignore[no-untyped-def]
+    """Year-to-date revenue facts of a calendar year: (month, value, filed) under one tag."""
+    return [ytd(iid, "revenue", year, m, v, f, quarter=q) | {"tag": tag} for m, v, f, q in rows]
+
+
+def test_year_ago_ttm_must_end_a_year_before_the_ttm() -> None:
+    """Quarters 2023-03..12, then 2024-06..12 (2024 Q1 not derivable) and 2025-03: the last
+    four quarters are consecutive, but the four before them have a hole, so there is no
+    year-ago TTM (it used to be the TTM to 2023-12, almost two years back)."""
+    rows = [
+        *_cum("EQ:G", TAGS["revenue"], 2023, [
+            (3, 100, date(2023, 5, 1), True), (6, 100, date(2023, 8, 1), True),
+            (9, 100, date(2023, 11, 1), True), (9, 300, date(2023, 11, 1), False),
+            (12, 400, date(2024, 2, 15), False),
+        ]),
+        *_cum("EQ:G", TAGS["revenue"], 2024, [
+            (6, 110, date(2024, 8, 1), True), (9, 110, date(2024, 11, 1), True),
+            (9, 330, date(2024, 11, 1), False), (12, 440, date(2025, 2, 15), False),
+        ]),
+        *_cum("EQ:G", TAGS["revenue"], 2025, [(3, 120, date(2025, 5, 1), True)]),
+    ]  # fmt: skip
+    (total, ago) = trailing(facts_of(rows), True) or (None, None)
+    assert total == (450, day(date(2025, 3, 31)), day(date(2025, 5, 1)), False)  # 110 x 3 + 120
+    assert ago is None
+
+
+def test_a_quarter_is_never_derived_across_tags() -> None:
+    """Annual revenue under Revenues (600), quarters and nine months under the contract tag
+    (100 a quarter, 300): the fourth quarter is not 300, it is unknown."""
+    q = lambda m, v, f, qq: (m, v, f, qq)  # noqa: E731
+    contract = [
+        q(3, 100, date(2025, 5, 1), True), q(6, 100, date(2025, 8, 1), True),
+        q(9, 100, date(2025, 11, 1), True), q(9, 300, date(2025, 11, 1), False),
+    ]  # fmt: skip
+    annual_other_tag = _cum("EQ:H", TAGS["revenue"], 2025, [(12, 600, date(2026, 2, 15), False)])
+    rows = [*_cum("EQ:H", CONTRACT, 2025, contract), *annual_other_tag]
+    quarters = discrete_quarters(facts_of(rows), True)
+    assert [x[0] for x in quarters] == [day(date(2025, m, 30 + (m in (3, 12)))) for m in (3, 6, 9)]
+    assert 300 not in [x[1] for x in quarters]
+    same_tag = _cum("EQ:H", CONTRACT, 2025, [(12, 400, date(2026, 2, 15), False)])
+    derived = discrete_quarters(
+        facts_of([*_cum("EQ:H", CONTRACT, 2025, contract), *same_tag]), True
+    )
+    assert [x[1] for x in derived] == [100, 100, 100, 100]  # 400 - 300 under one tag
+
+
+def test_the_better_tag_wins_a_reported_quarter() -> None:
+    both = [
+        *_cum("EQ:H", CONTRACT, 2025, [(3, 90, date(2025, 5, 1), True)]),
+        *_cum("EQ:H", TAGS["revenue"], 2025, [(3, 100, date(2025, 5, 1), True)]),
+    ]
+    assert [x[1] for x in discrete_quarters(facts_of(both))] == [100]
+
+
+def test_year_to_date_facts_of_different_restatement_generations_are_not_subtracted() -> None:
+    """The next 10-K restates the prior year's annual figure (discontinued operations) while
+    that year's nine months stay as first filed: 250 - 300 is not a quarter."""
+    nine = _cum("EQ:R", TAGS["revenue"], 2024, [(9, 300, date(2024, 11, 1), False)])
+    restated = _cum("EQ:R", TAGS["revenue"], 2024, [(12, 250, date(2026, 2, 15), False)])
+    assert discrete_quarters(facts_of([*nine, *restated]), True) == []
+    close = _cum("EQ:R", TAGS["revenue"], 2024, [(12, 250, date(2025, 2, 15), False)])
+    assert discrete_quarters(facts_of([*nine, *close]), True) == []  # negative revenue: dropped
+    negative_ok = discrete_quarters(facts_of([*nine, *close]), False)  # net income may fall
+    assert [x[1] for x in negative_ok] == [-50]
+
+
 def _setup() -> tuple[object, list[date]]:
     writer, reader = store()
-    names = ["EQ:A", "EQ:B", "EQ:C", "EQ:D", "EQ:E", "EQ:S", "EQ:LOSS", "EQ:ETF"]
+    names = ["EQ:A", "EQ:B", "EQ:C", "EQ:D", "EQ:E", "EQ:S", "EQ:LOSS", "EQ:ETF", "EQ:ADR", "EQ:M"]
     closes = {iid: series(100, n, start=40.0) for n, iid in enumerate(names)}
     days = write_bars(writer, closes)
     rows = [
@@ -160,12 +239,24 @@ def _setup() -> tuple[object, list[date]]:
         ytd("EQ:E", "revenue", 2026, 3, 5, date(2026, 5, 5)),
         # S: twice the EPS of A (TTM 10.7), a 2:1 split on 2026-08-20 after every filing
         *company_a("EQ:S", "eps_diluted", 0.02),
+        # ADR: the same figures as A, per ordinary share
+        *company_a("EQ:ADR", "revenue"),
+        *company_a("EQ:ADR", "eps_diluted", 0.01),
+        # M: revenue only annual and old, EPS current
+        fy("EQ:M", "revenue", 2024, 80),
+        *company_a("EQ:M", "eps_diluted", 0.01),
         # LOSS: negative EPS and net income
         *company_a("EQ:LOSS", "eps_diluted", -0.01),
         *company_a("EQ:LOSS", "net_income", -0.1),
     ]  # fmt: skip
     writer.write_table("instruments/shares", STORED, "facts", stamped(rows, STORED, "facts"))
     write_split(writer, "EQ:S", date(2026, 8, 20), 2.0, END)
+    reference = [
+        {"instrument_id": iid, "symbol": iid[3:], "asset_class": "equity", "multiplier": 1.0,
+         "security_type": "ADR" if iid == "EQ:ADR" else "COMMON_STOCK", "status": "ACTIVE"}
+        for iid in names
+    ]  # fmt: skip
+    writer.write_table("instruments/reference", END, "ref", stamped(reference, END, "ref"))
     return reader, days
 
 
@@ -220,6 +311,14 @@ def test_statuses_and_missing_facts_are_null_not_errors() -> None:
     assert rows.loc["EQ:C", "revenue_ttm"] == 50 and pd.isna(rows.loc["EQ:C", "eps_diluted_ttm"])
     d = rows.loc["EQ:D"]
     assert d["financials_status"] == "STALE" and d["revenue_ttm"] == 70  # still shown
+    assert d["eps_stale"]
+    m = rows.loc["EQ:M"]  # stale annual revenue, current quarterly EPS: the EPS is not stale
+    assert (m["financials_status"], m["ttm_basis"], bool(m["eps_stale"])) == (
+        "STALE",
+        "ANNUAL",
+        False,
+    )
+    assert not rows.loc["EQ:A", "eps_stale"] and pd.isna(rows.loc["EQ:C", "eps_stale"])
     e = rows.loc["EQ:E"]
     assert e["financials_status"] == "NO_TTM" and pd.isna(e["revenue_ttm"])
     assert pd.isna(e["ttm_basis"]) and pd.isna(e["ttm_as_of"])
@@ -265,25 +364,32 @@ def _expressions(rows: pd.DataFrame, close: float = 100.0) -> pd.DataFrame:
     stats = pd.DataFrame(
         {"instrument_id": rows["instrument_id"], "session_date": END, "close": close}
     )
-    frames = {price_stats.GROUP.table: stats, GROUP.table: rows.assign(session_date=END)}
+    rows = rows.assign(session_date=END)
+    for flag in ("eps_stale", "is_adr"):
+        if flag not in rows.columns:
+            rows[flag] = False
+    frames = {price_stats.GROUP.table: stats, GROUP.table: rows}
     return fs.evaluate(frames, ["pe_ratio", "revenue_growth_yoy"]).set_index("instrument_id")
 
 
 def test_pe_ratio_and_revenue_growth_expression_features() -> None:
     rows = pd.DataFrame(
         {
-            "instrument_id": ["EQ:A", "EQ:LOSS", "EQ:ZERO", "EQ:OLD", "EQ:ETF"],
-            "eps_diluted_ttm": [4.0, -2.0, 0.0, 5.0, None],
-            "financials_status": ["OK", "OK", "OK", "STALE", "NO_FACTS"],
-            "revenue_ttm": [535.0, 10.0, 10.0, 10.0, None],
-            "revenue_ttm_year_ago": [445.0, 20.0, 0.0, None, None],
+            "instrument_id": ["EQ:A", "EQ:LOSS", "EQ:ZERO", "EQ:OLD", "EQ:ETF", "EQ:ADR", "EQ:M"],
+            "eps_diluted_ttm": [4.0, -2.0, 0.0, 5.0, None, 4.0, 4.0],
+            "eps_stale": [False, False, False, True, None, False, False],
+            "is_adr": [False, False, False, False, False, True, False],
+            "financials_status": ["OK", "OK", "OK", "STALE", "NO_FACTS", "OK", "STALE"],
+            "revenue_ttm": [535.0, 10.0, 10.0, 10.0, None, 535.0, 10.0],
+            "revenue_ttm_year_ago": [445.0, 20.0, 0.0, None, None, 445.0, None],
         }
     )
     out = _expressions(rows)
     assert out.loc["EQ:A", "pe_ratio"] == pytest.approx(25.0)
     assert out.loc["EQ:A", "revenue_growth_yoy"] == pytest.approx(535 / 445 - 1)
-    for loss in ("EQ:LOSS", "EQ:ZERO", "EQ:OLD", "EQ:ETF"):  # no negative P/E, no stale P/E
+    for loss in ("EQ:LOSS", "EQ:ZERO", "EQ:OLD", "EQ:ETF", "EQ:ADR"):  # no loss, stale or ADR P/E
         assert pd.isna(out.loc[loss, "pe_ratio"]), loss
+    assert out.loc["EQ:M", "pe_ratio"] == pytest.approx(25.0)  # stale revenue, current EPS
     assert out.loc["EQ:LOSS", "revenue_growth_yoy"] == pytest.approx(-0.5)
     assert pd.isna(out.loc["EQ:ZERO", "revenue_growth_yoy"])  # zero base
     assert pd.isna(out.loc["EQ:OLD", "revenue_growth_yoy"])  # no year-ago
@@ -297,6 +403,9 @@ def test_pe_ratio_end_to_end_on_stored_facts() -> None:
     assert out.loc["EQ:A", "pe_ratio"] == pytest.approx(close / 5.35)
     assert out.loc["EQ:S", "pe_ratio"] == pytest.approx(close / 5.35)
     assert pd.isna(out.loc["EQ:LOSS", "pe_ratio"]) and pd.isna(out.loc["EQ:ETF", "pe_ratio"])
+    assert rows.loc["EQ:ADR", "is_adr"] and not rows.loc["EQ:A", "is_adr"]
+    assert pd.isna(out.loc["EQ:ADR", "pe_ratio"])  # same EPS as A, but per ordinary share
+    assert out.loc["EQ:M", "pe_ratio"] == pytest.approx(close / 5.35)
 
 
 def price_stats_close(reader: object, iid: str) -> float:

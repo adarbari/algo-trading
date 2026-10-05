@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-129 stored features in 15 groups, in dependency order; 36 expression features.
+131 stored features in 15 groups, in dependency order; 36 expression features.
 
 ## `option_liquidity@v1`
 
@@ -188,7 +188,7 @@ Shares outstanding (SEC company facts, point in time by filing date) and its sta
 
 ## `financials@v1`
 
-Trailing-twelve-month revenue, net income and diluted EPS and the last fiscal year's revenue (SEC company facts, point in time by filing date). Stored as `rollups/instrument/financials@v1`; reads `rollups/instrument/price_stats@v2`, `instruments/shares` (optional), `events/split` (optional).
+Trailing-twelve-month revenue, net income and diluted EPS and the last fiscal year's revenue (SEC company facts, point in time by filing date). Stored as `rollups/instrument/financials@v1`; reads `rollups/instrument/price_stats@v2`, `instruments/shares` (optional), `events/split` (optional), `instruments/reference` (optional).
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
@@ -198,10 +198,12 @@ Trailing-twelve-month revenue, net income and diluted EPS and the last fiscal ye
 | `eps_diluted_ttm` | window | float32 | usd_per_share | open |  | Diluted EPS (EarningsPerShareDiluted) over the trailing twelve months, summed from the quarters, split-adjusted to the session; negative for a loss | no revenue / net income / EPS fact filed by the session (ETFs, funds, no CIK, issuers that report outside USD): NO_FACTS; or neither four consecutive quarters nor a fiscal year of this concept are known | `instruments/shares.concept`, `instruments/shares.value`, `instruments/shares.period_start`, `instruments/shares.period_end`, `instruments/shares.filed`, `events/split.ratio` |
 | `revenue_fy` | window | float | usd | open | >= 0 | Revenue of the latest fiscal year reported | no revenue / net income / EPS fact filed by the session (ETFs, funds, no CIK, issuers that report outside USD): NO_FACTS; or no annual revenue fact filed | `instruments/shares.concept`, `instruments/shares.value`, `instruments/shares.period_start`, `instruments/shares.period_end`, `instruments/shares.filed` |
 | `revenue_fy_end` | window | date | date | open |  | The end of that fiscal year | no revenue / net income / EPS fact filed by the session (ETFs, funds, no CIK, issuers that report outside USD): NO_FACTS; or no annual revenue fact filed | `instruments/shares.period_end` |
-| `ttm_as_of` | window | date | date | open |  | The oldest period end among the TTMs shown: all of them are current to at least this date (the last quarter, or the fiscal year end of an annual one) | no revenue / net income / EPS fact filed by the session (ETFs, funds, no CIK, issuers that report outside USD): NO_FACTS | `instruments/shares.period_end` |
-| `ttm_filed` | window | date | date | open |  | The newest filing date behind the TTMs (when they were public) | no revenue / net income / EPS fact filed by the session (ETFs, funds, no CIK, issuers that report outside USD): NO_FACTS | `instruments/shares.filed` |
-| `ttm_basis` | label | str | category | open | QUARTERS, ANNUAL | QUARTERS: every TTM is the sum of four quarters; ANNUAL: at least one is the latest fiscal year | no revenue / net income / EPS fact filed by the session (ETFs, funds, no CIK, issuers that report outside USD): NO_FACTS | `instruments/shares.period_start` |
-| `financials_status` | label | str | category | open | OK, PARTIAL, NO_TTM, NO_FACTS, STALE | OK (all three TTMs); PARTIAL (some); NO_TTM (facts, but no TTM can be formed); NO_FACTS (none filed); STALE (the oldest TTM ended more than stale_days, 480, before the session; the values are still shown) | never | `instruments/shares.concept` |
+| `ttm_as_of` | window | date | date | open |  | The period end of the first TTM present of revenue, net income and EPS (the last quarter, or the fiscal year end of an annual one) | no revenue / net income / EPS fact filed by the session (ETFs, funds, no CIK, issuers that report outside USD): NO_FACTS | `instruments/shares.period_end` |
+| `ttm_filed` | window | date | date | open |  | The filing date that made that TTM public (the newest filing behind it) | no revenue / net income / EPS fact filed by the session (ETFs, funds, no CIK, issuers that report outside USD): NO_FACTS | `instruments/shares.filed` |
+| `ttm_basis` | label | str | category | open | QUARTERS, ANNUAL | QUARTERS: that TTM is the sum of four quarters; ANNUAL: it is the latest fiscal year (the other TTMs may differ) | no revenue / net income / EPS fact filed by the session (ETFs, funds, no CIK, issuers that report outside USD): NO_FACTS | `instruments/shares.period_start` |
+| `eps_stale` | window | bool | flag | open |  | The EPS TTM's own period ended more than stale_days (480) before the session: the value is shown but pe_ratio is null | there is no EPS TTM (see eps_diluted_ttm) | `instruments/shares.period_end` |
+| `is_adr` | window | bool | flag | open |  | The instrument is an ADR: its per-share figures are per ordinary share and the ADR ratio is not stored, so pe_ratio is null | never (false without an instruments/reference snapshot) | `instruments/reference.security_type` |
+| `financials_status` | label | str | category | open | OK, PARTIAL, NO_TTM, NO_FACTS, STALE | OK (all three TTMs); PARTIAL (some); NO_TTM (facts, but no TTM can be formed); NO_FACTS (none filed); STALE (the first TTM present ended more than stale_days, 480, before the session; the values are still shown) | never | `instruments/shares.concept` |
 
 ## `iv30@v1`
 
@@ -266,7 +268,7 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 |---|---|---|---|---|---|---|---|---|---|
 | `div_yield` | expression | float32 | decimal | open | 0 .. 1 | Trailing dividend yield: div_ttm / close; the continuous q in option pricing (iv30 reads it, so it is stored) | dividends div_ttm is null (no dividend in the window and too little bar history to call it a non-payer), or the close is not positive | `if(price_stats.close > 0, dividends.div_ttm / price_stats.close, null)` | `rollups/instrument/div_yield@v1` |
 | `market_cap` | expression | float | usd | open | >= 0 | shares_outstanding x close (the company total times this class's close) | fundamentals market_cap_status is not OK (no count, a stale count, or no close) | `if(fundamentals.market_cap_status == "OK", fundamentals.shares_outstanding * price_stats.close, null)` | virtual |
-| `pe_ratio` | expression | float | ratio | open | >= 0 | Trailing P/E: close / diluted EPS over the trailing twelve months. Null when the company lost money (EPS <= 0): a negative P/E is not shown | financials eps_diluted_ttm is null or not positive (a loss; ETFs and funds have none), the close is not positive, or the financials are STALE (the oldest TTM period ended more than stale_days before the session) | `if(financials.eps_diluted_ttm > 0 and price_stats.close > 0 and financials.financials_status != "STALE", price_stats.close / financials.eps_diluted_ttm, null)` | virtual |
+| `pe_ratio` | expression | float | ratio | open | >= 0 | Trailing P/E: close / diluted EPS over the trailing twelve months. Null when the company lost money (EPS <= 0: a negative P/E is not shown), when the EPS is stale, and for an ADR (its EPS is per ordinary share and the ADR ratio is not stored). Every share class of a company uses the company's EPS: only meaningful when the classes have equal economics | financials eps_diluted_ttm is null or not positive (a loss; ETFs and funds have none), the close is not positive, eps_stale (the EPS TTM ended more than stale_days before the session), or the instrument is an ADR | `if(financials.eps_diluted_ttm > 0 and price_stats.close > 0 and not financials.eps_stale and not financials.is_adr, price_stats.close / financials.eps_diluted_ttm, null)` | virtual |
 | `revenue_growth_yoy` | expression | float | decimal | open | >= -1 | Revenue growth year over year: the trailing-twelve-month revenue against the same TTM a year earlier | revenue_ttm or revenue_ttm_year_ago is null (fewer than two years of reported quarters or fiscal years), or the year-ago revenue is not positive | `if(financials.revenue_ttm_year_ago > 0, financials.revenue_ttm / financials.revenue_ttm_year_ago - 1, null)` | virtual |
 
 ### `liquidity.toml`

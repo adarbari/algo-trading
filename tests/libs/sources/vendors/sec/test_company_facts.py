@@ -138,26 +138,47 @@ def _financials_doc() -> bytes:
     return json.dumps(doc).encode()
 
 
-def test_flows_one_tag_per_period_first_filing_and_restatements() -> None:
+def test_flows_first_filing_and_restatements_per_tag() -> None:
     rows = parse_company_facts(_financials_doc())
     assert list(rows.columns) == list(FACT_COLUMNS)
-    revenue = rows[rows["concept"] == "revenue"].set_index(["period_start", "period_end", "filed"])
-    assert sorted(revenue.index) == [
-        ("2020-01-01", "2020-03-31", "2020-05-01"),
-        ("2026-01-01", "2026-03-31", "2026-05-01"),
-        ("2026-01-01", "2026-03-31", "2027-08-01"),
-        ("2026-01-01", "2026-12-31", "2027-02-20"),
-        ("2026-04-01", "2026-06-30", "2026-08-01"),
-    ]
-    assert revenue.loc[("2026-01-01", "2026-03-31", "2026-05-01"), "value"] == 100.0  # not 90
-    assert revenue.loc[("2026-01-01", "2026-03-31", "2027-08-01"), ["value", "form"]].tolist() == [
-        110.0,
-        "10-Q/A",
-    ]
-    assert revenue.loc[("2026-04-01", "2026-06-30", "2026-08-01"), "tag"] == (
-        "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax"
+    revenue = rows[rows["concept"] == "revenue"].set_index(["tag", "period_start", "filed"])
+    plain, contract = (
+        "us-gaap:Revenues",
+        "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
     )
+    assert sorted(revenue.index) == [
+        (contract, "2026-01-01", "2026-05-01"),
+        (contract, "2026-04-01", "2026-08-01"),
+        (plain, "2026-01-01", "2026-05-01"),
+        (plain, "2026-01-01", "2027-02-20"),
+        (plain, "2026-01-01", "2027-08-01"),
+        ("us-gaap:SalesRevenueNet", "2020-01-01", "2020-05-01"),
+    ]
+    assert revenue.loc[(plain, "2026-01-01", "2026-05-01"), "value"] == 100.0
+    assert revenue.loc[(contract, "2026-01-01", "2026-05-01"), "value"] == 90.0  # kept, own tag
+    restated = revenue.loc[(plain, "2026-01-01", "2027-08-01")]
+    assert (restated["value"], restated["form"]) == (110.0, "10-Q/A")
     assert set(revenue["unit"]) == {"usd"} and revenue["shares"].isna().all()
+
+
+def test_a_later_filing_with_another_tag_does_not_hide_the_first_report() -> None:
+    """The point-in-time dating must not depend on whether the whole history is parsed at
+    once: the first report of a period under one tag stays even when a later filing reports
+    the same period under a better tag."""
+    q1 = ("2026-01-01", "2026-03-31")
+    doc = {
+        "cik": 1234,
+        "facts": {
+            "us-gaap": {
+                "Revenues": _entry("USD", _row(*q1, 100, "2027-05-01")),
+                "RevenueFromContractWithCustomerExcludingAssessedTax": _entry(
+                    "USD", _row(*q1, 100, "2026-05-01")
+                ),
+            }
+        },
+    }
+    rows = parse_company_facts(json.dumps(doc).encode())
+    assert sorted(rows["filed"]) == ["2026-05-01", "2027-05-01"]
 
 
 def test_losses_and_eps_are_kept_with_their_units() -> None:

@@ -1,6 +1,7 @@
 """Feature inputs asked of ``algotrade.data`` by table name: each table's point-in-time read
 (bars, earnings snapshots, chain partitions, events by event date, the Treasury curve, share
-facts, IBKR vols) and other groups' stored rows, with this run's rows winning."""
+facts, the reference's security types, IBKR vols) and other groups' stored rows, with this
+run's rows winning."""
 
 from datetime import date, timedelta
 
@@ -117,3 +118,21 @@ def test_ibkr_vols_are_the_session_and_earlier_rows_merged_per_instrument() -> N
     assert list(window["iv30_ibkr"]) == pytest.approx([0.2, 0.21, 0.5])  # the later run wins
     assert list(window["source_kind"]) == ["history", "history", "snapshot"]
     assert inputs.load_input(reader, table, [END], 3).at(END, 3) is None  # nothing on END
+
+
+def test_reference_input_is_the_security_types_the_session_sees() -> None:
+    writer, reader = store()
+    assert inputs.load_input(reader, "instruments/reference", [END], 0).at(END, 0) is None
+    rows = [
+        {"instrument_id": "EQ:A", "symbol": "A", "asset_class": "equity", "multiplier": 1.0,
+         "security_type": "ADR", "status": "ACTIVE"},
+        {"instrument_id": "EQ:B", "symbol": "B", "asset_class": "equity", "multiplier": 1.0,
+         "security_type": "COMMON_STOCK", "status": "ACTIVE"},
+    ]  # fmt: skip
+    writer.write_table("instruments/reference", END, "r", stamped(rows, END, "r"))
+    seen = inputs.load_input(reader, "instruments/reference", [END], 0).at(END, 0)
+    assert seen is not None and list(seen.columns) == ["instrument_id", "security_type"]
+    assert dict(zip(seen["instrument_id"], seen["security_type"], strict=True)) == {
+        "EQ:A": "ADR",
+        "EQ:B": "COMMON_STOCK",
+    }

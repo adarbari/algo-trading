@@ -21,11 +21,11 @@ valid_range = [0, inf]
 version = 1
 
 [pe_ratio]
-expr = 'if(financials.eps_diluted_ttm > 0 and price_stats.close > 0 and financials.financials_status != "STALE", price_stats.close / financials.eps_diluted_ttm, null)'
+expr = "if(financials.eps_diluted_ttm > 0 and price_stats.close > 0 and not financials.eps_stale and not financials.is_adr, price_stats.close / financials.eps_diluted_ttm, null)"
 dtype = "float"
 unit = "ratio"
-description = "Trailing P/E: close / diluted EPS over the trailing twelve months. Null when the company lost money (EPS <= 0): a negative P/E is not shown"
-null_meaning = "financials eps_diluted_ttm is null or not positive (a loss; ETFs and funds have none), the close is not positive, or the financials are STALE (the oldest TTM period ended more than stale_days before the session)"
+description = "Trailing P/E: close / diluted EPS over the trailing twelve months. Null when the company lost money (EPS <= 0: a negative P/E is not shown), when the EPS is stale, and for an ADR (its EPS is per ordinary share and the ADR ratio is not stored). Every share class of a company uses the company's EPS: only meaningful when the classes have equal economics"
+null_meaning = "financials eps_diluted_ttm is null or not positive (a loss; ETFs and funds have none), the close is not positive, eps_stale (the EPS TTM ended more than stale_days before the session), or the instrument is an ADR"
 valid_range = [0, inf]
 version = 1
 
