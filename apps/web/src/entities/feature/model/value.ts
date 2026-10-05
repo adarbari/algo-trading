@@ -62,6 +62,17 @@ export function isUnknown(value: ServedValue | undefined): boolean {
 }
 
 /**
+ * What a cell with no value says (ADR 0041): "n/a" where the feature does not apply to the
+ * instrument, "Illiquid" where the options are too thin to price, else "Unknown". The one place
+ * the label is chosen; the server decides the code.
+ */
+export function unknownLabel(code: UnknownCodeName | null | undefined): string {
+  if (code === 'NOT_APPLICABLE') return 'n/a';
+  if (code === 'ILLIQUID') return 'Illiquid';
+  return 'Unknown';
+}
+
+/**
  * Why a value is UNKNOWN, in words: the table had no partition for the session, the instrument
  * had no row, or what a stored null means for this feature (`info.nullMeaning`).
  */
@@ -87,6 +98,10 @@ export function codeReason(
       return 'no row for this instrument in this session';
     case 'NULL':
       return nullMeaning || 'not known for this session';
+    case 'NOT_APPLICABLE':
+      return 'does not apply to this instrument (e.g. not optionable, or an ETF has no earnings)';
+    case 'ILLIQUID':
+      return 'options too thin to price: no near-the-money quote within the spread limit';
     case null:
       return 'not known';
     default:

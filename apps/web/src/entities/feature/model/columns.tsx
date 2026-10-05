@@ -21,7 +21,7 @@ import { DecisionBadge, OUTCOME_FILL, ScoreBreakdown, decisionLabel } from '@/en
 
 import { featureLabel, featureMarks, unitLabel } from './catalogue';
 import type { ColumnInfo, TableRow } from './table';
-import { codeReason, shownValue, valueFormat } from './value';
+import { codeReason, shownValue, unknownLabel, valueFormat } from './value';
 
 /** A table's columns, in order: each one a factory call. */
 export type ColumnPlan = readonly DataTableColumn<TableRow>[];
@@ -60,7 +60,7 @@ function describe(info: ColumnInfo): string {
 /**
  * One catalogue feature: headed by its short label (personal-licence features marked `(P)`),
  * formatted by the server's `info.format`; a cell the session has no value for reads
- * "Unknown" with the reason.
+ * "Unknown" (or "n/a" / "Illiquid", ADR 0041) with the reason.
  */
 export function featureColumn(info: ColumnInfo): DataTableColumn<TableRow> {
   const format = valueFormat(info);
@@ -78,7 +78,7 @@ export function featureColumn(info: ColumnInfo): DataTableColumn<TableRow> {
       if (!cell || cell.value === null || cell.value === undefined) {
         return (
           <Text tone="muted" title={codeReason(cell?.unknown ?? null, info.nullMeaning)}>
-            Unknown
+            {unknownLabel(cell?.unknown ?? null)}
           </Text>
         );
       }

@@ -27,6 +27,8 @@ class UnknownCode(StrEnum):
     LICENCE = "LICENCE"  # a personal-licence feature and the caller is not its owner (ADR 0028)
     NOT_RUN = "NOT_RUN"  # a screener (or the data-quality check) has no run for the session
     PRE_SNAPSHOT = "PRE_SNAPSHOT"  # identity came from a later snapshot (survivorship)
+    NOT_APPLICABLE = "NOT_APPLICABLE"  # the feature is not defined for this instrument (ADR 0041)
+    ILLIQUID = "ILLIQUID"  # an option feature null because the chain is too thin (ADR 0041)
 
 
 @dataclass(frozen=True)

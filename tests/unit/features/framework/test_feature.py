@@ -48,6 +48,8 @@ def test_a_valid_feature_has_no_problems() -> None:
         ({"categories": ("A",)}, "categories need dtype str"),
         ({"inputs": ("close",)}, "neither"),
         ({"licence": "public"}, "licence 'public' must be one of"),
+        ({"applies_to": "stocks"}, "applies_to 'stocks' must be one of"),
+        ({"null_status": "iv30.status@x"}, "null_status 'iv30.status@x' is not"),
     ],
 )
 def test_problems_are_named(changes: dict[str, Any], problem: str) -> None:
@@ -77,3 +79,25 @@ def test_licences_default_open_and_the_strictest_wins() -> None:
     assert _feature().licence == "open"
     assert strictest([]) == "open" and strictest(["open", "open"]) == "open"
     assert strictest(["open", "personal"]) == "personal"
+
+
+def test_applicability_is_inherited_from_the_group_and_status_fields_resolve() -> None:
+    group = FeatureGroup(
+        "demo", 1, "", (Input("bars/1d"),),
+        (*features({"a": "float", "status": "str"}), _feature(name="b", null_status="status")),
+        lambda *_: None, applies_to="optionable",
+    )  # fmt: skip
+    assert {f.applies_to for f in group.features} == {"optionable"}
+    assert group.feature("b").status_field == "rollup.demo@v1.status"
+    other = _feature(null_status="iv30.iv30_status@v1")
+    assert other.status_field == "rollup.iv30@v1.iv30_status" and feature_problems(other) == []
+    assert _feature().status_field == "" and _feature().applies_to == "any"
+    own = FeatureGroup(
+        "demo2", 1, "", (Input("bars/1d"),), (_feature(applies_to="not_etf"),),
+        lambda *_: None, applies_to="optionable",
+    )  # fmt: skip
+    assert own.feature("hv30").applies_to == "not_etf"  # a feature's own value wins
+    with pytest.raises(ValueError, match="not a column of the group"):
+        FeatureGroup(
+            "d3", 1, "", (Input("bars/1d"),), (_feature(null_status="nope"),), lambda *_: None
+        )

@@ -113,6 +113,37 @@ class FeatureSet:
         e = self.expressions[name]
         return f"{ROLLUP_TABLE_PREFIX}{e.name}@v{e.feature.version}"
 
+    def applicability(self, name: str) -> tuple[frozenset[str], tuple[str, ...]]:
+        """What a value's absence may be put down to (ADR 0041), inherited by an expression
+        from everything it reads like its licence: -> (the non-``any`` ``applies_to`` values
+        of the stored features it reads, the selection fields of their ``null_status`` columns).
+        ``name``: a selection field (``rollup.<group>.<col>``, ``feature.<name>``)."""
+        applies: set[str] = set()
+        statuses: list[str] = []
+
+        def add(feature: Feature) -> None:
+            if feature.applies_to != "any":
+                applies.add(feature.applies_to)
+            if feature.null_status:
+                statuses.append(feature.status_field)
+
+        def visit(expression: str) -> None:
+            e = self.expressions[expression]
+            for ref in e.refs:
+                group, _, column = ref.partition(".")
+                if group in self._by_name:
+                    add(self._by_name[group].feature(column))
+            for dep in e.uses:
+                visit(dep)
+
+        if name.startswith("feature."):
+            visit(name.removeprefix("feature."))
+        else:
+            found = self.feature(name)
+            if found is not None:
+                add(found)
+        return frozenset(applies), tuple(dict.fromkeys(statuses))
+
     def moved_field(self, name: str) -> str | None:
         """Where a field of a superseded group lives now (``""``: retired); ``None`` when
         ``name`` is not such a field."""

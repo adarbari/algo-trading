@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { isUnknown, shownValue, unknownReason, valueFormat, type ServedValue } from './value';
+import {
+  codeReason,
+  isUnknown,
+  shownValue,
+  unknownLabel,
+  unknownReason,
+  valueFormat,
+  type ServedValue,
+} from './value';
 
 describe('valueFormat', () => {
   it('follows the server format, the unit choosing currency and digits', () => {
@@ -29,7 +37,9 @@ describe('valueFormat', () => {
 });
 
 describe('unknown values', () => {
-  const value = (code: 'NO_PARTITION' | 'NO_ROW' | 'NULL' | 'LICENCE'): ServedValue => ({
+  const value = (
+    code: 'NO_PARTITION' | 'NO_ROW' | 'NULL' | 'LICENCE' | 'NOT_APPLICABLE' | 'ILLIQUID',
+  ): ServedValue => ({
     name: 'rollup.earnings@v1.next_earnings_date',
     value: null,
     unknown: { code, detail: 'rollups/instrument/earnings@v1 has no partition for 2026-10-02' },
@@ -51,5 +61,18 @@ describe('unknown values', () => {
     expect(isUnknown(undefined)).toBe(true);
     expect(isUnknown({ ...value('NULL'), value: 0, unknown: null })).toBe(false);
     expect([shownValue(true), shownValue(false), shownValue(3)]).toEqual(['Yes', 'No', 3]);
+  });
+
+  it('labels n/a and Illiquid cells apart from a real gap, with a reason for each', () => {
+    expect(unknownLabel('NOT_APPLICABLE')).toBe('n/a');
+    expect(unknownLabel('ILLIQUID')).toBe('Illiquid');
+    expect([unknownLabel('NULL'), unknownLabel('NO_ROW'), unknownLabel(null)]).toEqual([
+      'Unknown',
+      'Unknown',
+      'Unknown',
+    ]);
+    expect(codeReason('NOT_APPLICABLE', null)).toMatch(/does not apply/);
+    expect(codeReason('ILLIQUID', null)).toMatch(/too thin to price/);
+    expect(unknownReason(value('ILLIQUID'))).toMatch(/has no partition/); // the server's detail
   });
 });

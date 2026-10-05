@@ -38,6 +38,7 @@ IV30 = "rollups/instrument/iv30@v1"
 SOURCES = {"ours": "iv30", "cboe": "iv30_cboe"}
 
 _IV = "iv30.iv30@v1"
+_STATUS = "iv30.iv30_status@v1"  # why iv30@v1 has no IV (ADR 0041: a thin chain reads ILLIQUID)
 _UNKNOWN = "rank_status is UNKNOWN (fewer than 60 sessions with an IV), or there is no IV today"
 
 FEATURES = (
@@ -45,17 +46,18 @@ FEATURES = (
         "iv30", "float32", "decimal",
         "The session's IV30 from iv30@v1 (ours; the feed's with source = cboe)",
         "iv30@v1 has no IV for the session (its iv30_status says why)", "expression",
-        valid_range=(0, 5), inputs=(_IV, "iv30.iv30_cboe@v1"),
+        valid_range=(0, 5), inputs=(_IV, "iv30.iv30_cboe@v1"), null_status=_STATUS,
     ),
     Feature(
         "iv_rank_252d", "float32", "decimal",
         "IV rank: (iv30 - min) / (max - min) over the last 252 sessions' IVs, today included",
         f"{_UNKNOWN}; or every IV in the window is equal", valid_range=(0, 1), inputs=(_IV,),
+        null_status=_STATUS,
     ),
     Feature(
         "iv_percentile_252d", "float32", "decimal",
         "IV percentile: the share of the window's earlier IVs strictly below today's",
-        f"{_UNKNOWN}; or no earlier IV", valid_range=(0, 1), inputs=(_IV,),
+        f"{_UNKNOWN}; or no earlier IV", valid_range=(0, 1), inputs=(_IV,), null_status=_STATUS,
     ),
     Feature(
         "history_days", "int", "sessions",
@@ -135,4 +137,5 @@ GROUP = FeatureGroup(
     FEATURES,
     compute,
     IvHistoryParams(),
+    applies_to="optionable",
 )

@@ -25,7 +25,7 @@ from typing import Any
 import pandas as pd
 
 from algotrade.core.model.fields import ROLLUP_TABLE_PREFIX
-from algotrade.features.framework.feature import Feature, feature_problems
+from algotrade.features.framework.feature import AppliesTo, Feature, feature_problems
 
 type Inputs = Mapping[str, pd.DataFrame | None]
 type Compute = Callable[[Inputs, date, Any], pd.DataFrame]
@@ -68,10 +68,19 @@ class FeatureGroup:
     # A frozen dataclass of default parameters (scalar fields are rollups.toml keys), or
     # ``None``: the group takes no parameters.
     params: Any = None
+    # Which instruments the group's features are defined for (``Feature.applies_to``); a
+    # feature's own non-"any" value wins.
+    applies_to: AppliesTo = "any"
 
     def __post_init__(self) -> None:
         owned = tuple(
-            replace(f, version=f.version or self.version, group=self.key) for f in self.features
+            replace(
+                f,
+                version=f.version or self.version,
+                group=self.key,
+                applies_to=f.applies_to if f.applies_to != "any" else self.applies_to,
+            )
+            for f in self.features
         )
         object.__setattr__(self, "features", owned)
         problems = declaration_problems(self)
@@ -127,6 +136,8 @@ def declaration_problems(group: FeatureGroup) -> list[str]:
         problems.append(f"columns {clash} are reserved")
     for f in group.features:
         problems += feature_problems(f)
+        if f.null_status and "@" not in f.null_status and f.null_status not in names:
+            problems.append(f"{f.name}: null_status {f.null_status!r} is not a column of the group")
         if f.version != group.version:
             problems.append(f"{f.name}: version must be the group's ({group.version}) for now")
     if group.params is not None and not is_dataclass(group.params):
