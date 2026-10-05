@@ -94,33 +94,55 @@ export function useScreenTable(id: string, query: ScreenTableQuery, enabled = tr
   });
 }
 
-/** The user's saved view of a screen's results (columns, sort, decisions). */
-export function useScreenerView(id: string) {
+/** The user's view of a screen's results: the default one, or a named one. */
+export function useScreenerView(id: string, name: string | null = null) {
   return useQuery({
-    queryKey: queryKeys.screeners.view(id),
+    queryKey: queryKeys.screeners.view(id, name),
     queryFn: () =>
       unwrap(
         api.GET('/preferences/screeners/{screener_id}/view', {
-          params: { path: { screener_id: id } },
+          params: { path: { screener_id: id }, query: { name } },
         }),
       ),
   });
 }
 
-/** Saves the view (it belongs to the user, not to the screen: no version, no hash). */
+/** A view as saved: the columns added, the sort and the decisions shown. */
+export type ViewContent = Pick<ScreenerView, 'columns' | 'sort' | 'decisions'>;
+
+/** Saves a view (it belongs to the user, not to the screen: no version, no hash). */
 export function useSaveScreenerView(id: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (view: Pick<ScreenerView, 'columns' | 'sort' | 'decisions'>) =>
+    mutationFn: ({ name, view }: { name: string | null; view: ViewContent }) =>
       unwrap(
         api.PUT('/preferences/screeners/{screener_id}/view', {
-          params: { path: { screener_id: id } },
+          params: { path: { screener_id: id }, query: { name } },
           body: view,
         }),
       ),
-    onSuccess: (saved) => {
-      client.setQueryData(queryKeys.screeners.view(id), saved);
+    onSuccess: (saved, { name }) => {
+      client.setQueryData(queryKeys.screeners.view(id, name), saved);
+      // The list of named views changed: every view of this screener carries it.
+      void client.invalidateQueries({
+        queryKey: queryKeys.screeners.views(id),
+        predicate: (query) => query.queryKey[3] !== (name ?? ''),
+      });
     },
+  });
+}
+
+/** Removes a named view. */
+export function useDeleteScreenerView(id: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) =>
+      unwrap(
+        api.DELETE('/preferences/screeners/{screener_id}/view', {
+          params: { path: { screener_id: id }, query: { name } },
+        }),
+      ),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.screeners.views(id) }),
   });
 }
 

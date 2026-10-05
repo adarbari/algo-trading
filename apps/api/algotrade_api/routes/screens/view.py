@@ -19,5 +19,8 @@ def view(
     user: Annotated[
         str | None, Query(description="default: the API's user (a label until auth)")
     ] = None,
+    name: Annotated[
+        str | None, Query(description="a named view (default: the default view)")
+    ] = None,
 ) -> ScreenerView:
-    return ScreenerView.model_validate(screener_view(store, user, screener_id))
+    return ScreenerView.model_validate(screener_view(store, user, screener_id, name))
