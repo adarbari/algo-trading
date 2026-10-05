@@ -1,7 +1,16 @@
-/** Filtering the ideas: by best decision, and hiding names reporting earnings soon. */
+/**
+ * Filtering the ideas: by best decision, and hiding names reporting earnings soon. "Soon" is
+ * counted in sessions, the unit the server stores (`rollup.earnings@v1.days_to_earnings`); an
+ * idea whose next report is not known is kept.
+ */
 import type { Idea } from '@/entities/idea';
 
-export const EARNINGS_SOON_DAYS = 14;
+import { sessionsToEarnings } from './facts';
+
+export const EARNINGS_SOON_SESSIONS = 14;
+
+/** The filter chip's label (the unit is sessions, not calendar days). */
+export const EARNINGS_SOON_LABEL = `Hide earnings within ${EARNINGS_SOON_SESSIONS} sessions`;
 
 export interface IdeaFilters {
   /** Best decisions to keep; empty keeps all. */
@@ -16,8 +25,13 @@ export function filterIdeas(ideas: readonly Idea[], filters: IdeaFilters): Idea[
     if (filters.decisions.length > 0 && !filters.decisions.includes(idea.best.decision)) {
       return false;
     }
-    const days = idea.daysToEarnings;
-    return !(filters.hideEarningsSoon && days !== null && days >= 0 && days < EARNINGS_SOON_DAYS);
+    const sessions = sessionsToEarnings(idea);
+    return !(
+      filters.hideEarningsSoon &&
+      sessions !== null &&
+      sessions >= 0 &&
+      sessions < EARNINGS_SOON_SESSIONS
+    );
   });
 }
 

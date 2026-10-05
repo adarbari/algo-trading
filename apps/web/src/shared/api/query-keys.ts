@@ -7,6 +7,8 @@ export const queryKeys = {
   /** A GraphQL operation: its name and variables (every GraphQL read is keyed this way). */
   gql: (operationName: string, variables: Readonly<Record<string, unknown>>) =>
     ['gql', operationName, variables] as const,
+  /** Every cached response of one GraphQL operation, whatever its variables (invalidation). */
+  gqlAll: (operationName: string) => ['gql', operationName] as const,
   admin: {
     all: () => ['admin'] as const,
     completeness: (sessions: number) => ['admin', 'ingestion', 'completeness', sessions] as const,
@@ -27,10 +29,6 @@ export const queryKeys = {
     prices: (ids: readonly string[], from: string | null) =>
       ['explore', 'prices', ids, from] as const,
   },
-  ideas: {
-    all: () => ['ideas'] as const,
-    top: (limit: number) => ['ideas', 'top', limit] as const,
-  },
   screeners: {
     all: () => ['screeners'] as const,
     preview: (spec: unknown) => ['screeners', 'preview', spec] as const,
@@ -41,18 +39,6 @@ export const queryKeys = {
     views: (id: string) => ['screeners', 'view', id] as const,
     tables: (id: string) => ['screeners', 'table', id] as const,
     run: (id: string, jobId: string) => ['screeners', 'run', id, jobId] as const,
-  },
-  instruments: {
-    detail: (id: string) => ['instruments', id] as const,
-    bars: (id: string, from: string | null) => ['instruments', id, 'bars', from] as const,
-    events: (id: string) => ['instruments', id, 'events'] as const,
-    features: (id: string, from: string) => ['instruments', id, 'features', from] as const,
-  },
-  holdings: {
-    etf: (id: string, top: number) => ['holdings', id, top] as const,
-  },
-  chains: {
-    chain: (id: string, expiry: string | null) => ['chains', id, expiry] as const,
   },
   features: {
     check: (expr: string) => ['features', 'check', expr] as const,

@@ -1,0 +1,708 @@
+{
+  "data": {
+    "ideas": {
+      "session": "2026-10-02",
+      "priority": ["vrp-scanner", "short-premium-liquidity", "post-earnings-iv-crush"],
+      "total": 6,
+      "screeners": [
+        {
+          "screener": {
+            "id": "vrp-scanner",
+            "name": "VRP scanner",
+            "owner": "abhinav",
+            "version": 3
+          },
+          "run": {
+            "runId": "screen-vrp-scanner-abhinav-2026-10-02",
+            "configVersion": 3
+          },
+          "notRun": null,
+          "picked": 16,
+          "top": [
+            {
+              "instrumentId": "EQ:AAPL",
+              "score": 84.0,
+              "instrument": {
+                "symbol": "AAPL"
+              }
+            },
+            {
+              "instrumentId": "EQ:MSFT",
+              "score": 79.0,
+              "instrument": {
+                "symbol": "MSFT"
+              }
+            },
+            {
+              "instrumentId": "EQ:NVDA",
+              "score": 70.0,
+              "instrument": {
+                "symbol": "NVDA"
+              }
+            }
+          ]
+        },
+        {
+          "screener": {
+            "id": "short-premium-liquidity",
+            "name": "Short premium liquidity",
+            "owner": "abhinav",
+            "version": 3
+          },
+          "run": {
+            "runId": "screen-short-premium-liquidity-abhinav-2026-10-02",
+            "configVersion": 3
+          },
+          "notRun": null,
+          "picked": 12,
+          "top": [
+            {
+              "instrumentId": "EQ:AAPL",
+              "score": 91.0,
+              "instrument": {
+                "symbol": "AAPL"
+              }
+            },
+            {
+              "instrumentId": "EQ:KO",
+              "score": 66.0,
+              "instrument": {
+                "symbol": "KO"
+              }
+            },
+            {
+              "instrumentId": "EQ:SPY",
+              "score": 88.0,
+              "instrument": {
+                "symbol": "SPY"
+              }
+            }
+          ]
+        },
+        {
+          "screener": {
+            "id": "post-earnings-iv-crush",
+            "name": "Post-earnings IV crush",
+            "owner": "abhinav",
+            "version": 3
+          },
+          "run": {
+            "runId": "screen-post-earnings-iv-crush-abhinav-2026-10-02",
+            "configVersion": 3
+          },
+          "notRun": null,
+          "picked": 4,
+          "top": [
+            {
+              "instrumentId": "EQ:NVDA",
+              "score": 77.0,
+              "instrument": {
+                "symbol": "NVDA"
+              }
+            }
+          ]
+        }
+      ],
+      "items": [
+        {
+          "rank": 1,
+          "instrumentId": "EQ:AAPL",
+          "instrument": {
+            "symbol": "AAPL",
+            "features": [
+              {
+                "name": "rollup.earnings@v1.next_earnings_date",
+                "value": "2026-10-29",
+                "unknown": null,
+                "info": {
+                  "format": "DATE",
+                  "unit": null,
+                  "dtype": "date",
+                  "nullMeaning": "no report date on or after the session in the stored calendars"
+                }
+              },
+              {
+                "name": "rollup.earnings@v1.last_earnings_date",
+                "value": "2026-07-30",
+                "unknown": null,
+                "info": {
+                  "format": "DATE",
+                  "unit": null,
+                  "dtype": "date",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.earnings@v1.days_to_earnings",
+                "value": 27,
+                "unknown": null,
+                "info": {
+                  "format": "NUMBER",
+                  "unit": "sessions",
+                  "dtype": "int",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.nearest_expiry@v1.dte",
+                "value": 36,
+                "unknown": null,
+                "info": {
+                  "format": "NUMBER",
+                  "unit": "days",
+                  "dtype": "int",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "feature.earnings_before_expiry",
+                "value": true,
+                "unknown": null,
+                "info": {
+                  "format": "FLAG",
+                  "unit": "flag",
+                  "dtype": "bool",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "feature.vrp_iv30",
+                "value": 0.31,
+                "unknown": null,
+                "info": {
+                  "format": "PERCENT",
+                  "unit": "decimal",
+                  "dtype": "float",
+                  "nullMeaning": ""
+                }
+              }
+            ]
+          },
+          "picks": [
+            {
+              "configId": "vrp-scanner",
+              "decision": "QUALIFIED",
+              "score": 84.0,
+              "reasons": "",
+              "flags": [],
+              "criteria": [],
+              "columns": [
+                {
+                  "name": "hv30",
+                  "value": 0.21
+                },
+                {
+                  "name": "iv_hv_ratio",
+                  "value": 1.49
+                },
+                {
+                  "name": "put_strike",
+                  "value": 205
+                },
+                {
+                  "name": "put_delta",
+                  "value": -0.25
+                },
+                {
+                  "name": "put_premium",
+                  "value": 2.1
+                },
+                {
+                  "name": "put_roc",
+                  "value": 0.019
+                }
+              ]
+            },
+            {
+              "configId": "short-premium-liquidity",
+              "decision": "QUALIFIED",
+              "score": 91.0,
+              "reasons": "",
+              "flags": [],
+              "criteria": [],
+              "columns": []
+            }
+          ]
+        },
+        {
+          "rank": 2,
+          "instrumentId": "EQ:MSFT",
+          "instrument": {
+            "symbol": "MSFT",
+            "features": [
+              {
+                "name": "rollup.earnings@v1.next_earnings_date",
+                "value": "2026-10-28",
+                "unknown": null,
+                "info": {
+                  "format": "DATE",
+                  "unit": null,
+                  "dtype": "date",
+                  "nullMeaning": "no report date on or after the session in the stored calendars"
+                }
+              },
+              {
+                "name": "rollup.earnings@v1.last_earnings_date",
+                "value": "2026-07-29",
+                "unknown": null,
+                "info": {
+                  "format": "DATE",
+                  "unit": null,
+                  "dtype": "date",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.earnings@v1.days_to_earnings",
+                "value": 26,
+                "unknown": null,
+                "info": {
+                  "format": "NUMBER",
+                  "unit": "sessions",
+                  "dtype": "int",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.nearest_expiry@v1.dte",
+                "value": 36,
+                "unknown": null,
+                "info": {
+                  "format": "NUMBER",
+                  "unit": "days",
+                  "dtype": "int",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "feature.earnings_before_expiry",
+                "value": true,
+                "unknown": null,
+                "info": {
+                  "format": "FLAG",
+                  "unit": "flag",
+                  "dtype": "bool",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "feature.vrp_iv30",
+                "value": 0.28,
+                "unknown": null,
+                "info": {
+                  "format": "PERCENT",
+                  "unit": "decimal",
+                  "dtype": "float",
+                  "nullMeaning": ""
+                }
+              }
+            ]
+          },
+          "picks": [
+            {
+              "configId": "vrp-scanner",
+              "decision": "QUALIFIED",
+              "score": 79.0,
+              "reasons": "",
+              "flags": [],
+              "criteria": [],
+              "columns": [
+                {
+                  "name": "hv30",
+                  "value": 0.2
+                },
+                {
+                  "name": "iv_hv_ratio",
+                  "value": 1.42
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "rank": 3,
+          "instrumentId": "EQ:NVDA",
+          "instrument": {
+            "symbol": "NVDA",
+            "features": [
+              {
+                "name": "rollup.earnings@v1.next_earnings_date",
+                "value": null,
+                "unknown": {
+                  "code": "NULL",
+                  "detail": "rollup.earnings@v1.next_earnings_date is null"
+                },
+                "info": {
+                  "format": "DATE",
+                  "unit": null,
+                  "dtype": "date",
+                  "nullMeaning": "no report date on or after the session in the stored calendars"
+                }
+              },
+              {
+                "name": "rollup.earnings@v1.last_earnings_date",
+                "value": "2026-08-27",
+                "unknown": null,
+                "info": {
+                  "format": "DATE",
+                  "unit": null,
+                  "dtype": "date",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.earnings@v1.days_to_earnings",
+                "value": null,
+                "unknown": {
+                  "code": "NULL",
+                  "detail": "rollup.earnings@v1.days_to_earnings is null"
+                },
+                "info": {
+                  "format": "NUMBER",
+                  "unit": "sessions",
+                  "dtype": "int",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.nearest_expiry@v1.dte",
+                "value": 8,
+                "unknown": null,
+                "info": {
+                  "format": "NUMBER",
+                  "unit": "days",
+                  "dtype": "int",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "feature.earnings_before_expiry",
+                "value": false,
+                "unknown": null,
+                "info": {
+                  "format": "FLAG",
+                  "unit": "flag",
+                  "dtype": "bool",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "feature.vrp_iv30",
+                "value": null,
+                "unknown": {
+                  "code": "NULL",
+                  "detail": "feature.vrp_iv30 is null"
+                },
+                "info": {
+                  "format": "PERCENT",
+                  "unit": "decimal",
+                  "dtype": "float",
+                  "nullMeaning": ""
+                }
+              }
+            ]
+          },
+          "picks": [
+            {
+              "configId": "post-earnings-iv-crush",
+              "decision": "QUALIFIED",
+              "score": 77.0,
+              "reasons": "",
+              "flags": [],
+              "criteria": [],
+              "columns": []
+            },
+            {
+              "configId": "vrp-scanner",
+              "decision": "WATCH",
+              "score": 70.0,
+              "reasons": "",
+              "flags": [],
+              "criteria": [],
+              "columns": []
+            }
+          ]
+        },
+        {
+          "rank": 4,
+          "instrumentId": "EQ:KO",
+          "instrument": {
+            "symbol": "KO",
+            "features": [
+              {
+                "name": "rollup.earnings@v1.next_earnings_date",
+                "value": "2026-10-21",
+                "unknown": null,
+                "info": {
+                  "format": "DATE",
+                  "unit": null,
+                  "dtype": "date",
+                  "nullMeaning": "no report date on or after the session in the stored calendars"
+                }
+              },
+              {
+                "name": "rollup.earnings@v1.last_earnings_date",
+                "value": "2026-07-22",
+                "unknown": null,
+                "info": {
+                  "format": "DATE",
+                  "unit": null,
+                  "dtype": "date",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.earnings@v1.days_to_earnings",
+                "value": 19,
+                "unknown": null,
+                "info": {
+                  "format": "NUMBER",
+                  "unit": "sessions",
+                  "dtype": "int",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.nearest_expiry@v1.dte",
+                "value": 36,
+                "unknown": null,
+                "info": {
+                  "format": "NUMBER",
+                  "unit": "days",
+                  "dtype": "int",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "feature.earnings_before_expiry",
+                "value": false,
+                "unknown": null,
+                "info": {
+                  "format": "FLAG",
+                  "unit": "flag",
+                  "dtype": "bool",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "feature.vrp_iv30",
+                "value": null,
+                "unknown": {
+                  "code": "NULL",
+                  "detail": "feature.vrp_iv30 is null"
+                },
+                "info": {
+                  "format": "PERCENT",
+                  "unit": "decimal",
+                  "dtype": "float",
+                  "nullMeaning": ""
+                }
+              }
+            ]
+          },
+          "picks": [
+            {
+              "configId": "short-premium-liquidity",
+              "decision": "LIQUIDITY_RISK",
+              "score": 66.0,
+              "reasons": "ADV below target",
+              "flags": ["leveraged_inverse"],
+              "criteria": [],
+              "columns": []
+            }
+          ]
+        },
+        {
+          "rank": 5,
+          "instrumentId": "EQ:TSLA",
+          "instrument": {
+            "symbol": "TSLA",
+            "features": [
+              {
+                "name": "rollup.earnings@v1.next_earnings_date",
+                "value": "2026-10-08",
+                "unknown": null,
+                "info": {
+                  "format": "DATE",
+                  "unit": null,
+                  "dtype": "date",
+                  "nullMeaning": "no report date on or after the session in the stored calendars"
+                }
+              },
+              {
+                "name": "rollup.earnings@v1.last_earnings_date",
+                "value": "2026-07-22",
+                "unknown": null,
+                "info": {
+                  "format": "DATE",
+                  "unit": null,
+                  "dtype": "date",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.earnings@v1.days_to_earnings",
+                "value": 6,
+                "unknown": null,
+                "info": {
+                  "format": "NUMBER",
+                  "unit": "sessions",
+                  "dtype": "int",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.nearest_expiry@v1.dte",
+                "value": 15,
+                "unknown": null,
+                "info": {
+                  "format": "NUMBER",
+                  "unit": "days",
+                  "dtype": "int",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "feature.earnings_before_expiry",
+                "value": true,
+                "unknown": null,
+                "info": {
+                  "format": "FLAG",
+                  "unit": "flag",
+                  "dtype": "bool",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "feature.vrp_iv30",
+                "value": null,
+                "unknown": {
+                  "code": "NULL",
+                  "detail": "feature.vrp_iv30 is null"
+                },
+                "info": {
+                  "format": "PERCENT",
+                  "unit": "decimal",
+                  "dtype": "float",
+                  "nullMeaning": ""
+                }
+              }
+            ]
+          },
+          "picks": [
+            {
+              "configId": "vrp-scanner",
+              "decision": "EVENT_RISK",
+              "score": 63.0,
+              "reasons": "Earnings in 6 sessions",
+              "flags": ["large_move"],
+              "criteria": [],
+              "columns": []
+            }
+          ]
+        },
+        {
+          "rank": 6,
+          "instrumentId": "EQ:SPY",
+          "instrument": {
+            "symbol": "SPY",
+            "features": [
+              {
+                "name": "rollup.earnings@v1.next_earnings_date",
+                "value": null,
+                "unknown": {
+                  "code": "NULL",
+                  "detail": "rollup.earnings@v1.next_earnings_date is null"
+                },
+                "info": {
+                  "format": "DATE",
+                  "unit": null,
+                  "dtype": "date",
+                  "nullMeaning": "no report date on or after the session in the stored calendars"
+                }
+              },
+              {
+                "name": "rollup.earnings@v1.last_earnings_date",
+                "value": null,
+                "unknown": {
+                  "code": "NULL",
+                  "detail": "rollup.earnings@v1.last_earnings_date is null"
+                },
+                "info": {
+                  "format": "DATE",
+                  "unit": null,
+                  "dtype": "date",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.earnings@v1.days_to_earnings",
+                "value": null,
+                "unknown": {
+                  "code": "NULL",
+                  "detail": "rollup.earnings@v1.days_to_earnings is null"
+                },
+                "info": {
+                  "format": "NUMBER",
+                  "unit": "sessions",
+                  "dtype": "int",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "rollup.nearest_expiry@v1.dte",
+                "value": 8,
+                "unknown": null,
+                "info": {
+                  "format": "NUMBER",
+                  "unit": "days",
+                  "dtype": "int",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "feature.earnings_before_expiry",
+                "value": null,
+                "unknown": {
+                  "code": "NULL",
+                  "detail": "feature.earnings_before_expiry is null"
+                },
+                "info": {
+                  "format": "FLAG",
+                  "unit": "flag",
+                  "dtype": "bool",
+                  "nullMeaning": ""
+                }
+              },
+              {
+                "name": "feature.vrp_iv30",
+                "value": null,
+                "unknown": {
+                  "code": "NULL",
+                  "detail": "feature.vrp_iv30 is null"
+                },
+                "info": {
+                  "format": "PERCENT",
+                  "unit": "decimal",
+                  "dtype": "float",
+                  "nullMeaning": ""
+                }
+              }
+            ]
+          },
+          "picks": [
+            {
+              "configId": "short-premium-liquidity",
+              "decision": "QUALIFIED",
+              "score": 88.0,
+              "reasons": "",
+              "flags": [],
+              "criteria": [],
+              "columns": []
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

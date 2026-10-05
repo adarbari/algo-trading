@@ -154,23 +154,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/chains/{underlying_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Chain */
-        get: operations["chain_chains__underlying_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/chains/{underlying_id}/live": {
         parameters: {
             query?: never;
@@ -303,108 +286,6 @@ export interface paths {
         };
         /** Health */
         get: operations["health_health_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/ideas": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Top */
-        get: operations["top_ideas_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/instruments/{instrument_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Detail */
-        get: operations["detail_instruments__instrument_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/instruments/{instrument_id}/bars": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Bars */
-        get: operations["bars_instruments__instrument_id__bars_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/instruments/{instrument_id}/events": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Events */
-        get: operations["events_instruments__instrument_id__events_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/instruments/{instrument_id}/features": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Features */
-        get: operations["features_instruments__instrument_id__features_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/instruments/{instrument_id}/holdings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Holdings */
-        get: operations["holdings_instruments__instrument_id__holdings_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -668,47 +549,6 @@ export interface components {
          * @enum {string}
          */
         Adjustment: "splits" | "none" | "total_return";
-        /** Bar */
-        Bar: {
-            /** Close */
-            close: number;
-            /** High */
-            high: number;
-            /** Low */
-            low: number;
-            /** Open */
-            open: number;
-            /**
-             * Session Date
-             * Format: date
-             */
-            session_date: string;
-            /** Ts */
-            ts: string;
-            /** Volume */
-            volume: number;
-            /** Vwap */
-            vwap?: number | null;
-        };
-        /** BarSeries */
-        BarSeries: {
-            /** Adjustment */
-            adjustment: string;
-            /**
-             * End
-             * Format: date
-             */
-            end: string;
-            /** Instrument Id */
-            instrument_id: string;
-            /** Items */
-            items: components["schemas"]["Bar"][];
-            /**
-             * Start
-             * Format: date
-             */
-            start: string;
-        };
         /** Cell */
         Cell: {
             /** Basis */
@@ -889,21 +729,6 @@ export interface components {
                 [key: string]: unknown;
             };
         };
-        /** EtfHoldings */
-        EtfHoldings: {
-            /** As Of */
-            as_of: string | null;
-            /** Instrument Id */
-            instrument_id: string;
-            /** Is Etf */
-            is_etf: boolean;
-            /** Items */
-            items: components["schemas"]["Holding"][];
-            /** Source */
-            source: string | null;
-            /** Total */
-            total: number;
-        };
         /** ExpressionCheck */
         ExpressionCheck: {
             /** Categories */
@@ -978,27 +803,6 @@ export interface components {
                 [key: string]: unknown;
             };
         };
-        /** FeatureSeries */
-        FeatureSeries: {
-            /**
-             * End
-             * Format: date
-             */
-            end: string;
-            /** Instrument Id */
-            instrument_id: string;
-            /** Items */
-            items: {
-                [key: string]: unknown;
-            }[];
-            /** Names */
-            names: string[];
-            /**
-             * Start
-             * Format: date
-             */
-            start: string;
-        };
         /** Finalised */
         Finalised: {
             /** Hash */
@@ -1053,113 +857,10 @@ export interface components {
                 [key: string]: string;
             };
         };
-        /** Holding */
-        Holding: {
-            /** Asset Class */
-            asset_class: string | null;
-            /** Instrument Id */
-            instrument_id: string | null;
-            /** Name */
-            name: string;
-            /** Rank */
-            rank: number;
-            /** Symbol */
-            symbol: string | null;
-            /** Weight */
-            weight: number;
-        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
-        };
-        /** Idea */
-        Idea: {
-            /** Closest Expiry Dte */
-            closest_expiry_dte: number | null;
-            /** Days To Earnings */
-            days_to_earnings: number | null;
-            /** Earnings Before Expiry */
-            earnings_before_expiry: boolean | null;
-            /** Instrument Id */
-            instrument_id: string;
-            /** Next Earnings Date */
-            next_earnings_date: string | null;
-            /** Picks */
-            picks: components["schemas"]["IdeaPick"][];
-            /** Rank */
-            rank: number;
-            /** Symbol */
-            symbol: string | null;
-        };
-        /** IdeaCriterion */
-        IdeaCriterion: {
-            /** Criterion Id */
-            criterion_id: string;
-            /** Distance */
-            distance: number | null;
-            /** Field */
-            field: string;
-            /** Outcome */
-            outcome: string;
-            /** Value */
-            value: number | string | null;
-        };
-        /** IdeaPick */
-        IdeaPick: {
-            /** Columns */
-            columns: {
-                [key: string]: unknown;
-            };
-            /** Config Id */
-            config_id: string;
-            /** Config Version */
-            config_version: number | null;
-            /** Criteria */
-            criteria: components["schemas"]["IdeaCriterion"][];
-            /** Criterion Values */
-            criterion_values: {
-                [key: string]: unknown;
-            };
-            /** Decision */
-            decision: string;
-            /** Flags */
-            flags: string[];
-            /** Reasons */
-            reasons: string;
-            /** Score */
-            score: number | null;
-            /**
-             * Session
-             * Format: date
-             */
-            session: string;
-            /** User */
-            user: string;
-        };
-        /** Ideas */
-        Ideas: {
-            /** Items */
-            items: components["schemas"]["Idea"][];
-            /** Priority */
-            priority: string[];
-            /** Screeners */
-            screeners: components["schemas"]["IdeaScreener"][];
-            /** Session */
-            session: string | null;
-            /** Total */
-            total: number;
-        };
-        /** IdeaScreener */
-        IdeaScreener: {
-            /** Config Id */
-            config_id: string;
-            /** Name */
-            name: string;
-            /** User */
-            user: string | null;
-            /** Version */
-            version: number | null;
         };
         /** IdeasPriority */
         IdeasPriority: {
@@ -1173,43 +874,6 @@ export interface components {
              * @description screener ids, highest priority first
              */
             priority: string[];
-        };
-        /** InstrumentDetail */
-        InstrumentDetail: {
-            /** Company */
-            company: {
-                [key: string]: unknown;
-            } | null;
-            /** Feature Sessions */
-            feature_sessions: {
-                [key: string]: string;
-            };
-            /** Features */
-            features: {
-                [key: string]: unknown;
-            };
-            /** Instrument Id */
-            instrument_id: string;
-            /** Reference */
-            reference: {
-                [key: string]: unknown;
-            };
-            /**
-             * Reference Snapshot
-             * Format: date
-             */
-            reference_snapshot: string;
-        };
-        /** InstrumentEvent */
-        InstrumentEvent: {
-            /** Table */
-            table: string;
-            /** Ts */
-            ts: string;
-            /** Values */
-            values: {
-                [key: string]: unknown;
-            };
         };
         /** LiveOptionChain */
         LiveOptionChain: {
@@ -1370,77 +1034,6 @@ export interface components {
              * @description the workflow's steps in order
              */
             steps: components["schemas"]["Step"][];
-        };
-        /** OptionChain */
-        OptionChain: {
-            /** Expiries */
-            expiries: string[];
-            /**
-             * Our Iv
-             * @description our iv30 rollup row for the session (decimal)
-             */
-            our_iv: {
-                [key: string]: unknown;
-            } | null;
-            /**
-             * Quotes
-             * @description sorted by expiry, strike, right
-             */
-            quotes: components["schemas"]["OptionQuote"][];
-            /**
-             * Session
-             * Format: date
-             */
-            session: string;
-            /**
-             * Status
-             * @description the chain fetch status (OK, NO_CHAIN, STALE_DATA: ...)
-             */
-            status: string | null;
-            /** Strikes */
-            strikes: number[];
-            /**
-             * Underlying
-             * @description the underlying quote with the chain (Cboe iv30 in percent)
-             */
-            underlying: {
-                [key: string]: unknown;
-            } | null;
-            /** Underlying Id */
-            underlying_id: string;
-        };
-        /** OptionQuote */
-        OptionQuote: {
-            /** Ask */
-            ask: number | null;
-            /** Bid */
-            bid: number | null;
-            /** Delta */
-            delta: number | null;
-            /** Expiry */
-            expiry: string | null;
-            /** Gamma */
-            gamma: number | null;
-            /** Instrument Id */
-            instrument_id: string;
-            /** Iv */
-            iv: number | null;
-            /** Last */
-            last: number | null;
-            /** Open Interest */
-            open_interest: number | null;
-            /** Rho */
-            rho: number | null;
-            /** Right */
-            right: string | null;
-            /** Strike */
-            strike: number | null;
-            /** Theta */
-            theta: number | null;
-            /** Vega */
-            vega: number | null;
-            /** Volume */
-            volume: number | null;
         };
         /** Page[dict[str, Any]] */
         Page_dict_str__Any__: {
@@ -2494,40 +2087,6 @@ export interface operations {
             };
         };
     };
-    chain_chains__underlying_id__get: {
-        parameters: {
-            query?: {
-                date?: string | null;
-                expiry?: string | null;
-            };
-            header?: never;
-            path: {
-                underlying_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OptionChain"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     live_chain_chains__underlying_id__live_get: {
         parameters: {
             query: {
@@ -2787,214 +2346,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Health"];
-                };
-            };
-        };
-    };
-    top_ideas_get: {
-        parameters: {
-            query?: {
-                /** @description default: the latest */
-                date?: string | null;
-                limit?: number;
-                /** @description default: the API's user (a label until auth) */
-                user?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Ideas"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    detail_instruments__instrument_id__get: {
-        parameters: {
-            query?: {
-                date?: string | null;
-            };
-            header?: never;
-            path: {
-                instrument_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InstrumentDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    bars_instruments__instrument_id__bars_get: {
-        parameters: {
-            query?: {
-                adjust?: components["schemas"]["Adjustment"];
-                from?: string | null;
-                to?: string | null;
-            };
-            header?: never;
-            path: {
-                instrument_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BarSeries"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    events_instruments__instrument_id__events_get: {
-        parameters: {
-            query?: {
-                from?: string | null;
-                to?: string | null;
-            };
-            header?: never;
-            path: {
-                instrument_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InstrumentEvent"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    features_instruments__instrument_id__features_get: {
-        parameters: {
-            query?: {
-                from?: string | null;
-                /** @description comma-separated field names */
-                names?: string | null;
-                to?: string | null;
-            };
-            header?: never;
-            path: {
-                instrument_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FeatureSeries"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    holdings_instruments__instrument_id__holdings_get: {
-        parameters: {
-            query?: {
-                date?: string | null;
-                /** @description holdings to return */
-                top?: number;
-            };
-            header?: never;
-            path: {
-                instrument_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EtfHoldings"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

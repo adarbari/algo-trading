@@ -75,6 +75,8 @@ const stock = () =>
 
 const earnings = (ts: string, values: Record<string, unknown>): InstrumentEvent => ({
   table: 'events/earnings',
+  kind: 'earnings',
+  date: ts,
   ts: `${ts}T00:00:00+00:00`,
   values,
 });

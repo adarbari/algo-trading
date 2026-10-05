@@ -9,8 +9,8 @@ import {
   RangeControl,
   rangeFrom,
   toChartEvents,
-  useInstrumentBars,
   useInstrumentEvents,
+  useInstrumentPrices,
 } from '@/entities/instrument';
 
 export interface PriceChartPanelProps {
@@ -21,23 +21,20 @@ export interface PriceChartPanelProps {
 
 export function PriceChartPanel({ symbol, range, onRangeChange }: PriceChartPanelProps) {
   const from = rangeFrom(range);
-  const bars = useInstrumentBars(symbol, from);
+  const bars = useInstrumentPrices(symbol, from);
   const events = useInstrumentEvents(symbol);
-  const items = useMemo(() => bars.data?.items ?? [], [bars.data]);
+  const items = useMemo(() => bars.data ?? [], [bars.data]);
   const series = useMemo(
     () => [
       {
         id: symbol,
         label: symbol,
-        points: items.map((b) => ({ time: b.session_date, value: b.close })),
+        points: items.map((b) => ({ time: b.session, value: b.close })),
       },
     ],
     [items, symbol],
   );
-  const volume = useMemo(
-    () => items.map((b) => ({ time: b.session_date, value: b.volume })),
-    [items],
-  );
+  const volume = useMemo(() => items.map((b) => ({ time: b.session, value: b.volume })), [items]);
   const markers = useMemo(
     () => toChartEvents(events.data ?? []).filter((e) => e.time >= from),
     [events.data, from],

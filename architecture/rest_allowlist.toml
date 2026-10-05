@@ -19,7 +19,7 @@
 #   keep       true: stays REST by design (health, job polling, live quotes); false: retires
 #   retire_in  the read-model PR that moves it to GraphQL and removes this entry
 
-max_get_routes = 27
+max_get_routes = 20
 
 # ---------------------------------------------------------------------------- stays REST
 
@@ -41,51 +41,6 @@ path = "/chains/{underlying_id}/live"
 keep = true
 reason = "live quotes (ADR 0028): latency-bound, records to live/*, bypasses the session model on purpose"
 
-# ---------------------------------------------------------------------------- PR 5: Ideas
-
-[[route]]
-method = "GET"
-path = "/ideas"
-keep = false
-retire_in = "PR 5"
-
-# ---------------------------------------------------------------------------- PR 6: Explore detail pane
-
-[[route]]
-method = "GET"
-path = "/instruments/{instrument_id}"
-keep = false
-retire_in = "PR 6"
-
-[[route]]
-method = "GET"
-path = "/instruments/{instrument_id}/bars"
-keep = false
-retire_in = "PR 6"
-
-[[route]]
-method = "GET"
-path = "/instruments/{instrument_id}/events"
-keep = false
-retire_in = "PR 6"
-
-[[route]]
-method = "GET"
-path = "/instruments/{instrument_id}/features"
-keep = false
-retire_in = "PR 6"
-
-[[route]]
-method = "GET"
-path = "/instruments/{instrument_id}/holdings"
-keep = false
-retire_in = "PR 6"
-
-[[route]]
-method = "GET"
-path = "/chains/{underlying_id}"
-keep = false
-retire_in = "PR 6"
 
 # ---------------------------------------------------------------------------- PR 7: feature table, Explore tickers, compare
 

@@ -2,25 +2,21 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { OptionChain } from '@/entities/chain';
-import { ApiError } from '@/shared/api';
+import { CHAIN_FACTS, type OptionChain, type OptionQuote } from '@/entities/chain';
 import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib/testing';
 
 import { OptionsPanel, type OptionsPanelProps } from './OptionsPanel';
 
-const hooks = vi.hoisted(() => ({ useOptionChain: vi.fn(), useInstrument: vi.fn() }));
+const hooks = vi.hoisted(() => ({ useOptionChain: vi.fn(), useOptionQuotes: vi.fn() }));
 
 vi.mock('@/entities/chain', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useOptionChain: hooks.useOptionChain,
-}));
-vi.mock('@/entities/instrument', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  useInstrument: hooks.useInstrument,
+  useOptionQuotes: hooks.useOptionQuotes,
 }));
 
-const quote = (strike: number, right: 'P' | 'C', delta: number) => ({
-  instrument_id: `OPT:${right}${strike}`,
+const quote = (strike: number, right: 'P' | 'C', delta: number): OptionQuote => ({
+  instrumentId: `OPT:${right}${strike}`,
   expiry: '2026-11-20',
   right,
   strike,
@@ -28,25 +24,43 @@ const quote = (strike: number, right: 'P' | 'C', delta: number) => ({
   ask: 2.61,
   last: 2.5,
   volume: 386,
-  open_interest: 19780,
+  openInterest: 19780,
   iv: 0.288,
   delta,
   gamma: 0.0041,
   theta: -0.081,
   vega: 0.33,
-  rho: -0.1,
 });
 
 const chain: OptionChain = {
-  underlying_id: 'EQ:A',
+  underlyingId: 'EQ:A',
   session: '2026-10-02',
   status: 'OK',
-  underlying: { price: 333.6 },
-  our_iv: { iv30: 0.244 },
-  expiries: ['2026-10-16', '2026-11-20', '2026-12-18'],
+  expiries: [
+    { date: '2026-10-16', days: 14 },
+    { date: '2026-11-20', days: 49 },
+    { date: '2026-12-18', days: 77 },
+  ],
   strikes: [300, 320],
-  quotes: [quote(300, 'P', -0.12), quote(320, 'P', -0.25), quote(340, 'C', 0.4)],
 };
+
+const fact = (name: string, value: unknown) => ({
+  name,
+  value,
+  unknown: null,
+  info: { format: 'DATE' as const, unit: null, dtype: 'date', nullMeaning: '' },
+});
+
+const instrument = (target: string | null, data: OptionChain | null = chain) => ({
+  instrumentId: 'EQ:A',
+  symbol: 'AAPL',
+  features: [
+    fact(CHAIN_FACTS.target, target),
+    fact(CHAIN_FACTS.spot, 333.6),
+    fact(CHAIN_FACTS.iv30, 0.244),
+  ],
+  chain: data,
+});
 
 function setup(props: Partial<OptionsPanelProps> = {}) {
   const handlers = {
@@ -72,16 +86,17 @@ function setup(props: Partial<OptionsPanelProps> = {}) {
 stubElementSize();
 
 beforeEach(() => {
-  hooks.useInstrument.mockReturnValue(
-    fakeQuery({ features: { 'rollup.option_liquidity@v1.target_expiry': '2026-11-20' } }),
+  hooks.useOptionChain.mockReturnValue(fakeQuery(instrument('2026-11-20')));
+  hooks.useOptionQuotes.mockReturnValue(
+    fakeQuery([quote(300, 'P', -0.12), quote(320, 'P', -0.25), quote(340, 'C', 0.4)]),
   );
-  hooks.useOptionChain.mockReturnValue(fakeQuery(chain));
 });
 
 describe('OptionsPanel', () => {
   it('opens on the target expiry: puts in plain English with the delta band badged', async () => {
     const { container } = setup();
-    expect(hooks.useOptionChain).toHaveBeenLastCalledWith('AAPL', '2026-11-20');
+    expect(hooks.useOptionChain).toHaveBeenLastCalledWith('AAPL');
+    expect(hooks.useOptionQuotes).toHaveBeenLastCalledWith('AAPL', '2026-11-20', '2026-10-02');
     expect(
       screen.getByRole('heading', { name: 'AAPL options · 20 Nov · 49d · puts' }),
     ).toBeInTheDocument();
@@ -97,6 +112,7 @@ describe('OptionsPanel', () => {
       ),
     ).toBeInTheDocument();
     expect(within(grid).queryByRole('columnheader', { name: /Delta/ })).not.toBeInTheDocument();
+    expect(screen.getByText('24.4%')).toBeInTheDocument(); // our IV30: a catalogue feature
     await expectNoA11yViolations(container);
   });
 
@@ -114,21 +130,17 @@ describe('OptionsPanel', () => {
     expect(onRightChange).toHaveBeenCalledWith('C');
   });
 
-  it('waits for the detail before asking for the chain', () => {
-    hooks.useInstrument.mockReturnValue(fakeQuery(undefined));
+  it('opens three weeks out when the target expiry is not listed, and reads no quotes before the chain', () => {
+    hooks.useOptionChain.mockReturnValue(fakeQuery(instrument(null)));
+    setup();
+    expect(hooks.useOptionQuotes).toHaveBeenLastCalledWith('AAPL', '2026-11-20', '2026-10-02');
     hooks.useOptionChain.mockReturnValue(fakeQuery(undefined));
     setup();
-    expect(hooks.useOptionChain).toHaveBeenLastCalledWith(null, null);
+    expect(hooks.useOptionQuotes).toHaveBeenLastCalledWith(null, null, null);
   });
 
-  it('says when the ticker has no chain', () => {
-    hooks.useOptionChain.mockReturnValue(
-      fakeQuery(undefined, {
-        isError: true,
-        isPending: false,
-        error: new ApiError(404, 'no option chain'),
-      }),
-    );
+  it('says when the ticker has no chain for the session', () => {
+    hooks.useOptionChain.mockReturnValue(fakeQuery(instrument(null, null)));
     setup();
     expect(screen.getByText('No option chain for AAPL')).toBeInTheDocument();
   });

@@ -9,7 +9,7 @@ import { FeaturesPanel } from './FeaturesPanel';
 const hooks = vi.hoisted(() => ({
   useFeatureCatalogue: vi.fn(),
   useFeatureDistribution: vi.fn(),
-  useInstrument: vi.fn(),
+  useFeatureValues: vi.fn(),
   useFeatureHistory: vi.fn(),
 }));
 
@@ -20,7 +20,7 @@ vi.mock('@/entities/feature', async (importOriginal) => ({
 }));
 vi.mock('@/entities/instrument', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useInstrument: hooks.useInstrument,
+  useFeatureValues: hooks.useFeatureValues,
   useFeatureHistory: hooks.useFeatureHistory,
 }));
 
@@ -36,6 +36,9 @@ const base = {
   categories: [],
   owner: null,
 };
+
+const served = (name: string, value: unknown) =>
+  [name, { name, value, unknown: null, info: { format: 'NUMBER' as const } }] as const;
 
 stubElementSize();
 
@@ -73,19 +76,25 @@ beforeEach(() => {
       },
     ]),
   );
-  hooks.useInstrument.mockReturnValue(
-    fakeQuery({
-      instrument_id: 'EQ:A',
-      reference: { symbol: 'AAPL' },
-      company: { sector: 'Technology' },
-      features: { [IV30]: 0.244, 'feature.my_ratio': 1.5 },
-      feature_sessions: {},
-      reference_snapshot: '2026-10-02',
-    }),
-  );
-  hooks.useFeatureHistory.mockReturnValue(
-    fakeQuery({ items: [{ [IV30]: 0.22 }, { [IV30]: 0.23 }, { [IV30]: 0.244 }] }),
-  );
+  hooks.useFeatureValues.mockReturnValue({
+    session: '2026-10-02',
+    values: new Map([
+      served('instrument.sector', 'Technology'),
+      served(IV30, 0.244),
+      served('feature.my_ratio', 1.5),
+    ]),
+    isPending: false,
+    isError: false,
+    refetch: vi.fn(),
+  });
+  const points = [0.22, 0.23, 0.244].map((v, i) => ({
+    session: `2026-09-3${i}`,
+    values: [v, 1.5],
+  }));
+  hooks.useFeatureHistory.mockReturnValue({
+    series: [{ names: [IV30, 'feature.my_ratio'], points }],
+    isPending: false,
+  });
   hooks.useFeatureDistribution.mockReturnValue(
     fakeQuery({
       name: IV30,
@@ -119,6 +128,21 @@ describe('FeaturesPanel', () => {
     await expectNoA11yViolations(container);
     await userEvent.setup().click(within(grid).getByText('IV30 (ours)'));
     expect(onFeatureChange).toHaveBeenCalledWith(IV30);
+  });
+
+  it("asks for every value, and the history of numbers that have one, up to the values' session", () => {
+    render(<FeaturesPanel symbol="AAPL" feature={null} onFeatureChange={vi.fn()} />);
+    expect(hooks.useFeatureValues).toHaveBeenLastCalledWith('AAPL', [
+      'instrument.sector',
+      IV30,
+      'feature.my_ratio',
+    ]);
+    expect(hooks.useFeatureHistory).toHaveBeenLastCalledWith(
+      'AAPL',
+      [IV30, 'feature.my_ratio'],
+      '2026-07-04',
+      '2026-10-02',
+    );
   });
 
   it('shows the chosen feature across the universe with the ticker marked', async () => {

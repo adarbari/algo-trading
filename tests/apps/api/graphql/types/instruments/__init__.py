@@ -1,1 +1,1 @@
-"""Tests of the GraphQL types at instrument grain (mirrors graphql/types/instruments)."""
+"""Tests of the GraphQL instrument-grain types (graphql/types/instruments)."""

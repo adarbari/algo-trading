@@ -35,25 +35,25 @@ regex = "events/earnings"
 reason = "earnings facts are catalogue features (rollup.earnings@v1.*); raw events are for the events list only"
 allowed = ["src/entities/instrument/model/events.ts"]  # labels the event table in the events list
 
+# Enabled in PR 6 (the features panel's history window ends at the values' session):
+[[pattern]]
+regex = "todayIso\\("
+reason = "compare stored dates with `session.date` from the response, not the browser's today"
+allowed = ["src/shared/lib/date/", "src/entities/explore/model/freshness.ts", "src/entities/instrument/model/range.ts"]  # the wall clock itself, data freshness, chart range ends
+
+# Enabled in PR 5 (Ideas counts and best picks come from the server, over the whole run):
+[[pattern]]
+regex = "=== 'QUALIFIED'\\)\\.length|summarise\\("
+reason = "per-screener counts and top-N are population facts: ask for Ideas.screeners[].picked / .top, ScreenerRun.decisions"
+
+# Enabled in PR 6 (each listed expiry's days come with the chain: OptionExpiry.days):
+[[pattern]]
+regex = "daysBetween\\("
+reason = "days to expiry / earnings are stored: ask for rollup.nearest_expiry@v1.dte, rollup.earnings@v1.days_to_earnings, OptionChain.expiries[].days"
+allowed = ["src/shared/lib/date/", "src/entities/explore/model/freshness.ts"]  # the arithmetic itself, data freshness
+
 # ---------------------------------------------------------------------------- pending
 
-# pending, enable in PR 6 (the feature history range; the overview's use went in PR 4, the
-# features panel's `todayIso()` range start is the last caller outside the allowed files):
-# [[pattern]]
-# regex = "todayIso\\("
-# reason = "compare stored dates with `session.date` from the response, not the browser's today"
-# allowed = ["src/shared/lib/date/", "src/entities/explore/model/freshness.ts", "src/entities/instrument/model/range.ts"]  # the wall clock itself, data freshness, chart range ends
-
-# pending, enable in PR 5 (Ideas counts come from the server):
-# [[pattern]]
-# regex = "=== 'QUALIFIED'\\)\\.length|summarise\\("
-# reason = "per-screener counts and top-N are population facts: ask for Ideas.screeners[].picked / ScreenerRun.decisions"
-
-# pending, enable in PR 6 (days to expiry is rollup.nearest_expiry@v1.dte):
-# [[pattern]]
-# regex = "daysBetween\\("
-# reason = "days to expiry / earnings are stored: ask for rollup.nearest_expiry@v1.dte, rollup.earnings@v1.days_to_earnings"
-# allowed = ["src/shared/lib/date/", "src/entities/explore/model/freshness.ts"]  # the arithmetic itself, data freshness
 
 # pending, enable in PR 7 (FeatureTable.total):
 # [[pattern]]

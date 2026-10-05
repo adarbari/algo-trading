@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from algotrade_ingestion.cli import main as cli
+from algotrade_ingestion.ops import checkout
 from algotrade_sources.framework.http import RetryPolicy
 from algotrade_sources.framework.registry import build_sources
 from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource
@@ -23,6 +24,12 @@ from tests.helpers.payloads import treasury as treasury_payloads
 
 pytestmark = pytest.mark.e2e
 DAY = fx.SESSION.isoformat()
+
+
+@pytest.fixture(autouse=True)
+def _any_checkout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests run from worktrees too; the main-checkout guard has its own tests."""
+    monkeypatch.setattr(cli, "ensure_main_checkout", lambda: None)
 
 
 def treasury_feed(url: str) -> bytes:
@@ -462,3 +469,18 @@ def test_scheduled_nightly_while_locked_exits_quietly(
         assert cli.main(["nightly", "--date", DAY]) == cli.LOCKED_EXIT  # explicit: an error
         assert "pass --wait" in capsys.readouterr().err
     assert nightly_records() == []
+
+
+def test_nightly_refuses_code_from_a_worktree(
+    env: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    wt = env / "algo-trading-feat-x"
+    wt.mkdir()
+    (wt / ".git").write_text("gitdir: /main/.git/worktrees/x\n")
+    init = wt / "src" / "algotrade" / "__init__.py"
+    init.parent.mkdir(parents=True)
+    init.touch()
+    monkeypatch.setattr(cli, "ensure_main_checkout", lambda: checkout.ensure_main_checkout((init,)))
+    assert cli.main(["nightly", "--force"]) == 2
+    assert "refusing to run the nightly" in capsys.readouterr().err
+    assert not (env / "data").exists()  # refused before touching the store

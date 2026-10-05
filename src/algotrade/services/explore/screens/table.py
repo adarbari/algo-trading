@@ -7,8 +7,8 @@ Read-only over stored ``results/rule_screen`` and ``results/rule_screen_values``
 recomputed. A run holds a row for every instrument of the day's snapshot (about 11k), so the
 rows are filtered (decision, change, search), sorted and paged here; the finished table is
 cached per query and published state, and the reader pages through it. A ticker is *picked*
-when its decision is not in ``NOT_PICKED`` (the Ideas rule); a change compares that with the
-previous stored session of the same screen.
+when ``services.read.screens.runs.is_picked`` says so (the Ideas rule); a change compares that
+with the previous stored session of the same screen.
 """
 
 from dataclasses import dataclass
@@ -19,7 +19,6 @@ import pandas as pd
 
 from algotrade.config.strategy.schema import RULES_IMPL
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.explore.ideas.ranking import NOT_PICKED, RULE_SCREEN_VALUES, VALUE_COLUMNS
 from algotrade.services.explore.screens.results import RunRows, run_rows
 from algotrade.services.explore.store import (
     NotFoundError,
@@ -29,10 +28,15 @@ from algotrade.services.explore.store import (
     paginate,
 )
 from algotrade.services.explore.universe import ticker_columns
+from algotrade.services.read.screens.results import (
+    COLUMN_MODE,
+    RULE_SCREEN_VALUES,
+    VALUE_COLUMNS,
+)
+from algotrade.services.read.screens.runs import is_picked
 from algotrade.services.views import to_value
 
 CHANGES = ("new", "dropped")
-COLUMN_MODE = "column"  # a display column's rows in rule_screen_values (outcome INFO)
 SORTS = ("rank", "score", "symbol", "name", "decision")
 VALUES_BY_ID_LIMIT = 2000  # more tickers than this: read the whole partition, not row groups
 
@@ -100,10 +104,6 @@ def _text(value: object) -> str | None:
     return None if out is None else str(out)
 
 
-def _picked(decision: str) -> bool:
-    return decision not in NOT_PICKED
-
-
 def _previous(store: ReadStore, config_id: str, session: date) -> RunRows | None:
     """The screen's run in the stored session before ``session`` (None: there is none)."""
     try:
@@ -121,7 +121,7 @@ def _changes(
     out: dict[str, tuple[str | None, str | None]] = {}
     for iid, decision in zip(now["instrument_id"], now["decision"], strict=True):
         was = before.get(str(iid))
-        now_picked, was_picked = _picked(str(decision)), was is not None and _picked(was)
+        now_picked, was_picked = is_picked(str(decision)), was is not None and is_picked(was)
         out[str(iid)] = (
             "new" if now_picked and not was_picked else "dropped" if was_picked and not now_picked
             else None,

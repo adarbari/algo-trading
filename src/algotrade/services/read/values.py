@@ -5,6 +5,7 @@ A value that is not there is never silently ``None``: it comes with an ``Unknown
 (``UnknownCode``) and where (``detail`` names the table and the session)."""
 
 import math
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import StrEnum
@@ -13,6 +14,7 @@ from typing import Any
 import pandas as pd
 
 from algotrade.core.views.feature_view import FeatureValue
+from algotrade.storage.tables.schemas import COMMON
 
 
 class UnknownCode(StrEnum):
@@ -48,3 +50,10 @@ def to_scalar(value: Any) -> FeatureValue:
     if isinstance(value, (bool, int, float, str)):
         return value
     return str(value)
+
+
+def stored_values(row: Mapping[Any, Any], drop: Iterable[str] = ()) -> dict[str, FeatureValue]:
+    """A stored row as ``{column: to_scalar(value)}``, without the point-in-time stamps
+    (``session_date``, ``knowledge_ts``, ``source``, ``run_id``) and ``drop``."""
+    skip = {*COMMON, *drop}
+    return {str(k): to_scalar(v) for k, v in row.items() if str(k) not in skip}

@@ -22,15 +22,33 @@ const data: IdeasData = {
     {
       id: 'vrp-scanner',
       name: 'VRP scanner',
-      user: 'abhinav',
+      owner: 'abhinav',
       version: 3,
-      qualified: 14,
+      picked: 14,
+      notRun: null,
       top: [
         { symbol: 'AAPL', score: 84 },
         { symbol: 'MSFT', score: 79 },
       ],
     },
-    { id: 'near-low', name: 'near-low', user: 'abhinav', version: null, qualified: 0, top: [] },
+    {
+      id: 'near-low',
+      name: 'near-low',
+      owner: 'abhinav',
+      version: null,
+      picked: 0,
+      notRun: null,
+      top: [],
+    },
+    {
+      id: 'idle',
+      name: 'Idle',
+      owner: 'abhinav',
+      version: 1,
+      picked: 0,
+      notRun: 'idle (abhinav) has no run in results/rule_screen for 2026-10-02',
+      top: [],
+    },
   ],
 };
 
@@ -59,6 +77,8 @@ describe('ScreenerRanking', () => {
     expect(items[0]).toHaveTextContent('AAPL 84 · MSFT 79');
     expect(items[0]).toHaveTextContent('14');
     expect(items[1]).toHaveTextContent('No picks');
+    expect(items[2]).toHaveTextContent('Not run for this session');
+    expect(items[2]).toHaveTextContent('not run');
     await expectNoA11yViolations(container);
   });
 
@@ -71,7 +91,7 @@ describe('ScreenerRanking', () => {
 
     hooks.useIdeas.mockReturnValue(fakeQuery({ ...data, screeners: [] }));
     const empty = setup();
-    expect(screen.getByText(/No screener has run yet/)).toBeInTheDocument();
+    expect(screen.getByText(/You have no screeners yet/)).toBeInTheDocument();
     await expectNoA11yViolations(empty.container);
     empty.unmount();
 

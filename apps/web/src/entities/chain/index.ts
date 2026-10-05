@@ -1,6 +1,9 @@
 /** Entity: an underlying's option chain (expiries, quotes, Greeks) and its display rows. */
-export { useOptionChain } from './api/hooks';
+export { useOptionChain, useOptionQuotes } from './api/hooks';
 export {
+  CHAIN_FACTS,
+  CHAIN_FEATURES,
+  chainFacts,
   chainRows,
   defaultExpiry,
   DELTA_BAND,
@@ -8,9 +11,11 @@ export {
   inDeltaBand,
   NEAR_MONEY,
   plainEnglish,
-  spotOf,
+  upcomingExpiries,
+  type ChainFacts,
   type ChainRow,
   type OptionChain,
+  type OptionExpiry,
   type OptionQuote,
   type OptionRight,
 } from './model/chain';

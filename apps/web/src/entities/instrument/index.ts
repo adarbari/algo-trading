@@ -1,21 +1,22 @@
 /**
- * Entity: one instrument: its facts for a session (GraphQL: identity and catalogue features),
- * detail, daily bars, events and feature history.
+ * Entity: one instrument's detail pane over GraphQL: its facts for a session (identity and
+ * catalogue features), events, daily bars, and feature values and history.
  */
 export {
+  NAMES_PER_REQUEST,
   useFeatureHistory,
-  useInstrument,
-  useInstrumentBars,
+  useFeatureValues,
   useInstrumentEvents,
+  useInstrumentPrices,
 } from './api/hooks';
 export { useInstrumentFacts } from './api/facts';
 export {
-  displayName,
-  fieldValue,
+  chunks,
   historyOf,
-  type FeatureSeries,
-  type InstrumentDetail,
-} from './model/detail';
+  type FeatureHistory,
+  type FeatureValues,
+  type SeriesChunk,
+} from './model/values';
 export {
   earningsOn,
   reportTime,

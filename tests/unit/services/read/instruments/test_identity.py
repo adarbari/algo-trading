@@ -6,7 +6,11 @@ from datetime import date
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
 from algotrade.services.read.context import ReadContext, open_context
-from algotrade.services.read.instruments.identity import load_instrument, resolve_id
+from algotrade.services.read.instruments.identity import (
+    load_instrument,
+    load_instruments,
+    resolve_id,
+)
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from tests.unit.services.read.instruments.conftest import D0, D1
@@ -55,3 +59,10 @@ def test_a_company_snapshot_taken_after_the_session_never_names_it(reader: Store
     before = open_context(reader, MemoryConfigStore({}), UserContext("u"), date(2026, 9, 29))
     found = load_instrument(before, "AAA")
     assert found is not None and found.name == "AAA COMMON STOCK"  # the listing's name
+
+
+def test_instruments_are_named_in_one_read(ctx: ReadContext) -> None:
+    found = load_instruments(ctx, ["EQ:ETFX", "EQ:AAA", "EQ:NOPE", "EQ:AAA"])
+    assert sorted(found) == ["EQ:AAA", "EQ:ETFX"]  # an id the snapshot lacks is left out
+    assert (found["EQ:AAA"].name, found["EQ:ETFX"].is_etf) == ("AAA Holdings", True)
+    assert load_instruments(ctx, []) == {}

@@ -72,7 +72,7 @@ purpose). The non-obvious cases:
 | A feature derived from a personal-use source (IBKR) | its group in `features/rollups/` with `licence="personal"` on each `Feature`; expression features over it inherit the licence (ADR 0028) |
 | Comparing our data with a live source (verification check) | `apps/ingestion/.../tasks/verification/` (`checks.py`) |
 | A read object or loader a page needs | `src/algotrade/services/read/<area>/` (`add-domain-object`) |
-| A GraphQL field | `apps/api/algotrade_api/graphql/types/<object>.py` (`add-graphql-field`) |
+| A GraphQL field | `apps/api/algotrade_api/graphql/types/<area>/<object>.py` (`add-graphql-field`) |
 | A REST write, job, live or file endpoint | `apps/api/algotrade_api/{routes,schemas}/` (`add-api-endpoint`); page reads stay in `services/explore/` only until their area moves (`docs/api/read-model.md`) |
 | Web: component / page / feature | see Web UI below and `docs/ui/architecture.md` |
 
@@ -163,8 +163,11 @@ the skill with the fix.
 Worktrees: `scripts/worktree.sh <branch> [base]` makes `../algo-trading-<slug>` off
 `origin/main` (links `.venv`, writes `worktree.env` with the worktree's absolute `PYTHONPATH`,
 runs its own `npm ci`); `source` that file; `--remove` cleans up. Never symlink `node_modules`
-to main's: `make check`'s `npm ci` through the link empties main's. Never `--no-verify` /
-`SKIP=`: the hooks work in a worktree.
+to main's: `make check`'s `npm ci` through the link empties main's. **Never `uv sync` /
+`make install` in a worktree** (agent worktrees too): through the `.venv` link it points the
+main checkout's venv, which launchd's nightly and the API run, at the worktree's code
+(2026-10-05); use `worktree.env`'s `PYTHONPATH`. `make install` refuses, `make doctor` fails,
+the nightly refuses to start. Never `--no-verify` / `SKIP=`: the hooks work in a worktree.
 
 Commands (need `uv`; `make doctor` checks the machine, `make status` shows PRs, jobs, store): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make perf` (strict timing budgets; run on an idle machine), `make layout`, `make evaluate`, `make baseline`, `make features-doc`.
 Web (need Node 24): `make web-install`, `make web-check` (part of `make check`), `make web-visual` (screenshots, Docker); in `apps/web`: `npm run dev|storybook|check|visual:update`.

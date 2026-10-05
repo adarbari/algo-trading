@@ -11,7 +11,7 @@ only: another date is a named argument of the loader, never derived."""
 
 import threading
 from collections import OrderedDict
-from collections.abc import Hashable
+from collections.abc import Hashable, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
@@ -144,18 +144,33 @@ def open_context(
     )
 
 
-def partition(ctx: ReadContext, table: str) -> pd.DataFrame | Unknown:
+def partition(
+    ctx: ReadContext,
+    table: str,
+    columns: Sequence[str] | None = None,
+    instruments: Sequence[str] | None = None,
+) -> pd.DataFrame | Unknown:
     """``table``'s partition for exactly ``ctx.session.date``, else ``Unknown(NO_PARTITION)``;
-    never an older partition. ``ValueError`` for a table that is not session grain (snapshot,
+    never an older partition. ``columns``: only these (plus the row key and the point-in-time
+    columns); ``instruments``: only their rows (a stored partition with none of them is an
+    empty frame, not UNKNOWN). ``ValueError`` for a table that is not session grain (snapshot,
     event, issuer-dated and incremental tables have their own rule: ``session.grain_of``)."""
     grain = grain_of(table)
     if grain is not Grain.SESSION:
         raise ValueError(f"{table} is {grain} grain: read it by its own rule, not partition()")
-    frame = ctx.reader.table(table, ctx.session.date)
-    if frame is None:
-        detail = f"{table} has no partition for {ctx.session.date.isoformat()}"
-        return Unknown(UnknownCode.NO_PARTITION, detail)
-    return frame
+    day = ctx.session.date
+    absent = Unknown(UnknownCode.NO_PARTITION, f"{table} has no partition for {day.isoformat()}")
+    if columns is None and instruments is None:
+        whole = ctx.reader.table(table, day)
+        return absent if whole is None else whole
+    if day not in ctx.reader.dates(table):
+        return absent
+    found = ctx.reader.table_range(table, day, day, None, instruments, columns)
+    if found is None:  # the partition is stored; none of its rows is asked for
+        return pd.DataFrame(columns=["instrument_id", *(columns or ())])
+    if instruments is not None:  # the read prunes row groups only
+        found = found[found["instrument_id"].isin(set(instruments))].reset_index(drop=True)
+    return found
 
 
 def run_partition(ctx: Stores, table: str, run: RunRecord) -> pd.DataFrame | None:

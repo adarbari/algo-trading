@@ -10,12 +10,12 @@ Read first (by section): `docs/api/read-model.md` ("Catalogue feature or typed f
 
 ## Step 0: what exists today (check, do not assume)
 
-Run `ls apps/api/algotrade_api/graphql apps/api/algotrade_api/graphql/types src/algotrade/services/read`.
+Run `ls apps/api/algotrade_api/graphql apps/api/algotrade_api/graphql/types/* src/algotrade/services/read`.
 
 | You see | Meaning | Do |
 |---|---|---|
 | only `__init__.py` files under `graphql/` | an old branch (before PR 4) | rebase on `origin/main` |
-| `graphql/schema.py`, `apps/api/schema.graphql`, `apps/web/codegen.ts` exist | **today**: PR 4 landed (`Query.{session,instrument}`, `Instrument.features(names)`, the `features` dataloader, codegen, `useInstrumentFacts`) | continue |
+| `graphql/schema.py`, `apps/api/schema.graphql`, `apps/web/codegen.ts` exist | **today**: PRs 4-5 landed (`Query.{session,instrument,ideas,screeners,view}`, `Instrument.features(names)`, the `features` and `screener_latest_run` dataloaders, codegen, `useInstrumentFacts`, `useIdeas` on `IdeasPage`) | continue |
 | the area's REST GET is still in `architecture/rest_allowlist.toml` | that area has not moved yet | add the field in the area's migration PR (move the area), not beside the REST route |
 
 ## Step 1: which object owns it
@@ -51,7 +51,7 @@ Verify: `.venv/bin/python -m pytest tests/unit/services/read -q -x` then `make a
 
 ## Step 4: the resolver (no logic)
 
-In `apps/api/algotrade_api/graphql/types/<object>.py`:
+In `apps/api/algotrade_api/graphql/types/<area>/<object>.py` (`<area>` mirrors the read model: `instruments/`, `screens/`; `types/` itself holds only `query.py` and `session.py`):
 
 ```python
 @strawberry.field

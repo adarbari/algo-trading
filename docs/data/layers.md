@@ -179,8 +179,8 @@ instrument whose company is known; `algotrade-ingest company-details`)
 
 **`instruments/description`** (ADR 0034; increments merged across runs, one row per instrument;
 `algotrade-ingest descriptions`). A short plain-text description of what a company or fund is
-about. `GET /instruments/{id}` adds these columns to its `reference` dict (`None` when nothing
-is stored).
+about. The read model serves its text as `Instrument.description` (GraphQL; `None` when
+nothing is stored).
 
 | Columns | Notes |
 |---|---|

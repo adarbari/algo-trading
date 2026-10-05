@@ -1,3 +1,10 @@
+"""How bars are adjusted for corporate actions"""
+enum Adjustment {
+  SPLITS
+  NONE
+  TOTAL_RETURN
+}
+
 """
 A saved backtest run: `status` complete, partial or failed; `start` / `end` its first and last session; `metrics` (sharpe, cagr, max drawdown, ...)
 """
@@ -52,17 +59,47 @@ type Config {
   error: String
 }
 
+"""
+What one criterion judged: the value (null: missing), PASS / NEAR / FAIL / MISSING and, for a near miss or a fail, how far from passing
+"""
+type CriterionResult {
+  id: String!
+  field: String!
+  mode: String!
+  outcome: String!
+  value: JSON
+  distance: Float
+}
+
 """Date (isoformat)"""
 scalar Date
 
 """Date with time (isoformat)"""
 scalar DateTime
 
+"""How many rows of a run got one decision"""
+type DecisionCount {
+  decision: String!
+  count: Int!
+}
+
 """The portfolio after one bar: equity and gross exposure"""
 type EquityPoint {
   ts: String!
   equity: Float
   grossExposure: Float
+}
+
+"""
+A stored event: `table` events/<kind>, `date` the event date (UTC), `values` the row's other columns
+"""
+type Event {
+  instrumentId: String!
+  table: String!
+  kind: String!
+  date: Date!
+  ts: DateTime!
+  values: JSON!
 }
 
 """
@@ -118,6 +155,15 @@ A catalogue field: instrument.<column>, rollup.<group>@v<N>.<column> or feature.
 """
 scalar FeatureName
 
+"""Catalogue features per stored session of `start..end`"""
+type FeatureSeries {
+  instrumentId: String!
+  names: [String!]!
+  start: Date!
+  end: Date!
+  points: [SeriesPoint!]!
+}
+
 """
 A catalogue field's value for one instrument and the session: `value` is null exactly when `unknown` says why; format it with `info.format`
 """
@@ -140,6 +186,64 @@ type Fill {
 }
 
 """
+One line of the fund: `symbol` the issuer's ticker, `weight` a fraction (negative: short); `instrument` when it is in the universe
+"""
+type Holding {
+  rank: Int!
+  name: String!
+  symbol: String
+  instrumentId: String
+  weight: Float!
+  assetClass: String
+
+  """
+  The universe instrument the line is, for the session (null: not in the universe)
+  """
+  instrument: Instrument
+}
+
+"""
+An ETF's largest holdings as of the issuer's date `asOf` (null: none stored yet); `total` positions in the issuer's file, `source` who read it
+"""
+type Holdings {
+  fundId: String!
+  asOf: Date
+  source: String
+  total: Int!
+  items: [Holding!]!
+}
+
+"""A ticker some screener picked: its picks, best screener first"""
+type Idea {
+  rank: Int!
+  instrumentId: String!
+  instrument: Instrument
+  picks: [ScreenResult!]!
+}
+
+"""
+One of the user's screeners on the Ideas page: its run for the session (else `notRun`: NOT_RUN), how many tickers it picked and its best picks, over the run
+"""
+type IdeaScreener {
+  screener: Screener!
+  run: ScreenerRun
+  notRun: Unknown
+  picked: Int!
+  top: [ScreenResult!]!
+}
+
+"""
+The ideas for the session: `screeners` in the user's priority order (then the rest by id), `items` the first `limit` of `total` picked tickers
+"""
+type Ideas {
+  session: Date!
+  priority: [String!]!
+  screeners: [IdeaScreener!]!
+  total: Int!
+  items: [Idea!]!
+}
+
+"""
 An instrument as the session's reference snapshot has it. Per-session values (prices, earnings dates, flags, ...) are catalogue features: `features(names)`
 """
 type Instrument {
@@ -157,12 +261,74 @@ type Instrument {
   The values of `names` (catalogue fields, in the order asked) for the session; a name outside the caller's catalogue is an UNKNOWN_FEATURE error
   """
   features(names: [FeatureName!]!): [FeatureValue!]!
+
+  """
+  Stored events (earnings, dividends, splits, reference changes) with their event date in `start..end` (null: unbounded), oldest first
+  """
+  events(start: Date = null, end: Date = null): [Event!]!
+
+  """The option chain stored for the session (null: none stored for it)"""
+  chain: OptionChain
+
+  """
+  An ETF's `top` largest holdings as of the issuer's date the session sees (null: not an ETF)
+  """
+  holdings(top: Int! = 10): Holdings
+
+  """Daily bars of `start..end` (`end` null: the session's date), adjusted"""
+  prices(start: Date!, end: Date = null, adjustment: Adjustment! = SPLITS): PriceSeries!
+
+  """
+  `names` (catalogue features with a history: not instrument.*) per stored session of `start..end` (`end` null: the session's date)
+  """
+  series(names: [FeatureName!]!, start: Date!, end: Date = null): FeatureSeries!
 }
 
 """
 The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
 """
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
+
+"""
+An underlying's option chain as stored for the session (Cboe, delayed): `status` the chain run's
+"""
+type OptionChain {
+  underlyingId: String!
+  session: Date!
+  status: String
+  expiries: [OptionExpiry!]!
+  strikes: [Float!]!
+
+  """The quotes of `expiry`, by strike then right (empty: not listed)"""
+  quotes(expiry: Date!): [OptionQuote!]!
+}
+
+"""A listed expiry and its calendar days from the session"""
+type OptionExpiry {
+  date: Date!
+  days: Int!
+}
+
+"""
+One contract's stored quote; IV (a decimal) and Greeks as the feed computes them
+"""
+type OptionQuote {
+  instrumentId: String!
+  expiry: Date!
+  right: String!
+  strike: Float!
+  bid: Float
+  ask: Float
+  last: Float
+  volume: Float
+  openInterest: Float
+  iv: Float
+  delta: Float
+  gamma: Float
+  theta: Float
+  vega: Float
+  rho: Float
+}
 
 """
 The site preset a screen extends: `pinned` the version it extends (null: not copied yet), `current` the preset's version now
@@ -172,6 +338,26 @@ type PresetPin {
   pinned: Int
   current: Int
   rebaseAvailable: Boolean!
+}
+
+"""One session's daily bar, adjusted"""
+type PriceBar {
+  session: Date!
+  open: Float!
+  high: Float!
+  low: Float!
+  close: Float!
+  volume: Float!
+  vwap: Float
+}
+
+"""Daily bars of `start..end`, oldest first"""
+type PriceSeries {
+  instrumentId: String!
+  adjustment: Adjustment!
+  start: Date!
+  end: Date!
+  bars: [PriceBar!]!
 }
 
 """A quantile of the values: `q` 0.5 is the median"""
@@ -201,6 +387,33 @@ type Query {
     """
     date: Date = null
   ): Instrument
+
+  """
+  The tickers the user's screeners picked in the session, ranked by their screener priority then score (the first `limit`); a screener with no run for the session is listed NOT_RUN. Null: nothing stored
+  """
+  ideas(
+    limit: Int! = 50
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): Ideas
+
+  """
+  Every rule screen the user sees (their own config, else the site preset), by id; each with its run for the session
+  """
+  screeners(
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): [Screener!]!
+
+  """
+  The user's saved view of the screener `scope`'s results (the default view, or the one called `name`); null: a screener the user does not see, or nothing stored yet
+  """
+  view(scope: String!, name: String = null): TableView
 
   """
   The caller's feature catalogue (the site's fields plus their own expression features), in catalogue order
@@ -246,6 +459,12 @@ type Query {
   screenVersions(screenerId: String!): [ScreenVersion!]!
 }
 
+"""One of the screen's display columns for the instrument"""
+type ResultColumn {
+  name: String!
+  value: JSON
+}
+
 """
 A screen of the user (or a preset not copied yet): the `draft` and why it would not finalise (`draftError`), its `versions`, the `preset` it is pinned to, the latest version resolved (`hash`, `layers`, `resolved`, `error`) and `working`, the rule keys the Builder edits
 """
@@ -275,10 +494,67 @@ type ScreenListing {
   presetId: String
 }
 
+"""
+One instrument's row of a screener's run; `instrument` is null when the session's reference snapshot does not have it
+"""
+type ScreenResult {
+  runId: String!
+  configId: String!
+  instrumentId: String!
+  instrument: Instrument
+  rank: Int!
+  decision: String!
+  score: Float
+  tieBreak: Float
+  reasons: String!
+  flags: [String!]!
+  criteria: [CriterionResult!]!
+  columns: [ResultColumn!]!
+}
+
 """A finalised (immutable) version of a screen and its document"""
 type ScreenVersion {
   version: Int!
   document: JSON!
+}
+
+"""
+A rule screen as the user sees it (their own config, else the site preset): `owner` is whose runs are its; `latestRun` its run for the session, else `notRun` says why (NOT_RUN)
+"""
+type Screener {
+  id: String!
+  owner: String!
+  scope: String!
+  name: String!
+  version: Int
+  hash: String!
+
+  """Its run for the session; null: not run for it (see `notRun`)"""
+  latestRun: ScreenerRun
+
+  """Why it has no run for the session (NOT_RUN); null: it has one"""
+  notRun: Unknown
+}
+
+"""
+A screener's run for the session: whose, which version ran, its run record's status, and every decision with its count over the whole run (`picked`: the tickers it picked)
+"""
+type ScreenerRun {
+  runId: String!
+  configId: String!
+  owner: String!
+  session: Date!
+  status: String
+  knowledgeTs: DateTime!
+  configVersion: Int
+  decisions: [DecisionCount!]!
+  picked: Int!
+}
+
+"""One session's values, in the order of `FeatureSeries.names`"""
+type SeriesPoint {
+  session: Date!
+  values: [JSON]!
 }
 
 """
@@ -293,6 +569,19 @@ type Session {
   preSnapshot: Boolean!
   present: [String!]!
   missing: [String!]!
+}
+
+"""
+A user's saved view of a table (`scope`: a screener id); `saved` false: nothing saved, the page applies its defaults
+"""
+type TableView {
+  scope: String!
+  name: String
+  saved: Boolean!
+  columns: [String!]!
+  sort: String
+  decisions: [String!]!
+  names: [String!]!
 }
 
 """A value not known for the session: why, and where it looked"""

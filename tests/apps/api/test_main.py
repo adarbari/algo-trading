@@ -22,7 +22,7 @@ def test_committed_openapi_is_up_to_date() -> None:
 
 def test_openapi_is_served(client: TestClient) -> None:
     paths = client.get("/openapi.json").json()["paths"]
-    assert "/universe" in paths and "/chains/{underlying_id}" in paths
+    assert "/universe" in paths and "/chains/{underlying_id}/live" in paths
 
 
 def test_cors_allows_the_local_web_dev_server(client: TestClient) -> None:
@@ -79,17 +79,10 @@ ENDPOINTS = (
     "/universe",
     "/admin/review/figi",
     "/admin/review/leveraged",
-    "/instruments/AAA",
-    "/instruments/AAA/bars",
-    "/instruments/AAA/events",
-    "/instruments/AAA/features",
-    "/instruments/BULL/holdings",
-    "/chains/AAA",
     "/chains/AAA/live?expiry=2022-12-23",
     "/screens",
     "/screens/short_premium_liquidity/results",
     "/screens/vrp_scanner/table?columns=rollup.price_stats@v2.hv20",
-    "/ideas",
     "/explore/tickers?columns=rollup.price_stats@v2.hv20&sort=-rollup.price_stats@v2.hv20",
     "/explore/compare?ids=AAA,BBB",
     "/explore/compare/prices?ids=AAA,BBB",
@@ -115,8 +108,10 @@ def test_every_endpoint_answers_within_a_second_on_golden_data(
     assert min(timings) < 1.0, f"{path} took {min(timings):.2f}s (best of 3: {timings})"
 
 
-# The pages' main GraphQL operations (read-model PRs 4-7 add theirs: IdeasPage, ExploreDetail,
-# Table). InstrumentFacts: the Explore Overview pane (apps/web/src/entities/instrument/api).
+# The pages' main GraphQL operations. InstrumentFacts: the Explore Overview pane; IdeasPage:
+# the Ideas page (apps/web/src/entities/idea/api); the detail tabs' (read-model PR 6): events,
+# bars, feature history, the option chain and one expiry's quotes, an ETF's holdings
+# (apps/web/src/entities/{instrument,chain,holdings}/api).
 INSTRUMENT_FACTS = """query InstrumentFacts($key: String!, $names: [FeatureName!]!) {
   session { date isLatest missing }
   instrument(key: $key) {
@@ -137,6 +132,58 @@ OVERVIEW_NAMES = [
     "rollup.earnings@v1.last_earnings_date", "rollup.earnings@v1.days_to_earnings",
     "rollup.earnings@v1.earnings_time",
 ]  # fmt: skip
+IDEAS_PAGE = """query IdeasPage($limit: Int!, $names: [FeatureName!]!) {
+  ideas(limit: $limit) {
+    session priority total
+    screeners {
+      screener { id name owner version } run { runId configVersion } notRun { code detail }
+      picked top { instrumentId score instrument { symbol } }
+    }
+    items {
+      rank instrumentId
+      instrument {
+        symbol
+        features(names: $names) {
+          name value unknown { code detail } info { format unit dtype nullMeaning }
+        }
+      }
+      picks {
+        configId decision score reasons flags criteria { id value } columns { name value }
+      }
+    }
+  }
+}"""
+IDEA_NAMES = [
+    "rollup.earnings@v1.next_earnings_date", "rollup.earnings@v1.last_earnings_date",
+    "rollup.earnings@v1.days_to_earnings", "rollup.nearest_expiry@v1.dte",
+    "feature.earnings_before_expiry", "feature.vrp_iv30",
+]  # fmt: skip
+DETAIL = {
+    "InstrumentEvents": "query InstrumentEvents($key: String!) { instrument(key: $key) { "
+    "instrumentId events { table kind date ts values } } }",
+    "InstrumentPrices": "query InstrumentPrices($key: String!, $start: Date!) { instrument(key: "
+    "$key) { instrumentId prices(start: $start) { start end bars { session close volume } } } }",
+    "InstrumentHistory": "query InstrumentHistory($key: String!, $names: [FeatureName!]!, $start: "
+    "Date!, $date: Date!) { instrument(key: $key, date: $date) { instrumentId series(names: "
+    "$names, start: $start) { names points { session values } } } }",
+    "OptionChain": "query OptionChain($key: String!, $names: [FeatureName!]!) { instrument(key: "
+    "$key) { instrumentId symbol features(names: $names) { name value unknown { code detail } "
+    "info { format unit dtype nullMeaning } } chain { underlyingId session status expiries { "
+    "date days } strikes } } }",
+    "OptionQuotes": "query OptionQuotes($key: String!, $expiry: Date!, $date: Date!) { "
+    "instrument(key: $key, date: $date) { "
+    "instrumentId chain { quotes(expiry: $expiry) { instrumentId expiry right strike bid ask "
+    "last volume openInterest iv delta gamma theta vega } } } }",
+    "EtfHoldings": "query EtfHoldings($key: String!, $top: Int!) { instrument(key: $key) { "
+    "instrumentId isEtf holdings(top: $top) { asOf source total items { rank name symbol weight "
+    "assetClass instrument { symbol } } } } }",
+}
+CHAIN_NAMES = [
+    "rollup.option_liquidity@v1.target_expiry",
+    "rollup.option_liquidity@v1.underlying_price",
+    "rollup.iv30@v1.iv30",
+]
+HISTORY_NAMES = [n for n in OVERVIEW_NAMES if not n.startswith("instrument.") and "date" not in n]
 # The Builder's and pickers' reads (read-model PR 9): the catalogue, one distribution, the
 # saved backtests.
 CATALOGUE = "query FeatureCatalogue { catalogue { name dtype format unit scope licence } }"
@@ -146,6 +193,19 @@ DISTRIBUTION = """query FeatureDistribution($name: FeatureName!) {
 BACKTESTS = "query Backtests { backtests { runId configId status metrics } }"
 OPERATIONS = {
     "InstrumentFacts": (INSTRUMENT_FACTS, {"key": "AAA", "names": OVERVIEW_NAMES}),
+    "InstrumentEvents": (DETAIL["InstrumentEvents"], {"key": "AAA"}),
+    "InstrumentPrices": (DETAIL["InstrumentPrices"], {"key": "AAA", "start": "2021-11-23"}),
+    "InstrumentHistory": (
+        DETAIL["InstrumentHistory"],
+        {"key": "AAA", "names": HISTORY_NAMES, "start": "2022-08-25", "date": "2022-11-23"},
+    ),
+    "OptionChain": (DETAIL["OptionChain"], {"key": "AAA", "names": CHAIN_NAMES}),
+    "OptionQuotes": (
+        DETAIL["OptionQuotes"],
+        {"key": "AAA", "expiry": "2022-12-23", "date": "2022-11-23"},
+    ),
+    "EtfHoldings": (DETAIL["EtfHoldings"], {"key": "BULL", "top": 10}),
+    "IdeasPage": (IDEAS_PAGE, {"limit": 200, "names": IDEA_NAMES}),
     "FeatureCatalogue": (CATALOGUE, {}),
     "FeatureDistribution": (DISTRIBUTION, {"name": "rollup.price_stats@v2.hv20"}),
     "Backtests": (BACKTESTS, {}),
