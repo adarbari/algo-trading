@@ -1,11 +1,14 @@
+from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+
+import pandas as pd
 
 from algotrade.config.site.settings import load_universe
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
-from algotrade.storage.runs import RunStatus
+from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.reference.universe_build import (
     UniverseSettings,
@@ -174,39 +177,94 @@ def test_review_rows_list_only_active_unknown_leverage() -> None:
     ]
 
 
-def test_a_cut_short_sp500_file_fails_the_build_and_publishes_no_removals() -> None:
-    """A file that lost 10% of the members would emit hundreds of index removals."""
-    import pytest  # noqa: PLC0415
-
+def sp500_world() -> tuple[
+    StoreWriter, StoreReader, list[str], Callable[[list[str]], UniverseSources]
+]:
     names = [f"A{a}{b}" for a in "ABCDEFGHIJ" for b in "ABCDEFGHIJKL"]  # 120 listed stocks
     listed = fx.nasdaq([(n, f"{n} Common Stock", "N", "N") for n in names])
     backend = MemoryBackend()
-    writer, reader = StoreWriter(backend), StoreReader(backend)
 
     def day(members: list[str]) -> UniverseSources:
         return sources(
             listed, fx.other([("SPY", "SPDR", "P", "Y")]), fx.options([names[0]]), fx.spy(members)
         )
 
-    assert build_universe(task_ctx(writer, reader, CLOCK), day(names), SETTINGS, D1).stats[
-        "sp500_members"
-    ] == len(names)
-    with pytest.raises(ValueError, match="S&P 500 list has 100 members, the last snapshot 120"):
-        build_universe(task_ctx(writer, reader, CLOCK), day(names[:100]), SETTINGS, D2)
-    assert reader.table("events/index_change", D2) is None  # nothing was published
-    ok = build_universe(task_ctx(writer, reader, CLOCK), day(names[:110]), SETTINGS, D2)
-    assert ok.stats["events"]["index_change"] == {"sp500_removed": 10}  # a 10% change is real
+    return StoreWriter(backend), StoreReader(backend), names, day
 
 
-def test_the_sp500_floor_only_applies_with_a_real_previous_snapshot() -> None:
-    import pandas as pd  # noqa: PLC0415
+def flags(reader: StoreReader, session: date) -> set[str]:
+    reference = reader.table("instruments/reference", session)
+    assert reference is not None
+    return set(reference.loc[reference["in_sp500"].astype(bool), "symbol"])
 
-    check_sp500(3, None)  # the first build has nothing to compare with
-    tiny = pd.DataFrame({"in_sp500": [True] * 50})
-    check_sp500(1, tiny)  # test-sized universes are not index lists
-    real = pd.DataFrame({"in_sp500": [True] * 500})
-    check_sp500(450, real)
-    check_sp500(500, pd.DataFrame({"instrument_id": []}))  # no in_sp500 column yet
+
+def test_a_cut_short_sp500_list_keeps_the_membership_and_does_not_fail_the_build() -> None:
+    """The first guard raised, so the whole universe build was FAILED (no reference, no universe,
+    no listings that day) with no way to accept a real change. Now only the membership holds."""
+    writer, reader, names, day = sp500_world()
+
+    def build(members: list[str], session: date, accept: bool = False) -> RunRecord:
+        return build_universe(
+            task_ctx(writer, reader, CLOCK), day(members), SETTINGS, session, accept
+        )
+
+    assert build(names, D1).stats["sp500_members"] == len(names)
+    short = build(names[:100], D2)  # 20 of 120 gone: not an index change
+    assert short.status is RunStatus.PARTIAL and "20 left, 0 joined" in short.stats["sp500_held"]
+    assert short.stats["sp500_members"] == 100  # what the file said
+    assert flags(reader, D2) == set(names)  # the flags are as they were
+    assert reader.table("events/index_change", D2) is None  # no removal events
+    assert reader.table("universe", D2) is not None  # everything else was built
+    ok = build(names[:110], D2 + timedelta(days=1))  # 10 of 120: a plausible change
+    assert ok.stats["events"]["index_change"] == {"sp500_removed": 10}
+    assert ok.status is RunStatus.COMPLETE and flags(reader, D2 + timedelta(days=1)) == set(
+        names[:110]
+    )
+
+
+def test_accept_sp500_applies_a_large_change() -> None:
+    writer, reader, names, day = sp500_world()
+    build_universe(task_ctx(writer, reader, CLOCK), day(names), SETTINGS, D1)
+    accepted = build_universe(
+        task_ctx(writer, reader, CLOCK), day(names[:100]), SETTINGS, D2, accept_sp500=True
+    )
+    assert accepted.status is RunStatus.COMPLETE and "sp500_held" not in accepted.stats
+    assert accepted.stats["events"]["index_change"] == {"sp500_removed": 20}
+    assert flags(reader, D2) == set(names[:100])
+
+
+def test_the_registry_task_takes_the_accept_flag() -> None:
+    from algotrade_ingestion.tasks.framework.registry import TASKS  # noqa: PLC0415
+
+    flags_of = {f for param in TASKS["universe-build"].params for f in param.flags}
+    assert "--accept-sp500" in flags_of
+
+
+def members(count: int, start: int = 0) -> set[str]:
+    return {f"M{i:03d}" for i in range(start, start + count)}
+
+
+def reference_of(symbols: set[str]) -> pd.DataFrame:
+    return pd.DataFrame({"symbol": sorted(symbols), "in_sp500": True})
+
+
+def test_the_sp500_check_compares_with_the_last_snapshot() -> None:
+    assert check_sp500(members(3), None) is None  # the first build has nothing to compare with
+    assert check_sp500(members(1), reference_of(members(50))) is None  # test-sized: no index list
+    real = reference_of(members(500))
+    assert check_sp500(members(500), real) is None
+    assert check_sp500(members(500, 8), real) is None  # 8 swapped: a quarterly rebalance
+    assert check_sp500(members(488), real) is None  # 12 gone: the limit
+    assert check_sp500(members(500), pd.DataFrame({"instrument_id": []})) is None  # no flags yet
+
+
+def test_the_sp500_check_flags_a_cut_short_file_or_a_big_change() -> None:
+    real = reference_of(members(500))
+    cut = check_sp500(members(455), real)  # 45 gone: the 10% band let this through
+    assert cut is not None and "45 left" in cut[0] and cut[1] == members(500)
+    assert check_sp500(members(487), real) is not None  # 13 gone: more than a day's change
+    assert check_sp500(members(500, 15), real) is not None  # 15 in, 15 out
+    assert check_sp500(members(440), real) is not None  # under 90%
 
 
 def test_an_empty_listing_file_fails_closed() -> None:

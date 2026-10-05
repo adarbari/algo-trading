@@ -18,6 +18,9 @@ FIXTURES = REPO_ROOT / "tests" / "fixtures" / "sources" / "ssga"
 FINDER = (FIXTURES / "fundfinder.json").read_bytes()
 XLK = (FIXTURES / "holdings-daily-us-en-xlk.xlsx").read_bytes()
 BIL = (FIXTURES / "holdings-daily-us-en-bil.xlsx").read_bytes()
+# SPY's recorded workbook (2026-10-01), cut to a few big lines and the companies listed here but
+# domiciled abroad, whose security ids are CINS codes (Linde G54950103, Chubb H1467J104).
+SPY = (FIXTURES / "holdings-daily-us-en-spy-foreign-domiciled.xlsx").read_bytes()
 
 
 def source(urls: list[str] | None = None) -> SsgaHoldings:
@@ -217,12 +220,25 @@ def test_money_market_futures_and_cash_lines_are_not_equity_positions() -> None:
     }
 
 
-def test_a_usd_line_with_a_foreign_security_id_is_not_a_us_listing() -> None:
+def test_us_listed_companies_domiciled_abroad_are_linked_in_the_recorded_spy_workbook() -> None:
+    """They print a CINS (letter first), not a CUSIP; the first version of the US-listing rule
+    required a digit and unlinked ~29 S&P 500 members (Linde, Accenture, Chubb, Medtronic...)."""
+    normalized = source().normalize(FetchRequest("SPY"), SPY)
+    assert normalized is not None
+    holdings = normalized.parsed["holdings"]
+    listed = dict(zip(holdings["holding_symbol"], holdings["us_listed"], strict=True))
+    abroad = ["LIN", "ACN", "ETN", "CB", "MDT", "TT", "JCI", "AON", "TEL", "NXPI", "STX", "RCL"]
+    assert all(listed[t] for t in [*abroad, "GRMN", "NVDA", "AAPL", "T"])
+    ids = dict(zip(holdings["holding_symbol"], holdings["identifier"], strict=True))
+    assert (ids["LIN"], ids["CB"], ids["NXPI"]) == ("G54950103", "H1467J104", "N6596X109")
+
+
+def test_a_line_priced_in_another_currency_is_not_a_us_listing() -> None:
     rows = [
         HEADER,
         ["A INC", "AAA", "037833100", "x", 40.0, "-", 1.0, "USD"],
-        ["ROCHE", "ROP", "H69293217", "x", 30.0, "-", 1.0, "USD"],  # a CINS, as Roche prints
-        ["TELUS", "T", "87971M103", "x", 30.0, "-", 1.0, "CAD"],
+        ["ROCHE", "ROP", "H69293217", "x", 30.0, "-", 1.0, "CHF"],  # Roper's ticker, Roche's CINS
+        ["TELUS", "T", "87971M103", "x", 30.0, "-", 1.0, "CAD"],  # AT&T's ticker, a Canadian line
         DISCLAIMER,
     ]
     holdings = source().normalize(FetchRequest("XLK"), sheet(rows)).parsed["holdings"]  # type: ignore[union-attr]
@@ -230,6 +246,20 @@ def test_a_usd_line_with_a_foreign_security_id_is_not_a_us_listing() -> None:
         "AAA": True,
         "ROP": False,
         "T": False,
+    }
+
+
+def test_a_company_called_future_is_not_a_futures_line() -> None:
+    rows = [
+        HEADER,
+        ["FUTURE PLC", "FUTR", "G37005101", "x", 50.0, "-", 1.0, "USD"],
+        ["SWEEP MONEY MARKET", "-", "-", "x", 50.0, "-", 1.0, "USD"],
+        DISCLAIMER,
+    ]
+    holdings = source().normalize(FetchRequest("XLK"), sheet(rows)).parsed["holdings"]  # type: ignore[union-attr]
+    assert dict(zip(holdings["holding_name"], holdings["asset_class"], strict=True)) == {
+        "FUTURE PLC": "Equity",
+        "SWEEP MONEY MARKET": "Money Market",
     }
 
 

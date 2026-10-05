@@ -99,6 +99,7 @@ def test_status_has_the_issuers_date_and_the_last_session_read() -> None:
     )
     row = holdings_status(reader, S3).iloc[0]
     assert (row["as_of"], row["fetched_on"]) == (date(2026, 9, 7), S2)
+    assert row["source"] == "ssga_holdings"
 
 
 @pytest.mark.parametrize(
@@ -108,8 +109,8 @@ def test_status_has_the_issuers_date_and_the_last_session_read() -> None:
         ("US0378331005", "037833100"),
         ("CA1234567890", "123456789"),
         ("GB0002634946", None),
-        ("H69293217", None),  # a CINS (Roche): foreign, not a US/Canadian CUSIP
-        ("G5494J103", None),
+        ("G54950103", "G54950103"),  # a CINS (Linde): US-listed, domiciled abroad
+        ("H1467J104", "H1467J104"),
         ("CASH_USD", None),
         (None, None),
     ],
@@ -129,6 +130,14 @@ def test_known_cusips_pair_tickers_with_their_security_ids() -> None:
         "037833100": ("AAA", "EQ:AAA"),
         "900000002": ("BBB", "EQ:BBB"),
     }
+
+
+def test_a_cins_feeds_the_map_when_the_line_resolved() -> None:
+    """Linde prints G54950103 on a State Street line that resolves to the universe."""
+    rows = holdings_rows(FUND, S1, [("LIN", "Linde", 1.0)], linked={"LIN": "EQ:LIN"})
+    rows[0]["identifier"] = "G54950103"
+    reader = store((S1, "r1", rows, at(S1)))
+    assert known_cusips(reader, S3) == {"G54950103": ("LIN", "EQ:LIN")}
 
 
 def test_a_line_that_did_not_resolve_never_feeds_the_cusip_map() -> None:

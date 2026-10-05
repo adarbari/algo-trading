@@ -80,23 +80,25 @@ def etf_holdings(
 
 
 def holdings_status(reader: StoreReader, through: date) -> pd.DataFrame:
-    """One row per fund with stored holdings: ``instrument_id``, ``as_of`` and
-    ``holdings_count`` (of its latest stored read) and ``fetched_on`` (the latest session any
-    run stored it in)."""
+    """One row per fund with stored holdings: ``instrument_id``, ``as_of``, ``holdings_count``
+    and ``source`` (the issuer adapter) of its latest stored read, and ``fetched_on`` (the
+    latest session any run stored it in)."""
     frame = _stored(reader, through, None)
-    columns = ["instrument_id", "as_of", "holdings_count", "fetched_on"]
+    columns = ["instrument_id", "as_of", "holdings_count", "source", "fetched_on"]
     if frame is None or frame.empty:
         return pd.DataFrame({c: [] for c in columns})
     fetched = pd.to_datetime(frame["session_date"]).dt.date.groupby(frame["instrument_id"]).max()
     latest = _latest_per_fund(frame).groupby("instrument_id").first()
-    out = latest[["as_of", "holdings_count"]].assign(fetched_on=fetched).reset_index()
+    out = latest[["as_of", "holdings_count", "source"]].assign(fetched_on=fetched).reset_index()
     return out[columns]
 
 
 def cusip_of(identifier: object) -> str | None:
-    """The 9-character CUSIP inside a CUSIP or a U.S./Canadian ISIN (``US0378331005``)."""
+    """The 9-character CUSIP or CINS inside a security id, or a U.S./Canadian ISIN
+    (``US0378331005``). A CINS (letter first: Linde ``G54950103``) is looked up too; it only
+    links when a State Street line with a ticker in USD printed it (``known_cusips``)."""
     text = str(identifier or "").strip().upper()
-    if len(text) == 9 and text.isalnum() and text[0].isdigit():  # letters first: a CINS, foreign
+    if len(text) == 9 and text.isalnum():
         return text
     if len(text) == 12 and text[:2] in ("US", "CA") and text.isalnum():
         return text[2:11]

@@ -84,13 +84,9 @@ def test_every_cash_label_is_not_a_position_and_a_cusip_starts_with_a_digit() ->
         "Cash and/or Derivatives",
     ]
     assert not any(is_position(k) for k in labels)
-    assert [is_cusip(c) for c in ("037833100", "87971M103", "H69293217", "US0378331005", None)] == [
-        True,
-        True,
-        False,
-        False,
-        False,
-    ]
+    ids = ("037833100", "87971M103", "G54950103", "US0378331005", "CASH_USD", None)
+    # A CUSIP or a CINS (Linde): nine characters; an ISIN, a cash id and a blank are neither.
+    assert [is_cusip(c) for c in ids] == [True, True, True, False, False, False]
 
 
 def test_cash_futures_and_fx_lines_are_not_positions() -> None:

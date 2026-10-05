@@ -11,9 +11,16 @@ rest). Per run:
   refresh_days``, spread over the window by ticker; funds an issuer lists but has no file for
   count as read, so they are retried once a window, not nightly; SEC N-PORT funds report
   quarterly, so they are never read more often than ``cadence_days``). ONE list orders every due
-  fund across issuers (never read first, then the oldest read first, issuer priority breaking
-  ties, ``plan_due``), and only then is ``limit`` applied: the nightly passes ``[etf_holdings]
-  per_night``, so a cap can slow the weekly funds down but never starves an issuer;
+  fund across issuers (``plan_due``): funds whose last read failed go after healthy ones, then
+  funds never read, then the oldest read first, issuer priority breaking ties. Only then is
+  ``limit`` applied (``nightly_cap``; the nightly passes ``[etf_holdings] per_night``), and every
+  issuer with funds due is first given at least ``ISSUER_FLOOR`` (20%) of the slots, so a cap can
+  slow the weekly funds down but one issuer, broken or not, never starves the others. A fund
+  whose read failed (an error, or a rejection) is held back with a wait that doubles on each
+  failure in a row (``hold_until``: 1 or 2 days, up to 30; N-PORT 30), so a lasting fault costs
+  one request a month per fund, not one a night;
+- an issuer whose fund list could not be read tonight keeps its funds: they are not handed to
+  the next issuer (N-PORT is months older than the daily rows stored), and the run is PARTIAL;
 - the fund's lines are ranked by the size of their weight, the largest ``[etf_holdings]
   keep_top`` are kept, and every row carries the file's number of positions (cash, futures and
   FX lines are stored but not counted). A line's ticker resolves to an instrument id through
@@ -26,18 +33,24 @@ rest). Per run:
   funds), the file's own published weights too when they can be judged (iShares), the number of
   positions has not collapsed (daily files; a quarterly report is a new document), the as-of
   date has not gone back. A failed check is a FAILED item (the run is PARTIAL) and last read's
-  rows stay. The fund is not retried for ``RETRY_AFTER_DAYS`` (a quarterly source: 30), and a
-  collapsed position count that three reads in a row agree on (distinct, not older as-of dates)
-  is accepted as a real rebalance; ``force`` accepts what it reads, checks off.
+  rows stay. A collapsed position count is a soft rejection: it is accepted as a real rebalance
+  once the two latest outcomes were soft rejections too and the three reads agree (``confirmed``:
+  counts within 10% of each other and below the stored one, three increasing as-of dates, or one
+  date and one count seen on three different run days); a hard rejection, a missing file or a
+  failed read in between starts the count over. Outcomes are saved as plain fields in the run's
+  stats (``fund_events``), not read back from item text. ``force`` accepts what it reads,
+  checks off.
 
 Per-fund rows are staged, then published as one partition; a crashed run resumes.
 """
 
-import re
-from collections.abc import Mapping, Sequence
+import math
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from functools import partial
+from itertools import pairwise
+from typing import Any, Self
 
 import pandas as pd
 
@@ -47,10 +60,12 @@ from algotrade.data.resolver import SymbolResolver
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.refresh import due_keys
 from algotrade_ingestion.tasks.framework.run import (
+    FAILURES,
     IngestRun,
     NoResponseError,
     TaskContext,
     finished_runs,
+    status_label,
 )
 from algotrade_sources.framework.base import FetchRequest, HoldingsSource
 from algotrade_sources.framework.holdings import is_position
@@ -66,9 +81,15 @@ ETF = "ETF"
 WEIGHT_SUM_BAND = 0.10  # a fund's weights add up to 100% within this (not geared funds)
 PUBLISHED_FLOOR = 0.97  # a file whose own published weights add up to less was cut short
 MIN_COUNT_RATIO = 0.5  # a read with fewer positions than this share of the last one is rejected
-CONFIRMATIONS = 2  # earlier rejections (as-of dates 2+) after which a third consistent read wins
-RETRY_AFTER_DAYS = 2  # a rejected daily-file fund waits this many days (a quarterly one: 30)
-_REJECTION = re.compile(r"read as of (\d{4}-\d{2}-\d{2}); (soft|hard)")
+CONFIRMATIONS = 2  # earlier soft rejections after which a third consistent read wins
+COUNT_SPREAD = 1.10  # position counts of reads that "agree" are within 10% of each other
+EVENTS = "fund_events"  # run stats key: what each fund's outcome was, structured (see Event)
+ERROR, MISSING, SOFT, HARD = "error", "missing", "soft", "hard"  # Event kinds
+FAILING = (ERROR, SOFT, HARD)  # the kinds that hold a fund back (MISSING is a window, not a fault)
+REJECTION_HOLD_DAYS = 2  # a rejected daily-file fund first waits this long, then 4, 8, ... (cap 30)
+ERROR_HOLD_DAYS = 1  # a daily-file fund whose read failed first waits this long, then 2, 4, ...
+MAX_HOLD_DAYS = 30
+ISSUER_FLOOR = 0.2  # each issuer with funds due gets at least this share of the nightly cap
 
 
 @dataclass(frozen=True)
@@ -98,21 +119,44 @@ class Problem:
 
 
 @dataclass(frozen=True)
-class Rejection:
-    """An earlier run's rejected read of a fund (parsed from its run record)."""
+class Event:
+    """One fund's non-OK outcome in a run: ``kind`` (``ERROR`` the read failed, ``MISSING`` the
+    issuer has no file, ``SOFT`` / ``HARD`` a rejected read with the as-of date and number of
+    positions it had). Saved in the run's stats (``EVENTS``) as plain fields, never parsed from
+    the wording of an item."""
 
     session: date
-    as_of: date
-    soft: bool
+    kind: str
+    as_of: date | None = None
+    count: int | None = None
+
+    def to_record(self) -> dict[str, Any]:
+        return {
+            "kind": self.kind,
+            "as_of": None if self.as_of is None else self.as_of.isoformat(),
+            "count": self.count,
+        }
+
+    @classmethod
+    def from_record(cls, session: date, raw: Mapping[str, Any]) -> Self:
+        as_of = raw.get("as_of")
+        return cls(
+            session,
+            str(raw["kind"]),
+            None if as_of is None else date.fromisoformat(as_of),
+            raw.get("count"),
+        )
 
 
 @dataclass
 class History:
-    """What earlier runs left: when each fund was last read, what is stored, and rejections."""
+    """What earlier runs left: when each fund was last read, what is stored (and from which
+    issuer), and the outcomes (``Event``) of every run since its last stored read."""
 
     read: dict[str, date] = field(default_factory=dict)
     previous: dict[str, Previous] = field(default_factory=dict)
-    rejected: dict[str, list[Rejection]] = field(default_factory=dict)
+    stored_from: dict[str, str] = field(default_factory=dict)
+    events: dict[str, list[Event]] = field(default_factory=dict)
 
 
 def active_etfs(reference: pd.DataFrame) -> pd.DataFrame:
@@ -159,9 +203,33 @@ def assign(
     return out
 
 
-def retry_days(source: HoldingsSource) -> int:
-    """How long a fund whose read was rejected is left alone."""
-    return RETRY_AFTER_DAYS if source.cadence_days <= 1 else max(source.cadence_days // 3, 1)
+def failing_streak(events: Sequence[Event]) -> list[Event]:
+    """The trailing run of failures (errors and rejections) with nothing else in between."""
+    streak: list[Event] = []
+    for event in reversed(events):
+        if event.kind not in FAILING:
+            break
+        streak.append(event)
+    return streak[::-1]
+
+
+def hold_until(events: Sequence[Event], source: HoldingsSource) -> date | None:
+    """The first session a fund may be tried again, or ``None`` when it may be tried now.
+
+    A failure (a read that raised, or one the sanity checks rejected) holds the fund back, and
+    each further failure in a row doubles the wait: 1 day for an error and 2 for a rejection
+    (daily files), 4, 8, ... up to ``MAX_HOLD_DAYS``; a quarterly source waits ``cadence // 3``
+    (30 for N-PORT) from the first failure. A fund that keeps failing is tried about monthly
+    instead of nightly, so a broken issuer cannot keep taking the nightly cap."""
+    streak = failing_streak(events)
+    if not streak:
+        return None
+    if source.cadence_days > 1:
+        base = max(source.cadence_days // 3, 1)
+    else:
+        base = ERROR_HOLD_DAYS if streak[-1].kind == ERROR else REJECTION_HOLD_DAYS
+    days = min(base * 2 ** (len(streak) - 1), MAX_HOLD_DAYS)
+    return streak[-1].session + timedelta(days=days)
 
 
 def plan_due(
@@ -172,11 +240,13 @@ def plan_due(
     refresh_days: int,
     force: bool = False,
     hold: Mapping[str, date] | None = None,
+    failing: Collection[str] = (),
 ) -> list[str]:
     """Every fund to read on ``session``, in the order to read them: one list across issuers,
-    funds never read first, then the oldest read first, issuer priority breaking ties (so
-    daily-file funds feed the CUSIP bridge before the N-PORT funds that use it). ``hold``: fund
-    -> the first session it may be tried again (a rejected read)."""
+    healthy funds before those whose last read failed (``failing``), funds never read first,
+    then the oldest read first, issuer priority breaking ties (so daily-file funds feed the
+    CUSIP bridge before the N-PORT funds that use it). ``hold``: fund -> the first session it
+    may be tried again (a failed or rejected read)."""
     rank = {source.name: i for i, source in enumerate(issuers)}
     due: list[str] = []
     for source in issuers:  # per issuer: its own cadence (N-PORT is quarterly)
@@ -187,9 +257,10 @@ def plan_due(
         ]
         due += due_keys(mine, read, session, max(refresh_days, source.cadence_days), force)
 
-    def order(symbol: str) -> tuple[int, date, int, str]:
+    def order(symbol: str) -> tuple[int, int, date, int, str]:
         fetched = read.get(symbol)
         return (
+            1 if symbol in failing else 0,
             0 if fetched is None else 1,
             fetched or date.min,
             rank[covered[symbol].name],
@@ -199,35 +270,57 @@ def plan_due(
     return sorted(due, key=order)
 
 
+def nightly_cap(
+    due: Sequence[str], covered: Mapping[str, HoldingsSource], limit: int | None
+) -> list[str]:
+    """The funds to read tonight: the first ``limit`` of the ordered ``due`` list, except that
+    every issuer with funds due is first given its own best ``ISSUER_FLOOR`` of the slots, so
+    one issuer (whatever its funds' ages or faults) cannot take the whole cap."""
+    if limit is None:
+        return list(due)
+    limit = max(limit, 0)
+    if limit >= len(due):
+        return list(due)
+    reserve = math.ceil(round(ISSUER_FLOOR * limit, 6))
+    chosen: set[str] = set()
+    taken: dict[str, int] = {}
+    for fund in due:  # first pass: up to the floor per issuer, in list order
+        name = covered[fund].name
+        if taken.get(name, 0) < reserve and len(chosen) < limit:
+            chosen.add(fund)
+            taken[name] = taken.get(name, 0) + 1
+    for fund in due:  # second pass: the rest of the cap, in list order
+        if len(chosen) >= limit:
+            break
+        chosen.add(fund)
+    return [fund for fund in due if fund in chosen]
+
+
 def _read_before(ctx: TaskContext, etfs: pd.DataFrame, session: date) -> History:
     """Earlier runs' trace: the latest session each fund was read (stored holdings, or a
     finished run that found the issuer had no file for it, so it is retried once a window, not
-    nightly), what the store holds, and the reads sanity checks rejected since the last stored
-    one."""
+    nightly), what the store holds and from which issuer, and every outcome (``Event``) the
+    runs since the last stored read recorded in their stats."""
     history = History()
     ids = dict(zip(etfs["instrument_id"], etfs["symbol"], strict=True))
     status = holdings_status(ctx.reader, session)
-    columns = (status[c] for c in ("instrument_id", "as_of", "holdings_count", "fetched_on"))
-    for iid, as_of, count, fetched in zip(*columns, strict=True):
+    names = ("instrument_id", "as_of", "holdings_count", "fetched_on", "source")
+    for iid, as_of, count, fetched, issuer in zip(*(status[c] for c in names), strict=True):
         if iid in ids:
             history.read[ids[iid]] = fetched
             history.previous[ids[iid]] = Previous(as_of, int(count))
+            history.stored_from[ids[iid]] = str(issuer)
+    stored, symbols = dict(history.read), set(ids.values())
     for record in finished_runs(ctx.writer, TASK):
         if record.session_date > session:
             continue
-        for symbol, item in record.items.items():
-            label = item.split(":", 1)[0]
-            if label in (NO_FILE, EMPTY):
-                last = history.read.get(symbol, record.session_date)
-                history.read[symbol] = max(last, record.session_date)
-            found = _REJECTION.search(item) if label == REJECTED else None
-            if found and record.session_date > history.read.get(symbol, date.min):
-                rejection = Rejection(
-                    record.session_date,
-                    date.fromisoformat(found.group(1)),
-                    found.group(2) == "soft",
-                )
-                history.rejected.setdefault(symbol, []).append(rejection)
+        for symbol, raw in record.stats.get(EVENTS, {}).items():
+            if symbol not in symbols or record.session_date <= stored.get(symbol, date.min):
+                continue  # not an active ETF, or a stored read has happened since
+            event = Event.from_record(record.session_date, raw)
+            history.events.setdefault(symbol, []).append(event)
+            if event.kind == MISSING:  # no file: counts as read, so it is retried once a window
+                history.read[symbol] = max(history.read.get(symbol, event.session), event.session)
     return history
 
 
@@ -266,12 +359,29 @@ def sanity_problem(
     return None
 
 
-def confirmed(earlier: Sequence[Rejection], as_of: date) -> bool:
-    """Whether reads on enough different days agree that a position count really collapsed: the
-    last ``CONFIRMATIONS`` rejections were soft, on distinct as-of dates, none after this read's."""
-    soft = [r for r in earlier if r.soft]
-    dates = {r.as_of for r in soft}
-    return len(dates) >= CONFIRMATIONS and as_of >= max(dates)
+def confirmed(earlier: Sequence[Event], read: Event, stored: int) -> bool:
+    """Whether three reads in a row agree that a position count really collapsed.
+
+    The two latest outcomes before ``read`` must both be soft rejections with nothing else
+    after them (a hard rejection, a missing file or a failed read in between starts over), all
+    three counts below the ``stored`` one and within ``COUNT_SPREAD`` of each other, and
+    either their as-of dates strictly increase (a file that updates daily: three distinct
+    days) or they are one date with one count seen on three different run days (a file that
+    updates monthly keeps its date for weeks, so it must still get through)."""
+    streak = [e for e in earlier[-CONFIRMATIONS:] if e.kind == SOFT]
+    if len(streak) < CONFIRMATIONS:
+        return False
+    window = [*streak, read]
+    counts = [e.count for e in window if e.count is not None]
+    dates = [e.as_of for e in window if e.as_of is not None]
+    if len(counts) < len(window) or len(dates) < len(window):
+        return False
+    if min(counts) < 1 or max(counts) >= stored or max(counts) > COUNT_SPREAD * min(counts):
+        return False
+    if all(a < b for a, b in pairwise(dates)):
+        return True
+    one_reading = len(set(dates)) == 1 and len(set(counts)) == 1
+    return one_reading and len({e.session for e in window}) == len(window)
 
 
 def positions(holdings: pd.DataFrame) -> int:
@@ -337,6 +447,7 @@ class FundContext:
     history: History
     geared: set[str]
     force: bool = False
+    outcomes: dict[str, Event] = field(default_factory=dict)  # a fund's non-OK result, this run
 
 
 def _fund(run: IngestRun, source: HoldingsSource, iid: str, symbol: str, c: FundContext) -> str:
@@ -345,8 +456,10 @@ def _fund(run: IngestRun, source: HoldingsSource, iid: str, symbol: str, c: Fund
     try:
         normalized = run.fetch(source, FetchRequest(symbol, iid, run.session))
     except NoResponseError:
+        c.outcomes[symbol] = Event(run.session, MISSING)
         return NO_FILE
     if normalized is None or normalized.session_date is None:
+        c.outcomes[symbol] = Event(run.session, MISSING)
         return EMPTY
     holdings, as_of = normalized.parsed["holdings"], normalized.session_date
     basis_points = normalized.notes.get("published_weight_bp")
@@ -362,14 +475,19 @@ def _fund(run: IngestRun, source: HoldingsSource, iid: str, symbol: str, c: Fund
             published=None if basis_points is None else basis_points / 10_000,
             check_count=source.cadence_days <= 1,
         )
+    count = positions(holdings)
+    previous = c.history.previous.get(symbol)
+    read = Event(run.session, SOFT, as_of, count)
     if (
         problem is not None
         and problem.soft
-        and confirmed(c.history.rejected.get(symbol, []), as_of)
+        and previous is not None
+        and confirmed(c.history.events.get(symbol, []), read, previous.count)
     ):
         problem, note = None, " (the new size was confirmed by earlier reads)"
     if problem is not None:
-        kind = "soft" if problem.soft else "hard"
+        kind = SOFT if problem.soft else HARD
+        c.outcomes[symbol] = Event(run.session, kind, as_of, count)
         return f"{REJECTED}: {problem.text} (read as of {as_of}; {kind})"
     frame = fund_frame(iid, symbol, as_of, holdings, c.sources.keep_top, c.resolver, c.cusips)
     if not source.scope_limited:  # only issuers that print tickers feed the CUSIP bridge
@@ -403,25 +521,39 @@ def ingest_etf_holdings(
         etfs = etfs[etfs["symbol"].isin([s.upper() for s in only])]
     ids = dict(zip(etfs["symbol"], etfs["instrument_id"], strict=True))
     with IngestRun(ctx, TASK, session, resume=True) as run:
+        events: dict[str, Any] = run.stats.setdefault(
+            EVENTS, dict(run.record.stats.get(EVENTS, {}))
+        )
+        run.record.stats = run.stats  # checkpoints save the events with the items
         listed: dict[str, set[str]] = {}
         for source in sources.issuers:
             run.attempt(DIRECTORY + source.name, partial(_directory, run, source, listed))
+        history = _read_before(ctx, etfs, session)
         covered = assign(sorted(ids), sources.issuers, listed)
+        # An issuer whose fund list could not be read tonight: do not hand its funds to the next
+        # issuer (N-PORT is months older than the daily rows stored and would be rejected, after
+        # hundreds of header requests); they wait for the next night.
+        down = {
+            s.name for s in sources.issuers if status_label(run.items[DIRECTORY + s.name]) != "OK"
+        }
+        skipped = {s for s in covered if history.stored_from.get(s) in down}
+        covered = {s: o for s, o in covered.items() if s not in skipped}
         optionable = set(etfs.loc[etfs["optionable"], "symbol"])
         out_of_scope = {
             s for s, o in covered.items() if o.scope_limited and not _wanted(s, optionable, sources)
         }
         covered = {s: o for s, o in covered.items() if s not in out_of_scope}
-        history = _read_before(ctx, etfs, session)
         hold = {
-            s: max(r.session for r in rejected) + timedelta(days=retry_days(covered[s]))
-            for s, rejected in history.rejected.items()
-            if s in covered
+            s: until
+            for s, past in history.events.items()
+            if s in covered and (until := hold_until(past, covered[s])) is not None
         }
+        failing = {s for s, past in history.events.items() if s in covered and failing_streak(past)}
         due = plan_due(
-            covered, sources.issuers, history.read, session, sources.refresh_days, force, hold
-        )
-        todo = due if limit is None else due[: max(limit, 0)]
+            covered, sources.issuers, history.read, session, sources.refresh_days, force, hold,
+            failing,
+        )  # fmt: skip
+        todo = nightly_cap(due, covered, limit)
         shared = FundContext(
             sources,
             run.resolver(),
@@ -432,7 +564,10 @@ def ingest_etf_holdings(
         )
         pending = [s for s in todo if s not in run.items]  # the rest were read by the run resumed
         for done, symbol in enumerate(pending, start=1):
-            run.attempt(symbol, partial(_fund, run, covered[symbol], ids[symbol], symbol, shared))
+            status = run.attempt(
+                symbol, partial(_fund, run, covered[symbol], ids[symbol], symbol, shared)
+            )
+            _note(events, symbol, status, shared.outcomes.get(symbol), session)
             if done % CHECKPOINT_EVERY == 0:
                 run.checkpoint()
         rows = run.publish(TABLE)
@@ -440,8 +575,11 @@ def ingest_etf_holdings(
         run.stats.update(
             etfs=len(ids),
             covered={s.name: sum(1 for o in covered.values() if o is s) for s in sources.issuers},
-            uncovered=len(ids) - len(covered) - len(out_of_scope),
+            uncovered=len(ids) - len(covered) - len(out_of_scope) - len(skipped),
             out_of_scope=len(out_of_scope),
+            skipped_directory_down=len(skipped),
+            directory_down=sorted(down),
+            held=len(hold),
             due=len(due),
             requested=len(todo),
             read=sum(1 for v in funds.values() if v.startswith("OK")),
@@ -453,4 +591,22 @@ def ingest_etf_holdings(
             rows=rows,
             statuses=run.counts(),
         )
+        if down:
+            run.partial(
+                f"{', '.join(sorted(down))}: fund list unavailable, {len(skipped)} funds skipped"
+            )
     return run.record
+
+
+def _note(
+    events: dict[str, Any], symbol: str, status: str, outcome: Event | None, session: date
+) -> None:
+    """Keep the structured outcome of one fund in the run's stats: a read that raised is an
+    ``ERROR``, a rejection or a missing file carries its own ``Event``, an OK read clears it."""
+    label = status_label(status)
+    if label == "OK":
+        events.pop(symbol, None)
+    elif label in FAILURES and outcome is None:
+        events[symbol] = Event(session, ERROR).to_record()
+    elif outcome is not None:
+        events[symbol] = outcome.to_record()

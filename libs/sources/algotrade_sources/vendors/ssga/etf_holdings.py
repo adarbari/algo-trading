@@ -56,14 +56,15 @@ _FUTURE = re.compile(r"\b(FUTURES?|E-MINI)\b", re.IGNORECASE)
 _MONEY_MARKET = re.compile(r"MONEY MARKET|LIQUID RESERVES|\bSTIF\b|SWEEP", re.IGNORECASE)
 
 
-def asset_class(name: str | None, identifier: str | None, bonds: bool) -> str:
+def asset_class(name: str | None, identifier: str | None, bonds: bool, ticker: str | None) -> str:
     """The workbook has no asset class column: cash by its ``CASH_*`` id, futures and money
-    market sweeps by their names (a heuristic), else the fund's kind."""
+    market sweeps by their names (a heuristic, only for lines with no ticker: a company called
+    Future PLC is not a future), else the fund's kind."""
     if (identifier or "").upper().startswith("CASH"):
         return "Cash"
-    if _FUTURE.search(name or ""):
+    if ticker is None and _FUTURE.search(name or ""):
         return "Futures"
-    if _MONEY_MARKET.search(name or ""):
+    if ticker is None and _MONEY_MARKET.search(name or ""):
         return "Money Market"
     return "Fixed Income" if bonds else "Equity"
 
@@ -110,7 +111,7 @@ class SsgaHoldings:
         for line in table.to_dict("records"):
             ticker = holding_ticker(line.get("Ticker"))
             identifier = clean_text(line.get("Identifier"))
-            kind = asset_class(clean_text(line.get("Name")), identifier, bonds)
+            kind = asset_class(clean_text(line.get("Name")), identifier, bonds, ticker)
             rows.append(
                 {
                     "holding_symbol": ticker,
@@ -120,7 +121,8 @@ class SsgaHoldings:
                     "sector": clean_text(line.get("Sector")),
                     "shares": number(line.get(size)),
                     "identifier": None if kind == "Cash" else identifier,
-                    # The file has no exchange or country: a USD line with a U.S. CUSIP.
+                    # The file has no exchange or country: a USD equity line with a ticker and
+                    # a CUSIP or CINS (companies domiciled abroad but listed here print a CINS).
                     "us_listed": ticker is not None
                     and kind == "Equity"
                     and line.get("Local Currency") == "USD"

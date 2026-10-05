@@ -98,10 +98,12 @@ def is_position(asset_class: object) -> bool:
 
 
 def is_cusip(text: object) -> bool:
-    """A U.S. or Canadian CUSIP: nine characters starting with a digit (a CINS, which starts
-    with a letter, is a foreign security)."""
+    """A nine-character CUSIP (digit first) or CINS (letter first). A CINS is what U.S.-listed
+    companies domiciled abroad print (Linde ``G54950103``, Accenture ``G1151C101``, Chubb
+    ``H1467J104``); it says nothing about where a line trades, so State Street's U.S.-listing
+    rule also needs a ticker, the equity class and USD."""
     value = str(text or "").strip().upper()
-    return len(value) == 9 and value.isalnum() and value[0].isdigit()
+    return len(value) == 9 and value.isalnum()
 
 
 def fraction(percent: object) -> float | None:

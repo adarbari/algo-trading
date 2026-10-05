@@ -112,7 +112,9 @@ def _universe_build(ctx: TaskContext, p: Params) -> RunRecord:
         ctx.sources["spy_holdings"],
         ctx.sources.get("massive_tickers"),
     )
-    record = universe_build.build_universe(ctx, sources, settings, session_of(p))
+    record = universe_build.build_universe(
+        ctx, sources, settings, session_of(p), bool(p.get("accept_sp500"))
+    )
     if p.get("review_out"):
         universe_build.write_review(ctx.reader, session_of(p), p["review_out"])
         record.stats["review_out"] = str(p["review_out"])
@@ -361,6 +363,12 @@ TASKS: dict[str, Task] = {
                 SESSION,
                 Param("review_out", ("--review-out",), Path, "write leverage candidates (CSV)"),
                 Param(
+                    "accept_sp500",
+                    ("--accept-sp500",),
+                    None,
+                    "apply an S&P 500 list that differs a lot from the last snapshot",
+                ),
+                Param(
                     "figi_review_out",
                     ("--figi-review-out",),
                     Path,
@@ -422,7 +430,9 @@ TASKS: dict[str, Task] = {
             params=(
                 SESSION,
                 Param("symbols", ("--symbols",), str, "comma-separated ETF tickers"),
-                Param("force", ("--force",), None, "reread every covered fund"),
+                Param(
+                    "force", ("--force",), None, "reread every covered fund, accepting what is read"
+                ),
                 Param("limit", ("--limit",), int, "read at most N funds this run"),
             ),
             skip=_no_holdings_source,

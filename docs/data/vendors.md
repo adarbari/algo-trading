@@ -228,9 +228,11 @@ their terms of use for these public files (2026-10-05). `enabled = false` in `[s
 
 Linking: a holding's ticker becomes an instrument id through `SymbolResolver`, only for lines
 the issuer says are U.S. listings (iShares: Location United States and asset class Equity;
-State Street: local currency USD). N-PORT prints no tickers: its lines are matched by CUSIP to
-tickers the State Street files print beside CUSIPs (`data.funds.holdings.known_cusips`), so
-SPDR funds are read first. Cash, futures, bonds and unmatched lines keep their name only.
+State Street has no exchange or country column: an equity line with a ticker, in USD, with a
+CUSIP or a CINS, the letter-first code that Linde, Accenture, Chubb and other foreign-domiciled
+U.S. listings print). N-PORT prints no tickers: its lines are matched by CUSIP or CINS to the
+instrument the State Street files linked beside it (`data.funds.holdings.known_cusips`, which
+keeps the instrument id as stored), so SPDR funds are read first. Cash, futures, bonds and unmatched lines keep their name only.
 
 Pacing and cost: `[ssga]` and `[ishares]` 1 s between requests, SEC 0.2 s; raw files are kept
 14 days (SEC 7; this includes SPY's membership file, which was kept 90 days before `[ssga]`
@@ -241,9 +243,13 @@ funds from one due list across all issuers (never read first, then the oldest re
 bars and chains, so the first pass takes 6 weekday nights; in steady state a daily-file fund is
 read every 7 to 8 days and an N-PORT fund every ~91 days; the CLI is uncapped. A new read
 replaces a fund's rows only if it passes the sanity checks (ADR 0035 decision 6); otherwise
-last read's rows stay and the run is PARTIAL. A rejected fund waits 2 days (N-PORT 30) before
-it is read again, a collapsed position count that three reads agree on is accepted, and
-`--force` accepts a read with the checks off. `[ssga] etf_files = false` turns off only the
+last read's rows stay and the run is PARTIAL. A fund whose read failed or was rejected waits
+before it is tried again, longer each time in a row (1 or 2 days, then double, up to 30;
+N-PORT 30), funds that failed sort after healthy ones, and every issuer with funds due keeps at
+least 20% of the nightly slots, so a broken issuer cannot starve the others. A collapsed
+position count that three reads agree on is accepted, and `--force` accepts a read with the
+checks off. An issuer whose fund list cannot be read tonight keeps its funds (they are not
+handed to N-PORT) and the run is PARTIAL. `[ssga] etf_files = false` turns off only the
 SPDR fund files; SPY's S&P 500 membership file follows `[ssga] enabled`. N-PORT data is
 public 60 to 150 days after its period (a 90-day slot can add up to 90 more); stored rows carry
 `filed` and are hidden from reads before it.
