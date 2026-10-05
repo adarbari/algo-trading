@@ -5,7 +5,7 @@ BIN = $(dir $(PY))
 GOLDEN_URL ?= file://datasets/golden/store
 
 
-.PHONY: changed install doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen unit property integration e2e test \
+.PHONY: changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen unit property integration e2e test \
         evaluate baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-real web-visual
 
 UV ?= uv
@@ -20,9 +20,19 @@ doctor:          ## is this machine ready? (uv, Node 24, Docker, gh, venv, web d
 status:          ## PRs + CI, running ingest jobs, last nightly, store latest session, dev servers (~15 lines, read-only)
 	@$(if $(wildcard $(PY)),$(PY),python3) scripts/status.py
 
-install:         ## library + every app + dev tools into .venv, exactly as locked
+install: no-shared-venv  ## library + every app + dev tools into .venv, exactly as locked
 	$(UV) sync --all-packages --locked
 	$(BIN)pre-commit install
+
+# A worktree's .venv links to the main checkout's, which launchd's nightly and the API run:
+# syncing through the link points that venv at this worktree's unmerged code.
+no-shared-venv:  ## refuse to sync when .venv is a link (a worktree): it would rewrite the main checkout's venv
+	@if [ -L .venv ]; then \
+	  echo "refusing: .venv links to the main checkout's venv; syncing here points it (and the nightly and API that run it) at this worktree's code." >&2; \
+	  echo "  in a worktree, run the code through PYTHONPATH: source worktree.env (scripts/worktree.sh writes it)" >&2; \
+	  echo "  dependency changes: uv lock here; make install in the main checkout after the PR merges" >&2; \
+	  exit 1; \
+	fi
 
 lock-check:      ## uv.lock matches every pyproject.toml in the workspace
 	$(UV) lock --check
