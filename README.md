@@ -28,7 +28,7 @@ algotrade-ingest bars --from 2024-10-01 --to 2026-10-01   # 2-year backfill (nee
 algotrade-ingest rates --from 2024-01-01 --to 2026-10-02   # Treasury par yield curve (one request per year; no key)
 algotrade-ingest company-details [--force] [--limit N]   # SEC EDGAR company details (needs ALGOTRADE_SEC_CONTACT in .env)
 algotrade-ingest shares [--force] [--limit N]   # shares outstanding from SEC company facts (first run ~6k CIKs, ~30-40 min)
-algotrade-ingest descriptions [--only funds|massive] [--limit N] [--symbols A,B] [--force]   # company / ETF descriptions: ETFs from SEC prospectuses (one run, ~2 min), stocks from Massive (5/min: --limit 600 is ~2 h; nightly adds 100)
+algotrade-ingest descriptions [--only funds|massive] [--limit N] [--symbols A,B] [--force]   # company / ETF descriptions: ETFs from SEC prospectuses (one run, ~2 min), stocks from Massive (5/min: --limit 300 is ~1 h and holds the ingest lock; nightly adds 100)
 algotrade-ingest rollups --from 2024-10-03 --to 2026-10-02   # backfill rollups (price_stats, earnings, option_liquidity) per session
 algotrade-ingest rollups [--date D] [--only price_stats@v2]    # one session (alias: features); config/site/rollups.toml
 algotrade-ingest retire-features --group price_stats@v1 [--dry-run]   # delete a superseded group's tables once v2 covers them

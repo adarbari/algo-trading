@@ -16,7 +16,7 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 - VRP live spread check in the UI via `GET /chains/{id}/live`.
 - IBKR IV timeouts become NO_DATA: a timed-out `ibkr-iv` history request is stored as NO_DATA, counted as done and never refetched (`apps/ingestion/algotrade_ingestion/tasks/market/ibkr_iv.py` near lines 57 and 113; ib_async swallows the timeout). It should raise a retryable error. The 2026-10-04 chunk 2 run was killed at about 1,360 of 1,500 names after IBKR history requests started timing out; its run record `ibkr_iv_history-2026-10-02-20261004T164924Z` stays RUNNING, and the names marked NO_DATA after about 21:52 that day must be refetched. Restart IB Gateway before resuming: a resume that cannot connect marks itself COMPLETE and deletes the staged data (`_run`, lines about 206-208).
 - Flaky tests: preview timing under load, smoke axe admin light, one builder e2e.
-- Descriptions (ADR 0034, accepted): after merge run `algotrade-ingest descriptions --only funds` (ETFs, ~2 min), then stocks in chunks (`descriptions --limit 600`, ~2 h each, S&P 500 first; the nightly adds 100). Then the Overview tab reads `reference.description` from `GET /instruments/{id}`.
+- Descriptions (ADR 0034, accepted): after merge run `algotrade-ingest descriptions --only funds` (ETFs, ~2 min), then stocks in chunks (`descriptions --limit 300`, ~1 h each, S&P 500 first, each run holds the ingest lock; the nightly adds 100). Then the Overview tab reads `reference.description` from `GET /instruments/{id}`.
 
 **Facts**
 - IBKR fundamentals are not permitted on this account (error 10358): share-class counts stay SEC.

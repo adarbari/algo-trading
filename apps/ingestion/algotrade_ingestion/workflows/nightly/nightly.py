@@ -76,7 +76,7 @@ NIGHTLY: tuple[Step, ...] = (
     Step("rollups"),
     Step(SCREENS, blocked_by=("chains", "rollups"), requires=universe_exists, latest_only=True),
     # Company and ETF descriptions (ADR 0034): after bars and the screens, so the Massive
-    # requests (capped per night) never delay them; stocks from Massive, ETFs from SEC.
+    # requests (capped per night, ~21 min) do not delay them; stocks from Massive, ETFs from SEC.
     Step("descriptions", latest_only=True),
     # Read-only live verification vs IBKR (ADR 0026): SKIPPED with a WARN when [ibkr] is
     # disabled or IB Gateway is not reachable; never fails the ingestion.

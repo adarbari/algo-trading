@@ -3,12 +3,12 @@
 Two sources, one table (ADR 0034):
 
 - **Stocks and ADRs** from Massive's ticker overview: one request per ticker, on the free tier
-  5 requests a minute shared with the nightly bars. 11k instruments would take ~37 hours, so a
-  run asks for at most ``limit`` tickers (``[massive] descriptions_per_night``, 100 = ~21
-  minutes), in priority order: the configured ``priority_symbols`` and S&P 500 members, then
-  by liquidity, then the rest (``option_chains.prioritise``). A ticker is asked again only
-  after ``[massive] descriptions_refresh_days`` (365). A ticker Massive has no text for is
-  stored as a marker (no description), so it is not asked every night.
+  5 requests a minute. 11k instruments would take ~37 hours, so a run asks for at most
+  ``limit`` tickers (default ``[massive] descriptions_per_night``, 100 = ~21 minutes; named
+  ``symbols`` are never capped), in priority order: the configured ``priority_symbols`` and
+  S&P 500 members, then by liquidity, then the rest (``option_chains.prioritise``). A ticker
+  is asked again after ``[massive] descriptions_refresh_days`` (365). A ticker Massive has no
+  text for is stored as a marker (no description) and asked again after 30 days.
 - **ETFs** from the investment objective in their SEC prospectus (the quarterly Risk/Return
   Summary data sets, ~80 MB each): no per-ticker requests. The last ``[sec_edgar]
   fund_quarters`` completed quarters are read once each (a quarter a finished run already
@@ -52,6 +52,7 @@ STOCK_TYPES = ("COMMON_STOCK", "ADR")
 ONLY = ("massive", "funds")
 CHECKPOINT_EVERY = 25
 FUNDS = "funds"  # staging key of the ETF rows
+MARKER_RETRY_DAYS = 30  # a ticker with no text (404, a new IPO) is asked again after this
 COLUMNS = list(DESCRIPTION_COLUMNS)  # the table's columns, named once by the reader
 
 
@@ -84,6 +85,14 @@ def _active(reference: pd.DataFrame) -> pd.DataFrame:
     return reference[reference["status"].astype(str).str.upper() == "ACTIVE"]
 
 
+def _is_etf(frame: pd.DataFrame) -> pd.Series:
+    """ETFs: the reference's ``is_etf`` flag or an ETF security type. The one rule for both
+    sources, so an instrument is described from exactly one of them."""
+    kind = frame["security_type"] == "ETF" if "security_type" in frame.columns else False
+    flag = frame["is_etf"].fillna(False).astype(bool) if "is_etf" in frame.columns else False
+    return pd.Series(flag | kind, index=frame.index).astype(bool)
+
+
 def _frame(rows: list[dict[str, Any]]) -> pd.DataFrame:
     """Rows of ``COLUMNS`` as the table stores them (object dtype, ``None`` for gaps)."""
     out = pd.DataFrame(rows, columns=COLUMNS)
@@ -103,7 +112,7 @@ def stock_order(
 ) -> list[Underlying]:
     """Active stocks and ADRs (or just ``symbols``) in the order they are asked for."""
     active = _active(reference)
-    active = active[active["security_type"].isin(STOCK_TYPES)]
+    active = active[active["security_type"].isin(STOCK_TYPES) & ~_is_etf(active)]
     if symbols:
         wanted = {s.upper() for s in symbols}
         active = active[active["symbol"].astype(str).str.upper().isin(wanted)]
@@ -121,17 +130,22 @@ def due_stocks(
 ) -> list[Underlying]:
     """Tickers to ask, in order: never asked first (priority order), then those whose refresh
     slot passed since they were asked (``refresh.due_keys``: once per ``refresh_days``, on a
-    slot day spread by key), the stalest first. ``force``: all, in priority order."""
+    slot day spread by key; a ticker with no text only ``MARKER_RETRY_DAYS``), the stalest
+    first. ``force``: all, in priority order."""
     if force:
         return list(order)
     own = stored[stored["description_source"] == MASSIVE_TEXT]
     asked: dict[str, date] = dict(zip(own["instrument_id"], own["fetched_on"], strict=True))
-    due = due_keys([u.instrument_id for u in order], asked, session, refresh_days)
+    text = set(own[own["description"].notna()]["instrument_id"])
+    ids = [u.instrument_id for u in order]
+    rank = {i: n for n, i in enumerate(ids)}
+    new = {i for i in ids if i not in asked}
+    wait = min(refresh_days, MARKER_RETRY_DAYS)
+    stale = due_keys([i for i in ids if i in text], asked, session, refresh_days)
+    stale += due_keys([i for i in ids if i in asked and i not in text], asked, session, wait)
+    stale.sort(key=lambda i: (asked[i], rank[i]))
     by_id = {u.instrument_id: u for u in order}
-    new = {i for i in due if i not in asked}
-    return [u for u in order if u.instrument_id in new] + [
-        by_id[i] for i in due if i not in new
-    ]  # due_keys lists the stale ones stalest first
+    return [u for u in order if u.instrument_id in new] + [by_id[i] for i in stale]
 
 
 def _overview(run: IngestRun, source: Source, u: Underlying, stored: pd.DataFrame) -> str:
@@ -148,9 +162,13 @@ def _overview(run: IngestRun, source: Source, u: Underlying, stored: pd.DataFram
         if found is not None:
             row.update({k: found[k] for k in ("description", "homepage_url", "total_employees")})
         status = "OK" if row["description"] else "NO_DESCRIPTION"
-    kept = stored[stored["instrument_id"] == u.instrument_id]
-    if not row["description"] and len(kept) and kept.iloc[0]["description"]:
-        row["description"], status = kept.iloc[0]["description"], "KEPT"  # keep what we had
+    had = stored[stored["instrument_id"] == u.instrument_id]
+    if len(had):  # a refresh never drops what we had
+        for column in ("description", "homepage_url", "total_employees"):
+            old = had.iloc[0][column]
+            if pd.isna(row[column]) and not pd.isna(old):
+                row[column] = old
+                status = "KEPT" if column == "description" else status
     run.stage(TABLE, u.symbol, _frame([row]), source.name)
     return status
 
@@ -216,14 +234,16 @@ def _quarter(run: IngestRun, source: Source, quarter: str, out: list[pd.DataFram
     except NoResponseError:
         return "NOT_PUBLISHED"  # the SEC publishes a quarter about ten days after it ends
     frame = normalized.parsed["objectives"] if normalized is not None else None
-    if frame is not None and not frame.empty:
-        out.append(frame)
-    return f"OK: {0 if frame is None else len(frame)} series"
+    if frame is None or frame.empty:  # a published file with no objectives is a parse problem
+        raise ValueError(f"{quarter}: the data set held no investment objectives")
+    out.append(frame)
+    return f"OK: {len(frame)} series"
 
 
-def _quarters_read(ctx: TaskContext, run: IngestRun) -> set[str]:
-    """Quarters a published run (or this run, before a resume) already read."""
-    done = {k for k, v in run.items.items() if status_label(v) == "OK"}
+def _quarters_read(ctx: TaskContext) -> set[str]:
+    """Quarters a published run (COMPLETE or PARTIAL) read. Never this run's own items: its
+    objectives are staged after the loop, so a crashed run that is resumed has not stored them."""
+    done: set[str] = set()
     for record in finished_runs(ctx.writer, TASK):
         done |= {k for k, v in record.items.items() if status_label(v) == "OK"}
     return {k.removeprefix("fund:") for k in done if k.startswith("fund:")}
@@ -240,7 +260,7 @@ def _funds(
     """Read the quarters not read yet and stage the ETF rows they change."""
     assert sources.fund_tickers is not None and sources.fund_objectives is not None
     wanted = recent_quarters(run.session, sources.fund_quarters)
-    done = set() if force else _quarters_read(ctx, run)
+    done = set() if force else _quarters_read(ctx)
     todo = [q for q in wanted if q not in done]
     run.stats.update(fund_quarters=wanted, fund_quarters_todo=todo)
     if not todo:
@@ -256,8 +276,7 @@ def _funds(
         )
         run.checkpoint()
     active = _active(reference)
-    is_etf = active["is_etf"] if "is_etf" in active.columns else active["security_type"] == "ETF"
-    etfs = active[is_etf.fillna(False).astype(bool)][["instrument_id", "symbol"]]
+    etfs = active[_is_etf(active)][["instrument_id", "symbol"]]
     rows = fund_rows(objectives, funds[0], etfs.astype(str), stored, replace=force)
     run.stats.update(fund_etfs=len(etfs), fund_rows=len(rows))
     if not rows.empty:
@@ -279,15 +298,15 @@ def _stocks(
     reference: pd.DataFrame,
     stored: pd.DataFrame,
     symbols: Sequence[str],
-    cap: int,
+    cap: int | None,
     force: bool,
 ) -> None:
     if sources.overview is None:
         run.stats["massive"] = "skipped: " + _why(ctx, "massive_overview")
         return
     order = stock_order(ctx, reference, run.session, sources.priority_symbols, symbols)
-    due = due_stocks(order, stored, run.session, sources.refresh_days, force)
-    todo = due[: max(cap, 0)]
+    due = due_stocks(order, stored, run.session, sources.refresh_days, force or bool(symbols))
+    todo = due if cap is None else due[: max(cap, 0)]
     for i, u in enumerate(todo, start=1):
         if u.symbol in run.items:
             continue  # fetched before a resume
@@ -310,14 +329,16 @@ def ingest_descriptions(
     force: bool = False,
 ) -> RunRecord:
     """Describe stocks (Massive, at most ``limit`` tickers, default the per-night cap) and ETFs
-    (SEC prospectuses). ``only``: ``massive`` or ``funds``. ``symbols`` narrows the stocks and
-    skips the ETFs (a quarter read for a few tickers must not count as read)."""
+    (SEC prospectuses). ``only``: ``massive`` or ``funds``. ``symbols`` names the stocks to ask
+    (always asked, never capped by the nightly cap) and skips the ETFs (a quarter read for a few
+    tickers must not count as read). A forced or named run does not resume an earlier record:
+    what it asks for is asked."""
     if only is not None and only not in ONLY:
         raise ValueError(f"only must be one of {ONLY}, got {only!r}")
     reference = instruments(ctx.reader, session)
     stored = stored_descriptions(ctx.reader)
-    cap = sources.per_night if limit is None else limit
-    with IngestRun(ctx, TASK, session, resume=True) as run:
+    cap = None if symbols else (sources.per_night if limit is None else limit)
+    with IngestRun(ctx, TASK, session, resume=not (symbols or force)) as run:
         if only != "funds":
             _stocks(run, ctx, sources, reference, stored, symbols, cap, force)
         if only != "massive" and not symbols:

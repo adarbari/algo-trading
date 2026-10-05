@@ -2,6 +2,8 @@
 window, markers for tickers without text) and ETFs from SEC prospectus data (each quarter read
 once). Sources are recorded or synthetic payloads behind fake transports."""
 
+import io
+import zipfile
 from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
@@ -12,14 +14,18 @@ from algotrade.data.reference import descriptions, stored_descriptions
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.writers import StoreWriter
+from algotrade_ingestion.tasks.market.option_chains import Underlying
+from algotrade_ingestion.tasks.profile import descriptions as task
 from algotrade_ingestion.tasks.profile.descriptions import (
     FUND_TEXT,
     MASSIVE_TEXT,
     DescriptionSources,
+    due_stocks,
     fund_rows,
     ingest_descriptions,
     recent_quarters,
 )
+from algotrade_ingestion.tasks.reference.refresh import slot_day
 from algotrade_sources.framework.http import HttpError, RetryPolicy
 from algotrade_sources.vendors.massive.overview import MassiveOverview
 from algotrade_sources.vendors.sec.fund_objectives import SecFundObjectives, SecFundTickerMap
@@ -37,9 +43,14 @@ TEXT = {"AAPL": "Apple makes phones.", "KO": "Coca-Cola sells drinks.", "ZZZ": "
 
 
 class FakeMassive:
-    def __init__(self, broken: set[str] | None = None, empty: set[str] | None = None) -> None:
+    def __init__(
+        self,
+        broken: set[str] | None = None,
+        empty: set[str] | None = None,
+        bare: set[str] | None = None,
+    ) -> None:
         self.asked: list[str] = []
-        self.broken, self.empty = broken or set(), empty or set()
+        self.broken, self.empty, self.bare = broken or set(), empty or set(), bare or set()
 
     def __call__(self, url: str) -> bytes:
         ticker = url.rsplit("/", 1)[1]
@@ -49,13 +60,16 @@ class FakeMassive:
         if ticker == "GONE":
             raise HttpError(404)
         text = None if ticker in self.empty else TEXT.get(ticker)
+        if ticker in self.bare:  # nothing but identity fields, as for an ETF
+            return massive_payloads.overview(ticker, text)
         return massive_payloads.overview(ticker, text, f"https://{ticker}.example", 1000)
 
 
 class FakeSec:
-    def __init__(self, published: tuple[str, ...] = ("2026q2",)) -> None:
+    def __init__(self, published: tuple[str, ...] = ("2026q2",), zipped: bytes = ZIP) -> None:
         self.urls: list[str] = []
         self.published = published
+        self.zipped = zipped
 
     def __call__(self, url: str) -> bytes:
         self.urls.append(url)
@@ -63,7 +77,7 @@ class FakeSec:
             return FUNDS
         if not any(q in url for q in self.published):
             raise HttpError(404)
-        return ZIP
+        return self.zipped
 
     def quarters(self) -> list[str]:
         return [u.rsplit("/", 1)[1].removesuffix("_rr1.zip") for u in self.urls if "zip" in u]
@@ -102,6 +116,8 @@ def store() -> tuple[StoreWriter, StoreReader]:
          "security_type": "ETF", "status": "ACTIVE", "is_etf": True, "in_sp500": False}
         for s in ETFS
     ] + [
+        {"instrument_id": "EQ:OBTC", "symbol": "OBTC", "asset_class": "EQ", "multiplier": 1.0,
+         "security_type": "COMMON_STOCK", "status": "ACTIVE", "is_etf": True, "in_sp500": False},
         {"instrument_id": "EQ:WARR", "symbol": "WARR", "asset_class": "EQ", "multiplier": 1.0,
          "security_type": "WARRANT", "status": "ACTIVE", "is_etf": False, "in_sp500": False}
     ]  # fmt: skip
@@ -291,3 +307,146 @@ def test_a_later_filing_replaces_an_objective_but_an_older_one_does_not() -> Non
     )
     assert list(forced["description"]) == ["Older objective for the Fund."]  # a forced reread
     assert fund_rows([], funds, etfs, stored).empty
+
+
+# ------------------------------------------------------------------ review fixes
+
+
+def test_a_crashed_fund_read_is_redone_by_the_resumed_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A run that dies after reading the quarters has staged no ETF rows; resuming it must read
+    the quarters again, not skip them because its own items say OK."""
+    writer, reader = store()
+    sec = FakeSec(("2026q2", "2026q3"))
+
+    def boom(*args: object, **kwargs: object) -> pd.DataFrame:
+        raise RuntimeError("crash while combining")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(task, "fund_rows", boom)
+        with pytest.raises(RuntimeError, match="crash"):
+            run(writer, reader, sources(None, sec), only="funds")
+    assert descriptions(reader).empty
+    record = run(writer, reader, sources(None, sec), only="funds")  # resumes the failed record
+    assert record.stats["fund_quarters_todo"] == ["2026q2", "2026q3"]
+    assert len(descriptions(reader)) == 4
+
+
+def test_a_quarter_with_no_objectives_is_a_failure_and_is_read_again() -> None:
+    empty = io.BytesIO()
+    with zipfile.ZipFile(empty, "w") as archive:
+        archive.writestr("sub.tsv", "adsh\tform\tfiled\n")
+        archive.writestr("txt.tsv", "adsh\ttag\tseries\tvalue\n")
+    writer, reader = store()
+    record = run(
+        writer, reader, sources(None, FakeSec(("2026q2",), empty.getvalue())), only="funds"
+    )
+    assert record.status is RunStatus.PARTIAL
+    assert record.items["fund:2026q2"].startswith("FETCH_ERROR")
+    again = FakeSec(("2026q2",))
+    record = run(writer, reader, sources(None, again), DAY + timedelta(days=1), only="funds")
+    assert "2026q2" in again.quarters() and len(descriptions(reader)) == 4
+
+
+def test_named_symbols_are_asked_whatever_the_nightly_cap_is() -> None:
+    writer, reader = store()
+    off = FakeMassive()
+    run(writer, reader, sources(off, None, per_night=0), only="massive")
+    assert off.asked == []  # per_night = 0: the nightly asks for nothing
+    named = FakeMassive()
+    run(writer, reader, sources(named, None, per_night=0), symbols=("AAPL", "KO"))
+    assert named.asked == ["AAPL", "KO"]
+    capped = FakeMassive()
+    run(writer, reader, sources(capped, None, per_night=1), symbols=("AAPL", "KO", "ZZZ"))
+    assert sorted(capped.asked) == ["AAPL", "KO", "ZZZ"]  # not cut to the cap of 1
+    hand = FakeMassive()
+    run(writer, reader, sources(hand, None, per_night=0), limit=1, only="massive")
+    assert len(hand.asked) == 1  # a hand run with --limit works with the nightly turned off
+
+
+def test_a_named_or_forced_run_does_not_resume_an_earlier_record() -> None:
+    writer, reader = store()
+    first = run(writer, reader, sources(FakeMassive(broken={"KO"}), None), only="massive")
+    assert first.status is RunStatus.PARTIAL and first.items["AAPL"] == "OK"
+    named = FakeMassive()
+    run(writer, reader, sources(named, None), symbols=("AAPL",))
+    assert named.asked == ["AAPL"]  # a described stock, asked again because it was named
+    forced = FakeMassive()
+    run(writer, reader, sources(forced, None), only="massive", force=True, limit=2)
+    assert forced.asked == ["ZZZ", "AAPL"]  # asked although the PARTIAL record has them done
+
+
+def test_a_refresh_without_extras_keeps_the_stored_website_and_head_count() -> None:
+    writer, reader = store()
+    run(writer, reader, sources(FakeMassive(), None), only="massive")
+    later = DAY + timedelta(days=400)
+    record = run(writer, reader, sources(FakeMassive(empty={"AAPL"}, bare={"AAPL"}), None), later)
+    assert record.items["AAPL"] == "KEPT"
+    row = descriptions(reader).set_index("symbol").loc["AAPL"]
+    assert row["description"] == "Apple makes phones."
+    assert row["homepage_url"] == "https://AAPL.example" and row["total_employees"] == 1000
+    assert row["fetched_on"] == later
+
+
+def test_an_etf_flagged_stock_is_described_once_and_not_by_massive() -> None:
+    """OBTC is flagged ETF but typed COMMON_STOCK: the ETF flag wins, so Massive is not asked
+    and the publish has one row per instrument (it failed validation with two)."""
+    writer, reader = store()
+    massive = FakeMassive()
+    record = run(writer, reader, sources(massive, FakeSec()))
+    assert record.status is RunStatus.COMPLETE and "OBTC" not in massive.asked
+    ids = list(stored_descriptions(reader)["instrument_id"])
+    assert len(ids) == len(set(ids))
+
+
+def test_a_ticker_with_no_text_is_asked_again_after_a_month_not_a_year() -> None:
+    session = DAY
+    ids = [f"EQ:T{n}" for n in range(60)]
+    described = next(i for i in ids if slot_day(i, session, 365) <= session - timedelta(days=31))
+    marker = next(i for i in ids if i != described)
+    order = [Underlying(described, "DESC"), Underlying(marker, "MARK")]
+    fetched = session - timedelta(days=31)
+    stored = pd.DataFrame(
+        [
+            {"instrument_id": described, "description_source": MASSIVE_TEXT,
+             "description": "Text.", "fetched_on": fetched},
+            {"instrument_id": marker, "description_source": MASSIVE_TEXT,
+             "description": None, "fetched_on": fetched},
+        ]
+    )  # fmt: skip
+    due = [u.symbol for u in due_stocks(order, stored, session, 365)]
+    assert due == ["MARK"]  # the marker is retried after 31 days; the described one waits
+    later = [u.symbol for u in due_stocks(order, stored, session + timedelta(days=400), 365)]
+    assert sorted(later) == ["DESC", "MARK"]
+
+
+def test_a_forced_fund_read_replaces_text_that_reads_differently_whatever_its_date() -> None:
+    """The repair for objectives stored before the text cleaning was fixed."""
+    writer, reader = store()
+    sec = FakeSec(("2026q2", "2026q3"))
+    run(writer, reader, sources(None, sec), only="funds")
+    voo = stored_descriptions(reader).set_index("symbol").loc["VOO"]
+    stale = pd.DataFrame(
+        [{"instrument_id": "EQ:VOO", "symbol": "VOO", "description": "Old \\\"Fund\\\" text",
+          "description_source": FUND_TEXT, "filed": voo["filed"], "accn": voo["accn"],
+          "fetched_on": DAY}]
+    )  # fmt: skip
+    writer.write_table(
+        task.TABLE,
+        DAY + timedelta(days=1),
+        "old",
+        stamped(
+            stale.to_dict("records"),
+            DAY + timedelta(days=1),
+            "old",
+            datetime(2026, 10, 3, tzinfo=UTC),
+        ),
+    )
+    nxt = DAY + timedelta(days=2)
+    assert descriptions(reader).set_index("symbol").loc["VOO", "description"].startswith("Old")
+    run(writer, reader, sources(None, sec), nxt, only="funds")
+    assert descriptions(reader).set_index("symbol").loc["VOO", "description"].startswith("Old")
+    after = datetime(2026, 10, 5, tzinfo=UTC)  # later than the stale row's knowledge time
+    later = task_ctx(writer, reader, lambda: after)
+    ingest_descriptions(later, sources(None, sec), nxt, only="funds", force=True)
+    got = descriptions(reader).set_index("symbol").loc["VOO"]
+    assert got["description"].startswith("Vanguard 500 Index Fund (the Fund) seeks")

@@ -115,9 +115,11 @@ At 5 requests a minute 5.7k stocks and ADRs take about 20 hours, so the nightly 
 most `[massive] descriptions_per_night` (100, about 21 minutes, after bars and screens) in this
 order: `[cboe] priority_symbols`, S&P 500 members by liquidity, names with a liquidity class,
 the rest. A ticker is asked again after `descriptions_refresh_days` (365, on a slot day by key).
-Stocks Massive has no text for (and 404s) are stored as markers, so they are not asked every
-night. Do not run a large hand backfill while the nightly runs: both wait on the same limiter,
-so the bars would queue behind it.
+Stocks Massive has no text for (and 404s) are stored as markers and asked again after 30 days
+(new IPOs), not every night. Every ingest command runs under the one ingest lock, so a hand
+run keeps the scheduled nightly (it exits busy; a later start catches up) and the API's
+on-demand screens waiting for its whole length, and the nightly step itself holds the lock
+about 21 minutes longer: keep hand runs to about 300 stocks (about an hour).
 
 **ETFs: SEC prospectus investment objective.** Two official files, with the same contact
 `User-Agent`, `sec` limiter and `[sec_edgar]` section as the other SEC sources
@@ -142,10 +144,12 @@ used: issuer fund pages (a different layout and terms per issuer), Massive's pai
 Wikipedia (licence and coverage).
 
 **Backfill (owner action):** `algotrade-ingest descriptions --only funds` (ETFs, one run, about
-2 minutes, ~0.5 GB of zips kept 7 days as raw), then `algotrade-ingest descriptions --limit 600`
-repeatedly, or detached for all stocks (README "Long runs": 600 stocks take about 2 hours; the
-S&P 500 is the first ~500). The nightly then continues at 100 a night. `--symbols AAPL,KO`
-describes named stocks now; `--force` asks again.
+2 minutes, ~0.5 GB of zips kept 7 days as raw), then `algotrade-ingest descriptions --limit 300`
+repeatedly (300 stocks take about an hour, the S&P 500 is the first ~500; each run holds the
+ingest lock). The nightly then continues at 100 a night. `--symbols AAPL,KO` describes named
+stocks now (never capped); `--force` asks again and, with `--only funds`, replaces ETF text
+that reads differently from the cleaned text, whatever its filing date (the repair for text
+stored by an older cleaning).
 
 ## Nasdaq earnings calendar (implemented, phase 1.3)
 

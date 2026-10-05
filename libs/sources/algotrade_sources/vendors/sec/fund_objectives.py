@@ -52,22 +52,38 @@ MIN_LENGTH = 30  # shorter texts are headings or placeholders, not an objective
 MAX_LENGTH = 1200  # cut at a sentence end below this, so the Overview stays short
 
 
+def _quoted(match: re.Match[str]) -> str:
+    """``?Fund?`` (curly quotes the XBRL export lost) -> ``"Fund"``, spaced from a word after."""
+    after = match.string[match.end() : match.end() + 1]
+    return f'"{match.group(1).strip()}"' + (" " if after.isalnum() else "")
+
+
 def clean_text(raw: str) -> str:
-    """XBRL text block -> plain text: unescaped entities, no tags, single spaces, and no space
-    before closing punctuation (the exhibits write ``(the Fund )``)."""
-    text = raw
+    """XBRL text block -> plain text. Undone: quotes written as ``\\"`` or ``""`` and a wrapping
+    pair of quotes, HTML entities (``&amp;``, sometimes twice) and tags, stray spaces (before
+    closing punctuation, inside ``long -term``). Repaired: the glyphs the export turned into
+    ``?`` (``Fund?s`` -> ``Fund's``, ``?Fund?`` -> ``"Fund"``; any other ``?`` is a lost mark or
+    bullet and goes: an objective is never a question). An apostrophe lost without a ``?`` is
+    restored only for an opening ``The Funds investment objective``."""
+    text = raw.replace('\\"', '"').replace('""', '"')
+    if len(text) > 1 and text.startswith('"') and text.endswith('"'):
+        text = text[1:-1]
     for _ in range(2):  # some exhibits are escaped twice
         unescaped = html.unescape(text)
         if unescaped == text:
             break
         text = unescaped
     text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"(?<=[A-Za-z.])\?(?=(?:s|t|re|ve|ll|d)\b)", "'", text)
+    text = re.sub(r"(?<!\w)\?(?=\w)((?:(?!\. )[^?()]){1,40}?)\s*\?", _quoted, text)
+    text = re.sub(r"\s*\?\s*", " ", text)
     text = " ".join(text.split())
     text = re.sub(r"\s+([),.;:])", r"\1", text)
     text = re.sub(r"\(\s+", "(", text)
     text = re.sub(r"([A-Za-z]) -(?=[A-Za-z])", r"\1-", text)  # "long -term"
-    text = re.sub(r"\?([A-Z][\w ]{0,30}?)\?", r'"\1"', text)  # curly quotes came out as "?"
-    return re.sub(r"\b([Ff]und)s (?=investment|primary|principal|objective|goal)", r"\1's ", text)
+    return re.sub(
+        r"^The Funds (?=investment|primary|principal|objective|goal)", "The Fund's ", text
+    )
 
 
 def shorten(text: str, limit: int = MAX_LENGTH) -> str:
@@ -100,7 +116,9 @@ def parse_fund_tickers(payload: bytes) -> pd.DataFrame:
                 }
             )
     frame = pd.DataFrame(rows, columns=list(FUND_COLUMNS))
-    return frame.drop_duplicates("symbol", keep="first").reset_index(drop=True)
+    # A ticker can sit under two series (a reorganised fund): keep both, the objectives decide
+    # (the task takes the series with the latest filing).
+    return frame.drop_duplicates(["symbol", "series_id"]).reset_index(drop=True)
 
 
 def _is_day(text: str) -> bool:
@@ -130,11 +148,13 @@ def parse_objectives(payload: bytes) -> pd.DataFrame:
         found: dict[str, tuple[date, str, str, str | None]] = {}
         with archive.open("txt.tsv") as raw:
             text = io.TextIOWrapper(raw, encoding="utf-8", newline="")
-            rows = csv.reader(text, delimiter="\t", quoting=csv.QUOTE_NONE)
+            rows = csv.reader(text, delimiter="\t")  # fields with a quote are CSV-quoted
             head = next(rows)
             adsh, tag, series, value = (head.index(c) for c in ("adsh", "tag", "series", "value"))
             for row in rows:
-                if row[tag] != OBJECTIVE_TAG or not SERIES.match(row[series]):
+                if len(row) != len(head) or row[tag] != OBJECTIVE_TAG:
+                    continue
+                if not SERIES.match(row[series]):
                     continue
                 objective = clean_text(row[value])
                 if len(objective) < MIN_LENGTH:

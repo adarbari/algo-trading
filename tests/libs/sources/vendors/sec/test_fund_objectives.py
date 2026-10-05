@@ -27,7 +27,7 @@ FUNDS = (FIXTURES / "company_tickers_mf_sample.json").read_bytes()
 
 def test_objectives_are_the_latest_clean_text_per_series() -> None:
     frame = parse_objectives(ZIP).set_index("series_id")
-    assert len(frame) == 5  # the risk text and headings in the sample are not objectives
+    assert len(frame) == 11  # the risk text and headings in the sample are not objectives
     vanguard = frame.loc["S000002562"]
     assert vanguard["objective"].startswith("Vanguard Long-Term Bond Index Fund (the Fund) seeks")
     first_trust = frame.loc["S000031800"]["objective"]
@@ -42,12 +42,52 @@ def test_ampersands_and_spaces_before_punctuation_are_cleaned() -> None:
     assert clean_text("A &amp;amp; B") == "A & B"  # escaped twice
 
 
-def test_known_xbrl_artifacts_are_repaired() -> None:
-    raw = "The Funds investment objective is long -term growth (the ?Fund?) of capital -5%."
-    assert clean_text(raw) == (
-        'The Fund\'s investment objective is long-term growth (the "Fund") of capital -5%.'
+def test_quoted_values_and_lost_glyphs_in_real_exhibits_are_repaired() -> None:
+    """Recorded rows of the 2026q2 data set: a CSV-quoted value with doubled quotes, and the
+    exports that turned curly quotes and apostrophes into ``?``."""
+    got = parse_objectives(ZIP).set_index("series_id")["objective"]
+    assert got["S000104900"].startswith('The Corgi TPL 2x Daily ETF (the "Fund") seeks daily')
+    assert "\\" not in got["S000104900"] and '""' not in got["S000104900"]
+    assert got["S000029185"] == "The Fund's investment objective is capital appreciation."
+    assert got["S000066116"] == (
+        'The Quantified Evolution Plus Fund (the "Fund") seeks capital appreciation.'
     )
-    assert clean_text("Is it so?") == "Is it so?"  # a real question mark stays
+    assert got["S000051599"] == (
+        'The Fund seeks long-term "total return" on capital, primarily through capital'
+        " appreciation."
+    )
+    assert got["S000010926"].startswith('The Boyar Value Fund Inc.\'s (the "Fund") investment')
+    assert got["S000007716"].startswith("VIP Equity-Income Portfolio seeks reasonable income.")
+    assert got["S000004808"] == "The Blue Chip Investor Fund seeks long-term growth of capital."
+    assert not any("?" in text for text in got)
+
+
+def test_escaped_quotes_are_undone_if_a_value_arrives_escaped() -> None:
+    raw = '\\"The Corgi ETF (the \\"\\"Fund\\"\\") seeks daily results.\\"'
+    assert clean_text(raw) == 'The Corgi ETF (the "Fund") seeks daily results.'
+    assert clean_text('"VanEck ETF (the ""Fund"") seeks growth."') == (
+        'VanEck ETF (the "Fund") seeks growth.'
+    )
+
+
+def test_a_plural_is_not_turned_into_a_possessive() -> None:
+    underlying = "The Fund invests in Underlying Funds principal investment strategies matter."
+    assert clean_text(underlying) == underlying
+    assert clean_text("Each of the Funds investment objective is growth.") == (
+        "Each of the Funds investment objective is growth."
+    )
+    assert clean_text("The Funds investment objective is growth.") == (
+        "The Fund's investment objective is growth."
+    )
+
+
+def test_other_artifacts_are_repaired() -> None:
+    raw = "It seeks long -term growth (the ?Fund?) of capital -5% and Fund?s total return ?on top."
+    assert clean_text(raw) == (
+        'It seeks long-term growth (the "Fund") of capital -5% and Fund\'s total return on top.'
+    )
+    assert clean_text("The Fund seeks income. ?") == "The Fund seeks income."
+    assert clean_text("Contrafund? Portfolio seeks income") == "Contrafund Portfolio seeks income"
 
 
 def test_long_text_is_cut_at_a_sentence() -> None:
@@ -86,6 +126,16 @@ def test_a_newer_filing_wins_within_a_quarter() -> None:
     assert frame.iloc[0]["filed"] == date(2026, 5, 15) and frame.iloc[0]["form"] == "497"
 
 
+def test_a_ticker_under_two_series_keeps_both() -> None:
+    payload = (
+        b'{"fields": ["cik", "seriesId", "classId", "symbol"], "data": ['
+        b'[1, "S000000001", "C000000001", "AAA"], [1, "S000000002", "C000000002", "AAA"],'
+        b'[1, "S000000002", "C000000002", "AAA"]]}'
+    )
+    funds = parse_fund_tickers(payload)
+    assert list(funds["series_id"]) == ["S000000001", "S000000002"]  # not the first only
+
+
 def test_fund_tickers_map_symbols_to_series() -> None:
     funds = parse_fund_tickers(FUNDS).set_index("symbol")
     assert funds.loc["QQQ", "series_id"] == "S000101292"
@@ -107,7 +157,7 @@ def test_sources_fetch_their_files_and_report_missing_quarters() -> None:
     request = FetchRequest("2026q2")
     payload = objectives.fetch(request)
     normalized = objectives.normalize(request, payload or b"")
-    assert normalized is not None and len(normalized.parsed["objectives"]) == 5
+    assert normalized is not None and len(normalized.parsed["objectives"]) == 11
     assert urls[0].endswith("/return-summary-data-sets/2026q2_rr1.zip")
     assert objectives.fetch(FetchRequest("2030q1")) is None
     assert tickers.fetch(FetchRequest("fund_tickers")) == FUNDS
