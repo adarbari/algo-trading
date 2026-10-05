@@ -209,6 +209,15 @@ function TickerTable(
   );
 }
 
+/** The preview's columns with two tinted: IV/HV near its threshold, IV − HV missed. */
+const nearMissColumns: DataTableColumn<ScreenRow>[] = screenColumns.map((column) => {
+  if (column.id === 'ratio')
+    return { ...column, fill: (r) => (r.ratio < 1.3 ? 'warning' : undefined) };
+  if (column.id === 'spread')
+    return { ...column, fill: (r) => (r.spread < 12 ? 'negative' : undefined) };
+  return column;
+});
+
 const meta = {
   title: 'Components/DataTable',
   component: DataTable,
@@ -230,17 +239,15 @@ export const Default: Story = {};
 
 /** A criterion's near miss (warning) and miss (down) tint the cell; the value still reads as text. */
 export const NearMisses: Story = {
-  args: {
-    columns: screenColumns.map((column) => {
-      if (column.id === 'ratio') {
-        return { ...column, fill: (row: ScreenRow) => (row.ratio < 1.3 ? 'warning' : undefined) };
-      }
-      if (column.id === 'spread') {
-        return { ...column, fill: (row: ScreenRow) => (row.spread < 12 ? 'negative' : undefined) };
-      }
-      return column;
-    }),
-  },
+  render: () => (
+    <DataTable
+      columns={nearMissColumns}
+      rows={screenRows}
+      getRowId={(r) => r.symbol}
+      label="Preview results"
+      defaultSort={{ columnId: 'score', direction: 'desc' }}
+    />
+  ),
 };
 
 /** Explore ticker list: selection (controlled), two-line rows, toolbar and column picker. */
