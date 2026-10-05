@@ -18,10 +18,7 @@ interface Fixture {
 }
 
 const FIXTURE = JSON.parse(
-  readFileSync(
-    fileURLToPath(new URL('./fixtures/ideas/ideas-page.json', import.meta.url)),
-    'utf8',
-  ),
+  readFileSync(fileURLToPath(new URL('./fixtures/ideas/ideas-page.json', import.meta.url)), 'utf8'),
 ) as Fixture;
 
 export interface IdeasMockOptions {
