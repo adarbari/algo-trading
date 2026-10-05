@@ -5,7 +5,15 @@
  */
 import type { ChartRange, DataTableSort } from '@algotrade/ui';
 
-export const EXPLORE_TABS = ['compare', 'chart', 'options', 'features', 'events', 'hits'] as const;
+export const EXPLORE_TABS = [
+  'overview',
+  'compare',
+  'chart',
+  'options',
+  'features',
+  'events',
+  'hits',
+] as const;
 export type ExploreTab = (typeof EXPLORE_TABS)[number];
 
 /** The raw search params (what the URL holds). */

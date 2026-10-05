@@ -79,6 +79,23 @@ for (const theme of ['dark', 'light'] as const) {
   });
 }
 
+test('one ticker opens on its overview', async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto('/explore?sel=AAPL');
+  await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(page.getByRole('heading', { name: 'AAPL · overview' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'AAPL headline numbers' })).toContainText(
+    'Market cap',
+  );
+  await page.getByRole('tab', { name: 'Compare' }).click();
+  await expect(page).toHaveURL(/tab=compare/);
+  await expectAccessible(page);
+  expect(errors).toEqual([]);
+});
+
 test('the tabs, the compare set and the columns live in the URL', async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto(COMPARE);

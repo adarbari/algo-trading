@@ -4,7 +4,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ExplorePage } from './ExplorePage';
 
-const widgets = vi.hoisted(() => ({ table: vi.fn(), compare: vi.fn(), options: vi.fn() }));
+const widgets = vi.hoisted(() => ({
+  table: vi.fn(),
+  compare: vi.fn(),
+  options: vi.fn(),
+  overview: vi.fn(),
+}));
 
 vi.mock('@/widgets/ticker-table', async () => {
   const { Text } = await import('@algotrade/ui');
@@ -21,6 +26,15 @@ vi.mock('@/widgets/compare-panel', async () => {
     ComparePanel: (props: Record<string, unknown>) => {
       widgets.compare(props);
       return <Text>compare panel</Text>;
+    },
+  };
+});
+vi.mock('@/widgets/overview-panel', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return {
+    OverviewPanel: (props: Record<string, unknown>) => {
+      widgets.overview(props);
+      return <Text>overview panel</Text>;
     },
   };
 });
@@ -55,6 +69,26 @@ describe('ExplorePage', () => {
       expect.objectContaining({ symbols: ['AAPL', 'MSFT'], range: '1Y' }),
     );
     expect(screen.getByRole('tab', { name: 'Compare' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('opens one ticker on its overview and goes back to the default in the URL', async () => {
+    const user = userEvent.setup();
+    const onSearchChange = vi.fn();
+    render(<ExplorePage search={{ sel: 'AAPL' }} onSearchChange={onSearchChange} />);
+    expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
+    expect(widgets.overview).toHaveBeenLastCalledWith(expect.objectContaining({ symbol: 'AAPL' }));
+    await user.click(screen.getByRole('tab', { name: 'Compare' }));
+    expect(onSearchChange).toHaveBeenLastCalledWith({ tab: 'compare' });
+  });
+
+  it('drops the tab from the URL when it is the default', async () => {
+    const user = userEvent.setup();
+    const onSearchChange = vi.fn();
+    render(
+      <ExplorePage search={{ sel: 'AAPL', tab: 'options' }} onSearchChange={onSearchChange} />,
+    );
+    await user.click(screen.getByRole('tab', { name: 'Overview' }));
+    expect(onSearchChange).toHaveBeenLastCalledWith({ tab: undefined });
   });
 
   it('writes choices back as search params', async () => {
