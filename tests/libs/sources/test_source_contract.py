@@ -26,6 +26,7 @@ from algotrade_sources.vendors.massive.overview import MassiveOverview
 from algotrade_sources.vendors.massive.tickers import MassiveTickers
 from algotrade_sources.vendors.nasdaq.earnings import NasdaqEarningsSource
 from algotrade_sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
+from algotrade_sources.vendors.proshares.etf_holdings import ProsharesHoldings
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts
 from algotrade_sources.vendors.sec.edgar import SecSubmissions, SecTickerMap
 from algotrade_sources.vendors.sec.fund_objectives import (
@@ -96,6 +97,11 @@ def ishares_holdings() -> Adapter:
     ivv = (files / "IVV_latest-holdings.csv").read_bytes()
     source = IsharesHoldings(http_for(lambda url: screener if "screener" in url else ivv))
     return source, FetchRequest("IVV")
+
+
+def proshares_holdings() -> Adapter:
+    sample = (FIXTURES / "proshares" / "psdlyhld_sample.csv").read_bytes()
+    return ProsharesHoldings(http_for(lambda url: sample)), FetchRequest("UVXY")
 
 
 def sec_nport_holdings() -> Adapter:
@@ -202,6 +208,7 @@ ADAPTERS: dict[str, Callable[[], Adapter]] = {
     "spy_holdings": spy_holdings,
     "ssga_holdings": ssga_holdings,
     "ishares_holdings": ishares_holdings,
+    "proshares_holdings": proshares_holdings,
     "sec_nport_holdings": sec_nport_holdings,
 }
 

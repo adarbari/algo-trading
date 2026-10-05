@@ -12,7 +12,7 @@ number of entries equals the committed count:
 
 ``--update`` lowers ``max_get_routes`` to the number of entries and refuses to raise it.
 That every served GET route is listed (and every entry served) is
-``tests/architecture/test_structure.py::test_rest_get_routes_are_allowlisted``.
+``tests/architecture/api/test_rest_allowlist.py::test_rest_get_routes_are_allowlisted``.
 
 Usage: python scripts/check_rest_allowlist.py [--root DIR] [--update]
 Stdlib only, so it runs before (and without) the project environment.

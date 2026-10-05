@@ -566,9 +566,12 @@ detect = [{ call = "paginate" }, { call = "partition_for" }]
 
 [[responsibility]]
 id = "session-resolution"
-description = "Which partition a read sees (ADR 0036): resolve one Session (requested, else the latest with bars) and read session-grain tables for exactly that date, UNKNOWN otherwise; snapshot tables through data.reference.snapshot with the snapshot date disclosed. Today each services/explore module picks its own partition (six rules, the bug ADR 0036 fixes): explore is the current owner and services/read/session.py the target (PR 2). explore leaves `owner` as its modules are deleted (PRs 4-10); then only session.py remains"
-owner = ["src/algotrade/services/explore/*"]
-target_owner = ["src/algotrade/services/read/session.py"]
+description = "Which partition a read sees (ADR 0036): resolve one Session (requested, else the latest with bars) and read session-grain tables for exactly that date, UNKNOWN otherwise; snapshot tables through data.reference.snapshot with the snapshot date disclosed. services/read/session.py resolves (resolve_session, the table grains); services/read/context.py calls it once per request (open_context) and reads session partitions (partition); nothing else in services/read may. services/explore modules still pick their own partition (six rules, the bug ADR 0036 fixes) and leave `owner` as they are deleted (PRs 4-10); then only session.py and context.py remain"
+owner = [
+    "src/algotrade/services/explore/*",
+    "src/algotrade/services/read/session.py",
+    "src/algotrade/services/read/context.py",
+]
 allowed = [
     "src/algotrade/data/reference.py",  # the snapshot-grain primitive (snapshot-selection, ADR 0007's one rule)
     "src/algotrade/services/ondemand/screens.py",  # a write: an on-request run targets the latest session (ADR 0033), outside read strictness (ADR 0036 decision 5)
@@ -599,10 +602,10 @@ detect = [{ string_prefix = "rollups/instrument/" }]
 
 [[responsibility]]
 id = "scalar-coercion"
-description = "Turn a stored scalar (numpy, pandas, NaN, NaT, dates) into a JSON-safe value, one way for reads and runs (ADR 0037): today services/views.to_value; moving to services/read/values.py to_scalar in read-model PR 2 (views.py then imports it back). Callers of the one coercion are allowed; re-implementations are not. Deferred rule: { call_regex = \"^_(float|text|num)$\" } catches the private re-implementations (explore ranking._float/_text and screens/table._text, deleted in PRs 5 and 8; screening exports._text and rule_results._num, which PR 8 switches to to_scalar); it is added in PR 8, with allowed entries for the vendor payload parsers in libs/sources and the nightly email renderer, which parse or format text and never coerce stored values"
-owner = ["src/algotrade/services/views.py"]
-target_owner = ["src/algotrade/services/read/values.py"]
+description = "Turn a stored scalar (numpy, pandas, NaN, NaT, dates) into a JSON-safe value, one way for reads and runs (ADR 0037): services/read/values.py to_scalar; services/views.py imports it back as to_value for runs and today's callers. Callers of the one coercion are allowed; re-implementations are not. Deferred rule: { call_regex = \"^_(float|text|num)$\" } catches the private re-implementations (explore ranking._float/_text and screens/table._text, deleted in PRs 5 and 8; screening exports._text and rule_results._num, which PR 8 switches to to_scalar); it is added in PR 8, with allowed entries for the vendor payload parsers in libs/sources and the nightly email renderer, which parse or format text and never coerce stored values"
+owner = ["src/algotrade/services/read/values.py"]
 allowed = [
+    "src/algotrade/services/views.py",  # re-exports to_scalar as to_value (runs and today's callers) and coerces the FeatureView through it
     "src/algotrade/services/explore/*",  # today's display reads call the one coercion; each module leaves with explore (PRs 4-10)
     "src/algotrade/services/screening/exports.py",  # run exports serialise through the same coercion, so runs and reads agree
     "src/algotrade/services/selection.py",  # the selection's field values, same coercion

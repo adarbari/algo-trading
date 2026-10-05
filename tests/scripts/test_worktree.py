@@ -35,3 +35,10 @@ def test_remove_needs_an_existing_worktree() -> None:
 
 def test_usage_error_without_branch() -> None:
     assert _run().returncode == 2
+
+
+def test_create_plan_installs_node_modules_and_never_links_them() -> None:
+    # `make check` runs `npm ci`; through a symlink that empties the main checkout's install.
+    out = _run("feat/my-thing").stdout
+    assert "npm ci --prefix" in out and "algo-trading-feat-my-thing/apps/web" in out
+    assert not any("ln -s" in line and "node_modules" in line for line in out.splitlines())

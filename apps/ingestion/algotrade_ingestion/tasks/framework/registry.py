@@ -153,7 +153,12 @@ def _shares(ctx: TaskContext, p: Params) -> RunRecord:
     return shares.ingest_shares(ctx, sources, session_of(p), bool(p.get("force")), p.get("limit"))
 
 
-HOLDINGS_ISSUERS = ("ssga_holdings", "ishares_holdings", "sec_nport_holdings")  # priority order
+HOLDINGS_ISSUERS = (
+    "ssga_holdings",
+    "ishares_holdings",
+    "proshares_holdings",
+    "sec_nport_holdings",
+)  # priority order
 
 
 def _holdings_issuers(ctx: TaskContext) -> list[HoldingsSource]:
@@ -250,7 +255,12 @@ def _symbols(p: Params) -> list[str]:
     return [s.strip() for s in str(p.get("symbols") or "").split(",") if s.strip()]
 
 
-DESCRIPTION_SOURCES = ("massive_overview", "sec_fund_tickers", "sec_fund_objectives")
+DESCRIPTION_SOURCES = (
+    "massive_overview",
+    "sec_fund_tickers",
+    "sec_fund_objectives",
+    "sec_fund_series",
+)  # every source the task may read: the CLI builds only the ones a task declares
 
 
 def _descriptions(ctx: TaskContext, p: Params) -> RunRecord:

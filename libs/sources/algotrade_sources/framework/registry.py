@@ -50,6 +50,7 @@ from algotrade_sources.vendors.massive.overview import MassiveOverview
 from algotrade_sources.vendors.massive.tickers import MassiveTickers
 from algotrade_sources.vendors.nasdaq.earnings import NasdaqEarningsSource
 from algotrade_sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
+from algotrade_sources.vendors.proshares.etf_holdings import ProsharesHoldings
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts
 from algotrade_sources.vendors.sec.edgar import SecSubmissions, SecTickerMap, user_agent
 from algotrade_sources.vendors.sec.fund_objectives import (
@@ -187,6 +188,7 @@ SOURCES: dict[str, SourceSpec] = {
         SourceSpec(
             "ishares_holdings", "ishares", "ishares", IsharesHoldings, 1.0, not_found=no_file
         ),
+        SourceSpec("proshares_holdings", "proshares", "proshares", ProsharesHoldings, 1.0),
         SourceSpec(
             "nasdaq_earnings",
             "nasdaq_earnings",
