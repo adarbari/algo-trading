@@ -8,6 +8,7 @@ import { EmptyState, Stack, Tabs, type TabItem } from '@algotrade/ui';
 import { ComparePanel } from '@/widgets/compare-panel';
 import { EventsPanel } from '@/widgets/events-panel';
 import { FeaturesPanel } from '@/widgets/features-panel';
+import { HoldingsPanel } from '@/widgets/holdings-panel';
 import { OptionsPanel } from '@/widgets/options-panel';
 import { OverviewPanel } from '@/widgets/overview-panel';
 import { PriceChartPanel } from '@/widgets/price-chart-panel';
@@ -35,7 +36,19 @@ function FocusedTab({ search, onSearchChange, symbol }: DetailTabsProps & { symb
   const { tab, range } = exploreState(search);
   switch (tab) {
     case 'overview':
-      return <OverviewPanel symbol={symbol} />;
+      return (
+        <OverviewPanel
+          symbol={symbol}
+          fund={
+            <HoldingsPanel
+              symbol={symbol}
+              onSelectSymbol={(holding) => {
+                onSearchChange({ focus: holding, expiry: undefined, feature: undefined });
+              }}
+            />
+          }
+        />
+      );
     case 'chart':
       return (
         <PriceChartPanel
