@@ -99,11 +99,12 @@ describe('headlineStats and factGroups', () => {
       features: {
         'feature.pe_ratio': 31.2,
         'rollup.financials@v1.revenue_ttm': 4.1e11,
-        'rollup.financials@v1.eps_ttm': 10.7,
+        'rollup.financials@v1.eps_diluted_ttm': 10.7,
+        'feature.revenue_growth_yoy': 0.06,
       },
     });
     expect(headlineStats(withFundamentals, null).map((s) => s.id)).toEqual(['pe', 'revenue']);
-    expect(factGroups(withFundamentals)[0]?.items.map((i) => i.id)).toEqual(['eps']);
+    expect(factGroups(withFundamentals)[0]?.items.map((i) => i.id)).toEqual(['growth', 'eps']);
   });
 });
 
