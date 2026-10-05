@@ -143,9 +143,34 @@ test('a screener with no run says so, and Run now runs it and shows the results'
   expect(mock.runs).toEqual(['my-vrp']);
 });
 
-test('the Builder is one click away', async ({ page }) => {
+test('Edit criteria opens a drawer; an edit shows who would enter or leave, before saving', async ({
+  page,
+}) => {
+  const mock = await mockBuilderApi(page);
+  await page.goto('/screeners/vrp_scanner');
+  await expect(page.getByText(/Unsaved changes/)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Edit criteria' }).click();
+  const drawer = page.getByRole('dialog', { name: 'vrp_scanner · criteria' });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByRole('heading', { level: 1 })).toHaveCount(0); // no second page heading
+  const threshold = drawer.getByRole('spinbutton', { name: 'Threshold' }).first();
+  await threshold.fill('60');
+  await threshold.press('Enter');
+  await expect.poll(() => mock.copies).toEqual([{ id: 'vrp_scanner', preset: 'vrp_scanner' }]);
+  await expect(drawer.getByText('+3 enter: KO, MSFT, XOM.')).toBeVisible();
+  await expect(drawer.getByText('-4 leave: CHTR, RKT, SOXS, UVXY.')).toBeVisible();
+  await expect(drawer.getByText('DRAFT v1 · unsaved changes')).toBeVisible();
+  // Closing the drawer leaves the note above the results while the edit is unsaved.
+  await drawer.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByText('+3 enter: KO, MSFT, XOM.')).toBeVisible();
+  await page.getByRole('button', { name: 'Review criteria' }).click();
+  await expect(drawer).toBeVisible();
+});
+
+test('the full Builder is one click away from the drawer', async ({ page }) => {
   await mockBuilderApi(page);
   await page.goto('/screeners/my-vrp');
   await page.getByRole('button', { name: 'Edit criteria' }).click();
+  await page.getByRole('button', { name: 'Open in Builder' }).click();
   await expect(page).toHaveURL(/\/screeners\/my-vrp\/edit$/);
 });
