@@ -40,8 +40,8 @@ version = 1
 expr = "(swing_levels.swing_high - price_stats.close) / price_stats.close"
 dtype = "float"
 unit = "decimal"
-description = "How far the nearest confirmed swing high above the close is: (swing_high - close) / close, 0.05 is 5% above"
-null_meaning = "no confirmed swing high above the close in the last 252 sessions (e.g. at a one-year high), or no swing_levels row"
+description = "How far the most recent confirmed swing high above the close is: (swing_high - close) / close, 0.05 is 5% above"
+null_meaning = "no confirmed swing high above the close dated 5 to 246 sessions before the session (e.g. at a one-year high), or no swing_levels row"
 valid_range = [0, inf]
 version = 1
 
@@ -49,8 +49,8 @@ version = 1
 expr = "(price_stats.close - swing_levels.swing_low) / price_stats.close"
 dtype = "float"
 unit = "decimal"
-description = "How far the nearest confirmed swing low below the close is: (close - swing_low) / close, 0.05 is 5% below"
-null_meaning = "no confirmed swing low below the close in the last 252 sessions (e.g. at a one-year low), or no swing_levels row"
+description = "How far the most recent confirmed swing low below the close is: (close - swing_low) / close, 0.05 is 5% below"
+null_meaning = "no confirmed swing low below the close dated 5 to 246 sessions before the session (e.g. at a one-year low), or no swing_levels row"
 valid_range = [0, 1]
 version = 1
 

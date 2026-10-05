@@ -67,25 +67,38 @@ FEATURES = (
 COLUMNS = column_types(FEATURES)
 
 
-def valid_events(stored: pd.DataFrame) -> pd.DataFrame:
-    """The rows of the authoritative snapshot for each report date (see the module doc)."""
-    rows = stored.assign(
-        report=pd.to_datetime(stored["ts"], utc=True).dt.date,
-        snapshot=pd.to_datetime(stored["session_date"]).dt.date,
+def valid_events(stored: pd.DataFrame, since: date | None = None) -> pd.DataFrame:
+    """The rows of the authoritative snapshot for each report date (see the module doc).
+
+    ``since``: only report dates on or after it (``anchored_vwap@v1`` needs none older). The
+    snapshots' ranges still come from all their rows, so the rows kept are exactly those the
+    full reading keeps for those dates; only the per-date work is limited to them. The work
+    over every stored row is a vectorised group-by of two day columns."""
+    report_day = (
+        pd.to_datetime(stored["ts"], utc=True).dt.tz_localize(None).to_numpy(dtype="datetime64[D]")
     )
-    ranges = rows.groupby("snapshot")["report"].agg(["min", "max"])
-    snaps = ranges.index.to_numpy()
+    snap_day = pd.to_datetime(stored["session_date"]).to_numpy(dtype="datetime64[D]")
+    ranges = pd.DataFrame({"snapshot": snap_day, "report": report_day}).groupby("snapshot")
+    lo, hi = ranges["report"].min(), ranges["report"].max()
+    snaps = lo.index.to_numpy(dtype="datetime64[D]")
     # A snapshot covers from its own session (the calendar it fetched starts there) or its
     # earliest row (a backfill of past dates), to its latest row.
-    ranges["min"] = np.minimum(ranges["min"].to_numpy(), snaps)
-    reports = np.array(sorted(rows["report"].unique()))
-    covers = (ranges["min"].to_numpy()[None, :] <= reports[:, None]) & (
-        reports[:, None] <= ranges["max"].to_numpy()[None, :]
-    )
+    first = np.minimum(lo.to_numpy(dtype="datetime64[D]"), snaps)
+    last_day = hi.to_numpy(dtype="datetime64[D]")
+    keep = np.ones(len(stored), dtype=bool)
+    if since is not None:
+        keep = report_day >= np.datetime64(since, "D")
+    reports = np.unique(report_day[keep])
+    covers = (first[None, :] <= reports[:, None]) & (reports[:, None] <= last_day[None, :])
     # Snapshots are sorted ascending: the last covering one is the authority.
-    last = covers.shape[1] - 1 - np.argmax(covers[:, ::-1], axis=1)
-    authority = dict(zip(reports, snaps[last], strict=True))
-    return rows[rows["snapshot"] == rows["report"].map(authority)]
+    authority = snaps[covers.shape[1] - 1 - np.argmax(covers[:, ::-1], axis=1)]
+    kept = np.flatnonzero(keep)
+    valid = kept[snap_day[kept] == authority[np.searchsorted(reports, report_day[kept])]]
+    rows: pd.DataFrame = stored.iloc[valid]
+    return rows.assign(
+        report=pd.to_datetime(rows["ts"], utc=True).dt.date,
+        snapshot=pd.to_datetime(rows["session_date"]).dt.date,
+    )
 
 
 def _column(frame: pd.DataFrame, name: str) -> list[object]:

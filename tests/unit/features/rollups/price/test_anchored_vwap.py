@@ -13,6 +13,7 @@ from algotrade.core.time.calendar import sessions_ending
 from algotrade.data import StoreReader
 from algotrade.features.framework.runner import compute_one, compute_sessions
 from algotrade.features.registry import GROUPS
+from algotrade.features.rollups.corporate.earnings import valid_events
 from algotrade.features.rollups.price import anchored_vwap as av
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.rollup_store import END, series, store, write_bars, write_earnings, write_split
@@ -167,3 +168,37 @@ def test_point_in_time_reports_and_bars_after_the_session_never_count() -> None:
 def test_registered() -> None:
     assert GROUPS["anchored_vwap@v1"].table == "rollups/instrument/anchored_vwap@v1"
     assert [i.table for i in av.GROUP.inputs] == ["events/earnings", "bars/1d"]
+
+
+def test_reading_only_reports_that_can_anchor_changes_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``valid_events(stored, since=days[0])`` gives the rows the full reading (every report
+    date, as before) gave, on random calendars over 200 sessions: moved and cancelled dates,
+    past dates backfilled into one snapshot, anchors older than the window."""
+    rng = np.random.default_rng(3)
+    days = sessions_ending(END, 200)
+    writer, reader = store()
+    ids = [f"EQ:N{i}" for i in range(6)]
+    write_bars(
+        writer,
+        {i: series(200, seed=k) for k, i in enumerate(ids)},
+        volume={i: list(rng.uniform(1e5, 1e6, 200)) for i in ids},
+    )
+    times = ["pre_market", "after_hours", "time-not-supplied"]
+    for k in range(0, 200, 5):
+        back = 100 if k == 150 else 0  # one snapshot also lists past dates (a backfill)
+        listed = {
+            (i, days[min(199, k - back + int(rng.integers(0, back + 40)))]): times[t]
+            for i in ids
+            for t in rng.integers(0, 3, size=int(rng.integers(0, 3)))
+        }  # one row per name and date, as the calendar stores them
+        if listed:
+            write_earnings(writer, days[k], [(i, d, t) for (i, d), t in listed.items()])
+    picks = days[-130::2]  # every other session of the last 130
+    after = [r.frame for r in compute_sessions(reader, av.GROUP, picks)]
+    monkeypatch.setattr(av, "valid_events", lambda stored, since=None: valid_events(stored))
+    before = [r.frame for r in compute_sessions(reader, av.GROUP, picks)]
+    assert sum(f is not None and f["avwap_earnings"].notna().any() for f in after) > 40
+    for a, b in zip(after, before, strict=True):
+        pd.testing.assert_frame_equal(a, b)
