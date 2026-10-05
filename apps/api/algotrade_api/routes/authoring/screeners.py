@@ -1,4 +1,5 @@
-"""``/screeners/{id}``: read, draft, finalise, copy, rebase and schedule a user's rule screen.
+"""``/screeners/{id}``: read, draft, finalise, copy and rebase a user's rule screen (a finalised
+screen runs nightly; ADR 0033).
 ``?user=`` names the user (a label until identity arrives; default ``ALGOTRADE_USER``)."""
 
 from fastapi import APIRouter
@@ -10,8 +11,6 @@ from algotrade_api.schemas.authoring.screeners import (
     Draft,
     DraftBody,
     Finalised,
-    Schedule,
-    ScheduleBody,
     ScreenerDetail,
     ScreenerListItem,
     ScreenerVersion,
@@ -64,9 +63,3 @@ def copy(writer: Writer, user: User, screener_id: str, body: CopyBody) -> Draft:
 @router.post("/{screener_id}/rebase")
 def rebase(writer: Writer, user: User, screener_id: str) -> Draft:
     return Draft(screener_id=screener_id, document=presets.rebase(writer, user, screener_id))
-
-
-@router.put("/{screener_id}/schedule")
-def schedule(writer: Writer, user: User, screener_id: str, body: ScheduleBody) -> Schedule:
-    value = screens.set_schedule(writer, user, screener_id, body.schedule)
-    return Schedule(screener_id=screener_id, schedule=value)

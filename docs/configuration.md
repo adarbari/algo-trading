@@ -18,20 +18,17 @@ config/users/<user_id>/             L4: git-ignored locally; a DB behind ConfigS
   strategies/<id>.toml
   features/<theme>.toml             the user's expression features (always virtual)
   screeners/<id>/draft.toml         a rule screen's working copy (never run)
-  screeners/<id>/v<N>.toml          finalised versions: immutable; the latest (max N) runs
-  screeners/<id>/schedule.toml      the schedule switch (separate from finalise)
+  screeners/<id>/v<N>.toml          finalised versions: immutable; the latest (max N) runs nightly
 ```
 
 The location comes from `ALGOTRADE_CONFIG_DIR` (default `./config`) or `--config-dir`. Only
 `storage/configs/files.py` knows this layout; everything else uses the `ConfigStore`
 protocol (`load(scope, kind, name)`, `names`, `users`). A config id is found under the kind
 `strategies` or `screeners` (both is an error). `screeners` are versioned:
-`load(scope, "screeners", "<id>")` is the latest version (a user's with their schedule switch
-applied), `"<id>@<N>"` exactly version N. User configs are **written** only by
+`load(scope, "screeners", "<id>")` is the latest version, `"<id>@<N>"` exactly version N. User configs are **written** only by
 `services/authoring` through `ConfigWriter` (`storage/configs/writer.py`; atomic files, a
 version is never overwritten), which the API calls (ADR 0029): save / discard a draft,
-finalise it (validated fail closed), copy a preset, rebase, switch the schedule, save a user
-feature.
+finalise it (validated fail closed), copy a preset, rebase, save a user feature. Finalising puts a screen on the nightly (ADR 0033).
 
 ## Objects (`src/algotrade/config/`, pure, no I/O)
 

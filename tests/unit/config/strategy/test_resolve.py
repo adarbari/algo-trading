@@ -273,7 +273,7 @@ def test_extends_pins_a_preset_version() -> None:
         resolve("mine", UserContext("u1"), lying.load)
 
 
-def test_the_schedule_is_not_in_the_hash() -> None:
+def test_a_legacy_schedule_key_is_ignored_and_not_in_the_hash() -> None:
     on = store({("u1", "strategies", "scr"): {"schedule": "nightly"}})
     off = store({("u1", "strategies", "scr"): {"exports": []}})
     assert (

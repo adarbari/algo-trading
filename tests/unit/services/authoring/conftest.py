@@ -15,7 +15,6 @@ kind = "screener"
 impl = "rules"
 version = 3
 selection = "all_active"
-schedule = "nightly"
 
 [criteria.price]
 field = "rollup.price_stats@v2.close"

@@ -4,7 +4,7 @@ import pytest
 
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.services.configs import resolve_config, scheduled
+from algotrade.services.configs import nightly_screeners, resolve_config
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.factory import open_config_store
 from tests.conftest import REPO_ROOT
@@ -17,7 +17,6 @@ SITE_SCREENER = """id = "scr"
 kind = "screener"
 impl = "short_premium_liquidity"
 selection = "all_active"
-schedule = "nightly"
 """
 USER_STRATEGY = """id = "mine"
 kind = "strategy"
@@ -53,9 +52,9 @@ def test_file_store_reads_layers(root: Path) -> None:
     assert resolved.settings["screening"]["min_coverage"] == 0.5
 
 
-def test_scheduled_runs_site_and_user_configs(root: Path) -> None:
-    runs = [(r.user.user_id, r.config.id) for r in scheduled(FileConfigStore(root))]
-    assert runs == [(SITE_USER, "scr"), ("alice", "scr")]  # alice's "mine" has no schedule
+def test_the_nightly_runs_every_site_and_user_screener(root: Path) -> None:
+    runs = [(r.user.user_id, r.config.id) for r in nightly_screeners(FileConfigStore(root))]
+    assert runs == [(SITE_USER, "scr"), ("alice", "scr")]  # alice's "mine" is a strategy
 
 
 def test_invalid_toml_and_unsafe_ids(root: Path) -> None:

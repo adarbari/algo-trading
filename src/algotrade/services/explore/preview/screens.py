@@ -29,7 +29,7 @@ from algotrade.services.views import to_value
 from algotrade.strategies.screeners.rules import Outcome, RuleRow, RuleScreener
 
 DRAFT_ID = "preview"  # the screen id of a draft that names none
-UNMANAGED = ("schedule",)  # when a screen runs never changes what it computes
+UNMANAGED = ("schedule",)  # a legacy key (ADR 0033), dropped from a draft
 
 
 @dataclass(frozen=True)
@@ -134,7 +134,7 @@ def preview_session(store: ReadStore, now: datetime | None = None) -> tuple[date
 
 
 def draft_spec(document: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
-    """The draft's screen id and the document to resolve (without the schedule)."""
+    """The draft's screen id and the document to resolve (without a legacy schedule)."""
     if not isinstance(document, Mapping):
         raise ConfigurationError("spec: a draft is a table")
     raw_id = document.get("id", DRAFT_ID)

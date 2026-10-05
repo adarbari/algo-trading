@@ -1,4 +1,4 @@
-"""``/screeners/{id}``: copy, draft, finalise, versions, rebase, schedule (ADR 0029)."""
+"""``/screeners/{id}``: copy, draft, finalise, versions, rebase (ADR 0029)."""
 
 from pathlib import Path
 
@@ -13,7 +13,7 @@ OWN = {
 }
 
 
-def test_copy_finalise_schedule_and_rebase(writer_client: TestClient, root: Path) -> None:
+def test_copy_finalise_and_rebase(writer_client: TestClient, root: Path) -> None:
     c = writer_client
     assert c.get("/screeners/vrp?user=alice").json()["versions"] == []
     copied = c.post("/screeners/my_vrp/copy?user=alice", json={"preset": "vrp"})
@@ -26,19 +26,16 @@ def test_copy_finalise_schedule_and_rebase(writer_client: TestClient, root: Path
     done = c.post("/screeners/my_vrp/finalise?user=alice").json()
     assert done["version"] == 1 and done["hash"]
     detail = c.get("/screeners/my_vrp?user=alice").json()
-    assert (detail["versions"], detail["draft"], detail["schedule"]) == ([1], None, None)
+    assert (detail["versions"], detail["draft"]) == ([1], None)
+    assert "schedule" not in detail  # a finalised screen is on the nightly (ADR 0033)
     assert detail["preset"] == {
         "preset_id": "vrp",
         "pinned": 3,
         "current": 3,
         "rebase_available": False,
     }
-    scheduled = c.put("/screeners/my_vrp/schedule?user=alice", json={"schedule": "nightly"})
+    assert c.put("/screeners/my_vrp/schedule?user=alice", json={}).status_code == 404  # gone
     assert c.get("/screeners/my_vrp?user=alice").json()["hash"] == done["hash"]
-    assert scheduled.json() == {
-        "screener_id": "my_vrp",
-        "schedule": "nightly",
-    }
     hash_v1 = c.get("/screeners/my_vrp?user=alice").json()["hash"]
     presets = root / "site" / "presets" / "screeners" / "vrp"
     v3 = (presets / "v3.toml").read_text()
@@ -72,7 +69,6 @@ def test_draft_put_delete_and_fail_closed_finalise(writer_client: TestClient, ro
     assert c.delete("/screeners/mine/draft").status_code == 204
     assert c.post("/screeners/mine/finalise").status_code == 404
     assert c.get("/screeners/nothing").status_code == 404
-    assert c.put("/screeners/nothing/schedule", json={"schedule": "nightly"}).status_code == 404
 
 
 @pytest.mark.parametrize(

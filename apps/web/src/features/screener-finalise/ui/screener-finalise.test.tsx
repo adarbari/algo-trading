@@ -8,7 +8,6 @@ import { expectNoA11yViolations } from '@/shared/lib/testing';
 
 import { FinaliseButton } from './FinaliseButton';
 import { RebaseBanner } from './RebaseBanner';
-import { ScheduleToggle } from './ScheduleToggle';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -78,47 +77,6 @@ describe('FinaliseButton', () => {
   it('is disabled when there is nothing to finalize', () => {
     wrap(<FinaliseButton screenerId="my" version={1} prepare={() => Promise.resolve()} disabled />);
     expect(screen.getByRole('button', { name: 'Finalize v1' })).toBeDisabled();
-  });
-});
-
-describe('ScheduleToggle', () => {
-  it('switches the nightly schedule apart from finalising', async () => {
-    PUT.mockResolvedValue(ok({ screener_id: 'my', schedule: 'nightly' }) as never);
-    const { container } = wrap(<ScheduleToggle screenerId="my" schedule={null} finalised />);
-    await expectNoA11yViolations(container);
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Run nightly' }));
-    await waitFor(() => {
-      expect(PUT).toHaveBeenCalledWith('/screeners/{screener_id}/schedule', {
-        params: { path: { screener_id: 'my' } },
-        body: { schedule: 'nightly' },
-      });
-    });
-    expect(POST).not.toHaveBeenCalled();
-  });
-
-  it('switches it off', async () => {
-    PUT.mockResolvedValue(ok({ screener_id: 'my', schedule: null }) as never);
-    wrap(<ScheduleToggle screenerId="my" schedule="nightly" finalised />);
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Run nightly' }));
-    await waitFor(() => {
-      expect(PUT).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({ body: { schedule: null } }),
-      );
-    });
-  });
-
-  it('waits for a finalised version', () => {
-    wrap(<ScheduleToggle screenerId="my" schedule={null} finalised={false} />);
-    expect(screen.getByRole('checkbox', { name: 'Run nightly' })).toBeDisabled();
-    expect(screen.getByText('Finalize a version first')).toBeInTheDocument();
-  });
-
-  it('says so when the schedule could not change', async () => {
-    PUT.mockResolvedValue(fail('finalise a version before scheduling') as never);
-    wrap(<ScheduleToggle screenerId="my" schedule={null} finalised />);
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Run nightly' }));
-    expect(await screen.findByText('Could not change the schedule')).toBeInTheDocument();
   });
 });
 

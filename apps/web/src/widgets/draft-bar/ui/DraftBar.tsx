@@ -1,13 +1,13 @@
 /**
  * The Builder's header: the screener's name, its state (DRAFT vN, unsaved changes), the preset it
- * is a copy of ("Your copy of vrp_scanner v1"), and Discard / Save draft / Finalize; the nightly
- * schedule is a separate switch beside them. A newer preset version shows the rebase banner. A
+ * is a copy of ("Your copy of vrp_scanner v1"), and Discard / Save draft / Finalize (a finalised
+ * screen runs nightly, ADR 0033). A newer preset version shows the rebase banner. A
  * site preset not yet copied is shown as it is (its live preview runs); the first edit makes the
  * user's copy, so there is no separate read-only mode.
  */
 import { Banner, Button, Heading, Mono, Stack, StatusBadge, Text } from '@algotrade/ui';
 import { useScreenerBuilder } from '@/features/screener-builder';
-import { FinaliseButton, RebaseBanner, ScheduleToggle } from '@/features/screener-finalise';
+import { FinaliseButton, RebaseBanner } from '@/features/screener-finalise';
 
 import { draftState } from '../model/state';
 
@@ -43,11 +43,6 @@ export function DraftBar() {
           </Stack>
         </Stack>
         <Stack direction="row" gap={2} align="center" wrap>
-          <ScheduleToggle
-            screenerId={builder.id}
-            schedule={detail?.schedule ?? null}
-            finalised={(detail?.versions.length ?? 0) > 0}
-          />
           <Button
             disabled={!builder.dirty && !detail?.draft}
             loading={builder.discarding}

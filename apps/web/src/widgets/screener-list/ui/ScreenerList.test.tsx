@@ -47,7 +47,6 @@ const screener = (
   scope,
   kind: 'screener',
   impl,
-  schedule: null,
   selection: 'liquid_optionable',
   hash: 'h',
   error: null,
@@ -56,7 +55,7 @@ const screener = (
 const LIST = [
   screener('vrp_scanner', 'site', 'rules'),
   screener('short_premium', 'site', 'short_premium_liquidity'),
-  screener('my-vrp', 'abhinav', 'rules', { schedule: 'nightly' }),
+  screener('my-vrp', 'abhinav', 'rules'),
   screener('broken', 'abhinav', 'rules', { error: 'unknown field' }),
 ];
 const mine = (screener_id: string, patch: Partial<ScreenerListItem> = {}): ScreenerListItem => ({
@@ -64,12 +63,11 @@ const mine = (screener_id: string, patch: Partial<ScreenerListItem> = {}): Scree
   status: 'FINAL',
   latest: 1,
   has_draft: false,
-  schedule: null,
   preset_id: null,
   ...patch,
 });
 const MINE = [
-  mine('my-vrp', { schedule: 'nightly', preset_id: 'vrp_scanner', has_draft: true, latest: 2 }),
+  mine('my-vrp', { preset_id: 'vrp_scanner', has_draft: true, latest: 2 }),
   mine('broken'),
   mine('vrp_scanner', { status: 'DRAFT', latest: null, preset_id: 'vrp_scanner' }),
 ];
@@ -94,7 +92,6 @@ describe('ScreenerList', () => {
   it('separates your screeners from the site presets', async () => {
     const { container } = setup();
     const mineTable = screen.getByRole('grid', { name: 'Your screeners' });
-    expect(within(mineTable).getByRole('row', { name: /my-vrp/ })).toHaveTextContent('Nightly');
     expect(within(mineTable).getByRole('row', { name: /my-vrp/ })).toHaveTextContent('v2 + draft');
     expect(within(mineTable).getByRole('row', { name: /broken/ })).toHaveTextContent(
       'Does not resolve',

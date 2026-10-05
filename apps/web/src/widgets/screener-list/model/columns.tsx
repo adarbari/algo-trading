@@ -1,7 +1,7 @@
 /**
- * The screeners list's columns. Site presets: name, kind (rules or Python), universe, schedule,
+ * The screeners list's columns. Site presets: name, kind (rules or Python), universe,
  * state and Open / Copy. Your screeners: name, state (DRAFT or vN finalized, a working copy
- * beside it), the preset it copies, universe, schedule and Edit.
+ * beside it), the preset it copies, universe, Results and Edit.
  */
 import { Button, Stack, StatusBadge, type DataTableColumn } from '@algotrade/ui';
 
@@ -126,12 +126,6 @@ export function myColumns(actions: ScreenerActions): DataTableColumn<MyScreener>
       header: 'Universe',
       value: (s) => s.selection,
       mono: true,
-      tone: 'secondary',
-    },
-    {
-      id: 'schedule',
-      header: 'Schedule',
-      value: (s) => (s.schedule === 'nightly' ? 'Nightly' : 'Off'),
       tone: 'secondary',
     },
     {

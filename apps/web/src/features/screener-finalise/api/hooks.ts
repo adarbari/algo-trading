@@ -1,7 +1,6 @@
 /**
- * Finalise a draft into the next immutable version (POST /screeners/{id}/finalise), switch the
- * nightly schedule on or off (PUT .../schedule: a separate switch), and rebase on a newer preset
- * version (POST .../rebase).
+ * Finalise a draft into the next immutable version (POST /screeners/{id}/finalise; a finalised
+ * screen runs nightly, ADR 0033) and rebase on a newer preset version (POST .../rebase).
  */
 import { useToast } from '@algotrade/ui';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -29,28 +28,6 @@ export function useFinalise(id: string) {
       toast.show({
         tone: 'negative',
         title: 'Could not finalise',
-        description: errorDetail(error),
-      });
-    },
-  });
-}
-
-export function useSetSchedule(id: string) {
-  const refresh = useRefresh();
-  const toast = useToast();
-  return useMutation({
-    mutationFn: (schedule: 'nightly' | null) =>
-      unwrap(
-        api.PUT('/screeners/{screener_id}/schedule', {
-          params: { path: { screener_id: id } },
-          body: { schedule },
-        }),
-      ),
-    onSuccess: () => refresh(),
-    onError: (error) => {
-      toast.show({
-        tone: 'negative',
-        title: 'Could not change the schedule',
         description: errorDetail(error),
       });
     },

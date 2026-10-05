@@ -1,8 +1,8 @@
-"""The nightly ``screens`` step: one ``screen`` job per scheduled screener config.
+"""The nightly ``screens`` step: one ``screen`` job per screener (ADR 0033).
 
 Screens run through the job runner (``services/jobs``), never inline (ADR 0019, R5): each
-scheduled config (site presets as ``site``, then each user's own) becomes a ``screen`` job
-for its owner; exports are that job's output. The step is COMPLETE when every job is,
+screener (every site preset as ``site``, then each user's finalised ones) becomes a ``screen``
+job for its owner; exports are that job's output. The step is COMPLETE when every job is,
 FAILED when every job failed, else PARTIAL.
 """
 
@@ -11,7 +11,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from algotrade.services.configs import scheduled
+from algotrade.services.configs import nightly_screeners
 from algotrade.services.jobs import JobRecord, JobRunner
 from algotrade.storage.configs.store import ConfigStore
 from algotrade_ingestion.workflows.nightly.steps import Outcome, StepStatus, step_status
@@ -31,9 +31,7 @@ def screen_jobs(jobs: JobRunner, configs: ConfigStore, export_dir: Path | None) 
 
     def run(session: date) -> Outcome:
         summaries, statuses = [], []
-        for config in scheduled(configs, "nightly"):
-            if config.config.kind != "screener":
-                continue
+        for config in nightly_screeners(configs):
             params = {
                 "config": config.config.id,
                 "session": session.isoformat(),

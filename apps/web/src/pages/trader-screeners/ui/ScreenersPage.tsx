@@ -19,8 +19,8 @@ export function ScreenersPage({ onOpen, onEdit, onNew }: ScreenersPageProps) {
         <Stack gap={1}>
           <Heading level={1}>Screeners</Heading>
           <Text size="sm" tone="secondary">
-            Build a screener from the feature catalogue, preview it live, finalize a version and
-            schedule it nightly.
+            Build a screener from the feature catalogue, preview it live, finalize a version and it
+            runs every night.
           </Text>
         </Stack>
         <Button variant="primary" onClick={onNew}>

@@ -31,7 +31,6 @@ const detail = (patch: Record<string, unknown> = {}) => ({
   draft_error: null,
   versions: [1],
   latest: 1,
-  schedule: null,
   preset: { preset_id: 'vrp', pinned: 1, current: 1, rebase_available: false },
   hash: 'h',
   layers: [],
