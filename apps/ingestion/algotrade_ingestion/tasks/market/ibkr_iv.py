@@ -5,13 +5,19 @@ around the work) and only for underlyings with a resolved IBKR contract
 (``instruments/ibkr_contracts``, the ``ibkr-contracts`` task):
 
 - **History backfill** (``backfill_ivs``, ``--from`` / ``--to``): per underlying ONE request
-  per series (``OPTION_IMPLIED_VOLATILITY`` and ``HISTORICAL_VOLATILITY`` daily bars over the
-  whole range), paced by the shared ``ibkr_historical`` limiter (``[ibkr]
-  historical_min_interval_s``). Rows are ``source_kind = history``, one partition per
-  session. Resumable per underlying, also across nights: an underlying is skipped when an
-  earlier finished run (this task or the nightly) already fetched its history from the same
-  start or earlier (item ``hist:<id>``, status ``OK: <from>`` or ``NO_DATA: <from>``);
-  ``limit`` caps a run (priority symbols first, then alphabetical).
+  (``OPTION_IMPLIED_VOLATILITY`` daily bars over the whole range; IB's HV comes only from the
+  nightly snapshot, so history rows have no ``hv30_ibkr``), paced by the shared
+  ``ibkr_historical`` limiter (``[ibkr] historical_min_interval_s``). Rows are
+  ``source_kind = history``, one partition per session. Resumable per underlying, also
+  across nights: an underlying is skipped when an earlier finished run (this task or the
+  nightly) already fetched its history from the same start or earlier (item ``hist:<id>``,
+  status ``OK: <from>`` or ``NO_DATA: <from>``). ``NO_DATA`` only when IB ANSWERED with no
+  bars; a request IB did not answer (timeout, pacing or connectivity error: the facade's
+  ``TransientFetchError``) is retried ``HISTORY_ATTEMPTS`` times with a growing back-off
+  (``cool_down`` holds the historical limiter for every process), then recorded
+  ``FETCH_ERROR`` (pending: a resume or a later run fetches it again). ``STOP_AFTER_FAILED``
+  names failing in a row end the backfill part of the run (the rest stay pending). Order:
+  the most liquid names first (``by_liquidity``); ``limit`` caps a run.
 - **Nightly** (``nightly_ivs``): one streamed snapshot of every underlying's IV (tick 106)
   and HV (tick 104) after the close, ``[ibkr] iv_batch`` streams at a time, written to the
   session as ``source_kind = snapshot``; then the history of up to ``[ibkr]
@@ -19,9 +25,11 @@ around the work) and only for underlyings with a resolved IBKR contract
   spread over nights), up to the session before.
 
 Runs merge per instrument and session (the latest run's row wins, so a later history
-backfill replaces a snapshot). When the gateway cannot be opened the run records ``skipped``
-(the nightly step is SKIPPED with a WARN, never FAILED). Stats: coverage (snapshot rows with
-an IV over the coverage), backfill progress and the estimated time left at the current pace.
+backfill replaces a snapshot, its HV included). When the gateway cannot be opened the run
+records ``skipped`` (the nightly step is SKIPPED with a WARN, never FAILED) and is PARTIAL,
+never COMPLETE: what a resumed run had staged is still published, nothing is dropped
+unpublished. Stats: coverage (snapshot rows with an IV over the coverage), backfill progress
+and the estimated time left at the current pace.
 """
 
 from collections.abc import Callable, Sequence
@@ -31,9 +39,11 @@ from functools import partial
 
 import pandas as pd
 
+from algotrade.core.model.fields import ROLLUP_TABLE_PREFIX
 from algotrade.core.time.calendar import sessions_ending
-from algotrade.data.reference import ibkr_contracts
+from algotrade.data.reference import ibkr_contracts, snapshot
 from algotrade.data.volatility import IBKR_IV30
+from algotrade.services.features import field_view, site_features, site_store
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import (
     IngestRun,
@@ -45,8 +55,11 @@ from algotrade_ingestion.tasks.framework.run import (
 from algotrade_ingestion.tasks.market.option_chains import select_underlyings
 from algotrade_sources.framework.base import (
     FetchRequest,
+    Normalized,
     SessionSource,
     SessionUnavailableError,
+    Throttled,
+    TransientFetchError,
     opened,
 )
 
@@ -56,8 +69,16 @@ SOURCE = "ibkr"
 HISTORY, SNAPSHOT = "history", "snapshot"
 DONE = ("OK", "NO_DATA")  # history item statuses that need no refetch
 CHECKPOINT_EVERY = 20
-REQUESTS_PER_NAME = 2  # one historical request per series (IV, HV)
+REQUESTS_PER_NAME = 1  # one historical request per name: the IV series
 VOLS = ("iv30_ibkr", "hv30_ibkr")
+HISTORY_ATTEMPTS = 3  # requests per name before it is FETCH_ERROR (pending)
+BACKOFF_S = 30.0  # first back-off before a retry; doubles each time (30 s, 60 s)
+STOP_AFTER_FAILED = 5  # names failing in a row (gateway / IB trouble): stop the backfill
+# Backfill order inputs (stored rollups, through services.features): option tiers, the
+# liquidity class expression (config/site/features/liquidity.toml), 20-session dollar volume.
+PRICE_GROUP, OPTION_GROUP = "price_stats", "option_liquidity"
+LIQUID_TIERS, LIQUID_CLASSES = ("A", "B"), ("HIGH", "MEDIUM")
+LIQUIDITY_CLASS = "liquidity_class"
 
 
 @dataclass(frozen=True)
@@ -67,11 +88,9 @@ class Name:
     conid: int
 
 
-def covered_names(
-    run: IngestRun, session: date, symbols: Sequence[str], priority: Sequence[str]
-) -> tuple[list[Name], int]:
-    """The coverage's underlyings with an IBKR contract (priority symbols first, then
-    alphabetical) -> (names, coverage size)."""
+def covered_names(run: IngestRun, session: date, symbols: Sequence[str]) -> tuple[list[Name], int]:
+    """The coverage's underlyings with an IBKR contract (alphabetical) -> (names, coverage
+    size)."""
     underlyings = select_underlyings(run.reader, session, symbols)
     contracts = ibkr_contracts(run.reader, session)
     conids = (
@@ -84,9 +103,48 @@ def covered_names(
         for u in underlyings
         if u.instrument_id in conids
     ]
-    first = {s.upper(): i for i, s in enumerate(priority)}
-    names.sort(key=lambda n: (first.get(n.symbol, len(first)), n.symbol))
+    names.sort(key=lambda n: (n.symbol, n.instrument_id))
     return names, len(underlyings)
+
+
+def _rollup_field(features_table: str, column: str) -> str:
+    return f"rollup.{features_table.removeprefix(ROLLUP_TABLE_PREFIX)}.{column}"
+
+
+def by_liquidity(run: IngestRun, session: date, names: Sequence[Name]) -> tuple[list[Name], int]:
+    """``names`` in backfill order -> (ordered, how many are liquid). Liquid first: an option
+    tier A or B on either side (``option_liquidity`` ``put_tier`` / ``call_tier``) or a
+    ``liquidity_class`` of HIGH or MEDIUM; within each part by ``adv_usd_20d`` descending,
+    names without one after; ties by symbol. Inputs are the stored rollups of the latest
+    session on or before ``session`` with ``price_stats`` rows (the backfill runs before
+    that night's rollups); without any, the order is alphabetical."""
+    features = site_features(site_store(run.ctx.configs))
+    snap = snapshot(run.reader, features.table(PRICE_GROUP), session)
+    info: dict[str, tuple[bool, float | None]] = {}
+    if snap is not None and not snap.pre_snapshot and names:
+        option = features.table(OPTION_GROUP)
+        fields = [
+            _rollup_field(features.table(PRICE_GROUP), "adv_usd_20d"),
+            _rollup_field(option, "put_tier"),
+            _rollup_field(option, "call_tier"),
+            f"feature.{LIQUIDITY_CLASS}",
+        ]
+        ids = [n.instrument_id for n in names]
+        view = field_view(run.reader, snap.snapshot_date, fields, ids, features=features).frame
+        adv, put, call, label = view[fields[0]], view[fields[1]], view[fields[2]], view[fields[3]]
+        for i, row_id in enumerate(view["instrument_id"].astype(str)):
+            liquid = put.iloc[i] in LIQUID_TIERS or call.iloc[i] in LIQUID_TIERS
+            liquid = liquid or (isinstance(label.iloc[i], str) and label.iloc[i] in LIQUID_CLASSES)
+            dollars = adv.iloc[i]
+            info[row_id] = (liquid, None if pd.isna(dollars) else float(dollars))
+
+    def key(n: Name) -> tuple[int, int, float, str, str]:
+        liquid, dollars = info.get(n.instrument_id, (False, None))
+        known = dollars is not None
+        return (0 if liquid else 1, 0 if known else 1, -(dollars or 0.0), n.symbol, n.instrument_id)
+
+    ordered = sorted(names, key=key)
+    return ordered, sum(1 for n in ordered if info.get(n.instrument_id, (False, None))[0])
 
 
 def history_done(runs: Sequence[RunRecord], start: date) -> set[str]:
@@ -100,11 +158,26 @@ def history_done(runs: Sequence[RunRecord], start: date) -> set[str]:
     return done
 
 
+def _answered(run: IngestRun, source: SessionSource, request: FetchRequest) -> Normalized | None:
+    """``run.fetch`` retried while IB does not answer (``TransientFetchError``): at most
+    ``HISTORY_ATTEMPTS`` requests, backing off ``BACKOFF_S`` x 2^n in between (a hold on the
+    source's historical limiter when it is ``Throttled``); the last error is raised."""
+    for attempt in range(1, HISTORY_ATTEMPTS + 1):
+        try:
+            return run.fetch(source, request)
+        except TransientFetchError:
+            if attempt == HISTORY_ATTEMPTS:
+                raise
+            if isinstance(source, Throttled):
+                source.cool_down(BACKOFF_S * 2 ** (attempt - 1))
+    raise AssertionError("unreachable")  # pragma: no cover
+
+
 def _fetch_history(
     run: IngestRun, source: SessionSource, name: Name, start: date, end: date
 ) -> str:
     key = f"volhist__{name.symbol}__{name.conid}__{start.isoformat()}"  # IbkrSource keys
-    normalized = run.fetch(source, FetchRequest(key, name.instrument_id, end))
+    normalized = _answered(run, source, FetchRequest(key, name.instrument_id, end))
     if normalized is None or "volhist" not in normalized.parsed:
         raise NoResponseError(f"IBKR {key}: nothing parsed")
     rows = normalized.parsed["volhist"]
@@ -133,26 +206,34 @@ def _backfill(
     end: date,
     limit: int | None,
 ) -> dict[str, int | float]:
-    """Fetch the history of ``names`` not done yet (``limit`` at most) -> progress stats."""
+    """Fetch the history of ``names`` not done yet (``limit`` at most), the most liquid
+    first (``by_liquidity``) -> progress stats."""
     done = history_done(finished_runs(run.writer, NIGHTLY_TASK, HISTORY_TASK), start)
+    ordered, liquid = by_liquidity(run, run.session, names)
     pending = [
         n
-        for n in names
+        for n in ordered
         if n.instrument_id not in done and f"hist:{n.instrument_id}" not in run.items
     ]
     todo = pending if limit is None else pending[: max(0, limit)]
+    failed_in_a_row = 0
     for i, name in enumerate(todo, 1):
         item = f"hist:{name.instrument_id}"
-        run.attempt(item, partial(_fetch_history, run, source, name, start, end))
+        status = run.attempt(item, partial(_fetch_history, run, source, name, start, end))
+        failed_in_a_row = 0 if status_label(status) in DONE else failed_in_a_row + 1
         if i % CHECKPOINT_EVERY == 0:
             run.checkpoint()
-    left = len(pending) - sum(
-        1 for n in todo if status_label(run.items.get(f"hist:{n.instrument_id}", "")) in DONE
-    )
+        if failed_in_a_row >= STOP_AFTER_FAILED:
+            run.partial(f"backfill stopped: {failed_in_a_row} names in a row failed ({status})")
+            break
+    statuses = [status_label(run.items.get(f"hist:{n.instrument_id}", "")) for n in todo]
+    left = len(pending) - sum(1 for s in statuses if s in DONE)
     pace = run.ctx.settings.ibkr.historical_min_interval_s
     return {
         "backfill_names": len(names),
+        "backfill_liquid": liquid,
         "backfilled": len(todo),
+        "backfill_failed": sum(1 for s in statuses if s and s not in DONE),
         "backfill_pending": left,
         "backfill_eta_h": round(left * REQUESTS_PER_NAME * pace / 3600, 1),
     }
@@ -198,14 +279,17 @@ def _run(
     work: Callable[[IngestRun, SessionSource, list[Name]], None],
 ) -> RunRecord:
     with IngestRun(ctx, task, session, resume=True) as run:
-        names, coverage = covered_names(run, session, symbols, ctx.settings.cboe_priority_symbols)
+        names, coverage = covered_names(run, session, symbols)
         run.stats.update(underlyings=coverage, with_contract=len(names))
         try:
             with opened(source):
                 work(run, source, names)
         except SessionUnavailableError as exc:
+            # Not COMPLETE (nothing new was fetched), and what a resumed run staged before is
+            # published below: a COMPLETE skip would keep its items as done and drop that
+            # staging unpublished.
             run.stats["skipped"] = f"WARN: {exc}"
-            return run.record
+            run.partial(f"skipped: {exc}")
         written = run.publish_sessions(TABLE)
         run.stats.update(sessions_written=len(written), rows=sum(written.values()))
     return run.record
@@ -219,8 +303,8 @@ def backfill_ivs(
     symbols: Sequence[str] = (),
     limit: int | None = None,
 ) -> RunRecord:
-    """IB's IV and HV history from ``start`` to ``end`` for every covered underlying not
-    backfilled yet (``symbols``: only those; ``limit``: at most that many this run)."""
+    """IB's IV history from ``start`` to ``end`` for every covered underlying not backfilled
+    yet, most liquid first (``symbols``: only those; ``limit``: at most that many this run)."""
 
     def work(run: IngestRun, source: SessionSource, names: list[Name]) -> None:
         run.stats.update(history_from=start.isoformat(), history_to=end.isoformat())

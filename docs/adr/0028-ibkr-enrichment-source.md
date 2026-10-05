@@ -23,7 +23,7 @@ That data is licensed for the account holder's personal use, unlike our own comp
 ### Read-only, unchanged
 Every request goes through the facade (`gateway.py`, ADR 0026) and only through calls
 already on its allowlist: `qualifyContracts` (contract ids), `reqHistoricalData`
-(`OPTION_IMPLIED_VOLATILITY`, `HISTORICAL_VOLATILITY` daily bars), `reqMktData` /
+(`OPTION_IMPLIED_VOLATILITY` daily bars; `HISTORICAL_VOLATILITY` too until 2026-10-05), `reqMktData` /
 `cancelMktData` (generic ticks 106 and 104: the underlying's option implied vol and
 historical vol, streamed). No call was added; order and account calls stay blocked (tested),
 and the AST guard is unchanged. Tick 106 was confirmed on delayed market data (type 3) on a
@@ -50,8 +50,11 @@ We keep the conservative shared limiter `ibkr_historical` (`historical_min_inter
 i.e. 60 per 10 minutes) for every historical request, the live verification's included.
 
 - A **backfill** (`algotrade-ingest run ibkr-iv --from D1 --to D2`) makes ONE request per
-  series per underlying for the whole range (2 requests: IV and HV). At 10 s each that is
-  20 s per underlying: the ~4.2k optionable names take **about 23 hours**. It is resumable
+  underlying for the whole range: the IV only (amended 2026-10-05: the HV history was read by
+  nothing but `hv30_ibkr` itself; HV now comes only from the nightly snapshot, so history
+  rows leave it null). At 10 s each the ~4.2k optionable names take **about 12 hours**, the
+  most liquid first. A request IB does not answer (timeout, error 162, connection lost) is
+  retried and then left pending, never recorded as no data. It is resumable
   per underlying, within a run (`resume`) and across runs (an underlying whose history an
   earlier finished run fetched from the same start or earlier is skipped), and `--limit N`
   caps a run, so the owner spreads it over nights or a weekend.
@@ -60,7 +63,7 @@ i.e. 60 per 10 minutes) for every historical request, the live verification's in
   have about 100 market-data lines), paced by the general limiter (50 messages/s): a few
   minutes for 4.2k names. It then backfills the history of up to `[ibkr]
   iv_backfill_per_night` (100) underlyings that have none yet (new names; the initial
-  backfill spread over nights), about 33 minutes. Both IBKR steps are SKIPPED with a WARN when
+  backfill spread over nights), about 17 minutes. Both IBKR steps are SKIPPED with a WARN when
   `[ibkr]` is disabled or the gateway is down; the email shows IBKR IV coverage, backfill
   progress (pending, estimated hours left) and the `ibkr` / `ibkr_historical` pacing.
 
@@ -140,10 +143,11 @@ class-level source.
 ## Consequences
 - IV rank is available from day one for names IB covers, labelled `ibkr`; ours remains the
   fallback and the cross-check, labelled `ours`.
-- A full backfill is a long, resumable job (about 23 hours at the default pace); the nightly
-  grows by a few minutes for the snapshot plus up to ~33 minutes of capped backfill.
-  Lowering `historical_min_interval_s` for daily bars is possible under IB's rules but is the
-  owner's call after watching the pacing stats.
+- A full backfill is a long, resumable job (about 12 hours at the default pace); the nightly
+  grows by a few minutes for the snapshot plus up to ~17 minutes of capped backfill.
+  Lowering `historical_min_interval_s` for daily bars is possible under IB's rules (the 60
+  per 10 minutes limit is documented for bars of 30 s or less) but is the owner's call: trial
+  5 s, then 3 s, watching the pacing stats, timeouts and error 162.
 - Data derived from IBKR is personal-use: it must not be exposed to other users without
   revisiting this ADR.
 - The API is no longer strictly read-only: it appends the live quotes it served to `live/*`

@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 from ib_async import IB
 
-from algotrade_sources.framework.base import SessionUnavailableError
+from algotrade_sources.framework.base import SessionUnavailableError, TransientFetchError
 from algotrade_sources.vendors.ibkr.gateway import (
     CLIENT_CALLS,
     MARKET_DATA_CALLS,
@@ -18,6 +18,7 @@ from algotrade_sources.vendors.ibkr.gateway import (
     ReadOnlyViolationError,
     _detach_resubscribe,
     ib_symbol,
+    unanswered,
 )
 from tests.helpers.fake_ib import FakeIB
 from tests.helpers.ingest_fakes import CountingLimiter
@@ -163,7 +164,7 @@ def test_ib_symbols() -> None:
 
 
 def test_enrichment_calls_are_market_data_only_and_paced() -> None:
-    """ADR 0028: contracts, IV / HV history and the vol snapshot use only allowlisted calls;
+    """ADR 0028: contracts, the IV history and the vol snapshot use only allowlisted calls;
     order and account calls stay blocked on the same session."""
     fake = FakeIB(
         bars={"AAPL": BARS},
@@ -180,9 +181,9 @@ def test_enrichment_calls_are_market_data_only_and_paced() -> None:
     assert fake.calls.count("qualifyContracts") == 1  # one call for the batch
     assert general.waits == 2 + 3  # the handshake + market data type, then one per contract
     hist = gw.volatility_history("AAPL", date(2026, 10, 2), SESSION, conid=1004)
-    assert hist["OPTION_IMPLIED_VOLATILITY"] == [{"date": "2026-10-02", "close": 11.0}]
-    assert hist["HISTORICAL_VOLATILITY"] == [{"date": "2026-10-02", "close": 11.0}]
-    assert historical.waits == 2 and [r["durationStr"] for r in fake.requests] == ["1 D"] * 2
+    assert hist == {"OPTION_IMPLIED_VOLATILITY": [{"date": "2026-10-02", "close": 11.0}]}
+    assert historical.waits == 1 and [r["durationStr"] for r in fake.requests] == ["1 D"]
+    assert [r["whatToShow"] for r in fake.requests] == ["OPTION_IMPLIED_VOLATILITY"]  # no HV
     gw.volatility_history("MSFT", date(2024, 10, 2), SESSION, conid=272093)  # no lookup
     assert fake.requests[-1]["durationStr"] == "3 Y" and fake.requests[-1]["symbol"] == "MSFT"
     vols = gw.underlying_vols({"AAPL": 1004, "SPY": None, "ZZZZ": None})
@@ -283,3 +284,87 @@ def test_a_restored_connection_sends_no_account_request() -> None:
     sealed = IB()
     _detach_resubscribe(sealed)
     assert asyncio.run(emit_restored(sealed)) == []
+
+
+def history_gateway(fake: FakeIB) -> tuple[IbkrMarketData, CountingLimiter]:
+    historical = CountingLimiter()
+    cfg = GatewayConfig("127.0.0.1", 4002, 7, request_timeout_s=60.0)
+    gw = IbkrMarketData(cfg, historical=historical, ib_factory=lambda: fake, clock=fake.clock)
+    gw.connect()
+    return gw, historical
+
+
+@pytest.mark.parametrize(
+    ("fault", "why"),
+    [
+        ("timeout", "no answer within the 60 s request timeout"),
+        ("pacing", "IB error 162: .*pacing violation"),
+        ("1100", "IB error 1100 while the request was in flight"),
+    ],
+)
+def test_an_unanswered_history_request_is_a_transient_error_not_empty(fault: str, why: str) -> None:
+    """ib_async returns [] on a timeout and on IB errors; the facade tells them apart."""
+    fake = FakeIB(bars={"AAPL": BARS}, iv={"AAPL": BARS}, faults={"AAPL": [fault]})
+    gw, _ = history_gateway(fake)
+    with pytest.raises(TransientFetchError, match=why):
+        gw.volatility_history("AAPL", date(2026, 10, 1), SESSION, conid=1004)
+    assert gw.volatility_history("AAPL", date(2026, 10, 1), SESSION, conid=1004)[
+        "OPTION_IMPLIED_VOLATILITY"
+    ]  # the next request is answered
+    assert not set(FORBIDDEN) & set(fake.calls)
+
+
+@pytest.mark.parametrize("fault", ["no-data", None])
+def test_a_genuine_empty_history_is_empty(fault: str | None) -> None:
+    fake = FakeIB(bars={"AAPL": BARS}, faults={"AAPL": [fault]} if fault else {})
+    gw, _ = history_gateway(fake)
+    assert gw.volatility_history("AAPL", date(2026, 10, 1), SESSION, conid=1004) == {
+        "OPTION_IMPLIED_VOLATILITY": []
+    }
+
+
+def test_a_connection_flap_with_bars_is_answered() -> None:
+    fake = FakeIB(iv={"AAPL": BARS}, faults={"AAPL": ["flap"]})
+    gw, _ = history_gateway(fake)
+    hist = gw.volatility_history("AAPL", date(2026, 10, 1), SESSION, conid=1004)
+    assert len(hist["OPTION_IMPLIED_VOLATILITY"]) == 2
+
+
+def test_unanswered_reads_only_this_requests_errors_and_real_failures() -> None:
+    lost, pacing = (-1, 1100, "lost"), (7, 162, "pacing violation")
+    assert unanswered([], 7, 0.1, 60.0) is None
+    assert unanswered([(8, 162, "pacing violation")], 7, 0.1, 60.0) is None  # another request
+    assert unanswered([(7, 2174, "warning"), (-1, 2104, "farm OK")], 7, 0.1, 60.0) is None
+    assert unanswered([(7, 162, "HMDS query returned no data")], 7, 0.1, 60.0) is None
+    assert unanswered([pacing], 7, 0.1, 60.0) == "IB error 162: pacing violation"
+    assert unanswered([pacing], None, 0.1, 60.0) is not None  # request id unknown: any counts
+    assert unanswered([lost], 7, 0.1, 60.0) == "IB error 1100 while the request was in flight: lost"
+    assert unanswered([], 7, 59.5, 60.0) is not None and unanswered([], 7, 1.0, 0.0) is None
+
+
+def test_cool_down_holds_the_historical_limiter_and_close_stops_listening() -> None:
+    fake = FakeIB(iv={"AAPL": BARS})
+    gw, historical = history_gateway(fake)
+    assert len(fake.errorEvent.handlers) == 1
+    gw.cool_down(30.0)
+    assert historical.held == 30.0
+    fake.errorEvent.emit(-1, 1100, "lost", None)  # outside a request: not recorded
+    assert gw._errors is None
+    gw.close()
+    assert fake.errorEvent.handlers == []
+
+
+def test_the_error_listener_works_on_ib_asyncs_own_event() -> None:
+    """The real ``IB.errorEvent`` (no connection): IB's errors reach the facade only while a
+    history request is in flight, and closing detaches the listener."""
+    raw = IB()
+    gw = IbkrMarketData(GatewayConfig("127.0.0.1", 4002, 7))
+    gw._listen(raw)
+    seen: list[tuple[int, int, str]] = []
+    gw._errors = seen
+    raw.errorEvent.emit(5, 162, "pacing violation", None)
+    assert seen == [(5, 162, "pacing violation")]
+    gw._errors = None
+    gw.close()
+    raw.errorEvent.emit(5, 162, "again", None)
+    assert seen == [(5, 162, "pacing violation")] and gw._events is None

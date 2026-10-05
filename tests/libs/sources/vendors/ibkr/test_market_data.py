@@ -111,7 +111,18 @@ def test_enrichment_kinds_round_trip_through_raw_json() -> None:
     assert contracts.loc["AAPL", "conid"] == 1004 and pd.isna(contracts.loc["ZZZZ", "conid"])
     hist = parsed("volhist__AAPL__1004__2026-10-01", "volhist")
     assert list(hist["date"]) == [SESSION]  # from the start date only
-    assert hist.loc[0, "iv30_ibkr"] == 0.2 and hist.loc[0, "hv30_ibkr"] == 0.1
+    assert hist.loc[0, "iv30_ibkr"] == 0.2 and pd.isna(hist.loc[0, "hv30_ibkr"])  # IV only
+    assert [r["whatToShow"] for r in ib.requests] == ["OPTION_IMPLIED_VOLATILITY"]
+    legacy = {  # a payload saved before the backfill dropped the HV still parses both
+        "OPTION_IMPLIED_VOLATILITY": [{"date": "2026-10-02", "close": 0.2}],
+        "HISTORICAL_VOLATILITY": [{"date": "2026-10-01", "close": 0.1}],
+    }
+    request = FetchRequest("volhist__AAPL__1004__2026-10-01", None, SESSION)
+    replayed = src.normalize(request, json.dumps({"data": legacy}).encode())
+    assert replayed is not None
+    old = replayed.parsed["volhist"]
+    assert old["hv30_ibkr"].iloc[0] == 0.1 and pd.isna(old["hv30_ibkr"].iloc[1])
+    assert pd.isna(old["iv30_ibkr"].iloc[0]) and old["iv30_ibkr"].iloc[1] == 0.2
     vols = parsed("vols__AAPL:1004+ZZZZ:", "vols").set_index("symbol")
     assert vols.loc["AAPL", "iv30_ibkr"] == 0.3 and not vols.loc["ZZZZ", "listed"]
 
