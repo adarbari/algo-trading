@@ -81,7 +81,8 @@ when `sma_50` or `sma_200` is null. Example: 105, 100, 95 is UPTREND; 105, 95, 1
 high is strictly above each of the 5 highs before it and at least each of the 5 highs after
 it (a flat top counts once, at its first bar); a swing low mirrors it with lows. All 11 bars
 must exist. A pivot at t is confirmed only at t + 5, so on session d only pivots with t <= d -
-5 count. Pivots are searched over the last 252 sessions. Example: highs 101, 102, 103, 104,
+5 count. The bars read are the last 252 sessions (d - 251 to d), and a pivot needs its 5 bars
+each side among them, so a pivot can be dated d - 246 to d - 5. Example: highs 101, 102, 103, 104,
 105, **110**, 105, 104, 103, 102, 101 make a swing high of 110 at the sixth bar, known from the
 eleventh bar's session on, not before.
 
