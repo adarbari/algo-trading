@@ -26,8 +26,8 @@ STORED = END + timedelta(days=1)  # a backfill stored after every session it ser
 def fact(iid: str, concept: str, shares: float, end: date, filed: date, form: str = "10-Q"):  # type: ignore[no-untyped-def]
     return {
         "instrument_id": iid, "symbol": iid[3:], "cik": "0000000001", "concept": concept,
-        "period_end": end, "filed": filed, "form": form, "accn": f"{iid}-{filed}-{form}",
-        "shares": shares, "fetched_on": STORED,
+        "period_start": None, "period_end": end, "filed": filed, "form": form,
+        "accn": f"{iid}-{filed}-{form}", "shares": shares, "fetched_on": STORED,
     }  # fmt: skip
 
 

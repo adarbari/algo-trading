@@ -229,15 +229,17 @@ INSTRUMENT_COMPANY = _fixed(
     *_strings("website", "former_names", "exchanges", "tickers"),
     "fetched_on date",
 )
-# L1: share counts from SEC company facts, per instrument (every class of a CIK gets the
-# CIK's facts). Runs are increments (new facts + a ``checked`` marker per fetched CIK), so
-# they merge; a fact is identified by (instrument, concept, period end, filed date).
+# L1: share counts and basic financials (revenue, net income, diluted EPS: ``value`` in
+# ``unit``) from SEC company facts, per instrument (every class of a CIK gets the CIK's
+# facts). Runs are increments (new facts + a ``checked`` marker per fetched CIK), so they
+# merge; a fact is identified by (instrument, concept, period start, period end, filed date):
+# a year-to-date and a quarterly fact share an end date.
 INSTRUMENT_SHARES = _fixed(
     "instruments/shares",
     "reference",
-    ("instrument_id", "cik", "concept", "fetched_on"),
+    ("instrument_id", "cik", "concept", "period_start", "fetched_on"),
     "instrument_id string!",
-    *_strings("symbol", "tag", "form", "accn", "fp"),
+    *_strings("symbol", "tag", "form", "accn", "fp", "unit"),
     "cik string!",
     "concept string!",
     "period_start date",
@@ -246,9 +248,10 @@ INSTRUMENT_SHARES = _fixed(
     "fy int64",
     "shares float64",
     "class_values int64",
+    "value float64",
     "fetched_on date!",
     runs="merge",
-    key=("instrument_id", "concept", "period_end", "filed"),
+    key=("instrument_id", "concept", "period_start", "period_end", "filed"),
 )
 # L1: each instrument's IBKR stock contract (ADR 0028): conid and primary exchange from IB's
 # contract lookup, one full snapshot per run (rows not refreshed are carried forward).

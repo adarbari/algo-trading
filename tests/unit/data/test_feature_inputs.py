@@ -87,8 +87,8 @@ def test_share_facts_are_seen_from_their_filing_date() -> None:
     assert inputs.load_input(reader, SHARES, [END], 0).at(END, 0) is None
     early, late = END - timedelta(days=30), END + timedelta(days=5)
     rows = [
-        {"instrument_id": "EQ:A", "cik": "1", "concept": "dei", "shares": n, "period_end": f,
-         "filed": f, "fetched_on": late}
+        {"instrument_id": "EQ:A", "cik": "1", "concept": "dei", "shares": n, "period_start": None,
+         "period_end": f, "filed": f, "fetched_on": late}
         for n, f in ((10.0, early), (12.0, late))
     ]  # fmt: skip
     writer.write_table(SHARES, late, "r1", stamped(rows, late, "r1"))  # stored after both

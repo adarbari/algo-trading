@@ -14,6 +14,7 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 - API schemas built from domain types, not mirrored field lists.
 - VRP live spread check in the UI via `GET /chains/{id}/live`.
 - Swing features (SW, done on `feat/swing-levels-momentum`): check values against a chart on a few names, then backfill `algotrade-ingest rollups --from D --to D --only momentum@v1,swing_levels@v1,anchored_vwap@v1,oi_walls@v1`.
+- Company financials (`financials@v1`, `feature.pe_ratio`, `feature.revenue_growth_yoy`; Explore Overview reads them): after merge run `algotrade-ingest shares --force` (about 30 to 40 minutes, resumable), then `algotrade-ingest rollups --from 2024-10-03 --to <last session> --only financials@v1` (about 3 s a session), and spot-check a few names ([vendors.md](data/vendors.md) "SEC EDGAR company facts").
 - Flaky tests: preview timing under load, smoke axe admin light, one builder e2e.
 
 **Facts**

@@ -19,9 +19,9 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        later one, e.g. a declared future ex-date), with ``event_date``; an
                        empty frame when there are none
 - ``instruments/shares``
-                       ``shares.share_facts``: every stored share-count fact FILED on or before
-                       the session (point in time by filing date), sorted by ``filed``;
-                       ``None`` when there is none
+                       ``shares.share_facts``: every stored share-count and financial (revenue,
+                       net income, diluted EPS) fact FILED on or before the session (point in
+                       time by filing date), sorted by ``filed``; ``None`` when there is none
 - ``rates/treasury``   ``rates.curve_as_rows``: the curve the session sees (latest on or before;
                        ``curve_date`` and ``pre_snapshot`` added); ``None`` when none is stored
 - ``volatility/ibkr_iv30``
