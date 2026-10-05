@@ -1,6 +1,6 @@
 """`make status`: where things stand, in about 15 lines. Read-only: open PRs with CI state (gh),
 running ingest jobs and `var/logs/*.status` tails, the last nightly run and the store's latest
-session (through the explore services, never a path), dev servers on 8000 / 5173 / 5174.
+session (through the read model, never a path), dev servers on 8000 / 5173 / 5174.
 Every probe goes through `Probes`; a probe that cannot answer says why on its line.
 """
 
@@ -42,13 +42,13 @@ def _store_facts() -> tuple[str, str]:
     # Lazy: the library may be missing (no venv), and status must still report the rest.
     from algotrade.config.env import config_dir, data_url  # noqa: PLC0415
     from algotrade.config.user import UserContext  # noqa: PLC0415
-    from algotrade.services.explore.store import latest_session, open_store  # noqa: PLC0415
-    from algotrade.services.read.context import open_stores  # noqa: PLC0415
+    from algotrade.services.read.context import open_read_stores, open_stores  # noqa: PLC0415
     from algotrade.services.read.ops.runs import load_nightly_runs  # noqa: PLC0415
+    from algotrade.services.read.session import latest_session  # noqa: PLC0415
 
-    store = open_store(data_url(), config_dir(), UserContext("local"))
-    latest = latest_session(store.reader)
-    runs = load_nightly_runs(open_stores(store.reader, store.configs, store.user), 1)
+    reader, configs = open_read_stores(data_url(), config_dir())
+    latest = latest_session(reader)
+    runs = load_nightly_runs(open_stores(reader, configs, UserContext("local")), 1)
     last = f"{runs[0].session} {runs[0].status}" if runs else "none recorded"
     return str(latest) if latest else "empty", last
 

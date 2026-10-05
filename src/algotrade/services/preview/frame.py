@@ -17,7 +17,7 @@ from algotrade.data import StoreReader
 from algotrade.data.reference import Universe, load_universe
 from algotrade.engines.selection.evaluate import SelectionResult, evaluate_selection
 from algotrade.features.expressions.feature_set import FeatureSet
-from algotrade.services.explore.store import ResultCache
+from algotrade.services.read.context import ResultCache
 from algotrade.services.selection import fields_view
 from algotrade.services.views import to_value
 from algotrade.strategies.screeners.rules.evaluate import ScreenMemo

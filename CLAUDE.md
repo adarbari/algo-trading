@@ -74,7 +74,7 @@ purpose). The non-obvious cases:
 | Comparing our data with a live source (verification check) | `apps/ingestion/.../tasks/verification/` (`checks.py`) |
 | A read object or loader a page needs | `src/algotrade/services/read/<area>/` (`add-domain-object`) |
 | A GraphQL field | `apps/api/algotrade_api/graphql/types/<area>/<object>.py` (`add-graphql-field`) |
-| A REST write, job, live or file endpoint | `apps/api/algotrade_api/{routes,schemas}/` (`add-api-endpoint`); page reads stay in `services/explore/` only until their area moves (`docs/api/read-model.md`) |
+| A REST write, job, live or file endpoint | `apps/api/algotrade_api/{routes,schemas}/` (`add-api-endpoint`); a Builder dry run (preview POST) in `src/algotrade/services/preview/` |
 | Web: component / page / feature | see Web UI below and `docs/ui/architecture.md` |
 
 **If nothing fits, add a new folder for the new kind**: declare it in `architecture/layout.toml`
@@ -168,7 +168,9 @@ to main's: `make check`'s `npm ci` through the link empties main's. **Never `uv 
 `make install` in a worktree** (agent worktrees too): through the `.venv` link it points the
 main checkout's venv, which launchd's nightly and the API run, at the worktree's code
 (2026-10-05); use `worktree.env`'s `PYTHONPATH`. `make install` refuses, `make doctor` fails,
-the nightly refuses to start. Never `--no-verify` / `SKIP=`: the hooks work in a worktree.
+the nightly refuses to start. An agent worktree (`.claude/worktrees/`) links `.venv` and writes
+`worktree.env` itself; where `source` is refused, prefix with `env PYTHONPATH=...`
+(`.claude/agents/implementer.md`). Never `--no-verify` / `SKIP=`: the hooks work in a worktree.
 
 Commands (need `uv`; `make doctor` checks the machine, `make status` shows PRs, jobs, store): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make perf` (strict timing budgets; run on an idle machine), `make layout`, `make evaluate`, `make baseline`, `make features-doc`.
 Web (need Node 24): `make web-install`, `make web-check` (part of `make check`), `make web-visual` (screenshots, Docker); in `apps/web`: `npm run dev|storybook|check|visual:update`.

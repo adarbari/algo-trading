@@ -11,17 +11,18 @@ from algotrade.config.site.settings import IbkrSettings
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.data.chains import live_option_quotes
-from algotrade.services.explore.store import NotFoundError, ReadStore
 from algotrade.services.live.quotes import (
     DisabledFeed,
     FeedUnavailableError,
     LiveQuotes,
 )
 from algotrade.services.live.recorder import LiveRecorder
+from algotrade.services.read.context import NotFoundError, ReadContext, open_context
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.live_writer import LiveWriter
+from algotrade_api.deps import ReadStore
 
-EXPIRY = date(2022, 12, 23)  # the explore store's first expiry of EQ:AAA (spot 100)
+EXPIRY = date(2022, 12, 23)  # the golden API store's first expiry of EQ:AAA (spot 100)
 T0 = datetime(2022, 11, 25, 15, tzinfo=UTC)
 OPTIONS = IbkrSettings(live_strikes=3, live_max_strikes=4, live_cache_s=60)
 
@@ -78,13 +79,14 @@ def live(
 
 
 @pytest.fixture
-def store(explore: tuple[ReadStore, dict[str, str]]) -> ReadStore:
-    return explore[0]
+def ctx(api_golden: tuple[ReadStore, dict[str, str]]) -> ReadContext:
+    store = api_golden[0]
+    return open_context(store.reader, store.configs, store.user, cache=store.cache)
 
 
-def test_live_quotes_for_the_strikes_nearest_the_underlying(store: ReadStore) -> None:
+def test_live_quotes_for_the_strikes_nearest_the_underlying(ctx: ReadContext) -> None:
     feed, recorder = FakeFeed(), FakeRecorder()
-    got = live(feed, recorder).chain(store, "AAA", EXPIRY)
+    got = live(feed, recorder).chain(ctx, "AAA", EXPIRY)
     assert feed.asked == [("AAA", EXPIRY, [95.0, 100.0, 105.0])]
     assert (got.source, got.status, got.detail, got.delayed) == ("ibkr", "LIVE", None, True)
     assert got.underlying_id == "EQ:AAA" and got.symbol == "AAA" and got.as_of == T0
@@ -103,29 +105,29 @@ def test_live_quotes_for_the_strikes_nearest_the_underlying(store: ReadStore) ->
     assert set(recorded["symbol"]) == {"AAA"} and recorded["ts"].iloc[0] == pd.Timestamp(T0)
 
 
-def test_an_answer_is_cached_for_the_window_then_read_again(store: ReadStore) -> None:
+def test_an_answer_is_cached_for_the_window_then_read_again(ctx: ReadContext) -> None:
     feed, clock = FakeFeed(), Clock()
     quotes = live(feed, clock=clock)
-    quotes.chain(store, "AAA", EXPIRY)
+    quotes.chain(ctx, "AAA", EXPIRY)
     clock.now = T0 + timedelta(seconds=59)
-    again = quotes.chain(store, "EQ:AAA", EXPIRY)
+    again = quotes.chain(ctx, "EQ:AAA", EXPIRY)
     assert again.status == "CACHED" and again.as_of == T0 and len(feed.asked) == 1
-    other = quotes.chain(store, "AAA", EXPIRY, [80.0])  # other strikes: another entry
+    other = quotes.chain(ctx, "AAA", EXPIRY, [80.0])  # other strikes: another entry
     assert other.status == "LIVE" and len(feed.asked) == 2
     clock.now = T0 + timedelta(seconds=61)
-    assert quotes.chain(store, "AAA", EXPIRY).status == "LIVE" and len(feed.asked) == 3
+    assert quotes.chain(ctx, "AAA", EXPIRY).status == "LIVE" and len(feed.asked) == 3
 
 
-def test_named_strikes_must_be_listed_and_few_enough(store: ReadStore) -> None:
+def test_named_strikes_must_be_listed_and_few_enough(ctx: ReadContext) -> None:
     feed = FakeFeed(unlisted=120.0)
-    got = live(feed).chain(store, "AAA", EXPIRY, [120.0, 80.0, 80.0])
+    got = live(feed).chain(ctx, "AAA", EXPIRY, [120.0, 80.0, 80.0])
     assert got.strikes == [80.0, 120.0]
     unlisted = [q for q in got.quotes if q["strike"] == 120.0]
     assert unlisted and not any(q["listed"] for q in unlisted)
     with pytest.raises(ConfigurationError, match=r"strikes \[81.0\] are not in the stored chain"):
-        live(feed).chain(store, "AAA", EXPIRY, [81.0])
+        live(feed).chain(ctx, "AAA", EXPIRY, [81.0])
     with pytest.raises(ConfigurationError, match="at most 4 strikes"):
-        live(feed).chain(store, "AAA", EXPIRY, [80.0, 85.0, 90.0, 95.0, 100.0])
+        live(feed).chain(ctx, "AAA", EXPIRY, [80.0, 85.0, 90.0, 95.0, 100.0])
 
 
 @pytest.mark.parametrize(
@@ -137,10 +139,10 @@ def test_named_strikes_must_be_listed_and_few_enough(store: ReadStore) -> None:
     ],
 )
 def test_the_stored_chain_with_a_status_when_the_feed_cannot_answer(
-    store: ReadStore, feed: object, status: str, detail: str
+    ctx: ReadContext, feed: object, status: str, detail: str
 ) -> None:
     recorder = FakeRecorder()
-    got = live(feed, recorder).chain(store, "AAA", EXPIRY)
+    got = live(feed, recorder).chain(ctx, "AAA", EXPIRY)
     assert (got.source, got.status, got.delayed) == ("stored", status, True)
     assert got.detail is not None and detail in got.detail
     assert got.session == date(2022, 11, 23) and got.strikes == [95.0, 100.0, 105.0]
@@ -150,13 +152,13 @@ def test_the_stored_chain_with_a_status_when_the_feed_cannot_answer(
     assert recorder.rows == []  # nothing live to record
 
 
-def test_unknown_underlying_or_expiry_is_not_found(store: ReadStore) -> None:
+def test_unknown_underlying_or_expiry_is_not_found(ctx: ReadContext) -> None:
     with pytest.raises(NotFoundError, match="no 2022-12-30 expiry"):
-        live(FakeFeed()).chain(store, "AAA", date(2022, 12, 30))
+        live(FakeFeed()).chain(ctx, "AAA", date(2022, 12, 30))
     with pytest.raises(NotFoundError, match="no option chain"):
-        live(FakeFeed()).chain(store, "BBB", EXPIRY)
+        live(FakeFeed()).chain(ctx, "BBB", EXPIRY)
     with pytest.raises(NotFoundError):
-        live(FakeFeed()).chain(store, "NOPE", EXPIRY)
+        live(FakeFeed()).chain(ctx, "NOPE", EXPIRY)
 
 
 def test_close_stops_the_feed_and_the_recorder() -> None:
@@ -166,7 +168,7 @@ def test_close_stops_the_feed_and_the_recorder() -> None:
     live(DisabledFeed("off")).close()  # nothing to stop
 
 
-def test_a_live_answer_is_recorded_to_the_store(store: ReadStore) -> None:
+def test_a_live_answer_is_recorded_to_the_store(ctx: ReadContext) -> None:
     backend = MemoryBackend()
     recorder = LiveRecorder(LiveWriter(backend))
     feed = FakeFeed(unlisted=105.0)
@@ -174,7 +176,7 @@ def test_a_live_answer_is_recorded_to_the_store(store: ReadStore) -> None:
     feed.quotes = lambda *a: feed_rows(*a).assign(  # type: ignore[method-assign]
         conid=lambda f: [7.0 if listed else None for listed in f["listed"]], iv=None
     )
-    live(feed, recorder).chain(store, "AAA", EXPIRY)
+    live(feed, recorder).chain(ctx, "AAA", EXPIRY)
     recorder.flush()
     frame = live_option_quotes(StoreReader(backend), date(2022, 11, 25), ["EQ:AAA"])
     assert frame is not None and sorted(set(frame["strike"])) == [95.0, 100.0]  # listed only

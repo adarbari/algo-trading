@@ -351,6 +351,11 @@ export interface components {
             inputs: string[];
             /** Licence */
             licence: string;
+            /**
+             * Missing
+             * @description the inputs' tables with no partition for the session (their values UNKNOWN)
+             */
+            missing: string[];
             /** Non Null */
             non_null: number;
             /** Rows */
@@ -359,7 +364,7 @@ export interface components {
             sample: components["schemas"]["SampleValue"][];
             /**
              * Session
-             * @description the session sampled (None: nothing stored)
+             * @description the session sampled (None: an input has no partition for it, see missing)
              */
             session: string | null;
             /**

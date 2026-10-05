@@ -20,7 +20,14 @@ main checkout is busy; never `--no-verify` / `SKIP=`. In any worktree (yours und
 main checkout's, and syncing it points the owner's nightly and API at your branch. Run code
 through `source worktree.env` (its `PYTHONPATH`; link `.venv` to the main checkout's first if
 your worktree has none); a dependency change is `uv lock` plus the PR, installed in the main
-checkout after merge. On the shared machine run
+checkout after merge. A worktree not made by `scripts/worktree.sh` (an agent worktree under
+`.claude/worktrees/`) has neither: `ln -s <main>/.venv .venv` (stop and report if that is
+denied), then write `worktree.env` yourself with
+`PYTHONPATH=<wt>/src:<wt>/libs/sources:<wt>/apps/ingestion:<wt>/apps/api:<wt>/apps/backtest`
+(absolute `<wt>`). Where the shell refuses `export` / `source`, prefix each command that runs
+Python with it instead: `env PYTHONPATH=... make check ...`, `env PYTHONPATH=... git commit`
+(the hooks run Python). Check with `python -c "import algotrade; print(algotrade.__file__)"`
+that it imports this worktree's code, not main's. On the shared machine run
 `make check WORKERS=2 WEB_WORKERS=2` (and `pytest -n 2` when running tests directly).
 
 While writing:
@@ -41,7 +48,9 @@ these is true (these need the `architect` agent or the main session):
 - The change needs a new responsibility, a new folder, an ADR, a new table or grain, or a
   change to a layer boundary or import-linter contract.
 - It touches point-in-time reads (`knowledge_ts`, snapshot selection), `quant/` maths,
-  atomic publish or locks, or the IBKR read-only boundary.
+  atomic publish or locks, or the IBKR read-only boundary, unless the brief gives the
+  decided design (an architect or lead plan): then implement it and flag it for an
+  `architect` review of the diff in the hand-back and the PR.
 - The same check has failed twice after your fixes.
 
 Finish with a hand-back of at most 150 words: the PR link (or files changed), checks run and

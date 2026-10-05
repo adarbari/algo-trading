@@ -180,6 +180,14 @@
             "title": "Licence",
             "type": "string"
           },
+          "missing": {
+            "description": "the inputs' tables with no partition for the session (their values UNKNOWN)",
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing",
+            "type": "array"
+          },
           "non_null": {
             "title": "Non Null",
             "type": "integer"
@@ -205,7 +213,7 @@
                 "type": "null"
               }
             ],
-            "description": "the session sampled (None: nothing stored)",
+            "description": "the session sampled (None: an input has no partition for it, see missing)",
             "title": "Session"
           },
           "type": {
@@ -222,6 +230,7 @@
           "inputs",
           "licence",
           "session",
+          "missing",
           "rows",
           "non_null",
           "sample"

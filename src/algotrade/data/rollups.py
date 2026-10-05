@@ -3,7 +3,7 @@ or one instrument's latest row.
 
 ``rollup_rows``: for the rollup framework, when one rollup reads another's output
 (``iv_history@v2`` reads 252 sessions of ``iv30@v1``; ``data.feature_inputs``), and for the
-explore queries (feature series, pages); ``rollup_on`` one session's rows for a consumer
+read model's range reads (feature series); ``rollup_on`` one session's rows for a consumer
 comparing them (the live verification). ``feature_rows``: for the read path of expression
 features (``services.features``), only the columns a formula needs. Each partition is one
 session's rows from the latest run that wrote it (or the run current at ``as_of``). The stamp

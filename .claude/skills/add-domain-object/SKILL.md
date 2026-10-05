@@ -8,15 +8,11 @@ description: Add a domain read object (a frozen dataclass + its load_<object>(ct
 Read first (by section): `docs/api/read-model.md` ("Catalogue feature or typed field", "The
 domain objects", "Values and UNKNOWN", "Session resolution"), ADRs 0036, 0037, 0038.
 
-## Step 0: what exists today (check, do not assume)
+## Step 0: what exists
 
-Run `ls src/algotrade/services/read src/algotrade/services/read/* apps/api/algotrade_api/graphql`.
-
-| You see | Meaning | Do |
-|---|---|---|
-| only `__init__.py` files | read-model PR 1 state (superseded: PR 2 landed 2026-10) | you are on an old branch: rebase on `origin/main` |
-| `session.py`, `values.py`, `context.py`, but no `apps/api/algotrade_api/graphql/schema.py` | an old branch (PR 2 state) | rebase on `origin/main` |
-| `graphql/schema.py`, `read/instruments/{identity,features,catalogue}.py`, `read/screens/*` exist | **today**: PRs 4-5 landed (Instrument, FeatureValue, FeatureInfo; Screener, ScreenerRun, ScreenResult, Ideas, TableView on GraphQL); the next object is the one the next RM PR names (RM6: `read/instruments/{events,chains,holdings,prices,series}.py`) | all steps |
+The read model and its GraphQL layer are complete (read-model track, PRs 1-10b): loaders by
+area under `src/algotrade/services/read/{instruments,screens,ops}/`, their types under
+`apps/api/algotrade_api/graphql/types/<area>/`. `ls` the area first: the object may exist.
 
 Check the object is not already planned: `grep -n "<ObjectName>" docs/api/read-model.md`. If
 the spec's object table names it, build exactly that row (identity, fields, tables, module).
@@ -62,7 +58,7 @@ explicit, named argument (`previous_session`), never derived inside the loader.
   `load_<object>(ctx: ReadContext, <identity>) -> <Object> | None` (None = no such thing).
   Values through `values.to_scalar`; never `to_value`, never a private `_float` / `_text`.
 - Data only through `algotrade.data` and `partition(ctx, ...)`; never `algotrade.storage`
-  readers, never `services.explore` (it is being deleted).
+  readers.
 - No writes, no jobs (import-linter "Read model is read-only").
 
 Verify: `make arch layout ownership`.
@@ -90,7 +86,7 @@ if the grain has one. Run `.venv/bin/python -m pytest tests/unit/services/read -
 - `docs/api/read-model.md` "The domain objects": add or complete the row.
 - `make ownership layout`.
 
-## Step 7: GraphQL type (only once PR 4 has landed)
+## Step 7: GraphQL type
 
 Follow `.claude/skills/add-graphql-field` step 4: `apps/api/algotrade_api/graphql/types/<area>/<object>.py`
 with `@strawberry.type`, fields copied from the dataclass, one `of()` classmethod, resolvers that
@@ -119,7 +115,5 @@ call one loader. Then the snapshot (`.venv/bin/python scripts/export_graphql_sch
   `features(names)`; missing from the catalogue -> `add-feature` first.
 - You need "the latest" of something -> it is `ctx.session` (session grain) or the grain's one
   rule above; never your own max over dates.
-- You are about to import `services.explore` or copy code from it -> move the code (same PR),
-  delete the explore copy, and add the deferred ownership rule the plan names for that PR.
 - You are about to add a REST GET for it -> no: `architecture/rest_allowlist.toml` only shrinks.
 - The same check fails twice -> stop and escalate (CLAUDE.md "Agents, models and tokens").

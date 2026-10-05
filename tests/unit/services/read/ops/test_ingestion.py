@@ -5,25 +5,25 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from algotrade.services.explore.store import ReadStore
 from algotrade.services.read.context import ReadContext, open_context
 from algotrade.services.read.ops.ingestion import (
     Cell,
     load_cell_detail,
     load_completeness,
 )
+from algotrade_api.deps import ReadStore
 
 NOW = datetime(2026, 10, 5, 12, tzinfo=UTC)
 
 
-def _ctx(explore: tuple[ReadStore, dict[str, str]], day: date | None = None) -> ReadContext:
-    store = explore[0]
+def _ctx(api_golden: tuple[ReadStore, dict[str, str]], day: date | None = None) -> ReadContext:
+    store = api_golden[0]
     return open_context(store.reader, store.configs, store.user, day)
 
 
 @pytest.fixture(scope="module")
-def cells(explore: tuple[ReadStore, dict[str, str]]) -> dict[tuple[str, str], Cell]:
-    grid = load_completeness(_ctx(explore), 3, NOW)
+def cells(api_golden: tuple[ReadStore, dict[str, str]]) -> dict[tuple[str, str], Cell]:
+    grid = load_completeness(_ctx(api_golden), 3, NOW)
     assert grid.sessions == (date(2022, 11, 21), date(2022, 11, 22), date(2022, 11, 23))
     assert grid.last_closed == date(2026, 10, 2)  # Monday noon: Friday is the last closed
     assert len(grid.cells) == 3 * len(grid.datasets)
@@ -55,25 +55,25 @@ def test_snapshots_built_carried_or_missing(cells: dict[tuple[str, str], Cell]) 
 
 
 def test_the_window_ends_at_the_session_asked_for(
-    explore: tuple[ReadStore, dict[str, str]],
+    api_golden: tuple[ReadStore, dict[str, str]],
 ) -> None:
-    grid = load_completeness(_ctx(explore, date(2022, 11, 22)), 0, NOW)
+    grid = load_completeness(_ctx(api_golden, date(2022, 11, 22)), 0, NOW)
     assert grid.sessions == (date(2022, 11, 22),)  # at least one session
 
 
-def test_drill_down_chains_groups_underlyings(explore: tuple[ReadStore, dict[str, str]]) -> None:
-    detail = load_cell_detail(_ctx(explore, date(2022, 11, 23)), "chains/option_quotes")
+def test_drill_down_chains_groups_underlyings(api_golden: tuple[ReadStore, dict[str, str]]) -> None:
+    detail = load_cell_detail(_ctx(api_golden, date(2022, 11, 23)), "chains/option_quotes")
     assert detail is not None
     assert (detail.job, detail.cell.status, detail.groups) == ("option_chains", "PARTIAL", ())
     assert [r.job for r in detail.runs][-1] == "option_chains"
 
 
-def test_drill_down_groups_run_items(explore: tuple[ReadStore, dict[str, str]]) -> None:
-    detail = load_cell_detail(_ctx(explore, date(2022, 11, 23)), "bars/1d")
+def test_drill_down_groups_run_items(api_golden: tuple[ReadStore, dict[str, str]]) -> None:
+    detail = load_cell_detail(_ctx(api_golden, date(2022, 11, 23)), "bars/1d")
     assert detail is not None
     assert detail.job == "daily_bars" and detail.cell.run_ids
     assert {r.run_id for r in detail.runs} >= set(detail.cell.run_ids)
 
 
-def test_an_unlisted_dataset_is_none(explore: tuple[ReadStore, dict[str, str]]) -> None:
-    assert load_cell_detail(_ctx(explore), "nope") is None
+def test_an_unlisted_dataset_is_none(api_golden: tuple[ReadStore, dict[str, str]]) -> None:
+    assert load_cell_detail(_ctx(api_golden), "nope") is None

@@ -57,3 +57,9 @@ def stored_values(row: Mapping[Any, Any], drop: Iterable[str] = ()) -> dict[str,
     (``session_date``, ``knowledge_ts``, ``source``, ``run_id``) and ``drop``."""
     skip = {*COMMON, *drop}
     return {str(k): to_scalar(v) for k, v in row.items() if str(k) not in skip}
+
+
+def records(frame: pd.DataFrame, drop: Iterable[str] = ()) -> list[dict[str, FeatureValue]]:
+    """``stored_values`` of every row of ``frame``."""
+    dropped = tuple(drop)
+    return [stored_values(r, dropped) for r in frame.to_dict("records")]

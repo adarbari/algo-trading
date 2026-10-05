@@ -1,5 +1,6 @@
-"""One router per area: parse parameters, call ONE explore query (or, under ``authoring/``,
-one ``services.authoring`` write; ADR 0029; under ``preview/``, one dry run of unsaved input),
+"""One router per area: parse parameters, call ONE library function (under ``authoring/``, one
+``services.authoring`` write, ADR 0029; under ``preview/``, one ``services.preview`` dry run of
+unsaved input; else a job, the live quotes or the health check),
 map it to a response schema. No business logic here (ADR 0024); ``ROUTERS`` is what
 ``main.create_app`` mounts."""
 

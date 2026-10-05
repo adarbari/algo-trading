@@ -15,6 +15,7 @@ from algotrade.services.read.session import (
     Session,
     expected_tables,
     grain_of,
+    latest_session,
     resolve_session,
 )
 from algotrade.storage.backends.memory import MemoryBackend
@@ -47,6 +48,15 @@ def test_an_empty_store_has_no_latest_session() -> None:
     _, reader = store()
     with pytest.raises(NotFoundError, match="nothing stored"):
         resolve_session(reader, None, EXPECTED)
+
+
+def test_latest_session_is_the_latest_bars_else_the_reference_snapshot() -> None:
+    writer, reader = store()
+    assert latest_session(reader) is None
+    write_reference(writer, D2, {"AAA": "EQ:AAA"})
+    assert latest_session(reader) == D2  # no bars: the reference snapshot
+    write_bar(writer, D1)
+    assert latest_session(reader) == D1  # bars win, even an earlier partition
 
 
 def test_a_requested_date_is_served_even_when_nothing_is_stored_for_it() -> None:

@@ -1,4 +1,4 @@
-"""The store the API and explore tests read: the golden datasets loaded through ingestion, plus
+"""The store the API and read-model tests read: the golden datasets loaded through ingestion, plus
 one session (``END``, the last golden session) of everything else a page shows: universe,
 reference facts with review marks, company details, rollups, events, an option chain, the
 verification vs IBKR, run records (incl. data-quality checks), screen results and a saved
@@ -9,18 +9,22 @@ import shutil
 import tempfile
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pandas as pd
 
 from algotrade.config.user import SITE_USER, UserContext
+from algotrade.data import StoreReader
 from algotrade.services.backtests.run import EQUITY, FILLS, PORTFOLIO
 from algotrade.services.backtests.run import run_job_name as backtest_job
-from algotrade.services.explore.store import ReadStore, store_over
 from algotrade.services.screening.run import run_job_name as screen_job
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import FileConfigStore
+from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.runs import RunRecord, start_run
+from algotrade.storage.tables.interfaces import Backend
 from algotrade.storage.tables.writers import StoreWriter
+from algotrade_api.deps import ReadStore
 from algotrade_ingestion.tasks.maintenance.golden import load_golden
 from algotrade_sources.framework.base import FixtureSource
 from tests.helpers.ingest_fakes import task_ctx
@@ -33,6 +37,13 @@ NOW = datetime(2022, 11, 24, 2, tzinfo=UTC)
 SYMBOLS = ["AAA", "BBB", "BULL", "CCC"]
 SPLIT_DAY = date(2022, 6, 1)
 CONFIG_ROOT = Path(__file__).resolve().parents[2] / "config"
+
+
+def store_over(
+    backend: Backend, configs: ConfigStore, user: UserContext, data_url: str = "memory://"
+) -> ReadStore:
+    """The API's ``ReadStore`` over an open backend (``data_url``: the scheme it reports)."""
+    return ReadStore(StoreReader(backend), configs, user, urlparse(data_url).scheme)
 
 
 def _write(writer: StoreWriter, table: str, rows: list[dict[str, object]], day: date = END) -> None:

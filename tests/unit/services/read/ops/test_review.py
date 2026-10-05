@@ -5,13 +5,13 @@ from datetime import UTC, date, datetime
 
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
-from algotrade.services.explore.store import ReadStore
 from algotrade.services.read.context import ReadContext, open_context
 from algotrade.services.read.ops.review import load_figi_review, load_leverage_review
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import start_run
 from algotrade.storage.tables.writers import StoreWriter
+from algotrade_api.deps import ReadStore
 from tests.helpers.stored_frames import stamped
 
 REFERENCE = "instruments/reference"
@@ -19,19 +19,19 @@ D1, D2 = date(2026, 10, 1), date(2026, 10, 2)
 NOW = datetime(2026, 10, 3, 2, tzinfo=UTC)
 
 
-def _golden(explore: tuple[ReadStore, dict[str, str]]) -> ReadContext:
-    store = explore[0]
+def _golden(api_golden: tuple[ReadStore, dict[str, str]]) -> ReadContext:
+    store = api_golden[0]
     return open_context(store.reader, store.configs, store.user)
 
 
-def test_figi_review_from_the_universe_build(explore: tuple[ReadStore, dict[str, str]]) -> None:
-    found = load_figi_review(_golden(explore))
+def test_figi_review_from_the_universe_build(api_golden: tuple[ReadStore, dict[str, str]]) -> None:
+    found = load_figi_review(_golden(api_golden))
     assert found.source.startswith("universe_build-")
     assert [r["symbol"] for r in found.items] == ["BBB"]
 
 
-def test_leverage_review(explore: tuple[ReadStore, dict[str, str]]) -> None:
-    found = load_leverage_review(_golden(explore))
+def test_leverage_review(api_golden: tuple[ReadStore, dict[str, str]]) -> None:
+    found = load_leverage_review(_golden(api_golden))
     assert [r["symbol"] for r in found.items] == ["CCC"]
     assert set(found.items[0]) == {"symbol", "instrument_id", "name", "security_type", "exchange"}
     assert found.source == "instruments/reference" and found.session is not None

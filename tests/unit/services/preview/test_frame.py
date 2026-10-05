@@ -7,7 +7,7 @@ import pandas as pd
 from algotrade.config.strategy.schema import parse_selection
 from algotrade.core.views.feature_view import FeatureView
 from algotrade.data.reference import Universe
-from algotrade.services.explore.preview.frame import MAX_MEMO, FieldFrame, features_key
+from algotrade.services.preview.frame import MAX_MEMO, FieldFrame, features_key
 
 DAY = date(2026, 10, 2)
 

@@ -5,8 +5,7 @@
 #
 #   owner         module globs that own it (fnmatch; `*` crosses directories)
 #   target_owner  (optional) where it is moving; hits there are allowed too, so a PR can move
-#                 code without touching this file first. Today: the read-model track
-#                 (services/explore -> services/read, docs/api/read-model.md).
+#                 code without touching this file first.
 #   allowed       other modules that may legitimately match a detect rule (rare; say why)
 #   detect        AST patterns that signal "this module is doing that work":
 #                   call = "name"          a call to name / x.name (arg = "lit": with that literal)
@@ -538,7 +537,7 @@ detect = [{ call = "run_screener" }]
 
 [[responsibility]]
 id = "http-api"
-description = "Serve HTTP: FastAPI routers (one per area), response schemas, CORS, error mapping and the ASGI server; routes call one services.explore query each"
+description = "Serve HTTP: FastAPI routers (one per area: writes, job polling, health, live quotes, preview POSTs), response schemas, CORS, error mapping and the ASGI server; routes call one library function each (page reads are GraphQL: graphql-schema)"
 owner = ["apps/api/algotrade_api/*"]
 section = "docs/adr/0024-api.md#http-layer"
 detect = [{ import = "fastapi" }, { import = "starlette" }, { import = "uvicorn" }]
@@ -547,27 +546,18 @@ detect = [{ import = "fastapi" }, { import = "starlette" }, { import = "uvicorn"
 id = "run-item-summary"
 description = "Summarise a run record's per-item statuses: status codes, which are fine, failed items grouped by a normalised reason (the nightly report and the API share it)"
 owner = ["src/algotrade/services/run_items.py"]
-section = "docs/adr/0024-api.md#explore-queries"
+section = "docs/api/read-model.md#the-domain-objects"
 detect = [{ string = "<date>" }, { string = "<url>" }]
 
-[[responsibility]]
-id = "explore-queries"
-description = "Read-only queries apps display (what is left: screener results, tables, views and preview): pages, JSON-safe rows; which session a ?date= sees is session-resolution. Moving to the read model (ADR 0037) area by area in read-model PRs 4-10a (runs, universe, instruments, chains and admin are moved); the rest moves in PR 8 and services/explore is deleted in PR 10b"
-owner = ["src/algotrade/services/explore/*"]
-target_owner = ["src/algotrade/services/read/*"]
-section = "docs/adr/0024-api.md#explore-queries"
-detect = [{ call = "paginate" }, { call = "partition_for" }]
-
 # --------------------------------------------------------------------------- the read model (ADR 0036-0038)
-# Being built over read-model PRs 2-10 (docs/api/read-model.md "Migration plan"). Each entry
-# below says how it is enforced today and which detect rule a later PR adds; a PR that moves
-# the code adds that rule in the same PR (never parked in known_violations.toml).
+# Built over read-model PRs 2-10b (docs/api/read-model.md "Migration plan"); services/explore,
+# the legacy page reads, was deleted in PR 10b. A new rule is added with the code it guards
+# (never parked in known_violations.toml).
 
 [[responsibility]]
 id = "session-resolution"
-description = "Which partition a read sees (ADR 0036): resolve one Session (requested, else the latest with bars) and read session-grain tables for exactly that date, UNKNOWN otherwise; snapshot tables through data.reference.snapshot with the snapshot date disclosed. services/read/session.py resolves (resolve_session, the table grains); services/read/context.py calls it once per request (open_context) and reads session partitions (partition); nothing else in services/read may. services/explore modules still pick their own partition (six rules, the bug ADR 0036 fixes) and leave `owner` as they are deleted (PRs 4-10); then only session.py and context.py remain"
+description = "Which partition a read sees (ADR 0036): resolve one Session (requested, else the latest with bars) and read session-grain tables for exactly that date, UNKNOWN otherwise; snapshot tables through data.reference.snapshot with the snapshot date disclosed. services/read/session.py resolves (resolve_session, the table grains); services/read/context.py calls it once per request (open_context) and reads session partitions (partition); nothing else may (services/explore, which picked its own partition by six rules, the bug ADR 0036 fixes, was deleted in read-model PR 10b)"
 owner = [
-    "src/algotrade/services/explore/*",
     "src/algotrade/services/read/session.py",
     "src/algotrade/services/read/context.py",
 ]
@@ -601,12 +591,12 @@ detect = [{ string_prefix = "rollups/instrument/" }, { call = "chain_expiries" }
 
 [[responsibility]]
 id = "scalar-coercion"
-description = "Turn a stored scalar (numpy, pandas, NaN, NaT, dates) into a JSON-safe value, one way for reads and runs (ADR 0037): services/read/values.py to_scalar; services/views.py imports it back as to_value for runs and today's callers. Callers of the one coercion are allowed; re-implementations are not: a private _float / _text / _num helper is one (read-model PR 8), except where it parses a vendor payload, formats text or does arithmetic rather than coerce a stored value for display (the allowed entries below say which)"
+description = "Turn a stored scalar (numpy, pandas, NaN, NaT, dates) into a JSON-safe value, one way for reads and runs (ADR 0037): services/read/values.py to_scalar; services/views.py imports it back as to_value for runs. Callers of the one coercion are allowed; re-implementations are not: a private _float / _text / _num helper is one (read-model PR 8), except where it parses a vendor payload, formats text or does arithmetic rather than coerce a stored value for display (the allowed entries below say which)"
 owner = ["src/algotrade/services/read/values.py"]
 allowed = [
     "src/algotrade/services/read/*",  # the loaders call the one coercion for every value they return (docs/api/read-model.md "Values and UNKNOWN")
-    "src/algotrade/services/views.py",  # re-exports to_scalar as to_value (runs and today's callers) and coerces the FeatureView through it
-    "src/algotrade/services/explore/*",  # today's display reads call the one coercion; each module leaves with explore (PRs 4-10)
+    "src/algotrade/services/views.py",  # re-exports to_scalar as to_value (runs) and coerces the FeatureView through it
+    "src/algotrade/services/preview/*",  # the Builder's dry runs show values through the one coercion, as the nightly run stores them
     "src/algotrade/services/screening/exports.py",  # run exports serialise through the same coercion, so runs and reads agree
     "src/algotrade/services/selection.py",  # the selection's field values, same coercion
     "src/algotrade/services/screening/rule_results.py",  # the rule-screen writer types value_num through the one coercion (_num calls to_value)
@@ -635,10 +625,10 @@ detect = [{ call = "load_ideas" }]
 
 [[responsibility]]
 id = "screen-preview"
-description = "The Builder's dry runs (ADR 0029): an unsaved rule-screen draft resolved for a user and evaluated by the nightly evaluate_screen on the latest closed session (summary, funnel, coverage, top rows; the field frame cached per session, fields, user features and visible_seq), and a formula type checked and sampled; never writes"
-owner = ["src/algotrade/services/explore/preview/*"]
+description = "The Builder's dry runs (ADR 0029), over the request's ReadContext: an unsaved rule-screen draft resolved for a user and evaluated by the nightly evaluate_screen on the context's session (summary, funnel, coverage, top rows; the field frame cached per session, fields, user features and visible_seq), and a formula type checked and sampled on that session; never writes; REST POSTs by design"
+owner = ["src/algotrade/services/preview/*"]
 section = "docs/adr/0029-rule-screener.md#preview--nightly"
-detect = [{ call = "field_frame" }, { call = "preview_session" }]
+detect = [{ call = "field_frame" }]
 
 # --------------------------------------------------------------------------- stored tables
 # Every stored table has exactly one producing owner (tests/architecture/test_ownership.py),

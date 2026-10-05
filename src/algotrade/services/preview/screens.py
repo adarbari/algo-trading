@@ -1,11 +1,12 @@
 """The Builder's live preview (ADR 0029): an unsaved rule-screen draft resolved for a user and
-evaluated on the latest closed session by the SAME ``RuleScreener.evaluate`` (``evaluate_screen``)
+evaluated on the request's session (``ReadContext.session``: the latest with daily bars unless a
+date is asked for, ADR 0036) by the SAME ``RuleScreener.evaluate`` (``evaluate_screen``)
 the nightly ``screen`` job runs, over the same selection, fields and coverage rules. Saves
 nothing.
 
 ``preview_screen`` returns the run summary (passed, missing data by field, narrow misses), the
 decision counts, the funnel per gating criterion in spec order, the coverage, the session used,
-the top rows (every row that is not rejected and at least ``limit``, at most ``MAX_PAGE_SIZE``,
+the top rows (every row that is not rejected and at least ``limit``, at most ``MAX_ROWS``,
 so a screen with more picks than ``limit`` still shows each one; each with who the instrument
 is, as the review table's rows: one table widget renders both) and, for a screener with a saved
 run for that session, who the draft would pick that the run did not and the reverse
@@ -25,10 +26,9 @@ from algotrade.core.model.screen_spec import Mode, ScreenSpec
 from algotrade.core.time.calendar import last_closed_session
 from algotrade.core.views.feature_view import FeatureView
 from algotrade.services.configs import resolve_rule_draft
-from algotrade.services.explore.preview.frame import field_frame
-from algotrade.services.explore.store import BARS, MAX_PAGE_SIZE, ReadStore, partition_for
 from algotrade.services.features import config_features
-from algotrade.services.read.context import open_context
+from algotrade.services.preview.frame import field_frame
+from algotrade.services.read.context import ReadContext, ResultCache, open_context
 from algotrade.services.read.screens.runs import is_picked, latest_run, run_rows
 from algotrade.services.read.screens.screeners import (
     ScreenColumn,
@@ -40,6 +40,7 @@ from algotrade.services.views import to_value
 from algotrade.strategies.screeners.base import Decision
 from algotrade.strategies.screeners.rules import Outcome, RuleRow, RuleScreener
 
+MAX_ROWS = 1000  # the most rows one preview returns
 DRAFT_ID = "preview"  # the screen id of a draft that names none
 UNMANAGED = ("schedule",)  # a legacy key (ADR 0033), dropped from a draft
 
@@ -152,14 +153,6 @@ class ScreenPreview:
     changes: PreviewChanges | None  # None: no saved run of this screener for ``session``
 
 
-def preview_session(store: ReadStore, now: datetime | None = None) -> tuple[date, date]:
-    """(the session to preview, the latest closed session): the latest session with daily
-    bars on or before the last closed one (a session whose nightly has not landed yet falls
-    back to the previous stored one). ``NotFoundError`` before the first stored session."""
-    closed = last_closed_session(now or datetime.now(UTC))
-    return partition_for(store.reader, BARS, closed), closed
-
-
 def draft_spec(document: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
     """The draft's screen id and the document to resolve (without a legacy schedule)."""
     if not isinstance(document, Mapping):
@@ -229,7 +222,7 @@ def _row(row: RuleRow, symbol: str | None, name: str | None) -> PreviewRow:
 
 
 def preview_changes(
-    store: ReadStore,
+    ctx: ReadContext,
     who: UserContext,
     screener_id: str,
     session: date,
@@ -238,12 +231,12 @@ def preview_changes(
 ) -> PreviewChanges | None:
     """``rows`` (the draft's, every one) against ``screener_id``'s saved run for ``session``
     (the read model's latest-run rule, as ``who`` sees the screener); None without one."""
-    ctx = open_context(store.reader, store.configs, who, session, store.cache)
-    screener = load_screener(ctx, screener_id)
-    run = None if screener is None else latest_run(ctx, screener.owner, screener_id).run
+    mine = open_context(ctx.reader, ctx.configs, who, session, ctx.cache)
+    screener = load_screener(mine, screener_id)
+    run = None if screener is None else latest_run(mine, screener.owner, screener_id).run
     if run is None:
         return None
-    saved = run_rows(ctx, run)
+    saved = run_rows(mine, run)
     before = {str(i) for i, d in zip(saved["instrument_id"], saved["decision"], strict=True)
               if is_picked(str(d))}  # fmt: skip
     after = {r.instrument_id for r in rows if is_picked(r.decision.value)}
@@ -254,32 +247,31 @@ def preview_changes(
 
 
 def preview_screen(
-    store: ReadStore,
+    ctx: ReadContext,
+    frames: ResultCache,
     spec: Mapping[str, Any],
     user: str | None = None,
     limit: int = 50,
-    on: date | None = None,
     now: datetime | None = None,
 ) -> ScreenPreview:
-    """``spec`` (an unsaved draft rule screen, resolved for ``user``: default the store's)
-    evaluated on ``on`` (default: ``preview_session``). Fails closed: an invalid draft is a
-    ``ConfigurationError`` naming its path, and nothing is evaluated."""
-    who = UserContext(validate_id("user", user if user is not None else store.user.user_id))
+    """``spec`` (an unsaved draft rule screen, resolved for ``user``: default the context's)
+    evaluated on ``ctx.session``. ``frames``: the field-frame cache (large, few entries: kept
+    apart from ``ctx.cache`` so page reads never evict the frame an edit re-evaluates). Fails
+    closed: an invalid draft is a ``ConfigurationError`` naming its path, and nothing is
+    evaluated."""
+    who = UserContext(validate_id("user", user if user is not None else ctx.user.user_id))
     name, document = draft_spec(spec)
-    config = resolve_rule_draft(store.configs, name, who, document)
+    config = resolve_rule_draft(ctx.configs, name, who, document)
     rules, selection, screening = config.screen_spec, config.selection, config.screening
     if selection is None:  # a rule screen always resolves with one; never run without it
         raise ConfigurationError(f"{who.user_id}/{name}: a screener needs a selection")
-    if on is None:
-        session, closed = preview_session(store, now)
-    else:
-        session, closed = on, last_closed_session(now or datetime.now(UTC))
+    session, closed = ctx.session.date, last_closed_session(now or datetime.now(UTC))
     fields = {r.field for r in selection.where.rules()} | set(rules.fields())
     if selection.order_by:
         fields.add(selection.order_by)
     frame, cached = field_frame(
-        store.reader,
-        store.preview_cache,
+        ctx.reader,
+        frames,
         session,
         sorted(fields),
         config_features(config),
@@ -293,7 +285,7 @@ def preview_screen(
     run = settle_coverage(run, selected, frame.universe, session, screening, frame.missing)
     symbols, names = frame.symbols, frame.names
     kept = sum(1 for r in result.rows if r.decision is not Decision.REJECT)  # ranked first
-    top = result.rows[: max(0, min(max(limit, kept), MAX_PAGE_SIZE))]
+    top = result.rows[: max(0, min(max(limit, kept), MAX_ROWS))]
     summary = result.summary
     steps = funnel(rules, result.rows)
     return ScreenPreview(
@@ -340,5 +332,5 @@ def preview_screen(
         display_columns=[ScreenColumn(n, f) for n, f in rules.columns],
         rows=[_row(r, symbols.get(r.instrument_id), names.get(r.instrument_id)) for r in top],
         cached=cached,
-        changes=preview_changes(store, who, name, session, result.rows, symbols),
+        changes=preview_changes(ctx, who, name, session, result.rows, symbols),
     )

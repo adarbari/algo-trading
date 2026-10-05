@@ -7,7 +7,6 @@ import pytest
 
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
-from algotrade.services.explore.store import ReadStore
 from algotrade.services.read.context import StoreContext, open_stores
 from algotrade.services.read.ops.runs import (
     failure_groups,
@@ -18,13 +17,14 @@ from algotrade.services.read.ops.runs import (
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import start_run
+from algotrade_api.deps import ReadStore
 
 NOW = datetime(2026, 10, 3, 2, tzinfo=UTC)
 
 
 @pytest.fixture(scope="module")
-def golden(explore: tuple[ReadStore, dict[str, str]]) -> StoreContext:
-    store = explore[0]
+def golden(api_golden: tuple[ReadStore, dict[str, str]]) -> StoreContext:
+    store = api_golden[0]
     return open_stores(store.reader, store.configs, store.user)
 
 
@@ -72,9 +72,9 @@ def test_a_nightly_run_that_failed_early_shows_its_items_as_steps() -> None:
 
 
 def test_run_detail_groups_failures_by_reason(
-    golden: StoreContext, explore: tuple[ReadStore, dict[str, str]]
+    golden: StoreContext, api_golden: tuple[ReadStore, dict[str, str]]
 ) -> None:
-    detail = load_run(golden, explore[1]["chains"])
+    detail = load_run(golden, api_golden[1]["chains"])
     assert detail is not None and detail.items_total == 3
     assert detail.items_by_status == {"OK": 1, "NO_CHAIN": 1, "STALE_DATA": 1}
     groups = {g.reason: g for g in detail.failures}
@@ -83,9 +83,9 @@ def test_run_detail_groups_failures_by_reason(
 
 
 def test_run_items_every_item_with_its_code(
-    golden: StoreContext, explore: tuple[ReadStore, dict[str, str]]
+    golden: StoreContext, api_golden: tuple[ReadStore, dict[str, str]]
 ) -> None:
-    items = load_run_items(golden, explore[1]["chains"])
+    items = load_run_items(golden, api_golden[1]["chains"])
     assert items is not None
     assert [(i.key, i.code, i.status) for i in items] == [
         ("AAA", "OK", "OK"),

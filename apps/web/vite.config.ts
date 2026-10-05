@@ -19,7 +19,7 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    // The API (apps/api, `algotrade-api`) serves its routes at the root (/health, /explore/...);
+    // The API (apps/api, `algotrade-api`) serves its routes at the root (/health, /graphql, ...);
     // the web app calls them under /api, which the dev server strips and proxies.
     proxy: {
       '/api': {

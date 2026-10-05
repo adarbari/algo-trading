@@ -1,4 +1,4 @@
-"""``graph(query, variables)``: POST a GraphQL operation to the API over the golden explore
+"""``graph(query, variables)``: POST a GraphQL operation to the API over the golden API
 store (``tests/apps/api/conftest.py``) and return the JSON body (always HTTP 200); ``ctx``:
 the read context of that store's latest session."""
 
@@ -8,8 +8,8 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from algotrade.services.explore.store import ReadStore
 from algotrade.services.read.context import ReadContext, open_context
+from algotrade_api.deps import ReadStore
 
 Graph = Callable[..., dict[str, Any]]
 
@@ -35,6 +35,6 @@ def graph(client: TestClient) -> Graph:
 
 
 @pytest.fixture(scope="session")
-def ctx(explore: tuple[ReadStore, dict[str, str]]) -> ReadContext:
-    store = explore[0]
+def ctx(api_golden: tuple[ReadStore, dict[str, str]]) -> ReadContext:
+    store = api_golden[0]
     return open_context(store.reader, store.configs, store.user)
