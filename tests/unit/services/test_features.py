@@ -2,7 +2,7 @@
 ``FeatureView`` columns, and the selection catalogue of a config store's features."""
 
 import tomllib
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -53,6 +53,17 @@ def test_a_series_over_a_range_and_an_instrument_filter(reader: StoreReader) -> 
     no_iv = read_expressions(reader, ["iv_hv_spread"], D1)
     assert no_iv.frame["iv_hv_spread"].isna().all()
     assert no_iv.missing == ("rollups/instrument/iv_history@v2",)
+
+
+def test_narrowed_reads_tell_no_rows_from_no_partition(reader: StoreReader) -> None:
+    rowless = read_expressions(reader, ["near_52w"], D1, instruments=["EQ:NONE"])
+    assert rowless.missing == ()  # the partition exists: just no row for this instrument
+    absent = read_expressions(reader, ["near_52w"], date(2020, 3, 4), instruments=["EQ:BULL"])
+    assert absent.missing == (PS,)
+    before = read_expressions(
+        reader, ["near_52w"], D1, instruments=["EQ:NONE"], as_of=datetime(2000, 1, 1, tzinfo=UTC)
+    )
+    assert before.missing == (PS,)  # nothing of it was known then
 
 
 def test_selections_and_feature_views_name_expression_features(reader: StoreReader) -> None:

@@ -19,6 +19,8 @@ import pandas as pd
 
 from algotrade.config.strategy.schema import RULES_IMPL
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.data.reference import load_universe
+from algotrade.services.configs import catalog_of
 from algotrade.services.explore.screens.results import RunRows, run_rows
 from algotrade.services.explore.store import (
     NotFoundError,
@@ -26,8 +28,9 @@ from algotrade.services.explore.store import (
     ReadStore,
     cached,
     paginate,
+    store_features,
 )
-from algotrade.services.explore.universe import ticker_columns
+from algotrade.services.features import field_view
 from algotrade.services.read.screens.results import (
     COLUMN_MODE,
     RULE_SCREEN_VALUES,
@@ -158,6 +161,27 @@ def _values(
     return criteria, columns
 
 
+def _ticker_columns(
+    store: ReadStore, session: date, columns: list[str], ids: list[str]
+) -> tuple[pd.DataFrame, list[str]]:
+    """The universe snapshot's rows for ``ids`` (``instrument_id``, ``symbol``,
+    ``company_name``) with ``columns`` (catalogue fields for ``session``; ``ConfigurationError``
+    for one the user does not have), and the tables with no partition for ``session``. Moved
+    here from ``explore/universe.py`` when the universe table moved to the read model
+    (read-model PR 7); goes with this module in PR 8."""
+    fs = store_features(store)
+    catalogue = catalog_of(fs)
+    for name in columns:
+        catalogue.check_field(name, "columns")
+    universe = load_universe(store.reader, session).frame
+    frame = universe.reindex(columns=["instrument_id", "symbol", "company_name"])
+    frame["instrument_id"] = frame["instrument_id"].astype(str)
+    frame = frame[frame["instrument_id"].isin(set(ids))]
+    view = field_view(store.reader, session, columns, features=fs)
+    extra = view.frame.reindex(columns=["instrument_id", *columns])
+    return frame.merge(extra, on="instrument_id", how="left"), list(view.missing)
+
+
 def _sort_key(row: ScreenTableRow, sort: str) -> Any:
     """The value a row is ordered by (None: no value, always last)."""
     if sort in SORTS:
@@ -226,8 +250,8 @@ def _compute(
     if change:
         kept = kept[[moved.get(str(i), (None, None))[0] == change for i in kept["instrument_id"]]]
     ids = [str(i) for i in kept["instrument_id"]]
-    extra = ticker_columns(store, run.session, features, ids)
-    names = extra.frame.set_index(extra.frame["instrument_id"].astype(str))
+    extra, missing = _ticker_columns(store, run.session, features, ids)
+    names = extra.set_index(extra["instrument_id"].astype(str))
     criteria, columns = _values(store, run, ids)
     rows = []
     for r in kept.to_dict("records"):
@@ -267,7 +291,7 @@ def _compute(
         {c: int(totals.get(c, 0)) for c in CHANGES} if before is not None else {},
         [CriterionHeader(c.id, c.field, c.mode.value) for c in spec.criteria],
         [name for name, _ in spec.columns],
-        extra.missing,
+        missing,
         _sorted(rows, sort, set(features)),
     )
 

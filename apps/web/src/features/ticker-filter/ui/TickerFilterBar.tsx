@@ -25,7 +25,7 @@ export function TickerFilterBar({ filters, onChange, loading = false }: TickerFi
     <Stack gap={2}>
       <SearchInput
         aria-label="Filter tickers"
-        placeholder="Ticker, name or sector…"
+        placeholder="Ticker or name…"
         value={filters.q ?? ''}
         onValueChange={(q) => {
           set({ q: q || undefined });

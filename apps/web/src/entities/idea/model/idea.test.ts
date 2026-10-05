@@ -1,15 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { IDEA_FACTS } from './facts';
-import {
-  decisionLabel,
-  decisionTone,
-  earningsBeforeExpiry,
-  factOf,
-  NO_IDEAS,
-  toIdeasData,
-  type IdeasResponse,
-} from './idea';
+import { earningsBeforeExpiry, factOf, NO_IDEAS, toIdeasData, type IdeasResponse } from './idea';
 
 type Served = NonNullable<IdeasResponse['ideas']>;
 type Item = Served['items'][number];
@@ -177,15 +169,5 @@ describe('display values and watch-outs', () => {
 
   it('names the screeners', () => {
     expect(idea?.picks.map((p) => p.screenerName)).toEqual(['liq', 'VRP scanner']);
-  });
-});
-
-describe('decisions', () => {
-  it('labels and tones', () => {
-    expect(decisionLabel('EVENT_RISK')).toBe('Event risk');
-    expect(decisionTone('QUALIFIED')).toBe('positive');
-    expect(decisionTone('WATCH')).toBe('accent');
-    expect(decisionTone('EVENT_RISK')).toBe('warning');
-    expect(decisionTone('OTHER')).toBe('neutral');
   });
 });

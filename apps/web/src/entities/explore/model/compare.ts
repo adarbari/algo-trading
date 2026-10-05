@@ -1,33 +1,43 @@
-/** Compare results shaped for display: rebased price series and side-by-side feature rows. */
+/**
+ * The compare chart's series: each ticker's stored closes, shown rebased to 100 at its first
+ * close in the window so tickers at different prices share one axis. Rebasing is how the chart
+ * presents the closes the server sent (ADR 0038 "presentation is not derivation"); no value is
+ * computed that the server could send.
+ */
 import type { ChartSeries } from '@algotrade/ui';
 
-import type { components } from '@/shared/api';
+export const REBASE = 100;
 
-export type PriceComparison = components['schemas']['PriceComparison'];
-export type FeatureComparison = components['schemas']['FeatureComparison'];
-
-/** One chart series per instrument (ids are the tickers, so colours follow the compare set). */
-export function priceSeries(comparison: PriceComparison): ChartSeries[] {
-  return comparison.instruments.map((instrument) => {
-    const values = comparison.series[instrument.instrument_id] ?? [];
-    const points = comparison.dates.flatMap((time, i) => {
-      const value = values[i];
-      return typeof value === 'number' ? [{ time, value }] : [];
-    });
-    const symbol = instrument.symbol ?? instrument.instrument_id;
-    return { id: symbol, label: symbol, points };
-  });
+/** One ticker's closes, oldest first. */
+export interface ComparedPrices {
+  symbol: string;
+  instrumentId: string;
+  closes: readonly { session: string; close: number | null }[];
 }
 
-/** Ticker -> value of one feature row. */
-export function rowValues(
-  comparison: FeatureComparison,
-  feature: string,
-): Readonly<Record<string, unknown>> {
-  const row = comparison.rows.find((r) => r.feature === feature);
-  const out: Record<string, unknown> = {};
-  for (const instrument of comparison.instruments) {
-    out[instrument.symbol ?? instrument.instrument_id] = row?.values[instrument.instrument_id];
-  }
-  return out;
+interface ServedInstrument {
+  instrumentId: string;
+  symbol: string;
+  prices: { bars: readonly { session: string; close?: number | null }[] };
+}
+
+export function toCompared(instruments: readonly ServedInstrument[]): ComparedPrices[] {
+  return instruments.map((i) => ({
+    symbol: i.symbol,
+    instrumentId: i.instrumentId,
+    closes: i.prices.bars.map((b) => ({ session: b.session, close: b.close ?? null })),
+  }));
+}
+
+/** One chart series per ticker (ids are the tickers, so colours follow the compare set). */
+export function priceSeries(compared: readonly ComparedPrices[]): ChartSeries[] {
+  return compared.map(({ symbol, closes }) => {
+    const known = closes.filter((c): c is { session: string; close: number } => c.close !== null);
+    const first = known[0]?.close;
+    const points =
+      first === undefined || first === 0
+        ? []
+        : known.map((c) => ({ time: c.session, value: (c.close / first) * REBASE }));
+    return { id: symbol, label: symbol, points };
+  });
 }

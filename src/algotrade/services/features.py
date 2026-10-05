@@ -122,19 +122,30 @@ def field_view(
     features: FeatureSet | None = None,
 ) -> InstrumentView:
     """``data.reference.instrument_view`` for any catalogue fields: stored ones as read,
-    ``feature.<name>`` ones computed for the session (tables they need that have no rows
-    are added to ``missing``)."""
+    ``feature.<name>`` ones computed for the session, for ``ids`` only when given (tables they
+    need that have no partition for the session are added to ``missing``)."""
     expressions = [f.removeprefix(FEATURE_FIELD_PREFIX) for f in fields if is_feature_field(f)]
     stored = [f for f in fields if not is_feature_field(f)]
     view = instrument_view(reader, session, stored, ids, as_of)
     if not expressions:
         return view
-    computed = read_expressions(reader, expressions, session, as_of=as_of, features=features)
+    computed = read_expressions(
+        reader, expressions, session, as_of=as_of, instruments=ids, features=features
+    )
     extra = computed.frame.drop(columns="session_date").rename(
         columns={n: f"{FEATURE_FIELD_PREFIX}{n}" for n in expressions}
     )
     frame = view.frame.merge(extra, on="instrument_id", how="left")
     return replace(view, frame=frame, missing=tuple(sorted({*view.missing, *computed.missing})))
+
+
+def _stored(
+    reader: StoreReader, table: str, start: date, end: date, as_of: datetime | None
+) -> bool:
+    """Does ``table`` have rows in ``start..end`` known at ``as_of`` (None: now)?"""
+    if as_of is None:
+        return any(start <= d <= end for d in reader.dates(table))
+    return feature_rows(reader, table, ["instrument_id"], start, end, as_of) is not None
 
 
 def read_expressions(
@@ -149,15 +160,22 @@ def read_expressions(
     """Expression features ``names`` for ``start..end`` (``end``: ``start``), point in time,
     for ``instruments`` only when given. Rows are read only for them unless a formula uses
     ``exists(group)``, which needs every row of the session to tell "no row for this
-    instrument" from "no rows at all"."""
+    instrument" from "no rows at all". ``missing``: the tables read with no partition in the
+    range (never one that merely has no rows for ``instruments``)."""
     fs = features or site_features()
     _, todo = fs.plan(names)
     whole = instruments is None or any(fs.expressions[n].exists for n in todo)
     only = None if whole else instruments
+    last = end or start
     frames: dict[str, pd.DataFrame | None] = {}
     for table, columns in fs.stored_columns(names).items():
-        frames[table] = feature_rows(reader, table, columns, start, end or start, as_of, only)
-    missing = tuple(sorted(t for t, f in frames.items() if f is None))
+        frames[table] = feature_rows(reader, table, columns, start, last, as_of, only)
+    # Narrowed to some instruments, no rows may only mean none of theirs: then the table is
+    # missing only when it has no partition in the range at all.
+    empty = [t for t, f in frames.items() if f is None]
+    if only is not None:
+        empty = [t for t in empty if not _stored(reader, t, start, last, as_of)]
+    missing = tuple(sorted(empty))
     out = fs.evaluate(frames, names)
     if instruments is not None:
         out = out[out["instrument_id"].isin(set(instruments))].reset_index(drop=True)

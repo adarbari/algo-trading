@@ -1,8 +1,7 @@
 """Request dependencies: the API settings, the read-only store, the live quotes (ADR 0028),
 the config writer (ADR 0029: user configs only, through ``services.authoring``), the
 on-request screen runner (ADR 0033), the user a
-write is for, and the query parameters several routes share (universe filters, comma-separated
-lists).
+write is for, and the query parameters several routes share (comma-separated lists).
 
 Settings come from the environment through ``algotrade.config.env`` (the one reader):
 ``ALGOTRADE_DATA_URL``, ``ALGOTRADE_CONFIG_DIR`` and ``ALGOTRADE_USER`` (a single local
@@ -20,7 +19,6 @@ from algotrade.config.user import DEFAULT_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.authoring.scope import ConfigWriter, open_writer
 from algotrade.services.explore.store import ReadStore, open_store
-from algotrade.services.explore.universe import UniverseFilter
 from algotrade.services.live.quotes import LiveQuotes
 from algotrade.services.ondemand.screens import OnDemandScreens
 
@@ -101,21 +99,6 @@ def get_ondemand(request: Request) -> OnDemandScreens:
 
 
 OnDemand = Annotated[OnDemandScreens, Depends(get_ondemand)]
-
-
-def universe_filter(
-    security_type: str | None = None,
-    leveraged: bool | None = None,
-    sector: str | None = None,
-    liquidity_class: str | None = None,
-    q: Annotated[str | None, Query(description="symbol or company name contains")] = None,
-    optionable: Annotated[bool | None, Query(description="has listed options")] = None,
-) -> UniverseFilter:
-    """The universe filters ``/universe`` and ``/explore/tickers`` share."""
-    return UniverseFilter(security_type, leveraged, sector, liquidity_class, q, optionable)
-
-
-Filters = Annotated[UniverseFilter, Depends(universe_filter)]
 
 
 def name_list(value: str | None) -> list[str]:

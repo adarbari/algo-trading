@@ -1,8 +1,8 @@
 /**
  * Trader > Explore end to end, against the production build with the API mocked from
- * recorded fixtures (explore-api.ts): the ticker table at full universe size, the compare set
- * and detail tabs, URL state (shareable links), accessibility in dark and light, and that the
- * 11k-row table stays responsive (search and scrolling).
+ * recorded fixtures (explore-api.ts): the ticker table over the full universe one server page
+ * per request (sorted, filtered and paged by the server), the compare set and detail tabs, URL
+ * state (shareable links) and accessibility in dark and light.
  */
 import { expect, test, type Page } from '@playwright/test';
 
@@ -27,7 +27,7 @@ async function useTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
 }
 
 const tickers = (page: Page) => page.getByRole('grid', { name: 'Tickers' });
-const summary = (page: Page) => page.getByText(/of 11,427 tickers/);
+const summary = (page: Page) => page.getByText(/^[\d,]+ tickers? ·/);
 
 test.beforeEach(async ({ page }) => {
   await mockApi(page);
@@ -38,7 +38,7 @@ for (const theme of ['dark', 'light'] as const) {
     const errors = collectErrors(page);
     await page.goto(COMPARE);
     await expect(page.getByRole('heading', { level: 1, name: 'Explore' })).toBeVisible();
-    await expect(summary(page)).toHaveText('11,427 of 11,427 tickers · 3 selected');
+    await expect(summary(page)).toHaveText('11,427 tickers · 3 selected');
     for (const symbol of ['AAPL', 'MSFT', 'NVDA']) {
       await expect(
         page.getByRole('button', { name: `Remove ${symbol} from compare` }),
@@ -48,8 +48,9 @@ for (const theme of ['dark', 'light'] as const) {
       page.getByRole('heading', { name: 'Performance · rebased to 100 · 1Y' }),
     ).toBeVisible();
     const side = page.getByRole('grid', { name: 'Side by side' });
-    await expect(side.getByText('Last close')).toBeVisible();
+    await expect(side.getByRole('button', { name: 'Close', exact: true })).toBeVisible();
     await expect(side.getByText('$333.69')).toBeVisible();
+    await expect(side.getByText('NVDA', { exact: true })).toBeVisible();
     await useTheme(page, theme);
     await expectAccessible(page);
     expect(errors).toEqual([]);
@@ -119,36 +120,46 @@ test('the tabs, the compare set and the columns live in the URL', async ({ page 
 
 test('ticking a row adds it to the compare set', async ({ page }) => {
   await page.goto('/explore');
-  await expect(summary(page)).toHaveText('11,427 of 11,427 tickers · 0 selected');
+  await expect(summary(page)).toHaveText('11,427 tickers · 0 selected');
   await page.getByRole('searchbox', { name: 'Filter tickers' }).fill('AAPL');
   await tickers(page).getByRole('checkbox', { name: 'Select AAPL', exact: true }).check();
   await expect(page).toHaveURL(/sel=AAPL/);
   await expect(page.getByRole('button', { name: 'Remove AAPL from compare' })).toBeVisible();
 });
 
-test('the 11k-row table stays responsive', async ({ page }) => {
-  const started = Date.now();
-  await page.goto('/explore');
-  await expect(summary(page)).toBeVisible();
-  const loaded = Date.now() - started;
-  // Search filters the loaded rows locally: no network round trip per keystroke.
-  const search = page.getByRole('searchbox', { name: 'Filter tickers' });
-  const typed = Date.now();
-  await search.fill('NVDA');
-  await expect(summary(page)).toHaveText(/^1 of 11,427 tickers/);
-  const filtered = Date.now() - typed;
-  await search.fill('');
-  // Keyboard navigation reaches the last of 11,427 rows through the virtualised body.
-  const grid = tickers(page);
-  await grid.getByRole('row').nth(1).click();
-  const jumped = Date.now();
-  await page.keyboard.press('End');
-  await expect(grid.getByText('ZZ11426', { exact: true })).toBeVisible();
-  const scrolled = Date.now() - jumped;
-  test.info().annotations.push({
-    type: 'timing',
-    description: `load ${loaded} ms, search ${filtered} ms, jump to last row ${scrolled} ms`,
+test('one server page per request: sort, search and paging', async ({ page }) => {
+  const errors = collectErrors(page);
+  const asked: Record<string, unknown>[] = [];
+  page.on('request', (request) => {
+    const body = request.postData();
+    if (request.url().endsWith('/api/graphql') && body?.includes('query FeatureTable')) {
+      asked.push((JSON.parse(body) as { variables: Record<string, unknown> }).variables);
+    }
   });
-  expect(filtered).toBeLessThan(1_000);
-  expect(scrolled).toBeLessThan(1_000);
+  await page.goto('/explore');
+  await expect(summary(page)).toHaveText('11,427 tickers · 0 selected');
+  await expect(page.getByText('Page 1 of 115')).toBeVisible();
+  expect(asked).toHaveLength(1); // the whole universe in one page request, not 12
+  expect(asked[0]).toMatchObject({ page: 1, size: 100, sort: null });
+  const grid = tickers(page);
+  const close = grid.getByRole('button', { name: 'Close', exact: true });
+  await close.click();
+  await expect(page).toHaveURL(
+    /sort=-rollup\.price_stats%40v2\.close|sort=-rollup\.price_stats@v2\.close/,
+  );
+  const header = page.getByRole('button', { name: 'Close', exact: true });
+  await expect(grid.getByRole('columnheader').filter({ has: header })).toHaveAttribute(
+    'aria-sort',
+    'descending',
+  );
+  expect(asked.at(-1)).toMatchObject({ sort: '-rollup.price_stats@v2.close', page: 1 });
+  await expect(grid.getByText('MSFT', { exact: true })).toBeVisible(); // $517.53 is the top
+  await page.getByRole('button', { name: 'Next page' }).click();
+  await expect(page.getByText('Page 2 of 115')).toBeVisible();
+  expect(asked.at(-1)).toMatchObject({ page: 2 });
+  await page.getByRole('searchbox', { name: 'Filter tickers' }).fill('NVDA');
+  await expect(summary(page)).toHaveText(/^1 ticker ·/);
+  expect(asked.at(-1)).toMatchObject({ q: 'NVDA', page: 1 });
+  await expect(grid.getByText('NVDA', { exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
 });

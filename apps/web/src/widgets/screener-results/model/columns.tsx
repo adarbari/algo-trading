@@ -5,14 +5,7 @@
  * none); the screen's display columns; the catalogue features the user added; the flags and
  * the reasons. A column's id is the API's sort key for it.
  */
-import {
-  Mono,
-  Stack,
-  StatusBadge,
-  Text,
-  type DataTableColumn,
-  type DataTableFill,
-} from '@algotrade/ui';
+import { Mono, Stack, StatusBadge, Text, type DataTableColumn } from '@algotrade/ui';
 
 import {
   displayValue,
@@ -21,17 +14,12 @@ import {
   type CatalogueFeature,
 } from '@/entities/feature';
 import {
-  ScreenDecisionBadge,
+  DecisionBadge,
+  OUTCOME_FILL,
   type CriterionHeader,
   type ScreenTable,
   type ScreenTableRow,
 } from '@/entities/screen';
-
-const FILL: Readonly<Record<string, DataTableFill>> = {
-  NEAR: 'warning',
-  FAIL: 'negative',
-  MISSING: 'negative',
-};
 
 /** No pick is about to leave. */
 const NONE: ReadonlySet<string> = new Set();
@@ -69,7 +57,7 @@ export function resultColumns(
         description: `${describe(feature, c.field)} (criterion ${c.criterion_id}, ${c.mode}). A tint marks a near miss or a miss.`,
         value: (row) => displayValue(row.criteria[c.criterion_id]?.value),
         format: featureFormat(feature),
-        fill: (row) => FILL[row.criteria[c.criterion_id]?.outcome ?? ''],
+        fill: (row) => OUTCOME_FILL[row.criteria[c.criterion_id]?.outcome ?? ''],
       };
     });
   const display = table.column_names.map((name): DataTableColumn<ScreenTableRow> => ({
@@ -123,7 +111,7 @@ export function resultColumns(
       width: 'lg',
       cell: ({ row }) => (
         <Stack gap={0}>
-          <ScreenDecisionBadge decision={row.decision} />
+          <DecisionBadge decision={row.decision} />
           {row.symbol !== null && leaving.has(row.symbol) ? (
             <StatusBadge tone="warning">Would leave</StatusBadge>
           ) : null}

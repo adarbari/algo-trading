@@ -23,9 +23,9 @@ import { errorDetail } from '@/shared/api';
 
 import { FeaturePicker } from '@/features/column-picker';
 import { byName, useFeatureCatalogue } from '@/entities/feature';
-import { decisionLabel } from '@/entities/idea';
 import {
   orderedDecisions,
+  decisionLabel,
   runMessage,
   shownDecisions,
   useDeleteScreenerView,

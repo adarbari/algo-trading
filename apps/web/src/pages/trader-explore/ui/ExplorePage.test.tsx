@@ -6,17 +6,18 @@ import { ExplorePage } from './ExplorePage';
 
 const widgets = vi.hoisted(() => ({
   table: vi.fn(),
+  side: vi.fn(),
   compare: vi.fn(),
   options: vi.fn(),
   overview: vi.fn(),
 }));
 
-vi.mock('@/widgets/ticker-table', async () => {
+vi.mock('@/widgets/feature-table', async () => {
   const { Text } = await import('@algotrade/ui');
   return {
-    TickerTable: (props: Record<string, unknown>) => {
-      widgets.table(props);
-      return <Text>ticker table</Text>;
+    FeatureTable: (props: Record<string, unknown>) => {
+      (props['label'] === 'Tickers' ? widgets.table : widgets.side)(props);
+      return <Text>{String(props['label'])}</Text>;
     },
   };
 });
@@ -59,6 +60,7 @@ describe('ExplorePage', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Explore' })).toBeInTheDocument();
     expect(widgets.table).toHaveBeenLastCalledWith(
       expect.objectContaining({
+        sortMode: 'server',
         selected: ['AAPL', 'MSFT'],
         sort: { columnId: 'feature.market_cap', direction: 'desc' },
         filters: expect.objectContaining({ leveraged: true }) as unknown,
@@ -67,6 +69,13 @@ describe('ExplorePage', () => {
     );
     expect(widgets.compare).toHaveBeenLastCalledWith(
       expect.objectContaining({ symbols: ['AAPL', 'MSFT'], range: '1Y' }),
+    );
+    expect(widgets.side).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sortMode: 'client',
+        keys: ['AAPL', 'MSFT'],
+        columns: expect.arrayContaining(['feature.market_cap']) as unknown,
+      }),
     );
     expect(screen.getByRole('tab', { name: 'Compare' })).toHaveAttribute('aria-selected', 'true');
   });
@@ -105,16 +114,19 @@ describe('ExplorePage', () => {
     expect(onSearchChange).toHaveBeenLastCalledWith({ sel: 'AAPL', focus: undefined });
     const table = widgets.table.mock.lastCall?.[0] as {
       onColumnsChange: (c: string[]) => void;
-      onFocus: (s: string) => void;
+      onRowActivate: (s: string) => void;
+      onSelectedChange: (s: string[]) => void;
     };
     table.onColumnsChange([]);
     expect(onSearchChange).toHaveBeenLastCalledWith({ cols: 'none' });
-    table.onFocus('KO');
+    table.onRowActivate('KO');
     expect(onSearchChange).toHaveBeenLastCalledWith({
       focus: 'KO',
       expiry: undefined,
       feature: undefined,
     });
+    table.onSelectedChange(['KO', 'AAPL', 'MSFT']);
+    expect(onSearchChange).toHaveBeenLastCalledWith({ sel: 'AAPL,MSFT,KO' });
   });
 
   it('shows the focused ticker in the detail tabs and the screener placeholder', () => {

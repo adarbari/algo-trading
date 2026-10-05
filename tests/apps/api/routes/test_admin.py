@@ -73,3 +73,11 @@ def test_verification_counts_and_failing_rows(client: TestClient) -> None:
         "note",
     }
     assert client.get("/admin/verification/ibkr", params={"date": "2022-11-22"}).status_code == 404
+
+
+def test_review_lists(client: TestClient) -> None:
+    figi = client.get("/admin/review/figi").json()
+    assert figi["source"].startswith("universe_build-")
+    assert [r["symbol"] for r in figi["items"]] == ["BBB"]
+    leveraged = client.get("/admin/review/leveraged").json()
+    assert [r["symbol"] for r in leveraged["items"]] == ["CCC"]

@@ -4,23 +4,12 @@
  * screen's display columns (`[columns]`, labelled and formatted from the catalogue when the
  * name is a catalogue column), the flags and the reasons for the decision.
  */
-import { type DataTableColumn, type DataTableFill } from '@algotrade/ui';
+import { type DataTableColumn } from '@algotrade/ui';
 
-import {
-  featureColumn,
-  featureFormat,
-  featureLabel,
-  type CatalogueFeature,
-} from '@/entities/feature';
-import { ScoreBreakdown, ScreenDecisionBadge, type PreviewRow } from '@/entities/screen';
+import { columnOf, featureFormat, featureLabel, type CatalogueFeature } from '@/entities/feature';
+import { DecisionBadge, OUTCOME_FILL, ScoreBreakdown, type PreviewRow } from '@/entities/screen';
 
 type CriterionValue = PreviewRow['criteria'][number];
-
-const FILL: Readonly<Record<string, DataTableFill>> = {
-  NEAR: 'warning',
-  FAIL: 'negative',
-  MISSING: 'negative',
-};
 
 /** Who is screened is a gate, not a measurement: those criteria get no column. */
 const isGate = (criterion: CriterionValue): boolean => criterion.field.startsWith('instrument.');
@@ -43,7 +32,7 @@ const humanise = (name: string): string => {
 function byColumn(catalogue: ReadonlyMap<string, CatalogueFeature>) {
   const found = new Map<string, CatalogueFeature>();
   for (const feature of catalogue.values()) {
-    const column = featureColumn(feature.name);
+    const column = columnOf(feature.name);
     if (!found.has(column)) found.set(column, feature);
   }
   return found;
@@ -63,7 +52,7 @@ export function previewColumns(
       description: `${feature?.description ?? c.field} (criterion ${c.criterion_id}, ${c.mode}). A tint marks a near miss or a miss.`,
       value: (row) => cell(of(row)?.value),
       format: featureFormat(feature),
-      fill: (row) => FILL[of(row)?.outcome ?? ''],
+      fill: (row) => OUTCOME_FILL[of(row)?.outcome ?? ''],
     };
   });
   const labelOf = (id: string, field: string): string => {
@@ -107,7 +96,7 @@ export function previewColumns(
       id: 'decision',
       header: 'Decision',
       value: (row) => row.decision,
-      cell: ({ row }) => <ScreenDecisionBadge decision={row.decision} />,
+      cell: ({ row }) => <DecisionBadge decision={row.decision} />,
     },
     {
       id: 'score',
