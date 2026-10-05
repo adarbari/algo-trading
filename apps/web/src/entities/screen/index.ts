@@ -2,7 +2,10 @@
 export {
   PREVIEW_ROWS,
   useMyScreeners,
+  useSaveScreenerView,
   useScreener,
+  useScreenerView,
+  useScreenTable,
   useScreenerVersions,
   useScreenPreview,
   useScreeners,
@@ -45,3 +48,15 @@ export {
   type Tolerance,
 } from './model/spec';
 export { ScreenDecisionBadge } from './ui/ScreenDecisionBadge';
+export {
+  DEFAULT_DECISIONS,
+  orderedDecisions,
+  shownDecisions,
+  TABLE_ROWS,
+  type CriterionHeader,
+  type ScreenChange,
+  type ScreenerView,
+  type ScreenTable,
+  type ScreenTableQuery,
+  type ScreenTableRow,
+} from './model/table';

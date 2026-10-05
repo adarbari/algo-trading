@@ -2,11 +2,12 @@
  * Read hooks for rule screens: the screeners list (GET /configs), one screen's draft, versions
  * and preset pin (GET /screeners/{id}), and the live preview of a draft.
  */
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api, queryKeys, unwrap } from '@/shared/api';
 
 import type { ScreenDocument } from '../model/spec';
+import { tableParams, type ScreenerView, type ScreenTableQuery } from '../model/table';
 
 /** Every screener the user sees: site presets and their own (Python and rule screens). */
 export function useScreeners() {
@@ -68,5 +69,55 @@ export function useScreenPreview(document: ScreenDocument | null) {
     placeholderData: keepPreviousData,
     retry: false,
     staleTime: 30_000,
+  });
+}
+
+/**
+ * A rule screen's latest run as a review table: filtered, sorted and cut to the first
+ * `TABLE_ROWS` rows by the API. The previous table stays on screen while a new one loads.
+ * A screen with no stored run answers 404 (no retry).
+ */
+export function useScreenTable(id: string, query: ScreenTableQuery, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.screeners.table(id, { ...query }),
+    queryFn: () =>
+      unwrap(
+        api.GET('/screens/{config_id}/table', {
+          params: { path: { config_id: id }, query: tableParams(query) },
+        }),
+      ),
+    placeholderData: keepPreviousData,
+    enabled,
+    retry: false,
+  });
+}
+
+/** The user's saved view of a screen's results (columns, sort, decisions). */
+export function useScreenerView(id: string) {
+  return useQuery({
+    queryKey: queryKeys.screeners.view(id),
+    queryFn: () =>
+      unwrap(
+        api.GET('/preferences/screeners/{screener_id}/view', {
+          params: { path: { screener_id: id } },
+        }),
+      ),
+  });
+}
+
+/** Saves the view (it belongs to the user, not to the screen: no version, no hash). */
+export function useSaveScreenerView(id: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (view: Pick<ScreenerView, 'columns' | 'sort' | 'decisions'>) =>
+      unwrap(
+        api.PUT('/preferences/screeners/{screener_id}/view', {
+          params: { path: { screener_id: id } },
+          body: view,
+        }),
+      ),
+    onSuccess: (saved) => {
+      client.setQueryData(queryKeys.screeners.view(id), saved);
+    },
   });
 }

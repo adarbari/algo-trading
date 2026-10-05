@@ -35,6 +35,9 @@ export const queryKeys = {
     detail: (id: string) => ['screeners', 'detail', id] as const,
     versions: (id: string) => ['screeners', 'versions', id] as const,
     preview: (spec: unknown) => ['screeners', 'preview', spec] as const,
+    table: (id: string, query: Readonly<Record<string, unknown>>) =>
+      ['screeners', 'table', id, query] as const,
+    view: (id: string) => ['screeners', 'view', id] as const,
   },
   instruments: {
     detail: (id: string) => ['instruments', id] as const,

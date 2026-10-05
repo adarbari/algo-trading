@@ -7,14 +7,29 @@ import { ScreenersPage } from './ScreenersPage';
 vi.mock('@/widgets/screener-list', async () => {
   const { Button } = await import('@algotrade/ui');
   return {
-    ScreenerList: ({ onOpen }: { onOpen: (id: string) => void }) => (
-      <Button
-        onClick={() => {
-          onOpen('my-vrp');
-        }}
-      >
-        open
-      </Button>
+    ScreenerList: ({
+      onOpen,
+      onEdit,
+    }: {
+      onOpen: (id: string) => void;
+      onEdit: (id: string) => void;
+    }) => (
+      <>
+        <Button
+          onClick={() => {
+            onOpen('my-vrp');
+          }}
+        >
+          open
+        </Button>
+        <Button
+          onClick={() => {
+            onEdit('my-vrp');
+          }}
+        >
+          edit
+        </Button>
+      </>
     ),
   };
 });
@@ -22,12 +37,15 @@ vi.mock('@/widgets/screener-list', async () => {
 describe('ScreenersPage', () => {
   it('shows the list with "+ New screener" and passes navigation through', async () => {
     const onOpen = vi.fn();
+    const onEdit = vi.fn();
     const onNew = vi.fn();
-    render(<ScreenersPage onOpen={onOpen} onNew={onNew} />);
+    render(<ScreenersPage onOpen={onOpen} onEdit={onEdit} onNew={onNew} />);
     expect(screen.getByRole('heading', { level: 1, name: 'Screeners' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: '+ New screener' }));
     expect(onNew).toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'open' }));
     expect(onOpen).toHaveBeenCalledWith('my-vrp');
+    await userEvent.click(screen.getByRole('button', { name: 'edit' }));
+    expect(onEdit).toHaveBeenCalledWith('my-vrp');
   });
 });

@@ -81,12 +81,13 @@ beforeEach(() => {
 
 const setup = () => {
   const onOpen = vi.fn();
+  const onEdit = vi.fn();
   const view = render(
     <TestQueryProvider>
-      <ScreenerList onOpen={onOpen} />
+      <ScreenerList onOpen={onOpen} onEdit={onEdit} />
     </TestQueryProvider>,
   );
-  return { onOpen, ...view };
+  return { onOpen, onEdit, ...view };
 };
 
 describe('ScreenerList', () => {
@@ -117,11 +118,12 @@ describe('ScreenerList', () => {
     expect(row).toHaveTextContent('vrp_scanner');
   });
 
-  it('opens a screener to edit, and a preset to see its preview', async () => {
-    const { onOpen } = setup();
-    await userEvent.click(
-      within(screen.getByRole('row', { name: /my-vrp/ })).getByRole('button', { name: 'Edit' }),
-    );
+  it('opens a screener to its results or its Builder, and a preset to its results', async () => {
+    const { onOpen, onEdit } = setup();
+    const mine = within(screen.getByRole('row', { name: /my-vrp/ }));
+    await userEvent.click(mine.getByRole('button', { name: 'Edit' }));
+    expect(onEdit).toHaveBeenCalledWith('my-vrp');
+    await userEvent.click(mine.getByRole('button', { name: 'Results' }));
     expect(onOpen).toHaveBeenCalledWith('my-vrp');
     await userEvent.click(
       within(screen.getByRole('grid', { name: 'Site presets' })).getByRole('button', {
@@ -132,14 +134,14 @@ describe('ScreenerList', () => {
   });
 
   it('copies a preset and opens the copy', async () => {
-    const { onOpen } = setup();
+    const { onEdit } = setup();
     await userEvent.click(
       within(screen.getByRole('grid', { name: 'Site presets' })).getByRole('button', {
         name: 'Copy to my screeners',
       }),
     );
     await userEvent.click(screen.getByRole('button', { name: 'finish copy of vrp_scanner' }));
-    expect(onOpen).toHaveBeenCalledWith('my-vrp_scanner');
+    expect(onEdit).toHaveBeenCalledWith('my-vrp_scanner');
     expect(screen.queryByRole('button', { name: /finish copy/ })).toBeNull();
   });
 
@@ -152,7 +154,7 @@ describe('ScreenerList', () => {
     hooks.useMyScreeners.mockReturnValue(fakeQuery(undefined, { isError: true, isPending: false }));
     rerender(
       <TestQueryProvider>
-        <ScreenerList onOpen={vi.fn()} />
+        <ScreenerList onOpen={vi.fn()} onEdit={vi.fn()} />
       </TestQueryProvider>,
     );
     expect(screen.getAllByText('The screeners failed to load.').length).toBeGreaterThan(0);
