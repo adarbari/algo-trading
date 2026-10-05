@@ -3,19 +3,25 @@
  * table with the row under review beside it (its decision, criteria and price chart), and
  * "Edit criteria" for the Builder. Reviewing comes first, editing is one click away. The
  * review is keyboard-first: j / k move, c adds the ticker to the compare set, x hides it for
- * now, Enter opens it in Explore.
+ * now, Enter opens it in Explore. "Edit criteria" opens the criteria in a drawer over this page
+ * (the Builder's state, started on first use): an edit shows who would enter or leave before it
+ * is saved, and that note stays above the results while the edit is unsaved.
  */
-import { Button, Heading, Stack, Text, type ChartRange } from '@algotrade/ui';
+import { Button, Drawer, Heading, Stack, Text, type ChartRange } from '@algotrade/ui';
 import { useState } from 'react';
 
+import { ScreenerBuilderProvider } from '@/features/screener-builder';
+import { CriteriaTable } from '@/widgets/criteria-table';
+import { DraftBar } from '@/widgets/draft-bar';
 import { PickDetail } from '@/widgets/pick-detail';
+import { PreviewDiff } from '@/widgets/preview-diff';
 import { PriceChartPanel } from '@/widgets/price-chart-panel';
 import { ScreenerResults } from '@/widgets/screener-results';
 
 export interface ScreenerResultsPageProps {
   /** The screener shown. */
   id: string;
-  /** Open the Builder for this screener. */
+  /** Open the full Builder page for this screener. */
   onEdit: () => void;
   /** Open a ticker in Explore. */
   onOpenTicker: (symbol: string) => void;
@@ -33,6 +39,12 @@ export function ScreenerResultsPage({
   const [compared, setCompared] = useState<readonly string[]>([]);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
   const [range, setRange] = useState<ChartRange>('1Y');
+  const [editing, setEditing] = useState(false);
+  const [builderStarted, setBuilderStarted] = useState(false); // its preview runs once asked for
+  const edit = () => {
+    setBuilderStarted(true);
+    setEditing(true);
+  };
   const toggle = (symbol: string) => {
     setCompared((now) =>
       now.includes(symbol) ? now.filter((s) => s !== symbol) : [...now, symbol],
@@ -61,11 +73,36 @@ export function ScreenerResultsPage({
               {`Compare ${String(compared.length)} in Explore`}
             </Button>
           ) : null}
-          <Button variant="secondary" onClick={onEdit}>
+          <Button variant="secondary" onClick={edit}>
             Edit criteria
           </Button>
         </Stack>
       </Stack>
+      {builderStarted && (
+        <ScreenerBuilderProvider id={id} key={id}>
+          {!editing && <PreviewDiff id={id} onReview={edit} />}
+          <Drawer
+            open={editing}
+            onOpenChange={setEditing}
+            title={`${id} · criteria`}
+            description="Change a rule and see who would enter or leave before you save."
+            size="lg"
+            footer={
+              <Stack direction="row" gap={2} justify="end">
+                <Button variant="ghost" onClick={onEdit}>
+                  Open in Builder
+                </Button>
+              </Stack>
+            }
+          >
+            <Stack gap={3}>
+              <DraftBar compact />
+              <PreviewDiff id={id} />
+              <CriteriaTable />
+            </Stack>
+          </Drawer>
+        </ScreenerBuilderProvider>
+      )}
       <ScreenerResults
         id={id}
         onOpen={onOpenTicker}

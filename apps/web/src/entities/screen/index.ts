@@ -62,3 +62,4 @@ export {
   type ScreenTableRow,
 } from './model/table';
 export { isActive, runMessage, type ScreenRun } from './model/run';
+export { previewChanges, type PickedRow, type PreviewChanges } from './model/changes';
