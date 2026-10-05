@@ -103,6 +103,7 @@ to end:
 | `ssga_spy` / spy_holdings | 1 | ~55 KB; kept 14 days since `[ssga]` (it was 90) |
 | `ssga_holdings` / etf_holdings | the fund finder + ~26 SPDR funds | ~0.1 MB + ~32 KB each (measured, max 109 KB); kept 14 days |
 | `ishares_holdings` / etf_holdings | the product screener + ~70 iShares funds | ~0.2 MB + ~150 KB each (measured, max 0.8 MB; AGG's 13k lines); kept 14 days |
+| `proshares_holdings` / etf_holdings | the daily file (once) + its funds' rows as small slices | ~1.8 MB + ~2 MB of slices a night (measured 2026-10-05, 173 funds); kept 14 days |
 | `sec_nport` / nport_holdings | the fund list + ~5 funds | ~0.23 MB + ~18 KB each (measured, max 0.27 MB); kept 7 days with the other SEC sources |
 | `massive` / tickers, grouped_daily, corporate_actions | 1 + 1 + 2 | ~0.9 MB (grouped daily 0.3, tickers 0.25, corporate-action window ~0.35) |
 | `massive` / ticker_overview | one per stock asked, up to 100 | ~0.15 MB (1.5 KB each, gzipped) |

@@ -21,6 +21,7 @@ from algotrade_ingestion.tasks.market.etf_holdings import (
 from algotrade_sources.framework.base import HoldingsSource
 from algotrade_sources.framework.http import HttpError, RetryPolicy
 from algotrade_sources.vendors.ishares.etf_holdings import IsharesHoldings, no_file
+from algotrade_sources.vendors.proshares.etf_holdings import ProsharesHoldings
 from algotrade_sources.vendors.sec.nport_holdings import NportHoldings
 from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from tests.conftest import REPO_ROOT
@@ -30,6 +31,7 @@ from tests.helpers.stored_frames import stamped
 DAY = date(2026, 10, 2)
 FIXTURES = REPO_ROOT / "tests" / "fixtures" / "sources"
 SSGA, ISHARES, SEC = FIXTURES / "ssga", FIXTURES / "ishares", FIXTURES / "sec"
+PROSHARES = FIXTURES / "proshares" / "psdlyhld_sample.csv"
 KINDS = {
     "XLK": "ETF", "IVV": "ETF", "IWM": "ETF", "SLV": "ETF", "VTI": "ETF", "QQQ": "ETF",
     "AGG": "ETF", "OLD": "ETF", "ETNX": "ETN", "VUG": "ETF",
@@ -288,3 +290,29 @@ def test_force_rereads_covered_funds() -> None:
     run(writer, sources)
     forced = run(writer, sources, force=True)
     assert forced.stats["requested"] == 7
+
+
+def test_proshares_funds_are_read_from_the_issuers_daily_file_with_the_sum_checked() -> None:
+    """VIXY is long-only: its weights add up to 100% and pass the check. UVXY is leveraged and
+    SVXY inverse: their sums are not 100%, which the check skips for geared funds."""
+    writer = StoreWriter(MemoryBackend())
+    rows = [
+        {"instrument_id": f"EQ:{s}", "symbol": s, "asset_class": "EQ", "security_type": "ETF",
+         "multiplier": 1.0, "status": "ACTIVE", "optionable": True,
+         "is_leveraged": s == "UVXY", "is_inverse": s == "SVXY"}
+        for s in ("VIXY", "UVXY", "SVXY")
+    ]  # fmt: skip
+    writer.write_table("instruments/reference", DAY, "ref", stamped(rows, DAY, "ref"))
+    proshares = ProsharesHoldings(
+        http_for(lambda url: PROSHARES.read_bytes(), RetryPolicy(tries=1))
+    )
+    sources = HoldingsSources([proshares], 7, 100, "liquid", True)  # the weight-sum check is on
+    record = run(writer, sources)
+    assert record.status is RunStatus.COMPLETE, record.stats["failed"]
+    assert record.stats["covered"] == {"proshares_holdings": 3}
+    assert all(record.items[s].startswith("OK") for s in ("VIXY", "UVXY", "SVXY"))
+    vixy = holdings(writer, "VIXY")
+    assert set(vixy["source"]) == {"proshares_holdings"} and vixy["weight"].sum() == pytest.approx(
+        1
+    )
+    assert holdings(writer, "SVXY")["weight"].min() < 0

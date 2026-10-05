@@ -8,7 +8,7 @@ swapping a vendor never touches storage, features, strategies or the UI.
 
 **Pacing is shared.** Each source is declared once in `sources/framework/registry.py` with its
 `config/site/sources.toml` section and a limiter key (`cboe`, `nasdaqtrader`, `ssga`,
-`nasdaq`, `ishares`, `massive`, `sec`, `treasury`, `ibkr`, `ibkr_historical`). One limiter per key (`sources/framework/limiter.py`)
+`nasdaq`, `ishares`, `proshares`, `massive`, `sec`, `treasury`, `ibkr`, `ibkr_historical`). One limiter per key (`sources/framework/limiter.py`)
 spaces requests across every worker thread **and every process** on the machine (a lock file
 per key under `[http] limits_dir`, default `var/run/limits/`), so a backfill and the nightly
 run never exceed a vendor's limit together. The pace is **adaptive** between the section's
@@ -29,7 +29,7 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 |---|---|---|---|
 | Ticker universe | Nasdaq Trader symbol directory (`nasdaqlisted.txt`, `otherlisted.txt`, `options.txt`) | — | Official, free, updated daily |
 | S&P 500 membership | SPY daily holdings file (State Street) | — | Membership changes become events |
-| ETF holdings (top holdings and weights per fund) | **Issuer daily files**: State Street SPDR workbooks, iShares CSVs; **SEC N-PORT** for the funds they do not cover (ADR 0035) | Vanguard / Invesco / ARK sites (no usable public file, see below) | Accepted (ADR 0035) |
+| ETF holdings (top holdings and weights per fund) | **Issuer daily files**: State Street SPDR workbooks, iShares CSVs, the ProShares daily CSV; **SEC N-PORT** for the funds they do not cover (ADR 0035) | Vanguard / Invesco / ARK sites (no usable public file, see below) | Accepted (ADR 0035) |
 | Company details (name, SIC, sector, state, fiscal year end) | SEC EDGAR submissions (free; contact email in the user agent) | Massive ticker details | Implemented, phase 1.7 |
 | Company description (stocks, ADRs) | Massive ticker overview (`/v3/reference/tickers/{ticker}`; one request per ticker; free tier) | none free | Implemented (ADR 0034): capped per night |
 | Fund description (ETFs) | SEC prospectus investment objective (Risk/Return Summary data sets + `company_tickers_mf.json`; official, free) | issuer fund pages (per-site terms, not used) | Implemented (ADR 0034): the objective sentence, ~74% of ETFs |
@@ -193,6 +193,7 @@ second or slower.
 |---|---|---|---|
 | State Street (SPDR), `[ssga]` | The public fund finder (`/bin/v1/ssmp/fund/fundfinder?country=us&language=en&role=intermediary&product=etfs&ui=fund-finder`, 0.85 MB) lists each fund's `Holdings-daily` workbook path; one `.xlsx` per fund (20 to 190 KB). Equity funds: Name, Ticker, Identifier (CUSIP), SEDOL, Weight, Sector, Shares Held, Local Currency; bond funds: no ticker, ISIN, Par Value | 181 of the 183 US SPDR ETFs: SPY, XL*, DIA, MDY, SPYG... (not GLD, GLDM) | 1 day |
 | iShares, `[ishares]` | The product screener JSON (`/us/product-screener/product-screener-v3.1.jsn?...`, 1.9 MB) maps 526 tickers to fund pages; each page offers `<page>/latest-holdings.csv` (a schema.org DataDownload; 0.1 to 4 MB). Weights have two decimals, so the adapter uses each line's share of the market values when they agree; foreign lines print local tickers (Roche as `ROP`) | 526 listed funds; metal trusts (SLV) answer HTTP 400 | 1 day |
+| ProShares, `[proshares]` | `accounts.profunds.com/etfdata/psdlyhld.csv` (1.8 MB, linked from `proshares.com/resources/data-downloads`; preamble, then `Fund Ticker, Fund Name, Security Ticker, Security Sedol, Security Description, Coupon, Maturity Date, Shares/Contracts, Exposure Value (Notional + G/L), Market Value`): 173 funds, 20k lines, `AS OF` date in the second row. No weights: share of gross exposure (ADR 0035). Futures and swaps carry no ticker; a line with a ticker is an equity or ETF | UVXY, SVXY, VIXY and the other ProShares funds N-PORT lags or misses | 1 day |
 | SEC N-PORT, `[sec_edgar]` | `files/company_tickers_mf.json` (ticker to trust CIK and series), `data.sec.gov/submissions/CIK<cik>.json` (the trust's N-PORT-P list), the filing's `-index-headers.html` (names its series; the list does not), then `primary_doc.xml` (0.1 to 4 MB: name, CUSIP / ISIN, `pctVal` per line; no tickers) | Every registered fund: Vanguard, Invesco QQQ, Schwab, ARK... Not unit trusts (SPY, DIA) or commodity / crypto trusts | 60 to 150 days, quarterly |
 
 Coverage of the 5,730 active ETFs of the 2026-10-02 universe (listed by an adapter's directory):
@@ -224,8 +225,12 @@ Not used, with the reason:
 A sources.toml from before the `[ssga]` section (it had `[spy_holdings]`) keeps working: the sources use the defaults, enabled and a 1 s pace.
 
 State Street's and iShares' robots.txt files do not disallow these paths, and the owner accepted
-their terms of use for these public files (2026-10-05). `enabled = false` in `[ssga]` or
-`[ishares]` turns an issuer off.
+their terms of use for these public files (2026-10-05). ProShares' host (`accounts.profunds.com`)
+has no robots.txt (404) and `proshares.com/robots.txt` does not disallow `/resources`; the file
+is linked from ProShares' own data-downloads page, whose terms say the content is for
+information, education and non-commercial purposes: this project is personal and non-commercial.
+The owner is asked to confirm that in the PR that added it (ADR 0035 amendment).
+`enabled = false` in `[ssga]`, `[ishares]` or `[proshares]` turns an issuer off.
 
 Linking: a holding's ticker becomes an instrument id through `SymbolResolver`, only for lines
 the issuer says are U.S. listings (iShares: Location United States and asset class Equity;
@@ -235,7 +240,7 @@ U.S. listings print). N-PORT prints no tickers: its lines are matched by CUSIP o
 instrument the State Street files linked beside it (`data.funds.holdings.known_cusips`, which
 keeps the instrument id as stored), so SPDR funds are read first. Cash, futures, bonds and unmatched lines keep their name only.
 
-Pacing and cost: `[ssga]` and `[ishares]` 1 s between requests, SEC 0.2 s; raw files are kept
+Pacing and cost: `[ssga]`, `[ishares]` and `[proshares]` 1 s between requests, SEC 0.2 s; raw files are kept
 14 days (SEC 7; this includes SPY's membership file, which was kept 90 days before `[ssga]`
 existed: the membership lives in the tables). Each fund is read once a week on its own slot day
 (`[etf_holdings] refresh_days`), N-PORT funds once per 90 days at most, funds an issuer lists

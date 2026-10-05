@@ -12,6 +12,7 @@ holdings and the date they are as of. Only SPY's holdings were fetched, as a mem
 |---|---|---|---|
 | State Street (SPDR) daily workbook, one URL per fund, listed by its public fund finder | 181 SPDR ETFs: SPY, the sector funds, DIA, MDY, bond and international funds | 1 day | use |
 | iShares `latest-holdings.csv` on each fund page, listed by the product screener | 526 listed funds (480 in our universe); the metal trusts (SLV) have no file | 1 day | use |
+| ProShares `accounts.profunds.com/etfdata/psdlyhld.csv`, linked from its data-downloads page | one daily CSV for 173 ProShares funds: the VIX futures funds (UVXY, SVXY, VIXY), leveraged and inverse funds with their futures and swaps. No weight column, no robots.txt on the host | 1 day | use (amendment 2026-10-05) |
 | SEC N-PORT-P (`data.sec.gov` + `Archives`), series from `company_tickers_mf.json` | every registered fund: Vanguard, Invesco QQQ, Schwab, ARK, most others. Not unit trusts (SPY, DIA) or commodity and crypto trusts | 60 to 150 days, quarterly | use as fallback |
 | Vanguard fund pages | a single-page app; its data API answers HTML, no file | n/a | skip (N-PORT covers it) |
 | Invesco `dng-api.invesco.com` | HTTP 406 for a non-browser client | n/a | skip; we do not impersonate a browser (N-PORT covers QQQ) |
@@ -22,10 +23,16 @@ holdings and the date they are as of. Only SPY's holdings were fetched, as a mem
 1. **One shape, issuers as adapters.** `HoldingsSource` (`framework/base.py`) is a source with a
    directory request (which funds it publishes) and one request per fund returning the shared
    holdings frame (`framework/holdings.py`: weight as a fraction, ticker, name, asset class,
-   security id). Adapters: `ssga_holdings`, `ishares_holdings`, `sec_nport_holdings` (one
-   vendor folder each; the SEC one in `vendors/sec`). Another issuer is one more adapter.
+   security id). Adapters: `ssga_holdings`, `ishares_holdings`, `proshares_holdings`,
+   `sec_nport_holdings` (one vendor folder each; the SEC one in `vendors/sec`). Another issuer
+   is one more adapter.
 2. **Priority, not merging.** A fund is read from the first adapter that lists it: the issuer's
-   own daily file, then N-PORT. No averaging of sources.
+   own daily file (State Street, iShares, ProShares), then N-PORT. No averaging of sources.
+   ProShares publishes no weights: a line's weight is its share of the fund's **gross
+   exposure** (its market value, else its exposure value, which is the notional of a future or
+   swap, over the sum of the absolute values of the fund's lines). A long-only fund adds up to
+   100%; a leveraged or inverse fund does not, and the sum check is skipped for geared funds as
+   it already is. It is not a share of net assets, which the file does not contain.
 3. **A new grain, `holdings/etf`:** one row per fund x holding x as-of date, ranked by weight,
    the largest `[etf_holdings] keep_top` (100) kept (by the size of the weight, so a big short
    or swap line ranks with the big longs), every row carrying the fund's number of positions
