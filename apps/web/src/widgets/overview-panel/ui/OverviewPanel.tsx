@@ -1,22 +1,36 @@
 /**
- * Overview: what the focused ticker is. Name, kind and sector, the stored description, the
- * headline numbers (price, market cap, P/E, revenue, next earnings) and grouped key facts
- * (size, price range, dividends, options, earnings dates). Facts the store lacks are left out;
- * an ETF also shows the `fund` section the page passes in (its holdings).
+ * Overview: what the focused ticker is, for the latest session. Name, kind and sector, the
+ * stored description, the headline numbers (price, market cap, P/E, revenue, next earnings)
+ * and grouped key facts (size, price range, dividends, options, earnings dates), all from one
+ * GraphQL read (`useInstrumentFacts`). A value the session does not have says why (UNKNOWN
+ * and its reason); the nightly tables missing for the session are named in a banner. An ETF
+ * also shows the `fund` section the page passes in (its holdings).
  */
-import { Chip, Grid, Heading, KeyValue, Panel, StatStrip, Stack, Text } from '@algotrade/ui';
+import {
+  Banner,
+  Chip,
+  formatValue,
+  Grid,
+  Heading,
+  KeyValue,
+  Panel,
+  StatStrip,
+  Stack,
+  Text,
+} from '@algotrade/ui';
 import type { ReactNode } from 'react';
 import { useMemo } from 'react';
 
-import { useInstrument, useInstrumentEvents } from '@/entities/instrument';
-import { todayIso } from '@/shared/lib';
+import { useInstrumentEvents, useInstrumentFacts } from '@/entities/instrument';
 
 import {
   earningsGroup,
   factGroups,
   headlineStats,
-  nextEarningsDate,
+  missingTables,
+  OVERVIEW_FEATURES,
   profileOf,
+  valuesOf,
 } from '../model/overview';
 
 export interface OverviewPanelProps {
@@ -26,33 +40,50 @@ export interface OverviewPanelProps {
 }
 
 export function OverviewPanel({ symbol, fund }: OverviewPanelProps) {
-  const detail = useInstrument(symbol);
+  const facts = useInstrumentFacts(symbol, OVERVIEW_FEATURES);
   const events = useInstrumentEvents(symbol);
   const view = useMemo(() => {
-    if (!detail.data) return null;
-    const today = todayIso();
-    const found = events.data ?? [];
-    const earnings = earningsGroup(detail.data, found, today);
-    const groups = factGroups(detail.data);
+    const instrument = facts.data?.instrument;
+    if (!instrument) return null;
+    const values = valuesOf(instrument);
+    const groups = factGroups(values);
+    const earnings = earningsGroup(values, events.data ?? []);
     return {
-      profile: profileOf(detail.data),
-      stats: headlineStats(detail.data, nextEarningsDate(detail.data, found, today)),
-      groups: earnings ? [...groups.slice(0, 2), earnings, ...groups.slice(2)] : groups,
+      profile: profileOf(instrument, values),
+      stats: headlineStats(values),
+      groups: [...groups.slice(0, 2), earnings, ...groups.slice(2)],
     };
-  }, [detail.data, events.data]);
+  }, [facts.data, events.data]);
+  const session = facts.data?.session;
   const profile = view?.profile;
+  const missing = missingTables(session?.missing ?? []);
+  const day = session ? formatValue(session.date, { kind: 'date' }).text : '';
+  const state = facts.isError
+    ? 'error'
+    : facts.isPending
+      ? 'loading'
+      : view === null
+        ? 'empty'
+        : 'ready';
   return (
     <Stack gap={4}>
       <Panel
         title={`${symbol} · overview`}
         description={profile?.name || undefined}
-        state={detail.isError ? 'error' : detail.isPending ? 'loading' : 'ready'}
+        state={state}
         loadingLabel={`Loading ${symbol}…`}
         errorMessage={`${symbol} failed to load.`}
-        onRetry={() => void detail.refetch()}
+        emptyMessage={`${symbol} is not in the reference snapshot for ${day || 'the session'}.`}
+        onRetry={() => void facts.refetch()}
+        footer={session ? `Values for the session of ${day}.` : undefined}
       >
         {view && profile && (
           <Stack gap={4}>
+            {missing.length > 0 && (
+              <Banner tone="warning" title="Partial session">
+                Not stored for {day}: {missing.join(', ')}. Values from these tables read Unknown.
+              </Banner>
+            )}
             <Stack gap={2}>
               <Stack direction="row" gap={2} wrap>
                 <Chip label={profile.kind} />

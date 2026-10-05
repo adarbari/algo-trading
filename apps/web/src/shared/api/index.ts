@@ -1,5 +1,13 @@
-/** The API boundary: typed client, errors, query keys and the schema types. */
+/**
+ * The API boundary: the typed REST client, the GraphQL transport `gql()` with the generated
+ * `graphql()` tag and its types, the typed site feature names (`feature()`), errors, query keys
+ * and the schema types.
+ */
 export { api, ApiError, errorDetail, unwrap } from './client';
+export { feature, SITE_FEATURES, type SiteFeature } from './generated/catalogue';
+export { graphql, useFragment, type FragmentType } from './generated/graphql';
+export type * as gqlTypes from './generated/graphql/graphql';
 export type { components, paths } from './generated/schema';
+export { gql, GraphQLRequestError } from './graphql';
 export { queryKeys } from './query-keys';
 export { TestQueryProvider } from './test-provider';

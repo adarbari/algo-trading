@@ -2,7 +2,7 @@
 shared result cache, and ``partition``, which reads a session-grain table for exactly the
 session and never an older partition (ADR 0036 decision 6)."""
 
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pandas as pd
 import pytest
@@ -23,6 +23,7 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.rollup_store import write_rows
+from tests.helpers.stored_frames import stamped
 
 D1, D2 = date(2026, 9, 30), date(2026, 10, 1)
 EARNINGS = "rollups/instrument/earnings@v1"
@@ -72,6 +73,38 @@ def test_open_context_shares_the_cache_it_is_given(stored: tuple[StoreWriter, St
     ctx = open_context(stored[1], MemoryConfigStore({}), USER, D1, cache)
     assert ctx.cache is cache
     assert ctx.session.date == D1
+
+
+def publish_bar(backend: MemoryBackend, day: date) -> None:
+    """A bar written the way ingestion writes: pending, then committed (a publish)."""
+    bar = {"open": 1.0, "high": 1.0, "low": 1.0, "close": 1.0, "volume": 1.0}
+    row = {"instrument_id": "EQ:AAA", "ts": pd.Timestamp(day, tz="UTC"), **bar}
+    run = f"bars-{day}"
+    StoreWriter(backend).write_table("bars/1d", day, run, stamped([row], day, run), pending=True)
+    backend.tables.commit_run(run, datetime(2026, 10, 3, tzinfo=UTC))
+
+
+def test_the_session_is_resolved_once_per_publish(monkeypatch: pytest.MonkeyPatch) -> None:
+    backend = MemoryBackend()
+    publish_bar(backend, D2)
+    reader = StoreReader(backend)
+    calls: list[date | None] = []
+    real = context.resolve_session
+
+    def counting(reader: StoreReader, requested: date | None):  # type: ignore[no-untyped-def]
+        calls.append(requested)
+        return real(reader, requested)
+
+    monkeypatch.setattr(context, "resolve_session", counting)
+    cache = ResultCache()
+    first = open_context(reader, MemoryConfigStore({}), USER, None, cache)
+    again = open_context(reader, MemoryConfigStore({}), USER, None, cache)
+    assert again.session is first.session and calls == [None]  # nothing published since
+    open_context(reader, MemoryConfigStore({}), USER, D1, cache)
+    assert calls == [None, D1]  # another date is another session
+    publish_bar(backend, date(2026, 10, 2))  # a publish: the latest session moves on
+    later = open_context(reader, MemoryConfigStore({}), USER, None, cache)
+    assert later.session.date == date(2026, 10, 2) and calls == [None, D1, None]
 
 
 def test_open_context_on_an_empty_store_is_not_found() -> None:

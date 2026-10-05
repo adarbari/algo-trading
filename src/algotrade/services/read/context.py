@@ -2,9 +2,10 @@
 catalogue, the one resolved ``Session``, the result cache), opened by ``open_context``, and
 ``partition``, the only way a loader reads a session-grain table (ADR 0036 decision 6).
 
-``open_context`` resolves the session once per request; nothing else in ``services/read``
-calls ``resolve_session`` (ownership ``session-resolution``). A loader reads
-``ctx.session.date`` only: another date is a named argument of the loader, never derived."""
+``open_context`` resolves the session once per request (and reuses it while nothing is
+published: keyed on ``StoreReader.visible_seq``); nothing else in ``services/read`` calls
+``resolve_session`` (ownership ``session-resolution``). A loader reads ``ctx.session.date``
+only: another date is a named argument of the loader, never derived."""
 
 import threading
 from collections import OrderedDict
@@ -53,8 +54,10 @@ class ResultCache:
 @dataclass(frozen=True)
 class ReadContext:
     """One request's reads: market data (read-only), configs, whose they are, the session
-    every value is for, the caller's catalogue (read once per request) and the result cache
-    (shared across requests; entries keyed on the published state)."""
+    every value is for, the caller's catalogue (read once per request), the result cache
+    (shared across requests; entries keyed on the published state) and ``loaders``: the
+    GraphQL layer's per-request dataloaders (``algotrade_api.graphql.loaders``; None outside
+    a GraphQL request, which loaders never need)."""
 
     reader: StoreReader
     configs: ConfigStore
@@ -62,6 +65,7 @@ class ReadContext:
     session: Session
     features: FeatureSet = field(repr=False)
     cache: ResultCache = field(compare=False, repr=False)
+    loaders: Any = field(default=None, compare=False, repr=False)
 
 
 def open_context(
@@ -73,15 +77,23 @@ def open_context(
 ) -> ReadContext:
     """The context of one request for ``requested`` (None: the latest session): resolves the
     session once and reads ``user``'s catalogue once. ``NotFoundError`` on an empty store when
-    no date is asked for. ``cache``: the long-lived cache to share (default: a fresh one)."""
-    session = resolve_session(reader, requested)
+    no date is asked for. ``cache``: the long-lived cache to share (default: a fresh one); the
+    resolved session is kept in it until the next publish (resolving lists every expected
+    table's partitions: ~26 ``dates()`` calls)."""
+    cache = cache if cache is not None else ResultCache()
+    # Read before resolving (ADR 0022); a run's own pending writes do not move visible_seq.
+    key = ("session", requested, reader.own_run, reader.visible_seq())
+    session = cache.get(key)
+    if session is None:
+        session = resolve_session(reader, requested)
+        cache.put(key, session)
     return ReadContext(
         reader=reader,
         configs=configs,
         user=user,
         session=session,
         features=catalogue(configs, user.user_id),
-        cache=cache if cache is not None else ResultCache(),
+        cache=cache,
     )
 
 

@@ -27,13 +27,13 @@ import {
   type OptionRight,
 } from '@/entities/chain';
 import { useInstrument } from '@/entities/instrument';
-import { ApiError } from '@/shared/api';
+import { ApiError, feature } from '@/shared/api';
 
 import { BAND_LABEL, chainColumns, type ChainView } from '../model/columns';
 
 import { ExpiryTabs } from './ExpiryTabs';
 
-const TARGET_EXPIRY = 'rollup.option_liquidity@v1.target_expiry';
+const TARGET_EXPIRY = feature('rollup.option_liquidity@v1.target_expiry');
 
 export interface OptionsPanelProps {
   symbol: string;

@@ -15,8 +15,8 @@ Run `ls src/algotrade/services/read src/algotrade/services/read/* apps/api/algot
 | You see | Meaning | Do |
 |---|---|---|
 | only `__init__.py` files | read-model PR 1 state (superseded: PR 2 landed 2026-10) | you are on an old branch: rebase on `origin/main` |
-| `session.py`, `values.py`, `context.py`, but no `apps/api/algotrade_api/graphql/schema.py` | **today**: PR 2 landed (session, values, context), PR 4 not | the next read-model PRs are RM3 then RM4, in order (`docs/roadmap.md` track RM); a new object waits for its PR. If the owner asked for it now, build the object and its loader (steps 1-5) on `ReadContext` / `partition`, no GraphQL type |
-| `graphql/schema.py` exists | PR 4 landed | all steps |
+| `session.py`, `values.py`, `context.py`, but no `apps/api/algotrade_api/graphql/schema.py` | an old branch (PR 2 state) | rebase on `origin/main` |
+| `graphql/schema.py`, `read/instruments/{identity,features,catalogue}.py` exist | **today**: PR 4 landed (Instrument, FeatureValue, FeatureInfo on GraphQL); the next object is the one the next RM PR names (RM5: `read/screens/*`) | all steps |
 
 Check the object is not already planned: `grep -n "<ObjectName>" docs/api/read-model.md`. If
 the spec's object table names it, build exactly that row (identity, fields, tables, module).

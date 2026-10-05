@@ -14,6 +14,7 @@ DEFAULT_DATA_URL = "file://./var/data"
 CONFIG_DIR = "ALGOTRADE_CONFIG_DIR"
 DEFAULT_CONFIG_DIR = "config"
 USER = "ALGOTRADE_USER"
+API_DEBUG = "ALGOTRADE_API_DEBUG"  # "1": the API serves the GraphiQL IDE (local development)
 # The nightly summary email (workflows/nightly/notify.py): personal data stays out of the repo.
 NOTIFY_EMAIL_TO = "ALGOTRADE_NOTIFY_EMAIL_TO"  # comma-separated recipients
 NOTIFY_EMAIL_FROM = "ALGOTRADE_NOTIFY_EMAIL_FROM"  # default: the first recipient
@@ -35,6 +36,7 @@ REQUIRED_KEYS = (MASSIVE_API_KEY, SEC_CONTACT)
 __all__ = [
     "REQUIRED_KEYS",
     "api_credential",
+    "api_debug",
     "config_dir",
     "credential",
     "data_url",
@@ -93,6 +95,11 @@ def data_url(explicit: str | None = None) -> str:
 def config_dir(explicit: str | Path | None = None) -> Path:
     """The config root: ``explicit``, else ``$ALGOTRADE_CONFIG_DIR``, else ./config."""
     return Path(explicit or credential(CONFIG_DIR) or DEFAULT_CONFIG_DIR)
+
+
+def api_debug() -> bool:
+    """``$ALGOTRADE_API_DEBUG`` is ``1`` / ``true``: the API serves its development tools."""
+    return (credential(API_DEBUG) or "").strip().lower() in ("1", "true")
 
 
 def user_id(fallback: str) -> str:

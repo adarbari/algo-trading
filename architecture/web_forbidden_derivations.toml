@@ -24,20 +24,21 @@ allowed = ["src/shared/lib/date/"]  # todayIso(): the one wall-clock read (chart
 regex = "['\"`]EQ:"
 reason = "never build or parse an instrument id (ADR 0018): ask for `Instrument.symbol` / `instrumentId`"
 
+# Enabled in PR 4 (overview-panel reads earnings facts by catalogue name):
+[[pattern]]
+regex = "nextAndLast|earningsFacts|nextEarningsDate\\("
+reason = "next / last earnings are stored: ask for rollup.earnings@v1.next_earnings_date / last_earnings_date"
+
+# Enabled in PR 4 (only the events entity names the raw earnings table):
+[[pattern]]
+regex = "events/earnings"
+reason = "earnings facts are catalogue features (rollup.earnings@v1.*); raw events are for the events list only"
+allowed = ["src/entities/instrument/model/events.ts"]  # labels the event table in the events list
+
 # ---------------------------------------------------------------------------- pending
 
-# pending, enable in PR 4 (overview-panel reads earnings facts by catalogue name):
-# [[pattern]]
-# regex = "nextAndLast|earningsFacts|nextEarningsDate\\("
-# reason = "next / last earnings are stored: ask for rollup.earnings@v1.next_earnings_date / last_earnings_date"
-
-# pending, enable in PR 4 (only the events entity names the raw earnings table):
-# [[pattern]]
-# regex = "events/earnings"
-# reason = "earnings facts are catalogue features (rollup.earnings@v1.*); raw events are for the events list only"
-# allowed = ["src/entities/instrument/model/events.ts"]  # labels the event table in the events list
-
-# pending, enable in PR 4 (overview) and PR 6 (feature history range): today's date vs stored dates
+# pending, enable in PR 6 (the feature history range; the overview's use went in PR 4, the
+# features panel's `todayIso()` range start is the last caller outside the allowed files):
 # [[pattern]]
 # regex = "todayIso\\("
 # reason = "compare stored dates with `session.date` from the response, not the browser's today"

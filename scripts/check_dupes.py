@@ -2,8 +2,9 @@
 """Duplicate-code ratchet (ADR 0019): copy-pasted blocks in src/, libs/, apps/ may only go down.
 
 Runs pylint's ``duplicate-code`` check (R0801) alone over the tracked Python files in ``src/``,
-``libs/`` and ``apps/`` (tests excluded; imports, docstrings, comments and signatures ignored)
-and compares the number of duplicate blocks with ``architecture/dupes_baseline.txt``:
+``libs/`` and ``apps/`` (tests and the GraphQL mirror types excluded: ``MIRRORS``; imports,
+docstrings, comments and signatures ignored) and compares the number of duplicate blocks with
+``architecture/dupes_baseline.txt``:
 
 - more blocks than the baseline fails: reuse the owner (architecture/ownership.toml) instead;
 - fewer blocks fails too until the baseline is lowered (``make dupes-update``), so a removed
@@ -33,6 +34,11 @@ PYLINT_ARGS = (
     "--score=n",
 )
 BLOCK = re.compile(r"R0801: Similar lines in \d+ files")
+# The GraphQL object types repeat their read dataclass's fields on purpose (ADR 0037
+# "Consequences": the duplication is contained by one .of() per type, the SDL snapshot and
+# READ 7, tests/architecture/api/test_read_model.py::test_types_mirror_read_model, which fails
+# when a type drifts from its dataclass). Copy-paste of logic there is caught by READ 3.
+MIRRORS = "apps/api/algotrade_api/graphql/types/"
 
 
 def tracked_sources() -> list[str]:
@@ -42,7 +48,7 @@ def tracked_sources() -> list[str]:
         text=True,
         check=True,
     ).stdout
-    return out.split()
+    return [f for f in out.split() if not f.startswith(MIRRORS)]
 
 
 def count_blocks(pylint_output: str) -> int:

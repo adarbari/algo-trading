@@ -3,4 +3,6 @@ scalars (``FeatureName``, ``Date``, ``JSON``), error codes, per-request context 
 dataloaders; thin types over ``algotrade.services.read`` live in ``types/``. No logic beyond
 ``.of()`` mappings, no mutations (writes stay REST).
 
-Empty until read-model PR 4 (``docs/api/read-model.md``)."""
+``schema.py`` builds the schema and the router, ``context.py`` the per-request context,
+``loaders.py`` the dataloaders, ``limits.py`` the list-size caps, ``errors.py`` the error
+codes; the snapshot is ``apps/api/schema.graphql`` (``docs/api/read-model.md``)."""

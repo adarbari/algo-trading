@@ -4,7 +4,7 @@
  * `no-restricted-imports` do not merge across config objects, so each layer's full list is
  * built here in one place.
  */
-import { message, PAGE_SKILL } from './guide.js';
+import { message, PAGE_SKILL, readModelMessage } from './guide.js';
 
 /** Rule 3: no intrinsic elements, no styling props, no styling values outside design-system/. */
 const COMPONENT_ONLY = [
@@ -105,6 +105,42 @@ const HTTP_LIBRARIES = [
   'urql',
   '@urql/core',
 ];
+/**
+ * WEB 2: a GraphQL document is written only with the generated `graphql()` tag (from
+ * `@/shared/api`), so codegen sees it and types its result; no runtime GraphQL parser.
+ */
+const GRAPHQL_DOCUMENTS = ['graphql', 'graphql-tag'].map((name) => ({
+  name,
+  message: readModelMessage(
+    2,
+    `${name}: write operations with the generated graphql() tag from @/shared/api (codegen types them); gql() sends them.`,
+  ),
+}));
+
+/**
+ * WEB 5: a catalogue feature name is typed: `feature('rollup.<group>@vN.<col>')` from
+ * `@/shared/api` (generated catalogue.ts; a typo or a retired name fails tsc), never a bare
+ * string literal. Tests and stories may use literals (fixtures).
+ */
+const FEATURE_NAME = '^(rollup|feature|instrument)\\.[a-z]';
+const FEATURE_LITERALS = [
+  {
+    selector: `Literal[value=/${FEATURE_NAME}/]:not(CallExpression[callee.name='feature'] > Literal)`,
+    message: readModelMessage(
+      5,
+      "catalogue feature names are typed: feature('<name>') from @/shared/api, not a string literal.",
+    ),
+  },
+  {
+    selector: `TemplateElement[value.raw=/${FEATURE_NAME}/]`,
+    message: readModelMessage(
+      5,
+      "catalogue feature names are typed: feature('<name>') from @/shared/api, never built from parts.",
+    ),
+  },
+];
+const TEST_FILES = ['**/*.test.{ts,tsx}', '**/*.stories.{ts,tsx}', '**/testing/**'];
+
 const CSS_IN_JS = [
   'styled-components',
   '@emotion/react',
@@ -191,6 +227,7 @@ function restrictedImports(layer) {
     {
       paths: [
         ...(httpAllowed ? [] : http(HTTP_LIBRARIES)),
+        ...GRAPHQL_DOCUMENTS,
         ...CSS_IN_JS.map((name) => ({
           name,
           message: message(
@@ -207,30 +244,47 @@ function restrictedImports(layer) {
   ];
 }
 
-/** One config object per app layer with its complete restriction lists. */
-export const appRestrictions = Object.keys(LAYER_BANS).map((layer) => ({
-  name: `algotrade/restrictions/${layer}`,
-  files: [`src/${layer}/**/*.{ts,tsx}`],
-  rules: {
-    'no-restricted-syntax': [
-      'error',
-      ...COMPONENT_ONLY,
-      ...STYLING_VALUES,
-      ...(layer === 'shared/api' ? [] : HTTP_SYNTAX),
-    ],
-    'no-restricted-imports': restrictedImports(layer),
-    'no-restricted-globals': [
-      'error',
-      ...(layer === 'shared/api'
-        ? []
-        : ['fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource']
-      ).map((name) => ({
-        name,
-        message: message(4, `${name}: only src/shared/api talks HTTP.`, PAGE_SKILL),
-      })),
-    ],
+const syntaxRules = (layer, featureNames) => [
+  'error',
+  ...COMPONENT_ONLY,
+  ...STYLING_VALUES,
+  ...(layer === 'shared/api' ? [] : HTTP_SYNTAX),
+  ...(featureNames ? FEATURE_LITERALS : []),
+];
+
+/**
+ * One config object per app layer with its complete restriction lists, and one per layer's
+ * tests and stories: the same lists without WEB 5 (fixtures name features as plain strings).
+ */
+export const appRestrictions = Object.keys(LAYER_BANS).flatMap((layer) => [
+  appLayer(layer, true),
+  {
+    ...appLayer(layer, false),
+    name: `algotrade/restrictions/${layer}/tests`,
+    files: TEST_FILES.map((pattern) => `src/${layer}/${pattern}`),
   },
-}));
+]);
+
+function appLayer(layer, featureNames) {
+  return {
+    name: `algotrade/restrictions/${layer}`,
+    files: [`src/${layer}/**/*.{ts,tsx}`],
+    rules: {
+      'no-restricted-syntax': syntaxRules(layer, featureNames),
+      'no-restricted-imports': restrictedImports(layer),
+      'no-restricted-globals': [
+        'error',
+        ...(layer === 'shared/api'
+          ? []
+          : ['fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource']
+        ).map((name) => ({
+          name,
+          message: message(4, `${name}: only src/shared/api talks HTTP.`, PAGE_SKILL),
+        })),
+      ],
+    },
+  };
+}
 
 /** Design-system import bans; `chart` = the Chart folder, the one place lightweight-charts is allowed. */
 function designSystemImports({ chart }) {

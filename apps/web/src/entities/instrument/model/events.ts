@@ -1,6 +1,9 @@
 /**
  * Instrument events (rows of every `events/*` table) as one timeline and as chart markers:
- * each kind (earnings, dividend, split, ticker / reference change) with a plain-English detail.
+ * each kind (earnings, dividend, split, ticker / reference change) with a plain-English detail;
+ * and the report stored for one earnings date (`earningsOn`: the EPS figures of the date the
+ * server names as next or last; the dates themselves are catalogue features, never derived
+ * here from the events).
  */
 import { formatValue, type ChartEvent } from '@algotrade/ui';
 
@@ -41,11 +44,25 @@ const str = (value: unknown): string => (typeof value === 'string' ? value : '')
 const money = (value: unknown): string => formatValue(num(value), { kind: 'currency' }).text;
 const day = (value: unknown): string => formatValue(value, { kind: 'date' }).text;
 
+/**
+ * When a report is released, in words: events store `pre_market` / `after_hours`, the
+ * `earnings@v1` rollup `pre` / `post`; anything else (`unknown`, empty) says nothing.
+ */
+const REPORT_TIMES: Readonly<Record<string, string>> = {
+  pre: 'before the open',
+  pre_market: 'before the open',
+  post: 'after the close',
+  after_hours: 'after the close',
+};
+
+export function reportTime(value: unknown): string | null {
+  return REPORT_TIMES[str(value)] ?? null;
+}
+
 function earningsDetail(v: Readonly<Record<string, unknown>>): string {
   const parts = [str(v['fiscal_quarter']) ? `Quarter ${str(v['fiscal_quarter'])}` : ''];
-  const time = str(v['time']);
-  if (time && time !== 'unknown')
-    parts.push(time === 'pre' ? 'before the open' : 'after the close');
+  const time = reportTime(v['time']);
+  if (time) parts.push(time);
   if (num(v['eps_forecast']) !== null) parts.push(`EPS forecast ${money(v['eps_forecast'])}`);
   if (v['reported'] === true && num(v['eps_reported']) !== null) {
     parts.push(`reported ${money(v['eps_reported'])}`);
@@ -135,4 +152,38 @@ export function toChartEvents(events: readonly InstrumentEvent[]): ChartEvent[] 
       return [];
     })
     .reverse();
+}
+
+/** The figures of one earnings report (an `events/earnings` row). */
+export interface EarningsReport {
+  quarter: string | null;
+  epsForecast: number | null;
+  epsReported: number | null;
+  /** Surprise as a fraction (+0.05 is 5% above the forecast). */
+  surprise: number | null;
+  reported: boolean;
+}
+
+/**
+ * The stored report for the earnings date `date` (ISO day, as the server sent it), else null.
+ * It picks the event of a date the server named; it never decides which date is next or last.
+ */
+export function earningsOn(
+  events: readonly InstrumentEvent[],
+  date: string | null,
+): EarningsReport | null {
+  if (!date) return null;
+  const found = events.find(
+    (e) => KINDS[e.table] === 'earnings' && e.ts.slice(0, 10) === date.slice(0, 10),
+  );
+  if (!found) return null;
+  const v = found.values;
+  const surprise = num(v['surprise_pct']);
+  return {
+    quarter: str(v['fiscal_quarter']) || null,
+    epsForecast: num(v['eps_forecast']),
+    epsReported: num(v['eps_reported']),
+    surprise: surprise === null ? null : surprise / 100,
+    reported: v['reported'] === true,
+  };
 }

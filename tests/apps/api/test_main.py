@@ -53,6 +53,7 @@ def test_settings_from_env_open_the_named_store(
     monkeypatch.setenv("ALGOTRADE_USER", "alice")
     settings = ApiSettings.from_env()
     assert (settings.user, settings.config_dir) == ("alice", str(tmp_path))
+    assert settings.debug is False  # GraphiQL only with ALGOTRADE_API_DEBUG=1
     body = TestClient(create_app(settings)).get("/health").json()
     assert (body["storage"], body["latest_session"], body["tables"]) == ("file", None, [])
 
@@ -117,3 +118,42 @@ def test_every_endpoint_answers_within_a_second_on_golden_data(
         timings.append(time.process_time() - started)
         assert response.status_code == 200, response.text
     assert min(timings) < 1.0, f"{path} took {min(timings):.2f}s (best of 3: {timings})"
+
+
+# The pages' main GraphQL operations (read-model PRs 4-7 add theirs: IdeasPage, ExploreDetail,
+# Table). InstrumentFacts: the Explore Overview pane (apps/web/src/entities/instrument/api).
+INSTRUMENT_FACTS = """query InstrumentFacts($key: String!, $names: [FeatureName!]!) {
+  session { date isLatest missing }
+  instrument(key: $key) {
+    instrumentId symbol name securityType exchange isEtf description referenceSnapshot
+    features(names: $names) {
+      name value unknown { code detail } info { format unit nullMeaning description }
+    }
+  }
+}"""
+OVERVIEW_NAMES = [
+    "instrument.sector", "instrument.industry", "instrument.website", "instrument.in_sp500",
+    "instrument.optionable", "instrument.is_leveraged", "instrument.is_inverse",
+    "instrument.leverage", "instrument.tracks", "rollup.price_stats@v2.close",
+    "feature.market_cap", "feature.pe_ratio", "rollup.financials@v1.revenue_ttm",
+    "rollup.price_stats@v2.high_52w", "rollup.price_stats@v2.low_52w",
+    "feature.pct_from_high_52w", "rollup.price_stats@v2.hv30", "rollup.iv30@v1.iv30",
+    "feature.iv_rank", "feature.div_yield", "rollup.earnings@v1.next_earnings_date",
+    "rollup.earnings@v1.last_earnings_date", "rollup.earnings@v1.days_to_earnings",
+    "rollup.earnings@v1.earnings_time",
+]  # fmt: skip
+OPERATIONS = {"InstrumentFacts": (INSTRUMENT_FACTS, {"key": "AAA", "names": OVERVIEW_NAMES})}
+
+
+@pytest.mark.parametrize("name", OPERATIONS)
+def test_every_page_operation_answers_within_a_second_on_golden_data(
+    client: TestClient, name: str
+) -> None:
+    query, variables = OPERATIONS[name]
+    timings = []
+    for _ in range(3):  # CPU time, best of three (as above)
+        started = time.process_time()
+        response = client.post("/graphql", json={"query": query, "variables": variables})
+        timings.append(time.process_time() - started)
+        assert response.status_code == 200 and "errors" not in response.json(), response.text
+    assert min(timings) < 1.0, f"{name} took {min(timings):.2f}s (best of 3: {timings})"

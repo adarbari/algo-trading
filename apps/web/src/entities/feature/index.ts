@@ -1,4 +1,7 @@
-/** Entity: the feature catalogue (definitions, units, formats) and feature distributions. */
+/**
+ * Entity: the feature catalogue (definitions, units, formats), feature distributions, and how
+ * a served feature value reads (format from the server, UNKNOWN reasons).
+ */
 export { useFeatureCatalogue, useFeatureDistribution } from './api/hooks';
 export {
   byName,
@@ -15,6 +18,16 @@ export {
   unitLabel,
   type CatalogueFeature,
 } from './model/catalogue';
+export {
+  isUnknown,
+  shownValue,
+  unknownReason,
+  valueFormat,
+  type FeatureFormatName,
+  type ServedInfo,
+  type ServedValue,
+  type UnknownCodeName,
+} from './model/value';
 export {
   distributionBins,
   distributionCategories,

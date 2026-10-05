@@ -3,9 +3,10 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: ^datasets/
+        exclude: ^(datasets/|apps/web/src/shared/api/generated/graphql/)
+      # The GraphQL codegen output is kept byte-for-byte as generated (npm run generated:check).
       - id: end-of-file-fixer
-        exclude: ^datasets/
+        exclude: ^(datasets/|apps/web/src/shared/api/generated/graphql/)
       - id: check-yaml
       - id: check-added-large-files
         args: ["--maxkb=1024"]

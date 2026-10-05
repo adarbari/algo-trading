@@ -1,7 +1,8 @@
 /**
  * Generates the typed API schema (src/shared/api/generated/schema.ts) from the FastAPI OpenAPI
- * document the API app commits, apps/api/openapi.json (`npm run api:generate`). When the API
- * changes, regenerate here in the same PR: CI regenerates and fails on any diff.
+ * document the API app commits, apps/api/openapi.json. `npm run api:generate` runs it, then the
+ * GraphQL codegen (codegen.ts, from apps/api/schema.graphql). When the API changes, regenerate
+ * here in the same PR: CI regenerates both and fails on any diff (`npm run generated:check`).
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

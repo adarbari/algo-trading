@@ -5,6 +5,7 @@
 import { Button, Field, Popover, Select, Stack } from '@algotrade/ui';
 
 import { distributionCategories, useFeatureDistribution } from '@/entities/feature';
+import { feature } from '@/shared/api';
 
 import { liquidityLabel, typeLabel, type TickerFilters } from '../model/filters';
 
@@ -16,9 +17,9 @@ export interface MoreFiltersProps {
 }
 
 export function MoreFilters({ filters, onChange }: MoreFiltersProps) {
-  const sectors = useFeatureDistribution('instrument.sector');
-  const liquidity = useFeatureDistribution('feature.liquidity_class');
-  const types = useFeatureDistribution('instrument.security_type');
+  const sectors = useFeatureDistribution(feature('instrument.sector'));
+  const liquidity = useFeatureDistribution(feature('feature.liquidity_class'));
+  const types = useFeatureDistribution(feature('instrument.security_type'));
   const options = (values: string[], label: (v: string) => string, current?: string) => [
     { value: ANY, label: 'Any' },
     ...[...new Set([...values, ...(current ? [current] : [])])].map((v) => ({

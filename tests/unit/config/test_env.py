@@ -48,3 +48,11 @@ def test_the_api_has_its_own_ibkr_client_id(monkeypatch: pytest.MonkeyPatch) -> 
     assert env.api_credential(env.IBKR_CLIENT_ID) is None
     monkeypatch.setenv(env.IBKR_API_CLIENT_ID, "21")
     assert env.api_credential(env.IBKR_CLIENT_ID) == "21"
+
+
+@pytest.mark.parametrize(
+    ("value", "debug"), [("1", True), ("true", True), ("0", False), ("", False)]
+)
+def test_api_debug(monkeypatch: pytest.MonkeyPatch, value: str, debug: bool) -> None:
+    monkeypatch.setenv(env.API_DEBUG, value)
+    assert env.api_debug() is debug

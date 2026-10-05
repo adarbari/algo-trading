@@ -1,7 +1,7 @@
 /**
  * Playwright route mocks for the Explore page: every `/api/*` call it makes answered from
  * fixtures recorded from the real API (e2e/fixtures/explore/, AAPL / MSFT / NVDA on
- * 2026-10-02). The ticker table is padded with synthetic tickers to the real universe size
+ * 2026-10-02), the GraphQL reads (`POST /api/graphql`) by operation name and key. The ticker table is padded with synthetic tickers to the real universe size
  * (11,427) so the table is exercised at full scale.
  */
 import { readFileSync } from 'node:fs';
@@ -63,8 +63,23 @@ function tickerPage(url: URL): Json {
   };
 }
 
-function answer(url: URL): Json | Json[] | null {
+interface Operation {
+  query?: string;
+  variables?: Record<string, unknown>;
+}
+
+/** A GraphQL operation's recorded answer: `InstrumentFacts` for AAPL (the Overview pane). */
+function graphqlAnswer(operation: Operation): Json | null {
+  const name = /query\s+(\w+)/.exec(operation.query ?? '')?.[1];
+  if (name === 'InstrumentFacts' && operation.variables?.['key'] === 'AAPL') {
+    return fixture('facts-aapl.json');
+  }
+  return null;
+}
+
+function answer(url: URL, body: string | null): Json | Json[] | null {
   const path = url.pathname.replace(/^\/api/, '');
+  if (path === '/graphql') return graphqlAnswer(JSON.parse(body ?? '{}') as Operation);
   if (path === '/features') return fixture('features.json');
   const distribution = /^\/features\/(.+)\/distribution$/.exec(path);
   if (distribution) {
@@ -90,7 +105,7 @@ function answer(url: URL): Json | Json[] | null {
 export async function mockExploreApi(page: Page): Promise<void> {
   await page.route('**/api/**', async (route: Route) => {
     const url = new URL(route.request().url());
-    const body = answer(url);
+    const body = answer(url, route.request().postData());
     await route.fulfill(
       body === null
         ? { status: 404, json: { detail: `no fixture for ${url.pathname}` } }
