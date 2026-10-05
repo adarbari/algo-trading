@@ -15,7 +15,10 @@
                               (delete a superseded group's tables once its replacement covers them)
     algotrade-ingest screen   [--date YYYY-MM-DD] [--config ID] [--user U] [--export-dir out/]
     algotrade-ingest nightly  [--date YYYY-MM-DD] [--export-dir out/] [--force]
-                              (no --date: catch up; a quiet no-op when up to date)
+                              [--waive STEP --reason TEXT]
+                              (no --date: catch up; a quiet no-op when up to date; a failed
+                              session resumes; --force reruns every step; --waive accepts a
+                              step that cannot succeed, e.g. chains past their day: ADR 0039)
     algotrade-ingest report   [--date D] [--out report.html] [--send] [--max-examples N]
                               (the nightly summary email for a past session; read-only)
     algotrade-ingest purge-raw [--keep-days 90] [--staging-keep-days 14]
@@ -33,7 +36,8 @@ queues behind the first).
 
 ``nightly`` without ``--date`` is what the launchd agent runs (``schedule``: weekdays at
 15:00, at login and hourly), so it must be cheap to repeat: when every session up to the last
-closed one already has a COMPLETE / PARTIAL nightly it prints ``nothing to do: <session>
+closed one already has a done nightly (SUCCEEDED; COMPLETE / PARTIAL before ADR 0039) it
+prints ``nothing to do: <session>
 already ingested`` and exits 0 without taking the lock, writing a run record or notifying;
 while another ingest run holds the lock it prints one line and exits 3, also without
 notifying. ``--force`` runs anyway (the last closed session again when nothing is missing).
@@ -77,6 +81,7 @@ from algotrade_ingestion.ops.schedule import (
 )
 from algotrade_ingestion.tasks.framework.registry import TASKS, Task
 from algotrade_ingestion.tasks.framework.run import recover_unpublished
+from algotrade_ingestion.workflows.nightly.nightly import NIGHTLY
 from algotrade_ingestion.workflows.nightly.sessions import last_done
 
 # Task commands kept under their own names (``algotrade-ingest bars ...``); every registry
@@ -85,6 +90,7 @@ TASK_COMMANDS = tuple(name for name in TASKS if name != "golden-load")
 # Former command names kept working: ``features`` computed option_liquidity before 2b.2.
 ALIASES = {"rollups": ["features"]}
 LOCKED_EXIT = 3  # another run holds the store's ingest lock
+STEP_NAMES = tuple(s.name for s in NIGHTLY)  # what --waive accepts
 
 
 def add_wait(parser: argparse.ArgumentParser) -> None:
@@ -155,8 +161,18 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
             s.add_argument(
                 "--force",
                 action="store_true",
-                help="run even when every closed session is already ingested",
+                help="run even when every closed session is already ingested, and rerun every "
+                "step (no resume from an earlier attempt)",
             )
+            s.add_argument(
+                "--waive",
+                action="append",
+                default=[],
+                metavar="STEP",
+                help="with --date and --reason: accept STEP for that session without it "
+                "succeeding (recorded in the run record); repeatable",
+            )
+            s.add_argument("--reason", help="why the --waive steps are accepted")
         else:
             s.add_argument("--config", default="short_premium_liquidity", help="config id")
             s.add_argument("--user", help="config owner (default: $ALGOTRADE_USER or site)")
@@ -281,15 +297,32 @@ def nightly(
         # No --date: also the sessions missed since the last run. --force when nothing is
         # missing: the last closed session again.
         "catch_up": auto and through is None,
+        "resume": not args.force,
+        "waive": dict.fromkeys(args.waive, args.reason),
         "workers": args.workers,
         "export_dir": str(args.export_dir) if args.export_dir else None,
     }
     return report(run_job(args, reader, writer, "nightly", params, SITE_USER))
 
 
+def check_waive(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    """``--waive`` needs ``--date`` (the session) and ``--reason``, and names workflow steps."""
+    if args.command != "nightly" or not args.waive:
+        return
+    if args.date is None or not (args.reason or "").strip():
+        parser.error("--waive needs --date (the session) and --reason")
+    unknown = sorted(set(args.waive) - set(STEP_NAMES))
+    if unknown:
+        parser.error(
+            f"--waive: unknown step(s) {', '.join(unknown)}; steps: {', '.join(STEP_NAMES)}"
+        )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     load_dotenv()
-    args = _parser().parse_args(argv)
+    parser = _parser()
+    args = parser.parse_args(argv)
+    check_waive(parser, args)
     backend = open_backend(data_url())
     try:
         if args.command == "nightly":  # never an unmerged branch against the real store

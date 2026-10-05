@@ -2,8 +2,9 @@
 
 Screens run through the job runner (``services/jobs``), never inline (ADR 0019, R5): each
 screener (every site preset as ``site``, then each user's finalised ones) becomes a ``screen``
-job for its owner; exports are that job's output. The step is COMPLETE when every job is,
-FAILED when every job failed, else PARTIAL.
+job for its owner; exports are that job's output. The step SUCCEEDS when every job is
+COMPLETE (each screener reached its coverage threshold, ADR 0039), else it FAILS naming the
+screeners that did not.
 """
 
 from collections.abc import Callable
@@ -12,9 +13,9 @@ from pathlib import Path
 from typing import Any
 
 from algotrade.services.configs import nightly_screeners
-from algotrade.services.jobs import JobRecord, JobRunner
+from algotrade.services.jobs import JobRecord, JobRunner, JobStatus
 from algotrade.storage.configs.store import ConfigStore
-from algotrade_ingestion.workflows.nightly.steps import Outcome, StepStatus, step_status
+from algotrade_ingestion.workflows.nightly.steps import Outcome, StepStatus
 
 type ScreenStep = Callable[[date], Outcome]
 
@@ -30,7 +31,7 @@ def screen_jobs(jobs: JobRunner, configs: ConfigStore, export_dir: Path | None) 
     """The screens step, submitting through ``jobs`` (run in the nightly's own thread)."""
 
     def run(session: date) -> Outcome:
-        summaries, statuses = [], []
+        summaries, short = [], []
         for config in nightly_screeners(configs):
             params = {
                 "config": config.config.id,
@@ -39,13 +40,12 @@ def screen_jobs(jobs: JobRunner, configs: ConfigStore, export_dir: Path | None) 
             }
             job = jobs.run("screen", params, config.user, force=True)
             summaries.append(_summary(config.config.id, job))
-            statuses.append(step_status(job.status))
-        if statuses and all(s is StepStatus.FAILED for s in statuses):
-            status = StepStatus.FAILED
-        elif all(s is StepStatus.COMPLETE for s in statuses):
-            status = StepStatus.COMPLETE
-        else:
-            status = StepStatus.PARTIAL
-        return Outcome(status, {"screens": summaries})
+            if job.status is not JobStatus.COMPLETE:
+                short.append(f"{config.config.id} {job.status.value}")
+        result = {"screens": summaries}
+        if short:
+            reason = f"screeners not complete: {', '.join(short)}"
+            return Outcome(StepStatus.FAILED, result, reason)
+        return Outcome(StepStatus.SUCCEEDED, result)
 
     return run

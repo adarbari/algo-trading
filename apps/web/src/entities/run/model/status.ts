@@ -1,14 +1,23 @@
 /**
  * What a recorded status means on screen: the tone of an item status code (OK, STALE_DATA,
- * NO_CHAIN, FETCH_ERROR, ...), of a run (complete / partial / failed) and of a check (PASS /
+ * NO_CHAIN, FETCH_ERROR, ...), of a run or nightly step (complete / succeeded / waived / failed /
+ * not run, ADR 0039) and of a check (PASS /
  * WARN / FAIL), and a one-line hint for the item codes admins see most. The text always says
  * the status; the tone only reinforces it.
  */
 import type { DataTone, StatusTone } from '@algotrade/ui';
 
-const POSITIVE = new Set(['OK', 'STORED', 'PASS', 'COMPLETE', 'COMPLETED']);
-const WARNING = new Set(['WARN', 'PARTIAL', 'STALE_DATA', 'RUNNING', 'QUEUED', 'CARRIED']);
-const NEGATIVE = new Set(['FAIL', 'FAILED', 'ERROR', 'FETCH_ERROR', 'NOT_ATTEMPTED']);
+const POSITIVE = new Set(['OK', 'STORED', 'PASS', 'COMPLETE', 'COMPLETED', 'SUCCEEDED']);
+const WARNING = new Set([
+  'WARN',
+  'PARTIAL',
+  'STALE_DATA',
+  'RUNNING',
+  'QUEUED',
+  'CARRIED',
+  'WAIVED',
+]);
+const NEGATIVE = new Set(['FAIL', 'FAILED', 'ERROR', 'FETCH_ERROR', 'NOT_ATTEMPTED', 'NOT_RUN']);
 
 /** The tone of a status (any case), for StatusBadge. */
 export function statusTone(status: string): StatusTone {

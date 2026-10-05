@@ -8,7 +8,7 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 - Nothing long-running. IBKR IV history backfill finished 2026-10-05 05:30 (all 4,200 names: 4,197 OK, 3 genuine NO_DATA; `ibkr_iv@v1` rollups over 502 sessions, rank FULL for 4,789 of 5,415 names on 2026-10-02).
 
 **Next**
-- **Workflows (WF, ADR 0039):** WF1 first, in order ([WF section](#workflows-wf-dependencies-succeed-or-fail-cadence-adr-0039)). **Owner action first:** Massive returned 403 for the 2026-10-05 bars and that nightly finished PARTIAL, so nothing retries it: once Massive serves the day run `algotrade-ingest bars --date 2026-10-05 --wait`, then `rollups --date 2026-10-05 --wait`, then the 2026-10-05 screens (until then lookback rollups from 2026-10-06 compute over the gap).
+- **Workflows (WF, ADR 0039):** WF1-WF3 done; next WF3b, then WF4 ([WF section](#workflows-wf-dependencies-succeed-or-fail-cadence-adr-0039)). **Owner action first:** Massive returned 403 for the 2026-10-05 bars and that nightly finished PARTIAL, so nothing retries it: once Massive serves the day run `algotrade-ingest bars --date 2026-10-05 --wait`, then `rollups --date 2026-10-05 --wait`, then the 2026-10-05 screens (until then lookback rollups from 2026-10-06 compute over the gap).
 - ETF holdings (ADR 0035, accepted): after merge run `algotrade-ingest etf-holdings` once (reads the ~1,140 covered funds, plus the non-optionable N-PORT funds with a 20-session dollar volume of $5M or more, up to ~900 (`fallback_scope = "liquid"`, `fallback_min_adv_usd`): about 1.5 hours per 1,140, extrapolated from the sample, mostly SEC header lookups; or let the nightly fill it, 200 funds a night, 6 weekday nights), ProShares funds (173, the VIX funds UVXY / SVXY / VIXY and the leveraged and inverse ones) are read from their daily file by the same run (weights are shares of gross exposure, ADR 0035), then the Overview tab renders `<HoldingsPanel symbol onSelectSymbol>` (`widgets/holdings-panel`) for ETFs.
 - ETF descriptions for funds with no SEC prospectus objective: SPY, DIA, GLD, SLV, USO, IBIT, SOXL and the like (unit trusts, commodity and crypto trusts, some leveraged funds); 246 of the 1,464 ETFs trading $5M or more a day have none (2026-10-05). The SEC series match closes 83 of them; the rest need issuer pages (iShares and State Street page text for IBIT, SLV, SPY, DIA; ProShares and Direxion 497K or pages for SOXL, TSLL, UVXY) and an ADR.
 - Optional IBKR pace trial: `[ibkr] historical_min_interval_s` 5, then 3, watching timeouts and error 162 (the backfill ran at 10 s, IV only, about 6 names a minute). The nightly keeps the history current (100 names a night of any new gap).
@@ -46,13 +46,14 @@ lands. The target state of every item is described in [architecture.md](architec
 
 ## Workflows (WF): dependencies, succeed or fail, cadence (ADR 0039)
 
-One PR each, in order. Today's behaviour is described in `docs/architecture.md` ("The nightly workflow") until WF5.
+In order. WF1-WF3 shipped in one PR (resume and waivers are what make hold-back safe to run); `docs/architecture.md` ("The nightly workflow") describes the current behaviour.
 
 | # | Delivers | Status |
 |---|---|---|
-| WF1 | Step model: `needs`, `critical`, acceptance rules (thresholds in `nightly.toml`), SUCCEEDED / FAILED / NOT_RUN / SKIPPED; `quality` checks become per-step acceptance; rollups fail on a gap in a lookback window (`data/feature_inputs.py` `_Bars.at`) | next |
-| WF2 | DAG runner with resume (rerun only steps not SUCCEEDED); sessions in order, stopping at the oldest FAILED one (old PARTIAL records read as SUCCEEDED) | |
-| WF3 | `nightly --date D --waive STEP --reason ...` (stored in the run record); email and notifier name the failing step, rule and unblock command; alert on every failed retry | |
+| WF1 | Step model: `needs`, `critical`, acceptance checks (thresholds in `sources.toml [quality]`), SUCCEEDED / FAILED / NOT_RUN / SKIPPED / WAIVED; `quality` checks run per step; rollups fail on a gap in a lookback window; NYSE special closures | **done** |
+| WF2 | Resume (steps done in an earlier attempt are reused; `--force` reruns all); sessions in order, stopping at a FAILED one (later ones held), none dropped (old PARTIAL records count as done) | **done** |
+| WF3 | `nightly --date D --waive STEP --reason ...` (stored in the run record, kept on later attempts); expired latest-only steps name the unblock command; notifier names failing critical steps and held sessions, alerts on every failed retry | **done** |
+| WF3b | Chains retry refetches only STALE_DATA / FETCH_ERROR names (today a FAILED chains step refetches all ~4,200, 2-4 h); consider starting the nightly later than close + 30 min (2026-10-05: ~50% STALE_DATA at 13:40 PT) | next |
 | WF4 | Split into `market-daily` / `reference` (weekly) / `enrichment`: CLI commands, three launchd agents from `ops/schedule.py`, `ibkr-iv` session snapshot vs history backfill | |
 | WF5 | Reads default to the latest SUCCEEDED `market-daily` session (`services/read/session.py`); architecture docs rewritten | |
 

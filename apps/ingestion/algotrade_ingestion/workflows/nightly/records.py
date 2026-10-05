@@ -18,10 +18,12 @@ from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade_ingestion.tasks.framework.registry import TASKS
 from algotrade_ingestion.workflows.nightly.report import Report, build_report
 from algotrade_ingestion.workflows.nightly.sessions import NIGHTLY_RUN
-from algotrade_ingestion.workflows.nightly.steps import StepStatus, overall
 
 PURGE_STEP = "purge-raw"
 SLACK = timedelta(minutes=1)  # clock jitter between a task's record and the nightly's
+# A nightly record's status as the summary shows it (ADR 0039: a session that SUCCEEDED is
+# stored COMPLETE; PARTIAL only in records written before it, shown as stored).
+SHOWN_STATUS = {RunStatus.COMPLETE: "SUCCEEDED", RunStatus.FAILED: "FAILED"}
 
 
 def job_name(step: str) -> str | None:
@@ -69,18 +71,17 @@ def stored_summary(
     if purge is not None:
         took = ((purge.finished_at or purge.started_at) - purge.started_at).total_seconds()
         final[PURGE_STEP] = {
-            "status": "COMPLETE" if purge.status is RunStatus.COMPLETE else "FAILED",
+            "status": "SUCCEEDED" if purge.status is RunStatus.COMPLETE else "FAILED",
+            "critical": False,
             "duration_s": round(took, 3),
             "result": purge.stats,
         }
-    statuses = [StepStatus(s["status"]) for s in [*steps.values(), *final.values()]]
     end = (purge.finished_at if purge else None) or finished
+    status = SHOWN_STATUS.get(record.status, record.status.value.upper())
     return {
-        "status": overall(statuses).value,
+        "status": status,
         "sessions": [session.isoformat()],
-        "runs": [
-            {"session": session.isoformat(), "status": record.status.value.upper(), "steps": steps}
-        ],
+        "runs": [{"session": session.isoformat(), "status": status, "steps": steps}],
         "steps": final,
         "started_at": record.started_at.isoformat(),
         "finished_at": end.isoformat(),

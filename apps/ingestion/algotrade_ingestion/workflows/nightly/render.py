@@ -112,8 +112,10 @@ def _timing_overall(report: Report) -> list[tuple[str, str]]:
     sessions = ", ".join(report.sessions) or "none"
     if len(report.sessions) > 1:
         sessions += f" (catch-up: {len(report.sessions)} sessions)"
-    if report.catch_up_dropped:
-        sessions += f"; dropped over the cap: {', '.join(report.catch_up_dropped)}"
+    if report.catch_up_held:
+        sessions += f"; held back behind a failed session: {', '.join(report.catch_up_held)}"
+    if report.catch_up_waiting:
+        sessions += f"; waiting for the next run: {', '.join(report.catch_up_waiting)}"
     slower = [t.step for t in report.timings if t.slower]
     rows = [
         ("Total", total),
@@ -298,11 +300,14 @@ _CSS_TABLE = "border-collapse:collapse;font-size:13px;margin:4px 0 16px 0"
 _CSS_CELL = "border:1px solid #d0d7de;padding:4px 8px;text-align:left;vertical-align:top"
 _CSS_HEAD = _CSS_CELL + ";background:#f6f8fa"
 _STATUS_COLOR = {
+    "SUCCEEDED": "#1a7f37",
     "COMPLETE": "#1a7f37",
     "PASS": "#1a7f37",
+    "WAIVED": "#9a6700",
     "PARTIAL": "#9a6700",
     "WARN": "#9a6700",
     "BLOCKED": "#9a6700",
+    "NOT_RUN": "#cf222e",
     "FAILED": "#cf222e",
     "FAIL": "#cf222e",
     "SKIPPED": "#57606a",

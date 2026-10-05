@@ -2,7 +2,7 @@
 
 ``Notifier`` is the one interface: ``notify(notice)`` delivers a ``Notice`` and returns a
 warning when it could not (it never raises). ``MacNotifier`` shows a macOS notification
-(``osascript``; never under pytest) when the status is not COMPLETE; ``EmailNotifier`` mails
+(``osascript``; never under pytest) when the status is not SUCCEEDED; ``EmailNotifier`` mails
 the full report (statistics + failure deep dive, ``report.py`` / ``render.py``) after every
 run over SMTP (STARTTLS; port 465: implicit TLS). ``config/site/nightly.toml`` ``[notify]``
 turns notifications off or moves the summary file (``var/logs/nightly-latest.json``);
@@ -38,7 +38,7 @@ type Env = Callable[[str], str | None]
 class Notice:
     """What a nightly run tells its notifiers: one line, and the full report when built."""
 
-    status: str  # COMPLETE / PARTIAL / FAILED
+    status: str  # SUCCEEDED / FAILED
     title: str
     message: str  # one line: status, sessions, steps that did not complete
     subject: str = ""
@@ -47,7 +47,7 @@ class Notice:
 
     @property
     def alert(self) -> bool:
-        return self.status != "COMPLETE"
+        return self.status not in ("SUCCEEDED", "COMPLETE")  # COMPLETE: before ADR 0039
 
 
 class Notifier(Protocol):
@@ -62,7 +62,7 @@ class NullNotifier:
 
 
 class MacNotifier:
-    """A macOS notification (``display notification``) for runs that are not COMPLETE;
+    """A macOS notification (``display notification``) for runs that did not succeed;
     failures are ignored."""
 
     def notify(self, notice: Notice) -> str | None:
@@ -182,23 +182,24 @@ def default_notifier(settings: NightlySettings, lookup: Env = env.credential) ->
     return chosen[0] if len(chosen) == 1 else Notifiers(chosen)
 
 
+BAD = ("FAILED", "NOT_RUN", "BLOCKED", "PARTIAL")  # BLOCKED / PARTIAL: before ADR 0039
+
+
 def message(summary: Mapping[str, Any]) -> str:
-    """One line: status, sessions and the steps that did not complete."""
+    """One line: status, sessions, the critical steps that did not succeed (optional ones
+    are warnings in the report), and the sessions held back behind a failed one."""
+    steps = [(name, step) for run in summary.get("runs", []) for name, step in run["steps"].items()]
     bad = sorted(
         {
             f"{name} {step['status'].lower()}"
-            for run in summary.get("runs", [])
-            for name, step in run["steps"].items()
-            if step["status"] in ("FAILED", "BLOCKED", "PARTIAL")
-        }
-        | {
-            f"{name} {step['status'].lower()}"
-            for name, step in summary.get("steps", {}).items()
-            if step["status"] in ("FAILED", "BLOCKED", "PARTIAL")
+            for name, step in steps
+            if step["status"] in BAD and step.get("critical", True)
         }
     )
     sessions = ", ".join(summary.get("sessions", [])) or "no session"
-    return f"{summary['status']} ({sessions})" + (f": {'; '.join(bad)}" if bad else "")
+    held = (summary.get("catch_up") or {}).get("held", [])
+    tail = f"; held back: {', '.join(held)}" if held else ""
+    return f"{summary['status']} ({sessions})" + (f": {'; '.join(bad)}" if bad else "") + tail
 
 
 def notice(

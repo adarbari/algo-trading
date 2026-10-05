@@ -9,6 +9,8 @@ Pure Python. Rules (NYSE, current since 2022):
   Juneteenth (from 2022), Independence Day, Labor Day (1st Monday of September), Thanksgiving
   (4th Thursday of November) and Christmas; fixed-date holidays move Saturday -> Friday and
   Sunday -> Monday;
+- special closures (``SPECIAL_CLOSURES``): days the exchange closed outside the rules, e.g.
+  national days of mourning;
 - early closes (13:00 New York): July 3 and December 24 when they are sessions, and the day
   after Thanksgiving.
 
@@ -26,6 +28,11 @@ REGULAR_CLOSE = time(16, 0)
 EARLY_CLOSE = time(13, 0)
 DEFAULT_SETTLE = timedelta(minutes=30)
 _MONDAY, _THURSDAY, _FRIDAY, _SATURDAY = 0, 3, 4, 5
+# Full-day closures outside the rules (NYSE): national days of mourning.
+SPECIAL_CLOSURES: dict[date, str] = {
+    date(2018, 12, 5): "national day of mourning, President George H. W. Bush",
+    date(2025, 1, 9): "national day of mourning, President Jimmy Carter",
+}
 
 
 def is_weekend(day: date) -> bool:
@@ -85,6 +92,7 @@ def holidays(year: int) -> frozenset[date]:
         days.add(_observed(new_year))
     if year >= 2022:
         days.add(_observed(date(year, 6, 19)))
+    days.update(d for d in SPECIAL_CLOSURES if d.year == year)
     return frozenset(days)
 
 

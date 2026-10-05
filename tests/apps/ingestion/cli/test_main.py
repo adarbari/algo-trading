@@ -2,6 +2,7 @@
 
 import csv
 import json
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,10 @@ from algotrade_sources.framework.http import RetryPolicy
 from algotrade_sources.framework.registry import build_sources
 from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource
 from algotrade_sources.vendors.ishares.etf_holdings import IsharesHoldings
+from algotrade_sources.vendors.massive.bars import MassiveDailyBars
+from algotrade_sources.vendors.massive.corporate_actions import MassiveCorporateActions
+from algotrade_sources.vendors.massive.overview import MassiveOverview
+from algotrade_sources.vendors.massive.tickers import MassiveTickers
 from algotrade_sources.vendors.nasdaq.earnings import NasdaqEarningsSource
 from algotrade_sources.vendors.proshares.etf_holdings import ProsharesHoldings
 from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
@@ -20,6 +25,7 @@ from tests.apps.ingestion.tasks.market.test_option_chains import FakeFeed
 from tests.conftest import REPO_ROOT
 from tests.helpers.ingest_fakes import http_for, use_source
 from tests.helpers.payloads import cboe as fx
+from tests.helpers.payloads import massive as massive_payloads
 from tests.helpers.payloads import treasury as treasury_payloads
 
 pytestmark = pytest.mark.e2e
@@ -30,6 +36,18 @@ DAY = fx.SESSION.isoformat()
 def _any_checkout(monkeypatch: pytest.MonkeyPatch) -> None:
     """These tests run from worktrees too; the main-checkout guard has its own tests."""
     monkeypatch.setattr(cli, "ensure_main_checkout", lambda: None)
+
+
+def massive_feed(url: str) -> bytes:
+    """Massive: the asked session's grouped bars for this universe; no corporate actions,
+    tickers or descriptions. The nightly's bars and corporate actions are critical (ADR 0039)."""
+    if "/aggs/grouped/" in url:
+        day = date.fromisoformat(url.split("/stocks/", 1)[1][:10])
+        rows = [("AAPL", 230.0, 233.0, 229.0, 232.0, 5e7), ("TQQQ", 80.0, 82.0, 79.0, 81.0, 6e7)]
+        return massive_payloads.grouped(day, rows)
+    if "/reference/tickers/" in url:
+        return massive_payloads.overview(url.rsplit("/", 1)[-1].split("?", maxsplit=1)[0])
+    return massive_payloads.page([])
 
 
 def treasury_feed(url: str) -> bytes:
@@ -50,6 +68,13 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     shutil.rmtree(tmp_path / "config" / "site" / "presets" / "screeners")
     monkeypatch.setenv("ALGOTRADE_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.chdir(tmp_path)  # the nightly writes var/logs/nightly-latest.json here
+    # The nightly's "now": the evening of the fixture session, so it is the last closed one.
+    from datetime import UTC, datetime, timedelta  # noqa: PLC0415
+
+    from algotrade_ingestion.workflows.nightly import nightly  # noqa: PLC0415
+
+    evening = datetime.combine(fx.SESSION, datetime.min.time(), UTC) + timedelta(hours=23)
+    monkeypatch.setattr(nightly, "utc_now", lambda: evening)
     from tests.helpers.payloads.nasdaq_earnings import calendar  # noqa: PLC0415
 
     earnings = calendar([("AAPL", "time-after-hours")])
@@ -65,6 +90,14 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     )
     use_source(monkeypatch, "cboe", CboeOptionsSource(http_for(feed, policy)))
     use_source(monkeypatch, "treasury", TreasuryParYields(http_for(treasury_feed, policy)))
+    monkeypatch.setenv("ALGOTRADE_MASSIVE_API_KEY", "test-key")
+    for name, kind in (
+        ("massive_bars", MassiveDailyBars),
+        ("massive_corporate_actions", MassiveCorporateActions),
+        ("massive_tickers", MassiveTickers),
+        ("massive_overview", MassiveOverview),
+    ):
+        use_source(monkeypatch, name, kind(http_for(massive_feed, policy)))
     fixtures = REPO_ROOT / "tests" / "fixtures" / "sources"
     use_source(  # fund lists: State Street and iShares list none of this universe's one ETF
         monkeypatch,
@@ -105,8 +138,11 @@ def test_nightly_pipeline_end_to_end(env: Path, capsys: pytest.CaptureFixture[st
     code, nightly = call(
         capsys, "nightly", "--date", DAY, "--export-dir", str(env / "out"), "--workers", "2"
     )
-    assert code == 0 and nightly["status"] == "COMPLETE" and nightly["sessions"] == [DAY]
     steps = nightly["runs"][-1]["steps"]
+    why = {
+        n: s.get("error") or s.get("reason") for n, s in steps.items() if s["status"] != "SUCCEEDED"
+    }
+    assert code == 0 and nightly["status"] == "SUCCEEDED" and nightly["sessions"] == [DAY], why
     screens = steps["screens"]["result"]["screens"]
     assert screens[0]["coverage"] == "COMPLETE" and screens[0]["job_id"].startswith("job-screen")
     assert screens[0]["decisions"] == {"QUALIFIED": 1, "LIQUIDITY_RISK": 1}
@@ -115,13 +151,13 @@ def test_nightly_pipeline_end_to_end(env: Path, capsys: pytest.CaptureFixture[st
     purged = nightly["steps"]["purge-raw"]["result"]
     assert purged["raw_keep_days"]["cboe_delayed"] == 90  # per-source windows
     latest = json.loads((env / "var" / "logs" / "nightly-latest.json").read_text())
-    assert latest["status"] == "COMPLETE" and latest["sessions"] == [DAY]
+    assert latest["status"] == "SUCCEEDED" and latest["sessions"] == [DAY]
     with (env / "out" / f"short_premium_candidates_{DAY}.csv").open() as fh:
         assert [r["ticker"] for r in csv.DictReader(fh)] == ["AAPL"]
     # The nightly summary email, re-rendered from the stored run records (read-only).
     code = cli.main(["report", "--date", DAY, "--out", str(env / "r.html")])
     text = capsys.readouterr().out
-    assert code == 0 and text.startswith(f"[algotrade] {DAY} nightly: COMPLETE")
+    assert code == 0 and text.startswith(f"[algotrade] {DAY} nightly: SUCCEEDED")
     assert "chains 2 OK · 0 failures" in text and "FAILURE DEEP DIVE" in text
     assert (env / "r.html").read_text().startswith("<!doctype html>")
 
@@ -131,7 +167,8 @@ def test_report_command_errors_and_send(
 ) -> None:
     assert cli.main(["report", "--date", DAY]) == 2
     assert "no nightly run record" in capsys.readouterr().err
-    assert call(capsys, "nightly", "--date", DAY, "--workers", "1")[0] in (0, 1)
+    import_universe(env, capsys, DAY)
+    assert call(capsys, "nightly", "--date", DAY, "--workers", "1")[0] == 0
     for name in ("ALGOTRADE_NOTIFY_EMAIL_TO", "ALGOTRADE_SMTP_USER", "ALGOTRADE_SMTP_PASSWORD"):
         monkeypatch.delenv(name, raising=False)
     assert cli.main(["report", "--date", DAY, "--send", "--max-examples", "1"]) == 1
@@ -376,13 +413,36 @@ def test_nightly_recovers_a_job_left_running_by_a_crashed_process(
     from algotrade.storage.factory import open_backend  # noqa: PLC0415
 
     call(capsys, "universe", "--stocks", str(env / "stocks.csv"), "--version", "v", "--date", DAY)
-    params = {"session": DAY, "catch_up": False, "workers": 1, "export_dir": None}
+    params = {
+        "session": DAY,
+        "catch_up": False,
+        "resume": True,
+        "waive": {},
+        "workers": 1,
+        "export_dir": None,
+    }
     job_id = job_id_for("nightly", params, UserContext(SITE_USER))
     stuck = JobRecord(job_id, "nightly", params, SITE_USER, datetime.now(UTC))
     stuck.status = JobStatus.RUNNING
     open_backend(data_url()).runs.save(stuck.to_run())
     _, result = call(capsys, "nightly", "--date", DAY, "--workers", "1")
     assert result["job_id"] == job_id and "earnings" in result["runs"][-1]["steps"]
+
+
+def import_universe(env: Path, capsys: pytest.CaptureFixture[str], day: str) -> None:
+    code, _ = call(
+        capsys, "universe", "--stocks", str(env / "stocks.csv"), "--etfs", str(env / "etfs.csv"),
+        "--version", "v", "--date", day,
+    )  # fmt: skip
+    assert code == 0
+
+
+def accept_stale_chains(env: Path) -> None:
+    sources = env / "config" / "site" / "sources.toml"
+    text = sources.read_text().replace(
+        "max_chain_stale_share = 0.20", "max_chain_stale_share = 1.0"
+    )
+    sources.write_text(text)
 
 
 def nightly_records() -> list:  # type: ignore[type-arg]
@@ -422,13 +482,25 @@ def test_scheduled_nightly_catches_up_then_is_a_quiet_no_op(
     from algotrade.core.time.calendar import previous_session  # noqa: PLC0415
 
     before = previous_session(fx.SESSION).isoformat()
+    import_universe(env, capsys, before)
+    # The fake Cboe feed serves one session's snapshot: accept its stale chains, and leave
+    # the screens (covered end to end above) out of this catch-up test.
+    accept_stale_chains(env)
+    from algotrade_ingestion.workflows.nightly import screens  # noqa: PLC0415
+
+    monkeypatch.setattr(screens, "nightly_screeners", lambda configs: [])
     scheduled_at(monkeypatch, before)
     code, first = call(capsys, "nightly", "--workers", "1")  # no earlier nightly: one session
-    assert code in (0, 1) and first["sessions"] == [before]
+    why = {
+        n: v.get("error") or v.get("reason")
+        for n, v in first["runs"][-1]["steps"].items()
+        if v["status"] not in ("SUCCEEDED", "SKIPPED")
+    }
+    assert code == 0 and first["sessions"] == [before], why
     # The Mac was off over the next close: the next start catches the missed session up.
     scheduled_at(monkeypatch, DAY)
     code, caught_up = call(capsys, "nightly", "--workers", "1")
-    assert code in (0, 1) and caught_up["sessions"] == [DAY]
+    assert code == 0 and caught_up["sessions"] == [DAY]
     assert caught_up["catch_up"]["last_done"] == before
     # Up to date: one line, exit 0, no run record of any kind, no notification, fast.
     files = all_run_files(env)
@@ -445,11 +517,12 @@ def test_scheduled_nightly_catches_up_then_is_a_quiet_no_op(
 def test_force_reruns_the_last_session_when_up_to_date(
     env: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    import_universe(env, capsys, DAY)
     scheduled_at(monkeypatch, DAY)
     call(capsys, "nightly", "--workers", "1")
     count = len(nightly_records())
     code, forced = call(capsys, "nightly", "--force", "--workers", "1")
-    assert code in (0, 1) and forced["sessions"] == [DAY]
+    assert code == 0 and forced["sessions"] == [DAY]
     assert len(nightly_records()) > count  # a new run record for the same session
 
 

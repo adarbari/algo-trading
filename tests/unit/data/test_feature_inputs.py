@@ -8,6 +8,7 @@ from datetime import date, timedelta
 import pandas as pd
 import pytest
 
+from algotrade.core.model.errors import MissingDataError
 from algotrade.data import feature_inputs as inputs
 from algotrade.data.shares import TABLE as SHARES
 from tests.helpers.rollup_store import (
@@ -136,3 +137,20 @@ def test_reference_input_is_the_security_types_the_session_sees() -> None:
         "EQ:A": "ADR",
         "EQ:B": "COMMON_STOCK",
     }
+
+
+def test_a_bars_window_never_spans_a_missing_session() -> None:
+    writer, reader = store()
+    days = write_bars(writer, {"EQ:A": series(6)}, skip={"EQ:A": [2]})  # no bars that session
+    loaded = inputs.load_input(reader, "bars/1d", [days[5]], 5)
+    with pytest.raises(MissingDataError, match=f"no bars for {days[2]} in the 6-session window"):
+        loaded.at(days[5], 5)
+    assert loaded.at(days[5], 2) is not None  # days[3..5]: no gap
+
+
+def test_bars_windows_allow_the_start_of_history_and_one_names_gap() -> None:
+    writer, reader = store()
+    days = write_bars(writer, {"EQ:A": series(4), "EQ:B": series(4)}, skip={"EQ:B": [1]})
+    window = inputs.load_input(reader, "bars/1d", [days[3]], 20).at(days[3], 20)
+    assert window is not None  # 20 sessions back is before the first stored one: not a gap
+    assert sorted(window["session_date"].unique()) == days  # B's missing bar is not a gap

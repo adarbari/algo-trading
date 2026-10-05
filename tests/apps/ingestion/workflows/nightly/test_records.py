@@ -59,6 +59,16 @@ def test_stored_summary_rebuilds_the_latest_nightly() -> None:
     assert records.stored_summary(reader, fx.D - timedelta(days=1)) is None
 
 
+def test_a_succeeded_nightly_is_shown_as_succeeded() -> None:
+    reader, writer = _store()
+    latest = records.latest_nightly(reader, fx.D)
+    assert latest is not None
+    writer.save_run(replace(latest, status=RunStatus.COMPLETE))  # stored COMPLETE (ADR 0039)
+    summary = records.stored_summary(reader, fx.D, ORDER)
+    assert summary is not None and summary["status"] == "SUCCEEDED"
+    assert summary["runs"][0]["status"] == "SUCCEEDED"
+
+
 def test_task_records_pick_this_nights_records() -> None:
     reader, _ = _store()
     summary = records.stored_summary(reader, fx.D, ORDER)

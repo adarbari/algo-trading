@@ -194,66 +194,88 @@ audits. The local runner uses 2 threads.
   (the nightly runs its `screen` jobs this way). Fan-out inside a task (chain workers) uses
   `services.jobs.as_completed`.
 
-### The nightly workflow (R5)
+### The nightly workflow (R5, ADR 0039)
 
-> **Being replaced** by [ADR 0039](adr/0039-ingestion-workflows-dependencies-and-acceptance.md)
-> (three workflows by cadence, `needs` DAG, SUCCEEDED / FAILED by acceptance rules, hold-back
-> and resume, manual waivers; roadmap WF1-WF5). This section describes today's code until WF5 lands.
+> ADR 0039 steps WF1-WF3 are implemented (needs, acceptance, hold-back, resume, waivers). Still
+> to come: WF4 (split into `market-daily` / weekly `reference` / `enrichment`) and WF5 (reads
+> default to the latest SUCCEEDED session); until WF4 the reference steps run in this one
+> workflow as optional steps.
 
 `apps/ingestion/algotrade_ingestion/workflows/`: `nightly.py` (the steps and the job
-handler), `steps.py` (isolation, status rule), `sessions.py` (catch-up), `screens.py` (screen
-jobs), `notify.py` (summary file + notifiers), `records.py` / `report.py` / `timing.py` / `render.py`
-(the summary email).
+handler), `steps.py` (needs, acceptance, status rule), `attempts.py` (resume and expiry),
+`sessions.py` (catch-up), `screens.py` (screen jobs), `notify.py` (summary file + notifiers),
+`records.py` / `report.py` / `timing.py` / `render.py` (the summary email).
 
 - **Steps** (`NIGHTLY`): `universe-build`, `company-details`, `shares`, `earnings`, `bars`, `rates`,
-  `corporate-actions`, `chains`, `rollups`, `screens`, `descriptions`, `quality`; then `purge-raw` once
-  (`FINALLY`). Each is a registry task (or the `screens` job step) run in isolation: an
-  exception makes the step FAILED with its error and later steps still run. A step names its
-  hard dependencies (`screens` on `chains` and `rollups`): when one FAILED it is BLOCKED.
-  `rollups` runs for every session and reports a rollup whose input the session lacks as
-  `no_input`. Data preconditions are separate: `chains` and `screens` need a universe
-  snapshot to exist, not today's build to succeed. Missing sources → SKIPPED with the reason.
-  `quality` ends every session and `purge-raw` ends the run, whatever failed before. Every
-  step records its status and duration.
-- **Status, in one place** (`steps.overall`): of the steps that ran, none succeeded → FAILED;
-  any FAILED, BLOCKED or PARTIAL → PARTIAL; else COMPLETE. Each session gets a `nightly` run
-  record with that status and its per-step results.
+  `corporate-actions`, `chains`, `etf-holdings`, `ibkr-contracts`, `ibkr-iv`, `rollups`,
+  `screens`, `descriptions`, `verify`; then `purge-raw` once (`FINALLY`). Each is a registry
+  task (or the `screens` job step) run in isolation, declared with the steps it `needs`, whether
+  it is `critical`, its data precondition (`requires`) and its acceptance checks. A step runs
+  only when every need is satisfied (SUCCEEDED, WAIVED, or SKIPPED as not applicable); else it
+  is NOT_RUN with the reason. `rollups` needs bars, rates, corporate actions, earnings and
+  chains; `screens` needs chains and rollups. `chains` needs a universe snapshot to exist, not
+  today's build to succeed (chains can be fetched only for the current session; a failed
+  build fails the session anyway). Optional steps: company details, shares, ETF holdings, the
+  IBKR steps, descriptions, verify (their failures are warnings).
+- **Succeed or fail** (`steps.from_record`, `steps.overall`): a step that runs SUCCEEDS or
+  FAILS. Its task must not fail (nor finish PARTIAL for `task_complete` steps: universe,
+  earnings, rates, corporate actions, rollups), and its acceptance checks
+  (`tasks/maintenance/quality.py`, thresholds in `sources.toml [quality]`) must not FAIL:
+  universe size, bars fresh / count / resolved, chain fetch failures and stale share,
+  earnings present. WARN checks are carried as warnings. A critical step without its source
+  configured FAILS (an optional one is SKIPPED). A session SUCCEEDS when every critical step
+  is satisfied, else FAILS; its `nightly` run record is COMPLETE or FAILED and holds every
+  step's result. There is no PARTIAL session.
+- **Lookback gaps fail** (`data/feature_inputs.py`): a bars window that misses a session (on or
+  after the first stored one) raises `MissingDataError`, so a rollup never computes over a gap
+  and the `rollups` step FAILS.
 - **Exchange calendar** (`core/time/calendar.py`, pure Python): NYSE full-day holidays (with the
-  Saturday/Sunday observance rules, Good Friday from the Easter computus, Juneteenth from 2022)
+  Saturday/Sunday observance rules, Good Friday from the Easter computus, Juneteenth from 2022),
+  special closures (`SPECIAL_CLOSURES`: national days of mourning, 2018-12-05 and 2025-01-09)
   and 13:00 early closes (July 3 and December 24 when they are sessions, the day after
   Thanksgiving). `last_closed_session(now)` is the latest session whose close plus a settle
   margin (`config/site/nightly.toml`, 30 min) has passed in New York. Every default session in
   `algotrade-ingest` comes from it, so a run started during market hours never ingests today's
   intraday data as end of day.
-- **Catch-up** (`sessions.py`): without `--date`, the nightly runs every session after the
-  last COMPLETE / PARTIAL nightly up to the last closed session, oldest first, capped at the
-  latest `max_catch_up` (5; older ones are reported as `catch_up.dropped`). A FAILED nightly
-  is retried next time. Bars, corporate actions, earnings and rollups catch up; sources that
-  only serve the current snapshot (universe files, SEC, Cboe chains) and screens run only for
-  the latest session. Chains still check that the Cboe snapshot's
-  session matches (`STALE_DATA` otherwise), so a missed session's chains can be fetched only
-  until the next session opens. `--date D` runs exactly D.
+- **Catch-up, in order** (`sessions.py`): without `--date`, the nightly runs the sessions after
+  the last done one (SUCCEEDED; COMPLETE / PARTIAL before ADR 0039) up to the last closed
+  session, oldest first, at most `max_catch_up` (5) per run; the rest wait for the next run
+  (`catch_up.waiting`), none is dropped. The run stops at a session that FAILS: later ones are
+  `catch_up.held`, so lookback windows never span a gap. Sources that only serve the current
+  snapshot (universe files, SEC, Cboe chains) and screens run only for the last closed
+  session. `--date D` runs exactly D (as the latest).
+- **Resume and expiry** (`attempts.py`): a FAILED session is retried (the hourly watchdog) from
+  where it stopped: steps an earlier attempt SUCCEEDED or WAIVED are reused, not rerun
+  (records from before ADR 0039 are never reused). `--force` reruns every step. A step only
+  held back (NOT_RUN) was never tried, so a latest-only one is SKIPPED on a later day, not
+  expired. A critical latest-only step that failed and whose session is no
+  longer the latest FAILS as expired until waived: `algotrade-ingest nightly --date D --waive
+  chains --reason "..."` (the waiver, its user, time and reason are stored in the run record and
+  kept on later attempts).
 - **Quiet when up to date** (`cli/main.py`): the scheduled form (no `--date`, no `--force`)
   first reads the `nightly` run records, before taking the lock; when every session up to the
-  last closed one is COMPLETE / PARTIAL it prints `nothing to do: <session> already ingested`
+  last closed one is done it prints `nothing to do: <session> already ingested`
   and exits 0 (no run or job record, no summary file, no notification). If the lock is held
   (a nightly still running) it prints `busy: ...` and exits 3, without notifying. `--force`
-  runs anyway: the missed sessions, or the last closed session again when none are missing.
+  runs anyway: the pending sessions, or the last closed session again when none are pending.
 - **Screens are jobs**: one `screen` job per scheduled screener config, for its owner;
-  exports are that job's output. The screen audit records `universe_pre_snapshot`
+  exports are that job's output. The step SUCCEEDS only when every screener's job is
+  COMPLETE (its coverage threshold met). The screen audit records `universe_pre_snapshot`
   (survivorship).
 - **Notification** (`notify.py`): every run writes its summary to
   `var/logs/nightly-latest.json`, then hands a `Notice` to the `Notifier` (one interface;
   `notify(notice)` returns a warning instead of raising). The macOS notifier (`osascript`,
-  never in tests) alerts only when the status is not COMPLETE; the email notifier sends the
-  summary email after every run (below). A run longer than `max_duration_minutes` is
-  recorded as a `nightly_duration` WARN. All in `config/site/nightly.toml` (`[notify]
-  enabled = false` turns every notification off).
+  never in tests) alerts when the status is not SUCCEEDED (every failed retry alerts again),
+  naming the critical steps that did not succeed and the sessions held back; the email
+  notifier sends the summary email after every run (below). A run longer than
+  `max_duration_minutes` is recorded as a `nightly_duration` WARN, an optional step's failure
+  as an `optional_step` WARN. All in `config/site/nightly.toml` (`[notify] enabled = false`
+  turns every notification off).
 
 ### Nightly summary email
 
-After every nightly (COMPLETE or not) the owner gets one email: subject
-`[algotrade] 2026-10-02 nightly: PARTIAL · chains 3,624 OK · 5 steps with failures`, a plain-text
+After every nightly (SUCCEEDED or not) the owner gets one email: subject
+`[algotrade] 2026-10-02 nightly: FAILED · chains 3,624 OK · 2 steps with failures`, a plain-text
 and an HTML part (inline styles only, no images or external assets).
 
 - **Inputs** (`records.py`, read-only): the run summary plus, per step, the registry task's run

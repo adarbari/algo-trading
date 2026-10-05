@@ -466,6 +466,10 @@ reason = "the ingestion id rule (ADR 0018, `id-resolution`): golden and migrate-
 module = "apps/ingestion/algotrade_ingestion/tasks/market/option_chains.py"
 reason = "the option-chain coverage (`select_underlyings`: every active optionable instrument) is the coverage IBKR contract resolution enriches (ADR 0028), and `prioritise` is the one fetch order (priority symbols, S&P 500, liquidity) the descriptions task follows too (ADR 0034)"
 
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py"
+reason = "the data-quality checks are the nightly steps' acceptance checks (ADR 0039): the workflow declares which check accepts which step and runs it right after the step"
+
 # --------------------------------------------------------------------------- web app (apps/web)
 # ADR 0025 (frontend architecture). Every directory under apps/web (build output and
 # node_modules skipped) is a declared [[web_dir]]; enforced by
