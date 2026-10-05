@@ -162,6 +162,8 @@ Not used, with the reason:
   robots.txt disallows every crawler. N-PORT covers ARKK.
 - **Massive / Nasdaq** free tiers: no ETF holdings endpoint.
 
+A sources.toml from before the `[ssga]` section (it had `[spy_holdings]`) keeps working: the sources use the defaults, enabled and a 1 s pace.
+
 State Street's and iShares' robots.txt files do not disallow these paths. Neither site's terms
 of use were confirmed to allow automated downloads of the public holdings files (the iShares
 terms page could not be fetched); the owner should confirm, and `enabled = false` in `[ssga]`

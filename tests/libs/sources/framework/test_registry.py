@@ -79,6 +79,23 @@ def test_one_limiter_and_breaker_per_key_with_configured_or_default_pace(
     assert bars.breaker is not None and bars.breaker.threshold == 4
 
 
+def test_a_sources_toml_from_before_the_ssga_section_still_builds_and_paces_politely(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Older files have ``[spy_holdings]`` and no ``[ssga]``: SPY's file and the SPDR holdings
+    files still build, on one limiter with the default 1 s pace."""
+    http: dict[str, Http] = {}
+    for name in ("spy_holdings", "ssga_holdings"):
+        keep = partial(http.setdefault, name)
+        monkeypatch.setitem(registry.SOURCES, name, replace(SOURCES[name], build=keep))  # type: ignore[arg-type]
+    old = {k: v for k, v in SITE_SOURCES.items() if k != "ssga"}
+    old["spy_holdings"] = {"enabled": True, "min_interval_s": 0.0}
+    built = build_sources(settings(old), ENV.get, ["spy_holdings", "ssga_holdings"], tmp_path)
+    assert set(built.sources) == {"spy_holdings", "ssga_holdings"} and not built.skipped
+    assert http["spy_holdings"].limiter is http["ssga_holdings"].limiter
+    assert http["ssga_holdings"].limiter.min_interval_s == 1.0  # type: ignore[union-attr]
+
+
 def test_every_source_has_a_sources_toml_section_and_a_limiter_key() -> None:
     for name, spec in SOURCES.items():
         assert spec.name == name
