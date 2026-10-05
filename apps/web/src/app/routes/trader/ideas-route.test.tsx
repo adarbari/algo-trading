@@ -33,6 +33,7 @@ function setup() {
           onOpen={vi.fn()}
           onNewScreener={vi.fn()}
           onScreeners={vi.fn()}
+          onOpenScreener={vi.fn()}
         />
       </QueryClientProvider>
     </ToastProvider>,

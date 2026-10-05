@@ -1,3 +1,4 @@
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import type { CatalogueFeature } from '@/entities/feature';
@@ -29,7 +30,7 @@ const table = {
   feature_columns: ['feature.market_cap'],
 } as unknown as ScreenTable;
 
-const row = (outcome: string): ScreenTableRow => ({
+const row_ = (outcome: string): ScreenTableRow => ({
   rank: 1,
   instrument_id: 'EQ:A',
   symbol: 'A',
@@ -65,12 +66,27 @@ describe('resultColumns', () => {
   it('reads each value in the catalogue unit and tints a near miss or a miss', () => {
     const iv30 = columns.find((c) => c.id === 'criterion:iv30');
     expect(iv30?.format).toEqual({ kind: 'percent' });
-    expect(iv30?.value(row('PASS'))).toBe(0.307);
+    expect(iv30?.value(row_('PASS'))).toBe(0.307);
     expect([
-      iv30?.fill?.(row('PASS')),
-      iv30?.fill?.(row('NEAR')),
-      iv30?.fill?.(row('FAIL')),
+      iv30?.fill?.(row_('PASS')),
+      iv30?.fill?.(row_('NEAR')),
+      iv30?.fill?.(row_('FAIL')),
     ]).toEqual([undefined, 'warning', 'negative']);
-    expect(columns.find((c) => c.id === 'feature.market_cap')?.value(row('PASS'))).toBe(5e10);
+    expect(columns.find((c) => c.id === 'feature.market_cap')?.value(row_('PASS'))).toBe(5e10);
+  });
+
+  it('marks a pick the unsaved criteria would drop', () => {
+    const decision = (leaving: ReadonlySet<string>) => {
+      const column = resultColumns(table, CATALOGUE, leaving).find((c) => c.id === 'decision');
+      const cell = column?.cell;
+      if (!cell) throw new Error('no decision cell');
+      const row = row_('QUALIFIED');
+      return cell({ row, value: row.decision, formatted: { text: row.decision, tone: 'default' } });
+    };
+    const { unmount } = render(<>{decision(new Set())}</>);
+    expect(screen.queryByText('Would leave')).toBeNull();
+    unmount();
+    render(<>{decision(new Set(['A']))}</>);
+    expect(screen.getByText('Would leave')).toBeInTheDocument();
   });
 });

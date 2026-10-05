@@ -5,7 +5,14 @@
  * none); the screen's display columns; the catalogue features the user added; the flags and
  * the reasons. A column's id is the API's sort key for it.
  */
-import { Mono, Stack, Text, type DataTableColumn, type DataTableFill } from '@algotrade/ui';
+import {
+  Mono,
+  Stack,
+  StatusBadge,
+  Text,
+  type DataTableColumn,
+  type DataTableFill,
+} from '@algotrade/ui';
 
 import {
   displayValue,
@@ -25,6 +32,9 @@ const FILL: Readonly<Record<string, DataTableFill>> = {
   FAIL: 'negative',
   MISSING: 'negative',
 };
+
+/** No pick is about to leave. */
+const NONE: ReadonlySet<string> = new Set();
 
 const humanise = (name: string): string => {
   const words = name.replace(/_/g, ' ').trim();
@@ -47,6 +57,7 @@ function changeNote(row: ScreenTableRow): string | null {
 export function resultColumns(
   table: ScreenTable,
   catalogue: ReadonlyMap<string, CatalogueFeature>,
+  leaving: ReadonlySet<string> = NONE,
 ): DataTableColumn<ScreenTableRow>[] {
   const criteria = table.criteria
     .filter((c) => !isGate(c))
@@ -113,6 +124,9 @@ export function resultColumns(
       cell: ({ row }) => (
         <Stack gap={0}>
           <ScreenDecisionBadge decision={row.decision} />
+          {row.symbol !== null && leaving.has(row.symbol) ? (
+            <StatusBadge tone="warning">Would leave</StatusBadge>
+          ) : null}
           {changeNote(row) ? (
             <Text size="xs" tone="muted">
               {changeNote(row)}
@@ -138,6 +152,7 @@ export function resultColumns(
       value: (row) => row.flags.join(', ') || null,
       tone: 'secondary',
       sortable: false,
+      width: 'lg',
     },
     {
       id: 'reasons',

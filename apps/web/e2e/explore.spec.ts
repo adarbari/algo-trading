@@ -4,9 +4,9 @@
  * and detail tabs, URL state (shareable links), accessibility in dark and light, and that the
  * 11k-row table stays responsive (search and scrolling).
  */
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
+import { expectAccessible } from './a11y';
 import { mockApi } from './mock-api';
 
 const COMPARE = '/explore?sel=AAPL,MSFT,NVDA';
@@ -24,11 +24,6 @@ async function useTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {
   await page.evaluate((t) => {
     document.documentElement.setAttribute('data-theme', t);
   }, theme);
-}
-
-async function expectAccessible(page: Page): Promise<void> {
-  const axe = await new AxeBuilder({ page }).analyze();
-  expect(axe.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
 }
 
 const tickers = (page: Page) => page.getByRole('grid', { name: 'Tickers' });

@@ -21,16 +21,18 @@ import {
 export interface TopIdeasProps {
   onCompare: (search: IdeaCompareSearch) => void;
   onOpen: (symbol: string) => void;
+  /** Open a screener's results (a screener chip in a row). */
+  onOpenScreener: (screenerId: string) => void;
   /** Open the Screeners list (where a screener is run). */
   onScreeners: () => void;
 }
 
-export function TopIdeas({ onCompare, onOpen, onScreeners }: TopIdeasProps) {
+export function TopIdeas({ onCompare, onOpen, onOpenScreener, onScreeners }: TopIdeasProps) {
   const ideas = useIdeas();
   const [filters, setFilters] = useState<IdeaFilters>(NO_FILTERS);
   const [selected, setSelected] = useState<string[]>([]);
   const all = useMemo(() => ideas.data?.ideas ?? [], [ideas.data]);
-  const columns = useMemo(() => ideaColumns(all), [all]);
+  const columns = useMemo(() => ideaColumns(all, onOpenScreener), [all, onOpenScreener]);
   const rows = useMemo(() => filterIdeas(all, filters), [all, filters]);
   const symbols = selected.flatMap((id) => {
     const symbol = all.find((idea) => idea.instrumentId === id)?.symbol;

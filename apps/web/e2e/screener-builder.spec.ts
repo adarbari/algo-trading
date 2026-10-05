@@ -5,9 +5,9 @@
  * save / discard / finalize, rebase, a preview error naming its
  * criterion), adding a formula feature, copying a preset, starting a new screener, accessibility.
  */
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
+import { expectAccessible } from './a11y';
 import { mockBuilderApi } from './builder-api';
 import { mockApi } from './mock-api';
 
@@ -19,15 +19,6 @@ function collectErrors(page: Page): string[] {
     if (msg.type() === 'error' && !msg.text().includes('status of 400')) errors.push(msg.text());
   });
   return errors;
-}
-
-async function expectAccessible(page: Page): Promise<void> {
-  const axe = await new AxeBuilder({ page }).analyze();
-  expect(
-    axe.violations.map(
-      (v) => `${v.id}: ${v.help} ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`,
-    ),
-  ).toEqual([]);
 }
 
 test.beforeEach(async ({ page }) => {

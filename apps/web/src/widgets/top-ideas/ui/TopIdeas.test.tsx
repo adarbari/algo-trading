@@ -77,7 +77,12 @@ const response: IdeasResponse = {
 const data = toIdeasData(response);
 
 function setup() {
-  const handlers = { onCompare: vi.fn(), onOpen: vi.fn(), onScreeners: vi.fn() };
+  const handlers = {
+    onCompare: vi.fn(),
+    onOpen: vi.fn(),
+    onOpenScreener: vi.fn(),
+    onScreeners: vi.fn(),
+  };
   const view = render(<TopIdeas {...handlers} />);
   return { ...view, ...handlers, grid: () => screen.getByRole('grid', { name: 'Top ideas' }) };
 }
@@ -89,6 +94,13 @@ beforeEach(() => {
 });
 
 describe('TopIdeas', () => {
+  it("opens a screener's results from its name in a row", async () => {
+    const { grid, onOpenScreener } = setup();
+    const aapl = within(grid()).getByRole('row', { name: /AAPL/ });
+    await userEvent.click(within(aapl).getByRole('button', { name: 'VRP scanner' }));
+    expect(onOpenScreener).toHaveBeenCalledWith('vrp');
+  });
+
   it('shows each ticker with its screeners, decision, score, earnings and expiry flag', async () => {
     const { container, grid } = setup();
     const aapl = within(grid()).getByRole('row', { name: /AAPL/ });
