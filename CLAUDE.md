@@ -11,7 +11,7 @@ Read in this order, **by section and only when the task needs it** (grep, then r
 2. `docs/architecture.md` (target architecture + the rules enforced on today's code) and the
    spec for your area: `docs/data/layers.md`, `docs/configuration.md`, `docs/data/storage.md`,
    `docs/data/instruments.md`, `docs/data/vendors.md`, `docs/ui/architecture.md`,
-   `docs/ui/design-system.md`, `docs/screeners/`.
+   `docs/ui/design-system.md`, `docs/screeners/`, `docs/api/read-model.md`.
 3. `docs/adr/README.md`: why things are the way they are (the ADR number follows each decision below).
 
 ## Settled decisions (one line each; the ADR has the detail)
@@ -31,6 +31,9 @@ Read in this order, **by section and only when the task needs it** (grep, then r
 - **Vendors**: free first behind the source interface; Cboe chains, IBKR for futures and enrichment (IV rank prefers IBKR, labelled `iv_rank_source`; IBKR-derived features carry `licence = "personal"`); we compute Greeks ourselves; descriptions: Massive overview for stocks (capped per night), SEC prospectus objective for ETFs (ADR 0034). (ADRs 0012, 0014, 0028, 0034)
 - **Broker access is read-only**: IBKR only through `algotrade_sources/vendors/ibkr/gateway.py`; no orders, no account functions (fitness test + import-linter). (ADR 0026)
 - **Universe**: S&P 500 + Nasdaq-listed stocks + all ETFs, daily snapshots. (ADR 0013)
+- **Reads serve one session**: every read resolves the session once (`services/read/session.py`) and reads session-grain tables for exactly that date; a fact not stored for it is UNKNOWN with a reason (`services/read/values.py`), never an older partition; a screener with no run for it is NOT_RUN. Snapshot tables (reference, company, universe) follow ADR 0007's one rule and say which snapshot they used. (ADR 0036)
+- **One read model, one graph**: page data is a domain read object in `src/algotrade/services/read/` (one loader per object) served by GraphQL (`apps/api/algotrade_api/graphql/`, snapshot `apps/api/schema.graphql`). REST only for writes, job polling, health, live quotes, preview POSTs and files (`architecture/rest_allowlist.toml`, shrink-only). New page read: `.claude/skills/add-graphql-field`; new object: `.claude/skills/add-domain-object`; status and plan: `docs/api/read-model.md`. (ADR 0037)
+- **Per-instrument stored values are catalogue features**: read by name through `features(names)`, never a typed field; a fact a page needs that is not stored is a feature first (`add-feature`). The browser derives nothing from raw rows (`architecture/web_forbidden_derivations.toml`); tables are `widgets/feature-table` with the column factories in `entities/feature`. (ADR 0038)
 
 ## Ownership (ADR 0019; enforced by `make ownership`, `make dupes`, `make arch`)
 
@@ -68,7 +71,9 @@ purpose). The non-obvious cases:
 | A feature (a documented column) in a feature group | `src/algotrade/features/rollups/<kind>/<group>.py` (`FEATURES` + pure compute); then `make features-doc` |
 | A feature derived from a personal-use source (IBKR) | its group in `features/rollups/` with `licence="personal"` on each `Feature`; expression features over it inherit the licence (ADR 0028) |
 | Comparing our data with a live source (verification check) | `apps/ingestion/.../tasks/verification/` (`checks.py`) |
-| Read-only query a page shows (the API's backend) | `src/algotrade/services/explore/<area>.py`; route / schema in `apps/api/algotrade_api/{routes,schemas}/` (`add-api-endpoint`) |
+| A read object or loader a page needs | `src/algotrade/services/read/<area>/` (`add-domain-object`) |
+| A GraphQL field | `apps/api/algotrade_api/graphql/types/<object>.py` (`add-graphql-field`) |
+| A REST write, job, live or file endpoint | `apps/api/algotrade_api/{routes,schemas}/` (`add-api-endpoint`); page reads stay in `services/explore/` only until their area moves (`docs/api/read-model.md`) |
 | Web: component / page / feature | see Web UI below and `docs/ui/architecture.md` |
 
 **If nothing fits, add a new folder for the new kind**: declare it in `architecture/layout.toml`
@@ -149,7 +154,9 @@ the skill with the fix.
 | New UI component (design system) or visual element | `.claude/skills/add-ui-component` |
 | New web page, route or data hook | `.claude/skills/add-web-page` |
 | New responsibility, or moving one between modules | `.claude/skills/add-responsibility` |
-| New API endpoint | `.claude/skills/add-api-endpoint` |
+| New page read (a GraphQL field) | `.claude/skills/add-graphql-field` |
+| New domain read object (and its loader) | `.claude/skills/add-domain-object` |
+| New REST endpoint (writes, jobs, live, files only) | `.claude/skills/add-api-endpoint` |
 | A decision that changes architecture | `.claude/skills/write-adr` |
 | A lesson from this session (owner correction, rule-preventable error) | `.claude/skills/capture-learning` |
 

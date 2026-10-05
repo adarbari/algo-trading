@@ -1,0 +1,65 @@
+# Facts the browser may not derive from raw rows (ADR 0038; docs/api/read-model.md "What the
+# browser may not derive"). It asks the server for them instead: a catalogue feature by name,
+# a typed field of the read model, or `session.date` from the response.
+#
+# Checked by tests/architecture/test_layout_web.py::test_no_forbidden_derivations over
+# apps/web/src/**/*.{ts,tsx} (tests, stories and generated files excluded): a line matching a
+# pattern's `regex` fails unless its file path starts with one of the pattern's `allowed`.
+#
+#   regex    a Python regular expression, searched per line
+#   reason   what to ask for instead (the failure message)
+#   allowed  path prefixes relative to apps/web where the pattern is legitimate (say why)
+#
+# Only patterns current code already respects are enabled. Patterns the code still violates
+# are listed below as commented "pending, enable in PR N" entries: the read-model PR that
+# removes the derivation uncomments its entry in the same PR (never an allowed entry for the
+# violating file).
+
+[[pattern]]
+regex = "new Date\\(\\)|Date\\.now\\(\\)"
+reason = "the browser clock is not the data's session: compare stored dates with `session.date` from the response; the one wall-clock read is todayIso() in shared/lib/date"
+allowed = ["src/shared/lib/date/"]  # todayIso(): the one wall-clock read (chart ranges, data freshness)
+
+[[pattern]]
+regex = "['\"`]EQ:"
+reason = "never build or parse an instrument id (ADR 0018): ask for `Instrument.symbol` / `instrumentId`"
+
+# ---------------------------------------------------------------------------- pending
+
+# pending, enable in PR 4 (overview-panel reads earnings facts by catalogue name):
+# [[pattern]]
+# regex = "nextAndLast|earningsFacts|nextEarningsDate\\("
+# reason = "next / last earnings are stored: ask for rollup.earnings@v1.next_earnings_date / last_earnings_date"
+
+# pending, enable in PR 4 (only the events entity names the raw earnings table):
+# [[pattern]]
+# regex = "events/earnings"
+# reason = "earnings facts are catalogue features (rollup.earnings@v1.*); raw events are for the events list only"
+# allowed = ["src/entities/instrument/model/events.ts"]  # labels the event table in the events list
+
+# pending, enable in PR 4 (overview) and PR 6 (feature history range): today's date vs stored dates
+# [[pattern]]
+# regex = "todayIso\\("
+# reason = "compare stored dates with `session.date` from the response, not the browser's today"
+# allowed = ["src/shared/lib/date/", "src/entities/explore/model/freshness.ts", "src/entities/instrument/model/range.ts"]  # the wall clock itself, data freshness, chart range ends
+
+# pending, enable in PR 5 (Ideas counts come from the server):
+# [[pattern]]
+# regex = "=== 'QUALIFIED'\\)\\.length|summarise\\("
+# reason = "per-screener counts and top-N are population facts: ask for Ideas.screeners[].picked / ScreenerRun.decisions"
+
+# pending, enable in PR 6 (days to expiry is rollup.nearest_expiry@v1.dte):
+# [[pattern]]
+# regex = "daysBetween\\("
+# reason = "days to expiry / earnings are stored: ask for rollup.nearest_expiry@v1.dte, rollup.earnings@v1.days_to_earnings"
+# allowed = ["src/shared/lib/date/", "src/entities/explore/model/freshness.ts"]  # the arithmetic itself, data freshness
+
+# pending, enable in PR 7 (FeatureTable.total):
+# [[pattern]]
+# regex = "useUniverseSize"
+# reason = "the universe size is FeatureTable.total, not a size=1 page"
+
+# pending, enable in PR 8 (picked / not picked from the server):
+# [[pattern]]
+# regex = "NOT_PICKED"
+# reason = "picked / not picked and new / dropped are ScreenResult.change, decided on the server"

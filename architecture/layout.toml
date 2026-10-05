@@ -264,6 +264,26 @@ purpose = "read-only dry runs of unsaved Builder input (ADR 0029): a draft rule 
 contracts = ["Explore queries are read-only: no writers, no jobs (ADR 0024)"]
 
 [[dir]]
+path = "src/algotrade/services/read"
+purpose = "the read model (ADR 0037): session resolution (ADR 0036), UNKNOWN values and scalar coercion, the read context the GraphQL layer calls; one loader per domain object in the subfolders (replaces services/explore over read-model PRs 2-10, docs/api/read-model.md)"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
+path = "src/algotrade/services/read/instruments"
+purpose = "read objects at instrument grain for one session: Instrument identity, feature values by catalogue name (ADR 0038), catalogue, events, option chain, holdings, series, the feature table"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
+path = "src/algotrade/services/read/screens"
+purpose = "read objects over stored screen results for one session: Screener, ScreenerRun (the one latest-run rule), ScreenResult rows, the Ideas ranking, the user's table views"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
+path = "src/algotrade/services/read/ops"
+purpose = "read objects over run records: backtests, ingest and nightly runs, data-quality checks, admin review lists"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
 path = "src/algotrade/services/ondemand"
 purpose = "use case: the API's on-request screen runs (ADR 0033): a local job runner for the `screen` job (no wait for ingestion: atomic publication); writes only result tables and run records"
 
@@ -368,6 +388,16 @@ purpose = "request bodies and responses of the dry-run routes (screen preview, f
 [[dir]]
 path = "apps/api/algotrade_api/schemas/authoring"
 purpose = "request bodies and responses of the config-writing routes (ADR 0029)"
+
+[[dir]]
+path = "apps/api/algotrade_api/graphql"
+purpose = "the GraphQL read layer (ADR 0037): Strawberry schema at POST /graphql, scalars, errors, request context, dataloaders; thin types over services.read in types/"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/graphql/types"
+purpose = "GraphQL object types, one module per domain read object: fields mapped by one .of() classmethod, resolvers that call one loader or dataloader"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 # --------------------------------------------------------------------------- ingestion app
 
@@ -840,6 +870,10 @@ local = true
 [[docs_dir]]
 path = "docs"
 purpose = "cross-cutting docs: architecture, roadmap, configuration, testing, trading pitfalls"
+
+[[docs_dir]]
+path = "docs/api"
+purpose = "the API's read contract: the read model, GraphQL conventions, what stays REST, the read-model migration plan"
 
 [[docs_dir]]
 path = "docs/adr"
