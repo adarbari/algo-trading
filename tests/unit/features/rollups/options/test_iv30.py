@@ -152,6 +152,17 @@ def test_through_the_framework_with_stored_inputs() -> None:
     assert pd.isna(out["div_yield"].iloc[0])  # no div_yield@v1 stored: q = 0
 
 
+def test_a_duplicated_underlying_keeps_its_latest_quote_whatever_the_row_order() -> None:
+    older, newer = (
+        pd.Timestamp("2026-10-02 15:00", tz="UTC"),
+        pd.Timestamp("2026-10-02 20:00", tz="UTC"),
+    )
+    rows = [("EQ:A", newer, 12.0), ("EQ:A", older, 11.0), ("EQ:B", older, 5.0)]
+    for order in (rows, rows[::-1]):
+        quotes = pd.DataFrame(order, columns=["instrument_id", "ts", "price"])
+        assert iv30.positive_spots(quotes).to_dict() == {"EQ:A": 12.0, "EQ:B": 5.0}
+
+
 def test_spot_prices_are_the_one_spot_reader_of_the_chain_groups() -> None:
     quotes = pd.DataFrame(
         {
