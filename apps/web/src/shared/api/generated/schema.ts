@@ -1843,7 +1843,7 @@ export interface components {
         PreviewBody: {
             /**
              * Limit
-             * @description how many top rows to return
+             * @description the fewest top rows; every row not rejected comes too (up to 1000)
              * @default 50
              */
             limit: number;

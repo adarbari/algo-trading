@@ -39,8 +39,8 @@ const criterion = (id: string, field: string, value: number, outcome = 'PASS') =
   value,
   outcome,
   distance: null,
-  normalised: null,
-  penalty: 0,
+  normalised: outcome === 'NEAR' ? 0.4 : null,
+  penalty: outcome === 'NEAR' ? 4 : 0,
 });
 
 const row = (
@@ -120,6 +120,14 @@ describe('PreviewResults', () => {
     expect(screen.queryByRole('row', { name: /AAPL/ })).toBeNull();
     await userEvent.click(screen.getByText('KO'));
     expect(onOpen).toHaveBeenCalledWith('KO');
+  });
+
+  it('opens the score breakdown from the score without opening the ticker', async () => {
+    const onOpen = vi.fn();
+    render(<PreviewResults onOpen={onOpen} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Score 79: how it was worked out' }));
+    expect(screen.getByRole('dialog', { name: 'How KO scored 79' })).toHaveTextContent('IV/HV');
+    expect(onOpen).not.toHaveBeenCalled();
   });
 
   it('asks for a complete criterion while idle', () => {
