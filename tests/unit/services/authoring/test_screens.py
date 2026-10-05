@@ -100,6 +100,18 @@ def test_detail_and_versions_and_finalising_puts_a_screen_on_the_nightly(
     assert [r.config.id for r in nightly_screeners(writer) if r.user.user_id == "alice"] == ["mine"]
 
 
+def test_delete_takes_a_screen_off_the_list_and_the_nightly(writer: MemoryConfigWriter) -> None:
+    screens.save_draft(writer, "alice", "mine", OWN)
+    screens.finalise(writer, "alice", "mine")
+    screens.save_draft(writer, "alice", "mine", OWN)
+    screens.delete_screen(writer, "alice", "mine")
+    assert [s.screener_id for s in screens.list_screens(writer, "alice")] == []
+    assert [r.config.id for r in nightly_screeners(writer) if r.user.user_id == "alice"] == []
+    assert len(writer.archived) == 1
+    with pytest.raises(ScreenNotFoundError, match="no such screen"):
+        screens.delete_screen(writer, "alice", "mine")
+
+
 @pytest.mark.parametrize("user", ["site", "../etc", "Bob"])
 def test_users_are_strict_labels_never_the_site(writer: MemoryConfigWriter, user: str) -> None:
     with pytest.raises(ConfigurationError):

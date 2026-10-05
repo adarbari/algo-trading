@@ -569,7 +569,13 @@ export interface paths {
         get: operations["screener_screeners__screener_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Screener
+         * @description Delete the user's screen: its draft and versions are archived (off the list and the
+         *     nightly; stored runs stay). 404 when the user has no such screen (a site preset is changed
+         *     only by pull request).
+         */
+        delete: operations["delete_screener_screeners__screener_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3765,6 +3771,38 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ScreenerDetail"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_screener_screeners__screener_id__delete: {
+        parameters: {
+            query?: {
+                /** @description whose configs (a label until auth; default the API's) */
+                user?: string | null;
+            };
+            header?: never;
+            path: {
+                screener_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

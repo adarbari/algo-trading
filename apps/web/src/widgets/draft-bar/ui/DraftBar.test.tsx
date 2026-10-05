@@ -44,11 +44,11 @@ const builder = (patch: Record<string, unknown> = {}, detail: Record<string, unk
   ...patch,
 });
 
-function setup() {
+function setup(onDeleted?: () => void) {
   return render(
     <ToastProvider>
       <TestQueryProvider>
-        <DraftBar />
+        <DraftBar {...(onDeleted ? { onDeleted } : {})} />
       </TestQueryProvider>
     </ToastProvider>,
   );
@@ -95,6 +95,13 @@ describe('DraftBar', () => {
     expect(save).toHaveBeenCalled();
   });
 
+  it('offers Delete for your own screener when the page can leave it', () => {
+    setup();
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+    setup(vi.fn());
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled();
+  });
+
   it('cannot finalize without criteria', () => {
     state.builder = builder({ criteria: [] });
     setup();
@@ -133,6 +140,12 @@ describe('DraftBar', () => {
     expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Copy to my screeners' })).toBeNull();
     await expectNoA11yViolations(container);
+  });
+
+  it('offers no Delete for a site preset not copied yet (it changes by PR)', () => {
+    state.builder = untouched();
+    setup(vi.fn());
+    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
   });
 
   it('says it is your copy as soon as the first edit is made', () => {

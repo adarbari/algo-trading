@@ -1,10 +1,12 @@
-"""A user's rule screen (ADR 0029): read it (draft, versions, its preset pin), save
-or discard the draft, and finalise the draft into the next immutable version (which puts the
-screen on the nightly: ADR 0033). Finalise validates the whole screen as it would run (layers,
-selection, the ``ScreenSpec``, the catalogue incl. the user's features) and fails closed."""
+"""A user's rule screen (ADR 0029): read it (draft, versions, its preset pin), save or discard
+the draft, delete the screen (archived: off the list and the nightly), and finalise the draft
+into the next immutable version (which puts the screen on the nightly: ADR 0033). Finalise
+validates the whole screen as it would run (layers, selection, the ``ScreenSpec``, the
+catalogue incl. the user's features) and fails closed."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from algotrade.config.site.fields import reject_secrets
@@ -190,6 +192,15 @@ def save_draft(
 def discard_draft(writer: ConfigWriter, user: str, name: str) -> bool:
     who, name = author(user), screen_id(name)
     return writer.discard_draft(who.user_id, name)
+
+
+def delete_screen(writer: ConfigWriter, user: str, name: str, now: datetime | None = None) -> None:
+    """Delete ``user``'s screen ``name``: its draft and every version are archived, so it leaves
+    the list and the nightly (its stored runs stay). A site preset changes only by PR: one the
+    user has not copied is not theirs to delete (``ScreenNotFoundError``)."""
+    who, name = author(user), screen_id(name)
+    if not writer.delete_screen(who.user_id, name, now or datetime.now(UTC)):
+        raise ScreenNotFoundError(f"{who.user_id}/{name}: no such screen of yours to delete")
 
 
 @dataclass(frozen=True)

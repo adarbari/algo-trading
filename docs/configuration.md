@@ -19,6 +19,7 @@ config/users/<user_id>/             L4: git-ignored locally; a DB behind ConfigS
   features/<theme>.toml             the user's expression features (always virtual)
   screeners/<id>/draft.toml         a rule screen's working copy (never run)
   screeners/<id>/v<N>.toml          finalised versions: immutable; the latest (max N) runs nightly
+  archive/screeners/<id>-<stamp>/   a deleted screen's folder, moved whole (never run or listed)
 ```
 
 The location comes from `ALGOTRADE_CONFIG_DIR` (default `./config`) or `--config-dir`. Only
@@ -28,6 +29,7 @@ protocol (`load(scope, kind, name)`, `names`, `users`). A config id is found und
 `load(scope, "screeners", "<id>")` is the latest version, `"<id>@<N>"` exactly version N. User configs are **written** only by
 `services/authoring` through `ConfigWriter` (`storage/configs/writer.py`; atomic files, a
 version is never overwritten), which the API calls (ADR 0029): save / discard a draft,
+delete a screen (archived, never erased),
 finalise it (validated fail closed), copy a preset, rebase, save a user feature. Finalising puts a screen on the nightly (ADR 0033).
 
 ## Objects (`src/algotrade/config/`, pure, no I/O)

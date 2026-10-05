@@ -86,6 +86,17 @@ def test_ids_and_user_labels_are_strict(writer_client: TestClient, root: Path, u
     assert not (root / "users").exists()  # nothing written anywhere
 
 
+def test_delete_archives_a_screen_and_404s_a_preset(writer_client: TestClient, root: Path) -> None:
+    c = writer_client
+    assert c.put("/screeners/mine/draft?user=alice", json={"document": OWN}).status_code == 200
+    assert c.post("/screeners/mine/finalise?user=alice").status_code == 200
+    assert c.delete("/screeners/mine?user=alice").status_code == 204
+    assert [s["screener_id"] for s in c.get("/screeners?user=alice").json()] == []
+    assert len(list((root / "users" / "alice" / "archive" / "screeners").iterdir())) == 1
+    assert c.delete("/screeners/mine?user=alice").status_code == 404
+    assert c.delete("/screeners/vrp?user=alice").status_code == 404  # a site preset: by PR
+
+
 def test_list_has_finalised_and_draft_only_screens(writer_client: TestClient) -> None:
     c = writer_client
     assert c.get("/screeners?user=alice").json() == []

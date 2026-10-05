@@ -511,7 +511,7 @@ detect = [{ call = "parse_screen_spec" }, { call = "Criterion" }, { call = "Tole
 
 [[responsibility]]
 id = "config-authoring"
-description = "Write L4 user configs (ADR 0029): a rule screen's draft, finalise into an immutable v<N> (validated fail closed), copy a site preset pinned to its version and rebase, the schedule switch, named user expression features; the ConfigWriter (atomic, user-scoped files) behind the ConfigStore protocol"
+description = "Write L4 user configs (ADR 0029): a rule screen's draft, finalise into an immutable v<N> (validated fail closed), copy a site preset pinned to its version and rebase, delete a screen (archive its folder), the schedule switch, named user expression features; the ConfigWriter (atomic, user-scoped files) behind the ConfigStore protocol"
 owner = ["src/algotrade/services/authoring/*", "src/algotrade/storage/configs/writer.py"]
 section = "docs/adr/0029-rule-screener.md#versioned-configs"
 detect = [{ call = "add_version" }, { call = "save_features" }]
