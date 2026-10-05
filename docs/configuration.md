@@ -107,6 +107,7 @@ Selectable rollup fields today ([data/layers.md](data/layers.md#rollups-as-built
 | `swing_levels@v1` | `swing_high`, `swing_low` (float32); `swing_high_date`, `swing_low_date` (date) |
 | `anchored_vwap@v1` | `avwap_earnings` (float32); `avwap_anchor_date` (date) |
 | `oi_walls@v1` | `wall_status` (str); `call_wall`, `put_wall` (float32); `call_wall_oi`, `put_wall_oi` (int) |
+| `nearest_expiry@v1` | `expiry_date` (date); `dte`, `sessions_to_expiry` (int) |
 
 Expression features (`feature.<name>`): `liquidity_class` (str: HIGH / MEDIUM / LOW /
 UNKNOWN), `option_tier` (str: A-D), `option_chain_known`, `liquidity_high`,
@@ -114,8 +115,8 @@ UNKNOWN), `option_tier` (str: A-D), `option_chain_known`, `liquidity_high`,
 (float32, materialised), `market_cap`, `pe_ratio`, `revenue_growth_yoy`, `pct_from_high_52w`, `pct_from_low_52w`,
 `iv_hv_spread`, `iv_hv_ratio`, `atr_pct`, `range_20d_pct`, `dist_to_resistance`,
 `dist_to_support`, `dist_to_resistance_atr`, `dist_to_support_atr` (float), `breakout_20d`,
-`pullback_to_sma20` (bool), `near_52w` (str: HIGH / LOW / BOTH / NONE), `trend_state` (str:
-UPTREND / DOWNTREND / MIXED).
+`pullback_to_sma20`, `earnings_before_expiry` (bool), `near_52w` (str: HIGH / LOW / BOTH /
+NONE), `trend_state` (str: UPTREND / DOWNTREND / MIXED).
 
 **Superseded fields.** ADR 0023 step 3 replaced `price_stats@v1`, `dividends@v1`,
 `fundamentals@v1`, `iv_history@v1` and `liquidity_class@v1`. A selection naming one of their
