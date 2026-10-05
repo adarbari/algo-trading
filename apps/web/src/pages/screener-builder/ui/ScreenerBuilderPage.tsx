@@ -17,13 +17,15 @@ export interface ScreenerBuilderPageProps {
   id: string;
   /** Open a ticker in Explore. */
   onOpenTicker: (symbol: string) => void;
+  /** The screener was deleted: back to the list. */
+  onDeleted: () => void;
 }
 
-export function ScreenerBuilderPage({ id, onOpenTicker }: ScreenerBuilderPageProps) {
+export function ScreenerBuilderPage({ id, onOpenTicker, onDeleted }: ScreenerBuilderPageProps) {
   return (
     <ScreenerBuilderProvider id={id} key={id}>
       <Stack gap={3}>
-        <DraftBar />
+        <DraftBar onDeleted={onDeleted} />
         <Grid columns="main-aside" gap={4} collapse="lg" align="start">
           <CriteriaTable />
           <Stack gap={3}>

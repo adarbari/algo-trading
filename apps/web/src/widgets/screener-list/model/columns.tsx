@@ -1,7 +1,7 @@
 /**
  * The screeners list's columns. Site presets: name, kind (rules or Python), universe,
  * state and Open / Copy. Your screeners: name, state (DRAFT or vN finalized, a working copy
- * beside it), the preset it copies, universe, Results and Edit.
+ * beside it), the preset it copies, universe, Results, Edit and Delete.
  */
 import { Button, Stack, StatusBadge, type DataTableColumn } from '@algotrade/ui';
 
@@ -13,6 +13,8 @@ export interface ScreenerActions {
   /** Open a screener in the Builder. */
   onEdit: (id: string) => void;
   onCopy: (preset: string) => void;
+  /** Ask to delete one of your screeners. */
+  onDelete: (id: string) => void;
 }
 
 /** One of your screens: the API's listing joined with what its config resolves to. */
@@ -152,6 +154,16 @@ export function myColumns(actions: ScreenerActions): DataTableColumn<MyScreener>
             }}
           >
             Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-label={`Delete ${row.screener_id}`}
+            onClick={() => {
+              actions.onDelete(row.screener_id);
+            }}
+          >
+            Delete
           </Button>
         </Stack>
       ),

@@ -1,12 +1,14 @@
 /**
  * The Builder's header: the screener's name, its state (DRAFT vN, unsaved changes), the preset it
- * is a copy of ("Your copy of vrp_scanner v1"), and Discard / Save draft / Finalize (a finalised
- * screen runs nightly, ADR 0033). A newer preset version shows the rebase banner. A
+ * is a copy of ("Your copy of vrp_scanner v1"), and Delete (the user's own screen, after a
+ * confirmation) / Discard (the unsaved edits and the saved draft) / Save draft / Finalize (a
+ * finalised screen runs nightly, ADR 0033). A newer preset version shows the rebase banner. A
  * site preset not yet copied is shown as it is (its live preview runs); the first edit makes the
  * user's copy, so there is no separate read-only mode.
  */
 import { Banner, Button, Heading, Mono, Stack, StatusBadge, Text } from '@algotrade/ui';
 import { useScreenerBuilder } from '@/features/screener-builder';
+import { DeleteScreenerButton } from '@/features/screener-delete';
 import { FinaliseButton, RebaseBanner } from '@/features/screener-finalise';
 
 import { draftState } from '../model/state';
@@ -14,14 +16,18 @@ import { draftState } from '../model/state';
 export interface DraftBarProps {
   /** Without the page heading (inside a drawer): the state and the actions only. */
   compact?: boolean;
+  /** The screener was deleted: leave its pages. Without it there is no Delete. */
+  onDeleted?: () => void;
 }
 
-export function DraftBar({ compact = false }: DraftBarProps) {
+export function DraftBar({ compact = false, onDeleted }: DraftBarProps) {
   const builder = useScreenerBuilder();
   const { detail } = builder;
   const state = draftState(builder);
   const pin = detail?.preset ?? null;
   const untouched = builder.preset !== null && !builder.dirty;
+  // The user's own screen (a version or a saved draft); an uncopied preset changes only by PR.
+  const own = detail !== undefined && (detail.versions.length > 0 || detail.draft !== null);
   // The preset this screen is a copy of: its pin, or (the first edit, the copy in flight) the preset.
   const copyOf = builder.preset
     ? { id: builder.preset.id, version: builder.preset.version }
@@ -50,6 +56,9 @@ export function DraftBar({ compact = false }: DraftBarProps) {
           </Stack>
         </Stack>
         <Stack direction="row" gap={2} align="center" wrap>
+          {onDeleted && own && (
+            <DeleteScreenerButton screenerId={builder.id} onDeleted={onDeleted} />
+          )}
           <Button
             disabled={!builder.dirty && !detail?.draft}
             loading={builder.discarding}

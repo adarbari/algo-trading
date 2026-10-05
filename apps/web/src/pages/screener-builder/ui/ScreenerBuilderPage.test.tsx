@@ -35,7 +35,7 @@ vi.mock('@/widgets/preview-results', async () => {
 describe('ScreenerBuilderPage', () => {
   it('lays the Builder out around one provider and passes navigation through', async () => {
     const onOpenTicker = vi.fn();
-    render(<ScreenerBuilderPage id="my-vrp" onOpenTicker={onOpenTicker} />);
+    render(<ScreenerBuilderPage id="my-vrp" onOpenTicker={onOpenTicker} onDeleted={vi.fn()} />);
     expect(probe.id).toBe('my-vrp');
     for (const text of ['draft bar', 'criteria', 'summary', 'funnel'])
       expect(screen.getByText(text)).toBeInTheDocument();

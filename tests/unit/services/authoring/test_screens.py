@@ -100,6 +100,18 @@ def test_detail_and_versions_and_finalising_puts_a_screen_on_the_nightly(
     assert [r.config.id for r in nightly_screeners(writer) if r.user.user_id == "alice"] == ["mine"]
 
 
+def test_delete_takes_a_screen_off_the_list_and_the_nightly(writer: MemoryConfigWriter) -> None:
+    screens.save_draft(writer, "alice", "mine", OWN)
+    screens.finalise(writer, "alice", "mine")
+    screens.save_draft(writer, "alice", "mine", OWN)
+    screens.delete_screen(writer, "alice", "mine")
+    assert [s.screener_id for s in screens.list_screens(writer, "alice")] == []
+    assert [r.config.id for r in nightly_screeners(writer) if r.user.user_id == "alice"] == []
+    assert len(writer.archived) == 1
+    with pytest.raises(ScreenNotFoundError, match="no such screen"):
+        screens.delete_screen(writer, "alice", "mine")
+
+
 @pytest.mark.parametrize("user", ["site", "../etc", "Bob"])
 def test_users_are_strict_labels_never_the_site(writer: MemoryConfigWriter, user: str) -> None:
     with pytest.raises(ConfigurationError):
@@ -148,3 +160,30 @@ def test_an_uncopied_preset_names_itself_and_its_version(writer: MemoryConfigWri
         3,
     )
     assert not detail.preset.rebase_available
+
+
+def test_a_deleted_id_is_never_reused(writer: MemoryConfigWriter) -> None:
+    """Runs, ideas and views are keyed by the id: a new screen must not inherit them."""
+    screens.save_draft(writer, "alice", "mine", OWN)
+    screens.delete_screen(writer, "alice", "mine")
+    with pytest.raises(ConflictError, match="deleted"):
+        screens.save_draft(writer, "alice", "mine", OWN)  # a late save of the open Builder too
+    writer.save_draft("alice", "mine-2", OWN)  # an id that only starts with it is free
+    assert not writer.was_deleted("alice", "mine-2") and not writer.was_deleted("bob", "mine")
+
+
+def test_delete_forgets_the_screener_in_the_preferences(writer: MemoryConfigWriter) -> None:
+    screens.save_draft(writer, "alice", "mine", OWN)
+    screens.finalise(writer, "alice", "mine")
+    writer.save_preferences(
+        "alice",
+        {
+            "ideas": {"priority": ["mine", "vrp"]},
+            "screeners": {"mine": {"view": {"columns": []}}, "vrp": {"view": {"columns": []}}},
+        },
+    )
+    screens.delete_screen(writer, "alice", "mine")
+    assert writer.load("alice", "preferences", "preferences") == {
+        "ideas": {"priority": ["vrp"]},
+        "screeners": {"vrp": {"view": {"columns": []}}},
+    }

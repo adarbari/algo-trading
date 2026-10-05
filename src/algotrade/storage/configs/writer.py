@@ -1,13 +1,18 @@
 """Write access to L4 user configs (ADR 0029): a rule screen's draft, its immutable finalised
-versions, and a user's expression-feature files.
+versions, deleting a screen (archived, never erased), and a user's expression-feature files.
 
 ``ConfigWriter`` extends the read-only ``ConfigStore`` protocol, so one object serves the
 resolver (which sees each user screen's latest version) and the writes. Only
 ``services/authoring`` uses it (import-linter). Every write is user-scoped
 (``config/users/<u>/``; never ``site``), keyed by validated ids, and atomic: a temp file in
 the same directory, then a rename (drafts, features) or a hard link that fails if
-the target exists (versions: a ``v<N>.toml`` is never overwritten). The memory writer has the
-same semantics for tests; a DB backend can replace both under the protocol later.
+the target exists (versions: a ``v<N>.toml`` is never overwritten). Deleting a screen moves its
+whole folder (draft and versions) to ``users/<u>/archive/screeners/<id>-<UTC stamp>/`` in one
+rename: it leaves the list and the nightly, its past runs stay attributable to the archived
+versions, and it can be moved back by hand. A deleted id is never reused (``was_deleted``):
+runs, ideas and views are keyed by the id, so a new screen of that name would inherit them.
+The memory writer has the same semantics for tests; a DB backend can replace both under the
+protocol later.
 """
 
 import json
@@ -17,7 +22,7 @@ import re
 import tempfile
 import tomllib
 from collections.abc import Mapping
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -64,6 +69,14 @@ class ConfigWriter(ConfigStore, Protocol):
 
     def add_version(self, user: str, name: str, version: int, document: Mapping[str, Any]) -> None:
         """Write ``v<version>``; ``VersionExistsError`` if it exists (never overwritten)."""
+        ...
+
+    def delete_screen(self, user: str, name: str, at: datetime) -> bool:
+        """Archive the screen (draft and versions) as of ``at``; ``True`` when there was one."""
+        ...
+
+    def was_deleted(self, user: str, name: str) -> bool:
+        """``user`` once deleted a screen ``name`` (it is in the archive)."""
         ...
 
     def save_features(self, user: str, theme: str, document: Mapping[str, Any]) -> None:
@@ -164,6 +177,18 @@ def _user(user: str) -> str:
     return validate_id("user", user)
 
 
+def archive_name(name: str, at: datetime) -> str:
+    """``<id>-<YYYYmmddTHHMMSSffffffZ>``: an archived screen's folder (``at`` is UTC-aware)."""
+    if at.tzinfo is None or at.utcoffset() is None:
+        raise ConfigurationError("an archive time must be timezone-aware (UTC)")
+    return f"{validate_id('screener', name)}-{at.astimezone(UTC):%Y%m%dT%H%M%S%fZ}"
+
+
+def _archived_as(name: str) -> re.Pattern[str]:
+    """Matches the archive names of the screen ``name`` (and no other id that starts with it)."""
+    return re.compile(rf"{re.escape(validate_id('screener', name))}-\d{{8}}T\d{{12}}Z")
+
+
 def _version(version: int) -> int:
     if not isinstance(version, int) or isinstance(version, bool) or version < 1:
         raise ConfigurationError(f"invalid version {version!r}: a positive integer")
@@ -231,6 +256,23 @@ class FileConfigWriter(FileConfigStore):
         path = self.screen_dir(_user(user), name) / version_file(_version(version))
         self._write(user, path, toml_text(document), exclusive=True)
 
+    def delete_screen(self, user: str, name: str, at: datetime) -> bool:
+        scope = _user(user)
+        source = self._inside_user(user, self.screen_dir(scope, name))
+        if not source.is_dir():
+            return False
+        target = self._inside_user(
+            user, self.root / "users" / scope / "archive" / SCREENERS / archive_name(name, at)
+        )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        source.rename(target)  # atomic on one filesystem; fails if the target exists
+        return True
+
+    def was_deleted(self, user: str, name: str) -> bool:
+        base = self.root / "users" / _user(user) / "archive" / SCREENERS
+        pattern = _archived_as(name)
+        return base.is_dir() and any(pattern.fullmatch(p.name) for p in base.iterdir())
+
     def save_features(self, user: str, theme: str, document: Mapping[str, Any]) -> None:
         path = (
             self.root / "users" / _user(user) / "features" / f"{validate_id('theme', theme)}.toml"
@@ -258,6 +300,8 @@ class MemoryConfigWriter(MemoryConfigStore):
         super().__init__(documents or {}, overrides)
         self._drafts: dict[tuple[str, str], dict[str, Any]] = {}
         self._versions: dict[tuple[str, str], dict[int, dict[str, Any]]] = {}
+        # (user, archive name) -> (draft, versions) of a deleted screen
+        self.archived: dict[tuple[str, str], tuple[dict[str, Any] | None, dict[int, Any]]] = {}
 
     def _screen(self, user: str, name: str) -> tuple[str, str]:
         return _user(user), validate_id("screener", name)
@@ -306,6 +350,18 @@ class MemoryConfigWriter(MemoryConfigStore):
         if _version(version) in versions:
             raise VersionExistsError(f"v{version} exists: versions are immutable")
         versions[version] = _copy(document)
+
+    def delete_screen(self, user: str, name: str, at: datetime) -> bool:
+        key = self._screen(user, name)
+        draft, versions = self._drafts.pop(key, None), self._versions.pop(key, {})
+        if draft is None and not versions:
+            return False
+        self.archived[(key[0], archive_name(key[1], at))] = (draft, versions)
+        return True
+
+    def was_deleted(self, user: str, name: str) -> bool:
+        pattern = _archived_as(name)
+        return any(u == _user(user) and pattern.fullmatch(n) for u, n in self.archived)
 
     def save_features(self, user: str, theme: str, document: Mapping[str, Any]) -> None:
         self._docs[(_user(user), "features", validate_id("theme", theme))] = _copy(document)
