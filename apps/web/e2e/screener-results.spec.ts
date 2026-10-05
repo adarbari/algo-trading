@@ -5,9 +5,9 @@
  * chips), decision filters and the user's view saved as they change it, the way to the Builder,
  * and the empty state of a screener with no run. Accessibility in both themes.
  */
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
+import { expectAccessible } from './a11y';
 import { mockBuilderApi } from './builder-api';
 import { mockApi } from './mock-api';
 
@@ -18,11 +18,6 @@ function collectErrors(page: Page): string[] {
     if (msg.type() === 'error' && !msg.text().includes('404')) errors.push(msg.text());
   });
   return errors;
-}
-
-async function expectAccessible(page: Page): Promise<void> {
-  const axe = await new AxeBuilder({ page }).analyze();
-  expect(axe.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
 }
 
 const grid = (page: Page) => page.getByRole('grid', { name: 'Screener results' });
@@ -163,6 +158,9 @@ test('Edit criteria opens a drawer; an edit shows who would enter or leave, befo
   // Closing the drawer leaves the note above the results while the edit is unsaved.
   await drawer.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByText('+3 enter: KO, MSFT, XOM.')).toBeVisible();
+  // The picks the edit would drop are marked in the grid.
+  await expect(grid(page).getByRole('row', { name: /SOXS/ })).toContainText('Would leave');
+  await expect(grid(page).getByRole('row', { name: /AAPL/ })).not.toContainText('Would leave');
   await page.getByRole('button', { name: 'Review criteria' }).click();
   await expect(drawer).toBeVisible();
 });

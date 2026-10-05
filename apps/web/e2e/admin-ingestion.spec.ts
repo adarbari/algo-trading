@@ -4,9 +4,9 @@
  * drawer, the CSV download, quality checks, verification vs IBKR, review items and recent runs,
  * accessible in dark and light; the stale-data banner; a failed section shows its error.
  */
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
+import { expectAccessible } from './a11y';
 import { ADMIN_FIXTURES, mockAdminApi } from './admin-api';
 
 function collectErrors(page: Page): string[] {
@@ -38,8 +38,7 @@ for (const theme of ['dark', 'light'] as const) {
     );
     await expect(page.getByRole('grid', { name: 'Recent nightly runs' })).toContainText('26m 0s');
     await expect(page.getByText('Latest session not ingested')).toHaveCount(0);
-    const axe = await new AxeBuilder({ page }).analyze();
-    expect(axe.violations.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
+    await expectAccessible(page);
     expect(errors).toEqual([]);
   });
 }
