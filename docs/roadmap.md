@@ -4,18 +4,17 @@
 
 The pickup list a fresh session reads first. A PR that opens or closes an item updates it.
 
-**Running** (check `make status`; verified 2026-10-04 09:19: no ingest process alive)
-- IBKR IV history backfill, detached `var/logs/ibkr-iv-backfill.sh` (status `var/logs/ibkr-iv-backfill.status`; needs IB Gateway paper :4002, client 17, Mac awake). Its script has ended: chunk 1 exit=1, chunks 2-3 exit=0 within a second, `ibkr_iv@v1` rollups exit=0. Treat the history as unverified: check coverage, then re-run the chunk (re-running resumes).
+**Running** (check `make status`; verified 2026-10-05 05:40)
+- Nothing long-running. IBKR IV history backfill finished 2026-10-05 05:30 (all 4,200 names: 4,197 OK, 3 genuine NO_DATA; `ibkr_iv@v1` rollups over 502 sessions, rank FULL for 4,789 of 5,415 names on 2026-10-02).
 
 **Next**
 - ETF holdings (ADR 0035, accepted): after merge run `algotrade-ingest etf-holdings` once (reads the ~1,140 covered funds: about 1.5 hours, extrapolated from the sample, mostly SEC header lookups; or let the nightly fill it, 200 funds a night, 6 weekday nights), then the Overview tab renders `<HoldingsPanel symbol onSelectSymbol>` (`widgets/holdings-panel`) for ETFs.
-- IBKR IV backfill (fixed on `feat/ibkr-iv-backfill-fixes`: IV only, ~12 h for all names, most liquid first; an unanswered request is retried, then left pending, never `NO_DATA`): re-run the chunks (they resume). The ~40 names saved `NO_DATA` during the 2026-10-04 timeouts still count as done (the records cannot tell them apart): owner decision on a one-off refetch. Optional pace trial: `[ibkr] historical_min_interval_s` 5, then 3, watching timeouts and error 162.
+- Optional IBKR pace trial: `[ibkr] historical_min_interval_s` 5, then 3, watching timeouts and error 162 (the backfill ran at 10 s, IV only, about 6 names a minute). The nightly keeps the history current (100 names a night of any new gap).
 - API endpoints that return 404 "nothing stored" on an empty store return 200 with an empty body.
 - Split crowded folders by area: `apps/api` routes/ + schemas/, `services/explore/` (`screens/` is split out; the next new area follows it).
 - API schemas built from domain types, not mirrored field lists.
 - VRP live spread check in the UI via `GET /chains/{id}/live`.
 - Company financials (`financials@v1`, `feature.pe_ratio`, `feature.revenue_growth_yoy`; Explore Overview reads them): after merge run `algotrade-ingest shares --force` (about 30 to 40 minutes, resumable), then `algotrade-ingest rollups --from 2024-10-03 --to <last session> --only financials@v1` (a few seconds a session, estimated), and spot-check a few names ([vendors.md](data/vendors.md) "SEC EDGAR company facts").
-- IBKR IV timeouts become NO_DATA: a timed-out `ibkr-iv` history request is stored as NO_DATA, counted as done and never refetched (`apps/ingestion/algotrade_ingestion/tasks/market/ibkr_iv.py` near lines 57 and 113; ib_async swallows the timeout). It should raise a retryable error. The 2026-10-04 chunk 2 run was killed at about 1,360 of 1,500 names after IBKR history requests started timing out; its run record `ibkr_iv_history-2026-10-02-20261004T164924Z` stays RUNNING, and the names marked NO_DATA after about 21:52 that day must be refetched. Restart IB Gateway before resuming: a resume that cannot connect marks itself COMPLETE and deletes the staged data (`_run`, lines about 206-208).
 - Flaky tests: preview timing under load, smoke axe admin light, one builder e2e.
 - Descriptions (ADR 0034, accepted): after merge run `algotrade-ingest descriptions --only funds` (ETFs, ~2 min), then stocks in chunks (`descriptions --limit 300`, ~1 h each, S&P 500 first, each run holds the ingest lock; the nightly adds 100). Then the Overview tab reads `reference.description` from `GET /instruments/{id}`.
 
