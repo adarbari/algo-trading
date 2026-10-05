@@ -1,33 +1,16 @@
-"""``/screeners/{id}``: read, draft, finalise, copy, rebase and delete a user's rule screen (a
-finalised screen runs nightly, ADR 0033; a deleted one is archived).
+"""``/screeners/{id}``: draft, finalise, copy, rebase and delete a user's rule screen (a
+finalised screen runs nightly, ADR 0033; a deleted one is archived). Reading a screen (its
+draft, versions and preset pin) is GraphQL (``Query.myScreens``, ``screenDetail``,
+``screenVersions``; ADR 0037).
 ``?user=`` names the user (a label until identity arrives; default ``ALGOTRADE_USER``)."""
 
 from fastapi import APIRouter
 
 from algotrade.services.authoring import presets, screens
 from algotrade_api.deps import User, Writer
-from algotrade_api.schemas.authoring.screeners import (
-    CopyBody,
-    Draft,
-    DraftBody,
-    Finalised,
-    ScreenerDetail,
-    ScreenerListItem,
-    ScreenerVersion,
-)
+from algotrade_api.schemas.authoring.screeners import CopyBody, Draft, DraftBody, Finalised
 
 router = APIRouter(prefix="/screeners", tags=["screeners"])
-
-
-@router.get("")
-def screeners(writer: Writer, user: User) -> list[ScreenerListItem]:
-    """The user's screens: finalised ones and draft-only ones (status DRAFT)."""
-    return [ScreenerListItem.model_validate(s) for s in screens.list_screens(writer, user)]
-
-
-@router.get("/{screener_id}")
-def screener(writer: Writer, user: User, screener_id: str) -> ScreenerDetail:
-    return ScreenerDetail.model_validate(screens.screen_detail(writer, user, screener_id))
 
 
 @router.delete("/{screener_id}", status_code=204)
@@ -36,12 +19,6 @@ def delete_screener(writer: Writer, user: User, screener_id: str) -> None:
     nightly; stored runs stay). 404 when the user has no such screen (a site preset is changed
     only by pull request)."""
     screens.delete_screen(writer, user, screener_id)
-
-
-@router.get("/{screener_id}/versions")
-def versions(writer: Writer, user: User, screener_id: str) -> list[ScreenerVersion]:
-    found = screens.screen_versions(writer, user, screener_id)
-    return [ScreenerVersion.model_validate(v) for v in found]
 
 
 @router.put("/{screener_id}/draft")

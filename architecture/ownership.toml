@@ -165,9 +165,8 @@ id = "feature-input-loading"
 description = "What a feature group reads, by table name: each input table's point-in-time read for features (from its data owner), slicing per session and lookback, other groups' stored rows with this run's rows winning; features never read storage or a domain reader"
 owner = ["src/algotrade/data/feature_inputs.py"]
 allowed = [
-    # ADR 0024: the API shows stored group rows (a feature's series, a distribution); a
-    # display read, never a feature input
-    "src/algotrade/services/explore/features.py",
+    # ADR 0024: the API shows stored group rows (a feature's series); a display read, never a
+    # feature input
     "src/algotrade/services/explore/instruments.py",
 ]
 section = "docs/adr/0023-feature-store.md#step-2-inputs-through-data"
@@ -512,7 +511,7 @@ detect = [{ call = "parse_screen_spec" }, { call = "Criterion" }, { call = "Tole
 
 [[responsibility]]
 id = "config-authoring"
-description = "Write L4 user configs (ADR 0029): a rule screen's draft, finalise into an immutable v<N> (validated fail closed), copy a site preset pinned to its version and rebase, delete a screen (archive its folder), the schedule switch, named user expression features; the ConfigWriter (atomic, user-scoped files) behind the ConfigStore protocol"
+description = "Write L4 user configs (ADR 0029): a rule screen's draft, finalise into an immutable v<N> (validated fail closed), copy a site preset pinned to its version and rebase, delete a screen (archive its folder), the schedule switch, named user expression features; the ConfigWriter (atomic, user-scoped files) behind the ConfigStore protocol (which reads drafts and versions back: the read model, services/read/screens/documents.py)"
 owner = ["src/algotrade/services/authoring/*", "src/algotrade/storage/configs/writer.py"]
 section = "docs/adr/0029-rule-screener.md#versioned-configs"
 detect = [{ call = "add_version" }, { call = "save_features" }]
@@ -553,7 +552,7 @@ detect = [{ string = "<date>" }, { string = "<url>" }]
 
 [[responsibility]]
 id = "explore-queries"
-description = "Read-only queries apps display (runs, universe, instruments, chains, features, screens, backtests, configs): pages, JSON-safe rows; which session a ?date= sees is session-resolution. Moving to the read model (ADR 0037) area by area in read-model PRs 4-10; deleted with services/explore in PR 10"
+description = "Read-only queries apps display (runs, universe, instruments, chains, screens): pages, JSON-safe rows; which session a ?date= sees is session-resolution. Moving to the read model (ADR 0037) area by area in read-model PRs 4-10; deleted with services/explore in PR 10"
 owner = ["src/algotrade/services/explore/*"]
 target_owner = ["src/algotrade/services/read/*"]
 section = "docs/adr/0024-api.md#explore-queries"

@@ -4,12 +4,20 @@
  * user's overrides; the criteria shown are the working copy resolved through its layers (the
  * API's `working`), with the draft's own changes merged on top by id. Pure.
  */
-import { feature, type components } from '@/shared/api';
+import { feature, type gqlTypes } from '@/shared/api';
 
-export type ScreenerDetail = components['schemas']['ScreenerDetail'];
-export type ScreenerListItem = components['schemas']['ScreenerListItem'];
-export type ScreenerSummary = components['schemas']['ConfigSummary'];
-export type PresetPin = components['schemas']['PresetPin'];
+type ServedDetail = NonNullable<gqlTypes.ScreenDetailQuery['screenDetail']>;
+type Table = Record<string, unknown>;
+
+/** One screen as `screenDetail` serves it; its JSON documents are TOML tables (objects). */
+export type ScreenerDetail = Omit<ServedDetail, 'draft' | 'working' | 'resolved'> & {
+  draft: Table | null;
+  working: Table | null;
+  resolved: Table | null;
+};
+export type ScreenerListItem = gqlTypes.MyScreensQuery['myScreens'][number];
+export type ScreenerSummary = gqlTypes.ScreenerConfigsQuery['configs'][number];
+export type PresetPin = NonNullable<ServedDetail['preset']>;
 
 export type CriterionMode = 'hard' | 'soft' | 'score';
 export type MissDecision = 'WATCH' | 'LIQUIDITY_RISK' | 'EVENT_RISK';

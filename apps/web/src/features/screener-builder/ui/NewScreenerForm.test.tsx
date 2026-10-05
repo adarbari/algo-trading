@@ -2,29 +2,35 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { api, TestQueryProvider } from '@/shared/api';
+import { api, gql, TestQueryProvider } from '@/shared/api';
 import { expectNoA11yViolations } from '@/shared/lib/testing';
 
 import { NewScreenerForm } from './NewScreenerForm';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
-  return { ...actual, api: { GET: vi.fn(), PUT: vi.fn() } };
+  return { ...actual, api: { PUT: vi.fn() }, gql: vi.fn() };
 });
 
-const GET = vi.mocked(api.GET);
+const GQL = vi.mocked(gql);
 const PUT = vi.mocked(api.PUT);
 
 beforeEach(() => {
-  GET.mockReset();
+  GQL.mockReset();
   PUT.mockReset();
-  GET.mockResolvedValue({
-    data: [
-      { config_id: 'vrp', scope: 'site', kind: 'screener', selection: 'vrp_universe' },
-      { config_id: 'taken', scope: 'u', kind: 'screener', selection: 'inline' },
-    ],
-    response: new Response(null, { status: 200 }),
-  });
+  // The screener configs (a site preset, one of the user's) and the user's own screens.
+  GQL.mockImplementation((document: unknown) =>
+    Promise.resolve(
+      String(document).includes('query MyScreens')
+        ? { myScreens: [{ screenerId: 'drafted', status: 'DRAFT' }] }
+        : {
+            configs: [
+              { configId: 'vrp', scope: 'site', kind: 'screener', selection: 'vrp_universe' },
+              { configId: 'taken', scope: 'u', kind: 'screener', selection: 'inline' },
+            ],
+          },
+    ),
+  );
   PUT.mockResolvedValue({
     data: { screener_id: 'mine', document: {} },
     response: new Response(null, { status: 200 }),
@@ -84,6 +90,11 @@ describe('NewScreenerForm', () => {
       await screen.findByText('A screener with this name already exists.'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create draft' })).toBeDisabled();
+    await userEvent.clear(name);
+    await userEvent.type(name, 'drafted');
+    expect(
+      await screen.findByText('A screener with this name already exists.'),
+    ).toBeInTheDocument();
     expect(PUT).not.toHaveBeenCalled();
   });
 

@@ -5,7 +5,8 @@ import pytest
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.configs import nightly_screeners, resolve_config
-from algotrade.storage.configs.files import FileConfigStore
+from algotrade.storage.configs.files import FileConfigStore, MemoryConfigStore
+from algotrade.storage.configs.store import OverlayConfigStore
 from algotrade.storage.factory import open_config_store
 from tests.conftest import REPO_ROOT
 
@@ -93,3 +94,28 @@ def test_site_settings_and_overrides(root: Path) -> None:
         {"symbol": "TQQQ", "leverage": "3", "tracks": "Nasdaq-100"}
     ]
     assert store.overrides("missing") == []
+
+
+def test_screen_documents_are_read_through_every_store(tmp_path: Path) -> None:
+    """Drafts and versions are read through the ``ConfigStore`` (the read model reads them;
+    only the writer writes them): files, memory and an overlay over either."""
+    screen = tmp_path / "users" / "alice" / "screeners" / "mine"
+    screen.mkdir(parents=True)
+    (screen / "draft.toml").write_text('id = "mine"\n')
+    (screen / "v1.toml").write_text('id = "mine"\nversion = 1\n')
+    files = FileConfigStore(tmp_path)
+    assert (files.drafts("alice"), files.versions("alice", "mine")) == (["mine"], [1])
+    assert files.draft("alice", "mine") == {"id": "mine"}
+    assert files.version("alice", "mine", 1) == {"id": "mine", "version": 1}
+    assert (files.draft(SITE_USER, "mine"), files.drafts(SITE_USER)) == (None, [])
+    with pytest.raises(ConfigurationError):
+        files.version("alice", "mine", 0)
+    memory = MemoryConfigStore({("alice", "screeners", "mine@2"): {"id": "mine", "version": 2}})
+    assert (memory.draft("alice", "mine"), memory.drafts("alice")) == (None, [])
+    assert memory.versions("alice", "mine") == [2]
+    assert memory.version("alice", "mine", 2) == {"id": "mine", "version": 2}
+    assert memory.version("alice", "mine", 1) is None
+    overlay = OverlayConfigStore(files, {})
+    assert (overlay.drafts("alice"), overlay.versions("alice", "mine")) == (["mine"], [1])
+    assert overlay.draft("alice", "mine") == files.draft("alice", "mine")
+    assert overlay.version("alice", "mine", 1) == files.version("alice", "mine", 1)

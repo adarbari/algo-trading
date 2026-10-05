@@ -66,7 +66,7 @@ const catalogue = [
     source: 'rollups',
     dtype: 'float',
     description: 'Our 30-day ATM implied volatility',
-    null_meaning: '',
+    nullMeaning: '',
     version: 1,
     group: 'iv30@v1',
     key: null,

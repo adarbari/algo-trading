@@ -35,10 +35,10 @@ const builder = (patch: Record<string, unknown> = {}, detail: Record<string, unk
   discard,
   detail: {
     draft: { id: 'my-vrp' },
-    draft_error: null,
+    draftError: null,
     versions: [1],
     latest: 1,
-    preset: { preset_id: 'vrp', pinned: 1, current: 1, rebase_available: false },
+    preset: { presetId: 'vrp', pinned: 1, current: 1, rebaseAvailable: false },
     ...detail,
   },
   ...patch,
@@ -111,7 +111,7 @@ describe('DraftBar', () => {
   it('offers a rebase when the preset has a newer version, once the edits are saved', () => {
     state.builder = builder(
       { dirty: true },
-      { preset: { preset_id: 'vrp', pinned: 1, current: 2, rebase_available: true } },
+      { preset: { presetId: 'vrp', pinned: 1, current: 2, rebaseAvailable: true } },
     );
     setup();
     expect(screen.getByText('Rebase available')).toBeInTheDocument();
@@ -125,7 +125,7 @@ describe('DraftBar', () => {
         draft: null,
         versions: [],
         latest: null,
-        preset: { preset_id: 'vrp', pinned: null, current: 3, rebase_available: false },
+        preset: { presetId: 'vrp', pinned: null, current: 3, rebaseAvailable: false },
       },
     );
 
@@ -162,7 +162,7 @@ describe('DraftBar', () => {
   it('warns when the saved draft would not finalize', () => {
     state.builder = builder(
       {},
-      { draft_error: 'my-vrp.criteria: needs at least one enabled criterion' },
+      { draftError: 'my-vrp.criteria: needs at least one enabled criterion' },
     );
     setup();
     expect(screen.getByText('This draft would not finalize')).toBeInTheDocument();

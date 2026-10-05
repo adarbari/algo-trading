@@ -4,15 +4,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { CatalogueFeature } from '@/entities/feature';
 import type { Criterion } from '@/entities/screen';
-import { api } from '@/shared/api';
-import { TestQueryProvider } from '@/shared/api';
+import { gql, TestQueryProvider } from '@/shared/api';
 import { expectNoA11yViolations } from '@/shared/lib/testing';
 
 import { CriterionRow } from './CriterionRow';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
-  return { ...actual, api: { GET: vi.fn() } };
+  return { ...actual, gql: vi.fn() };
 });
 
 const CATALOGUE = [
@@ -130,21 +129,20 @@ describe('CriterionRow', () => {
   });
 
   it('loads the distribution only when it is opened, with the threshold marked', async () => {
-    vi.mocked(api.GET).mockResolvedValue({
-      data: {
+    vi.mocked(gql).mockResolvedValue({
+      distribution: {
         name: 'rollup.iv30@v1.iv30',
-        dtype: 'float',
         session: '2026-10-02',
         count: 100,
         nulls: 0,
-        quantiles: { '0.5': 0.4 },
+        quantiles: [{ q: 0.5, value: 0.4 }],
         histogram: [{ lo: 0, hi: 1, count: 10 }],
         categories: [],
+        unknown: null,
       },
-      response: new Response(null, { status: 200 }),
     });
     setup();
-    expect(api.GET).not.toHaveBeenCalled();
+    expect(gql).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: /Distribution/ }));
     expect(
       await screen.findByRole('img', { name: /rollup\.iv30@v1\.iv30 across 100 instruments/ }),

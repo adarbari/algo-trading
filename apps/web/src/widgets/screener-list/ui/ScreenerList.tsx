@@ -33,11 +33,11 @@ export function ScreenerList({ onOpen, onEdit }: ScreenerListProps) {
   const myCols = useMemo(() => myColumns(actions), [actions]);
   const all = configs.data ?? [];
   const presets = all.filter((s) => s.scope === 'site');
-  const resolved = new Map(all.filter((s) => s.scope !== 'site').map((s) => [s.config_id, s]));
+  const resolved = new Map(all.filter((s) => s.scope !== 'site').map((s) => [s.configId, s]));
   const own: MyScreener[] = (mine.data ?? []).map((s) => ({
     ...s,
-    selection: resolved.get(s.screener_id)?.selection ?? null,
-    error: resolved.get(s.screener_id)?.error ?? null,
+    selection: resolved.get(s.screenerId)?.selection ?? null,
+    error: resolved.get(s.screenerId)?.error ?? null,
   }));
   const stateOf = (query: { isError: boolean; isPending: boolean; data: unknown }) =>
     query.isError && !query.data ? 'error' : query.isPending ? 'loading' : 'ready';
@@ -56,8 +56,8 @@ export function ScreenerList({ onOpen, onEdit }: ScreenerListProps) {
           label="Your screeners"
           columns={myCols}
           rows={own}
-          getRowId={(s) => s.screener_id}
-          getRowLabel={(s) => s.screener_id}
+          getRowId={(s) => s.screenerId}
+          getRowLabel={(s) => s.screenerId}
           defaultSort={{ columnId: 'name', direction: 'asc' }}
           emptyMessage="You have no screener yet. Create one, or open a preset and change it."
         />
@@ -75,8 +75,8 @@ export function ScreenerList({ onOpen, onEdit }: ScreenerListProps) {
           label="Site presets"
           columns={presetCols}
           rows={presets}
-          getRowId={(s) => s.config_id}
-          getRowLabel={(s) => s.config_id}
+          getRowId={(s) => s.configId}
+          getRowLabel={(s) => s.configId}
           defaultSort={{ columnId: 'name', direction: 'asc' }}
           emptyMessage="No site screener presets."
         />

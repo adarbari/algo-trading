@@ -33,10 +33,6 @@ export const queryKeys = {
   },
   screeners: {
     all: () => ['screeners'] as const,
-    list: () => ['screeners', 'list'] as const,
-    mine: () => ['screeners', 'mine'] as const,
-    detail: (id: string) => ['screeners', 'detail', id] as const,
-    versions: (id: string) => ['screeners', 'versions', id] as const,
     preview: (spec: unknown) => ['screeners', 'preview', spec] as const,
     table: (id: string, query: Readonly<Record<string, unknown>>) =>
       ['screeners', 'table', id, query] as const,
@@ -59,8 +55,6 @@ export const queryKeys = {
     chain: (id: string, expiry: string | null) => ['chains', id, expiry] as const,
   },
   features: {
-    catalogue: () => ['features'] as const,
-    distribution: (name: string) => ['features', name, 'distribution'] as const,
     check: (expr: string) => ['features', 'check', expr] as const,
   },
 } as const;

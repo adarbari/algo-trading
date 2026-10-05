@@ -1,13 +1,16 @@
-"""Drafts, finalise (fail closed, immutable versions), detail, and the nightly (ADR 0033)."""
+"""Drafts, finalise (fail closed, immutable versions), delete, and the nightly (ADR 0033); each
+write read back through the read model (``services.read.screens.documents``)."""
 
 from typing import Any
 
 import pytest
 
+from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.authoring import presets, screens
 from algotrade.services.authoring.scope import ConflictError, ScreenNotFoundError
 from algotrade.services.configs import nightly_screeners
+from algotrade.services.read.screens import documents
 from algotrade.storage.configs.writer import MemoryConfigWriter, VersionExistsError
 
 OWN: dict[str, Any] = {
@@ -16,6 +19,7 @@ OWN: dict[str, Any] = {
     "selection": "all_active",
     "criteria": {"price": {"field": "rollup.price_stats@v2.close", "op": "gt", "value": 10}},
 }
+ALICE = UserContext("alice")
 
 
 def test_save_draft_sets_id_and_drops_managed_keys(writer: MemoryConfigWriter) -> None:
@@ -83,19 +87,19 @@ def test_finalise_needs_a_draft_and_reports_a_race(
 def test_detail_and_versions_and_finalising_puts_a_screen_on_the_nightly(
     writer: MemoryConfigWriter,
 ) -> None:
-    with pytest.raises(ScreenNotFoundError):
-        screens.screen_detail(writer, "alice", "mine")
-    preset = screens.screen_detail(writer, "alice", "vrp")  # an uncopied site preset
-    assert preset.versions == [] and preset.layers[0] == "site/screeners/vrp"
+    assert documents.screen_detail(writer, ALICE, "mine") is None
+    preset = documents.screen_detail(writer, ALICE, "vrp")  # an uncopied site preset
+    assert preset is not None
+    assert preset.versions == () and preset.layers[0] == "site/screeners/vrp"
     screens.save_draft(writer, "alice", "mine", OWN)
     assert [r.config.id for r in nightly_screeners(writer) if r.user.user_id == "alice"] == []
     screens.finalise(writer, "alice", "mine")
     screens.save_draft(writer, "alice", "mine", OWN | {"selection": "nope"})
-    detail = screens.screen_detail(writer, "alice", "mine")
-    assert (detail.versions, detail.latest) == ([1], 1)
+    detail = documents.screen_detail(writer, ALICE, "mine")
+    assert detail is not None and (detail.versions, detail.latest) == ((1,), 1)
     assert detail.draft_error and "nope" in detail.draft_error
     assert detail.error is None and detail.resolved is not None
-    assert [v.version for v in screens.screen_versions(writer, "alice", "mine")] == [1]
+    assert [v.version for v in documents.screen_versions(writer, ALICE, "mine")] == [1]
     # Finalising is what puts a screen on the nightly: no switch, and a draft alone is not run.
     assert [r.config.id for r in nightly_screeners(writer) if r.user.user_id == "alice"] == ["mine"]
 
@@ -105,7 +109,7 @@ def test_delete_takes_a_screen_off_the_list_and_the_nightly(writer: MemoryConfig
     screens.finalise(writer, "alice", "mine")
     screens.save_draft(writer, "alice", "mine", OWN)
     screens.delete_screen(writer, "alice", "mine")
-    assert [s.screener_id for s in screens.list_screens(writer, "alice")] == []
+    assert documents.screen_listings(writer, ALICE) == ()
     assert [r.config.id for r in nightly_screeners(writer) if r.user.user_id == "alice"] == []
     assert len(writer.archived) == 1
     with pytest.raises(ScreenNotFoundError, match="no such screen"):
@@ -118,48 +122,16 @@ def test_users_are_strict_labels_never_the_site(writer: MemoryConfigWriter, user
         screens.save_draft(writer, user, "mine", OWN)
 
 
-def test_list_screens_has_finalised_and_draft_only_screens(writer: MemoryConfigWriter) -> None:
-    assert screens.list_screens(writer, "alice") == []
-    screens.save_draft(writer, "alice", "mine", OWN)
-    screens.finalise(writer, "alice", "mine")
-    screens.save_draft(writer, "alice", "mine", OWN)  # a working copy beside v1
-    screens.save_draft(writer, "alice", "vrp", {"extends": "vrp@3"})  # same id as the preset
-    listed = {s.screener_id: s for s in screens.list_screens(writer, "alice")}
-    assert list(listed) == ["mine", "vrp"]
-    assert (listed["mine"].status, listed["mine"].latest, listed["mine"].has_draft) == (
-        "FINAL",
-        1,
-        True,
-    )
-    assert (listed["vrp"].status, listed["vrp"].latest, listed["vrp"].preset_id) == (
-        "DRAFT",
-        None,
-        "vrp",
-    )
-    assert screens.list_screens(writer, "bob") == []
-
-
 def test_a_copy_may_share_its_presets_id_and_clear_the_tie_break(
     writer: MemoryConfigWriter,
 ) -> None:
     presets.copy_preset(writer, "alice", "vrp", "vrp")
-    detail = screens.screen_detail(writer, "alice", "vrp")
+    detail = documents.screen_detail(writer, ALICE, "vrp")
+    assert detail is not None
     assert detail.draft == {"id": "vrp", "extends": "vrp@3"} and detail.draft_error is None
     cleared = {"extends": "vrp@3", "rank": {"tie_break": ""}}
     screens.save_draft(writer, "alice", "vrp", cleared)
     assert screens.finalise(writer, "alice", "vrp").version == 1
-
-
-def test_an_uncopied_preset_names_itself_and_its_version(writer: MemoryConfigWriter) -> None:
-    detail = screens.screen_detail(writer, "alice", "vrp")
-    assert detail.draft is None and detail.versions == []
-    assert detail.preset is not None
-    assert (detail.preset.preset_id, detail.preset.pinned, detail.preset.current) == (
-        "vrp",
-        None,
-        3,
-    )
-    assert not detail.preset.rebase_available
 
 
 def test_a_deleted_id_is_never_reused(writer: MemoryConfigWriter) -> None:

@@ -154,40 +154,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/backtests": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Runs */
-        get: operations["runs_backtests_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/backtests/{run_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Detail */
-        get: operations["detail_backtests__run_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/chains/{underlying_id}": {
         parameters: {
             query?: never;
@@ -218,40 +184,6 @@ export interface paths {
          *     a status when the gateway cannot answer. Each live answer is recorded (``live/*``).
          */
         get: operations["live_chain_chains__underlying_id__live_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/configs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Config List */
-        get: operations["config_list_configs_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/configs/{config_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Config Detail */
-        get: operations["config_detail_configs__config_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -303,44 +235,6 @@ export interface paths {
         };
         /** Tickers */
         get: operations["tickers_explore_tickers_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/features": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Catalogue
-         * @description The caller's catalogue: the site's fields plus their own expression features
-         *     (``scope = "user"``; the user is ``ALGOTRADE_USER``).
-         */
-        get: operations["catalogue_features_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/features/{name}/distribution": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Distribution */
-        get: operations["distribution_features__name__distribution_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -555,26 +449,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/screeners": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Screeners
-         * @description The user's screens: finalised ones and draft-only ones (status DRAFT).
-         */
-        get: operations["screeners_screeners_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/screeners/{screener_id}": {
         parameters: {
             query?: never;
@@ -582,8 +456,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Screener */
-        get: operations["screener_screeners__screener_id__get"];
+        get?: never;
         put?: never;
         post?: never;
         /**
@@ -661,23 +534,6 @@ export interface paths {
         put?: never;
         /** Rebase */
         post: operations["rebase_screeners__screener_id__rebase_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/screeners/{screener_id}/versions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Versions */
-        get: operations["versions_screeners__screener_id__versions_get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -812,70 +668,6 @@ export interface components {
          * @enum {string}
          */
         Adjustment: "splits" | "none" | "total_return";
-        /** BacktestDetail */
-        BacktestDetail: {
-            /** Config Hash */
-            config_hash: string | null;
-            /** Data */
-            data: {
-                [key: string]: unknown;
-            };
-            /** Equity */
-            equity: components["schemas"]["EquityPoint"][];
-            /** Fills */
-            fills: components["schemas"]["Fill"][];
-            /** Rebalances */
-            rebalances: {
-                [key: string]: unknown;
-            }[];
-            /** Selection */
-            selection: {
-                [key: string]: unknown;
-            };
-            summary: components["schemas"]["BacktestSummary"];
-        };
-        /** BacktestSummary */
-        BacktestSummary: {
-            /** Config Id */
-            config_id: string;
-            /**
-             * End
-             * Format: date
-             * @description last session: the results partition
-             */
-            end: string;
-            /** Finished At */
-            finished_at: string | null;
-            /**
-             * Metrics
-             * @description performance metrics (sharpe, cagr, max drawdown, ...)
-             */
-            metrics: {
-                [key: string]: unknown;
-            };
-            /** Run Id */
-            run_id: string;
-            /**
-             * Start
-             * @description first session (ISO date)
-             */
-            start: string | null;
-            /**
-             * Started At
-             * Format: date-time
-             */
-            started_at: string;
-            /**
-             * Status
-             * @description complete | partial | failed
-             */
-            status: string;
-            /**
-             * User
-             * @description whose run (the config's user)
-             */
-            user: string;
-        };
         /** Bar */
         Bar: {
             /** Close */
@@ -916,22 +708,6 @@ export interface components {
              * Format: date
              */
             start: string;
-        };
-        /** Bin */
-        Bin: {
-            /** Count */
-            count: number;
-            /** Hi */
-            hi: number;
-            /** Lo */
-            lo: number;
-        };
-        /** Category */
-        Category: {
-            /** Count */
-            count: number;
-            /** Value */
-            value: string;
         };
         /** Cell */
         Cell: {
@@ -1016,21 +792,6 @@ export interface components {
             /** Sessions */
             sessions: string[];
         };
-        /** ConfigDetail */
-        ConfigDetail: {
-            /** Config Id */
-            config_id: string;
-            /** Hash */
-            hash: string;
-            /** Layers */
-            layers: string[];
-            /** Resolved */
-            resolved: {
-                [key: string]: unknown;
-            };
-            /** User */
-            user: string;
-        };
         /** ConfigSummary */
         ConfigSummary: {
             /** Config Id */
@@ -1109,42 +870,6 @@ export interface components {
             /** Value */
             value: unknown;
         };
-        /** Distribution */
-        Distribution: {
-            /**
-             * Categories
-             * @description the most frequent values (other features)
-             */
-            categories: components["schemas"]["Category"][];
-            /**
-             * Count
-             * @description instruments with a row (null or not)
-             */
-            count: number;
-            /** Dtype */
-            dtype: string;
-            /**
-             * Histogram
-             * @description 20 equal-width bins (numeric features)
-             */
-            histogram: components["schemas"]["Bin"][];
-            /** Name */
-            name: string;
-            /** Nulls */
-            nulls: number;
-            /**
-             * Quantiles
-             * @description '0.5' -> median, ... (numeric features)
-             */
-            quantiles: {
-                [key: string]: number;
-            };
-            /**
-             * Session
-             * Format: date
-             */
-            session: string;
-        };
         /** Draft */
         Draft: {
             /** Document */
@@ -1163,15 +888,6 @@ export interface components {
             document: {
                 [key: string]: unknown;
             };
-        };
-        /** EquityPoint */
-        EquityPoint: {
-            /** Equity */
-            equity: number;
-            /** Gross Exposure */
-            gross_exposure: number;
-            /** Ts */
-            ts: string;
         };
         /** EtfHoldings */
         EtfHoldings: {
@@ -1237,62 +953,6 @@ export interface components {
              */
             statuses: string[];
         };
-        /** Feature */
-        Feature: {
-            /** Categories */
-            categories: string[];
-            /** Description */
-            description: string;
-            /** Dtype */
-            dtype: string;
-            /** Group */
-            group: string | null;
-            /** Inputs */
-            inputs: string[];
-            /**
-             * Key
-             * @description the feature key <group>.<column>@v<N>
-             */
-            key: string | null;
-            /**
-             * Kind
-             * @description instrument, or the feature's kind (window, chain, ...)
-             */
-            kind: string;
-            /**
-             * Licence
-             * @description open, or personal: derived from IBKR market data (personal-use licence); hidden from users other than the owner once there are any (ADR 0028)
-             */
-            licence: string;
-            /**
-             * Name
-             * @description the selection field (rollup.<group>@v<N>.<column>, ...)
-             */
-            name: string;
-            /** Null Meaning */
-            null_meaning: string;
-            /**
-             * Owner
-             * @description the user who declared it (scope user)
-             */
-            owner: string | null;
-            /**
-             * Range
-             * @description plausible (min, max)
-             */
-            range: (number | null)[] | null;
-            /**
-             * Scope
-             * @description site, or user: one of the caller's own expression features
-             */
-            scope: string;
-            /** Source */
-            source: string;
-            /** Unit */
-            unit: string | null;
-            /** Version */
-            version: number | null;
-        };
         /** FeatureComparison */
         FeatureComparison: {
             /** Instruments */
@@ -1338,23 +998,6 @@ export interface components {
              * Format: date
              */
             start: string;
-        };
-        /** Fill */
-        Fill: {
-            /** Commission */
-            commission: number;
-            /** Instrument Id */
-            instrument_id: string;
-            /** Multiplier */
-            multiplier?: number | null;
-            /** Price */
-            price: number;
-            /** Quantity */
-            quantity: number;
-            /** Side */
-            side: string;
-            /** Ts */
-            ts: string;
         };
         /** Finalised */
         Finalised: {
@@ -1845,23 +1488,6 @@ export interface components {
             /** Total */
             total: number;
         };
-        /** PresetPin */
-        PresetPin: {
-            /**
-             * Current
-             * @description the site preset's version now
-             */
-            current: number | null;
-            /**
-             * Pinned
-             * @description the preset version the screen extends
-             */
-            pinned: number | null;
-            /** Preset Id */
-            preset_id: string;
-            /** Rebase Available */
-            rebase_available: boolean;
-        };
         /** PreviewBody */
         PreviewBody: {
             /**
@@ -2201,84 +1827,6 @@ export interface components {
             latest_session: string | null;
             /** Latest Status */
             latest_status: string | null;
-        };
-        /** ScreenerDetail */
-        ScreenerDetail: {
-            /**
-             * Draft
-             * @description the Builder's working copy
-             */
-            draft: {
-                [key: string]: unknown;
-            } | null;
-            /**
-             * Draft Error
-             * @description why the draft would not finalise
-             */
-            draft_error: string | null;
-            /**
-             * Error
-             * @description why that does not resolve (e.g. rebase needed)
-             */
-            error: string | null;
-            /**
-             * Hash
-             * @description the latest version (else the site preset) resolved
-             */
-            hash: string | null;
-            /** Latest */
-            latest: number | null;
-            /** Layers */
-            layers: string[];
-            preset: components["schemas"]["PresetPin"] | null;
-            /** Resolved */
-            resolved: {
-                [key: string]: unknown;
-            } | null;
-            /** Screener Id */
-            screener_id: string;
-            /** User */
-            user: string;
-            /** Versions */
-            versions: number[];
-            /**
-             * Working
-             * @description the working copy's rule keys (criteria, flags, ...) resolved through its layers: the draft when it resolves, else the latest version, else the preset
-             */
-            working?: {
-                [key: string]: unknown;
-            } | null;
-        };
-        /** ScreenerListItem */
-        ScreenerListItem: {
-            /**
-             * Has Draft
-             * @description a working copy exists (beside a finalised version too)
-             */
-            has_draft: boolean;
-            /** Latest */
-            latest: number | null;
-            /**
-             * Preset Id
-             * @description the site preset the screen extends
-             */
-            preset_id: string | null;
-            /** Screener Id */
-            screener_id: string;
-            /**
-             * Status
-             * @description FINAL (has a finalised version) or DRAFT (a draft only)
-             */
-            status: string;
-        };
-        /** ScreenerVersion */
-        ScreenerVersion: {
-            /** Document */
-            document: {
-                [key: string]: unknown;
-            };
-            /** Version */
-            version: number;
         };
         /** ScreenerView */
         ScreenerView: {
@@ -2946,57 +2494,6 @@ export interface operations {
             };
         };
     };
-    runs_backtests_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BacktestSummary"][];
-                };
-            };
-        };
-    };
-    detail_backtests__run_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                run_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BacktestDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     chain_chains__underlying_id__get: {
         parameters: {
             query?: {
@@ -3053,57 +2550,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LiveOptionChain"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    config_list_configs_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConfigSummary"][];
-                };
-            };
-        };
-    };
-    config_detail_configs__config_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                config_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConfigDetail"];
                 };
             };
             /** @description Validation Error */
@@ -3223,59 +2669,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TickerTable"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    catalogue_features_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Feature"][];
-                };
-            };
-        };
-    };
-    distribution_features__name__distribution_get: {
-        parameters: {
-            query?: {
-                date?: string | null;
-            };
-            header?: never;
-            path: {
-                name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Distribution"];
                 };
             };
             /** @description Validation Error */
@@ -3754,72 +3147,6 @@ export interface operations {
             };
         };
     };
-    screeners_screeners_get: {
-        parameters: {
-            query?: {
-                /** @description whose configs (a label until auth; default the API's) */
-                user?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScreenerListItem"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    screener_screeners__screener_id__get: {
-        parameters: {
-            query?: {
-                /** @description whose configs (a label until auth; default the API's) */
-                user?: string | null;
-            };
-            header?: never;
-            path: {
-                screener_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScreenerDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     delete_screener_screeners__screener_id__delete: {
         parameters: {
             query?: {
@@ -4015,40 +3342,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Draft"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    versions_screeners__screener_id__versions_get: {
-        parameters: {
-            query?: {
-                /** @description whose configs (a label until auth; default the API's) */
-                user?: string | null;
-            };
-            header?: never;
-            path: {
-                screener_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScreenerVersion"][];
                 };
             };
             /** @description Validation Error */

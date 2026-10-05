@@ -5,23 +5,17 @@
 import { useToast } from '@algotrade/ui';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import type { ScreenDocument } from '@/entities/screen';
+import { refreshScreens, type ScreenDocument } from '@/entities/screen';
 import { api, ApiError, queryKeys, unwrap, errorDetail } from '@/shared/api';
 
-/** Refresh everything cached about one screen. */
-function useRefresh(id: string) {
+/** Refresh everything cached about the screens (lists, detail, versions). */
+function useRefresh() {
   const client = useQueryClient();
-  return () =>
-    Promise.all([
-      client.invalidateQueries({ queryKey: queryKeys.screeners.detail(id) }),
-      client.invalidateQueries({ queryKey: queryKeys.screeners.versions(id) }),
-      client.invalidateQueries({ queryKey: queryKeys.screeners.list() }),
-      client.invalidateQueries({ queryKey: queryKeys.screeners.mine() }),
-    ]);
+  return () => refreshScreens(client);
 }
 
 export function useSaveDraft(id: string) {
-  const refresh = useRefresh(id);
+  const refresh = useRefresh();
   const toast = useToast();
   return useMutation({
     mutationFn: (document: ScreenDocument) =>
@@ -43,7 +37,7 @@ export function useSaveDraft(id: string) {
 }
 
 export function useDiscardDraft(id: string) {
-  const refresh = useRefresh(id);
+  const refresh = useRefresh();
   const toast = useToast();
   return useMutation({
     mutationFn: async () => {
@@ -68,7 +62,7 @@ export function useDiscardDraft(id: string) {
  * version) as a draft of the same name: the first edit of a preset does it, transparently.
  */
 export function useCopyOwnPreset(id: string) {
-  const refresh = useRefresh(id);
+  const refresh = useRefresh();
   const toast = useToast();
   return useMutation({
     mutationFn: () =>
@@ -100,6 +94,10 @@ export function useCreateScreener() {
           body: { document },
         }),
       ),
-    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.screeners.all() }),
+    onSuccess: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.screeners.all() }),
+        refreshScreens(client),
+      ]),
   });
 }

@@ -1,5 +1,84 @@
+"""
+A saved backtest run: `status` complete, partial or failed; `start` / `end` its first and last session; `metrics` (sharpe, cagr, max drawdown, ...)
+"""
+type Backtest {
+  runId: String!
+  configId: String!
+  user: String!
+  status: String!
+  start: String
+  end: Date!
+  startedAt: DateTime!
+  finishedAt: DateTime
+  metrics: JSON!
+}
+
+"""
+A saved run with its config hash, selection audit, `data` (as_of, data_versions, reference_snapshot, survivorship_bias), rebalance evaluations, equity curve and fills
+"""
+type BacktestDetail {
+  summary: Backtest!
+  configHash: String
+  selection: JSON!
+  data: JSON!
+  rebalances: [JSON!]!
+  equity: [EquityPoint!]!
+  fills: [Fill!]!
+}
+
+"""One equal-width histogram bin, `lo` to `hi`"""
+type Bin {
+  lo: Float!
+  hi: Float!
+  count: Int!
+}
+
+"""A value of a non-numeric feature and how many instruments have it"""
+type Category {
+  value: String!
+  count: Int!
+}
+
+"""
+A config the user sees: `scope` site (a preset) or the user's id; `kind` strategy or screener (null when it does not resolve); `selection` the named selection or inline; `error` why it does not resolve
+"""
+type Config {
+  configId: String!
+  scope: String!
+  kind: String
+  impl: String
+  selection: String
+  hash: String
+  error: String
+}
+
 """Date (isoformat)"""
 scalar Date
+
+"""Date with time (isoformat)"""
+scalar DateTime
+
+"""The portfolio after one bar: equity and gross exposure"""
+type EquityPoint {
+  ts: String!
+  equity: Float
+  grossExposure: Float
+}
+
+"""
+A catalogue feature across instruments for `session`: `count` instruments with a row (a value or a stored null), `nulls` stored nulls; `quantiles` and 20-bin `histogram` for a number, `categories` (the most frequent values) otherwise; `unknown`: why nothing is counted (not stored for the session)
+"""
+type FeatureDistribution {
+  name: String!
+  session: Date!
+  info: FeatureInfo!
+  count: Int!
+  nulls: Int!
+  quantiles: [Quantile!]!
+  histogram: [Bin!]!
+  categories: [Category!]!
+  unknown: Unknown
+}
 
 """How a client shows a feature's value"""
 enum FeatureFormat {
@@ -49,6 +128,17 @@ type FeatureValue {
   info: FeatureInfo!
 }
 
+"""One simulated fill"""
+type Fill {
+  ts: String!
+  instrumentId: String!
+  side: String!
+  quantity: Float
+  price: Float
+  commission: Float
+  multiplier: Float
+}
+
 """
 An instrument as the session's reference snapshot has it. Per-session values (prices, earnings dates, flags, ...) are catalogue features: `features(names)`
 """
@@ -74,6 +164,22 @@ The `JSON` scalar type represents JSON values as specified by [ECMA-404](https:/
 """
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
 
+"""
+The site preset a screen extends: `pinned` the version it extends (null: not copied yet), `current` the preset's version now
+"""
+type PresetPin {
+  presetId: String!
+  pinned: Int
+  current: Int
+  rebaseAvailable: Boolean!
+}
+
+"""A quantile of the values: `q` 0.5 is the median"""
+type Quantile {
+  q: Float!
+  value: Float!
+}
+
 """Reads for the web app, each for one session (ADR 0036)"""
 type Query {
   """The session `date` resolves to; null: nothing stored"""
@@ -95,6 +201,84 @@ type Query {
     """
     date: Date = null
   ): Instrument
+
+  """
+  The caller's feature catalogue (the site's fields plus their own expression features), in catalogue order
+  """
+  catalogue: [FeatureInfo!]!
+
+  """
+  The catalogue field `name` across instruments for the session; a name outside the caller's catalogue is an UNKNOWN_FEATURE error. Null: nothing stored
+  """
+  distribution(
+    name: FeatureName!
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): FeatureDistribution
+
+  """
+  Every strategy and screener config the user sees: site presets, then their own (`kind`: only `strategy` or `screener`)
+  """
+  configs(kind: String = null): [Config!]!
+
+  """
+  Every saved backtest run of the strategy configs the user sees, newest first
+  """
+  backtests: [Backtest!]!
+
+  """The saved backtest run `runId`; null: no such backtest run"""
+  backtest(runId: String!): BacktestDetail
+
+  """
+  The user's own rule screens: finalised ones and draft-only ones (status DRAFT), by id
+  """
+  myScreens: [ScreenListing!]!
+
+  """
+  The user's screen `screenerId` (or the site preset of that id they have not copied yet): draft, versions, preset pin, working copy. Null: no such screen
+  """
+  screenDetail(screenerId: String!): ScreenDetail
+
+  """The finalised versions of the user's screen `screenerId`, oldest first"""
+  screenVersions(screenerId: String!): [ScreenVersion!]!
+}
+
+"""
+A screen of the user (or a preset not copied yet): the `draft` and why it would not finalise (`draftError`), its `versions`, the `preset` it is pinned to, the latest version resolved (`hash`, `layers`, `resolved`, `error`) and `working`, the rule keys the Builder edits
+"""
+type ScreenDetail {
+  screenerId: String!
+  user: String!
+  draft: JSON
+  draftError: String
+  versions: [Int!]!
+  latest: Int
+  preset: PresetPin
+  hash: String
+  layers: [String!]!
+  resolved: JSON
+  error: String
+  working: JSON
+}
+
+"""
+One of the user's screens: `status` FINAL (has a finalised version) or DRAFT (a draft only); `presetId` the site preset it extends
+"""
+type ScreenListing {
+  screenerId: String!
+  status: String!
+  latest: Int
+  hasDraft: Boolean!
+  presetId: String
+}
+
+"""A finalised (immutable) version of a screen and its document"""
+type ScreenVersion {
+  version: Int!
+  document: JSON!
 }
 
 """

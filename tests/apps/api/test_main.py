@@ -39,9 +39,9 @@ def test_configuration_errors_are_400(
     def broken(*args: object) -> None:
         raise ConfigurationError("bad config")
 
-    monkeypatch.setattr("algotrade.services.explore.configs.resolve_config", broken)
+    monkeypatch.setattr("algotrade.services.read.ops.configs.resolve_config", broken)
     app = create_app(ApiSettings("memory://", "config"), explore[0])
-    response = TestClient(app).get("/configs/sma_trend")
+    response = TestClient(app).get("/screens/vrp_scanner/results")
     assert (response.status_code, response.json()) == (400, {"detail": "bad config"})
 
 
@@ -86,15 +86,10 @@ ENDPOINTS = (
     "/instruments/BULL/holdings",
     "/chains/AAA",
     "/chains/AAA/live?expiry=2022-12-23",
-    "/features",
-    "/features/rollup.price_stats@v2.hv20/distribution",
     "/screens",
     "/screens/short_premium_liquidity/results",
     "/screens/vrp_scanner/table?columns=rollup.price_stats@v2.hv20",
     "/ideas",
-    "/backtests",
-    "/configs",
-    "/configs/sma_trend",
     "/explore/tickers?columns=rollup.price_stats@v2.hv20&sort=-rollup.price_stats@v2.hv20",
     "/explore/compare?ids=AAA,BBB",
     "/explore/compare/prices?ids=AAA,BBB",
@@ -142,7 +137,19 @@ OVERVIEW_NAMES = [
     "rollup.earnings@v1.last_earnings_date", "rollup.earnings@v1.days_to_earnings",
     "rollup.earnings@v1.earnings_time",
 ]  # fmt: skip
-OPERATIONS = {"InstrumentFacts": (INSTRUMENT_FACTS, {"key": "AAA", "names": OVERVIEW_NAMES})}
+# The Builder's and pickers' reads (read-model PR 9): the catalogue, one distribution, the
+# saved backtests.
+CATALOGUE = "query FeatureCatalogue { catalogue { name dtype format unit scope licence } }"
+DISTRIBUTION = """query FeatureDistribution($name: FeatureName!) {
+  distribution(name: $name) { count nulls quantiles { q value } histogram { lo hi count } }
+}"""
+BACKTESTS = "query Backtests { backtests { runId configId status metrics } }"
+OPERATIONS = {
+    "InstrumentFacts": (INSTRUMENT_FACTS, {"key": "AAA", "names": OVERVIEW_NAMES}),
+    "FeatureCatalogue": (CATALOGUE, {}),
+    "FeatureDistribution": (DISTRIBUTION, {"name": "rollup.price_stats@v2.hv20"}),
+    "Backtests": (BACKTESTS, {}),
+}
 
 
 @pytest.mark.parametrize("name", OPERATIONS)

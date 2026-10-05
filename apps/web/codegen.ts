@@ -20,7 +20,7 @@ const config: CodegenConfig = {
         enumsAsTypes: true,
         useTypeImports: true,
         strictScalars: true,
-        scalars: { Date: 'string', JSON: 'unknown', FeatureName: 'string' },
+        scalars: { Date: 'string', DateTime: 'string', JSON: 'unknown', FeatureName: 'string' },
       },
     },
   },

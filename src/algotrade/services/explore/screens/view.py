@@ -9,9 +9,9 @@ its own defaults."""
 from dataclasses import dataclass
 
 from algotrade.config.user import UserContext
-from algotrade.services.explore.configs import resolved
 from algotrade.services.explore.ideas.ranking import PREFERENCES
 from algotrade.services.explore.store import ReadStore
+from algotrade.services.read.ops.configs import resolved_for
 
 
 @dataclass(frozen=True)
@@ -30,7 +30,7 @@ def screener_view(
 ) -> ScreenerView:
     """``user``'s (default: the store's) view of ``screener_id``: the default one, or the one
     called ``name``. ``NotFoundError`` for a screener the user cannot see."""
-    resolved(store, screener_id)
+    resolved_for(store.configs, store.user, screener_id)
     who = UserContext(user).user_id if user else store.user.user_id
     doc = store.configs.load(who, PREFERENCES, PREFERENCES) or {}
     entry = (doc.get("screeners") or {}).get(screener_id) or {}

@@ -32,7 +32,7 @@ export function DraftBar({ compact = false, onDeleted }: DraftBarProps) {
   const copyOf = builder.preset
     ? { id: builder.preset.id, version: builder.preset.version }
     : pin
-      ? { id: pin.preset_id, version: pin.pinned }
+      ? { id: pin.presetId, version: pin.pinned }
       : null;
   const version = (v: number | null) => (v === null ? '' : ` v${String(v)}`);
 
@@ -90,18 +90,18 @@ export function DraftBar({ compact = false, onDeleted }: DraftBarProps) {
           {`This is the site preset${version(builder.preset?.version ?? null)} with its live preview. Change anything and a copy of it becomes yours (pinned to this version); the preset itself changes only by pull request.`}
         </Banner>
       )}
-      {pin?.rebase_available && pin.pinned !== null && pin.current !== null && (
+      {pin?.rebaseAvailable && pin.pinned !== null && pin.current !== null && (
         <RebaseBanner
           screenerId={builder.id}
-          preset={pin.preset_id}
+          preset={pin.presetId}
           pinned={pin.pinned}
           current={pin.current}
           disabled={builder.dirty}
         />
       )}
-      {detail?.draft_error && !builder.dirty && (
+      {detail?.draftError && !builder.dirty && (
         <Banner tone="warning" title="This draft would not finalize">
-          {detail.draft_error}
+          {detail.draftError}
         </Banner>
       )}
     </Stack>

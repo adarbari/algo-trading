@@ -68,24 +68,31 @@ interface Operation {
   variables?: Record<string, unknown>;
 }
 
-/** A GraphQL operation's recorded answer: `InstrumentFacts` for AAPL (the Overview pane). */
+/** A feature's distribution: the recorded one for its name, else IV30's renamed. */
+function distribution(name: string): Json {
+  const answer = fixture(DISTRIBUTIONS[name] ?? 'dist-iv30.json') as {
+    data: { distribution: Json };
+  };
+  return { data: { distribution: { ...answer.data.distribution, name } } };
+}
+
+/**
+ * A GraphQL operation's recorded answer: `InstrumentFacts` for AAPL (the Overview pane), the
+ * catalogue (`FeatureCatalogue`) and a feature's distribution (`FeatureDistribution`).
+ */
 function graphqlAnswer(operation: Operation): Json | null {
   const name = /query\s+(\w+)/.exec(operation.query ?? '')?.[1];
   if (name === 'InstrumentFacts' && operation.variables?.['key'] === 'AAPL') {
     return fixture('facts-aapl.json');
   }
+  if (name === 'FeatureCatalogue') return fixture('catalogue.json');
+  if (name === 'FeatureDistribution') return distribution(String(operation.variables?.['name']));
   return null;
 }
 
 function answer(url: URL, body: string | null): Json | Json[] | null {
   const path = url.pathname.replace(/^\/api/, '');
   if (path === '/graphql') return graphqlAnswer(JSON.parse(body ?? '{}') as Operation);
-  if (path === '/features') return fixture('features.json');
-  const distribution = /^\/features\/(.+)\/distribution$/.exec(path);
-  if (distribution) {
-    const name = decodeURIComponent(distribution[1] ?? '');
-    return { ...fixture(DISTRIBUTIONS[name] ?? 'dist-iv30.json'), name };
-  }
   if (path === '/explore/tickers') return tickerPage(url);
   if (path === '/explore/compare') return fixture('compare.json');
   if (path === '/explore/compare/prices') return fixture('prices.json');

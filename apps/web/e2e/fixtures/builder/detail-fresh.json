@@ -1,5 +1,5 @@
 {
-  "screener_id": "fresh",
+  "screenerId": "fresh",
   "user": "abhinav",
   "draft": {
     "id": "fresh",
@@ -23,7 +23,7 @@
       }
     }
   },
-  "draft_error": null,
+  "draftError": null,
   "versions": [],
   "latest": null,
   "preset": null,

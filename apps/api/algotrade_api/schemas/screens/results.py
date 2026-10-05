@@ -3,8 +3,19 @@
 from datetime import date
 from typing import Any
 
-from algotrade_api.schemas.configs import ConfigSummary
+from pydantic import Field
+
 from algotrade_api.schemas.health import Page, Schema
+
+
+class ConfigSummary(Schema):
+    config_id: str
+    scope: str = Field(description="site (a preset) or the user's id")
+    kind: str | None = Field(description="strategy | screener (null when it does not resolve)")
+    impl: str | None
+    selection: str | None = Field(description="the named selection, or inline")
+    hash: str | None = Field(description="fingerprint of the resolved config")
+    error: str | None = Field(description="why the config does not resolve")
 
 
 class ScreenConfig(Schema):

@@ -18,7 +18,13 @@ from algotrade.services.authoring.scope import ConfigWriter, ConflictError, Scre
 from algotrade.services.explore.store import NotFoundError, ReadStore
 from algotrade.services.live.quotes import LiveQuotes
 from algotrade.services.ondemand.screens import OnDemandScreens, open_ondemand
-from algotrade.services.read.context import ReadContext, ResultCache, open_context
+from algotrade.services.read.context import (
+    ReadContext,
+    ResultCache,
+    StoreContext,
+    open_context,
+    open_stores,
+)
 from algotrade_api import __version__
 from algotrade_api.deps import ApiSettings
 from algotrade_api.graphql.schema import graphql_router
@@ -92,14 +98,22 @@ def create_app(
     app.add_exception_handler(ConfigurationError, _bad_request)
     for router in ROUTERS:
         app.include_router(router)
-    app.include_router(graphql_router(_reads(app.state.store), settings.debug))
+    cache = ResultCache()
+    reads, stores = _reads(app.state.store, cache), _stores(app.state.store, cache)
+    app.include_router(graphql_router(reads, settings.debug, stores))
     return app
 
 
-def _reads(store: ReadStore) -> Callable[[date | None], ReadContext]:
+def _reads(store: ReadStore, cache: ResultCache) -> Callable[[date | None], ReadContext]:
     """Opens a GraphQL request's read context over ``store`` for a requested session, with
     one result cache for every request of the app (entries keyed on the published state)."""
-    return partial(open_context, store.reader, store.configs, store.user, cache=ResultCache())
+    return partial(open_context, store.reader, store.configs, store.user, cache=cache)
+
+
+def _stores(store: ReadStore, cache: ResultCache) -> Callable[[], StoreContext]:
+    """Opens a GraphQL request's session-free context over ``store`` (configs, run records,
+    the catalogue: they need no stored market data)."""
+    return partial(open_stores, store.reader, store.configs, store.user, cache=cache)
 
 
 def openapi_json() -> str:
