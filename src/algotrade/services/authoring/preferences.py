@@ -1,4 +1,4 @@
-"""Save a user's preferences (``config/users/<u>/preferences.toml``; ADR 0029, 0031): the
+"""Save a user's preferences (``config/users/<u>/preferences.toml``; ADR 0029, 0032): the
 Ideas screener priority, ``ideas.priority`` (screener ids, best first), and the user's view of
 a screener's results, ``screeners.<id>.view`` (columns, sort, decisions shown). Every id must be
 a screen the user can run (their own or a site preset) and listed once, and every column a

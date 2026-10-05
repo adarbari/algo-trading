@@ -1,4 +1,4 @@
-"""A user's saved view of a screener's results (ADR 0031): the catalogue columns they added, the
+"""A user's saved view of a screener's results (ADR 0032): the catalogue columns they added, the
 sort and the decisions they show, from ``screeners.<id>.view`` of their ``preferences.toml``.
 
 Read-only. A view is the user's, not the screener's: it is never part of a version or a hash.
