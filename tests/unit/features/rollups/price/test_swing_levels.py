@@ -78,6 +78,21 @@ def test_a_pivot_is_known_only_five_sessions_later() -> None:
         assert results[days[k]]["swing_high_date"] == days[30]
 
 
+def test_pivots_can_be_dated_d_minus_246_to_d_minus_5() -> None:
+    """The 252 sessions read are d - 251 .. d and a pivot needs 5 bars each side among them."""
+    writer, reader = store()
+    n = 300
+    oldest, too_old = n - 1 - sl.FIRST_PIVOT, n - 2 - sl.FIRST_PIVOT
+    days = write(
+        writer,
+        {"EQ:IN": bars(peak(n, oldest, 110.0)), "EQ:OUT": bars(peak(n, too_old, 110.0))},
+    )
+    out = levels(compute_one(reader, sl.GROUP, END).frame)
+    assert sl.FIRST_PIVOT == 246
+    assert out["EQ:IN"]["swing_high"] == 110.0 and out["EQ:IN"]["swing_high_date"] == days[oldest]
+    assert np.isnan(out["EQ:OUT"]["swing_high"])  # d - 247: its 5th bar before is not read
+
+
 def test_most_recent_pivot_beyond_the_close() -> None:
     writer, reader = store()
     n = 60
