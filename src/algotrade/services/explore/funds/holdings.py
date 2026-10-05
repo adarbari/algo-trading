@@ -34,8 +34,8 @@ class EtfHoldings:
     instrument_id: str
     is_etf: bool
     as_of: date | None  # the issuer's holdings date
-    source: str | None  # the source that read it (ssga_holdings, ishares_holdings, sec_edgar)
-    total: int  # lines in the issuer's file (not only those stored)
+    source: str | None  # the source that read it (ssga_holdings, ishares_holdings, sec_nport)
+    total: int  # positions in the issuer's file (cash, futures and FX lines not counted)
     items: list[Holding]  # largest weight first
 
 

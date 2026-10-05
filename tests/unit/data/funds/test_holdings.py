@@ -108,6 +108,8 @@ def test_status_has_the_issuers_date_and_the_last_session_read() -> None:
         ("US0378331005", "037833100"),
         ("CA1234567890", "123456789"),
         ("GB0002634946", None),
+        ("H69293217", None),  # a CINS (Roche): foreign, not a US/Canadian CUSIP
+        ("G5494J103", None),
         ("CASH_USD", None),
         (None, None),
     ],
@@ -119,8 +121,49 @@ def test_a_cusip_is_read_from_cusips_and_us_isins(
 
 
 def test_known_cusips_pair_tickers_with_their_security_ids() -> None:
-    rows = holdings_rows(FUND, S1, LINES)
+    rows = holdings_rows(FUND, S1, LINES, linked={"AAA": "EQ:AAA", "BBB": "EQ:BBB"})
     rows[0]["identifier"] = "037833100"
     rows[2]["identifier"] = "CASH_USD"
     reader = store((S1, "r1", rows, at(S1)))
-    assert known_cusips(reader, S3) == {"037833100": "AAA", "CUSIP0002": "BBB"}
+    assert known_cusips(reader, S3) == {"037833100": "AAA", "900000002": "BBB"}
+
+
+def test_a_line_that_did_not_resolve_never_feeds_the_cusip_map() -> None:
+    """State Street prints Telus as T (CAD) with Telus' CUSIP. It never resolves to a universe
+    instrument, so a later line with that CUSIP must not become AT&T's ticker."""
+    rows = holdings_rows(
+        FUND, S1, [("T", "Telus", 0.5), ("AAA", "Alpha", 0.5)], linked={"AAA": "EQ:AAA"}
+    )
+    rows[0]["identifier"] = "87971M103"
+    reader = store((S1, "r1", rows, at(S1)))
+    assert known_cusips(reader, S3) == {"900000002": "AAA"}
+
+
+def test_lines_of_excluded_sources_and_other_asset_classes_do_not_feed_the_map() -> None:
+    linked = {"AAA": "EQ:AAA", "BBB": "EQ:BBB"}
+    borrowed = holdings_rows(OTHER, S1, LINES[:2], linked=linked)  # tickers the bridge supplied
+    bond = holdings_rows(FUND, S1, [("AAA", "A bond", 1.0)], linked={"AAA": "EQ:AAA"})
+    bond[0]["asset_class"] = "Fixed Income"
+    writer = StoreWriter(MemoryBackend())
+    writer.write_table(TABLE, S1, "r1", stamped(borrowed, S1, "r1", at(S1), "sec_nport"))
+    writer.write_table(TABLE, S1, "r2", stamped(bond, S1, "r2", at(S1), "ssga_holdings"))
+    reader = StoreReader(writer._backend)
+    assert known_cusips(reader, S3, exclude_sources=["sec_nport"]) == {}
+    assert set(known_cusips(reader, S3)) == {"900000001", "900000002"}
+
+
+def test_a_row_is_invisible_before_the_date_it_was_filed() -> None:
+    """An N-PORT report stored under an earlier session (a back-dated run) is not public yet."""
+    late = holdings_rows(FUND, date(2026, 6, 30), LINES, filed=date(2026, 8, 28))
+    reader = store((S1, "r1", late, at(S1)))  # session 2026-09-01 is after the filing
+    assert len(etf_holdings(reader, FUND, date(2026, 9, 1))) == 3
+    early = store((date(2026, 8, 1), "r1", late, at(date(2026, 8, 1))))  # stored under 2026-08-01
+    assert etf_holdings(early, FUND, date(2026, 8, 20)).empty  # filed on the 28th
+    assert len(etf_holdings(early, FUND, date(2026, 8, 28))) == 3
+    assert holdings_status(early, date(2026, 8, 20)).empty
+    assert known_cusips(early, date(2026, 8, 20)) == {}
+
+
+def test_status_reports_the_stored_position_count() -> None:
+    reader = store((S1, "r1", holdings_rows(FUND, S1, LINES, total=250), at(S1)))
+    assert int(holdings_status(reader, S3).iloc[0]["holdings_count"]) == 250

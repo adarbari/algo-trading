@@ -1,5 +1,6 @@
 """State Street ETF holdings against recorded workbooks and fund finder (no network)."""
 
+import io
 from datetime import date
 
 import pytest
@@ -7,6 +8,7 @@ import pytest
 from algotrade_sources.framework.base import FetchRequest, HoldingsSource
 from algotrade_sources.framework.holdings import HOLDING_COLUMNS
 from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings, parse_finder
+from algotrade_sources.vendors.ssga.workbook import read_workbook
 from tests.conftest import REPO_ROOT
 from tests.helpers.ingest_fakes import http_for
 
@@ -82,6 +84,43 @@ def test_a_fund_fetch_reads_the_directory_first_when_it_has_not() -> None:
     urls: list[str] = []
     assert source(urls).fetch(FetchRequest("BIL")) == BIL
     assert "fundfinder" in urls[0] and len(urls) == 2
+
+
+def workbook(header: str = "Weight", weight: object = 1.5, name: str = "Name") -> bytes:
+    import openpyxl  # noqa: PLC0415
+
+    book = openpyxl.Workbook()
+    sheet = book.active
+    sheet.append(["Fund Name:", "SPDR Test"])
+    sheet.append(["Ticker Symbol:", "XLK"])
+    sheet.append(["Holdings:", "As of 01-Oct-2026"])
+    sheet.append(
+        [name, "Ticker", "Identifier", "SEDOL", header, "Sector", "Shares Held", "Local Currency"]
+    )
+    sheet.append(["ALPHA INC", "AAA", "037833100", "x", 60.0, "-", 10.0, "USD"])
+    sheet.append(["BETA INC", "BBB", "594918104", "x", weight, "-", 10.0, "USD"])
+    sheet.append(["Past performance is not a reliable indicator of future performance."])
+    out = io.BytesIO()
+    book.save(out)
+    return out.getvalue()
+
+
+def test_a_table_without_a_weight_column_is_a_parse_failure_not_a_guess() -> None:
+    """It used to fall back to the first column, so the disclaimer row became a holding."""
+    with pytest.raises(ValueError, match="no Weight column"):
+        read_workbook(workbook(header="Wt"))
+    with pytest.raises(ValueError, match="no Weight column"):
+        source().normalize(FetchRequest("XLK"), workbook(header="Wt"))
+    with pytest.raises(ValueError, match="no table"):
+        read_workbook(workbook(name="Nome"))
+
+
+def test_a_weight_that_does_not_read_drops_the_line_and_is_counted() -> None:
+    normalized = source().normalize(FetchRequest("XLK"), workbook(weight="n/a"))
+    assert normalized is not None and normalized.notes["unreadable_lines"] == 1
+    holdings = normalized.parsed["holdings"]
+    assert list(holdings["holding_name"]) == ["ALPHA INC"]  # BETA is not a 0% holding
+    assert holdings["filed"].isna().all()  # a daily file is public on its own date
 
 
 def test_a_file_for_another_fund_is_rejected() -> None:

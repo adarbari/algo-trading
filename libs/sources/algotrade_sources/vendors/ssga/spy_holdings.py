@@ -6,19 +6,18 @@ disclaimer text. Tickers use the same style as Nasdaq Trader (``BRK.B``). Non-se
 (cash ``-``, identifiers that are not tickers) are skipped and counted.
 """
 
-import re
 from datetime import date
 
 import pandas as pd
 
 from algotrade_sources.framework.base import FetchRequest, Normalized
+from algotrade_sources.framework.holdings import holding_ticker
 from algotrade_sources.framework.http import Http
 from algotrade_sources.vendors.ssga.workbook import read_workbook
 
 SOURCE = "ssga_spy"
 DATASET = "spy_holdings"
 URL = "https://www.ssga.com/us/en/intermediary/library-content/products/fund-data/etfs/us/holdings-daily-us-en-spy.xlsx"
-_TICKER = re.compile(r"^[A-Z]{1,5}(\.[A-Z])?$")
 
 
 def parse_holdings(payload: bytes) -> tuple[pd.DataFrame, date | None, int]:
@@ -30,8 +29,8 @@ def parse_holdings(payload: bytes) -> tuple[pd.DataFrame, date | None, int]:
     for name, ticker, weight in zip(
         book.table["Name"], book.table["Ticker"], book.table["Weight"], strict=True
     ):
-        symbol = str(ticker).strip().upper()
-        if not _TICKER.match(symbol):
+        symbol = holding_ticker(ticker)  # a blank cell is not the ticker "NAN"
+        if symbol is None:
             skipped += 1
             continue
         holdings.append({"symbol": symbol, "name": name, "weight": float(weight or 0.0)})

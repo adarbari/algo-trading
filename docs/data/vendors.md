@@ -134,7 +134,7 @@ second or slower.
 | Issuer | What we read | Coverage | Lag |
 |---|---|---|---|
 | State Street (SPDR), `[ssga]` | The public fund finder (`/bin/v1/ssmp/fund/fundfinder?country=us&language=en&role=intermediary&product=etfs&ui=fund-finder`, 0.85 MB) lists each fund's `Holdings-daily` workbook path; one `.xlsx` per fund (20 to 190 KB). Equity funds: Name, Ticker, Identifier (CUSIP), SEDOL, Weight, Sector, Shares Held, Local Currency; bond funds: no ticker, ISIN, Par Value | 181 of the 183 US SPDR ETFs: SPY, XL*, DIA, MDY, SPYG... (not GLD, GLDM) | 1 day |
-| iShares, `[ishares]` | The product screener JSON (`/us/product-screener/product-screener-v3.1.jsn?...`, 1.9 MB) maps 526 tickers to fund pages; each page offers `<page>/latest-holdings.csv` (a schema.org DataDownload; 0.1 to 4 MB). Weights have two decimals; foreign lines print local tickers (Roche as `ROP`) | 526 listed funds; metal trusts (SLV) answer HTTP 400 | 1 day |
+| iShares, `[ishares]` | The product screener JSON (`/us/product-screener/product-screener-v3.1.jsn?...`, 1.9 MB) maps 526 tickers to fund pages; each page offers `<page>/latest-holdings.csv` (a schema.org DataDownload; 0.1 to 4 MB). Weights have two decimals, so the adapter uses each line's share of the market values when they agree; foreign lines print local tickers (Roche as `ROP`) | 526 listed funds; metal trusts (SLV) answer HTTP 400 | 1 day |
 | SEC N-PORT, `[sec_edgar]` | `files/company_tickers_mf.json` (ticker to trust CIK and series), `data.sec.gov/submissions/CIK<cik>.json` (the trust's N-PORT-P list), the filing's `-index-headers.html` (names its series; the list does not), then `primary_doc.xml` (0.1 to 4 MB: name, CUSIP / ISIN, `pctVal` per line; no tickers) | Every registered fund: Vanguard, Invesco QQQ, Schwab, ARK... Not unit trusts (SPY, DIA) or commodity / crypto trusts | 60 to 150 days, quarterly |
 
 Coverage of the 5,730 active ETFs of the 2026-10-02 universe (listed by an adapter's directory):
@@ -175,9 +175,15 @@ tickers the State Street files print beside CUSIPs (`data.funds.holdings.known_c
 SPDR funds are read first. Cash, futures, bonds and unmatched lines keep their name only.
 
 Pacing and cost: `[ssga]` and `[ishares]` 1 s between requests, SEC 0.2 s; raw files are kept
-14 days (SEC 7). Each fund is read once a week on its own slot day (`[etf_holdings]
-refresh_days`), N-PORT funds once per 30 days at most, funds an issuer lists but has no file
-for once a window. The nightly reads the funds due, about a seventh of the covered funds.
+14 days (SEC 7; this includes SPY's membership file, which was kept 90 days before `[ssga]`
+existed: the membership lives in the tables). Each fund is read once a week on its own slot day
+(`[etf_holdings] refresh_days`), N-PORT funds once per 90 days at most, funds an issuer lists
+but has no file for once a window. The nightly reads at most `[etf_holdings] per_night` (100)
+funds, new and stalest first, after bars and chains, so the first pass takes about 12 nights;
+the CLI is uncapped. A new read replaces a fund's rows only if it passes the sanity checks
+(ADR 0035 decision 6); otherwise last read's rows stay and the run is PARTIAL. N-PORT data is
+public 60 to 150 days after its period (a 90-day slot can add up to 90 more); stored rows carry
+`filed` and are hidden from reads before it.
 Backfill by hand: `algotrade-ingest etf-holdings [--limit N] [--symbols SPY,QQQ] [--force]`.
 
 ## SEC EDGAR company details (implemented, phase 1.7)

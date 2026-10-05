@@ -4,7 +4,7 @@ from datetime import date
 
 import pytest
 
-from algotrade_sources.framework.base import FetchRequest, HoldingsSource
+from algotrade_sources.framework.base import FetchRequest, HoldingsSource, Normalized
 from algotrade_sources.vendors.sec.nport_holdings import (
     NportHoldings,
     parse_filings,
@@ -63,7 +63,8 @@ def test_filings_are_the_nport_p_forms_newest_first() -> None:
 
 
 def test_the_report_has_names_cusips_and_fractional_weights_but_no_tickers() -> None:
-    as_of, rows = parse_report(REPORT)
+    as_of, series, rows = parse_report(REPORT)
+    assert series == "S000002848"
     assert as_of == date(2026, 6, 30) and len(rows) == 5
     first = rows[0]
     assert first["holding_name"] == "NVIDIA Corp"
@@ -91,6 +92,30 @@ def test_a_funds_filing_is_found_by_reading_headers_newest_first_and_cached() ->
     assert src.fetch(FetchRequest("VOO")) is None  # its series filed nothing in the list
     assert not any(u.endswith("-index-headers.html") for u in urls)  # all four were cached
     assert src.fetch(FetchRequest("SCHD")) is None  # not in the directory: no request at all
+
+
+def test_rows_carry_the_filing_date_so_readers_can_hide_them_until_then() -> None:
+    src = source()
+    src.fetch(FetchRequest("directory"))
+    payload = src.fetch(FetchRequest("VTI")) or b""
+    holdings = (src.normalize(FetchRequest("VTI"), payload) or Normalized(None, {})).parsed[
+        "holdings"
+    ]
+    assert set(holdings["filed"]) == {date(2026, 8, 28)}  # from the trust's filing list
+
+
+def test_a_replay_from_raw_assumes_the_filing_deadline() -> None:
+    """No filing list in hand: 60 days after the period is when an N-PORT-P is due."""
+    holdings = source().normalize(FetchRequest("VTI"), REPORT).parsed["holdings"]  # type: ignore[union-attr]
+    assert set(holdings["filed"]) == {date(2026, 8, 29)}
+
+
+def test_unreadable_weights_are_dropped_not_read_as_zero() -> None:
+    broken = REPORT.replace(b"<pctVal>6.355382492074<", b"<pctVal>n/a<", 1)
+    assert broken != REPORT
+    normalized = source().normalize(FetchRequest("VTI"), broken)
+    assert normalized is not None and normalized.notes["unreadable_lines"] == 1
+    assert len(normalized.parsed["holdings"]) == 4
 
 
 def test_a_fund_with_no_report_is_nothing() -> None:

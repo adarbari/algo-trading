@@ -108,7 +108,7 @@ VENDOR_EXTRAS = {
     "massive": ("corporate_actions_window",),
     "sec_edgar": ("refresh_days", "facts_refresh_days"),
     "treasury": ("lookback_days",),
-    "etf_holdings": ("refresh_days", "keep_top", "fallback_scope"),
+    "etf_holdings": ("refresh_days", "keep_top", "fallback_scope", "per_night"),
     "ibkr": (
         "historical_min_interval_s",
         "market_data_type",
@@ -207,6 +207,7 @@ class SourcesSettings:
     treasury_lookback_days: int = 10
     etf_refresh_days: int = 7  # [etf_holdings]: refetch a fund's holdings once per window
     etf_keep_top: int = 100  # holdings stored per fund, largest weights first (0: all)
+    etf_per_night: int = 100  # funds the nightly reads per night (0: no cap)
     etf_fallback_scope: str = "optionable"  # which funds SEC N-PORT reads: optionable, all, off
     http_max_retry_s: float = 300.0
     http_breaker_failures: int = 10
@@ -275,7 +276,9 @@ class SourcesSettings:
                 "staging_retention_days", d.staging_retention_days, 1
             ),
             live_retention_days=root.integer("live_retention_days", d.live_retention_days, 1),
-            vendors={name: _vendor(t, name not in OFF_BY_DEFAULT) for name, t in vendors.items()},
+            vendors=_with_legacy_sections(
+                {name: _vendor(t, name not in OFF_BY_DEFAULT) for name, t in vendors.items()}
+            ),
             cboe_workers=_extra(vendors, "cboe").integer("workers", d.cboe_workers, 1),
             cboe_priority_symbols=tuple(
                 s.upper() for s in _extra(vendors, "cboe").strings("priority_symbols", ())
@@ -298,6 +301,7 @@ class SourcesSettings:
                 "refresh_days", d.etf_refresh_days, 0
             ),
             etf_keep_top=_extra(vendors, "etf_holdings").integer("keep_top", d.etf_keep_top, 0),
+            etf_per_night=_extra(vendors, "etf_holdings").integer("per_night", d.etf_per_night, 0),
             etf_fallback_scope=_extra(vendors, "etf_holdings").choice(
                 "fallback_scope", d.etf_fallback_scope, ETF_FALLBACK_SCOPES
             ),
@@ -320,6 +324,18 @@ class SourcesSettings:
             max_verify_failures=quality.fraction("max_verify_failures", d.max_verify_failures),
             ibkr=_ibkr(_extra(vendors, "ibkr")),
         )
+
+
+# Sections that were renamed: a file with only the old one keeps its on/off switch under the new
+# name (pacing is not inherited: the old SPY file ran unpaced, the new section paces every file).
+LEGACY_SECTIONS = {"ssga": "spy_holdings"}
+
+
+def _with_legacy_sections(vendors: dict[str, VendorSettings]) -> dict[str, VendorSettings]:
+    for new, old in LEGACY_SECTIONS.items():
+        if new not in vendors and old in vendors:
+            vendors[new] = VendorSettings(enabled=vendors[old].enabled)
+    return vendors
 
 
 def _ibkr(section: Table) -> IbkrSettings:

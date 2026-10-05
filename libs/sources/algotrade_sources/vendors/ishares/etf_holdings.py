@@ -37,6 +37,8 @@ SCREENER_URL = (
     "ishares-product-screener-backend-config&siteEntryPassthrough=true"
 )
 _US = "United States"
+UNLISTED = ("NO MARKET (E.G. UNLISTED)",)  # an unlisted line is not a US listing
+MAX_WEIGHT_DRIFT = 0.001  # market-value weights may differ from the published ones by 0.1 pt
 
 
 def no_file(error: HttpError) -> bool:
@@ -80,6 +82,25 @@ def parse_csv(payload: bytes) -> tuple[date | None, list[dict[str, str]]]:
     return as_of, lines
 
 
+def line_weights(lines: list[dict[str, str]]) -> list[float | None]:
+    """Each line's weight as a fraction of the fund. The published ``Weight (%)`` has two
+    decimals (a 13k-line bond fund sums to 82%), so when every line has a market value the
+    weight is its share of the sum of market values, provided that agrees with the published
+    weights to 0.1 point; otherwise the published weights stand (an unreadable one is ``None``
+    and the line is dropped)."""
+    published = [fraction(line.get("Weight (%)")) for line in lines]
+    values = [number(line.get("Market Value")) for line in lines]
+    total = sum(v for v in values if v is not None)
+    if any(v is None for v in values) or total <= 0:
+        return published
+    derived = [round(v / total, 12) for v in values if v is not None]
+    if any(
+        p is None or abs(d - p) > MAX_WEIGHT_DRIFT for d, p in zip(derived, published, strict=True)
+    ):
+        return published
+    return [*derived]
+
+
 class IsharesHoldings:
     """Implements ``base.HoldingsSource``. Request keys: ``directory``, or an iShares ticker."""
 
@@ -111,22 +132,29 @@ class IsharesHoldings:
         as_of, lines = parse_csv(payload)
         if not lines or as_of is None:
             return None
+        weights = line_weights(lines)
         rows = []
-        for line in lines:
+        for line, weight in zip(lines, weights, strict=True):
             ticker = holding_ticker(line.get("Ticker"))
             kind = clean_text(line.get("Asset Class"))
             rows.append(
                 {
                     "holding_symbol": ticker,
                     "holding_name": clean_text(line.get("Name")),
-                    "weight": fraction(line.get("Weight (%)")),
+                    "weight": weight,
                     "asset_class": kind,
                     "sector": clean_text(line.get("Sector")),
                     "shares": number(line.get("Quantity", line.get("Par Value"))),
                     "identifier": clean_text(line.get("CUSIP")) or clean_text(line.get("ISIN")),
                     "us_listed": ticker is not None
                     and kind == "Equity"
-                    and line.get("Location") == _US,
+                    and line.get("Location") == _US
+                    and line.get("Exchange") not in UNLISTED,
+                    "filed": None,
                 }
             )
-        return Normalized(as_of, {}, parsed={"holdings": holdings_frame(rows)})
+        holdings = holdings_frame(rows)
+        if holdings.empty:
+            return None
+        notes = {"unreadable_lines": len(rows) - len(holdings)}
+        return Normalized(as_of, {}, notes=notes, parsed={"holdings": holdings})

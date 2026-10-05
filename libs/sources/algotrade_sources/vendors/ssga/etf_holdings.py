@@ -102,6 +102,11 @@ class SsgaHoldings:
                     "shares": number(line.get(size)),
                     "identifier": None if cash else identifier,
                     "us_listed": ticker is not None and line.get("Local Currency") == "USD",
+                    "filed": None,
                 }
             )
-        return Normalized(book.as_of, {}, parsed={"holdings": holdings_frame(rows)})
+        holdings = holdings_frame(rows)
+        if holdings.empty:
+            return None
+        notes = {"unreadable_lines": len(rows) - len(holdings)}
+        return Normalized(book.as_of, {}, notes=notes, parsed={"holdings": holdings})

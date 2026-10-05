@@ -51,6 +51,13 @@ def test_parse_spy_holdings_skips_cash_and_disclaimers() -> None:
     assert skipped == 1
 
 
+def test_a_blank_ticker_is_not_an_sp500_member() -> None:
+    """A blank cell was read as the ticker "NONE" / "NAN", which passes the ticker pattern."""
+    holdings, _, skipped = parse_holdings(fx.spy(["NVDA", None, "BRK.B"]))
+    assert list(holdings["symbol"]) == ["NVDA", "BRK.B"]
+    assert skipped == 2  # the blank cell and the cash line
+
+
 def test_sources_fetch_and_normalize() -> None:
     payloads = {"nasdaqlisted": fx.nasdaq([("AAPL", "Apple", "N", "N")])}
     urls: list[str] = []

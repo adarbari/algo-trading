@@ -103,5 +103,64 @@ def test_fetch_goes_through_the_screener_to_the_fund_page() -> None:
     assert len(urls) == 2
 
 
+HEADER = (
+    "Ticker,Name,Sector,Asset Class,Market Value,Weight (%),Notional Value,Quantity,Price,"
+    "Location,Exchange,Currency,FX Rate,Market Currency,Accrual Date"
+)
+
+
+def csv_file(*lines: tuple[str, str, str, str, str]) -> bytes:
+    """(ticker, asset class, market value, weight, exchange) lines under the real header."""
+    body = [
+        f'"{t}","{t} CORP","Tech","{k}","{mv}","{w}","{mv}","1.00","1.00","United States","{x}",'
+        '"USD","1.00","USD","-"'
+        for t, k, mv, w, x in lines
+    ]
+    head = 'iShares Test ETF\nFund Holdings as of,"Oct 01, 2026"\n\n'
+    return (head + "\n".join([HEADER, *body]) + "\n").encode()
+
+
+def weights(payload: bytes) -> list[float]:
+    normalized = source().normalize(FetchRequest("TEST"), payload)
+    assert normalized is not None
+    return list(normalized.parsed["holdings"]["weight"])
+
+
+def test_weights_come_from_market_values_when_the_two_decimals_lose_precision() -> None:
+    payload = csv_file(
+        ("AAA", "Equity", "9,999,600.00", "100.00", "NYSE"),
+        ("BBB", "Equity", "400.00", "0.00", "NYSE"),  # published as 0.00%
+    )
+    assert weights(payload) == [0.99996, 0.00004]
+
+
+def test_published_weights_stand_when_market_values_disagree_or_are_missing() -> None:
+    disagree = csv_file(
+        ("AAA", "Equity", "100.00", "90.00", "NYSE"), ("BBB", "Equity", "100.00", "10.00", "NYSE")
+    )
+    assert weights(disagree) == [0.9, 0.1]
+    missing = csv_file(
+        ("AAA", "Equity", "-", "60.00", "NYSE"), ("BBB", "Equity", "100.00", "40.00", "NYSE")
+    )
+    assert weights(missing) == [0.6, 0.4]
+
+
+def test_a_weight_that_does_not_read_drops_the_line_and_is_counted() -> None:
+    payload = csv_file(("AAA", "Equity", "-", "60.00", "NYSE"), ("BBB", "Equity", "-", "-", "NYSE"))
+    normalized = source().normalize(FetchRequest("TEST"), payload)
+    assert normalized is not None and normalized.notes["unreadable_lines"] == 1
+    assert list(normalized.parsed["holdings"]["holding_symbol"]) == ["AAA"]  # BBB is not 0%
+
+
+def test_an_unlisted_line_is_not_a_us_listing() -> None:
+    payload = csv_file(
+        ("AAA", "Equity", "60.00", "60.00", "NYSE"),
+        ("BBB", "Equity", "40.00", "40.00", "NO MARKET (E.G. UNLISTED)"),
+    )
+    normalized = source().normalize(FetchRequest("TEST"), payload)
+    assert normalized is not None
+    assert list(normalized.parsed["holdings"]["us_listed"]) == [True, False]
+
+
 def test_http_400_means_no_file() -> None:
     assert no_file(HttpError(400)) and not no_file(HttpError(403)) and not no_file(HttpError(500))

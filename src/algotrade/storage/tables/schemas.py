@@ -311,13 +311,15 @@ TREASURY_RATES = _fixed(
     "rate_cont float64!",
 )
 # L2: what an ETF holds (ADR 0035): one row per fund x holding x as-of date, the largest
-# ``[etf_holdings] keep_top`` holdings of the fund's file, ranked by weight (1 = largest).
-# ``as_of`` is the issuer's holdings date; the partition is the session of the run that read
-# it. Runs are increments (a few funds each), so they merge on (fund, as_of, rank); a later
-# run of the same as_of may hold fewer holdings, so readers take each fund's rows from its
-# latest run (``data.funds.holdings``). ``weight`` is a fraction of the fund (negative for
-# shorts); ``holding_id`` is the holding's instrument when its ticker resolves to a universe
-# instrument; ``holdings_count`` counts every line of the issuer's file, not only those kept.
+# ``[etf_holdings] keep_top`` holdings of the fund's file, ranked by the size of the weight
+# (1 = largest). ``as_of`` is the issuer's holdings date; the partition is the session of the
+# run that read it; ``filed`` is when the data became public if later (an N-PORT filing), and
+# readers never show a row before it. Runs are increments (a few funds each), so they merge on
+# (fund, as_of, rank); a later run of the same as_of may hold fewer holdings, so readers take
+# each fund's rows from its latest run (``data.funds.holdings``). ``weight`` is a fraction of
+# the fund (negative for shorts); ``holding_id`` is the holding's instrument when its ticker
+# resolves to a universe instrument (null otherwise, so it also marks a line as a U.S. listing);
+# ``holdings_count`` counts the issuer's positions in securities, not cash, futures or FX lines.
 ETF_HOLDINGS = _fixed(
     "holdings/etf",
     "holdings",
@@ -325,6 +327,7 @@ ETF_HOLDINGS = _fixed(
     "instrument_id string!",
     "symbol string",
     "as_of date!",
+    "filed date",
     "rank int64!",
     *_strings("holding_symbol", "holding_id"),
     "holding_name string!",

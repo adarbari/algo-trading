@@ -85,6 +85,7 @@ def holdings_rows(
     lines: list[tuple[str | None, str, float]],
     total: int | None = None,
     linked: Mapping[str, str] | None = None,
+    filed: date | None = None,
 ) -> list[dict[str, object]]:
     """``holdings/etf`` rows of one fund: ``lines`` are (ticker, name, weight) largest first;
     ``linked`` maps a ticker to the instrument id it resolves to."""
@@ -94,7 +95,8 @@ def holdings_rows(
             "rank": rank, "holding_symbol": ticker,
             "holding_id": (linked or {}).get(ticker) if ticker else None,
             "holding_name": name, "weight": weight, "asset_class": "Equity",
-            "sector": None, "shares": 100.0 * rank, "identifier": f"CUSIP{rank:04d}",
+            "sector": None, "shares": 100.0 * rank, "identifier": f"9000000{rank:02d}",
+            "filed": filed,
             "holdings_count": total or len(lines),
         }
         for rank, (ticker, name, weight) in enumerate(lines, start=1)

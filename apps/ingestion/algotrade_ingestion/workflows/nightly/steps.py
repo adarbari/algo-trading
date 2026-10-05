@@ -6,7 +6,7 @@ not configured, is SKIPPED (with the reason). ``overall`` is the one place that 
 statuses into the run's COMPLETE / PARTIAL / FAILED.
 """
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import StrEnum
@@ -42,6 +42,7 @@ class Step:
     blocked_by: tuple[str, ...] = ()  # hard dependencies: these FAILED -> BLOCKED
     requires: Precondition | None = None  # data that must exist (not "today's build passed")
     latest_only: bool = False  # current-snapshot sources: only the latest closed session
+    params: Mapping[str, Any] = field(default_factory=dict, compare=False)  # extra task params
 
 
 @dataclass

@@ -38,9 +38,11 @@ def read_workbook(payload: bytes) -> Workbook:
             as_of = datetime.strptime(match.group(1), "%d-%b-%Y").date()  # noqa: DTZ007
     header = next((i for i, r in enumerate(rows) if r[0] == "Name"), None)
     if header is None:
-        return Workbook(fund, as_of, pd.DataFrame())
+        raise ValueError("the workbook has no table (no row starting with Name)")
     names = [str(v) for v in rows[header] if v is not None]
-    weight = names.index("Weight") if "Weight" in names else 0
+    if "Weight" not in names:  # a changed layout is a parse failure, never a guess
+        raise ValueError(f"the workbook's table has no Weight column (columns: {names})")
+    weight = names.index("Weight")
     body = []
     for row in rows[header + 1 :]:
         if row[weight] is None:  # disclaimer text after the table

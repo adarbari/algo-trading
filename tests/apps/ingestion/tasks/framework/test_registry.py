@@ -124,6 +124,31 @@ def test_etf_holdings_takes_its_defaults_from_settings(calls: Calls) -> None:
     )
 
 
+def test_the_nightly_reads_a_slice_of_funds_and_the_cli_reads_everything(calls: Calls) -> None:
+    ssga = SsgaHoldings(http_for(lambda url: b""))
+    ctx = task_ctx(StoreWriter(MemoryBackend()), sources={"ssga_holdings": ssga})
+
+    def limit_of(params: dict[str, Any], settings: SourcesSettings | None = None) -> Any:
+        ctx.settings = settings or SourcesSettings()
+        run_task("etf-holdings", ctx, {"session": DAY, **params})
+        return calls.args[-1][4]
+
+    assert limit_of({}) is None  # `algotrade-ingest etf-holdings`: every fund due
+    assert limit_of({"nightly": True}) == 100  # [etf_holdings] per_night
+    assert limit_of({"nightly": True, "limit": 7}) == 7  # an explicit limit wins
+    uncapped = SourcesSettings.from_document({"etf_holdings": {"per_night": 0}})
+    assert limit_of({"nightly": True}, uncapped) is None  # 0: no cap
+    custom = SourcesSettings.from_document({"etf_holdings": {"per_night": 25}})
+    assert limit_of({"nightly": True}, custom) == 25
+
+
+def test_the_nightly_step_runs_after_bars_and_chains_with_the_nightly_flag() -> None:
+    names = [step.name for step in pipeline.NIGHTLY]
+    assert names.index("etf-holdings") > names.index("chains") > names.index("bars")
+    step = pipeline.NIGHTLY[names.index("etf-holdings")]
+    assert step.params == {"nightly": True} and step.latest_only
+
+
 def test_etf_holdings_is_skipped_without_an_issuer_or_when_switched_off() -> None:
     c = task_ctx(StoreWriter(MemoryBackend()))
     c.unavailable = {"ssga_holdings": "[ssga] is disabled in sources.toml"}

@@ -29,8 +29,8 @@ replace it. Readers take the latest run, and the earlier file stays as history.
 
 ## Tables written each night
 
-Nightly order: universe → company details → shares → ETF holdings → earnings → bars → rates → corporate actions →
-chains → rollups → screens → quality → purge.
+Nightly order: universe → company details → shares → earnings → bars → rates → corporate actions →
+chains → ETF holdings (at most 100 funds) → rollups → screens → quality → purge.
 
 **Duration: about 80 minutes**, almost all of it the chains step: ~4.2k Cboe requests paced at
 ~57 per minute (`[cboe] min_interval_s = 1.05`, just under Cboe's ~60 per rolling minute) take
@@ -47,7 +47,7 @@ first (S&P 500 and `priority_symbols`, then by liquidity class and chain open in
 | | `events/index_change` | an S&P 500 add or remove | usually 0 | tiny; skipped when empty | `change`, `old`, `new`, `ts` |
 | company details | `instruments/company` | an instrument with a known company (full snapshot) | ~7.5k *est.* (instruments with a CIK) | ~0.3 MB *est.* | `cik`, `name`, `entity_type`, `sic`, `sic_description`, `sector`, `industry`, `state_of_incorporation`, `fiscal_year_end`, `website`, `fetched_on`, … |
 | shares | `instruments/shares` | a new share-count fact or a `checked` marker, per instrument of each CIK refetched (~1/30 of CIKs a night) | ~250 markers + new facts *est.* (backfill: ~1.5M rows *est.*) | small *est.* | `cik`, `concept`, `period_end`, `filed`, `form`, `accn`, `shares`, `fetched_on`, … |
-| ETF holdings | `holdings/etf` | a fund × holding × issuer as-of date: the largest 100 holdings of each fund read that night (~100 funds: each of ~660 daily-file funds weekly, ~480 N-PORT funds every 90 days) | ~9k *est.* (first pass over every covered fund: ~110k) | ~0.35 MB *est.* (37 B/row measured on a 2.8k-row sample; first pass ~4 MB) | `symbol`, `as_of`, `rank`, `holding_symbol`, `holding_id`, `holding_name`, `weight`, `asset_class`, `sector`, `shares`, `identifier`, `holdings_count` |
+| ETF holdings | `holdings/etf` | a fund × holding × issuer as-of date: the largest 100 holdings of each fund read that night (at most `per_night` = 100 funds: new and stalest first; in steady state ~660 daily-file funds weekly and ~480 N-PORT funds every 90 days; the first pass takes ~12 nights) | ~9k *est.* (first pass over every covered fund: ~110k) | ~0.35 MB *est.* (37 B/row measured on a 2.8k-row sample; first pass ~4 MB) | `symbol`, `as_of`, `rank`, `holding_symbol`, `holding_id`, `holding_name`, `weight`, `asset_class`, `sector`, `shares`, `identifier`, `holdings_count` |
 | earnings | `events/earnings` | a company × report date in the last 7 and the next 60 days | ~4.4k | ~0.06 MB | `earnings_date`, `time`, `fiscal_quarter`, `eps_forecast`, `estimates`, `eps_reported`, `surprise_pct` |
 | bars | `bars/1d` | an instrument × session, unadjusted OHLCV | ~10.7k | ~0.42 MB (39 B/row) | `ts`, `open`, `high`, `low`, `close`, `volume`, `vwap`, `trades` |
 | corporate actions | `events/split`, `events/dividend` | a split / dividend in the window −7…+30 days | ~5k dividends, ~150 splits | ~0.06 MB | split: `split_from`, `split_to`, `ratio`; dividend: `cash_amount`, `pay_date`, `record_date`, `frequency`, … |
@@ -96,7 +96,7 @@ to end:
 |---|---|---|
 | `cboe` / option chain | one per underlying, ~4.2k | **~90 MB** (measured ~60 B per contract) |
 | `nasdaq_trader` / symbol_directory | 3 (`nasdaqlisted`, `otherlisted`, `options`) | ~5.1 MB, almost all of it the `options` file |
-| `ssga_spy` / spy_holdings | 1 | ~55 KB |
+| `ssga_spy` / spy_holdings | 1 | ~55 KB; kept 14 days since `[ssga]` (it was 90) |
 | `ssga_holdings` / etf_holdings | the fund finder + ~26 SPDR funds | ~0.1 MB + ~32 KB each (measured, max 109 KB); kept 14 days |
 | `ishares_holdings` / etf_holdings | the product screener + ~70 iShares funds | ~0.2 MB + ~150 KB each (measured, max 0.8 MB; AGG's 13k lines); kept 14 days |
 | `sec_nport` / nport_holdings | the fund list + ~5 funds | ~0.23 MB + ~18 KB each (measured, max 0.27 MB); kept 7 days with the other SEC sources |

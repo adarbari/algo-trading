@@ -177,8 +177,11 @@ def _etf_holdings(ctx: TaskContext, p: Params) -> RunRecord:
         ctx.settings.etf_keep_top,
         ctx.settings.etf_fallback_scope,
     )
+    limit = p.get("limit")
+    if limit is None and p.get("nightly") and ctx.settings.etf_per_night > 0:
+        limit = ctx.settings.etf_per_night  # the nightly reads a slice a night (per_night)
     return etf_holdings.ingest_etf_holdings(
-        ctx, sources, session_of(p), bool(p.get("force")), p.get("limit"), _symbols(p)
+        ctx, sources, session_of(p), bool(p.get("force")), limit, _symbols(p)
     )
 
 

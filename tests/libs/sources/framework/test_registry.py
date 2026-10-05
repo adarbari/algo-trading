@@ -96,6 +96,16 @@ def test_a_sources_toml_from_before_the_ssga_section_still_builds_and_paces_poli
     assert http["ssga_holdings"].limiter.min_interval_s == 1.0  # type: ignore[union-attr]
 
 
+def test_an_old_file_that_switched_spy_holdings_off_does_not_switch_it_back_on(
+    tmp_path: Path,
+) -> None:
+    old = {k: v for k, v in SITE_SOURCES.items() if k != "ssga"}
+    old["spy_holdings"] = {"enabled": False, "min_interval_s": 0.0}
+    built = build_sources(settings(old), ENV.get, ["spy_holdings", "ssga_holdings"], tmp_path)
+    assert built.sources == {}
+    assert built.skipped["spy_holdings"] == "[ssga] is disabled in sources.toml"
+
+
 def test_every_source_has_a_sources_toml_section_and_a_limiter_key() -> None:
     for name, spec in SOURCES.items():
         assert spec.name == name

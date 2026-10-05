@@ -43,7 +43,11 @@ export function HoldingsPanel({ symbol, onSelectSymbol }: HoldingsPanelProps) {
       flush
       state={holdings.isError ? 'error' : empty ? 'empty' : 'ready'}
       errorMessage={`${symbol} holdings failed to load.`}
-      emptyMessage={`No holdings stored for ${symbol}: no issuer file or SEC filing covers it yet.`}
+      emptyMessage={
+        data && !data.is_etf
+          ? `${symbol} is not an ETF, so it has no holdings.`
+          : `No holdings stored for ${symbol}: no issuer file or SEC filing covers it yet.`
+      }
       onRetry={() => void holdings.refetch()}
       footer={source ? `Source: ${source}.` : undefined}
     >

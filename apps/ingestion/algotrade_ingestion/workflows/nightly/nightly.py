@@ -61,13 +61,19 @@ NIGHTLY: tuple[Step, ...] = (
     Step("universe-build", latest_only=True),
     Step("company-details", latest_only=True),
     Step("shares", latest_only=True),
-    # What each ETF holds (ADR 0035): issuer files, a weekly slot per fund (~100 funds a night).
-    Step("etf-holdings", requires=universe_exists, latest_only=True),
     Step("earnings"),
     Step("bars"),
     Step("rates"),
     Step("corporate-actions"),
     Step("chains", requires=universe_exists, latest_only=True),
+    # What each ETF holds (ADR 0035), after the market data: issuer files, a weekly slot per fund,
+    # and at most [etf_holdings] per_night funds a night (new and stalest first).
+    Step(
+        "etf-holdings",
+        requires=universe_exists,
+        latest_only=True,
+        params={"nightly": True},
+    ),
     # IBKR enrichment (ADR 0028), read-only, SKIPPED with a WARN when [ibkr] is disabled or IB
     # Gateway is not reachable: conids for new optionable names (and the monthly refresh),
     # then the session's IV snapshot (+ a capped history backfill) for ibkr_iv@v1.
@@ -127,7 +133,7 @@ def run_step(
             if screens is None:
                 return Outcome(StepStatus.SKIPPED, reason="no job runner to submit screens to")
             return screens(session)
-        return from_record(run_task(step.name, ctx, {**params, "session": session}))
+        return from_record(run_task(step.name, ctx, {**params, **step.params, "session": session}))
 
     return run_isolated(step.name, body, ctx.clock)
 

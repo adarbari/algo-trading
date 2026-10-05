@@ -5,14 +5,18 @@ N-PORT XML). Each adapter under ``vendors/`` reads its own layout and returns th
 here, so the ``etf-holdings`` task sees one shape (``HoldingsSource`` in ``base.py``):
 
 - ``weight`` is a fraction of the fund (0.0844 for 8.44%); it can be negative (shorts,
-  derivatives, a cash overdraft);
+  derivatives, a cash overdraft). A line whose weight does not read is dropped (the adapter
+  counts it), never stored as 0. Lines are ranked by the size of their weight, so a big short
+  or swap line ranks with the big longs;
 - ``holding_symbol`` is the issuer's ticker for the line in the Nasdaq Trader style
   (``BRK.B``), ``None`` for lines without one (bonds, cash, private lines);
 - ``us_listed`` says the issuer's ticker is a U.S. listing, so the task may resolve it to an
   instrument; a foreign line whose local ticker clashes with a U.S. one (Roche ``ROP`` vs
   Roper) stays name-only;
 - ``identifier`` is the best security id the issuer gives (CUSIP, else ISIN): a bridge to
-  tickers for issuers that publish none (SEC N-PORT).
+  tickers for issuers that publish none (SEC N-PORT);
+- ``filed`` is the date the data became public when that is later than the as-of date (an
+  N-PORT filing), else ``None``: readers never show a row before it.
 """
 
 import re
@@ -30,8 +34,23 @@ HOLDING_COLUMNS = (
     "shares",
     "identifier",
     "us_listed",
+    "filed",
 )
 FUND_COLUMNS = ("symbol", "name")
+# Lines that are not positions in a security: they stay in the table (they carry weight) but are
+# not counted as "holdings" of the fund.
+NOT_A_POSITION = frozenset(
+    {
+        "cash",
+        "money market",
+        "futures",
+        "fx",
+        "forward",
+        "repo",
+        "derivative",
+        "cash collateral and margin",
+    }
+)
 _TICKER = re.compile(r"^[A-Z]{1,5}(\.[A-Z])?$")
 _CLASS_SEPARATOR = re.compile(r"^([A-Z]{1,5})[ /-]([A-Z])$")  # "BF B", "BRK/B", "BRK-B"
 _NO_VALUE = {"", "-", "--", "nan", "none", "n/a", "unassigned"}
@@ -39,7 +58,7 @@ _NO_VALUE = {"", "-", "--", "nan", "none", "n/a", "unassigned"}
 
 def holding_ticker(raw: object) -> str | None:
     """The issuer's ticker in the universe's style, or ``None`` if the line has no U.S.-style
-    ticker (``-``, ``CASH_USD``, ``A000660``, ``ESZ6`` stays: futures are caught by asset class)."""
+    ticker (``-``, ``CASH_USD``, ``A000660``; futures are told apart by their asset class)."""
     text = clean_text(raw)
     if text is None:
         return None
@@ -71,21 +90,29 @@ def number(raw: object) -> float | None:
         return None
 
 
-def fraction(percent: object) -> float:
-    """A published percent as a fraction (``"8.44"`` -> 0.0844), 0.0 when it does not read.
-    Rounded so float noise from the division never reaches storage."""
-    return round((number(percent) or 0.0) / 100, 12)
+def is_position(asset_class: object) -> bool:
+    """Whether a line is a position in a security (not cash, a future, an FX or repo line)."""
+    return str(asset_class or "").strip().lower() not in NOT_A_POSITION
+
+
+def fraction(percent: object) -> float | None:
+    """A published percent as a fraction (``"8.44"`` -> 0.0844); ``None`` when it does not read
+    (the line is dropped, never read as 0). Rounded so float noise never reaches storage."""
+    value = number(percent)
+    return None if value is None else round(value / 100, 12)
 
 
 def holdings_frame(rows: Iterable[Mapping[str, Any]]) -> pd.DataFrame:
-    """The canonical holdings frame (``HOLDING_COLUMNS``) from adapter rows, largest weight
-    first (ties keep the issuer's order). Rows without a name or a weight are dropped."""
+    """The canonical holdings frame (``HOLDING_COLUMNS``) from adapter rows, largest first by
+    the size of the weight (a short or swap line of -30% ranks above a long of 20%; ties keep the
+    issuer's order). Rows without a name or a readable weight are dropped."""
     frame = pd.DataFrame(list(rows), columns=list(HOLDING_COLUMNS))
     frame = frame[frame["holding_name"].notna() & frame["weight"].notna()]
     frame = frame.astype(
         {"weight": "float64", "shares": "float64", "us_listed": "bool"}, errors="raise"
     )
-    return frame.sort_values("weight", ascending=False, kind="stable").reset_index(drop=True)
+    order = frame["weight"].abs().sort_values(ascending=False, kind="stable").index
+    return frame.loc[order].reset_index(drop=True)
 
 
 def funds_frame(rows: Iterable[tuple[str, str]]) -> pd.DataFrame:

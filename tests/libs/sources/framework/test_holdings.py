@@ -9,6 +9,7 @@ from algotrade_sources.framework.holdings import (
     funds_frame,
     holding_ticker,
     holdings_frame,
+    is_position,
     number,
 )
 
@@ -40,7 +41,8 @@ def test_numbers_read_the_ways_issuers_print_them() -> None:
     assert number("$869,444,904.90") == 869444904.9
     assert number(3) == 3.0 and number(None) is None and number("n/a") is None
     assert number(True) is None
-    assert fraction("8.44") == 0.0844 and fraction("-") == 0.0 and fraction("-0.10") == -0.001
+    assert fraction("8.44") == 0.0844 and fraction("-0.10") == -0.001
+    assert fraction("-") is None and fraction(None) is None  # unreadable is not 0
 
 
 def test_text_placeholders_are_missing() -> None:
@@ -60,6 +62,23 @@ def test_the_frame_is_sorted_by_weight_and_drops_unreadable_lines() -> None:
     assert tuple(frame.columns) == HOLDING_COLUMNS
     assert list(frame["holding_name"]) == ["A", "B", "C", "D"]  # ties keep the file's order
     assert str(frame["weight"].dtype) == "float64" and str(frame["us_listed"].dtype) == "bool"
+
+
+def test_lines_rank_by_the_size_of_their_weight_and_unreadable_ones_are_dropped() -> None:
+    rows = [
+        {"holding_name": "Long", "weight": 0.2, "us_listed": False},
+        {"holding_name": "Swap", "weight": -0.9, "us_listed": False},
+        {"holding_name": "Broken", "weight": fraction("n/a"), "us_listed": False},
+        {"holding_name": "Short", "weight": -0.3, "us_listed": False},
+    ]
+    frame = holdings_frame(rows)
+    assert list(frame["holding_name"]) == ["Swap", "Short", "Long"]  # Broken is not a 0% line
+    assert list(frame["weight"]) == [-0.9, -0.3, 0.2]  # the sign is kept
+
+
+def test_cash_futures_and_fx_lines_are_not_positions() -> None:
+    kinds = ["Equity", "Fixed Income", "Cash", "Money Market", "Futures", "FX", "Derivative", None]
+    assert [is_position(k) for k in kinds] == [True, True, False, False, False, False, False, True]
 
 
 def test_the_directory_frame_is_one_sorted_row_per_ticker() -> None:

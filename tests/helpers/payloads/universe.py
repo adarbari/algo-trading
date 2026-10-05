@@ -35,7 +35,7 @@ def options(underlyings: Iterable[str]) -> bytes:
     return "\n".join(lines).encode()
 
 
-def spy(tickers: Iterable[str], as_of: str = "01-Oct-2026") -> bytes:
+def spy(tickers: Iterable[str | None], as_of: str = "01-Oct-2026") -> bytes:
     import openpyxl  # noqa: PLC0415
 
     wb = openpyxl.Workbook()

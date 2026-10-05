@@ -22,7 +22,7 @@ SEC fair-access rules apply as for the other SEC sources (contact in the User-Ag
 import io
 import json
 import re
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 from xml.etree import ElementTree
 
@@ -46,6 +46,7 @@ SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
 ARCHIVE = "https://www.sec.gov/Archives/edgar/data/{cik}/{folder}"
 MAX_HEADERS_PER_TRUST = 400  # filings whose series we look up before giving up on a fund
 FORM = "NPORT-P"
+FILING_LAG_DAYS = 60  # N-PORT-P is due 60 days after the period it reports
 _SERIES = re.compile(r"<SERIES-ID>(S\d{9})")
 _ASSET = {
     "EC": "Equity",
@@ -120,18 +121,21 @@ def _identifier(element: ElementTree.Element, name: str) -> str | None:
     return clean_text(found.get("value")) if found is not None else None
 
 
-def parse_report(payload: bytes) -> tuple[date | None, list[dict[str, Any]]]:
-    """-> (the report date, one row per holding in ``holdings_frame`` terms)."""
+def parse_report(payload: bytes) -> tuple[date | None, str | None, list[dict[str, Any]]]:
+    """-> (the report date, the series id, one row per holding in ``holdings_frame`` terms)."""
     as_of: date | None = None
+    series: str | None = None
     rows: list[dict[str, Any]] = []
     for _, element in ElementTree.iterparse(io.BytesIO(payload), events=("end",)):
         name = _local(element.tag)
         if name == "repPdDate" and element.text:
             as_of = date.fromisoformat(element.text.strip())
+        elif name == "seriesId" and element.text and series is None:
+            series = element.text.strip()
         elif name == "invstOrSec":
             rows.append(_holding(element))
             element.clear()
-    return as_of, rows
+    return as_of, series, rows
 
 
 def _holding(line: ElementTree.Element) -> dict[str, Any]:
@@ -149,6 +153,7 @@ def _holding(line: ElementTree.Element) -> dict[str, Any]:
         "shares": number(_text(line, "balance")) if _text(line, "units") == "NS" else None,
         "identifier": cusip or _identifier(line, "isin"),
         "us_listed": ticker is not None and kind == "Equity" and _text(line, "invCountry") == "US",
+        "filed": None,
     }
 
 
@@ -166,6 +171,7 @@ class NportHoldings:
         self._funds: dict[str, tuple[str, str]] = {}
         self._filings: dict[str, list[tuple[str, date]]] = {}  # CIK -> its N-PORT-P filings
         self._series: dict[str, str] = {}  # accession -> series id (read from the header page)
+        self._filed: dict[str, date] = {}  # series id -> filing date of the report fetched
 
     def fetch(self, request: FetchRequest) -> bytes | None:
         if request.key == DIRECTORY:
@@ -199,6 +205,7 @@ class NportHoldings:
                 match = _SERIES.search((header or b"").decode("utf-8", errors="replace"))
                 self._series[accession] = match.group(1) if match else ""
             if self._series[accession] == series:
+                self._filed[series] = dict(self._filings[cik])[accession]
                 return accession
         return None
 
@@ -206,7 +213,14 @@ class NportHoldings:
         if request.key == DIRECTORY:
             funds = funds_frame((t, series) for t, (_, series) in parse_funds(payload).items())
             return Normalized(None, {}, parsed={"funds": funds})
-        as_of, rows = parse_report(payload)
+        as_of, series, rows = parse_report(payload)
         if not rows or as_of is None:
             return None
-        return Normalized(as_of, {}, parsed={"holdings": holdings_frame(rows)})
+        # The report is public from its filing date (months after the period). A replay from
+        # raw has no filing list, so it assumes the filing deadline, 60 days after the period.
+        filed = self._filed.get(series or "") or as_of + timedelta(days=FILING_LAG_DAYS)
+        holdings = holdings_frame(rows).assign(filed=filed)
+        if holdings.empty:
+            return None
+        notes = {"unreadable_lines": len(rows) - len(holdings)}
+        return Normalized(as_of, {}, notes=notes, parsed={"holdings": holdings})

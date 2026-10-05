@@ -1,5 +1,6 @@
 """The etf-holdings task over the three issuer adapters and recorded responses (no network)."""
 
+from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
@@ -44,13 +45,16 @@ def clock() -> datetime:
     return NOW[0]
 
 
-def ssga(down: bool = False) -> SsgaHoldings:
+def ssga(down: bool = False, files: Mapping[str, bytes] | None = None) -> SsgaHoldings:
+    """``files``: fund file name (``xlk.xlsx``) -> bytes served instead of the recorded one."""
+
     def transport(url: str) -> bytes:
         if down:
             raise HttpError(500)
         if "fundfinder" in url:
             return (SSGA / "fundfinder.json").read_bytes()
-        return (SSGA / f"holdings-daily-us-en-{url.rsplit('-', 1)[1]}").read_bytes()
+        name = url.rsplit("-", 1)[1]
+        return (files or {}).get(name) or (SSGA / f"holdings-daily-us-en-{name}").read_bytes()
 
     return SsgaHoldings(http_for(transport, RetryPolicy(tries=1)))
 
@@ -82,17 +86,21 @@ def nport() -> NportHoldings:
 
 
 def world(
-    keep_top: int = 100, refresh_days: int = 7, scope: str = "optionable"
+    keep_top: int = 100,
+    refresh_days: int = 7,
+    scope: str = "optionable",
+    geared: tuple[str, ...] = (),
 ) -> tuple[StoreWriter, HoldingsSources]:
     writer = StoreWriter(MemoryBackend())
     rows = [
         {"instrument_id": f"EQ:{s}", "symbol": s, "asset_class": "EQ", "security_type": kind,
          "multiplier": 1.0, "status": "DELISTED" if s == "OLD" else "ACTIVE",
-         "optionable": s != "VUG"}
+         "optionable": s != "VUG", "is_leveraged": s in geared}
         for s, kind in KINDS.items()
     ]  # fmt: skip
     writer.write_table("instruments/reference", DAY, "ref", stamped(rows, DAY, "ref"))
-    return writer, HoldingsSources([ssga(), ishares(), nport()], refresh_days, keep_top, scope)
+    sources = HoldingsSources([ssga(), ishares(), nport()], refresh_days, keep_top, scope, False)
+    return writer, sources  # the recorded files are trimmed, so their weights do not add up
 
 
 def run(
@@ -144,7 +152,7 @@ def test_every_issuer_reads_its_funds_and_the_stats_say_what_is_covered() -> Non
     assert (stats["read"], stats["no_file"], stats["failed_count"]) == (5, 2, 0)
     assert record.items["SLV"].startswith("NO_FILE")  # the silver trust answers 400
     assert record.items["QQQ"].startswith("NO_FILE")  # N-PORT lists it, no filing in the list
-    assert record.items["XLK"] == "OK: 12 holdings as of 2026-10-01"
+    assert record.items["XLK"] == "OK: 12 lines as of 2026-10-01"
 
 
 def test_rows_are_ranked_trimmed_counted_and_linked_to_the_universe() -> None:
@@ -211,7 +219,7 @@ def test_a_reread_stores_another_run_and_readers_see_one_set_of_rows() -> None:
 
 def test_an_issuer_whose_directory_fails_makes_the_run_partial_not_empty() -> None:
     writer, _ = world()
-    sources = HoldingsSources([ssga(down=True), ishares(), nport()], 7, 100)
+    sources = HoldingsSources([ssga(down=True), ishares(), nport()], 7, 100, "optionable", False)
     record = run(writer, sources)
     assert record.status is RunStatus.PARTIAL
     assert record.items["directory:ssga_holdings"].startswith("FETCH_ERROR")

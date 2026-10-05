@@ -98,6 +98,7 @@ def test_missing_files_fall_back_to_defaults() -> None:
         ({"http": {"pace": 1}}, r"\[http\]: unknown keys \['pace'\]"),
         ({"etf_holdings": {"keep_top": -1}}, r"\[etf_holdings\] keep_top: expected an integer"),
         ({"etf_holdings": {"fallback_scope": "some"}}, r"\[etf_holdings\] fallback_scope"),
+        ({"etf_holdings": {"per_night": -1}}, r"\[etf_holdings\] per_night: expected an integer"),
         ({"etf_holdings": {"refresh": 7}}, r"\[etf_holdings\]: unknown keys \['refresh'\]"),
     ],
 )
@@ -289,7 +290,7 @@ def test_figi_override_errors_name_the_line(rows: list[dict[str, str]], message:
 
 def test_etf_holdings_settings_and_the_issuer_sections() -> None:
     sources = SourcesSettings.from_document(site("sources"))
-    assert (sources.etf_refresh_days, sources.etf_keep_top) == (7, 100)
+    assert (sources.etf_refresh_days, sources.etf_keep_top, sources.etf_per_night) == (7, 100, 100)
     assert sources.etf_fallback_scope == "optionable"
     for issuer in ("ssga", "ishares"):  # State Street also serves SPY's membership file
         assert sources.vendor(issuer).enabled and sources.vendor(issuer).raw_retention_days == 14
@@ -297,6 +298,20 @@ def test_etf_holdings_settings_and_the_issuer_sections() -> None:
     custom = SourcesSettings.from_document(document)
     assert (custom.etf_refresh_days, custom.etf_keep_top) == (3, 0)
     assert custom.etf_fallback_scope == "all"
+
+
+def test_a_legacy_spy_holdings_section_keeps_its_switch_under_the_new_name() -> None:
+    """Files from before ``[ssga]`` had ``[spy_holdings]``: ``enabled = false`` must still turn
+    State Street off, but its pacing (0 s, one request a day) is not inherited by the fund files."""
+    off = SourcesSettings.from_document({"spy_holdings": {"enabled": False, "min_interval_s": 0.0}})
+    assert not off.vendor("ssga").enabled and off.vendor("ssga").min_interval_s is None
+    on = SourcesSettings.from_document({"spy_holdings": {"enabled": True}})
+    assert on.vendor("ssga").enabled
+    both = SourcesSettings.from_document(
+        {"spy_holdings": {"enabled": False}, "ssga": {"enabled": True}}
+    )
+    assert both.vendor("ssga").enabled  # the new section wins
+    assert SourcesSettings.from_document({}).vendor("ssga").enabled
 
 
 def test_ibkr_and_verification_settings() -> None:

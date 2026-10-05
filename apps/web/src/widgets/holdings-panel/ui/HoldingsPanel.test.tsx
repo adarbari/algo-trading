@@ -101,6 +101,14 @@ describe('HoldingsPanel', () => {
     expect(screen.queryByRole('grid')).not.toBeInTheDocument();
   });
 
+  it('says a non-ETF is not an ETF rather than that nothing is stored', () => {
+    hooks.useEtfHoldings.mockReturnValue(
+      fakeQuery({ ...HOLDINGS, is_etf: false, as_of: null, source: null, total: 0, items: [] }),
+    );
+    render(<HoldingsPanel symbol="AAPL" />);
+    expect(screen.getByText('AAPL is not an ETF, so it has no holdings.')).toBeInTheDocument();
+  });
+
   it('shows the table loading, and an error with a retry', async () => {
     hooks.useEtfHoldings.mockReturnValue(fakeQuery(undefined));
     const { rerender } = render(<HoldingsPanel symbol="XLK" />);
