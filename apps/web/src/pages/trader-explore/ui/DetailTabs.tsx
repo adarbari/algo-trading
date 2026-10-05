@@ -1,7 +1,7 @@
 /**
- * The right-hand side of Explore: the compare bar and the detail tabs (Compare, Chart,
- * Options, Features, Events, Screener hits), each tab a widget for the compare set or the
- * focused ticker.
+ * The right-hand side of Explore: the compare bar and the detail tabs (Overview, Compare,
+ * Chart, Options, Features, Events, Screener hits), each tab a widget for the compare set or
+ * the focused ticker.
  */
 import { EmptyState, Stack, Tabs, type TabItem } from '@algotrade/ui';
 
@@ -9,13 +9,15 @@ import { ComparePanel } from '@/widgets/compare-panel';
 import { EventsPanel } from '@/widgets/events-panel';
 import { FeaturesPanel } from '@/widgets/features-panel';
 import { OptionsPanel } from '@/widgets/options-panel';
+import { OverviewPanel } from '@/widgets/overview-panel';
 import { PriceChartPanel } from '@/widgets/price-chart-panel';
 import { CompareSetBar } from '@/features/compare-set';
 
 import { DEFAULT_DIMENSIONS, joinList, type ExploreSearch, type ExploreTab } from '../model/search';
-import { exploreState, type SearchPatch } from '../model/state';
+import { defaultTab, exploreState, type SearchPatch } from '../model/state';
 
 const TABS: readonly (TabItem & { id: ExploreTab })[] = [
+  { id: 'overview', label: 'Overview' },
   { id: 'compare', label: 'Compare' },
   { id: 'chart', label: 'Chart' },
   { id: 'options', label: 'Options' },
@@ -32,6 +34,8 @@ export interface DetailTabsProps {
 function FocusedTab({ search, onSearchChange, symbol }: DetailTabsProps & { symbol: string }) {
   const { tab, range } = exploreState(search);
   switch (tab) {
+    case 'overview':
+      return <OverviewPanel symbol={symbol} />;
     case 'chart':
       return (
         <PriceChartPanel
@@ -145,7 +149,9 @@ export function DetailTabs({ search, onSearchChange }: DetailTabsProps) {
         items={TABS}
         value={tab}
         onChange={(id) => {
-          onSearchChange({ tab: id === 'compare' ? undefined : (id as ExploreTab) });
+          onSearchChange({
+            tab: id === defaultTab(selected.length) ? undefined : (id as ExploreTab),
+          });
         }}
       >
         {content}
