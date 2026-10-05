@@ -116,6 +116,14 @@
   padding: 0 var(--density-cell-padding-x);
 }
 
+.cell[data-fill='warning'] {
+  background: var(--color-warning-bg);
+}
+
+.cell[data-fill='negative'] {
+  background: var(--color-negative-bg);
+}
+
 .headerCell[data-align='end'],
 .cell[data-align='end'] {
   justify-content: flex-end;
