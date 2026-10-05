@@ -1,0 +1,22 @@
+iShares Core S&P Mid-Cap ETF
+Fund Holdings as of,"Oct 02, 2026"
+Inception Date,"May 22, 2000"
+Shares Outstanding,"1,679,050,000.00"
+Stock,"-"
+Bond,"-"
+Cash,"-"
+Other,"-"
+
+Ticker,Name,Type,Sector,Asset Class,Market Value,Notional Value,Quantity,Price,Location,Exchange,Currency,FX Rate,Market Currency,Accrual Date,Market Weight,Notional Weight
+"TWLO","TWILIO CLASS A","EQUITY","Information Technology","Equity","1,609,831,978.04","1,609,831,978.04","5,464,838.00","294.58","United States","NYSE","USD","1.00","USD","-","1.31","1.30"
+"OKTA","OKTA CLASS A","EQUITY","Information Technology","Equity","1,250,171,954.42","1,250,171,954.42","5,911,258.00","211.49","United States","NASDAQ","USD","1.00","USD","-","1.01","1.01"
+"NVT","NVENT ELECTRIC PLC","EQUITY","Industrials","Equity","976,594,045.68","976,594,045.68","5,759,578.00","169.56","United States","NYSE","USD","1.00","USD","-","0.79","0.79"
+"FTI","TECHNIPFMC PLC","EQUITY","Energy","Equity","960,372,570.54","960,372,570.54","13,954,847.00","68.82","United States","NYSE","USD","1.00","USD","-","0.78","0.78"
+"ATI","ATI","EQUITY","Industrials","Equity","932,375,728.08","932,375,728.08","4,845,524.00","192.42","United States","NYSE","USD","1.00","USD","-","0.76","0.76"
+"ENTG","ENTEGRIS INC","EQUITY","Information Technology","Equity","905,142,170.43","905,142,170.43","5,437,269.00","166.47","United States","NASDAQ","USD","1.00","USD","-","0.73","0.73"
+"UTHR","UNITED THERAPEUTICS","EQUITY","Health Care","Equity","826,779,917.30","826,779,917.30","1,526,269.00","541.70","United States","NASDAQ","USD","1.00","USD","-","0.67","0.67"
+"MTSI","MACOM TECHNOLOGY SOLUTIONS","EQUITY","Information Technology","Equity","795,317,121.60","795,317,121.60","2,473,001.00","321.60","United States","NASDAQ","USD","1.00","USD","-","0.65","0.64"
+"FAZ6","S&P MID 400 EMINI DEC 26","INDEX","Cash and/or Derivatives","Futures","0.00","202,922,500.00","550.00","3,689.50","-","Index And Options Market","USD","1.00","USD","-","-","0.16"
+"USD","USD CASH","CASH","Cash and/or Derivatives","Cash","108,706,114.33","108,706,114.33","46,879,986.00","100.00","United States","-","USD","1.00","USD","-","0.09","0.09"
+"XTSLA","BLK CSH FND TREASURY SL AGENCY","STIF","Cash and/or Derivatives","Money Market","146,053,292.59","84,227,163.67","146,053,293.00","1.00","United States","-","USD","1.00","USD","-","0.12","0.07"
+"UBFUT","CASH COLLATERAL USD UBFUT","COLLATERAL","Cash and/or Derivatives","Cash Collateral and Margins","13,895,000.00","13,895,000.00","13,895,000.00","100.00","United States","-","USD","1.00","USD","Oct 01, 2015","0.01","0.01"

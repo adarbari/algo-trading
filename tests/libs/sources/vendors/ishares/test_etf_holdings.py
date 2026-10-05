@@ -186,3 +186,36 @@ def test_the_files_own_weights_are_reported_when_they_can_be_judged() -> None:
 
 def test_http_400_means_no_file() -> None:
     assert no_file(HttpError(400)) and not no_file(HttpError(403)) and not no_file(HttpError(500))
+
+
+IJH = csv("IJH")  # real rows of the layout with Market Weight and Notional Weight
+
+
+def ijh_holdings() -> pd.DataFrame:
+    adapter = IsharesHoldings(http_for(lambda url: SCREENER if "screener" in url else IJH))
+    normalized = adapter.normalize(FetchRequest("IJH"), IJH)
+    assert normalized is not None
+    return normalized.parsed["holdings"]
+
+
+def test_the_futures_overlay_layout_is_read_by_its_market_weight() -> None:
+    as_of, lines = parse_csv(IJH)
+    assert as_of == date(2026, 10, 2) and "Weight (%)" not in lines[0]
+    frame = ijh_holdings().set_index("holding_name")
+    twilio = frame.loc["TWILIO CLASS A"]
+    assert twilio["weight"] == pytest.approx(0.0131, abs=1e-4)  # Market Weight, not Notional 1.30
+    assert twilio["holding_symbol"] == "TWLO" and bool(twilio["us_listed"])
+    assert frame.loc["USD CASH", "weight"] == pytest.approx(0.0009, abs=1e-4)
+
+
+def test_the_futures_line_has_no_market_weight_and_is_dropped() -> None:
+    frame = ijh_holdings()
+    assert not frame["holding_name"].str.contains("EMINI").any()  # notional weight only
+    normalized = IsharesHoldings(http_for(lambda url: IJH)).normalize(FetchRequest("IJH"), IJH)
+    assert normalized is not None and normalized.notes["unreadable_lines"] == 1
+
+
+def test_a_file_with_neither_weight_column_is_a_layout_change() -> None:
+    broken = IJH.replace(b"Market Weight", b"Mkt Wt").replace(b"Notional Weight", b"Not Wt")
+    with pytest.raises(ValueError, match="Weight"):
+        parse_csv(broken)
