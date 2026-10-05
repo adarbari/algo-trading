@@ -7,9 +7,13 @@
  */
 import { formatValue, type ChartEvent } from '@algotrade/ui';
 
-import type { components } from '@/shared/api';
+import type { gqlTypes } from '@/shared/api';
 
-export type InstrumentEvent = components['schemas']['InstrumentEvent'];
+/** A stored event as `InstrumentEvents` selects it: `kind` names its table (`events/<kind>`),
+ * `date` the event date the server read it by. */
+export type InstrumentEvent = NonNullable<
+  gqlTypes.InstrumentEventsQuery['instrument']
+>['events'][number];
 
 export type EventKind = 'earnings' | 'dividend' | 'split' | 'change' | 'other';
 
@@ -24,10 +28,10 @@ export interface TimelineEvent {
 }
 
 const KINDS: Readonly<Record<string, EventKind>> = {
-  'events/earnings': 'earnings',
-  'events/dividend': 'dividend',
-  'events/split': 'split',
-  'events/reference_change': 'change',
+  earnings: 'earnings',
+  dividend: 'dividend',
+  split: 'split',
+  reference_change: 'change',
 };
 
 const LABELS: Readonly<Record<EventKind, string>> = {
@@ -43,6 +47,12 @@ const num = (value: unknown): number | null =>
 const str = (value: unknown): string => (typeof value === 'string' ? value : '');
 const money = (value: unknown): string => formatValue(num(value), { kind: 'currency' }).text;
 const day = (value: unknown): string => formatValue(value, { kind: 'date' }).text;
+
+/** An event's stored columns (the server sends them as a JSON object). */
+function valuesOf(event: InstrumentEvent): Readonly<Record<string, unknown>> {
+  const v = event.values;
+  return typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : {};
+}
 
 /**
  * When a report is released, in words: events store `pre_market` / `after_hours`, the
@@ -127,13 +137,13 @@ function detailOf(kind: EventKind, v: Readonly<Record<string, unknown>>): string
 export function toTimeline(events: readonly InstrumentEvent[]): TimelineEvent[] {
   return events
     .map((event, i) => {
-      const kind = KINDS[event.table] ?? 'other';
+      const kind = KINDS[event.kind] ?? 'other';
       return {
         id: `${event.table}-${event.ts}-${i}`,
-        date: event.ts.slice(0, 10),
+        date: event.date,
         kind,
-        label: kind === 'other' ? event.table.replace('events/', '') : LABELS[kind],
-        detail: detailOf(kind, event.values),
+        label: kind === 'other' ? event.kind.replace(/_/g, ' ') : LABELS[kind],
+        detail: detailOf(kind, valuesOf(event)),
       };
     })
     .sort((a, b) => (a.date === b.date ? a.id.localeCompare(b.id) : b.date.localeCompare(a.date)));
@@ -173,11 +183,9 @@ export function earningsOn(
   date: string | null,
 ): EarningsReport | null {
   if (!date) return null;
-  const found = events.find(
-    (e) => KINDS[e.table] === 'earnings' && e.ts.slice(0, 10) === date.slice(0, 10),
-  );
+  const found = events.find((e) => KINDS[e.kind] === 'earnings' && e.date === date.slice(0, 10));
   if (!found) return null;
-  const v = found.values;
+  const v = valuesOf(found);
   const surprise = num(v['surprise_pct']);
   return {
     quarter: str(v['fiscal_quarter']) || null,

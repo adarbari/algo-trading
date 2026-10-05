@@ -1,8 +1,11 @@
 /**
  * Playwright route mocks for the Explore page: every `/api/*` call it makes answered from
  * fixtures recorded from the real API (e2e/fixtures/explore/, AAPL / MSFT / NVDA on
- * 2026-10-02), the GraphQL reads (`POST /api/graphql`) by operation name and key. The ticker table is padded with synthetic tickers to the real universe size
- * (11,427) so the table is exercised at full scale.
+ * 2026-10-02), the GraphQL reads (`POST /api/graphql`) by operation name and key: the detail
+ * pane's operations answer for AAPL from its recorded values, history, events, bars and chain
+ * (feature values and history picked by the names asked). The ticker table is padded with
+ * synthetic tickers to the real universe size (11,427) so the table is exercised at full
+ * scale.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -68,13 +71,84 @@ interface Operation {
   variables?: Record<string, unknown>;
 }
 
-/** A GraphQL operation's recorded answer: `InstrumentFacts` for AAPL (the Overview pane). */
+const VALUES = fixture('values-aapl.json') as {
+  session: string;
+  instrumentId: string;
+  values: Record<string, Json>;
+};
+const HISTORY = fixture('history-aapl.json') as {
+  names: string[];
+  points: { session: string; values: unknown[] }[];
+};
+
+const asked = (operation: Operation): string[] =>
+  (operation.variables?.['names'] as string[] | undefined) ?? [];
+
+/** The recorded values of the names asked, in order (a name not recorded is UNKNOWN). */
+function featureValues(names: readonly string[]): Json[] {
+  return names.map(
+    (name) =>
+      VALUES.values[name] ?? {
+        name,
+        value: null,
+        unknown: { code: 'NULL', detail: `${name} not recorded` },
+        info: { format: 'NUMBER', unit: null, dtype: 'float', nullMeaning: '' },
+      },
+  );
+}
+
+/** The recorded history of the names asked, each point's values in that order. */
+function featureHistory(names: readonly string[]): Json {
+  const at = names.map((n) => HISTORY.names.indexOf(n));
+  const points = HISTORY.points.map((p) => ({
+    session: p.session,
+    values: at.map((i) => (i < 0 ? null : (p.values[i] ?? null))),
+  }));
+  return { names, points };
+}
+
+/** A GraphQL operation's recorded answer (`{ data }`) for AAPL (the detail pane). */
 function graphqlAnswer(operation: Operation): Json | null {
   const name = /query\s+(\w+)/.exec(operation.query ?? '')?.[1];
-  if (name === 'InstrumentFacts' && operation.variables?.['key'] === 'AAPL') {
-    return fixture('facts-aapl.json');
+  if (operation.variables?.['key'] !== 'AAPL') return null;
+  const instrumentId = VALUES.instrumentId;
+  switch (name) {
+    case 'InstrumentFacts':
+      return fixture('facts-aapl.json');
+    case 'InstrumentEvents':
+      return fixture('gql-events-aapl.json');
+    case 'InstrumentPrices':
+      return fixture('gql-prices-aapl.json');
+    case 'InstrumentFeatureValues':
+      return {
+        data: {
+          session: { date: VALUES.session },
+          instrument: { instrumentId, features: featureValues(asked(operation)) },
+        },
+      };
+    case 'InstrumentHistory':
+      return { data: { instrument: { instrumentId, series: featureHistory(asked(operation)) } } };
+    case 'OptionChain':
+      return {
+        data: {
+          instrument: {
+            instrumentId,
+            symbol: 'AAPL',
+            features: featureValues(asked(operation)),
+            chain: fixture('gql-chain-aapl.json'),
+          },
+        },
+      };
+    case 'OptionQuotes': {
+      const expiry = operation.variables['expiry'];
+      const quotes = (fixture('gql-quotes-aapl.json') as unknown as Json[]).filter(
+        (q) => q['expiry'] === expiry,
+      );
+      return { data: { instrument: { instrumentId, chain: { quotes } } } };
+    }
+    default:
+      return null;
   }
-  return null;
 }
 
 function answer(url: URL, body: string | null): Json | Json[] | null {
@@ -89,15 +163,6 @@ function answer(url: URL, body: string | null): Json | Json[] | null {
   if (path === '/explore/tickers') return tickerPage(url);
   if (path === '/explore/compare') return fixture('compare.json');
   if (path === '/explore/compare/prices') return fixture('prices.json');
-  if (path === '/chains/AAPL') return fixture('chain-aapl.json');
-  const instrument = /^\/instruments\/([^/]+)(\/\w+)?$/.exec(path);
-  if (instrument?.[1] === 'AAPL') {
-    const part = instrument[2] ?? '';
-    if (part === '') return fixture('instrument-aapl.json');
-    if (part === '/bars') return fixture('bars-aapl.json');
-    if (part === '/events') return fixture('events-aapl.json');
-    if (part === '/features') return fixture('feature-history-aapl.json');
-  }
   return null;
 }
 

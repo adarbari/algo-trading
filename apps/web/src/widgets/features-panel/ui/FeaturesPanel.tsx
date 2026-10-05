@@ -1,16 +1,24 @@
 /**
- * Features: every catalogue feature for the focused ticker (value, unit, kind, definition,
- * a sparkline of the last 90 days for numbers), searchable; choosing a row shows that
- * feature's distribution across the universe with the ticker marked.
+ * Features: every catalogue feature for the focused ticker (its value for the session, unit,
+ * kind, definition, a sparkline of the 90 days up to the session for numbers), searchable;
+ * choosing a row shows that feature's distribution across the universe with the ticker
+ * marked. Values and history come over GraphQL (`useFeatureValues`, `useFeatureHistory`);
+ * the history window ends at the session the values are for, never the browser's today.
  */
 import { DataTable, EmptyState, Panel, SearchInput, Stack } from '@algotrade/ui';
 import { useMemo, useState } from 'react';
 
 import { useFeatureCatalogue } from '@/entities/feature';
-import { useFeatureHistory, useInstrument } from '@/entities/instrument';
-import { addDays, todayIso } from '@/shared/lib';
+import { useFeatureHistory, useFeatureValues } from '@/entities/instrument';
+import { addDays } from '@/shared/lib';
 
-import { featureColumns, featureRows, filterRows, type FeatureRow } from '../model/rows';
+import {
+  featureColumns,
+  featureRows,
+  filterRows,
+  historyNames,
+  type FeatureRow,
+} from '../model/rows';
 
 import { FeatureDistribution } from './FeatureDistribution';
 
@@ -26,16 +34,19 @@ export interface FeaturesPanelProps {
 export function FeaturesPanel({ symbol, feature, onFeatureChange }: FeaturesPanelProps) {
   const [query, setQuery] = useState('');
   const catalogue = useFeatureCatalogue();
-  const detail = useInstrument(symbol);
-  const history = useFeatureHistory(symbol, addDays(todayIso(), -HISTORY_DAYS));
+  const names = useMemo(() => (catalogue.data ?? []).map((f) => f.name), [catalogue.data]);
+  const values = useFeatureValues(symbol, names);
+  const start = values.session ? addDays(values.session, -HISTORY_DAYS) : null;
+  const tracked = useMemo(() => historyNames(catalogue.data ?? []), [catalogue.data]);
+  const history = useFeatureHistory(symbol, tracked, start, values.session);
   const rows = useMemo(
-    () => featureRows(catalogue.data ?? [], detail.data, history.data),
-    [catalogue.data, detail.data, history.data],
+    () => featureRows(catalogue.data ?? [], values.values, history),
+    [catalogue.data, values.values, history],
   );
   const shown = useMemo(() => filterRows(rows, query), [rows, query]);
   const columns = useMemo(() => featureColumns(symbol), [symbol]);
   const chosen = rows.find((r) => r.feature.name === feature);
-  const failed = catalogue.isError || detail.isError;
+  const failed = catalogue.isError || values.isError;
   return (
     <Stack gap={4}>
       <Panel
@@ -46,7 +57,7 @@ export function FeaturesPanel({ symbol, feature, onFeatureChange }: FeaturesPane
         errorMessage={`${symbol} features failed to load.`}
         onRetry={() => {
           void catalogue.refetch();
-          void detail.refetch();
+          void values.refetch();
         }}
       >
         <DataTable<FeatureRow>
@@ -59,7 +70,7 @@ export function FeaturesPanel({ symbol, feature, onFeatureChange }: FeaturesPane
           onRowActivate={(r) => {
             onFeatureChange(r.feature.name);
           }}
-          status={catalogue.isPending || detail.isPending ? 'loading' : 'ready'}
+          status={catalogue.isPending || values.isPending ? 'loading' : 'ready'}
           emptyMessage={`No feature matches “${query}”`}
           toolbar={
             <SearchInput

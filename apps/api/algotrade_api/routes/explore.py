@@ -2,16 +2,24 @@
 paged) and multi-ticker compare (features side by side, rebased prices)."""
 
 from datetime import date
+from enum import StrEnum
 from typing import Annotated
 
 from fastapi import APIRouter, Query
 
-from algotrade.services.explore import instruments, universe
+from algotrade.services.explore import compare as comparing
+from algotrade.services.explore import universe
 from algotrade_api.deps import Filters, Store, name_list
-from algotrade_api.routes.instruments import Adjustment
 from algotrade_api.schemas.explore import FeatureComparison, PriceComparison, TickerTable
 
 router = APIRouter(prefix="/explore", tags=["explore"])
+
+
+class Adjustment(StrEnum):
+    splits = "splits"
+    none = "none"
+    total_return = "total_return"
+
 
 Session = Annotated[date | None, Query(alias="date", description="default: the latest")]
 Ids = Annotated[str, Query(description="comma-separated instrument ids or tickers (max 10)")]
@@ -38,7 +46,7 @@ def compare(
     features: Annotated[str | None, Query(description="default: the whole catalogue")] = None,
     on: Session = None,
 ) -> FeatureComparison:
-    found = instruments.compare_features(store, name_list(ids), name_list(features) or None, on)
+    found = comparing.compare_features(store, name_list(ids), name_list(features) or None, on)
     return FeatureComparison.model_validate(found)
 
 
@@ -51,7 +59,5 @@ def compare_prices(
     rebase: Annotated[float, Query(ge=0, description="0: raw closes")] = 100.0,
     adjust: Adjustment = Adjustment.splits,
 ) -> PriceComparison:
-    found = instruments.compare_prices(
-        store, name_list(ids), start, to, rebase or None, adjust.value
-    )
+    found = comparing.compare_prices(store, name_list(ids), start, to, rebase or None, adjust.value)
     return PriceComparison.model_validate(found)

@@ -68,11 +68,15 @@ beforeEach(() => {
     fakeQuery([
       {
         table: 'events/earnings',
+        kind: 'earnings',
+        date: '2026-08-27',
         ts: '2026-08-27T00:00:00+00:00',
         values: { reported: true, eps_forecast: 0.8, eps_reported: 0.82, time: 'pre_market' },
       },
       {
         table: 'events/earnings',
+        kind: 'earnings',
+        date: '2099-02-10',
         ts: '2099-02-10T00:00:00+00:00',
         values: { reported: false, eps_forecast: 0.9 },
       },

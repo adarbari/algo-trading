@@ -23,9 +23,20 @@ loaders `read/instruments/{identity,features,catalogue}.py` (`load_instrument`,
 `types/{query,session,instrument,feature}.py` at `POST /graphql`, the snapshot
 `apps/api/schema.graphql`, the web codegen (`apps/web/codegen.ts`, `shared/api/graphql.ts`,
 `generated/{graphql,catalogue.ts}`) and the Explore Overview on `useInstrumentFacts`; READ 3,
-6, 7, 9 and WEB 2, 5, 6 are on. Every other page still reads `services/explore` over REST until
-the PR that moves its area (the [migration plan](#migration-plan)): a new page read is a
-GraphQL field (`add-graphql-field`) in the area's migration PR.
+6, 7, 9 and WEB 2, 5, 6 are on. **PR 6 moved the Explore detail pane**: the loaders
+`read/instruments/{events,chains,holdings,prices,series}.py` (and `identity.load_instruments`,
+the batch), `Instrument.{events,chain,holdings,prices,series}` with `OptionChain.quotes(expiry)`
+and `Holding.instrument`, each through a per-request dataloader (`graphql/loaders.batched`:
+one loader call per distinct arguments), the web entities `instrument`, `chain` and
+`holdings` on GraphQL (one operation per tab: `InstrumentEvents`, `InstrumentPrices`,
+`InstrumentFeatureValues` / `InstrumentHistory` in chunks of 60 names, `OptionChain` then
+`OptionQuotes`, `EtfHoldings`), `explore/{instruments,chains,funds}` deleted (compare moved to
+`explore/compare.py` until PR 7; live quotes read the read model's chain) and their GETs off
+the allow-list; the PR 6 derivation entries are on. `Instrument.screenerHits` waits for the
+screens read model (PR 5) and lands with it or PR 8. Every other page still reads
+`services/explore` over REST until the PR that moves its area (the
+[migration plan](#migration-plan)): a new page read is a GraphQL field (`add-graphql-field`)
+in the area's migration PR.
 
 ## What is wrong today
 
@@ -62,7 +73,12 @@ The rule ([ADR 0038](../adr/0038-catalogue-named-values.md)), quoted by the skil
 Decided grey zone: `optionable` is a catalogue field (`instrument.optionable`); a chain's
 `status` (OK / NO_CHAIN / STALE) is typed on `OptionChain` (it describes the pull);
 `description` is a typed field of `Instrument` (text, not selectable). `change` (new / dropped)
-compares two runs and stays typed on `ScreenResult`.
+compares two runs and stays typed on `ScreenResult`. Settled in PR 6: each listed expiry's
+`days` from the session is typed on `OptionChain.expiries` (structure of the chain, one per
+expiry; the nearest's DTE as a fact is `rollup.nearest_expiry@v1.dte`); the chain's
+per-instrument facts (our IV30, the underlying's price with the chain, the target expiry) are
+catalogue features, not chain fields; a `PriceBar`'s OHLCV are typed (a point of a range-grain
+series, `RANGE_GRAIN_FIELDS` in `test_read_model.py`, as `Bar.close` was on REST).
 
 **A fact a page needs that is computed on read becomes a stored feature first**
 (`.claude/skills/add-feature`): `rollup.nearest_expiry@v1.{expiry_date,dte,sessions_to_expiry}`
@@ -83,10 +99,10 @@ Owner folder `src/algotrade/services/read/` (ownership `domain-read-model`). Eve
 | FeatureValue | (`instrumentId`, `name`, `session`) | `name, value: JSON?, unknown?, info` | `rollups/instrument/*`, expressions, reference columns | `read/instruments/features.py` (wraps `services.features.field_view`) | the features bag, `rollup_row` in chains, `VIEW_FIELDS`, `ticker_columns`, `ranking._earnings` |
 | FeatureInfo | `name` | `kind, source, dtype, format, description, nullMeaning, version, group, key, inputs, unit, range, categories, scope, owner, licence` | registry + user `FeatureSet` | `read/instruments/catalogue.py` (PR 4; explore's REST catalogue maps from it until PR 9) | `explore/features.feature_catalogue` |
 | FeatureDistribution | (`name`, `session`) | `count, nulls, quantiles, histogram, categories` | as FeatureValue | `read/instruments/catalogue.py` | `explore/features.feature_distribution` |
-| Event | (`instrumentId`, `table`, `ts`) | `kind, date, values` | `events/*` by event date | `read/instruments/events.py` | `explore/instruments.instrument_events` |
-| OptionChain | (`underlyingId`, `session`) | `status, underlying, expiries, strikes, quotes(expiry)` | `chains/*` exact session | `read/instruments/chains.py` | `explore/chains.option_chain` (minus `our_iv`: a feature) |
-| Holdings | (`fundId`, `asOf`) | `asOf, source, total, items` | `holdings/etf` | `read/instruments/holdings.py` | `explore/funds/holdings` |
-| PriceSeries / FeatureSeries | (`instrumentId`, range) | bars; `[{session, values}]` | `bars/1d` + actions; rollups | `read/instruments/{prices,series}.py` | `instrument_bars`, `compare_prices`, `instrument_features` |
+| Event | (`instrumentId`, `table`, `ts`) | `kind, date, ts, values` | `events/*` by event date | `read/instruments/events.py` (PR 6) | `explore/instruments.instrument_events` |
+| OptionChain | (`underlyingId`, `session`) | `session, status, expiries[{date, days}], strikes, quotes(expiry)` | `chains/*` exact session | `read/instruments/chains.py` (PR 6) | `explore/chains.option_chain` (minus `our_iv` and the underlying quote: features) |
+| Holdings | (`fundId`, `asOf`) | `asOf, source, total, items[{rank, name, symbol, instrumentId, weight, assetClass, instrument?}]` | `holdings/etf` | `read/instruments/holdings.py` (PR 6) | `explore/funds/holdings` |
+| PriceSeries / FeatureSeries | (`instrumentId`, range) | `adjustment, start, end, bars[{session, open, high, low, close, volume, vwap}]`; `names, start, end, points[{session, values}]` | `bars/1d` + actions; rollups | `read/instruments/{prices,series}.py` (PR 6) | `instrument_bars`, `instrument_features` (`compare_prices` in PR 7) |
 | FeatureTable | (query) | `columns, rows: [[JSON]], unknown, total, page, size, missing` (columnar) | FeatureValues + identity | `read/instruments/table.py` | `universe.ticker_table`, `universe_page`, `compare_features` |
 | Screener | (`owner`, `configId`) | `id, owner, scope, name, version, hash, criteria, displayColumns, latestRun, notRun, runs` | configs, run records | `read/screens/screeners.py` | `results.screen_configs`, ranking's `_screeners` |
 | ScreenerRun | `runId` | `screener, session, status, knowledgeTs, decisions, changes, previousSession, audit, results(...)` | `results/rule_screen` exact session | `read/screens/runs.py` (`latest_run`: THE rule) | `results.run_rows`, `ranking._latest_runs`, `table._previous` |
@@ -202,7 +218,10 @@ generic read (R1 unchanged); what goes is each consumer deciding which partition
 - **Dataloaders** (built per request in `get_context`): `features` keyed
   `(instrument_id, names)` (one `feature_values` call per distinct `names`), `instruments`
   keyed `instrument_id`, `events` keyed `(instrument_id, start, end)`, `screener_latest_run`
-  keyed `(owner, config_id)`, `holdings` keyed `(fund_id, top)`. A type resolves a child object
+  keyed `(owner, config_id)`, `holdings` keyed `(fund_id, top)`; PR 6 adds `chains`
+  (`instrument_id`), `quotes` (`(underlying_id, expiry)`), `prices`
+  (`(instrument_id, start, end, adjustment)`) and `series` (`(instrument_id, names, start,
+  end)`). A type resolves a child object
   only through a dataloader. Tables (`FeatureTable`, run results, Ideas) are built by
   whole-population loaders, never per row.
 - **Feature values**: `features(names: [FeatureName!]!): [FeatureValue!]!` with
@@ -301,8 +320,8 @@ browser clock outside `src/shared/lib/date/`, and building `EQ:` ids. The others
 | Forbidden in `apps/web/src` | Ask instead | Enabled |
 |---|---|---|
 | next / last earnings from `events/earnings` (`nextAndLast`, `nextEarningsDate`) | `rollup.earnings@v1.{next,last}_earnings_date` | **on** (PR 4; only `entities/instrument/model/events.ts` names `events/earnings`) |
-| days to earnings, DTE, earnings before expiry | `rollup.earnings@v1.days_to_earnings`, `rollup.nearest_expiry@v1.dte`, `feature.earnings_before_expiry` | PR 6 |
-| "today" / `new Date()` against stored dates | `session.date` from the response | now (`new Date()`); PR 6 (`todayIso()`: the overview's use went in PR 4, the features panel's range start is the last) |
+| days to earnings, DTE, earnings before expiry | `rollup.earnings@v1.days_to_earnings`, `rollup.nearest_expiry@v1.dte`, `feature.earnings_before_expiry`, `OptionChain.expiries[].days` | **on** (PR 6: `daysBetween(`) |
+| "today" / `new Date()` against stored dates | `session.date` from the response | **on** (`new Date()`; `todayIso()` since PR 6: the features panel's history ends at the values' session) |
 | per-screener counts, top-N from a page (`summarise`) | `Ideas.screeners[].picked`, `ScreenerRun.decisions` | PR 5 |
 | picked / not picked from a decision string | `ScreenResult.change` | PR 8 |
 | symbol from an instrument id, or the reverse | `Instrument.symbol` | now |
@@ -389,7 +408,7 @@ Each PR is independently shippable with `make check` green and updates `docs/roa
 | 3 | Stored facts | `features/rollups/options/nearest_expiry.py`, its `[[table]]`, `feature.earnings_before_expiry`, `make features-doc`. **R:** `algotrade-ingest rollups --from 2024-10-03 --to <last> --only nearest_expiry@v1` | the catalogue lists them |
 | 4 | Vertical slice: Instrument + features | `read/instruments/{identity,features,catalogue}.py` (+ `format`); `graphql/{schema,context,scalars,errors,loaders}.py`, `types/{session,instrument,feature}.py`; `POST /graphql`; `scripts/export_graphql_schema.py`, `apps/api/schema.graphql`, snapshot test, READ 3 resolver test, READ 7, READ 9; mypy Strawberry plugin; `scripts/export_catalogue.py` -> `catalogue.ts`; web `shared/api/graphql.ts`, `codegen.ts`, `generated/graphql`, `queryKeys.gql`, WEB 2 / 5 / 6; overview-panel reads its facts through `useInstrumentFacts`; `overview.ts` loses `earningsFacts/nextAndLast/nextEarningsDate`; enable the PR 4 derivation entries | Overview shows session-exact facts with UNKNOWN reasons |
 | 5 | Screens read model + Ideas | `read/screens/{screeners,runs,results,ideas,views}.py` (one `latest_run`); `types/{screener,result,ideas,view}.py`; Ideas on the `IdeasPage` query; `summarise()` and `ideas/ranking.py` deleted; `GET /ideas` off the allow-list; the two `Idea` entries out of `TYPED_FACT_FIELDS`; `chain_expiries` detect rule; PR 5 derivation entry | every value in an Ideas row is for `ideas.session.date` or says why not |
-| 6 | Explore detail pane | `read/instruments/{events,chains,holdings,prices,series}.py`; `Instrument.{events,chain,holdings,prices,series,screenerHits,description}`; `explore/{instruments,chains,funds}` deleted; `/instruments/*`, `/chains/{id}` off the list | the detail pane is one query |
+| 6 | Explore detail pane (**done**) | `read/instruments/{events,chains,holdings,prices,series}.py`; `Instrument.{events,chain,holdings,prices,series,screenerHits,description}` (`description` came in PR 4; `screenerHits` needs PR 5's screens read model: it lands with PR 5 or PR 8); `explore/{instruments,chains,funds}` deleted; `/instruments/*`, `/chains/{id}` off the list | the detail pane is one query (per tab) |
 | 7 | FeatureTable + Explore tickers + compare | `read/instruments/table.py` (columnar, server-paged); `Query.table`; `widgets/feature-table`, the column factories (WEB 4); ticker table and compare rebuilt; `explore/universe.py` deleted; `/explore/*`, `/universe` off the list | one page per request (no 12-page fan-out) |
 | 8 | Screener results + preview + views | `ScreenerRun.results`; `features/table-view` (+ `views.<scope>` in `preferences.toml`); screener and preview results on `feature-table`; `explore/screens/*` deleted; `/screens*` and the view GET off the list; the `_float/_text/_num` detect rule; WEB 7 | one table widget renders all four tables |
 | 9 | Catalogue, distribution, backtests, configs | `Query.{catalogue,distribution,backtests}`, screener authoring reads; `explore/{features,backtests,configs}.py` deleted; their GETs off the list | the trader workspace is fully on GraphQL |
@@ -416,4 +435,13 @@ after the object graph because they need the columnar type and the factories.
   `# type: ignore[misc]` to `graphql/types/*` only, capped by a fitness test.
 - **Performance**: add `IdeasPage`, `ExploreDetail`, `Table` to the 1 s budget in
   `tests/apps/api/test_main.py` (`OPERATIONS`) as PRs 5-7 add them; PR 4 added
-  `InstrumentFacts` (the Overview).
+  `InstrumentFacts` (the Overview), PR 6 the detail tabs' operations (`InstrumentEvents`,
+  `InstrumentPrices`, `InstrumentHistory`, `OptionChain`, `OptionQuotes`, `EtfHoldings`).
+- **Events are not knowledge-dated** (PR 6): `Instrument.events` reads each event's latest
+  stored version by event date, so a read pinned to a past session can show an event or a
+  revision stored after it. Bounding it by `knowledge_ts` / stored partition is open; until
+  then the web reads events only for the latest session. `prices` / `series` refuse an `end`
+  after the session.
+- **`graphql/types/` nears its 10-module cap** (8 after PR 6); PR 5's four screen types push it
+  over: split it by area (`types/instruments/`, `types/screens/`, mirroring `services/read`)
+  in whichever of PR 5 / PR 6 lands second.

@@ -1,13 +1,14 @@
 """Live option quotes for one underlying and expiry (ADR 0028): from a quote feed (IB Gateway,
 read-only) when it answers, else the stored delayed chain with a status. Never an error page.
 
-The stored chain (the latest session's ``chains/option_quotes``) names the contracts: their
-ids, strikes and the underlying's symbol and price. The feed is asked for the calls and puts
-at the strikes the caller names, or the ``live_strikes`` nearest the underlying. An answer is
-cached for ``live_cache_s`` per (underlying, expiry, strikes) and handed to the recorder,
-which writes it to ``live/option_quotes`` in the background. When the feed is disabled, down,
-busy, slow or fails, the answer is the stored chain's quotes for the same strikes, with
-``source = "stored"`` and a status saying why.
+The stored chain (the read model's chain for the latest session, ADR 0036) names the contracts:
+their ids, strikes and the underlying's symbol and price; no chain stored for that session (the
+chain step late or failed) is a 404, as the Options pane shows no chain. The feed is asked for
+the calls and puts at the strikes the caller names, or the ``live_strikes`` nearest the
+underlying. An answer is cached for ``live_cache_s`` per (underlying, expiry, strikes) and
+handed to the recorder, which writes it to ``live/option_quotes`` in the background. When the
+feed is disabled, down, busy, slow or fails, the answer is the stored chain's quotes for the
+same strikes, with ``source = "stored"`` and a status saying why.
 
 Statuses: ``LIVE`` (just read), ``CACHED`` (read within the cache window), ``DISABLED`` (no
 feed configured), ``UNAVAILABLE`` (the gateway is down, busy or too slow), ``ERROR`` (the feed
@@ -17,7 +18,7 @@ failed otherwise; logged).
 import logging
 import threading
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, date, datetime
 from statistics import median
 from typing import Any, Protocol
@@ -26,9 +27,12 @@ import pandas as pd
 
 from algotrade.config.site.settings import IbkrSettings
 from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
-from algotrade.services.explore.chains import option_chain
+from algotrade.data.chains import underlying_quotes
 from algotrade.services.explore.store import NotFoundError, ReadStore, records
 from algotrade.services.live.recorder import Recorder
+from algotrade.services.read.context import open_context
+from algotrade.services.read.instruments.chains import load_chains, load_quotes
+from algotrade.services.read.instruments.identity import resolve_id
 
 log = logging.getLogger(__name__)
 
@@ -193,18 +197,26 @@ def _fresh(answer: LiveOptionChain, now: datetime, options: IbkrSettings) -> boo
 
 
 def _stored(store: ReadStore, key: str, expiry: date) -> _Stored:
-    """The latest stored chain's quotes for ``expiry`` (exactly what ``/chains/{id}`` shows)."""
-    chain = option_chain(store, key, None, expiry)
-    if expiry not in chain.expiries:
-        raise NotFoundError(
-            f"no {expiry} expiry in the chain of {chain.underlying_id} on {chain.session}"
-        )
-    under: dict[str, Any] = chain.underlying or {}
+    """The stored chain's quotes for ``expiry`` for the latest session: the read model's
+    chain, exactly what the Options pane shows (``Instrument.chain``), with the underlying's
+    quote captured with it. ``NotFoundError`` for an unknown instrument, no chain stored for
+    the session, or an expiry it does not list."""
+    ctx = open_context(store.reader, store.configs, store.user, cache=store.cache)
+    iid = resolve_id(ctx, key)
+    if iid is None:
+        raise NotFoundError(f"no instrument {key!r} in the reference snapshot")
+    chain = load_chains(ctx, [iid])[iid]
+    if chain is None:
+        raise NotFoundError(f"no option chain for {iid} on {ctx.session.date}")
+    if expiry not in {e.date for e in chain.expiries}:
+        raise NotFoundError(f"no {expiry} expiry in the chain of {iid} on {chain.session}")
+    rows = underlying_quotes(store.reader, chain.session, [iid])
+    under: dict[str, Any] = records(rows)[0] if rows is not None and len(rows) else {}
     price = next((float(under[c]) for c in ("price", "close") if under.get(c) is not None), None)
     taken = datetime.fromisoformat(under["ts"]) if under.get("ts") else None
     symbol = str(under["symbol"]) if under.get("symbol") else None
-    frame = pd.DataFrame(chain.quotes).assign(expiry=expiry)
-    return _Stored(chain.underlying_id, symbol, chain.session, price, taken, frame)
+    frame = pd.DataFrame([asdict(q) for q in load_quotes(ctx, [iid], expiry)[iid]])
+    return _Stored(iid, symbol, chain.session, price, taken, frame)
 
 
 def _with_ids(

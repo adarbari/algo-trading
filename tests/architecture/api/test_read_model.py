@@ -215,16 +215,27 @@ def test_types_mirror_read_model() -> None:
     )
 
 
+# Fields of range-grain types that share a catalogue column's name but are not a session's
+# fact (the REST twin keeps the same entry in TYPED_FACT_FIELDS). Shrink-only, never a value.
+RANGE_GRAIN_FIELDS = {
+    "PriceBar.close": "a bar of a price series (range grain, docs/api/read-model.md); the "
+    "session's close as a fact is rollup.price_stats@v2.close",
+}
+
+
 def test_no_typed_feature_fields() -> None:
     """Identity (``symbol``, ``name``, ``exchange``, ...) is typed by rule (ADR 0038); a field
     named like a rollup column or an expression feature is a per-instrument value."""
     catalogue = {f.name for f in FEATURES.values()} | set(site_features().expressions)
-    hits = sorted(
+    named = {
         f"{cls.__name__}.{field.python_name}"
         for cls in graphql_objects()
         for field in cls.__strawberry_definition__.fields
         if field.python_name in catalogue
-    )
+    }
+    hits = sorted(named - RANGE_GRAIN_FIELDS.keys())
+    gone = sorted(RANGE_GRAIN_FIELDS.keys() - named)
+    assert not gone, f"remove these retired entries from RANGE_GRAIN_FIELDS: {gone}"
     assert not hits, (
         f"[READ 9 / ADR 0038] GraphQL fields named like catalogue features: {hits}. Read "
         "per-instrument values by name through `features(names)` (docs/api/read-model.md "

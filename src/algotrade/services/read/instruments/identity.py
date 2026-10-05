@@ -8,7 +8,7 @@ sees (``data.reference``: latest on or before the session, else the earliest, fl
 ``instrument_id`` or a ticker, resolved through that snapshot's ``SymbolResolver`` (ADR 0018);
 neither known is no such instrument (``None``), never an error."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -44,12 +44,6 @@ def _text(value: Any) -> str | None:
     return (found.strip() or None) if isinstance(found, str) else None
 
 
-def _first(frame: pd.DataFrame | None) -> Mapping[str, Any]:
-    if frame is None or frame.empty:
-        return {}
-    return {str(k): v for k, v in frame.iloc[0].items()}
-
-
 def _descriptions(ctx: ReadContext) -> pd.DataFrame:
     """Every stored description with text: the table is read once per publish (a year of
     nightly increments is hundreds of small files, ~1 s), not once per page."""
@@ -72,26 +66,43 @@ def resolve_id(ctx: ReadContext, key: str) -> str | None:
     return names.id_for(key) if names.knows(key) else None
 
 
+def _by_id(frame: pd.DataFrame | None) -> dict[str, Mapping[Any, Any]]:
+    if frame is None or frame.empty:
+        return {}
+    return {str(r["instrument_id"]): r for r in frame.to_dict("records")}
+
+
+def load_instruments(ctx: ReadContext, instrument_ids: Sequence[str]) -> dict[str, Instrument]:
+    """The instruments of ``instrument_ids`` (ids, not tickers) in the session's reference
+    snapshot, by id: one read of each snapshot table for them all; an id the snapshot does
+    not have is absent."""
+    snapshot = ctx.session.reference_snapshot
+    if snapshot is None or not instrument_ids:
+        return {}
+    ids = list(dict.fromkeys(instrument_ids))
+    references = _by_id(instruments(ctx.reader, ctx.session.date, ids))
+    companies_ = _by_id(companies(ctx.reader, ctx.session.date, ids))
+    stored = _descriptions(ctx)
+    texts = _by_id(stored[stored["instrument_id"].isin(list(references))])
+    out: dict[str, Instrument] = {}
+    for iid, reference in references.items():
+        company, text = companies_.get(iid, {}), texts.get(iid, {})
+        security_type = _text(reference.get("security_type"))
+        out[iid] = Instrument(
+            instrument_id=iid,
+            symbol=str(reference["symbol"]),
+            name=_text(company.get("name")) or _text(reference.get("name")) or "",
+            security_type=security_type,
+            asset_class=str(reference["asset_class"]),
+            exchange=_text(reference.get("exchange")),
+            is_etf=to_scalar(reference.get("is_etf")) is True or security_type == ETF,
+            description=_text(text.get("description")),
+            reference_snapshot=snapshot,
+        )
+    return out
+
+
 def load_instrument(ctx: ReadContext, key: str) -> Instrument | None:
     """The instrument ``key`` names for ``ctx.session`` (see ``resolve_id``), else ``None``."""
     iid = resolve_id(ctx, key)
-    if iid is None:
-        return None
-    reference = _first(instruments(ctx.reader, ctx.session.date, [iid]))
-    company = _first(companies(ctx.reader, ctx.session.date, [iid]))
-    stored = _descriptions(ctx)
-    text = _first(stored[stored["instrument_id"] == iid])
-    security_type = _text(reference.get("security_type"))
-    snapshot = ctx.session.reference_snapshot
-    assert snapshot is not None  # resolve_id found the instrument in it
-    return Instrument(
-        instrument_id=iid,
-        symbol=str(reference["symbol"]),
-        name=_text(company.get("name")) or _text(reference.get("name")) or "",
-        security_type=security_type,
-        asset_class=str(reference["asset_class"]),
-        exchange=_text(reference.get("exchange")),
-        is_etf=to_scalar(reference.get("is_etf")) is True or security_type == ETF,
-        description=_text(text.get("description")),
-        reference_snapshot=snapshot,
-    )
+    return load_instruments(ctx, [iid]).get(iid) if iid is not None else None

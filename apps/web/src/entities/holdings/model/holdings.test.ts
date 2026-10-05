@@ -3,9 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { hasShort, shownWeight, sourceLabel, toRows, type EtfHoldings } from './holdings';
 
 const HOLDINGS: EtfHoldings = {
-  instrument_id: 'EQ:FUND',
-  is_etf: true,
-  as_of: '2026-10-01',
+  asOf: '2026-10-01',
   source: 'ishares_holdings',
   total: 500,
   items: [
@@ -13,24 +11,24 @@ const HOLDINGS: EtfHoldings = {
       rank: 1,
       name: 'Apple',
       symbol: 'AAPL',
-      instrument_id: 'EQ:AAPL',
+      instrument: { symbol: 'AAPL' },
       weight: 0.5,
-      asset_class: 'Equity',
+      assetClass: 'Equity',
     },
     {
       rank: 2,
       name: 'Roper',
       symbol: 'ROP',
-      instrument_id: null,
+      instrument: null,
       weight: 0.25,
-      asset_class: 'Equity',
+      assetClass: 'Equity',
     },
-    { rank: 3, name: 'Cash', symbol: null, instrument_id: null, weight: 0.1, asset_class: null },
+    { rank: 3, name: 'Cash', symbol: null, instrument: null, weight: 0.1, assetClass: null },
   ],
 };
 
 describe('holdings model', () => {
-  it('links a holding only when its ticker is an instrument of the universe', () => {
+  it('links a holding only when the server resolved it to an instrument of the universe', () => {
     expect(toRows(HOLDINGS).map((r) => [r.ticker, r.symbol])).toEqual([
       ['AAPL', 'AAPL'],
       ['ROP', null], // printed with a ticker, not in the universe

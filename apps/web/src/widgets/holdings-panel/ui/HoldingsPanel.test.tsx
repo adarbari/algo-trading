@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { EtfHoldings } from '@/entities/holdings';
+import type { Fund } from '@/entities/holdings';
 import { expectNoA11yViolations, fakeQuery, stubElementSize } from '@/shared/lib/testing';
 
 import { HoldingsPanel } from './HoldingsPanel';
@@ -16,38 +16,40 @@ vi.mock('@/entities/holdings', async (importOriginal) => ({
 
 stubElementSize();
 
-const HOLDINGS: EtfHoldings = {
-  instrument_id: 'EQ:XLK',
-  is_etf: true,
-  as_of: '2026-10-01',
-  source: 'ssga_holdings',
-  total: 77,
-  items: [
-    {
-      rank: 1,
-      name: 'NVIDIA CORP',
-      symbol: 'NVDA',
-      instrument_id: 'EQ:NVDA',
-      weight: 0.154706,
-      asset_class: 'Equity',
-    },
-    {
-      rank: 2,
-      name: 'ASML HOLDING NV',
-      symbol: 'ASML',
-      instrument_id: null,
-      weight: 0.0209,
-      asset_class: 'Equity',
-    },
-    {
-      rank: 3,
-      name: 'U.S. Dollar',
-      symbol: null,
-      instrument_id: null,
-      weight: 0.0087,
-      asset_class: 'Cash',
-    },
-  ],
+const HOLDINGS: Fund = {
+  instrumentId: 'EQ:XLK',
+  isEtf: true,
+  holdings: {
+    asOf: '2026-10-01',
+    source: 'ssga_holdings',
+    total: 77,
+    items: [
+      {
+        rank: 1,
+        name: 'NVIDIA CORP',
+        symbol: 'NVDA',
+        instrument: { symbol: 'NVDA' },
+        weight: 0.154706,
+        assetClass: 'Equity',
+      },
+      {
+        rank: 2,
+        name: 'ASML HOLDING NV',
+        symbol: 'ASML',
+        instrument: null,
+        weight: 0.0209,
+        assetClass: 'Equity',
+      },
+      {
+        rank: 3,
+        name: 'U.S. Dollar',
+        symbol: null,
+        instrument: null,
+        weight: 0.0087,
+        assetClass: 'Cash',
+      },
+    ],
+  },
 };
 
 beforeEach(() => {
@@ -94,7 +96,7 @@ describe('HoldingsPanel', () => {
 
   it('says so when the fund has no stored holdings', () => {
     hooks.useEtfHoldings.mockReturnValue(
-      fakeQuery({ ...HOLDINGS, as_of: null, source: null, total: 0, items: [] }),
+      fakeQuery({ ...HOLDINGS, holdings: { asOf: null, source: null, total: 0, items: [] } }),
     );
     render(<HoldingsPanel symbol="GLD" />);
     expect(screen.getByText(/No holdings stored for GLD/)).toBeInTheDocument();
@@ -105,24 +107,29 @@ describe('HoldingsPanel', () => {
     hooks.useEtfHoldings.mockReturnValue(
       fakeQuery({
         ...HOLDINGS,
-        items: [
-          {
-            rank: 1,
-            name: 'Total Return Swap',
-            symbol: null,
-            instrument_id: null,
-            weight: -0.8,
-            asset_class: 'Derivative',
-          },
-          {
-            rank: 2,
-            name: 'T-Bill',
-            symbol: null,
-            instrument_id: null,
-            weight: 0.1,
-            asset_class: 'Cash',
-          },
-        ],
+        holdings: {
+          asOf: '2026-10-01',
+          source: null,
+          total: 2,
+          items: [
+            {
+              rank: 1,
+              name: 'Total Return Swap',
+              symbol: null,
+              instrument: null,
+              weight: -0.8,
+              assetClass: 'Derivative',
+            },
+            {
+              rank: 2,
+              name: 'T-Bill',
+              symbol: null,
+              instrument: null,
+              weight: 0.1,
+              assetClass: 'Cash',
+            },
+          ],
+        },
       }),
     );
     render(<HoldingsPanel symbol="SQQQ" />);
@@ -132,11 +139,15 @@ describe('HoldingsPanel', () => {
   });
 
   it('says a non-ETF is not an ETF rather than that nothing is stored', () => {
-    hooks.useEtfHoldings.mockReturnValue(
-      fakeQuery({ ...HOLDINGS, is_etf: false, as_of: null, source: null, total: 0, items: [] }),
-    );
+    hooks.useEtfHoldings.mockReturnValue(fakeQuery({ ...HOLDINGS, isEtf: false, holdings: null }));
     render(<HoldingsPanel symbol="AAPL" />);
     expect(screen.getByText('AAPL is not an ETF, so it has no holdings.')).toBeInTheDocument();
+  });
+
+  it('says a ticker the session does not know is not in the reference snapshot', () => {
+    hooks.useEtfHoldings.mockReturnValue(fakeQuery(null));
+    render(<HoldingsPanel symbol="NOPE" />);
+    expect(screen.getByText(/NOPE is not in the reference snapshot/)).toBeInTheDocument();
   });
 
   it('shows the table loading, and an error with a retry', async () => {

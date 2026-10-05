@@ -17,10 +17,24 @@ stubElementSize();
 beforeEach(() => {
   hooks.useInstrumentEvents.mockReturnValue(
     fakeQuery([
-      { table: 'events/dividend', ts: '2026-08-10T00:00:00+00:00', values: { cash_amount: 0.27 } },
-      { table: 'events/earnings', ts: '2026-10-29T00:00:00+00:00', values: { reported: false } },
+      {
+        table: 'events/dividend',
+        kind: 'dividend',
+        date: '2026-08-10',
+        ts: '2026-08-10T00:00:00+00:00',
+        values: { cash_amount: 0.27 },
+      },
+      {
+        table: 'events/earnings',
+        kind: 'earnings',
+        date: '2026-10-29',
+        ts: '2026-10-29T00:00:00+00:00',
+        values: { reported: false },
+      },
       {
         table: 'events/split',
+        kind: 'split',
+        date: '2020-08-31',
         ts: '2020-08-31T00:00:00+00:00',
         values: { split_from: 1, split_to: 4 },
       },

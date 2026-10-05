@@ -46,18 +46,6 @@ export const queryKeys = {
     tables: (id: string) => ['screeners', 'table', id] as const,
     run: (id: string, jobId: string) => ['screeners', 'run', id, jobId] as const,
   },
-  instruments: {
-    detail: (id: string) => ['instruments', id] as const,
-    bars: (id: string, from: string | null) => ['instruments', id, 'bars', from] as const,
-    events: (id: string) => ['instruments', id, 'events'] as const,
-    features: (id: string, from: string) => ['instruments', id, 'features', from] as const,
-  },
-  holdings: {
-    etf: (id: string, top: number) => ['holdings', id, top] as const,
-  },
-  chains: {
-    chain: (id: string, expiry: string | null) => ['chains', id, expiry] as const,
-  },
   features: {
     catalogue: () => ['features'] as const,
     distribution: (name: string) => ['features', name, 'distribution'] as const,

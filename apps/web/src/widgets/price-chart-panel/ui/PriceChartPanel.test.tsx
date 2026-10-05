@@ -9,7 +9,7 @@ import { expectNoA11yViolations, fakeQuery } from '@/shared/lib/testing';
 import { PriceChartPanel } from './PriceChartPanel';
 
 const hooks = vi.hoisted(() => ({
-  useInstrumentBars: vi.fn(),
+  useInstrumentPrices: vi.fn(),
   useInstrumentEvents: vi.fn(),
   chart: vi.fn(),
 }));
@@ -33,33 +33,28 @@ vi.mock('@algotrade/ui', async (importOriginal) => {
 });
 vi.mock('@/entities/instrument', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  useInstrumentBars: hooks.useInstrumentBars,
+  useInstrumentPrices: hooks.useInstrumentPrices,
   useInstrumentEvents: hooks.useInstrumentEvents,
 }));
 
-const bar = (session_date: string, close: number) => ({
-  ts: `${session_date}T20:00:00+00:00`,
-  session_date,
-  open: close,
-  high: close,
-  low: close,
-  close,
-  volume: 1000,
-  vwap: null,
+const bar = (session: string, close: number) => ({ session, close, volume: 1000 });
+const dividend = (date: string, cash: number) => ({
+  table: 'events/dividend',
+  kind: 'dividend',
+  date,
+  ts: `${date}T00:00:00+00:00`,
+  values: { cash_amount: cash },
 });
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-10-03T12:00:00Z'));
   hooks.chart.mockClear();
-  hooks.useInstrumentBars.mockReturnValue(
-    fakeQuery({ items: [bar('2026-08-07', 220), bar('2026-08-10', 229)] }),
+  hooks.useInstrumentPrices.mockReturnValue(
+    fakeQuery([bar('2026-08-07', 220), bar('2026-08-10', 229)]),
   );
   hooks.useInstrumentEvents.mockReturnValue(
-    fakeQuery([
-      { table: 'events/dividend', ts: '2026-08-10T00:00:00+00:00', values: { cash_amount: 0.27 } },
-      { table: 'events/dividend', ts: '2024-08-10T00:00:00+00:00', values: { cash_amount: 0.25 } },
-    ]),
+    fakeQuery([dividend('2026-08-10', 0.27), dividend('2024-08-10', 0.25)]),
   );
 });
 
@@ -69,7 +64,7 @@ describe('PriceChartPanel', () => {
     const { container } = render(
       <PriceChartPanel symbol="AAPL" range="1Y" onRangeChange={onRangeChange} />,
     );
-    expect(hooks.useInstrumentBars).toHaveBeenCalledWith('AAPL', '2025-10-03');
+    expect(hooks.useInstrumentPrices).toHaveBeenCalledWith('AAPL', '2025-10-03');
     const chart = hooks.chart.mock.lastCall?.[0] as ChartProps;
     expect(chart.series[0]?.points).toEqual([
       { time: '2026-08-07', value: 220 },
