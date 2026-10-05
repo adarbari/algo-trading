@@ -65,3 +65,18 @@ also needs the owner's explicit request and an allow-list entry with `keep = fal
 `retire_in` naming the read-model PR that moves it; otherwise do the migration PR in order.
 Never add `partition_for` / `latest_session` calls outside `services/explore` (ownership
 `session-resolution`).
+
+**What counts as "the owner explicitly asks".** Only words about the path itself: "use the
+legacy / REST path", "don't wait for the read-model track", "patch it now on REST". A feature
+request ("show X on page Y", "add whatever endpoint it needs") is **not** an explicit ask, even
+when it names the page. For a feature request, stop and reply with: the read-model PR that
+delivers it (`docs/api/read-model.md` "Migration plan"), what that PR needs first, and the
+question "do it in track order, or patch the legacy REST read now?". Do not write code until
+the owner answers.
+
+**Even on the legacy path, never add a typed per-instrument fact field** (ADR 0038), e.g.
+`last_earnings_date: date | None` on `Idea`. A per-instrument stored value goes into the
+response as `features: dict[str, Any]` keyed by catalogue name (the `ScreenTableRow.features`
+shape), read through `services.features.field_view` for the request's session; the web reads
+`row.features['rollup.earnings@v1.last_earnings_date']`. If the response has no `features`
+dict yet, add one; do not add the typed field "just for now".

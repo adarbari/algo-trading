@@ -5,6 +5,9 @@ Includes the REST GET allow-list (ADR 0037): every GET route is listed in
 
 import ast
 import hashlib
+import importlib
+import inspect
+import pkgutil
 import re
 import socket
 import subprocess
@@ -13,7 +16,10 @@ import tomllib
 from pathlib import Path
 
 import pytest
+from pydantic import BaseModel
 
+from algotrade.features.registry import FEATURES
+from algotrade_api import schemas
 from algotrade_api.deps import ApiSettings
 from algotrade_api.main import create_app
 from tests.conftest import REPO_ROOT
@@ -223,3 +229,36 @@ def test_a_marked_test_reaches_its_own_loopback_server() -> None:
 def test_localhost_mark_does_not_open_the_internet() -> None:
     with pytest.raises(RuntimeError, match="network blocked"):
         socket.create_connection(("93.184.216.34", 80), timeout=1)
+
+
+# ADR 0038: a per-instrument stored value is read by catalogue name, never as a typed field of
+# an API response (REST legacy reads included). The entries below are the only exceptions;
+# the list only shrinks: removing a field without removing its entry fails too.
+TYPED_FACT_FIELDS = {
+    ("instruments", "Bar", "close"): "keep: a bar of a price series (range grain)",
+    ("instruments", "LiveOptionChain", "underlying_price"): "keep: a live quote (ADR 0028)",
+    ("instruments", "LiveOptionQuote", "close"): "keep: a live quote (ADR 0028)",
+    ("screens.ideas", "Idea", "days_to_earnings"): "retire in read-model PR 5 (Ideas on GraphQL)",
+    ("screens.ideas", "Idea", "next_earnings_date"): "retire in read-model PR 5 (Ideas on GraphQL)",
+}
+
+
+def test_no_typed_catalogue_fields_in_api_schemas() -> None:
+    """A response field named like a catalogue feature is a typed fact (ADR 0038): put it in a
+    ``features: dict[str, Any]`` keyed by catalogue name instead (docs/api/read-model.md)."""
+    names = {f.name for f in FEATURES.values()}
+    found = set()
+    for info in pkgutil.walk_packages(schemas.__path__, schemas.__name__ + "."):
+        module = importlib.import_module(info.name)
+        for cls_name, cls in inspect.getmembers(module, inspect.isclass):
+            if issubclass(cls, BaseModel) and cls.__module__ == module.__name__:
+                short = module.__name__.removeprefix(schemas.__name__ + ".")
+                found |= {(short, cls_name, f) for f in cls.model_fields if f in names}
+    new = sorted(found - TYPED_FACT_FIELDS.keys())
+    gone = sorted(TYPED_FACT_FIELDS.keys() - found)
+    assert not new, (
+        f"[READ 9 / ADR 0038] typed catalogue fields in API schemas: {new}. Return them in a "
+        "`features: dict[str, Any]` keyed by catalogue name (docs/api/read-model.md "
+        "'Catalogue feature or typed field'); never add an exception here"
+    )
+    assert not gone, f"remove these retired entries from TYPED_FACT_FIELDS: {gone}"

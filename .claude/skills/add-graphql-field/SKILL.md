@@ -14,7 +14,7 @@ Run `ls apps/api/algotrade_api/graphql apps/api/algotrade_api/graphql/types src/
 
 | You see | Meaning | Do |
 |---|---|---|
-| only `__init__.py` files under `graphql/` | read-model PR 1-3 state: no schema, no `POST /graphql`, no codegen yet (PR 4 builds them) | **Stop.** Do the next read-model PR in order (`docs/api/read-model.md` "Migration plan"; `docs/roadmap.md` track RM). Only if the owner explicitly asked for this page data now, use the old path: `.claude/skills/add-api-endpoint`, "Legacy page reads", and say so in the PR |
+| only `__init__.py` files under `graphql/` | read-model PR 1-3 state: no schema, no `POST /graphql`, no codegen yet (PR 4 builds them) | **Stop.** Do the next read-model PR in order (`docs/api/read-model.md` "Migration plan"; `docs/roadmap.md` track RM). A feature request is **not** permission for the old path: reply with the read-model PR that delivers it and ask "track order, or patch the legacy REST read now?" (definition: `add-api-endpoint`, "Legacy page reads"). Only on an explicit "use the legacy path" follow that section, and say so in the PR |
 | `graphql/schema.py`, `apps/api/schema.graphql`, `apps/web/codegen.ts` exist | PR 4 landed | continue |
 | the area's REST GET is still in `architecture/rest_allowlist.toml` | that area has not moved yet | add the field in the area's migration PR (move the area), not beside the REST route |
 
