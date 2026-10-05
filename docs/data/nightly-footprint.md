@@ -75,18 +75,19 @@ Screener CSV exports go to `--export-dir` (outside the store) and are not counte
 
 The four swing groups (`momentum`, `swing_levels`, `anchored_vwap`, `oi_walls`;
 [swing.md](swing.md)) were added after the sizes above were measured, so their rows and sizes
-are not in the totals yet. What is known so far, all measured on the machine this store lives
-on (no other machine timed), and not budgets:
+are not in the totals yet. What is known so far, on the machine this store lives on (no other machine timed), and not
+budgets. The in-memory per-session times are estimates; only the backfill run was timed end
+to end:
 
-- **Per session, in memory** (compute only, inputs already loaded; timed during the PR #130
-  review): `momentum@v1` about 0.36 s, `swing_levels@v1` about 0.7 s.
-- **Backfill, wall clock**: the `rollups` run of `momentum@v1`, `swing_levels@v1`,
+- **Per session, in memory, estimated** (compute only, inputs already loaded; not timed end
+  to end; from the PR #130 review): `momentum@v1` about 0.36 s, `swing_levels@v1` about 0.7 s.
+- **Backfill, wall clock, measured**: the `rollups` run of `momentum@v1`, `swing_levels@v1`,
   `anchored_vwap@v1`, `oi_walls@v1` and `earnings@v1` over 501 sessions (2024-10-03 to
   2026-10-02) took about 11 minutes in total, 23:34 to 23:45 local time on 2026-10-04 (its
   start and end times). `anchored_vwap@v1`, `oi_walls@v1` and `earnings@v1` hold the
   2026-10-02 session only (by design); the run's time is not split by group.
 - **`oi_walls@v1` reads the whole session's `chains/option_quotes`** (about 1.5M rows, the
-  2026-10-02 count in the table above) for every session it computes: its cost follows the
+  chains row of the table above) for every session it computes: its cost follows the
   chain's size, not the number of underlyings it writes. Its own time is not measured yet.
 
 ## Raw responses saved each night (purged after 90 days; SEC after 7)
