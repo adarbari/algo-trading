@@ -22,7 +22,7 @@ def test_committed_openapi_is_up_to_date() -> None:
 
 def test_openapi_is_served(client: TestClient) -> None:
     paths = client.get("/openapi.json").json()["paths"]
-    assert "/universe" in paths and "/chains/{underlying_id}/live" in paths
+    assert "/admin/review/figi" in paths and "/chains/{underlying_id}/live" in paths
 
 
 def test_cors_allows_the_local_web_dev_server(client: TestClient) -> None:
@@ -76,7 +76,6 @@ def test_asgi_app_is_configured_from_the_environment(monkeypatch: pytest.MonkeyP
 ENDPOINTS = (
     "/health",
     "/admin/runs/nightly",
-    "/universe",
     "/admin/review/figi",
     "/admin/review/leveraged",
     "/chains/AAA/live?expiry=2022-12-23",
@@ -89,9 +88,6 @@ ENDPOINTS = (
     "/backtests",
     "/configs",
     "/configs/sma_trend",
-    "/explore/tickers?columns=rollup.price_stats@v2.hv20&sort=-rollup.price_stats@v2.hv20",
-    "/explore/compare?ids=AAA,BBB",
-    "/explore/compare/prices?ids=AAA,BBB",
     "/admin/ingestion/completeness",
     "/admin/ingestion/chains/option_quotes/2022-11-23",
     "/admin/quality",
@@ -117,7 +113,9 @@ def test_every_endpoint_answers_within_a_second_on_golden_data(
 # The pages' main GraphQL operations (read-model PRs 4-7 add theirs: IdeasPage, ExploreDetail,
 # Table). InstrumentFacts: the Explore Overview pane; the detail tabs' (read-model PR 6):
 # events, bars, feature history, the option chain and one expiry's quotes, an ETF's holdings
-# (apps/web/src/entities/{instrument,chain,holdings}/api).
+# (apps/web/src/entities/{instrument,chain,holdings}/api); the feature table (read-model PR 7:
+# the Explore ticker table and the compare set side by side) and the compare chart's prices
+# (apps/web/src/entities/{feature,explore}/api).
 INSTRUMENT_FACTS = """query InstrumentFacts($key: String!, $names: [FeatureName!]!) {
   session { date isLatest missing }
   instrument(key: $key) {
@@ -158,6 +156,27 @@ DETAIL = {
     "instrumentId isEtf holdings(top: $top) { asOf source total items { rank name symbol weight "
     "assetClass instrument { symbol } } } } }",
 }
+FEATURE_TABLE = """query FeatureTable($columns: [FeatureName!]!, $keys: [String!],
+  $securityType: String, $sector: String, $liquidityClass: String, $leveraged: Boolean,
+  $optionable: Boolean, $q: String, $sort: String, $page: Int, $size: Int) {
+  table(columns: $columns, keys: $keys, securityType: $securityType, sector: $sector,
+        liquidityClass: $liquidityClass, leveraged: $leveraged, optionable: $optionable,
+        q: $q, sort: $sort, page: $page, size: $size) {
+    session { date missing } universeSnapshot preSnapshot sort total page size
+    columns { name description format unit dtype nullMeaning licence scope }
+    instruments { instrumentId symbol name }
+    rows unknown
+  }
+}"""
+COMPARE_PRICES = """query ComparePrices($keys: [String!]!, $start: Date!) {
+  table(columns: [], keys: $keys) {
+    instruments { instrumentId symbol prices(start: $start) { bars { session close } } }
+  }
+}"""
+EXPLORE_COLUMNS = [
+    "rollup.price_stats@v2.close", "rollup.iv30@v1.iv30", "feature.iv_hv_ratio",
+    "feature.pct_from_high_52w", "rollup.earnings@v1.days_to_earnings",
+]  # fmt: skip
 CHAIN_NAMES = [
     "rollup.option_liquidity@v1.target_expiry",
     "rollup.option_liquidity@v1.underlying_price",
@@ -178,6 +197,12 @@ OPERATIONS = {
         {"key": "AAA", "expiry": "2022-12-23", "date": "2022-11-23"},
     ),
     "EtfHoldings": (DETAIL["EtfHoldings"], {"key": "BULL", "top": 10}),
+    "Table": (
+        FEATURE_TABLE,
+        {"columns": EXPLORE_COLUMNS, "sort": "-feature.iv_hv_ratio", "page": 1, "size": 100},
+    ),
+    "CompareTable": (FEATURE_TABLE, {"columns": OVERVIEW_NAMES[9:], "keys": ["AAA", "BULL"]}),
+    "ComparePrices": (COMPARE_PRICES, {"keys": ["AAA", "BULL"], "start": "2021-11-23"}),
 }
 
 

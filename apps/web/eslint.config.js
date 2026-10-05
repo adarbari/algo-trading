@@ -5,9 +5,11 @@
  *   restrictions.js  rules 3-4: component-only UI, no styling outside design-system, HTTP only
  *                    in shared/api, which libraries each layer may use; lightweight-charts only
  *                    in design-system/components/Chart
+ *   columns.js       read model WEB 4: table columns only from the column factories
  * Every message names its rule, docs/ui/architecture.md and the skill that explains the fix.
  */
 import { base } from './lint-rules/base.js';
+import { columnFactories } from './lint-rules/columns.js';
 import { layers } from './lint-rules/layers.js';
 import {
   appRestrictions,
@@ -32,4 +34,5 @@ export default [
   ...appRestrictions,
   designSystemRestrictions,
   chartRestrictions,
+  columnFactories,
 ];

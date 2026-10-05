@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { decisionLabel, decisionTone, toIdeasData, type IdeasResponse } from './idea';
+import { toIdeasData, type IdeasResponse } from './idea';
 
 const pick = (config_id: string, decision: string, score: number | null) => ({
   config_id,
@@ -140,15 +140,5 @@ describe('display values and watch-outs', () => {
     const data = toIdeasData(rich);
     expect(data.screeners.map((s) => s.name)).toEqual(['VRP scanner', 'liq', 'Unused one']);
     expect(idea?.picks.map((p) => p.screenerName)).toEqual(['VRP scanner', 'liq']);
-  });
-});
-
-describe('decisions', () => {
-  it('labels and tones', () => {
-    expect(decisionLabel('EVENT_RISK')).toBe('Event risk');
-    expect(decisionTone('QUALIFIED')).toBe('positive');
-    expect(decisionTone('WATCH')).toBe('accent');
-    expect(decisionTone('EVENT_RISK')).toBe('warning');
-    expect(decisionTone('OTHER')).toBe('neutral');
   });
 });

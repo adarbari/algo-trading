@@ -9,7 +9,7 @@ import { previewPanelState, useScreenerBuilder } from '@/features/screener-build
 import {
   decisionCounts,
   narrowMissGroups,
-  ScreenDecisionBadge,
+  DecisionBadge,
   type ScreenPreview,
 } from '@/entities/screen';
 
@@ -46,7 +46,7 @@ function Summary({ preview }: { preview: ScreenPreview }) {
       <Stack direction="row" gap={3} align="center" wrap>
         {decisionCounts(preview).map(({ decision, count }) => (
           <Stack key={decision} direction="row" gap={1} align="center">
-            <ScreenDecisionBadge decision={decision} />
+            <DecisionBadge decision={decision} />
             <Text size="sm" numeric>
               {count.toLocaleString('en-US')}
             </Text>

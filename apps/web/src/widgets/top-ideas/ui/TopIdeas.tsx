@@ -7,7 +7,8 @@ import { Button, Chip, DataTable, Panel, Stack, Text } from '@algotrade/ui';
 import { useMemo, useState } from 'react';
 
 import { CompareIdeasButton, type IdeaCompareSearch } from '@/features/idea-compare';
-import { decisionLabel, useIdeas, type Idea } from '@/entities/idea';
+import { useIdeas, type Idea } from '@/entities/idea';
+import { decisionLabel } from '@/entities/screen';
 
 import { ideaColumns } from '../model/columns';
 import {

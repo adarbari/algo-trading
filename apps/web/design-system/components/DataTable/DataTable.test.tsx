@@ -131,6 +131,16 @@ describe('DataTable', () => {
     expect(firstCells()).toEqual(['AAPL', 'MSFT', 'NVDA', 'QQQ', 'SPY']);
   });
 
+  it('leaves the order to the caller in server sort mode, still reporting the sort', async () => {
+    const onSortChange = vi.fn();
+    render(<Table sortMode="server" onSortChange={onSortChange} />);
+    const closeHeader = screen.getByRole('columnheader', { name: /Close/ });
+    await userEvent.setup().click(within(closeHeader).getByRole('button'));
+    expect(closeHeader).toHaveAttribute('aria-sort', 'descending');
+    expect(onSortChange).toHaveBeenLastCalledWith({ columnId: 'close', direction: 'desc' });
+    expect(firstCells()).toEqual(rows.map((r) => r.symbol)); // the rows as given
+  });
+
   it('keeps missing values last in both directions', async () => {
     const withGap = [...rows, { ...at(rows, 0), id: 'NOIV', symbol: 'NOIV', iv30: null }];
     render(<Table rows={withGap} defaultSort={{ columnId: 'iv30', direction: 'desc' }} />);

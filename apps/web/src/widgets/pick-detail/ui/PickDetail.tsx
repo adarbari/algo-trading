@@ -26,7 +26,7 @@ import {
   featureLabel,
   useFeatureCatalogue,
 } from '@/entities/feature';
-import { ScreenDecisionBadge, type CriterionHeader, type ScreenTableRow } from '@/entities/screen';
+import { DecisionBadge, type CriterionHeader, type ScreenTableRow } from '@/entities/screen';
 
 export interface PickDetailProps {
   row: ScreenTableRow;
@@ -87,7 +87,7 @@ export function PickDetail({
     <Panel
       title={symbol}
       description={row.name ?? undefined}
-      actions={<ScreenDecisionBadge decision={row.decision} />}
+      actions={<DecisionBadge decision={row.decision} />}
     >
       <Stack gap={3}>
         <Text size="sm" tone="secondary">

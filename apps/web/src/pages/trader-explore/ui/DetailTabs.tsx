@@ -1,12 +1,14 @@
 /**
  * The right-hand side of Explore: the compare bar and the detail tabs (Overview, Compare,
  * Chart, Options, Features, Events, Screener hits), each tab a widget for the compare set or
- * the focused ticker.
+ * the focused ticker. Compare is the rebased chart over the compare set's features side by
+ * side (the feature table for those tickers, sorted in the table).
  */
 import { EmptyState, Stack, Tabs, type TabItem } from '@algotrade/ui';
 
 import { ComparePanel } from '@/widgets/compare-panel';
 import { EventsPanel } from '@/widgets/events-panel';
+import { FeatureTable } from '@/widgets/feature-table';
 import { FeaturesPanel } from '@/widgets/features-panel';
 import { HoldingsPanel } from '@/widgets/holdings-panel';
 import { OptionsPanel } from '@/widgets/options-panel';
@@ -109,19 +111,38 @@ export function DetailTabs({ search, onSearchChange }: DetailTabsProps) {
   };
   let content;
   if (tab === 'compare') {
-    content = (
+    const chart = (
       <ComparePanel
         symbols={selected}
         range={state.range}
         onRangeChange={(range) => {
           onSearchChange({ range });
         }}
-        dimensions={state.dimensions}
-        onDimensionsChange={(dims) => {
-          onSearchChange({ dims: joinList(dims, DEFAULT_DIMENSIONS) });
-        }}
       />
     );
+    content =
+      selected.length === 0 ? (
+        chart
+      ) : (
+        <Stack gap={4}>
+          {chart}
+          <FeatureTable
+            label="Side by side"
+            keys={selected}
+            columns={state.dimensions}
+            onColumnsChange={(dims) => {
+              onSearchChange({ dims: joinList(dims, DEFAULT_DIMENSIONS) });
+            }}
+            pickerLabel="Dimension"
+            pickerIcon="plus"
+            sortMode="client"
+            emptyMessage="None of these tickers is in the reference snapshot."
+            onRowActivate={(focus) => {
+              onSearchChange({ focus, expiry: undefined, feature: undefined });
+            }}
+          />
+        </Stack>
+      );
   } else if (tab === 'hits') {
     content = (
       <EmptyState

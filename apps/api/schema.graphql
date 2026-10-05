@@ -71,6 +71,24 @@ type FeatureSeries {
 }
 
 """
+Instruments x catalogue features for one session, one page of the rows matching the filters in the sort order (`total`: every page). `rows[i][j]` is the value of `columns[j]` for `instruments[i]`, null exactly when `unknown[i][j]` says why. `missing`: tables the filters and sort read with nothing for the session (no row passes a filter on them); the nightly tables missing for it are `session.missing`
+"""
+type FeatureTable {
+  session: Session!
+  universeSnapshot: Date
+  preSnapshot: Boolean!
+  columns: [FeatureInfo!]!
+  instruments: [Instrument!]!
+  rows: [[JSON]!]!
+  unknown: [[UnknownCode]!]!
+  sort: String
+  total: Int!
+  page: Int!
+  size: Int!
+  missing: [String!]!
+}
+
+"""
 A catalogue field's value for one instrument and the session: `value` is null exactly when `unknown` says why; format it with `info.format`
 """
 type FeatureValue {
@@ -236,6 +254,28 @@ type Query {
     """
     date: Date = null
   ): Instrument
+
+  """
+  Instruments x `columns` (catalogue fields, in order) for the session: the universe, or the instruments `keys` (ids or tickers) name in that order; filtered (security type, sector, liquidity class, leveraged, optionable: case-insensitive; `q`: the symbol or name contains it), sorted by `sort` (`symbol` or a catalogue field, `-` prefix: descending, missing values last) and paged (`page` from 1, `size` rows). Null: nothing stored
+  """
+  table(
+    columns: [FeatureName!]!
+    keys: [String!] = null
+    securityType: String = null
+    sector: String = null
+    liquidityClass: String = null
+    leveraged: Boolean = null
+    optionable: Boolean = null
+    q: String = null
+    sort: String = null
+    page: Int! = 1
+    size: Int! = 100
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): FeatureTable
 }
 
 """One session's values, in the order of `FeatureSeries.names`"""

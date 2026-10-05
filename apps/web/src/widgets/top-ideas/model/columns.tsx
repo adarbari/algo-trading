@@ -14,7 +14,8 @@ import {
   type ValueFormat,
 } from '@algotrade/ui';
 
-import { DecisionBadge, type Idea } from '@/entities/idea';
+import { type Idea } from '@/entities/idea';
+import { DecisionBadge } from '@/entities/screen';
 
 /** A display value a screener may store (`[columns]` or a criterion id), shown when present. */
 interface MetricColumn {

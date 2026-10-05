@@ -89,21 +89,6 @@ const decisionRank = (decision: string): number => {
   return index < 0 ? DECISION_ORDER.length : index;
 };
 
-/** "EVENT_RISK" -> "Event risk". */
-export function decisionLabel(decision: string): string {
-  const text = decision.toLowerCase().replace(/_/g, ' ');
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-export type DecisionTone = 'positive' | 'accent' | 'warning' | 'neutral';
-
-export function decisionTone(decision: string): DecisionTone {
-  if (decision === 'QUALIFIED') return 'positive';
-  if (decision === 'WATCH') return 'accent';
-  if (decision === 'EVENT_RISK') return 'warning';
-  return 'neutral';
-}
-
 const FLAG_LABELS: Record<string, string> = {
   leveraged_inverse: 'Leveraged / inverse',
   large_move: 'Large move',

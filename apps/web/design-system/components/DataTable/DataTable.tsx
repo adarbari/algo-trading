@@ -1,7 +1,8 @@
 /**
  * DataTable: the generic data grid (screener results, ticker lists, quality checks). Typed
  * columns (header, description, accessor, format, cell slot); single-column sorting with
- * `aria-sort`; numbers right-aligned in tabular figures through the shared formatters (number,
+ * `aria-sort` (sorted here, or by the caller when `sortMode` is `server`: a header only reports
+ * the sort it asks for); numbers right-aligned in tabular figures through the shared formatters (number,
  * percent, `$13.99B`, date, signed delta with up / down tone); a column picker fed by the
  * caller's columns and descriptions; controlled row selection (checkbox column, Shift-click
  * ranges); a sticky header; virtual scrolling with fixed row heights per density (tens of
@@ -57,6 +58,11 @@ export interface DataTableProps<TRow> {
   /** Initial sort when uncontrolled. */
   defaultSort?: DataTableSort | null;
   onSortChange?: (sort: DataTableSort | null) => void;
+  /**
+   * `client` (default): the table sorts `rows` by the sorted column's values. `server`: `rows`
+   * come sorted (and paged) by the caller; a header click only reports the sort it asks for.
+   */
+  sortMode?: 'client' | 'server';
   /** Controlled hidden column ids (pair with `onHiddenColumnsChange`). */
   hiddenColumns?: readonly string[];
   /** Initially hidden column ids when uncontrolled. */
@@ -109,6 +115,7 @@ export function DataTable<TRow extends RowData>({
   sort,
   defaultSort = null,
   onSortChange,
+  sortMode = 'client',
   hiddenColumns,
   defaultHiddenColumns = EMPTY_IDS,
   onHiddenColumnsChange,
@@ -179,6 +186,7 @@ export function DataTable<TRow extends RowData>({
     },
     enableRowSelection: selectable,
     enableSortingRemoval: false,
+    manualSorting: sortMode === 'server',
   });
 
   const visibleColumns = columns.filter((column) => columnVisibility[column.id] !== false);

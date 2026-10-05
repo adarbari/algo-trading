@@ -50,7 +50,8 @@ export {
   type ScreenerSummary,
   type Tolerance,
 } from './model/spec';
-export { ScreenDecisionBadge } from './ui/ScreenDecisionBadge';
+export { DecisionBadge } from './ui/DecisionBadge';
+export { decisionLabel, decisionTone, OUTCOME_FILL, type DecisionTone } from './model/decisions';
 export { ScoreBreakdown } from './ui/ScoreBreakdown';
 export { scoreBreakdown, type ScoreLine } from './model/score';
 export {

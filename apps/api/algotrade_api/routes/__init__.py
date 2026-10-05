@@ -10,11 +10,9 @@ from algotrade_api.routes import (
     backtests,
     chains,
     configs,
-    explore,
     features,
     health,
     runs,
-    universe,
 )
 from algotrade_api.routes.authoring import preferences, screeners, user_features
 from algotrade_api.routes.preview import features as feature_check
@@ -28,9 +26,7 @@ from algotrade_api.routes.screens import view as screener_view
 ROUTERS: tuple[APIRouter, ...] = (
     health.router,
     runs.router,
-    universe.router,
     chains.router,
-    explore.router,
     user_features.router,
     feature_check.router,
     features.router,

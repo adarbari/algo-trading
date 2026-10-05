@@ -34,9 +34,12 @@ No new HTML: pages, widgets, features and entities only compose `@algotrade/ui`.
    builder, mutations). Imports entities and shared; never another feature.
 4. **Widgets** (`src/widgets/<widget>/`): a page section composing features and entities.
    **Tables use `widgets/feature-table` with the column factories in
-   `entities/feature/model/columns.tsx`; never a `DataTableColumn` literal** (ADR 0038; both
-   arrive in read-model PR 7; until then a table keeps its widget's `model/columns.tsx`, and
-   PR 7 replaces every one of them).
+   `entities/feature/model/columns.tsx`; never a `DataTableColumn` literal** (ADR 0038; ESLint
+   WEB 4, `lint-rules/columns.js`). A widget cannot import another widget, so the page
+   composes `FeatureTable` (`sortMode="server"` for the universe, `"client"` for a few keyed
+   rows); a missing kind of column is a new factory there, never a literal. Tables whose rows
+   are not instruments (chain quotes, events, run records) are listed in `columns.js`
+   `STRUCTURE` with the reason.
 5. **Page** (`src/pages/<page>/`): composes widgets / features with primitives (`Stack`,
    `Text`); receives route params as props; no logic, no styling, no Query, no router.
    Export it from `index.ts`; add `<Page>.test.tsx`.

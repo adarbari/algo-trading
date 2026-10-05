@@ -96,10 +96,15 @@ def create_app(
     return app
 
 
+READ_CACHE_SIZE = 32
+
+
 def _reads(store: ReadStore) -> Callable[[date | None], ReadContext]:
     """Opens a GraphQL request's read context over ``store`` for a requested session, with
-    one result cache for every request of the app (entries keyed on the published state)."""
-    return partial(open_context, store.reader, store.configs, store.user, cache=ResultCache())
+    one result cache for every request of the app (entries keyed on the published state;
+    room for the session, the descriptions, the universe and a few table orders)."""
+    cache = ResultCache(READ_CACHE_SIZE)
+    return partial(open_context, store.reader, store.configs, store.user, cache=cache)
 
 
 def openapi_json() -> str:

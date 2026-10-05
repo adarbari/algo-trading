@@ -1,9 +1,7 @@
 /** Feature: filter the ticker table (search, security type, sector, liquidity, flags). */
 export {
   liquidityLabel,
-  matchesSearch,
-  searchRows,
-  toTickerQuery,
+  toTableFilters,
   TYPE_CHIPS,
   typeLabel,
   type TickerFilters,
