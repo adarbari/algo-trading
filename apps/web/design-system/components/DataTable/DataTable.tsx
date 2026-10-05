@@ -5,8 +5,9 @@
  * percent, `$13.99B`, date, signed delta with up / down tone); a column picker fed by the
  * caller's columns and descriptions; controlled row selection (checkbox column, Shift-click
  * ranges); a sticky header; virtual scrolling with fixed row heights per density (tens of
- * thousands of rows); loading / empty / error states; keyboard navigation (arrows, Page Up /
- * Down, Home / End move the active row, Enter activates it, Space selects it); horizontal
+ * thousands of rows); loading / empty / error states; keyboard navigation (arrows or j / k, Page
+ * Up / Down, Home / End move the active row, Enter activates it, Space selects it, and the
+ * caller's own `rowKeys` act on it); the active row can be controlled; horizontal
  * scrolling on narrow widths. Built on TanStack Table + Virtual, which stay internal.
  */
 import {
@@ -67,8 +68,16 @@ export interface DataTableProps<TRow> {
   selectable?: boolean;
   selectedIds?: readonly string[];
   onSelectionChange?: (ids: string[]) => void;
-  /** Enter on the active row, or a click on a row. */
+  /** Enter on the active row, or a click on a row (unless `activateOnClick` is false). */
   onRowActivate?: (row: TRow) => void;
+  /** A click activates the row (default), or only makes it the active row (`false`). */
+  activateOnClick?: boolean;
+  /** The active (keyboard) row id, when the caller controls it (else the table keeps it). */
+  activeRowId?: string | null;
+  /** The active row changed: arrows, `j` / `k`, Home / End, Page Up / Down, or a click. */
+  onActiveRowChange?: (row: TRow) => void;
+  /** Extra single-character keys for the active row (`c`, `x`), while the grid has focus. */
+  rowKeys?: Readonly<Record<string, (row: TRow) => void>>;
   /** `ready` (default), `loading` (placeholder rows) or `error` (shows `errorMessage`). */
   status?: 'ready' | 'loading' | 'error';
   errorMessage?: ReactNode;
@@ -108,6 +117,10 @@ export function DataTable<TRow extends RowData>({
   selectedIds = EMPTY_IDS,
   onSelectionChange,
   onRowActivate,
+  activateOnClick = true,
+  activeRowId,
+  onActiveRowChange,
+  rowKeys,
   status = 'ready',
   errorMessage = 'The data failed to load.',
   emptyMessage = 'No rows to show',
@@ -192,7 +205,8 @@ export function DataTable<TRow extends RowData>({
   }, [virtualizer, rowHeight]);
 
   // The active (keyboard) row, by id so it survives sorting.
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [ownActiveId, setActiveId] = useState<string | null>(null);
+  const activeId = activeRowId === undefined ? ownActiveId : activeRowId;
   const activeIndex = activeId === null ? -1 : tableRows.findIndex((row) => row.id === activeId);
 
   function moveTo(index: number) {
@@ -201,6 +215,7 @@ export function DataTable<TRow extends RowData>({
     const row = tableRows[next];
     if (!row) return;
     setActiveId(row.id);
+    onActiveRowChange?.(row.original);
     virtualizer.scrollToIndex(next, { align: 'auto' });
   }
 
@@ -208,9 +223,12 @@ export function DataTable<TRow extends RowData>({
     if (event.target !== event.currentTarget || bodyRows === 0) return;
     const at = activeIndex < 0 ? -1 : activeIndex;
     const page = Math.max(1, visibleRows - 1);
+    const plain = !(event.ctrlKey || event.metaKey || event.altKey);
     const targets: Record<string, number | undefined> = {
       ArrowDown: at + 1,
       ArrowUp: Math.max(at - 1, 0),
+      ...(plain && !rowKeys?.['j'] ? { j: at + 1 } : {}), // vim-style, unless the caller binds them
+      ...(plain && !rowKeys?.['k'] ? { k: Math.max(at - 1, 0) } : {}),
       PageDown: at + page,
       PageUp: Math.max(at - page, 0),
       Home: 0,
@@ -224,7 +242,11 @@ export function DataTable<TRow extends RowData>({
     }
     const row = tableRows[at];
     if (!row) return;
-    if (event.key === 'Enter' && onRowActivate) {
+    const rowKey = plain ? rowKeys?.[event.key] : undefined;
+    if (rowKey) {
+      event.preventDefault();
+      rowKey(row.original);
+    } else if (event.key === 'Enter' && onRowActivate) {
       event.preventDefault();
       onRowActivate(row.original);
     } else if (event.key === ' ' && selectable) {
@@ -241,7 +263,8 @@ export function DataTable<TRow extends RowData>({
     const row = rowId === undefined ? undefined : tableRows.find((r) => r.id === rowId);
     if (!row) return;
     setActiveId(row.id);
-    onRowActivate?.(row.original);
+    onActiveRowChange?.(row.original);
+    if (activateOnClick) onRowActivate?.(row.original);
   }
 
   const { template, minWidth } = gridTemplate(visibleColumns, selectable);
