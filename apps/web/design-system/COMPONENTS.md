@@ -317,7 +317,7 @@ Source: `design-system/components/Combobox`
 
 ### DataTable
 
-DataTable: the generic data grid (screener results, ticker lists, quality checks). Typed columns (header, description, accessor, format, cell slot); single-column sorting with `aria-sort`; numbers right-aligned in tabular figures through the shared formatters (number, percent, `$13.99B`, date, signed delta with up / down tone); a column picker fed by the caller's columns and descriptions; controlled row selection (checkbox column, Shift-click ranges); a sticky header; virtual scrolling with fixed row heights per density (tens of thousands of rows); loading / empty / error states; keyboard navigation (arrows or j / k, Page Up / Down, Home / End move the active row, Enter activates it, Space selects it, and the caller's own `rowKeys` act on it); the active row can be controlled; horizontal scrolling on narrow widths. Built on TanStack Table + Virtual, which stay internal.
+DataTable: the generic data grid (screener results, ticker lists, quality checks). Typed columns (header, description, accessor, format, cell slot); single-column sorting with `aria-sort` (sorted here, or by the caller when `sortMode` is `server`: a header only reports the sort it asks for); numbers right-aligned in tabular figures through the shared formatters (number, percent, `$13.99B`, date, signed delta with up / down tone); a column picker fed by the caller's columns and descriptions; controlled row selection (checkbox column, Shift-click ranges); a sticky header; virtual scrolling with fixed row heights per density (tens of thousands of rows); loading / empty / error states; keyboard navigation (arrows or j / k, Page Up / Down, Home / End move the active row, Enter activates it, Space selects it, and the caller's own `rowKeys` act on it); the active row can be controlled; horizontal scrolling on narrow widths. Built on TanStack Table + Virtual, which stay internal.
 
 Source: `design-system/components/DataTable`
 
@@ -331,6 +331,7 @@ Source: `design-system/components/DataTable`
 | `sort` | `DataTableSort \| null` | no | Controlled sort (pair with `onSortChange`); `null` = unsorted (input order). |
 | `defaultSort` | `DataTableSort \| null` | no | Initial sort when uncontrolled. |
 | `onSortChange` | `(sort: DataTableSort \| null) => void` | no |  |
+| `sortMode` | `'client' \| 'server'` | no | `client` (default): the table sorts `rows` by the sorted column's values. `server`: `rows` come sorted (and paged) by the caller; a header click only reports the sort it asks for. |
 | `hiddenColumns` | `readonly string[]` | no | Controlled hidden column ids (pair with `onHiddenColumnsChange`). |
 | `defaultHiddenColumns` | `readonly string[]` | no | Initially hidden column ids when uncontrolled. |
 | `onHiddenColumnsChange` | `(hidden: string[]) => void` | no |  |

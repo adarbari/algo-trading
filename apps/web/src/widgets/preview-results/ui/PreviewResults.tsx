@@ -6,8 +6,7 @@ import { Chip, DataTable, Panel, Stack } from '@algotrade/ui';
 import { useMemo, useState } from 'react';
 
 import { byName, useFeatureCatalogue } from '@/entities/feature';
-import { decisionCounts, extraColumns, type PreviewRow } from '@/entities/screen';
-import { decisionLabel } from '@/entities/idea';
+import { decisionCounts, decisionLabel, extraColumns, type PreviewRow } from '@/entities/screen';
 import { previewPanelState, useScreenerBuilder } from '@/features/screener-builder';
 
 import { criterionColumns, previewColumns } from '../model/columns';

@@ -175,57 +175,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/explore/compare": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Compare */
-        get: operations["compare_explore_compare_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/explore/compare/prices": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Compare Prices */
-        get: operations["compare_prices_explore_compare_prices_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/explore/tickers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Tickers */
-        get: operations["tickers_explore_tickers_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/features/check": {
         parameters: {
             query?: never;
@@ -523,32 +472,10 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/universe": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Universe Page */
-        get: operations["universe_page_universe_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /**
-         * Adjustment
-         * @enum {string}
-         */
-        Adjustment: "splits" | "none" | "total_return";
         /** Cell */
         Cell: {
             /** Basis */
@@ -609,13 +536,6 @@ export interface components {
             counts: {
                 [key: string]: number;
             };
-        };
-        /** Compared */
-        Compared: {
-            /** Instrument Id */
-            instrument_id: string;
-            /** Symbol */
-            symbol: string | null;
         };
         /** Completeness */
         Completeness: {
@@ -777,31 +697,6 @@ export interface components {
              * @description distinct statuses as recorded, at most 10
              */
             statuses: string[];
-        };
-        /** FeatureComparison */
-        FeatureComparison: {
-            /** Instruments */
-            instruments: components["schemas"]["Compared"][];
-            /** Missing */
-            missing: string[];
-            /** Rows */
-            rows: components["schemas"]["FeatureRow"][];
-            /**
-             * Session
-             * Format: date
-             */
-            session: string;
-        };
-        /** FeatureRow */
-        FeatureRow: {
-            /** Dtype */
-            dtype: string;
-            /** Feature */
-            feature: string;
-            /** Values */
-            values: {
-                [key: string]: unknown;
-            };
         };
         /** Finalised */
         Finalised: {
@@ -1035,19 +930,6 @@ export interface components {
              */
             steps: components["schemas"]["Step"][];
         };
-        /** Page[dict[str, Any]] */
-        Page_dict_str__Any__: {
-            /** Items */
-            items: {
-                [key: string]: unknown;
-            }[];
-            /** Page */
-            page: number;
-            /** Size */
-            size: number;
-            /** Total */
-            total: number;
-        };
         /** Page[ScreenRow] */
         Page_ScreenRow_: {
             /** Items */
@@ -1063,17 +945,6 @@ export interface components {
         Page_ScreenTableRow_: {
             /** Items */
             items: components["schemas"]["ScreenTableRow"][];
-            /** Page */
-            page: number;
-            /** Size */
-            size: number;
-            /** Total */
-            total: number;
-        };
-        /** Page[UniverseRow] */
-        Page_UniverseRow_: {
-            /** Items */
-            items: components["schemas"]["UniverseRow"][];
             /** Page */
             page: number;
             /** Size */
@@ -1220,40 +1091,6 @@ export interface components {
             passed: number;
             /** Rows */
             rows: number;
-        };
-        /** PriceComparison */
-        PriceComparison: {
-            /** Adjustment */
-            adjustment: string;
-            /**
-             * Dates
-             * @description the union of the instruments' sessions
-             */
-            dates: string[];
-            /**
-             * End
-             * Format: date
-             */
-            end: string;
-            /** Instruments */
-            instruments: components["schemas"]["Compared"][];
-            /**
-             * Rebase
-             * @description each series / its first close x rebase (null: raw closes)
-             */
-            rebase: number | null;
-            /**
-             * Series
-             * @description instrument id -> close per date (null: no bar)
-             */
-            series: {
-                [key: string]: (number | null)[];
-            };
-            /**
-             * Start
-             * Format: date
-             */
-            start: string;
         };
         /** QualityCheck */
         QualityCheck: {
@@ -1636,88 +1473,6 @@ export interface components {
             reason: string | null;
             /** Status */
             status: string;
-        };
-        /** TickerTable */
-        TickerTable: {
-            /**
-             * Columns
-             * @description the requested feature columns, in order
-             */
-            columns: string[];
-            /**
-             * Missing
-             * @description tables with no partition for the session (their columns are null)
-             */
-            missing: string[];
-            page: components["schemas"]["Page_dict_str__Any__"];
-            /** Pre Snapshot */
-            pre_snapshot: boolean;
-            /**
-             * Session
-             * Format: date
-             */
-            session: string;
-            /**
-             * Snapshot Date
-             * Format: date
-             */
-            snapshot_date: string;
-            /**
-             * Sort
-             * @description the sort column ('-' prefix: descending; nulls last)
-             */
-            sort: string;
-        };
-        /** UniversePage */
-        UniversePage: {
-            /** Missing */
-            missing: string[];
-            page: components["schemas"]["Page_UniverseRow_"];
-            /** Pre Snapshot */
-            pre_snapshot: boolean;
-            /**
-             * Session
-             * Format: date
-             */
-            session: string;
-            /**
-             * Snapshot Date
-             * Format: date
-             */
-            snapshot_date: string;
-            /** Version */
-            version: string;
-        };
-        /** UniverseRow */
-        UniverseRow: {
-            /** Asset Class */
-            asset_class: string | null;
-            /** Company Name */
-            company_name: string | null;
-            /** Exchange */
-            exchange: string | null;
-            /** In Sp500 */
-            in_sp500: boolean | null;
-            /** Industry */
-            industry: string | null;
-            /** Instrument Id */
-            instrument_id: string;
-            /** Is Inverse */
-            is_inverse: boolean | null;
-            /** Is Leveraged */
-            is_leveraged: boolean | null;
-            /** Leverage */
-            leverage: number | null;
-            /** Liquidity Class */
-            liquidity_class: string | null;
-            /** Optionable */
-            optionable: boolean | null;
-            /** Sector */
-            sector: string | null;
-            /** Security Type */
-            security_type: string | null;
-            /** Symbol */
-            symbol: string | null;
         };
         /** UserFeatureBody */
         UserFeatureBody: {
@@ -2109,125 +1864,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LiveOptionChain"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    compare_explore_compare_get: {
-        parameters: {
-            query: {
-                /** @description default: the latest */
-                date?: string | null;
-                /** @description default: the whole catalogue */
-                features?: string | null;
-                /** @description comma-separated instrument ids or tickers (max 10) */
-                ids: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FeatureComparison"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    compare_prices_explore_compare_prices_get: {
-        parameters: {
-            query: {
-                adjust?: components["schemas"]["Adjustment"];
-                from?: string | null;
-                /** @description comma-separated instrument ids or tickers (max 10) */
-                ids: string;
-                /** @description 0: raw closes */
-                rebase?: number;
-                to?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PriceComparison"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    tickers_explore_tickers_get: {
-        parameters: {
-            query?: {
-                /** @description comma-separated feature names */
-                columns?: string | null;
-                /** @description default: the latest */
-                date?: string | null;
-                leveraged?: boolean | null;
-                liquidity_class?: string | null;
-                /** @description has listed options */
-                optionable?: boolean | null;
-                page?: number;
-                /** @description symbol or company name contains */
-                q?: string | null;
-                sector?: string | null;
-                security_type?: string | null;
-                size?: number;
-                /** @description a column; '-' prefix: descending */
-                sort?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TickerTable"];
                 };
             };
             /** @description Validation Error */
@@ -2896,48 +2532,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScreenTable"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    universe_page_universe_get: {
-        parameters: {
-            query?: {
-                /** @description default: the latest */
-                date?: string | null;
-                leveraged?: boolean | null;
-                liquidity_class?: string | null;
-                /** @description has listed options */
-                optionable?: boolean | null;
-                page?: number;
-                /** @description symbol or company name contains */
-                q?: string | null;
-                sector?: string | null;
-                security_type?: string | null;
-                size?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UniversePage"];
                 };
             };
             /** @description Validation Error */

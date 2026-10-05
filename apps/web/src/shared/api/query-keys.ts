@@ -22,13 +22,6 @@ export const queryKeys = {
     figiReview: () => ['admin', 'review', 'figi'] as const,
     leveragedReview: () => ['admin', 'review', 'leveraged'] as const,
   },
-  explore: {
-    tickers: (query: Readonly<Record<string, unknown>>) => ['explore', 'tickers', query] as const,
-    compare: (ids: readonly string[], features: readonly string[]) =>
-      ['explore', 'compare', ids, features] as const,
-    prices: (ids: readonly string[], from: string | null) =>
-      ['explore', 'prices', ids, from] as const,
-  },
   screeners: {
     all: () => ['screeners'] as const,
     preview: (spec: unknown) => ['screeners', 'preview', spec] as const,

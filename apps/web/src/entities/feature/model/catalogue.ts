@@ -48,7 +48,7 @@ const NAMES: Readonly<Record<string, string>> = {
 };
 
 /** The column part of a field name: `rollup.iv30@v1.iv30` -> `iv30`. */
-export function featureColumn(name: string): string {
+export function columnOf(name: string): string {
   return name.slice(name.lastIndexOf('.') + 1);
 }
 
@@ -60,12 +60,12 @@ function humanise(column: string): string {
 
 /** A short header for a table column. */
 export function featureLabel(name: string): string {
-  return LABELS[name] ?? humanise(featureColumn(name));
+  return LABELS[name] ?? humanise(columnOf(name));
 }
 
 /** A readable name for a row that names the feature (compare dimensions, feature list). */
 export function featureTitle(name: string): string {
-  return NAMES[name] ?? LABELS[name] ?? humanise(featureColumn(name));
+  return NAMES[name] ?? LABELS[name] ?? humanise(columnOf(name));
 }
 
 /** The group a feature belongs to, for grouping a picker: `price_stats@v2`, `reference`, ... */
@@ -77,7 +77,7 @@ export function featureGroup(feature: CatalogueFeature): string {
 }
 
 /** A user's own feature (scope `user`): declared in their config, never shared. */
-export function isOwn(feature: CatalogueFeature): boolean {
+export function isOwn(feature: Pick<CatalogueFeature, 'scope'>): boolean {
   return feature.scope === 'user';
 }
 
@@ -85,12 +85,12 @@ export function isOwn(feature: CatalogueFeature): boolean {
  * Derived from personal-use licensed market data (IBKR; ADR 0028): its values are shown to
  * the owner only, never shared or published.
  */
-export function isPersonal(feature: CatalogueFeature): boolean {
+export function isPersonal(feature: Pick<CatalogueFeature, 'licence'>): boolean {
   return feature.licence === 'personal';
 }
 
 /** The marks a feature carries in lists: "yours", "personal licence". */
-export function featureMarks(feature: CatalogueFeature): string[] {
+export function featureMarks(feature: Pick<CatalogueFeature, 'scope' | 'licence'>): string[] {
   return [
     ...(isOwn(feature) ? ['yours'] : []),
     ...(isPersonal(feature) ? ['personal licence'] : []),

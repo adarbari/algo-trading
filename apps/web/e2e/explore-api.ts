@@ -3,9 +3,10 @@
  * fixtures recorded from the real API (e2e/fixtures/explore/, AAPL / MSFT / NVDA on
  * 2026-10-02), the GraphQL reads (`POST /api/graphql`) by operation name and key: the detail
  * pane's operations answer for AAPL from its recorded values, history, events, bars and chain
- * (feature values and history picked by the names asked). The ticker table is padded with
- * synthetic tickers to the real universe size (11,427) so the table is exercised at full
- * scale.
+ * (feature values and history picked by the names asked). The feature table (`FeatureTable`)
+ * answers like the server: the universe padded with synthetic tickers to the real size
+ * (11,427), filtered, sorted (missing values last) and paged; with `keys`, those tickers in
+ * that order. `ComparePrices` answers the compare set's recorded closes.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -45,26 +46,131 @@ function universe(): Row[] {
 }
 
 const ROWS = universe();
+const BY_SYMBOL = new Map(ROWS.map((r) => [String(r['symbol']), r]));
+
+/** The compare fixture's values by instrument id and feature (the dimensions). */
+const COMPARED = new Map<string, Record<string, unknown>>();
+for (const row of (fixture('compare.json') as { rows: { feature: string; values: Row }[] }).rows) {
+  for (const [id, value] of Object.entries(row.values)) {
+    COMPARED.set(id, { ...(COMPARED.get(id) ?? {}), [row.feature]: value });
+  }
+}
+
+const CATALOGUE = new Map(
+  (fixture('features.json') as unknown as Row[]).map((f) => [String(f['name']), f]),
+);
+
+/** The server's display format from a feature's unit and dtype (catalogue.format_of). */
+function formatOf(feature: Row | undefined): string {
+  const unit = feature?.['unit'];
+  const dtype = (feature?.['dtype'] as string | undefined) ?? 'float';
+  if (dtype === 'date' || unit === 'date') return 'DATE';
+  if (dtype === 'bool') return 'FLAG';
+  if (dtype === 'str') return 'TEXT';
+  if (unit === 'decimal') return 'PERCENT';
+  if (unit === 'usd_per_share') return 'CURRENCY';
+  if (unit === 'usd' || unit === 'shares') return 'COMPACT';
+  return 'NUMBER';
+}
+
+function columnInfo(name: string): Json {
+  const feature = CATALOGUE.get(name);
+  return {
+    name,
+    description: feature?.['description'] ?? name,
+    format: formatOf(feature),
+    unit: feature?.['unit'] ?? null,
+    dtype: feature?.['dtype'] ?? 'float',
+    nullMeaning: feature?.['null_meaning'] ?? '',
+    licence: feature?.['licence'] ?? 'open',
+    scope: feature?.['scope'] ?? 'site',
+  };
+}
+
+const valueOf = (row: Row, name: string): unknown =>
+  row[name] ?? COMPARED.get(String(row['instrument_id']))?.[name] ?? null;
+
+function compare(a: unknown, b: unknown): number {
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  return String(a).localeCompare(String(b));
+}
+
+/** `FeatureTable`: filtered, sorted (missing last, ties by symbol) and paged like the server. */
+function featureTable(variables: Record<string, unknown>): Json {
+  const columns = (variables['columns'] as string[] | undefined) ?? [];
+  const keys = variables['keys'] as string[] | null | undefined;
+  const sort = (variables['sort'] as string | null | undefined) ?? (keys ? null : 'symbol');
+  const size = Number(variables['size'] ?? 100);
+  const page = Number(variables['page'] ?? 1);
+  let rows = keys ? keys.flatMap((k) => (BY_SYMBOL.has(k) ? [BY_SYMBOL.get(k) as Row] : [])) : ROWS;
+  const type = variables['securityType'];
+  if (type) rows = rows.filter((r) => r['security_type'] === type);
+  if (variables['optionable'] === true) rows = rows.filter((_, i) => i % 2 === 0);
+  const q = ((variables['q'] as string | null | undefined) ?? '').toLowerCase();
+  if (q) {
+    rows = rows.filter((r) =>
+      `${String(r['symbol'])} ${String(r['company_name'])}`.toLowerCase().includes(q),
+    );
+  }
+  if (sort) {
+    const column = sort.replace(/^-/, '');
+    const sign = sort.startsWith('-') ? -1 : 1;
+    const key = (r: Row) => (column === 'symbol' ? r['symbol'] : valueOf(r, column));
+    rows = [...rows].sort((a, b) => {
+      const [x, y] = [key(a), key(b)];
+      if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1;
+      return sign * compare(x, y) || compare(a['symbol'], b['symbol']);
+    });
+  }
+  const shown = keys ? rows : rows.slice((page - 1) * size, page * size);
+  return {
+    data: {
+      table: {
+        session: { date: tickers['session'], missing: [] },
+        universeSnapshot: keys ? null : tickers['snapshot_date'],
+        preSnapshot: false,
+        sort,
+        total: rows.length,
+        page: keys ? 1 : page,
+        size: keys ? 100 : size,
+        missing: [],
+        columns: columns.map(columnInfo),
+        instruments: shown.map((r) => ({
+          instrumentId: r['instrument_id'],
+          symbol: r['symbol'],
+          name: r['company_name'],
+        })),
+        rows: shown.map((r) => columns.map((c) => valueOf(r, c))),
+        unknown: shown.map((r) => columns.map((c) => (valueOf(r, c) === null ? 'NULL' : null))),
+      },
+    },
+  };
+}
+
+const PRICES = fixture('prices.json') as {
+  instruments: { instrument_id: string; symbol: string }[];
+  dates: string[];
+  series: Record<string, (number | null)[]>;
+};
+
+/** `ComparePrices`: the recorded closes of the tickers asked, in order. */
+function comparePrices(variables: Record<string, unknown>): Json {
+  const keys = (variables['keys'] as string[] | undefined) ?? [];
+  const instruments = keys.flatMap((symbol) => {
+    const known = PRICES.instruments.find((i) => i.symbol === symbol);
+    if (!known) return [];
+    const closes = PRICES.series[known.instrument_id] ?? [];
+    const bars = PRICES.dates.map((session, i) => ({ session, close: closes[i] ?? null }));
+    return [{ instrumentId: known.instrument_id, symbol, prices: { bars } }];
+  });
+  return { data: { table: { instruments } } };
+}
 
 const DISTRIBUTIONS: Record<string, string> = {
   'instrument.sector': 'dist-sector.json',
   'feature.liquidity_class': 'dist-liquidity.json',
   'instrument.security_type': 'dist-type.json',
 };
-
-function tickerPage(url: URL): Json {
-  const size = Number(url.searchParams.get('size') ?? 100);
-  const page = Number(url.searchParams.get('page') ?? 1);
-  const type = url.searchParams.get('security_type');
-  const optionable = url.searchParams.get('optionable');
-  let rows = ROWS;
-  if (type) rows = rows.filter((r) => r['security_type'] === type);
-  if (optionable === 'true') rows = rows.filter((_, i) => i % 2 === 0);
-  return {
-    ...tickers,
-    page: { total: rows.length, page, size, items: rows.slice((page - 1) * size, page * size) },
-  };
-}
 
 interface Operation {
   query?: string;
@@ -123,6 +229,8 @@ function graphqlAnswer(operation: Operation): Json | null {
   const name = /query\s+(\w+)/.exec(operation.query ?? '')?.[1];
   if (name === 'FeatureCatalogue') return fixture('catalogue.json');
   if (name === 'FeatureDistribution') return distribution(String(operation.variables?.['name']));
+  if (name === 'FeatureTable') return featureTable(operation.variables ?? {});
+  if (name === 'ComparePrices') return comparePrices(operation.variables ?? {});
   if (operation.variables?.['key'] !== 'AAPL') return null;
   const instrumentId = VALUES.instrumentId;
   switch (name) {
@@ -167,9 +275,6 @@ function graphqlAnswer(operation: Operation): Json | null {
 function answer(url: URL, body: string | null): Json | Json[] | null {
   const path = url.pathname.replace(/^\/api/, '');
   if (path === '/graphql') return graphqlAnswer(JSON.parse(body ?? '{}') as Operation);
-  if (path === '/explore/tickers') return tickerPage(url);
-  if (path === '/explore/compare') return fixture('compare.json');
-  if (path === '/explore/compare/prices') return fixture('prices.json');
   return null;
 }
 

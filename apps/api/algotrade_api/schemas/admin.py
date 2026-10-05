@@ -1,5 +1,5 @@
-"""``/admin``: ingestion completeness (dataset x session), one cell's drill-down and the live
-verification vs IBKR."""
+"""``/admin``: ingestion completeness (dataset x session), one cell's drill-down, the live
+verification vs IBKR and the owner's review lists."""
 
 from datetime import date
 from typing import Any
@@ -52,3 +52,9 @@ class Verification(Schema):
         description="FAIL then WARN rows (at most 50), largest diff first: instrument_id, "
         "symbol, check, status, ours, theirs, diff, tolerance, note"
     )
+
+
+class ReviewList(Schema):
+    session: date | None
+    source: str
+    items: list[dict[str, Any]]

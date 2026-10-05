@@ -18,12 +18,12 @@ import {
 
 import { valueFormat } from '@/entities/feature';
 import {
-  DecisionBadge,
   earningsBeforeExpiry,
   factOf,
   IDEA_FACTS,
   type Idea,
 } from '@/entities/idea';
+import { DecisionBadge } from '@/entities/screen';
 
 import { dteReason, earningsCell, expiryDte, iv30, nextEarnings } from './facts';
 

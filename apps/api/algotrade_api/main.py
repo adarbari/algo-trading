@@ -98,15 +98,19 @@ def create_app(
     app.add_exception_handler(ConfigurationError, _bad_request)
     for router in ROUTERS:
         app.include_router(router)
-    cache = ResultCache()
+    cache = ResultCache(READ_CACHE_SIZE)
     reads, stores = _reads(app.state.store, cache), _stores(app.state.store, cache)
     app.include_router(graphql_router(reads, settings.debug, stores))
     return app
 
 
+READ_CACHE_SIZE = 32
+
+
 def _reads(store: ReadStore, cache: ResultCache) -> Callable[[date | None], ReadContext]:
     """Opens a GraphQL request's read context over ``store`` for a requested session, with
-    one result cache for every request of the app (entries keyed on the published state)."""
+    one result cache for every request of the app (entries keyed on the published state;
+    room for the session, the descriptions, the universe and a few table orders)."""
     return partial(open_context, store.reader, store.configs, store.user, cache=cache)
 
 

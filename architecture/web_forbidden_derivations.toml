@@ -52,13 +52,14 @@ regex = "daysBetween\\("
 reason = "days to expiry / earnings are stored: ask for rollup.nearest_expiry@v1.dte, rollup.earnings@v1.days_to_earnings, OptionChain.expiries[].days"
 allowed = ["src/shared/lib/date/", "src/entities/explore/model/freshness.ts"]  # the arithmetic itself, data freshness
 
+# Enabled in PR 7 (the ticker table's count is the feature table's total):
+[[pattern]]
+regex = "useUniverseSize"
+reason = "the universe size is FeatureTable.total, not a size=1 page"
+
 # ---------------------------------------------------------------------------- pending
 
 
-# pending, enable in PR 7 (FeatureTable.total):
-# [[pattern]]
-# regex = "useUniverseSize"
-# reason = "the universe size is FeatureTable.total, not a size=1 page"
 
 # pending, enable in PR 8 (picked / not picked from the server):
 # [[pattern]]

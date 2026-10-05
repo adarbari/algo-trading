@@ -68,14 +68,28 @@ export function isUnknown(value: ServedValue | undefined): boolean {
 export function unknownReason(value: ServedValue | undefined): string {
   const unknown = value?.unknown;
   if (!value || !unknown) return 'not known';
-  switch (unknown.code) {
+  if (unknown.code === 'NO_PARTITION') return `not stored for this session (${unknown.detail})`;
+  if (unknown.code === 'NO_ROW' || unknown.code === 'NULL') {
+    return codeReason(unknown.code, value.info.nullMeaning);
+  }
+  return unknown.detail;
+}
+
+/** Why a table cell is UNKNOWN, from its code alone (a table sends codes, not details). */
+export function codeReason(
+  code: UnknownCodeName | null,
+  nullMeaning: string | null | undefined,
+): string {
+  switch (code) {
     case 'NO_PARTITION':
-      return `not stored for this session (${unknown.detail})`;
+      return 'not stored for this session';
     case 'NO_ROW':
       return 'no row for this instrument in this session';
     case 'NULL':
-      return value.info.nullMeaning || 'not known for this session';
+      return nullMeaning || 'not known for this session';
+    case null:
+      return 'not known';
     default:
-      return unknown.detail;
+      return code.toLowerCase().replace(/_/g, ' ');
   }
 }

@@ -1,12 +1,15 @@
 /**
  * Trader > Explore: one page for the universe, instruments, chains and features. Left, the
- * ticker table (filters, catalogue columns, selection into the compare set); right, the
- * detail tabs for the compare set and the focused ticker. Every choice lives in the URL's
- * search params (given as props by the route), so a view is a shareable link.
+ * ticker table (the feature table over the universe: filters, catalogue columns, sorting and
+ * paging on the server, selection into the compare set); right, the detail tabs for the
+ * compare set and the focused ticker. Every choice lives in the URL's search params (given as
+ * props by the route), so a view is a shareable link.
  */
 import { Grid, Heading, Stack, Text } from '@algotrade/ui';
 
-import { TickerTable } from '@/widgets/ticker-table';
+import { FeatureTable } from '@/widgets/feature-table';
+import { MAX_COMPARE, nextSelection } from '@/features/compare-set';
+import { TickerFilterBar, toTableFilters, type TickerFilters } from '@/features/ticker-filter';
 
 import { DEFAULT_COLUMNS, formatSort, joinList, type ExploreSearch } from '../model/search';
 import { exploreState, type SearchPatch } from '../model/state';
@@ -20,6 +23,14 @@ export interface ExplorePageProps {
 
 export function ExplorePage({ search, onSearchChange }: ExplorePageProps) {
   const state = exploreState(search);
+  const filters: TickerFilters = {
+    q: search.q,
+    type: search.type,
+    sector: search.sector,
+    liquidity: search.liq,
+    leveraged: search.lev,
+    optionable: search.opt,
+  };
   return (
     <Stack gap={3}>
       <Stack gap={1}>
@@ -30,40 +41,45 @@ export function ExplorePage({ search, onSearchChange }: ExplorePageProps) {
         </Text>
       </Stack>
       <Grid columns={2} gap={4} collapse="lg" align="start">
-        <TickerTable
-          filters={{
-            q: search.q,
-            type: search.type,
-            sector: search.sector,
-            liquidity: search.liq,
-            leveraged: search.lev,
-            optionable: search.opt,
-          }}
-          onFiltersChange={(f) => {
-            onSearchChange({
-              q: f.q,
-              type: f.type,
-              sector: f.sector,
-              liq: f.liquidity,
-              lev: f.leveraged,
-              opt: f.optionable,
-            });
-          }}
+        <FeatureTable
+          label="Tickers"
           columns={state.columns}
           onColumnsChange={(cols) => {
             onSearchChange({ cols: joinList(cols, DEFAULT_COLUMNS) });
           }}
+          filters={toTableFilters(filters)}
+          header={
+            <TickerFilterBar
+              filters={filters}
+              onChange={(f) => {
+                onSearchChange({
+                  q: f.q,
+                  type: f.type,
+                  sector: f.sector,
+                  liq: f.liquidity,
+                  lev: f.leveraged,
+                  opt: f.optionable,
+                });
+              }}
+            />
+          }
+          sortMode="server"
           sort={state.sort}
           onSortChange={(sort) => {
             onSearchChange({ sort: formatSort(sort) });
           }}
           selected={state.selected}
           onSelectedChange={(sel) => {
-            onSearchChange({ sel: sel.length > 0 ? sel.join(',') : undefined });
+            const next = nextSelection(state.selected, sel);
+            onSearchChange({ sel: next.length > 0 ? next.join(',') : undefined });
           }}
-          onFocus={(focus) => {
+          maxSelected={MAX_COMPARE}
+          onRowActivate={(focus) => {
             onSearchChange({ focus, expiry: undefined, feature: undefined });
           }}
+          emptyMessage={
+            search.q ? `No ticker matches “${search.q}”` : 'No tickers match these filters'
+          }
         />
         <DetailTabs search={search} onSearchChange={onSearchChange} />
       </Grid>

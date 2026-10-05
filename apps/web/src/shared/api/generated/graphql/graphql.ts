@@ -42,6 +42,14 @@ export type OptionQuotesQueryVariables = Exact<{
 
 export type OptionQuotesQuery = { instrument: { instrumentId: string, chain: { quotes: Array<{ instrumentId: string, expiry: string, right: string, strike: number, bid: number | null, ask: number | null, last: number | null, volume: number | null, openInterest: number | null, iv: number | null, delta: number | null, gamma: number | null, theta: number | null, vega: number | null }> } | null } | null };
 
+export type ComparePricesQueryVariables = Exact<{
+  keys: Array<string> | string;
+  start: string;
+}>;
+
+
+export type ComparePricesQuery = { table: { instruments: Array<{ instrumentId: string, symbol: string, prices: { bars: Array<{ session: string, close: number }> } }> } | null };
+
 export type FeatureCatalogueQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -53,6 +61,23 @@ export type FeatureDistributionQueryVariables = Exact<{
 
 
 export type FeatureDistributionQuery = { distribution: { name: string, session: string, count: number, nulls: number, quantiles: Array<{ q: number, value: number }>, histogram: Array<{ lo: number, hi: number, count: number }>, categories: Array<{ value: string, count: number }>, unknown: { code: UnknownCode, detail: string } | null } | null };
+
+export type FeatureTableQueryVariables = Exact<{
+  columns: Array<string> | string;
+  keys?: Array<string> | string | null | undefined;
+  securityType?: string | null | undefined;
+  sector?: string | null | undefined;
+  liquidityClass?: string | null | undefined;
+  leveraged?: boolean | null | undefined;
+  optionable?: boolean | null | undefined;
+  q?: string | null | undefined;
+  sort?: string | null | undefined;
+  page?: number | null | undefined;
+  size?: number | null | undefined;
+}>;
+
+
+export type FeatureTableQuery = { table: { universeSnapshot: string | null, preSnapshot: boolean, sort: string | null, total: number, page: number, size: number, missing: Array<string>, rows: Array<Array<unknown>>, unknown: Array<Array<UnknownCode | null>>, session: { date: string, missing: Array<string> }, columns: Array<{ name: string, description: string, format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string, licence: string, scope: string }>, instruments: Array<{ instrumentId: string, symbol: string, name: string }> } | null };
 
 export type EtfHoldingsQueryVariables = Exact<{
   key: string;
@@ -212,6 +237,22 @@ export const OptionQuotesDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<OptionQuotesQuery, OptionQuotesQueryVariables>;
+export const ComparePricesDocument = new TypedDocumentString(`
+    query ComparePrices($keys: [String!]!, $start: Date!) {
+  table(columns: [], keys: $keys) {
+    instruments {
+      instrumentId
+      symbol
+      prices(start: $start) {
+        bars {
+          session
+          close
+        }
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<ComparePricesQuery, ComparePricesQueryVariables>;
 export const FeatureCatalogueDocument = new TypedDocumentString(`
     query FeatureCatalogue {
   catalogue {
@@ -262,6 +303,52 @@ export const FeatureDistributionDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<FeatureDistributionQuery, FeatureDistributionQueryVariables>;
+export const FeatureTableDocument = new TypedDocumentString(`
+    query FeatureTable($columns: [FeatureName!]!, $keys: [String!], $securityType: String, $sector: String, $liquidityClass: String, $leveraged: Boolean, $optionable: Boolean, $q: String, $sort: String, $page: Int, $size: Int) {
+  table(
+    columns: $columns
+    keys: $keys
+    securityType: $securityType
+    sector: $sector
+    liquidityClass: $liquidityClass
+    leveraged: $leveraged
+    optionable: $optionable
+    q: $q
+    sort: $sort
+    page: $page
+    size: $size
+  ) {
+    session {
+      date
+      missing
+    }
+    universeSnapshot
+    preSnapshot
+    sort
+    total
+    page
+    size
+    missing
+    columns {
+      name
+      description
+      format
+      unit
+      dtype
+      nullMeaning
+      licence
+      scope
+    }
+    instruments {
+      instrumentId
+      symbol
+      name
+    }
+    rows
+    unknown
+  }
+}
+    `) as unknown as TypedDocumentString<FeatureTableQuery, FeatureTableQueryVariables>;
 export const EtfHoldingsDocument = new TypedDocumentString(`
     query EtfHoldings($key: String!, $top: Int!) {
   instrument(key: $key) {
