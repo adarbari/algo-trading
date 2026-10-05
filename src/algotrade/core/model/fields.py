@@ -11,6 +11,7 @@ from algotrade.core.model.errors import ConfigurationError
 
 REFERENCE_TABLE = "instruments/reference"
 COMPANY_TABLE = "instruments/company"
+DESCRIPTION_TABLE = "instruments/description"  # what a company or fund is about (ADR 0034)
 ROLLUP_TABLE_PREFIX = "rollups/instrument/"
 FEATURE_FIELD_PREFIX = "feature."
 # The value types a field (an instrument column or a declared rollup column) may have.

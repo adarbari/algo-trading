@@ -37,6 +37,7 @@ from algotrade_ingestion.tasks.market import (
     option_chains,
     rates,
 )
+from algotrade_ingestion.tasks.profile import descriptions
 from algotrade_ingestion.tasks.reference import (
     company_details,
     ibkr_contracts,
@@ -204,6 +205,41 @@ def _symbols(p: Params) -> list[str]:
     return [s.strip() for s in str(p.get("symbols") or "").split(",") if s.strip()]
 
 
+DESCRIPTION_SOURCES = ("massive_overview", "sec_fund_tickers", "sec_fund_objectives")
+
+
+def _descriptions(ctx: TaskContext, p: Params) -> RunRecord:
+    s = ctx.settings
+    sources = descriptions.DescriptionSources(
+        ctx.sources.get("massive_overview"),
+        ctx.sources.get("sec_fund_tickers"),
+        ctx.sources.get("sec_fund_objectives"),
+        s.descriptions_per_night,
+        s.descriptions_refresh_days,
+        s.sec_fund_quarters,
+        s.cboe_priority_symbols,
+    )
+    return descriptions.ingest_descriptions(
+        ctx,
+        sources,
+        session_of(p),
+        only=p.get("only"),
+        limit=p.get("limit"),
+        symbols=_symbols(p),
+        force=bool(p.get("force")),
+    )
+
+
+def _no_description_source(ctx: TaskContext) -> str | None:
+    """Workflows skip ``descriptions`` when neither Massive nor the SEC sources are built."""
+    if any(name in ctx.sources for name in DESCRIPTION_SOURCES):
+        return None
+    reasons = sorted(
+        {ctx.unavailable.get(n, f"{n} is not configured") for n in DESCRIPTION_SOURCES}
+    )
+    return f"skipped: {'; '.join(reasons)}"
+
+
 def _ibkr(ctx: TaskContext) -> SessionSource:
     source = ctx.sources["ibkr"]
     if not isinstance(source, SessionSource):
@@ -332,6 +368,23 @@ TASKS: dict[str, Task] = {
                 Param("force", ("--force",), None, "refetch every company"),
                 Param("limit", ("--limit",), int, "fetch at most N companies this run"),
             ),
+        ),
+        Task(
+            "descriptions",
+            "descriptions: stocks from Massive (capped per night), ETFs from SEC prospectuses",
+            descriptions,
+            (descriptions.TABLE,),
+            _descriptions,
+            optional_sources=DESCRIPTION_SOURCES,
+            settings="sources.toml [massive] descriptions_per_night, [sec_edgar] fund_quarters",
+            params=(
+                SESSION,
+                Param("limit", ("--limit",), int, "ask Massive for at most N stocks this run"),
+                Param("symbols", ("--symbols",), str, "comma-separated stocks (skips the ETFs)"),
+                Param("only", ("--only",), str, "massive (stocks) or funds (ETFs)"),
+                Param("force", ("--force",), None, "ask again even if described"),
+            ),
+            skip=_no_description_source,
         ),
         Task(
             "earnings",

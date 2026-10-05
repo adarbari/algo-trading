@@ -15,9 +15,11 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 - VRP live spread check in the UI via `GET /chains/{id}/live`.
 - Swing features (SW, done on `feat/swing-levels-momentum`): check values against a chart on a few names, then backfill `algotrade-ingest rollups --from D --to D --only momentum@v1,swing_levels@v1,anchored_vwap@v1,oi_walls@v1`.
 - Flaky tests: preview timing under load, smoke axe admin light, one builder e2e.
+- Descriptions (ADR 0034, PR on `feat/company-description`, held for owner review): after merge run `algotrade-ingest descriptions --only funds` (ETFs, ~2 min), then stocks in chunks (`descriptions --limit 600`, ~2 h each, S&P 500 first; the nightly adds 100). Then the Overview tab reads `reference.description` from `GET /instruments/{id}`.
 
 **Facts**
 - IBKR fundamentals are not permitted on this account (error 10358): share-class counts stay SEC.
+- Massive's ticker overview has descriptions for stocks and ADRs, none for ETFs (free tier, checked 2026-10-04); ETF text is the SEC prospectus objective (~74% of ETFs). Massive: 5 requests a minute, so descriptions are capped at 100 stocks a night (ADR 0034).
 - Owner screener / VRP decisions: ADR 0029, ADR 0030 (rule screens: no selection, missing data never skips, no tiers / classify / labels; `vrp_scanner` v3) and `docs/screeners/vrp-scanner.md`. A v3 run stores a row per snapshot instrument (about 11.4k, was about 4.2k).
 - Harness audit: last 2026-10-04 (`/audit-harness`; `/start` flags when older than 30 days; fixes log: [history.md](history.md)).
 

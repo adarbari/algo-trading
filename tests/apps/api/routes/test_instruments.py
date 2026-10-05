@@ -16,6 +16,10 @@ def test_detail_by_id_or_ticker(client: TestClient) -> None:
     assert by_id == by_ticker
     assert by_id["reference"]["symbol"] == "AAA"
     assert by_id["company"]["sector"] == "Technology"
+    assert by_id["reference"]["description"] == "AAA makes widgets."
+    assert by_id["reference"]["description_source"] == "massive_overview"
+    assert by_id["reference"]["homepage_url"] == "https://aaa.example"
+    assert by_id["reference"]["total_employees"] == 1200
     assert by_id["features"]["rollup.price_stats@v2.close"] == 101.0
     assert by_id["feature_sessions"]["iv30@v1"] == "2022-11-23"
     assert by_id["features"]["feature.liquidity_class"] == "HIGH"
@@ -24,7 +28,9 @@ def test_detail_by_id_or_ticker(client: TestClient) -> None:
 
 
 def test_detail_without_company_and_unknown_instrument(client: TestClient) -> None:
-    assert client.get("/instruments/BBB").json()["company"] is None
+    bbb = client.get("/instruments/BBB").json()
+    assert bbb["company"] is None
+    assert bbb["reference"]["description"] is None  # nothing stored: the key is still there
     assert client.get("/instruments/NOPE").status_code == 404
 
 

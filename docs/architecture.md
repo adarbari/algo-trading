@@ -55,7 +55,7 @@ See [roadmap.md](roadmap.md) (phase tables and Now / Next) for what is built; th
 
 ---|---|---|
 | Apps | `apps/ingestion`, `apps/backtest`, `apps/api` v1 (read-only, ADR 0024); `apps/web` skeleton + harness (ADR 0025: layers, design-system package, final tokens + layout primitives, placeholder routes) | API writes (submit jobs) (4), `apps/web` screens (5, after mockup approval) |
-| L1 | `instruments/reference` from the Nasdaq Trader + SPY universe builder (or universe CSVs) with FIGI / CIK and vendor security types (Massive), `instruments/symbol_history`, FIGI-based `instrument_id` + `instruments/id_map` + `SymbolResolver` (ADR 0018), company details (SEC EDGAR), `events/reference_change` (incl. `ticker_changed`, `id_changed`) + `events/index_change`, rollups `option_liquidity@v1`, `price_stats@v2`, `earnings@v1` (the rollup framework, 2b.2; v2 since ADR 0023 step 3), `InstrumentView` reader | `iv_history` rollup (2b.3) and the liquidity class (an expression feature since ADR 0023 step 3); `fundamentals@v2` + `instruments/shares` from SEC company facts (2b.4) |
+| L1 | `instruments/reference` from the Nasdaq Trader + SPY universe builder (or universe CSVs) with FIGI / CIK and vendor security types (Massive), `instruments/symbol_history`, FIGI-based `instrument_id` + `instruments/id_map` + `SymbolResolver` (ADR 0018), company details (SEC EDGAR), descriptions (`instruments/description`: Massive overview for stocks, SEC prospectus objective for ETFs, ADR 0034), `events/reference_change` (incl. `ticker_changed`, `id_changed`) + `events/index_change`, rollups `option_liquidity@v1`, `price_stats@v2`, `earnings@v1` (the rollup framework, 2b.2; v2 since ADR 0023 step 3), `InstrumentView` reader | `iv_history` rollup (2b.3) and the liquidity class (an expression feature since ADR 0023 step 3); `fundamentals@v2` + `instruments/shares` from SEC company facts (2b.4) |
 | L2 | `chains/*` (Cboe), `events/earnings` (Nasdaq), `bars/1d` + `events/split` + `events/dividend` (Massive, unadjusted; adjusted at read time), `rates/treasury` (U.S. Treasury par yield curve), golden data | live Massive run awaits the API key (1); intraday bars + `rollups/daily/*` (6) |
 | L3 | `defaults.toml`, `universe.toml`, `sources.toml`, `nightly.toml`, `rollups.toml`, `features/*.toml` (expression features, ADR 0023), `overrides/leveraged_etfs.csv`, `presets/selections/*`, `presets/strategies/*` | |
 | L4 | `strategies/`, `selections/` | `watchlists/`, `preferences.toml` (4–5); DB-backed `ConfigStore` (4) |
@@ -201,8 +201,8 @@ handler), `steps.py` (isolation, status rule), `sessions.py` (catch-up), `screen
 jobs), `notify.py` (summary file + notifiers), `records.py` / `report.py` / `timing.py` / `render.py`
 (the summary email).
 
-- **Steps** (`NIGHTLY`): `universe-build`, `company-details`, `earnings`, `bars`, `rates`,
-  `corporate-actions`, `chains`, `rollups`, `screens`, `quality`; then `purge-raw` once
+- **Steps** (`NIGHTLY`): `universe-build`, `company-details`, `shares`, `earnings`, `bars`, `rates`,
+  `corporate-actions`, `chains`, `rollups`, `screens`, `descriptions`, `quality`; then `purge-raw` once
   (`FINALLY`). Each is a registry task (or the `screens` job step) run in isolation: an
   exception makes the step FAILED with its error and later steps still run. A step names its
   hard dependencies (`screens` on `chains` and `rollups`): when one FAILED it is BLOCKED.

@@ -30,6 +30,8 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 | Ticker universe | Nasdaq Trader symbol directory (`nasdaqlisted.txt`, `otherlisted.txt`, `options.txt`) | — | Official, free, updated daily |
 | S&P 500 membership | SPY daily holdings file (State Street) | — | Membership changes become events |
 | Company details (name, SIC, sector, state, fiscal year end) | SEC EDGAR submissions (free; contact email in the user agent) | Massive ticker details | Implemented, phase 1.7 |
+| Company description (stocks, ADRs) | Massive ticker overview (`/v3/reference/tickers/{ticker}`; one request per ticker; free tier) | none free | Implemented (ADR 0034): capped per night |
+| Fund description (ETFs) | SEC prospectus investment objective (Risk/Return Summary data sets + `company_tickers_mf.json`; official, free) | issuer fund pages (per-site terms, not used) | Implemented (ADR 0034): the objective sentence, ~74% of ETFs |
 | Shares outstanding (market cap) | SEC EDGAR company facts (XBRL; free; same contact and pacing) | Massive ticker details (`share_class_shares_outstanding`) | Implemented, phase 2b.4 |
 | Daily stock and ETF bars (swing / momentum) | Massive (formerly Polygon) free tier: all US tickers, 2 years history, 5 calls/min; "grouped daily" = whole market in 1 call | Alpaca (free account), IBKR, Yahoo (unofficial, history backfill only) | |
 | IV history / IV rank (enrichment) | **IBKR** (ADR 0028): IB's daily 30-day IV and HV per underlying, years of history; personal-use licence | our IV30 history (from the Cboe chains), the fallback | Implemented: `ibkr_iv@v1`, `iv_rank` with `iv_rank_source` |
@@ -93,6 +95,57 @@ where it stopped; nightly fetches the session's bars and a corporate-action wind
 days; `[massive]` in `config/site/sources.toml`). Massive preferred tickers (`KIMpL`) are mapped to the universe's ACT style (`KIM$L`).
 Prices are adjusted at read time (`none`, `splits`, `total_return`; setting
 `[backtest] price_adjustment`).
+
+## Company and fund descriptions (implemented, ADR 0034)
+
+One table, `instruments/description` (columns in [layers.md](layers.md)), written by the
+`descriptions` task (`algotrade-ingest descriptions`). Checked live on 2026-10-04 and 2026-10-05.
+
+**Stocks and ADRs: Massive ticker overview.** `GET https://api.massive.com/v3/reference/tickers/{ticker}`,
+same key, header and `massive` limiter as the bars (`sources/vendors/massive/overview.py`).
+
+| Ticker | Result on the free tier |
+|---|---|
+| AAPL, KO, PLTR, TSM | 200 with `description` (470 to 790 characters), `homepage_url`, `total_employees`, `list_date`, `market_cap`, `sic_description` (US issuers) |
+| SPY, QQQ, XLK, ARKK, JEPI, BITO | 200 with identity fields only (name, FIGI, CIK, `list_date`): **no description for ETFs** |
+| ZZZZ (unknown) | 404, read as "nothing there" |
+
+We store `description`, `homepage_url` and `total_employees`; a response took 0.2 to 0.5 s.
+At 5 requests a minute 5.7k stocks and ADRs take about 20 hours, so the nightly step asks for at
+most `[massive] descriptions_per_night` (100, about 21 minutes, after bars and screens) in this
+order: `[cboe] priority_symbols`, S&P 500 members by liquidity, names with a liquidity class,
+the rest. A ticker is asked again after `descriptions_refresh_days` (365, on a slot day by key).
+Stocks Massive has no text for (and 404s) are stored as markers, so they are not asked every
+night. Do not run a large hand backfill while the nightly runs: both wait on the same limiter,
+so the bars would queue behind it.
+
+**ETFs: SEC prospectus investment objective.** Two official files, with the same contact
+`User-Agent`, `sec` limiter and `[sec_edgar]` section as the other SEC sources
+(`sources/vendors/sec/fund_objectives.py`):
+
+| File | Used for |
+|---|---|
+| `https://www.sec.gov/files/company_tickers_mf.json` (1.2 MB) | fund ticker to series id (`S000...`) and class id |
+| `https://www.sec.gov/files/dera/data/mutual-fund-prospectus-risk/return-summary-data-sets/<year>q<n>_rr1.zip` (~80 MB, 640k facts) | `txt.tsv` tag `ObjectivePrimaryTextBlock` per series, `sub.tsv` for the filing date and form |
+
+A fund is in a quarter's file only if it filed a prospectus then, so the task reads the last
+`[sec_edgar] fund_quarters` (6) completed quarters, once each (a quarter is published about ten
+days after it ends; until then the file answers 404 and is tried again the next night), keeps
+the latest filing per series and stores it for every ETF with that ticker. Measured on the
+local universe (5,764 ETFs, 2026-10-05): 5 published quarters give **4,267 ETFs (74%)** in about
+90 seconds; 11 quarters give 4,382 (76%). The rest are not in the SEC fund map or file no such
+exhibit: commodity and currency trusts (GLD, SLV, USO), unit trusts (SPY, DIA, MDY), ETNs.
+Text is cleaned (`&amp;`, spaces before punctuation, `long -term`, `?Fund?`); some apostrophes
+are lost in the SEC's XBRL ("The Funds investment objective"). The objective is one or two
+sentences ("... seeks to track the performance of ..."), not marketing copy. Considered and not
+used: issuer fund pages (a different layout and terms per issuer), Massive's paid ETF add-on,
+Wikipedia (licence and coverage).
+
+**Backfill (owner action):** `algotrade-ingest descriptions --only funds` (ETFs, one run, about
+2 minutes, ~0.5 GB of zips kept 7 days as raw), then `algotrade-ingest descriptions --limit 600`
+repeatedly, or detached for all stocks (README "Long runs": 600 stocks take about 2 hours; the
+S&P 500 is the first ~500). The nightly then continues at 100 a night. `--symbols AAPL,KO`
+describes named stocks now; `--force` asks again.
 
 ## Nasdaq earnings calendar (implemented, phase 1.3)
 

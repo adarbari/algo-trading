@@ -105,8 +105,8 @@ ADAPTIVE_KEYS = ("max_interval_s", "start_interval_s")
 VENDOR_EXTRAS = {
     "cboe": ("workers", "priority_symbols"),
     "nasdaq_earnings": ("days",),
-    "massive": ("corporate_actions_window",),
-    "sec_edgar": ("refresh_days", "facts_refresh_days"),
+    "massive": ("corporate_actions_window", "descriptions_per_night", "descriptions_refresh_days"),
+    "sec_edgar": ("refresh_days", "facts_refresh_days", "fund_quarters"),
     "treasury": ("lookback_days",),
     "ibkr": (
         "historical_min_interval_s",
@@ -200,6 +200,9 @@ class SourcesSettings:
     actions_window: tuple[int, int] = (-7, 30)
     sec_refresh_days: int = 30
     sec_facts_refresh_days: int = 30
+    sec_fund_quarters: int = 6  # SEC prospectus data sets read for ETF descriptions (ADR 0034)
+    descriptions_per_night: int = 100  # Massive ticker overviews the nightly requests (0: none)
+    descriptions_refresh_days: int = 365  # refetch a stock's description after this many days
     treasury_lookback_days: int = 10
     http_max_retry_s: float = 300.0
     http_breaker_failures: int = 10
@@ -280,6 +283,15 @@ class SourcesSettings:
             ),
             sec_facts_refresh_days=_extra(vendors, "sec_edgar").integer(
                 "facts_refresh_days", d.sec_facts_refresh_days, 0
+            ),
+            sec_fund_quarters=_extra(vendors, "sec_edgar").integer(
+                "fund_quarters", d.sec_fund_quarters, 0
+            ),
+            descriptions_per_night=_extra(vendors, "massive").integer(
+                "descriptions_per_night", d.descriptions_per_night, 0
+            ),
+            descriptions_refresh_days=_extra(vendors, "massive").integer(
+                "descriptions_refresh_days", d.descriptions_refresh_days, 0
             ),
             treasury_lookback_days=_extra(vendors, "treasury").integer(
                 "lookback_days", d.treasury_lookback_days, 1

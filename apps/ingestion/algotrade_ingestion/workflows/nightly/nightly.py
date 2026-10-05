@@ -9,8 +9,9 @@ after the data they read; one whose input a session lacks, e.g. option liquidity
 session's chains, reports ``no_input``). ``ibkr-contracts`` and ``ibkr-iv`` enrich the latest
 session from IBKR before the rollups (conids, the IV snapshot, a capped history backfill);
 ``verify`` compares the latest session with IBKR (all read-only; skipped when the gateway is
-down). ``quality`` ends every
-session and the ``purge-raw`` task ends the run, whatever failed before; then
+down). ``descriptions`` follows the screens: a capped number of Massive requests for stock
+descriptions and, once a quarter, the SEC prospectus data for ETFs (ADR 0034). ``quality``
+ends every session and the ``purge-raw`` task ends the run, whatever failed before; then
 ``notify.report`` writes the summary file and sends the notifications (the summary email every
 night). Each session gets a ``nightly`` run record (COMPLETE / PARTIAL / FAILED, per
 ``steps.overall``), which is how the next run knows where to resume.
@@ -74,6 +75,9 @@ NIGHTLY: tuple[Step, ...] = (
     # Every session (catch-up too): a rollup whose input is missing reports no_input.
     Step("rollups"),
     Step(SCREENS, blocked_by=("chains", "rollups"), requires=universe_exists, latest_only=True),
+    # Company and ETF descriptions (ADR 0034): after bars and the screens, so the Massive
+    # requests (capped per night) never delay them; stocks from Massive, ETFs from SEC.
+    Step("descriptions", latest_only=True),
     # Read-only live verification vs IBKR (ADR 0026): SKIPPED with a WARN when [ibkr] is
     # disabled or IB Gateway is not reachable; never fails the ingestion.
     Step("verify", latest_only=True),
