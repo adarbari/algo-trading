@@ -42,6 +42,7 @@ from algotrade_ingestion.tasks.framework.run import (
     status_label,
 )
 from algotrade_ingestion.tasks.market.option_chains import Underlying, prioritise
+from algotrade_ingestion.tasks.profile.fund_series import extend_fund_map
 from algotrade_sources.framework.base import FetchRequest, Source
 
 TASK = "descriptions"
@@ -67,6 +68,7 @@ class DescriptionSources:
     refresh_days: int = 365
     fund_quarters: int = 6
     priority_symbols: tuple[str, ...] = ()
+    fund_series: Source | None = None  # SecFundSeries: finds the ETFs the ticker map misses
 
 
 def recent_quarters(session: date, count: int) -> list[str]:
@@ -228,6 +230,14 @@ def _fund_tickers(run: IngestRun, source: Source, out: list[pd.DataFrame]) -> st
     return f"OK: {len(out[-1])} fund tickers"
 
 
+def _fund_series(run: IngestRun, source: Source, out: list[pd.DataFrame]) -> str:
+    normalized = run.fetch(source, FetchRequest(str(run.session.year), session_date=run.session))
+    if normalized is None or normalized.parsed["series"].empty:
+        raise ValueError("SEC series / class file had no rows")
+    out.append(normalized.parsed["series"])
+    return f"OK: {len(out[-1])} share classes"
+
+
 def _quarter(run: IngestRun, source: Source, quarter: str, out: list[pd.DataFrame]) -> str:
     try:
         normalized = run.fetch(source, FetchRequest(quarter, session_date=run.session))
@@ -276,8 +286,16 @@ def _funds(
         )
         run.checkpoint()
     active = _active(reference)
-    etfs = active[_is_etf(active)][["instrument_id", "symbol"]]
-    rows = fund_rows(objectives, funds[0], etfs.astype(str), stored, replace=force)
+    etfs = active[_is_etf(active)].reindex(columns=["instrument_id", "symbol", "name"])
+    etfs = etfs.fillna("").astype(str)
+    fund_map = funds[0]
+    if sources.fund_series is not None:  # without it the ticker map alone decides (as before)
+        series: list[pd.DataFrame] = []
+        found = run.attempt("fund_series", partial(_fund_series, run, sources.fund_series, series))
+        if status_label(found) == "OK":
+            fund_map, matched = extend_fund_map(fund_map, series[0], etfs)
+            run.stats.update(fund_matched=matched)
+    rows = fund_rows(objectives, fund_map, etfs, stored, replace=force)
     run.stats.update(fund_etfs=len(etfs), fund_rows=len(rows))
     if not rows.empty:
         rows["fetched_on"] = run.session

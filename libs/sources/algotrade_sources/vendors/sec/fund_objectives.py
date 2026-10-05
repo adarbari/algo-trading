@@ -13,6 +13,12 @@ instead. Two SEC files, both official bulk data:
   prospectus ("The Fund seeks to track the performance of ..."). ``sub.tsv`` gives the filing
   date and form of each accession.
 
+- ``https://www.sec.gov/files/investment/data/other/investment-company-series-class-information/
+  investment-company-series-class-<year>.csv`` (8 MB, one per year, published around June): every
+  registered series and share class with its trust (CIK), names and class ticker
+  (``SecFundSeries``). The ticker map above misses ~970 ETFs; this file lists most of them by
+  name, and its ``Class Ticker`` column some by ticker.
+
 A fund appears in a quarter only if it filed a prospectus then (most funds once a year, at
 different months), so several quarters are read and the latest filing per series wins. Funds
 that do not file this exhibit (grantor trusts such as GLD, unit trusts such as SPY) have no
@@ -48,6 +54,20 @@ SERIES = re.compile(r"^S\d{9}$")
 OBJECTIVE_TAG = "ObjectivePrimaryTextBlock"
 FUND_COLUMNS = ("symbol", "series_id", "class_id", "cik")
 OBJECTIVE_COLUMNS = ("series_id", "objective", "accn", "form", "filed")
+SERIES_CLASS_URL = (
+    "https://www.sec.gov/files/investment/data/other/investment-company-series-class-information/"
+    "investment-company-series-class-{year}.csv"
+)
+YEAR = re.compile(r"^\d{4}$")
+SERIES_COLUMNS = ("series_id", "series_name", "class_id", "class_name", "class_ticker", "cik")
+SERIES_HEADERS = {
+    "Series ID": "series_id",
+    "Series Name": "series_name",
+    "Class ID": "class_id",
+    "Class Name": "class_name",
+    "Class Ticker": "class_ticker",
+    "CIK Number": "cik",
+}
 MIN_LENGTH = 30  # shorter texts are headings or placeholders, not an objective
 MAX_LENGTH = 1200  # cut at a sentence end below this, so the Overview stays short
 
@@ -119,6 +139,25 @@ def parse_fund_tickers(payload: bytes) -> pd.DataFrame:
     # A ticker can sit under two series (a reorganised fund): keep both, the objectives decide
     # (the task takes the series with the latest filing).
     return frame.drop_duplicates(["symbol", "series_id"]).reset_index(drop=True)
+
+
+def parse_series_classes(payload: bytes) -> pd.DataFrame:
+    """The yearly series / class CSV -> one row per share class (``SERIES_COLUMNS``): its series
+    and class ids and names, the class ticker (upper case, None when it has none) and the
+    trust's CIK. Rows without a valid series id are dropped."""
+    text = payload.decode("utf-8-sig", errors="replace")
+    reader = csv.DictReader(io.StringIO(text, newline=""))
+    missing = [name for name in SERIES_HEADERS if name not in (reader.fieldnames or [])]
+    if missing:  # a renamed column is a layout change, not an empty file
+        raise ValueError(f"the series / class file has no column {missing}")
+    rows = []
+    for raw in reader:
+        row = {column: (raw.get(name) or "").strip() for name, column in SERIES_HEADERS.items()}
+        if SERIES.match(row["series_id"]):
+            row["class_ticker"] = act_symbol(row["class_ticker"]) if row["class_ticker"] else ""
+            rows.append({k: (v or None) for k, v in row.items()})
+    frame = pd.DataFrame(rows, columns=list(SERIES_COLUMNS))
+    return frame.drop_duplicates(["series_id", "class_id"]).reset_index(drop=True)
 
 
 def _is_day(text: str) -> bool:
@@ -213,4 +252,26 @@ class SecFundObjectives(_Sec):
     def normalize(self, request: FetchRequest, payload: bytes) -> Normalized | None:
         return Normalized(
             session_date=None, tables={}, parsed={"objectives": parse_objectives(payload)}
+        )
+
+
+class SecFundSeries(_Sec):
+    """Every registered fund series and share class of a year. Request key: the year
+    (``2026``). The file is published once a year, so a year with none yet (early in the year)
+    is read from the year before."""
+
+    dataset = "fund_series"
+
+    def fetch(self, request: FetchRequest) -> bytes | None:
+        if not YEAR.match(request.key):
+            raise ValueError(f"not a year like 2026: {request.key!r}")
+        year = int(request.key)
+        found = self._http.get(SERIES_CLASS_URL.format(year=year))
+        return (
+            found if found is not None else self._http.get(SERIES_CLASS_URL.format(year=year - 1))
+        )
+
+    def normalize(self, request: FetchRequest, payload: bytes) -> Normalized | None:
+        return Normalized(
+            session_date=None, tables={}, parsed={"series": parse_series_classes(payload)}
         )
