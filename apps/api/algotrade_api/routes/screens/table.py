@@ -1,4 +1,4 @@
-"""``GET /screens/{id}/table``: a rule screen's latest run as a review table (ADR 0031). The
+"""``GET /screens/{id}/table``: a rule screen's latest run as a review table (ADR 0032). The
 response is the query's own dataclass (no mirrored schema; pydantic reads it directly)."""
 
 from datetime import date

@@ -11,8 +11,8 @@ import pytest
 from algotrade.core.model.fields import field_source
 from algotrade.features.framework.runner import compute_in_memory
 from algotrade.features.registry import catalogue_columns
-from algotrade.features.rollups import price_stats
-from algotrade.features.rollups.fundamentals import GROUP, FundamentalsParams, choose
+from algotrade.features.rollups.corporate.fundamentals import GROUP, FundamentalsParams, choose
+from algotrade.features.rollups.price import price_stats
 from algotrade.features.site import site_features
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.tables.writers import StoreWriter

@@ -13,6 +13,7 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 - Split crowded folders by area: `apps/api` routes/ + schemas/, `services/explore/` (`screens/` is split out; the next new area follows it).
 - API schemas built from domain types, not mirrored field lists.
 - VRP live spread check in the UI via `GET /chains/{id}/live`.
+- Swing features (SW, done on `feat/swing-levels-momentum`): check values against a chart on a few names, then backfill `algotrade-ingest rollups --from D --to D --only momentum@v1,swing_levels@v1,anchored_vwap@v1,oi_walls@v1`.
 - Flaky tests: preview timing under load, smoke axe admin light, one builder e2e.
 
 **Facts**
@@ -79,6 +80,29 @@ catalogue of every feature is [data/features.md](data/features.md).
 | FS6 | `cross_section` features (ranks, z-scores within the universe or a sector) | later |
 | FS7 | Feature quality: null rates and `valid_range` checks in nightly (out-of-range values reported, never clipped) | later |
 | FS8 | New grains (`market`, `contract`, `sector`) when a feature needs one | later |
+
+## Swing levels and momentum (SW): support, resistance and momentum from daily bars
+
+A small set the owner can explain in one sentence each and check against a chart. All from
+stored daily bars (plus earnings dates and chain OI for two of them); no new vendor. Each is a
+`FeatureGroup` or expression feature (ADR 0023; `.claude/skills/add-feature`). Validate every
+value against a charting tool on a few names before merging. Existing features are reused, not
+repeated: `sma_20/50/200`, `high_52w`, `low_52w`, `ret_20d`, `ret_60d`, `hv20`, `pct_vs_sma_*`.
+
+| # | Delivers | Status |
+|---|---|---|
+| SW0 | Spec [data/swing.md](data/swing.md): definitions, worked examples, null rules; `features/rollups/` split by kind (`price/`, `options/`, `corporate/`) so the new groups need no `price_stats` re-version | **done** |
+| SW1 | Momentum and volatility: `atr_14`, `atr_pct`, `rsi_14`, `ret_5d`, `rel_volume` (volume / 20-day average), `high_20d`, `low_20d`, `high_50d`, `low_50d`, `range_20d_pct`, `trend_state` (group `momentum@v1` + expression features in `config/site/features/swing.toml`) | **done** |
+| SW2 | Levels: `swing_high`, `swing_low` (most recent pivots), `dist_to_resistance`, `dist_to_support` (percent and in ATR) (group `swing_levels@v1` with pivot dates; distances are expression features) | **done** |
+| SW3 | Setups as expression features: `breakout_20d`, `pullback_to_sma20` (`config/site/features/swing.toml`) | **done** |
+| SW4 | `avwap_earnings` (VWAP anchored to the last earnings date) and OI-based `call_wall` / `put_wall` (strike with the most call OI above spot, the most put OI below spot; Cboe OI is end of day) (groups `anchored_vwap@v1`, `oi_walls@v1` with `wall_status`) | **done** |
+
+**Parked:** the wider options positioning set (gamma and delta exposure, hedge wall, flow
+ratios, skew and rank, implied move, GARCH rank, dark pool / short volume). Drafts kept, not
+scheduled: [data/positioning.md](data/positioning.md) and
+[ADR 0031](adr/0031-options-positioning-features.md) (proposed, not accepted). Revisit when a
+screener needs one of them. If DPI comes back, FINRA daily short-sale volume (published after
+the close, not real time) is the likely source.
 
 ## Phase 0 follow-ups (the architecture is the target; these close the gaps)
 

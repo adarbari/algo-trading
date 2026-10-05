@@ -151,7 +151,22 @@ contracts = ["Expressions are pure: no storage, data, services or Python eval of
 
 [[dir]]
 path = "src/algotrade/features/rollups"
-purpose = "feature groups (rollups): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
+purpose = "feature groups (rollups), one folder per kind of input (no modules of its own)"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/features/rollups/price"
+purpose = "feature groups from daily bars: one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/features/rollups/options"
+purpose = "feature groups from option chains and implied volatility: one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
+path = "src/algotrade/features/rollups/corporate"
+purpose = "feature groups from corporate events and filings (earnings, dividends, share counts): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
@@ -807,7 +822,7 @@ kind = "log"
 
 [[docs_dir]]
 path = "docs/data"
-purpose = "data specs: layers, storage, instruments, vendors, nightly footprint"
+purpose = "data specs: layers, storage, instruments, vendors, nightly footprint, feature catalogue, options positioning, swing levels"
 
 [[docs_dir]]
 path = "docs/screeners"

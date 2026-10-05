@@ -56,3 +56,7 @@ delta_hi = 0.15
 search_lo = 0.05         # candidates for the best put: search_lo <= |our delta| <= search_hi
 search_hi = 0.35
 prefer_monthly = true    # standard monthlies in the window first (where OI concentrates), else any
+
+["oi_walls@v1"]          # call / put walls (docs/data/swing.md); the DTE window is part of v1
+dte_min = 1              # open interest is summed across expiries dte_min..dte_max calendar
+dte_max = 60             # days out (0: an expiry on the session, gone by the next open)

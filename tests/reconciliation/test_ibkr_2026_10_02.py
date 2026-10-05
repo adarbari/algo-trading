@@ -20,7 +20,8 @@ import pandas as pd
 import pytest
 
 from algotrade.data.prices import adjust_bars
-from algotrade.features.rollups import dividends, price_stats
+from algotrade.features.rollups.corporate import dividends
+from algotrade.features.rollups.price import price_stats
 from algotrade.features.site import site_features
 from algotrade.quant import realized_vol
 from algotrade.storage.configs.files import FileConfigStore

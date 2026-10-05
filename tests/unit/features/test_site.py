@@ -286,3 +286,127 @@ def test_distance_to_52w_extreme_and_moving_averages(fs: FeatureSet) -> None:
     assert out.loc["EQ:B", "pct_vs_sma_20"] == pytest.approx(0.3)
     assert pd.isna(out.loc["EQ:B", "pct_vs_sma_50"])
     assert out.loc["EQ:C", "pct_vs_sma_200"] == pytest.approx(-0.5)
+
+
+MOMENTUM = "rollups/instrument/momentum@v1"
+
+
+def test_swing_atr_pct_range_and_trend_state(fs: FeatureSet) -> None:
+    ids = ["EQ:UP", "EQ:DOWN", "EQ:MIX", "EQ:TIE", "EQ:NEW"]
+    stats = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "close": [105.0, 90.0, 105.0, 100.0, 50.0],
+            "sma_50": [100.0, 95.0, 95.0, 100.0, 48.0],
+            "sma_200": [95.0, 100.0, 100.0, 90.0, np.nan],
+        }
+    ).astype("float32", errors="ignore")
+    mom = pd.DataFrame(
+        {
+            "instrument_id": ids[:4],
+            "session_date": END,
+            "atr_14": [2.1, 1.8, np.nan, 0.0],
+            "high_20d": [110.0, 99.0, 106.0, 100.0],
+            "low_20d": [100.0, 89.0, np.nan, 100.0],
+        }
+    ).astype("float32", errors="ignore")
+    names = ["atr_pct", "range_20d_pct", "trend_state"]
+    out = fs.evaluate({PRICE_STATS: stats, MOMENTUM: mom}, names).set_index("instrument_id")
+    assert out.loc["EQ:UP", "atr_pct"] == pytest.approx(2.1 / 105, rel=1e-6)
+    assert out.loc["EQ:UP", "range_20d_pct"] == pytest.approx(10 / 105, rel=1e-6)
+    assert out.loc["EQ:TIE", "atr_pct"] == 0.0 and out.loc["EQ:TIE", "range_20d_pct"] == 0.0
+    assert pd.isna(out.loc["EQ:MIX", "atr_pct"]) and pd.isna(out.loc["EQ:MIX", "range_20d_pct"])
+    assert pd.isna(out.loc["EQ:NEW", "atr_pct"])  # no momentum row
+    assert out["trend_state"].to_dict() == {
+        "EQ:UP": "UPTREND",  # 105 > 100 > 95
+        "EQ:DOWN": "DOWNTREND",  # 90 < 95 < 100
+        "EQ:MIX": "MIXED",  # close above SMA50, SMA50 below SMA200
+        "EQ:TIE": "MIXED",  # close equals SMA50
+        "EQ:NEW": None,  # no SMA200 yet: unknown, not MIXED
+    }
+
+
+SWING = "rollups/instrument/swing_levels@v1"
+
+
+def test_swing_distances_to_resistance_and_support(fs: FeatureSet) -> None:
+    ids = ["EQ:A", "EQ:TOP", "EQ:NOATR"]
+    stats = pd.DataFrame({"instrument_id": ids, "session_date": END, "close": [102.0, 50.0, 20.0]})
+    levels = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "swing_high": [104.0, np.nan, 21.0],  # EQ:TOP is at a one-year high
+            "swing_low": [97.0, 45.0, 19.0],
+        }
+    )
+    mom = pd.DataFrame({"instrument_id": ids, "session_date": END, "atr_14": [2.0, 1.0, np.nan]})
+    names = [
+        "dist_to_resistance",
+        "dist_to_support",
+        "dist_to_resistance_atr",
+        "dist_to_support_atr",
+    ]
+    frames = {PRICE_STATS: stats.astype({"close": "float32"}), SWING: levels, MOMENTUM: mom}
+    out = fs.evaluate(frames, names).set_index("instrument_id")
+    assert out.loc["EQ:A", "dist_to_resistance"] == pytest.approx(2 / 102)  # 0.0196
+    assert out.loc["EQ:A", "dist_to_support"] == pytest.approx(5 / 102)
+    assert out.loc["EQ:A", "dist_to_resistance_atr"] == pytest.approx(1.0)
+    assert out.loc["EQ:A", "dist_to_support_atr"] == pytest.approx(2.5)
+    assert pd.isna(out.loc["EQ:TOP", "dist_to_resistance"])  # no resistance: unknown, not 0
+    assert pd.isna(out.loc["EQ:TOP", "dist_to_resistance_atr"])
+    assert out.loc["EQ:TOP", "dist_to_support"] == pytest.approx(0.1)
+    assert pd.isna(out.loc["EQ:NOATR", "dist_to_support_atr"])  # no ATR yet
+    assert out.loc["EQ:NOATR", "dist_to_resistance"] == pytest.approx(0.05)
+
+
+def test_swing_breakout_and_pullback_rules(fs: FeatureSet) -> None:
+    ids = [
+        "EQ:BREAK",
+        "EQ:QUIET",
+        "EQ:INSIDE",
+        "EQ:NOVOL",
+        "EQ:PULL",
+        "EQ:EDGE",
+        "EQ:FAR",
+        "EQ:MIX",
+    ]
+    stats = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            # UPTREND needs close > sma_50 > sma_200: sma_50 90, sma_200 80 for every row
+            "close": [111.0, 111.0, 109.0, 111.0, 101.5, 98.0, 103.0, 101.0],
+            "sma_20": [100.0] * 8,
+            "sma_50": [90.0] * 7 + [102.0],  # EQ:MIX: close below SMA50: MIXED
+            "sma_200": [80.0] * 8,
+        }
+    )
+    mom = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "prior_high_20d": [110.0, 110.0, 110.0, 110.0] + [120.0] * 4,
+            "rel_volume": [1.8, 1.2, 3.0, np.nan] + [1.0] * 4,
+            "atr_14": [2.0] * 8,
+        }
+    )
+    frames = {PRICE_STATS: stats.astype("float32", errors="ignore"), MOMENTUM: mom}
+    out = fs.evaluate(frames, ["breakout_20d", "pullback_to_sma20"]).set_index("instrument_id")
+    assert out["breakout_20d"].to_dict() == {
+        "EQ:BREAK": True,  # 111 > 110 on 1.8x volume
+        "EQ:QUIET": False,  # volume only 1.2x
+        "EQ:INSIDE": False,  # below the prior high: false whatever the volume
+        "EQ:NOVOL": None,  # above the prior high, volume unknown
+        "EQ:PULL": False,
+        "EQ:EDGE": False,
+        "EQ:FAR": False,
+        "EQ:MIX": False,
+    }
+    pull = out["pullback_to_sma20"].to_dict()
+    assert pull["EQ:PULL"] is True  # |101.5 - 100| <= 2
+    assert pull["EQ:EDGE"] is True  # 2 below SMA20: the edge counts
+    assert pull["EQ:FAR"] is False  # 3 above: more than 1 ATR
+    assert pull["EQ:MIX"] is False  # not an uptrend
+    assert pull["EQ:BREAK"] is False  # 11 above SMA20

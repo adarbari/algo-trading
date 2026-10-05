@@ -22,6 +22,7 @@ from algotrade_api.routes.preview import screeners as screen_preview
 from algotrade_api.routes.screens import ideas
 from algotrade_api.routes.screens import results as screen_results
 from algotrade_api.routes.screens import table as screen_table
+from algotrade_api.routes.screens import view as screener_view
 
 ROUTERS: tuple[APIRouter, ...] = (
     health.router,
@@ -38,6 +39,7 @@ ROUTERS: tuple[APIRouter, ...] = (
     screen_preview.router,
     screeners.router,
     preferences.router,
+    screener_view.router,
     ideas.router,
     backtests.router,
     configs.router,

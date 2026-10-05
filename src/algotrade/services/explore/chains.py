@@ -7,7 +7,7 @@ from typing import Any
 
 from algotrade.data.chains import OPTION_QUOTES, chain_status, option_quotes, underlying_quotes
 from algotrade.data.rollups import rollup_row
-from algotrade.features.rollups import iv30
+from algotrade.features.rollups.options import iv30
 from algotrade.services.explore.instruments import resolve_key
 from algotrade.services.explore.store import (
     NotFoundError,

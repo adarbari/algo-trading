@@ -10,7 +10,7 @@ import pytest
 
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.framework.runner import compute_one
-from algotrade.features.rollups.iv_history import GROUP, IvHistoryParams, history
+from algotrade.features.rollups.options.iv_history import GROUP, IvHistoryParams, history
 from tests.helpers.rollup_store import END, store
 from tests.helpers.stored_frames import stamped
 

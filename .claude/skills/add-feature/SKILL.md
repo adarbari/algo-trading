@@ -41,7 +41,7 @@ row), it is a **column of a feature group**:
 
 Read first: ADR 0007, ADR 0023 (the feature store), `docs/data/layers.md` ("Rollups as
 built"), the catalogue `docs/data/features.md` (does the feature already exist?) and an
-existing group (`src/algotrade/features/rollups/price_stats.py`).
+existing group (`src/algotrade/features/rollups/price/price_stats.py`).
 
 **Ownership check (ADR 0019: `rollup-computation`, `feature-metadata`,
 `feature-input-loading`):** a feature is one documented column of a **feature group**. The
@@ -53,8 +53,8 @@ Never read storage or `algotrade.data` inside a group (import-linter enforces it
 loader under `features/`, and never write a new task for a group. `make ownership` and
 `make dupes` must pass.
 
-0. **Where it goes:** a feature of an existing group goes in that group's module (a new stored column = a new group version, step 6); a new group in `features/rollups/<name>.py`; a new input table's read in its owner in `src/algotrade/data/` plus an `INPUTS` entry in `data/feature_inputs.py`; pure maths in `quant/` (`grep -n purpose architecture/layout.toml`); no fit: new folder, `add-responsibility` step 3. Tests mirror it; if a folder is at 8+ modules, plan the split (`make layout`).
-1. **Declare its features** in `src/algotrade/features/rollups/<name>.py`: `FEATURES = (
+0. **Where it goes:** a feature of an existing group goes in that group's module (a new stored column = a new group version, step 6); a new group in `features/rollups/<kind>/<name>.py` (`price/` daily bars, `options/` chains and implied vol, `corporate/` events and filings); a new input table's read in its owner in `src/algotrade/data/` plus an `INPUTS` entry in `data/feature_inputs.py`; pure maths in `quant/` (`grep -n purpose architecture/layout.toml`); no fit: new folder, `add-responsibility` step 3. Tests mirror it; if a folder is at 8+ modules, plan the split (`make layout`).
+1. **Declare its features** in `src/algotrade/features/rollups/<kind>/<name>.py`: `FEATURES = (
    Feature(name, dtype, unit, description, null_meaning, kind, valid_range=..., categories=...,
    inputs=...), ...)` (`features/framework/feature.py`): `dtype` one of `float32 | float | int |
    bool | str | date` (new groups store floats as `float32`); `unit` from `UNITS` (`decimal` 0.25 = 25%, `pct_points` 25 = 25%, `usd`,
@@ -98,7 +98,7 @@ loader under `features/`, and never write a new task for a group. `make ownershi
    fields then fail with the field that replaced them), and after the owner's backfill retire
    the old table with `algotrade-ingest retire-features --group <name>@v<N> [--dry-run]`.
    Metadata-only edits (a better description) need no new version.
-7. **Tests** (`tests/unit/features/rollups/`): hand-computed values on a small stored series
+7. **Tests** (`tests/unit/features/rollups/<kind>/`): hand-computed values on a small stored series
    (`tests/helpers/rollup_store.py`), missing history / gaps are null, a backfill equals the
    per-session compute, and anything adjustment-sensitive (splits) as of each session.
 8. **Docs:** the generated catalogue (`make features-doc`), the groups table in

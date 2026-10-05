@@ -1,4 +1,4 @@
-"""A rule screen's latest run as a review table (ADR 0031): one row per instrument with its
+"""A rule screen's latest run as a review table (ADR 0032): one row per instrument with its
 decision, score and reasons, the value and PASS / NEAR / FAIL / MISSING of every criterion, the
 screen's display columns, any catalogue features the reader adds, and what changed since the
 previous run (``new`` / ``dropped``).

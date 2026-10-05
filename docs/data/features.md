@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-99 stored features in 10 groups, in dependency order; 25 expression features.
+119 stored features in 14 groups, in dependency order; 34 expression features.
 
 ## `option_liquidity@v1`
 
@@ -115,6 +115,54 @@ The largest one-day close-to-close move over the last 20 sessions. Stored as `ro
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
 | `one_day_move` | window | float32 | decimal | open | >= 0 | Largest absolute one-day close-to-close return over the last 20 sessions (split-adjusted as of the session): 0.12 is a 12% move up or down | a session among the last 21 has no close (a gap), or the history is shorter | `bars/1d.close` |
+
+## `momentum@v1`
+
+Wilder ATR and RSI (14), 5-session return, relative volume and the 20 / 50-session high-low channel. Stored as `rollups/instrument/momentum@v1`; reads `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `atr_14` | window | float32 | usd_per_share | open | >= 0 | Wilder average true range (14): seeded with the mean of the first 14 true ranges, then (13 x ATR + TR) / 14, over the consecutive bars ending on the session (at most the last 150 sessions); TR = max(high - low, \|high - previous close\|, \|low - previous close\|) | fewer than 15 consecutive bars ending on the session (a gap among the last 15 sessions, or a shorter history) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
+| `rsi_14` | window | float32 | pct_points | open | 0 .. 100 | Wilder RSI (14) of close changes over the same run as atr_14: 100 - 100 / (1 + average gain / average loss); 100 when there was no loss | fewer than 15 consecutive bars ending on the session (a gap among the last 15 sessions, or a shorter history); or the close never moved over the run (no gain and no loss: 0/0) | `bars/1d.close` |
+| `ret_5d` | window | float32 | decimal | open | >= -1 | Close / close 5 sessions earlier - 1 | a session among the last 6 has no bar (a gap), or the history is shorter | `bars/1d.close` |
+| `rel_volume` | window | float32 | ratio | open | >= 0 | The session's volume / the mean volume of the 20 sessions before it (the session excluded): 1.8 is 80% above normal; 0 on a day without trades | a session among the last 21 has no bar (a gap), or the history is shorter; or those 20 sessions had no volume at all | `bars/1d.volume` |
+| `high_20d` | window | float32 | usd_per_share | open | >= 0 | Highest daily high over the last 20 sessions, the session included | a session among the last 20 has no bar (a gap), or the history is shorter | `bars/1d.high` |
+| `low_20d` | window | float32 | usd_per_share | open | >= 0 | Lowest daily low over the last 20 sessions, the session included | a session among the last 20 has no bar (a gap), or the history is shorter | `bars/1d.low` |
+| `high_50d` | window | float32 | usd_per_share | open | >= 0 | Highest daily high over the last 50 sessions, the session included | a session among the last 50 has no bar (a gap), or the history is shorter | `bars/1d.high` |
+| `low_50d` | window | float32 | usd_per_share | open | >= 0 | Lowest daily low over the last 50 sessions, the session included | a session among the last 50 has no bar (a gap), or the history is shorter | `bars/1d.low` |
+| `prior_high_20d` | window | float32 | usd_per_share | open | >= 0 | Highest daily high over the 20 sessions before the session (the session excluded): the level a breakout close must clear | a session among the 20 before the session has no bar (a gap), or the history is shorter | `bars/1d.high` |
+
+## `swing_levels@v1`
+
+Resistance and support: the most recent confirmed swing high above and swing low below the close (5 bars each side, last 252 sessions). Stored as `rollups/instrument/swing_levels@v1`; reads `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `swing_high` | window | float32 | usd_per_share | open | >= 0 | Resistance: the high of the most recent swing high above the close (a bar whose high is strictly above the 5 highs before it and at least the 5 after it, confirmed 5 sessions later) | no confirmed swing high above the close among the last 252 sessions (e.g. the close is at a 252-session high), or fewer than 11 bars in a row | `bars/1d.high`, `bars/1d.close` |
+| `swing_high_date` | window | date | date | open |  | The session of that swing high | no confirmed swing high above the close among the last 252 sessions (e.g. the close is at a 252-session high), or fewer than 11 bars in a row | `bars/1d.high`, `bars/1d.close` |
+| `swing_low` | window | float32 | usd_per_share | open | >= 0 | Support: the low of the most recent swing low below the close (a bar whose low is strictly below the 5 lows before it and at most the 5 after it, confirmed 5 sessions later) | no confirmed swing low below the close among the last 252 sessions (e.g. the close is at a 252-session low), or fewer than 11 bars in a row | `bars/1d.low`, `bars/1d.close` |
+| `swing_low_date` | window | date | date | open |  | The session of that swing low | no confirmed swing low below the close among the last 252 sessions (e.g. the close is at a 252-session low), or fewer than 11 bars in a row | `bars/1d.low`, `bars/1d.close` |
+
+## `anchored_vwap@v1`
+
+VWAP anchored to the last earnings report (from the reaction session through the session). Stored as `rollups/instrument/anchored_vwap@v1`; reads `events/earnings`, `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `avwap_earnings` | window | float32 | usd_per_share | open | >= 0 | Volume-weighted average of the typical price (high + low + close) / 3 from the last earnings anchor session through the session (the anchor: the report date, or the next session for a report after the close) | no report known on the session anchors on or before it within the last 126 sessions (no earlier report stored, or the last one is older); or fewer than 2 sessions from the anchor through the session, a session in that range without a bar, or no volume in it | `events/earnings.ts`, `events/earnings.time`, `bars/1d.high`, `bars/1d.low`, `bars/1d.close`, `bars/1d.volume` |
+| `avwap_anchor_date` | window | date | date | open |  | The session avwap_earnings is anchored on: the last report date (pre-market or unknown time) or the session after it (after the close) | no report known on the session anchors on or before it within the last 126 sessions (no earlier report stored, or the last one is older) | `events/earnings.ts`, `events/earnings.time` |
+
+## `oi_walls@v1`
+
+Call and put walls: the strikes with the most open interest at or above / at or below spot, summed across expiries 1..60 days out (end-of-day OI). Stored as `rollups/instrument/oi_walls@v1`; reads `chains/option_quotes`, `chains/underlying_quotes` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `wall_status` | label | str | category | open | OK, PARTIAL, NO_OI, NO_SPOT, NO_CHAIN, NO_EXPIRY | OK (both walls), PARTIAL (one wall), NO_OI (no open interest on either side), or the first failing step: NO_SPOT, NO_CHAIN (no quotes), NO_EXPIRY (none 1..60 days out) | never | `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/option_quotes.open_interest`, `chains/underlying_quotes.price` |
+| `call_wall` | chain | float32 | usd_per_share | open | >= 0 | Call wall: the strike at or above spot with the most call open interest, summed across expiries 1..60 calendar days out (end-of-day OI; ties: nearer spot) | no call with open interest above 0 at a strike at or above spot 1..60 days out, or wall_status NO_SPOT, NO_CHAIN or NO_EXPIRY | `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/option_quotes.open_interest`, `chains/underlying_quotes.price` |
+| `call_wall_oi` | chain | int | count | open | >= 1 | Call open interest at the call wall, summed across expiries 1..60 days out | no call with open interest above 0 at a strike at or above spot 1..60 days out, or wall_status NO_SPOT, NO_CHAIN or NO_EXPIRY | `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/option_quotes.open_interest`, `chains/underlying_quotes.price` |
+| `put_wall` | chain | float32 | usd_per_share | open | >= 0 | Put wall: the strike at or below spot with the most put open interest, summed across expiries 1..60 calendar days out (end-of-day OI; ties: nearer spot) | no put with open interest above 0 at a strike at or below spot 1..60 days out, or wall_status NO_SPOT, NO_CHAIN or NO_EXPIRY | `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/option_quotes.open_interest`, `chains/underlying_quotes.price` |
+| `put_wall_oi` | chain | int | count | open | >= 1 | Put open interest at the put wall, summed across expiries 1..60 days out | no put with open interest above 0 at a strike at or below spot 1..60 days out, or wall_status NO_SPOT, NO_CHAIN or NO_EXPIRY | `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/option_quotes.open_interest`, `chains/underlying_quotes.price` |
 
 ## `dividends@v2`
 
@@ -225,6 +273,20 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | `pct_vs_sma_20` | expression | float | decimal | open | >= -1 | Close / 20-session moving average - 1 | price_stats sma_20 is null (a gap among the last 20 sessions, or a shorter history), or no price_stats row | `price_stats.close / price_stats.sma_20 - 1` | virtual |
 | `pct_vs_sma_50` | expression | float | decimal | open | >= -1 | Close / 50-session moving average - 1 | price_stats sma_50 is null (a gap among the last 50 sessions, or a shorter history), or no price_stats row | `price_stats.close / price_stats.sma_50 - 1` | virtual |
 | `pct_vs_sma_200` | expression | float | decimal | open | >= -1 | Close / 200-session moving average - 1 | price_stats sma_200 is null (a gap among the last 200 sessions, or a shorter history), or no price_stats row | `price_stats.close / price_stats.sma_200 - 1` | virtual |
+
+### `swing.toml`
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Formula | Stored |
+|---|---|---|---|---|---|---|---|---|---|
+| `atr_pct` | expression | float | decimal | open | >= 0 | Wilder ATR(14) as a fraction of the close: 0.02 is a typical daily range of 2% | atr_14 is null (fewer than 15 consecutive bars), or no momentum or price_stats row | `momentum.atr_14 / price_stats.close` | virtual |
+| `range_20d_pct` | expression | float | decimal | open | >= 0 | Width of the 20-session high-low channel as a fraction of the close: (high_20d - low_20d) / close | high_20d or low_20d is null (a gap among the last 20 sessions, or a shorter history) | `(momentum.high_20d - momentum.low_20d) / price_stats.close` | virtual |
+| `trend_state` | label | str | category | open | UPTREND, DOWNTREND, MIXED | UPTREND when close > SMA50 > SMA200, DOWNTREND when close < SMA50 < SMA200, else MIXED (an equality is MIXED) | sma_50 or sma_200 is null (a gap among the last 50 / 200 sessions, or a shorter history), or no price_stats row | `if(is_null(price_stats.sma_50) or is_null(price_stats.sma_200), null, if(price_stats.close > price_stats.sma_50 and price_stats.sma_50 > price_stats.sma_200, "UPTREND", if(price_stats.close < price_stats.sma_50 and price_stats.sma_50 < price_stats.sma_200, "DOWNTREND", "MIXED")))` | virtual |
+| `dist_to_resistance` | expression | float | decimal | open | >= 0 | How far the nearest confirmed swing high above the close is: (swing_high - close) / close, 0.05 is 5% above | no confirmed swing high above the close in the last 252 sessions (e.g. at a one-year high), or no swing_levels row | `(swing_levels.swing_high - price_stats.close) / price_stats.close` | virtual |
+| `dist_to_support` | expression | float | decimal | open | 0 .. 1 | How far the nearest confirmed swing low below the close is: (close - swing_low) / close, 0.05 is 5% below | no confirmed swing low below the close in the last 252 sessions (e.g. at a one-year low), or no swing_levels row | `(price_stats.close - swing_levels.swing_low) / price_stats.close` | virtual |
+| `dist_to_resistance_atr` | expression | float | ratio | open | >= 0 | Distance to resistance in ATRs: (swing_high - close) / atr_14 | dist_to_resistance is null, atr_14 is null (fewer than 15 consecutive bars), or atr_14 is 0 | `(swing_levels.swing_high - price_stats.close) / momentum.atr_14` | virtual |
+| `dist_to_support_atr` | expression | float | ratio | open | >= 0 | Distance to support in ATRs: (close - swing_low) / atr_14 | dist_to_support is null, atr_14 is null (fewer than 15 consecutive bars), or atr_14 is 0 | `(price_stats.close - swing_levels.swing_low) / momentum.atr_14` | virtual |
+| `breakout_20d` | expression | bool | flag | open |  | A 20-session breakout on volume: close above the highest high of the 20 sessions before today (prior_high_20d) and rel_volume above 1.5 (params.min_rel_volume) | neither condition is false and one is unknown (prior_high_20d or rel_volume null: a gap among the last 21 sessions, or a shorter history) | `price_stats.close > momentum.prior_high_20d and momentum.rel_volume > min_rel_volume` (min_rel_volume = 1.5) | virtual |
+| `pullback_to_sma20` | expression | bool | flag | open |  | A pullback in an uptrend: trend_state UPTREND and the close within 1 ATR (params.atr_multiple) of SMA20, above or below it (edges included) | neither condition is false and one is unknown (trend_state, sma_20 or atr_14 null) | `trend_state == "UPTREND" and abs(price_stats.close - price_stats.sma_20) <= atr_multiple * momentum.atr_14` (atr_multiple = 1.0) | virtual |
 
 ### `volatility.toml`
 

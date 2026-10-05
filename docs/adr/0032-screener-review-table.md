@@ -1,4 +1,4 @@
-# ADR 0031: Screener results are the default surface; a review table over the stored run
+# ADR 0032: Screener results are the default surface; a review table over the stored run
 
 **Status:** accepted (2026-10-04; owner decision, mockup option B). Extends
 [0029](0029-rule-screener.md) and [0030](0030-rule-screener-simplification.md).

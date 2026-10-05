@@ -6,7 +6,7 @@ from datetime import date
 import pandas as pd
 
 from algotrade.features.framework.runner import compute_one, compute_sessions
-from algotrade.features.rollups import earnings
+from algotrade.features.rollups.corporate import earnings
 from tests.helpers.rollup_store import store, write_earnings
 
 GROUP = earnings.GROUP

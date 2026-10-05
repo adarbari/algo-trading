@@ -502,6 +502,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/preferences/screeners/{screener_id}/view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** View */
+        get: operations["view_preferences_screeners__screener_id__view_get"];
+        /** Save Screener View */
+        put: operations["save_screener_view_preferences_screeners__screener_id__view_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/screeners": {
         parameters: {
             query?: never;
@@ -2177,6 +2195,49 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** ScreenerView */
+        ScreenerView: {
+            /**
+             * Columns
+             * @description catalogue features added to the table, in order
+             */
+            columns: string[];
+            /**
+             * Decisions
+             * @description decisions shown (empty: the page's default)
+             */
+            decisions: string[];
+            /**
+             * Saved
+             * @description false: no view saved yet (the page uses its defaults)
+             */
+            saved: boolean;
+            /** Screener Id */
+            screener_id: string;
+            /**
+             * Sort
+             * @description a /screens/{id}/table sort (null: the default)
+             */
+            sort: string | null;
+        };
+        /** ScreenerViewBody */
+        ScreenerViewBody: {
+            /**
+             * Columns
+             * @description catalogue features added to the table, in order
+             */
+            columns: string[];
+            /**
+             * Decisions
+             * @description decisions shown (empty: the page's default)
+             */
+            decisions: string[];
+            /**
+             * Sort
+             * @description a /screens/{id}/table sort ('-' prefix: descending); null: default
+             */
+            sort?: string | null;
+        };
         /** ScreenPreview */
         ScreenPreview: {
             /**
@@ -3410,6 +3471,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IdeasPriority"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    view_preferences_screeners__screener_id__view_get: {
+        parameters: {
+            query?: {
+                /** @description default: the API's user (a label until auth) */
+                user?: string | null;
+            };
+            header?: never;
+            path: {
+                screener_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenerView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_screener_view_preferences_screeners__screener_id__view_put: {
+        parameters: {
+            query?: {
+                /** @description whose configs (a label until auth; default the API's) */
+                user?: string | null;
+            };
+            header?: never;
+            path: {
+                screener_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreenerViewBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenerView"];
                 };
             };
             /** @description Validation Error */

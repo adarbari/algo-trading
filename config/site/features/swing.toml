@@ -1,0 +1,94 @@
+# Swing levels and momentum (the SW track; definitions and worked examples in
+# docs/data/swing.md). Formulas over price_stats@v2, momentum@v1 and swing_levels@v1, computed
+# on read. The language and the keys: docs/configuration.md "Expression features". Changing a
+# formula or a param: bump its version.
+
+[atr_pct]
+expr = "momentum.atr_14 / price_stats.close"
+dtype = "float"
+unit = "decimal"
+description = "Wilder ATR(14) as a fraction of the close: 0.02 is a typical daily range of 2%"
+null_meaning = "atr_14 is null (fewer than 15 consecutive bars), or no momentum or price_stats row"
+valid_range = [0, inf]
+version = 1
+
+[range_20d_pct]
+expr = "(momentum.high_20d - momentum.low_20d) / price_stats.close"
+dtype = "float"
+unit = "decimal"
+description = "Width of the 20-session high-low channel as a fraction of the close: (high_20d - low_20d) / close"
+null_meaning = "high_20d or low_20d is null (a gap among the last 20 sessions, or a shorter history)"
+valid_range = [0, inf]
+version = 1
+
+[trend_state]
+kind = "label"
+expr = '''
+if(is_null(price_stats.sma_50) or is_null(price_stats.sma_200), null,
+   if(price_stats.close > price_stats.sma_50 and price_stats.sma_50 > price_stats.sma_200, "UPTREND",
+      if(price_stats.close < price_stats.sma_50 and price_stats.sma_50 < price_stats.sma_200, "DOWNTREND",
+         "MIXED")))
+'''
+dtype = "str"
+unit = "category"
+categories = ["UPTREND", "DOWNTREND", "MIXED"]
+description = "UPTREND when close > SMA50 > SMA200, DOWNTREND when close < SMA50 < SMA200, else MIXED (an equality is MIXED)"
+null_meaning = "sma_50 or sma_200 is null (a gap among the last 50 / 200 sessions, or a shorter history), or no price_stats row"
+version = 1
+
+[dist_to_resistance]
+expr = "(swing_levels.swing_high - price_stats.close) / price_stats.close"
+dtype = "float"
+unit = "decimal"
+description = "How far the nearest confirmed swing high above the close is: (swing_high - close) / close, 0.05 is 5% above"
+null_meaning = "no confirmed swing high above the close in the last 252 sessions (e.g. at a one-year high), or no swing_levels row"
+valid_range = [0, inf]
+version = 1
+
+[dist_to_support]
+expr = "(price_stats.close - swing_levels.swing_low) / price_stats.close"
+dtype = "float"
+unit = "decimal"
+description = "How far the nearest confirmed swing low below the close is: (close - swing_low) / close, 0.05 is 5% below"
+null_meaning = "no confirmed swing low below the close in the last 252 sessions (e.g. at a one-year low), or no swing_levels row"
+valid_range = [0, 1]
+version = 1
+
+[dist_to_resistance_atr]
+expr = "(swing_levels.swing_high - price_stats.close) / momentum.atr_14"
+dtype = "float"
+unit = "ratio"
+description = "Distance to resistance in ATRs: (swing_high - close) / atr_14"
+null_meaning = "dist_to_resistance is null, atr_14 is null (fewer than 15 consecutive bars), or atr_14 is 0"
+valid_range = [0, inf]
+version = 1
+
+[dist_to_support_atr]
+expr = "(price_stats.close - swing_levels.swing_low) / momentum.atr_14"
+dtype = "float"
+unit = "ratio"
+description = "Distance to support in ATRs: (close - swing_low) / atr_14"
+null_meaning = "dist_to_support is null, atr_14 is null (fewer than 15 consecutive bars), or atr_14 is 0"
+valid_range = [0, inf]
+version = 1
+
+[breakout_20d]
+expr = "price_stats.close > momentum.prior_high_20d and momentum.rel_volume > min_rel_volume"
+params = { min_rel_volume = 1.5 }  # volume above 1.5x the prior 20-session average
+dtype = "bool"
+unit = "flag"
+description = "A 20-session breakout on volume: close above the highest high of the 20 sessions before today (prior_high_20d) and rel_volume above 1.5 (params.min_rel_volume)"
+null_meaning = "neither condition is false and one is unknown (prior_high_20d or rel_volume null: a gap among the last 21 sessions, or a shorter history)"
+version = 1
+
+[pullback_to_sma20]
+expr = '''
+trend_state == "UPTREND"
+and abs(price_stats.close - price_stats.sma_20) <= atr_multiple * momentum.atr_14
+'''
+params = { atr_multiple = 1.0 }  # how near SMA20 counts, in ATRs, either side (edges included)
+dtype = "bool"
+unit = "flag"
+description = "A pullback in an uptrend: trend_state UPTREND and the close within 1 ATR (params.atr_multiple) of SMA20, above or below it (edges included)"
+null_meaning = "neither condition is false and one is unknown (trend_state, sma_20 or atr_14 null)"
+version = 1

@@ -378,7 +378,7 @@ def test_the_committed_feature_files_load() -> None:
     names = sorted(p.stem for p in (SITE / "features").glob("*.toml"))
     store = open_config_store(str(REPO_ROOT / "config"))
     assert store.names("site", "features") == names
-    assert names == ["fundamentals", "liquidity", "price", "volatility", "vrp"]
+    assert names == ["fundamentals", "liquidity", "price", "swing", "volatility", "vrp"]
     definitions = load_features(store)
     assert {d.name for d in definitions} >= {"liquidity_class", "div_yield", "near_52w"}
     assert [d.name for d in definitions if d.materialise] == ["div_yield"]

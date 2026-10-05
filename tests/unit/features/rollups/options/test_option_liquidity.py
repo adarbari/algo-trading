@@ -6,7 +6,7 @@ from hypothesis import strategies as st
 
 from algotrade.core.model.options import OptionRight, third_friday
 from algotrade.features.registry import GROUPS
-from algotrade.features.rollups import option_liquidity as liq
+from algotrade.features.rollups.options import option_liquidity as liq
 from tests.unit.features import legacy_reference
 
 SESSION = date(2026, 10, 2)

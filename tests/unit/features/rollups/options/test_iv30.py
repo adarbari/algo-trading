@@ -11,8 +11,8 @@ import pandas as pd
 import pytest
 
 from algotrade.features.framework.runner import compute_in_memory, compute_one
-from algotrade.features.rollups import iv30
-from algotrade.features.rollups.iv30 import GROUP, Iv30Params, choose_expiries
+from algotrade.features.rollups.options import iv30
+from algotrade.features.rollups.options.iv30 import GROUP, Iv30Params, choose_expiries
 from algotrade.quant.implied_vol import interpolate_total_variance
 from tests.helpers.rollup_store import END, chain_rows, store, write_chains, write_curve
 

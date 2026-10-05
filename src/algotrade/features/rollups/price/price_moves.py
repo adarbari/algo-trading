@@ -22,7 +22,7 @@ import pandas as pd
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
-from algotrade.features.rollups.price_stats import panel
+from algotrade.features.rollups.price.price_stats import panel
 
 NAME = "price_moves"
 VERSION = 1
