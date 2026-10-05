@@ -18,7 +18,7 @@ that was never run, or changed since it last ran, can only be run from the CLI.
    `schedule` key in an older document is accepted and ignored (the immutable `vrp_scanner`
    v1 to v3 presets still carry a "not scheduled" comment; their files are hash-locked).
    `services.configs.nightly_screeners` replaces `scheduled`.
-2. **A screener can be run on request** from the API (`POST /screens/{id}/run`, later PR):
+2. **A screener can be run on request** from the API (`POST /screens/{id}/run`):
    for the latest session with data, unless results for this screener version (config hash)
    and session are already stored, in which case nothing runs and the stored ones are
    reported. The request returns a job id; the page polls `GET /jobs/{id}` (ADR 0010).
@@ -38,4 +38,5 @@ that was never run, or changed since it last ran, can only be run from the CLI.
 - Rule screens cost about 11k rows each per night; the nightly's screens step grows with the
   number of finalised screens. If that becomes slow, the step can parallelise (the job
   runner already has a pool).
-- This PR implements 1; the endpoints and the Results page's "Run now" follow.
+- Part 1 (the nightly) shipped first; part 2 is `services/ondemand`, `POST /screens/{id}/run`
+  with `GET /screens/{id}/run/{job_id}`, and "Run now" on the Results page.

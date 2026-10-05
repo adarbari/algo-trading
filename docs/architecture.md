@@ -539,6 +539,7 @@ web (apps/web) ──HTTP/JSON──▶ routes/<area>.py ──one call──▶
 | features | `/features` (catalogue: kind, dtype, description, null meaning, version, inputs); `/features/{name}/distribution?date` (count, nulls, quantiles, histogram or categories) |
 | ideas | `/ideas?date&user&limit` (one row per ticker over every rule screen's latest stored run, ranked by the user's `ideas.priority` in `config/users/<u>/preferences.toml`, then score) |
 | screener view | `GET /preferences/screeners/{id}/view?user` and `PUT` (a user's added catalogue columns, sort and shown decisions for one screener's results, in `screeners.<id>.view` of `preferences.toml`; never part of a screener version or hash; ADR 0032) |
+| screen run | `POST /screens/{config_id}/run?date&user` (run a screener on request for the latest session with data, unless this version has results for it: `ready`, else the nightly's `screen` job under the writer lock, 202) and `GET /screens/{config_id}/run/{job_id}` (its state; ADR 0033) |
 | screens | `/screens` (screener configs + schedule + latest run); `/screens/{config_id}/results?date&decision&page&size` (+ audit); `/screens/{config_id}/table?date&decision&change&q&columns&sort&page&size` (a rule screen's run as a review table: criteria, display columns, features, new / dropped; ADR 0032) |
 | backtests | `/backtests`; `/backtests/{run_id}` (metrics, selection, data versions, rebalances, equity curve, fills) |
 | configs | `/configs`; `/configs/{id}` (resolved: layers + hash) |
