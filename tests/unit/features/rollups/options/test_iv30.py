@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 from algotrade.features.framework.runner import compute_in_memory, compute_one
-from algotrade.features.rollups.options import iv30
+from algotrade.features.rollups.options import iv30, oi_walls, put_wing
 from algotrade.features.rollups.options.iv30 import GROUP, Iv30Params, choose_expiries
 from algotrade.quant.implied_vol import interpolate_total_variance
 from tests.helpers.rollup_store import END, chain_rows, store, write_chains, write_curve
@@ -150,3 +150,20 @@ def test_through_the_framework_with_stored_inputs() -> None:
     out = compute_in_memory(reader, [GROUP], [END])[GROUP.key][0].frame
     assert out is not None and out["iv30"].iloc[0] == pytest.approx(0.25, abs=1e-6)
     assert pd.isna(out["div_yield"].iloc[0])  # no div_yield@v1 stored: q = 0
+
+
+def test_spot_prices_are_the_one_spot_reader_of_the_chain_groups() -> None:
+    quotes = pd.DataFrame(
+        {
+            "instrument_id": ["EQ:A", "EQ:B", "EQ:C", "EQ:D", "EQ:A"],
+            "price": [10.0, 0.0, -1.0, None, 12.0],  # EQ:A quoted twice: the last row wins
+            "iv30": 30.0,
+        }
+    )
+    spots = iv30.spot_prices(quotes)
+    assert list(spots.index) == ["EQ:B", "EQ:C", "EQ:D", "EQ:A"]
+    assert spots["EQ:A"] == 12.0 and spots[["EQ:B", "EQ:C", "EQ:D"]].isna().all()
+    assert iv30.positive_spots(quotes).to_dict() == {"EQ:A": 12.0}
+    assert iv30.spot_prices(None).empty and iv30.positive_spots(quotes.iloc[:0]).empty
+    assert put_wing.positive_spots is iv30.positive_spots
+    assert oi_walls.positive_spots is iv30.positive_spots

@@ -220,6 +220,12 @@ OI alone is dominated by far-dated LEAPS. A side restriction makes a wall jump t
 strike the day spot crosses it, which hides exactly the event a trader watches. In practice
 the gamma-weighted call wall sits at or above spot and the put wall at or below.
 
+Note: `oi_walls@v1` (swing track, built; [swing.md](swing.md)) is exactly the alternative
+argued against here: OI-based, call wall at or above spot, put wall at or below, expiries 1 to
+60 days out. It is a separate group with its own columns (`call_wall`, `put_wall`), a plain
+end-of-day read for swing levels, and does not settle this proposal: the gamma-based walls
+above stay proposed and would be new columns in this set.
+
 **Hedge Wall = `gamma_flip` (Proposed).** The spot level where the dealer book's net gamma
 changes sign: for `x` on the grid `S0 x (1 - flip_range) .. S0 x (1 + flip_range)` in steps
 of `flip_step x S0`, recompute `net(x) = sum sign_i x gamma_i(x) x OI_i x 100 x x^2 x 0.01`

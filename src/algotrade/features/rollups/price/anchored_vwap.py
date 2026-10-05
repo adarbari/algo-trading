@@ -3,7 +3,8 @@
 
 Inputs: every ``events/earnings`` calendar snapshot stored on or before the session, read as
 ``earnings@v1`` reads them (``corporate.earnings.valid_events``: the latest snapshot covering a
-date is its authority, moved or cancelled dates are dropped), and ``bars/1d`` split-adjusted AS
+date is its authority, moved or cancelled dates are dropped; only report dates from the
+session before the window on, the only ones that can anchor), and ``bars/1d`` split-adjusted AS
 OF the session (prices divided and volume multiplied by the splits up to it), the session plus
 ``MAX_SESSIONS`` earlier ones. One row per instrument with a bar on the session.
 
@@ -88,7 +89,8 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     days = sessions_ending(session, MAX_SESSIONS + 2)  # the window plus the session before it
     px = panel(bars, days[1:])
     traded = ~np.isnan(px.close[-1])
-    reports = valid_events(stored)
+    # A report before days[0] anchors at row 0 at the latest: too old, never used.
+    reports = valid_events(stored, since=days[0])
     rows = anchors(reports[reports["report"] <= session], days).reindex(px.ids) - 1
     typical = (px.high + px.low + px.close) / 3
     # sums from each row through the last one (a missing bar counts in ``gaps``)

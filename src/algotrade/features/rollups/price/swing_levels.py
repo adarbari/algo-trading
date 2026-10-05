@@ -1,5 +1,5 @@
-"""``swing_levels@v1``: the nearest confirmed swing high above the close (resistance) and swing
-low below it (support), from daily bars (``docs/data/swing.md``).
+"""``swing_levels@v1``: the most recent confirmed swing high above the close (resistance) and
+swing low below it (support), from daily bars (``docs/data/swing.md``).
 
 Input: ``bars/1d`` split-adjusted AS OF the session (``data.prices.session_bars``), the
 session plus ``WINDOW - 1`` earlier sessions. One row per instrument with a bar on the session.
@@ -8,7 +8,8 @@ A bar t is a **swing high** when its high is strictly above each of the ``PIVOT_
 highs before it and at least each of the 5 highs after it (a flat top counts once, at its
 first bar); a **swing low** mirrors it with lows. All 11 sessions must have a bar. A pivot at t
 is confirmed only once bar t + 5 exists, so on session d only pivots up to d - 5 count (bars
-after d are never read). Pivots are searched over the last ``WINDOW`` (252) sessions.
+after d are never read). The bars read are the last ``WINDOW`` (252) sessions, d - 251 to d,
+and a pivot needs its 5 bars each side inside them, so a pivot can be dated d - 246 to d - 5.
 
     swing_high       the high of the most recent confirmed swing high strictly above the
                      session's close; swing_high_date its session
@@ -37,7 +38,8 @@ NAME = "swing_levels"
 VERSION = 1
 BARS = "bars/1d"
 PIVOT_WIDTH = 5  # bars on each side of a pivot
-WINDOW = 252  # sessions searched for pivots, the session included
+WINDOW = 252  # sessions of bars read, the session included
+FIRST_PIVOT = WINDOW - 1 - PIVOT_WIDTH  # the oldest pivot, d - 246: its 5 bars before are read
 
 CLOSE, HIGH, LOW = (f"{BARS}.{c}" for c in ("close", "high", "low"))
 _PIVOT = (
@@ -48,9 +50,9 @@ _PIVOT = (
 
 def _none(side: str, where: str) -> str:
     return (
-        f"no confirmed swing {side} {where} the close among the last {WINDOW} sessions (e.g. "
-        f"the close is at a {WINDOW}-session {'high' if side == 'high' else 'low'}), or fewer "
-        f"than {2 * PIVOT_WIDTH + 1} bars in a row"
+        f"no confirmed swing {side} {where} the close dated {PIVOT_WIDTH} to {FIRST_PIVOT} "
+        f"sessions before the session (e.g. the close is at a {WINDOW}-session "
+        f"{'high' if side == 'high' else 'low'}), or fewer than {2 * PIVOT_WIDTH + 1} bars in a row"
     )
 
 
@@ -132,7 +134,8 @@ GROUP = FeatureGroup(
     NAME,
     VERSION,
     f"Resistance and support: the most recent confirmed swing high above and swing low below "
-    f"the close ({PIVOT_WIDTH} bars each side, last {WINDOW} sessions)",
+    f"the close ({PIVOT_WIDTH} bars each side, pivots {PIVOT_WIDTH} to {FIRST_PIVOT} sessions "
+    "back)",
     (Input(BARS, lookback=WINDOW - 1),),
     FEATURES,
     compute,
