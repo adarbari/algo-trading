@@ -104,7 +104,7 @@ FIXED_PACE = ("ibkr",)
 ADAPTIVE_KEYS = ("max_interval_s", "start_interval_s")
 VENDOR_EXTRAS = {
     "cboe": ("workers", "priority_symbols"),
-    "nasdaq_earnings": ("days",),
+    "nasdaq_earnings": ("days", "lookback_days"),
     "massive": ("corporate_actions_window",),
     "sec_edgar": ("refresh_days", "facts_refresh_days"),
     "treasury": ("lookback_days",),
@@ -197,6 +197,7 @@ class SourcesSettings:
     cboe_workers: int = 4
     cboe_priority_symbols: tuple[str, ...] = ()  # fetched first (with S&P 500 members)
     earnings_days: int = 60
+    earnings_lookback_days: int = 7
     actions_window: tuple[int, int] = (-7, 30)
     sec_refresh_days: int = 30
     sec_facts_refresh_days: int = 30
@@ -274,6 +275,9 @@ class SourcesSettings:
                 s.upper() for s in _extra(vendors, "cboe").strings("priority_symbols", ())
             ),
             earnings_days=_extra(vendors, "nasdaq_earnings").integer("days", d.earnings_days, 1),
+            earnings_lookback_days=_extra(vendors, "nasdaq_earnings").integer(
+                "lookback_days", d.earnings_lookback_days, 0
+            ),
             actions_window=(window[0], window[1]),
             sec_refresh_days=_extra(vendors, "sec_edgar").integer(
                 "refresh_days", d.sec_refresh_days, 0
