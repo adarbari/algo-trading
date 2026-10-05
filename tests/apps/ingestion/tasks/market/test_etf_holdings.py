@@ -1,6 +1,7 @@
 """The etf-holdings task over the three issuer adapters and recorded responses (no network)."""
 
 from collections.abc import Mapping
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
@@ -242,6 +243,44 @@ def test_the_fallback_scope_decides_which_funds_n_port_is_read_for() -> None:
     nothing = run(*world(scope="off"))
     assert nothing.stats["covered"]["sec_nport"] == 0 and nothing.stats["out_of_scope"] == 3
     assert "VTI" not in nothing.items
+
+
+def write_adv(writer: StoreWriter, adv: Mapping[str, float]) -> None:
+    """``price_stats`` rows on the session before ``DAY`` (the nightly rolls up after this step)."""
+    day = DAY - timedelta(days=1)
+    rows = [{"instrument_id": f"EQ:{s}", "adv_usd_20d": v, "close": 50.0} for s, v in adv.items()]
+    writer.write_table("rollups/instrument/price_stats@v2", day, "r", stamped(rows, day, "r"))
+
+
+def test_the_liquid_scope_adds_funds_that_trade_enough_to_the_optionable_ones() -> None:
+    writer, sources = world(scope="liquid")
+    write_adv(writer, {"VUG": 9_000_000.0, "VTI": 10.0, "QQQ": 10.0})  # VUG: N-PORT, not optionable
+    record = run(writer, sources)
+    assert record.stats["fallback_scope"] == "liquid" and record.stats["out_of_scope"] == 0
+    assert record.status is RunStatus.COMPLETE
+    assert "VUG" in record.items  # asked of N-PORT (the recorded trust has no filing for it)
+    quiet_writer, quiet = world(scope="liquid")
+    write_adv(quiet_writer, {"VUG": 4_999_999.0})  # just under the default $5M
+    quiet_run = run(quiet_writer, quiet)
+    assert quiet_run.stats["out_of_scope"] == 1 and "VUG" not in quiet_run.items
+    assert quiet_run.status is RunStatus.COMPLETE
+    low_writer, low = world(scope="liquid")
+    write_adv(low_writer, {"VUG": 4_999_999.0})
+    lowered = run(low_writer, replace(low, fallback_min_adv_usd=1_000_000.0))
+    assert lowered.stats["out_of_scope"] == 0 and "VUG" in lowered.items
+
+
+def test_the_liquid_scope_without_price_stats_reads_the_optionable_funds_and_says_so() -> None:
+    writer, sources = world(scope="liquid")  # no rollups stored yet (a new store)
+    record = run(writer, sources)
+    assert record.stats["out_of_scope"] == 1 and "VUG" not in record.items
+    assert record.stats["fallback_adv_missing"] is True
+    assert (
+        record.status is RunStatus.COMPLETE
+    )  # not a fault of this run: the nightly rolls up later
+    writer2, sources2 = world(scope="liquid")
+    write_adv(writer2, {"VUG": 1.0})
+    assert run(writer2, sources2).stats["fallback_adv_missing"] is False
 
 
 def test_force_rereads_covered_funds() -> None:

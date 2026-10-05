@@ -6,7 +6,10 @@ rest). Per run:
 
 - each issuer's directory says which funds it publishes; the funds are the active ETFs of the
   reference snapshot (security type ``ETF``) that some issuer lists. N-PORT is scope-limited
-  (``[etf_holdings] fallback_scope``): by default only for optionable ETFs no daily file covers;
+  (``[etf_holdings] fallback_scope``): by default only for the ETFs no daily file covers that are
+  optionable or liquid (a 20-session dollar volume of at least ``fallback_min_adv_usd``, read
+  from the latest ``price_stats`` rows; without any (a new store: the nightly rolls up after this
+  step), only the optionable ones, and the stats say so: ``fallback_adv_missing``);
 - a fund is due when it was never read, or past its refresh slot (``[etf_holdings]
   refresh_days``, spread over the window by ticker; funds an issuer lists but has no file for
   count as read, so they are retried once a window, not nightly; SEC N-PORT funds report
@@ -55,8 +58,10 @@ from typing import Any, Self
 import pandas as pd
 
 from algotrade.data.funds.holdings import Bridge, cusip_of, holdings_status, known_cusips
-from algotrade.data.reference import instruments
+from algotrade.data.reference import instruments, snapshot
 from algotrade.data.resolver import SymbolResolver
+from algotrade.data.rollups import rollup_on
+from algotrade.services.features import site_features, site_store
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.refresh import due_keys
 from algotrade_ingestion.tasks.framework.run import (
@@ -67,6 +72,7 @@ from algotrade_ingestion.tasks.framework.run import (
     finished_runs,
     status_label,
 )
+from algotrade_ingestion.tasks.market.option_chains import PRICE_GROUP
 from algotrade_sources.framework.base import FetchRequest, HoldingsSource
 from algotrade_sources.framework.holdings import is_position
 
@@ -97,8 +103,9 @@ class HoldingsSources:
     issuers: Sequence[HoldingsSource]  # priority order: the first that lists a fund reads it
     refresh_days: int = 7
     keep_top: int = 100  # holdings stored per fund; 0 keeps all
-    fallback_scope: str = "optionable"  # funds a scope-limited issuer (N-PORT) is read for
+    fallback_scope: str = "liquid"  # funds a scope-limited issuer (N-PORT) is read for
     check_weight_sum: bool = True  # reject weights far from 100% (off in tests: trimmed files)
+    fallback_min_adv_usd: float = 5_000_000.0  # "liquid": also funds with at least this ADV
 
 
 @dataclass(frozen=True)
@@ -175,11 +182,39 @@ def active_etfs(reference: pd.DataFrame) -> pd.DataFrame:
     return out.reset_index(drop=True)
 
 
-def _wanted(symbol: str, optionable: set[str], sources: HoldingsSources) -> bool:
-    """Whether a scope-limited issuer is read for ``symbol`` (``fallback_scope``)."""
+def liquid_funds(
+    run: IngestRun, etfs: pd.DataFrame, session: date, min_adv_usd: float
+) -> set[str] | None:
+    """Tickers of the ``etfs`` whose 20-session dollar volume (``price_stats.adv_usd_20d``) is at
+    least ``min_adv_usd``, on the latest session on or before ``session`` that has ``price_stats``
+    rows; ``None`` when there are none (the nightly rolls them up after this step, so they are
+    usually the previous session's)."""
+    table = site_features(site_store(run.ctx.configs)).table(PRICE_GROUP)
+    snap = snapshot(run.reader, table, session)
+    if snap is None or snap.pre_snapshot:
+        return None
+    frame = rollup_on(run.reader, table, snap.snapshot_date, list(etfs["instrument_id"]))
+    if frame is None or "adv_usd_20d" not in frame.columns:
+        return None
+    dollars = pd.to_numeric(frame["adv_usd_20d"], errors="coerce")
+    symbols = dict(zip(etfs["instrument_id"], etfs["symbol"], strict=True))
+    return {symbols[i] for i in frame.loc[dollars >= min_adv_usd, "instrument_id"] if i in symbols}
+
+
+def scope_funds(
+    run: IngestRun, etfs: pd.DataFrame, session: date, sources: HoldingsSources
+) -> tuple[set[str], bool]:
+    """(the tickers a scope-limited issuer is read for, whether ``liquid`` had to fall back to
+    the optionable funds for want of ``price_stats`` rows), by ``fallback_scope``."""
+    optionable = set(etfs.loc[etfs["optionable"], "symbol"])
     if sources.fallback_scope == "all":
-        return True
-    return sources.fallback_scope == "optionable" and symbol in optionable
+        return set(etfs["symbol"]), False
+    if sources.fallback_scope == "optionable":
+        return optionable, False
+    if sources.fallback_scope != "liquid":
+        return set(), False
+    liquid = liquid_funds(run, etfs, session, sources.fallback_min_adv_usd)
+    return (optionable, True) if liquid is None else (optionable | liquid, False)
 
 
 def _directory(run: IngestRun, source: HoldingsSource, listed: dict[str, set[str]]) -> str:
@@ -538,10 +573,8 @@ def ingest_etf_holdings(
         }
         skipped = {s for s in covered if history.stored_from.get(s) in down}
         covered = {s: o for s, o in covered.items() if s not in skipped}
-        optionable = set(etfs.loc[etfs["optionable"], "symbol"])
-        out_of_scope = {
-            s for s, o in covered.items() if o.scope_limited and not _wanted(s, optionable, sources)
-        }
+        wanted, no_adv = scope_funds(run, etfs, session, sources)
+        out_of_scope = {s for s, o in covered.items() if o.scope_limited and s not in wanted}
         covered = {s: o for s, o in covered.items() if s not in out_of_scope}
         hold = {
             s: until
@@ -574,6 +607,8 @@ def ingest_etf_holdings(
         funds = {k: v for k, v in run.items.items() if not k.startswith(DIRECTORY)}
         run.stats.update(
             etfs=len(ids),
+            fallback_scope=sources.fallback_scope,
+            fallback_adv_missing=no_adv,
             covered={s.name: sum(1 for o in covered.values() if o is s) for s in sources.issuers},
             uncovered=len(ids) - len(covered) - len(out_of_scope) - len(skipped),
             out_of_scope=len(out_of_scope),
@@ -595,6 +630,7 @@ def ingest_etf_holdings(
             run.partial(
                 f"{', '.join(sorted(down))}: fund list unavailable, {len(skipped)} funds skipped"
             )
+
     return run.record
 
 

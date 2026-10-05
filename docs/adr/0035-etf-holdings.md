@@ -62,10 +62,14 @@ holdings and the date they are as of. Only SPY's holdings were fetched, as a mem
    funds stretch to 18 days between reads and at 150 to 12, which is why the default is 200.
    (The first version of this ADR said "about 12 nights" for the first pass; that counted 100 a
    night and ignored that daily-file funds come due again every week.) The step runs
-   after bars and chains. N-PORT is a scope-limited fallback: by default it is read only for
-   optionable ETFs that no daily file covers (`fallback_scope`; `all` reaches every registered
-   fund, ~4k funds, with a first pass of hours; `off` leaves it out), because most of the 3.9k
-   funds it could add are tiny and each costs a few hundred small requests per trust.
+   after bars and chains. N-PORT is a scope-limited fallback: by default (`fallback_scope = "liquid"`) it is read
+   only for ETFs that no daily file covers and that are optionable or trade at least
+   `fallback_min_adv_usd` ($5M) a day (`price_stats.adv_usd_20d`, from the latest session that has
+   rollups; with none stored, as on a new store, it reads the optionable funds only and the run's stats
+   say so: `fallback_adv_missing`).
+   `optionable` is the first version's scope; `all` reaches every registered fund, ~4k funds,
+   with a first pass of hours; `off` leaves it out. The rest are not read because most of the 3.9k
+   funds N-PORT could add are tiny and each costs a few hundred small requests per trust.
    **One broken issuer must not take the cap.** A read that raised (an issuer answering 403, a
    changed layout, an N-PORT report with no period date) is held back like a rejection: the
    fund waits 1 day after its first failure, then 2, 4, 8 ... up to 30 (N-PORT: 30), so a
@@ -141,7 +145,11 @@ holdings and the date they are as of. Only SPY's holdings were fetched, as a mem
 - The issuers' sites are not licensed APIs; they can change a layout or block us. Adapters are
   tested against recorded responses, each fund is an isolated item, and a changed file makes
   one fund fail, not the run. The owner accepted State Street's and iShares' terms of use for
-  these public holdings files (2026-10-05) and kept `fallback_scope = "optionable"`.
+  these public holdings files (2026-10-05) and kept `fallback_scope = "optionable"`. The same day
+  the default became `liquid`, because the optionable-only scope left liquid non-optionable funds
+  without holdings. Measured on 2026-10-05: of the 5,730 ETFs, up
+  to 943 non-optionable ones trade at least $5M a day (640 at $10M, 343 at $25M); the ones a daily
+  file already covers are in that count and were in scope before.
 - Storage: about 100 rows per fund, 37 bytes a row measured; a full pass over the ~1,100
   covered funds is ~110k rows, ~4 MB. Raw files add about 12 MB a night, kept 14 days.
 - Known limits and follow-ups: N-PORT filers that print tickers skip the CUSIP bridge, and the

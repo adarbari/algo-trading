@@ -75,9 +75,13 @@ per_night = 200                  # funds the NIGHTLY reads per night: one list a
                                  # unless --limit says so.
 keep_top = 100                   # store this many holdings per fund, largest weights first
                                  # (0: all; the fund's total count is stored on every row)
-fallback_scope = "optionable"    # which funds SEC N-PORT (months-old, quarterly) is read for: the
-                                 # optionable ETFs no daily file covers ("all": every registered fund,
-                                 # ~4k funds, a long first pass; "off": daily files only)
+fallback_scope = "liquid"        # which funds SEC N-PORT (months-old, quarterly) is read for, among the
+                                 # funds no daily file covers: "liquid" = the optionable ones plus those
+                                 # with a 20-session dollar volume of at least fallback_min_adv_usd;
+                                 # "optionable" = only the optionable ones; "all" = every registered fund
+                                 # (~4k funds, a long first pass); "off" = daily files only
+fallback_min_adv_usd = 5_000_000 # "liquid": ADV (price_stats.adv_usd_20d) from which a fund is read;
+                                 # about 940 non-optionable ETFs trade at least $5M a day, 640 $10M
 
 [nasdaq_earnings]                # earnings calendar
 enabled = true
