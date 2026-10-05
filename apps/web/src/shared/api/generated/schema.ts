@@ -531,7 +531,8 @@ export interface paths {
         /** Save Screener View */
         put: operations["save_screener_view_preferences_screeners__screener_id__view_put"];
         post?: never;
-        delete?: never;
+        /** Delete Screener View */
+        delete: operations["delete_screener_view_preferences_screeners__screener_id__view_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2269,8 +2270,18 @@ export interface components {
              */
             decisions: string[];
             /**
+             * Name
+             * @description the view's name (null: the screener's default view)
+             */
+            name: string | null;
+            /**
+             * Names
+             * @description the user's named views of this screener, sorted
+             */
+            names: string[];
+            /**
              * Saved
-             * @description false: no view saved yet (the page uses its defaults)
+             * @description false: this view is not saved yet (the page uses defaults)
              */
             saved: boolean;
             /** Screener Id */
@@ -2622,6 +2633,14 @@ export interface components {
              * @description the partition shown: latest on or before the date
              */
             session: string;
+        };
+        /** ViewNames */
+        ViewNames: {
+            /**
+             * Names
+             * @description the user's named views of this screener, sorted
+             */
+            names: string[];
         };
     };
     responses: never;
@@ -3583,6 +3602,8 @@ export interface operations {
     view_preferences_screeners__screener_id__view_get: {
         parameters: {
             query?: {
+                /** @description a named view (default: the default view) */
+                name?: string | null;
                 /** @description default: the API's user (a label until auth) */
                 user?: string | null;
             };
@@ -3617,6 +3638,8 @@ export interface operations {
     save_screener_view_preferences_screeners__screener_id__view_put: {
         parameters: {
             query?: {
+                /** @description a named view (default: the screener's default view) */
+                name?: string | null;
                 /** @description whose configs (a label until auth; default the API's) */
                 user?: string | null;
             };
@@ -3639,6 +3662,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScreenerView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_screener_view_preferences_screeners__screener_id__view_delete: {
+        parameters: {
+            query: {
+                /** @description the named view to remove */
+                name: string;
+                /** @description whose configs (a label until auth; default the API's) */
+                user?: string | null;
+            };
+            header?: never;
+            path: {
+                screener_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ViewNames"];
                 };
             };
             /** @description Validation Error */

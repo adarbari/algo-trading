@@ -44,8 +44,10 @@ export interface BuilderMock {
   features: Json[];
   /** The query of every GET /screens/{id}/table. */
   tables: Record<string, string>[];
-  /** Every PUT of a screener view. */
-  views: { id: string; view: Json }[];
+  /** Every PUT of a screener view (`name`: null for the default view). */
+  views: { id: string; name: string | null; view: Json }[];
+  /** Every DELETE of a named view. */
+  removedViews: string[];
   /** The screeners whose run was requested (POST /screens/{id}/run). */
   runs: string[];
 }
@@ -65,13 +67,19 @@ export async function mockBuilderApi(
     features: [],
     tables: [],
     views: [],
+    removedViews: [],
     runs: [],
   };
   const details: Record<string, Json> = Object.fromEntries(
     Object.entries(DETAILS).map(([id, detail]) => [id, structuredClone(detail)]),
   );
 
-  const saved: Record<string, Json> = {}; // the views a flow saved, read back by the next GET
+  const saved: Record<string, Json> = {}; // the views a flow saved ('id|name'), read back by GET
+  const namesOf = (id: string): string[] =>
+    Object.keys(saved)
+      .filter((key) => key.startsWith(`${id}|`) && key !== `${id}|`)
+      .map((key) => key.slice(id.length + 1))
+      .sort();
   const ran = new Set<string>(); // the screeners whose requested run has finished
   let polls = 0;
   const detailOf = (id: string): Json | null => details[id] ?? null;
@@ -176,13 +184,23 @@ export async function mockBuilderApi(
     const viewOf = /^\/preferences\/screeners\/([^/]+)\/view$/.exec(path);
     if (viewOf) {
       const id = decodeURIComponent(viewOf[1] ?? '');
+      const name = url.searchParams.get('name');
+      const key = `${id}|${name ?? ''}`;
       if (method === 'PUT') {
         const view = body();
-        mock.views.push({ id, view });
-        saved[id] = { screener_id: id, saved: true, ...view };
-        return json(saved[id]);
+        mock.views.push({ id, name, view });
+        saved[key] = { screener_id: id, name, saved: true, ...view };
+        return json({ ...saved[key], names: namesOf(id) });
       }
-      return json(saved[id] ?? { ...fixture('view.json'), screener_id: id });
+      if (method === 'DELETE') {
+        mock.removedViews.push(String(name));
+        Reflect.deleteProperty(saved, key);
+        return json({ names: namesOf(id) });
+      }
+      return json({
+        ...(saved[key] ?? { ...fixture('view.json'), screener_id: id, name }),
+        names: namesOf(id),
+      });
     }
     const match = /^\/screeners\/([^/]+)(?:\/(\w+))?$/.exec(path);
     if (!match) return route.fallback();

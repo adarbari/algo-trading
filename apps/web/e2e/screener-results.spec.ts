@@ -62,11 +62,41 @@ test('decision chips filter the run and the view is saved as yours', async ({ pa
     .poll(() => mock.views.at(-1))
     .toEqual({
       id: 'vrp_scanner',
+      name: null,
       view: { columns: [], sort: null, decisions: ['QUALIFIED', 'WATCH', 'EVENT_RISK'] },
     });
   await expect.poll(() => mock.tables.at(-1)?.['decision']).toBe('QUALIFIED,WATCH,EVENT_RISK');
   await page.getByRole('button', { name: /^New/ }).click();
   await expect.poll(() => mock.tables.at(-1)?.['change']).toBe('new');
+});
+
+test('a view can be saved under a name, switched to and deleted', async ({ page }) => {
+  const mock = await mockBuilderApi(page);
+  await page.goto('/screeners/vrp_scanner');
+  await expect(grid(page).getByRole('row', { name: /AAPL/ })).toBeVisible();
+  await page.getByRole('button', { name: /^Liquidity risk/ }).click(); // a change to the default view
+  await page.getByRole('button', { name: 'Save view as…' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Save view as' });
+  await dialog.getByLabel('Name of the view').fill('VRP review');
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect
+    .poll(() => mock.views.at(-1))
+    .toMatchObject({
+      id: 'vrp_scanner',
+      name: 'VRP review',
+      view: { decisions: ['QUALIFIED', 'WATCH', 'EVENT_RISK'] },
+    });
+  const views = page.getByRole('combobox', { name: 'View' });
+  await expect(views).toHaveValue('VRP review');
+  // What you change now is saved into that view, not the default one.
+  await page.getByRole('button', { name: /^Watch/ }).click();
+  await expect.poll(() => mock.views.at(-1)).toMatchObject({ name: 'VRP review' });
+  await views.selectOption({ label: 'Default view' });
+  await expect(views).toHaveValue('');
+  await views.selectOption({ label: 'VRP review' });
+  await page.getByRole('button', { name: 'Delete view' }).click();
+  await expect.poll(() => mock.removedViews).toEqual(['VRP review']);
+  await expect(views).toHaveValue('');
 });
 
 test('sorting is saved too, and a ticker opens in Explore', async ({ page }) => {

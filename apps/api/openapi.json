@@ -4127,8 +4127,28 @@
             "title": "Decisions",
             "type": "array"
           },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the view's name (null: the screener's default view)",
+            "title": "Name"
+          },
+          "names": {
+            "description": "the user's named views of this screener, sorted",
+            "items": {
+              "type": "string"
+            },
+            "title": "Names",
+            "type": "array"
+          },
           "saved": {
-            "description": "false: no view saved yet (the page uses its defaults)",
+            "description": "false: this view is not saved yet (the page uses defaults)",
             "title": "Saved",
             "type": "boolean"
           },
@@ -4151,10 +4171,12 @@
         },
         "required": [
           "screener_id",
+          "name",
           "saved",
           "columns",
           "sort",
-          "decisions"
+          "decisions",
+          "names"
         ],
         "title": "ScreenerView",
         "type": "object"
@@ -4730,6 +4752,23 @@
           "failing"
         ],
         "title": "Verification",
+        "type": "object"
+      },
+      "ViewNames": {
+        "properties": {
+          "names": {
+            "description": "the user's named views of this screener, sorted",
+            "items": {
+              "type": "string"
+            },
+            "title": "Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "names"
+        ],
+        "title": "ViewNames",
         "type": "object"
       }
     }
@@ -6573,6 +6612,75 @@
       }
     },
     "/preferences/screeners/{screener_id}/view": {
+      "delete": {
+        "operationId": "delete_screener_view_preferences_screeners__screener_id__view_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "screener_id",
+            "required": true,
+            "schema": {
+              "title": "Screener Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "the named view to remove",
+            "in": "query",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "description": "the named view to remove",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "description": "whose configs (a label until auth; default the API's)",
+            "in": "query",
+            "name": "user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "whose configs (a label until auth; default the API's)",
+              "title": "User"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ViewNames"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Screener View",
+        "tags": [
+          "ideas"
+        ]
+      },
       "get": {
         "operationId": "view_preferences_screeners__screener_id__view_get",
         "parameters": [
@@ -6601,6 +6709,24 @@
               ],
               "description": "default: the API's user (a label until auth)",
               "title": "User"
+            }
+          },
+          {
+            "description": "a named view (default: the default view)",
+            "in": "query",
+            "name": "name",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "a named view (default: the default view)",
+              "title": "Name"
             }
           }
         ],
@@ -6641,6 +6767,24 @@
             "schema": {
               "title": "Screener Id",
               "type": "string"
+            }
+          },
+          {
+            "description": "a named view (default: the screener's default view)",
+            "in": "query",
+            "name": "name",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "a named view (default: the screener's default view)",
+              "title": "Name"
             }
           },
           {
