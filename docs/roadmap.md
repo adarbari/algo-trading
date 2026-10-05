@@ -10,6 +10,7 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 
 **Next**
 - ETF holdings (ADR 0035, accepted): after merge run `algotrade-ingest etf-holdings` once (reads the ~1,140 covered funds: about 1.5 hours, extrapolated from the sample, mostly SEC header lookups; or let the nightly's weekly slots fill it), then the Overview tab renders `<HoldingsPanel symbol onSelectSymbol>` (`widgets/holdings-panel`) for ETFs.
+- IBKR IV backfill (fixed on `feat/ibkr-iv-backfill-fixes`: IV only, ~12 h for all names, most liquid first; an unanswered request is retried, then left pending, never `NO_DATA`): re-run the chunks (they resume). The ~40 names saved `NO_DATA` during the 2026-10-04 timeouts still count as done (the records cannot tell them apart): owner decision on a one-off refetch. Optional pace trial: `[ibkr] historical_min_interval_s` 5, then 3, watching timeouts and error 162.
 - API endpoints that return 404 "nothing stored" on an empty store return 200 with an empty body.
 - Split crowded folders by area: `apps/api` routes/ + schemas/, `services/explore/` (`screens/` is split out; the next new area follows it).
 - API schemas built from domain types, not mirrored field lists.

@@ -51,7 +51,9 @@ FEATURES = (
     Feature(
         "hv30_ibkr", "float32", "decimal",
         "IBKR's 30-day historical (realised) vol of the underlying for the session",
-        "IBKR had no historical vol for the session", valid_range=(0, 5), inputs=(_HV,),
+        "IBKR had no historical vol for the session; or the session has no nightly snapshot "
+        "(the IV history backfill fetches no HV: it comes from the snapshot only)",
+        valid_range=(0, 5), inputs=(_HV,),
         licence=_P,
     ),
     Feature(

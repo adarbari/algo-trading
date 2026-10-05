@@ -192,6 +192,14 @@ def test_ibkr_site_section_uses_ibkr_pacing() -> None:
     assert parsed.market_data_type == 3 and parsed.historical_min_interval_s == 10.0
 
 
+def test_the_historical_pace_is_the_setting(tmp_path: Path) -> None:
+    doc = {**SITE_SOURCES, "ibkr": {**SITE_SOURCES["ibkr"], "historical_min_interval_s": 5.0}}
+    built = build_sources(settings(doc), IBKR_ENV.get, ["ibkr"], tmp_path)
+    gateway = built.sources["ibkr"].gateway  # type: ignore[attr-defined]
+    assert gateway.historical.min_interval_s == 5.0
+    assert built.limiters["ibkr_historical"].min_interval_s == 5.0
+
+
 def test_each_key_gets_adaptive_pacing_from_its_section_and_http(tmp_path: Path) -> None:
     built = build_sources(settings(), ENV.get, limits_dir=tmp_path)
     cboe, massive = built.limiters["cboe"].pacing, built.limiters["massive"].pacing
