@@ -25,6 +25,8 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
 from algotrade.config.site.fields import Table, reject_secrets
+from algotrade.config.site.holdings import KEYS as ETF_KEYS
+from algotrade.config.site.holdings import LEGACY_SECTIONS, EtfHoldingsSettings
 from algotrade.config.user import SITE_USER
 from algotrade.core.model.errors import ConfigurationError
 
@@ -105,10 +107,10 @@ ADAPTIVE_KEYS = ("max_interval_s", "start_interval_s")
 VENDOR_EXTRAS = {
     "cboe": ("workers", "priority_symbols"),
     "nasdaq_earnings": ("days", "lookback_days"),
-    "massive": ("corporate_actions_window",),
-    "sec_edgar": ("refresh_days", "facts_refresh_days"),
+    "massive": ("corporate_actions_window", "descriptions_per_night", "descriptions_refresh_days"),
+    "sec_edgar": ("refresh_days", "facts_refresh_days", "fund_quarters"),
     "treasury": ("lookback_days",),
-    "etf_holdings": ("refresh_days", "keep_top", "fallback_scope", "per_night"),
+    "etf_holdings": ETF_KEYS,
     "ibkr": (
         "historical_min_interval_s",
         "market_data_type",
@@ -123,7 +125,6 @@ VENDOR_EXTRAS = {
         *("live_cache_s", "live_strikes", "live_max_strikes", "live_timeout_s", "live_retry_s"),
     ),
 }
-ETF_FALLBACK_SCOPES = ("optionable", "all", "off")  # [etf_holdings] fallback_scope
 # Vendors that stay off unless their section says ``enabled = true`` (a missing section or key
 # means disabled): IBKR needs the owner's gateway, set up read-only (ADR 0026).
 OFF_BY_DEFAULT = ("ibkr",)
@@ -204,11 +205,10 @@ class SourcesSettings:
     actions_window: tuple[int, int] = (-7, 30)
     sec_refresh_days: int = 30
     sec_facts_refresh_days: int = 30
+    sec_fund_quarters: int = 6  # SEC prospectus data sets read for ETF descriptions (ADR 0034)
+    descriptions_per_night: int = 100  # Massive ticker overviews the nightly requests (0: none)
+    descriptions_refresh_days: int = 365  # refetch a stock's description after this many days
     treasury_lookback_days: int = 10
-    etf_refresh_days: int = 7  # [etf_holdings]: refetch a fund's holdings once per window
-    etf_keep_top: int = 100  # holdings stored per fund, largest weights first (0: all)
-    etf_per_night: int = 100  # funds the nightly reads per night (0: no cap)
-    etf_fallback_scope: str = "optionable"  # which funds SEC N-PORT reads: optionable, all, off
     http_max_retry_s: float = 300.0
     http_breaker_failures: int = 10
     limits_dir: str = "var/run/limits"
@@ -224,6 +224,7 @@ class SourcesSettings:
     max_chain_stale_share: float = 0.20
     max_verify_failures: float = 0.10
     ibkr: IbkrSettings = IbkrSettings()
+    etf: EtfHoldingsSettings = field(default_factory=EtfHoldingsSettings)  # [etf_holdings]
 
     def vendor(self, section: str) -> VendorSettings:
         """``[section]`` of sources.toml (defaults when the section is missing)."""
@@ -276,7 +277,7 @@ class SourcesSettings:
                 "staging_retention_days", d.staging_retention_days, 1
             ),
             live_retention_days=root.integer("live_retention_days", d.live_retention_days, 1),
-            vendors=_with_legacy_sections(
+            vendors=_renamed(
                 {name: _vendor(t, name not in OFF_BY_DEFAULT) for name, t in vendors.items()}
             ),
             cboe_workers=_extra(vendors, "cboe").integer("workers", d.cboe_workers, 1),
@@ -294,16 +295,17 @@ class SourcesSettings:
             sec_facts_refresh_days=_extra(vendors, "sec_edgar").integer(
                 "facts_refresh_days", d.sec_facts_refresh_days, 0
             ),
+            sec_fund_quarters=_extra(vendors, "sec_edgar").integer(
+                "fund_quarters", d.sec_fund_quarters, 0
+            ),
+            descriptions_per_night=_extra(vendors, "massive").integer(
+                "descriptions_per_night", d.descriptions_per_night, 0
+            ),
+            descriptions_refresh_days=_extra(vendors, "massive").integer(
+                "descriptions_refresh_days", d.descriptions_refresh_days, 0
+            ),
             treasury_lookback_days=_extra(vendors, "treasury").integer(
                 "lookback_days", d.treasury_lookback_days, 1
-            ),
-            etf_refresh_days=_extra(vendors, "etf_holdings").integer(
-                "refresh_days", d.etf_refresh_days, 0
-            ),
-            etf_keep_top=_extra(vendors, "etf_holdings").integer("keep_top", d.etf_keep_top, 0),
-            etf_per_night=_extra(vendors, "etf_holdings").integer("per_night", d.etf_per_night, 0),
-            etf_fallback_scope=_extra(vendors, "etf_holdings").choice(
-                "fallback_scope", d.etf_fallback_scope, ETF_FALLBACK_SCOPES
             ),
             http_max_retry_s=http.number("max_retry_s", d.http_max_retry_s, 0),
             http_breaker_failures=http.integer("breaker_failures", d.http_breaker_failures, 1),
@@ -323,15 +325,12 @@ class SourcesSettings:
             ),
             max_verify_failures=quality.fraction("max_verify_failures", d.max_verify_failures),
             ibkr=_ibkr(_extra(vendors, "ibkr")),
+            etf=EtfHoldingsSettings.from_table(_extra(vendors, "etf_holdings")),
         )
 
 
-# Sections that were renamed: a file with only the old one keeps its on/off switch under the new
-# name (pacing is not inherited: the old SPY file ran unpaced, the new section paces every file).
-LEGACY_SECTIONS = {"ssga": "spy_holdings"}
-
-
-def _with_legacy_sections(vendors: dict[str, VendorSettings]) -> dict[str, VendorSettings]:
+def _renamed(vendors: dict[str, VendorSettings]) -> dict[str, VendorSettings]:
+    """A file with only a renamed section's old name keeps its on/off switch (not its pacing)."""
     for new, old in LEGACY_SECTIONS.items():
         if new not in vendors and old in vendors:
             vendors[new] = VendorSettings(enabled=vendors[old].enabled)

@@ -1,6 +1,7 @@
 """Which keys (CIKs) an incremental reference task refetches this run, spread over the window.
 
-Incremental tasks (``company_details``, ``shares``) fetch a key when it was never fetched,
+Incremental tasks (``company_details``, ``shares``, ``ibkr_contracts``, and the profile
+task ``descriptions``) fetch a key when it was never fetched,
 then once per ``refresh_days``. Refetching every key ``refresh_days`` after it was fetched
 would bring all ~6k CIKs of a one-night backfill due again on the same night, so each key
 gets its own **slot day** in the window instead:

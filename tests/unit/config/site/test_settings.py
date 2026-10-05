@@ -44,6 +44,8 @@ def test_the_committed_site_files_load() -> None:
     cboe = sources.vendor("cboe")
     assert (cboe.min_interval_s, cboe.max_interval_s, cboe.start_interval_s) == (1.05, 5.0, None)
     assert sources.cboe_workers == 2 and sources.cboe_priority_symbols[:2] == ("SPY", "QQQ")
+    assert (sources.descriptions_per_night, sources.descriptions_refresh_days) == (100, 365)
+    assert sources.sec_fund_quarters == 6
     assert (sources.http_backoff_factor, sources.http_speedup_factor) == (1.5, 1.05)
     assert (sources.http_speedup_after, sources.http_error_window) == (100, 50)
     assert sources.http_max_error_rate == 0.10
@@ -71,6 +73,12 @@ def test_missing_files_fall_back_to_defaults() -> None:
         ({"massive": {"corporate_actions_window": [1]}}, "a list of 2 integers"),
         ({"cboe": {"enabled": "yes"}}, r"\[cboe\] enabled: expected true or false"),
         ({"cboe": {"workers": 0}}, r"workers: expected an integer >= 1"),
+        (
+            {"massive": {"descriptions_per_night": -1}},
+            r"descriptions_per_night: expected an integer",
+        ),
+        ({"massive": {"descriptions_refresh_days": 1.5}}, r"descriptions_refresh_days: expected"),
+        ({"sec_edgar": {"fund_quarters": -2}}, r"fund_quarters: expected an integer >= 0"),
         ({"sec_edgar": {"raw_retention_days": 0}}, r"\[sec_edgar\] raw_retention_days: expected"),
         ({"sec_edgar": {"raw_retention_days": 1.5}}, r"raw_retention_days: expected an integer"),
         ({"cboe": {"workers": True}}, r"workers: expected an integer"),
@@ -290,14 +298,14 @@ def test_figi_override_errors_name_the_line(rows: list[dict[str, str]], message:
 
 def test_etf_holdings_settings_and_the_issuer_sections() -> None:
     sources = SourcesSettings.from_document(site("sources"))
-    assert (sources.etf_refresh_days, sources.etf_keep_top, sources.etf_per_night) == (7, 100, 100)
-    assert sources.etf_fallback_scope == "optionable"
+    assert (sources.etf.refresh_days, sources.etf.keep_top, sources.etf.per_night) == (7, 100, 100)
+    assert sources.etf.fallback_scope == "optionable"
     for issuer in ("ssga", "ishares"):  # State Street also serves SPY's membership file
         assert sources.vendor(issuer).enabled and sources.vendor(issuer).raw_retention_days == 14
     document = {"etf_holdings": {"refresh_days": 3, "keep_top": 0, "fallback_scope": "all"}}
     custom = SourcesSettings.from_document(document)
-    assert (custom.etf_refresh_days, custom.etf_keep_top) == (3, 0)
-    assert custom.etf_fallback_scope == "all"
+    assert (custom.etf.refresh_days, custom.etf.keep_top) == (3, 0)
+    assert custom.etf.fallback_scope == "all"
 
 
 def test_a_legacy_spy_holdings_section_keeps_its_switch_under_the_new_name() -> None:
@@ -439,3 +447,16 @@ def test_pacing_settings_are_typed() -> None:
     assert s.cboe_priority_symbols == ("SPY", "QQQ")
     assert (s.http_backoff_factor, s.http_speedup_after, s.http_max_error_rate) == (2.0, 10, 0.2)
     assert s.vendor("massive").max_interval_s is None  # the registry's default ceiling
+
+
+def test_description_settings_are_typed_and_zero_turns_the_nightly_requests_off() -> None:
+    doc = {
+        "massive": {"descriptions_per_night": 0, "descriptions_refresh_days": 90},
+        "sec_edgar": {"fund_quarters": 2},
+    }
+    s = SourcesSettings.from_document(doc)
+    assert (s.descriptions_per_night, s.descriptions_refresh_days, s.sec_fund_quarters) == (
+        0,
+        90,
+        2,
+    )

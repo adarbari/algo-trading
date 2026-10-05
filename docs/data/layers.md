@@ -158,7 +158,7 @@ Resolution order and the narrow/replace rules are in [../configuration.md](../co
 | Group | Columns | Source |
 |---|---|---|
 | Identity | `instrument_id`, `symbol`, `figi` (1), `cik` (1) | Nasdaq Trader, universe CSVs; Massive / OpenFIGI (1) |
-| Company | `name`, `description` (1), `country` (1); SIC, `sector`, `industry`, website… live in `instruments/company` (below) | Nasdaq Trader; SEC EDGAR, Massive ticker details (1) |
+| Company | `name`, `country` (1); SIC, `sector`, `industry`, website… live in `instruments/company` (below); the `description` lives in `instruments/description` (below) | Nasdaq Trader; SEC EDGAR |
 | Classification | `asset_class`, `security_type` (COMMON_STOCK, ADR, ETF, ETN, PREFERRED, WARRANT, UNIT, RIGHT, CEF), `exchange`, `currency` | Nasdaq Trader, universe CSVs |
 | Contract terms | `multiplier`, `tick_size`, `round_lot` | derived per asset class |
 | ETF attributes | `is_etf`, `is_leveraged`, `is_inverse`, `leverage`, `tracks` | ETF flag + `config/site/overrides/leveraged_etfs.csv`; **unknown for an ETF unless supplied** (fail closed) |
@@ -176,6 +176,23 @@ instrument whose company is known; `algotrade-ingest company-details`)
 | `sic`, `sic_description`, `sic_division`, `sector`, `industry` | `sector`: SIC ranges → market sector (heuristic); `industry` = SIC description |
 | `state_of_incorporation`, `fiscal_year_end` (MMDD), `website` | `website` is blank for most filers |
 | `fetched_on` | when SEC was last asked; drives the `refresh_days` refresh |
+
+**`instruments/description`** (ADR 0034; increments merged across runs, one row per instrument;
+`algotrade-ingest descriptions`). A short plain-text description of what a company or fund is
+about. `GET /instruments/{id}` adds these columns to its `reference` dict (`None` when nothing
+is stored).
+
+| Columns | Notes |
+|---|---|
+| `instrument_id`, `symbol` | stocks and ADRs (Massive) and ETFs (SEC) |
+| `description` | stock: Massive's ticker overview (a paragraph); ETF: the investment objective from the SEC prospectus (a sentence or two); `NULL` is a marker that the vendor was asked and had no text |
+| `description_source` | `massive_overview` or `sec_fund_objective` |
+| `homepage_url`, `total_employees` | from the Massive overview (stocks only) |
+| `filed`, `accn` | the prospectus filing date and accession (ETFs only) |
+| `fetched_on` | when the vendor was asked; drives `descriptions_refresh_days` |
+
+Reads (`data.reference.descriptions`) union every partition and keep the latest stored row per
+instrument; markers are left out of `descriptions` and kept in `stored_descriptions`.
 
 **`instruments/shares`** (SEC company facts, phase 2b.4; increments merged across runs, one row
 per instrument, concept, period start, period end and filing date; `algotrade-ingest shares`)

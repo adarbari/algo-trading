@@ -1,6 +1,6 @@
 """The one snapshot rule and the reference reads built on it (``algotrade.data.reference``)."""
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pandas as pd
 import pytest
@@ -9,6 +9,7 @@ from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.reference import (
     IBKR_CONTRACTS,
+    descriptions,
     ibkr_contracts,
     instrument_terms,
     instrument_view,
@@ -16,6 +17,7 @@ from algotrade.data.reference import (
     load_universe,
     resolver,
     snapshot,
+    stored_descriptions,
 )
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
@@ -154,3 +156,43 @@ def test_ibkr_contracts_are_the_snapshot_on_or_before_never_a_later_one() -> Non
     found = ibkr_contracts(reader, D2 + timedelta(days=3))
     assert found is not None and list(found["conid"]) == [265598]
     assert ibkr_contracts(reader, D1) is None  # resolved later: not known on D1
+
+
+# ----------------------------------------------------------------- descriptions (increments)
+DESC = "instruments/description"
+T1, T2 = datetime(2026, 9, 1, 22, tzinfo=UTC), datetime(2026, 10, 1, 22, tzinfo=UTC)
+
+
+def described(symbol: str, text: str | None, fetched: date) -> dict[str, object]:
+    return {
+        "instrument_id": f"EQ:{symbol}", "symbol": symbol, "description": text,
+        "description_source": "massive_overview", "fetched_on": fetched,
+    }  # fmt: skip
+
+
+def test_descriptions_of_an_empty_store() -> None:
+    reader = StoreReader(MemoryBackend())
+    assert stored_descriptions(reader).empty and descriptions(reader).empty
+
+
+def test_descriptions_union_latest_row_markers_and_point_in_time() -> None:
+    writer = StoreWriter(MemoryBackend())
+    first = [
+        described("AAA", "Old text.", D1),
+        described("BBB", None, D1),
+        described("ETF", "Seeks.", D1),
+    ]
+    writer.write_table(DESC, D1, "r1", stamped(first, D1, "r1", T1))
+    second = [described("AAA", "New text.", D2), described("CCC", "Third.", D2)]
+    writer.write_table(DESC, D2, "r2", stamped(second, D2, "r2", T2))
+    reader = StoreReader(writer._backend)
+    stored = stored_descriptions(reader).set_index("symbol")
+    assert list(stored.index) == ["AAA", "BBB", "CCC", "ETF"]
+    assert stored.loc["AAA", "description"] == "New text."  # the latest run wins
+    assert stored.loc["AAA", "fetched_on"] == D2 and stored.loc["BBB", "fetched_on"] == D1
+    assert "knowledge_ts" not in stored.columns and "run_id" not in stored.columns
+    texts = descriptions(reader).set_index("symbol")
+    assert list(texts.index) == ["AAA", "CCC", "ETF"]  # BBB is a marker: nothing to show
+    assert list(descriptions(reader, ["EQ:ETF"])["symbol"]) == ["ETF"]
+    then = descriptions(reader, as_of=datetime(2026, 9, 15, tzinfo=UTC)).set_index("symbol")
+    assert then.loc["AAA", "description"] == "Old text." and "CCC" not in then.index

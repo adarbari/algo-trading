@@ -103,7 +103,7 @@ last step; `apps/ingestion/.../tasks/maintenance/purge.py`) or, for staging, by 
 
 Implemented tables (layers per [layers.md](layers.md)):
 L1 `instruments/reference`, `instruments/symbol_history`, `instruments/id_map` (symbol id →
-FIGI id upgrades, ADR 0018), `instruments/company`; L2 `bars/<interval>` (1d, 1h, 30m, 15m, 5m, 1m; OHLCV
+FIGI id upgrades, ADR 0018), `instruments/company`, `instruments/description` (ADR 0034); L2 `bars/<interval>` (1d, 1h, 30m, 15m, 5m, 1m; OHLCV
 sanity-checked on write), `chains/underlying_quotes`, `chains/option_quotes`,
 `chains/status`, `events/<type>`, `rates/treasury` (one partition per curve date), `holdings/etf` (ETF holdings, runs merge); rollups `rollups/daily/*` and `rollups/instrument/*`
 (e.g. `rollups/instrument/option_liquidity@v1`); `universe`; `catalog/*`; `results/<name>`;
@@ -183,6 +183,7 @@ into the same session, a `migrate_ids` rewrite). Each table declares in its `Tab
 | `merge` | `events/*` (`dividend`, `split`, `earnings`, `reference_change`, `index_change`, …) | the union of every run with `knowledge_ts` <= `as_of`, from the latest **restating** run on; per table key (`instrument_id`, `ts`, + `change`) the latest run's row wins |
 | `merge` | `results/rule_screen` (key `user_id`, `config_id`, `instrument_id`), `results/rule_screen_values` (+ `mode`, `criterion_id`) | as above: every rule-screen config and user shares a session's partition. A rerun never removes a row an earlier run wrote, so readers take a config's rows of its latest run (`run_id` from the run record) |
 | `merge` | `holdings/etf` (key `instrument_id`, `as_of`, `rank`) | as above; a later run of the same `as_of` may hold fewer ranks, so `data.funds.holdings` takes each fund's rows from the latest run |
+| `merge` | `instruments/description` (key `instrument_id`; increments: each run adds the descriptions it fetched, ADR 0034) | as above, on the table's own key; reads also union the partitions of every session and keep the latest row per instrument (`data.reference.descriptions`) |
 | `merge` | `instruments/id_map` (key `old_id`, `new_id`), `instruments/symbol_history` (key `figi`, `symbol`, `valid_from`) | as above, on the table's own key (`TableSpec.key`). Both are cumulative and a build only adds to them (an upgrade, an opened or closed row), so a re-run that saw less cannot hide what an earlier run of the session recorded (2026-10-03: a 3-row id map hid 10,817 upgrades) |
 
 - **Restating runs**: `StoreWriter.write_table(..., restates=True)` (used by

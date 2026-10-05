@@ -77,6 +77,13 @@ min_interval_s = 0.5             # spacing between requests
 enabled = true
 min_interval_s = 12.5            # free tier: 5 requests/minute
 corporate_actions_window = [-7, 30]   # days around the session
+# Company descriptions (ticker overview, one request each, ADR 0034). The free tier is 5
+# requests/minute, so the nightly asks for at most this many (100 x 12.5 s = ~21 min, run after
+# bars and the screens, holding the ingest lock that long); S&P 500 first, then the liquid
+# names. 0 turns the nightly requests off; a hand run (`algotrade-ingest descriptions --limit N`
+# or `--symbols A,B`) still works.
+descriptions_per_night = 100
+descriptions_refresh_days = 365  # descriptions rarely change: refetch a stock's after a year
 
 [sec_edgar]                      # company details + share counts (needs ALGOTRADE_SEC_CONTACT in .env)
 enabled = true
@@ -86,6 +93,8 @@ raw_retention_days = 7           # submissions, company_tickers, companyfacts: ~
 refresh_days = 30                # refetch a company's details once per this many days
 facts_refresh_days = 30          # refetch a company's share counts (company facts) once per this
                                  # many days; both spread over the window by CIK
+fund_quarters = 6                # quarterly prospectus data sets read for ETF descriptions (ADR 0034):
+                                 # ~80 MB each, the last N completed quarters, each fetched once
 
 [treasury]                       # daily par yield curve (risk-free rates), one request per year
 enabled = true

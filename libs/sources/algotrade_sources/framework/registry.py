@@ -46,11 +46,13 @@ from algotrade_sources.vendors.ibkr.market_data import IbkrSource
 from algotrade_sources.vendors.ishares.etf_holdings import IsharesHoldings, no_file
 from algotrade_sources.vendors.massive.bars import MassiveDailyBars
 from algotrade_sources.vendors.massive.corporate_actions import MassiveCorporateActions
+from algotrade_sources.vendors.massive.overview import MassiveOverview
 from algotrade_sources.vendors.massive.tickers import MassiveTickers
 from algotrade_sources.vendors.nasdaq.earnings import NasdaqEarningsSource
 from algotrade_sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts
 from algotrade_sources.vendors.sec.edgar import SecSubmissions, SecTickerMap, user_agent
+from algotrade_sources.vendors.sec.fund_objectives import SecFundObjectives, SecFundTickerMap
 from algotrade_sources.vendors.sec.nport_holdings import NportHoldings
 from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource
@@ -188,10 +190,13 @@ SOURCES: dict[str, SourceSpec] = {
         _massive("massive_bars", MassiveDailyBars),
         _massive("massive_corporate_actions", MassiveCorporateActions),
         _massive("massive_tickers", MassiveTickers),
+        _massive("massive_overview", MassiveOverview),
         _sec("sec_tickers", SecTickerMap),
         _sec("sec_submissions", SecSubmissions),
         _sec("sec_company_facts", SecCompanyFacts),
         _sec("sec_nport_holdings", NportHoldings),
+        _sec("sec_fund_tickers", SecFundTickerMap),
+        _sec("sec_fund_objectives", SecFundObjectives),
         SourceSpec("treasury", "treasury", "treasury", TreasuryParYields, 1.0),
     )
 }

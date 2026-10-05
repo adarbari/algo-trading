@@ -397,6 +397,11 @@ purpose = "reference-data tasks: universe, instrument ids, classification, histo
 kind = "task-domain"
 
 [[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/profile"
+purpose = "profile tasks: descriptive text about what an instrument is (stock descriptions from Massive, ETF investment objectives from SEC prospectuses)"
+kind = "task-domain"
+
+[[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/market"
 purpose = "market-data tasks: bars, corporate actions, earnings, option chains, Treasury rates, IBKR implied / historical vol, ETF holdings"
 kind = "task-domain"
@@ -432,7 +437,7 @@ reason = "the ingestion id rule (ADR 0018, `id-resolution`): golden and migrate-
 
 [[shared]]
 module = "apps/ingestion/algotrade_ingestion/tasks/market/option_chains.py"
-reason = "the option-chain coverage (`select_underlyings`: every active optionable instrument) is the coverage IBKR contract resolution enriches (ADR 0028)"
+reason = "the option-chain coverage (`select_underlyings`: every active optionable instrument) is the coverage IBKR contract resolution enriches (ADR 0028), and `prioritise` is the one fetch order (priority symbols, S&P 500, liquidity) the descriptions task follows too (ADR 0034)"
 
 # --------------------------------------------------------------------------- web app (apps/web)
 # ADR 0025 (frontend architecture). Every directory under apps/web (build output and

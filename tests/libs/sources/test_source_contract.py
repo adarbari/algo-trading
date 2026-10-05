@@ -22,11 +22,13 @@ from algotrade_sources.vendors.ibkr.market_data import IbkrSource
 from algotrade_sources.vendors.ishares.etf_holdings import IsharesHoldings
 from algotrade_sources.vendors.massive.bars import MassiveDailyBars
 from algotrade_sources.vendors.massive.corporate_actions import MassiveCorporateActions
+from algotrade_sources.vendors.massive.overview import MassiveOverview
 from algotrade_sources.vendors.massive.tickers import MassiveTickers
 from algotrade_sources.vendors.nasdaq.earnings import NasdaqEarningsSource
 from algotrade_sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts
 from algotrade_sources.vendors.sec.edgar import SecSubmissions, SecTickerMap
+from algotrade_sources.vendors.sec.fund_objectives import SecFundObjectives, SecFundTickerMap
 from algotrade_sources.vendors.sec.nport_holdings import NportHoldings
 from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource
@@ -136,6 +138,21 @@ def massive_tickers() -> Adapter:
     return source, FetchRequest("active")
 
 
+def massive_overview() -> Adapter:
+    payload = (FIXTURES / "massive" / "overview_KO.json").read_bytes()
+    return MassiveOverview(http_for(lambda url: payload)), FetchRequest("KO")
+
+
+def sec_fund_tickers() -> Adapter:
+    payload = (FIXTURES / "sec" / "company_tickers_mf_sample.json").read_bytes()
+    return SecFundTickerMap(http_for(lambda url: payload)), FetchRequest("fund_tickers")
+
+
+def sec_fund_objectives() -> Adapter:
+    payload = (FIXTURES / "sec" / "rr1_2026q2_sample.zip").read_bytes()
+    return SecFundObjectives(http_for(lambda url: payload)), FetchRequest("2026q2")
+
+
 def sec_tickers() -> Adapter:
     payload = sec_payloads.tickers([(320193, "Apple Inc.", "AAPL", "Nasdaq")])
     return SecTickerMap(http_for(lambda url: payload)), FetchRequest("tickers")
@@ -159,6 +176,9 @@ def treasury() -> Adapter:
 ADAPTERS: dict[str, Callable[[], Adapter]] = {
     "treasury": treasury,
     "massive_tickers": massive_tickers,
+    "massive_overview": massive_overview,
+    "sec_fund_tickers": sec_fund_tickers,
+    "sec_fund_objectives": sec_fund_objectives,
     "sec_tickers": sec_tickers,
     "sec_submissions": sec_submissions,
     "sec_company_facts": sec_company_facts,
