@@ -197,9 +197,10 @@ second or slower.
 
 Coverage of the 5,730 active ETFs of the 2026-10-02 universe (listed by an adapter's directory):
 State Street 181 (3.2%), iShares 480 more (8.4%), so **661 funds (11.5%) have a daily file**;
-SEC N-PORT lists 3,949 of the rest, and the default `fallback_scope = "optionable"` reads the 480
-of them that are optionable, so the default run covers **1,141 funds (19.9%)**, and **630 of
-the 767 optionable ETFs (82%)**. `fallback_scope = "all"` reaches 4,610 funds (80.5%) at the
+SEC N-PORT lists 3,949 of the rest. `fallback_scope = "optionable"` reads the 480 of them that are
+optionable (**1,141 funds, 19.9%**, and **630 of the 767 optionable ETFs, 82%**); the default,
+`"liquid"`, adds the funds with a 20-session dollar volume of at least `fallback_min_adv_usd`
+($5M: up to ~940 more non-optionable ETFs, measured 2026-10-05). `fallback_scope = "all"` reaches 4,610 funds (80.5%) at the
 cost of a long first pass. Not covered by anything: gold and silver trusts outside iShares
 (GLD, USO), the VIX ETPs (UVXY, VXX, SVXY, VIXY) and crypto trusts, which hold no securities
 lines. A real sample of 53 funds on 2026-10-05 (SPY, QQQ, VOO, VTI, 6 SPDR and iShares funds, 33

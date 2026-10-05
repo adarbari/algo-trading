@@ -106,6 +106,10 @@ def test_missing_files_fall_back_to_defaults() -> None:
         ({"http": {"pace": 1}}, r"\[http\]: unknown keys \['pace'\]"),
         ({"etf_holdings": {"keep_top": -1}}, r"\[etf_holdings\] keep_top: expected an integer"),
         ({"etf_holdings": {"fallback_scope": "some"}}, r"\[etf_holdings\] fallback_scope"),
+        (
+            {"etf_holdings": {"fallback_min_adv_usd": -1}},
+            r"fallback_min_adv_usd: expected a number",
+        ),
         ({"etf_holdings": {"per_night": -1}}, r"\[etf_holdings\] per_night: expected an integer"),
         ({"etf_holdings": {"min_interval_s": 1}}, r"\[etf_holdings\]: unknown keys"),
         ({"etf_holdings": {"raw_retention_days": 3}}, r"\[etf_holdings\]: unknown keys"),
@@ -302,13 +306,17 @@ def test_figi_override_errors_name_the_line(rows: list[dict[str, str]], message:
 def test_etf_holdings_settings_and_the_issuer_sections() -> None:
     sources = SourcesSettings.from_document(site("sources"))
     assert (sources.etf.refresh_days, sources.etf.keep_top, sources.etf.per_night) == (7, 100, 200)
-    assert sources.etf.fallback_scope == "optionable"
+    assert (sources.etf.fallback_scope, sources.etf.fallback_min_adv_usd) == ("liquid", 5_000_000.0)
     for issuer in ("ssga", "ishares"):  # State Street also serves SPY's membership file
         assert sources.vendor(issuer).enabled and sources.vendor(issuer).raw_retention_days == 14
-    document = {"etf_holdings": {"refresh_days": 3, "keep_top": 0, "fallback_scope": "all"}}
+    document = {
+        "etf_holdings": {
+            "refresh_days": 3, "keep_top": 0, "fallback_scope": "all", "fallback_min_adv_usd": 2e6,
+        }
+    }  # fmt: skip
     custom = SourcesSettings.from_document(document)
     assert (custom.etf.refresh_days, custom.etf.keep_top) == (3, 0)
-    assert custom.etf.fallback_scope == "all"
+    assert (custom.etf.fallback_scope, custom.etf.fallback_min_adv_usd) == ("all", 2_000_000.0)
 
 
 def test_a_legacy_spy_holdings_section_keeps_its_switch_under_the_new_name() -> None:
