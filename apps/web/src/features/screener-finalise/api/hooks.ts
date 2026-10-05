@@ -5,11 +5,16 @@
 import { useToast } from '@algotrade/ui';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { refreshScreens } from '@/entities/screen';
 import { api, queryKeys, unwrap, errorDetail } from '@/shared/api';
 
 function useRefresh() {
   const client = useQueryClient();
-  return () => client.invalidateQueries({ queryKey: queryKeys.screeners.all() });
+  return () =>
+    Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.screeners.all() }),
+      refreshScreens(client),
+    ]);
 }
 
 export function useFinalise(id: string) {

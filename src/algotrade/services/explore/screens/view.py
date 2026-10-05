@@ -1,17 +1,14 @@
-"""A user's saved view of a screener's results (ADR 0032): the catalogue columns they added, the
-sort and the decisions they show, from ``screeners.<id>.view`` of their ``preferences.toml``.
-
-Read-only. A view is the user's, not the screener's: it is never part of a version or a hash.
-A screener has a default view and any number of named ones ("VRP review", "Earnings check").
-Nothing saved is not an error: the view is empty and ``saved`` is false, so the page applies
-its own defaults."""
+"""A user's saved view of a screener's results (ADR 0032) for the REST GET, until read-model
+PR 8 moves the screener pages to GraphQL: the view itself is ``services.read.screens.views``
+(``table_view``, one reading of ``preferences.toml``); this adds the explore user default and
+``NotFoundError`` for a screener the user cannot see."""
 
 from dataclasses import dataclass
 
 from algotrade.config.user import UserContext
-from algotrade.services.explore.configs import resolved
-from algotrade.services.explore.ideas.ranking import PREFERENCES
 from algotrade.services.explore.store import ReadStore
+from algotrade.services.read.ops.configs import resolved_for
+from algotrade.services.read.screens.views import table_view
 
 
 @dataclass(frozen=True)
@@ -30,22 +27,15 @@ def screener_view(
 ) -> ScreenerView:
     """``user``'s (default: the store's) view of ``screener_id``: the default one, or the one
     called ``name``. ``NotFoundError`` for a screener the user cannot see."""
-    resolved(store, screener_id)
+    resolved_for(store.configs, store.user, screener_id)
     who = UserContext(user).user_id if user else store.user.user_id
-    doc = store.configs.load(who, PREFERENCES, PREFERENCES) or {}
-    entry = (doc.get("screeners") or {}).get(screener_id) or {}
-    named = dict(entry.get("views") or {})
-    names = sorted(named)
-    view = entry.get("view") if name is None else named.get(name)
-    if not view:
-        return ScreenerView(screener_id, name, False, [], None, [], names)
-    sort = view.get("sort")
+    view = table_view(store.configs, who, screener_id, name)
     return ScreenerView(
         screener_id,
-        name,
-        True,
-        [str(c) for c in view.get("columns") or []],
-        None if sort is None else str(sort),
-        [str(d) for d in view.get("decisions") or []],
-        names,
+        view.name,
+        view.saved,
+        list(view.columns),
+        view.sort,
+        list(view.decisions),
+        list(view.names),
     )

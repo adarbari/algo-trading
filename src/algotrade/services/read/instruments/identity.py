@@ -67,9 +67,11 @@ def resolve_id(ctx: ReadContext, key: str) -> str | None:
 
 
 def _by_id(frame: pd.DataFrame | None) -> dict[str, Mapping[Any, Any]]:
+    """The first row of each instrument in ``frame``, by id."""
     if frame is None or frame.empty:
         return {}
-    return {str(r["instrument_id"]): r for r in frame.to_dict("records")}
+    first = frame.drop_duplicates("instrument_id", keep="first")
+    return {str(r["instrument_id"]): r for r in first.to_dict("records")}
 
 
 def load_instruments(ctx: ReadContext, instrument_ids: Sequence[str]) -> dict[str, Instrument]:

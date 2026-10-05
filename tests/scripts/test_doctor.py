@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -128,3 +129,75 @@ def test_exit_code_is_non_zero_only_for_hard_failures() -> None:
     assert code == 0 and "fix: fix a" in text and text.endswith("ready")
     text, code = doctor.render([*soft, doctor.Result(doctor.FAIL, "c", "z", "do c")])
     assert code == 1 and "fix: do c" in text
+
+
+def _shared_venv(main: Path, src: Path, python: Path) -> None:
+    """A main checkout whose venv's editable install points at ``src`` and whose console
+    script runs ``python`` (as uv writes them)."""
+    (main / ".git").mkdir(parents=True)
+    site = main / ".venv" / "lib" / "python3.12" / "site-packages"
+    site.mkdir(parents=True)
+    (site / "_editable_impl_algotrade.pth").write_text(str(src))
+    (site / "other.pth").write_text("/elsewhere/entirely")  # not ours: never inspected
+    bin_ = main / ".venv" / "bin"
+    bin_.mkdir()
+    (bin_ / "algotrade-ingest").write_text(f"#!{python}\nimport sys\n")
+    (bin_ / "activate").write_text("# no shebang\n")
+
+
+def test_venv_paths_ok_when_everything_points_at_the_main_checkout(tmp_path: Path) -> None:
+    main = tmp_path / "algo-trading"
+    _shared_venv(main, main / "src", main / ".venv" / "bin" / "python3")
+    r = doctor.check_venv_paths(probes(tmp_path, {}, main=lambda: main))
+    assert r.level == "ok", r.detail
+
+
+@pytest.mark.parametrize(
+    "where",
+    [
+        "algo-trading-feat-x",  # scripts/worktree.sh: a sibling of the main checkout
+        "algo-trading/.claude/worktrees/agent-abc",  # Claude agent worktrees nest inside it
+    ],
+)
+def test_venv_paths_fail_when_a_worktree_synced_the_shared_venv(tmp_path: Path, where: str) -> None:
+    main, wt = tmp_path / "algo-trading", tmp_path / where
+    _shared_venv(main, wt / "src", main / ".venv" / "bin" / "python3")
+    r = doctor.check_venv_paths(probes(tmp_path, {}, main=lambda: main))
+    assert r.level == doctor.FAIL
+    assert f"{wt}/src" in r.detail
+    assert r.fix == f"cd {main} && uv sync --all-packages --locked"
+
+
+def test_venv_paths_fail_on_a_script_shebang_into_a_worktree(tmp_path: Path) -> None:
+    main = tmp_path / "algo-trading"
+    wt = main / ".claude" / "worktrees" / "agent-abc"
+    _shared_venv(main, main / "src", wt / ".venv" / "bin" / "python3")
+    r = doctor.check_venv_paths(probes(tmp_path, {}, main=lambda: main))
+    assert r.level == doctor.FAIL and "bin/algotrade-ingest" in r.detail
+
+
+def test_venv_paths_see_uvs_exec_trampoline_for_long_paths(tmp_path: Path) -> None:
+    main, wt = tmp_path / "algo-trading", tmp_path / "algo-trading-feat-x"
+    _shared_venv(main, main / "src", main / ".venv" / "bin" / "python3")
+    (main / ".venv" / "bin" / "algotrade-api").write_text(
+        f"#!/bin/sh\n'''exec' \"{wt}/.venv/bin/python3\" \"$0\" \"$@\"\n' '''\n"
+    )
+    r = doctor.check_venv_paths(probes(tmp_path, {}, main=lambda: main))
+    assert r.level == doctor.FAIL and "bin/algotrade-api" in r.detail
+
+
+def test_venv_paths_fail_under_a_nested_checkout_with_its_own_git(tmp_path: Path) -> None:
+    main = tmp_path / "algo-trading"
+    nested = main / "elsewhere" / "wt"
+    _shared_venv(main, nested / "src", main / ".venv" / "bin" / "python3")
+    (nested / "src").mkdir(parents=True)
+    (nested / ".git").write_text("gitdir: ../../.git/worktrees/wt\n")
+    r = doctor.check_venv_paths(probes(tmp_path, {}, main=lambda: main))
+    assert r.level == doctor.FAIL
+
+
+def test_main_checkout_comes_from_the_git_common_dir(tmp_path: Path) -> None:
+    main = tmp_path / "main"
+    subprocess.run(["git", "init", "-q", str(main)], check=True)
+    assert doctor._main_checkout(main) == main.resolve()
+    assert doctor._main_checkout(tmp_path / "nowhere") == tmp_path / "nowhere"

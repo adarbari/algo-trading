@@ -56,32 +56,23 @@ for (const row of (fixture('compare.json') as { rows: { feature: string; values:
   }
 }
 
+/** The recorded catalogue (`FeatureCatalogue`) by name: a column's info comes from it. */
 const CATALOGUE = new Map(
-  (fixture('features.json') as unknown as Row[]).map((f) => [String(f['name']), f]),
+  (fixture('catalogue.json') as { data: { catalogue: Row[] } }).data.catalogue.map((f) => [
+    String(f['name']),
+    f,
+  ]),
 );
-
-/** The server's display format from a feature's unit and dtype (catalogue.format_of). */
-function formatOf(feature: Row | undefined): string {
-  const unit = feature?.['unit'];
-  const dtype = (feature?.['dtype'] as string | undefined) ?? 'float';
-  if (dtype === 'date' || unit === 'date') return 'DATE';
-  if (dtype === 'bool') return 'FLAG';
-  if (dtype === 'str') return 'TEXT';
-  if (unit === 'decimal') return 'PERCENT';
-  if (unit === 'usd_per_share') return 'CURRENCY';
-  if (unit === 'usd' || unit === 'shares') return 'COMPACT';
-  return 'NUMBER';
-}
 
 function columnInfo(name: string): Json {
   const feature = CATALOGUE.get(name);
   return {
     name,
     description: feature?.['description'] ?? name,
-    format: formatOf(feature),
+    format: feature?.['format'] ?? 'NUMBER',
     unit: feature?.['unit'] ?? null,
     dtype: feature?.['dtype'] ?? 'float',
-    nullMeaning: feature?.['null_meaning'] ?? '',
+    nullMeaning: feature?.['nullMeaning'] ?? '',
     licence: feature?.['licence'] ?? 'open',
     scope: feature?.['scope'] ?? 'site',
   };
@@ -213,9 +204,22 @@ function featureHistory(names: readonly string[]): Json {
   return { names, points };
 }
 
-/** A GraphQL operation's recorded answer (`{ data }`) for AAPL (the detail pane). */
+/** A feature's distribution: the recorded one for its name, else IV30's renamed. */
+function distribution(name: string): Json {
+  const answer = fixture(DISTRIBUTIONS[name] ?? 'dist-iv30.json') as {
+    data: { distribution: Json };
+  };
+  return { data: { distribution: { ...answer.data.distribution, name } } };
+}
+
+/**
+ * A GraphQL operation's recorded answer (`{ data }`): the catalogue (`FeatureCatalogue`), a
+ * feature's distribution (`FeatureDistribution`) and AAPL's detail pane.
+ */
 function graphqlAnswer(operation: Operation): Json | null {
   const name = /query\s+(\w+)/.exec(operation.query ?? '')?.[1];
+  if (name === 'FeatureCatalogue') return fixture('catalogue.json');
+  if (name === 'FeatureDistribution') return distribution(String(operation.variables?.['name']));
   if (name === 'FeatureTable') return featureTable(operation.variables ?? {});
   if (name === 'ComparePrices') return comparePrices(operation.variables ?? {});
   if (operation.variables?.['key'] !== 'AAPL') return null;
@@ -262,12 +266,6 @@ function graphqlAnswer(operation: Operation): Json | null {
 function answer(url: URL, body: string | null): Json | Json[] | null {
   const path = url.pathname.replace(/^\/api/, '');
   if (path === '/graphql') return graphqlAnswer(JSON.parse(body ?? '{}') as Operation);
-  if (path === '/features') return fixture('features.json');
-  const distribution = /^\/features\/(.+)\/distribution$/.exec(path);
-  if (distribution) {
-    const name = decodeURIComponent(distribution[1] ?? '');
-    return { ...fixture(DISTRIBUTIONS[name] ?? 'dist-iv30.json'), name };
-  }
   return null;
 }
 

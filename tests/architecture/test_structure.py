@@ -189,8 +189,6 @@ def test_localhost_mark_does_not_open_the_internet() -> None:
 TYPED_FACT_FIELDS = {
     ("chains", "LiveOptionChain", "underlying_price"): "keep: a live quote (ADR 0028)",
     ("chains", "LiveOptionQuote", "close"): "keep: a live quote (ADR 0028)",
-    ("screens.ideas", "Idea", "days_to_earnings"): "retire in read-model PR 5 (Ideas on GraphQL)",
-    ("screens.ideas", "Idea", "next_earnings_date"): "retire in read-model PR 5 (Ideas on GraphQL)",
 }
 
 

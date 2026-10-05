@@ -15,7 +15,12 @@ Before writing:
   `architecture/layout.toml` with a grep. Extend the owner; never re-implement it.
 
 Work in a worktree (`scripts/worktree.sh <branch>`, then `source worktree.env`) when the
-main checkout is busy; never `--no-verify` / `SKIP=`. On the shared machine run
+main checkout is busy; never `--no-verify` / `SKIP=`. In any worktree (yours under
+`.claude/worktrees/` too) never run `uv sync`, `uv run` or `make install`: `.venv` is the
+main checkout's, and syncing it points the owner's nightly and API at your branch. Run code
+through `source worktree.env` (its `PYTHONPATH`; link `.venv` to the main checkout's first if
+your worktree has none); a dependency change is `uv lock` plus the PR, installed in the main
+checkout after merge. On the shared machine run
 `make check WORKERS=2 WEB_WORKERS=2` (and `pytest -n 2` when running tests directly).
 
 While writing:

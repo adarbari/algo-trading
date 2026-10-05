@@ -12,7 +12,7 @@ from strawberry.http import GraphQLHTTPResponse
 from strawberry.schema.config import StrawberryConfig
 from strawberry.types import ExecutionResult
 
-from algotrade_api.graphql.context import Opener, RequestContext, context_getter
+from algotrade_api.graphql.context import Opener, RequestContext, StoresOpener, context_getter
 from algotrade_api.graphql.errors import response_of
 from algotrade_api.graphql.limits import EXTENSIONS
 from algotrade_api.graphql.scalars import SCALARS
@@ -41,14 +41,17 @@ class _Router(GraphQLRouter[RequestContext, None]):
         return response_of(result)
 
 
-def graphql_router(opener: Opener, debug: bool = False) -> GraphQLRouter[RequestContext, None]:
+def graphql_router(
+    opener: Opener, debug: bool = False, stores: StoresOpener | None = None
+) -> GraphQLRouter[RequestContext, None]:
     """``POST /graphql`` over the read contexts ``opener`` opens (one per requested session,
-    per request); the GraphiQL IDE at ``GET /graphql`` only when ``debug``."""
+    per request) and the session-free one ``stores`` opens (configs, run records); the
+    GraphiQL IDE at ``GET /graphql`` only when ``debug``."""
     return _Router(
         schema,
         path=PATH,
         graphql_ide="graphiql" if debug else None,
         allow_queries_via_get=False,
-        context_getter=context_getter(opener),
+        context_getter=context_getter(opener, stores),
         tags=["graphql"],
     )

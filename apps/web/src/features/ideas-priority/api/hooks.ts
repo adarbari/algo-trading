@@ -1,15 +1,18 @@
 /**
  * Saving the screener priority: PUT /preferences/ideas, optimistic. The list reorders at once
- * (the cached ideas take the new priority); on a failure the previous cache is restored and a
- * toast says so; once settled the ideas are refetched, ranked by the saved order.
+ * (the cached `IdeasPage` responses take the new order); on a failure the previous cache is
+ * restored and a toast says so; once settled the ideas are refetched, ranked by the server in
+ * the saved order.
  */
 import { useToast } from '@algotrade/ui';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import type { IdeasResponse } from '@/entities/idea';
+import { IDEAS_OPERATION, type IdeasResponse } from '@/entities/idea';
 import { api, queryKeys, unwrap } from '@/shared/api';
 
 import { withPriority } from '../model/priority';
+
+const IDEAS = queryKeys.gqlAll(IDEAS_OPERATION);
 
 type Snapshot = [readonly unknown[], IdeasResponse | undefined][];
 
@@ -20,9 +23,9 @@ export function useSavePriority() {
     mutationFn: (priority: string[]) =>
       unwrap(api.PUT('/preferences/ideas', { body: { priority } })),
     onMutate: async (priority): Promise<{ previous: Snapshot }> => {
-      await client.cancelQueries({ queryKey: queryKeys.ideas.all() });
-      const previous = client.getQueriesData<IdeasResponse>({ queryKey: queryKeys.ideas.all() });
-      client.setQueriesData<IdeasResponse>({ queryKey: queryKeys.ideas.all() }, (cached) =>
+      await client.cancelQueries({ queryKey: IDEAS });
+      const previous = client.getQueriesData<IdeasResponse>({ queryKey: IDEAS });
+      client.setQueriesData<IdeasResponse>({ queryKey: IDEAS }, (cached) =>
         cached ? withPriority(cached, priority) : cached,
       );
       return { previous };
@@ -35,6 +38,6 @@ export function useSavePriority() {
         description: 'The previous order is back. Try again.',
       });
     },
-    onSettled: () => client.invalidateQueries({ queryKey: queryKeys.ideas.all() }),
+    onSettled: () => client.invalidateQueries({ queryKey: IDEAS }),
   });
 }

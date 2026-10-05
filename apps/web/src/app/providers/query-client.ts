@@ -1,12 +1,19 @@
 /** The TanStack Query client: one per app, with defaults for a read-mostly API. */
 import { QueryClient } from '@tanstack/react-query';
 
-import { ApiError } from '@/shared/api';
+import { ApiError, GraphQLRequestError } from '@/shared/api';
+
+/** GraphQL error codes about the request itself: asking again gets the same answer. */
+const REQUEST_CODES = new Set(['BAD_REQUEST', 'NOT_FOUND', 'UNKNOWN_FEATURE']);
 
 /** Retry a failed read once, but only when it may be transient: a 4xx answer (nothing stored,
- * a bad request) will not change, so it settles as an error at once instead of waiting. */
+ * a bad request), or a GraphQL error about the request, will not change, so it settles as an
+ * error at once instead of waiting. */
 export function shouldRetry(failureCount: number, error: unknown): boolean {
   if (error instanceof ApiError && error.status >= 400 && error.status < 500) return false;
+  if (error instanceof GraphQLRequestError && error.codes.every((c) => REQUEST_CODES.has(c))) {
+    return false;
+  }
   return failureCount < 1;
 }
 

@@ -12,7 +12,6 @@ from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import RULES_IMPL
 from algotrade.config.user import SITE_USER
 from algotrade.data.reference import resolver
-from algotrade.services.explore.configs import ConfigSummary, config_list, resolved
 from algotrade.services.explore.store import (
     NotFoundError,
     Page,
@@ -21,6 +20,7 @@ from algotrade.services.explore.store import (
     partition_for,
     record,
 )
+from algotrade.services.read.ops.configs import Config, configs_of, resolved_for
 from algotrade.services.screening.run import run_job_name
 from algotrade.services.views import to_value
 from algotrade.storage.tables.schemas import result_table
@@ -39,7 +39,7 @@ ROW_FIELDS = (
 
 @dataclass(frozen=True)
 class ScreenConfig:
-    config: ConfigSummary
+    config: Config
     latest_run: str | None
     latest_session: date | None
     latest_status: str | None
@@ -52,7 +52,7 @@ def _owners(store: ReadStore) -> list[str]:
 
 def screen_configs(store: ReadStore) -> list[ScreenConfig]:
     out = []
-    for config in config_list(store, SCREENER):
+    for config in configs_of(store.configs, store.user, SCREENER):
         owner = SITE_USER if config.scope == "site" else config.scope
         runs = store.reader.runs(run_job_name(config.config_id, owner))
         last = runs[-1] if runs else None
@@ -92,7 +92,7 @@ class RunRows:
 def run_rows(store: ReadStore, config_id: str, on: date | None) -> RunRows:
     """The rows the screen saved for the latest session on or before ``on`` (the user's run,
     else the site's). ``NotFoundError``: not a screener, or nothing stored."""
-    config = resolved(store, config_id)
+    config = resolved_for(store.configs, store.user, config_id)
     if config.config.kind != SCREENER:
         raise NotFoundError(f"{config_id} is a {config.config.kind}, not a screener")
     rules = config.config.impl == RULES_IMPL  # one table holds every rule screen's rows

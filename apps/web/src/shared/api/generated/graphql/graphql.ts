@@ -50,6 +50,18 @@ export type ComparePricesQueryVariables = Exact<{
 
 export type ComparePricesQuery = { table: { instruments: Array<{ instrumentId: string, symbol: string, prices: { bars: Array<{ session: string, close: number }> } }> } | null };
 
+export type FeatureCatalogueQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type FeatureCatalogueQuery = { catalogue: Array<{ name: string, kind: string, source: string, dtype: string, format: FeatureFormat, description: string, nullMeaning: string, version: number | null, group: string | null, key: string | null, inputs: Array<string>, unit: string | null, range: Array<number | null> | null, categories: Array<string>, scope: string, owner: string | null, licence: string }> };
+
+export type FeatureDistributionQueryVariables = Exact<{
+  name: string;
+}>;
+
+
+export type FeatureDistributionQuery = { distribution: { name: string, session: string, count: number, nulls: number, quantiles: Array<{ q: number, value: number }>, histogram: Array<{ lo: number, hi: number, count: number }>, categories: Array<{ value: string, count: number }>, unknown: { code: UnknownCode, detail: string } | null } | null };
+
 export type FeatureTableQueryVariables = Exact<{
   columns: Array<string> | string;
   keys?: Array<string> | string | null | undefined;
@@ -74,6 +86,14 @@ export type EtfHoldingsQueryVariables = Exact<{
 
 
 export type EtfHoldingsQuery = { instrument: { instrumentId: string, isEtf: boolean, holdings: { asOf: string | null, source: string | null, total: number, items: Array<{ rank: number, name: string, symbol: string | null, weight: number, assetClass: string | null, instrument: { symbol: string } | null }> } | null } | null };
+
+export type IdeasPageQueryVariables = Exact<{
+  limit: number;
+  names: Array<string> | string;
+}>;
+
+
+export type IdeasPageQuery = { ideas: { session: string, priority: Array<string>, total: number, screeners: Array<{ picked: number, screener: { id: string, name: string, owner: string, version: number | null }, run: { runId: string, configVersion: number | null } | null, notRun: { code: UnknownCode, detail: string } | null, top: Array<{ instrumentId: string, score: number | null, instrument: { symbol: string } | null }> }>, items: Array<{ rank: number, instrumentId: string, instrument: { symbol: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, detail: string } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null, picks: Array<{ configId: string, decision: string, score: number | null, reasons: string, flags: Array<string>, criteria: Array<{ id: string, value: unknown }>, columns: Array<{ name: string, value: unknown }> }> }> } | null };
 
 export type InstrumentFactsQueryVariables = Exact<{
   key: string;
@@ -116,6 +136,30 @@ export type InstrumentHistoryQueryVariables = Exact<{
 
 
 export type InstrumentHistoryQuery = { instrument: { instrumentId: string, series: { names: Array<string>, points: Array<{ session: string, values: Array<unknown> }> } } | null };
+
+export type ScreenerConfigsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ScreenerConfigsQuery = { configs: Array<{ configId: string, scope: string, kind: string | null, impl: string | null, selection: string | null, hash: string | null, error: string | null }> };
+
+export type MyScreensQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type MyScreensQuery = { myScreens: Array<{ screenerId: string, status: string, latest: number | null, hasDraft: boolean, presetId: string | null }> };
+
+export type ScreenDetailQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type ScreenDetailQuery = { screenDetail: { screenerId: string, user: string, draft: unknown, draftError: string | null, versions: Array<number>, latest: number | null, hash: string | null, layers: Array<string>, resolved: unknown, error: string | null, working: unknown, preset: { presetId: string, pinned: number | null, current: number | null, rebaseAvailable: boolean } | null } | null };
+
+export type ScreenVersionsQueryVariables = Exact<{
+  id: string;
+}>;
+
+
+export type ScreenVersionsQuery = { screenVersions: Array<{ version: number, document: unknown }> };
 
 export class TypedDocumentString<TResult, TVariables>
   extends String
@@ -209,6 +253,56 @@ export const ComparePricesDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ComparePricesQuery, ComparePricesQueryVariables>;
+export const FeatureCatalogueDocument = new TypedDocumentString(`
+    query FeatureCatalogue {
+  catalogue {
+    name
+    kind
+    source
+    dtype
+    format
+    description
+    nullMeaning
+    version
+    group
+    key
+    inputs
+    unit
+    range
+    categories
+    scope
+    owner
+    licence
+  }
+}
+    `) as unknown as TypedDocumentString<FeatureCatalogueQuery, FeatureCatalogueQueryVariables>;
+export const FeatureDistributionDocument = new TypedDocumentString(`
+    query FeatureDistribution($name: FeatureName!) {
+  distribution(name: $name) {
+    name
+    session
+    count
+    nulls
+    quantiles {
+      q
+      value
+    }
+    histogram {
+      lo
+      hi
+      count
+    }
+    categories {
+      value
+      count
+    }
+    unknown {
+      code
+      detail
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<FeatureDistributionQuery, FeatureDistributionQueryVariables>;
 export const FeatureTableDocument = new TypedDocumentString(`
     query FeatureTable($columns: [FeatureName!]!, $keys: [String!], $securityType: String, $sector: String, $liquidityClass: String, $leveraged: Boolean, $optionable: Boolean, $q: String, $sort: String, $page: Int, $size: Int) {
   table(
@@ -278,6 +372,75 @@ export const EtfHoldingsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<EtfHoldingsQuery, EtfHoldingsQueryVariables>;
+export const IdeasPageDocument = new TypedDocumentString(`
+    query IdeasPage($limit: Int!, $names: [FeatureName!]!) {
+  ideas(limit: $limit) {
+    session
+    priority
+    total
+    screeners {
+      screener {
+        id
+        name
+        owner
+        version
+      }
+      run {
+        runId
+        configVersion
+      }
+      notRun {
+        code
+        detail
+      }
+      picked
+      top {
+        instrumentId
+        score
+        instrument {
+          symbol
+        }
+      }
+    }
+    items {
+      rank
+      instrumentId
+      instrument {
+        symbol
+        features(names: $names) {
+          name
+          value
+          unknown {
+            code
+            detail
+          }
+          info {
+            format
+            unit
+            dtype
+            nullMeaning
+          }
+        }
+      }
+      picks {
+        configId
+        decision
+        score
+        reasons
+        flags
+        criteria {
+          id
+          value
+        }
+        columns {
+          name
+          value
+        }
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<IdeasPageQuery, IdeasPageQueryVariables>;
 export const InstrumentFactsDocument = new TypedDocumentString(`
     query InstrumentFacts($key: String!, $names: [FeatureName!]!) {
   session {
@@ -381,3 +544,58 @@ export const InstrumentHistoryDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<InstrumentHistoryQuery, InstrumentHistoryQueryVariables>;
+export const ScreenerConfigsDocument = new TypedDocumentString(`
+    query ScreenerConfigs {
+  configs(kind: "screener") {
+    configId
+    scope
+    kind
+    impl
+    selection
+    hash
+    error
+  }
+}
+    `) as unknown as TypedDocumentString<ScreenerConfigsQuery, ScreenerConfigsQueryVariables>;
+export const MyScreensDocument = new TypedDocumentString(`
+    query MyScreens {
+  myScreens {
+    screenerId
+    status
+    latest
+    hasDraft
+    presetId
+  }
+}
+    `) as unknown as TypedDocumentString<MyScreensQuery, MyScreensQueryVariables>;
+export const ScreenDetailDocument = new TypedDocumentString(`
+    query ScreenDetail($id: String!) {
+  screenDetail(screenerId: $id) {
+    screenerId
+    user
+    draft
+    draftError
+    versions
+    latest
+    preset {
+      presetId
+      pinned
+      current
+      rebaseAvailable
+    }
+    hash
+    layers
+    resolved
+    error
+    working
+  }
+}
+    `) as unknown as TypedDocumentString<ScreenDetailQuery, ScreenDetailQueryVariables>;
+export const ScreenVersionsDocument = new TypedDocumentString(`
+    query ScreenVersions($id: String!) {
+  screenVersions(screenerId: $id) {
+    version
+    document
+  }
+}
+    `) as unknown as TypedDocumentString<ScreenVersionsQuery, ScreenVersionsQueryVariables>;

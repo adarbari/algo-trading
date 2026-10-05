@@ -23,8 +23,8 @@ export function NewScreenerForm({ onCreated, onCancel }: NewScreenerFormProps) {
   const [id, setId] = useState('');
   const create = useCreateScreener();
   const taken =
-    (screeners.data ?? []).some((s) => s.config_id === id && s.scope !== 'site') ||
-    (mine.data ?? []).some((s) => s.screener_id === id);
+    (screeners.data ?? []).some((s) => s.configId === id && s.scope !== 'site') ||
+    (mine.data ?? []).some((s) => s.screenerId === id);
   const idError =
     id !== '' && !isScreenId(id)
       ? 'Use 1-64 of a-z, 0-9, _ and -.'

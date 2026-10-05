@@ -51,12 +51,12 @@ vi.mock('@/features/screener-delete', async () => {
 stubElementSize();
 
 const screener = (
-  config_id: string,
+  configId: string,
   scope: string,
   impl: string,
   patch: Partial<ScreenerSummary> = {},
 ): ScreenerSummary => ({
-  config_id,
+  configId,
   scope,
   kind: 'screener',
   impl,
@@ -71,18 +71,18 @@ const LIST = [
   screener('my-vrp', 'abhinav', 'rules'),
   screener('broken', 'abhinav', 'rules', { error: 'unknown field' }),
 ];
-const mine = (screener_id: string, patch: Partial<ScreenerListItem> = {}): ScreenerListItem => ({
-  screener_id,
+const mine = (screenerId: string, patch: Partial<ScreenerListItem> = {}): ScreenerListItem => ({
+  screenerId,
   status: 'FINAL',
   latest: 1,
-  has_draft: false,
-  preset_id: null,
+  hasDraft: false,
+  presetId: null,
   ...patch,
 });
 const MINE = [
-  mine('my-vrp', { preset_id: 'vrp_scanner', has_draft: true, latest: 2 }),
+  mine('my-vrp', { presetId: 'vrp_scanner', hasDraft: true, latest: 2 }),
   mine('broken'),
-  mine('vrp_scanner', { status: 'DRAFT', latest: null, preset_id: 'vrp_scanner' }),
+  mine('vrp_scanner', { status: 'DRAFT', latest: null, presetId: 'vrp_scanner' }),
 ];
 
 beforeEach(() => {

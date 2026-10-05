@@ -1,15 +1,15 @@
 {
-  "screener_id": "vrp_scanner",
+  "screenerId": "vrp_scanner",
   "user": "abhinav",
   "draft": null,
-  "draft_error": null,
+  "draftError": null,
   "versions": [],
   "latest": null,
   "preset": {
-    "preset_id": "vrp_scanner",
+    "presetId": "vrp_scanner",
     "pinned": null,
     "current": 2,
-    "rebase_available": false
+    "rebaseAvailable": false
   },
   "hash": "h-vrp",
   "layers": ["site/vrp_scanner"],

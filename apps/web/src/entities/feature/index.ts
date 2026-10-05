@@ -4,7 +4,7 @@
  * (instruments x catalogue columns, one page per request) and the column factories every
  * table is built from (ADR 0038).
  */
-export { useFeatureCatalogue, useFeatureDistribution } from './api/hooks';
+export { refreshCatalogue, useFeatureCatalogue, useFeatureDistribution } from './api/hooks';
 export { useFeatureTable } from './api/table';
 export {
   changeColumn,

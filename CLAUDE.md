@@ -34,6 +34,7 @@ Read in this order, **by section and only when the task needs it** (grep, then r
 - **Reads serve one session**: every read resolves the session once (`services/read/session.py`) and reads session-grain tables for exactly that date; a fact not stored for it is UNKNOWN with a reason (`services/read/values.py`), never an older partition; a screener with no run for it is NOT_RUN. Snapshot tables (reference, company, universe) follow ADR 0007's one rule and say which snapshot they used. (ADR 0036)
 - **One read model, one graph**: page data is a domain read object in `src/algotrade/services/read/` (one loader per object) served by GraphQL (`apps/api/algotrade_api/graphql/`, snapshot `apps/api/schema.graphql`). REST only for writes, job polling, health, live quotes, preview POSTs and files (`architecture/rest_allowlist.toml`, shrink-only). New page read: `.claude/skills/add-graphql-field`; new object: `.claude/skills/add-domain-object`; status and plan: `docs/api/read-model.md`. (ADR 0037)
 - **Per-instrument stored values are catalogue features**: read by name through `features(names)`, never a typed field (REST legacy reads included: `features` dict; test `test_no_typed_catalogue_fields_in_api_schemas`); a fact a page needs that is not stored is a feature first (`add-feature`). The browser derives nothing from raw rows (`architecture/web_forbidden_derivations.toml`); tables are `widgets/feature-table` with the column factories in `entities/feature`. (ADR 0038)
+- **Ingestion workflows** by cadence: `market-daily` (gates screens), weekly `reference`, `enrichment`. A step declares `needs` and runs only when they SUCCEEDED; it SUCCEEDS or FAILS by its acceptance rule (thresholds in `nightly.toml`), never PARTIAL; a failed critical step holds back the workflow and every later session until it succeeds or is waived by hand (`--waive`). (ADR 0039)
 
 ## Ownership (ADR 0019; enforced by `make ownership`, `make dupes`, `make arch`)
 
@@ -72,7 +73,7 @@ purpose). The non-obvious cases:
 | A feature derived from a personal-use source (IBKR) | its group in `features/rollups/` with `licence="personal"` on each `Feature`; expression features over it inherit the licence (ADR 0028) |
 | Comparing our data with a live source (verification check) | `apps/ingestion/.../tasks/verification/` (`checks.py`) |
 | A read object or loader a page needs | `src/algotrade/services/read/<area>/` (`add-domain-object`) |
-| A GraphQL field | `apps/api/algotrade_api/graphql/types/<object>.py` (`add-graphql-field`) |
+| A GraphQL field | `apps/api/algotrade_api/graphql/types/<area>/<object>.py` (`add-graphql-field`) |
 | A REST write, job, live or file endpoint | `apps/api/algotrade_api/{routes,schemas}/` (`add-api-endpoint`); page reads stay in `services/explore/` only until their area moves (`docs/api/read-model.md`) |
 | Web: component / page / feature | see Web UI below and `docs/ui/architecture.md` |
 
@@ -163,8 +164,11 @@ the skill with the fix.
 Worktrees: `scripts/worktree.sh <branch> [base]` makes `../algo-trading-<slug>` off
 `origin/main` (links `.venv`, writes `worktree.env` with the worktree's absolute `PYTHONPATH`,
 runs its own `npm ci`); `source` that file; `--remove` cleans up. Never symlink `node_modules`
-to main's: `make check`'s `npm ci` through the link empties main's. Never `--no-verify` /
-`SKIP=`: the hooks work in a worktree.
+to main's: `make check`'s `npm ci` through the link empties main's. **Never `uv sync` /
+`make install` in a worktree** (agent worktrees too): through the `.venv` link it points the
+main checkout's venv, which launchd's nightly and the API run, at the worktree's code
+(2026-10-05); use `worktree.env`'s `PYTHONPATH`. `make install` refuses, `make doctor` fails,
+the nightly refuses to start. Never `--no-verify` / `SKIP=`: the hooks work in a worktree.
 
 Commands (need `uv`; `make doctor` checks the machine, `make status` shows PRs, jobs, store): `make install` (= `uv sync --all-packages --locked`), `make check`, `make test`, `make perf` (strict timing budgets; run on an idle machine), `make layout`, `make evaluate`, `make baseline`, `make features-doc`.
 Web (need Node 24): `make web-install`, `make web-check` (part of `make check`), `make web-visual` (screenshots, Docker); in `apps/web`: `npm run dev|storybook|check|visual:update`.

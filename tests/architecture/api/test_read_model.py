@@ -134,7 +134,7 @@ def resolver_problems(source: str) -> list[str]:
 
 
 def test_resolvers_call_one_loader() -> None:
-    sources = sorted((GRAPHQL / "types").glob("*.py"))
+    sources = sorted((GRAPHQL / "types").rglob("*.py"))
     hits = [
         f"{path.relative_to(REPO_ROOT)}: {problem}"
         for path in sources
@@ -175,13 +175,21 @@ def test_the_resolver_check_catches_logic() -> None:
 def graphql_objects() -> list[type]:
     """Every Strawberry object type declared in ``algotrade_api.graphql.types``."""
     found = []
-    for info in pkgutil.iter_modules(graphql_types.__path__, graphql_types.__name__ + "."):
+    for info in pkgutil.walk_packages(graphql_types.__path__, graphql_types.__name__ + "."):
         module = importlib.import_module(info.name)
         for _, cls in inspect.getmembers(module, inspect.isclass):
             definition = getattr(cls, "__strawberry_definition__", None)
             if cls.__module__ == module.__name__ and definition is not None:
                 found.append(cls)
     return found
+
+
+def test_the_type_walk_reaches_every_area() -> None:
+    """``types/`` is split by area (``instruments/``, ``screens/``, ``ops/``): the checks see
+    them all."""
+    names = {cls.__name__ for cls in graphql_objects()}
+    areas = {"Instrument", "FeatureValue", "Ideas", "Screener", "ScreenDetail", "Backtest"}
+    assert {"Query", "Session"} | areas <= names
 
 
 def test_types_mirror_read_model() -> None:
@@ -253,7 +261,7 @@ def test_type_ignores_only_on_strawberry_field_decorators() -> None:
             if "type: ignore" not in line:
                 continue
             allowed = (
-                path.parent.name == "types"
+                "types" in path.relative_to(GRAPHQL).parts
                 and line.strip() == "@strawberry.field(  # type: ignore[untyped-decorator]"
             )
             if not allowed:

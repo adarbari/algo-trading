@@ -79,7 +79,7 @@ A copy of a preset clears an inherited tie-break with `tie_break = ""` (a user l
 delete a key); changing it is setting another field.
 
 Field names are catalogue names (`instrument.*`, `rollup.<group>@vN.*`, `feature.<name>`;
-see `GET /features` and [docs/data/features.md](../data/features.md)). A formula is never
+see the GraphQL `catalogue` and [docs/data/features.md](../data/features.md)). A formula is never
 written inline: make it a user feature (`config/users/<u>/features/`) and use
 `feature.<name>`; the Builder's "Add formula feature" does this and asks the user to name it.
 

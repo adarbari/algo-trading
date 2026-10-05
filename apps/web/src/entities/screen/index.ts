@@ -1,6 +1,8 @@
 /** Entity: rule screens (the draft document, its criteria, the live preview and the list). */
 export {
   PREVIEW_ROWS,
+  forgetScreen,
+  refreshScreens,
   useMyScreeners,
   useRunScreener,
   useDeleteScreenerView,

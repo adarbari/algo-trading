@@ -106,10 +106,11 @@ def _value(
 
 
 def load_feature_values(
-    ctx: ReadContext, instrument_ids: Sequence[str], names: Sequence[str]
+    ctx: ReadContext, instrument_ids: Sequence[str] | None, names: Sequence[str]
 ) -> dict[str, tuple[FeatureValue, ...]]:
     """``names`` (catalogue fields, in the order asked; repeats dropped) for each instrument
-    of ``instrument_ids``, for ``ctx.session``: one read for them all.
+    of ``instrument_ids`` (None: every instrument of the session's reference snapshot, the
+    population a distribution is over), for ``ctx.session``: one read for them all.
     ``UnknownFeatureError`` when a name is not in the caller's catalogue."""
     wanted = list(dict.fromkeys(names))
     infos = feature_infos(ctx.features, wanted)
@@ -131,6 +132,8 @@ def load_feature_values(
         }
         # A company snapshot taken after the session is not known on it (no lookahead).
         missing = (*view.missing, COMPANY_TABLE) if view.company_pre_snapshot else view.missing
+    if instrument_ids is None:
+        instrument_ids = list(rows)
     return {
         iid: tuple(_value(infos[n], tables[n], rows.get(iid), missing, ctx, iid) for n in wanted)
         for iid in instrument_ids

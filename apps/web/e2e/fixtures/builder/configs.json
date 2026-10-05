@@ -1,6 +1,6 @@
 [
   {
-    "config_id": "vrp_scanner",
+    "configId": "vrp_scanner",
     "scope": "site",
     "kind": "screener",
     "impl": "rules",
@@ -9,7 +9,7 @@
     "error": null
   },
   {
-    "config_id": "short_premium_liquidity",
+    "configId": "short_premium_liquidity",
     "scope": "site",
     "kind": "screener",
     "impl": "short_premium_liquidity",
@@ -18,7 +18,7 @@
     "error": null
   },
   {
-    "config_id": "my-vrp",
+    "configId": "my-vrp",
     "scope": "abhinav",
     "kind": "screener",
     "impl": "rules",

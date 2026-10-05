@@ -39,9 +39,9 @@ def test_configuration_errors_are_400(
     def broken(*args: object) -> None:
         raise ConfigurationError("bad config")
 
-    monkeypatch.setattr("algotrade.services.explore.configs.resolve_config", broken)
+    monkeypatch.setattr("algotrade.services.read.ops.configs.resolve_config", broken)
     app = create_app(ApiSettings("memory://", "config"), explore[0])
-    response = TestClient(app).get("/configs/sma_trend")
+    response = TestClient(app).get("/screens/vrp_scanner/results")
     assert (response.status_code, response.json()) == (400, {"detail": "bad config"})
 
 
@@ -79,15 +79,9 @@ ENDPOINTS = (
     "/admin/review/figi",
     "/admin/review/leveraged",
     "/chains/AAA/live?expiry=2022-12-23",
-    "/features",
-    "/features/rollup.price_stats@v2.hv20/distribution",
     "/screens",
     "/screens/short_premium_liquidity/results",
     "/screens/vrp_scanner/table?columns=rollup.price_stats@v2.hv20",
-    "/ideas",
-    "/backtests",
-    "/configs",
-    "/configs/sma_trend",
     "/admin/ingestion/completeness",
     "/admin/ingestion/chains/option_quotes/2022-11-23",
     "/admin/quality",
@@ -110,9 +104,9 @@ def test_every_endpoint_answers_within_a_second_on_golden_data(
     assert min(timings) < 1.0, f"{path} took {min(timings):.2f}s (best of 3: {timings})"
 
 
-# The pages' main GraphQL operations (read-model PRs 4-7 add theirs: IdeasPage, ExploreDetail,
-# Table). InstrumentFacts: the Explore Overview pane; the detail tabs' (read-model PR 6):
-# events, bars, feature history, the option chain and one expiry's quotes, an ETF's holdings
+# The pages' main GraphQL operations. InstrumentFacts: the Explore Overview pane; IdeasPage:
+# the Ideas page (apps/web/src/entities/idea/api); the detail tabs' (read-model PR 6): events,
+# bars, feature history, the option chain and one expiry's quotes, an ETF's holdings
 # (apps/web/src/entities/{instrument,chain,holdings}/api); the feature table (read-model PR 7:
 # the Explore ticker table and the compare set side by side) and the compare chart's prices
 # (apps/web/src/entities/{feature,explore}/api).
@@ -135,6 +129,32 @@ OVERVIEW_NAMES = [
     "feature.iv_rank", "feature.div_yield", "rollup.earnings@v1.next_earnings_date",
     "rollup.earnings@v1.last_earnings_date", "rollup.earnings@v1.days_to_earnings",
     "rollup.earnings@v1.earnings_time",
+]  # fmt: skip
+IDEAS_PAGE = """query IdeasPage($limit: Int!, $names: [FeatureName!]!) {
+  ideas(limit: $limit) {
+    session priority total
+    screeners {
+      screener { id name owner version } run { runId configVersion } notRun { code detail }
+      picked top { instrumentId score instrument { symbol } }
+    }
+    items {
+      rank instrumentId
+      instrument {
+        symbol
+        features(names: $names) {
+          name value unknown { code detail } info { format unit dtype nullMeaning }
+        }
+      }
+      picks {
+        configId decision score reasons flags criteria { id value } columns { name value }
+      }
+    }
+  }
+}"""
+IDEA_NAMES = [
+    "rollup.earnings@v1.next_earnings_date", "rollup.earnings@v1.last_earnings_date",
+    "rollup.earnings@v1.days_to_earnings", "rollup.nearest_expiry@v1.dte",
+    "feature.earnings_before_expiry", "feature.vrp_iv30",
 ]  # fmt: skip
 DETAIL = {
     "InstrumentEvents": "query InstrumentEvents($key: String!) { instrument(key: $key) { "
@@ -183,6 +203,13 @@ CHAIN_NAMES = [
     "rollup.iv30@v1.iv30",
 ]
 HISTORY_NAMES = [n for n in OVERVIEW_NAMES if not n.startswith("instrument.") and "date" not in n]
+# The Builder's and pickers' reads (read-model PR 9): the catalogue, one distribution, the
+# saved backtests.
+CATALOGUE = "query FeatureCatalogue { catalogue { name dtype format unit scope licence } }"
+DISTRIBUTION = """query FeatureDistribution($name: FeatureName!) {
+  distribution(name: $name) { count nulls quantiles { q value } histogram { lo hi count } }
+}"""
+BACKTESTS = "query Backtests { backtests { runId configId status metrics } }"
 OPERATIONS = {
     "InstrumentFacts": (INSTRUMENT_FACTS, {"key": "AAA", "names": OVERVIEW_NAMES}),
     "InstrumentEvents": (DETAIL["InstrumentEvents"], {"key": "AAA"}),
@@ -197,6 +224,10 @@ OPERATIONS = {
         {"key": "AAA", "expiry": "2022-12-23", "date": "2022-11-23"},
     ),
     "EtfHoldings": (DETAIL["EtfHoldings"], {"key": "BULL", "top": 10}),
+    "IdeasPage": (IDEAS_PAGE, {"limit": 200, "names": IDEA_NAMES}),
+    "FeatureCatalogue": (CATALOGUE, {}),
+    "FeatureDistribution": (DISTRIBUTION, {"name": "rollup.price_stats@v2.hv20"}),
+    "Backtests": (BACKTESTS, {}),
     "Table": (
         FEATURE_TABLE,
         {"columns": EXPLORE_COLUMNS, "sort": "-feature.iv_hv_ratio", "page": 1, "size": 100},

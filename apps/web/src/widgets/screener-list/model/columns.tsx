@@ -28,7 +28,7 @@ const isRules = (screener: ScreenerSummary): boolean => screener.impl === 'rules
 const NAME: DataTableColumn<ScreenerSummary> = {
   id: 'name',
   header: 'Screener',
-  value: (s) => s.config_id,
+  value: (s) => s.configId,
   mono: true,
   hideable: false,
   grow: true,
@@ -65,7 +65,7 @@ export function presetColumns(actions: ScreenerActions): DataTableColumn<Screene
             <Button
               size="sm"
               onClick={() => {
-                actions.onOpen(row.config_id);
+                actions.onOpen(row.configId);
               }}
             >
               Open
@@ -74,7 +74,7 @@ export function presetColumns(actions: ScreenerActions): DataTableColumn<Screene
               size="sm"
               variant="primary"
               onClick={() => {
-                actions.onCopy(row.config_id);
+                actions.onCopy(row.configId);
               }}
             >
               Copy to my screeners
@@ -87,7 +87,7 @@ export function presetColumns(actions: ScreenerActions): DataTableColumn<Screene
 
 const stateOf = (s: MyScreener): string => {
   if (s.status === 'DRAFT') return 'DRAFT';
-  return `v${String(s.latest ?? 1)}${s.has_draft ? ' + draft' : ''}`;
+  return `v${String(s.latest ?? 1)}${s.hasDraft ? ' + draft' : ''}`;
 };
 
 export function myColumns(actions: ScreenerActions): DataTableColumn<MyScreener>[] {
@@ -95,7 +95,7 @@ export function myColumns(actions: ScreenerActions): DataTableColumn<MyScreener>
     {
       id: 'name',
       header: 'Screener',
-      value: (s) => s.screener_id,
+      value: (s) => s.screenerId,
       mono: true,
       hideable: false,
       grow: true,
@@ -119,7 +119,7 @@ export function myColumns(actions: ScreenerActions): DataTableColumn<MyScreener>
     {
       id: 'preset',
       header: 'Copy of',
-      value: (s) => s.preset_id,
+      value: (s) => s.presetId,
       mono: true,
       tone: 'secondary',
     },
@@ -142,7 +142,7 @@ export function myColumns(actions: ScreenerActions): DataTableColumn<MyScreener>
           <Button
             size="sm"
             onClick={() => {
-              actions.onOpen(row.screener_id);
+              actions.onOpen(row.screenerId);
             }}
           >
             Results
@@ -150,7 +150,7 @@ export function myColumns(actions: ScreenerActions): DataTableColumn<MyScreener>
           <Button
             size="sm"
             onClick={() => {
-              actions.onEdit(row.screener_id);
+              actions.onEdit(row.screenerId);
             }}
           >
             Edit
@@ -158,9 +158,9 @@ export function myColumns(actions: ScreenerActions): DataTableColumn<MyScreener>
           <Button
             size="sm"
             variant="ghost"
-            aria-label={`Delete ${row.screener_id}`}
+            aria-label={`Delete ${row.screenerId}`}
             onClick={() => {
-              actions.onDelete(row.screener_id);
+              actions.onDelete(row.screenerId);
             }}
           >
             Delete

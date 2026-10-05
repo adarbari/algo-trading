@@ -5,6 +5,9 @@
  * figures come from the components' CSS. Missing values (null, undefined, NaN) read as an em dash.
  */
 
+/** How a date reads (see `ValueFormat`). */
+export type DateStyle = 'short' | 'weekday' | 'day' | 'iso';
+
 /** The tone a formatted value carries: `up` / `down` for signed changes, `muted` for missing. */
 export type ValueTone = 'default' | 'up' | 'down' | 'muted';
 
@@ -21,8 +24,11 @@ export type ValueFormat =
   | { kind: 'currency-compact' }
   /** Compact count: `11.4K`, `2.4M`. */
   | { kind: 'compact' }
-  /** ISO date (`2026-10-02`) or Date: `short` = `2 Oct 2026`, `weekday` = `Fri 2 Oct`, `iso`. */
-  | { kind: 'date'; style?: 'short' | 'weekday' | 'iso' }
+  /**
+   * ISO date (`2026-10-02`) or Date: `short` = `2 Oct 2026`, `weekday` = `Fri 2 Oct`,
+   * `day` = `2 Oct`, `iso`.
+   */
+  | { kind: 'date'; style?: DateStyle }
   /**
    * A signed change with an up / down tone: `percent` (a fraction, +0.0124 -> `+1.24%`),
    * `points` (`+3.2 pts`) or `number` (`+1.20`). Zero has no tone.
@@ -77,14 +83,17 @@ function toDate(value: unknown): Date | undefined {
   return undefined;
 }
 
-function formatDate(value: unknown, style: 'short' | 'weekday' | 'iso'): string {
+const DATE_OPTIONS: Record<Exclude<DateStyle, 'iso'>, Intl.DateTimeFormatOptions> = {
+  short: { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' },
+  weekday: { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' },
+  day: { day: 'numeric', month: 'short', timeZone: 'UTC' },
+};
+
+function formatDate(value: unknown, style: DateStyle): string {
   const date = toDate(value);
   if (!date) return MISSING;
   if (style === 'iso') return date.toISOString().slice(0, 10);
-  const options: Intl.DateTimeFormatOptions =
-    style === 'weekday'
-      ? { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }
-      : { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' };
+  const options = DATE_OPTIONS[style];
   return new Intl.DateTimeFormat('en-GB', options).format(date).replace(',', '');
 }
 

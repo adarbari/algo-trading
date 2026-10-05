@@ -20,8 +20,9 @@ const feature = (patch: Partial<CatalogueFeature>): CatalogueFeature => ({
   kind: 'chain',
   source: 'rollups/instrument/iv30@v1',
   dtype: 'float',
+  format: 'PERCENT',
   description: 'Our 30-day ATM implied volatility',
-  null_meaning: 'no chain',
+  nullMeaning: 'no chain',
   version: 1,
   group: 'iv30@v1',
   key: 'iv30.iv30@v1',
@@ -81,16 +82,21 @@ describe('feature catalogue', () => {
 describe('feature distribution', () => {
   const distribution = {
     name: 'rollup.iv30@v1.iv30',
-    dtype: 'float',
     session: '2026-10-02',
     count: 10,
     nulls: 1,
-    quantiles: { '0.25': 0.3, '0.5': 0.45, '0.75': 0.7, '0.99': 1.6 },
+    quantiles: [
+      { q: 0.25, value: 0.3 },
+      { q: 0.5, value: 0.45 },
+      { q: 0.75, value: 0.7 },
+      { q: 0.99, value: 1.6 },
+    ],
     histogram: [
       { lo: 0, hi: 0.5, count: 6 },
       { lo: 0.5, hi: 1, count: 3 },
     ],
     categories: [],
+    unknown: null,
   };
 
   it('maps bins and quartile markers, with the ticker highlighted', () => {

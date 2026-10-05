@@ -1,39 +1,127 @@
 /**
- * Read hooks for rule screens: the screeners list (GET /configs), one screen's draft, versions
- * and preset pin (GET /screeners/{id}), and the live preview of a draft.
+ * Read hooks for rule screens: the screener configs (GraphQL `configs`), the user's own screens
+ * and one screen's draft, versions and preset pin (GraphQL `myScreens`, `screenDetail`,
+ * `screenVersions`; ADR 0037), and the live preview of a draft (a preview POST). The writes stay
+ * REST (features/screener-*); after one, `refreshScreens` reads them all again.
  */
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
-import { api, queryKeys, unwrap } from '@/shared/api';
+import { api, gql, graphql, queryKeys, unwrap } from '@/shared/api';
 
-import type { ScreenDocument } from '../model/spec';
+import type { ScreenDocument, ScreenerDetail } from '../model/spec';
 import { isActive } from '../model/run';
 import { tableParams, type ScreenerView, type ScreenTableQuery } from '../model/table';
 
-/** Every screener the user sees: site presets and their own (Python and rule screens). */
+const ScreenerConfigs = graphql(`
+  query ScreenerConfigs {
+    configs(kind: "screener") {
+      configId
+      scope
+      kind
+      impl
+      selection
+      hash
+      error
+    }
+  }
+`);
+
+const MyScreens = graphql(`
+  query MyScreens {
+    myScreens {
+      screenerId
+      status
+      latest
+      hasDraft
+      presetId
+    }
+  }
+`);
+
+const ScreenDetail = graphql(`
+  query ScreenDetail($id: String!) {
+    screenDetail(screenerId: $id) {
+      screenerId
+      user
+      draft
+      draftError
+      versions
+      latest
+      preset {
+        presetId
+        pinned
+        current
+        rebaseAvailable
+      }
+      hash
+      layers
+      resolved
+      error
+      working
+    }
+  }
+`);
+
+const ScreenVersions = graphql(`
+  query ScreenVersions($id: String!) {
+    screenVersions(screenerId: $id) {
+      version
+      document
+    }
+  }
+`);
+
+/** The screen operations, so a write can read them all again. */
+const SCREEN_OPERATIONS = ['ScreenerConfigs', 'MyScreens', 'ScreenDetail', 'ScreenVersions'];
+
+/** Read every screen list and detail again (after a draft, finalise, copy or delete). */
+export async function refreshScreens(client: QueryClient): Promise<void> {
+  await Promise.all(
+    SCREEN_OPERATIONS.map((name) => client.invalidateQueries({ queryKey: ['gql', name] })),
+  );
+}
+
+/** Drop one screen's cached detail (it no longer exists). */
+export function forgetScreen(client: QueryClient, id: string): void {
+  client.removeQueries({ queryKey: queryKeys.gql('ScreenDetail', { id }) });
+}
+
+/** Every screener config the user sees: site presets and their own (Python and rule screens). */
 export function useScreeners() {
   return useQuery({
-    queryKey: queryKeys.screeners.list(),
-    queryFn: () => unwrap(api.GET('/configs')),
-    select: (configs) => configs.filter((c) => c.kind === 'screener'),
+    queryKey: queryKeys.gql('ScreenerConfigs', {}),
+    queryFn: () => gql(ScreenerConfigs, {}),
+    select: (data) => data.configs,
   });
 }
 
 /** The user's own screens: finalized ones and draft-only ones (status DRAFT). */
 export function useMyScreeners() {
   return useQuery({
-    queryKey: queryKeys.screeners.mine(),
-    queryFn: () => unwrap(api.GET('/screeners')),
+    queryKey: queryKeys.gql('MyScreens', {}),
+    queryFn: () => gql(MyScreens, {}),
+    select: (data) => data.myScreens,
   });
 }
 
-/** One screen: its draft, versions, preset pin and resolved working copy. */
+/**
+ * One screen: its draft, versions, preset pin and resolved working copy; `null` when the user
+ * has no such screen (and there is no preset of that id).
+ */
 export function useScreener(id: string | null) {
+  const variables = { id: id ?? '' };
   return useQuery({
-    queryKey: queryKeys.screeners.detail(id ?? ''),
-    queryFn: () =>
-      unwrap(api.GET('/screeners/{screener_id}', { params: { path: { screener_id: id ?? '' } } })),
+    queryKey: queryKeys.gql('ScreenDetail', variables),
+    queryFn: () => gql(ScreenDetail, variables),
+    // The JSON documents are the screen's TOML tables (objects) as stored.
+    select: (data) => data.screenDetail as ScreenerDetail | null,
     enabled: Boolean(id),
     retry: false,
   });
@@ -41,14 +129,15 @@ export function useScreener(id: string | null) {
 
 /** The finalised versions of a screen (oldest first), each with its document. */
 export function useScreenerVersions(id: string | null, enabled = true) {
+  const variables = { id: id ?? '' };
   return useQuery({
-    queryKey: queryKeys.screeners.versions(id ?? ''),
-    queryFn: () =>
-      unwrap(
-        api.GET('/screeners/{screener_id}/versions', {
-          params: { path: { screener_id: id ?? '' } },
-        }),
-      ),
+    queryKey: queryKeys.gql('ScreenVersions', variables),
+    queryFn: () => gql(ScreenVersions, variables),
+    select: (data) =>
+      data.screenVersions.map((v) => ({
+        version: v.version,
+        document: v.document as Record<string, unknown>,
+      })),
     enabled: Boolean(id) && enabled,
   });
 }

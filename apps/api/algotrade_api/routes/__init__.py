@@ -5,19 +5,10 @@ map it to a response schema. No business logic here (ADR 0024); ``ROUTERS`` is w
 
 from fastapi import APIRouter
 
-from algotrade_api.routes import (
-    admin,
-    backtests,
-    chains,
-    configs,
-    features,
-    health,
-    runs,
-)
+from algotrade_api.routes import admin, chains, health, runs
 from algotrade_api.routes.authoring import preferences, screeners, user_features
 from algotrade_api.routes.preview import features as feature_check
 from algotrade_api.routes.preview import screeners as screen_preview
-from algotrade_api.routes.screens import ideas
 from algotrade_api.routes.screens import results as screen_results
 from algotrade_api.routes.screens import run as screen_run
 from algotrade_api.routes.screens import table as screen_table
@@ -29,7 +20,6 @@ ROUTERS: tuple[APIRouter, ...] = (
     chains.router,
     user_features.router,
     feature_check.router,
-    features.router,
     screen_results.router,
     screen_run.router,
     screen_table.router,
@@ -37,8 +27,5 @@ ROUTERS: tuple[APIRouter, ...] = (
     screeners.router,
     preferences.router,
     screener_view.router,
-    ideas.router,
-    backtests.router,
-    configs.router,
     admin.router,
 )
