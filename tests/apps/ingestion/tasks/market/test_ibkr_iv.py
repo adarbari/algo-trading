@@ -271,6 +271,9 @@ def test_a_history_row_keeps_the_hv_of_the_snapshot_it_replaces() -> None:
     assert set(rows["source_kind"]) == {"history"}  # the history replaced the snapshot
     assert rows.loc[day, "hv30_ibkr"] == 0.33 and rows.loc[day, "iv30_ibkr"] == 0.24
     assert rows["hv30_ibkr"].drop(day).isna().all()  # no snapshot, no HV
+    backfill_ivs(ctx, ibkr_source(fake(["A"])), START - timedelta(1), SESSION)  # again
+    again = ibkr_iv30(reader, START, SESSION).set_index("session_date")
+    assert again.loc[day, "hv30_ibkr"] == 0.33  # a second backfill keeps it too
 
 
 class CrashOnClose(IbkrSource):

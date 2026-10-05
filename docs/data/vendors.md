@@ -278,8 +278,8 @@ gives replaces a free source, and what derives from it carries `licence = person
   on a paper login (checked 2026-10-03: AAPL, SPY, MSFT answered within 1 s; HV can lag, so a
   batch waits up to `stream_wait_s` for both). ~4.2k names in batches of 50: a few minutes.
   The snapshot is written to the session; a later history backfill of that session replaces
-  it (runs merge per instrument, latest wins), keeping the snapshot's HV (history rows have
-  no HV of their own).
+  it (runs merge per instrument, latest wins), keeping the stored HV (history rows have no
+  HV of their own; a second backfill of a session keeps it too).
 - **Features**: `ibkr_iv@v1` (IV30 / HV30 and the 252-session rank, percentile and status on
   IB's IV, the `iv_history@v2` rules); `iv_rank` / `iv_percentile` prefer it and fall back to
   ours, `iv_rank_source` says which (`config/site/features/volatility.toml`).

@@ -6,7 +6,7 @@ around the work) and only for underlyings with a resolved IBKR contract
 
 - **History backfill** (``backfill_ivs``, ``--from`` / ``--to``): per underlying ONE request
   (``OPTION_IMPLIED_VOLATILITY`` daily bars over the whole range; IB's HV comes only from the
-  nightly snapshot: a history row keeps the HV of the stored snapshot it replaces, else has
+  nightly snapshot: a history row keeps the HV of the stored row it replaces, else has
   none), paced by the shared
   ``ibkr_historical`` limiter (``[ibkr] historical_min_interval_s``). Rows are
   ``source_kind = history``, one partition per session. Resumable per underlying, also
@@ -28,11 +28,11 @@ around the work) and only for underlyings with a resolved IBKR contract
   spread over nights), up to the session before.
 
 Runs merge per instrument and session (the latest run's row wins, so a later history
-backfill replaces a snapshot, keeping its HV). When the gateway cannot be opened the run
-records ``skipped`` (the nightly step is SKIPPED with a WARN, never FAILED) and is PARTIAL,
-never COMPLETE: what a resumed run had staged is still published, nothing is dropped
-unpublished. Stats: coverage (snapshot rows with an IV over the coverage), backfill progress
-and the estimated time left at the current pace.
+backfill replaces a snapshot, keeping its HV, as a second backfill of a session does).
+When the gateway cannot be opened the run records ``skipped`` (the nightly step is SKIPPED
+with a WARN, never FAILED) and is PARTIAL, never COMPLETE: what a resumed run had staged is
+still published, nothing is dropped unpublished. Stats: coverage (snapshot rows with an IV
+over the coverage), backfill progress and the estimated time left at the current pace.
 """
 
 from collections.abc import Callable, Collection, Mapping, Sequence
@@ -45,7 +45,7 @@ import pandas as pd
 from algotrade.core.model.fields import ROLLUP_TABLE_PREFIX
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.data.reference import ibkr_contracts, snapshot
-from algotrade.data.volatility import IBKR_IV30, ibkr_snapshot_hv
+from algotrade.data.volatility import IBKR_IV30, ibkr_stored_hv
 from algotrade.services.features import field_view, site_features, site_store
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import (
@@ -226,7 +226,7 @@ def _fetch_history(
     rows = rows[(rows["date"] >= start) & (rows["date"] <= end)]
     if rows.empty:
         return f"NO_DATA: {start.isoformat()}"
-    # IV only: a session's stored snapshot HV is kept (this row replaces the snapshot's)
+    # IV only: a session's stored HV is kept (this row replaces the stored one)
     stored = [kept_hv.get((name.instrument_id, d)) for d in rows["date"]]
     fetched = rows["hv30_ibkr"].astype(float).to_numpy()
     hv = pd.Series([f if k is None else k for f, k in zip(fetched, stored, strict=True)])
@@ -263,7 +263,7 @@ def _backfill(
         if n.instrument_id not in done and f"hist:{n.instrument_id}" not in run.items
     ]
     todo = pending if limit is None else pending[: max(0, limit)]
-    kept_hv = ibkr_snapshot_hv(run.reader, start, end, [n.instrument_id for n in todo])
+    kept_hv = ibkr_stored_hv(run.reader, start, end, [n.instrument_id for n in todo])
     unanswered_in_a_row = 0
     for i, name in enumerate(todo, 1):
         item = f"hist:{name.instrument_id}"
