@@ -100,8 +100,10 @@ Prices are adjusted at read time (`none`, `splits`, `total_return`; setting
 (browser user agent required). One request per date returns every company reporting that day
 with timing (pre-market / after hours / not supplied), the EPS forecast and number of
 estimates; past dates add the reported EPS and surprise. `algotrade-ingest earnings` stores a
-60-day forward window nightly in `events/earnings`, in the partition of the run's session, so
-date changes stay point-in-time; `--start` in the past backfills. About 2 minutes a night
+60-day forward window nightly in `events/earnings`, plus the last 7 days (`lookback_days`: those
+reports now carry the reported EPS and surprise, and `last_earnings_date` stays current), in the
+partition of the run's session, so date changes stay point-in-time; `--start` in the past
+backfills. About 2 minutes a night
 (requests spaced by `[nasdaq_earnings] min_interval_s`, 0.5 s).
 
 ## U.S. Treasury par yield curve (implemented, phase 2b.1)
