@@ -1,7 +1,6 @@
 # ADR 0035: ETF holdings from issuer files, with SEC N-PORT as the universal fallback
 
-**Status:** proposed (2026-10-05; a new data source and a new grain, so it needs owner
-review). Extends [0012](0012-data-vendors.md), [0013](0013-universe.md) and
+**Status:** accepted (2026-10-05; owner review of the new source and grain done). Extends [0012](0012-data-vendors.md), [0013](0013-universe.md) and
 [0027](0027-vendor-sources-shared-package.md).
 
 ## Context
@@ -61,7 +60,7 @@ holdings and the date they are as of. Only SPY's holdings were fetched, as a mem
   (GLD, SLV, bitcoin trusts), ETNs, and funds whose N-PORT lookup finds no filing.
 - The issuers' sites are not licensed APIs; they can change a layout or block us. Adapters are
   tested against recorded responses, each fund is an isolated item, and a changed file makes
-  one fund fail, not the run. The terms of use of State Street and iShares were not confirmed
-  to permit automated downloads of the public holdings files; the owner should confirm.
+  one fund fail, not the run. The owner accepted State Street's and iShares' terms of use for
+  these public holdings files (2026-10-05) and kept `fallback_scope = "optionable"`.
 - Storage: about 100 rows per fund, 37 bytes a row measured; a full pass over the ~1,100
   covered funds is ~110k rows, ~4 MB. Raw files add about 12 MB a night, kept 14 days.

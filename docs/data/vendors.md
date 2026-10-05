@@ -29,7 +29,7 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 |---|---|---|---|
 | Ticker universe | Nasdaq Trader symbol directory (`nasdaqlisted.txt`, `otherlisted.txt`, `options.txt`) | — | Official, free, updated daily |
 | S&P 500 membership | SPY daily holdings file (State Street) | — | Membership changes become events |
-| ETF holdings (top holdings and weights per fund) | **Issuer daily files**: State Street SPDR workbooks, iShares CSVs; **SEC N-PORT** for the funds they do not cover (ADR 0035) | Vanguard / Invesco / ARK sites (no usable public file, see below) | Proposed, needs owner review of the terms of use |
+| ETF holdings (top holdings and weights per fund) | **Issuer daily files**: State Street SPDR workbooks, iShares CSVs; **SEC N-PORT** for the funds they do not cover (ADR 0035) | Vanguard / Invesco / ARK sites (no usable public file, see below) | Accepted (ADR 0035) |
 | Company details (name, SIC, sector, state, fiscal year end) | SEC EDGAR submissions (free; contact email in the user agent) | Massive ticker details | Implemented, phase 1.7 |
 | Shares outstanding (market cap) | SEC EDGAR company facts (XBRL; free; same contact and pacing) | Massive ticker details (`share_class_shares_outstanding`) | Implemented, phase 2b.4 |
 | Daily stock and ETF bars (swing / momentum) | Massive (formerly Polygon) free tier: all US tickers, 2 years history, 5 calls/min; "grouped daily" = whole market in 1 call | Alpaca (free account), IBKR, Yahoo (unofficial, history backfill only) | |
@@ -164,10 +164,9 @@ Not used, with the reason:
 
 A sources.toml from before the `[ssga]` section (it had `[spy_holdings]`) keeps working: the sources use the defaults, enabled and a 1 s pace.
 
-State Street's and iShares' robots.txt files do not disallow these paths. Neither site's terms
-of use were confirmed to allow automated downloads of the public holdings files (the iShares
-terms page could not be fetched); the owner should confirm, and `enabled = false` in `[ssga]`
-or `[ishares]` turns an issuer off.
+State Street's and iShares' robots.txt files do not disallow these paths, and the owner accepted
+their terms of use for these public files (2026-10-05). `enabled = false` in `[ssga]` or
+`[ishares]` turns an issuer off.
 
 Linking: a holding's ticker becomes an instrument id through `SymbolResolver`, only for lines
 the issuer says are U.S. listings (iShares: Location United States and asset class Equity;
