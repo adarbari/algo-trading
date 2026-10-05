@@ -24,7 +24,8 @@ config/users/<user_id>/             L4: git-ignored locally; a DB behind ConfigS
 
 The location comes from `ALGOTRADE_CONFIG_DIR` (default `./config`) or `--config-dir`. Only
 `storage/configs/files.py` knows this layout; everything else uses the `ConfigStore`
-protocol (`load(scope, kind, name)`, `names`, `users`). A config id is found under the kind
+protocol (`load(scope, kind, name)`, `names`, `users`, and a user's rule-screen drafts and
+versions: `draft`, `drafts`, `versions`, `version`, which the read model reads). A config id is found under the kind
 `strategies` or `screeners` (both is an error). `screeners` are versioned:
 `load(scope, "screeners", "<id>")` is the latest version, `"<id>@<N>"` exactly version N. User configs are **written** only by
 `services/authoring` through `ConfigWriter` (`storage/configs/writer.py`; atomic files, a
@@ -305,7 +306,7 @@ null_meaning = "any input is null"
 - **Always virtual**: `materialise` is not allowed (computed on read; ask for a site feature
   when it must be stored or read by a group).
 - **Names**: selectable as `feature.<name>` by that user only: their selections, strategy and
-  screener configs, the Explore ticker table / compare columns and `GET /features` (listed
+  screener configs, the Explore ticker table / compare columns and the GraphQL `catalogue` (listed
   with `scope = "user"` and `owner`). Another user never sees them (an unknown field there).
   A user feature may read stored features (`group.column`), site expression features and the
   user's own; it may **not** take a site feature's name (the error names both definitions), so

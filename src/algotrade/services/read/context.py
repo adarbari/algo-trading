@@ -1,6 +1,8 @@
 """What every loader reads through: the ``ReadContext`` of one request (the stores, whose
 catalogue, the one resolved ``Session``, the result cache), opened by ``open_context``, and
-``partition``, the only way a loader reads a session-grain table (ADR 0036 decision 6).
+``partition``, the only way a loader reads a session-grain table for the request's session
+(ADR 0036 decision 6), and ``run_partition``, a run record's own results (the run names its
+session: an explicit argument, never "latest").
 
 ``open_context`` resolves the session once per request (and reuses it while nothing is
 published: keyed on ``StoreReader.visible_seq``); nothing else in ``services/read`` calls
@@ -23,8 +25,19 @@ from algotrade.services.features import catalogue
 from algotrade.services.read.session import Grain, NotFoundError, Session, grain_of, resolve_session
 from algotrade.services.read.values import Unknown, UnknownCode
 from algotrade.storage.configs.store import ConfigStore
+from algotrade.storage.runs import RunRecord
 
-__all__ = ["NotFoundError", "ReadContext", "ResultCache", "open_context", "partition"]
+__all__ = [
+    "NotFoundError",
+    "ReadContext",
+    "ResultCache",
+    "StoreContext",
+    "Stores",
+    "open_context",
+    "open_stores",
+    "partition",
+    "run_partition",
+]
 
 
 class ResultCache:
@@ -66,6 +79,40 @@ class ReadContext:
     features: FeatureSet = field(repr=False)
     cache: ResultCache = field(compare=False, repr=False)
     loaders: Any = field(default=None, compare=False, repr=False)
+
+
+@dataclass(frozen=True)
+class StoreContext:
+    """One request's stores without a session: what a loader of configs and run records reads
+    (they are not session data, so they need no stored market data to resolve a session from:
+    a fresh store still lists its configs and the user's drafts). The same fields as
+    ``ReadContext`` minus ``session`` and ``loaders``."""
+
+    reader: StoreReader
+    configs: ConfigStore
+    user: UserContext
+    features: FeatureSet = field(repr=False)
+    cache: ResultCache = field(compare=False, repr=False)
+
+
+# What a session-free loader takes: a ``StoreContext``, or a ``ReadContext`` (a superset).
+Stores = StoreContext | ReadContext
+
+
+def open_stores(
+    reader: StoreReader,
+    configs: ConfigStore,
+    user: UserContext,
+    cache: ResultCache | None = None,
+) -> StoreContext:
+    """The session-free context of one request: ``user``'s catalogue read once."""
+    return StoreContext(
+        reader=reader,
+        configs=configs,
+        user=user,
+        features=catalogue(configs, user.user_id),
+        cache=cache if cache is not None else ResultCache(),
+    )
 
 
 def open_context(
@@ -124,3 +171,17 @@ def partition(
     if instruments is not None:  # the read prunes row groups only
         found = found[found["instrument_id"].isin(set(instruments))].reset_index(drop=True)
     return found
+
+
+def run_partition(ctx: Stores, table: str, run: RunRecord) -> pd.DataFrame | None:
+    """The rows ``run`` wrote to the session-grain ``table`` (a ``results/*`` table it
+    publishes to its own end session), read as of the run: a later run with the same end
+    session replaces the partition, so it is read as the run left it. ``None``: nothing
+    stored for it. ``ValueError`` for a table that is not session grain."""
+    grain = grain_of(table)
+    if grain is not Grain.SESSION:
+        raise ValueError(f"{table} is {grain} grain: a run's results are session grain")
+    frame = ctx.reader.table(table, run.session_date, as_of=run.started_at)
+    if frame is None:
+        return None
+    return frame[frame["run_id"] == run.run_id].reset_index(drop=True)

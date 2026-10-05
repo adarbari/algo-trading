@@ -1,55 +1,59 @@
 {
-  "name": "instrument.sector",
-  "dtype": "str",
-  "session": "2026-10-02",
-  "count": 13295,
-  "nulls": 6051,
-  "quantiles": {},
-  "histogram": [],
-  "categories": [
-    {
-      "value": "Financials",
-      "count": 2151
-    },
-    {
-      "value": "Industrials",
-      "count": 1161
-    },
-    {
-      "value": "Health Care",
-      "count": 1064
-    },
-    {
-      "value": "Technology",
-      "count": 871
-    },
-    {
-      "value": "Consumer Discretionary",
-      "count": 489
-    },
-    {
-      "value": "Real Estate",
-      "count": 425
-    },
-    {
-      "value": "Materials",
-      "count": 357
-    },
-    {
-      "value": "Consumer Staples",
-      "count": 203
-    },
-    {
-      "value": "Utilities",
-      "count": 201
-    },
-    {
-      "value": "Energy",
-      "count": 168
-    },
-    {
-      "value": "Communication Services",
-      "count": 154
+  "data": {
+    "distribution": {
+      "name": "instrument.sector",
+      "session": "2026-10-02",
+      "count": 13295,
+      "nulls": 6051,
+      "quantiles": [],
+      "histogram": [],
+      "categories": [
+        {
+          "value": "Financials",
+          "count": 2151
+        },
+        {
+          "value": "Industrials",
+          "count": 1161
+        },
+        {
+          "value": "Health Care",
+          "count": 1064
+        },
+        {
+          "value": "Technology",
+          "count": 871
+        },
+        {
+          "value": "Consumer Discretionary",
+          "count": 489
+        },
+        {
+          "value": "Real Estate",
+          "count": 425
+        },
+        {
+          "value": "Materials",
+          "count": 357
+        },
+        {
+          "value": "Consumer Staples",
+          "count": 203
+        },
+        {
+          "value": "Utilities",
+          "count": 201
+        },
+        {
+          "value": "Energy",
+          "count": 168
+        },
+        {
+          "value": "Communication Services",
+          "count": 154
+        }
+      ],
+      "unknown": null
     }
-  ]
+  }
 }

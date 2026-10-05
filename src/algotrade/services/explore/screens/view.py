@@ -6,8 +6,8 @@ PR 8 moves the screener pages to GraphQL: the view itself is ``services.read.scr
 from dataclasses import dataclass
 
 from algotrade.config.user import UserContext
-from algotrade.services.explore.configs import resolved
 from algotrade.services.explore.store import ReadStore
+from algotrade.services.read.ops.configs import resolved_for
 from algotrade.services.read.screens.views import table_view
 
 
@@ -27,7 +27,7 @@ def screener_view(
 ) -> ScreenerView:
     """``user``'s (default: the store's) view of ``screener_id``: the default one, or the one
     called ``name``. ``NotFoundError`` for a screener the user cannot see."""
-    resolved(store, screener_id)
+    resolved_for(store.configs, store.user, screener_id)
     who = UserContext(user).user_id if user else store.user.user_id
     view = table_view(store.configs, who, screener_id, name)
     return ScreenerView(

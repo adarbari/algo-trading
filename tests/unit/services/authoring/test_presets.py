@@ -2,10 +2,18 @@
 
 import pytest
 
+from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.authoring import presets, screens
 from algotrade.services.authoring.scope import ConflictError, ScreenNotFoundError
+from algotrade.services.read.screens.documents import ScreenDetail, screen_detail
 from algotrade.storage.configs.writer import MemoryConfigWriter
+
+
+def _detail(writer: MemoryConfigWriter, name: str) -> ScreenDetail:
+    found = screen_detail(writer, UserContext("alice"), name)
+    assert found is not None
+    return found
 
 
 def _bump(writer: MemoryConfigWriter, **changes: object) -> None:
@@ -21,7 +29,7 @@ def test_copy_pins_the_preset_version(writer: MemoryConfigWriter) -> None:
     with pytest.raises(ScreenNotFoundError):
         presets.copy_preset(writer, "alice", "other", "nope")
     assert screens.finalise(writer, "alice", "my_vrp").version == 1
-    resolved = screens.screen_detail(writer, "alice", "my_vrp")
+    resolved = _detail(writer, "my_vrp")
     assert resolved.preset and (resolved.preset.pinned, resolved.preset.current) == (3, 3)
 
 
@@ -30,17 +38,17 @@ def test_a_stale_pin_keeps_resolving_and_rebase_is_optional(writer: MemoryConfig
         writer, "alice", "my_vrp", {"extends": "vrp@3", "criteria": {"price": {"value": 7}}}
     )
     screens.finalise(writer, "alice", "my_vrp")
-    before = screens.screen_detail(writer, "alice", "my_vrp")
+    before = _detail(writer, "my_vrp")
     price = {"field": "rollup.price_stats@v2.close", "op": "gt", "value": 50}
     _bump(writer, criteria={"price": price})
-    detail = screens.screen_detail(writer, "alice", "my_vrp")
+    detail = _detail(writer, "my_vrp")
     assert detail.error is None and detail.hash == before.hash  # still v3's preset
     assert detail.layers[0] == "site/screeners/vrp@3"
     assert detail.preset and detail.preset.rebase_available
     draft = presets.rebase(writer, "alice", "my_vrp")
     assert draft == {"id": "my_vrp", "extends": "vrp@4", "criteria": {"price": {"value": 7}}}
     assert screens.finalise(writer, "alice", "my_vrp").version == 2
-    assert screens.screen_detail(writer, "alice", "my_vrp").error is None
+    assert _detail(writer, "my_vrp").error is None
 
 
 def test_rebase_fails_closed_when_overrides_no_longer_fit(writer: MemoryConfigWriter) -> None:

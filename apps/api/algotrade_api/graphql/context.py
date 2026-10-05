@@ -14,21 +14,25 @@ from datetime import date
 
 from strawberry.fastapi import BaseContext
 
-from algotrade.services.read.context import NotFoundError, ReadContext
+from algotrade.services.read.context import NotFoundError, ReadContext, Stores
 from algotrade_api.graphql.loaders import Loaders
 
 # Opens the read context for a requested session (None: the latest): ``open_context`` over
 # the app's store, configs, user and result cache.
 Opener = Callable[[date | None], ReadContext]
+# Opens the session-free context (configs, run records, the catalogue): ``open_stores``.
+StoresOpener = Callable[[], Stores]
 
 
 class RequestContext(BaseContext):
     """What a resolver reads through (``info.context``) during one request."""
 
-    def __init__(self, opener: Opener) -> None:
+    def __init__(self, opener: Opener, stores: StoresOpener | None = None) -> None:
         super().__init__()
         self._open = opener
+        self._open_stores = stores
         self._contexts: dict[date | None, ReadContext | None] = {}
+        self._stores: Stores | None = None
 
     def read(self, requested: date | None) -> ReadContext | None:
         """The read context for ``requested`` (None: the latest session), with this request's
@@ -42,11 +46,23 @@ class RequestContext(BaseContext):
                 self._contexts[requested] = replace(ctx, loaders=Loaders(ctx))
         return self._contexts[requested]
 
+    def stores(self) -> Stores | None:
+        """The session-free context for configs, run records and the catalogue: it needs no
+        stored market data (a fresh store still lists its configs). Without a stores opener,
+        the latest session's read context (None on an empty store)."""
+        if self._open_stores is None:
+            return self.read(None)
+        if self._stores is None:
+            self._stores = self._open_stores()
+        return self._stores
 
-def context_getter(opener: Opener) -> Callable[[], RequestContext]:
+
+def context_getter(
+    opener: Opener, stores: StoresOpener | None = None
+) -> Callable[[], RequestContext]:
     """The router's ``context_getter``: a fresh ``RequestContext`` per request."""
 
     def get_context() -> RequestContext:
-        return RequestContext(opener)
+        return RequestContext(opener, stores)
 
     return get_context

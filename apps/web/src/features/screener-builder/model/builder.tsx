@@ -96,12 +96,16 @@ function useSource(id: string) {
     if (latest) return toDocument(latest.document, id);
     if (asPreset) {
       const pin = asPreset.current === null ? '' : `@${String(asPreset.current)}`;
-      return { id, extends: `${asPreset.preset_id}${pin}` };
+      return { id, extends: `${asPreset.presetId}${pin}` };
     }
     return null;
   }, [draft, latest, asPreset, id]);
   const waiting = detail.isPending || (!hasDraft && hasVersions && versions.isPending);
-  const failed = detail.isError ? detail.error : versions.isError ? versions.error : null;
+  // No such screen (and no preset of that id) is a null detail: the page says so.
+  const missing = detail.data === null ? new Error(`There is no screener ${id}.`) : null;
+  const failed = detail.isError
+    ? detail.error
+    : (missing ?? (versions.isError ? versions.error : null));
   return { detail, source, waiting, failed, hasDraft, hasVersions, asPreset };
 }
 
@@ -115,7 +119,7 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
   const copying = useRef<Promise<unknown> | null>(null);
 
   const base = detail.data?.working ?? null;
-  const preset = asPreset ? { id: asPreset.preset_id, version: asPreset.current } : null;
+  const preset = asPreset ? { id: asPreset.presetId, version: asPreset.current } : null;
   const document = useMemo<ScreenDocument>(() => edited ?? source ?? { id }, [edited, source, id]);
   const criteria = useMemo(() => criteriaOf(base, document), [base, document]);
 
@@ -148,7 +152,7 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
     status: failed ? 'error' : waiting ? 'loading' : 'ready',
     error: failed ?? null,
     retry: () => void detail.refetch(),
-    detail: detail.data,
+    detail: detail.data ?? undefined,
     preset,
     document,
     criteria,

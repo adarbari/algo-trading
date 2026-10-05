@@ -2,7 +2,7 @@
  * Entity: the feature catalogue (definitions, units, formats), feature distributions, and how
  * a served feature value reads (format from the server, UNKNOWN reasons).
  */
-export { useFeatureCatalogue, useFeatureDistribution } from './api/hooks';
+export { refreshCatalogue, useFeatureCatalogue, useFeatureDistribution } from './api/hooks';
 export {
   byName,
   displayValue,

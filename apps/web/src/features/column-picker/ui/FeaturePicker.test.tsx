@@ -15,7 +15,7 @@ vi.mock('@/entities/feature', async (importOriginal) => ({
 
 const base = {
   source: 'x',
-  null_meaning: '',
+  nullMeaning: '',
   version: 1,
   group: null,
   key: null,

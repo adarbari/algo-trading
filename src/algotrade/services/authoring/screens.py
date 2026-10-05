@@ -1,8 +1,9 @@
-"""A user's rule screen (ADR 0029): read it (draft, versions, its preset pin), save or discard
-the draft, delete the screen (archived: off the list and the nightly), and finalise the draft
-into the next immutable version (which puts the screen on the nightly: ADR 0033). Finalise
-validates the whole screen as it would run (layers, selection, the ``ScreenSpec``, the
-catalogue incl. the user's features) and fails closed."""
+"""A user's rule screen (ADR 0029): save or discard the draft, delete the screen (archived: off
+the list and the nightly), and finalise the draft into the next immutable version (which puts
+the screen on the nightly: ADR 0033). Finalise validates the whole screen as it would run
+(layers, selection, the ``ScreenSpec``, the catalogue incl. the user's features) and fails
+closed. Reading a screen (draft, versions, preset pin) is the read model's
+(``services.read.screens.documents``)."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -10,8 +11,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 from algotrade.config.site.fields import reject_secrets
-from algotrade.config.strategy.resolve import ResolvedConfig, config_document, parse_extends
-from algotrade.config.user import SITE_USER, UserContext
+from algotrade.config.strategy.resolve import ResolvedConfig
+from algotrade.config.user import UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.authoring.preferences import forget_screener
 from algotrade.services.authoring.scope import (
@@ -20,8 +21,7 @@ from algotrade.services.authoring.scope import (
     author,
     screen_id,
 )
-from algotrade.services.configs import resolve_config, resolve_rule_draft
-from algotrade.storage.configs.files import SCREENERS
+from algotrade.services.configs import resolve_rule_draft
 from algotrade.storage.configs.writer import ConfigWriter, VersionExistsError
 
 # Set by the authoring flow, never by a draft: finalise numbers versions. ``schedule`` is a
@@ -45,137 +45,6 @@ def draft_document(name: str, document: Mapping[str, Any]) -> dict[str, Any]:
     if given != name:
         raise ConfigurationError(f"{name}: the draft's id is {given!r}")
     return {"id": name} | {k: v for k, v in document.items() if k not in ("id", *MANAGED_KEYS)}
-
-
-@dataclass(frozen=True)
-class PresetPin:
-    preset_id: str
-    pinned: int | None  # the preset version the screen extends (None: unpinned)
-    current: int | None  # the site preset's version now
-
-    @property
-    def rebase_available(self) -> bool:
-        return self.pinned is not None and self.current is not None and self.current > self.pinned
-
-
-@dataclass(frozen=True)
-class ScreenDetail:
-    screener_id: str
-    user: str
-    draft: dict[str, Any] | None
-    draft_error: str | None  # why the draft would not finalise (None: it would)
-    versions: list[int]
-    latest: int | None
-    preset: PresetPin | None
-    hash: str | None  # the latest version (or, with none, the site preset) resolved
-    layers: list[str]
-    resolved: dict[str, Any] | None
-    error: str | None  # why that does not resolve (e.g. a stale pin: rebase)
-    # The rule keys (criteria, flags, ...) of the working copy resolved through its layers (the
-    # draft when it resolves, else the latest version, else the preset): what the Builder edits.
-    working: dict[str, Any] | None = None
-
-
-def preset_pin(writer: ConfigWriter, document: Mapping[str, Any] | None) -> PresetPin | None:
-    if not document or "extends" not in document:
-        return None
-    preset, pinned = parse_extends(document["extends"], "extends")
-    site = config_document(writer.load, "site", preset)
-    current = site[1].get("version") if site else None
-    return PresetPin(preset, pinned, current if isinstance(current, int) else None)
-
-
-def uncopied(name: str, site: tuple[str, Mapping[str, Any]] | None) -> PresetPin | None:
-    """The pin of a site rule-screen preset the user has not copied yet: the preset itself,
-    at its current version (``pinned`` None: nothing is based on it yet)."""
-    version = site[1].get("version") if site and site[0] == SCREENERS else None
-    return PresetPin(name, None, version) if isinstance(version, int) else None
-
-
-def screen_detail(writer: ConfigWriter, user: str, name: str) -> ScreenDetail:
-    """``user``'s screen ``name`` (or the site preset ``name`` they have not copied yet)."""
-    who, name = author(user), screen_id(name)
-    draft, versions = writer.draft(who.user_id, name), writer.versions(who.user_id, name)
-    latest = writer.version(who.user_id, name, versions[-1]) if versions else None
-    site = config_document(writer.load, "site", name) if draft is None and latest is None else None
-    if draft is None and latest is None and site is None:
-        raise ScreenNotFoundError(f"no screen {name!r} for user {who.user_id!r}")
-    owner = who if versions else UserContext(SITE_USER)
-    resolved: ResolvedConfig | None = None
-    try:
-        resolved = resolve_config(writer, name, owner)
-        error = None
-    except ConfigurationError as exc:
-        error = str(exc)
-    draft_error = None
-    working = dict(resolved.config.rules) if resolved else None
-    if draft is not None:
-        try:
-            working = dict(validate(writer, who, name, draft).config.rules)
-        except ConfigurationError as exc:
-            draft_error = str(exc)
-    return ScreenDetail(
-        screener_id=name,
-        user=who.user_id,
-        draft=draft,
-        draft_error=draft_error,
-        versions=versions,
-        latest=versions[-1] if versions else None,
-        preset=preset_pin(writer, draft if draft is not None else latest) or uncopied(name, site),
-        hash=resolved.hash if resolved else None,
-        layers=list(resolved.layers) if resolved else [],
-        resolved=resolved.canonical() if resolved else None,
-        error=error,
-        working=working,
-    )
-
-
-@dataclass(frozen=True)
-class ScreenListing:
-    screener_id: str
-    status: str  # FINAL (has a finalised version) or DRAFT (a draft only)
-    latest: int | None
-    has_draft: bool
-    preset_id: str | None  # the site preset it extends (draft, else latest version)
-
-
-def list_screens(writer: ConfigWriter, user: str) -> list[ScreenListing]:
-    """Every screen of ``user``: the finalised ones and the draft-only ones (status DRAFT),
-    sorted by id."""
-    who = author(user)
-    drafts = set(writer.drafts(who.user_id))
-    out = []
-    for name in sorted({*writer.names(who.user_id, SCREENERS), *drafts}):
-        versions = writer.versions(who.user_id, name)
-        draft = writer.draft(who.user_id, name) if name in drafts else None
-        latest = writer.version(who.user_id, name, versions[-1]) if versions else None
-        pin = preset_pin(writer, draft if draft is not None else latest)
-        out.append(
-            ScreenListing(
-                screener_id=name,
-                status="FINAL" if versions else "DRAFT",
-                latest=versions[-1] if versions else None,
-                has_draft=name in drafts,
-                preset_id=pin.preset_id if pin else None,
-            )
-        )
-    return out
-
-
-@dataclass(frozen=True)
-class ScreenVersion:
-    version: int
-    document: dict[str, Any]
-
-
-def screen_versions(writer: ConfigWriter, user: str, name: str) -> list[ScreenVersion]:
-    """Every finalised version of ``user``'s screen ``name``, oldest first."""
-    who, name = author(user), screen_id(name)
-    out = []
-    for v in writer.versions(who.user_id, name):
-        document = writer.version(who.user_id, name, v)
-        out.append(ScreenVersion(v, document or {}))
-    return out
 
 
 def save_draft(

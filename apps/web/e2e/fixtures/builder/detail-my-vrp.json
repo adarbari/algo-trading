@@ -1,5 +1,5 @@
 {
-  "screener_id": "my-vrp",
+  "screenerId": "my-vrp",
   "user": "abhinav",
   "draft": {
     "id": "my-vrp",
@@ -10,14 +10,14 @@
       }
     }
   },
-  "draft_error": null,
+  "draftError": null,
   "versions": [1],
   "latest": 1,
   "preset": {
-    "preset_id": "vrp_scanner",
+    "presetId": "vrp_scanner",
     "pinned": 1,
     "current": 2,
-    "rebase_available": true
+    "rebaseAvailable": true
   },
   "hash": "h-my-vrp",
   "layers": ["site/vrp_scanner@1", "abhinav/my-vrp"],

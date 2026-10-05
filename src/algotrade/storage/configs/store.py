@@ -1,4 +1,6 @@
-"""Read access to configuration documents (L3 site, L4 user). Only backends know layout."""
+"""Read access to configuration documents (L3 site, L4 user), including a user's rule-screen
+drafts and finalised versions (written only through ``writer.ConfigWriter``). Only backends
+know layout."""
 
 from collections.abc import Mapping
 from typing import Any, Protocol
@@ -25,6 +27,21 @@ class ConfigStore(Protocol):
     def overrides(self, name: str) -> list[dict[str, str]]:
         """Curated site corrections (``config/site/overrides/<name>.csv``); [] if absent."""
         ...
+
+    # A user's rule screens as stored (ADR 0029), read-only: ``ConfigWriter`` writes them.
+    def draft(self, user: str, name: str) -> dict[str, Any] | None:
+        """``user``'s working copy of the screen ``name`` (never loaded to run); None: none."""
+        ...
+
+    def drafts(self, user: str) -> list[str]:
+        """The names of ``user``'s screens that have a draft (finalised or not), sorted."""
+        ...
+
+    def versions(self, user: str, name: str) -> list[int]:
+        """Finalised versions, ascending (the latest is the last)."""
+        ...
+
+    def version(self, user: str, name: str, version: int) -> dict[str, Any] | None: ...
 
 
 def split_version(name: str) -> tuple[str, int | None]:
@@ -59,3 +76,15 @@ class OverlayConfigStore:
 
     def overrides(self, name: str) -> list[dict[str, str]]:
         return self._base.overrides(name)
+
+    def draft(self, user: str, name: str) -> dict[str, Any] | None:
+        return self._base.draft(user, name)
+
+    def drafts(self, user: str) -> list[str]:
+        return self._base.drafts(user)
+
+    def versions(self, user: str, name: str) -> list[int]:
+        return self._base.versions(user, name)
+
+    def version(self, user: str, name: str, version: int) -> dict[str, Any] | None:
+        return self._base.version(user, name, version)
