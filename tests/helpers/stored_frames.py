@@ -77,3 +77,27 @@ def write_reference(
         for symbol, iid in ids.items()
     ]
     writer.write_table("instruments/reference", session, run_id, stamped(rows, session, run_id))
+
+
+def holdings_rows(
+    fund: str,
+    as_of: date,
+    lines: list[tuple[str | None, str, float]],
+    total: int | None = None,
+    linked: Mapping[str, str] | None = None,
+    filed: date | None = None,
+) -> list[dict[str, object]]:
+    """``holdings/etf`` rows of one fund: ``lines`` are (ticker, name, weight) largest first;
+    ``linked`` maps a ticker to the instrument id it resolves to."""
+    return [
+        {
+            "instrument_id": fund, "symbol": fund.removeprefix("EQ:"), "as_of": as_of,
+            "rank": rank, "holding_symbol": ticker,
+            "holding_id": (linked or {}).get(ticker) if ticker else None,
+            "holding_name": name, "weight": weight, "asset_class": "Equity",
+            "sector": None, "shares": 100.0 * rank, "identifier": f"9000000{rank:02d}",
+            "filed": filed,
+            "holdings_count": total or len(lines),
+        }
+        for rank, (ticker, name, weight) in enumerate(lines, start=1)
+    ]  # fmt: skip

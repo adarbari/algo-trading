@@ -49,6 +49,9 @@ export const queryKeys = {
     events: (id: string) => ['instruments', id, 'events'] as const,
     features: (id: string, from: string) => ['instruments', id, 'features', from] as const,
   },
+  holdings: {
+    etf: (id: string, top: number) => ['holdings', id, top] as const,
+  },
   chains: {
     chain: (id: string, expiry: string | null) => ['chains', id, expiry] as const,
   },

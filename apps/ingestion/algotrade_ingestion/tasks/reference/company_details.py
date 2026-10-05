@@ -5,7 +5,7 @@ Each run writes a **full snapshot** for its session: one row per instrument in t
 
 - CIK: the reference's (Massive, phase 1.5) when present, else the SEC ticker map.
 - Incremental: submissions are fetched only for CIKs not yet stored or past their refresh
-  slot (``tasks/reference/refresh.py``: once per ``refresh_days``, spread over the window by
+  slot (``tasks/framework/refresh.py``: once per ``refresh_days``, spread over the window by
   CIK; ``force`` refetches all; ``limit`` caps a run). Every other CIK carries its previous
   details forward, so a nightly run makes few requests.
 - Funds and ETFs often have no submissions (404) or no CIK at all: counted, not failures.
@@ -22,8 +22,8 @@ from algotrade.core.model.instruments import pad_cik
 from algotrade.data import StoreReader
 from algotrade.data.reference import instruments, snapshot
 from algotrade.storage.runs import RunRecord
+from algotrade_ingestion.tasks.framework.refresh import due_keys
 from algotrade_ingestion.tasks.framework.run import IngestRun, NoResponseError, TaskContext
-from algotrade_ingestion.tasks.reference.refresh import due_keys
 from algotrade_sources.framework.base import FetchRequest, Source
 
 TASK = "company_details"

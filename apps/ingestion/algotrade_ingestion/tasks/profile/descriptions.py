@@ -33,6 +33,7 @@ import pandas as pd
 from algotrade.core.model.fields import DESCRIPTION_TABLE
 from algotrade.data.reference import DESCRIPTION_COLUMNS, instruments, stored_descriptions
 from algotrade.storage.runs import RunRecord
+from algotrade_ingestion.tasks.framework.refresh import due_keys
 from algotrade_ingestion.tasks.framework.run import (
     IngestRun,
     NoResponseError,
@@ -41,7 +42,6 @@ from algotrade_ingestion.tasks.framework.run import (
     status_label,
 )
 from algotrade_ingestion.tasks.market.option_chains import Underlying, prioritise
-from algotrade_ingestion.tasks.reference.refresh import due_keys
 from algotrade_sources.framework.base import FetchRequest, Source
 
 TASK = "descriptions"

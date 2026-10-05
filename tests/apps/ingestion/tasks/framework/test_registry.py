@@ -13,9 +13,16 @@ from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.framework import registry
 from algotrade_ingestion.tasks.framework.registry import TASKS, run_task, session_of, task
-from algotrade_ingestion.tasks.market import bars, corporate_actions, earnings, option_chains
+from algotrade_ingestion.tasks.market import (
+    bars,
+    corporate_actions,
+    earnings,
+    etf_holdings,
+    option_chains,
+)
 from algotrade_ingestion.workflows.nightly import nightly as pipeline
-from tests.helpers.ingest_fakes import FIXED, task_ctx
+from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
+from tests.helpers.ingest_fakes import FIXED, http_for, task_ctx
 
 DAY = date(2026, 10, 2)
 
@@ -37,6 +44,7 @@ def calls(monkeypatch: pytest.MonkeyPatch) -> Calls:
         (earnings, "ingest_earnings"),
         (bars, "ingest_daily_bars"),
         (option_chains, "ingest_option_chains"),
+        (etf_holdings, "ingest_etf_holdings"),
     ):
         monkeypatch.setattr(module, fn, fake)
     monkeypatch.setattr(option_chains, "select_underlyings", lambda reader, d, s: list(s))
@@ -96,6 +104,67 @@ def test_universe_build_needs_a_directory_source() -> None:
     c.configs = MemoryConfigStore({})
     with pytest.raises(TypeError, match="DirectorySource"):
         run_task("universe-build", c, {"session": DAY})
+
+
+def test_etf_holdings_takes_its_defaults_from_settings(calls: Calls) -> None:
+    ssga = SsgaHoldings(http_for(lambda url: b""))
+    settings = SourcesSettings.from_document(
+        {"etf_holdings": {"refresh_days": 3, "keep_top": 20, "fallback_scope": "all"}}
+    )
+    c = task_ctx(StoreWriter(MemoryBackend()), sources={"ssga_holdings": ssga}, settings=settings)
+    run_task("etf-holdings", c, {"session": DAY, "symbols": "xlk, spy", "limit": 5})
+    _, sources, session, force, limit, only, _ = calls.args[-1]
+    assert (sources.issuers, sources.refresh_days, sources.keep_top) == ([ssga], 3, 20)
+    assert (sources.fallback_scope, session, force, limit, only) == (
+        "all",
+        DAY,
+        False,
+        5,
+        ["xlk", "spy"],
+    )
+
+
+def test_the_nightly_reads_a_slice_of_funds_and_the_cli_reads_everything(calls: Calls) -> None:
+    ssga = SsgaHoldings(http_for(lambda url: b""))
+    ctx = task_ctx(StoreWriter(MemoryBackend()), sources={"ssga_holdings": ssga})
+
+    def limit_of(params: dict[str, Any], settings: SourcesSettings | None = None) -> Any:
+        ctx.settings = settings or SourcesSettings()
+        run_task("etf-holdings", ctx, {"session": DAY, **params})
+        return calls.args[-1][4]
+
+    assert limit_of({}) is None  # `algotrade-ingest etf-holdings`: every fund due
+    assert limit_of({"nightly": True}) == 100  # [etf_holdings] per_night
+    assert limit_of({"nightly": True, "limit": 7}) == 7  # an explicit limit wins
+    uncapped = SourcesSettings.from_document({"etf_holdings": {"per_night": 0}})
+    assert limit_of({"nightly": True}, uncapped) is None  # 0: no cap
+    custom = SourcesSettings.from_document({"etf_holdings": {"per_night": 25}})
+    assert limit_of({"nightly": True}, custom) == 25
+
+
+def test_the_nightly_step_runs_after_bars_and_chains_with_the_nightly_flag() -> None:
+    names = [step.name for step in pipeline.NIGHTLY]
+    assert names.index("etf-holdings") > names.index("chains") > names.index("bars")
+    step = pipeline.NIGHTLY[names.index("etf-holdings")]
+    assert step.params == {"nightly": True} and step.latest_only
+
+
+def test_etf_holdings_is_skipped_without_an_issuer_or_when_switched_off() -> None:
+    c = task_ctx(StoreWriter(MemoryBackend()))
+    c.unavailable = {"ssga_holdings": "[ssga] is disabled in sources.toml"}
+    reason = pipeline.skip_reason("etf-holdings", c) or ""
+    assert reason.startswith("skipped: ") and "[ssga] is disabled" in reason
+    assert "ishares_holdings is not configured" in reason
+    c.sources = {"ssga_holdings": SsgaHoldings(http_for(lambda url: b""))}
+    assert pipeline.skip_reason("etf-holdings", c) is None
+    c.settings = SourcesSettings.from_document({"etf_holdings": {"enabled": False}})
+    assert (
+        pipeline.skip_reason("etf-holdings", c)
+        == "skipped: [etf_holdings] is disabled in sources.toml"
+    )
+    with pytest.raises(KeyError, match="needs one of the sources"):
+        c.sources = {}
+        run_task("etf-holdings", c, {"session": DAY})
 
 
 def test_nightly_skips_tasks_without_sources_or_by_rule() -> None:

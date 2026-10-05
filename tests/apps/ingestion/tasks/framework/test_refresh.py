@@ -4,7 +4,7 @@ once per window; missed slot days are caught up; new keys first; ``force``; 0 da
 from collections import Counter
 from datetime import date, timedelta
 
-from algotrade_ingestion.tasks.reference.refresh import due_keys, slot_day
+from algotrade_ingestion.tasks.framework.refresh import due_keys, slot_day
 
 DAY = date(2026, 10, 2)
 CIKS = [f"{n:010d}" for n in range(100_000, 106_000)]  # ~ the universe's 6k CIKs

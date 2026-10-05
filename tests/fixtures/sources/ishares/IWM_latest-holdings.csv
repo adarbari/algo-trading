@@ -1,0 +1,19 @@
+iShares Russell 2000 ETF
+Fund Holdings as of,"Oct 01, 2026"
+Inception Date,"May 22, 2000"
+Shares Outstanding,"277,650,000.00"
+Stock,"-"
+Bond,"-"
+Cash,"-"
+Other,"-"
+
+Ticker,Name,Sector,Asset Class,Market Value,Weight (%),Notional Value,Quantity,Price,Location,Exchange,Currency,FX Rate,Market Currency,Accrual Date
+"XTSLA","BLK CSH FND TREASURY SL AGENCY","Cash and/or Derivatives","Money Market","369,037,248.40","0.47","369,037,248.40","369,037,248.00","1.00","United States","-","USD","1.00","USD","-"
+"TWST","TWIST BIOSCIENCE","Health Care","Equity","325,953,082.60","0.42","325,953,082.60","1,733,332.00","188.05","United States","NASDAQ","USD","1.00","USD","-"
+"MOG A","MOOG INC CLASS A","Industrials","Equity","292,546,123.07","0.37","292,546,123.07","749,753.00","390.19","United States","NYSE","USD","1.00","USD","-"
+"FROG","JFROG","Information Technology","Equity","279,357,815.94","0.36","279,357,815.94","2,862,566.00","97.59","United States","NASDAQ","USD","1.00","USD","-"
+"TXG","10X GENOMICS CLASS A","Health Care","Equity","272,180,853.56","0.35","272,180,853.56","3,066,481.00","88.76","United States","NASDAQ","USD","1.00","USD","-"
+"UMBF","UMB FINANCIAL","Financials","Equity","252,799,251.24","0.32","252,799,251.24","1,947,756.00","129.79","United States","NASDAQ","USD","1.00","USD","-"
+"-","RENT THE RUNWAY INC","Consumer Discretionary","Equity","2.51","0.00","2.51","251,444.00","0.00","United States","NO MARKET (E.G. UNLISTED)","USD","1.00","USD","-"
+"RTYZ6","RUSSELL 2000 EMINI CME DEC 26","Cash and/or Derivatives","Futures","0.00","0.00","271,947,780.00","1,924.00","2,826.90","-","Chicago Mercantile Exchange","USD","1.00","USD","-"
+"USD","USD CASH","Cash and/or Derivatives","Cash","-75,933,670.33","-0.10","-75,933,670.33","-75,933,670.00","100.00","United States","-","USD","1.00","USD","-"

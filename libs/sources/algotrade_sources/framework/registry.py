@@ -43,6 +43,7 @@ from algotrade_sources.framework.limiter import Limiter, Pacing
 from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource, missing_chain
 from algotrade_sources.vendors.ibkr.gateway import GatewayConfig, IbkrMarketData
 from algotrade_sources.vendors.ibkr.market_data import IbkrSource
+from algotrade_sources.vendors.ishares.etf_holdings import IsharesHoldings, no_file
 from algotrade_sources.vendors.massive.bars import MassiveDailyBars
 from algotrade_sources.vendors.massive.corporate_actions import MassiveCorporateActions
 from algotrade_sources.vendors.massive.overview import MassiveOverview
@@ -52,6 +53,8 @@ from algotrade_sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts
 from algotrade_sources.vendors.sec.edgar import SecSubmissions, SecTickerMap, user_agent
 from algotrade_sources.vendors.sec.fund_objectives import SecFundObjectives, SecFundTickerMap
+from algotrade_sources.vendors.sec.nport_holdings import NportHoldings
+from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource
 from algotrade_sources.vendors.treasury.par_yields import TreasuryParYields
 
@@ -171,7 +174,11 @@ SOURCES: dict[str, SourceSpec] = {
     for s in (
         SourceSpec("cboe", "cboe", "cboe", CboeOptionsSource, not_found=missing_chain),
         SourceSpec("nasdaq_trader", "nasdaq_trader", "nasdaqtrader", NasdaqTraderSource),
-        SourceSpec("spy_holdings", "spy_holdings", "ssga", SpyHoldingsSource),
+        SourceSpec("spy_holdings", "ssga", "ssga", SpyHoldingsSource, 1.0),
+        SourceSpec("ssga_holdings", "ssga", "ssga", SsgaHoldings, 1.0),
+        SourceSpec(
+            "ishares_holdings", "ishares", "ishares", IsharesHoldings, 1.0, not_found=no_file
+        ),
         SourceSpec(
             "nasdaq_earnings",
             "nasdaq_earnings",
@@ -187,6 +194,7 @@ SOURCES: dict[str, SourceSpec] = {
         _sec("sec_tickers", SecTickerMap),
         _sec("sec_submissions", SecSubmissions),
         _sec("sec_company_facts", SecCompanyFacts),
+        _sec("sec_nport_holdings", NportHoldings),
         _sec("sec_fund_tickers", SecFundTickerMap),
         _sec("sec_fund_objectives", SecFundObjectives),
         SourceSpec("treasury", "treasury", "treasury", TreasuryParYields, 1.0),

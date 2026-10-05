@@ -33,6 +33,7 @@ from algotrade_ingestion.tasks.market import (
     bars,
     corporate_actions,
     earnings,
+    etf_holdings,
     ibkr_iv,
     option_chains,
     rates,
@@ -49,6 +50,7 @@ from algotrade_ingestion.tasks.verification import verify
 from algotrade_sources.framework.base import (
     DirectorySource,
     FixtureSource,
+    HoldingsSource,
     SessionSource,
 )
 
@@ -147,6 +149,41 @@ def _shares(ctx: TaskContext, p: Params) -> RunRecord:
         ctx.sources["sec_company_facts"], ctx.settings.sec_facts_refresh_days
     )
     return shares.ingest_shares(ctx, sources, session_of(p), bool(p.get("force")), p.get("limit"))
+
+
+HOLDINGS_ISSUERS = ("ssga_holdings", "ishares_holdings", "sec_nport_holdings")  # priority order
+
+
+def _holdings_issuers(ctx: TaskContext) -> list[HoldingsSource]:
+    found = [ctx.sources[n] for n in HOLDINGS_ISSUERS if n in ctx.sources]
+    return [s for s in found if isinstance(s, HoldingsSource)]
+
+
+def _no_holdings_source(ctx: TaskContext) -> str | None:
+    if not ctx.settings.vendor("etf_holdings").enabled:
+        return "skipped: [etf_holdings] is disabled in sources.toml"
+    if _holdings_issuers(ctx):
+        return None
+    reasons = sorted({ctx.unavailable.get(n, f"{n} is not configured") for n in HOLDINGS_ISSUERS})
+    return f"skipped: {'; '.join(reasons)}"
+
+
+def _etf_holdings(ctx: TaskContext, p: Params) -> RunRecord:
+    issuers = _holdings_issuers(ctx)
+    if not issuers:
+        raise KeyError(f"task 'etf-holdings' needs one of the sources {list(HOLDINGS_ISSUERS)}")
+    sources = etf_holdings.HoldingsSources(
+        issuers,
+        ctx.settings.etf.refresh_days,
+        ctx.settings.etf.keep_top,
+        ctx.settings.etf.fallback_scope,
+    )
+    limit = p.get("limit")
+    if limit is None and p.get("nightly") and ctx.settings.etf.per_night > 0:
+        limit = ctx.settings.etf.per_night  # the nightly reads a slice a night (per_night)
+    return etf_holdings.ingest_etf_holdings(
+        ctx, sources, session_of(p), bool(p.get("force")), limit, _symbols(p)
+    )
 
 
 def _earnings(ctx: TaskContext, p: Params) -> RunRecord:
@@ -373,6 +410,22 @@ TASKS: dict[str, Task] = {
                 Param("force", ("--force",), None, "refetch every company"),
                 Param("limit", ("--limit",), int, "fetch at most N companies this run"),
             ),
+        ),
+        Task(
+            "etf-holdings",
+            "what each ETF holds, from the issuers' daily files and SEC N-PORT (incremental)",
+            etf_holdings,
+            ("holdings/etf",),
+            _etf_holdings,
+            optional_sources=HOLDINGS_ISSUERS,
+            settings="sources.toml [etf_holdings]",
+            params=(
+                SESSION,
+                Param("symbols", ("--symbols",), str, "comma-separated ETF tickers"),
+                Param("force", ("--force",), None, "reread every covered fund"),
+                Param("limit", ("--limit",), int, "read at most N funds this run"),
+            ),
+            skip=_no_holdings_source,
         ),
         Task(
             "descriptions",

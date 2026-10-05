@@ -17,6 +17,7 @@ from algotrade_api.routes import (
     universe,
 )
 from algotrade_api.routes.authoring import preferences, screeners, user_features
+from algotrade_api.routes.funds import holdings as etf_holdings
 from algotrade_api.routes.preview import features as feature_check
 from algotrade_api.routes.preview import screeners as screen_preview
 from algotrade_api.routes.screens import ideas
@@ -31,6 +32,7 @@ ROUTERS: tuple[APIRouter, ...] = (
     universe.router,
     instruments.router,
     instruments.chains,
+    etf_holdings.router,
     explore.router,
     user_features.router,
     feature_check.router,

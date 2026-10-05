@@ -42,9 +42,30 @@ priority_symbols = [             # fetched first (with S&P 500 members), in this
 enabled = true
 min_interval_s = 0.0
 
-[spy_holdings]                   # S&P 500 membership
-enabled = true
-min_interval_s = 0.0
+[ssga]                           # State Street: SPY holdings (S&P 500 membership) and the daily
+enabled = true                   # holdings file of every SPDR ETF (etf-holdings). robots.txt allows
+min_interval_s = 1.0             # /library-content/products/fund-data; one file per request, polite pace
+raw_retention_days = 14          # holdings files are re-read weekly; the table keeps the data (SPY's
+                                 # membership file is in this section too: 14 days, was 90)
+
+[ishares]                        # iShares: the latest-holdings.csv of each fund page (etf-holdings)
+enabled = true                   # robots.txt allows /us/products; files are 0.1 to 4 MB
+min_interval_s = 1.0
+raw_retention_days = 14
+
+[etf_holdings]                   # the etf-holdings task (tasks/market/etf_holdings.py)
+enabled = true                   # false: the nightly skips the step (an explicit run still works)
+refresh_days = 7                 # refetch a fund's holdings once per this many days, spread over the
+                                 # window by ticker (SEC N-PORT funds: quarterly data, so they are
+                                 # only refetched once per 90 days)
+per_night = 100                  # funds the NIGHTLY reads per night (new and stalest first), so the first
+                                 # nights read a slice, not all ~1,140 (~1.5 h); 0 = no cap. The CLI
+                                 # (`algotrade-ingest etf-holdings`) is uncapped unless --limit says so.
+keep_top = 100                   # store this many holdings per fund, largest weights first
+                                 # (0: all; the fund's total count is stored on every row)
+fallback_scope = "optionable"    # which funds SEC N-PORT (months-old, quarterly) is read for: the
+                                 # optionable ETFs no daily file covers ("all": every registered fund,
+                                 # ~4k funds, a long first pass; "off": daily files only)
 
 [nasdaq_earnings]                # earnings calendar
 enabled = true

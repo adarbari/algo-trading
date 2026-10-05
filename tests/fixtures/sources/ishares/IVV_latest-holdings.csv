@@ -1,0 +1,20 @@
+iShares Core S&P 500 ETF
+Fund Holdings as of,"Oct 01, 2026"
+Inception Date,"May 15, 2000"
+Shares Outstanding,"1,149,200,000.00"
+Stock,"-"
+Bond,"-"
+Cash,"-"
+Other,"-"
+
+Ticker,Name,Sector,Asset Class,Market Value,Weight (%),Notional Value,Quantity,Price,Location,Exchange,Currency,FX Rate,Market Currency,Accrual Date
+"NVDA","NVIDIA","Information Technology","Equity","74,456,320,330.28","8.44","74,456,320,330.28","322,517,198.00","230.86","United States","NASDAQ","USD","1.00","USD","-"
+"AAPL","APPLE","Information Technology","Equity","64,246,883,915.04","7.29","64,246,883,915.04","194,498,922.00","330.32","United States","NASDAQ","USD","1.00","USD","-"
+"MSFT","MICROSOFT","Information Technology","Equity","50,747,418,740.00","5.76","50,747,418,740.00","98,961,425.00","512.80","United States","NASDAQ","USD","1.00","USD","-"
+"AMZN","AMAZON.COM INC","Consumer Discretionary","Equity","32,471,879,786.40","3.68","32,471,879,786.40","130,813,680.00","248.23","United States","NASDAQ","USD","1.00","USD","-"
+"GOOGL","ALPHABET CLASS A","Communication","Equity","26,451,915,109.76","3.00","26,451,915,109.76","78,204,574.00","338.24","United States","NASDAQ","USD","1.00","USD","-"
+"AVGO","BROADCOM INC","Information Technology","Equity","21,788,435,093.92","2.47","21,788,435,093.92","63,404,828.00","343.64","United States","NASDAQ","USD","1.00","USD","-"
+"META","META PLATFORMS CLASS A","Communication","Equity","21,333,434,838.90","2.42","21,333,434,838.90","29,387,730.00","725.93","United States","NASDAQ","USD","1.00","USD","-"
+"GOOG","ALPHABET CLASS C","Communication","Equity","21,216,870,327.54","2.41","21,216,870,327.54","63,347,178.00","334.93","United States","NASDAQ","USD","1.00","USD","-"
+"HOLX","HOLOGIC INC","Health Care","Equity","28,433.88","0.00","28,433.88","2,843,388.00","0.01","United States","NO MARKET (E.G. UNLISTED)","USD","1.00","USD","-"
+"ESZ6","S&P500 EMINI DEC 26","Cash and/or Derivatives","Futures","0.00","0.00","1,355,175,800.00","3,509.00","7,724.00","-","Index And Options Market","USD","1.00","USD","-"

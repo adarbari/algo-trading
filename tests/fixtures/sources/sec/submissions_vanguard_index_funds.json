@@ -1,0 +1,139 @@
+{
+ "cik": "0000036405",
+ "entityType": "investment",
+ "sic": "",
+ "sicDescription": "",
+ "ownerOrg": "",
+ "insiderTransactionForOwnerExists": 0,
+ "insiderTransactionForIssuerExists": 0,
+ "name": "VANGUARD INDEX FUNDS",
+ "tickers": [],
+ "exchanges": [],
+ "ein": "231999755",
+ "lei": null,
+ "website": "",
+ "investorWebsite": "",
+ "category": "",
+ "fiscalYearEnd": "1231",
+ "stateOfIncorporation": "DE",
+ "stateOfIncorporationDescription": "DE",
+ "phone": "6106691000",
+ "flags": "",
+ "filings": {
+  "recent": {
+   "accessionNumber": [
+    "0000036405-26-000483",
+    "0000036405-26-000482",
+    "0000036405-26-000481",
+    "0000036405-26-000480",
+    "0000036405-26-000228"
+   ],
+   "filingDate": [
+    "2026-08-28",
+    "2026-08-28",
+    "2026-08-28",
+    "2026-08-28",
+    "2026-04-28"
+   ],
+   "reportDate": [
+    "2026-06-30",
+    "2026-06-30",
+    "2026-06-30",
+    "2026-06-30",
+    ""
+   ],
+   "acceptanceDateTime": [
+    "2026-08-28T20:17:20.000Z",
+    "2026-08-28T20:17:11.000Z",
+    "2026-08-28T20:17:00.000Z",
+    "2026-08-28T20:16:46.000Z",
+    "2026-04-27T21:38:31.000Z"
+   ],
+   "act": [
+    "40",
+    "40",
+    "40",
+    "40",
+    "33"
+   ],
+   "form": [
+    "NPORT-P",
+    "NPORT-P",
+    "NPORT-P",
+    "NPORT-P",
+    "497K"
+   ],
+   "fileNumber": [
+    "811-02652",
+    "811-02652",
+    "811-02652",
+    "811-02652",
+    "002-56846"
+   ],
+   "filmNumber": [
+    "261340374",
+    "261340362",
+    "261340342",
+    "261340329",
+    "26902454"
+   ],
+   "items": [
+    "",
+    "",
+    "",
+    "",
+    ""
+   ],
+   "core_type": [
+    "NPORT-P",
+    "NPORT-P",
+    "NPORT-P",
+    "NPORT-P",
+    "497K"
+   ],
+   "size": [
+    523254,
+    198087,
+    139068,
+    3202198,
+    137256
+   ],
+   "isXBRL": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "isInlineXBRL": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "isXBRLNumeric": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "primaryDocument": [
+    "xslFormNPORT-P_X01/primary_doc.xml",
+    "xslFormNPORT-P_X01/primary_doc.xml",
+    "xslFormNPORT-P_X01/primary_doc.xml",
+    "xslFormNPORT-P_X01/primary_doc.xml",
+    "f44892d1.htm"
+   ],
+   "primaryDocDescription": [
+    "",
+    "",
+    "",
+    "",
+    "SPI 856 VANGUARD EXTENDED MARKET INDEX FUND"
+   ]
+  },
+  "files": []
+ }
+}

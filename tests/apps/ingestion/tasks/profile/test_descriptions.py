@@ -14,6 +14,7 @@ from algotrade.data.reference import descriptions, stored_descriptions
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.writers import StoreWriter
+from algotrade_ingestion.tasks.framework.refresh import slot_day
 from algotrade_ingestion.tasks.market.option_chains import Underlying
 from algotrade_ingestion.tasks.profile import descriptions as task
 from algotrade_ingestion.tasks.profile.descriptions import (
@@ -25,7 +26,6 @@ from algotrade_ingestion.tasks.profile.descriptions import (
     ingest_descriptions,
     recent_quarters,
 )
-from algotrade_ingestion.tasks.reference.refresh import slot_day
 from algotrade_sources.framework.http import HttpError, RetryPolicy
 from algotrade_sources.vendors.massive.overview import MassiveOverview
 from algotrade_sources.vendors.sec.fund_objectives import SecFundObjectives, SecFundTickerMap

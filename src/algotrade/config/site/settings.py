@@ -25,6 +25,8 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
 from algotrade.config.site.fields import Table, reject_secrets
+from algotrade.config.site.holdings import KEYS as ETF_KEYS
+from algotrade.config.site.holdings import LEGACY_SECTIONS, EtfHoldingsSettings
 from algotrade.config.user import SITE_USER
 from algotrade.core.model.errors import ConfigurationError
 
@@ -108,6 +110,7 @@ VENDOR_EXTRAS = {
     "massive": ("corporate_actions_window", "descriptions_per_night", "descriptions_refresh_days"),
     "sec_edgar": ("refresh_days", "facts_refresh_days", "fund_quarters"),
     "treasury": ("lookback_days",),
+    "etf_holdings": ETF_KEYS,
     "ibkr": (
         "historical_min_interval_s",
         "market_data_type",
@@ -221,6 +224,7 @@ class SourcesSettings:
     max_chain_stale_share: float = 0.20
     max_verify_failures: float = 0.10
     ibkr: IbkrSettings = IbkrSettings()
+    etf: EtfHoldingsSettings = field(default_factory=EtfHoldingsSettings)  # [etf_holdings]
 
     def vendor(self, section: str) -> VendorSettings:
         """``[section]`` of sources.toml (defaults when the section is missing)."""
@@ -273,7 +277,9 @@ class SourcesSettings:
                 "staging_retention_days", d.staging_retention_days, 1
             ),
             live_retention_days=root.integer("live_retention_days", d.live_retention_days, 1),
-            vendors={name: _vendor(t, name not in OFF_BY_DEFAULT) for name, t in vendors.items()},
+            vendors=_renamed(
+                {name: _vendor(t, name not in OFF_BY_DEFAULT) for name, t in vendors.items()}
+            ),
             cboe_workers=_extra(vendors, "cboe").integer("workers", d.cboe_workers, 1),
             cboe_priority_symbols=tuple(
                 s.upper() for s in _extra(vendors, "cboe").strings("priority_symbols", ())
@@ -319,7 +325,16 @@ class SourcesSettings:
             ),
             max_verify_failures=quality.fraction("max_verify_failures", d.max_verify_failures),
             ibkr=_ibkr(_extra(vendors, "ibkr")),
+            etf=EtfHoldingsSettings.from_table(_extra(vendors, "etf_holdings")),
         )
+
+
+def _renamed(vendors: dict[str, VendorSettings]) -> dict[str, VendorSettings]:
+    """A file with only a renamed section's old name keeps its on/off switch (not its pacing)."""
+    for new, old in LEGACY_SECTIONS.items():
+        if new not in vendors and old in vendors:
+            vendors[new] = VendorSettings(enabled=vendors[old].enabled)
+    return vendors
 
 
 def _ibkr(section: Table) -> IbkrSettings:

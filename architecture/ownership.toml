@@ -251,7 +251,7 @@ detect = [
 [[responsibility]]
 id = "refresh-scheduling"
 description = "Which keys (CIKs, instrument ids) an incremental reference or profile task refetches on a session: new first, then each once per refresh_days on its own slot day (crc32 of the key), so refreshes spread over the window"
-owner = ["apps/ingestion/algotrade_ingestion/tasks/reference/refresh.py"]
+owner = ["apps/ingestion/algotrade_ingestion/tasks/framework/refresh.py"]
 section = "docs/data/vendors.md#refreshes-spread-over-the-window"
 detect = [{ call = "crc32" }, { call = "slot_day" }]
 
@@ -289,7 +289,7 @@ allowed = [
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#r3-tasks-get-sources-from-the-registry"
 detect = [
-    { import = "algotrade_sources", except = ["algotrade_sources.framework.base", "algotrade_sources.framework.registry", "algotrade_sources.framework.session_thread"] },
+    { import = "algotrade_sources", except = ["algotrade_sources.framework.base", "algotrade_sources.framework.holdings", "algotrade_sources.framework.registry", "algotrade_sources.framework.session_thread"] },
     { string = "nasdaqlisted" },
     { string = "otherlisted" },
     { string = "dividends" },
@@ -341,6 +341,20 @@ allowed = [
 ]
 section = "docs/adr/0028-ibkr-enrichment-source.md#decision"
 detect = [{ string = "instruments/ibkr_contracts" }, { string = "volatility/ibkr_iv30" }]
+
+[[responsibility]]
+id = "etf-holdings"
+description = "What each ETF holds (ADR 0035): the etf-holdings task reads the issuers' daily files and SEC N-PORT through HoldingsSource adapters (first issuer that lists a fund wins), ranks and trims each fund's lines, links tickers to instruments through SymbolResolver and writes holdings/etf; consumers read it only through data.funds.holdings (latest rows per fund) and the explore query behind GET /instruments/{id}/holdings"
+owner = [
+    "apps/ingestion/algotrade_ingestion/tasks/market/etf_holdings.py",
+    "src/algotrade/data/funds/holdings.py",
+]
+allowed = [
+    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
+]
+section = "docs/adr/0035-etf-holdings.md#decision"
+detect = [{ string = "holdings/etf" }]
 
 [[responsibility]]
 id = "live-option-quotes"
@@ -735,6 +749,10 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/reference/ibkr_contracts.py"
 [[table]]
 name = "volatility/ibkr_iv30"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/ibkr_iv.py"
+
+[[table]]
+name = "holdings/etf"
+owner = "apps/ingestion/algotrade_ingestion/tasks/market/etf_holdings.py"
 
 [[table]]
 name = "live/option_quotes"

@@ -485,6 +485,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/instruments/{instrument_id}/holdings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Holdings */
+        get: operations["holdings_instruments__instrument_id__holdings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/preferences/ideas": {
         parameters: {
             query?: never;
@@ -1133,6 +1150,21 @@ export interface components {
             /** Ts */
             ts: string;
         };
+        /** EtfHoldings */
+        EtfHoldings: {
+            /** As Of */
+            as_of: string | null;
+            /** Instrument Id */
+            instrument_id: string;
+            /** Is Etf */
+            is_etf: boolean;
+            /** Items */
+            items: components["schemas"]["Holding"][];
+            /** Source */
+            source: string | null;
+            /** Total */
+            total: number;
+        };
         /** ExpressionCheck */
         ExpressionCheck: {
             /** Categories */
@@ -1354,6 +1386,21 @@ export interface components {
             versions: {
                 [key: string]: string;
             };
+        };
+        /** Holding */
+        Holding: {
+            /** Asset Class */
+            asset_class: string | null;
+            /** Instrument Id */
+            instrument_id: string | null;
+            /** Name */
+            name: string;
+            /** Rank */
+            rank: number;
+            /** Symbol */
+            symbol: string | null;
+            /** Weight */
+            weight: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -3468,6 +3515,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FeatureSeries"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    holdings_instruments__instrument_id__holdings_get: {
+        parameters: {
+            query?: {
+                date?: string | null;
+                /** @description holdings to return */
+                top?: number;
+            };
+            header?: never;
+            path: {
+                instrument_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EtfHoldings"];
                 };
             };
             /** @description Validation Error */
