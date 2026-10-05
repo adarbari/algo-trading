@@ -3,5 +3,5 @@
 read context the GraphQL layer builds per request; one loader module per domain object lives
 in the subfolders (``instruments``, ``screens``, ``ops``). Read-only: no writers, no jobs.
 
-Empty until read-model PR 2 (``session.py``, ``values.py``, ``context.py``); the plan is
-``docs/api/read-model.md``."""
+``session.py`` resolves the session, ``values.py`` holds ``Unknown`` and ``to_scalar``,
+``context.py`` the ``ReadContext`` and ``partition``; the plan is ``docs/api/read-model.md``."""

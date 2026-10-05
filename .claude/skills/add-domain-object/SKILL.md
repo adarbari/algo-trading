@@ -14,8 +14,8 @@ Run `ls src/algotrade/services/read src/algotrade/services/read/* apps/api/algot
 
 | You see | Meaning | Do |
 |---|---|---|
-| only `__init__.py` files | read-model PR 1 state: no `session.py`, `values.py`, `context.py` yet | **Stop.** The next step is read-model PR 2 (`docs/api/read-model.md` "Migration plan"); do that PR first, in order. Only if the owner explicitly asked for this page data now, use the old path (`.claude/skills/add-api-endpoint`, "Legacy page reads") and say so in the PR |
-| `session.py`, `values.py`, `context.py`, but no `apps/api/algotrade_api/graphql/schema.py` | PR 2 or 3 landed, PR 4 not | build the object and its loader (steps 1-5) but no GraphQL type; or do PR 4 first if the page needs it |
+| only `__init__.py` files | read-model PR 1 state (superseded: PR 2 landed 2026-10) | you are on an old branch: rebase on `origin/main` |
+| `session.py`, `values.py`, `context.py`, but no `apps/api/algotrade_api/graphql/schema.py` | **today**: PR 2 landed (session, values, context), PR 4 not | the next read-model PRs are RM3 then RM4, in order (`docs/roadmap.md` track RM); a new object waits for its PR. If the owner asked for it now, build the object and its loader (steps 1-5) on `ReadContext` / `partition`, no GraphQL type |
 | `graphql/schema.py` exists | PR 4 landed | all steps |
 
 Check the object is not already planned: `grep -n "<ObjectName>" docs/api/read-model.md`. If

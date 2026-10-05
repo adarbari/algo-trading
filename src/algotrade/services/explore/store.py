@@ -1,9 +1,9 @@
 """Open the stores read-only, and what every explore query shares: the session a date
-resolves to, pages of rows, JSON-safe records and the not-found error."""
+resolves to, pages of rows and JSON-safe records. ``NotFoundError`` and ``ResultCache`` live in
+the read model (``services.read.context``) and are re-exported here until explore is deleted
+(read-model PR 10)."""
 
-import threading
-from collections import OrderedDict
-from collections.abc import Callable, Hashable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from importlib.metadata import PackageNotFoundError, version
@@ -14,11 +14,12 @@ from urllib.parse import urlparse
 import pandas as pd
 
 from algotrade.config.user import UserContext
-from algotrade.core.model.errors import AlgoTradeError
 from algotrade.data import StoreReader
 from algotrade.data.reference import snapshot
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.features import catalogue
+from algotrade.services.read.context import NotFoundError as NotFoundError  # noqa: PLC0414
+from algotrade.services.read.context import ResultCache as ResultCache  # noqa: PLC0414
 from algotrade.services.views import to_value
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.factory import open_backend, open_config_store
@@ -27,34 +28,6 @@ from algotrade.storage.tables.schemas import COMMON, SCHEMA_VERSION
 
 BARS = "bars/1d"
 MAX_PAGE_SIZE = 1000
-
-
-class NotFoundError(AlgoTradeError):
-    """The thing asked for (an instrument, a run, a config, a partition) does not exist."""
-
-
-class ResultCache:
-    """A small LRU of computed results. Callers key on ``StoreReader.visible_seq()`` (read
-    before computing), so a publish makes every earlier entry unreachable (ADR 0022)."""
-
-    def __init__(self, size: int = 8) -> None:
-        self._size = size
-        self._items: OrderedDict[Hashable, Any] = OrderedDict()
-        self._lock = threading.Lock()
-
-    def get(self, key: Hashable) -> Any | None:
-        with self._lock:
-            if key not in self._items:
-                return None
-            self._items.move_to_end(key)
-            return self._items[key]
-
-    def put(self, key: Hashable, value: Any) -> None:
-        with self._lock:
-            self._items[key] = value
-            self._items.move_to_end(key)
-            while len(self._items) > self._size:
-                self._items.popitem(last=False)
 
 
 @dataclass(frozen=True)

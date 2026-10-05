@@ -4,7 +4,7 @@
 # polling, health, live quotes, the preview POSTs, files and (until read-model PR 10) admin.
 # Every GET route the API serves must be listed here, and the list may only get shorter:
 #
-#   - tests/architecture/test_structure.py::test_rest_get_routes_are_allowlisted fails on a GET
+#   - tests/architecture/api/test_rest_allowlist.py::test_rest_get_routes_are_allowlisted fails on a GET
 #     route not listed here, and on an entry no route serves any more (remove it);
 #   - test_rest_allowlist_only_shrinks fails when the number of entries differs from
 #     `max_get_routes`: after removing entries run `make rest-allowlist-update` (it lowers the
