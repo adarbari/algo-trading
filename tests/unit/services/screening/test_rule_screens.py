@@ -9,7 +9,7 @@ import pytest
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.data import StoreReader
 from algotrade.engines.screening.runner import RunCoverage
-from algotrade.services.configs import resolve_config, scheduled
+from algotrade.services.configs import nightly_screeners, resolve_config
 from algotrade.services.jobs import JobStatus, LocalJobRunner
 from algotrade.services.jobs.handlers import LIBRARY_HANDLERS
 from algotrade.services.screening import run as run_module
@@ -172,12 +172,12 @@ def test_failed_write_publishes_nothing(monkeypatch: pytest.MonkeyPatch) -> None
     assert reader.table("results/rule_screen", DAY) is None  # the first table rolled back too
 
 
-def test_scheduled_rule_screen_runs_as_a_screen_job() -> None:
-    """The nightly ``screens`` step submits each scheduled config as a ``screen`` job."""
+def test_a_rule_screen_runs_as_a_screen_job() -> None:
+    """The nightly ``screens`` step submits each screener as a ``screen`` job."""
     reader, writer = seeded()
-    store = configs(schedule="nightly")
-    (scheduled_config,) = scheduled(store, "nightly")
-    assert scheduled_config.config.impl == "rules"
+    store = configs()
+    (nightly,) = nightly_screeners(store)
+    assert nightly.config.impl == "rules"
     runner = LocalJobRunner(
         writer.runs_backend,
         LIBRARY_HANDLERS,

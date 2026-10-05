@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 def test_screen_configs_with_latest_run(client: TestClient) -> None:
     configs = client.get("/screens").json()
     assert [c["config"]["config_id"] for c in configs] == ["short_premium_liquidity", "vrp_scanner"]
-    assert configs[0]["config"]["schedule"] == "nightly"
+    assert "schedule" not in configs[0]["config"]
     assert configs[0]["latest_session"] == "2022-11-23"
 
 

@@ -1,6 +1,6 @@
 """The site VRP scanner preset (``config/site/presets/screeners/vrp_scanner/v<N>.toml``): v1
 and v2 (pinned, ``extends = "vrp_scanner@N"``) and v3 (the latest) resolve and validate against
-the catalogue, are not scheduled, and on a
+the catalogue, and on a
 fixed fixture of rows gives the owner-decided outcomes (docs/screeners/vrp-scanner.md): the
 hard gates reject (a missing value too), liquidity misses are LIQUIDITY_RISK near misses,
 IBKR IV rank only lowers the score, leveraged / inverse flag, ties by the IV-HV spread."""
@@ -93,7 +93,7 @@ def preset_v3() -> ResolvedConfig:
 
 def test_preset_resolves_and_validates(preset: ResolvedConfig) -> None:
     spec = preset.screen_spec
-    assert preset.config.impl == "rules" and preset.config.schedule is None  # on request only
+    assert preset.config.impl == "rules"
     assert preset.selection is not None and preset.selection.name == "liquid_optionable"
     gates = [(c.id, c.mode.value) for c in spec.criteria]
     assert gates[:5] == [
@@ -168,7 +168,7 @@ EXPECTED_V2 = {  # id: (score, flags)
 
 def test_v2_resolves_with_scored_put_criteria(preset_v2: ResolvedConfig) -> None:
     spec = preset_v2.screen_spec
-    assert spec.version == 2 and preset_v2.config.schedule is None  # on request, like v1
+    assert spec.version == 2
     assert preset_v2.config.name == "VRP"
     modes = {c.id: c.mode.value for c in spec.criteria}
     assert {k: v for k, v in modes.items() if v == "soft"} == {"adv": "soft"}
@@ -230,7 +230,7 @@ FIXTURE_V3: dict[str, dict[str, Any]] = {
 
 def test_v3_has_no_selection_and_opens_with_the_base_gates(preset_v3: ResolvedConfig) -> None:
     spec = preset_v3.screen_spec
-    assert spec.version == 3 and preset_v3.config.schedule is None
+    assert spec.version == 3
     assert preset_v3.config.selection is None
     assert preset_v3.selection is not None and preset_v3.selection.name == "all"  # every instrument
     assert not preset_v3.selection.where.children

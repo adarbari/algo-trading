@@ -22,7 +22,6 @@ __all__ = [
     "OPS",
     "RULES_IMPL",
     "RULE_SCREEN_KEYS",
-    "SCHEDULES",
     "Group",
     "Rule",
     "RuleValue",
@@ -36,7 +35,6 @@ __all__ = [
 ]
 
 KINDS = frozenset({"screener", "strategy"})
-SCHEDULES = frozenset({"nightly"})
 RULES_IMPL = "rules"
 # The rule-screen part of a config (ADR 0029), kept raw here and parsed by
 # ``config.strategy.screen_spec`` after the layers are merged. ``tiers`` and ``classify`` are
@@ -73,7 +71,6 @@ class StrategyConfig:
     params: Mapping[str, Scalar] = field(default_factory=dict)
     selection: str | Selection | None = None
     selection_overrides: Group | None = None
-    schedule: str | None = None
     exports: tuple[str, ...] = ()
     settings: Mapping[str, Any] = field(default_factory=dict)  # screening / backtest overrides
     rules: Mapping[str, Any] = field(default_factory=dict)  # RULE_SCREEN_KEYS, impl "rules" only
@@ -155,7 +152,7 @@ def parse_strategy(raw: Mapping[str, Any], path: str) -> StrategyConfig:
         "params",
         "selection",
         "selection_overrides",
-        "schedule",
+        "schedule",  # legacy (ADR 0033): every finalised screener runs nightly; ignored
         "exports",
         "screening",
         "backtest",
@@ -186,9 +183,6 @@ def parse_strategy(raw: Mapping[str, Any], path: str) -> StrategyConfig:
     else:
         raise _fail(f"{path}.selection", "expected a preset name or a selection table")
     overrides = raw.get("selection_overrides")
-    schedule = raw.get("schedule")
-    if schedule is not None and schedule not in SCHEDULES:
-        raise _fail(f"{path}.schedule", f"must be one of {sorted(SCHEDULES)}")
     exports = raw.get("exports", [])
     if not isinstance(exports, list) or not all(isinstance(e, str) for e in exports):
         raise _fail(f"{path}.exports", "expected a list of export names")
@@ -207,7 +201,6 @@ def parse_strategy(raw: Mapping[str, Any], path: str) -> StrategyConfig:
         selection_overrides=parse_group(overrides, f"{path}.selection_overrides")
         if overrides
         else None,
-        schedule=schedule,
         exports=tuple(exports),
         settings=settings,
         rules=rules,

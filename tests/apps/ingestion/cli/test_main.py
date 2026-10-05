@@ -35,6 +35,9 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
     shutil.copytree(REPO_ROOT / "config" / "site", tmp_path / "config" / "site")
     (tmp_path / "config" / "site" / "universe.toml").write_text('source = "csv_import"\n')
+    # Every site screener runs nightly (ADR 0033); the rule preset reads rollups this fixture
+    # does not build, so the pipeline test keeps to the one screener its data supports.
+    shutil.rmtree(tmp_path / "config" / "site" / "presets" / "screeners")
     monkeypatch.setenv("ALGOTRADE_CONFIG_DIR", str(tmp_path / "config"))
     monkeypatch.chdir(tmp_path)  # the nightly writes var/logs/nightly-latest.json here
     from tests.helpers.payloads.nasdaq_earnings import calendar  # noqa: PLC0415
@@ -236,7 +239,7 @@ def test_screen_runs_a_user_config(env: Path, capsys: pytest.CaptureFixture[str]
     user_dir = env / "config" / "users" / "alice" / "strategies"
     user_dir.mkdir(parents=True)
     (user_dir / "stocks_only.toml").write_text(
-        'extends = "short_premium_liquidity"\nschedule = "nightly"\n'
+        'extends = "short_premium_liquidity"\n'
         '[selection_overrides]\nall = [{field = "instrument.is_etf", op = "eq", value = false}]\n'
     )
     code, audit = call(

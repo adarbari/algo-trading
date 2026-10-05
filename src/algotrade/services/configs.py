@@ -1,4 +1,4 @@
-"""Use case: resolve configs from the ``ConfigStore`` and find scheduled ones."""
+"""Use case: resolve configs from the ``ConfigStore`` and find the screeners that run nightly."""
 
 from collections.abc import Mapping, Sequence
 from typing import Any
@@ -15,7 +15,7 @@ from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.registry import catalogue_columns
 from algotrade.services.features import catalogue
 from algotrade.storage.configs.files import SCREENERS
-from algotrade.storage.configs.store import ConfigStore, OverlayConfigStore, screen_document
+from algotrade.storage.configs.store import ConfigStore, OverlayConfigStore
 
 
 def default_user(fallback: str) -> UserContext:
@@ -54,14 +54,12 @@ def resolve_rule_draft(
     name: str,
     user: UserContext,
     document: Mapping[str, Any],
-    schedule: str | None = None,
 ) -> ResolvedConfig:
     """``document`` (a draft, not stored) resolved as ``user``'s rule screen ``name``, exactly
     as it would run: layers, selection, the ``ScreenSpec`` and the catalogue (incl. the user's
     features). A ``ConfigurationError`` naming the path unless it is a valid rule screen.
     Authoring validates drafts with it; the Builder's preview evaluates them with it."""
-    draft = screen_document(document, schedule)
-    overlay = OverlayConfigStore(store, {(user.user_id, SCREENERS, name): draft})
+    overlay = OverlayConfigStore(store, {(user.user_id, SCREENERS, name): document})
     resolved = resolve_config(overlay, name, user)
     if resolved.config.kind != "screener" or resolved.config.impl != RULES_IMPL:
         raise ConfigurationError(f"{user.user_id}/{name}: not a rule screen (impl = 'rules')")
@@ -89,15 +87,16 @@ def user_features_read(
     return tuple(e.definition for n, e in fs.expressions.items() if n in seen)
 
 
-def scheduled(store: ConfigStore, schedule: str = "nightly") -> list[ResolvedConfig]:
-    """Configs to run on ``schedule``: site presets (as the ``site`` user) and each user's own."""
+def nightly_screeners(store: ConfigStore) -> list[ResolvedConfig]:
+    """The screeners the nightly runs (ADR 0033): every site screener preset (as the ``site``
+    user) and every finalised screener of each user. There is no schedule switch: finalising
+    a screener is what puts it on the nightly. A draft never finalised is not run."""
     runs: list[ResolvedConfig] = []
-    owners = [SITE_USER, *store.users()]
-    for owner in owners:
+    for owner in [SITE_USER, *store.users()]:
         scope = "site" if owner == SITE_USER else owner
         for config_id in config_ids(store, scope):
             resolved = resolve_config(store, config_id, UserContext(owner))
-            if resolved.config.schedule == schedule:
+            if resolved.config.kind == "screener":
                 runs.append(resolved)
     return runs
 

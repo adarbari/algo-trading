@@ -26,7 +26,7 @@ export function useMyScreeners() {
   });
 }
 
-/** One screen: its draft, versions, schedule, preset pin and resolved working copy. */
+/** One screen: its draft, versions, preset pin and resolved working copy. */
 export function useScreener(id: string | null) {
   return useQuery({
     queryKey: queryKeys.screeners.detail(id ?? ''),

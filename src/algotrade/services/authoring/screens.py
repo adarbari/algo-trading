@@ -1,7 +1,7 @@
-"""A user's rule screen (ADR 0029): read it (draft, versions, schedule, its preset pin), save
-or discard the draft, finalise the draft into the next immutable version, and switch its
-schedule. Finalise validates the whole screen as it would run (layers, selection, the
-``ScreenSpec``, the catalogue incl. the user's features) and fails closed."""
+"""A user's rule screen (ADR 0029): read it (draft, versions, its preset pin), save
+or discard the draft, and finalise the draft into the next immutable version (which puts the
+screen on the nightly: ADR 0033). Finalise validates the whole screen as it would run (layers,
+selection, the ``ScreenSpec``, the catalogue incl. the user's features) and fails closed."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -9,7 +9,6 @@ from typing import Any
 
 from algotrade.config.site.fields import reject_secrets
 from algotrade.config.strategy.resolve import ResolvedConfig, config_document, parse_extends
-from algotrade.config.strategy.schema import SCHEDULES
 from algotrade.config.user import SITE_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.authoring.scope import (
@@ -22,8 +21,8 @@ from algotrade.services.configs import resolve_config, resolve_rule_draft
 from algotrade.storage.configs.files import SCREENERS
 from algotrade.storage.configs.writer import ConfigWriter, VersionExistsError
 
-# Set by the authoring flow, never by a draft: finalise numbers versions; the schedule is a
-# separate switch.
+# Set by the authoring flow, never by a draft: finalise numbers versions. ``schedule`` is a
+# legacy key (every finalised screen runs nightly, ADR 0033): stripped, never written.
 MANAGED_KEYS = ("version", "schedule")
 
 
@@ -32,7 +31,7 @@ def validate(
 ) -> ResolvedConfig:
     """``document`` resolved as ``user``'s screen ``name``; a ``ConfigurationError`` (with
     its path) unless it is a valid rule screen."""
-    return resolve_rule_draft(writer, name, user, document, writer.schedule(user.user_id, name))
+    return resolve_rule_draft(writer, name, user, document)
 
 
 def draft_document(name: str, document: Mapping[str, Any]) -> dict[str, Any]:
@@ -64,7 +63,6 @@ class ScreenDetail:
     draft_error: str | None  # why the draft would not finalise (None: it would)
     versions: list[int]
     latest: int | None
-    schedule: str | None
     preset: PresetPin | None
     hash: str | None  # the latest version (or, with none, the site preset) resolved
     layers: list[str]
@@ -120,7 +118,6 @@ def screen_detail(writer: ConfigWriter, user: str, name: str) -> ScreenDetail:
         draft_error=draft_error,
         versions=versions,
         latest=versions[-1] if versions else None,
-        schedule=writer.schedule(who.user_id, name),
         preset=preset_pin(writer, draft if draft is not None else latest) or uncopied(name, site),
         hash=resolved.hash if resolved else None,
         layers=list(resolved.layers) if resolved else [],
@@ -136,7 +133,6 @@ class ScreenListing:
     status: str  # FINAL (has a finalised version) or DRAFT (a draft only)
     latest: int | None
     has_draft: bool
-    schedule: str | None
     preset_id: str | None  # the site preset it extends (draft, else latest version)
 
 
@@ -157,7 +153,6 @@ def list_screens(writer: ConfigWriter, user: str) -> list[ScreenListing]:
                 status="FINAL" if versions else "DRAFT",
                 latest=versions[-1] if versions else None,
                 has_draft=name in drafts,
-                schedule=writer.schedule(who.user_id, name),
                 preset_id=pin.preset_id if pin else None,
             )
         )
@@ -207,7 +202,7 @@ class Finalised:
 def finalise(writer: ConfigWriter, user: str, name: str) -> Finalised:
     """The draft becomes version ``latest + 1`` (immutable) and the draft is removed. Fails
     closed: nothing is written unless the screen resolves and validates exactly as it will
-    run. Does not schedule (``set_schedule``)."""
+    run. Finalising puts the screen on the nightly (ADR 0033)."""
     who, name = author(user), screen_id(name)
     draft = writer.draft(who.user_id, name)
     if draft is None:
@@ -222,14 +217,3 @@ def finalise(writer: ConfigWriter, user: str, name: str) -> Finalised:
         raise ConflictError(f"{who.user_id}/{name}: {exc}; finalise again") from exc
     writer.discard_draft(who.user_id, name)
     return Finalised(name, version, resolved.hash)
-
-
-def set_schedule(writer: ConfigWriter, user: str, name: str, schedule: str | None) -> str | None:
-    """Switch ``user``'s finalised screen ``name`` on (``"nightly"``) or off (``None``)."""
-    who, name = author(user), screen_id(name)
-    if schedule is not None and schedule not in SCHEDULES:
-        raise ConfigurationError(f"schedule must be one of {sorted(SCHEDULES)} or null")
-    if not writer.versions(who.user_id, name):
-        raise ScreenNotFoundError(f"{who.user_id}/{name}: finalise a version before scheduling")
-    writer.set_schedule(who.user_id, name, schedule)
-    return schedule

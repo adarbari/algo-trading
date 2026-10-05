@@ -1,4 +1,4 @@
-"""Drafts, finalise (fail closed, immutable versions), detail and the schedule switch."""
+"""Drafts, finalise (fail closed, immutable versions), detail, and the nightly (ADR 0033)."""
 
 from typing import Any
 
@@ -7,7 +7,7 @@ import pytest
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.authoring import presets, screens
 from algotrade.services.authoring.scope import ConflictError, ScreenNotFoundError
-from algotrade.services.configs import scheduled
+from algotrade.services.configs import nightly_screeners
 from algotrade.storage.configs.writer import MemoryConfigWriter, VersionExistsError
 
 OWN: dict[str, Any] = {
@@ -80,27 +80,24 @@ def test_finalise_needs_a_draft_and_reports_a_race(
         screens.finalise(writer, "alice", "mine")
 
 
-def test_detail_versions_and_schedule(writer: MemoryConfigWriter) -> None:
+def test_detail_and_versions_and_finalising_puts_a_screen_on_the_nightly(
+    writer: MemoryConfigWriter,
+) -> None:
     with pytest.raises(ScreenNotFoundError):
         screens.screen_detail(writer, "alice", "mine")
     preset = screens.screen_detail(writer, "alice", "vrp")  # an uncopied site preset
     assert preset.versions == [] and preset.layers[0] == "site/screeners/vrp"
-    with pytest.raises(ScreenNotFoundError):
-        screens.set_schedule(writer, "alice", "mine", "nightly")
     screens.save_draft(writer, "alice", "mine", OWN)
+    assert [r.config.id for r in nightly_screeners(writer) if r.user.user_id == "alice"] == []
     screens.finalise(writer, "alice", "mine")
     screens.save_draft(writer, "alice", "mine", OWN | {"selection": "nope"})
     detail = screens.screen_detail(writer, "alice", "mine")
-    assert (detail.versions, detail.latest, detail.schedule) == ([1], 1, None)
+    assert (detail.versions, detail.latest) == ([1], 1)
     assert detail.draft_error and "nope" in detail.draft_error
     assert detail.error is None and detail.resolved is not None
     assert [v.version for v in screens.screen_versions(writer, "alice", "mine")] == [1]
-    assert [r.config.id for r in scheduled(writer) if r.user.user_id == "alice"] == []
-    assert screens.set_schedule(writer, "alice", "mine", "nightly") == "nightly"
-    assert screens.screen_detail(writer, "alice", "mine").hash == detail.hash  # when, not what
-    assert [r.config.id for r in scheduled(writer) if r.user.user_id == "alice"] == ["mine"]
-    with pytest.raises(ConfigurationError, match="schedule"):
-        screens.set_schedule(writer, "alice", "mine", "hourly")
+    # Finalising is what puts a screen on the nightly: no switch, and a draft alone is not run.
+    assert [r.config.id for r in nightly_screeners(writer) if r.user.user_id == "alice"] == ["mine"]
 
 
 @pytest.mark.parametrize("user", ["site", "../etc", "Bob"])

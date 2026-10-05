@@ -1,4 +1,4 @@
-"""``/screeners``: a user's rule screen (draft, versions, schedule, preset pin) and the
+"""``/screeners``: a user's rule screen (draft, versions, preset pin) and the
 bodies of its writes."""
 
 from typing import Any
@@ -22,7 +22,6 @@ class ScreenerDetail(Schema):
     draft_error: str | None = Field(description="why the draft would not finalise")
     versions: list[int]
     latest: int | None
-    schedule: str | None
     preset: PresetPin | None
     hash: str | None = Field(description="the latest version (else the site preset) resolved")
     layers: list[str]
@@ -40,7 +39,6 @@ class ScreenerListItem(Schema):
     status: str = Field(description="FINAL (has a finalised version) or DRAFT (a draft only)")
     latest: int | None
     has_draft: bool = Field(description="a working copy exists (beside a finalised version too)")
-    schedule: str | None
     preset_id: str | None = Field(description="the site preset the screen extends")
 
 
@@ -62,18 +60,9 @@ class Draft(Schema):
 
 class DraftBody(BaseModel):
     document: dict[str, Any] = Field(
-        description="the screen's TOML keys as JSON (version and schedule are managed)"
+        description="the screen's TOML keys as JSON (the version is managed)"
     )
 
 
 class CopyBody(BaseModel):
     preset: str = Field(description="the site rule-screen preset to extend (pinned)")
-
-
-class ScheduleBody(BaseModel):
-    schedule: str | None = Field(description='"nightly", or null to switch it off')
-
-
-class Schedule(Schema):
-    screener_id: str
-    schedule: str | None

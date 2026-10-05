@@ -4,5 +4,4 @@ id = "short_premium_liquidity"
 kind = "screener"
 impl = "short_premium_liquidity"
 selection = "liquid_optionable"
-schedule = "nightly"
 exports = ["legacy_liquidity_csv"]

@@ -15,16 +15,14 @@ is a list of `hard` criteria like any other (security type, `ACTIVE`, optionable
 | File | What |
 |---|---|
 | `config/site/presets/screeners/<id>/v<N>.toml` | site preset versions, added by PR, immutable (hash-locked in `architecture/preset_versions.toml`); the latest is the highest N; visible and editable in the Builder |
-| `config/users/<u>/screeners/<id>/draft.toml` | the Builder's working copy (autosaved, never run nightly) |
+| `config/users/<u>/screeners/<id>/draft.toml` | the Builder's working copy (autosaved, never run: only finalised screens run) |
 | `config/users/<u>/screeners/<id>/v<N>.toml` | a finalised version: immutable; the latest is the highest N |
-| `config/users/<u>/screeners/<id>/schedule.toml` | the schedule switch (not part of a version, not in the config hash) |
 
 Finalise validates the spec (fields exist in the catalogue, types match, user features
 resolve) and refuses to save an invalid one. An error names the criterion and the key at
 fault (`<id>.criteria.<criterion_id>.field`, `.value` or `.tolerance`), so the Builder can mark
-the row; preview and finalise report the same paths. Finalising does not schedule: the nightly
-schedule (`schedule = "nightly"`) is a separate switch, kept outside the versioned document
-and the config hash (the hash says what a screen computes, not when it runs).
+the row; preview and finalise report the same paths. There is no schedule switch (ADR 0033): finalising a screen puts it on the nightly, and every
+site screener preset runs nightly too. An old `schedule` key in a document is ignored.
 
 ## Example
 
@@ -33,7 +31,6 @@ id = "high_iv_near_extreme"
 kind = "screener"
 impl = "rules"
 version = 2
-schedule = "nightly"                  # omit to run only on request
 
 [criteria.optionable]                 # who is screened is a criterion too
 field = "instrument.optionable"

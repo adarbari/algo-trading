@@ -579,17 +579,6 @@
             "description": "strategy | screener (null when it does not resolve)",
             "title": "Kind"
           },
-          "schedule": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Schedule"
-          },
           "scope": {
             "description": "site (a preset) or the user's id",
             "title": "Scope",
@@ -613,7 +602,6 @@
           "scope",
           "kind",
           "impl",
-          "schedule",
           "selection",
           "hash",
           "error"
@@ -833,7 +821,7 @@
         "properties": {
           "document": {
             "additionalProperties": true,
-            "description": "the screen's TOML keys as JSON (version and schedule are managed)",
+            "description": "the screen's TOML keys as JSON (the version is managed)",
             "title": "Document",
             "type": "object"
           }
@@ -3288,52 +3276,6 @@
         "title": "SavedFeature",
         "type": "object"
       },
-      "Schedule": {
-        "properties": {
-          "schedule": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Schedule"
-          },
-          "screener_id": {
-            "title": "Screener Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "screener_id",
-          "schedule"
-        ],
-        "title": "Schedule",
-        "type": "object"
-      },
-      "ScheduleBody": {
-        "properties": {
-          "schedule": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "\"nightly\", or null to switch it off",
-            "title": "Schedule"
-          }
-        },
-        "required": [
-          "schedule"
-        ],
-        "title": "ScheduleBody",
-        "type": "object"
-      },
       "ScreenConfig": {
         "properties": {
           "config": {
@@ -3878,17 +3820,6 @@
             ],
             "title": "Resolved"
           },
-          "schedule": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Schedule"
-          },
           "screener_id": {
             "title": "Screener Id",
             "type": "string"
@@ -3925,7 +3856,6 @@
           "draft_error",
           "versions",
           "latest",
-          "schedule",
           "preset",
           "hash",
           "layers",
@@ -3965,17 +3895,6 @@
             "description": "the site preset the screen extends",
             "title": "Preset Id"
           },
-          "schedule": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Schedule"
-          },
           "screener_id": {
             "title": "Screener Id",
             "type": "string"
@@ -3991,7 +3910,6 @@
           "status",
           "latest",
           "has_draft",
-          "schedule",
           "preset_id"
         ],
         "title": "ScreenerListItem",
@@ -6997,76 +6915,6 @@
           }
         },
         "summary": "Rebase",
-        "tags": [
-          "screeners"
-        ]
-      }
-    },
-    "/screeners/{screener_id}/schedule": {
-      "put": {
-        "operationId": "schedule_screeners__screener_id__schedule_put",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "screener_id",
-            "required": true,
-            "schema": {
-              "title": "Screener Id",
-              "type": "string"
-            }
-          },
-          {
-            "description": "whose configs (a label until auth; default the API's)",
-            "in": "query",
-            "name": "user",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "whose configs (a label until auth; default the API's)",
-              "title": "User"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ScheduleBody"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Schedule"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Schedule",
         "tags": [
           "screeners"
         ]

@@ -23,7 +23,6 @@ def test_copy_pins_the_preset_version(writer: MemoryConfigWriter) -> None:
     assert screens.finalise(writer, "alice", "my_vrp").version == 1
     resolved = screens.screen_detail(writer, "alice", "my_vrp")
     assert resolved.preset and (resolved.preset.pinned, resolved.preset.current) == (3, 3)
-    assert resolved.schedule is None  # the preset's nightly schedule is not inherited
 
 
 def test_a_stale_pin_keeps_resolving_and_rebase_is_optional(writer: MemoryConfigWriter) -> None:
