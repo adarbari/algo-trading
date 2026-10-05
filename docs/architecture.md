@@ -196,6 +196,10 @@ audits. The local runner uses 2 threads.
 
 ### The nightly workflow (R5)
 
+> **Being replaced** by [ADR 0039](adr/0039-ingestion-workflows-dependencies-and-acceptance.md)
+> (three workflows by cadence, `needs` DAG, SUCCEEDED / FAILED by acceptance rules, hold-back
+> and resume, manual waivers; roadmap WF1-WF5). This section describes today's code until WF5 lands.
+
 `apps/ingestion/algotrade_ingestion/workflows/`: `nightly.py` (the steps and the job
 handler), `steps.py` (isolation, status rule), `sessions.py` (catch-up), `screens.py` (screen
 jobs), `notify.py` (summary file + notifiers), `records.py` / `report.py` / `timing.py` / `render.py`
