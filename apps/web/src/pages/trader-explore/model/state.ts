@@ -13,6 +13,11 @@ import {
 /** A change to the search params; `undefined` removes a key. */
 export type SearchPatch = { [K in keyof ExploreSearch]?: ExploreSearch[K] | undefined };
 
+/** One ticker opens on its overview; a compare set of two or more opens on the comparison. */
+export function defaultTab(selectedCount: number): ExploreTab {
+  return selectedCount > 1 ? 'compare' : 'overview';
+}
+
 export interface ExploreState {
   selected: string[];
   focused: string | null;
@@ -28,7 +33,7 @@ export function exploreState(search: ExploreSearch): ExploreState {
   return {
     selected,
     focused: search.focus ?? selected[0] ?? null,
-    tab: search.tab ?? 'compare',
+    tab: search.tab ?? defaultTab(selected.length),
     columns: search.cols === undefined ? DEFAULT_COLUMNS : splitList(search.cols),
     dimensions: search.dims === undefined ? DEFAULT_DIMENSIONS : splitList(search.dims),
     sort: parseSort(search.sort),

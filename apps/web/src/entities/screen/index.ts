@@ -3,6 +3,7 @@ export {
   PREVIEW_ROWS,
   useMyScreeners,
   useRunScreener,
+  useDeleteScreenerView,
   useSaveScreenerView,
   useScreener,
   useScreenerView,
@@ -10,6 +11,7 @@ export {
   useScreenerVersions,
   useScreenPreview,
   useScreeners,
+  type ViewContent,
 } from './api/hooks';
 export {
   decisionCounts,
@@ -62,3 +64,4 @@ export {
   type ScreenTableRow,
 } from './model/table';
 export { isActive, runMessage, type ScreenRun } from './model/run';
+export { previewChanges, type PickedRow, type PreviewChanges } from './model/changes';

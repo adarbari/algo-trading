@@ -66,6 +66,7 @@ describe('IdeasPage', () => {
         onOpen={onOpen}
         onNewScreener={onNewScreener}
         onScreeners={onScreeners}
+        onOpenScreener={vi.fn()}
       />,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Ideas for Fri 2 Oct' })).toBeVisible();
