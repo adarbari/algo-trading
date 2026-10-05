@@ -26,8 +26,18 @@ Read-only by construction (ADR 0026), three layers:
    the gateway rejects order messages even if the two layers above were bypassed.
 
 Pacing: every message waits on ``general`` (IBKR: <= 50 messages/s); every historical-data
-request also waits on ``historical`` (<= 60 per 10 minutes, >= 10 s between identical ones).
-Both are the registry's shared limiters (``sources/framework/limiter.py``).
+request also waits on ``historical`` (``[ibkr] historical_min_interval_s``, 10 s by default).
+Both are the registry's shared limiters (``sources/framework/limiter.py``); ``cool_down``
+holds ``historical`` for every process (a task's back-off before a retry).
+
+Unanswered is not empty: ``ib_async`` returns an empty bar list on a request timeout and on
+an IB error (``RaiseRequestErrors`` is off), the same as a genuine "no data". The facade
+watches IB's error events while a historical request is in flight and times it, and raises
+``TransientFetchError`` (retryable) for a timeout, an error of that request (error 162
+pacing violation, a cancelled query, ...) or a lost connection (error 1100, HMDS farm down),
+and a plain ``LookupError`` (not retried; still not "no data") for an error a retry cannot
+fix (``refused``: no security definition, no market data permissions). Only an empty answer
+without any of these, or IB's own error 162 "query returned no data", is an empty result.
 """
 
 import math
@@ -40,7 +50,7 @@ from typing import Any
 
 from ib_async import IB, Option, Stock
 
-from algotrade_sources.framework.base import SessionUnavailableError
+from algotrade_sources.framework.base import SessionUnavailableError, TransientFetchError
 from algotrade_sources.framework.http import Pacer
 
 # The ib_async.IB methods this facade may call: market data, contract lookup, the event loop.
@@ -60,7 +70,19 @@ MARKET_DATA_CALLS = frozenset(
 CLIENT_CALLS = frozenset({"connect", "isReady"})  # the API handshake only
 DIVIDEND_TICKS = "456"  # IB dividends: past 12 months, next 12 months, next date and amount
 VOL_TICKS = "104,106"  # the underlying's historical vol (104) and option implied vol (106)
-VOL_HISTORIES = ("OPTION_IMPLIED_VOLATILITY", "HISTORICAL_VOLATILITY")
+VOL_HISTORIES = ("OPTION_IMPLIED_VOLATILITY", "HISTORICAL_VOLATILITY")  # what a payload may hold
+BACKFILL_HISTORIES = VOL_HISTORIES[:1]  # what ``volatility_history`` fetches: the IV only
+# Errors without a request id that mean a request in flight may never be answered: the
+# gateway lost IB (1100), the socket was reset (1300), the HMDS farm (2105) or the
+# TWS-server link (2110) is broken.
+CONNECTIVITY_ERRORS = frozenset({1100, 1300, 2105, 2110})
+NO_DATA_ERROR = 162  # "Historical Market Data Service error": no data, or pacing / other
+NO_DATA_TEXT = "no data"  # in 162's message when IB answered "query returned no data"
+TIMEOUT_SLACK_S = 1.0  # an empty answer this close to the request timeout is the timeout
+# Request errors a retry cannot fix: no security definition (200), market data not
+# subscribed (354, 10090); and 162 naming missing permissions. Not transient: no retry.
+REFUSED_ERRORS = frozenset({200, 354, 10090})
+REFUSED_TEXT = "permission"
 EASTERN = "US/Eastern"  # IB's time zone name for an end date's 23:59:59
 
 
@@ -81,6 +103,48 @@ class _Guarded:
             )
         self._log.append(name)
         return getattr(self._target, name)
+
+
+def _informational(code: int) -> bool:
+    """IB's warnings and notices (``ib_async`` logs them, nothing failed): 165, 2100-2199."""
+    return code == 165 or 2100 <= code < 2200
+
+
+def _mine(rid: int, req_id: int | None) -> bool:
+    return rid != -1 and (req_id is None or rid == req_id)
+
+
+def refused(errors: Sequence[tuple[int, int, str]], req_id: int | None) -> str | None:
+    """A request error retrying cannot fix (``REFUSED_ERRORS``, a 162 about permissions)."""
+    for rid, code, message in errors:
+        if _mine(rid, req_id) and (
+            code in REFUSED_ERRORS or (code == NO_DATA_ERROR and REFUSED_TEXT in message.lower())
+        ):
+            return f"IB error {code}: {message}"
+    return None
+
+
+def unanswered(
+    errors: Sequence[tuple[int, int, str]], req_id: int | None, elapsed: float, timeout: float
+) -> str | None:
+    """Why an EMPTY historical answer is not IB saying "no data" (``None``: it is).
+
+    ``errors``: ``(request id, code, message)`` IB sent while the request was in flight;
+    ``req_id``: the request's id (``None``: unknown, any request-scoped error counts);
+    ``elapsed``: how long it took, against ``timeout`` (``ib_async`` gives up silently)."""
+    for rid, code, message in errors:
+        if rid == -1:
+            if code in CONNECTIVITY_ERRORS:
+                return f"IB error {code} while the request was in flight: {message}"
+            continue
+        if not _mine(rid, req_id) or _informational(code):
+            continue
+        if code == NO_DATA_ERROR and NO_DATA_TEXT in message.lower():
+            continue  # IB's own "query returned no data": a genuine empty answer
+        return f"IB error {code}: {message}"
+    if timeout > 0 and elapsed >= timeout - TIMEOUT_SLACK_S:
+        return f"no answer within the {timeout:g} s request timeout"
+    return None
 
 
 def _detach_resubscribe(raw: Any) -> None:
@@ -152,6 +216,8 @@ class IbkrMarketData:
     clock: Callable[[], float] = time.monotonic
     calls: list[str] = field(default_factory=list)  # every guarded call made, in order
     _ib: _Guarded | None = None
+    _events: Any = None  # the raw IB's errorEvent while connected (our listener on it)
+    _errors: list[tuple[int, int, str]] | None = None  # IB errors during a history request
     _contracts: dict[str, Any] = field(default_factory=dict)
     _options: dict[tuple[str, date, float, str], Any] = field(default_factory=dict)
 
@@ -186,6 +252,7 @@ class IbkrMarketData:
             ) from exc
         if not client.isReady():
             raise SessionUnavailableError(f"IB Gateway on {self.config.address}: API not ready")
+        self._listen(raw)
         self._ib = ib
         self.general.wait()
         ib.reqMarketDataType(self.config.market_data_type)
@@ -194,11 +261,29 @@ class IbkrMarketData:
         ib, self._ib = self._ib, None
         self._contracts.clear()
         self._options.clear()
+        events, self._events = self._events, None
+        if events is not None:
+            events -= self._on_error
         if ib is not None:
             try:
                 ib.disconnect()
             except Exception:  # closing never fails the caller
                 return
+
+    def _listen(self, raw: Any) -> None:
+        """Subscribe to the raw IB's error events (no message is sent: a local callback)."""
+        events = getattr(raw, "errorEvent", None)
+        if events is not None:
+            events += self._on_error
+            self._events = events
+
+    def _on_error(self, req_id: int, code: int, message: str, *_: Any) -> None:
+        if self._errors is not None:
+            self._errors.append((int(req_id), int(code), str(message)))
+
+    def cool_down(self, seconds: float) -> None:
+        """Hold historical requests for ``seconds`` (every process): a back-off."""
+        self.historical.hold(seconds)
 
     @property
     def ib(self) -> _Guarded:
@@ -248,18 +333,32 @@ class IbkrMarketData:
     # ------------------------------------------------------------------ market data
 
     def _history(self, contract: Any, end: date, duration: str, what: str) -> list[dict[str, Any]]:
+        """Daily ``what`` bars; ``TransientFetchError`` when IB did not answer (``unanswered``)."""
         self.historical.wait()
-        bars = self._call(
-            "reqHistoricalData",
-            contract,
-            endDateTime=f"{end:%Y%m%d} 23:59:59 {EASTERN}",
-            durationStr=duration,
-            barSizeSetting="1 day",
-            whatToShow=what,
-            useRTH=True,
-            formatDate=1,
-            timeout=self.config.request_timeout_s,
-        )
+        timeout = self.config.request_timeout_s
+        errors: list[tuple[int, int, str]] = []
+        self._errors = errors
+        started = self.clock()
+        try:
+            bars = self._call(
+                "reqHistoricalData",
+                contract,
+                endDateTime=f"{end:%Y%m%d} 23:59:59 {EASTERN}",
+                durationStr=duration,
+                barSizeSetting="1 day",
+                whatToShow=what,
+                useRTH=True,
+                formatDate=1,
+                timeout=timeout,
+            )
+        finally:
+            self._errors = None
+        if not bars:
+            req_id, elapsed = getattr(bars, "reqId", None), self.clock() - started
+            if (why := refused(errors, req_id)) is not None:
+                raise LookupError(f"IBKR {what} {contract.symbol}: {why}")  # not retried
+            if (why := unanswered(errors, req_id, elapsed, timeout)) is not None:
+                raise TransientFetchError(f"IBKR {what} {contract.symbol}: {why}")
         return [
             {
                 "date": str(b.date)[:10],
@@ -284,13 +383,14 @@ class IbkrMarketData:
     def volatility_history(
         self, symbol: str, start: date, end: date, conid: int | None = None
     ) -> dict[str, list[dict[str, Any]]]:
-        """Daily OPTION_IMPLIED_VOLATILITY and HISTORICAL_VOLATILITY closes of the underlying
-        (annualised 30-day vols, IB's) from ``start`` to ``end``: one request per kind."""
+        """Daily OPTION_IMPLIED_VOLATILITY closes of the underlying (IB's annualised 30-day
+        implied vol) from ``start`` to ``end``: ONE request (``BACKFILL_HISTORIES``; the HV
+        comes from the nightly snapshot, tick 104). Keyed by kind, as ``VOL_HISTORIES``."""
         contract = self._stock(symbol, conid)
         days = (end - start).days + 1
         duration = f"{days} D" if days <= 365 else f"{math.ceil(days / 365)} Y"
         out: dict[str, list[dict[str, Any]]] = {}
-        for what in VOL_HISTORIES:
+        for what in BACKFILL_HISTORIES:
             bars = self._history(contract, end, duration, what)
             out[what] = [
                 {"date": b["date"], "close": b["close"]}

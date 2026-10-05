@@ -9,11 +9,13 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 - VRP v2 feature backfill `var/logs/vrp-v2-rollups.sh` (`put_wing@v1`, `price_moves@v1`, waits for the ingest lock): finished, exit=0.
 
 **Next**
+- IBKR IV backfill (fixed on `feat/ibkr-iv-backfill-fixes`: IV only, ~12 h for all names, most liquid first; an unanswered request is retried, then left pending, never `NO_DATA`): re-run the chunks (they resume). The ~40 names saved `NO_DATA` during the 2026-10-04 timeouts still count as done (the records cannot tell them apart): owner decision on a one-off refetch. Optional pace trial: `[ibkr] historical_min_interval_s` 5, then 3, watching timeouts and error 162.
 - API endpoints that return 404 "nothing stored" on an empty store return 200 with an empty body.
 - Split crowded folders by area: `apps/api` routes/ + schemas/, `services/explore/` (`screens/` is split out; the next new area follows it).
 - API schemas built from domain types, not mirrored field lists.
 - VRP live spread check in the UI via `GET /chains/{id}/live`.
-- Swing features (SW, done on `feat/swing-levels-momentum`): check values against a chart on a few names, then backfill `algotrade-ingest rollups --from D --to D --only momentum@v1,swing_levels@v1,anchored_vwap@v1,oi_walls@v1`.
+- IBKR IV timeouts become NO_DATA: a timed-out `ibkr-iv` history request is stored as NO_DATA, counted as done and never refetched (`apps/ingestion/algotrade_ingestion/tasks/market/ibkr_iv.py` near lines 57 and 113; ib_async swallows the timeout). It should raise a retryable error. The 2026-10-04 chunk 2 run was killed at about 1,360 of 1,500 names after IBKR history requests started timing out; its run record `ibkr_iv_history-2026-10-02-20261004T164924Z` stays RUNNING, and the names marked NO_DATA after about 21:52 that day must be refetched. Restart IB Gateway before resuming: a resume that cannot connect marks itself COMPLETE and deletes the staged data (`_run`, lines about 206-208).
+- Swing features (SW0-SW4 done and backfilled, see the SW section): check values against a chart on a few names.
 - Flaky tests: preview timing under load, smoke axe admin light, one builder e2e.
 
 **Facts**
@@ -96,6 +98,10 @@ repeated: `sma_20/50/200`, `high_52w`, `low_52w`, `ret_20d`, `ret_60d`, `hv20`, 
 | SW2 | Levels: `swing_high`, `swing_low` (most recent pivots), `dist_to_resistance`, `dist_to_support` (percent and in ATR) (group `swing_levels@v1` with pivot dates; distances are expression features) | **done** |
 | SW3 | Setups as expression features: `breakout_20d`, `pullback_to_sma20` (`config/site/features/swing.toml`) | **done** |
 | SW4 | `avwap_earnings` (VWAP anchored to the last earnings date) and OI-based `call_wall` / `put_wall` (strike with the most call OI above spot, the most put OI below spot; Cboe OI is end of day) (groups `anchored_vwap@v1`, `oi_walls@v1` with `wall_status`) | **done** |
+
+SW0-SW4 are done and backfilled (2026-10-04): `momentum@v1` and `swing_levels@v1` over 501
+sessions (2024-10-03..2026-10-02); `anchored_vwap@v1`, `oi_walls@v1` and `earnings@v1` hold
+the 2026-10-02 session only, by design.
 
 **Parked:** the wider options positioning set (gamma and delta exposure, hedge wall, flow
 ratios, skew and rank, implied move, GARCH rank, dark pool / short volume). Drafts kept, not

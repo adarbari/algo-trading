@@ -130,6 +130,12 @@ const GROUPS: readonly { id: string; title: string; facts: readonly FactSpec[] }
         format: { kind: 'compact' },
       },
       {
+        id: 'growth',
+        label: 'Revenue growth (YoY)',
+        field: 'feature.revenue_growth_yoy',
+        format: { kind: 'delta' },
+      },
+      {
         id: 'income',
         label: 'Net income (TTM)',
         field: 'rollup.financials@v1.net_income_ttm',
@@ -137,8 +143,8 @@ const GROUPS: readonly { id: string; title: string; facts: readonly FactSpec[] }
       },
       {
         id: 'eps',
-        label: 'EPS (TTM)',
-        field: 'rollup.financials@v1.eps_ttm',
+        label: 'Diluted EPS (TTM)',
+        field: 'rollup.financials@v1.eps_diluted_ttm',
         format: { kind: 'currency' },
       },
       {

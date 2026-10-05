@@ -244,7 +244,7 @@ gives replaces a free source, and what derives from it carries `licence = person
 | Request (key) | IB call | Pacing | Table |
 |---|---|---|---|
 | `contracts__<SYM>+<SYM>...`: conid, primary exchange, security type, currency | `qualifyContracts` (one call per `contracts_batch` = 25) | `ibkr` (one slot per contract) | `instruments/ibkr_contracts` (task `ibkr-contracts`) |
-| `volhist__<SYM>__<CONID>__<from>`: IB's daily 30-day implied vol and historical vol from a date to the session | `reqHistoricalData` x 2 (`OPTION_IMPLIED_VOLATILITY`, `HISTORICAL_VOLATILITY`) | `ibkr` + `ibkr_historical` | `volatility/ibkr_iv30`, `source_kind = history` (task `ibkr-iv --from/--to`) |
+| `volhist__<SYM>__<CONID>__<from>`: IB's daily 30-day implied vol from a date to the session (no HV: `hv30_ibkr` comes from the nightly snapshot) | `reqHistoricalData` x 1 (`OPTION_IMPLIED_VOLATILITY`) | `ibkr` + `ibkr_historical` | `volatility/ibkr_iv30`, `source_kind = history` (task `ibkr-iv --from/--to`) |
 | `vols__<SYM>:<CONID>+...`: the IV and HV now | `reqMktData` generic ticks 106 + 104, `iv_batch` = 50 streams together, then `cancelMktData` | `ibkr` | `volatility/ibkr_iv30`, `source_kind = snapshot` (nightly `ibkr-iv`) |
 | `quotes__<SYM>__<expiry>__<strike>+...`: the calls and puts of an expiry at those strikes now (bid, ask, last, close, volume, IB's model IV and delta) | `qualifyContracts` (once per contract per session) + `reqMktData` streams (bid and ask, or `stream_wait_s`), then `cancelMktData` | `ibkr` (one slot per contract) | `live/option_quotes` (the API's `/chains/{id}/live`, ADR 0028) |
 
@@ -255,19 +255,33 @@ gives replaces a free source, and what derives from it carries `licence = person
 - **Pacing, measured 2026-10-03** (paper login, delayed data type 3): a two-year IV or HV
   request answers in under a second; the wait is the limiter. IB's rules: no identical
   request within 15 s, no 6+ for one contract and tick type within 2 s, at most 60 per 10
-  minutes (strict for bars of 30 s or less; daily bars are "soft"-throttled, at most 50 open).
-  We keep `historical_min_interval_s = 10` for every historical request, so a backfill costs
-  **2 requests x 10 s = 20 s per underlying: ~23 h for ~4.2k names** (AAPL + SPY took 33 s).
-  It is resumable per underlying (an underlying whose history an earlier finished run fetched
-  from the same start or earlier is skipped), `--limit N` caps a run, and the nightly
-  continues it for `iv_backfill_per_night = 100` names (~33 min). Lowering
-  `historical_min_interval_s` for daily bars would be allowed by IB but is the owner's call
-  after watching the `ibkr_historical` pacing stats.
+  minutes (IBKR documents that rule only for bars of 30 s or less; daily bars are "soft"
+  throttled, at most 50 open). We keep `historical_min_interval_s = 10` (a setting, `[ibkr]`)
+  for every historical request, so a backfill costs **1 request (IV only) x 10 s per
+  underlying: ~12 h for ~4.2k names**, the most liquid first (option tier A / B on either
+  side or liquidity class HIGH / MEDIUM, then by 20-session dollar volume). It is resumable
+  per underlying (an underlying whose history an earlier finished run fetched from the same
+  start or earlier is skipped), `--limit N` caps a run, and the nightly continues it for
+  `iv_backfill_per_night = 100` names (~17 min). The owner may trial
+  `historical_min_interval_s = 5`, then 3, watching the `ibkr_historical` pacing stats,
+  timeouts and error 162.
+- **Unanswered is not empty**: `ib_async` returns an empty bar list on a timeout or an IB
+  error. The facade watches IB's error events and the elapsed time of each historical
+  request and raises a retryable error for a timeout, an error of that request (162 pacing
+  violation, ...) or a lost connection (1100, HMDS farm down); the backfill retries a name
+  3 times (30 s then 60 s back-off on the shared limiter), then records it `FETCH_ERROR`
+  (pending: the next run or a resume fetches it; later runs try such names after every
+  untried one) and stops after 5 such names in a row. An error a retry cannot fix (no
+  permissions, no security definition) is `FETCH_ERROR` at once, without retries.
+  `NO_DATA` (done for good) only when IB answered with no bars (or its own 162 "query
+  returned no data"). A run that cannot connect is PARTIAL, never COMPLETE, and still
+  publishes what a resumed run had staged.
 - **Nightly snapshot**: tick 106 (option implied vol of the underlying) works on delayed data
   on a paper login (checked 2026-10-03: AAPL, SPY, MSFT answered within 1 s; HV can lag, so a
   batch waits up to `stream_wait_s` for both). ~4.2k names in batches of 50: a few minutes.
   The snapshot is written to the session; a later history backfill of that session replaces
-  it (runs merge per instrument, latest wins).
+  it (runs merge per instrument, latest wins), keeping the stored HV (history rows have no
+  HV of their own; a second backfill of a session keeps it too).
 - **Features**: `ibkr_iv@v1` (IV30 / HV30 and the 252-session rank, percentile and status on
   IB's IV, the `iv_history@v2` rules); `iv_rank` / `iv_percentile` prefer it and fall back to
   ours, `iv_rank_source` says which (`config/site/features/volatility.toml`).

@@ -93,6 +93,11 @@ class SessionUnavailableError(ConnectionError):
     """A session source cannot connect (gateway down, refused, handshake timed out)."""
 
 
+class TransientFetchError(RuntimeError):
+    """The vendor did not answer this request (a timeout, a pacing or connectivity error):
+    NOT "no data". Retrying later may succeed; a task never records it as an empty answer."""
+
+
 @runtime_checkable
 class SessionSource(Source, Protocol):
     """A source over a stateful session (a socket to a local gateway), not HTTP requests.

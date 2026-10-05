@@ -46,7 +46,15 @@ describe('orderedDecisions', () => {
 
 describe('shownDecisions', () => {
   it('uses the saved decisions, else the picks (never the rejects)', () => {
-    const view = { screener_id: 'x', saved: true, columns: [], sort: null, decisions: ['REJECT'] };
+    const view = {
+      screener_id: 'x',
+      name: null,
+      names: [],
+      saved: true,
+      columns: [],
+      sort: null,
+      decisions: ['REJECT'],
+    };
     expect(shownDecisions(view)).toEqual(['REJECT']);
     expect(shownDecisions({ ...view, saved: false, decisions: [] })).toEqual(DEFAULT_DECISIONS);
     expect(shownDecisions(undefined)).toEqual(DEFAULT_DECISIONS);

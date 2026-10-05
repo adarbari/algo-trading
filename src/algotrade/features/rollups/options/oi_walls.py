@@ -4,7 +4,7 @@ and below spot (``docs/data/swing.md``).
 Inputs: the session's ``chains/option_quotes`` (required) and ``chains/underlying_quotes``
 (the spot captured with the chain). One row per underlying with a chain or an underlying quote.
 
-Open interest is summed per strike across every expiry ``dte_min..dte_max`` (1..60) calendar
+Open interest is summed per strike across every expiry ``DTE_MIN..DTE_MAX`` (1..60) calendar
 days out (an expiry on the session itself is left out: it is gone by the next open). The
 **call wall** is the strike at or above spot with the most call OI, the **put wall** the strike
 at or below spot with the most put OI; ties go to the strike nearer spot. A missing OI counts
@@ -18,10 +18,10 @@ describe positioning at a close, not intraday. ``wall_status``, first failing st
     PARTIAL    one wall found (the other side has no positive OI)
     OK         both walls found
 
-The DTE window is named in the feature descriptions: changing it is a new version.
+The DTE window is part of the definition (named in the feature descriptions), so it is a
+module constant, not a ``rollups.toml`` param: changing it is a new version.
 """
 
-from dataclasses import dataclass
 from datetime import date
 
 import numpy as np
@@ -29,12 +29,13 @@ import pandas as pd
 
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
-from algotrade.features.rollups.options.iv30 import OPTIONS, UNDERLYINGS
-from algotrade.features.rollups.options.put_wing import positive_spots
+from algotrade.features.rollups.options.iv30 import OPTIONS, UNDERLYINGS, positive_spots
 
 NAME = "oi_walls"
 VERSION = 1
 STATUSES = ("OK", "PARTIAL", "NO_OI", "NO_SPOT", "NO_CHAIN", "NO_EXPIRY")
+DTE_MIN, DTE_MAX = 1, 60  # expiries DTE_MIN..DTE_MAX calendar days out are summed
+_DAYS = f"{DTE_MIN}..{DTE_MAX}"
 
 _CHAIN = tuple(f"{OPTIONS}.{c}" for c in ("strike", "expiry", "right", "open_interest"))
 _INPUTS = (*_CHAIN, f"{UNDERLYINGS}.price")
@@ -42,7 +43,7 @@ _INPUTS = (*_CHAIN, f"{UNDERLYINGS}.price")
 
 def _wall(side: str, where: str) -> str:
     return (
-        f"no {side} with open interest above 0 at a strike {where} spot 1..60 days out, or "
+        f"no {side} with open interest above 0 at a strike {where} spot {_DAYS} days out, or "
         "wall_status NO_SPOT, NO_CHAIN or NO_EXPIRY"
     )
 
@@ -51,43 +52,33 @@ FEATURES = (
     Feature(
         "wall_status", "str", "category",
         "OK (both walls), PARTIAL (one wall), NO_OI (no open interest on either side), or the "
-        "first failing step: NO_SPOT, NO_CHAIN (no quotes), NO_EXPIRY (none 1..60 days out)",
+        f"first failing step: NO_SPOT, NO_CHAIN (no quotes), NO_EXPIRY (none {_DAYS} days out)",
         "never", "label", categories=STATUSES, inputs=_INPUTS,
     ),
     Feature(
         "call_wall", "float32", "usd_per_share",
         "Call wall: the strike at or above spot with the most call open interest, summed "
-        "across expiries 1..60 calendar days out (end-of-day OI; ties: nearer spot)",
+        f"across expiries {_DAYS} calendar days out (end-of-day OI; ties: nearer spot)",
         _wall("call", "at or above"), "chain", valid_range=(0, None), inputs=_INPUTS,
     ),
     Feature(
         "call_wall_oi", "int", "count", "Call open interest at the call wall, summed across "
-        "expiries 1..60 days out",
+        f"expiries {_DAYS} days out",
         _wall("call", "at or above"), "chain", valid_range=(1, None), inputs=_INPUTS,
     ),
     Feature(
         "put_wall", "float32", "usd_per_share",
         "Put wall: the strike at or below spot with the most put open interest, summed across "
-        "expiries 1..60 calendar days out (end-of-day OI; ties: nearer spot)",
+        f"expiries {_DAYS} calendar days out (end-of-day OI; ties: nearer spot)",
         _wall("put", "at or below"), "chain", valid_range=(0, None), inputs=_INPUTS,
     ),
     Feature(
         "put_wall_oi", "int", "count", "Put open interest at the put wall, summed across "
-        "expiries 1..60 days out",
+        f"expiries {_DAYS} days out",
         _wall("put", "at or below"), "chain", valid_range=(1, None), inputs=_INPUTS,
     ),
 )  # fmt: skip
 COLUMNS = column_types(FEATURES)
-
-
-@dataclass(frozen=True)
-class OiWallsParams:
-    dte_min: int = 1  # expiries dte_min..dte_max calendar days out are summed
-    dte_max: int = 60
-
-    def __post_init__(self) -> None:
-        if not 0 <= self.dte_min <= self.dte_max:
-            raise ValueError("need 0 <= dte_min <= dte_max")
 
 
 def walls(options: pd.DataFrame, spots: pd.Series, call: bool) -> dict[str, tuple[float, int]]:
@@ -105,7 +96,7 @@ def walls(options: pd.DataFrame, spots: pd.Series, call: bool) -> dict[str, tupl
     return {iid: (k, int(oi)) for iid, (k, oi) in zip(best["underlying_id"], pairs, strict=True)}
 
 
-def compute(inputs: Inputs, session: date, p: OiWallsParams) -> pd.DataFrame:
+def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     options = inputs[OPTIONS]
     assert options is not None  # required input
     underlyings = inputs.get(UNDERLYINGS)
@@ -119,7 +110,7 @@ def compute(inputs: Inputs, session: date, p: OiWallsParams) -> pd.DataFrame:
         oi=pd.to_numeric(options["open_interest"], errors="coerce").fillna(0),
     )
     with_chain = set(options["underlying_id"])
-    window = options[options["dte"].between(p.dte_min, p.dte_max)]
+    window = options[options["dte"].between(DTE_MIN, DTE_MAX)]
     window = window[window["underlying_id"].isin(spots.index)]
     calls, puts = walls(window, spots, call=True), walls(window, spots, call=False)
     in_window = set(window["underlying_id"])
@@ -147,9 +138,8 @@ GROUP = FeatureGroup(
     NAME,
     VERSION,
     "Call and put walls: the strikes with the most open interest at or above / at or below "
-    "spot, summed across expiries 1..60 days out (end-of-day OI)",
+    f"spot, summed across expiries {_DAYS} days out (end-of-day OI)",
     (Input(OPTIONS), Input(UNDERLYINGS, required=False)),
     FEATURES,
     compute,
-    OiWallsParams(),
 )

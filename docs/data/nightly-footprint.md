@@ -56,6 +56,10 @@ first (S&P 500 and `priority_symbols`, then by liquidity class and chain open in
 | rollups | `rollups/instrument/option_liquidity@v1` | an underlying × session | ~4.2k | ~0.3 MB *est.* | `liq_status`, `put_tier`, `call_tier`, `chain_oi`, `chain_volume`, `expiries_within_60d`, `underlying_price`, `iv30`, … |
 | | `rollups/instrument/price_stats@v2` | an instrument with a bar that session | ~12.6k (measured 2026-10-02) | ~0.5 MB (v1: ~1 MB; 32-bit floats, ADR 0023 step 3) | `close`, `sma_20/50/200`, `ret_20d/60d`, `high_52w`, `low_52w`, `hv20`, `hv30`, `hv20_yz`, `adv_usd_20d`, `history_days` |
 | | `rollups/instrument/earnings@v1` | an instrument with a known next / last report | ~4.4k | ~0.05 MB *est.* | `next_earnings_date`, `earnings_time`, `days_to_earnings`, `date_confirmed`, `last_earnings_date` |
+| | `rollups/instrument/momentum@v1` | an instrument with a bar that session | not measured yet | not measured yet | `atr_14`, `rsi_14`, `ret_5d`, `rel_volume`, `high_20d`, `low_20d`, `high_50d`, `low_50d`, `prior_high_20d` |
+| | `rollups/instrument/swing_levels@v1` | an instrument with a bar that session | not measured yet | not measured yet | `swing_high`, `swing_high_date`, `swing_low`, `swing_low_date` |
+| | `rollups/instrument/anchored_vwap@v1` | an instrument with a bar that session | not measured yet | not measured yet | `avwap_earnings`, `avwap_anchor_date` |
+| | `rollups/instrument/oi_walls@v1` | an underlying with a chain or an underlying quote | not measured yet | not measured yet | `wall_status`, `call_wall`, `call_wall_oi`, `put_wall`, `put_wall_oi` |
 | screens | `results/<screener>` | an instrument the screener evaluated | up to ~4.2k per screener | small | defined by the screener |
 
 **About 58 MB of tables per night, which is about 14.6 GB a year** (252 sessions). Option
@@ -65,6 +69,24 @@ unchanged rows. That costs about 1.6 MB a night (about 0.4 GB a year) and keeps 
 reads to one file each.
 
 Screener CSV exports go to `--export-dir` (outside the store) and are not counted here.
+
+### Swing rollups: compute time
+
+The four swing groups (`momentum`, `swing_levels`, `anchored_vwap`, `oi_walls`;
+[swing.md](swing.md)) were added after the sizes above were measured, so their rows and sizes
+are not in the totals yet. What is known so far, all measured on the machine this store lives
+on (no other machine timed), and not budgets:
+
+- **Per session, in memory** (compute only, inputs already loaded; timed during the PR #130
+  review): `momentum@v1` about 0.36 s, `swing_levels@v1` about 0.7 s.
+- **Backfill, wall clock**: the `rollups` run of `momentum@v1`, `swing_levels@v1`,
+  `anchored_vwap@v1`, `oi_walls@v1` and `earnings@v1` over 501 sessions (2024-10-03 to
+  2026-10-02) took about 11 minutes in total, 23:34 to 23:45 local time on 2026-10-04 (its
+  start and end times). `anchored_vwap@v1`, `oi_walls@v1` and `earnings@v1` hold the
+  2026-10-02 session only (by design); the run's time is not split by group.
+- **`oi_walls@v1` reads the whole session's `chains/option_quotes`** (about 1.5M rows, the
+  2026-10-02 count in the table above) for every session it computes: its cost follows the
+  chain's size, not the number of underlyings it writes. Its own time is not measured yet.
 
 ## Raw responses saved each night (purged after 90 days; SEC after 7)
 

@@ -56,6 +56,7 @@ from algotrade.features.rollups.options.iv30 import (  # the same input tables, 
     OPTIONS,
     RATES,
     UNDERLYINGS,
+    positive_spots,
 )
 from algotrade.quant.black_scholes import greeks
 from algotrade.quant.implied_vol import IVStatus, implied_vol
@@ -253,15 +254,6 @@ def wing_row(puts: pd.DataFrame, p: PutWingParams) -> dict[str, object]:
         "best_put_spread_pct": float(best["spread"]),
         "best_put_roc": float(best["roc"]),
     }
-
-
-def positive_spots(underlyings: pd.DataFrame | None) -> pd.Series:
-    """Positive underlying prices by instrument id."""
-    if underlyings is None or underlyings.empty:
-        return pd.Series(dtype=float)
-    price = pd.to_numeric(underlyings["price"], errors="coerce")
-    ids = underlyings["instrument_id"].astype(str)
-    return pd.Series(price.to_numpy(dtype=float), index=ids.to_numpy())[lambda s: s > 0]
 
 
 def _div_yields(rows: pd.DataFrame | None, session: date) -> pd.Series:
