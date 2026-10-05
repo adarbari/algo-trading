@@ -34,7 +34,11 @@ CODE_FILES = sorted(
 )
 SITE_SETTINGS = sorted((REPO_ROOT / "config" / "site").glob("*.toml"))
 # Typed views of L3 settings (the one loader): every field must be used by code, not only parsed.
-TYPED_SETTINGS_FILE = "src/algotrade/config/site/settings.py"
+TYPED_SETTINGS_FILES = (
+    "src/algotrade/config/site/settings.py",
+    "src/algotrade/config/site/holdings.py",
+    "src/algotrade/config/site/ibkr.py",
+)
 TYPED_SETTINGS = (
     "SourcesSettings",
     "VendorSettings",
@@ -45,6 +49,7 @@ TYPED_SETTINGS = (
     "CostSettings",
     "LimitSettings",
     "IbkrSettings",
+    "EtfHoldingsSettings",
     "VerificationSettings",
 )
 # Settings that are parsed but drive nothing today. This list may only shrink: wire the
@@ -146,7 +151,7 @@ def _code_names() -> tuple[set[str], Counter[str]]:
     names: set[str] = set()
     attrs: Counter[str] = Counter()
     for path in CODE_FILES:
-        loader = path == REPO_ROOT / TYPED_SETTINGS_FILE
+        loader = path.relative_to(REPO_ROOT).as_posix() in TYPED_SETTINGS_FILES
         for node in ast.walk(ast.parse(path.read_text())):
             if isinstance(node, ast.Constant) and isinstance(node.value, str):
                 names.add(node.value)
@@ -164,9 +169,14 @@ def _code_names() -> tuple[set[str], Counter[str]]:
 
 def _typed_fields() -> list[str]:
     fields = []
-    tree = ast.parse((REPO_ROOT / TYPED_SETTINGS_FILE).read_text())
+    classes = {
+        n.name: n
+        for name in TYPED_SETTINGS_FILES
+        for n in ast.parse((REPO_ROOT / name).read_text()).body
+        if isinstance(n, ast.ClassDef)
+    }
     for cls in TYPED_SETTINGS:
-        node = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == cls)
+        node = classes[cls]
         fields += [
             f"{cls}.{s.target.id}"
             for s in node.body
