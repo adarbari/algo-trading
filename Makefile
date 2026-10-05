@@ -5,7 +5,7 @@ BIN = $(dir $(PY))
 GOLDEN_URL ?= file://datasets/golden/store
 
 
-.PHONY: changed install doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update filelen unit property integration e2e test \
+.PHONY: changed install doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen unit property integration e2e test \
         evaluate baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-real web-visual
 
 UV ?= uv
@@ -56,6 +56,12 @@ dupes:           ## no new copy-pasted code in src/ and apps/ (pylint duplicate-
 
 dupes-update:    ## after removing duplicates: lower architecture/dupes_baseline.txt
 	$(PY) scripts/check_dupes.py --update
+
+rest-allowlist:  ## REST GET routes only shrink (ADR 0037): architecture/rest_allowlist.toml vs its committed count
+	$(PY) scripts/check_rest_allowlist.py
+
+rest-allowlist-update: ## after retiring GET routes (removing their entries): lower the committed count
+	$(PY) scripts/check_rest_allowlist.py --update
 
 features-doc:    ## regenerate the feature catalogue docs/data/features.md from the registry
 	$(PY) scripts/features_doc.py
@@ -122,7 +128,7 @@ web-real: $(WEB)/node_modules/.package-lock.json golden-store  ## real-app smoke
 web-visual:      ## screenshots + axe over every story, in the CI Linux image (needs Docker)
 	cd $(WEB) && $(NPM) run visual:docker
 
-check: lock-check lint typecheck arch layout ownership dupes filelen datasets-verify test evaluate web-check web-real
+check: lock-check lint typecheck arch layout ownership dupes rest-allowlist filelen datasets-verify test evaluate web-check web-real
 
 nightly:
 	HYPOTHESIS_PROFILE=nightly $(PY) -m pytest tests/property

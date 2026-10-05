@@ -7,13 +7,16 @@
 - ``kind = "layer"`` folders hold only folders and a README; a ``slice`` has a public
   ``index.ts``; a ``segment`` is named for its kind; a ``component`` has its source, styles,
   story, test, index and screenshots; ``screenshots`` hold only ``.png``;
-- stylesheets only where ``styles = true`` (the design system).
+- stylesheets only where ``styles = true`` (the design system);
+- no fact the server owns is derived in ``src/``
+  (``architecture/web_forbidden_derivations.toml``, ADR 0038).
 
 Import rules between these folders are ESLint's (``apps/web/lint-rules/``); the per-story
 completeness of design-system components is ``npm run ds:check``.
 """
 
 import fnmatch
+import re
 import tomllib
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -201,3 +204,49 @@ def test_every_component_folder_is_complete(component: str) -> None:
 def test_screenshot_folders_hold_only_png(shots: str) -> None:
     stray = [f.name for f in _files(REPO_ROOT / shots) if f.suffix != ".png"]
     assert not stray, f"{shots} holds screenshot baselines (.png) only: {stray}"
+
+
+# ----------------------------------------------------------------------------- derived facts
+
+DERIVATIONS_FILE = "architecture/web_forbidden_derivations.toml"
+DERIVED_SKIP = ("*.test.*", "*.spec.*", "*.stories.*", "*.d.ts")
+
+
+def forbidden_derivations(src: Path, patterns: list[dict[str, Any]]) -> list[str]:
+    """``file:line: reason`` for each line of ``src/**/*.{ts,tsx}`` (tests, stories and
+    generated files left out) matching a pattern outside its ``allowed`` path prefixes."""
+    compiled = [(re.compile(p["regex"]), p) for p in patterns]
+    found = []
+    for path in sorted(src.rglob("*.ts*")):
+        rel = path.relative_to(src.parent).as_posix()
+        if path.suffix not in (".ts", ".tsx") or "/generated/" in rel:
+            continue
+        if any(fnmatch.fnmatchcase(path.name, skip) for skip in DERIVED_SKIP):
+            continue
+        for n, line in enumerate(path.read_text().splitlines(), start=1):
+            for regex, pattern in compiled:
+                if regex.search(line) and not rel.startswith(tuple(pattern.get("allowed", []))):
+                    found.append(f"{rel}:{n}: {pattern['reason']}")
+    return found
+
+
+def test_no_forbidden_derivations() -> None:
+    """ADR 0038: the browser renders facts the server sends, it never derives them."""
+    patterns = tomllib.loads((REPO_ROOT / DERIVATIONS_FILE).read_text()).get("pattern", [])
+    assert patterns, f"{DERIVATIONS_FILE} has no enabled pattern"
+    found = forbidden_derivations(REPO_ROOT / WEB["root"] / "src", patterns)
+    assert not found, (
+        f"facts derived in the browser ({DERIVATIONS_FILE}; docs/api/read-model.md):\n"
+        + "\n".join(found)
+    )
+
+
+def test_forbidden_derivations_respect_allowed_paths(tmp_path: Path) -> None:
+    src = tmp_path / "src"
+    (src / "shared" / "lib").mkdir(parents=True)
+    (src / "widgets").mkdir()
+    (src / "shared" / "lib" / "clock.ts").write_text("const now = new Date();\n")
+    (src / "widgets" / "w.tsx").write_text("ok\nconst t = new Date();\n")
+    (src / "widgets" / "w.test.tsx").write_text("const t = new Date();\n")
+    patterns = [{"regex": r"new Date\(\)", "reason": "ask", "allowed": ["src/shared/lib/"]}]
+    assert forbidden_derivations(src, patterns) == ["src/widgets/w.tsx:2: ask"]

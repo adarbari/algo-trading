@@ -1,6 +1,6 @@
 # ADR 0025: Frontend architecture: a layered, component-only web app
 
-**Status:** accepted (2026-10-03). Extends [0011](0011-design-system-first-ui.md) (design
+**Status:** accepted (2026-10-03); amended by [0037](0037-domain-read-model-served-by-graphql.md) (rule 4: a second generated client, GraphQL via graphql-codegen, through `shared/api`). Extends [0011](0011-design-system-first-ui.md) (design
 system first), [0019](0019-ownership-and-boundaries.md) (one owner per responsibility) and
 [0020](0020-directory-layout.md) (one kind of thing per folder) to `apps/web`. Guide:
 [docs/ui/architecture.md](../ui/architecture.md).

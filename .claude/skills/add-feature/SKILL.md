@@ -5,6 +5,12 @@ description: Add a computed feature to the feature store: a formula over existin
 
 # Add a feature
 
+**A fact a page or Ideas needs per instrument is a feature, even if only one page shows it**
+(ADR 0038): the read model never computes it per request and the browser never derives it.
+`rollup.nearest_expiry@v1` (DTE) and `feature.earnings_before_expiry` are the example
+(read-model PR 3). Pages read it by name through GraphQL `features(names)`
+(`.claude/skills/add-graphql-field`).
+
 **First: is it a formula over features that already exist?** (`iv30 - hv30`, `close /
 high_52w - 1`, a HIGH / LOW label from thresholds, `shares x close`.) Then it is an
 **expression feature: a TOML entry, no code** (ADR 0023 step 3):

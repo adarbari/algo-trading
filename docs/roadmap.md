@@ -11,9 +11,7 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 - ETF holdings (ADR 0035, accepted): after merge run `algotrade-ingest etf-holdings` once (reads the ~1,140 covered funds, plus the non-optionable N-PORT funds with a 20-session dollar volume of $5M or more, up to ~900 (`fallback_scope = "liquid"`, `fallback_min_adv_usd`): about 1.5 hours per 1,140, extrapolated from the sample, mostly SEC header lookups; or let the nightly fill it, 200 funds a night, 6 weekday nights), then the Overview tab renders `<HoldingsPanel symbol onSelectSymbol>` (`widgets/holdings-panel`) for ETFs.
 - ETF descriptions for funds with no SEC prospectus objective: SPY, DIA, GLD, SLV, USO, IBIT, SOXL and the like (unit trusts, commodity and crypto trusts, some leveraged funds); 246 of the 1,464 ETFs trading $5M or more a day have none (2026-10-05). The SEC series match closes 83 of them; the rest need issuer pages (iShares and State Street page text for IBIT, SLV, SPY, DIA; ProShares and Direxion 497K or pages for SOXL, TSLL, UVXY) and an ADR.
 - Optional IBKR pace trial: `[ibkr] historical_min_interval_s` 5, then 3, watching timeouts and error 162 (the backfill ran at 10 s, IV only, about 6 names a minute). The nightly keeps the history current (100 names a night of any new gap).
-- API endpoints that return 404 "nothing stored" on an empty store return 200 with an empty body.
-- Split crowded folders by area: `apps/api` routes/ + schemas/, `services/explore/` (`screens/` is split out; the next new area follows it).
-- API schemas built from domain types, not mirrored field lists.
+- **Read-model track (RM, ADRs 0036-0038, [api/read-model.md](api/read-model.md)):** RM1 (decisions + harness) done; next RM2 session + values, then RM3 stored facts (owner backfill after merge), RM4 the GraphQL slice (Overview facts), RM5 Ideas on GraphQL (the MRVL fix), RM6-RM10 per the RM table. Do them in order; a new page read uses the old REST path only if the owner asks. Absorbs the old items: 404 on an empty store, splitting `services/explore` / routes / schemas, API types from domain types.
 - VRP live spread check in the UI via `GET /chains/{id}/live`.
 - Company financials (`financials@v1`, `feature.pe_ratio`, `feature.revenue_growth_yoy`; Explore Overview reads them): after merge run `algotrade-ingest shares --force` (about 30 to 40 minutes, resumable), then `algotrade-ingest rollups --from 2024-10-03 --to <last session> --only financials@v1` (a few seconds a session, estimated), and spot-check a few names ([vendors.md](data/vendors.md) "SEC EDGAR company facts").
 - Flaky tests: preview timing under load, smoke axe admin light, one builder e2e.
@@ -43,6 +41,25 @@ lands. The target state of every item is described in [architecture.md](architec
 | 5a | Design system | Tokens → **owner approves mockups** → components + catalogue → lint enforcement | **done**: tokens final 2026-10-03 (ADR 0011, 0025) |
 | 5b | Web app | Screener list, results table, contract detail, data freshness; L4 watchlists and preferences | **done** (pages in `apps/web/src/pages`; further pages via Next) |
 | 6 | Expansion | Backtests from the UI on a queue-backed job runner; on-request pulls; futures (IBKR); intraday bars + `rollups/daily/*`; S3 storage backend and hosting; screener outcome tracking | |
+
+## Read model (RM): one session, one read model, one graph (ADRs 0036-0038)
+
+Every page read serves one resolved session, comes from a domain read object in
+`services/read/` and is served by GraphQL; per-instrument values are catalogue features.
+Plan, rules and enforcement: [api/read-model.md](api/read-model.md) ("Migration plan").
+
+| # | Delivers | Status |
+|---|---|---|
+| RM1 | ADRs 0036-0038, the spec, empty `services/read` + `graphql` packages, ownership entries, import-linter contracts, REST GET allow-list (shrink-only), web derivation list, skills `add-graphql-field` / `add-domain-object`, Strawberry dependency | **done** |
+| RM2 | `read/session.py` (`resolve_session`), `values.py` (`Unknown`, `to_scalar`), `context.py`; split `tests/architecture`, READ 2 test | next |
+| RM3 | Stored facts: `nearest_expiry@v1`, `feature.earnings_before_expiry`; owner backfill | |
+| RM4 | GraphQL vertical slice: Instrument + features, schema snapshot, codegen, Overview facts by catalogue name | |
+| RM5 | Screens read model + Ideas on GraphQL (one latest-run rule, NOT_RUN, server counts); `ideas/ranking.py` deleted | |
+| RM6 | Explore detail pane on one query; `explore/{instruments,chains,funds}` deleted | |
+| RM7 | Columnar FeatureTable, `widgets/feature-table`, column factories; Explore tickers + compare | |
+| RM8 | Screener results, preview and views on the one table widget; `explore/screens` deleted | |
+| RM9 | Catalogue, distribution, backtests, configs on GraphQL | |
+| RM10 | Admin on GraphQL; `services/explore` deleted; READ 2 widened to all code | |
 
 ## Live verification (LV): our data against IBKR, read-only (ADR 0026)
 

@@ -312,6 +312,39 @@ forbidden_modules = [
 ]
 allow_indirect_imports = true  # the backtest / screen use cases' naming helpers sit beside their writers
 
+# ---- ADR 0037: the read model replaces services.explore (read-model PRs 2-10); same rule.
+
+[[tool.importlinter.contracts]]
+name = "Read model is read-only: no writers, no jobs (ADR 0037)"
+type = "forbidden"
+source_modules = ["algotrade.services.read"]
+forbidden_modules = [
+    "algotrade.storage.tables.writers",
+    "algotrade.storage.tables.result_writer",
+    "algotrade.storage.configs.writer",
+    "algotrade.services.jobs",
+    "algotrade.services.authoring",
+]
+allow_indirect_imports = true  # as for explore: the use cases' naming helpers sit beside their writers
+
+[[tool.importlinter.contracts]]
+name = "GraphQL types are thin: only services.read, config, core (ADR 0037)"
+type = "forbidden"
+source_modules = ["algotrade_api.graphql"]
+forbidden_modules = [
+    "pandas",
+    "numpy",
+    "algotrade.data",
+    "algotrade.storage",
+    "algotrade.features",
+    "algotrade.engines",
+    "algotrade.services.explore",
+    "algotrade.services.features",
+    "algotrade.services.views",
+    "algotrade.services.selection",
+]
+allow_indirect_imports = true  # services.read reads the stores (pandas) on the schema's behalf
+
 # ---- ADR 0028: the API's live quotes write only live/* tables, only through the live writer.
 
 [[tool.importlinter.contracts]]
