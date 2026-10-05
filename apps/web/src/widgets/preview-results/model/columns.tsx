@@ -18,8 +18,8 @@ type CriterionValue = PreviewRow['criteria'][number];
 
 const FILL: Readonly<Record<string, DataTableFill>> = {
   NEAR: 'warning',
-  FAIL: 'down',
-  MISSING: 'down',
+  FAIL: 'negative',
+  MISSING: 'negative',
 };
 
 /** Who is screened is a gate, not a measurement: those criteria get no column. */

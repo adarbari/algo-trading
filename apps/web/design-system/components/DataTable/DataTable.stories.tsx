@@ -236,7 +236,7 @@ export const NearMisses: Story = {
         return { ...column, fill: (row: ScreenRow) => (row.ratio < 1.3 ? 'warning' : undefined) };
       }
       if (column.id === 'spread') {
-        return { ...column, fill: (row: ScreenRow) => (row.spread < 12 ? 'down' : undefined) };
+        return { ...column, fill: (row: ScreenRow) => (row.spread < 12 ? 'negative' : undefined) };
       }
       return column;
     }),

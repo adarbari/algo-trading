@@ -120,8 +120,8 @@
   background: var(--color-warning-bg);
 }
 
-.cell[data-fill='down'] {
-  background: color-mix(in srgb, var(--color-down) 16%, transparent);
+.cell[data-fill='negative'] {
+  background: var(--color-negative-bg);
 }
 
 .headerCell[data-align='end'],

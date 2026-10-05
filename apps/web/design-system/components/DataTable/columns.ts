@@ -61,10 +61,10 @@ export interface DataTableColumn<TRow> {
 }
 
 /**
- * A tint behind a cell: `warning` (a near miss) or `down` (a miss). The cell's text still says
+ * A tint behind a cell: `warning` (a near miss) or `negative` (a miss). The cell's text still says
  * what it is (the value, or a "Why" column beside it), so colour never carries the meaning alone.
  */
-export type DataTableFill = 'warning' | 'down';
+export type DataTableFill = 'warning' | 'negative';
 
 /** The TanStack features the DataTable registers (module scope: stable across renders). */
 export const features = tableFeatures({
