@@ -8,16 +8,15 @@ from fastapi import APIRouter
 from algotrade_api.routes import (
     admin,
     backtests,
+    chains,
     configs,
     explore,
     features,
     health,
-    instruments,
     runs,
     universe,
 )
 from algotrade_api.routes.authoring import preferences, screeners, user_features
-from algotrade_api.routes.funds import holdings as etf_holdings
 from algotrade_api.routes.preview import features as feature_check
 from algotrade_api.routes.preview import screeners as screen_preview
 from algotrade_api.routes.screens import ideas
@@ -30,9 +29,7 @@ ROUTERS: tuple[APIRouter, ...] = (
     health.router,
     runs.router,
     universe.router,
-    instruments.router,
-    instruments.chains,
-    etf_holdings.router,
+    chains.router,
     explore.router,
     user_features.router,
     feature_check.router,

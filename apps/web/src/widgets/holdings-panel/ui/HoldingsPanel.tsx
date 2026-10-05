@@ -30,15 +30,16 @@ export interface HoldingsPanelProps {
 
 export function HoldingsPanel({ symbol, onSelectSymbol }: HoldingsPanelProps) {
   const holdings = useEtfHoldings(symbol, TOP);
-  const data = holdings.data;
+  const fund = holdings.data;
+  const data = fund?.holdings ?? undefined;
   const rows = useMemo(() => (data ? toRows(data) : []), [data]);
   const columns = useMemo(() => holdingColumns(onSelectSymbol), [onSelectSymbol]);
-  const empty = data !== undefined && rows.length === 0;
+  const empty = fund !== undefined && rows.length === 0;
   const description =
     data && !empty
-      ? summary(data.total, rows.length, shownWeight(data), hasShort(data), data.as_of)
+      ? summary(data.total, rows.length, shownWeight(data), hasShort(data), data.asOf ?? null)
       : undefined;
-  const source = data ? sourceLabel(data.source) : null;
+  const source = sourceLabel(data?.source);
   return (
     <Panel
       title={`${symbol} · holdings`}
@@ -47,9 +48,11 @@ export function HoldingsPanel({ symbol, onSelectSymbol }: HoldingsPanelProps) {
       state={holdings.isError ? 'error' : empty ? 'empty' : 'ready'}
       errorMessage={`${symbol} holdings failed to load.`}
       emptyMessage={
-        data && !data.is_etf
-          ? `${symbol} is not an ETF, so it has no holdings.`
-          : `No holdings stored for ${symbol}: no issuer file or SEC filing covers it yet.`
+        fund === null
+          ? `${symbol} is not in the reference snapshot for the session.`
+          : fund && !fund.isEtf
+            ? `${symbol} is not an ETF, so it has no holdings.`
+            : `No holdings stored for ${symbol}: no issuer file or SEC filing covers it yet.`
       }
       onRetry={() => void holdings.refetch()}
       footer={source ? `Source: ${source}.` : undefined}

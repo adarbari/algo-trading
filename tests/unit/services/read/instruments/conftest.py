@@ -3,6 +3,7 @@ reference and company snapshots taken on D0 only (so a read for D1 sees D0's), a
 ``price_stats@v2`` for both sessions (D1: AAA only, ``hv20`` null) and ``earnings@v1`` only on
 D0 (an older partition a D1 read must never show)."""
 
+from collections.abc import Callable
 from datetime import date
 
 import pandas as pd
@@ -54,16 +55,28 @@ def _market(writer: StoreWriter) -> None:
     write_rows(writer, EARNINGS, D0, [earnings])
 
 
-@pytest.fixture
-def reader() -> StoreReader:
+def store_with(*writes: Callable[[StoreWriter], None]) -> StoreReader:
+    """This store plus what each of ``writes`` writes."""
     backend = MemoryBackend()
     writer = StoreWriter(backend)
     _reference(writer)
     _market(writer)
+    for write in writes:
+        write(writer)
     return StoreReader(backend)
+
+
+def context(reader: StoreReader, day: date | None = None) -> ReadContext:
+    """The read context of ``reader`` for ``day`` (None: the latest session, D1)."""
+    return open_context(reader, MemoryConfigStore({}), UserContext("local"), day)
+
+
+@pytest.fixture
+def reader() -> StoreReader:
+    return store_with()
 
 
 @pytest.fixture
 def ctx(reader: StoreReader) -> ReadContext:
     """The read context for the latest session, D1."""
-    return open_context(reader, MemoryConfigStore({}), UserContext("local"))
+    return context(reader)

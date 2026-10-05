@@ -1,6 +1,7 @@
 /**
- * Every catalogue feature for one ticker: its value for the session, unit, kind, definition
- * and (numbers only) its recent history, as the rows and columns of the features table.
+ * Every catalogue feature for one ticker: its value for the session (as the server served it),
+ * unit, kind, definition and (numbers with a history only) its recent history, as the rows
+ * and columns of the features table.
  */
 import {
   formatValue,
@@ -20,13 +21,9 @@ import {
   featureMarks,
   unitLabel,
   type CatalogueFeature,
+  type ServedValue,
 } from '@/entities/feature';
-import {
-  fieldValue,
-  historyOf,
-  type FeatureSeries,
-  type InstrumentDetail,
-} from '@/entities/instrument';
+import { historyOf, type FeatureHistory } from '@/entities/instrument';
 
 export interface FeatureRow {
   feature: CatalogueFeature;
@@ -36,10 +33,19 @@ export interface FeatureRow {
   history: (number | null)[] | null;
 }
 
+/** Instrument facts are snapshot facts: they have no history to draw. */
+const hasHistory = (feature: CatalogueFeature): boolean =>
+  feature.kind !== 'instrument' && isNumericFeature(feature);
+
+/** The features whose history the table draws (numbers that are not instrument facts). */
+export function historyNames(catalogue: readonly CatalogueFeature[]): string[] {
+  return catalogue.filter(hasHistory).map((f) => f.name);
+}
+
 export function featureRows(
   catalogue: readonly CatalogueFeature[],
-  detail: InstrumentDetail | undefined,
-  series: FeatureSeries | undefined,
+  values: ReadonlyMap<string, ServedValue>,
+  history: FeatureHistory,
 ): FeatureRow[] {
   // Computed features first; the reference facts (instrument.*) after them.
   const ordered = [...catalogue].sort(
@@ -48,8 +54,8 @@ export function featureRows(
   return ordered.map((feature) => ({
     feature,
     title: featureTitle(feature.name),
-    value: detail ? fieldValue(detail, feature.name) : undefined,
-    history: series && isNumericFeature(feature) ? historyOf(series, feature.name) : null,
+    value: values.get(feature.name)?.value ?? undefined,
+    history: hasHistory(feature) ? historyOf(history, feature.name) : null,
   }));
 }
 

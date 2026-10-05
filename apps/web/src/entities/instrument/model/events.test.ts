@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { displayName, fieldValue, historyOf, type InstrumentDetail } from './detail';
 import {
   earningsOn,
   reportTime,
@@ -10,25 +9,34 @@ import {
   type InstrumentEvent,
 } from './events';
 import { rangeFrom } from './range';
+import { chunks, historyOf } from './values';
 
 const events: InstrumentEvent[] = [
   {
     table: 'events/dividend',
+    kind: 'dividend',
+    date: '2026-08-10',
     ts: '2026-08-10T00:00:00+00:00',
     values: { cash_amount: 0.27, pay_date: '2026-08-13', distribution_type: 'recurring' },
   },
   {
     table: 'events/earnings',
+    kind: 'earnings',
+    date: '2026-10-29',
     ts: '2026-10-29T00:00:00+00:00',
     values: { fiscal_quarter: 'Sep/2026', time: 'post', eps_forecast: 1.98, reported: false },
   },
   {
     table: 'events/split',
+    kind: 'split',
+    date: '2024-06-10',
     ts: '2024-06-10T00:00:00+00:00',
     values: { split_from: 1, split_to: 10, adjustment_type: 'forward_split' },
   },
   {
     table: 'events/reference_change',
+    kind: 'reference_change',
+    date: '2026-10-02',
     ts: '2026-10-02T00:00:00+00:00',
     values: { change: 'id_changed', old: 'EQ:NVDA', new: 'EQ:BBG000BBJQV0' },
   },
@@ -52,6 +60,8 @@ describe('instrument events', () => {
     // events/earnings stores pre_market / after_hours: a pre-market report is before the open.
     const preMarket: InstrumentEvent = {
       table: 'events/earnings',
+      kind: 'earnings',
+      date: '2026-08-27',
       ts: '2026-08-27T00:00:00+00:00',
       values: { time: 'pre_market', reported: true },
     };
@@ -67,6 +77,8 @@ describe('instrument events', () => {
   it('finds the report of the date the server names, never another', () => {
     const reported: InstrumentEvent = {
       table: 'events/earnings',
+      kind: 'earnings',
+      date: '2026-08-27',
       ts: '2026-08-27T00:00:00+00:00',
       values: {
         fiscal_quarter: 'Jul/2026',
@@ -104,33 +116,19 @@ describe('instrument events', () => {
 });
 
 describe('instrument detail', () => {
-  const detail: InstrumentDetail = {
-    instrument_id: 'EQ:A',
-    reference_snapshot: '2026-10-02',
-    reference: { symbol: 'AAPL', name: 'Apple Inc. - Common Stock', optionable: true },
-    company: { name: 'Apple Inc.', sector: 'Technology' },
-    features: { 'feature.market_cap': 4.87e12 },
-    feature_sessions: {},
-  };
-
-  it('reads catalogue fields from reference, company and features', () => {
-    expect(fieldValue(detail, 'instrument.optionable')).toBe(true);
-    expect(fieldValue(detail, 'instrument.sector')).toBe('Technology');
-    expect(fieldValue(detail, 'feature.market_cap')).toBe(4.87e12);
-    expect(fieldValue(detail, 'feature.unknown')).toBeUndefined();
-    expect(displayName(detail)).toBe('Apple Inc.');
-    expect(displayName({ ...detail, company: null })).toBe('Apple Inc. - Common Stock');
+  it('reads one feature history with gaps', () => {
+    const points = [1, null, 'n/a', 2.5].map((x, i) => ({
+      session: `2026-09-0${i + 1}`,
+      values: [0, x],
+    }));
+    const history = { series: [{ names: ['y', 'x'], points }], isPending: false };
+    expect(historyOf(history, 'x')).toEqual([1, null, null, 2.5]);
+    expect(historyOf(history, 'z')).toBeNull(); // not asked: no sparkline, not an empty one
   });
 
-  it('reads one feature history with gaps', () => {
-    const series = {
-      instrument_id: 'EQ:A',
-      names: ['x'],
-      start: '2026-09-01',
-      end: '2026-09-03',
-      items: [{ x: 1 }, { x: null }, { x: 'n/a' }, { x: 2.5 }],
-    };
-    expect(historyOf(series, 'x')).toEqual([1, null, null, 2.5]);
+  it('asks for names in chunks the API accepts', () => {
+    expect(chunks(['a', 'b', 'c', 'd', 'e'], 2)).toEqual([['a', 'b'], ['c', 'd'], ['e']]);
+    expect(chunks([], 60)).toEqual([]);
   });
 
   it('counts chart windows back from today', () => {

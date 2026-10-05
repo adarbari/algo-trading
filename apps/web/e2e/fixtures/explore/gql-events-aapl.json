@@ -1,0 +1,178 @@
+{
+  "data": {
+    "instrument": {
+      "instrumentId": "EQ:BBG000B9XRY4",
+      "events": [
+        {
+          "table": "events/dividend",
+          "kind": "dividend",
+          "date": "2024-11-08",
+          "ts": "2024-11-08T00:00:00+00:00",
+          "values": {
+            "symbol": "AAPL",
+            "cash_amount": 0.25,
+            "currency": "USD",
+            "pay_date": "2024-11-14",
+            "record_date": "2024-11-11",
+            "declaration_date": "2024-10-31",
+            "frequency": 4,
+            "distribution_type": "recurring"
+          }
+        },
+        {
+          "table": "events/dividend",
+          "kind": "dividend",
+          "date": "2025-02-10",
+          "ts": "2025-02-10T00:00:00+00:00",
+          "values": {
+            "symbol": "AAPL",
+            "cash_amount": 0.25,
+            "currency": "USD",
+            "pay_date": "2025-02-13",
+            "record_date": "2025-02-10",
+            "declaration_date": "2025-01-30",
+            "frequency": 4,
+            "distribution_type": "recurring"
+          }
+        },
+        {
+          "table": "events/dividend",
+          "kind": "dividend",
+          "date": "2025-05-12",
+          "ts": "2025-05-12T00:00:00+00:00",
+          "values": {
+            "symbol": "AAPL",
+            "cash_amount": 0.26,
+            "currency": "USD",
+            "pay_date": "2025-05-15",
+            "record_date": "2025-05-12",
+            "declaration_date": "2025-05-01",
+            "frequency": 4,
+            "distribution_type": "recurring"
+          }
+        },
+        {
+          "table": "events/dividend",
+          "kind": "dividend",
+          "date": "2025-08-11",
+          "ts": "2025-08-11T00:00:00+00:00",
+          "values": {
+            "symbol": "AAPL",
+            "cash_amount": 0.26,
+            "currency": "USD",
+            "pay_date": "2025-08-14",
+            "record_date": "2025-08-11",
+            "declaration_date": "2025-07-31",
+            "frequency": 4,
+            "distribution_type": "recurring"
+          }
+        },
+        {
+          "table": "events/dividend",
+          "kind": "dividend",
+          "date": "2025-11-10",
+          "ts": "2025-11-10T00:00:00+00:00",
+          "values": {
+            "symbol": "AAPL",
+            "cash_amount": 0.26,
+            "currency": "USD",
+            "pay_date": "2025-11-13",
+            "record_date": "2025-11-10",
+            "declaration_date": "2025-10-30",
+            "frequency": 4,
+            "distribution_type": "recurring"
+          }
+        },
+        {
+          "table": "events/dividend",
+          "kind": "dividend",
+          "date": "2026-02-09",
+          "ts": "2026-02-09T00:00:00+00:00",
+          "values": {
+            "symbol": "AAPL",
+            "cash_amount": 0.26,
+            "currency": "USD",
+            "pay_date": "2026-02-12",
+            "record_date": "2026-02-09",
+            "declaration_date": "2026-01-29",
+            "frequency": 4,
+            "distribution_type": "recurring"
+          }
+        },
+        {
+          "table": "events/dividend",
+          "kind": "dividend",
+          "date": "2026-05-11",
+          "ts": "2026-05-11T00:00:00+00:00",
+          "values": {
+            "symbol": "AAPL",
+            "cash_amount": 0.27,
+            "currency": "USD",
+            "pay_date": "2026-05-14",
+            "record_date": "2026-05-11",
+            "declaration_date": "2026-04-30",
+            "frequency": 4,
+            "distribution_type": "recurring"
+          }
+        },
+        {
+          "table": "events/dividend",
+          "kind": "dividend",
+          "date": "2026-08-10",
+          "ts": "2026-08-10T00:00:00+00:00",
+          "values": {
+            "symbol": "AAPL",
+            "cash_amount": 0.27,
+            "currency": "USD",
+            "pay_date": "2026-08-13",
+            "record_date": "2026-08-10",
+            "declaration_date": "2026-07-30",
+            "frequency": 4,
+            "distribution_type": "recurring"
+          }
+        },
+        {
+          "table": "events/reference_change",
+          "kind": "reference_change",
+          "date": "2026-10-02",
+          "ts": "2026-10-02T00:00:00+00:00",
+          "values": {
+            "symbol": "AAPL",
+            "change": "added",
+            "old": null,
+            "new": "Apple Inc. - Common Stock"
+          }
+        },
+        {
+          "table": "events/reference_change",
+          "kind": "reference_change",
+          "date": "2026-10-02",
+          "ts": "2026-10-02T00:00:00+00:00",
+          "values": {
+            "symbol": "AAPL",
+            "change": "id_changed",
+            "old": "EQ:AAPL",
+            "new": "EQ:BBG000B9XRY4"
+          }
+        },
+        {
+          "table": "events/earnings",
+          "kind": "earnings",
+          "date": "2026-10-29",
+          "ts": "2026-10-29T00:00:00+00:00",
+          "values": {
+            "symbol": "AAPL",
+            "earnings_date": "2026-10-29",
+            "time": "unknown",
+            "fiscal_quarter": "Sep/2026",
+            "eps_forecast": 1.98,
+            "estimates": 8.0,
+            "eps_reported": null,
+            "surprise_pct": null,
+            "reported": false
+          }
+        }
+      ]
+    }
+  }
+}

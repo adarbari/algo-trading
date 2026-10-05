@@ -1,13 +1,16 @@
 /**
  * What an ETF holds, as Explore shows it: the largest holdings with their weights, how much of
  * the fund they are, the issuer's date and where the file came from. A holding links to its
- * Explore row only when its ticker is an instrument of the universe; cash, futures, bonds and
- * foreign lines keep their name only.
+ * Explore row only when the server resolved it to an instrument of the universe (its symbol
+ * is the instrument's, not the issuer's); cash, futures, bonds and foreign lines keep their
+ * name only.
  */
-import type { components } from '@/shared/api';
+import type { gqlTypes } from '@/shared/api';
 
-export type EtfHoldings = components['schemas']['EtfHoldings'];
-export type Holding = components['schemas']['Holding'];
+/** The fund as `EtfHoldings` selects it: whether it is an ETF and, if so, its holdings. */
+export type Fund = NonNullable<gqlTypes.EtfHoldingsQuery['instrument']>;
+export type EtfHoldings = NonNullable<Fund['holdings']>;
+export type Holding = EtfHoldings['items'][number];
 
 /** A holding as a table row. `symbol` is set only when the line links to an Explore row. */
 export interface HoldingRow {
@@ -28,10 +31,10 @@ export function toRows(holdings: EtfHoldings): HoldingRow[] {
     id: String(h.rank),
     rank: h.rank,
     name: h.name,
-    ticker: h.symbol,
-    symbol: h.instrument_id !== null && h.symbol !== null ? h.symbol : null,
+    ticker: h.symbol ?? null,
+    symbol: h.instrument?.symbol ?? null,
     weight: h.weight,
-    assetClass: h.asset_class,
+    assetClass: h.assetClass ?? null,
   }));
 }
 
@@ -53,7 +56,7 @@ const SOURCES: Readonly<Record<string, string>> = {
 };
 
 /** Where the holdings came from, in words; an unknown source is shown as its id. */
-export function sourceLabel(source: string | null): string | null {
-  if (source === null) return null;
+export function sourceLabel(source: string | null | undefined): string | null {
+  if (source === null || source === undefined) return null;
   return SOURCES[source] ?? source;
 }

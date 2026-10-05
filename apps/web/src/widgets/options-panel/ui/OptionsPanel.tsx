@@ -1,7 +1,7 @@
 /**
- * Options: the focused ticker's chain for one expiry. Opens on the expiry the liquidity
- * rollup targets (the standard monthly near 35 days), else the first at least three weeks
- * out. Puts or calls; Simple (strike, bid, ask, open interest, plain English) or Pro (adds
+ * Options: the focused ticker's chain for the session, one expiry at a time (GraphQL
+ * `OptionChain`, then `OptionQuotes`). Opens on the expiry the liquidity rollup targets (the
+ * standard monthly near 35 days), else the first at least three weeks out. Puts or calls; Simple (strike, bid, ask, open interest, plain English) or Pro (adds
  * implied vol and the Greeks); strikes near the money unless "All strikes"; the 8-15 delta
  * band is badged.
  */
@@ -18,22 +18,19 @@ import {
 import { useMemo } from 'react';
 
 import {
+  chainFacts,
   chainRows,
   defaultExpiry,
   expiryLabel,
-  spotOf,
   useOptionChain,
+  useOptionQuotes,
   type ChainRow,
   type OptionRight,
 } from '@/entities/chain';
-import { useInstrument } from '@/entities/instrument';
-import { ApiError, feature } from '@/shared/api';
 
 import { BAND_LABEL, chainColumns, type ChainView } from '../model/columns';
 
 import { ExpiryTabs } from './ExpiryTabs';
-
-const TARGET_EXPIRY = feature('rollup.option_liquidity@v1.target_expiry');
 
 export interface OptionsPanelProps {
   symbol: string;
@@ -50,38 +47,40 @@ export interface OptionsPanelProps {
 
 export function OptionsPanel(props: OptionsPanelProps) {
   const { symbol, expiry, view, right, allStrikes } = props;
-  const detail = useInstrument(symbol);
-  const target = detail.data?.features[TARGET_EXPIRY];
-  const wanted = expiry ?? (typeof target === 'string' ? target : null);
-  // Wait for the detail so the first request asks for one expiry, not the whole chain.
-  const chain = useOptionChain(detail.isPending ? null : symbol, wanted);
-  const data = chain.data;
-  const active = wanted ?? (data ? defaultExpiry(data) : null);
+  const chain = useOptionChain(symbol);
+  const { target, spot, iv30 } = useMemo(() => chainFacts(chain.data?.features), [chain.data]);
+  const data = chain.data?.chain ?? undefined;
+  const listed = data?.expiries.some((e) => e.date === target) ? target : null;
+  const active = expiry ?? listed ?? (data ? defaultExpiry(data) : null);
+  const quotes = useOptionQuotes(data ? symbol : null, active, data?.session ?? null);
   const rows = useMemo(
     () =>
-      data && active
-        ? chainRows(data, { right, expiry: active, symbol, nearMoney: !allStrikes })
+      active
+        ? chainRows(quotes.data ?? [], {
+            right,
+            expiry: active,
+            symbol,
+            spot,
+            nearMoney: !allStrikes,
+          })
         : [],
-    [data, active, right, symbol, allStrikes],
+    [quotes.data, active, right, symbol, spot, allStrikes],
   );
   const columns = useMemo(() => chainColumns(view), [view]);
 
-  const missing = chain.error instanceof ApiError && chain.error.status === 404;
+  const missing = chain.data !== undefined && !data;
   if (missing) {
     return (
       <EmptyState
         bordered
         title={`No option chain for ${symbol}`}
-        description="The nightly chain run stored no options for this ticker."
+        description="The nightly chain run stored no options for this ticker for the session."
       />
     );
   }
   const side = right === 'P' ? 'puts' : 'calls';
-  const title =
-    data && active
-      ? `${symbol} options · ${expiryLabel(data.session, active)} · ${side}`
-      : `${symbol} options`;
-  const ours = data?.our_iv?.['iv30'];
+  const shown = data?.expiries.find((e) => e.date === active);
+  const title = shown ? `${symbol} options · ${expiryLabel(shown)} · ${side}` : `${symbol} options`;
   return (
     <Panel
       title={title}
@@ -114,9 +113,12 @@ export function OptionsPanel(props: OptionsPanelProps) {
           />
         </Stack>
       }
-      state={chain.isError ? 'error' : 'ready'}
+      state={chain.isError || quotes.isError ? 'error' : 'ready'}
       errorMessage={`${symbol} options failed to load.`}
-      onRetry={() => void chain.refetch()}
+      onRetry={() => {
+        void chain.refetch();
+        void quotes.refetch();
+      }}
       footer={`${BAND_LABEL}: contracts whose |delta| is 0.08 to 0.15. Cboe delayed quotes for the session; IV and Greeks as the feed computes them.`}
     >
       <Stack gap={3}>
@@ -132,13 +134,13 @@ export function OptionsPanel(props: OptionsPanelProps) {
               {
                 id: 'spot',
                 label: 'Underlying',
-                value: spotOf(data),
+                value: spot,
                 format: { kind: 'currency' },
               },
               {
                 id: 'iv',
                 label: 'IV30 (ours)',
-                value: typeof ours === 'number' ? ours : null,
+                value: iv30,
                 format: { kind: 'percent' },
               },
               {
@@ -152,12 +154,7 @@ export function OptionsPanel(props: OptionsPanelProps) {
           />
         ) : null}
         {data && active ? (
-          <ExpiryTabs
-            session={data.session}
-            expiries={data.expiries}
-            value={active}
-            onChange={props.onExpiryChange}
-          >
+          <ExpiryTabs chain={data} value={active} onChange={props.onExpiryChange}>
             <DataTable<ChainRow>
               label={`${symbol} ${side}, ${active}`}
               columns={columns}
@@ -165,7 +162,7 @@ export function OptionsPanel(props: OptionsPanelProps) {
               getRowId={(r) => r.id}
               defaultSort={{ columnId: 'strike', direction: 'asc' }}
               visibleRows={14}
-              status={chain.isFetching && rows.length === 0 ? 'loading' : 'ready'}
+              status={quotes.isFetching && rows.length === 0 ? 'loading' : 'ready'}
               emptyMessage={`No ${side} near the money for this expiry: try All strikes.`}
             />
           </ExpiryTabs>

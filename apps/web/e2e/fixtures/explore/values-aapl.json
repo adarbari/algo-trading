@@ -1,0 +1,1350 @@
+{
+  "session": "2026-10-02",
+  "instrumentId": "EQ:BBG000B9XRY4",
+  "values": {
+    "instrument.instrument_id": {
+      "name": "instrument.instrument_id",
+      "value": "EQ:BBG000B9XRY4",
+      "unknown": null,
+      "info": {
+        "format": "TEXT",
+        "unit": null,
+        "dtype": "str",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.symbol": {
+      "name": "instrument.symbol",
+      "value": "AAPL",
+      "unknown": null,
+      "info": {
+        "format": "TEXT",
+        "unit": null,
+        "dtype": "str",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.name": {
+      "name": "instrument.name",
+      "value": "Apple Inc. - Common Stock",
+      "unknown": null,
+      "info": {
+        "format": "TEXT",
+        "unit": null,
+        "dtype": "str",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.asset_class": {
+      "name": "instrument.asset_class",
+      "value": "EQ",
+      "unknown": null,
+      "info": {
+        "format": "TEXT",
+        "unit": null,
+        "dtype": "str",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.security_type": {
+      "name": "instrument.security_type",
+      "value": "COMMON_STOCK",
+      "unknown": null,
+      "info": {
+        "format": "TEXT",
+        "unit": null,
+        "dtype": "str",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.exchange": {
+      "name": "instrument.exchange",
+      "value": "NASDAQ",
+      "unknown": null,
+      "info": {
+        "format": "TEXT",
+        "unit": null,
+        "dtype": "str",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.currency": {
+      "name": "instrument.currency",
+      "value": "USD",
+      "unknown": null,
+      "info": {
+        "format": "TEXT",
+        "unit": null,
+        "dtype": "str",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.multiplier": {
+      "name": "instrument.multiplier",
+      "value": 1.0,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": null,
+        "dtype": "float",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.tick_size": {
+      "name": "instrument.tick_size",
+      "value": 0.01,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": null,
+        "dtype": "float",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.is_etf": {
+      "name": "instrument.is_etf",
+      "value": false,
+      "unknown": null,
+      "info": {
+        "format": "FLAG",
+        "unit": null,
+        "dtype": "bool",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.is_leveraged": {
+      "name": "instrument.is_leveraged",
+      "value": false,
+      "unknown": null,
+      "info": {
+        "format": "FLAG",
+        "unit": null,
+        "dtype": "bool",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.is_inverse": {
+      "name": "instrument.is_inverse",
+      "value": false,
+      "unknown": null,
+      "info": {
+        "format": "FLAG",
+        "unit": null,
+        "dtype": "bool",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.leverage": {
+      "name": "instrument.leverage",
+      "value": 1.0,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": null,
+        "dtype": "float",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.tracks": {
+      "name": "instrument.tracks",
+      "value": null,
+      "unknown": {
+        "code": "NULL",
+        "detail": "instrument.tracks is null for EQ:BBG000B9XRY4 on 2026-10-02"
+      },
+      "info": {
+        "format": "TEXT",
+        "unit": null,
+        "dtype": "str",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.optionable": {
+      "name": "instrument.optionable",
+      "value": true,
+      "unknown": null,
+      "info": {
+        "format": "FLAG",
+        "unit": null,
+        "dtype": "bool",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.status": {
+      "name": "instrument.status",
+      "value": "ACTIVE",
+      "unknown": null,
+      "info": {
+        "format": "TEXT",
+        "unit": null,
+        "dtype": "str",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.listed_on": {
+      "name": "instrument.listed_on",
+      "value": null,
+      "unknown": {
+        "code": "NULL",
+        "detail": "instrument.listed_on is null for EQ:BBG000B9XRY4 on 2026-10-02"
+      },
+      "info": {
+        "format": "DATE",
+        "unit": null,
+        "dtype": "date",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.delisted_on": {
+      "name": "instrument.delisted_on",
+      "value": null,
+      "unknown": {
+        "code": "NULL",
+        "detail": "instrument.delisted_on is null for EQ:BBG000B9XRY4 on 2026-10-02"
+      },
+      "info": {
+        "format": "DATE",
+        "unit": null,
+        "dtype": "date",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.first_seen": {
+      "name": "instrument.first_seen",
+      "value": "2026-10-02",
+      "unknown": null,
+      "info": {
+        "format": "DATE",
+        "unit": null,
+        "dtype": "date",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.round_lot": {
+      "name": "instrument.round_lot",
+      "value": 40.0,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": null,
+        "dtype": "float",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.is_test_issue": {
+      "name": "instrument.is_test_issue",
+      "value": false,
+      "unknown": null,
+      "info": {
+        "format": "FLAG",
+        "unit": null,
+        "dtype": "bool",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.financial_status": {
+      "name": "instrument.financial_status",
+      "value": "N",
+      "unknown": null,
+      "info": {
+        "format": "TEXT",
+        "unit": null,
+        "dtype": "str",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.in_sp500": {
+      "name": "instrument.in_sp500",
+      "value": true,
+      "unknown": null,
+      "info": {
+        "format": "FLAG",
+        "unit": null,
+        "dtype": "bool",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.sic": {
+      "name": "instrument.sic",
+      "value": "3571",
+      "unknown": null,
+      "info": {
+        "format": "TEXT",
+        "unit": null,
+        "dtype": "str",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.sic_description": {
+      "name": "instrument.sic_description",
+      "value": "Electronic Computers",
+      "unknown": null,
+      "info": {
+        "format": "TEXT",
+        "unit": null,
+        "dtype": "str",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.sic_division": {
+      "name": "instrument.sic_division",
+      "value": "Manufacturing",
+      "unknown": null,
+      "info": {
+        "format": "TEXT",
+        "unit": null,
+        "dtype": "str",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.sector": {
+      "name": "instrument.sector",
+      "value": "Technology",
+      "unknown": null,
+      "info": {
+        "format": "TEXT",
+        "unit": null,
+        "dtype": "str",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.industry": {
+      "name": "instrument.industry",
+      "value": "Electronic Computers",
+      "unknown": null,
+      "info": {
+        "format": "TEXT",
+        "unit": null,
+        "dtype": "str",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.state_of_incorporation": {
+      "name": "instrument.state_of_incorporation",
+      "value": "CA",
+      "unknown": null,
+      "info": {
+        "format": "TEXT",
+        "unit": null,
+        "dtype": "str",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.fiscal_year_end": {
+      "name": "instrument.fiscal_year_end",
+      "value": "0926",
+      "unknown": null,
+      "info": {
+        "format": "TEXT",
+        "unit": null,
+        "dtype": "str",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "instrument.website": {
+      "name": "instrument.website",
+      "value": null,
+      "unknown": {
+        "code": "NULL",
+        "detail": "instrument.website is null for EQ:BBG000B9XRY4 on 2026-10-02"
+      },
+      "info": {
+        "format": "TEXT",
+        "unit": null,
+        "dtype": "str",
+        "nullMeaning": "not known for this instrument (UNKNOWN)"
+      }
+    },
+    "rollup.option_liquidity@v1.liq_status": {
+      "name": "rollup.option_liquidity@v1.liq_status",
+      "value": "OK",
+      "unknown": null,
+      "info": {
+        "format": "CATEGORY",
+        "unit": "category",
+        "dtype": "str",
+        "nullMeaning": "never"
+      }
+    },
+    "rollup.option_liquidity@v1.chain_oi": {
+      "name": "rollup.option_liquidity@v1.chain_oi",
+      "value": 4985059,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "count",
+        "dtype": "int",
+        "nullMeaning": "no standard-series contracts (NO_STANDARD_SERIES), or the chain fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.chain_volume": {
+      "name": "rollup.option_liquidity@v1.chain_volume",
+      "value": 1360432,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "count",
+        "dtype": "int",
+        "nullMeaning": "no standard-series contracts (NO_STANDARD_SERIES), or the chain fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.expiries_within_60d": {
+      "name": "rollup.option_liquidity@v1.expiries_within_60d",
+      "value": 12,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "count",
+        "dtype": "int",
+        "nullMeaning": "no standard-series contracts (NO_STANDARD_SERIES), or the chain fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.target_expiry": {
+      "name": "rollup.option_liquidity@v1.target_expiry",
+      "value": "2026-11-20",
+      "unknown": null,
+      "info": {
+        "format": "DATE",
+        "unit": null,
+        "dtype": "float",
+        "nullMeaning": ""
+      }
+    },
+    "rollup.option_liquidity@v1.target_dte": {
+      "name": "rollup.option_liquidity@v1.target_dte",
+      "value": 49,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "days",
+        "dtype": "int",
+        "nullMeaning": "no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.short_put_ok": {
+      "name": "rollup.option_liquidity@v1.short_put_ok",
+      "value": true,
+      "unknown": null,
+      "info": {
+        "format": "FLAG",
+        "unit": "flag",
+        "dtype": "bool",
+        "nullMeaning": "no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.short_call_ok": {
+      "name": "rollup.option_liquidity@v1.short_call_ok",
+      "value": true,
+      "unknown": null,
+      "info": {
+        "format": "FLAG",
+        "unit": "flag",
+        "dtype": "bool",
+        "nullMeaning": "no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.underlying_price": {
+      "name": "rollup.option_liquidity@v1.underlying_price",
+      "value": 333.6,
+      "unknown": null,
+      "info": {
+        "format": "CURRENCY",
+        "unit": null,
+        "dtype": "float",
+        "nullMeaning": ""
+      }
+    },
+    "rollup.option_liquidity@v1.iv30": {
+      "name": "rollup.option_liquidity@v1.iv30",
+      "value": 25.398,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "pct_points",
+        "dtype": "float",
+        "nullMeaning": "no underlying quote captured with the session's chain"
+      }
+    },
+    "rollup.option_liquidity@v1.stock_volume": {
+      "name": "rollup.option_liquidity@v1.stock_volume",
+      "value": 33278552.0,
+      "unknown": null,
+      "info": {
+        "format": "COMPACT",
+        "unit": "shares",
+        "dtype": "float",
+        "nullMeaning": "no underlying quote captured with the session's chain"
+      }
+    },
+    "rollup.option_liquidity@v1.chain_asof": {
+      "name": "rollup.option_liquidity@v1.chain_asof",
+      "value": "2026-10-03",
+      "unknown": null,
+      "info": {
+        "format": "DATE",
+        "unit": "date",
+        "dtype": "date",
+        "nullMeaning": "no underlying quote captured with the session's chain"
+      }
+    },
+    "rollup.option_liquidity@v1.put_tier": {
+      "name": "rollup.option_liquidity@v1.put_tier",
+      "value": "A",
+      "unknown": null,
+      "info": {
+        "format": "CATEGORY",
+        "unit": "category",
+        "dtype": "str",
+        "nullMeaning": "never"
+      }
+    },
+    "rollup.option_liquidity@v1.put_strike": {
+      "name": "rollup.option_liquidity@v1.put_strike",
+      "value": 325.0,
+      "unknown": null,
+      "info": {
+        "format": "CURRENCY",
+        "unit": "usd_per_share",
+        "dtype": "float",
+        "nullMeaning": "no two-sided put quote with a delta at the target expiry; or no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.put_delta": {
+      "name": "rollup.option_liquidity@v1.put_delta",
+      "value": -0.358,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "ratio",
+        "dtype": "float",
+        "nullMeaning": "no two-sided put quote with a delta at the target expiry; or no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.put_bid": {
+      "name": "rollup.option_liquidity@v1.put_bid",
+      "value": 8.0,
+      "unknown": null,
+      "info": {
+        "format": "CURRENCY",
+        "unit": "usd_per_share",
+        "dtype": "float",
+        "nullMeaning": "no two-sided put quote with a delta at the target expiry; or no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.put_ask": {
+      "name": "rollup.option_liquidity@v1.put_ask",
+      "value": 8.2,
+      "unknown": null,
+      "info": {
+        "format": "CURRENCY",
+        "unit": "usd_per_share",
+        "dtype": "float",
+        "nullMeaning": "no two-sided put quote with a delta at the target expiry; or no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.put_spread_abs": {
+      "name": "rollup.option_liquidity@v1.put_spread_abs",
+      "value": 0.2,
+      "unknown": null,
+      "info": {
+        "format": "CURRENCY",
+        "unit": "usd_per_share",
+        "dtype": "float",
+        "nullMeaning": "no two-sided put quote with a delta at the target expiry; or no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.put_spread_pct": {
+      "name": "rollup.option_liquidity@v1.put_spread_pct",
+      "value": 0.0247,
+      "unknown": null,
+      "info": {
+        "format": "PERCENT",
+        "unit": "decimal",
+        "dtype": "float",
+        "nullMeaning": "no two-sided put quote with a delta at the target expiry; or no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.put_strike_oi": {
+      "name": "rollup.option_liquidity@v1.put_strike_oi",
+      "value": 3852,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "count",
+        "dtype": "int",
+        "nullMeaning": "no two-sided put quote with a delta at the target expiry; or no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.put_zone_oi": {
+      "name": "rollup.option_liquidity@v1.put_zone_oi",
+      "value": 44445,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "count",
+        "dtype": "int",
+        "nullMeaning": "no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.put_zone_vol": {
+      "name": "rollup.option_liquidity@v1.put_zone_vol",
+      "value": 1977,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "count",
+        "dtype": "int",
+        "nullMeaning": "no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.put_missing_delta": {
+      "name": "rollup.option_liquidity@v1.put_missing_delta",
+      "value": 0,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "count",
+        "dtype": "int",
+        "nullMeaning": "no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.call_tier": {
+      "name": "rollup.option_liquidity@v1.call_tier",
+      "value": "A",
+      "unknown": null,
+      "info": {
+        "format": "CATEGORY",
+        "unit": "category",
+        "dtype": "str",
+        "nullMeaning": "never"
+      }
+    },
+    "rollup.option_liquidity@v1.call_strike": {
+      "name": "rollup.option_liquidity@v1.call_strike",
+      "value": 350.0,
+      "unknown": null,
+      "info": {
+        "format": "CURRENCY",
+        "unit": "usd_per_share",
+        "dtype": "float",
+        "nullMeaning": "no two-sided call quote with a delta at the target expiry; or no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.call_delta": {
+      "name": "rollup.option_liquidity@v1.call_delta",
+      "value": 0.331,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "ratio",
+        "dtype": "float",
+        "nullMeaning": "no two-sided call quote with a delta at the target expiry; or no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.call_bid": {
+      "name": "rollup.option_liquidity@v1.call_bid",
+      "value": 6.05,
+      "unknown": null,
+      "info": {
+        "format": "CURRENCY",
+        "unit": "usd_per_share",
+        "dtype": "float",
+        "nullMeaning": "no two-sided call quote with a delta at the target expiry; or no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.call_ask": {
+      "name": "rollup.option_liquidity@v1.call_ask",
+      "value": 6.2,
+      "unknown": null,
+      "info": {
+        "format": "CURRENCY",
+        "unit": "usd_per_share",
+        "dtype": "float",
+        "nullMeaning": "no two-sided call quote with a delta at the target expiry; or no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.call_spread_abs": {
+      "name": "rollup.option_liquidity@v1.call_spread_abs",
+      "value": 0.15,
+      "unknown": null,
+      "info": {
+        "format": "CURRENCY",
+        "unit": "usd_per_share",
+        "dtype": "float",
+        "nullMeaning": "no two-sided call quote with a delta at the target expiry; or no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.call_spread_pct": {
+      "name": "rollup.option_liquidity@v1.call_spread_pct",
+      "value": 0.0245,
+      "unknown": null,
+      "info": {
+        "format": "PERCENT",
+        "unit": "decimal",
+        "dtype": "float",
+        "nullMeaning": "no two-sided call quote with a delta at the target expiry; or no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.call_strike_oi": {
+      "name": "rollup.option_liquidity@v1.call_strike_oi",
+      "value": 16103,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "count",
+        "dtype": "int",
+        "nullMeaning": "no two-sided call quote with a delta at the target expiry; or no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.call_zone_oi": {
+      "name": "rollup.option_liquidity@v1.call_zone_oi",
+      "value": 61433,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "count",
+        "dtype": "int",
+        "nullMeaning": "no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.call_zone_vol": {
+      "name": "rollup.option_liquidity@v1.call_zone_vol",
+      "value": 4768,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "count",
+        "dtype": "int",
+        "nullMeaning": "no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.option_liquidity@v1.call_missing_delta": {
+      "name": "rollup.option_liquidity@v1.call_missing_delta",
+      "value": 0,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "count",
+        "dtype": "int",
+        "nullMeaning": "no target expiry (NO_TARGET_EXPIRY), no standard series, or the fetch failed"
+      }
+    },
+    "rollup.price_stats@v2.close": {
+      "name": "rollup.price_stats@v2.close",
+      "value": 333.69000244140625,
+      "unknown": null,
+      "info": {
+        "format": "CURRENCY",
+        "unit": "usd_per_share",
+        "dtype": "float32",
+        "nullMeaning": "never: a row exists only for an instrument with a bar on the session"
+      }
+    },
+    "rollup.price_stats@v2.sma_20": {
+      "name": "rollup.price_stats@v2.sma_20",
+      "value": 331.8949890136719,
+      "unknown": null,
+      "info": {
+        "format": "CURRENCY",
+        "unit": "usd_per_share",
+        "dtype": "float32",
+        "nullMeaning": "a session among the last 20 has no bar (a gap), or the history is shorter"
+      }
+    },
+    "rollup.price_stats@v2.sma_50": {
+      "name": "rollup.price_stats@v2.sma_50",
+      "value": 322.41619873046875,
+      "unknown": null,
+      "info": {
+        "format": "CURRENCY",
+        "unit": "usd_per_share",
+        "dtype": "float32",
+        "nullMeaning": "a session among the last 50 has no bar (a gap), or the history is shorter"
+      }
+    },
+    "rollup.price_stats@v2.sma_200": {
+      "name": "rollup.price_stats@v2.sma_200",
+      "value": 289.1585998535156,
+      "unknown": null,
+      "info": {
+        "format": "CURRENCY",
+        "unit": "usd_per_share",
+        "dtype": "float32",
+        "nullMeaning": "a session among the last 200 has no bar (a gap), or the history is shorter"
+      }
+    },
+    "rollup.price_stats@v2.ret_20d": {
+      "name": "rollup.price_stats@v2.ret_20d",
+      "value": 0.0166966263204813,
+      "unknown": null,
+      "info": {
+        "format": "PERCENT",
+        "unit": "decimal",
+        "dtype": "float32",
+        "nullMeaning": "a session among the last 21 has no bar (a gap), or the history is shorter"
+      }
+    },
+    "rollup.price_stats@v2.ret_60d": {
+      "name": "rollup.price_stats@v2.ret_60d",
+      "value": 0.055246345698833466,
+      "unknown": null,
+      "info": {
+        "format": "PERCENT",
+        "unit": "decimal",
+        "dtype": "float32",
+        "nullMeaning": "a session among the last 61 has no bar (a gap), or the history is shorter"
+      }
+    },
+    "rollup.price_stats@v2.high_52w": {
+      "name": "rollup.price_stats@v2.high_52w",
+      "value": 345.3399963378906,
+      "unknown": null,
+      "info": {
+        "format": "CURRENCY",
+        "unit": "usd_per_share",
+        "dtype": "float32",
+        "nullMeaning": "fewer than min_year_sessions (240) bars among the last year_sessions (252)"
+      }
+    },
+    "rollup.price_stats@v2.low_52w": {
+      "name": "rollup.price_stats@v2.low_52w",
+      "value": 243.4199981689453,
+      "unknown": null,
+      "info": {
+        "format": "CURRENCY",
+        "unit": "usd_per_share",
+        "dtype": "float32",
+        "nullMeaning": "fewer than min_year_sessions (240) bars among the last year_sessions (252)"
+      }
+    },
+    "rollup.price_stats@v2.hv20": {
+      "name": "rollup.price_stats@v2.hv20",
+      "value": 0.2304123342037201,
+      "unknown": null,
+      "info": {
+        "format": "PERCENT",
+        "unit": "decimal",
+        "dtype": "float32",
+        "nullMeaning": "a session among the last 21 has no bar (a gap), or the history is shorter"
+      }
+    },
+    "rollup.price_stats@v2.hv30": {
+      "name": "rollup.price_stats@v2.hv30",
+      "value": 0.2116633653640747,
+      "unknown": null,
+      "info": {
+        "format": "PERCENT",
+        "unit": "decimal",
+        "dtype": "float32",
+        "nullMeaning": "a session among the last 31 has no bar (a gap), or the history is shorter"
+      }
+    },
+    "rollup.price_stats@v2.hv20_yz": {
+      "name": "rollup.price_stats@v2.hv20_yz",
+      "value": 0.23184114694595337,
+      "unknown": null,
+      "info": {
+        "format": "PERCENT",
+        "unit": "decimal",
+        "dtype": "float32",
+        "nullMeaning": "a session among the last 21 has no bar (a gap), or the history is shorter"
+      }
+    },
+    "rollup.price_stats@v2.adv_usd_20d": {
+      "name": "rollup.price_stats@v2.adv_usd_20d",
+      "value": 13988558848.0,
+      "unknown": null,
+      "info": {
+        "format": "COMPACT",
+        "unit": "usd",
+        "dtype": "float32",
+        "nullMeaning": "a session among the last 20 has no bar (a gap), or the history is shorter"
+      }
+    },
+    "rollup.price_stats@v2.history_days": {
+      "name": "rollup.price_stats@v2.history_days",
+      "value": 252,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "sessions",
+        "dtype": "int",
+        "nullMeaning": "never"
+      }
+    },
+    "rollup.earnings@v1.next_earnings_date": {
+      "name": "rollup.earnings@v1.next_earnings_date",
+      "value": "2026-10-29",
+      "unknown": null,
+      "info": {
+        "format": "DATE",
+        "unit": "date",
+        "dtype": "date",
+        "nullMeaning": "no report date on or after the session in the calendars stored by then (the row exists for a last date)"
+      }
+    },
+    "rollup.earnings@v1.earnings_time": {
+      "name": "rollup.earnings@v1.earnings_time",
+      "value": "unknown",
+      "unknown": null,
+      "info": {
+        "format": "CATEGORY",
+        "unit": "category",
+        "dtype": "str",
+        "nullMeaning": "no report date on or after the session in the calendars stored by then"
+      }
+    },
+    "rollup.earnings@v1.days_to_earnings": {
+      "name": "rollup.earnings@v1.days_to_earnings",
+      "value": 19,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "sessions",
+        "dtype": "int",
+        "nullMeaning": "no report date on or after the session in the calendars stored by then"
+      }
+    },
+    "rollup.earnings@v1.date_confirmed": {
+      "name": "rollup.earnings@v1.date_confirmed",
+      "value": null,
+      "unknown": {
+        "code": "NULL",
+        "detail": "rollup.earnings@v1.date_confirmed is null for EQ:BBG000B9XRY4 on 2026-10-02"
+      },
+      "info": {
+        "format": "FLAG",
+        "unit": "flag",
+        "dtype": "bool",
+        "nullMeaning": "the source does not say (the Nasdaq calendar never does), or no report date on or after the session in the calendars stored by then"
+      }
+    },
+    "rollup.earnings@v1.last_earnings_date": {
+      "name": "rollup.earnings@v1.last_earnings_date",
+      "value": null,
+      "unknown": {
+        "code": "NULL",
+        "detail": "rollup.earnings@v1.last_earnings_date is null for EQ:BBG000B9XRY4 on 2026-10-02"
+      },
+      "info": {
+        "format": "DATE",
+        "unit": "date",
+        "dtype": "date",
+        "nullMeaning": "no earlier report date in the calendars stored by then (they start with the first stored snapshot; a backfill does not invent history)"
+      }
+    },
+    "rollup.iv30@v1.iv30": {
+      "name": "rollup.iv30@v1.iv30",
+      "value": 0.24420201425105806,
+      "unknown": null,
+      "info": {
+        "format": "PERCENT",
+        "unit": null,
+        "dtype": "float",
+        "nullMeaning": ""
+      }
+    },
+    "rollup.iv30@v1.iv30_cboe": {
+      "name": "rollup.iv30@v1.iv30_cboe",
+      "value": 0.25398,
+      "unknown": null,
+      "info": {
+        "format": "PERCENT",
+        "unit": "decimal",
+        "dtype": "float",
+        "nullMeaning": "no underlying quote for it, or the feed gives no IV30"
+      }
+    },
+    "rollup.iv30@v1.iv30_status": {
+      "name": "rollup.iv30@v1.iv30_status",
+      "value": "OK",
+      "unknown": null,
+      "info": {
+        "format": "CATEGORY",
+        "unit": "category",
+        "dtype": "str",
+        "nullMeaning": "never"
+      }
+    },
+    "rollup.iv30@v1.near_expiry": {
+      "name": "rollup.iv30@v1.near_expiry",
+      "value": "2026-10-16",
+      "unknown": null,
+      "info": {
+        "format": "DATE",
+        "unit": "date",
+        "dtype": "date",
+        "nullMeaning": "no expiry in 7..90 days at or before the target, or no expiry was selected (NO_SPOT, NO_CHAIN or NO_EXPIRY)"
+      }
+    },
+    "rollup.iv30@v1.far_expiry": {
+      "name": "rollup.iv30@v1.far_expiry",
+      "value": "2026-11-20",
+      "unknown": null,
+      "info": {
+        "format": "DATE",
+        "unit": "date",
+        "dtype": "date",
+        "nullMeaning": "no expiry in 7..90 days at or after the target, or no expiry was selected (NO_SPOT, NO_CHAIN or NO_EXPIRY)"
+      }
+    },
+    "rollup.iv30@v1.atm_strike_near": {
+      "name": "rollup.iv30@v1.atm_strike_near",
+      "value": 335.0,
+      "unknown": null,
+      "info": {
+        "format": "CURRENCY",
+        "unit": "usd_per_share",
+        "dtype": "float",
+        "nullMeaning": "no expiry was selected (NO_SPOT, NO_CHAIN or NO_EXPIRY)"
+      }
+    },
+    "rollup.iv30@v1.spot": {
+      "name": "rollup.iv30@v1.spot",
+      "value": 333.6,
+      "unknown": null,
+      "info": {
+        "format": "CURRENCY",
+        "unit": "usd_per_share",
+        "dtype": "float",
+        "nullMeaning": "no positive underlying price (NO_SPOT)"
+      }
+    },
+    "rollup.iv30@v1.rate": {
+      "name": "rollup.iv30@v1.rate",
+      "value": 0.04033307304668754,
+      "unknown": null,
+      "info": {
+        "format": "PERCENT",
+        "unit": "decimal",
+        "dtype": "float",
+        "nullMeaning": "never (the curve is a required input)"
+      }
+    },
+    "rollup.iv30@v1.div_yield": {
+      "name": "rollup.iv30@v1.div_yield",
+      "value": 0.003176600905135274,
+      "unknown": null,
+      "info": {
+        "format": "PERCENT",
+        "unit": "decimal",
+        "dtype": "float",
+        "nullMeaning": "div_yield@v1 has no yield for it (UNKNOWN; priced with q = 0)"
+      }
+    },
+    "rollup.iv30@v1.n_quotes_used": {
+      "name": "rollup.iv30@v1.n_quotes_used",
+      "value": 8,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "count",
+        "dtype": "int",
+        "nullMeaning": "never (0 when none)"
+      }
+    },
+    "rollup.dividends@v2.div_ttm": {
+      "name": "rollup.dividends@v2.div_ttm",
+      "value": 1.059999942779541,
+      "unknown": null,
+      "info": {
+        "format": "CURRENCY",
+        "unit": "usd_per_share",
+        "dtype": "float32",
+        "nullMeaning": "no dividend in the window and fewer than min_history_days (240) bars among the last 252 sessions (too new, or bars do not cover the window, to call it a non-payer)"
+      }
+    },
+    "rollup.dividends@v2.div_count_ttm": {
+      "name": "rollup.dividends@v2.div_count_ttm",
+      "value": 4,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "count",
+        "dtype": "int",
+        "nullMeaning": "no dividend in the window and fewer than min_history_days (240) bars among the last 252 sessions (too new, or bars do not cover the window, to call it a non-payer)"
+      }
+    },
+    "rollup.dividends@v2.last_ex_date": {
+      "name": "rollup.dividends@v2.last_ex_date",
+      "value": "2026-08-10",
+      "unknown": null,
+      "info": {
+        "format": "DATE",
+        "unit": "date",
+        "dtype": "date",
+        "nullMeaning": "no ex-date in the window (a non-payer, or unknown as for div_ttm)"
+      }
+    },
+    "rollup.iv_history@v2.iv30": {
+      "name": "rollup.iv_history@v2.iv30",
+      "value": 0.24420201778411865,
+      "unknown": null,
+      "info": {
+        "format": "PERCENT",
+        "unit": "decimal",
+        "dtype": "float32",
+        "nullMeaning": "iv30@v1 has no IV for the session (its iv30_status says why)"
+      }
+    },
+    "rollup.iv_history@v2.iv_rank_252d": {
+      "name": "rollup.iv_history@v2.iv_rank_252d",
+      "value": null,
+      "unknown": {
+        "code": "NULL",
+        "detail": "rollup.iv_history@v2.iv_rank_252d is null for EQ:BBG000B9XRY4 on 2026-10-02"
+      },
+      "info": {
+        "format": "PERCENT",
+        "unit": "decimal",
+        "dtype": "float32",
+        "nullMeaning": "rank_status is UNKNOWN (fewer than 60 sessions with an IV), or there is no IV today; or every IV in the window is equal"
+      }
+    },
+    "rollup.iv_history@v2.iv_percentile_252d": {
+      "name": "rollup.iv_history@v2.iv_percentile_252d",
+      "value": null,
+      "unknown": {
+        "code": "NULL",
+        "detail": "rollup.iv_history@v2.iv_percentile_252d is null for EQ:BBG000B9XRY4 on 2026-10-02"
+      },
+      "info": {
+        "format": "PERCENT",
+        "unit": "decimal",
+        "dtype": "float32",
+        "nullMeaning": "rank_status is UNKNOWN (fewer than 60 sessions with an IV), or there is no IV today; or no earlier IV"
+      }
+    },
+    "rollup.iv_history@v2.history_days": {
+      "name": "rollup.iv_history@v2.history_days",
+      "value": 1,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "sessions",
+        "dtype": "int",
+        "nullMeaning": "never"
+      }
+    },
+    "rollup.iv_history@v2.rank_status": {
+      "name": "rollup.iv_history@v2.rank_status",
+      "value": "UNKNOWN",
+      "unknown": null,
+      "info": {
+        "format": "CATEGORY",
+        "unit": "category",
+        "dtype": "str",
+        "nullMeaning": "never"
+      }
+    },
+    "rollup.fundamentals@v2.shares_outstanding": {
+      "name": "rollup.fundamentals@v2.shares_outstanding",
+      "value": 14594180096.0,
+      "unknown": null,
+      "info": {
+        "format": "COMPACT",
+        "unit": "shares",
+        "dtype": "float32",
+        "nullMeaning": "no share-count fact filed by the session (ETFs, funds, no CIK): NO_SHARES"
+      }
+    },
+    "rollup.fundamentals@v2.shares_as_of": {
+      "name": "rollup.fundamentals@v2.shares_as_of",
+      "value": "2026-07-17",
+      "unknown": null,
+      "info": {
+        "format": "DATE",
+        "unit": "date",
+        "dtype": "date",
+        "nullMeaning": "no share-count fact filed by the session (ETFs, funds, no CIK): NO_SHARES"
+      }
+    },
+    "rollup.fundamentals@v2.shares_filed": {
+      "name": "rollup.fundamentals@v2.shares_filed",
+      "value": "2026-07-31",
+      "unknown": null,
+      "info": {
+        "format": "DATE",
+        "unit": "date",
+        "dtype": "date",
+        "nullMeaning": "no share-count fact filed by the session (ETFs, funds, no CIK): NO_SHARES"
+      }
+    },
+    "rollup.fundamentals@v2.shares_source": {
+      "name": "rollup.fundamentals@v2.shares_source",
+      "value": "dei",
+      "unknown": null,
+      "info": {
+        "format": "CATEGORY",
+        "unit": "category",
+        "dtype": "str",
+        "nullMeaning": "no share-count fact filed by the session (ETFs, funds, no CIK): NO_SHARES"
+      }
+    },
+    "rollup.fundamentals@v2.market_cap_status": {
+      "name": "rollup.fundamentals@v2.market_cap_status",
+      "value": "OK",
+      "unknown": null,
+      "info": {
+        "format": "CATEGORY",
+        "unit": "category",
+        "dtype": "str",
+        "nullMeaning": "never"
+      }
+    },
+    "feature.div_yield": {
+      "name": "feature.div_yield",
+      "value": 0.003176600905135274,
+      "unknown": null,
+      "info": {
+        "format": "PERCENT",
+        "unit": "decimal",
+        "dtype": "float32",
+        "nullMeaning": "dividends div_ttm is null (no dividend in the window and too little bar history to call it a non-payer), or the close is not positive"
+      }
+    },
+    "feature.market_cap": {
+      "name": "feature.market_cap",
+      "value": 4869931991864.5625,
+      "unknown": null,
+      "info": {
+        "format": "COMPACT",
+        "unit": "usd",
+        "dtype": "float",
+        "nullMeaning": "fundamentals market_cap_status is not OK (no count, a stale count, or no close)"
+      }
+    },
+    "feature.option_chain_known": {
+      "name": "feature.option_chain_known",
+      "value": true,
+      "unknown": null,
+      "info": {
+        "format": "FLAG",
+        "unit": "flag",
+        "dtype": "bool",
+        "nullMeaning": "no option_liquidity rows for the session (chains not run)"
+      }
+    },
+    "feature.option_tier": {
+      "name": "feature.option_tier",
+      "value": "A",
+      "unknown": null,
+      "info": {
+        "format": "CATEGORY",
+        "unit": "category",
+        "dtype": "str",
+        "nullMeaning": "option_chain_known is not true (no chain run for the session, or its fetch failed: STALE_DATA, FETCH_ERROR, NOT_ATTEMPTED)"
+      }
+    },
+    "feature.option_chain_oi": {
+      "name": "feature.option_chain_oi",
+      "value": 4985059,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "count",
+        "dtype": "int",
+        "nullMeaning": "option_chain_known is not true"
+      }
+    },
+    "feature.option_chain_volume": {
+      "name": "feature.option_chain_volume",
+      "value": 1360432,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "count",
+        "dtype": "int",
+        "nullMeaning": "option_chain_known is not true"
+      }
+    },
+    "feature.liquidity_high": {
+      "name": "feature.liquidity_high",
+      "value": true,
+      "unknown": null,
+      "info": {
+        "format": "FLAG",
+        "unit": "flag",
+        "dtype": "bool",
+        "nullMeaning": "no threshold fails and one cannot be checked (an unknown ADV, close or option input)"
+      }
+    },
+    "feature.liquidity_medium": {
+      "name": "feature.liquidity_medium",
+      "value": true,
+      "unknown": null,
+      "info": {
+        "format": "FLAG",
+        "unit": "flag",
+        "dtype": "bool",
+        "nullMeaning": "no threshold fails and one cannot be checked (an unknown ADV, close or option input)"
+      }
+    },
+    "feature.liquidity_class": {
+      "name": "feature.liquidity_class",
+      "value": "HIGH",
+      "unknown": null,
+      "info": {
+        "format": "CATEGORY",
+        "unit": "category",
+        "dtype": "str",
+        "nullMeaning": "no price_stats row for the instrument on the session (no bar)"
+      }
+    },
+    "feature.pct_from_high_52w": {
+      "name": "feature.pct_from_high_52w",
+      "value": -0.033734852667009596,
+      "unknown": null,
+      "info": {
+        "format": "PERCENT",
+        "unit": "decimal",
+        "dtype": "float",
+        "nullMeaning": "price_stats high_52w is null (fewer than 240 bars in the last 252 sessions), or no price_stats row"
+      }
+    },
+    "feature.pct_from_low_52w": {
+      "name": "feature.pct_from_low_52w",
+      "value": 0.37084054289495616,
+      "unknown": null,
+      "info": {
+        "format": "PERCENT",
+        "unit": "decimal",
+        "dtype": "float",
+        "nullMeaning": "price_stats low_52w is null (fewer than 240 bars in the last 252 sessions), or no price_stats row"
+      }
+    },
+    "feature.near_52w": {
+      "name": "feature.near_52w",
+      "value": "HIGH",
+      "unknown": null,
+      "info": {
+        "format": "CATEGORY",
+        "unit": "category",
+        "dtype": "str",
+        "nullMeaning": "the 52-week high or low is unknown (pct_from_high_52w or pct_from_low_52w is null)"
+      }
+    },
+    "feature.iv_hv_spread": {
+      "name": "feature.iv_hv_spread",
+      "value": 0.032538652420043945,
+      "unknown": null,
+      "info": {
+        "format": "PERCENT",
+        "unit": "decimal",
+        "dtype": "float",
+        "nullMeaning": "iv30 or hv30 is null (no IV for the session, or a gap in the last 31 sessions)"
+      }
+    },
+    "feature.iv_hv_ratio": {
+      "name": "feature.iv_hv_ratio",
+      "value": 1.1537283146002868,
+      "unknown": null,
+      "info": {
+        "format": "NUMBER",
+        "unit": "ratio",
+        "dtype": "float",
+        "nullMeaning": "iv30 or hv30 is null, or hv30 is 0"
+      }
+    }
+  }
+}

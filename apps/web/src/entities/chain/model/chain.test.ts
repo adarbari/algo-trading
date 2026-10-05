@@ -6,13 +6,13 @@ import {
   expiryLabel,
   inDeltaBand,
   plainEnglish,
-  spotOf,
+  upcomingExpiries,
   type OptionChain,
   type OptionQuote,
 } from './chain';
 
 const quote = (patch: Partial<OptionQuote>): OptionQuote => ({
-  instrument_id: 'OPT:X',
+  instrumentId: 'OPT:X',
   expiry: '2026-11-20',
   right: 'P',
   strike: 300,
@@ -20,32 +20,38 @@ const quote = (patch: Partial<OptionQuote>): OptionQuote => ({
   ask: 2.61,
   last: 2.5,
   volume: 10,
-  open_interest: 19780,
+  openInterest: 19780,
   iv: 0.3,
   delta: -0.12,
   gamma: 0.004,
   theta: -0.05,
   vega: 0.3,
-  rho: -0.1,
   ...patch,
 });
 
 const chain: OptionChain = {
-  underlying_id: 'EQ:A',
+  underlyingId: 'EQ:A',
   session: '2026-10-02',
   status: 'OK',
-  underlying: { price: 333.6, close: 333.69 },
-  our_iv: { iv30: 0.244 },
-  expiries: ['2026-10-02', '2026-10-09', '2026-10-23', '2026-11-20'],
-  strikes: [100, 300, 330, 340],
-  quotes: [
-    quote({ instrument_id: 'P100', strike: 100, bid: 0, delta: -0.001 }),
-    quote({ instrument_id: 'P300', strike: 300 }),
-    quote({ instrument_id: 'C340', right: 'C', strike: 340, delta: 0.4, bid: 5 }),
-    quote({ instrument_id: 'P340', strike: 340, delta: -0.6, bid: 9 }),
-    quote({ instrument_id: 'P300-oct', strike: 300, expiry: '2026-10-23' }),
+  expiries: [
+    { date: '2026-09-25', days: -7 },
+    { date: '2026-10-02', days: 0 },
+    { date: '2026-10-09', days: 7 },
+    { date: '2026-10-23', days: 21 },
+    { date: '2026-11-20', days: 49 },
   ],
+  strikes: [100, 300, 330, 340],
 };
+
+const quotes = [
+  quote({ instrumentId: 'P100', strike: 100, bid: 0, delta: -0.001 }),
+  quote({ instrumentId: 'P300', strike: 300 }),
+  quote({ instrumentId: 'C340', right: 'C', strike: 340, delta: 0.4, bid: 5 }),
+  quote({ instrumentId: 'P340', strike: 340, delta: -0.6, bid: 9 }),
+  quote({ instrumentId: 'P300-oct', strike: 300, expiry: '2026-10-23' }),
+];
+
+const options = { expiry: '2026-11-20', symbol: 'AAPL', spot: 333.6 } as const;
 
 describe('option chain', () => {
   it('highlights |delta| from 0.08 to 0.15', () => {
@@ -56,30 +62,17 @@ describe('option chain', () => {
   });
 
   it('keeps one expiry and right, near the money unless asked for all strikes', () => {
-    const near = chainRows(chain, {
-      right: 'P',
-      expiry: '2026-11-20',
-      symbol: 'AAPL',
-      nearMoney: true,
-    });
+    const near = chainRows(quotes, { ...options, right: 'P', nearMoney: true });
     expect(near.map((r) => [r.id, r.inBand])).toEqual([
       ['P300', true],
       ['P340', false],
     ]);
-    const all = chainRows(chain, {
-      right: 'P',
-      expiry: '2026-11-20',
-      symbol: 'AAPL',
-      nearMoney: false,
-    });
+    const all = chainRows(quotes, { ...options, right: 'P', nearMoney: false });
     expect(all.map((r) => r.id)).toEqual(['P100', 'P300', 'P340']);
-    const calls = chainRows(chain, {
-      right: 'C',
-      expiry: '2026-11-20',
-      symbol: 'AAPL',
-      nearMoney: true,
-    });
+    const calls = chainRows(quotes, { ...options, right: 'C', nearMoney: true });
     expect(calls.map((r) => r.id)).toEqual(['C340']);
+    const unknownSpot = chainRows(quotes, { ...options, spot: null, right: 'P', nearMoney: true });
+    expect(unknownSpot.map((r) => r.id)).toEqual(['P100', 'P300', 'P340']);
   });
 
   it('says what each contract means in plain English', () => {
@@ -100,12 +93,12 @@ describe('option chain', () => {
     );
   });
 
-  it('opens on the first expiry three weeks out, and labels expiries with days', () => {
+  it("opens on the first expiry three weeks out by the server's days, labelled with them", () => {
     expect(defaultExpiry(chain)).toBe('2026-10-23');
-    expect(defaultExpiry({ ...chain, expiries: ['2026-10-05'] })).toBe('2026-10-05');
+    const one = { ...chain, expiries: [{ date: '2026-10-05', days: 3 }] };
+    expect(defaultExpiry(one)).toBe('2026-10-05');
     expect(defaultExpiry({ ...chain, expiries: [] })).toBeNull();
-    expect(expiryLabel('2026-10-02', '2026-11-20')).toBe('20 Nov · 49d');
-    expect(spotOf(chain)).toBe(333.6);
-    expect(spotOf({ ...chain, underlying: null })).toBeNull();
+    expect(expiryLabel({ date: '2026-11-20', days: 49 })).toBe('20 Nov · 49d');
+    expect(upcomingExpiries(chain).map((e) => e.date)[0]).toBe('2026-10-02');
   });
 });

@@ -6,6 +6,7 @@ export {
   sourceLabel,
   toRows,
   type EtfHoldings,
+  type Fund,
   type Holding,
   type HoldingRow,
 } from './model/holdings';
