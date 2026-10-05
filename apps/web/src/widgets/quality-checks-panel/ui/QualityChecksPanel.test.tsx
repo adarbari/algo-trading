@@ -4,24 +4,28 @@ import axe from 'axe-core';
 import type { ReactNode } from 'react';
 import { afterAll, beforeAll, expect, vi } from 'vitest';
 
-import { api, TestQueryProvider } from '@/shared/api';
+import { gql, TestQueryProvider } from '@/shared/api';
 
 vi.mock('@/shared/api', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  api: { GET: vi.fn() },
+  gql: vi.fn(),
 }));
 
-/** Answers `api.GET(path)` from `routes` (a missing path is a 404, `null` an error 500). */
-function serve(routes: Record<string, unknown>) {
-  vi.mocked(api.GET).mockImplementation(((path: string) => {
-    const data = routes[path];
-    const status = data === undefined ? 404 : data === null ? 500 : 200;
-    return Promise.resolve(
-      status === 200
-        ? { data, response: new Response(null, { status }) }
-        : { error: { detail: `failed ${path}` }, response: new Response(null, { status }) },
-    );
-  }) as never);
+/** A `serve` value: the operation fails (an HTTP or GraphQL error). */
+const FAIL = Symbol('fail');
+
+/**
+ * Answers `gql(document)` with `fields[<the operation's Query field>]`: a missing field is
+ * null (nothing stored, no such thing), `FAIL` an error.
+ */
+function serve(fields: Record<string, unknown>) {
+  vi.mocked(gql).mockImplementation((document: unknown) => {
+    const field = /\{\s*(\w+)/.exec(String(document))?.[1] ?? '';
+    const data = fields[field];
+    return data === FAIL
+      ? Promise.reject(new Error(`${field} failed`))
+      : Promise.resolve({ [field]: data ?? null });
+  });
 }
 
 function renderWith(ui: ReactNode) {
@@ -61,11 +65,11 @@ import { QualityChecksPanel } from './QualityChecksPanel';
 describe('QualityChecksPanel', () => {
   it('lists the checks, failures first', async () => {
     serve({
-      '/admin/quality': {
-        run_id: 'q',
+      quality: {
+        runId: 'q',
         session: '2026-10-02',
         status: 'partial',
-        finished_at: null,
+        finishedAt: null,
         checks: [
           { name: 'bars_fresh', status: 'PASS', detail: 'latest bars session 2026-10-02' },
           { name: 'chains_coverage', status: 'FAIL', detail: '86.2% of 4203 underlyings' },
@@ -80,9 +84,26 @@ describe('QualityChecksPanel', () => {
     await expectAccessible(container);
   });
 
-  it('says when there are no checks yet', async () => {
+  it('says when the session has no checks, with the reason', async () => {
+    serve({
+      quality: {
+        session: '2026-10-02',
+        runId: null,
+        status: null,
+        finishedAt: null,
+        checks: [],
+        unknown: { code: 'NOT_RUN', detail: 'no data_quality run for 2026-10-02' },
+      },
+    });
+    renderWith(<QualityChecksPanel />);
+    expect(await screen.findByText('No quality checks for this session')).toBeInTheDocument();
+    expect(screen.getByText(/no data_quality run for 2026-10-02/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Quality checks · Fri 2 Oct' })).toBeInTheDocument();
+  });
+
+  it('says when nothing is stored yet', async () => {
     serve({});
     renderWith(<QualityChecksPanel />);
-    expect(await screen.findByText('No quality checks yet')).toBeInTheDocument();
+    expect(await screen.findByText('No quality checks for this session')).toBeInTheDocument();
   });
 });

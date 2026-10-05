@@ -321,7 +321,7 @@ owner = ["apps/ingestion/algotrade_ingestion/tasks/verification/*"]
 allowed = [
     "src/algotrade/storage/tables/schemas.py",  # declares the table
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the session's rows
-    "src/algotrade/services/explore/ingestion.py",  # shows them read-only (/admin/verification/ibkr)
+    "src/algotrade/services/read/ops/quality.py",  # shows the session's rows read-only (Query.verification)
 ]
 section = "docs/adr/0026-live-verification-ibkr.md#the-verify-task"
 detect = [{ string = "verification/ibkr" }, { call = "compare_bars" }, { call = "Grader" }]
@@ -552,7 +552,7 @@ detect = [{ string = "<date>" }, { string = "<url>" }]
 
 [[responsibility]]
 id = "explore-queries"
-description = "Read-only queries apps display (runs, universe, instruments, chains, screens): pages, JSON-safe rows; which session a ?date= sees is session-resolution. Moving to the read model (ADR 0037) area by area in read-model PRs 4-10; deleted with services/explore in PR 10"
+description = "Read-only queries apps display (what is left: screener results, tables, views and preview): pages, JSON-safe rows; which session a ?date= sees is session-resolution. Moving to the read model (ADR 0037) area by area in read-model PRs 4-10a (runs, universe, instruments, chains and admin are moved); the rest moves in PR 8 and services/explore is deleted in PR 10b"
 owner = ["src/algotrade/services/explore/*"]
 target_owner = ["src/algotrade/services/read/*"]
 section = "docs/adr/0024-api.md#explore-queries"

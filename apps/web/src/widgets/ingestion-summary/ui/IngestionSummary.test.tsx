@@ -4,24 +4,28 @@ import axe from 'axe-core';
 import type { ReactNode } from 'react';
 import { afterAll, beforeAll, expect, vi } from 'vitest';
 
-import { api, TestQueryProvider } from '@/shared/api';
+import { gql, TestQueryProvider } from '@/shared/api';
 
 vi.mock('@/shared/api', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  api: { GET: vi.fn() },
+  gql: vi.fn(),
 }));
 
-/** Answers `api.GET(path)` from `routes` (a missing path is a 404, `null` an error 500). */
-function serve(routes: Record<string, unknown>) {
-  vi.mocked(api.GET).mockImplementation(((path: string) => {
-    const data = routes[path];
-    const status = data === undefined ? 404 : data === null ? 500 : 200;
-    return Promise.resolve(
-      status === 200
-        ? { data, response: new Response(null, { status }) }
-        : { error: { detail: `failed ${path}` }, response: new Response(null, { status }) },
-    );
-  }) as never);
+/** A `serve` value: the operation fails (an HTTP or GraphQL error). */
+const FAIL = Symbol('fail');
+
+/**
+ * Answers `gql(document)` with `fields[<the operation's Query field>]`: a missing field is
+ * null (nothing stored, no such thing), `FAIL` an error.
+ */
+function serve(fields: Record<string, unknown>) {
+  vi.mocked(gql).mockImplementation((document: unknown) => {
+    const field = /\{\s*(\w+)/.exec(String(document))?.[1] ?? '';
+    const data = fields[field];
+    return data === FAIL
+      ? Promise.reject(new Error(`${field} failed`))
+      : Promise.resolve({ [field]: data ?? null });
+  });
 }
 
 function renderWith(ui: ReactNode) {
@@ -71,13 +75,13 @@ const cell = (
   present,
   expected,
   basis: expected === null ? 'snapshot built' : 'optionable universe, fetch OK',
-  run_ids: ['option_chains-2026-10-02-20261003T093502Z'],
+  runIds: ['option_chains-2026-10-02-20261003T093502Z'],
 });
 
 const COMPLETENESS = {
   sessions: ['2026-10-01', '2026-10-02'],
   datasets: ['bars/1d', 'chains/option_quotes'],
-  last_closed: '2026-10-02',
+  lastClosed: '2026-10-02',
   cells: [
     cell('bars/1d', '2026-10-01', 'COMPLETE', 12594, 12590),
     cell('bars/1d', '2026-10-02', 'COMPLETE', 12601, 12594),
@@ -87,10 +91,10 @@ const COMPLETENESS = {
 };
 
 const QUALITY = {
-  run_id: 'data_quality-2026-10-02',
+  runId: 'data_quality-2026-10-02',
   session: '2026-10-02',
   status: 'partial',
-  finished_at: null,
+  finishedAt: null,
   checks: [
     { name: 'bars_fresh', status: 'PASS', detail: 'latest bars session 2026-10-02' },
     {
@@ -101,14 +105,14 @@ const QUALITY = {
   ],
 };
 const RUN = {
-  run_id: 'nightly-1',
+  runId: 'nightly-1',
   session: '2026-10-02',
   status: 'partial',
-  started_at: '2026-10-03T13:26:00Z',
-  finished_at: '2026-10-03T13:52:00Z',
-  duration_s: 1560,
+  startedAt: '2026-10-03T13:26:00Z',
+  finishedAt: '2026-10-03T13:52:00Z',
+  durationS: 1560,
   steps: [
-    { name: 'chains', status: 'PARTIAL', duration_s: 1237, reason: null, error: null, counts: {} },
+    { name: 'chains', status: 'PARTIAL', durationS: 1237, reason: null, error: null, counts: {} },
   ],
   problems: [],
 };
@@ -116,11 +120,11 @@ const RUN = {
 describe('IngestionSummary', () => {
   it('summarises completeness, quality, the run and open issues', async () => {
     serve({
-      '/admin/ingestion/completeness': COMPLETENESS,
-      '/admin/quality': QUALITY,
-      '/admin/runs/nightly': [RUN],
-      '/admin/review/figi': { session: '2026-10-02', source: 'x', items: [{ symbol: 'MMED' }] },
-      '/admin/review/leveraged': { session: '2026-10-02', source: 'x', items: [] },
+      completeness: COMPLETENESS,
+      quality: QUALITY,
+      nightlyRuns: [RUN],
+      figiReview: { session: '2026-10-02', source: 'x', items: [{ symbol: 'MMED' }] },
+      leverageReview: { session: '2026-10-02', source: 'x', items: [] },
     });
     const { container } = renderWith(<IngestionSummary />);
     expect(await screen.findByText('1 pass · 1 fail')).toBeInTheDocument();
@@ -133,8 +137,8 @@ describe('IngestionSummary', () => {
 
   it('warns when the exchange closed a session the store lacks', async () => {
     serve({
-      '/admin/ingestion/completeness': { ...COMPLETENESS, last_closed: '2026-10-05' },
-      '/admin/runs/nightly': [],
+      completeness: { ...COMPLETENESS, lastClosed: '2026-10-05' },
+      nightlyRuns: [],
     });
     renderWith(<IngestionSummary />);
     expect(await screen.findByText(/Latest session not ingested/)).toBeInTheDocument();

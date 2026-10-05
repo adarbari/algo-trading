@@ -46,10 +46,36 @@ type Category {
   count: Int!
 }
 
+"""
+One completeness cell with the reasons behind it: `job` the ingestion task that writes the dataset, `groups` its items not OK grouped by reason (chains: per underlying), `runs` the runs that wrote the partition and the job's runs that session
+"""
+type CellDetail {
+  cell: IngestionCell!
+  job: String!
+  groups: [FailureGroup!]!
+  runs: [RunDetail!]!
+}
+
 """How many tickers of a run are `new` or `dropped`"""
 type ChangeCount {
   change: String!
   count: Int!
+}
+
+"""Rows per status (PASS / WARN / FAIL / NA) of one check"""
+type CheckCounts {
+  check: String!
+  counts: JSON!
+}
+
+"""
+Ingestion completeness: every dataset x the window's `sessions` (oldest first, ending at the session read); `lastClosed` the exchange's last closed session (later than the last of `sessions`: the store is stale)
+"""
+type Completeness {
+  sessions: [Date!]!
+  datasets: [String!]!
+  cells: [IngestionCell!]!
+  lastClosed: Date!
 }
 
 """
@@ -106,6 +132,16 @@ type Event {
   date: Date!
   ts: DateTime!
   values: JSON!
+}
+
+"""
+Items not fine, grouped by a normalised `reason` (code + message without ids, URLs, dates or numbers): `examples` item keys (at most 10), `statuses` the distinct statuses as recorded (at most 10)
+"""
+type FailureGroup {
+  reason: String!
+  count: Int!
+  examples: [String!]!
+  statuses: [String!]!
 }
 
 """
@@ -268,6 +304,19 @@ type Ideas {
 }
 
 """
+One dataset on one session: `status` COMPLETE, PARTIAL, MISSING or CARRIED; `present` rows stored, `expected` rows expected and `basis` what that is; `runIds` the stored runs the rows came from
+"""
+type IngestionCell {
+  dataset: String!
+  session: Date!
+  status: String!
+  present: Int!
+  expected: Int
+  basis: String!
+  runIds: [String!]!
+}
+
+"""
 An instrument as the session's reference snapshot has it. Per-session values (prices, earnings dates, flags, ...) are catalogue features: `features(names)`
 """
 type Instrument {
@@ -317,6 +366,20 @@ type Instrument {
 The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
 """
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
+
+"""
+One session's nightly run: `status` queued, running, complete, partial or failed; `steps` in workflow order; `problems` why it is partial or failed
+"""
+type NightlyRun {
+  runId: String!
+  session: Date!
+  status: String!
+  startedAt: DateTime!
+  finishedAt: DateTime
+  durationS: Float
+  steps: [RunStep!]!
+  problems: [String!]!
+}
 
 """
 An underlying's option chain as stored for the session (Cboe, delayed): `status` the chain run's
@@ -387,6 +450,27 @@ type PriceSeries {
   start: Date!
   end: Date!
   bars: [PriceBar!]!
+}
+
+"""
+One data-quality check: `status` PASS, WARN or FAIL; `detail` what was measured, against which rule
+"""
+type QualityCheck {
+  name: String!
+  status: String!
+  detail: String!
+}
+
+"""
+The data-quality checks of the session's `data_quality` run (the latest, when it ran twice): `status` the run's (complete, partial, failed); `unknown` NOT_RUN when the session has none
+"""
+type QualityReport {
+  session: Date!
+  runId: String
+  status: String
+  finishedAt: DateTime
+  checks: [QualityCheck!]!
+  unknown: Unknown
 }
 
 """A quantile of the values: `q` 0.5 is the median"""
@@ -520,12 +604,127 @@ type Query {
 
   """The finalised versions of the user's screen `screenerId`, oldest first"""
   screenVersions(screenerId: String!): [ScreenVersion!]!
+
+  """The `limit` most recent nightly session runs, newest first"""
+  nightlyRuns(limit: Int! = 10): [NightlyRun!]!
+
+  """
+  The run record `runId` (any job): items summarised, failures grouped by reason; null: no such run
+  """
+  run(runId: String!): RunDetail
+
+  """
+  Every item of the run `runId` with its status, by key; null: no such run
+  """
+  runItems(runId: String!): [RunItem!]
+
+  """
+  The session's data-quality checks (NOT_RUN when it has no data-quality run); null: nothing stored
+  """
+  quality(
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): QualityReport
+
+  """
+  The session's live verification vs IBKR (NO_PARTITION when it did not run for the session); null: nothing stored
+  """
+  verification(
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): Verification
+
+  """
+  Ingestion completeness: every dataset x the last `sessions` exchange sessions ending at the session; null: nothing stored
+  """
+  completeness(
+    sessions: Int! = 10
+
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): Completeness
+
+  """
+  One completeness cell, `dataset` on the session `date`, with the reasons behind it; null: a dataset the grid does not list
+  """
+  ingestionCell(dataset: String!, date: Date!): CellDetail
+
+  """
+  Listings marked for FIGI review (the universe build's list on or before the session, else its reference snapshot); null: nothing stored
+  """
+  figiReview(
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): ReviewList
+
+  """
+  Active ETFs in the session's reference snapshot whose leverage the rules could not classify; null: nothing stored
+  """
+  leverageReview(
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): ReviewList
 }
 
 """One of the screen's display columns for the instrument"""
 type ResultColumn {
   name: String!
   value: JSON
+}
+
+"""
+Rows to review: `session` the snapshot or run they come from (null: nothing stored), `source` a run id or the reference table, `items` one row each
+"""
+type ReviewList {
+  session: Date
+  source: String!
+  items: [JSON!]!
+}
+
+"""
+One run record: `job` (daily_bars, option_chains, nightly, screen-...), `itemsByStatus` status code -> count (most common first), `failures` largest group first, `stats` as recorded (counts, audit, errors)
+"""
+type RunDetail {
+  runId: String!
+  job: String!
+  session: Date!
+  status: String!
+  startedAt: DateTime!
+  finishedAt: DateTime
+  durationS: Float
+  itemsTotal: Int!
+  itemsByStatus: JSON!
+  failures: [FailureGroup!]!
+  stats: JSON!
+}
+
+"""
+One item of a run: `key` (a ticker, an instrument id, a step, a check), its status `code` (STALE_DATA) and `status` as recorded, with its detail after a colon
+"""
+type RunItem {
+  key: String!
+  code: String!
+  status: String!
+}
+
+"""One step of a nightly run: `counts` its result counts as recorded"""
+type RunStep {
+  name: String!
+  status: String!
+  durationS: Float
+  reason: String
+  error: String
+  counts: JSON!
 }
 
 """A display column of a screen: its name and catalogue field"""
@@ -719,4 +918,17 @@ enum UnknownCode {
   LICENCE
   NOT_RUN
   PRE_SNAPSHOT
+}
+
+"""
+The session's live verification vs IBKR (verification/ibkr): `counts` rows per status (PASS / WARN / FAIL / NA), `byCheck` most failures first, `failing` FAIL then WARN rows (at most 50: instrument_id, symbol, check, status, ours, theirs, diff, tolerance, note), largest diff first; `unknown` NO_PARTITION when it did not run for the session
+"""
+type Verification {
+  session: Date!
+  runIds: [String!]!
+  instruments: Int!
+  counts: JSON!
+  byCheck: [CheckCounts!]!
+  failing: [JSON!]!
+  unknown: Unknown
 }

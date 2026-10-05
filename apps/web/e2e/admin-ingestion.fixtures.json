@@ -1,6 +1,6 @@
 {
-  "_comment": "Shaped from real API responses of 2026-10-02 (trimmed: 2 nightly runs, 25 items, 5 leveraged ETFs; verification failing rows from the first verify run of that day; fetch tiers added). Served by e2e/admin-ingestion.spec.ts.",
-  "/admin/ingestion/completeness": {
+  "_comment": "Admin GraphQL answers by Query field (`field` or `field:<key>`), shaped from real responses of 2026-10-02; e2e/admin-api.ts serves them.",
+  "completeness": {
     "sessions": [
       "2026-09-21",
       "2026-09-22",
@@ -34,7 +34,7 @@
         "present": 0,
         "expected": null,
         "basis": "no snapshot on or before",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "instruments/reference",
@@ -43,7 +43,7 @@
         "present": 0,
         "expected": null,
         "basis": "no snapshot on or before",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "instruments/reference",
@@ -52,7 +52,7 @@
         "present": 0,
         "expected": null,
         "basis": "no snapshot on or before",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "instruments/reference",
@@ -61,7 +61,7 @@
         "present": 0,
         "expected": null,
         "basis": "no snapshot on or before",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "instruments/reference",
@@ -70,7 +70,7 @@
         "present": 0,
         "expected": null,
         "basis": "no snapshot on or before",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "instruments/reference",
@@ -79,7 +79,7 @@
         "present": 0,
         "expected": null,
         "basis": "no snapshot on or before",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "instruments/reference",
@@ -88,7 +88,7 @@
         "present": 0,
         "expected": null,
         "basis": "no snapshot on or before",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "instruments/reference",
@@ -97,7 +97,7 @@
         "present": 0,
         "expected": null,
         "basis": "no snapshot on or before",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "instruments/reference",
@@ -106,7 +106,7 @@
         "present": 0,
         "expected": null,
         "basis": "no snapshot on or before",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "instruments/reference",
@@ -115,7 +115,7 @@
         "present": 13295,
         "expected": null,
         "basis": "snapshot built",
-        "run_ids": ["universe_build-2026-10-02-20261003T173124Z"]
+        "runIds": ["universe_build-2026-10-02-20261003T173124Z"]
       },
       {
         "dataset": "universe",
@@ -124,7 +124,7 @@
         "present": 0,
         "expected": null,
         "basis": "no snapshot on or before",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "universe",
@@ -133,7 +133,7 @@
         "present": 0,
         "expected": null,
         "basis": "no snapshot on or before",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "universe",
@@ -142,7 +142,7 @@
         "present": 0,
         "expected": null,
         "basis": "no snapshot on or before",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "universe",
@@ -151,7 +151,7 @@
         "present": 0,
         "expected": null,
         "basis": "no snapshot on or before",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "universe",
@@ -160,7 +160,7 @@
         "present": 0,
         "expected": null,
         "basis": "no snapshot on or before",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "universe",
@@ -169,7 +169,7 @@
         "present": 0,
         "expected": null,
         "basis": "no snapshot on or before",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "universe",
@@ -178,7 +178,7 @@
         "present": 0,
         "expected": null,
         "basis": "no snapshot on or before",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "universe",
@@ -187,7 +187,7 @@
         "present": 0,
         "expected": null,
         "basis": "no snapshot on or before",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "universe",
@@ -196,7 +196,7 @@
         "present": 0,
         "expected": null,
         "basis": "no snapshot on or before",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "universe",
@@ -205,7 +205,7 @@
         "present": 11427,
         "expected": null,
         "basis": "snapshot built",
-        "run_ids": ["universe_build-2026-10-02-20261003T173124Z"]
+        "runIds": ["universe_build-2026-10-02-20261003T173124Z"]
       },
       {
         "dataset": "bars/1d",
@@ -214,7 +214,7 @@
         "present": 12626,
         "expected": 12592,
         "basis": "rows on 2026-09-18",
-        "run_ids": ["daily_bars-2026-10-02-20261003T051929Z"]
+        "runIds": ["daily_bars-2026-10-02-20261003T051929Z"]
       },
       {
         "dataset": "bars/1d",
@@ -223,7 +223,7 @@
         "present": 12601,
         "expected": 12626,
         "basis": "rows on 2026-09-21",
-        "run_ids": ["daily_bars-2026-10-02-20261003T051929Z"]
+        "runIds": ["daily_bars-2026-10-02-20261003T051929Z"]
       },
       {
         "dataset": "bars/1d",
@@ -232,7 +232,7 @@
         "present": 12604,
         "expected": 12601,
         "basis": "rows on 2026-09-22",
-        "run_ids": ["daily_bars-2026-10-02-20261003T051929Z"]
+        "runIds": ["daily_bars-2026-10-02-20261003T051929Z"]
       },
       {
         "dataset": "bars/1d",
@@ -241,7 +241,7 @@
         "present": 12625,
         "expected": 12604,
         "basis": "rows on 2026-09-23",
-        "run_ids": ["daily_bars-2026-10-02-20261003T051929Z"]
+        "runIds": ["daily_bars-2026-10-02-20261003T051929Z"]
       },
       {
         "dataset": "bars/1d",
@@ -250,7 +250,7 @@
         "present": 12591,
         "expected": 12625,
         "basis": "rows on 2026-09-24",
-        "run_ids": ["daily_bars-2026-10-02-20261003T051929Z"]
+        "runIds": ["daily_bars-2026-10-02-20261003T051929Z"]
       },
       {
         "dataset": "bars/1d",
@@ -259,7 +259,7 @@
         "present": 12572,
         "expected": 12591,
         "basis": "rows on 2026-09-25",
-        "run_ids": ["daily_bars-2026-10-02-20261003T051929Z"]
+        "runIds": ["daily_bars-2026-10-02-20261003T051929Z"]
       },
       {
         "dataset": "bars/1d",
@@ -268,7 +268,7 @@
         "present": 12605,
         "expected": 12572,
         "basis": "rows on 2026-09-28",
-        "run_ids": ["daily_bars-2026-10-02-20261003T051929Z"]
+        "runIds": ["daily_bars-2026-10-02-20261003T051929Z"]
       },
       {
         "dataset": "bars/1d",
@@ -277,7 +277,7 @@
         "present": 12613,
         "expected": 12605,
         "basis": "rows on 2026-09-29",
-        "run_ids": ["daily_bars-2026-10-02-20261003T051929Z"]
+        "runIds": ["daily_bars-2026-10-02-20261003T051929Z"]
       },
       {
         "dataset": "bars/1d",
@@ -286,7 +286,7 @@
         "present": 12594,
         "expected": 12613,
         "basis": "rows on 2026-09-30",
-        "run_ids": ["daily_bars-2026-10-02-20261003T051929Z"]
+        "runIds": ["daily_bars-2026-10-02-20261003T051929Z"]
       },
       {
         "dataset": "bars/1d",
@@ -295,7 +295,7 @@
         "present": 12601,
         "expected": 12594,
         "basis": "rows on 2026-10-01",
-        "run_ids": ["migrate_ids-2026-10-03-20261003T130731Z"]
+        "runIds": ["migrate_ids-2026-10-03-20261003T130731Z"]
       },
       {
         "dataset": "chains/option_quotes",
@@ -304,7 +304,7 @@
         "present": 0,
         "expected": 4203,
         "basis": "optionable universe, fetch OK",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "chains/option_quotes",
@@ -313,7 +313,7 @@
         "present": 0,
         "expected": 4203,
         "basis": "optionable universe, fetch OK",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "chains/option_quotes",
@@ -322,7 +322,7 @@
         "present": 0,
         "expected": 4203,
         "basis": "optionable universe, fetch OK",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "chains/option_quotes",
@@ -331,7 +331,7 @@
         "present": 0,
         "expected": 4203,
         "basis": "optionable universe, fetch OK",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "chains/option_quotes",
@@ -340,7 +340,7 @@
         "present": 0,
         "expected": 4203,
         "basis": "optionable universe, fetch OK",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "chains/option_quotes",
@@ -349,7 +349,7 @@
         "present": 0,
         "expected": 4203,
         "basis": "optionable universe, fetch OK",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "chains/option_quotes",
@@ -358,7 +358,7 @@
         "present": 0,
         "expected": 4203,
         "basis": "optionable universe, fetch OK",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "chains/option_quotes",
@@ -367,7 +367,7 @@
         "present": 0,
         "expected": 4203,
         "basis": "optionable universe, fetch OK",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "chains/option_quotes",
@@ -376,7 +376,7 @@
         "present": 0,
         "expected": 4203,
         "basis": "optionable universe, fetch OK",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "chains/option_quotes",
@@ -385,7 +385,7 @@
         "present": 3623,
         "expected": 4203,
         "basis": "optionable universe, fetch OK",
-        "run_ids": ["option_chains-2026-10-02-20261003T093502Z"]
+        "runIds": ["option_chains-2026-10-02-20261003T093502Z"]
       },
       {
         "dataset": "rollups/instrument/option_liquidity@v1",
@@ -394,7 +394,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/option_liquidity@v1",
@@ -403,7 +403,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/option_liquidity@v1",
@@ -412,7 +412,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/option_liquidity@v1",
@@ -421,7 +421,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/option_liquidity@v1",
@@ -430,7 +430,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/option_liquidity@v1",
@@ -439,7 +439,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/option_liquidity@v1",
@@ -448,7 +448,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/option_liquidity@v1",
@@ -457,7 +457,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/option_liquidity@v1",
@@ -466,7 +466,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/option_liquidity@v1",
@@ -475,7 +475,7 @@
         "present": 4203,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/price_stats@v2",
@@ -484,7 +484,7 @@
         "present": 12626,
         "expected": 12592,
         "basis": "rows on 2026-09-18",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/price_stats@v2",
@@ -493,7 +493,7 @@
         "present": 12601,
         "expected": 12626,
         "basis": "rows on 2026-09-21",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/price_stats@v2",
@@ -502,7 +502,7 @@
         "present": 12604,
         "expected": 12601,
         "basis": "rows on 2026-09-22",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/price_stats@v2",
@@ -511,7 +511,7 @@
         "present": 12625,
         "expected": 12604,
         "basis": "rows on 2026-09-23",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/price_stats@v2",
@@ -520,7 +520,7 @@
         "present": 12591,
         "expected": 12625,
         "basis": "rows on 2026-09-24",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/price_stats@v2",
@@ -529,7 +529,7 @@
         "present": 12572,
         "expected": 12591,
         "basis": "rows on 2026-09-25",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/price_stats@v2",
@@ -538,7 +538,7 @@
         "present": 12605,
         "expected": 12572,
         "basis": "rows on 2026-09-28",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/price_stats@v2",
@@ -547,7 +547,7 @@
         "present": 12613,
         "expected": 12605,
         "basis": "rows on 2026-09-29",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/price_stats@v2",
@@ -556,7 +556,7 @@
         "present": 12594,
         "expected": 12613,
         "basis": "rows on 2026-09-30",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/price_stats@v2",
@@ -565,7 +565,7 @@
         "present": 12601,
         "expected": 12594,
         "basis": "rows on 2026-10-01",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/earnings@v1",
@@ -574,7 +574,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/earnings@v1",
@@ -583,7 +583,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/earnings@v1",
@@ -592,7 +592,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/earnings@v1",
@@ -601,7 +601,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/earnings@v1",
@@ -610,7 +610,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/earnings@v1",
@@ -619,7 +619,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/earnings@v1",
@@ -628,7 +628,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/earnings@v1",
@@ -637,7 +637,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/earnings@v1",
@@ -646,7 +646,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/earnings@v1",
@@ -655,7 +655,7 @@
         "present": 4412,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/iv30@v1",
@@ -664,7 +664,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/iv30@v1",
@@ -673,7 +673,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/iv30@v1",
@@ -682,7 +682,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/iv30@v1",
@@ -691,7 +691,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/iv30@v1",
@@ -700,7 +700,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/iv30@v1",
@@ -709,7 +709,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/iv30@v1",
@@ -718,7 +718,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/iv30@v1",
@@ -727,7 +727,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/iv30@v1",
@@ -736,7 +736,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/iv30@v1",
@@ -745,7 +745,7 @@
         "present": 3625,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/dividends@v2",
@@ -754,7 +754,7 @@
         "present": 12626,
         "expected": 12592,
         "basis": "rows on 2026-09-18",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/dividends@v2",
@@ -763,7 +763,7 @@
         "present": 12601,
         "expected": 12626,
         "basis": "rows on 2026-09-21",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/dividends@v2",
@@ -772,7 +772,7 @@
         "present": 12604,
         "expected": 12601,
         "basis": "rows on 2026-09-22",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/dividends@v2",
@@ -781,7 +781,7 @@
         "present": 12625,
         "expected": 12604,
         "basis": "rows on 2026-09-23",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/dividends@v2",
@@ -790,7 +790,7 @@
         "present": 12591,
         "expected": 12625,
         "basis": "rows on 2026-09-24",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/dividends@v2",
@@ -799,7 +799,7 @@
         "present": 12572,
         "expected": 12591,
         "basis": "rows on 2026-09-25",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/dividends@v2",
@@ -808,7 +808,7 @@
         "present": 12605,
         "expected": 12572,
         "basis": "rows on 2026-09-28",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/dividends@v2",
@@ -817,7 +817,7 @@
         "present": 12613,
         "expected": 12605,
         "basis": "rows on 2026-09-29",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/dividends@v2",
@@ -826,7 +826,7 @@
         "present": 12594,
         "expected": 12613,
         "basis": "rows on 2026-09-30",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/dividends@v2",
@@ -835,7 +835,7 @@
         "present": 12601,
         "expected": 12594,
         "basis": "rows on 2026-10-01",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/iv_history@v2",
@@ -844,7 +844,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/iv_history@v2",
@@ -853,7 +853,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/iv_history@v2",
@@ -862,7 +862,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/iv_history@v2",
@@ -871,7 +871,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/iv_history@v2",
@@ -880,7 +880,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/iv_history@v2",
@@ -889,7 +889,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/iv_history@v2",
@@ -898,7 +898,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/iv_history@v2",
@@ -907,7 +907,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/iv_history@v2",
@@ -916,7 +916,7 @@
         "present": 0,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": []
+        "runIds": []
       },
       {
         "dataset": "rollups/instrument/iv_history@v2",
@@ -925,7 +925,7 @@
         "present": 3625,
         "expected": null,
         "basis": "no earlier session",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/fundamentals@v2",
@@ -934,7 +934,7 @@
         "present": 12965,
         "expected": 12955,
         "basis": "rows on 2026-09-18",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/fundamentals@v2",
@@ -943,7 +943,7 @@
         "present": 12950,
         "expected": 12965,
         "basis": "rows on 2026-09-21",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/fundamentals@v2",
@@ -952,7 +952,7 @@
         "present": 12959,
         "expected": 12950,
         "basis": "rows on 2026-09-22",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/fundamentals@v2",
@@ -961,7 +961,7 @@
         "present": 12984,
         "expected": 12959,
         "basis": "rows on 2026-09-23",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/fundamentals@v2",
@@ -970,7 +970,7 @@
         "present": 12979,
         "expected": 12984,
         "basis": "rows on 2026-09-24",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/fundamentals@v2",
@@ -979,7 +979,7 @@
         "present": 12945,
         "expected": 12979,
         "basis": "rows on 2026-09-25",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/fundamentals@v2",
@@ -988,7 +988,7 @@
         "present": 12949,
         "expected": 12945,
         "basis": "rows on 2026-09-28",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/fundamentals@v2",
@@ -997,7 +997,7 @@
         "present": 12964,
         "expected": 12949,
         "basis": "rows on 2026-09-29",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/fundamentals@v2",
@@ -1006,7 +1006,7 @@
         "present": 12949,
         "expected": 12964,
         "basis": "rows on 2026-09-30",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
         "dataset": "rollups/instrument/fundamentals@v2",
@@ -1015,16 +1015,16 @@
         "present": 12966,
         "expected": 12949,
         "basis": "rows on 2026-10-01",
-        "run_ids": ["rollups-2026-10-02-20261003T194554Z"]
+        "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       }
     ],
-    "last_closed": "2026-10-02"
+    "lastClosed": "2026-10-02"
   },
-  "/admin/quality": {
-    "run_id": "data_quality-2026-10-02-20261003T153508Z",
+  "quality": {
+    "runId": "data_quality-2026-10-02-20261003T153508Z",
     "session": "2026-10-02",
     "status": "partial",
-    "finished_at": "2026-10-03T15:35:09.066119Z",
+    "finishedAt": "2026-10-03T15:35:09.066119Z",
     "checks": [
       {
         "name": "universe_size",
@@ -1051,11 +1051,12 @@
         "status": "PASS",
         "detail": "4412 upcoming earnings rows"
       }
-    ]
+    ],
+    "unknown": null
   },
-  "/admin/verification/ibkr": {
+  "verification": {
     "session": "2026-10-02",
-    "run_ids": ["verify_ibkr-2026-10-02-20261003T183836Z"],
+    "runIds": ["verify_ibkr-2026-10-02-20261003T183836Z"],
     "instruments": 6,
     "counts": {
       "PASS": 42,
@@ -1063,7 +1064,7 @@
       "FAIL": 2,
       "NA": 12
     },
-    "by_check": [
+    "byCheck": [
       {
         "check": "low",
         "counts": {
@@ -1196,21 +1197,22 @@
         "status": "FAIL",
         "note": "rel diff; worst session 2025-10-10 of 260 compared"
       }
-    ]
+    ],
+    "unknown": null
   },
-  "/admin/runs/nightly": [
+  "nightlyRuns": [
     {
-      "run_id": "nightly-2026-10-02-20261003T132614Z",
+      "runId": "nightly-2026-10-02-20261003T132614Z",
       "session": "2026-10-02",
       "status": "partial",
-      "started_at": "2026-10-03T13:26:14.413853Z",
-      "finished_at": "2026-10-03T13:52:14.081716Z",
-      "duration_s": 1559.668,
+      "startedAt": "2026-10-03T13:26:14.413853Z",
+      "finishedAt": "2026-10-03T13:52:14.081716Z",
+      "durationS": 1559.668,
       "steps": [
         {
           "name": "bars",
           "status": "COMPLETE",
-          "duration_s": 0.007,
+          "durationS": 0.007,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1218,7 +1220,7 @@
         {
           "name": "chains",
           "status": "PARTIAL",
-          "duration_s": 1237.083,
+          "durationS": 1237.083,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1226,7 +1228,7 @@
         {
           "name": "company-details",
           "status": "COMPLETE",
-          "duration_s": 0.265,
+          "durationS": 0.265,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1234,7 +1236,7 @@
         {
           "name": "corporate-actions",
           "status": "COMPLETE",
-          "duration_s": 13.13,
+          "durationS": 13.13,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1242,7 +1244,7 @@
         {
           "name": "earnings",
           "status": "COMPLETE",
-          "duration_s": 83.698,
+          "durationS": 83.698,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1250,7 +1252,7 @@
         {
           "name": "quality",
           "status": "PARTIAL",
-          "duration_s": 0.015,
+          "durationS": 0.015,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1258,7 +1260,7 @@
         {
           "name": "rates",
           "status": "COMPLETE",
-          "duration_s": 18.316,
+          "durationS": 18.316,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1266,7 +1268,7 @@
         {
           "name": "rollups",
           "status": "COMPLETE",
-          "duration_s": 20.033,
+          "durationS": 20.033,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1274,7 +1276,7 @@
         {
           "name": "screens",
           "status": "PARTIAL",
-          "duration_s": 0.424,
+          "durationS": 0.424,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1282,7 +1284,7 @@
         {
           "name": "shares",
           "status": "PARTIAL",
-          "duration_s": 11.585,
+          "durationS": 11.585,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1290,7 +1292,7 @@
         {
           "name": "universe-build",
           "status": "FAILED",
-          "duration_s": 175.109,
+          "durationS": 175.109,
           "reason": null,
           "error": "DataValidationError: instruments/symbol_history: duplicate rows for the table key",
           "counts": {}
@@ -1299,17 +1301,17 @@
       "problems": ["steps not complete: universe-build, shares, chains, screens, quality"]
     },
     {
-      "run_id": "nightly-2026-10-02-20261003T130116Z",
+      "runId": "nightly-2026-10-02-20261003T130116Z",
       "session": "2026-10-02",
       "status": "partial",
-      "started_at": "2026-10-03T13:01:16.835830Z",
-      "finished_at": "2026-10-03T13:07:13.584064Z",
-      "duration_s": 356.748,
+      "startedAt": "2026-10-03T13:01:16.835830Z",
+      "finishedAt": "2026-10-03T13:07:13.584064Z",
+      "durationS": 356.748,
       "steps": [
         {
           "name": "bars",
           "status": "COMPLETE",
-          "duration_s": 0.005,
+          "durationS": 0.005,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1317,7 +1319,7 @@
         {
           "name": "chains",
           "status": "PARTIAL",
-          "duration_s": 35.685,
+          "durationS": 35.685,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1325,7 +1327,7 @@
         {
           "name": "company-details",
           "status": "COMPLETE",
-          "duration_s": 0.264,
+          "durationS": 0.264,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1333,7 +1335,7 @@
         {
           "name": "corporate-actions",
           "status": "COMPLETE",
-          "duration_s": 13.141,
+          "durationS": 13.141,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1341,7 +1343,7 @@
         {
           "name": "earnings",
           "status": "COMPLETE",
-          "duration_s": 82.521,
+          "durationS": 82.521,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1349,7 +1351,7 @@
         {
           "name": "quality",
           "status": "PARTIAL",
-          "duration_s": 0.019,
+          "durationS": 0.019,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1357,7 +1359,7 @@
         {
           "name": "rates",
           "status": "COMPLETE",
-          "duration_s": 17.249,
+          "durationS": 17.249,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1365,7 +1367,7 @@
         {
           "name": "rollups",
           "status": "COMPLETE",
-          "duration_s": 20.318,
+          "durationS": 20.318,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1373,7 +1375,7 @@
         {
           "name": "screens",
           "status": "PARTIAL",
-          "duration_s": 0.417,
+          "durationS": 0.417,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1381,7 +1383,7 @@
         {
           "name": "shares",
           "status": "PARTIAL",
-          "duration_s": 11.598,
+          "durationS": 11.598,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1389,7 +1391,7 @@
         {
           "name": "universe-build",
           "status": "COMPLETE",
-          "duration_s": 175.53,
+          "durationS": 175.53,
           "reason": null,
           "error": null,
           "counts": {}
@@ -1398,7 +1400,7 @@
       "problems": ["steps not complete: shares, chains, screens, quality"]
     }
   ],
-  "/admin/review/figi": {
+  "figiReview": {
     "session": "2026-10-02",
     "source": "universe_build-2026-10-02-20261003T173124Z",
     "items": [
@@ -1418,7 +1420,7 @@
       }
     ]
   },
-  "/admin/review/leveraged": {
+  "leverageReview": {
     "session": "2026-10-02",
     "source": "instruments/reference",
     "items": [
@@ -1459,7 +1461,7 @@
       }
     ]
   },
-  "/admin/ingestion/chains/option_quotes/2026-10-02": {
+  "ingestionCell:chains/option_quotes/2026-10-02": {
     "cell": {
       "dataset": "chains/option_quotes",
       "session": "2026-10-02",
@@ -1467,7 +1469,7 @@
       "present": 3623,
       "expected": 4203,
       "basis": "optionable universe, fetch OK",
-      "run_ids": ["option_chains-2026-10-02-20261003T093502Z"]
+      "runIds": ["option_chains-2026-10-02-20261003T093502Z"]
     },
     "job": "option_chains",
     "groups": [
@@ -1514,15 +1516,15 @@
     ],
     "runs": [
       {
-        "run_id": "option_chains-2026-10-02-20261003T093502Z",
+        "runId": "option_chains-2026-10-02-20261003T093502Z",
         "job": "option_chains",
         "session": "2026-10-02",
         "status": "partial",
-        "started_at": "2026-10-03T09:35:02.094636Z",
-        "finished_at": "2026-10-03T13:51:53.605759Z",
-        "duration_s": 15411.511,
-        "items_total": 4204,
-        "items_by_status": {
+        "startedAt": "2026-10-03T09:35:02.094636Z",
+        "finishedAt": "2026-10-03T13:51:53.605759Z",
+        "durationS": 15411.511,
+        "itemsTotal": 4204,
+        "itemsByStatus": {
           "OK": 3624,
           "STALE_DATA": 515,
           "NO_CHAIN": 63,
@@ -1598,16 +1600,16 @@
       }
     ]
   },
-  "/admin/runs/option_chains-2026-10-02-20261003T093502Z": {
-    "run_id": "option_chains-2026-10-02-20261003T093502Z",
+  "run:option_chains-2026-10-02-20261003T093502Z": {
+    "runId": "option_chains-2026-10-02-20261003T093502Z",
     "job": "option_chains",
     "session": "2026-10-02",
     "status": "partial",
-    "started_at": "2026-10-03T09:35:02.094636Z",
-    "finished_at": "2026-10-03T13:51:53.605759Z",
-    "duration_s": 15411.511,
-    "items_total": 4204,
-    "items_by_status": {
+    "startedAt": "2026-10-03T09:35:02.094636Z",
+    "finishedAt": "2026-10-03T13:51:53.605759Z",
+    "durationS": 15411.511,
+    "itemsTotal": 4204,
+    "itemsByStatus": {
       "OK": 3624,
       "STALE_DATA": 515,
       "NO_CHAIN": 63,
@@ -1681,7 +1683,7 @@
       }
     }
   },
-  "/admin/runs/option_chains-2026-10-02-20261003T093502Z/items": [
+  "runItems:option_chains-2026-10-02-20261003T093502Z": [
     {
       "key": "EQ:ACGL",
       "code": "OK",

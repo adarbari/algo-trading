@@ -7,12 +7,13 @@
 import { formatValue, type BarListItem, type StackedBarSegment } from '@algotrade/ui';
 
 import type { CellDetail } from '@/entities/ingestion';
-import { segmentTone, type RunDetail } from '@/entities/run';
+import { segmentTone, toRunDetail, type RunDetail } from '@/entities/run';
 
 /** The run whose items explain the cell. */
 export function primaryRun(detail: CellDetail): RunDetail | undefined {
   const own = detail.runs.filter((r) => r.job === detail.job);
-  return own.filter((r) => r.items_total > 0).at(-1) ?? own.at(-1) ?? detail.runs.at(-1);
+  const run = own.filter((r) => r.itemsTotal > 0).at(-1) ?? own.at(-1) ?? detail.runs.at(-1);
+  return run ? toRunDetail(run) : undefined;
 }
 
 const label = (code: string) =>
@@ -25,8 +26,8 @@ export function statusSegments(
   detail: CellDetail,
   run: RunDetail | undefined,
 ): StackedBarSegment[] {
-  if (run && run.items_total > 0) {
-    return Object.entries(run.items_by_status).map(([code, n]) => ({
+  if (run && run.itemsTotal > 0) {
+    return Object.entries(run.itemsByStatus).map(([code, n]) => ({
       id: code,
       label: label(code),
       value: n,

@@ -10,13 +10,13 @@ const cell = (
   status: string,
   present: number,
   expected: number | null,
-): CompletenessCell => ({ dataset, session, status, present, expected, basis: '', run_ids: [] });
+): CompletenessCell => ({ dataset, session, status, present, expected, basis: '', runIds: [] });
 
 // Shaped like the real grid of 2026-10-02: chains start on the last session, bars complete.
 const grid: Completeness = {
   sessions: ['2026-09-30', '2026-10-01', '2026-10-02'],
   datasets: ['bars/1d', 'chains/option_quotes', 'universe'],
-  last_closed: '2026-10-02',
+  lastClosed: '2026-10-02',
   cells: [
     cell('bars/1d', '2026-09-30', 'COMPLETE', 12590, 12580),
     cell('bars/1d', '2026-10-01', 'COMPLETE', 12594, 12590),
@@ -65,6 +65,6 @@ describe('completeness grid', () => {
 
   it('is stale when the exchange closed a later session', () => {
     expect(staleSince(grid)).toBeNull();
-    expect(staleSince({ ...grid, last_closed: '2026-10-05' })).toBe('2026-10-02');
+    expect(staleSince({ ...grid, lastClosed: '2026-10-05' })).toBe('2026-10-02');
   });
 });

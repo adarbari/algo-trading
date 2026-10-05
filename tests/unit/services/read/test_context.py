@@ -18,7 +18,10 @@ from algotrade.services.read.context import (
     at_session,
     open_context,
     partition,
+    partition_on,
     previous_session,
+    snapshot_on,
+    stored_dates,
 )
 from algotrade.services.read.values import Unknown, UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
@@ -124,6 +127,19 @@ def test_an_older_partition_exists_and_is_ignored(stored: tuple[StoreWriter, Sto
     assert partition(open_for(stored[1]), EARNINGS) == Unknown(
         UnknownCode.NO_PARTITION, f"{EARNINGS} has no partition for 2026-10-01"
     )
+
+
+def test_inventory_reads_name_their_dates(stored: tuple[StoreWriter, StoreReader]) -> None:
+    """The ops loaders' inventory: every stored date, a partition on a date they name, the
+    snapshot a date sees (ADR 0007's rule), not the session's fact reads."""
+    ctx = open_for(stored[1])
+    assert stored_dates(ctx, EARNINGS) == (D1,)
+    found = partition_on(ctx, EARNINGS, D1)
+    assert found is not None and found["days_to_earnings"].tolist() == [3]
+    assert partition_on(ctx, EARNINGS, D2) is None
+    snap = snapshot_on(ctx, "bars/1d", date(2026, 10, 5))
+    assert snap is not None and snap.snapshot_date == D2
+    assert snapshot_on(ctx, "instruments/reference", D2) is None
 
 
 def test_partition_prunes_columns_and_instruments(stored: tuple[StoreWriter, StoreReader]) -> None:

@@ -4,7 +4,10 @@ catalogue, the one resolved ``Session``, the result cache), opened by ``open_con
 (ADR 0036 decision 6), and ``run_partition``, a run record's own results (the run names its
 session: an explicit argument, never "latest"), and ``previous_session`` / ``at_session``: the
 stored session of a table before the request's and a context for it (a loader comparing with
-the previous run names that date explicitly, ADR 0036).
+the previous run names that date explicitly, ADR 0036). The inventory reads (``stored_dates``,
+``partition_on``, ``snapshot_on``) report what is stored on dates the caller names: only the ops
+loader that describes storage itself calls them (the Admin completeness grid; READ 2's
+``test_inventory_reads_only_in_the_completeness_loader``), never a loader of a fact.
 
 ``open_context`` resolves the session once per request (and reuses it while nothing is
 published: keyed on ``StoreReader.visible_seq``); nothing else in ``services/read`` calls
@@ -22,6 +25,7 @@ import pandas as pd
 
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
+from algotrade.data.reference import Snapshot, snapshot
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.features import catalogue
 from algotrade.services.read.session import Grain, NotFoundError, Session, grain_of, resolve_session
@@ -39,8 +43,11 @@ __all__ = [
     "open_context",
     "open_stores",
     "partition",
+    "partition_on",
     "previous_session",
     "run_partition",
+    "snapshot_on",
+    "stored_dates",
 ]
 
 
@@ -211,3 +218,26 @@ def run_partition(ctx: Stores, table: str, run: RunRecord) -> pd.DataFrame | Non
     if frame is None:
         return None
     return frame[frame["run_id"] == run.run_id].reset_index(drop=True)
+
+
+# ---------------------------------------------------------------------------- inventory
+# What is stored, for the ops loaders that report on storage (services/read/ops): which dates a
+# table has, one partition on a date the caller names, the snapshot a date sees. Never the
+# partition a displayed fact is read from: that is ``partition`` (exactly the session).
+
+
+def stored_dates(ctx: Stores, table: str) -> tuple[date, ...]:
+    """Every date ``table`` has a partition for, oldest first (an inventory, not a pick)."""
+    return tuple(ctx.reader.dates(table))
+
+
+def partition_on(ctx: Stores, table: str, day: date) -> pd.DataFrame | None:
+    """``table``'s partition for exactly ``day``, whatever its grain (``None``: none stored):
+    an ops loader counting what is stored on each session of a window it names."""
+    return ctx.reader.table(table, day)
+
+
+def snapshot_on(ctx: Stores, table: str, day: date) -> Snapshot | None:
+    """The snapshot of ``table`` a read for ``day`` sees (ADR 0007's one rule,
+    ``data.reference.snapshot``); ``None``: the table has no partition at all."""
+    return snapshot(ctx.reader, table, day)

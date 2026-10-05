@@ -5,7 +5,7 @@ session), [ADR 0037](../adr/0037-domain-read-model-served-by-graphql.md) (a doma
 served by GraphQL) and [ADR 0038](../adr/0038-catalogue-named-values.md) (catalogue-named
 values). Skills: `.claude/skills/add-domain-object`, `.claude/skills/add-graphql-field`.
 
-**What exists now (read-model PRs 1-9).** The decisions, this spec, the packages
+**What exists now (read-model PRs 1-9, 10a).** The decisions, this spec, the packages
 `src/algotrade/services/read/{,instruments,screens,ops}` and
 `apps/api/algotrade_api/graphql/{,types}` (declared in `architecture/layout.toml`, guarded by
 two import-linter contracts), the ownership entries, the REST GET allow-list
@@ -81,9 +81,21 @@ the new factories `screenColumn`, `reasonsColumn` (and `decisionColumn(leaving)`
 instrument's name, its draft's `criteria` / `display_columns` and `changes` against the saved
 run of the session (`entered` / `left`, decided on the server: the NOT_PICKED entry is on);
 `explore/screens/*`, `/screens`, `/screens/{id}/{results,table}` and the view GET are deleted;
-the `_float/_text/_num` rule is on. Every other page still reads `services/explore` over REST until
-the PR that moves its area (the [migration plan](#migration-plan)): a new page read is a
-GraphQL field (`add-graphql-field`) in the area's migration PR.
+the `_float/_text/_num` rule is on. **PR 10a
+moved Admin**: `read/ops/{runs,quality,ingestion,review}.py` (`NightlyRun`, `RunDetail`,
+`RunItem`; the session's `QualityReport` and `Verification`; `Completeness` and `CellDetail`;
+`ReviewList`), `types/ops/{run,quality,ingestion,review}.py`, `Query.{nightlyRuns,run,runItems,
+quality,verification,completeness,ingestionCell,figiReview,leverageReview}`, the Admin entities
+`ingestion`, `run`, `verification` and `review` on GraphQL, and the context's inventory reads
+(`stored_dates`, `partition_on`, `snapshot_on`: what is stored on dates the caller names, for
+`read/ops/ingestion.py` only, `test_inventory_reads_only_in_the_completeness_loader`); `explore/{runs,ingestion,review}.py`,
+`routes/{admin,runs}.py` and their schemas are deleted and every `/admin` GET is off the
+allow-list. Run records are session-free (`stores()`); the quality checks and the verification
+are for exactly the session (`NOT_RUN` / `NO_PARTITION`, never an earlier session's, ADR 0036),
+the completeness window ends at it and the review lists read its reference snapshot. Screener
+results, preview and views still read `services/explore` over REST until PR 8; PR 10b then
+deletes `services/explore` (the [migration plan](#migration-plan)). A new page read is a
+GraphQL field (`add-graphql-field`).
 
 ## What is wrong today
 
@@ -160,7 +172,10 @@ Owner folder `src/algotrade/services/read/` (ownership `domain-read-model`). Eve
 | Backtest, BacktestDetail | `runId` | `configId, user, status, start, end, startedAt, finishedAt, metrics`; detail: `configHash, selection, data, rebalances, equity[], fills[]` | run records; the run's own `results/backtest_{equity,fills}` partition as of the run (`context.run_partition`) | `read/ops/backtests.py` (PR 9) | `explore/backtests.py` (deleted) |
 | Config | (`scope`, `configId`) | `kind, impl, selection, hash, error` | configs | `read/ops/configs.py` (PR 9) | `explore/configs.py` (deleted) |
 | ScreenListing, ScreenDetail, ScreenVersion | (`user`, `screenerId`) | `status, latest, hasDraft, presetId`; `draft, draftError, versions, preset{presetId, pinned, current, rebaseAvailable}, hash, layers, resolved, error, working`; `version, document` | the user's drafts and versions (`ConfigStore`) | `read/screens/documents.py` (PR 9) | `services/authoring/screens.{screen_detail,list_screens,screen_versions}` |
-| IngestRun, NightlyRun, QualityCheck | `runId` / `session` | as today | run records | `read/ops/*` | `explore/{runs,ingestion}.py` |
+| NightlyRun, RunDetail, RunItem | `runId` | `runId, session, status, startedAt, finishedAt, durationS, steps[{name, status, durationS, reason, error, counts}], problems`; `job, itemsTotal, itemsByStatus, failures[{reason, count, examples, statuses}], stats`; `key, code, status` | run records (session-free: `Stores`) | `read/ops/runs.py` (PR 10a) | `explore/runs.py` (deleted) |
+| QualityReport, Verification | `session` | `runId, status, finishedAt, checks[{name, status, detail}], unknown` (`NOT_RUN`: no `data_quality` run for the session); `runIds, instruments, counts, byCheck, failing, unknown` (`NO_PARTITION`) | the session's `data_quality` run records; `verification/ibkr` exact session | `read/ops/quality.py` (PR 10a) | `explore/{runs,ingestion}.py` (deleted; both were "latest on or before") |
+| Completeness, CellDetail | (`session`, window); (`dataset`, `session`) | `sessions, datasets, cells[{dataset, session, status, present, expected, basis, runIds}], lastClosed`; `cell, job, groups, runs` | every dataset's partitions on the window's sessions (inventory reads), `chains/status`, universe snapshot, run records | `read/ops/ingestion.py` (PR 10a) | `explore/ingestion.py` (deleted) |
+| ReviewList | (kind, `session`) | `session, source, items: [JSON]` | the `figi_review` of the `universe_build` record on or before the session (never a later one), else the session's reference snapshot; leverage: that snapshot | `read/ops/review.py` (PR 10a) | `explore/review.py` (deleted) |
 
 `explore`'s `ReadStore`, `ResultCache`, `open_store`, `paginate` and `record(s)` move to
 `read/context.py` and `read/values.py`; `services/explore/` is deleted in PR 10.
@@ -177,7 +192,7 @@ vocabulary. `FeatureValue.value is None` always comes with `unknown` set.
 | `NULL` | stored null: see `FeatureInfo.nullMeaning` |
 | `NOT_IN_CATALOGUE` | the name is not in the caller's catalogue |
 | `LICENCE` | a `personal`-licence feature and the caller is not its owner (ADR 0028) |
-| `NOT_RUN` | a screener has no run for the session |
+| `NOT_RUN` | a screener (or the nightly data-quality check) has no run for the session |
 | `PRE_SNAPSHOT` | identity came from a later snapshot (survivorship) |
 
 In PR 4 `features(names)` returns `NO_PARTITION`, `NO_ROW` and `NULL`. A name the caller's
@@ -391,7 +406,6 @@ query IdeasPage($date: Date, $limit: Int!, $names: [FeatureName!]!) {
 | `GET /chains/{id}/live` | latency-bound, records to `live/*`, bypasses the session model on purpose (ADR 0028) |
 | `POST /screeners/preview`, `POST /features/check` | compute over a request body with its own cache |
 | Files (exports) | binary / streaming |
-| `/admin/*` | until PR 10 (moves last) |
 
 Every read for a trader page goes to GraphQL. No new GET serving stored data.
 
@@ -450,7 +464,7 @@ its own change). View preferences go through one adapter, `features/table-view`
 | # | Rule | Mechanism | Status |
 |---|---|---|---|
 | READ 1 | Only `services/read/session.py` decides which partition a read sees | ownership `session-resolution` (`partition_for`, `latest_session`, `latest_date`, `rollup_row`, `resolve_session`) | **on**: owners `session.py`, `context.py` (`open_context`) and explore (until its modules are deleted); any other caller fails now |
-| READ 2 | Only `services/read/**` reads session partitions for display | `tests/architecture/api/test_read_model.py::test_only_loaders_read_partitions` (AST) | **on**, scoped to `services/read` (only `session.py` / `context.py` pick or read a partition); widened to all of `src/` and `apps/` in PR 10 |
+| READ 2 | Only `services/read/**` reads session partitions for display | `tests/architecture/api/test_read_model.py::test_only_loaders_read_partitions` (AST); `test_inventory_reads_only_in_the_completeness_loader` (the context's inventory reads: `read/ops/ingestion.py` only, calls and imports) | **on**, scoped to `services/read` (only `session.py` / `context.py` pick or read a partition); widened to all of `src/` and `apps/` in PR 10b (after PR 8 deletes the last explore reads) |
 | READ 3 | GraphQL types are thin | import-linter "GraphQL types are thin" + `test_resolvers_call_one_loader` | **on** |
 | READ 4 | The read model is read-only | import-linter "Read model is read-only" | **on** |
 | READ 5 | No new REST GET for stored data | `architecture/rest_allowlist.toml` + two tests | **on** |
@@ -512,7 +526,8 @@ Each PR is independently shippable with `make check` green and updates `docs/roa
 | 7 | FeatureTable + Explore tickers + compare (**done**) | `read/instruments/table.py` (columnar, server-paged); `Query.table`; `widgets/feature-table`, the column factories (WEB 4); ticker table and compare rebuilt; `explore/{universe,compare}.py` deleted (admin review lists to `explore/review.py` until PR 10); `/explore/*`, `/universe` off the list | one page per request (no 12-page fan-out) |
 | 8 | Screener results + preview + views (**done**) | `ScreenerRun.results`; `features/table-view` (+ `views.<scope>` in `preferences.toml`); screener and preview results on `feature-table`; `explore/screens/*` deleted; `/screens*` and the view GET off the list; the `_float/_text/_num` detect rule; WEB 7; `Instrument.screenerHits` | one table widget renders all four tables |
 | 9 | Catalogue, distribution, backtests, configs (**done**) | `Query.{catalogue,distribution,backtests}`, screener authoring reads; `explore/{features,backtests,configs}.py` deleted; their GETs off the list | the trader workspace is fully on GraphQL |
-| 10 | Admin and the end of explore | `read/ops/*`; admin entities on GraphQL; `services/explore/` deleted; `explore-queries` removed; READ 2 widens to all of `src/` and `apps/`; `add-api-endpoint` loses its read steps | allow-list = writes, jobs, health, live, preview, files |
+| 10a | Admin on GraphQL (**done**) | `read/ops/{runs,quality,ingestion,review}.py`; `types/ops/*`; the Admin entities (ingestion, run, verification, review) on GraphQL; `explore/{runs,ingestion,review}.py`, `routes/{admin,runs}.py` and their schemas deleted; every `/admin` GET off the list | Admin reads no REST |
+| 10b | The end of explore (after PR 8) | `services/explore/` deleted (`store.py` with PR 8's last callers); `explore-queries` removed; READ 2 widens to all of `src/` and `apps/`; `add-api-endpoint` loses its read steps | allow-list = writes, jobs, health, live, preview, files |
 
 Order: PR 4 proves the pipeline (Strawberry, dataloader, codegen, lint) on one pane with little
 logic; PR 5 is the first user-visible fix and deletes the biggest bespoke module; tables come

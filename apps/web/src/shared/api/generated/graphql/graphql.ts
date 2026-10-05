@@ -95,6 +95,21 @@ export type IdeasPageQueryVariables = Exact<{
 
 export type IdeasPageQuery = { ideas: { session: string, priority: Array<string>, total: number, screeners: Array<{ picked: number, screener: { id: string, name: string, owner: string, version: number | null }, run: { runId: string, configVersion: number | null } | null, notRun: { code: UnknownCode, detail: string } | null, top: Array<{ instrumentId: string, score: number | null, instrument: { symbol: string } | null }> }>, items: Array<{ rank: number, instrumentId: string, instrument: { symbol: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, detail: string } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null, picks: Array<{ configId: string, decision: string, score: number | null, reasons: string, flags: Array<string>, criteria: Array<{ id: string, value: unknown }>, columns: Array<{ name: string, value: unknown }> }> }> } | null };
 
+export type IngestionCompletenessQueryVariables = Exact<{
+  sessions: number;
+}>;
+
+
+export type IngestionCompletenessQuery = { completeness: { sessions: Array<string>, datasets: Array<string>, lastClosed: string, cells: Array<{ dataset: string, session: string, status: string, present: number, expected: number | null, basis: string, runIds: Array<string> }> } | null };
+
+export type IngestionCellQueryVariables = Exact<{
+  dataset: string;
+  date: string;
+}>;
+
+
+export type IngestionCellQuery = { ingestionCell: { job: string, cell: { dataset: string, session: string, status: string, present: number, expected: number | null, basis: string, runIds: Array<string> }, groups: Array<{ reason: string, count: number, examples: Array<string>, statuses: Array<string> }>, runs: Array<{ runId: string, job: string, session: string, status: string, startedAt: string, finishedAt: string | null, durationS: number | null, itemsTotal: number, itemsByStatus: unknown, stats: unknown, failures: Array<{ reason: string, count: number, examples: Array<string>, statuses: Array<string> }> }> } | null };
+
 export type InstrumentFactsQueryVariables = Exact<{
   key: string;
   names: Array<string> | string;
@@ -136,6 +151,42 @@ export type InstrumentHistoryQueryVariables = Exact<{
 
 
 export type InstrumentHistoryQuery = { instrument: { instrumentId: string, series: { names: Array<string>, points: Array<{ session: string, values: Array<unknown> }> } } | null };
+
+export type FigiReviewQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type FigiReviewQuery = { figiReview: { session: string | null, source: string, items: Array<unknown> } | null };
+
+export type LeverageReviewQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type LeverageReviewQuery = { leverageReview: { session: string | null, source: string, items: Array<unknown> } | null };
+
+export type NightlyRunsQueryVariables = Exact<{
+  limit: number;
+}>;
+
+
+export type NightlyRunsQuery = { nightlyRuns: Array<{ runId: string, session: string, status: string, startedAt: string, finishedAt: string | null, durationS: number | null, problems: Array<string>, steps: Array<{ name: string, status: string, durationS: number | null, reason: string | null, error: string | null }> }> };
+
+export type RunRecordQueryVariables = Exact<{
+  runId: string;
+}>;
+
+
+export type RunRecordQuery = { run: { runId: string, job: string, session: string, status: string, startedAt: string, finishedAt: string | null, durationS: number | null, itemsTotal: number, itemsByStatus: unknown, stats: unknown, failures: Array<{ reason: string, count: number, examples: Array<string>, statuses: Array<string> }> } | null };
+
+export type RunItemsQueryVariables = Exact<{
+  runId: string;
+}>;
+
+
+export type RunItemsQuery = { runItems: Array<{ key: string, code: string, status: string }> | null };
+
+export type QualityChecksQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type QualityChecksQuery = { quality: { session: string, runId: string | null, status: string | null, finishedAt: string | null, checks: Array<{ name: string, status: string, detail: string }>, unknown: { code: UnknownCode, detail: string } | null } | null };
 
 export type InstrumentScreenerHitsQueryVariables = Exact<{
   key: string;
@@ -181,6 +232,11 @@ export type ScreenerResultsQueryVariables = Exact<{
 
 
 export type ScreenerResultsQuery = { session: { date: string, missing: Array<string> } | null, screener: { id: string, name: string, criteria: Array<{ id: string, field: string, mode: string }>, displayColumns: Array<{ name: string, field: string }>, notRun: { code: UnknownCode, detail: string } | null, latestRun: { runId: string, session: string, previousSession: string | null, decisions: Array<{ decision: string, count: number }>, changes: Array<{ change: string, count: number }>, results: { sort: string, total: number, page: number, size: number, missing: Array<string>, rows: Array<Array<unknown>>, unknown: Array<Array<UnknownCode | null>>, columns: Array<{ name: string, description: string, format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string, licence: string, scope: string }>, results: Array<{ instrumentId: string, rank: number, decision: string, score: number | null, reasons: string, flags: Array<string>, change: string | null, previousDecision: string | null, instrument: { instrumentId: string, symbol: string, name: string } | null, criteria: Array<{ id: string, field: string, mode: string, outcome: string, value: unknown, distance: number | null }>, columns: Array<{ name: string, value: unknown }> }> } } | null } | null };
+
+export type VerificationQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type VerificationQuery = { verification: { session: string, runIds: Array<string>, instruments: number, counts: unknown, failing: Array<unknown>, byCheck: Array<{ check: string, counts: unknown }>, unknown: { code: UnknownCode, detail: string } | null } | null };
 
 export type TableViewQueryVariables = Exact<{
   scope: string;
@@ -470,6 +526,64 @@ export const IdeasPageDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<IdeasPageQuery, IdeasPageQueryVariables>;
+export const IngestionCompletenessDocument = new TypedDocumentString(`
+    query IngestionCompleteness($sessions: Int!) {
+  completeness(sessions: $sessions) {
+    sessions
+    datasets
+    lastClosed
+    cells {
+      dataset
+      session
+      status
+      present
+      expected
+      basis
+      runIds
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<IngestionCompletenessQuery, IngestionCompletenessQueryVariables>;
+export const IngestionCellDocument = new TypedDocumentString(`
+    query IngestionCell($dataset: String!, $date: Date!) {
+  ingestionCell(dataset: $dataset, date: $date) {
+    job
+    cell {
+      dataset
+      session
+      status
+      present
+      expected
+      basis
+      runIds
+    }
+    groups {
+      reason
+      count
+      examples
+      statuses
+    }
+    runs {
+      runId
+      job
+      session
+      status
+      startedAt
+      finishedAt
+      durationS
+      itemsTotal
+      itemsByStatus
+      stats
+      failures {
+        reason
+        count
+        examples
+        statuses
+      }
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<IngestionCellQuery, IngestionCellQueryVariables>;
 export const InstrumentFactsDocument = new TypedDocumentString(`
     query InstrumentFacts($key: String!, $names: [FeatureName!]!) {
   session {
@@ -573,6 +687,94 @@ export const InstrumentHistoryDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<InstrumentHistoryQuery, InstrumentHistoryQueryVariables>;
+export const FigiReviewDocument = new TypedDocumentString(`
+    query FigiReview {
+  figiReview {
+    session
+    source
+    items
+  }
+}
+    `) as unknown as TypedDocumentString<FigiReviewQuery, FigiReviewQueryVariables>;
+export const LeverageReviewDocument = new TypedDocumentString(`
+    query LeverageReview {
+  leverageReview {
+    session
+    source
+    items
+  }
+}
+    `) as unknown as TypedDocumentString<LeverageReviewQuery, LeverageReviewQueryVariables>;
+export const NightlyRunsDocument = new TypedDocumentString(`
+    query NightlyRuns($limit: Int!) {
+  nightlyRuns(limit: $limit) {
+    runId
+    session
+    status
+    startedAt
+    finishedAt
+    durationS
+    problems
+    steps {
+      name
+      status
+      durationS
+      reason
+      error
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<NightlyRunsQuery, NightlyRunsQueryVariables>;
+export const RunRecordDocument = new TypedDocumentString(`
+    query RunRecord($runId: String!) {
+  run(runId: $runId) {
+    runId
+    job
+    session
+    status
+    startedAt
+    finishedAt
+    durationS
+    itemsTotal
+    itemsByStatus
+    stats
+    failures {
+      reason
+      count
+      examples
+      statuses
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<RunRecordQuery, RunRecordQueryVariables>;
+export const RunItemsDocument = new TypedDocumentString(`
+    query RunItems($runId: String!) {
+  runItems(runId: $runId) {
+    key
+    code
+    status
+  }
+}
+    `) as unknown as TypedDocumentString<RunItemsQuery, RunItemsQueryVariables>;
+export const QualityChecksDocument = new TypedDocumentString(`
+    query QualityChecks {
+  quality {
+    session
+    runId
+    status
+    finishedAt
+    checks {
+      name
+      status
+      detail
+    }
+    unknown {
+      code
+      detail
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<QualityChecksQuery, QualityChecksQueryVariables>;
 export const InstrumentScreenerHitsDocument = new TypedDocumentString(`
     query InstrumentScreenerHits($key: String!) {
   session {
@@ -745,6 +947,25 @@ export const ScreenerResultsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<ScreenerResultsQuery, ScreenerResultsQueryVariables>;
+export const VerificationDocument = new TypedDocumentString(`
+    query Verification {
+  verification {
+    session
+    runIds
+    instruments
+    counts
+    byCheck {
+      check
+      counts
+    }
+    failing
+    unknown {
+      code
+      detail
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<VerificationQuery, VerificationQueryVariables>;
 export const TableViewDocument = new TypedDocumentString(`
     query TableView($scope: String!, $name: String) {
   view(scope: $scope, name: $name) {

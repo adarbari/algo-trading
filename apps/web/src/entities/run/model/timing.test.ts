@@ -3,22 +3,22 @@ import { describe, expect, it } from 'vitest';
 import { incompleteSteps, stepTimings } from './timing';
 import type { NightlyRun } from './types';
 
-const step = (name: string, status: string, duration_s: number | null) => ({
+const step = (name: string, status: string, durationS: number | null) => ({
   name,
   status,
-  duration_s,
+  durationS,
   reason: null,
   error: null,
   counts: {},
 });
 
 const run: NightlyRun = {
-  run_id: 'nightly-2026-10-02',
+  runId: 'nightly-2026-10-02',
   session: '2026-10-02',
   status: 'partial',
-  started_at: '2026-10-03T09:00:00Z',
-  finished_at: '2026-10-03T09:26:00Z',
-  duration_s: 1560,
+  startedAt: '2026-10-03T09:00:00Z',
+  finishedAt: '2026-10-03T09:26:00Z',
+  durationS: 1560,
   steps: [
     step('bars', 'COMPLETE', 0.5),
     step('chains', 'PARTIAL', 1200),

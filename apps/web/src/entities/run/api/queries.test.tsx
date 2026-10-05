@@ -3,72 +3,85 @@ import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { api } from '@/shared/api';
+import { gql, GraphQLRequestError } from '@/shared/api';
 
 import { useNightlyRuns, useQualityChecks, useRun, useRunItems } from './queries';
 
 vi.mock('@/shared/api', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  api: { GET: vi.fn() },
+  gql: vi.fn(),
 }));
 
-const GET = vi.mocked(api.GET);
-const ok = (data: unknown) =>
-  Promise.resolve({ data, response: new Response(null, { status: 200 }) }) as never;
+const GQL = vi.mocked(gql);
 
 function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 
+/** The operation name and variables of the `n`th call. */
+function call(n: number): [string, unknown] {
+  const [document, variables] = GQL.mock.calls[n] ?? [];
+  return [/query (\w+)/.exec(String(document))?.[1] ?? '', variables];
+}
+
 describe('run queries', () => {
   beforeEach(() => {
-    GET.mockReset();
+    GQL.mockReset();
   });
 
   it('reads the recent nightly runs with a limit', async () => {
-    GET.mockReturnValue(ok([{ run_id: 'n1' }]));
+    GQL.mockResolvedValue({ nightlyRuns: [{ runId: 'n1' }] });
     const { result } = renderHook(() => useNightlyRuns(5), { wrapper });
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
-    expect(GET).toHaveBeenCalledWith('/admin/runs/nightly', { params: { query: { limit: 5 } } });
-    expect(result.current.data).toEqual([{ run_id: 'n1' }]);
+    expect(call(0)).toEqual(['NightlyRuns', { limit: 5 }]);
+    expect(result.current.data).toEqual([{ runId: 'n1' }]);
   });
 
   it('reads one run and its items only when there is an id', async () => {
-    GET.mockReturnValue(ok({ run_id: 'r1' }));
+    GQL.mockResolvedValue({
+      run: { runId: 'r1', itemsByStatus: { OK: 2, odd: 'x' }, stats: null },
+      runItems: [{ key: 'AAA', code: 'OK', status: 'OK' }],
+    });
     const { result: none } = renderHook(() => useRun(null), { wrapper });
     expect(none.current.fetchStatus).toBe('idle');
     const { result } = renderHook(() => useRun('r1'), { wrapper });
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
-    expect(GET).toHaveBeenCalledWith('/admin/runs/{run_id}', {
-      params: { path: { run_id: 'r1' } },
-    });
+    expect(call(0)).toEqual(['RunRecord', { runId: 'r1' }]);
+    expect(result.current.data).toMatchObject({ itemsByStatus: { OK: 2 }, stats: {} });
     const { result: items } = renderHook(() => useRunItems('r1'), { wrapper });
     await waitFor(() => {
       expect(items.current.isSuccess).toBe(true);
     });
-    expect(GET).toHaveBeenCalledWith('/admin/runs/{run_id}/items', {
-      params: { path: { run_id: 'r1' } },
-    });
+    expect(call(1)).toEqual(['RunItems', { runId: 'r1' }]);
     const { result: off } = renderHook(() => useRunItems('r1', false), { wrapper });
     expect(off.current.fetchStatus).toBe('idle');
   });
 
-  it('surfaces API errors', async () => {
-    GET.mockReturnValue(
-      Promise.resolve({
-        error: { detail: 'no data-quality run' },
-        response: new Response(null, { status: 404 }),
-      }),
-    );
+  it('reads no such run as null, and its items as a failure', async () => {
+    GQL.mockResolvedValue({ run: null, runItems: null });
+    const { result } = renderHook(() => useRun('nope'), { wrapper });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(result.current.data).toBeNull();
+    const { result: items } = renderHook(() => useRunItems('nope'), { wrapper });
+    await waitFor(() => {
+      expect(items.current.isError).toBe(true);
+    });
+  });
+
+  it('reads the session quality checks and surfaces GraphQL errors', async () => {
+    GQL.mockRejectedValue(new GraphQLRequestError([{ message: 'boom' }]));
     const { result } = renderHook(() => useQualityChecks(), { wrapper });
     await waitFor(() => {
       expect(result.current.isError).toBe(true);
     });
-    expect(result.current.error?.message).toBe('API 404: no data-quality run');
+    expect(call(0)[0]).toBe('QualityChecks');
+    expect(result.current.error?.message).toBe('boom');
   });
 });

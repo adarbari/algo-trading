@@ -7,7 +7,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { expectAccessible } from './a11y';
-import { ADMIN_FIXTURES, mockAdminApi } from './admin-api';
+import { ADMIN_FIXTURES, FAIL, mockAdminApi } from './admin-api';
 
 function collectErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -46,8 +46,8 @@ for (const theme of ['dark', 'light'] as const) {
 test('a cell drills in, opens its run record and downloads its items', async ({ page }) => {
   const errors = collectErrors(page);
   await mockAdminApi(page, {
-    '/admin/ingestion/bars/1d/2026-10-02': {
-      ...(ADMIN_FIXTURES['/admin/ingestion/chains/option_quotes/2026-10-02'] as object),
+    'ingestionCell:bars/1d/2026-10-02': {
+      ...(ADMIN_FIXTURES['ingestionCell:chains/option_quotes/2026-10-02'] as object),
       cell: {
         dataset: 'bars/1d',
         session: '2026-10-02',
@@ -55,7 +55,7 @@ test('a cell drills in, opens its run record and downloads its items', async ({ 
         present: 12601,
         expected: 12594,
         basis: 'rows on 2026-10-01',
-        run_ids: [],
+        runIds: [],
       },
     },
   });
@@ -84,17 +84,15 @@ test('warns when the latest session is not ingested; a failed section shows its 
   page,
 }) => {
   await mockAdminApi(page, {
-    '/admin/ingestion/completeness': {
-      ...(ADMIN_FIXTURES['/admin/ingestion/completeness'] as object),
-      last_closed: '2026-10-05',
+    completeness: {
+      ...(ADMIN_FIXTURES['completeness'] as object),
+      lastClosed: '2026-10-05',
     },
-    '/admin/verification/ibkr': undefined,
+    verification: undefined,
+    quality: FAIL,
   });
-  await page.route('**/api/admin/quality', (route) =>
-    route.fulfill({ status: 500, json: { detail: 'store unavailable' } }),
-  );
   await page.goto('/admin/ingestion');
   await expect(page.getByText(/Latest session not ingested/)).toBeVisible();
   await expect(page.getByText('Quality checks could not load.')).toBeVisible();
-  await expect(page.getByText('No verification run yet')).toBeVisible();
+  await expect(page.getByText('No verification for this session')).toBeVisible();
 });

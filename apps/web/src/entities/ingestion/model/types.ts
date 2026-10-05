@@ -1,11 +1,9 @@
-/** The ingestion entity's types: the completeness grid and one cell's drill-down. */
-import type { components } from '@/shared/api';
+/** The ingestion entity's types, as `Query.{completeness,ingestionCell}` serve them. */
+import type { gqlTypes } from '@/shared/api';
 
-type Schemas = components['schemas'];
-
-export type Completeness = Schemas['Completeness'];
-export type CompletenessCell = Schemas['Cell'];
-export type CellDetail = Schemas['CellDetail'];
+export type Completeness = NonNullable<gqlTypes.IngestionCompletenessQuery['completeness']>;
+export type CompletenessCell = Completeness['cells'][number];
+export type CellDetail = NonNullable<gqlTypes.IngestionCellQuery['ingestionCell']>;
 
 /** A cell of the grid: one dataset on one session (ISO date). */
 export interface CellRef {

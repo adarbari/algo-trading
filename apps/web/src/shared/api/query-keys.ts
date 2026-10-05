@@ -9,19 +9,6 @@ export const queryKeys = {
     ['gql', operationName, variables] as const,
   /** Every cached response of one GraphQL operation, whatever its variables (invalidation). */
   gqlAll: (operationName: string) => ['gql', operationName] as const,
-  admin: {
-    all: () => ['admin'] as const,
-    completeness: (sessions: number) => ['admin', 'ingestion', 'completeness', sessions] as const,
-    cell: (dataset: string, session: string) =>
-      ['admin', 'ingestion', 'cell', dataset, session] as const,
-    nightlyRuns: (limit: number) => ['admin', 'runs', 'nightly', limit] as const,
-    run: (runId: string) => ['admin', 'runs', 'run', runId] as const,
-    runItems: (runId: string) => ['admin', 'runs', 'run', runId, 'items'] as const,
-    quality: () => ['admin', 'quality'] as const,
-    verification: () => ['admin', 'verification', 'ibkr'] as const,
-    figiReview: () => ['admin', 'review', 'figi'] as const,
-    leveragedReview: () => ['admin', 'review', 'leveraged'] as const,
-  },
   screeners: {
     all: () => ['screeners'] as const,
     preview: (spec: unknown) => ['screeners', 'preview', spec] as const,

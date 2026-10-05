@@ -27,7 +27,7 @@ import {
   type NightlyRun,
 } from '@/entities/run';
 
-const started = (run: NightlyRun) => `${run.started_at.replace('T', ' ').slice(0, 16)} UTC`;
+const started = (run: NightlyRun) => `${run.startedAt.replace('T', ' ').slice(0, 16)} UTC`;
 
 const COLUMNS: DataTableColumn<NightlyRun>[] = [
   {
@@ -48,8 +48,8 @@ const COLUMNS: DataTableColumn<NightlyRun>[] = [
   {
     id: 'duration',
     header: 'Duration',
-    value: (r) => r.duration_s,
-    cell: ({ row }) => formatDuration(row.duration_s),
+    value: (r) => r.durationS,
+    cell: ({ row }) => formatDuration(row.durationS),
     align: 'end',
     width: 'sm',
   },
@@ -77,7 +77,7 @@ function RunTiming({ run }: { run: NightlyRun }) {
   return (
     <Stack gap={2}>
       <Text size="sm" tone="muted">
-        {`Run timing · ${formatValue(run.session, { kind: 'date', style: 'weekday' }).text} · started ${started(run)} · ${formatDuration(run.duration_s)}`}
+        {`Run timing · ${formatValue(run.session, { kind: 'date', style: 'weekday' }).text} · started ${started(run)} · ${formatDuration(run.durationS)}`}
       </Text>
       <BarList
         label={`Step durations of the run started ${started(run)}`}
@@ -102,7 +102,7 @@ function RunTiming({ run }: { run: NightlyRun }) {
 export function RecentRunsPanel() {
   const runs = useNightlyRuns();
   const [chosen, setChosen] = useState<string | null>(null);
-  const run = runs.data?.find((r) => r.run_id === chosen) ?? runs.data?.[0];
+  const run = runs.data?.find((r) => r.runId === chosen) ?? runs.data?.[0];
   return (
     <Panel
       title="Recent nightly runs"
@@ -139,9 +139,9 @@ export function RecentRunsPanel() {
             label="Recent nightly runs"
             columns={COLUMNS}
             rows={runs.data}
-            getRowId={(r) => r.run_id}
+            getRowId={(r) => r.runId}
             onRowActivate={(r) => {
-              setChosen(r.run_id);
+              setChosen(r.runId);
             }}
             visibleRows={Math.min(runs.data.length, 10)}
           />

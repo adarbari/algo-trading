@@ -25,7 +25,7 @@ REST is for (ADR 0037 decision 4):
 
 Read first: ADR 0024 (`docs/adr/0024-api.md`, as amended by 0029, 0033, 0037), and one write
 end to end (`services/authoring/screens.py` -> `schemas/authoring/` -> `routes/authoring/screeners.py`
--> `tests/apps/api/routes/authoring/`). Admin endpoints use the `/admin/` prefix.
+-> `tests/apps/api/routes/authoring/`). Admin writes and jobs use the `/admin/` prefix (Admin reads are GraphQL since read-model PR 10a).
 
 **Ownership (ADR 0019):** `http-api` is `apps/api/algotrade_api/*`; config writes go only
 through `services/authoring` (import-linter "Config writes go only through
