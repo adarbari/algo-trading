@@ -1,4 +1,5 @@
-"""Open a storage backend from a URL, and the config store from a directory.
+"""Open a storage backend (and the text cache beside it) from a URL, and the config store from
+a directory.
 
 Callers pass both explicitly (``algotrade.config.env`` resolves them from the environment);
 storage never reads environment variables.
@@ -10,6 +11,7 @@ from urllib.parse import urlparse
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.backends.text_cache import LocalTextCache, MemoryTextCache
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.tables.interfaces import Backend
@@ -22,6 +24,18 @@ def open_backend(url: str) -> Backend:
         return MemoryBackend()
     if parsed.scheme == "file":
         return LocalBackend(Path(parsed.netloc + parsed.path).expanduser())
+    raise ConfigurationError(f"unsupported storage URL {url!r} (expected file:// or memory://)")
+
+
+def open_text_cache(url: str) -> LocalTextCache | MemoryTextCache:
+    """The cache of text answers beside the store at ``url``: ``cache/explanations`` next to
+    the data root (``file://./var/data`` -> ``./var/cache/explanations``), or in memory."""
+    parsed = urlparse(url)
+    if parsed.scheme == "memory":
+        return MemoryTextCache()
+    if parsed.scheme == "file":
+        data_root = Path(parsed.netloc + parsed.path).expanduser()
+        return LocalTextCache.beside(data_root)
     raise ConfigurationError(f"unsupported storage URL {url!r} (expected file:// or memory://)")
 
 

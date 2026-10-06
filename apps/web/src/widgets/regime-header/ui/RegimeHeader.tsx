@@ -13,6 +13,7 @@ import {
   useRegime,
   type Regime,
 } from '@/entities/regime';
+import { ExplainRegime } from '@/features/regime-explain';
 
 function WhatChanged({ regime }: { regime: Regime }) {
   const changed = changedIndicators(regime);
@@ -64,6 +65,7 @@ export function RegimeHeader() {
         <Stack gap={4}>
           <RegimeHeadline regime={regime.data} />
           <WhatChanged regime={regime.data} />
+          {regime.data.label !== 'UNKNOWN' && <ExplainRegime />}
         </Stack>
       )}
     </Panel>

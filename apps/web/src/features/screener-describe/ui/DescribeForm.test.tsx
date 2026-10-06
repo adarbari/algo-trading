@@ -75,14 +75,14 @@ describe('DescribeForm', () => {
   it("shows the API's refusal as the field's error", async () => {
     POST.mockResolvedValue({
       error: {
-        detail: 'natural-language drafts are off: enable them in config/site/llm.toml (ADR 0041)',
+        detail: 'the text model is off: enable it in config/site/llm.toml (ADR 0041)',
       },
       response: new Response(null, { status: 503 }),
     });
     const { onDraft } = setup();
     await userEvent.type(screen.getByRole('textbox', { name: 'Describe the screen' }), 'stocks');
     await userEvent.click(screen.getByRole('button', { name: 'Draft it' }));
-    expect(await screen.findByText(/drafts are off/)).toBeInTheDocument();
+    expect(await screen.findByText(/text model is off/)).toBeInTheDocument();
     expect(onDraft).not.toHaveBeenCalled();
   });
 });

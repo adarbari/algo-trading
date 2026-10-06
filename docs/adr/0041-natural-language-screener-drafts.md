@@ -11,10 +11,14 @@ wrong (a pending takeover pins RSI high and realised volatility near zero; an ea
 inflates a month of realised volatility), and the situations that fool several thresholds
 at once; one source for the Builder's field help, the generated page
 `docs/data/field-guide.md` and the prompt, because drafts chose the right fields but poor
-thresholds; the owner wants the same explanation for people as for the model). Extends
+thresholds; the owner wants the same explanation for people as for the model), and a third
+time 2026-10-06 (**the text-model seam** has a second caller, the on-demand regime
+explanation: `TextModel` moves to `services/text_model`, the explanation's prompt discipline,
+number check and link filter, and an ADR 0005 write exception for its answer cache; see
+"Amended 2026-10-06: the text-model seam"). Extends
 [0027](0027-vendor-sources-shared-package.md) (an external text model is a vendor adapter in
 `libs/sources`), [0029](0029-rule-screener.md) (a draft is still the only thing the Builder
-edits) and [0037](0037-domain-read-model-served-by-graphql.md) decision 4 (a compute over a request body
+edits), [0005](0005-ingestion-is-the-only-writer.md) (one derived-cache write exception) and [0037](0037-domain-read-model-served-by-graphql.md) decision 4 (a compute over a request body
 stays REST).
 
 ## Context
@@ -81,6 +85,46 @@ only through `services.*`, and the API never writes market or feature data (ADR 
    and injects it; the route lives in `routes/drafting/` with its schema in
    `schemas/drafting/`. Off, or a model that does not answer: the endpoint answers 503 with
    the reason; the Builder shows it inline.
+
+## Amended 2026-10-06: the text-model seam
+
+The seam has a second caller. A regime explanation (docs/market-regime-plan.md 5.6, ADR 0047)
+asks the same `TextModel` for plain words about the market weather.
+
+1. **One seam, two callers.** `TextModel` (and `ModelUnavailableError`) moves to
+   `services/text_model/model.py`, with a `name` (the model `llm.toml` names) so an answer can
+   be cached per model; the API builds it once (`open_text_model`, `apps/api/algotrade_api/
+   text_model.py`) and both routes get it from the one dependency. Ownership splits:
+   `text-model-seam` owns the protocol, the adapter `algotrade_sources/llm/*` and the API wiring;
+   `screen-drafting` keeps the screen prompt and parsing; `regime-explaining` owns the
+   explanation (`services/explaining/`). The 503 reasons name "the text model", not drafting.
+2. **Prompt discipline.** An explanation's prompt is the task (explain to someone who does not
+   follow markets; describe, never advise; use only the facts and links given; under 150 words;
+   name the one or two signals that matter most), the regime's facts (weather word, headline,
+   the three scores, each indicator that is on or changed with its plain name, one line, value,
+   verdict, lead time and false-alarm line; a card question adds that card in full) and the
+   allowed links (the cards' reading lists). No market data beyond those numbers, no user data,
+   no credentials, no free text from the page: the question is "what is happening?" or a card's
+   plain name, and the route accepts nothing else. Rendered byte-stable. Nothing calls the model
+   unasked.
+3. **The answer is checked, not trusted.** It is a JSON object `{text, links}` (the adapter asks
+   the provider for a JSON object), parsed strictly: anything else is `ModelUnavailableError`. A URL that is not an allowed link is dropped; the allowed
+   ones become citations; markdown marks are removed. Every number in the text must be one of
+   the facts' numbers, with the same sign and to the precision the text shows (the as-of date
+   is not a fact); the check is magnitude and sign only, it does not read spelled-out numbers
+   or units; one that is not withholds the whole
+   answer (`checked = false`, a note, no text) and the page shows its templated text instead.
+4. **A derived cache, an ADR 0005 write exception.** The API writes the model's raw answer,
+   only when it checked, to JSON files under `var/cache/explanations/` through
+   `storage/backends/text_cache.py` (the `TextCache` protocol, keyed by session date and a hash
+   of the signals' verdicts, the question, the model and the prompt's version),
+   like its live-quote log (ADR 0028):
+   derived, losable (a lost file is one more model call), never read by a backtest or a screen.
+   A cached answer is checked again on every read. Per-user rate limit: 6 model calls a
+   minute (in memory; a cache hit does not count); a seventh is a 429 with `Retry-After`.
+5. **REST.** `POST /regime/explain {question | card}` is a compute over a request body, the
+   same class as `draft-from-text`; it is a POST, so it is not on the GET allow-list
+   (ADR 0037 is unchanged).
 
 ## Consequences
 - A sentence becomes a reviewable draft in one request; a hallucinated field becomes a

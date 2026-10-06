@@ -13,6 +13,15 @@ vi.mock('@/entities/regime', async (importOriginal) => ({
   useRegime: hooks.useRegime,
 }));
 
+vi.mock('@/features/regime-explain', async () => {
+  const { Button } = await import('@algotrade/ui');
+  return {
+    ExplainRegime: ({ card }: { card?: string }) => (
+      <Button>{`Explain ${card ?? 'the regime'}`}</Button>
+    ),
+  };
+});
+
 beforeEach(() => {
   hooks.useRegime.mockReset();
 });
@@ -25,6 +34,7 @@ describe('RegimeHeader', () => {
     expect(screen.getByRole('heading', { name: 'What changed this week' })).toBeVisible();
     expect(screen.getByText('Are financial conditions tight?')).toBeVisible();
     expect(screen.getByText('Now on')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Explain the regime' })).toBeVisible();
     expect(screen.queryByText('Is the yield curve inverted?')).toBeNull();
     await expectNoA11yViolations(container);
   });
@@ -47,6 +57,7 @@ describe('RegimeHeader', () => {
     expect(screen.getByRole('heading', { level: 3, name: 'Not computed' })).toBeVisible();
     expect(screen.getByText('The regime is not in the catalogue yet.')).toBeVisible();
     expect(screen.getByText('Nothing to compare: the regime is not computed.')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Explain the regime' })).toBeNull();
   });
 
   it('is empty when nothing is stored, loading before the answer', () => {

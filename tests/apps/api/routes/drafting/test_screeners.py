@@ -31,6 +31,8 @@ ANSWER = {
 
 
 class Canned:
+    name = "canned"
+
     def __init__(self, answer: Any) -> None:
         self.answer, self.asked = json.dumps(answer), 0
 
@@ -40,6 +42,8 @@ class Canned:
 
 
 class Down:
+    name = "down"
+
     def complete(self, system: str, user: str) -> str:
         raise ModelUnavailableError("llama at http://localhost:11434/v1: HTTP 429 slow down")
 
@@ -47,7 +51,7 @@ class Down:
 def app_with(store: ReadStore, model: Any) -> TestClient:
     return TestClient(
         create_app(
-            ApiSettings("memory://", "config"), store, drafter=model, authenticator=as_user()
+            ApiSettings("memory://", "config"), store, text_model=model, authenticator=as_user()
         )
     )
 
