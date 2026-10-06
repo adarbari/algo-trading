@@ -60,6 +60,12 @@ class MassiveDailyBars(_Massive):
     def fetch(self, request: FetchRequest) -> bytes | None:
         return self._get(GROUPED.format(date=date.fromisoformat(request.key).isoformat()))
 
+    def probe(self, day: date) -> int:
+        """The HTTP status of one request for ``day``'s grouped bars (no retries): the ingestion
+        asks it for the session before, to tell a session Massive has not published yet (that
+        one answers 200) from a key or plan that no longer works (ADR 0043)."""
+        return self._http.status(GROUPED.format(date=day.isoformat()))
+
     def normalize(self, request: FetchRequest, payload: bytes) -> Normalized | None:
         day = date.fromisoformat(request.key)
         bars, invalid = parse_grouped(day, payload)

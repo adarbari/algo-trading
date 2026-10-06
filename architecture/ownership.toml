@@ -445,6 +445,7 @@ description = "Load and type L3 site settings (config/site/*.toml: sources, univ
 owner = [
     "src/algotrade/config/site/settings.py",
     "src/algotrade/config/site/users.py",
+    "src/algotrade/config/site/nightly.py",
     "src/algotrade/storage/configs/store.py",
     "src/algotrade/storage/configs/files.py",
 ]

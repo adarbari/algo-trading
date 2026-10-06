@@ -12,7 +12,7 @@ from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.ops.schedule import LABEL, nightly_plist
-from algotrade_ingestion.tasks.maintenance.quality import run_quality
+from algotrade_ingestion.tasks.maintenance.quality import check_chains, run_quality
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.stored_frames import stamped, universe_rows
 
@@ -196,6 +196,20 @@ def test_an_empty_tier_passes_and_a_status_without_a_tier_counts_as_rest() -> No
     result = tiered_checks([("A", "rest", "OK")])
     assert result["chains_stale_core"]["status"] == "PASS"
     assert "0 of 0 core" in result["chains_stale_core"]["detail"]
+
+
+def test_stale_chains_are_pending_but_fetch_failures_never_are() -> None:
+    """ADR 0043: Cboe not rolled yet may wait for the deadline; a failed fetch may not."""
+    chains = ["OK"] * 10 + ["STALE_DATA: x"] * 10 + [CIRCUIT] * 2
+    stale, fetch = (
+        {
+            c.name: c
+            for c in check_chains(seed(1000, 1000, 100, 100, chains), D2, SourcesSettings())
+        }[n]
+        for n in ("chains_stale_rest", "chains_fetch")
+    )
+    assert (stale.status, stale.pending) == ("FAIL", True)
+    assert (fetch.status, fetch.pending) == ("FAIL", False)
 
 
 def test_chain_thresholds_come_from_sources_toml() -> None:

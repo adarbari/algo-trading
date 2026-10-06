@@ -4,13 +4,16 @@ A step declares the steps it ``needs`` and runs only when each of them is satisf
 (SUCCEEDED, WAIVED, or SKIPPED as not applicable); otherwise it is NOT_RUN with the reason.
 A step that runs either SUCCEEDS or FAILS: its task must not fail (nor finish PARTIAL when
 ``task_complete``), and every acceptance check it declares must not FAIL. Checks that WARN
-are carried as warnings. A step that raises is FAILED with its error. ``overall`` is the one
-place that turns step results into the run's SUCCEEDED / FAILED: a run SUCCEEDS when every
-critical step is satisfied; an optional (non-critical) step's failure is only a warning.
+are carried as warnings. A step that raises is FAILED with its error. A failing check marked
+``pending`` (its source has not published the session yet) makes the step WAITING instead,
+while ``wait`` holds (before the step's deadline, ADR 0043); never for a fetch failure.
+``overall`` is the one place that turns step results into the run's SUCCEEDED / WAITING /
+FAILED: a run SUCCEEDS when every critical step is satisfied; an optional (non-critical)
+step's failure is only a warning.
 """
 
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import StrEnum
 from typing import Any
@@ -26,6 +29,7 @@ class StepStatus(StrEnum):
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
     NOT_RUN = "NOT_RUN"  # a need was not satisfied, or its data precondition was not met
+    WAITING = "WAITING"  # its source has not published the session yet; retried until the deadline
     SKIPPED = "SKIPPED"  # not applicable: latest-only during catch-up, a skip rule
     WAIVED = "WAIVED"  # accepted by hand (``nightly --waive``), with a reason
 
@@ -37,7 +41,7 @@ LEGACY = {
     "BLOCKED": StepStatus.NOT_RUN,
 }
 SATISFIED = (StepStatus.SUCCEEDED, StepStatus.WAIVED, StepStatus.SKIPPED)
-BAD = (StepStatus.FAILED, StepStatus.NOT_RUN)
+BAD = (StepStatus.FAILED, StepStatus.NOT_RUN, StepStatus.WAITING)
 
 
 def parse_status(value: str) -> StepStatus:
@@ -47,6 +51,7 @@ def parse_status(value: str) -> StepStatus:
 
 class Status(StrEnum):
     SUCCEEDED = "SUCCEEDED"
+    WAITING = "WAITING"
     FAILED = "FAILED"
 
 
@@ -80,6 +85,7 @@ class StepResult:
     reason: str | None = None  # why it FAILED acceptance, was NOT_RUN, SKIPPED or WAIVED
     error: str | None = None  # the exception when it raised
     checks: list[dict[str, str]] = field(default_factory=list)  # checks that did not PASS
+    held_by_wait: bool = False  # NOT_RUN only because a need is WAITING (transitively)
 
     def as_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -92,6 +98,8 @@ class StepResult:
                 out[key] = getattr(self, key)
         if self.checks:
             out["checks"] = self.checks
+        if self.held_by_wait:
+            out["held_by_wait"] = True
         return out
 
 
@@ -105,13 +113,20 @@ class Outcome:
     checks: list[dict[str, str]] = field(default_factory=list)
 
 
-def judge(checks: Iterable[Check], result: Any = None) -> Outcome:
-    """Acceptance: FAILED with the failing checks as the reason when any check FAILs."""
+def judge(checks: Iterable[Check], result: Any = None, wait: bool = False) -> Outcome:
+    """Acceptance: FAILED with the failing checks as the reason when any check FAILs; WAITING
+    instead when ``wait`` and every failing check is ``pending`` (not yet published)."""
     checks = list(checks)
     failed = [c for c in checks if c.status == "FAIL"]
-    shown = [asdict(c) for c in checks if c.status != "PASS"]
+    shown = [
+        {"name": c.name, "status": c.status, "detail": c.detail}
+        for c in checks
+        if c.status != "PASS"
+    ]
     if failed:
         reason = "; ".join(f"{c.name}: {c.detail}" for c in failed)
+        if wait and all(c.pending for c in failed):
+            return Outcome(StepStatus.WAITING, result, f"not published yet: {reason}", shown)
         return Outcome(StepStatus.FAILED, result, reason, shown)
     return Outcome(StepStatus.SUCCEEDED, result, None, shown)
 
@@ -121,6 +136,7 @@ def from_record(
     step: Step | None = None,
     ctx: TaskContext | None = None,
     session: date | None = None,
+    wait: bool = False,
 ) -> Outcome:
     """A registry task's run record as a step outcome, after the step's acceptance checks.
     A task that could not run for a reason outside our data (``stats["skipped"]``, e.g. its
@@ -137,7 +153,7 @@ def from_record(
     if step is None or ctx is None or session is None:
         return Outcome(StepStatus.SUCCEEDED, record.stats)
     checks = [c for fn in step.accept for c in fn(ctx.reader, session, ctx.settings)]
-    return judge(checks, record.stats)
+    return judge(checks, record.stats, wait)
 
 
 SHOWN_ITEMS = 3  # failed items named in a step's reason
@@ -176,20 +192,34 @@ def run_isolated(
     return result
 
 
-def _critical_status(result: StepResult | Mapping[str, Any]) -> tuple[bool, StepStatus]:
+def _critical_status(result: StepResult | Mapping[str, Any]) -> tuple[bool, StepStatus, bool]:
     if isinstance(result, StepResult):
-        return result.critical, result.status
-    return bool(result.get("critical", True)), parse_status(str(result["status"]))
+        return result.critical, result.status, result.held_by_wait
+    return (
+        bool(result.get("critical", True)),
+        parse_status(str(result["status"])),
+        bool(result.get("held_by_wait", False)),
+    )
 
 
 def overall(results: Iterable[StepResult | Mapping[str, Any]]) -> Status:
     """The status rule, in one place: SUCCEEDED when every critical step is satisfied
-    (SUCCEEDED, WAIVED or SKIPPED); else FAILED. Stored results without ``critical`` (run
-    records written before ADR 0039) count as critical."""
-    for critical, status in map(_critical_status, results):
-        if critical and status not in SATISFIED:
-            return Status.FAILED
-    return Status.SUCCEEDED
+    (SUCCEEDED, WAIVED or SKIPPED); WAITING when every unmet critical step is WAITING or
+    NOT_RUN only because of a waiting need (``held_by_wait``) and at least one is WAITING;
+    else FAILED: a real failure is never masked by waiting. Stored results without
+    ``critical`` (run records written before ADR 0039) count as critical."""
+    unmet = [
+        (status, held)
+        for critical, status, held in map(_critical_status, results)
+        if critical and status not in SATISFIED
+    ]
+    if not unmet:
+        return Status.SUCCEEDED
+    waiting = [s is StepStatus.WAITING for s, _ in unmet]
+    covered = all(
+        w or (s is StepStatus.NOT_RUN and held) for w, (s, held) in zip(waiting, unmet, strict=True)
+    )
+    return Status.WAITING if covered and any(waiting) else Status.FAILED
 
 
 def unsatisfied(needs: Iterable[str], done: Mapping[str, StepResult]) -> list[str]:

@@ -28,6 +28,7 @@ class Check:
     name: str
     status: str  # PASS | WARN | FAIL
     detail: str
+    pending: bool = False  # a FAIL that only means "the source has not published it yet" (ADR 0043)
 
 
 def _rows(reader: StoreReader, table: str, day: date | None) -> int | None:
@@ -48,6 +49,20 @@ def _previous(reader: StoreReader, table: str, session: date) -> date | None:
     return dates[-1] if dates else None
 
 
+BARS_TASK = "daily_bars"  # the bars task's run-record job name (tasks/market/bars.py)
+NOT_PUBLISHED = "NOT_PUBLISHED"  # the bars task's item status (tasks/market/bars.py)
+
+
+def _bars_not_published(reader: StoreReader, session: date) -> bool:
+    """Whether the latest bars run for ``session`` found it not published yet (the vendor
+    answers for the session before: ``tasks/market/bars.py``)."""
+    runs = [r for r in reader.runs(BARS_TASK, session) if r.finished_at is not None]
+    if not runs:
+        return False
+    latest = max(runs, key=lambda r: r.finished_at or r.started_at)
+    return str(latest.items.get(session.isoformat(), "")).startswith(NOT_PUBLISHED)
+
+
 def check_bars(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:
     latest = _latest(reader, "bars/1d", session)
     if latest is None:
@@ -57,6 +72,7 @@ def check_bars(reader: StoreReader, session: date, s: SourcesSettings) -> list[C
             "bars_fresh",
             "PASS" if latest == session else "FAIL",
             f"latest bars session {latest}, expected {session}",
+            pending=latest != session and _bars_not_published(reader, session),
         )
     ]
     today, before = (
@@ -74,9 +90,6 @@ def check_bars(reader: StoreReader, session: date, s: SourcesSettings) -> list[C
             )
         )
     return checks
-
-
-BARS_TASK = "daily_bars"  # the bars task's run-record job name (tasks/market/bars.py)
 
 
 def check_bars_resolved(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:
@@ -174,6 +187,7 @@ def _stale_check(
         f"chains_stale_{tier}",
         "FAIL" if share > limit else "PASS",
         f"{count} of {total} {tier} chains stale ({share:.1%}, max {limit:.0%}){names}; {detail}",
+        pending=True,  # Cboe has not rolled to the session yet (ADR 0043)
     )
 
 
