@@ -44,12 +44,25 @@ class Input:
     function of the params). ``required``: without data for the session the group has
     nothing to compute (the runner reports NO_INPUT instead of calling ``compute``).
     ``ids``: only these instruments of a table read by id (``macro/series``: the group's
-    series, ``MACRO:<KEY>`` / ``IDX:<KEY>``); empty: all of them."""
+    series, ``MACRO:<KEY>`` / ``IDX:<KEY>``); empty: all of them.
+    ``windows``: fixed ``(first, last)`` date ranges of the table instead of a trailing
+    lookback (``data.feature_inputs.WINDOW_INPUTS``: ``bars/1d``, the closes only): for each,
+    the rows from ``first`` to the earlier of ``last`` and the session, in a frame whose
+    ``window`` column is the index into this tuple. It is its own input beside a trailing one
+    of the same table (``key``), never required, with no lookback: a group whose history is
+    years back loads it once per window, not as one lookback of everything between."""
 
     table: str
     lookback: Lookback = 0
     required: bool = True
     ids: tuple[str, ...] = ()
+    windows: tuple[tuple[date, date], ...] = ()
+
+    @property
+    def key(self) -> str:
+        """The key of this input's frame in ``compute``'s ``inputs``: the table, or
+        ``<table>#windows`` for its fixed windows."""
+        return f"{self.table}#windows" if self.windows else self.table
 
     def sessions_back(self, params: Any) -> int:
         n = self.lookback(params) if callable(self.lookback) else self.lookback
@@ -134,8 +147,7 @@ def declaration_problems(group: FeatureGroup) -> list[str]:
         problems.append("version must be >= 1")
     if not group.inputs:
         problems.append("declare at least one input")
-    if len({i.table for i in group.inputs}) != len(group.inputs):
-        problems.append("inputs are declared twice")
+    problems += _input_problems(group)
     if not group.features:
         problems.append("declare at least one feature")
     names = [f.name for f in group.features]
@@ -155,6 +167,18 @@ def declaration_problems(group: FeatureGroup) -> list[str]:
     if group.params is not None and not is_dataclass(group.params):
         problems.append("params must be a dataclass instance (or None)")
     return problems + _entity_problems(group)
+
+
+def _input_problems(group: FeatureGroup) -> list[str]:
+    problems = []
+    if len({i.key for i in group.inputs}) != len(group.inputs):
+        problems.append("inputs are declared twice")
+    for i in group.inputs:
+        if i.windows and (i.required or i.lookback or i.ids):
+            problems.append(f"{i.key}: windows take no lookback or ids and are not required")
+        if any(first > last for first, last in i.windows):
+            problems.append(f"{i.key}: a window ends before it starts")
+    return problems
 
 
 def _entity_problems(group: FeatureGroup) -> list[str]:

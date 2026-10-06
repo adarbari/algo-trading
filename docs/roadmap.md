@@ -154,7 +154,7 @@ branches from `main`. `architect` review after RG1a, RG1d, RG2a, RG3 and RG4. Re
 | RG1e | Market reads and `Query.regime` (label UNKNOWN until RG3) | **done** |
 | RG1f | Design-system pieces: `ScoreMeter`, `IndicatorRow`, `Chart.bands` | next |
 | RG1g | `entities/regime` (`useRegime`, `useRegimeBands`, `RegimeChip`, `toChartBands`), the top-bar chip, the page header and cards | next |
-| RG1h | Per-instrument episode features `episode_behaviour@v1` (`features/rollups/price/episodes.py`) | next |
+| RG1h | Per-instrument episode features `episode_behaviour@v1` (`features/rollups/price/episodes.py`; `Input.windows` for each episode's own closes) | **done** |
 | RG2a | The `macro/series` table, `data/macro.py`, `Input.ids`, `config/site/macro.py` settings | next |
 | RG2b | FRED / ALFRED and published-file adapters against recorded payloads | next |
 | RG2c | The `macro` task, step and `check_macro`; then a detached backfill | next |

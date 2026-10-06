@@ -36,13 +36,15 @@ def bars(
     end: date,
     instruments: Sequence[str] | None = None,
     as_of: datetime | None = None,
+    columns: Sequence[str] | None = None,
 ) -> pd.DataFrame:
-    """Bars for ``start <= session_date <= end``, sorted by (instrument_id, ts).
+    """Bars for ``start <= session_date <= end``, sorted by (instrument_id, ts). ``columns``:
+    only these (and the key and point-in-time columns) are read: a long window of one price.
 
     Raises ``MissingDataError`` when nothing is stored; backtests never fetch (ADR 0008).
     """
     table = f"bars/{interval}"
-    frame = reader.table_range(table, start, end, as_of, instruments)
+    frame = reader.table_range(table, start, end, as_of, instruments, columns)
     if frame is None:
         hint = f"run the ingestion job that loads {table} for {start}..{end}"
         raise MissingDataError(table, f"no bars between {start} and {end}", hint)
@@ -111,8 +113,10 @@ def adjust_bars(
                 previous_close = close[before][-1]  # unadjusted basis, as the cash amount is
                 if previous_close > amount:
                     price_factor[before] *= 1 - amount / previous_close
-    out[_PRICES] = out[_PRICES].to_numpy() * price_factor[:, None]
-    out["volume"] = out["volume"].to_numpy() * volume_factor
+    prices = [c for c in _PRICES if c in out.columns]  # a column-pruned read has fewer
+    out[prices] = out[prices].to_numpy() * price_factor[:, None]
+    if "volume" in out.columns:
+        out["volume"] = out["volume"].to_numpy() * volume_factor
     return out
 
 
@@ -216,8 +220,10 @@ class SessionBars:
             rows = self._rows[str(iid)]
             factor[rows[(rows >= lo) & (rows < hi)] - lo] *= ratio
         out = out.copy()
-        out[_PRICES] = out[_PRICES].to_numpy() * factor[:, None]
-        out["volume"] = out["volume"].to_numpy() / factor
+        prices = [c for c in _PRICES if c in out.columns]
+        out[prices] = out[prices].to_numpy() * factor[:, None]
+        if "volume" in out.columns:
+            out["volume"] = out["volume"].to_numpy() / factor
         return out
 
 
@@ -227,14 +233,17 @@ def session_bars(
     end: date,
     instruments: Sequence[str] | None = None,
     as_of: datetime | None = None,
+    columns: Sequence[str] | None = None,
 ) -> SessionBars:
     """Daily bars for ``start..end`` (split events in the range applied) as ``SessionBars``.
+    ``columns``: only those of ``open high low close volume`` are read and kept.
 
     Raises ``MissingDataError`` when no bars are stored in the range."""
-    frame = bars(reader, "1d", start, end, instruments, as_of)
+    frame = bars(reader, "1d", start, end, instruments, as_of, columns)
     splits = read_events(reader, "events/split", start, end, instruments, as_of).frame
     no_dividends = pd.DataFrame(columns=["instrument_id", "ts", "cash_amount"])
-    frame = adjust_bars(frame, splits, no_dividends, "splits")[_WINDOW_COLUMNS]
+    frame = adjust_bars(frame, splits, no_dividends, "splits")
+    frame = frame[[c for c in _WINDOW_COLUMNS if c in frame.columns]]
     frame = frame.sort_values(["session_date", "instrument_id"], kind="stable")
     frame = frame.reset_index(drop=True)
     table = pd.DataFrame(
