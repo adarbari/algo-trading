@@ -53,7 +53,7 @@ def test_market_groups_get_their_own_section_only_when_there_are_any() -> None:
     assert "## Market features" not in render(
         FeatureSet(instruments, site.expressions, site.superseded)
     )
-    assert "\n### `market_trend@v1`" in render(site)
+    assert "\n### `market_trend@v2`" in render(site)
     code = {**site.code, MARKET_COUNTS.key: MARKET_COUNTS}
     with_market = FeatureSet(code, site.expressions, site.superseded)
     text = render(with_market)

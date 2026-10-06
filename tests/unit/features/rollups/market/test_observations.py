@@ -1,6 +1,7 @@
 """``observations``: the input's known rows as one series per id, complete day windows only (a
 history that does not reach a window's start gives null), and monthly windows that tolerate gaps
-down to a minimum of months present."""
+down to a minimum of months present, and a level's last observations (counted, padded, null
+when stale)."""
 
 from datetime import date
 
@@ -12,6 +13,8 @@ from algotrade.features.rollups.market.observations import (
     as_series,
     by_month,
     change_12m,
+    fresh,
+    last_observations,
     latest,
     since,
     trailing_mean,
@@ -86,3 +89,17 @@ def test_monthly_windows_tolerate_gaps_down_to_their_minimum() -> None:
     assert np.isnan(trailing_mean(three_gaps, last, 12, 10))  # 9 of 12: below the minimum
     assert trailing_mean(three_gaps, last - 2, 3, 2) == pytest.approx((7 + 9) / 2)
     assert by_month(None) == {}
+
+
+def test_last_observations_count_values_pad_the_front_and_refuse_a_stale_series() -> None:
+    # sessions 30 Sep, 1, 2 and 5 Oct 2026; a null (FRED ".") is no observation
+    days = pd.to_datetime(["2026-09-30", "2026-10-01", "2026-10-02", "2026-10-05"])
+    s = pd.Series([1.0, np.nan, 2.0, 3.0], index=days)
+    got = last_observations(s, date(2026, 10, 6), 5, max_age=2)
+    assert got is not None
+    np.testing.assert_array_equal(got[2:], [1.0, 2.0, 3.0])
+    assert np.isnan(got[:2]).all()
+    assert fresh(s, date(2026, 10, 7), 2) and not fresh(s, date(2026, 10, 8), 2)
+    assert last_observations(s, date(2026, 10, 8), 5, max_age=2) is None
+    assert last_observations(None, date(2026, 10, 6), 5, max_age=2) is None
+    assert not fresh(pd.Series(dtype=float), date(2026, 10, 6), 2)

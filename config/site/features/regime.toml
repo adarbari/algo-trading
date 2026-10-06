@@ -33,16 +33,16 @@ params = { correction_at = -0.10, bear_at = -0.20 }  # the plan's index drawdown
 dtype = "str"
 unit = "category"
 categories = ["NEAR_HIGH", "CORRECTION", "BEAR"]
-description = "SPY's distance from its 52-week closing high as a band: NEAR_HIGH, CORRECTION from 10% below (params.correction_at), BEAR from 20% below (params.bear_at)"
-null_meaning = "market_trend.spx_drawdown_252d is null (SPY is not in the reference, or misses a bar among the last 252 sessions)"
+description = "The S&P 500's distance from its 52-week closing high (SPY, else the index's previous close: market_trend.spx_source) as a band: NEAR_HIGH, CORRECTION from 10% below (params.correction_at), BEAR from 20% below (params.bear_at)"
+null_meaning = "market_trend.spx_drawdown_252d is null (SPY has no complete 253-session window, and the S&P 500 level is unknown or stale)"
 version = 1
 
 [spx_death_cross]
 expr = "market_trend.spx_sma50_vs_sma200 < 0"
 dtype = "bool"
 unit = "flag"
-description = "SPY's 50-session mean close is below its 200-session mean (a death cross)"
-null_meaning = "market_trend.spx_sma50_vs_sma200 is null (a gap or a short history in the last 200 sessions)"
+description = "The S&P 500's 50-close mean is below its 200-close mean, a death cross (SPY, else the index's previous close: market_trend.spx_source)"
+null_meaning = "market_trend.spx_sma50_vs_sma200 is null (SPY has no complete 253-session window, and the S&P 500 level is unknown or stale)"
 version = 1
 
 [spx_vol_high]
@@ -50,8 +50,8 @@ expr = "market_trend.spx_realised_vol_20d > vol_above"
 params = { vol_above = 0.25 }  # the plan's realised-vol level (3B): 1987, 2008, 2020, 2025
 dtype = "bool"
 unit = "flag"
-description = "SPY's 20-session realised volatility is above 25% (params.vol_above)"
-null_meaning = "market_trend.spx_realised_vol_20d is null (a gap in the last 21 sessions)"
+description = "The S&P 500's 20-close realised volatility is above 25% (params.vol_above; SPY, else the index's previous close: market_trend.spx_source)"
+null_meaning = "market_trend.spx_realised_vol_20d is null (SPY has no complete 253-session window, and the S&P 500 level is unknown or stale)"
 version = 1
 
 [curve_10y2y_inverted]
