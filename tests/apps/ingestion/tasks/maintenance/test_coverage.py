@@ -296,3 +296,14 @@ def test_close_with_the_site_catalogue_no_trade_covers_only_outside_the_core() -
     check = only(check_coverage(reader, D, rules(CLOSE)), "price_stats.close")
     assert (cell(check, "core")["covered"], cell(check, "core")["missing"]) == (1, ["C2"])
     assert cell(check, "rest")["covered"] == 4  # R1 did not trade: not a gap
+
+
+def test_a_next_date_not_announced_is_covered_but_no_earnings_row_is_a_gap() -> None:
+    writer, reader = store()
+    put(writer, EARNINGS, D, {"C1": {"next_earnings_date": None}, "C2": {"next_earnings_date": D}})
+    put(writer, "rollups/instrument/earnings_schedule@v1", D,
+        {"C1": {"next_status": "NOT_ANNOUNCED"}, "C2": {"next_status": "SCHEDULED"}})  # fmt: skip
+    rule = CoverageRule("earnings.next_earnings_date", 1.0, 0.5)  # by value (the site rule)
+    check = only(check_coverage(reader, D, rules(rule)), "earnings.next_earnings_date")
+    assert cell(check, "core")["covered"] == 2
+    assert cell(check, "rest")["missing"] == ["N1", "R1", "R2"]  # no row, no status: gaps
