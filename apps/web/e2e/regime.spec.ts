@@ -1,8 +1,9 @@
 /**
  * Trader > Regime end to end, against the production build with the regime mocked from
- * fixtures recorded from the real API (regime-api.ts): until the RG3 groups exist the regime
- * is UNKNOWN with its reason, every indicator card is listed (slow and fast) and the reading
- * list shows each link once. The top-bar chip says "not computed" on every page and opens the
+ * fixtures recorded from the real API (regime-api.ts): on the golden store the regime is
+ * UNKNOWN with its reason, every indicator card is listed (slow and fast) with its unknown
+ * meter, the legend and the cycles chart render, and the reading list shows each link once; a
+ * computed regime shows range meters, sources, history and the market falls. The top-bar chip says "not computed" on every page and opens the
  * Regime page; the Ideas strip says the sizing rule; accessibility in both themes.
  */
 import { expect, test, type Page } from '@playwright/test';
@@ -35,11 +36,14 @@ for (const theme of ['dark', 'light'] as const) {
     }, theme);
     await expect(page.getByRole('heading', { level: 1, name: 'Regime' })).toBeVisible();
     await expect(page.getByRole('heading', { level: 3, name: 'Not computed' })).toBeVisible();
-    await expect(page.getByText(/the regime has not been computed yet/).first()).toBeVisible();
+    await expect(page.getByText(/has no partition for/).first()).toBeVisible();
     const slow = page.getByRole('region', { name: 'Slow-moving warning signs' });
     const fast = page.getByRole('region', { name: 'Fast-moving market signs' });
     await expect(slow.getByRole('listitem')).toHaveCount(5);
     await expect(fast.getByRole('listitem')).toHaveCount(3);
+    await expect(page.getByRole('region', { name: 'How to read the charts' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Scores through the cycles' })).toBeVisible();
+    await expect(slow.getByRole('img', { name: /: unknown\./ }).first()).toBeVisible();
     const reading = page.getByRole('region', { name: 'Reading list' });
     await expect(reading.getByRole('link').first()).toBeVisible();
     await expectAccessible(page);
@@ -58,9 +62,52 @@ test('the Regime page shows the sizing rules of the caller, read-only', async ({
 
 test('a card opens to its detail and its links', async ({ page }) => {
   await page.goto('/regime');
-  await page.getByRole('button', { name: /Are long-term rates below short-term ones/ }).click();
-  await expect(page.getByRole('heading', { name: 'What it did before' })).toBeVisible();
+  await page
+    .getByRole('button', { name: /Why it matters, what it did before/ })
+    .first()
+    .click();
+  await expect(page.getByRole('heading', { name: 'What it did before' }).first()).toBeVisible();
   await expect(page.getByRole('link', { name: /FRED/ }).first()).toBeVisible();
+});
+
+test('the Regime page teaches: legend, scores through the cycles, range meters, sources, falls', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await mockRegimeComputed(page);
+  await mockExplain(page, false);
+  await page.goto('/regime');
+  await expect(page.getByRole('region', { name: 'How to read the charts' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Scores through the cycles' })).toBeVisible();
+  await expect(
+    page.getByRole('img', { name: /^Macro risk and market stress scores/ }),
+  ).toBeVisible();
+  const slow = page.getByRole('region', { name: 'Slow-moving warning signs' });
+  await expect(slow.getByRole('meter').first()).toBeVisible();
+  await expect(slow.getByText(/^On when (above|below) /).first()).toBeVisible();
+  await expect(slow.getByRole('link', { name: 'FRED T10Y3M' })).toBeVisible();
+  await expect(page.getByRole('grid', { name: 'Market falls' })).toBeVisible();
+  await expectAccessible(page);
+  expect(errors.filter((e) => !e.includes('503'))).toEqual([]);
+});
+
+test('an indicator opens its history and a market fall sets the range of every chart', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await mockRegimeComputed(page);
+  await mockExplain(page, false);
+  await page.goto('/regime');
+  const slow = page.getByRole('region', { name: 'Slow-moving warning signs' });
+  await slow.getByRole('button', { name: 'Show history' }).first().click();
+  await expect(slow.getByRole('radiogroup', { name: 'Chart range' }).first()).toBeVisible();
+  await expect(slow.getByText(/Colors as in the legend above/).first()).toBeVisible();
+  await page
+    .getByRole('grid', { name: 'Market falls' })
+    .getByText('Covid crash, early 2020')
+    .click();
+  await expect(page.getByText('Showing Covid crash, early 2020').first()).toBeVisible();
+  expect(errors.filter((e) => !e.includes('503'))).toEqual([]);
 });
 
 test('the top-bar chip says not computed and opens the Regime page; Ideas shows the strip', async ({

@@ -1,45 +1,13 @@
 /**
  * The regime's indicator cards in two lists, slow (macro, weekly) and fast (market, daily):
- * each an `IndicatorRow` with the plain name, what it measures, its current value (or why it is
- * unknown) and its verdict; expanded, why it matters, what "on" means, what it did before past
- * falls, its lead time, its false alarms and its links. Data, empty and error states.
+ * each an `IndicatorCard` (name and verdict, range meter, linked how-line, sources with their
+ * provenance, history chart, and the detail of why it matters). Data, empty and error states.
  */
-import { IndicatorRow, Panel, Skeleton, Stack } from '@algotrade/ui';
+import { Panel, Skeleton, Stack } from '@algotrade/ui';
 
-import { shownValue, valueFormat } from '@/entities/feature';
-import {
-  indicatorChange,
-  indicatorsOfPace,
-  indicatorStatus,
-  useRegime,
-  type Regime,
-  type RegimeIndicator,
-} from '@/entities/regime';
+import { indicatorsOfPace, useRegime, type Regime } from '@/entities/regime';
 
-import { IndicatorDetail } from './IndicatorDetail';
-
-const isScalar = (value: unknown): value is string | number | boolean =>
-  typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
-
-function Row({ indicator, explainable }: { indicator: RegimeIndicator; explainable: boolean }) {
-  const known = indicator.unknown === null && isScalar(indicator.value);
-  const shown = known ? shownValue(indicator.value) : null;
-  const change = indicatorChange(indicator);
-  const reason = indicator.unknown?.detail;
-  return (
-    <IndicatorRow
-      status={indicatorStatus(indicator.status)}
-      name={indicator.plainName}
-      technicalName={indicator.technicalName}
-      description={reason ? `${indicator.oneLiner} Unknown: ${reason}` : indicator.oneLiner}
-      value={typeof shown === 'string' || typeof shown === 'number' ? shown : null}
-      format={valueFormat({ format: indicator.format ?? 'TEXT' })}
-      {...(change ? { changed: change.change, changedLabel: change.label } : {})}
-    >
-      <IndicatorDetail indicator={indicator} explainable={explainable} />
-    </IndicatorRow>
-  );
-}
+import { IndicatorCard } from './IndicatorCard';
 
 function PaceList({
   regime,
@@ -64,7 +32,11 @@ function PaceList({
       <Stack as="ul" gap={0}>
         {indicators.map((indicator) => (
           <Stack as="li" key={indicator.key}>
-            <Row indicator={indicator} explainable={regime.label !== 'UNKNOWN'} />
+            <IndicatorCard
+              indicator={indicator}
+              session={regime.session}
+              explainable={regime.label !== 'UNKNOWN'}
+            />
           </Stack>
         ))}
       </Stack>
