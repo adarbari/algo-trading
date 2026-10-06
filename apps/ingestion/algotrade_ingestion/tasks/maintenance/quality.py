@@ -296,23 +296,50 @@ def check_macro(reader: StoreReader, session: date, s: SourcesSettings) -> list[
 def macro_checks(
     reader: StoreReader, session: date, s: SourcesSettings, macro: MacroSettings
 ) -> list[Check]:
-    """FAIL when over ``max_macro_stale_share`` of the enabled series (their source is
-    enabled in ``sources.toml``) have no observation newer than ``stale_after_days`` (WARN on
-    any fewer), and when a series holds fewer vintages than an earlier ``macro`` run recorded
-    (a stored vintage is never removed: ADR 0048)."""
+    """FAIL when over ``max_macro_stale_share`` of the fetchable series have no observation
+    newer than ``stale_after_days`` (WARN on any fewer), and when a series holds fewer
+    vintages than an earlier ``macro`` run recorded (a stored vintage is never removed: ADR
+    0048). Fetchable: its source is enabled in ``sources.toml`` and the latest macro run did
+    not skip it (no credential); the skipped ones are named in the detail, and when every
+    enabled series was skipped the check WARNs instead of failing."""
     enabled = [x for x in macro.series if s.vendor(x.source).enabled]
     if not enabled:
         return []
+    runs = reader.runs(MACRO_TASK)
+    named = {x.key for x in enabled}
+    skipped = {k: v for k, v in _skipped_series(runs).items() if k in named}
+    fetchable = [x for x in enabled if x.key not in skipped]
     stored = stored_vintages(reader, [x.instrument_id for x in enabled])
     return [
-        _macro_fresh(stored, session, s.max_macro_stale_share, enabled),
-        _macro_vintages(stored, reader.runs(MACRO_TASK), enabled),
+        _macro_fresh(stored, session, s.max_macro_stale_share, fetchable, skipped),
+        _macro_vintages(stored, runs, enabled),
     ]
 
 
+def _skipped_series(runs: list[RunRecord]) -> dict[str, str]:
+    """Series key -> why, for what the latest finished ``macro`` run skipped."""
+    done = [r for r in runs if r.status in PUBLISHED]
+    if not done:
+        return {}
+    latest = max(done, key=lambda r: (r.started_at, r.run_id))
+    return {str(k): str(v) for k, v in dict(latest.stats.get("skipped_series") or {}).items()}
+
+
 def _macro_fresh(
-    stored: pd.DataFrame, session: date, max_share: float, enabled: list[MacroSeries]
+    stored: pd.DataFrame,
+    session: date,
+    max_share: float,
+    enabled: list[MacroSeries],
+    skipped: dict[str, str],
 ) -> Check:
+    note = ""
+    if skipped:
+        keys = ", ".join(list(skipped)[:EXAMPLES_MACRO]) + (
+            " ..." if len(skipped) > EXAMPLES_MACRO else ""
+        )
+        note = f"; {len(skipped)} skipped, not graded ({keys}: {next(iter(skipped.values()))})"
+    if not enabled:
+        return Check("macro_fresh", "WARN", f"no macro series was fetchable{note}")
     known = latest_vintages(stored, session)
     newest = known[known["value"].notna()].groupby("instrument_id")["obs_date"].max()
     stale = [
@@ -327,7 +354,7 @@ def _macro_fresh(
     return Check(
         "macro_fresh",
         "FAIL" if share > max_share else "WARN" if stale else "PASS",
-        f"{detail}: {named}" if stale else detail,
+        (f"{detail}: {named}" if stale else detail) + note,
     )
 
 

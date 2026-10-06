@@ -91,10 +91,14 @@ def test_a_disabled_source_is_left_out() -> None:
 
 
 def record_run(
-    reader: StoreReader, vintages: dict[str, int], status: RunStatus, minute: int = 0
+    reader: StoreReader,
+    vintages: dict[str, int],
+    status: RunStatus,
+    minute: int = 0,
+    skipped: dict[str, str] | None = None,
 ) -> None:
     run = start_run("macro", D, datetime(2026, 10, 4, 22, minute, tzinfo=UTC))
-    run.status, run.stats = status, {"vintages": vintages}
+    run.status, run.stats = status, {"vintages": vintages, "skipped_series": skipped or {}}
     StoreWriter(reader._backend).save_run(run)
 
 
@@ -120,3 +124,32 @@ def test_check_macro_reads_the_sites_registry() -> None:
     checks = check_macro(store({}), D, SourcesSettings())
     status, detail = by_name(checks)["macro_fresh"]
     assert status == "FAIL" and "series stale" in detail
+
+
+NO_KEY = "ALGOTRADE_FRED_API_KEY is not set"
+
+
+def test_series_the_run_skipped_are_not_graded_but_are_named() -> None:
+    reader = store({"A": D, "B": D})  # C and D have no data: skipped for want of a key
+    record_run(reader, {}, RunStatus.COMPLETE, skipped={"C": NO_KEY, "D": NO_KEY})
+    fresh = by_name(macro_checks(reader, D, SourcesSettings(), registry("A", "B", "C", "D")))[
+        "macro_fresh"
+    ]
+    assert fresh[0] == "PASS" and "0 of 2 series stale" in fresh[1]
+    assert f"2 skipped, not graded (C, D: {NO_KEY})" in fresh[1]
+
+
+def test_a_fetched_series_that_is_stale_still_fails_next_to_skipped_ones() -> None:
+    reader = store({"A": D - timedelta(days=30)})
+    record_run(reader, {}, RunStatus.COMPLETE, skipped={"B": NO_KEY})
+    fresh = by_name(macro_checks(reader, D, SourcesSettings(), registry("A", "B")))["macro_fresh"]
+    assert fresh[0] == "FAIL" and "1 of 1 series stale" in fresh[1]
+
+
+def test_when_every_series_was_skipped_the_check_warns_instead_of_failing() -> None:
+    reader = store({})
+    record_run(reader, {}, RunStatus.COMPLETE, skipped={"A": NO_KEY, "B": NO_KEY})
+    checks = macro_checks(reader, D, SourcesSettings(), registry("A", "B"))
+    status, detail = by_name(checks)["macro_fresh"]
+    assert status == "WARN" and "no macro series was fetchable" in detail and "2 skipped" in detail
+    assert by_name(checks)["macro_vintages"][0] == "PASS"
