@@ -26,9 +26,10 @@ export interface LegendProps {
   items: readonly LegendItem[];
   /**
    * Swatch shape: `cell` (tinted fill + border, matches HeatGrid cells), `solid` (bars and
-   * areas, the default) or `line` (chart lines).
+   * areas, the default), `line` (chart lines) or `hatch` (diagonal lines in the tone, for a
+   * hatched chart band).
    */
-  swatch?: 'cell' | 'solid' | 'line';
+  swatch?: 'cell' | 'solid' | 'line' | 'hatch';
   /** Accessible name of the list, e.g. "Status key". */
   label?: string;
   /** Text size: `sm` 12 px (default) or `xs` 11.5 px. */
@@ -48,7 +49,13 @@ export function Legend({ items, swatch = 'solid', label = 'Legend', size = 'sm' 
             data-swatch={swatch}
             data-tone={item.tone}
             aria-hidden="true"
-          />
+          >
+            {swatch === 'hatch' && (
+              <svg viewBox="0 0 10 10" className={styles.hatch} focusable="false">
+                <path d="M-1 5 L5 -1 M-1 11 L11 -1 M5 11 L11 5" />
+              </svg>
+            )}
+          </span>
           <span className={styles.label}>{item.label}</span>
           {item.value !== undefined && <span className={styles.value}>{item.value}</span>}
         </li>

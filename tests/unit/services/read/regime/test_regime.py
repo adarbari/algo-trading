@@ -9,8 +9,20 @@ import pytest
 from algotrade.config.site.regime.cards import load_cards
 from algotrade.config.strategy.regime import DEFAULT_MULTIPLIERS
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.services.features import catalogue
 from algotrade.services.read.instruments.catalogue import FeatureFormat
-from algotrade.services.read.regime.indicators import IndicatorStatus, RegimeIndicator
+from algotrade.services.read.regime.fields import (
+    FRAGILITY,
+    MACRO_COVERAGE,
+    MACRO_RISK,
+    MARKET_COVERAGE,
+    MARKET_STRESS,
+)
+from algotrade.services.read.regime.indicators import (
+    IndicatorStatus,
+    RegimeIndicator,
+    RiskDirection,
+)
 from algotrade.services.read.regime.regime import (
     RegimeLabel,
     headline,
@@ -22,6 +34,7 @@ from tests.conftest import REPO_ROOT
 from tests.unit.services.read.instruments.conftest import D0, D1, context, store_with
 from tests.unit.services.read.regime.conftest import (
     SEP28,
+    card,
     regime_ctx,
     with_regime,
     write_indicators,
@@ -243,3 +256,35 @@ def test_a_users_own_regime_layer_changes_their_screeners_pauses_only() -> None:
 def test_the_gate_off_by_default_says_so() -> None:
     sizing = load_regime(regime_ctx()).sizing
     assert not sizing.enabled and sizing.screeners == ()
+
+
+def test_an_indicator_carries_its_range_linked_how_and_the_codes_rule() -> None:
+    rollups = {"regime_indicators@v1": {"nfci_above": 0.25}, "regime@v2": {"macro_high": 40.0}}
+    cards = [card("nfci", "slow"), card("breadth_200d", "fast"), card("hy", "slow")]
+    ctx = with_regime(context(store_with()), cards, docs={("site", "settings", "rollups"): rollups})
+    found = load_regime(ctx)
+    nfci, breadth, hy = found.indicators
+    assert (nfci.range.min, nfci.range.max) == (0, 1)
+    assert [(p.text, p.url) for p in nfci.how] == [
+        ("How ", None), ("nfci", "https://example.org/nfci/how"), (" is computed.", None)
+    ]  # fmt: skip
+    assert (nfci.threshold, nfci.direction) == (0.25, RiskDirection.HIGHER_IS_RISK)  # the site's
+    assert (breadth.threshold, breadth.direction) == (0.4, RiskDirection.LOWER_IS_RISK)
+    assert nfci.verdict_feature == "market.regime_indicators@v1.nfci_on"
+    assert (hy.threshold, hy.direction) == (None, None)  # no rule in code for this key
+    assert nfci.sources == () and hy.sources == ()  # the test group's columns have no inputs
+    scores = found.scores
+    macro, market, fragility = scores.macro_risk, scores.market_stress, scores.fragility
+    assert (macro.feature, macro.coverage_feature, macro.threshold) == (
+        "market.regime@v2.macro_risk", "market.regime@v2.macro_coverage", 40.0
+    )  # fmt: skip
+    assert (market.coverage_feature, market.threshold) == ("market.regime@v2.market_coverage", 50.0)
+    assert (fragility.feature, fragility.coverage_feature, fragility.threshold) == (
+        "market.regime@v2.fragility", None, None
+    )  # fmt: skip
+
+
+def test_the_score_fields_are_in_the_shipped_catalogue() -> None:
+    market = catalogue(FileConfigStore(REPO_ROOT / "config")).field_types("market")
+    for name in (MACRO_RISK, MARKET_STRESS, FRAGILITY, MACRO_COVERAGE, MARKET_COVERAGE):
+        assert name in market, name

@@ -5,8 +5,11 @@ For each card ``CARDS`` key: ``<key>`` its value (a column of ``market_macro@v1`
 ``market_trend@v2`` or ``market_breadth@v1`` for the session), ``<key>_on`` its verdict from the
 thresholds of ``Params`` (``config/site/rollups.toml ["regime_indicators@v1"]``), and
 ``<key>_changed`` whether that verdict differs from the one ``changed_sessions`` sessions
-earlier. The earlier verdict is recomputed from the inputs stored for that session, never read
-back from this group (stateless: a backfill equals the nightly).
+earlier. Each ``Card`` names its primary threshold (``threshold``, a ``Params`` field) and how
+the value is compared with it (``op``), so the read model shows the threshold and the direction
+of risk from this code, never a copy (``services/read/regime/indicators.py``). The earlier
+verdict is recomputed from the inputs stored for that session, never read back from this
+group (stateless: a backfill equals the nightly).
 
 A verdict is null (UNKNOWN) when a value it needs is null; an "either" rule (the high-yield
 spread) is on as soon as one side is on. ``_changed`` is null unless both verdicts are known.
@@ -42,7 +45,8 @@ class Params:
     """The cards' thresholds (docs/market-regime-plan.md sections 3 and 4)."""
 
     changed_sessions: int = 5  # <key>_changed compares with this many sessions earlier
-    curve_min_inverted_days: int = 21  # curve: inverted now and on this many of the last 252
+    curve_below: float = 0.0  # curve: 10y - 3m below this (inverted) ...
+    curve_min_inverted_days: int = 21  # ... now and on this many of the last 252 sessions
     hy_oas_above: float = 0.05  # high-yield spread above 5% ...
     hy_oas_off_low: float = 0.015  # ... or 150 bp or more above its 6-month low
     unrate_trend_above: float = 0.0  # unemployment above its 12-month mean
@@ -90,18 +94,49 @@ def both(*verdicts: Verdict) -> Verdict:
     return None if any(v is None for v in verdicts) else True
 
 
+OPS = (">", ">=", "<", "<=")
+Rule = Callable[[Values, Params], Verdict]
+
+
 @dataclass(frozen=True)
 class Card:
+    """One card's verdict. ``threshold`` names the ``Params`` field of its primary threshold
+    and ``op`` how the value is compared with it (on when ``value op threshold``): a lower
+    value is the risk for ``<`` / ``<=`` (``lower_is_risk``). A compound rule (the curve's
+    month of inversion, the spread's 6-month low) gives ``rule``, which reads the same
+    primary threshold; without one the verdict is that one comparison."""
+
     key: str
     group: str  # the input group's key
     column: str  # its value column
-    rule: str  # the verdict in words (the feature's description)
-    verdict: Callable[[Values, Params], Verdict]
+    words: str  # the verdict in words (the feature's description)
+    threshold: str  # the Params field of the primary threshold
+    op: str  # the primary comparison: value op threshold
+    rule: Rule | None = None  # a compound verdict (default: the primary comparison)
+
+    def __post_init__(self) -> None:
+        if self.op not in OPS:
+            raise ValueError(f"{self.key}: op must be one of {OPS}, got {self.op!r}")
+        if not isinstance(getattr(D, self.threshold, None), float):
+            raise ValueError(f"{self.key}: threshold {self.threshold!r} is no float of Params")
+
+    @property
+    def lower_is_risk(self) -> bool:
+        return self.op in ("<", "<=")
+
+    def threshold_of(self, p: Params) -> float:
+        """The primary threshold under ``p``."""
+        return float(getattr(p, self.threshold))
+
+    def verdict(self, v: Values, p: Params) -> Verdict:
+        if self.rule is not None:
+            return self.rule(v, p)
+        return compare(number(v, self.column), self.op, self.threshold_of(p))
 
 
 def _curve(v: Values, p: Params) -> Verdict:
     days = number(v, "curve_inverted_days_252d")
-    return both(compare(number(v, "curve_10y3m"), "<", 0.0),
+    return both(compare(number(v, "curve_10y3m"), "<", p.curve_below),
                 compare(days, ">=", p.curve_min_inverted_days))  # fmt: skip
 
 
@@ -114,23 +149,23 @@ D = Params()
 M, T, B = macro.GROUP.key, trend.GROUP.key, breadth.GROUP.key
 CARDS = (
     Card("curve_10y3m", M, "curve_10y3m",
-         f"10y - 3m below 0 now and on at least {D.curve_min_inverted_days} of the last 252 "
-         "sessions (inverted for about a month)", _curve),
+         f"10y - 3m below {D.curve_below:g} now and on at least {D.curve_min_inverted_days} of "
+         "the last 252 sessions (inverted for about a month)", "curve_below", "<", _curve),
     Card("hy_oas", M, "hy_oas", f"high-yield spread above {D.hy_oas_above:.0%}, or "
-         f"{D.hy_oas_off_low * 1e4:.0f} bp or more above its 126-session low", _hy),
+         f"{D.hy_oas_off_low * 1e4:.0f} bp or more above its 126-session low", "hy_oas_above",
+         ">", _hy),
     Card("unrate_trend", M, "unrate_vs_12m_avg", "unemployment above its 12-month mean",
-         lambda v, p: compare(number(v, "unrate_vs_12m_avg"), ">", p.unrate_trend_above)),
+         "unrate_trend_above", ">"),
     Card("sahm", M, "sahm_gap", f"Sahm gap at least {D.sahm_at_least * 100:.1f} points",
-         lambda v, p: compare(number(v, "sahm_gap"), ">=", p.sahm_at_least)),
-    Card("nfci", M, "nfci", "NFCI above 0 (tighter than average)",
-         lambda v, p: compare(number(v, "nfci"), ">", p.nfci_above)),
+         "sahm_at_least", ">="),
+    Card("nfci", M, "nfci", "NFCI above 0 (tighter than average)", "nfci_above", ">"),
     Card("spx_trend_200d", T, "spx_close_vs_sma200", "the S&P 500 below its 200-day mean",
-         lambda v, p: compare(number(v, "spx_close_vs_sma200"), "<", p.spx_trend_below)),
+         "spx_trend_below", "<"),
     Card("vix_term", M, "vix_term_ratio", f"VIX / VIX3M above {D.vix_term_above:g}",
-         lambda v, p: compare(number(v, "vix_term_ratio"), ">", p.vix_term_above)),
+         "vix_term_above", ">"),
     Card("breadth_200d", B, "pct_above_sma200",
          f"fewer than {D.breadth_below:.0%} of the universe above their 200-day mean",
-         lambda v, p: compare(number(v, "pct_above_sma200"), "<", p.breadth_below)),
+         "breadth_below", "<"),
 )  # fmt: skip
 GROUPS = {g.key: g for g in (macro.GROUP, trend.GROUP, breadth.GROUP)}
 # What each card's verdict reads, beyond its value column.
@@ -146,7 +181,7 @@ def _features(c: Card) -> tuple[Feature, ...]:
     return (
         Feature(c.key, "float32", source.unit, f"{source.description} (the {c.key} card's value)",
                 unknown, valid_range=source.valid_range, inputs=(source.key,), licence=licence),
-        Feature(f"{c.key}_on", "bool", "flag", f"The {c.key} card is on: {c.rule}",
+        Feature(f"{c.key}_on", "bool", "flag", f"The {c.key} card is on: {c.words}",
                 f"a value the rule needs is null ({', '.join(reads)})", inputs=reads),
         Feature(f"{c.key}_changed", "bool", "flag", f"The {c.key} verdict differs from "
                 f"{D.changed_sessions} sessions earlier (recomputed from that session's inputs)",

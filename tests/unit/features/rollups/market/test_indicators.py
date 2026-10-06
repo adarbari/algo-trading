@@ -1,9 +1,11 @@
 """``regime_indicators@v1``: each card's verdict on either side of its threshold, Kleene
 nulls, and ``_changed`` against the verdict recomputed for 5 sessions earlier."""
 
+import hashlib
 from collections.abc import Mapping
 from datetime import date
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -94,3 +96,57 @@ def test_the_contract_columns_of_the_read_model() -> None:
     # raw licensed values stay personal; our verdicts are open (ADR 0047 on ADR 0028)
     personal = {f.name for f in indicators.FEATURES if f.licence == "personal"}
     assert personal == {"hy_oas", "vix_term", "spx_trend_200d"}  # S&P 500 levels: market_trend@v2
+
+
+# Each verdict input around its threshold (stored float32 values: some exactly on it), with
+# nulls; the rows of 40 sessions recorded before the cards named their thresholds in code.
+AROUND = {
+    "curve_10y3m": (0.0, 0.002), "curve_inverted_days_252d": (21, 3),
+    "hy_oas": (0.05, 0.004), "hy_oas_vs_126d_low": (0.015, 0.002),
+    "unrate_vs_12m_avg": (0.0, 0.001), "sahm_gap": (0.005, 0.001), "nfci": (0.0, 0.1),
+    "spx_close_vs_sma200": (0.0, 0.01), "vix_term_ratio": (1.0, 0.05),
+    "pct_above_sma200": (0.4, 0.03),
+}  # fmt: skip
+RECORDED = "bd0012cd5f838df73166d42d80d15fd01cbc067c75368289868c9c85cfb23760"
+
+
+def fixture_rows() -> pd.DataFrame:
+    rng = np.random.default_rng(7)
+    days = sessions_ending(END, 46)
+    by_day: dict[date, dict[str, object]] = {}
+    for d in days:
+        values: dict[str, object] = {}
+        for column, (at, spread) in AROUND.items():
+            pick = rng.random()
+            value = at if pick < 0.2 else None if pick < 0.3 else at + rng.normal(0.0, spread)
+            if column == "curve_inverted_days_252d" and value is not None:
+                value = round(float(value))
+            values[column] = None if value is None else np.float32(value).item()
+        by_day[d] = values
+    rows = [indicators.compute(frames(by_day), d, P) for d in days[6:]]
+    return pd.concat(rows, ignore_index=True)
+
+
+def test_the_verdicts_are_byte_identical_to_the_recorded_rows() -> None:
+    frame = fixture_rows()
+    digest = hashlib.sha256(frame.to_json(orient="split", double_precision=15).encode())
+    assert digest.hexdigest() == RECORDED
+
+
+def test_each_card_names_its_primary_threshold_and_direction() -> None:
+    named = {c.key: (c.threshold, c.op, c.lower_is_risk) for c in CARDS}
+    assert named["curve_10y3m"] == ("curve_below", "<", True)
+    assert named["hy_oas"] == ("hy_oas_above", ">", False)  # 5%, the primary of the two
+    assert named["breadth_200d"] == ("breadth_below", "<", True)
+    assert named["sahm"] == ("sahm_at_least", ">=", False)
+    site = Params(nfci_above=0.5)
+    nfci = next(c for c in CARDS if c.key == "nfci")
+    assert nfci.threshold_of(site) == 0.5
+    assert nfci.verdict({"nfci": 0.4}, site) is False and nfci.verdict({"nfci": 0.6}, site)
+
+
+def test_a_card_must_name_a_float_threshold_and_a_known_op() -> None:
+    with pytest.raises(ValueError, match="op must be"):
+        indicators.Card("x", "g", "x", "words", "nfci_above", "==")
+    with pytest.raises(ValueError, match="no float of Params"):
+        indicators.Card("x", "g", "x", "words", "changed_sessions", ">")

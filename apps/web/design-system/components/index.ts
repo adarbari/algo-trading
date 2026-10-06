@@ -14,10 +14,14 @@ export {
   type ChartBandTone,
   type ChartEvent,
   type ChartEventKind,
+  type ChartLane,
+  type ChartLaneSegment,
   type ChartPoint,
   type ChartProps,
   type ChartRange,
+  type ChartReferenceLine,
   type ChartSeries,
+  type ChartTone,
 } from './Chart';
 export { Checkbox, type CheckboxProps } from './Checkbox';
 export { Chip, type ChipProps } from './Chip';
@@ -66,6 +70,13 @@ export { Kbd, type KbdProps } from './Kbd';
 export { LoginForm, type LoginCredentials, type LoginFormProps } from './LoginForm';
 export { KeyValue, type KeyValueItem, type KeyValueProps } from './KeyValue';
 export { Legend, type DataTone, type LegendItem, type LegendProps } from './Legend';
+export {
+  LinkedText,
+  splitTerms,
+  type LinkedTerm,
+  type LinkedTextPart,
+  type LinkedTextProps,
+} from './LinkedText';
 export { NavTabs, type NavItem, type NavLinkRenderProps, type NavTabsProps } from './NavTabs';
 export { NumberInput, type NumberInputProps } from './NumberInput';
 export { Panel, type PanelProps, type PanelState } from './Panel';
@@ -75,7 +86,12 @@ export {
   type PopoverProps,
   type PopoverTriggerProps,
 } from './Popover';
-export { ScoreMeter, type ScoreMeterProps, type ScoreThreshold } from './ScoreMeter';
+export {
+  ScoreMeter,
+  type ScoreDirection,
+  type ScoreMeterProps,
+  type ScoreThreshold,
+} from './ScoreMeter';
 export { SearchInput, type SearchInputProps } from './SearchInput';
 export {
   SegmentedControl,
@@ -85,6 +101,7 @@ export {
 export { Select, type SelectOption, type SelectProps } from './Select';
 export { ShareBar, type ShareBarProps } from './ShareBar';
 export { Skeleton, type SkeletonProps } from './Skeleton';
+export { SourceLine, type SourceLineItem, type SourceLineProps } from './SourceLine';
 export { SortableList, type SortableItemState, type SortableListProps } from './SortableList';
 export { Sparkline, type SparklineProps, type SparklineTone } from './Sparkline';
 export { StackedBar, type StackedBarProps, type StackedBarSegment } from './StackedBar';
