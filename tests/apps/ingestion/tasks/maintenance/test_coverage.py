@@ -8,9 +8,13 @@ from datetime import date, timedelta
 from algotrade.config.site.coverage import CoverageRule
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.data import StoreReader
+from algotrade.features.expressions.feature_set import FeatureSet
+from algotrade.features.framework.declaration import FeatureGroup, Input
+from algotrade.features.framework.feature import Feature
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.tasks.maintenance.coverage import check_coverage
+from algotrade_ingestion.tasks.maintenance.coverage import cells, check_coverage
+from tests.helpers.rollup_store import features
 from tests.helpers.stored_frames import stamped
 
 D = date(2026, 10, 2)
@@ -246,3 +250,39 @@ def test_a_blank_check_company_is_not_expected_to_have_earnings() -> None:
     rule = CoverageRule("earnings.next_earnings_date", 1.0, 0.5, covered_by="row")
     check = only(check_coverage(reader, D, rules(rule)), "earnings.next_earnings_date")
     assert cell(check, "rest")["missing"] == ["N1"]  # R2 is a SPAC: out of the denominator
+
+
+def _explaining() -> FeatureSet:
+    """``prices.close`` whose null ``history.bar_status@v1`` explains (NO_TRADE), as
+    ``price_stats.close`` and ``price_history@v1`` (ADR 0046)."""
+    close = Feature(
+        "close", "float", "usd_per_share", "close", "no bar",
+        null_status="history.bar_status@v1", explained_statuses=("NO_TRADE",),
+    )  # fmt: skip
+    status = Feature(
+        "bar_status", "str", "category", "status", "never", "label",
+        categories=("TRADED", "NO_TRADE"),
+    )  # fmt: skip
+    groups = {
+        "prices@v1": FeatureGroup(
+            "prices", 1, "", (Input("bars/1d"),), (close, *features({"x": "float"})),
+            lambda *_: None,
+        ),
+        "history@v1": FeatureGroup(
+            "history", 1, "", (Input("bars/1d"),), (status,), lambda *_: None
+        ),
+    }  # fmt: skip
+    return FeatureSet(groups, {}, {})
+
+
+def test_an_explained_absence_covers_except_no_trade_in_the_core_tier() -> None:
+    writer, reader = store()
+    put(writer, "rollups/instrument/prices@v1", D, {"C1": {"close": 10.0}, "R2": {"close": None}})
+    statuses = {s: {"bar_status": "NO_TRADE"} for s in ("C2", "R1", "R2")}
+    put(writer, "rollups/instrument/history@v1", D, statuses | {"N1": {"bar_status": "TRADED"}})
+    rule = CoverageRule("prices.close", 0.9, 0.9)
+    core, rest = cells(reader, D, (rule,), (), _explaining()) or []
+    assert (core.covered, core.missing) == (1, ("C2",))  # a core name with no bar is a gap
+    # R1 (no row) and R2 (a null close) did not trade; N1 traded with no close and E1 has
+    # neither a row nor a status: gaps
+    assert (rest.covered, rest.missing) == (2, ("E1", "N1"))
