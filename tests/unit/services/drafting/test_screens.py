@@ -18,7 +18,17 @@ from algotrade.services.drafting.screens import (
     parse_answer,
 )
 from algotrade.services.read.context import ReadContext, open_context
-from tests.unit.services.screening.test_rule_screens import DAY, LIQ, configs, seeded
+from algotrade.storage.configs.files import MemoryConfigStore
+from tests.unit.services.screening.test_rule_screens import (
+    ACTIVE as ACTIVE_SELECTION,
+)
+from tests.unit.services.screening.test_rule_screens import (
+    DAY,
+    LIQ,
+    SCREEN,
+    configs,
+    seeded,
+)
 
 ALICE = "alice"
 PRICE = f"{LIQ}.underlying_price"
@@ -193,6 +203,29 @@ def test_the_sentence_is_bounded_and_the_model_can_be_down(ctx: ReadContext) -> 
         draft_screen(ctx, Canned(proposal()), "s", "x" * (MAX_TEXT + 1))
     with pytest.raises(ModelUnavailableError, match="timed out"):
         draft_screen(ctx, Down(), "s", "stocks")
+
+
+def test_the_site_phrasebook_goes_to_the_model() -> None:
+    reader, _ = seeded()
+    phrasebook = {
+        "phrase": [
+            {"say": ["liquid"], "fields": [OI, "feature.nope"], "hint": "chain_oi gte 1000"},
+            {"say": ["yield"], "fields": ["feature.nope"]},
+        ]
+    }
+    store = MemoryConfigStore(
+        {
+            ("site", "selections", "active"): ACTIVE_SELECTION,
+            ("site", "strategies", "big_liquid"): SCREEN,
+            ("site", "settings", "phrasebook"): phrasebook,
+        }
+    )
+    ctx = open_context(reader, store, UserContext(ALICE), DAY)
+    model = Canned(proposal(PRICE_GT))
+    draft_screen(ctx, model, "s", "liquid names over 50")
+    system = model.asked[0][0]
+    assert f"liquid | {OI} | chain_oi gte 1000" in system
+    assert "\nyield | " not in system  # a phrase with none of the catalogue's fields is left out
 
 
 def test_the_current_criteria_go_to_the_model(ctx: ReadContext) -> None:

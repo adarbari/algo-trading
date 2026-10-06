@@ -1,6 +1,8 @@
-"""Site settings for the text model behind natural-language screener drafts (ADR 0041,
-``config/site/llm.toml``): which OpenAI-compatible endpoint and model answer, and how long a
-request may take. Off by default; the key comes only from the environment (``config/env.py``)."""
+"""Site settings for natural-language screener drafts (ADR 0041): the text model
+(``config/site/llm.toml``: which OpenAI-compatible endpoint and model answer, how long a request
+may take; off by default, the key only from the environment, ``config/env.py``) and the
+phrasebook (``config/site/phrasebook.toml``: trader vocabulary mapped to catalogue fields with a
+hint on thresholds, listed in the prompt after the catalogue)."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -12,6 +14,7 @@ from algotrade.core.model.errors import ConfigurationError
 
 KEYS = ("enabled", "base_url", "model", "timeout_s", "answer_limit")
 LOOPBACK = ("localhost", "127.0.0.1", "::1")
+PHRASE_KEYS = ("say", "fields", "hint")
 
 
 @dataclass(frozen=True)
@@ -52,3 +55,42 @@ def _endpoint(url: str, where: str) -> str:
     if parts.scheme == "http" and parts.hostname not in LOOPBACK:
         raise ConfigurationError(f"{where}: a remote endpoint must use https, got {url!r}")
     return url.rstrip("/")
+
+
+@dataclass(frozen=True)
+class Phrase:
+    """One phrasebook entry: what the trader ``say``s (any of the words), the catalogue
+    ``fields`` that express it (exact names) and a ``hint`` on how to use them (the gate, a
+    confirmation or a score, typical thresholds, what not to combine)."""
+
+    say: tuple[str, ...]
+    fields: tuple[str, ...]
+    hint: str = ""
+
+
+@dataclass(frozen=True)
+class PhrasebookSettings:
+    """``phrasebook.toml``: the phrases in file order (none without the file)."""
+
+    phrases: tuple[Phrase, ...] = ()
+
+    @classmethod
+    def from_document(cls, doc: Mapping[str, Any] | None) -> "PhrasebookSettings":
+        where = "phrasebook.toml"
+        reject_secrets(doc or {}, where)
+        root = Table(doc, where)
+        root.only(("phrase",))
+        raw = root.raw("phrase") or []
+        if not isinstance(raw, list) or not all(isinstance(e, Mapping) for e in raw):
+            raise ConfigurationError(f"{where} phrase: expected a list of tables ([[phrase]])")
+        return cls(tuple(_phrase(Table(e, f"{where} [[phrase]][{i}]")) for i, e in enumerate(raw)))
+
+
+def _phrase(t: Table) -> Phrase:
+    t.only(PHRASE_KEYS)
+    say, fields = t.strings("say", ()), t.strings("fields", ())
+    if not say or not all(s.strip() for s in say):
+        raise ConfigurationError(f"{t.where} say: expected one or more non-empty strings")
+    if not fields or not all(f.strip() for f in fields):
+        raise ConfigurationError(f"{t.where} fields: expected one or more catalogue field names")
+    return Phrase(tuple(s.strip() for s in say), tuple(fields), t.text("hint", "").strip())

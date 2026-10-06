@@ -34,6 +34,13 @@ the catalogue does not have is dropped with a reason, the rest is validated exac
 finalise does, and the Builder loads the result as unsaved rows. The model's notes say what it
 could not map. Nothing is saved or run until the user saves and finalises as usual.
 
+The prompt carries two worked examples and the site **phrasebook**
+(`config/site/phrasebook.toml`): trader vocabulary ("momentum", "near the 52-week low",
+"liquid", "avoid earnings") mapped to the catalogue fields that express it, with a hint on
+which field is the gate, which a confirmation or a score, and the usual thresholds. It is how
+a free model gets the mapping right; extend it by PR when a sentence maps badly (every field
+it names must exist in the catalogue: a test checks).
+
 ## Example
 
 ```toml

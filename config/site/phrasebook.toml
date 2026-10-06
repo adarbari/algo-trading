@@ -1,0 +1,120 @@
+# L3 site setting: trader vocabulary -> catalogue fields, for natural-language screener drafts
+# (ADR 0041). The drafting prompt lists these after the catalogue so the words a trader uses
+# ("momentum", "near the low", "liquid") land on the right fields with sensible thresholds.
+# Edit by PR. Every field named here must exist in the site catalogue (a test checks); a phrase
+# whose fields the caller's catalogue lacks is left out of that caller's prompt.
+#
+# [[phrase]]  say    = what the trader says (any of these words)
+#             fields = the catalogue fields that express it (exact names)
+#             hint   = how to use them: which is the gate, which a confirmation or a score,
+#                      typical thresholds, what not to combine
+
+[[phrase]]
+say = ["upward momentum", "momentum", "trending up", "gaining", "strong"]
+fields = ["rollup.price_stats@v2.ret_20d", "rollup.price_stats@v2.ret_60d", "feature.pct_vs_sma_20", "rollup.momentum@v1.rsi_14"]
+hint = "gate: ret_20d gt 0 (ret_60d for a longer run); confirm: pct_vs_sma_20 gt 0; rsi_14 gte 50 as a score, never the only gate; do not add trend_state UPTREND when the sentence also says near the low"
+
+[[phrase]]
+say = ["downward momentum", "falling", "weak", "selling off"]
+fields = ["rollup.price_stats@v2.ret_20d", "feature.pct_vs_sma_20", "rollup.momentum@v1.rsi_14"]
+hint = "gate: ret_20d lt 0; confirm: pct_vs_sma_20 lt 0; rsi_14 lte 50 as a score"
+
+[[phrase]]
+say = ["near the 52-week low", "close to its low", "off the lows", "beaten down", "at the bottom"]
+fields = ["feature.pct_from_low_52w", "feature.near_52w"]
+hint = "pct_from_low_52w lte 0.10 (within 10% of the low; 0.20 for 'off the lows'), soft with tolerance 0.05; or near_52w eq LOW for the catalogue's own 10% band"
+
+[[phrase]]
+say = ["near the 52-week high", "at highs", "near its high", "breaking out to highs"]
+fields = ["feature.pct_from_high_52w", "feature.near_52w"]
+hint = "pct_from_high_52w gte -0.10 (within 10% of the high; the value is negative or 0), soft with tolerance 0.05; or near_52w eq HIGH"
+
+[[phrase]]
+say = ["oversold"]
+fields = ["rollup.momentum@v1.rsi_14"]
+hint = "rsi_14 lt 30 (percentage points, 0 to 100)"
+
+[[phrase]]
+say = ["overbought"]
+fields = ["rollup.momentum@v1.rsi_14"]
+hint = "rsi_14 gt 70 (percentage points, 0 to 100)"
+
+[[phrase]]
+say = ["uptrend", "in an uptrend", "above its moving averages"]
+fields = ["feature.trend_state", "feature.pct_vs_sma_50", "feature.pct_vs_sma_200"]
+hint = "trend_state eq UPTREND (close above SMA50 above SMA200); or pct_vs_sma_50 gt 0 for a looser 'above the 50-day'"
+
+[[phrase]]
+say = ["downtrend"]
+fields = ["feature.trend_state", "feature.pct_vs_sma_50"]
+hint = "trend_state eq DOWNTREND; or pct_vs_sma_50 lt 0"
+
+[[phrase]]
+say = ["pullback", "dip in an uptrend", "buy the dip"]
+fields = ["feature.pullback_to_sma20"]
+hint = "pullback_to_sma20 eq true (an uptrend with the close within one ATR of SMA20)"
+
+[[phrase]]
+say = ["breakout", "breaking out", "new 20-day high on volume"]
+fields = ["feature.breakout_20d", "rollup.momentum@v1.rel_volume"]
+hint = "breakout_20d eq true; 'on heavy volume' alone is rel_volume gte 1.5"
+
+[[phrase]]
+say = ["liquid", "actively traded", "heavy volume", "enough volume", "tradable"]
+fields = ["rollup.price_stats@v2.adv_usd_20d", "feature.liquidity_class"]
+hint = "adv_usd_20d gte 50000000 (dollars a day; 'very liquid' 100000000, 'some volume' 5000000), soft with tolerance {relative = 0.2} and on_miss LIQUIDITY_RISK; or liquidity_class in [HIGH, MEDIUM]"
+
+[[phrase]]
+say = ["cheap", "low priced", "under $N", "penny stocks", "expensive"]
+fields = ["rollup.price_stats@v2.close"]
+hint = "close lt N / gt N in dollars; 'penny' is close lt 5; a price floor ('over $5') is a hard gate"
+
+[[phrase]]
+say = ["large cap", "mid cap", "small cap", "market cap"]
+fields = ["feature.market_cap"]
+hint = "market_cap in dollars: large gte 10000000000, mid between [2000000000, 10000000000], small lt 2000000000"
+
+[[phrase]]
+say = ["high implied volatility", "high IV", "IV rank", "elevated vol", "expensive options", "volatility premium"]
+fields = ["feature.iv_rank", "rollup.iv_history@v2.iv30", "feature.iv_hv_spread", "feature.iv_hv_ratio"]
+hint = "iv_rank gte 0.5 (a fraction 0 to 1: 'IV rank above 50%' is 0.5); 'IV over 40%' is iv30 gte 0.40; 'premium' or 'IV over realised' is iv_hv_spread gte 0.05 or iv_hv_ratio gte 1.2"
+
+[[phrase]]
+say = ["low implied volatility", "cheap options", "low IV"]
+fields = ["feature.iv_rank", "rollup.iv_history@v2.iv30"]
+hint = "iv_rank lte 0.3; or iv30 lte 0.25"
+
+[[phrase]]
+say = ["earnings soon", "before earnings", "earnings this week", "avoid earnings", "no earnings coming"]
+fields = ["rollup.earnings@v1.days_to_earnings"]
+hint = "sessions until the next report: 'earnings this week' days_to_earnings lte 5; 'avoid earnings' / 'no earnings in the next N' days_to_earnings gt N (N sessions; default 10), soft with on_miss EVENT_RISK"
+
+[[phrase]]
+say = ["dividend", "yield", "income"]
+fields = ["feature.div_yield"]
+hint = "div_yield as a fraction: 'yield over 3%' is div_yield gte 0.03"
+
+[[phrase]]
+say = ["volatile", "big moves", "choppy", "moves a lot"]
+fields = ["feature.atr_pct", "rollup.price_stats@v2.hv20", "rollup.price_moves@v1.one_day_move"]
+hint = "atr_pct gte 0.03 (daily range as a fraction of price); 'realised vol over 40%' is hv20 gte 0.40; 'had a big one-day move' is one_day_move gte 0.08"
+
+[[phrase]]
+say = ["good options", "tradable options", "tight spreads", "options liquidity"]
+fields = ["feature.option_tier", "feature.option_chain_oi"]
+hint = "option_tier in [A, B] (A best); 'open interest over N' is option_chain_oi gte N; add instrument.optionable eq true"
+
+[[phrase]]
+say = ["cheap valuation", "low P/E", "growing", "revenue growth"]
+fields = ["feature.pe_ratio", "feature.revenue_growth_yoy"]
+hint = "pe_ratio lt 15 (trailing); 'growing revenue' is revenue_growth_yoy gt 0.10 (a fraction)"
+
+[[phrase]]
+say = ["near support", "near resistance", "room to run"]
+fields = ["feature.dist_to_support", "feature.dist_to_resistance"]
+hint = "near support: dist_to_support lte 0.03 (fraction of price); room to run: dist_to_resistance gte 0.10"
+
+[[phrase]]
+say = ["stocks", "ETFs", "optionable", "active"]
+fields = ["instrument.security_type", "instrument.optionable", "instrument.status"]
+hint = "stocks: security_type in [COMMON_STOCK, ADR]; ETFs: security_type in [ETF]; optionable: optionable eq true; always status eq ACTIVE"

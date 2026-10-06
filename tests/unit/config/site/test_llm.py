@@ -1,12 +1,13 @@
 """``llm.toml`` (ADR 0041): defaults (off, a local server), typed keys, https for anything that
-is not this machine, no secrets in the file."""
+is not this machine, no secrets in the file. ``phrasebook.toml``: phrases in file order, each
+with words, fields and a hint; errors name the entry."""
 
 from typing import Any
 
 import pytest
 
-from algotrade.config.site.llm import LlmSettings
-from algotrade.config.site.settings import load_llm
+from algotrade.config.site.llm import LlmSettings, Phrase, PhrasebookSettings
+from algotrade.config.site.settings import load_llm, load_phrasebook
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.storage.configs.files import MemoryConfigStore
 from tests.unit.config.site.test_settings import site
@@ -57,3 +58,48 @@ def test_errors_name_the_key(doc: dict[str, Any], message: str) -> None:
 def test_plain_http_is_fine_on_this_machine() -> None:
     for host in ("localhost", "127.0.0.1", "[::1]"):
         assert LlmSettings.from_document({"base_url": f"http://{host}:11434/v1"}).enabled is False
+
+
+def test_phrasebook_entries_in_file_order() -> None:
+    book = PhrasebookSettings.from_document(
+        {
+            "phrase": [
+                {
+                    "say": ["momentum", " trending up "],
+                    "fields": ["rollup.a@v1.x"],
+                    "hint": " gate:  x gt 0 ",
+                },
+                {"say": ["cheap"], "fields": ["rollup.a@v1.close", "feature.p"]},
+            ]
+        }
+    )
+    assert book.phrases == (
+        Phrase(("momentum", "trending up"), ("rollup.a@v1.x",), "gate:  x gt 0"),
+        Phrase(("cheap",), ("rollup.a@v1.close", "feature.p"), ""),
+    )
+    assert PhrasebookSettings.from_document(None).phrases == ()
+    assert load_phrasebook(MemoryConfigStore({})).phrases == ()
+
+
+def test_the_shipped_phrasebook_loads() -> None:
+    book = PhrasebookSettings.from_document(site("phrasebook"))
+    assert len(book.phrases) >= 10
+    assert any("momentum" in p.say for p in book.phrases)
+    assert all(p.hint for p in book.phrases)
+
+
+@pytest.mark.parametrize(
+    ("doc", "message"),
+    [
+        ({"phrase": {"say": ["x"]}}, r"expected a list of tables"),
+        ({"phrase": [{"fields": ["a"]}]}, r"\[\[phrase\]\]\[0\] say"),
+        ({"phrase": [{"say": ["x"]}]}, r"\[\[phrase\]\]\[0\] fields"),
+        ({"phrase": [{"say": ["x"], "fields": [""]}]}, r"fields: expected"),
+        ({"phrase": [{"say": "x", "fields": ["a"]}]}, r"a list of strings"),
+        ({"phrase": [{"say": ["x"], "fields": ["a"], "mean": "y"}]}, r"unknown keys"),
+        ({"phrases": []}, r"unknown keys"),
+    ],
+)
+def test_phrasebook_errors_name_the_entry(doc: dict[str, Any], message: str) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        PhrasebookSettings.from_document(doc)

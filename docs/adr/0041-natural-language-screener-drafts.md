@@ -1,6 +1,10 @@
 # ADR 0041: Natural-language screener drafts through a swappable text model
 
-**Status:** accepted (2026-10-05; owner decision; implementation: roadmap NL1). Extends
+**Status:** accepted (2026-10-05; owner decision; implementation: roadmap NL1), amended
+2026-10-06 (the prompt also carries two worked examples and a site phrasebook,
+`config/site/phrasebook.toml`: trader vocabulary mapped to catalogue fields with threshold
+hints, so a free model maps "momentum" or "near the low" the way the owner means; the owner
+chose free providers and a phrasebook over a paid model). Extends
 [0027](0027-vendor-sources-shared-package.md) (an external text model is a vendor adapter in
 `libs/sources`), [0029](0029-rule-screener.md) (a draft is still the only thing the Builder
 edits) and [0037](0037-domain-read-model-served-by-graphql.md) decision 4 (a compute over a request body
