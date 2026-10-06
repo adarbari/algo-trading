@@ -85,6 +85,7 @@ class StepResult:
     reason: str | None = None  # why it FAILED acceptance, was NOT_RUN, SKIPPED or WAIVED
     error: str | None = None  # the exception when it raised
     checks: list[dict[str, str]] = field(default_factory=list)  # checks that did not PASS
+    held_by_wait: bool = False  # NOT_RUN only because a need is WAITING (transitively)
 
     def as_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -97,6 +98,8 @@ class StepResult:
                 out[key] = getattr(self, key)
         if self.checks:
             out["checks"] = self.checks
+        if self.held_by_wait:
+            out["held_by_wait"] = True
         return out
 
 
@@ -189,24 +192,34 @@ def run_isolated(
     return result
 
 
-def _critical_status(result: StepResult | Mapping[str, Any]) -> tuple[bool, StepStatus]:
+def _critical_status(result: StepResult | Mapping[str, Any]) -> tuple[bool, StepStatus, bool]:
     if isinstance(result, StepResult):
-        return result.critical, result.status
-    return bool(result.get("critical", True)), parse_status(str(result["status"]))
+        return result.critical, result.status, result.held_by_wait
+    return (
+        bool(result.get("critical", True)),
+        parse_status(str(result["status"])),
+        bool(result.get("held_by_wait", False)),
+    )
 
 
 def overall(results: Iterable[StepResult | Mapping[str, Any]]) -> Status:
     """The status rule, in one place: SUCCEEDED when every critical step is satisfied
-    (SUCCEEDED, WAIVED or SKIPPED); FAILED when a critical step FAILED; WAITING when none
-    failed and one is WAITING (the steps held back behind it are NOT_RUN: waiting, not
-    failing); else FAILED (a critical step NOT_RUN for another reason). Stored results without
+    (SUCCEEDED, WAIVED or SKIPPED); WAITING when every unmet critical step is WAITING or
+    NOT_RUN only because of a waiting need (``held_by_wait``) and at least one is WAITING;
+    else FAILED: a real failure is never masked by waiting. Stored results without
     ``critical`` (run records written before ADR 0039) count as critical."""
-    unmet = [s for critical, s in map(_critical_status, results) if critical and s not in SATISFIED]
+    unmet = [
+        (status, held)
+        for critical, status, held in map(_critical_status, results)
+        if critical and status not in SATISFIED
+    ]
     if not unmet:
         return Status.SUCCEEDED
-    if StepStatus.FAILED not in unmet and StepStatus.WAITING in unmet:
-        return Status.WAITING
-    return Status.FAILED
+    waiting = [s is StepStatus.WAITING for s, _ in unmet]
+    covered = all(
+        w or (s is StepStatus.NOT_RUN and held) for w, (s, held) in zip(waiting, unmet, strict=True)
+    )
+    return Status.WAITING if covered and any(waiting) else Status.FAILED
 
 
 def unsatisfied(needs: Iterable[str], done: Mapping[str, StepResult]) -> list[str]:

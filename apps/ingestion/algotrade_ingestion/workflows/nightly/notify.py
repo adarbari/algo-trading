@@ -10,7 +10,8 @@ file (``var/logs/nightly-latest.json``);
 ``[notify.email]`` enables the email. Addresses and credentials come only from the
 environment (``config/env.py``); a missing one, or an SMTP error, becomes a WARN in the run
 summary and never fails the nightly. Credentials are never logged. A WAITING run (a source has
-not published the session yet; ADR 0043) writes its summary file only: no desktop alert and no
+not published the session yet; ADR 0043) whose only session is the waiting one writes its
+summary file only: no desktop alert and no
 email, because the next hourly run resumes it and the run that ends it (SUCCEEDED, or FAILED
 at the deadline) sends the report.
 """
@@ -240,7 +241,8 @@ def report(
     out = dict(summary)
     path = Path(settings.summary_path)
     _write(path, out)
-    if not settings.notify_enabled or out["status"] == "WAITING":
+    only_waiting = out["status"] == "WAITING" and len(out.get("runs", [])) <= 1
+    if not settings.notify_enabled or only_waiting:  # catch-up sessions that finished still mail
         return out
     note, problem = notice(out, reader, settings)
     try:

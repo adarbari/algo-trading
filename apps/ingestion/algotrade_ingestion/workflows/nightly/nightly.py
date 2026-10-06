@@ -201,7 +201,10 @@ def _not_run(
         return _not_latest(step, before)
     held = unsatisfied(step.needs, done)
     if held:
-        return _held(step, StepStatus.NOT_RUN, f"needs {', '.join(held)}")
+        result = _held(step, StepStatus.NOT_RUN, f"needs {', '.join(held)}")
+        unmet = [done[n] for n in step.needs if n in done and done[n].status in BAD]
+        result.held_by_wait = all(r.status is StepStatus.WAITING or r.held_by_wait for r in unmet)
+        return result
     reason = skip_reason(step.name, ctx) if step.name in TASKS else None
     if reason is None:
         return None

@@ -15,7 +15,7 @@ from algotrade.storage.runs import RunStatus
 from algotrade_ingestion.tasks.maintenance.quality import Check
 from algotrade_ingestion.workflows.nightly import screens as screens_module
 from algotrade_ingestion.workflows.nightly.nightly import run_nightly, run_session
-from algotrade_ingestion.workflows.nightly.notify import message
+from algotrade_ingestion.workflows.nightly.notify import message, report
 from algotrade_ingestion.workflows.nightly.render import _status
 from algotrade_ingestion.workflows.nightly.sessions import Plan, last_done
 from algotrade_ingestion.workflows.nightly.steps import (
@@ -64,11 +64,15 @@ def test_overall_waiting_unless_something_failed() -> None:
     def result(name: str, status: StepStatus) -> StepResult:
         return StepResult(name, status)
 
-    waiting, held = result("bars", StepStatus.WAITING), result("rollups", StepStatus.NOT_RUN)
-    ok = result("rates", StepStatus.SUCCEEDED)
+    waiting, ok = result("bars", StepStatus.WAITING), result("rates", StepStatus.SUCCEEDED)
+    held = StepResult("rollups", StepStatus.NOT_RUN, held_by_wait=True)  # transitively too
+    precondition = result("chains", StepStatus.NOT_RUN)  # e.g. no universe snapshot
     assert overall([ok, waiting, held]) is Status.WAITING
+    assert overall([ok, waiting, precondition]) is Status.FAILED  # never masked by waiting
+    assert overall([ok, waiting, held, precondition]) is Status.FAILED
     assert overall([ok, waiting, result("earnings", StepStatus.FAILED)]) is Status.FAILED
-    assert overall([ok, held]) is Status.FAILED  # held back by something that is not waiting
+    assert overall([ok, held]) is Status.FAILED  # nothing is actually waiting
+    assert overall([ok, waiting, {"status": "NOT_RUN", "held_by_wait": True}]) is Status.WAITING
     assert (
         overall([ok, StepResult("shares", StepStatus.WAITING, critical=False)]) is Status.SUCCEEDED
     )
@@ -85,6 +89,7 @@ def test_a_pending_failure_waits_before_the_deadline_and_holds_dependents(
     assert steps["bars"]["status"] == "WAITING"
     assert steps["bars"]["reason"].startswith("not published yet: bars_fresh")
     assert steps["rollups"]["reason"] == "needs bars (WAITING)"
+    assert steps["rollups"]["held_by_wait"] and steps["screens"]["held_by_wait"]  # transitively
     assert summary["status"] == "WAITING"
     (record,) = writer.runs_for("nightly", D)
     assert record.status is RunStatus.WAITING and record.items["bars"] == "WAITING"
@@ -190,3 +195,18 @@ def test_the_deadline_settings_are_typed() -> None:
             NightlySettings.from_document(bad)
     with pytest.raises(ConfigurationError, match="unknown keys"):
         NightlySettings.from_document({"steps": {"bars": {"deadlin": "23:00"}}})
+
+
+def test_a_waiting_run_that_also_finished_sessions_is_still_reported(tmp_path: Path) -> None:
+    steps = {"bars": {"status": "WAITING", "critical": True}}
+    runs = [
+        {"session": D1.isoformat(), "status": "SUCCEEDED", "steps": {}},
+        {"session": D.isoformat(), "status": "WAITING", "steps": steps},
+    ]
+    base = {"status": "WAITING", "sessions": [D1.isoformat(), D.isoformat()], "runs": runs}
+    settings = NightlySettings.from_document({"notify": {"summary_path": str(tmp_path / "s.json")}})
+    notifier = FakeNotifier()
+    report(base, settings, notifier)
+    assert len(notifier.notices) == 1  # D1 SUCCEEDED in this run: say so
+    report({**base, "runs": runs[1:]}, settings, notifier)
+    assert len(notifier.notices) == 1  # only the waiting session: quiet
