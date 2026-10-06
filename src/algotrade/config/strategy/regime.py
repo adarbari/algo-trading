@@ -2,7 +2,7 @@
 
 Layered like ``[screening]`` and ``[backtest]`` (ADR 0015: built-in < ``config/site/defaults.toml``
 < the site preset < the user's config < run overrides), so the config hash records it. Off by
-default. ``label`` is the market feature holding the session's regime (``market.regime@v2.label``:
+default. ``label`` is the market feature holding the session's regime (``market.regime@v3.label``:
 CALM, CAUTION, STRESS, CRISIS; null is unknown). ``multipliers`` size positions per label;
 ``unknown_multiplier`` is the size when the label is unknown (fail closed: 0 by default).
 ``pause_in`` lists the labels in which a screener's QUALIFIED / WATCH rows are PAUSED;
@@ -21,7 +21,7 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.fields import field_source, group_of_table
 
 REGIME_LABELS = ("CALM", "CAUTION", "STRESS", "CRISIS")  # calmest first
-REGIME_LABEL = "market.regime@v2.label"
+REGIME_LABEL = "market.regime@v3.label"
 DEFAULT_MULTIPLIERS: Mapping[str, float] = MappingProxyType(
     {"CALM": 1.0, "CAUTION": 0.75, "STRESS": 0.5, "CRISIS": 0.25}
 )

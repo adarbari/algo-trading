@@ -2,7 +2,7 @@
 # docs/market-regime-plan.md sections 3B and 4): market-entity formulas over the market groups
 # (market_macro, market_trend), computed on read. They are the plan's context signals, shown
 # beside the regime but never counted in its scores: the cards' verdicts and the scores live in
-# the groups regime_indicators@v1 and regime@v2 (features/rollups/market/), whose thresholds are
+# the groups regime_indicators@v1 and regime@v3 (features/rollups/market/), whose thresholds are
 # in config/site/rollups.toml, because a verdict there compares with 5 sessions earlier, which
 # the expression language cannot. Features over VIX read a personal-use series (ADR 0028).
 # Language and keys: docs/configuration.md "Expression features".

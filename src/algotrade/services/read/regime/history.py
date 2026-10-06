@@ -1,6 +1,6 @@
 """The regime label's history as bands (ADR 0047): for the sessions of ``start..end`` (explicit
 dates, never after ``ctx.session``: a window past it would show what the session did not know),
-each session's label read from its own partition of the market's ``regime@v2`` table, and runs
+each session's label read from its own partition of the market's ``regime@v3`` table, and runs
 of consecutive sessions with the same label merged server-side into ``RegimeBand`` (the browser
 only draws them, ADR 0038). A session with no stored label (no partition, no row, a null or an
 unknown value, or the field not in the catalogue yet) is an ``UNKNOWN`` band: never carried
