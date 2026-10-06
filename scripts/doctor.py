@@ -6,6 +6,7 @@ never fail it). Every probe goes through `Probes`, so tests pass fakes. Never pr
 from __future__ import annotations
 
 import json
+import plistlib
 import re
 import shutil
 import socket
@@ -56,6 +57,8 @@ class Probes:
     data_url: Callable[[], str] = field(default=lambda: "file://./var/data")
     main: Callable[[], Path] = _main_checkout
     required: tuple[str, ...] = ()
+    web_dist: Callable[[], Path | None] = field(default=lambda: None)  # ALGOTRADE_WEB_DIST
+    launch_agents: Path = Path.home() / "Library" / "LaunchAgents"
 
 
 @dataclass(frozen=True)
@@ -244,6 +247,62 @@ def check_store(p: Probes) -> Result:
     )
 
 
+def check_web_dist(p: Probes) -> Result:
+    """The API serves the built web from ``ALGOTRADE_WEB_DIST`` when set (ADR 0044) and
+    refuses to start without its ``index.html``."""
+    dist = p.web_dist()
+    if dist is None:
+        return Result(INFO, "web build", "ALGOTRADE_WEB_DIST unset: the API serves no files")
+    path = dist if dist.is_absolute() else p.repo / dist
+    if (path / "index.html").is_file():
+        return Result(OK, "web build", "ALGOTRADE_WEB_DIST has index.html (rebuild on web changes)")
+    return Result(
+        FAIL,
+        "web build",
+        "ALGOTRADE_WEB_DIST names a directory without index.html: the API will not start",
+        "make web-build  # and ALGOTRADE_WEB_DIST=var/web in .env (docs/hosting.md)",
+    )
+
+
+# The launchd agents (``algotrade-ingest schedule``, ``algotrade-api schedule``): label -> the
+# command that rewrites it. Each must run the main checkout's code from the main checkout.
+AGENTS = {
+    "com.algotrade.nightly": ".venv/bin/algotrade-ingest schedule",
+    "com.algotrade.api": ".venv/bin/algotrade-api schedule",
+}
+
+
+def check_agents(p: Probes) -> list[Result]:
+    """Each installed launchd agent runs this (main) checkout's venv in this checkout: an agent
+    written in a worktree or another clone serves or ingests with code nobody reviewed here."""
+    main = p.main()
+    out = []
+    for label, rewrite in AGENTS.items():
+        installed = p.launch_agents / f"{label}.plist"
+        if not installed.exists():
+            out.append(Result(INFO, label, "not installed"))
+            continue
+        try:
+            agent = plistlib.loads(installed.read_bytes())
+            paths = [str(agent["ProgramArguments"][0]), str(agent["WorkingDirectory"])]
+        except (OSError, ValueError, LookupError, TypeError, plistlib.InvalidFileException):
+            paths = []
+        bad = [x for x in paths if not _in_main(x, main)]
+        if paths and not bad and Path(paths[0]).exists():
+            out.append(Result(OK, label, f"installed, runs {main}"))
+            continue
+        shown = ", ".join(bad) if bad else "an unreadable plist or a missing program"
+        out.append(
+            Result(
+                FAIL,
+                label,
+                f"the installed agent does not run the main checkout {main}: {shown}",
+                f"cd {main} && {rewrite}  # then run the install commands it prints",
+            )
+        )
+    return out
+
+
 def run_checks(p: Probes) -> list[Result]:
     return [
         check_uv(p),
@@ -256,6 +315,8 @@ def run_checks(p: Probes) -> list[Result]:
         check_env(p),
         check_ibkr(p),
         check_store(p),
+        check_web_dist(p),
+        *check_agents(p),
     ]
 
 
@@ -276,13 +337,19 @@ def main() -> int:
             REQUIRED_KEYS,
             data_url,
             dotenv_keys,
+            load_dotenv,
+            web_dist,
         )
     except ImportError:  # no usable venv: still report everything that does not need the library
         probes = Probes()
         extra = [Result(FAIL, "library", "algotrade not importable", "make install (needs uv)")]
     else:
+        load_dotenv(REPO / ".env")  # as the API and the nightly see it (never printed)
         probes = Probes(
-            env_keys=lambda: dotenv_keys(REPO / ".env"), data_url=data_url, required=REQUIRED_KEYS
+            env_keys=lambda: dotenv_keys(REPO / ".env"),
+            data_url=data_url,
+            required=REQUIRED_KEYS,
+            web_dist=web_dist,
         )
         extra = []
     text, code = render(run_checks(probes) + extra)

@@ -32,6 +32,8 @@ one could pick a different session (ADR 0036).
 4. **REST only for** writes, job polling, health, live quotes, the preview POSTs, files and,
    until the last PR, admin. Every GET route is in `architecture/rest_allowlist.toml`, which only
    shrinks (two fitness tests). A new GET that is not a page read needs an amendment here.
+   Amended by [0044](0044-hosting-from-the-owners-mac.md): the files include the built web
+   app (`GET /{path}`, mounted last, only when `ALGOTRADE_WEB_DIST` is set).
 5. **Migration in ten PRs** (the spec's plan), each green and shippable; `services/explore` is
    deleted in the last.
 

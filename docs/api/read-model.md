@@ -418,6 +418,7 @@ query IdeasPage($date: Date, $limit: Int!, $names: [FeatureName!]!) {
 | `GET /chains/{id}/live` | latency-bound, records to `live/*`, bypasses the session model on purpose (ADR 0028) |
 | `POST /screeners/preview`, `POST /features/check` | compute over a request body with its own cache |
 | Files (exports) | binary / streaming |
+| `GET /{path}`: the built web app, only when `ALGOTRADE_WEB_DIST` is set | files on the API's own origin, mounted last, public, no data (ADR 0044) |
 
 Every read for a trader page goes to GraphQL. No new GET serving stored data.
 

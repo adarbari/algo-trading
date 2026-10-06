@@ -5,6 +5,7 @@ only shrinks (page reads move to GraphQL, docs/api/read-model.md "What stays RES
 import subprocess
 import sys
 import tomllib
+from pathlib import Path
 
 from algotrade_api.deps import ApiSettings
 from algotrade_api.main import create_app
@@ -14,17 +15,18 @@ from tests.helpers.api_store import as_user
 REST_ALLOWLIST = "architecture/rest_allowlist.toml"
 
 
-def _served_get_routes() -> set[str]:
-    """Every GET path the API serves, from its OpenAPI document (the app as served)."""
-    paths = create_app(ApiSettings("memory://", "config"), authenticator=as_user()).openapi()[
-        "paths"
-    ]
+def _served_get_routes(web_dist: Path) -> set[str]:
+    """Every GET path the API serves, from its OpenAPI document (the app as served, with every
+    optional part switched on: the built web app of ``web_dist``, ADR 0044)."""
+    (web_dist / "index.html").write_text("<!doctype html>")
+    settings = ApiSettings("memory://", "config", web_dist=web_dist)
+    paths = create_app(settings, authenticator=as_user()).openapi()["paths"]
     return {path for path, ops in paths.items() if "get" in ops}
 
 
-def test_rest_get_routes_are_allowlisted() -> None:
+def test_rest_get_routes_are_allowlisted(tmp_path: Path) -> None:
     listed = {r["path"] for r in tomllib.loads((REPO_ROOT / REST_ALLOWLIST).read_text())["route"]}
-    served = _served_get_routes()
+    served = _served_get_routes(tmp_path)
     new, gone = sorted(served - listed), sorted(listed - served)
     assert not new, (
         f"GET routes not in {REST_ALLOWLIST}: {new}. A read for a page is a GraphQL field "

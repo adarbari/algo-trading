@@ -585,9 +585,12 @@ test fails when it is stale); the web client is generated from it.
 ## 13. Hosting
 
 Local (macOS) today: Python 3.12 via uv, storage at `ALGOTRADE_DATA_URL` (default
-`file://./var/data`), configs at `ALGOTRADE_CONFIG_DIR` (default `./config`). Hosting needs no
-redesign: an `s3://` storage backend, a DB-backed `ConfigStore` and a queue-backed job runner
-(phases 4–6).
+`file://./var/data`), configs at `ALGOTRADE_CONFIG_DIR` (default `./config`). Users outside the
+Mac reach it through Tailscale Funnel ([ADR 0044](adr/0044-hosting-from-the-owners-mac.md),
+runbook [hosting.md](hosting.md)): one origin, the API serving the built web
+(`ALGOTRADE_WEB_DIST`) and kept up by a launchd agent (`algotrade-api schedule`). Moving off
+the Mac needs no redesign: an `s3://` storage backend, a DB-backed `ConfigStore` and a
+queue-backed job runner (phases 4–6).
 
 ---
 
