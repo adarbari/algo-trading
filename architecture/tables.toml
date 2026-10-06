@@ -167,8 +167,8 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
 name = "rollups/market/*"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-note = "market-entity feature groups (ADR 0047): one MKT:US row per session, compute_rollups(entity='market')"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
+note = "market-entity feature groups (ADR 0047): one MKT:US row per session, the market-rollups task (compute_rollups(entity='market')); each group's own table is declared here when the group is added"
 
 [[table]]
 name = "rollups/daily/*"

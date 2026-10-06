@@ -99,13 +99,14 @@ detect = [{ call_regex = "(^|\\.)(find_peaks|argrelextrema|argrelmax|argrelmin)$
 
 [[responsibility]]
 id = "rollup-computation"
-description = "Compute feature groups (rollups): the FeatureGroup declaration (inputs + lookback, params from rollups.toml, declared features, the entity one row describes: instrument, or market with one MKT:US row checked by the runner, ADR 0047), asking algotrade.data for inputs by table name, point in time per session, backfills; groups are pure compute modules (a materialised expression feature is a one-feature group built by the FeatureSet), stored only by the rollups task (compute_rollups, per entity)"
+description = "Compute feature groups (rollups): the FeatureGroup declaration (inputs + lookback, params from rollups.toml, declared features, the entity one row describes: instrument, or market with one MKT:US row checked by the runner, ADR 0047), asking algotrade.data for inputs by table name, point in time per session, backfills; groups are pure compute modules (a materialised expression feature is a one-feature group built by the FeatureSet), stored only by the rollups task (instrument groups) and the market-rollups task (market groups), both through compute_rollups per entity"
 owner = [
     "src/algotrade/features/framework/*",
     "src/algotrade/features/registry.py",
     "src/algotrade/features/rollups/*",
     "src/algotrade/features/expressions/feature_set.py",
     "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py",
+    "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py",  # the market entity's task
 ]
 section = "docs/data/layers.md#rollups-as-built"
 detect = [{ call = "compute_sessions" }, { call = "compute_one" }, { call = "FeatureGroup" }]

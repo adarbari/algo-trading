@@ -15,9 +15,11 @@ from typing import Any
 import pandas as pd
 
 from algotrade.config.site.settings import SourcesSettings
+from algotrade.core.model.instruments import market_id
 from algotrade.data import StoreReader
 from algotrade.data.chains import chain_status
 from algotrade.data.reference import snapshot
+from algotrade.services.features import site_features
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_ingestion.tasks.reference.classify import security_type
@@ -277,6 +279,29 @@ def check_verification(reader: StoreReader, session: date, s: SourcesSettings) -
             f"{share:.1%} of {graded} graded checks failed vs IBKR "
             f"(max {s.max_verify_failures:.0%}); {breakdown}{worst}",
         )
+    ]
+
+
+def check_market_rollups(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:
+    """The acceptance of ``market-rollups`` (ADR 0047): each market group has its one
+    ``MKT:US`` row stored for ``session``; FAIL names the groups without (a group with no
+    input for the session writes nothing). PASS with no market group declared."""
+    groups = [g for g in site_features().groups.values() if g.entity == "market"]
+    missing = []
+    for group in groups:
+        frame = reader.table(group.table, session)
+        if frame is None or list(frame["instrument_id"]) != [market_id("US")]:
+            missing.append(group.key)
+    if missing:
+        return [
+            Check(
+                "market_rollups",
+                "FAIL",
+                f"no {market_id('US')} row for {session}: {', '.join(missing)}",
+            )
+        ]
+    return [
+        Check("market_rollups", "PASS", f"{len(groups)} market groups with their row for {session}")
     ]
 
 

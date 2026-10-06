@@ -164,6 +164,32 @@ def test_an_optional_step_failing_is_a_warning(fake: Callable[..., Calls]) -> No
     ]
 
 
+def test_a_market_rollups_failure_never_holds_back_the_screens(
+    fake: Callable[..., Calls],
+) -> None:
+    """ADR 0047: market-rollups needs rollups, is not critical, and the screens do not need it."""
+    bad = Check("market_rollups", "FAIL", f"no MKT:US row for {D}: trend@v1")
+    calls = fake(checks={"market-rollups": [bad]})
+    summary = run_nightly(task_ctx(store()), Plan([D]))
+    market = steps_of(summary)["market-rollups"]
+    assert market["status"] == "FAILED" and market["critical"] is False
+    assert market["reason"] == f"market_rollups: no MKT:US row for {D}: trend@v1"
+    assert statuses(summary)["screens"] == "SKIPPED"  # reached (no screener in this store)
+    assert summary["status"] == "SUCCEEDED" and calls.sessions("market-rollups") == [D]
+    fake(fail=("market-rollups",))
+    summary = run_nightly(task_ctx(store()), Plan([D]))
+    assert statuses(summary)["market-rollups"] == "FAILED"
+    assert statuses(summary)["screens"] == "SKIPPED" and summary["status"] == "SUCCEEDED"
+
+
+def test_market_rollups_wait_for_the_rollups(fake: Callable[..., Calls]) -> None:
+    calls = fake(fail=("rollups",))
+    summary = run_nightly(task_ctx(store()), Plan([D]))
+    market = steps_of(summary)["market-rollups"]
+    assert (market["status"], market["reason"]) == ("NOT_RUN", "needs rollups (FAILED)")
+    assert calls.sessions("market-rollups") == []
+
+
 def test_chains_need_a_universe_snapshot_not_a_successful_build(
     fake: Callable[..., Calls],
 ) -> None:
@@ -487,7 +513,7 @@ def test_notifies_on_failure_and_always_writes_the_summary(
     assert summary["status"] == "FAILED" and summary["sessions"] == [D.isoformat()]
     # The notice carries the full report (the email body): subject, text and HTML.
     (note,) = notifier.notices
-    assert note.subject == f"[algotrade] {D} nightly: FAILED · 3 steps with failures"
+    assert note.subject == f"[algotrade] {D} nightly: FAILED · 4 steps with failures"
     assert "bars FAILED: RuntimeError: bars broke" in note.text
     assert note.html.startswith("<!doctype html>") and "bars broke" in note.html
     assert summary["started_at"] <= summary["finished_at"]
