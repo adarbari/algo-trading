@@ -11,6 +11,8 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import date
 
+import pandas as pd
+
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.data import StoreReader
 from algotrade.data.chains import chain_status
@@ -139,6 +141,7 @@ def check_universe(reader: StoreReader, session: date, s: SourcesSettings) -> li
 # rest are answers.
 FETCH_FAILURES = ("FETCH_ERROR", "NOT_ATTEMPTED")  # FETCH_ERROR includes an open circuit
 STALE = "STALE_DATA"
+EXAMPLES = 8  # stale core names listed in the detail
 REPORTED = ("OK", "STALE_DATA", "NO_CHAIN", "NO_STANDARD_SERIES")
 
 
@@ -150,7 +153,6 @@ def check_chains(reader: StoreReader, session: date, s: SourcesSettings) -> list
     total = len(labels)
     counts = labels.value_counts()
     failed = int(labels.isin(FETCH_FAILURES).sum())
-    stale = int(counts.get(STALE, 0))
     breakdown = ", ".join(f"{k} {int(counts.get(k, 0))}" for k in REPORTED)
     detail = f"of {total} underlyings: {breakdown}, fetch failures {failed}"
     return [
@@ -160,13 +162,38 @@ def check_chains(reader: StoreReader, session: date, s: SourcesSettings) -> list
             f"{failed / total:.1%} failed to fetch "
             f"(max {s.max_chain_fetch_failures:.0%}); {detail}",
         ),
-        Check(
-            "chains_stale",
-            "FAIL" if stale / total > s.max_chain_stale_share else "PASS",
-            f"{stale / total:.1%} stale (max {s.max_chain_stale_share:.0%}); {detail}",
-            pending=True,  # Cboe has not rolled to the session yet (ADR 0043)
-        ),
+        _stale_check(status_frame, labels, "core", s.max_chain_stale_share_core, detail),
+        _stale_check(status_frame, labels, "rest", s.max_chain_stale_share, detail),
     ]
+
+
+def _stale_check(
+    frame: pd.DataFrame, labels: pd.Series, tier: str, limit: float, detail: str
+) -> Check:
+    """``chains_stale_<tier>``: the share of the tier's chains that are STALE_DATA, FAIL above
+    ``limit``. The tier is the one stored with each status row at fetch time (rows from before
+    the column existed count as rest); stale core names are listed."""
+    stored = frame["tier"] if "tier" in frame.columns else pd.Series("rest", index=frame.index)
+    in_tier = stored.fillna("rest").astype(str) == tier
+    total = int(in_tier.sum())
+    if tier == "core" and total == 0 and "tier" in frame.columns:
+        # a tiered status with no core name means the tier inputs were missing: no gate
+        return Check(
+            "chains_stale_core", "FAIL", f"no core names in a tiered chain status; {detail}"
+        )
+    stale = in_tier & (labels == STALE)
+    count = int(stale.sum())
+    share = count / total if total else 0.0
+    names = ""
+    if tier == "core" and count:
+        listed = frame.loc[stale, "symbol"].astype(str).sort_values().head(EXAMPLES).tolist()
+        names = f"; stale: {', '.join(listed)}" + (" ..." if count > EXAMPLES else "")
+    return Check(
+        f"chains_stale_{tier}",
+        "FAIL" if share > limit else "PASS",
+        f"{count} of {total} {tier} chains stale ({share:.1%}, max {limit:.0%}){names}; {detail}",
+        pending=True,  # Cboe has not rolled to the session yet (ADR 0043)
+    )
 
 
 def check_earnings(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:

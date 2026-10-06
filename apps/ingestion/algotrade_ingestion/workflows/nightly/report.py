@@ -342,8 +342,10 @@ HINTS: tuple[tuple[re.Pattern[str], str], ...] = tuple(
         ),
         (
             r"^chains_stale",
-            "chains_stale: STALE_DATA share above [quality] max_chain_stale_share: Cboe served "
-            "older chains (thin delayed data). Re-run chains later; screens treat them as UNKNOWN.",
+            "chains_stale_core / chains_stale_rest: STALE_DATA share of the tier above [quality] "
+            "max_chain_stale_share_core (S&P 500, priority symbols, HIGH liquidity) or "
+            "max_chain_stale_share (the rest): Cboe served older chains (thin delayed data). "
+            "Re-run chains later; screens treat them as UNKNOWN.",
         ),
         (
             r"IB Gateway not reachable|\[ibkr\] is disabled",

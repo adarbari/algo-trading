@@ -160,7 +160,7 @@ CHAIN_STATUS = _fixed(
     "chain_snapshot",
     ("instrument_id", "status"),
     "instrument_id string!",
-    *_strings("symbol", "status"),
+    *_strings("symbol", "status", "tier"),
 )
 
 # L1: what each instrument is (one full snapshot per date). See docs/design/phase-0.md.

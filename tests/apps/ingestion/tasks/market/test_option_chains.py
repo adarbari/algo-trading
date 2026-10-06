@@ -100,6 +100,7 @@ def test_chain_job_records_every_status_and_publishes() -> None:
     assert feed.calls.count("BROKEN") == 2  # main pass + gentle retry pass
     status = reader.table(STATUS, DAY)
     assert status is not None and len(status) == 6
+    assert set(status["tier"]) == {"rest"}  # no S&P 500 / priority / HIGH names here
     options = reader.table(OPTIONS, DAY)
     assert options is not None and set(options["underlying_id"]) == {"EQ:GOOD"}
     assert backend.raw.get("cboe_delayed", "option_chain", DAY, record.run_id, "GOOD") is not None
@@ -338,3 +339,16 @@ def test_chain_run_fetches_in_priority_order_and_records_tiers_and_pacing(
     pacing = record.stats["pacing"]
     assert set(pacing) == {"cboe"}  # keys that sent no request are left out
     assert pacing["cboe"]["requests"] == 3 and pacing["cboe"]["errors"] == 0  # A: 404, missing
+
+
+def test_status_records_the_tier_of_each_underlying_at_fetch_time(tmp_path: Path) -> None:
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    feed = FakeFeed({"SPY": fx.payload("SPY"), "B": fx.payload("B")})
+    ctx = task_ctx(writer, clock=CLOCK)
+    source = CboeOptionsSource(http_for(feed, NO_RETRY, Limiter("cboe", Pacing(0.0), tmp_path)))
+    config = ChainJobConfig(workers=1, retry_pause_s=0, priority_symbols=("SPY",))
+    ingest_option_chains(ctx, source, universe("B", "SPY"), DAY, config)
+    status = StoreReader(backend).table(STATUS, DAY)
+    assert status is not None
+    assert dict(zip(status["symbol"], status["tier"], strict=True)) == {"SPY": "core", "B": "rest"}

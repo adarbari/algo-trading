@@ -163,6 +163,7 @@ max_bar_unresolved = 0.01        # bars: FAIL if over 1% of the session's bars h
 max_universe_change = 0.05       # universe-build: FAIL on a >5% day-over-day change in coverage
 max_chain_fetch_failures = 0.02  # chains: FAIL if over 2% of optionable names failed to fetch (FETCH_ERROR,
                                  # incl. an open circuit, or never attempted)
-max_chain_stale_share = 0.20     # chains: FAIL if over 20% of chains are STALE_DATA (the feed served an
-                                 # older session; a later retry usually gets the session's chains)
+max_chain_stale_share = 0.20     # chains: FAIL if over 20% of the "rest" tier's chains are STALE_DATA (the feed
+                                 # served an older session; a later retry usually gets the session's chains)
+max_chain_stale_share_core = 0.02  # same for the "core" tier (S&P 500, priority symbols, HIGH liquidity)
 max_verify_failures = 0.10       # verification vs IBKR: FAIL if over 10% of checks FAIL (any FAIL: WARN)

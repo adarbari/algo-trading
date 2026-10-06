@@ -230,6 +230,14 @@ detect = [
 ]
 
 [[responsibility]]
+id = "instrument-tiers"
+description = "Which underlyings are core (S&P 500, [cboe] priority_symbols, latest liquidity_class HIGH) and which are rest: the one tier rule, recorded in chains/status.tier at fetch time and graded by the chain acceptance check (ADR 0043)"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/market/tiers.py"]
+section = "docs/adr/0019-ownership-and-boundaries.md#guardrails"
+allowed = ["apps/ingestion/algotrade_ingestion/tasks/market/option_chains.py"]  # the chain run loads the tiers it records and orders by
+detect = [{ call = "Tiers" }, { call = "load_tiers" }]
+
+[[responsibility]]
 id = "ingestion-report"
 description = "The nightly summary report (statistics per step, failed items grouped by reason with examples, failed checks, hints) and notifications: the desktop alert and the daily summary email over SMTP"
 owner = [

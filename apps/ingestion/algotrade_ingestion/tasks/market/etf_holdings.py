@@ -72,7 +72,7 @@ from algotrade_ingestion.tasks.framework.run import (
     finished_runs,
     status_label,
 )
-from algotrade_ingestion.tasks.market.option_chains import PRICE_GROUP
+from algotrade_ingestion.tasks.market.tiers import PRICE_GROUP
 from algotrade_sources.framework.base import FetchRequest, HoldingsSource
 from algotrade_sources.framework.holdings import is_position
 

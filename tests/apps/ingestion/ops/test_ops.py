@@ -80,6 +80,7 @@ def seed(
     universe_d2: int,
     chains: list[str] | None = None,
     unresolved: int | None = None,
+    status_rows: list[dict[str, str]] | None = None,
 ) -> StoreReader:
     backend = MemoryBackend()
     w = StoreWriter(backend)
@@ -94,7 +95,9 @@ def seed(
         rows = universe_rows([f"S{i}" for i in range(n)])
         w.write_table("universe", day, f"u{day.day}", stamped(rows, day, f"u{day.day}"))
     chains = chains if chains is not None else ["OK"] * 20
-    status = [{"instrument_id": f"EQ:S{i}", "status": s} for i, s in enumerate(chains)]
+    status = status_rows or [
+        {"instrument_id": f"EQ:S{i}", "status": s} for i, s in enumerate(chains)
+    ]
     w.write_table("chains/status", D2, "c", stamped(status, D2, "c"))
     earnings = [{"instrument_id": "EQ:S1", "ts": pd.Timestamp(D2 + timedelta(5), tz="UTC")}]
     w.write_table("events/earnings", D2, "e", stamped(earnings, D2, "e"))
@@ -142,7 +145,7 @@ def test_chain_fetch_failures_up_to_the_threshold_pass() -> None:
 
 def test_stale_chains_over_the_share_fail() -> None:
     chains = ["OK"] * 13 + ["STALE_DATA: chain is for 2026-10-01"] * 5 + ["NO_CHAIN"] * 2
-    check = chain_check(chains, "chains_stale")  # 25% stale > 20%
+    check = chain_check(chains, "chains_stale_rest")  # 25% stale > 20%
     assert check["status"] == "FAIL" and check["run"] == RunStatus.PARTIAL.value
     assert (
         "OK 13, STALE_DATA 5, NO_CHAIN 2, NO_STANDARD_SERIES 0, fetch failures 0"
@@ -150,7 +153,59 @@ def test_stale_chains_over_the_share_fail() -> None:
     )
     assert chain_check(chains, "chains_fetch")["status"] == "PASS"
     four = ["OK"] * 16 + ["STALE_DATA: x"] * 4  # 20%: not over 20%
-    assert chain_check(four, "chains_stale")["status"] == "PASS"
+    assert chain_check(four, "chains_stale_rest")["status"] == "PASS"
+
+
+def tiered_checks(rows: list[tuple[str, str, str]], **quality: float) -> dict[str, dict[str, str]]:
+    """(symbol, tier, status) rows stored as chains/status -> the quality checks by name."""
+    status = [
+        {"instrument_id": f"EQ:{s}", "symbol": s, "tier": t, "status": st} for s, t, st in rows
+    ]
+    reader = seed(1000, 1000, 100, 100, status_rows=status)
+    settings = SourcesSettings.from_document({"quality": quality})
+    ctx = task_ctx(StoreWriter(MemoryBackend()), reader, CLOCK, settings=settings)
+    return {c["name"]: c for c in run_quality(ctx, D2).stats["checks"]}
+
+
+def test_core_chains_have_a_stricter_stale_limit_than_the_rest() -> None:
+    core = [(f"C{i}", "core", "OK") for i in range(48)]
+    core += [("AAPL", "core", "STALE_DATA: x"), ("MSFT", "core", "STALE_DATA: x")]  # 4% > 2%
+    rest = [(f"R{i}", "rest", "OK") for i in range(80)] + [
+        (f"S{i}", "rest", "STALE_DATA: x")
+        for i in range(10)  # 11% < 20%
+    ]
+    result = tiered_checks([*core, *rest])
+    assert result["chains_stale_core"]["status"] == "FAIL"
+    assert (
+        "2 of 50 core chains stale (4.0%, max 2%); stale: AAPL, MSFT"
+        in (result["chains_stale_core"]["detail"])
+    )
+    assert result["chains_stale_rest"]["status"] == "PASS"
+    one = [*core[:48], ("AAPL", "core", "STALE_DATA: x"), ("MSFT", "core", "OK")]  # 1 of 50: 2%
+    assert tiered_checks(one)["chains_stale_core"]["status"] == "PASS"
+    loose = tiered_checks(
+        [*core, *rest], max_chain_stale_share_core=0.10, max_chain_stale_share=0.05
+    )
+    assert (loose["chains_stale_core"]["status"], loose["chains_stale_rest"]["status"]) == (
+        "PASS",
+        "FAIL",
+    )
+
+
+def test_a_status_without_a_tier_column_counts_as_rest() -> None:
+    result = {c["name"]: c for c in run_quality(
+        task_ctx(StoreWriter(MemoryBackend()), seed(1000, 1000, 100, 100, ["OK"] * 20), CLOCK), D2
+    ).stats["checks"]}  # fmt: skip
+    assert result["chains_stale_core"]["status"] == "PASS"  # legacy partition: nothing to grade
+    assert "0 of 0 core" in result["chains_stale_core"]["detail"]
+
+
+def test_a_tiered_status_with_no_core_name_fails_and_does_not_wait() -> None:
+    check = tiered_checks(
+        [("A", "rest", "OK")],
+    )["chains_stale_core"]
+    assert (check["status"], check["pending"]) == ("FAIL", False)
+    assert "no core names" in check["detail"]
 
 
 def test_stale_chains_are_pending_but_fetch_failures_never_are() -> None:
@@ -161,7 +216,7 @@ def test_stale_chains_are_pending_but_fetch_failures_never_are() -> None:
             c.name: c
             for c in check_chains(seed(1000, 1000, 100, 100, chains), D2, SourcesSettings())
         }[n]
-        for n in ("chains_stale", "chains_fetch")
+        for n in ("chains_stale_rest", "chains_fetch")
     )
     assert (stale.status, stale.pending) == ("FAIL", True)
     assert (fetch.status, fetch.pending) == ("FAIL", False)
@@ -174,7 +229,7 @@ def test_chain_thresholds_come_from_sources_toml() -> None:
     reader = seed(1000, 1000, 100, 100, ["OK"] * 18 + ["FETCH_ERROR: x", "STALE_DATA: x"])
     ctx = task_ctx(StoreWriter(MemoryBackend()), reader, CLOCK, settings=settings)
     result = {c["name"]: c["status"] for c in run_quality(ctx, D2).stats["checks"]}
-    assert (result["chains_fetch"], result["chains_stale"]) == ("PASS", "FAIL")
+    assert (result["chains_fetch"], result["chains_stale_rest"]) == ("PASS", "FAIL")
 
 
 def test_unresolved_bars_over_the_share_fail() -> None:

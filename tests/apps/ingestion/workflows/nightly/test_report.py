@@ -74,7 +74,7 @@ def test_hints_for_known_failure_kinds() -> None:
     for expected in ("Circuit breaker", "STALE_DATA", "NO_CHAIN", "Duplicate table keys"):
         assert expected in hints
     assert "SEC companyfacts" in hints and "HTTP 401" not in hints
-    assert "max_chain_fetch_failures" in hints and "max_chain_stale_share" in hints
+    assert "max_chain_fetch_failures" in hints and "max_chain_stale_share_core" in hints
 
 
 def test_subject() -> None:

@@ -63,6 +63,11 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
     shutil.copytree(REPO_ROOT / "config" / "site", tmp_path / "config" / "site")
     (tmp_path / "config" / "site" / "universe.toml").write_text('source = "csv_import"\n')
+    # A tiered chain status needs a core name (an empty core fails the check): AAPL is pinned.
+    cboe = tmp_path / "config" / "site" / "sources.toml"
+    cboe.write_text(
+        cboe.read_text().replace("priority_symbols = [", 'priority_symbols = [ "AAPL",', 1)
+    )
     # Every site screener runs nightly (ADR 0033); the rule preset reads rollups this fixture
     # does not build, so the pipeline test keeps to the one screener its data supports.
     shutil.rmtree(tmp_path / "config" / "site" / "presets" / "screeners")
@@ -439,8 +444,10 @@ def import_universe(env: Path, capsys: pytest.CaptureFixture[str], day: str) -> 
 
 def accept_stale_chains(env: Path) -> None:
     sources = env / "config" / "site" / "sources.toml"
-    text = sources.read_text().replace(
-        "max_chain_stale_share = 0.20", "max_chain_stale_share = 1.0"
+    text = (
+        sources.read_text()
+        .replace("max_chain_stale_share = 0.20", "max_chain_stale_share = 1.0")
+        .replace("max_chain_stale_share_core = 0.02", "max_chain_stale_share_core = 1.0")
     )
     sources.write_text(text)
 

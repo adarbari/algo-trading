@@ -208,7 +208,8 @@ class SourcesSettings:
     max_universe_change: float = 0.05
     max_bar_unresolved: float = 0.01
     max_chain_fetch_failures: float = 0.02
-    max_chain_stale_share: float = 0.20
+    max_chain_stale_share: float = 0.20  # the "rest" tier
+    max_chain_stale_share_core: float = 0.02  # core tier (tasks/market/tiers.py)
     max_verify_failures: float = 0.10
     ibkr: IbkrSettings = field(default_factory=IbkrSettings)
     etf: EtfHoldingsSettings = field(default_factory=EtfHoldingsSettings)  # [etf_holdings]
@@ -248,6 +249,7 @@ class SourcesSettings:
                 "max_bar_unresolved",
                 "max_chain_fetch_failures",
                 "max_chain_stale_share",
+                "max_chain_stale_share_core",
                 "max_verify_failures",
             ],
         )
@@ -314,6 +316,9 @@ class SourcesSettings:
             ),
             max_chain_stale_share=quality.fraction(
                 "max_chain_stale_share", d.max_chain_stale_share
+            ),
+            max_chain_stale_share_core=quality.fraction(
+                "max_chain_stale_share_core", d.max_chain_stale_share_core
             ),
             max_verify_failures=quality.fraction("max_verify_failures", d.max_verify_failures),
             ibkr=load_ibkr(_extra(vendors, "ibkr")),

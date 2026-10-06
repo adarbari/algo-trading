@@ -43,14 +43,14 @@ not published yet" is not a failure until the day's deadline has passed.
    not published this session) and `bars_fresh` is pending. Anything else (the probe also
    403s or errors, the status is not 403, the session is not the last closed one) stays a
    FETCH_ERROR / NO_SESSION failure: an expired key or plan must fail, not wait.
-6. **Chains:** `chains_stale` above `max_chain_stale_share` is pending.
+6. **Chains:** `chains_stale_core` and `chains_stale_rest` above their limits are pending.
 7. **Notifications.** A WAITING run writes its summary file and nothing else: no desktop
    alert, no email (the hourly runs would repeat it). The run that ends the wait (SUCCEEDED,
    or FAILED at the deadline) reports as before. The email and the Admin ingestion page show
    WAITING with its own label and the `info` badge tone (not a failure colour).
 
 ## Later PRs under this ADR (not in this change)
-- **Tiered stale limits:** `max_chain_stale_share` split by how stale a chain is.
+- [x] **Tiered stale limits** (implemented): `max_chain_stale_share_core` (2%) for core names (S&P 500, priority symbols, HIGH liquidity; `chains/status.tier`, recorded at fetch time), `max_chain_stale_share` (20%) for the rest; checks `chains_stale_core` / `chains_stale_rest`.
 - **Coverage acceptance:** acceptance by share of the universe covered (names with a usable
   value), not by the count of failed items.
 

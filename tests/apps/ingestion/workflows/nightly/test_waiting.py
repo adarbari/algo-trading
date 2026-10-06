@@ -9,10 +9,13 @@ from pathlib import Path
 
 import pytest
 
-from algotrade.config.site.settings import NightlySettings
+from algotrade.config.site.settings import ConfigurationError, NightlySettings, SourcesSettings
 from algotrade.config.user import SITE_USER, UserContext
+from algotrade.data import StoreReader
+from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
-from algotrade_ingestion.tasks.maintenance.quality import Check
+from algotrade.storage.tables.writers import StoreWriter
+from algotrade_ingestion.tasks.maintenance.quality import Check, check_chains
 from algotrade_ingestion.workflows.nightly import screens as screens_module
 from algotrade_ingestion.workflows.nightly.nightly import run_nightly, run_session
 from algotrade_ingestion.workflows.nightly.notify import message, report
@@ -40,6 +43,7 @@ from tests.apps.ingestion.workflows.nightly.test_nightly import (
     store,
 )
 from tests.helpers.ingest_fakes import task_ctx
+from tests.helpers.stored_frames import stamped
 
 # 23:00 in Los Angeles on D (PDT, UTC-7) is 06:00 UTC the next day.
 BEFORE_DEADLINE = AFTER_CLOSE  # 16:00 PT on D
@@ -58,6 +62,26 @@ def test_judge_waits_only_for_pending_failures_before_the_deadline() -> None:
     assert judge([NOT_YET, hard], wait=True).status is StepStatus.FAILED  # one real failure
     assert judge([hard], wait=True).status is StepStatus.FAILED
     assert judge([Check("x", "PASS", "ok")], wait=True).status is StepStatus.SUCCEEDED
+
+
+def test_stale_chain_checks_of_both_tiers_wait_before_the_deadline_and_fail_after() -> None:
+
+    backend = MemoryBackend()
+    rows = [
+        {"instrument_id": f"EQ:{s}", "symbol": s, "tier": t, "status": "STALE_DATA: x"}
+        for s, t in (("AAPL", "core"), ("ZZZ", "rest"))
+    ]
+    StoreWriter(backend).write_table("chains/status", D, "c", stamped(rows, D, "c"))
+
+    checks = check_chains(StoreReader(backend), D, SourcesSettings.from_document({"quality": {
+        "max_chain_stale_share": 0.1, "max_chain_stale_share_core": 0.1}}))  # fmt: skip
+    stale = [c for c in checks if c.name.startswith("chains_stale_")]
+    assert [(c.name, c.status, c.pending) for c in stale] == [
+        ("chains_stale_core", "FAIL", True),
+        ("chains_stale_rest", "FAIL", True),
+    ]
+    assert judge(stale, wait=True).status is StepStatus.WAITING  # before the deadline
+    assert judge(stale, wait=False).status is StepStatus.FAILED  # at the deadline
 
 
 def test_overall_waiting_unless_something_failed() -> None:
@@ -182,7 +206,6 @@ def test_waiting_has_a_label_colour_in_the_email() -> None:
 
 
 def test_the_deadline_settings_are_typed() -> None:
-    from algotrade.config.site.settings import ConfigurationError  # noqa: PLC0415
 
     assert NightlySettings().deadline_for("bars").isoformat() == "23:00:00"
     custom = NightlySettings.from_document(

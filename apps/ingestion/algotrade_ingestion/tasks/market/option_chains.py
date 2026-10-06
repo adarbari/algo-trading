@@ -5,7 +5,8 @@ Behaviour carried over from the original liquidity_screen.py and made stricter:
   the vendor or the clock still has them: S&P 500 members and the configured
   ``[cboe] priority_symbols``, then by the latest ``feature.liquidity_class`` and
   ``feature.option_chain_oi`` (expression features), then the rest alphabetically;
-- every ticker gets a status (OK, NO_CHAIN, NO_STANDARD_SERIES, STALE_DATA, FETCH_ERROR);
+- every ticker gets a status and a tier (``tiers.py``: core or rest, recorded at fetch time
+  for the acceptance check) (OK, NO_CHAIN, NO_STANDARD_SERIES, STALE_DATA, FETCH_ERROR);
   none is dropped;
 - the task is resumable: a re-run for the same session reuses finished tickers (OK, NO_CHAIN,
   NO_STANDARD_SERIES) and refetches the STALE_DATA and FETCH_ERROR ones (``RETRYABLE``), so a
@@ -27,15 +28,13 @@ from functools import partial
 
 import pandas as pd
 
-from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
-from algotrade.data.reference import instruments, load_universe, resolver, snapshot
-from algotrade.features.expressions.feature_set import FeatureSet
-from algotrade.services.features import read_expressions, site_features, site_store
+from algotrade.data.reference import load_universe, resolver
 from algotrade.services.jobs import as_completed
 from algotrade.storage.configs.store import ConfigStore
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import IngestRun, NoResponseError, TaskContext
+from algotrade_ingestion.tasks.market.tiers import CLASS_RANK, Tiers, load_tiers
 from algotrade_sources.framework.base import FetchRequest, Source, Throttled
 
 TASK = "option_chains"
@@ -43,11 +42,7 @@ OPTIONS, UNDERLYINGS, STATUS = "chains/option_quotes", "chains/underlying_quotes
 CHECKPOINT_EVERY = 100
 # Universe rows are all optionable, so many NO_CHAIN results point at a source problem.
 MAX_NO_CHAIN_SHARE = 0.25
-# Expression features (config/site/features/liquidity.toml), read through services.features
-LIQUIDITY_CLASS, CHAIN_OI = "liquidity_class", "option_chain_oi"
-PRICE_GROUP = "price_stats"  # the class is computed for the latest session this group has
-CLASS_RANK = {"HIGH": 0, "MEDIUM": 1, "LOW": 2, "UNKNOWN": 3}
-TIERS = ("priority", "liquidity", "rest")
+ORDER_TIERS = ("priority", "liquidity", "rest")
 
 
 @dataclass(frozen=True)
@@ -82,50 +77,15 @@ def select_underlyings(
     return [u for u in underlyings if u.instrument_id in wanted]
 
 
-def _sp500(reader: StoreReader, session_date: date) -> set[str]:
-    """Instrument ids in the S&P 500 per the reference snapshot (none when there is none)."""
-    try:
-        frame = instruments(reader, session_date)
-    except MissingDataError:
-        return set()
-    if "in_sp500" not in frame.columns:
-        return set()
-    members = frame[frame["in_sp500"].fillna(False).astype(bool)]
-    return set(members["instrument_id"].astype(str))
-
-
-def _liquidity(
-    reader: StoreReader, session_date: date, features: FeatureSet
-) -> dict[str, tuple[int, float]]:
-    """instrument id -> (class rank, -chain OI) from the expression features
-    ``liquidity_class`` and ``option_chain_oi`` on the latest session on or before
-    ``session_date`` with ``price_stats`` rows (chains are fetched before the session's
-    rollups, so usually the previous session). Instruments with neither are left out."""
-    snap = snapshot(reader, features.table(PRICE_GROUP), session_date)
-    if snap is None or snap.pre_snapshot:
-        return {}
-    frame = read_expressions(
-        reader, [LIQUIDITY_CLASS, CHAIN_OI], snap.snapshot_date, features=features
-    ).frame
-    unknown = CLASS_RANK["UNKNOWN"]
-    out: dict[str, tuple[int, float]] = {}
-    for row in frame.itertuples(index=False):
-        label, oi = getattr(row, LIQUIDITY_CLASS), getattr(row, CHAIN_OI)
-        has_label, has_oi = isinstance(label, str), not pd.isna(oi)
-        if has_label or has_oi:
-            rank = CLASS_RANK.get(label.upper(), unknown) if has_label else unknown
-            out[str(row.instrument_id)] = (rank, -float(oi) if has_oi else 0.0)
-    return out
-
-
 def prioritise(
     reader: StoreReader,
     session_date: date,
     underlyings: Sequence[Underlying],
     priority_symbols: Sequence[str] = (),
     configs: ConfigStore | None = None,
+    tiers: Tiers | None = None,
 ) -> tuple[list[Underlying], dict[str, int]]:
-    """``underlyings`` in fetch order, and how many fell in each tier (``TIERS``):
+    """``underlyings`` in fetch order, and how many fell in each tier (``ORDER_TIERS``):
 
     1. ``priority``: the configured ``priority_symbols`` (in their order), then S&P 500
        members by liquidity;
@@ -134,10 +94,10 @@ def prioritise(
        ``feature.option_chain_oi`` descending (the site features of ``configs``);
     3. ``rest``: alphabetically.
 
+    ``tiers`` (``load_tiers``) is read from the store when not given.
     Ties break by symbol, so the order is deterministic for a given store."""
-    pinned = {s.upper(): n for n, s in enumerate(dict.fromkeys(priority_symbols))}
-    members = _sp500(reader, session_date)
-    liquidity = _liquidity(reader, session_date, site_features(site_store(configs)))
+    tiers = tiers or load_tiers(reader, session_date, priority_symbols, configs)
+    pinned, members, liquidity = tiers.pinned, tiers.members, tiers.liquidity
     last = (len(CLASS_RANK), 0.0)
 
     def key(u: Underlying) -> tuple[int, int, int, float, str]:
@@ -151,9 +111,9 @@ def prioritise(
         return (2, 0, 0, 0.0, u.symbol)
 
     ordered = sorted(underlyings, key=key)
-    counts = dict.fromkeys(TIERS, 0)
+    counts = dict.fromkeys(ORDER_TIERS, 0)
     for u in ordered:
-        counts[TIERS[key(u)[0]]] += 1
+        counts[ORDER_TIERS[key(u)[0]]] += 1
     return ordered, counts
 
 
@@ -183,7 +143,9 @@ def _run_pass(run: IngestRun, source: Source, todo: Sequence[Underlying], worker
             run.checkpoint()
 
 
-def _publish(run: IngestRun, universe: Sequence[Underlying], source_name: str) -> None:
+def _publish(
+    run: IngestRun, universe: Sequence[Underlying], tiers: Tiers, source_name: str
+) -> None:
     for table in (UNDERLYINGS, OPTIONS):
         run.publish(table)
     status = pd.DataFrame(
@@ -192,6 +154,7 @@ def _publish(run: IngestRun, universe: Sequence[Underlying], source_name: str) -
                 "instrument_id": u.instrument_id,
                 "symbol": u.symbol,
                 "status": run.items.get(u.instrument_id, "NOT_ATTEMPTED"),
+                "tier": tiers.tier(u.instrument_id, u.symbol),  # graded by check_chains
             }
             for u in universe
         ]
@@ -209,8 +172,9 @@ def ingest_option_chains(
     config = config or ChainJobConfig()
     with IngestRun(ctx, TASK, session_date, resume=True) as run:
         run.checkpoint()
+        tier_rule = load_tiers(run.reader, session_date, config.priority_symbols, ctx.configs)
         ordered, tiers = prioritise(
-            run.reader, session_date, universe, config.priority_symbols, ctx.configs
+            run.reader, session_date, universe, config.priority_symbols, ctx.configs, tier_rule
         )
         _run_pass(run, source, [u for u in ordered if u.instrument_id not in run.items],
                   config.workers)  # fmt: skip
@@ -219,10 +183,15 @@ def ingest_option_chains(
             if isinstance(source, Throttled):
                 source.cool_down(config.retry_pause_s)
             _run_pass(run, source, failed, 1)
-        _publish(run, universe, source.name)
+        _publish(run, universe, tier_rule, source.name)
         counts = run.counts()
         no_chain_share = counts.get("NO_CHAIN", 0) / len(universe) if universe else 0.0
-        run.stats.update(universe=len(universe), statuses=counts, order_tiers=tiers)
+        run.stats.update(
+            universe=len(universe),
+            statuses=counts,
+            order_tiers=tiers,
+            tier_sources=tier_rule.sources(),
+        )
         if no_chain_share > MAX_NO_CHAIN_SHARE:
             run.partial(f"{no_chain_share:.0%} of optionable names returned no chain")
     return run.record  # staging: dropped by IngestRun unless retryable items remain
