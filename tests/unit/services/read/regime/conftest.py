@@ -72,6 +72,9 @@ def card(key: str, pace: str, **extra: Any) -> dict[str, Any]:
         "false_alarms": "Some.",
         "links": [{"title": f"{key} page", "url": f"https://example.org/{key}"}],
         "before": {"2008": f"{key} rose.", "2020": f"{key} jumped."},
+        "range": {"min": 0, "max": 1},
+        "how": f"How {key} is computed.",
+        "terms": [{"text": key, "url": f"https://example.org/{key}/how"}],
         **extra,
     }
 

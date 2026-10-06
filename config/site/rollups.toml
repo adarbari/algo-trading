@@ -77,7 +77,8 @@ min_months_3 = 2            # a 3-month mean needs this many of its months
 
 ["regime_indicators@v1"]     # the regime cards' verdicts (ADR 0047; docs/market-regime-plan.md 3-4)
 changed_sessions = 5         # <card>_changed compares the verdict with this many sessions earlier
-curve_min_inverted_days = 21 # curve: 10y - 3m below 0 now and on this many of the last 252 sessions
+curve_below = 0.0            # curve: 10y - 3m below this (inverted) ...
+curve_min_inverted_days = 21 # ... now and on this many of the last 252 sessions
 hy_oas_above = 0.05          # high-yield spread above 5% ...
 hy_oas_off_low = 0.015       # ... or 150 bp or more above its 126-session low
 unrate_trend_above = 0.0     # unemployment above its 12-month mean

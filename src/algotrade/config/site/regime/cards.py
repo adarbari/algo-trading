@@ -3,19 +3,28 @@ docs/market-regime-plan.md 5.5): per indicator the plain-language text a non-exp
 first (``plain_name``, ``one_liner``), what it means (``why_it_matters``,
 ``what_on_means``), what it did before the big falls (``before``, ``lead_time``,
 ``false_alarms``), the curated reading list (``links``: the
-explanation model may cite only these) and ``feature``, the market catalogue field the card
-reads its value from (``market.regime_indicators@v1.<key>``, written by the RG3 group).
+explanation model may cite only these), ``feature``, the market catalogue field the card
+reads its value from (``market.regime_indicators@v1.<key>``, written by the RG3 group), the
+display ``range`` of its meter (in the value's stored unit) and ``how`` it is calculated, one
+plain sentence whose ``terms`` link to an explainer (returned pre-split, ``terms.py``).
 
-The loader checks shape only: unique keys and features, no empty text, ``https`` links. That a
-card's ``feature`` is a catalogue field is a fitness test once the group exists."""
+``[[source]]`` names the stored inputs that are not macro series (``bars/1d``,
+``rates/treasury``, ``universe``): what a card's lineage reaches there is shown as that
+source (``services/read/regime/sources.py``; a series is described by ``macro.toml``).
+
+The loader checks shape only: unique keys, features and source inputs, no empty text,
+``https`` links, a range with ``min < max``, each term once in ``how``. That a card's
+``feature`` is a catalogue field, and that every input its lineage reaches has a source, are
+fitness tests."""
 
 from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
-from urllib.parse import urlsplit
 
 from algotrade.config.site.fields import Table, reject_secrets
+from algotrade.config.site.macro import CADENCES
+from algotrade.config.site.regime.terms import Term, TextPart, https, split
 from algotrade.core.model.errors import ConfigurationError
 
 FOLDER = "regime"
@@ -34,8 +43,14 @@ KEYS = (
     "false_alarms",
     "links",
     "before",
+    "range",
+    "how",
+    "terms",
 )
 LINK_KEYS = ("title", "url")
+TERM_KEYS = ("text", "url")
+RANGE_KEYS = ("min", "max")
+SOURCE_KEYS = ("input", "label", "cadence", "url")
 
 
 class Documents(Protocol):
@@ -50,6 +65,26 @@ class CardLink:
 
     title: str
     url: str
+
+
+@dataclass(frozen=True)
+class CardRange:
+    """The meter's display range, in the value's stored unit (``min < max``)."""
+
+    min: float
+    max: float
+
+
+@dataclass(frozen=True)
+class InputSource:
+    """``[[source]]``: a stored input that is not a macro series (``input``: its table, as a
+    feature's lineage names it, e.g. ``bars/1d``), shown as ``label``, updated at ``cadence``;
+    ``url``: a page about it (``None``: our own data, nothing public to link)."""
+
+    input: str
+    label: str
+    cadence: str
+    url: str | None = None
 
 
 @dataclass(frozen=True)
@@ -70,21 +105,25 @@ class RegimeCard:
     lead_time: str
     false_alarms: str
     links: tuple[CardLink, ...]
+    range: CardRange
+    how: tuple[TextPart, ...]
     before: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class RegimeCards:
-    """``cards.toml``: the cards in file order (none without the file)."""
+    """``cards.toml``: the cards in file order and the non-series input ``sources`` (none
+    without the file)."""
 
     cards: tuple[RegimeCard, ...] = ()
+    sources: tuple[InputSource, ...] = ()
 
     @classmethod
     def from_document(cls, doc: Mapping[str, Any] | None) -> "RegimeCards":
         where = f"{FOLDER}/{NAME}.toml"
         reject_secrets(doc or {}, where)
         root = Table(doc, where)
-        root.only(("card",))
+        root.only(("card", "source"))
         raw = root.raw("card") or []
         if not isinstance(raw, list) or not all(isinstance(e, Mapping) for e in raw):
             raise ConfigurationError(f"{where} card: expected a list of tables ([[card]])")
@@ -95,7 +134,7 @@ class RegimeCards:
             )
             if repeated:
                 raise ConfigurationError(f"{where}: {what}s declared more than once: {repeated}")
-        return cls(cards)
+        return cls(cards, _sources(root, where))
 
 
 def load_cards(configs: Documents) -> RegimeCards:
@@ -114,11 +153,53 @@ def _line(t: Table, key: str) -> str:
 
 def _link(t: Table) -> CardLink:
     t.only(LINK_KEYS)
-    url = _line(t, "url")
-    parts = urlsplit(url)
-    if parts.scheme != "https" or not parts.hostname:
-        raise ConfigurationError(f"{t.where} url: expected an https URL, got {url!r}")
-    return CardLink(_line(t, "title"), url)
+    return CardLink(_line(t, "title"), https(_line(t, "url"), f"{t.where} url"))
+
+
+def _tables(t: Table, key: str, what: str) -> list[Table]:
+    raw = t.raw(key)
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or not all(isinstance(e, Mapping) for e in raw):
+        raise ConfigurationError(f"{t.where} {key}: expected a list of {what}")
+    return [Table(e, f"{t.where} {key}[{i}]") for i, e in enumerate(raw)]
+
+
+def _range(t: Table) -> CardRange:
+    raw = t.raw("range")
+    if not isinstance(raw, Mapping):
+        raise ConfigurationError(f"{t.where} range: expected a table {{min, max}}")
+    sub = Table(raw, f"{t.where} range")
+    sub.only(RANGE_KEYS)
+    low, high = sub.number("min", None), sub.number("max", None)
+    if low is None or high is None or not low < high:
+        raise ConfigurationError(f"{sub.where}: expected numbers min < max, got {dict(raw)}")
+    return CardRange(low, high)
+
+
+def _how(t: Table) -> tuple[TextPart, ...]:
+    terms = []
+    for sub in _tables(t, "terms", "{text, url}"):
+        sub.only(TERM_KEYS)
+        terms.append(Term(_line(sub, "text"), https(_line(sub, "url"), f"{sub.where} url")))
+    return split(_line(t, "how"), tuple(terms), t.where)
+
+
+def _source(t: Table) -> InputSource:
+    t.only(SOURCE_KEYS)
+    cadence = _line(t, "cadence")
+    if cadence not in CADENCES:
+        raise ConfigurationError(f"{t.where} cadence: expected one of {list(CADENCES)}")
+    url = https(_line(t, "url"), f"{t.where} url") if t.raw("url") is not None else None
+    return InputSource(_line(t, "input"), _line(t, "label"), cadence, url)
+
+
+def _sources(root: Table, where: str) -> tuple[InputSource, ...]:
+    found = tuple(_source(t) for t in _tables(root, "source", "tables ([[source]])"))
+    repeated = sorted(k for k, n in Counter(s.input for s in found).items() if n > 1)
+    if repeated:
+        raise ConfigurationError(f"{where}: source inputs declared more than once: {repeated}")
+    return found
 
 
 def _links(t: Table) -> tuple[CardLink, ...]:
@@ -155,5 +236,7 @@ def _card(t: Table) -> RegimeCard:
         lead_time=_line(t, "lead_time"),
         false_alarms=_line(t, "false_alarms"),
         links=_links(t),
+        range=_range(t),
+        how=_how(t),
         before=_before(t),
     )

@@ -20,14 +20,18 @@ from datetime import date
 from enum import StrEnum
 
 from algotrade.config.strategy.regime import site_regime
+from algotrade.features.rollups.market import regime as scores
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.regime.fields import (
     FRAGILITY,
     LABEL,
+    MACRO_COVERAGE,
     MACRO_RISK,
+    MARKET_COVERAGE,
     MARKET_STRESS,
     Reading,
     read_fields,
+    site_params,
 )
 from algotrade.services.read.regime.indicators import (
     IndicatorStatus,
@@ -61,10 +65,16 @@ NOT_COMPUTED = "Not computed yet"
 
 @dataclass(frozen=True)
 class RegimeScore:
-    """One 0-100 score; ``value`` is ``None`` exactly when ``unknown`` says why."""
+    """One 0-100 score; ``value`` is ``None`` exactly when ``unknown`` says why. ``feature``:
+    its catalogue field; ``coverage_feature``: the field of the share of its weight known
+    (``None``: fragility has none); ``threshold``: the score at or above which it counts as
+    high for the label (the site's ``rollups.toml``; ``None``: context only)."""
 
     value: float | None
     unknown: Unknown | None
+    feature: str
+    coverage_feature: str | None
+    threshold: float | None
 
 
 @dataclass(frozen=True)
@@ -138,9 +148,22 @@ def _label(reading: Reading) -> tuple[RegimeLabel, Unknown | None]:
     return found, None
 
 
-def _score(reading: Reading) -> RegimeScore:
+def _score(
+    reading: Reading, feature: str, coverage: str | None, threshold: float | None
+) -> RegimeScore:
     value = to_scalar(reading.value)
-    return RegimeScore(None if value is None else float(value), reading.unknown)
+    number = None if value is None else float(value)
+    return RegimeScore(number, reading.unknown, feature, coverage, threshold)
+
+
+def _scores(ctx: ReadContext, read: Mapping[str, Reading]) -> RegimeScores:
+    """The three scores with their fields and the site's thresholds for a high score."""
+    p = site_params(ctx, scores.GROUP)
+    return RegimeScores(
+        _score(read[MACRO_RISK], MACRO_RISK, MACRO_COVERAGE, p.macro_high),
+        _score(read[MARKET_STRESS], MARKET_STRESS, MARKET_COVERAGE, p.market_high),
+        _score(read[FRAGILITY], FRAGILITY, None, None),
+    )
 
 
 def _sizing(ctx: ReadContext, label: RegimeLabel) -> RegimeSizing:
@@ -203,9 +226,7 @@ def load_regime(ctx: ReadContext) -> MarketRegime:
         label=label,
         plain_label=PLAIN_LABELS[label],
         headline=headline(label, indicators),
-        scores=RegimeScores(
-            _score(read[MACRO_RISK]), _score(read[MARKET_STRESS]), _score(read[FRAGILITY])
-        ),
+        scores=_scores(ctx, read),
         indicators=indicators,
         sizing=_sizing(ctx, label),
         unknown_reason=reason,
