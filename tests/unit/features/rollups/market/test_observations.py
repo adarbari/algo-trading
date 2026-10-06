@@ -1,5 +1,5 @@
-"""``observations``: the latest vintage per observation as a session knew it, and complete
-windows only (a history that does not reach a window's start gives null)."""
+"""``observations``: the input's known rows as one series per id, and complete windows only (a
+history that does not reach a window's start gives null)."""
 
 from datetime import date
 
@@ -8,8 +8,8 @@ import pandas as pd
 import pytest
 
 from algotrade.features.rollups.market.observations import (
+    as_series,
     change_12m,
-    known_series,
     last_months,
     latest,
     since,
@@ -33,25 +33,17 @@ def rows(*items: tuple[str, str, float | None]) -> pd.DataFrame:
     ).sort_values("vintage_date", kind="stable")
 
 
-def test_the_latest_vintage_known_by_the_session_wins_and_nulls_are_no_observation() -> None:
+def test_known_rows_become_one_series_per_id_and_nulls_are_no_observation() -> None:
     frame = rows(
-        ("2008-01-01", "2008-02-01", 4.9),
-        ("2008-01-01", "2008-03-07", 5.0),  # the March revision of January
         ("2008-02-01", "2008-03-07", None),  # FRED's "."
+        ("2008-01-01", "2008-03-07", 5.0),
     )
-    feb = known_series(frame, date(2008, 2, 15))[ID]
-    assert list(feb) == [4.9]
-    march = known_series(frame, date(2008, 3, 7))[ID]
-    assert list(march) == [5.0]  # revised; February is no observation
-    assert known_series(frame, date(2008, 1, 31)) == {}
-    assert (
-        known_series(None, date(2008, 3, 7)) == {} == known_series(frame.iloc[:0], date(2008, 3, 7))
-    )
-
-
-def test_old_observations_are_never_read() -> None:
-    frame = rows(("2000-01-01", "2000-02-01", 4.0), ("2008-01-01", "2008-02-01", 5.0))
-    assert list(known_series(frame, date(2008, 3, 1), history_days=800)[ID]) == [5.0]
+    frame = pd.concat([frame, frame.assign(instrument_id="MACRO:B", value=[1.0, 2.0])])
+    got = as_series(frame)
+    assert sorted(got) == ["MACRO:B", ID]
+    assert list(got[ID]) == [5.0]  # February is no observation
+    assert list(got["MACRO:B"].index) == [pd.Timestamp("2008-01-01"), pd.Timestamp("2008-02-01")]
+    assert as_series(None) == {} == as_series(frame.iloc[:0])
     assert np.isnan(latest({}, ID))
 
 

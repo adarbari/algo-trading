@@ -6,6 +6,8 @@ import sys
 
 from algotrade.analytics.report import markdown_table
 from algotrade.config.env import config_dir, data_url
+from algotrade.config.site.regime.episodes import load_episodes
+from algotrade.config.site.settings import load_macro
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
@@ -14,6 +16,8 @@ from algotrade.engines.backtest.engine import run_backtest
 from algotrade.services.configs import default_user, resolve_config
 from algotrade.services.datasets import list_datasets, load_dataset
 from algotrade.services.evaluation.baseline import compare_to_baseline, load_baseline, save_baseline
+from algotrade.services.evaluation.regime_report import render
+from algotrade.services.evaluation.regime_scorecard import load_history
 from algotrade.services.evaluation.suite import run_suite, with_benchmark_excess
 from algotrade.services.features import check_user_features
 from algotrade.services.jobs import JobStatus, run_job
@@ -185,4 +189,17 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
         print("If intended: `algotrade-backtest evaluate --update-baseline`, then commit it.")
         return 1
     print("\nall results match baseline")
+    return 0
+
+
+def cmd_regime_scorecard(args: argparse.Namespace) -> int:
+    """The regime episode scorecard over the store (docs/market-regime-plan.md section 4):
+    deterministic text, "no data" sections (exit 0) until the macro backfill has run."""
+    configs = open_config_store(config_dir(args.config_dir))
+    revised = [s.instrument_id for s in load_macro(configs).series if s.is_revised]
+    history = load_history(reader_for(args), configs, _user(args))
+    text = render(history, load_episodes(configs).episodes, revised)
+    print(text, end="")
+    if args.report:
+        args.report.write_text(text)
     return 0

@@ -6,7 +6,7 @@ GOLDEN_URL ?= file://datasets/golden/store
 
 
 .PHONY: changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen unit property integration e2e test \
-        evaluate baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-real web-visual web-build
+        evaluate regime-scorecard baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-real web-visual web-build
 
 UV ?= uv
 WORKERS ?= auto
@@ -112,8 +112,12 @@ golden-store:    ## (re)load the golden CSVs into the fixture store
 	rm -rf datasets/golden/store
 	ALGOTRADE_DATA_URL=$(GOLDEN_URL) $(BIN)algotrade-ingest golden load
 
-evaluate: golden-store  ## strategy scorecard vs committed baseline
+evaluate: golden-store  ## strategy scorecard vs committed baseline, then the regime scorecard section
 	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate --report scorecard.md
+	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) regime-scorecard
+
+regime-scorecard:  ## the regime episode scorecard over the configured store (ALGOTRADE_DATA_URL)
+	$(BIN)algotrade-backtest regime-scorecard --report regime-scorecard.txt
 
 baseline: golden-store  ## accept current results as the new baseline (review the diff!)
 	$(BIN)algotrade-backtest --data-url $(GOLDEN_URL) evaluate --update-baseline

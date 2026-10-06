@@ -1,10 +1,15 @@
-"""Published series files (Stooq, Fed EBP, OFR FSI, Shiller) against documented formats."""
+"""Published series files (Stooq, Fed EBP, OFR FSI, EPU, Shiller) against documented formats,
+and every published series of ``config/site/macro.toml`` against its recorded file (trimmed from
+the real download, ``tests/fixtures/sources/published``; CI never calls the network)."""
 
 from datetime import date
+from pathlib import Path
 
 import pandas as pd
 import pytest
 
+from algotrade.config.site.settings import load_macro
+from algotrade.storage.configs.files import FileConfigStore
 from algotrade_sources.framework.series import SERIES_COLUMNS, SERIES_FRAME, SeriesRequest
 from algotrade_sources.vendors.published.csv_series import PublishedSeries, parse_series
 from algotrade_sources.vendors.published.parsers import PARSERS
@@ -18,6 +23,9 @@ STOOQ = SeriesRequest(
 EBP = SeriesRequest(
     "EBP", url="https://example.org/ebp_csv.csv", date_column="date", value_column="ebp"
 )
+REPO = Path(__file__).resolve().parents[5]
+RECORDED = REPO / "tests" / "fixtures" / "sources" / "published"
+RECORDED_FILES = {"ebp_csv.csv", "fsi.csv", "All_Daily_Policy_Data.csv"}  # named as served
 OFR = SeriesRequest(
     "OFR_FSI", url="https://example.org/fsi.csv", date_column="Date", value_column="OFR FSI"
 )
@@ -98,3 +106,45 @@ def test_an_empty_body_is_nothing_there_and_a_bad_url_is_refused() -> None:
         source.fetch(SeriesRequest("X", url="file:///etc/passwd"))
     with pytest.raises(ValueError, match="http"):
         source.fetch(SeriesRequest("X"))
+
+
+def test_epu_daily_builds_the_date_from_its_three_columns() -> None:
+    payload = b"day,month,year,daily_policy_index\n1,1,1985,103.83\n31,2,1985,5\n16,9,2008,307.09\n"
+    request = SeriesRequest(
+        "EPU_DAILY", parser="epu_daily", date_column="date", value_column="daily_policy_index"
+    )
+    frame = parse_series(request, payload)
+    assert frame["obs_date"].dt.date.tolist() == [date(1985, 1, 1), date(2008, 9, 16)]
+    assert frame["value"].tolist() == [103.83, 307.09]  # 31 February is no date: dropped
+    assert PARSERS["epu_daily"](b"").empty
+    with pytest.raises(ValueError, match="EPU"):
+        PARSERS["epu_daily"](b"date,value\n2026-01-02,1\n")
+
+
+@pytest.mark.parametrize(
+    ("key", "rows", "first", "value"),
+    [
+        ("EBP", 9, date(1973, 1, 1), -0.046854494),
+        ("EBP_RECESSION_PROB", 9, date(1973, 1, 1), 0.18496912088474687),
+        ("OFR_FSI", 6, date(2000, 1, 3), 2.14),
+        ("EPU_DAILY", 6, date(1985, 1, 1), 103.83),
+    ],
+)
+def test_each_registry_file_loads_from_its_recorded_response(
+    key: str, rows: int, first: date, value: float
+) -> None:
+    spec = load_macro(FileConfigStore(REPO / "config")).by_key(key)
+    name = spec.url.rsplit("/", 1)[-1]
+    assert spec.source == "published" and spec.pit == "lag" and name in RECORDED_FILES
+    request = SeriesRequest(
+        spec.key, code=spec.vendor_code, url=spec.url, date_column=spec.date_column,
+        value_column=spec.value_column, parser=spec.parser,
+    )  # fmt: skip
+    payload = (RECORDED / name).read_bytes()
+    normalized = PublishedSeries(http_for(lambda url: payload)).normalize(request, payload)
+    assert normalized is not None
+    frame = normalized.parsed[SERIES_FRAME]
+    assert len(frame) == rows and frame["value"].notna().all()
+    assert frame["obs_date"].dt.date.iloc[0] == first
+    assert frame["value"].iloc[0] == pytest.approx(value)
+    assert frame["obs_date"].is_monotonic_increasing

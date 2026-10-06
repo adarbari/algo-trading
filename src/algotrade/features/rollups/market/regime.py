@@ -4,10 +4,12 @@ row per session (ADR 0047; docs/market-regime-plan.md section 4).
 Each score is a weighted count of signals that are on (``SIGNALS``; weights and thresholds in
 ``Params``, ``config/site/rollups.toml ["regime@v1"]``, each score's weights summing to 100).
 The cards' signals are ``regime_indicators@v1``'s verdicts; the others are thresholds on
-``market_macro@v1``, ``market_trend@v1`` and ``market_cross_asset@v1`` here.
+``market_macro@v2``, ``market_trend@v1`` and ``market_cross_asset@v1`` here.
 
-- ``macro_risk`` (slow): curve, credit, labour (unemployment trend, Sahm, claims), financial
-  conditions, lending standards, permits, Fed hikes and inflation.
+- ``macro_risk`` (slow): curve, credit (the high-yield card's verdict, else, when the high-yield
+  spread is unknown, as before 1997, the excess bond premium above ``ebp_above``), labour
+  (unemployment trend, Sahm, claims), financial conditions, lending standards, permits, Fed
+  hikes and inflation.
 - ``market_stress`` (fast): trend, VIX term structure, drawdown, breadth, leadership and credit
   ETFs, turbulence and absorption.
 - ``fragility`` (context only, never the label): credit expansion and the index's one-year
@@ -81,6 +83,7 @@ class Params:
     permits_at_most: float = -0.20  # permits down 20% or more on the year
     fed_hikes_above: float = 0.02  # fed funds up more than 200 bp on the year
     cpi_above: float = 0.04  # CPI inflation above 4%
+    ebp_above: float = 0.005  # credit, when the high-yield spread is unknown: EBP above 50 bp
     # market_stress: trend 20, VIX term 20, drawdown 10, breadth 20, leadership + credit 15,
     # turbulence + absorption 15
     w_trend: float = 20.0
@@ -120,6 +123,12 @@ def flag(v: Values, column: str) -> Verdict:
     return bool(value) if isinstance(value, (bool, np.bool_)) else None
 
 
+def _credit(v: Values, p: Params) -> Verdict:
+    """The high-yield card's verdict; when it is unknown, the excess bond premium's."""
+    high_yield = flag(v, "hy_oas_on")
+    return high_yield if high_yield is not None else compare(number(v, "ebp"), ">", p.ebp_above)
+
+
 def _turbulence(v: Values, p: Params) -> Verdict:
     size = number(v, "basket_size")
     ratio = number(v, "turbulence_60d") / size if size else np.nan
@@ -157,7 +166,7 @@ def _over(
 
 SIGNALS: tuple[Signal, ...] = (
     _card("curve", "macro", "w_curve", "curve_10y3m"),
-    _card("credit", "macro", "w_credit", "hy_oas"),
+    Signal("credit", "macro", "w_credit", (*_keys(CARD, "hy_oas_on"), *_keys(M, "ebp")), _credit),
     _card("unrate_trend", "macro", "w_unrate_trend", "unrate_trend"),
     _card("sahm", "macro", "w_sahm", "sahm"),
     _over("claims", "macro", "w_claims", M, "claims_4w_vs_52w_low", ">=", "claims_at_least"),

@@ -15,6 +15,7 @@ from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.framework.declaration import FeatureGroup
 from algotrade.features.framework.runner import SessionResult, compute_in_memory
 from algotrade.features.site import site_features
+from algotrade.quant.black_scholes import norm_cdf
 from algotrade.storage.configs.files import FileConfigStore
 from tests.conftest import REPO_ROOT
 from tests.helpers.features_v1 import liquidity_class_v1, moved_numbers_v1
@@ -460,3 +461,30 @@ def test_earnings_before_expiry_compares_the_two_dates(fs: FeatureSet) -> None:
     assert not bool(flags["EQ:AFTER"])
     for unknown in ("EQ:NOCHAIN", "EQ:LASTONLY", "EQ:NOEARN", "EQ:PAST"):
         assert pd.isna(flags[unknown])  # either date unknown: UNKNOWN, never false
+
+
+def test_the_bear_state_probit_and_its_source(fs: FeatureSet) -> None:
+    macro = pd.DataFrame(
+        {
+            "instrument_id": ["MKT:US", "MKT:XX"],
+            "session_date": END,
+            "curve_10y3m": [-0.005, 0.01],
+            "cpi_yoy": [0.04, 0.03],
+            "hy_oas": [0.05, np.nan],  # before 1997: no high-yield spread
+        }
+    )
+    out = fs.evaluate(
+        {"rollups/market/market_macro@v2": macro}, ["bear_prob_6m", "bear_prob_source"]
+    )
+    out = out.set_index("instrument_id")
+    z = -1.0 - 40 * -0.005 + 15 * 0.04 + 10 * 0.05
+    assert out.loc["MKT:US", "bear_prob_6m"] == pytest.approx(float(norm_cdf(z)))
+    assert out.loc["MKT:US", "bear_prob_source"] == "literature"  # fitted = 0: not fitted
+    assert pd.isna(out.loc["MKT:XX", "bear_prob_6m"]) and pd.isna(
+        out.loc["MKT:XX", "bear_prob_source"]
+    )
+    assert fs.expressions["bear_prob_6m"].feature.licence == "personal"  # from hy_oas
+    assert fs.expressions["bear_prob_source"].definition.params == {
+        "fitted": 0,
+        "fitted_through": "",
+    }

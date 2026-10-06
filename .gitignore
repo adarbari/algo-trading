@@ -219,6 +219,7 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 scorecard.md
+regime-scorecard.txt
 coverage.xml
 
 # golden fixture store (rebuilt by make golden-store)

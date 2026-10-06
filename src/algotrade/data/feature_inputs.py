@@ -59,11 +59,12 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
 - ``volatility/ibkr_iv30``
                        ``volatility.ibkr_iv30``: IBKR's vols for the session plus ``lookback``
                        earlier sessions; ``None`` when the session has no rows (no IBKR run)
-- ``macro/series``     ``macro.series.stored_vintages``: every vintage of the group's series
-                       (``Input.ids``; all when empty) with ``vintage_date`` on or before the
-                       session (point in time by vintage, ADR 0048), sorted by
-                       ``vintage_date`` (the group keeps the latest vintage per observation);
-                       ``None`` when there is none
+- ``macro/series``     ``macro.series.known_window`` over the group's series (``Input.ids``;
+                       all when empty): each observation as the session knew it (the latest
+                       vintage with ``vintage_date`` on or before the session: point in time
+                       by vintage, ADR 0048), dated within ``lookback`` sessions, plus each
+                       series' latest known observation however old; sorted by id and
+                       observation; ``None`` when no vintage is known by the session
 - ``rollups/instrument/<name>@v<N>``, ``rollups/market/<name>@v<N>``
                        another group's stored output (``rollups.rollup_rows``) for the session
                        plus ``lookback`` earlier sessions; ``None`` when the session has no
@@ -85,7 +86,7 @@ from algotrade.core.time.calendar import sessions_between, sessions_ending
 from algotrade.data.chains import chain_status, option_quotes, underlying_quotes
 from algotrade.data.events import events_by_event_date, stored_events
 from algotrade.data.macro.series import TABLE as MACRO_SERIES
-from algotrade.data.macro.series import stored_vintages
+from algotrade.data.macro.series import known_window, stored_vintages
 from algotrade.data.prices import DateWindow, SessionBars, session_bars, window_closes
 from algotrade.data.rates import TABLE as TREASURY
 from algotrade.data.rates import curve_as_rows
@@ -236,12 +237,26 @@ def _share_facts(reader: StoreReader, sessions: Sequence[date], lookback: int) -
     return _Snapshots(frame, _days(frame["filed"]) if len(frame) else np.array([], "datetime64[D]"))
 
 
+@dataclass(frozen=True)
+class _Vintages:
+    """Every stored vintage, read once, sorted by ``vintage_date`` (``days``); ``at`` is what
+    the session knew (``macro.series.known_window``: the latest vintage per observation, the
+    observations of the last ``lookback`` sessions and each series' latest)."""
+
+    frame: pd.DataFrame
+    days: np.ndarray
+
+    def at(self, session: date, lookback: int) -> pd.DataFrame | None:
+        end = int(np.searchsorted(self.days, np.datetime64(session, "D"), side="right"))
+        return known_window(self.frame.iloc[:end], session, lookback) if end else None
+
+
 def _macro_series(
     reader: StoreReader, sessions: Sequence[date], lookback: int, ids: Sequence[str]
 ) -> Loaded:
     frame = stored_vintages(reader, ids)
     days = _days(frame["vintage_date"]) if len(frame) else np.array([], "datetime64[D]")
-    return _Snapshots(frame, days)
+    return _Vintages(frame, days)
 
 
 @dataclass(frozen=True)
