@@ -19,6 +19,7 @@ from algotrade_sources.framework.http import RetryPolicy
 from algotrade_sources.framework.series import SeriesRequest
 from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource
 from algotrade_sources.vendors.fred.observations import FredObservations
+from algotrade_sources.vendors.fred.releases import FredReleaseDates, ReleaseRequest
 from algotrade_sources.vendors.ibkr.gateway import GatewayConfig, IbkrMarketData
 from algotrade_sources.vendors.ibkr.market_data import IbkrSource
 from algotrade_sources.vendors.ishares.etf_holdings import IsharesHoldings
@@ -38,6 +39,7 @@ from algotrade_sources.vendors.sec.fund_objectives import (
     SecFundTickerMap,
 )
 from algotrade_sources.vendors.sec.nport_holdings import NportHoldings
+from algotrade_sources.vendors.sec.submissions import FilingsRequest, SecFilings
 from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource
 from algotrade_sources.vendors.treasury.par_yields import TreasuryParYields
@@ -198,6 +200,16 @@ def fred() -> Adapter:
     return FredObservations(http_for(lambda url: fred_payloads.payload())), request
 
 
+def fred_release_dates() -> Adapter:
+    payload = (FIXTURES / "fred" / "release_dates_10_cpi.json").read_bytes()
+    return FredReleaseDates(http_for(lambda url: payload)), ReleaseRequest("10")
+
+
+def sec_filings() -> Adapter:
+    payload = (FIXTURES / "sec" / "submissions_CIK0000723125.json").read_bytes()
+    return SecFilings(http_for(lambda url: payload)), FilingsRequest("723125")
+
+
 def published() -> Adapter:
     request = SeriesRequest(
         "SPX", url="https://stooq.com/q/d/l/?s=^spx&i=d", date_column="Date", value_column="Close"
@@ -207,6 +219,8 @@ def published() -> Adapter:
 
 ADAPTERS: dict[str, Callable[[], Adapter]] = {
     "fred": fred,
+    "fred_release_dates": fred_release_dates,
+    "sec_filings": sec_filings,
     "published": published,
     "treasury": treasury,
     "massive_tickers": massive_tickers,

@@ -76,7 +76,10 @@ loader under `features/`, and never write a new task for a group. `make ownershi
    `window | chain | expression | cross_section | label`; say exactly when it is null (null is
    UNKNOWN, never zero); a sane `valid_range` for numbers (values outside are kept, not
    clipped) and `categories` for a label; `inputs` as features (`price_stats.close@v1`) or raw
-   fields (`bars/1d.close`). Then `COLUMNS = column_types(FEATURES)` if the compute needs it,
+   fields (`bars/1d.close`). A column name must not equal a typed field of an API schema
+   (`volume`, `bid`, `price`, ...: `test_no_typed_feature_fields` and
+   `test_no_typed_catalogue_fields_in_api_schemas` fail, and their lists are shrink-only):
+   qualify it (`session_volume`). Then `COLUMNS = column_types(FEATURES)` if the compute needs it,
    and `GROUP = FeatureGroup(name, version (1), description, inputs (Input(table,
    lookback=sessions or lambda params: ..., required=True)), FEATURES, compute, params)`: the
    pure `compute(inputs, session, params) -> frame` returns ``instrument_id`` + the feature

@@ -1,0 +1,36 @@
+# Volume: drying up, event-sized days and accumulation / distribution. Formulas over
+# volume@v1, computed on read. The language and the keys: docs/configuration.md "Expression
+# features". Changing a formula or a param: bump its version.
+
+[volume_dry_up]
+expr = "volume.volume_ratio_5d_20d < max_ratio"
+params = { max_ratio = 0.6 }  # the last week under 60% of the 20-session average volume
+dtype = "bool"
+unit = "flag"
+description = "The last 5 sessions traded under 60% (params.max_ratio) of the 20-session average volume: the contraction that often precedes a breakout"
+null_meaning = "volume_ratio_5d_20d is null (a gap among the last 20 sessions, a shorter history, or no volume at all over the 20)"
+version = 1
+
+[volume_climax]
+expr = "volume.volume_z_20d >= min_z"
+params = { min_z = 3.0 }  # standard deviations above the 20 sessions before the session
+dtype = "bool"
+unit = "flag"
+description = "The session's volume is 3 (params.min_z) or more standard deviations above the 20 sessions before it: an event-sized day (earnings, news, an index event or a capitulation)"
+null_meaning = "volume_z_20d is null (a gap among the last 21 sessions, a shorter history, or the 20 sessions before all had the same volume)"
+version = 1
+
+[volume_bias]
+kind = "label"
+expr = '''
+if(is_null(volume.up_volume_share_20d), null,
+   if(volume.up_volume_share_20d >= accumulation_at, "ACCUMULATION",
+      if(volume.up_volume_share_20d <= distribution_at, "DISTRIBUTION", "NEUTRAL")))
+'''
+params = { accumulation_at = 0.6, distribution_at = 0.4 }  # up-volume share bounds (edges included)
+dtype = "str"
+unit = "category"
+categories = ["ACCUMULATION", "DISTRIBUTION", "NEUTRAL"]
+description = "ACCUMULATION when 60% (params.accumulation_at) or more of the last 20 sessions' volume traded on up days, DISTRIBUTION at 40% (params.distribution_at) or less, else NEUTRAL"
+null_meaning = "up_volume_share_20d is null (a gap among the last 21 sessions, a shorter history, or no volume at all over the 20)"
+version = 1

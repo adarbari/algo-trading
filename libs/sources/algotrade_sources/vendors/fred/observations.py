@@ -38,6 +38,7 @@ import pandas as pd
 
 from algotrade_sources.framework.base import FetchRequest, Normalized, TransientFetchError
 from algotrade_sources.framework.http import Http, HttpError
+from algotrade_sources.framework.pages import json_documents
 from algotrade_sources.framework.series import (
     SERIES_FRAME,
     SeriesRequest,
@@ -71,22 +72,7 @@ def too_many_vintages(exc: HttpError) -> bool:
 
 def parse_documents(payload: bytes) -> list[dict[str, Any]]:
     """The JSON documents in ``payload`` (one per page, whitespace between)."""
-    text, decoder, pos, documents = payload.decode("utf-8-sig"), json.JSONDecoder(), 0, []
-    while True:
-        while pos < len(text) and text[pos].isspace():
-            pos += 1
-        if pos >= len(text):
-            break
-        try:
-            document, pos = decoder.raw_decode(text, pos)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"FRED answer is not JSON: {exc}") from exc
-        if not isinstance(document, dict):
-            raise ValueError("FRED answer is not a JSON object")
-        documents.append(document)
-    if not documents:
-        raise ValueError("FRED answer is empty")
-    return documents
+    return json_documents(payload, "FRED")
 
 
 def halves(window: Window) -> list[Window]:

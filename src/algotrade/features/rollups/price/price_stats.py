@@ -32,6 +32,7 @@ computed from other columns: ``pct_from_high_52w`` / ``pct_from_low_52w`` are ex
 features (``config/site/features/price.toml``), computed on read.
 """
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -188,6 +189,16 @@ def panel(bars: pd.DataFrame, days: list[date]) -> Panel:
     )
 
 
+def traded_rows(px: Panel, values: Mapping[str, Matrix], columns: Iterable[str]) -> pd.DataFrame:
+    """One row per instrument with a bar on the panel's last session: ``instrument_id`` and
+    each of ``columns`` from ``values`` (one value per instrument)."""
+    traded = ~np.isnan(px.close[-1])
+    frame = pd.DataFrame({"instrument_id": px.ids[traded]})
+    for column in columns:
+        frame[column] = values[column][traded]
+    return frame
+
+
 def _complete(window: Matrix) -> npt.NDArray[np.bool_]:
     return ~np.isnan(window).any(axis=0)
 
@@ -227,11 +238,7 @@ def compute(inputs: Inputs, session: date, p: PriceStatsParams) -> pd.DataFrame:
     bars = inputs[BARS]
     assert bars is not None  # required input
     px = panel(bars, sessions_ending(session, lookback(p) + 1))
-    traded = ~np.isnan(px.close[-1])
-    values = stats(px, p)
-    frame = pd.DataFrame({"instrument_id": px.ids[traded]})
-    for column in COLUMNS:
-        frame[column] = values[column][traded]
+    frame = traded_rows(px, stats(px, p), COLUMNS)
     frame["history_days"] = frame["history_days"].astype(np.int64)
     return frame
 

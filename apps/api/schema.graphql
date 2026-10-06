@@ -116,7 +116,7 @@ type DecisionCount {
 }
 
 """
-One reference market drawdown, with its plain `name`. `recovered`: the session the S&P 500 regained its peak, null while the session did not know it yet; `nberStart` / `nberEnd`: the NBER recession months (first days) it overlapped, if any. Listed from `knownFrom` (its trough)
+One reference market drawdown, with its plain `name`. `recovered`: the session the S&P 500 regained its peak, null while the session did not know it yet; `recession` / `nberStart` / `nberEnd`: the NBER recession months (first days) it overlapped, shown only once NBER had announced them (`kind` reads `shock` until the peak is announced; `nberEnd` is null until the trough is). Listed from `knownFrom` (its trough)
 """
 type Episode {
   key: String!

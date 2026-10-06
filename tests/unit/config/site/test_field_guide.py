@@ -142,6 +142,7 @@ def test_the_shipped_guide_is_complete() -> None:
         "options-wing",
         "situations",
         "volatility",
+        "volume",
     ]
     assert store.load("alice", "field_guide", "momentum") is None  # site-only
     guide = load_field_guide(store)
