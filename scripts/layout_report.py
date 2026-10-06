@@ -16,6 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 LAYOUT = tomllib.loads((ROOT / "architecture" / "layout.toml").read_text())
+WEB = tomllib.loads((ROOT / "architecture" / "web_layout.toml").read_text())["web"]
 NOT_COUNTED = {"__init__.py", "conftest.py"}
 SKIPPED = {".venv", "node_modules", "__pycache__"}
 WEB_SUFFIXES = {".ts", ".tsx", ".js"}
@@ -28,7 +29,7 @@ def module_counts() -> Counter[str]:
         for path in (ROOT / top).rglob("*.py"):
             if path.name not in NOT_COUNTED and not SKIPPED & set(path.parts):
                 counts[path.parent.relative_to(ROOT).as_posix()] += 1
-    web = LAYOUT["web"]
+    web = WEB
     for path in (ROOT / web["root"]).rglob("*"):
         rel = path.relative_to(ROOT)
         if set(web["skipped"]) & set(rel.parts) or path.suffix not in WEB_SUFFIXES:

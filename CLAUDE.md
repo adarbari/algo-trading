@@ -65,7 +65,7 @@ source (`tests/unit/<path>` = `src/algotrade/<path>`, `tests/libs/sources/<path>
 `apps/ingestion/algotrade_ingestion/<path>`); shared test builders live in `tests/helpers/`
 (vendor payloads in `tests/helpers/payloads/`), recorded data in `tests/fixtures/`.
 
-**Where does this go?** `grep -n purpose architecture/layout.toml` (every folder, with its
+**Where does this go?** `grep -n purpose architecture/*layout.toml` (every folder, with its
 purpose). The non-obvious cases:
 
 | Kind of code | Folder |
@@ -100,7 +100,7 @@ Screeners, Explore, Backtests) and ADMIN (Ingestion, Screener runs, Users & conf
 gating goes only in `src/app/workspaces/guard.ts`. Order (ADR 0011): tokens (FINAL, approved
 mockups 2026-10-03) -> primitives -> components -> screens; screens lay out and set text only
 with the primitives (Box, Surface, Stack, Grid, Text, Heading, Mono, Divider, VisuallyHidden).
-Every folder is a `[[web_dir]]` in `architecture/layout.toml`. Lint messages name the rule and
+Every folder is a `[[web_dir]]` in `architecture/web_layout.toml`. Lint messages name the rule and
 the skill with the fix.
 
 
