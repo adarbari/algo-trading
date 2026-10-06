@@ -130,4 +130,5 @@ GROUP = FeatureGroup(
     FEATURES,
     compute,
     IbkrIvParams(),
+    applies_to="optionable",
 )

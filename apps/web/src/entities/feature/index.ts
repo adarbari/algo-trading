@@ -51,6 +51,7 @@ export {
   codeReason,
   isUnknown,
   shownValue,
+  unknownLabel,
   unknownReason,
   valueFormat,
   type FeatureFormatName,

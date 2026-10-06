@@ -923,6 +923,8 @@ enum UnknownCode {
   LICENCE
   NOT_RUN
   PRE_SNAPSHOT
+  NOT_APPLICABLE
+  ILLIQUID
 }
 
 """

@@ -396,4 +396,5 @@ GROUP = FeatureGroup(
     FEATURES,
     compute,
     LiquidityParams(),
+    applies_to="optionable",
 )

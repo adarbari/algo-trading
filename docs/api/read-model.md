@@ -202,8 +202,11 @@ vocabulary. `FeatureValue.value is None` always comes with `unknown` set.
 | `LICENCE` | a `personal`-licence feature and the caller is not its owner (ADR 0028) |
 | `NOT_RUN` | a screener (or the nightly data-quality check) has no run for the session |
 | `PRE_SNAPSHOT` | identity came from a later snapshot (survivorship) |
+| `NOT_APPLICABLE` | the feature is not defined for this instrument (not optionable; an ETF has no earnings); shown "n/a" (ADR 0042) |
+| `ILLIQUID` | an option feature null because the chain is too thin to price (`iv30_status` NO_QUOTES / WIDE_SPREADS / ILLIQUID); shown "Illiquid" (ADR 0042) |
 
-In PR 4 `features(names)` returns `NO_PARTITION`, `NO_ROW` and `NULL`. A name the caller's
+`features(names)` returns `NO_PARTITION`, `NO_ROW`, `NULL`, `NOT_APPLICABLE` and `ILLIQUID`
+(precedence: no partition, a present value, not applicable, illiquid, no row, null; ADR 0042). A name the caller's
 catalogue lacks is a request error (`UNKNOWN_FEATURE`, naming it) when the client asked for it;
 `NOT_IN_CATALOGUE` is for names the server reads on its own (a saved view's columns, PR 8).
 `LICENCE` waits for a second user (ADR 0028: personal values are hidden from other users once
@@ -415,8 +418,24 @@ query IdeasPage($date: Date, $limit: Int!, $names: [FeatureName!]!) {
 | `GET /chains/{id}/live` | latency-bound, records to `live/*`, bypasses the session model on purpose (ADR 0028) |
 | `POST /screeners/preview`, `POST /features/check` | compute over a request body with its own cache |
 | Files (exports) | binary / streaming |
+| `GET /{path}`: the built web app, only when `ALGOTRADE_WEB_DIST` is set | files on the API's own origin, mounted last, public, no data (ADR 0044) |
 
 Every read for a trader page goes to GraphQL. No new GET serving stored data.
+
+**Who a REST write is for (ADR 0040):** the caller, from their token; there is no `?user=`
+query parameter on any route (`tests/apps/api/test_main.py` asserts it). An admin acting for
+another user names them in the `X-Act-For` header on a write (one dependency, `deps.write_user`;
+a trader naming someone else is 403, and `services.authoring` refuses an id the registry does
+not declare: 400) or, on the preview POSTs, in the body's `user`. A route never reads either by
+hand. `GET /screens/{id}/run/{job_id}` is 403 for another user's job unless the caller is an
+admin (a site preset's run is the site's: shared by everyone who may request the preset).
+
+**Who a GraphQL field is for:** the Admin area (nightly runs, run records, quality,
+verification, completeness, ingestion cells, review lists: `Query` fields returning the
+`types/ops/{run,quality,ingestion,review}` objects) is admin-only. Each carries the
+`AdminOnly` field extension (`graphql/permissions.py`, the one check): a trader gets a
+`FORBIDDEN` error. `tests/apps/api/graphql/test_permissions.py` finds those fields in the
+schema, so a new one cannot skip it.
 
 ## What the browser may not derive
 

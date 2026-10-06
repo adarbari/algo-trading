@@ -30,3 +30,8 @@ class ModelUnavailableError(AlgoTradeError):
     """The text model behind a screener draft (ADR 0041) cannot answer now: drafting is off in
     the site settings, the provider refused or timed out, or its answer was not text. The
     message says which; it never carries a credential."""
+
+
+class PermissionDeniedError(AlgoTradeError):
+    """The caller may not do this (ADR 0040): an ops read for a trader, or another user's job.
+    The API answers 403 (REST) or ``FORBIDDEN`` (GraphQL)."""

@@ -526,8 +526,10 @@ thresholds in `config/site/sources.toml` `[quality]`); any FAIL marks the nightl
 Option chains are judged on two separate counts: **fetch failures** (`FETCH_ERROR`, including
 an open circuit breaker, or never attempted) above `max_chain_fetch_failures` (5% of the
 universe) FAIL `chains_fetch`, because the night's data is missing; **stale chains**
-(`STALE_DATA`: the feed served an older session) above `max_chain_stale_share` (20%) only WARN
-`chains_stale`, because screens already treat those names as UNKNOWN. Both details report the
+(`STALE_DATA`: the feed served an older session) are graded per tier, the tier stored with each
+status row at fetch time (`tasks/market/tiers.py`: core = S&P 500, `[cboe] priority_symbols`,
+HIGH liquidity): above `max_chain_stale_share_core` (2%) of core chains FAIL `chains_stale_core`,
+above `max_chain_stale_share` (20%) of the rest FAIL `chains_stale_rest`. Both details report the
 OK / STALE_DATA / NO_CHAIN / NO_STANDARD_SERIES counts. It is scheduled
 locally by a launchd agent (`algotrade-ingest schedule`, `ops/schedule.py`): weekdays at 15:00
 local (Pacific; close 13:00 PT), `RunAtLoad` (login / boot, for a Mac that was off) and an
@@ -571,7 +573,7 @@ web (apps/web) ──HTTP/JSON─────▶ routes/<area>.py ──one call
 | chains | `/chains/{underlying_id}/live?expiry&strikes=` (repeatable; default the `live_strikes` nearest the underlying): live IBKR quotes through `services/live/` ([ADR 0028](adr/0028-ibkr-enrichment-source.md#live-option-quotes-in-the-api)), cached 60 s, recorded to `live/option_quotes`; when the gateway cannot answer, the stored chain with `source = stored` and a `status` (DISABLED, UNAVAILABLE, ERROR), never an error |
 | GraphQL (`POST /graphql`, ADR 0037; [api/read-model.md](api/read-model.md)) | the session, an instrument and its features by catalogue name, the catalogue (`catalogue`), a feature across instruments (`distribution(name, date)`: count, nulls, quantiles, histogram or categories, UNKNOWN when not stored for the session), configs (`configs(kind)`), saved backtests (`backtests`, `backtest(runId)`: metrics, selection, data versions, rebalances, equity curve, fills) and the user's rule screens (`myScreens`, `screenDetail(screenerId)`: draft, versions, preset pin, working copy; `screenVersions`) |
 | ideas | GraphQL since read-model PR 5 (ADR 0037): `ideas(date)` (one row per ticker over the user's rule screens' runs for exactly the session, `NOT_RUN` without one; ranked by the user's `ideas.priority` in `config/users/<u>/preferences.toml`, then score) |
-| table views | read: GraphQL `view(scope, name)` (read-model PR 8); write: `PUT /preferences/views/{scope}/view?user&name` and `DELETE ?name=` (a user's added catalogue columns, sort and shown decisions for one table, `scope` `screener:<id>` for a screener's results: the default view, in `views.<scope>.view` of `preferences.toml`, and any named ones, `views.<scope>.views.<name>`; a view saved before PR 8 under `screeners.<id>` is read there until the user's next preferences write moves it; never part of a screener version or hash; ADR 0032) |
+| table views | read: GraphQL `view(scope, name)` (read-model PR 8); write: `PUT /preferences/views/{scope}/view?name` and `DELETE ?name=` (a user's added catalogue columns, sort and shown decisions for one table, `scope` `screener:<id>` for a screener's results: the default view, in `views.<scope>.view` of `preferences.toml`, and any named ones, `views.<scope>.views.<name>`; a view saved before PR 8 under `screeners.<id>` is read there until the user's next preferences write moves it; never part of a screener version or hash; ADR 0032) |
 | screen run | `POST /screens/{config_id}/run?date&user` (run a screener on request for the latest session with data, unless this version has results for it: `ready`, else the nightly's `screen` job, without waiting for ingestion, 202) and `GET /screens/{config_id}/run/{job_id}` (its state; ADR 0033) |
 | screens | GraphQL since read-model PR 8 (ADR 0037): `screener(id, date) { criteria displayColumns latestRun { decisions changes previousSession audit results(decisions, change, q, sort, columns, page, size) { results { rank decision score criteria columns change previousDecision instrument } columns rows unknown total } } }` (a rule screen's run as a review table, filtered, sorted and paged on the server; ADR 0032) and `instrument(key) { screenerHits { screener result } }` |
 | preview (POST, read-only dry runs; `routes/preview/` → `services/preview/`, over the request's `ReadContext`) | `POST /screeners/preview {spec, user, limit}` (an unsaved rule-screen draft evaluated by the nightly `evaluate_screen` on the context's session, the latest with daily bars: summary, decisions, funnel per gating criterion, coverage, the top rows (every row not rejected, at least `limit`, at most 1000; with each instrument's name, as the review table's rows), the draft's criteria and display columns, and `changes` against the screener's saved run for that session (`entered` / `left`, over every row); field frame cached per session, fields, user features and `visible_seq`; an invalid draft → 400 naming its path); `POST /features/check {expr, user, sample}` (a formula's type, inputs and licence, sampled on the context's session; `session` null when an input has nothing stored for it) |
@@ -585,9 +587,12 @@ test fails when it is stale); the web client is generated from it.
 ## 13. Hosting
 
 Local (macOS) today: Python 3.12 via uv, storage at `ALGOTRADE_DATA_URL` (default
-`file://./var/data`), configs at `ALGOTRADE_CONFIG_DIR` (default `./config`). Hosting needs no
-redesign: an `s3://` storage backend, a DB-backed `ConfigStore` and a queue-backed job runner
-(phases 4–6).
+`file://./var/data`), configs at `ALGOTRADE_CONFIG_DIR` (default `./config`). Users outside the
+Mac reach it through Tailscale Funnel ([ADR 0044](adr/0044-hosting-from-the-owners-mac.md),
+runbook [hosting.md](hosting.md)): one origin, the API serving the built web
+(`ALGOTRADE_WEB_DIST`) and kept up by a launchd agent (`algotrade-api schedule`). Moving off
+the Mac needs no redesign: an `s3://` storage backend, a DB-backed `ConfigStore` and a
+queue-backed job runner (phases 4–6).
 
 ---
 

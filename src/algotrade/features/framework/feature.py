@@ -30,6 +30,16 @@ type and, later, UI and email labels (ADR 0023).
                   ``personal`` (derived from a personal-use market-data licence, e.g. IBKR's:
                   shown to the owner only once there are other users; ADR 0028). An
                   expression feature takes the most restrictive licence of its inputs
+- ``applies_to``  which instruments the feature is defined for: ``any``, ``optionable``
+                  (option-chain features: a non-optionable instrument has none) or ``not_etf``
+                  (earnings: an ETF has none). A group's value is inherited by its features.
+                  Where it does not apply the read says NOT_APPLICABLE, not UNKNOWN (ADR 0042)
+- ``null_status`` the status column saying why this one is null: a sibling column of the same
+                  group (``iv30_status``) or another group's (``iv30.iv30_status@v1``, for a
+                  feature derived from it); when its value is an illiquid status the read
+                  says ILLIQUID (ADR 0042)
+- ``illiquid_statuses``  which ``null_status`` values mean the chain is too thin (the others
+                  stay NULL); declared with ``null_status``, each needs the other
 - ``version``     the feature's definition version: a group feature's is its group's (a
                   group is re-versioned only when its stored columns change); an expression
                   feature's is its own
@@ -46,10 +56,12 @@ type Entity = Literal["instrument"]
 type Kind = Literal["window", "chain", "expression", "cross_section", "label"]
 type Range = tuple[float | None, float | None]
 type Licence = Literal["open", "personal"]
+type AppliesTo = Literal["any", "optionable", "not_etf"]
 
 ENTITIES = frozenset({"instrument"})
 KINDS = frozenset({"window", "chain", "expression", "cross_section", "label"})
 LICENCES = ("open", "personal")  # least to most restrictive
+APPLIES_TO = ("any", "optionable", "not_etf")
 UNITS = frozenset(
     {
         "decimal",  # a fraction: 0.25 is 25% (returns, vols, yields, rates, relative spreads)
@@ -87,6 +99,9 @@ class Feature:
     version: int = 0  # 0: the group's version (set when the group is declared)
     group: str = ""  # the owning group's key (set when declared); "": an expression feature
     licence: Licence = "open"
+    applies_to: AppliesTo = "any"
+    null_status: str = ""  # a sibling status column; "": null always means UNKNOWN
+    illiquid_statuses: tuple[str, ...] = ()  # the null_status values that mean "too thin"
 
     @property
     def key(self) -> str:
@@ -95,6 +110,18 @@ class Feature:
         if not self.group:
             return f"{self.name}@v{self.version}"
         return f"{self.group.partition('@')[0]}.{self.name}@v{self.version}"
+
+    @property
+    def status_field(self) -> str:
+        """The selection field of ``null_status`` (``""``: none): a sibling column of this
+        group, or ``<group>.<column>@v<N>`` of another."""
+        if not self.null_status:
+            return ""
+        if "@" not in self.null_status:
+            return f"rollup.{self.group}.{self.null_status}"
+        group, _, rest = self.null_status.partition(".")
+        column, _, version = rest.partition("@")
+        return f"rollup.{group}@{version}.{column}"
 
     @property
     def field(self) -> str:
@@ -124,6 +151,7 @@ def feature_problems(feature: Feature) -> list[str]:
         problems.append(f"{f.name}: entity {f.entity!r} must be one of {sorted(ENTITIES)}")
     if f.licence not in LICENCES:
         problems.append(f"{f.name}: licence {f.licence!r} must be one of {list(LICENCES)}")
+    problems += _absence_problems(f)
     if not f.description.strip() or not f.null_meaning.strip():
         problems.append(f"{f.name}: describe it and say when it is null")
     if f.valid_range is not None:
@@ -137,6 +165,17 @@ def feature_problems(feature: Feature) -> list[str]:
     bad = [r for r in f.inputs if not (is_feature_ref(r) or _RAW_REF.match(r))]
     if bad:
         problems.append(f"{f.name}: inputs {bad} are neither <group>.<column>@vN nor table.column")
+    return problems
+
+
+def _absence_problems(f: Feature) -> list[str]:
+    problems = []
+    if f.applies_to not in APPLIES_TO:
+        problems.append(f"{f.name}: applies_to {f.applies_to!r} must be one of {list(APPLIES_TO)}")
+    if "@" in f.null_status and not is_feature_ref(f.null_status):
+        problems.append(f"{f.name}: null_status {f.null_status!r} is not <group>.<column>@vN")
+    if bool(f.null_status) != bool(f.illiquid_statuses):
+        problems.append(f"{f.name}: null_status and illiquid_statuses go together")
     return problems
 
 

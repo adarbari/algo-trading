@@ -11,6 +11,8 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import date
 
+import pandas as pd
+
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.data import StoreReader
 from algotrade.data.chains import chain_status
@@ -26,6 +28,7 @@ class Check:
     name: str
     status: str  # PASS | WARN | FAIL
     detail: str
+    pending: bool = False  # a FAIL that only means "the source has not published it yet" (ADR 0043)
 
 
 def _rows(reader: StoreReader, table: str, day: date | None) -> int | None:
@@ -46,6 +49,20 @@ def _previous(reader: StoreReader, table: str, session: date) -> date | None:
     return dates[-1] if dates else None
 
 
+BARS_TASK = "daily_bars"  # the bars task's run-record job name (tasks/market/bars.py)
+NOT_PUBLISHED = "NOT_PUBLISHED"  # the bars task's item status (tasks/market/bars.py)
+
+
+def _bars_not_published(reader: StoreReader, session: date) -> bool:
+    """Whether the latest bars run for ``session`` found it not published yet (the vendor
+    answers for the session before: ``tasks/market/bars.py``)."""
+    runs = [r for r in reader.runs(BARS_TASK, session) if r.finished_at is not None]
+    if not runs:
+        return False
+    latest = max(runs, key=lambda r: r.finished_at or r.started_at)
+    return str(latest.items.get(session.isoformat(), "")).startswith(NOT_PUBLISHED)
+
+
 def check_bars(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:
     latest = _latest(reader, "bars/1d", session)
     if latest is None:
@@ -55,6 +72,7 @@ def check_bars(reader: StoreReader, session: date, s: SourcesSettings) -> list[C
             "bars_fresh",
             "PASS" if latest == session else "FAIL",
             f"latest bars session {latest}, expected {session}",
+            pending=latest != session and _bars_not_published(reader, session),
         )
     ]
     today, before = (
@@ -72,9 +90,6 @@ def check_bars(reader: StoreReader, session: date, s: SourcesSettings) -> list[C
             )
         )
     return checks
-
-
-BARS_TASK = "daily_bars"  # the bars task's run-record job name (tasks/market/bars.py)
 
 
 def check_bars_resolved(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:
@@ -126,6 +141,7 @@ def check_universe(reader: StoreReader, session: date, s: SourcesSettings) -> li
 # rest are answers.
 FETCH_FAILURES = ("FETCH_ERROR", "NOT_ATTEMPTED")  # FETCH_ERROR includes an open circuit
 STALE = "STALE_DATA"
+EXAMPLES = 8  # stale core names listed in the detail
 REPORTED = ("OK", "STALE_DATA", "NO_CHAIN", "NO_STANDARD_SERIES")
 
 
@@ -137,7 +153,6 @@ def check_chains(reader: StoreReader, session: date, s: SourcesSettings) -> list
     total = len(labels)
     counts = labels.value_counts()
     failed = int(labels.isin(FETCH_FAILURES).sum())
-    stale = int(counts.get(STALE, 0))
     breakdown = ", ".join(f"{k} {int(counts.get(k, 0))}" for k in REPORTED)
     detail = f"of {total} underlyings: {breakdown}, fetch failures {failed}"
     return [
@@ -147,12 +162,38 @@ def check_chains(reader: StoreReader, session: date, s: SourcesSettings) -> list
             f"{failed / total:.1%} failed to fetch "
             f"(max {s.max_chain_fetch_failures:.0%}); {detail}",
         ),
-        Check(
-            "chains_stale",
-            "FAIL" if stale / total > s.max_chain_stale_share else "PASS",
-            f"{stale / total:.1%} stale (max {s.max_chain_stale_share:.0%}); {detail}",
-        ),
+        _stale_check(status_frame, labels, "core", s.max_chain_stale_share_core, detail),
+        _stale_check(status_frame, labels, "rest", s.max_chain_stale_share, detail),
     ]
+
+
+def _stale_check(
+    frame: pd.DataFrame, labels: pd.Series, tier: str, limit: float, detail: str
+) -> Check:
+    """``chains_stale_<tier>``: the share of the tier's chains that are STALE_DATA, FAIL above
+    ``limit``. The tier is the one stored with each status row at fetch time (rows from before
+    the column existed count as rest); stale core names are listed."""
+    stored = frame["tier"] if "tier" in frame.columns else pd.Series("rest", index=frame.index)
+    in_tier = stored.fillna("rest").astype(str) == tier
+    total = int(in_tier.sum())
+    if tier == "core" and total == 0 and "tier" in frame.columns:
+        # a tiered status with no core name means the tier inputs were missing: no gate
+        return Check(
+            "chains_stale_core", "FAIL", f"no core names in a tiered chain status; {detail}"
+        )
+    stale = in_tier & (labels == STALE)
+    count = int(stale.sum())
+    share = count / total if total else 0.0
+    names = ""
+    if tier == "core" and count:
+        listed = frame.loc[stale, "symbol"].astype(str).sort_values().head(EXAMPLES).tolist()
+        names = f"; stale: {', '.join(listed)}" + (" ..." if count > EXAMPLES else "")
+    return Check(
+        f"chains_stale_{tier}",
+        "FAIL" if share > limit else "PASS",
+        f"{count} of {total} {tier} chains stale ({share:.1%}, max {limit:.0%}){names}; {detail}",
+        pending=True,  # Cboe has not rolled to the session yet (ADR 0043)
+    )
 
 
 def check_earnings(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:

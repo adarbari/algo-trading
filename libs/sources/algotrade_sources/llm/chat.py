@@ -32,6 +32,7 @@ class ChatCompletions:
     max_tokens: int = 2000
     retries: int = 2  # attempts after the first, on a busy provider or a transport failure
     backoff_s: float = 3.0  # the wait before the first retry; doubled each time
+    throttle_s: float = 20.0  # the wait after a 429 without Retry-After (a per-minute quota)
     extra: Mapping[str, Any] = field(default_factory=dict)  # provider fields sent as given
 
     @property
@@ -68,7 +69,8 @@ class ChatCompletions:
                     raise ModelUnavailableError(
                         f"{where}: HTTP {exc.status}{tried} {detail}"
                     ) from exc
-                delay = exc.retry_after or self.backoff_s * 2**attempt
+                floor = self.throttle_s if exc.status == 429 else 0.0
+                delay = exc.retry_after or max(floor, self.backoff_s * 2**attempt)
             except (OSError, TimeoutError) as exc:
                 if last:
                     raise ModelUnavailableError(f"{where}{tried}: {exc}") from exc

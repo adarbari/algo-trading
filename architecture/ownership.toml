@@ -230,6 +230,14 @@ detect = [
 ]
 
 [[responsibility]]
+id = "instrument-tiers"
+description = "Which underlyings are core (S&P 500, [cboe] priority_symbols, latest liquidity_class HIGH) and which are rest: the one tier rule, recorded in chains/status.tier at fetch time and graded by the chain acceptance check (ADR 0043)"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/market/tiers.py"]
+section = "docs/adr/0019-ownership-and-boundaries.md#guardrails"
+allowed = ["apps/ingestion/algotrade_ingestion/tasks/market/option_chains.py"]  # the chain run loads the tiers it records and orders by
+detect = [{ call = "Tiers" }, { call = "load_tiers" }]
+
+[[responsibility]]
 id = "ingestion-report"
 description = "The nightly summary report (statistics per step, failed items grouped by reason with examples, failed checks, hints) and notifications: the desktop alert and the daily summary email over SMTP"
 owner = [
@@ -438,6 +446,7 @@ description = "Load and type L3 site settings (config/site/*.toml: sources, univ
 owner = [
     "src/algotrade/config/site/settings.py",
     "src/algotrade/config/site/users.py",
+    "src/algotrade/config/site/nightly.py",
     "src/algotrade/storage/configs/store.py",
     "src/algotrade/storage/configs/files.py",
 ]
@@ -511,7 +520,7 @@ detect = [{ call = "parse_screen_spec" }, { call = "Criterion" }, { call = "Tole
 
 [[responsibility]]
 id = "config-authoring"
-description = "Write L4 user configs (ADR 0029): a rule screen's draft, finalise into an immutable v<N> (validated fail closed), copy a site preset pinned to its version and rebase, delete a screen (archive its folder), the schedule switch, named user expression features; the ConfigWriter (atomic, user-scoped files) behind the ConfigStore protocol (which reads drafts and versions back: the read model, services/read/screens/documents.py)"
+description = "Write L4 user configs (ADR 0029): a rule screen's draft, finalise into an immutable v<N> (validated fail closed), copy a site preset pinned to its version and rebase, delete a screen (archive its folder), the schedule switch, named user expression features; for a user the site registry declares (the API passes the registry as a predicate to `author`; no I/O of its own); the ConfigWriter (atomic, user-scoped files) behind the ConfigStore protocol (which reads drafts and versions back: the read model, services/read/screens/documents.py)"
 owner = ["src/algotrade/services/authoring/*", "src/algotrade/storage/configs/writer.py"]
 section = "docs/adr/0029-rule-screener.md#versioned-configs"
 detect = [{ call = "add_version" }, { call = "save_features" }]
@@ -542,6 +551,27 @@ description = "Serve HTTP: FastAPI routers (one per area: writes, job polling, h
 owner = ["apps/api/algotrade_api/*"]
 section = "docs/adr/0024-api.md#http-layer"
 detect = [{ import = "fastapi" }, { import = "starlette" }, { import = "uvicorn" }]
+
+[[responsibility]]
+id = "web-on-api-origin"
+description = "Serve the built web app on the API's origin (ADR 0044): the files of ALGOTRADE_WEB_DIST, the SPA fallback to index.html, confinement to the build directory, cache headers; create_app mounts it last so every API route keeps precedence"
+owner = ["apps/api/algotrade_api/web.py"]
+section = "docs/adr/0044-hosting-from-the-owners-mac.md#decision"
+detect = [
+    { call = "FileResponse" },
+    { import = "starlette.staticfiles" },
+    { import = "fastapi.staticfiles" },
+]
+
+[[responsibility]]
+id = "launchd-agents"
+description = "Generate the macOS launchd agents that run the apps on the owner's Mac, written and never installed (the owner runs launchctl): the nightly (ingestion ops/schedule.py) and the API kept serving behind Tailscale Funnel (api ops/schedule.py, ADR 0044)"
+owner = [
+    "apps/ingestion/algotrade_ingestion/ops/schedule.py",
+    "apps/api/algotrade_api/ops/schedule.py",
+]
+section = "docs/adr/0044-hosting-from-the-owners-mac.md#decision"
+detect = [{ import = "plistlib" }]
 
 [[responsibility]]
 id = "api-authentication"
@@ -906,6 +936,13 @@ section = "docs/adr/0025-frontend-architecture.md#rule-4-only-sharedapi-talks-ht
 enforced_by = ["eslint no-restricted-globals / no-restricted-syntax / no-restricted-imports (apps/web/lint-rules/restrictions.js)", "npm run generated:check (schema matches the OpenAPI document)"]
 
 [[web_responsibility]]
+id = "web-session"
+description = "The browser's Supabase session: password sign-in and sign-out, the access token sent as the bearer on every request, a 401 ending the session (ADR 0040)"
+owner = ["apps/web/src/shared/api/auth.ts"]
+section = "docs/adr/0040-identity-and-roles.md#decision"
+enforced_by = ["eslint no-restricted-imports: @supabase/supabase-js only in src/shared/api (apps/web/lint-rules/restrictions.js)"]
+
+[[web_responsibility]]
 id = "web-data-access"
 description = "Server state: TanStack Query hooks over shared/api"
 owner = ["apps/web/src/entities/**", "apps/web/src/features/**", "apps/web/src/app/providers/*"]
@@ -921,7 +958,7 @@ enforced_by = ["eslint no-restricted-imports: @tanstack/react-router only in src
 
 [[web_responsibility]]
 id = "web-workspace-access"
-description = "Who may enter a workspace (TRADER, ADMIN): the role-gating seam"
+description = "Who may enter a workspace (TRADER, ADMIN): the role-gating seam, reading the viewer's registry workspaces (ADR 0040)"
 owner = ["apps/web/src/app/workspaces/guard.ts"]
 section = "docs/adr/0025-frontend-architecture.md#workspaces-and-routes"
 enforced_by = ["review: every workspace layout route calls workspaceGuard in beforeLoad"]

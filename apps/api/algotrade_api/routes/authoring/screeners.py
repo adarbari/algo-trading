@@ -2,7 +2,7 @@
 finalised screen runs nightly, ADR 0033; a deleted one is archived). Reading a screen (its
 draft, versions and preset pin) is GraphQL (``Query.myScreens``, ``screenDetail``,
 ``screenVersions``; ADR 0037).
-``?user=`` names the user (a label until identity arrives; default ``ALGOTRADE_USER``)."""
+The write is for the caller; an admin names another user in the ``X-Act-For`` header (ADR 0040)."""
 
 from fastapi import APIRouter
 

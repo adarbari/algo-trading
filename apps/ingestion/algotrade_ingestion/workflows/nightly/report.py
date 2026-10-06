@@ -25,7 +25,7 @@ from algotrade_ingestion.workflows.nightly.timing import (
     vendor_pacing,
 )
 
-BAD_STEPS = ("FAILED", "NOT_RUN", "PARTIAL", "BLOCKED")  # PARTIAL / BLOCKED: before ADR 0039
+BAD_STEPS = ("FAILED", "NOT_RUN", "WAITING", "PARTIAL", "BLOCKED")  # PARTIAL / BLOCKED: before 0039
 # Key counts per step (result keys); other steps show their top-level numbers.
 KEY_COUNTS: Mapping[str, tuple[str, ...]] = {
     "universe-build": ("covered", "delisted_carried"),
@@ -342,8 +342,10 @@ HINTS: tuple[tuple[re.Pattern[str], str], ...] = tuple(
         ),
         (
             r"^chains_stale",
-            "chains_stale: STALE_DATA share above [quality] max_chain_stale_share: Cboe served "
-            "older chains (thin delayed data). Re-run chains later; screens treat them as UNKNOWN.",
+            "chains_stale_core / chains_stale_rest: STALE_DATA share of the tier above [quality] "
+            "max_chain_stale_share_core (S&P 500, priority symbols, HIGH liquidity) or "
+            "max_chain_stale_share (the rest): Cboe served older chains (thin delayed data). "
+            "Re-run chains later; screens treat them as UNKNOWN.",
         ),
         (
             r"IB Gateway not reachable|\[ibkr\] is disabled",

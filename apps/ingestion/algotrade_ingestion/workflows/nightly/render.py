@@ -306,6 +306,7 @@ _STATUS_COLOR = {
     "WAIVED": "#9a6700",
     "PARTIAL": "#9a6700",
     "WARN": "#9a6700",
+    "WAITING": "#9a6700",  # not published yet (ADR 0043)
     "BLOCKED": "#9a6700",
     "NOT_RUN": "#cf222e",
     "FAILED": "#cf222e",

@@ -19,6 +19,7 @@ class RunStatus(StrEnum):
     RUNNING = "running"
     COMPLETE = "complete"
     PARTIAL = "partial"
+    WAITING = "waiting"  # a workflow whose source has not published the session yet (ADR 0043)
     FAILED = "failed"
 
 

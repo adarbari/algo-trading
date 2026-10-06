@@ -274,7 +274,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Run Status */
+        /**
+         * Run Status
+         * @description 403 for another user's job unless the caller is an admin (the job's owner is its user).
+         */
         get: operations["run_status_screens__config_id__run__job_id__get"];
         put?: never;
         post?: never;
@@ -1108,11 +1111,11 @@ export interface operations {
     };
     save_user_feature_features_user_post: {
         parameters: {
-            query?: {
+            query?: never;
+            header?: {
                 /** @description whose configs (default: the caller's; another user's: admins only) */
-                user?: string | null;
+                "X-Act-For"?: string | null;
             };
-            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -1184,11 +1187,11 @@ export interface operations {
     };
     save_ideas_priority_preferences_ideas_put: {
         parameters: {
-            query?: {
+            query?: never;
+            header?: {
                 /** @description whose configs (default: the caller's; another user's: admins only) */
-                user?: string | null;
+                "X-Act-For"?: string | null;
             };
-            header?: never;
             path?: never;
             cookie?: never;
         };
@@ -1223,10 +1226,11 @@ export interface operations {
             query?: {
                 /** @description a named view (default: the table's default view) */
                 name?: string | null;
-                /** @description whose configs (default: the caller's; another user's: admins only) */
-                user?: string | null;
             };
-            header?: never;
+            header?: {
+                /** @description whose configs (default: the caller's; another user's: admins only) */
+                "X-Act-For"?: string | null;
+            };
             path: {
                 scope: string;
             };
@@ -1263,10 +1267,11 @@ export interface operations {
             query: {
                 /** @description the named view to remove */
                 name: string;
-                /** @description whose configs (default: the caller's; another user's: admins only) */
-                user?: string | null;
             };
-            header?: never;
+            header?: {
+                /** @description whose configs (default: the caller's; another user's: admins only) */
+                "X-Act-For"?: string | null;
+            };
             path: {
                 scope: string;
             };
@@ -1296,11 +1301,11 @@ export interface operations {
     };
     delete_screener_screeners__screener_id__delete: {
         parameters: {
-            query?: {
+            query?: never;
+            header?: {
                 /** @description whose configs (default: the caller's; another user's: admins only) */
-                user?: string | null;
+                "X-Act-For"?: string | null;
             };
-            header?: never;
             path: {
                 screener_id: string;
             };
@@ -1328,11 +1333,11 @@ export interface operations {
     };
     copy_screeners__screener_id__copy_post: {
         parameters: {
-            query?: {
+            query?: never;
+            header?: {
                 /** @description whose configs (default: the caller's; another user's: admins only) */
-                user?: string | null;
+                "X-Act-For"?: string | null;
             };
-            header?: never;
             path: {
                 screener_id: string;
             };
@@ -1366,11 +1371,11 @@ export interface operations {
     };
     save_draft_screeners__screener_id__draft_put: {
         parameters: {
-            query?: {
+            query?: never;
+            header?: {
                 /** @description whose configs (default: the caller's; another user's: admins only) */
-                user?: string | null;
+                "X-Act-For"?: string | null;
             };
-            header?: never;
             path: {
                 screener_id: string;
             };
@@ -1404,11 +1409,11 @@ export interface operations {
     };
     discard_draft_screeners__screener_id__draft_delete: {
         parameters: {
-            query?: {
+            query?: never;
+            header?: {
                 /** @description whose configs (default: the caller's; another user's: admins only) */
-                user?: string | null;
+                "X-Act-For"?: string | null;
             };
-            header?: never;
             path: {
                 screener_id: string;
             };
@@ -1471,11 +1476,11 @@ export interface operations {
     };
     finalise_screeners__screener_id__finalise_post: {
         parameters: {
-            query?: {
+            query?: never;
+            header?: {
                 /** @description whose configs (default: the caller's; another user's: admins only) */
-                user?: string | null;
+                "X-Act-For"?: string | null;
             };
-            header?: never;
             path: {
                 screener_id: string;
             };
@@ -1505,11 +1510,11 @@ export interface operations {
     };
     rebase_screeners__screener_id__rebase_post: {
         parameters: {
-            query?: {
+            query?: never;
+            header?: {
                 /** @description whose configs (default: the caller's; another user's: admins only) */
-                user?: string | null;
+                "X-Act-For"?: string | null;
             };
-            header?: never;
             path: {
                 screener_id: string;
             };
@@ -1575,10 +1580,11 @@ export interface operations {
             query?: {
                 /** @description default: the latest session with data */
                 date?: string | null;
-                /** @description whose configs (default: the caller's; another user's: admins only) */
-                user?: string | null;
             };
-            header?: never;
+            header?: {
+                /** @description whose configs (default: the caller's; another user's: admins only) */
+                "X-Act-For"?: string | null;
+            };
             path: {
                 config_id: string;
             };

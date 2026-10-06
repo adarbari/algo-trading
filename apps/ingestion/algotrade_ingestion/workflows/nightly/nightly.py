@@ -13,6 +13,11 @@ Cboe chains: sources that serve only the current snapshot) runs only for the las
 session; one that failed and whose session is no longer the latest FAILS as expired until it
 is waived by hand (``algotrade-ingest nightly --date D --waive STEP --reason ...``).
 
+A step whose source has not published the latest session yet is WAITING, not FAILED, until its
+deadline (``[schedule] data_deadline``, ADR 0043; ``waits``): the session is WAITING, holds
+later sessions back like a failed one, is not done (the next hourly run resumes it) and sends
+no alert. A catch-up session (not the latest) is past its deadline: FAILED as before.
+
 ``purge-raw`` ends the run whatever failed before; then ``notify.report`` writes the summary
 file and sends the notifications. Each session gets a ``nightly`` run record (COMPLETE when
 the session SUCCEEDED, else FAILED) holding every step's result, which is how the next run
@@ -25,7 +30,7 @@ from pathlib import Path
 from typing import Any
 
 from algotrade.config.site.settings import NightlySettings, SourcesSettings, load_nightly
-from algotrade.core.time.calendar import last_closed_session
+from algotrade.core.time.calendar import last_closed_session, local_deadline
 from algotrade.data.reference import snapshot
 from algotrade.services.jobs import JobContext
 from algotrade_ingestion.tasks.framework.registry import TASKS, run_task, task
@@ -48,6 +53,7 @@ from algotrade_ingestion.workflows.nightly.sessions import (
     plan_sessions,
 )
 from algotrade_ingestion.workflows.nightly.steps import (
+    BAD,
     Outcome,
     Status,
     Step,
@@ -195,7 +201,10 @@ def _not_run(
         return _not_latest(step, before)
     held = unsatisfied(step.needs, done)
     if held:
-        return _held(step, StepStatus.NOT_RUN, f"needs {', '.join(held)}")
+        result = _held(step, StepStatus.NOT_RUN, f"needs {', '.join(held)}")
+        unmet = [done[n] for n in step.needs if n in done and done[n].status in BAD]
+        result.held_by_wait = all(r.status is StepStatus.WAITING or r.held_by_wait for r in unmet)
+        return result
     reason = skip_reason(step.name, ctx) if step.name in TASKS else None
     if reason is None:
         return None
@@ -204,15 +213,25 @@ def _not_run(
     return _held(step, StepStatus.SKIPPED, reason)
 
 
+def waits(
+    step: Step, ctx: TaskContext, session: date, latest: bool, settings: NightlySettings
+) -> bool:
+    """Whether ``step`` may WAIT for its source to publish ``session``: only the latest
+    session, and only before the step's deadline (Los Angeles time on the session's date)."""
+    deadline = local_deadline(session, settings.deadline_for(step.name))
+    return latest and ctx.clock() < deadline
+
+
 def run_step(
     step: Step,
     ctx: TaskContext,
     session: date,
     params: Mapping[str, Any],
     screens: ScreenStep | None,
+    wait: bool = False,
 ) -> StepResult:
     """One step, isolated: its precondition, the registry task (or the screen jobs), then
-    its acceptance checks."""
+    its acceptance checks (``wait``: a pending failure is WAITING, not FAILED)."""
 
     def body() -> Outcome:
         if step.requires is not None and (why := step.requires(ctx, session)):
@@ -222,7 +241,7 @@ def run_step(
                 return Outcome(StepStatus.SKIPPED, reason="no job runner to submit screens to")
             return screens(session)
         record = run_task(step.name, ctx, {**params, **step.params, "session": session})
-        return from_record(record, step, ctx, session)
+        return from_record(record, step, ctx, session, wait)
 
     return run_isolated(step.name, body, ctx.clock, step.critical)
 
@@ -235,25 +254,32 @@ def run_session(
     workers: int | None = None,
     resume: bool = True,
     waive: Mapping[str, str] | None = None,
+    settings: NightlySettings | None = None,
 ) -> dict[str, Any]:
     """Every ``NIGHTLY`` step for one session; saves the session's ``nightly`` run record.
     ``resume``: reuse the steps an earlier attempt of the session did; ``waive``: step ->
-    reason, accepted by hand."""
+    reason, accepted by hand; ``settings``: the deadlines a step may wait until."""
+    settings = settings or NightlySettings()
     before = earlier_attempts(ctx.reader, session) if resume else Attempts()
     done: dict[str, StepResult] = {}
     with IngestRun(ctx, NIGHTLY_RUN, session) as run:
         for step in NIGHTLY:
             held = _not_run(step, ctx, latest, done, before, waive or {})
-            done[step.name] = held or run_step(step, ctx, session, {"workers": workers}, screens)
+            wait = waits(step, ctx, session, latest, settings)
+            done[step.name] = held or run_step(
+                step, ctx, session, {"workers": workers}, screens, wait
+            )
             run.record_item(step.name, _item(done[step.name]))
         status = overall(done.values())
         failed = [
             f"{n}: {r.error or r.reason or r.status.value}"
             for n, r in done.items()
-            if r.critical and r.status in (StepStatus.FAILED, StepStatus.NOT_RUN)
+            if r.critical and r.status in BAD
         ]
         if status is Status.FAILED:
             run.failed(f"critical steps not done: {'; '.join(failed)}")
+        elif status is Status.WAITING:  # not done either: the next run resumes it (ADR 0043)
+            run.waiting(f"waiting for publication: {'; '.join(failed)}")
         steps = {name: r.as_dict() for name, r in done.items()}
         run.stats["steps"] = steps
     return {"session": session.isoformat(), "status": status.value, "steps": steps}
@@ -288,11 +314,13 @@ def run_nightly(
     runs: list[dict[str, Any]] = []
     held: list[date] = []
     for session in plan.sessions:
-        if runs and runs[-1]["status"] == Status.FAILED:
+        if runs and runs[-1]["status"] != Status.SUCCEEDED:  # failed or waiting
             held.append(session)
             continue
         runs.append(
-            run_session(ctx, session, session == plan.latest, screens, workers, resume, waive)
+            run_session(
+                ctx, session, session == plan.latest, screens, workers, resume, waive, settings
+            )
         )
     ran = [date.fromisoformat(r["session"]) for r in runs]
     reference = ran[-1] if ran else plan.last_done
@@ -300,8 +328,12 @@ def run_nightly(
     if reference is not None:
         for step in FINALLY:
             final[step.name] = run_step(step, ctx, reference, {}, screens)
-    failed = any(r["status"] == Status.FAILED for r in runs)
-    status = Status.FAILED if failed else Status.SUCCEEDED
+    statuses = {r["status"] for r in runs}
+    status = Status.SUCCEEDED
+    if Status.FAILED in statuses:
+        status = Status.FAILED
+    elif Status.WAITING in statuses:
+        status = Status.WAITING
     finished = ctx.clock()
     minutes = _minutes(started, finished)
     warnings = []

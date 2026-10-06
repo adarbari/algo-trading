@@ -69,7 +69,7 @@ Two physical parts, always read together:
 | Table | Grain (one row is…) | Interval | Notes |
 |---|---|---|---|
 | `bars/<interval>` | instrument × bar start | `1d` (phase 1), `1h`/`5m`/`1m` later | OHLCV + VWAP, **unadjusted**; splits and dividends applied at read time from `events` |
-| `chains/option_quotes`, `chains/underlying_quotes`, `chains/status` | contract (or underlying) × snapshot | end of day | built (Cboe) |
+| `chains/option_quotes`, `chains/underlying_quotes`, `chains/status` | contract (or underlying) × snapshot | end of day | built (Cboe); `chains/status` carries each underlying's `status` and `tier` (core / rest at fetch time, `tasks/market/tiers.py`) |
 | `events/<type>` | instrument × event time | irregular | `earnings`, `split`, `dividend`, `reference_change`, `index_change` |
 | `volatility/ibkr_iv30` | instrument × session | daily | IBKR's 30-day implied vol of the underlying's options and 30-day historical vol (`iv30_ibkr`, `hv30_ibkr`, `source_kind` history / snapshot; ADR 0028). Merge runs (a backfill writes many sessions, the nightly one; latest run wins per instrument). Personal-use licence. Read through `data.volatility.ibkr_iv30` |
 | `live/option_quotes` | contract × time taken | on request | the live IBKR quotes the API served (`/chains/{id}/live`; ADR 0028): bid, ask, last, close, volume, IB's model `iv` and `delta`, `conid`, `market_data_type`. Merge runs (each a batch of snapshots; every snapshot kept, keyed by contract and `ts`); `session_date` is the session the quote was taken in. The API's one write, only through `LiveWriter`; never read by backtests. Personal-use licence. Read through `data.chains.live_option_quotes` |

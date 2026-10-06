@@ -17,7 +17,9 @@ export type FeatureFormat =
 
 /** Why a value is UNKNOWN for the session */
 export type UnknownCode =
+  | 'ILLIQUID'
   | 'LICENCE'
+  | 'NOT_APPLICABLE'
   | 'NOT_IN_CATALOGUE'
   | 'NOT_RUN'
   | 'NO_PARTITION'
@@ -237,6 +239,11 @@ export type VerificationQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type VerificationQuery = { verification: { session: string, runIds: Array<string>, instruments: number, counts: unknown, failing: Array<unknown>, byCheck: Array<{ check: string, counts: unknown }>, unknown: { code: UnknownCode, detail: string } | null } | null };
+
+export type ViewerQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ViewerQuery = { viewer: { id: string, name: string, role: string, workspaces: Array<string> } };
 
 export type TableViewQueryVariables = Exact<{
   scope: string;
@@ -966,6 +973,16 @@ export const VerificationDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<VerificationQuery, VerificationQueryVariables>;
+export const ViewerDocument = new TypedDocumentString(`
+    query Viewer {
+  viewer {
+    id
+    name
+    role
+    workspaces
+  }
+}
+    `) as unknown as TypedDocumentString<ViewerQuery, ViewerQueryVariables>;
 export const TableViewDocument = new TypedDocumentString(`
     query TableView($scope: String!, $name: String) {
   view(scope: $scope, name: $name) {

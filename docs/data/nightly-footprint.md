@@ -19,7 +19,7 @@ There are four areas, and only the backend (`storage/backends/`) knows these pat
 | Tables | `tables/<table>/date=<session>/run=<run_id>.parquet` | Parquet, zstd, rows sorted by `instrument_id`, written atomically | forever (point-in-time history) |
 | Table index | `tables/<table>/date=<session>/_runs.json` | JSON `{run_id: knowledge_ts}` so readers pick the run known at `as_of` | forever |
 | Raw | `raw/source=<s>/dataset=<d>/date=<session>/run=<run_id>/<key>.json.gz` | the vendor's bytes exactly as received, gzipped (the name says `.json.gz` even for text and xlsx payloads) | per source: its section's `raw_retention_days` (`sec_edgar`: 7), else the global `raw_retention_days` (90) |
-| Staging | `staging/<run_id>/<table>/<key>.parquet` | per-ticker Parquet pieces of the chain job | dropped when the run finishes with nothing left to retry (COMPLETE, or PARTIAL without FETCH_ERROR items); otherwise kept for a resume and purged after `staging_retention_days` (14) |
+| Staging | `staging/<run_id>/<table>/<key>.parquet` | per-ticker Parquet pieces of the chain job | dropped when the run finishes with nothing left to retry (COMPLETE, or PARTIAL without FETCH_ERROR or STALE_DATA items); otherwise kept for a resume and purged after `staging_retention_days` (14) |
 | Run records | `runs/<run_id>.json` | JSON: job, status, per-item statuses, stats | forever (the audit trail every row's `run_id` points to) |
 
 Equity and ETF ids are `EQ:<composite FIGI>` when known, else `EQ:<symbol>` (ADR 0018).
@@ -56,7 +56,7 @@ screens); on the night a new quarter of SEC fund data appears it also downloads 
 | corporate actions | `events/split`, `events/dividend` | a split / dividend in the window −7…+30 days | ~5k dividends, ~150 splits | ~0.06 MB | split: `split_from`, `split_to`, `ratio`; dividend: `cash_amount`, `pay_date`, `record_date`, `frequency`, … |
 | chains | **`chains/option_quotes`** | an option contract × session | **~1.5M** | **~55 MB** (measured 37 B/row) | `underlying_id`, `ts`, `root`, `expiry`, `right`, `strike`, `last`, `bid`, `ask`, `bid_size`, `ask_size`, `volume`, `open_interest`, `iv`, `delta`, `gamma`, `vega`, `theta`, `rho`, `theo` |
 | | `chains/underlying_quotes` | an underlying × session | ~4.2k | ~0.3 MB *est.* | `price`, `open`, `high`, `low`, `close`, `prev_close`, `volume`, `iv30` |
-| | `chains/status` | every universe underlying, fetched or not | ~4.2k | tiny | `status` (OK, NO_CHAIN, NO_STANDARD_SERIES, STALE_DATA, FETCH_ERROR) |
+| | `chains/status` | every universe underlying, fetched or not | ~4.2k | tiny | `status` (OK, NO_CHAIN, NO_STANDARD_SERIES, STALE_DATA, FETCH_ERROR), `tier` (core, rest: recorded at fetch time) |
 | rollups | `rollups/instrument/option_liquidity@v1` | an underlying × session | ~4.2k | ~0.3 MB *est.* | `liq_status`, `put_tier`, `call_tier`, `chain_oi`, `chain_volume`, `expiries_within_60d`, `underlying_price`, `iv30`, … |
 | | `rollups/instrument/price_stats@v2` | an instrument with a bar that session | ~12.6k (measured 2026-10-02) | ~0.5 MB (v1: ~1 MB; 32-bit floats, ADR 0023 step 3) | `close`, `sma_20/50/200`, `ret_20d/60d`, `high_52w`, `low_52w`, `hv20`, `hv30`, `hv20_yz`, `adv_usd_20d`, `history_days` |
 | | `rollups/instrument/financials@v1` | an instrument with a bar that session or a financial fact | ~12.6k (measured 2026-10-02) | ~0.1 MB (measured) | `revenue_ttm`, `revenue_ttm_year_ago`, `net_income_ttm`, `eps_diluted_ttm`, `revenue_fy`, `ttm_as_of`, `ttm_basis`, `financials_status` |

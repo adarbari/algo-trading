@@ -7,9 +7,12 @@
  * The API answers 200 with `data` and `errors[]`; any error rejects with a `GraphQLRequestError`
  * carrying each error's `extensions.code` (NOT_FOUND, BAD_REQUEST, UNKNOWN_FEATURE, NO_DATA).
  * "Nothing stored yet" is never an error: it is a null field or an UNKNOWN value.
+ * Every request carries the Supabase access token as a bearer (ADR 0040); a 401 ends the
+ * session (`handleUnauthorized`) and rejects with an `ApiError`.
  */
 import { apiBaseUrl } from '@/shared/config';
 
+import { accessToken, handleUnauthorized } from './auth';
 import { ApiError } from './client';
 import type { TypedDocumentString } from './generated/graphql/graphql';
 
@@ -39,11 +42,17 @@ export async function gql<TResult, TVariables>(
   document: TypedDocumentString<TResult, TVariables>,
   variables: TVariables,
 ): Promise<TResult> {
+  const token = await accessToken();
   const response = await fetch(`${apiBaseUrl}/graphql`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      accept: 'application/json',
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({ query: document.toString(), variables }),
   });
+  if (response.status === 401) await handleUnauthorized();
   if (!response.ok) throw new ApiError(response.status, response.statusText);
   const body = (await response.json()) as Body<TResult>;
   if (body.errors?.length) throw new GraphQLRequestError(body.errors);

@@ -113,19 +113,20 @@ def test_a_fatal_error_saves_a_failed_record_then_reraises() -> None:
     assert saved[0].stats["error"] == "RuntimeError: vendor down"
 
 
-def test_resume_keeps_finished_items_and_retries_fetch_errors() -> None:
+def test_resume_keeps_finished_items_and_retries_fetch_errors_and_stale_data() -> None:
     writer, reader, _ = store()
     ctx = task_ctx(writer, reader)
     with IngestRun(ctx, "demo", DAY, resume=True) as first:
         first.record_item("a", "OK")
+        first.stage("t", "a", pd.DataFrame({"x": [1]}), "src")  # the scratch a resume needs
         first.fail("b", "timeout")
         first.fail("c", "old", kind="STALE_DATA")
     second = IngestRun(ctx, "demo", DAY, resume=True)
     assert second.run_id == first.run_id
-    assert second.items == {"a": "OK", "c": "STALE_DATA: old"}
+    assert second.items == {"a": "OK"}  # FETCH_ERROR and STALE_DATA items are refetched
     with second:
-        second.items.pop("c")
         second.record_item("b", "OK")
+        second.record_item("c", "OK")
     assert second.record.status is RunStatus.COMPLETE
     assert IngestRun(ctx, "demo", DAY, resume=True).items == {}  # complete: a fresh run
 

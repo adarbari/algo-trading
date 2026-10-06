@@ -100,6 +100,7 @@ def test_chain_job_records_every_status_and_publishes() -> None:
     assert feed.calls.count("BROKEN") == 2  # main pass + gentle retry pass
     status = reader.table(STATUS, DAY)
     assert status is not None and len(status) == 6
+    assert set(status["tier"]) == {"rest"}  # no S&P 500 / priority / HIGH names here
     options = reader.table(OPTIONS, DAY)
     assert options is not None and set(options["underlying_id"]) == {"EQ:GOOD"}
     assert backend.raw.get("cboe_delayed", "option_chain", DAY, record.run_id, "GOOD") is not None
@@ -133,11 +134,65 @@ def test_finished_chain_runs_drop_their_staging(backend: MemoryBackend | LocalBa
     assert done.status is RunStatus.COMPLETE
     assert writer.staging.keys(done.run_id, OPTIONS) == []
     assert StoreReader(backend).table(OPTIONS, DAY) is not None
-    # PARTIAL with nothing a resume would refetch (no FETCH_ERROR): dropped too
-    stale = {"A": fx.payload("A"), "OLD": fx.payload("OLD", session=DAY - timedelta(days=1))}
-    partial = run(writer, FakeFeed(stale), universe("A", "OLD"), retry_pause_s=0)
-    assert partial.status is RunStatus.PARTIAL
-    assert writer.staging.keys(partial.run_id, OPTIONS) == []
+    # PARTIAL with nothing a resume would refetch (only NO_CHAIN misses): dropped too
+    gone = run(writer, FakeFeed({"A": fx.payload("A")}), universe("A", "GONE"), retry_pause_s=0)
+    assert gone.status is RunStatus.PARTIAL  # 50% NO_CHAIN is suspicious
+    assert writer.staging.keys(gone.run_id, OPTIONS) == []
+
+
+def test_rerun_refetches_stale_and_keeps_ok_rows(backend: MemoryBackend | LocalBackend) -> None:
+    writer = StoreWriter(backend)
+    old = DAY - timedelta(days=1)
+    names = universe("A", "OLD", "BARE")
+    bare = fx.payload("BARE", options=[fx.contract("BARE1", fx.EXPIRIES[0], "C", 100)])
+    stale = fx.payload("OLD", session=old)
+    first_feed = FakeFeed({"A": fx.payload("A"), "OLD": stale, "BARE": bare})
+    first = run(writer, first_feed, names, retry_pause_s=0)
+    assert first.status is RunStatus.PARTIAL
+    assert first.items["EQ:OLD"].startswith("STALE_DATA")
+    assert writer.staging.keys(first.run_id, OPTIONS) == ["A"]  # stale left: kept
+    # the feed rolled over
+    feed = FakeFeed({"A": fx.payload("A"), "OLD": fx.payload("OLD"), "BARE": bare})
+    second = run(writer, feed, names, retry_pause_s=0)
+    assert second.run_id == first.run_id
+    assert second.status is RunStatus.COMPLETE
+    assert second.items == {"EQ:A": "OK", "EQ:OLD": "OK", "EQ:BARE": "NO_STANDARD_SERIES"}
+    assert feed.calls == ["OLD"]  # OK and NO_STANDARD_SERIES results are kept, not refetched
+    options = StoreReader(backend).table(OPTIONS, DAY)
+    assert options is not None and set(options["underlying_id"]) == {"EQ:A", "EQ:OLD"}
+    status = StoreReader(backend).table(STATUS, DAY)
+    assert status is not None and set(status["status"]) == {"OK", "NO_STANDARD_SERIES"}
+    assert writer.staging.keys(second.run_id, OPTIONS) == []  # nothing stale left: dropped
+
+
+def test_resume_without_staging_starts_fresh_and_never_shrinks_partition(
+    backend: MemoryBackend | LocalBackend,
+) -> None:
+    writer = StoreWriter(backend)
+    old = DAY - timedelta(days=1)
+    names = universe("A", "OLD")
+    first = run(writer, FakeFeed({"A": fx.payload("A"), "OLD": fx.payload("OLD", session=old)}),
+                names, retry_pause_s=0)  # fmt: skip
+    writer.staging.clear(first.run_id)  # dropped on commit / purged by retention
+    feed = FakeFeed({"A": fx.payload("A"), "OLD": fx.payload("OLD")})
+    run(writer, feed, names, retry_pause_s=0)
+    assert sorted(feed.calls) == ["A", "OLD"]  # a fresh run refetches all
+    options = StoreReader(backend).table(OPTIONS, DAY)
+    assert options is not None and set(options["underlying_id"]) == {"EQ:A", "EQ:OLD"}
+
+
+def test_rerun_with_nothing_retryable_starts_fresh_and_keeps_every_row(
+    backend: MemoryBackend | LocalBackend,
+) -> None:
+    writer = StoreWriter(backend)
+    names = universe("A", "GONE")  # PARTIAL (50% NO_CHAIN): staging dropped, nothing retryable
+    first = run(writer, FakeFeed({"A": fx.payload("A")}), names, retry_pause_s=0)
+    assert first.status is RunStatus.PARTIAL
+    feed = FakeFeed({"A": fx.payload("A")})
+    run(writer, feed, names, retry_pause_s=0)
+    assert sorted(feed.calls) == ["A", "GONE"]  # no scratch to resume from: a full fetch
+    options = StoreReader(backend).table(OPTIONS, DAY)
+    assert options is not None and set(options["underlying_id"]) == {"EQ:A"}
 
 
 def test_mass_no_chain_is_suspicious() -> None:
@@ -284,3 +339,16 @@ def test_chain_run_fetches_in_priority_order_and_records_tiers_and_pacing(
     pacing = record.stats["pacing"]
     assert set(pacing) == {"cboe"}  # keys that sent no request are left out
     assert pacing["cboe"]["requests"] == 3 and pacing["cboe"]["errors"] == 0  # A: 404, missing
+
+
+def test_status_records_the_tier_of_each_underlying_at_fetch_time(tmp_path: Path) -> None:
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    feed = FakeFeed({"SPY": fx.payload("SPY"), "B": fx.payload("B")})
+    ctx = task_ctx(writer, clock=CLOCK)
+    source = CboeOptionsSource(http_for(feed, NO_RETRY, Limiter("cboe", Pacing(0.0), tmp_path)))
+    config = ChainJobConfig(workers=1, retry_pause_s=0, priority_symbols=("SPY",))
+    ingest_option_chains(ctx, source, universe("B", "SPY"), DAY, config)
+    status = StoreReader(backend).table(STATUS, DAY)
+    assert status is not None
+    assert dict(zip(status["symbol"], status["tier"], strict=True)) == {"SPY": "core", "B": "rest"}

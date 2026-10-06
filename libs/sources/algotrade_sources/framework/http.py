@@ -33,6 +33,15 @@ class HttpError(Exception):
         super().__init__(f"HTTP {status}")
 
 
+class GaveUpError(RuntimeError):
+    """A request kept failing and was given up on; ``status`` is the last HTTP status (``None``
+    when the last failure was not an HTTP answer), so a caller can tell a 403 from an outage."""
+
+    def __init__(self, message: str, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
+
+
 type Transport = Callable[[str], bytes]
 type Sleep = Callable[[float], None]
 
@@ -229,10 +238,17 @@ def get_with_retry(
         if attempt + 1 == policy.tries:
             break
         if policy.max_total_s is not None and clock() - started + delay > policy.max_total_s:
-            raise RuntimeError(f"giving up on {url} after {clock() - started:.0f}s: {last_error}")
+            raise GaveUpError(
+                f"giving up on {url} after {clock() - started:.0f}s: {last_error}",
+                _status(last_error),
+            )
         if pause:
             sleep(delay)
-    raise RuntimeError(f"giving up on {url}: {last_error}")
+    raise GaveUpError(f"giving up on {url}: {last_error}", _status(last_error))
+
+
+def _status(error: Exception | None) -> int | None:
+    return error.status if isinstance(error, HttpError) else None
 
 
 def _backoff(
@@ -279,6 +295,19 @@ class Http:
             limiter=self.limiter,
             breaker=self.breaker,
         )
+
+    def status(self, url: str) -> int:
+        """One request, no retries and no circuit breaker: the HTTP status it got (200 when it
+        succeeded); a probe of "does the vendor answer this at all". Waits on the limiter."""
+        if self.limiter is not None:
+            self.limiter.wait()
+        try:
+            self.transport(url)
+        except HttpError as exc:
+            _report(self.limiter, "error")
+            return exc.status
+        _report(self.limiter, "ok")
+        return 200
 
     def cool_down(self, seconds: float) -> None:
         """Ask the vendor's limiter (shared across processes) to pause new requests."""

@@ -15,6 +15,10 @@ CONFIG_DIR = "ALGOTRADE_CONFIG_DIR"
 DEFAULT_CONFIG_DIR = "config"
 USER = "ALGOTRADE_USER"
 API_DEBUG = "ALGOTRADE_API_DEBUG"  # "1": the API serves the GraphiQL IDE (local development)
+CORS_ORIGINS = "ALGOTRADE_CORS_ORIGINS"  # comma-separated web origins the API allows (hosting)
+# The built web app the API serves on its own origin (ADR 0044): `var/web` after
+# `make web-build`; unset: the API serves no files (development runs the Vite dev server).
+WEB_DIST = "ALGOTRADE_WEB_DIST"
 # Who may call the API (ADR 0040): "supabase" (default) verifies a Supabase access token per
 # request; "off" serves ALGOTRADE_USER without one, and only on a loopback address.
 AUTH = "ALGOTRADE_AUTH"
@@ -55,6 +59,7 @@ __all__ = [
     "supabase_jwt_secret",
     "supabase_url",
     "user_id",
+    "web_dist",
 ]
 
 
@@ -112,6 +117,21 @@ def config_dir(explicit: str | Path | None = None) -> Path:
 def api_debug() -> bool:
     """``$ALGOTRADE_API_DEBUG`` is ``1`` / ``true``: the API serves its development tools."""
     return (credential(API_DEBUG) or "").strip().lower() in ("1", "true")
+
+
+def cors_origins(default: tuple[str, ...]) -> tuple[str, ...]:
+    """``$ALGOTRADE_CORS_ORIGINS`` (comma-separated origins, blanks and trailing slashes
+    dropped), else ``default`` (the local web dev server)."""
+    raw = credential(CORS_ORIGINS)
+    found = tuple(o.strip().rstrip("/") for o in (raw or "").split(",") if o.strip())
+    return found or default
+
+
+def web_dist() -> Path | None:
+    """``$ALGOTRADE_WEB_DIST``: the built web app's directory the API serves; ``None`` when
+    unset (the API serves no files)."""
+    raw = credential(WEB_DIST)
+    return Path(raw.strip()) if raw and raw.strip() else None
 
 
 def auth_mode() -> str:

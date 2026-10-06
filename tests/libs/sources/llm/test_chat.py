@@ -98,11 +98,14 @@ def test_a_busy_provider_is_retried_with_a_doubling_pause_or_retry_after() -> No
             raise HttpError(503, None, b'{"error": {"message": "high demand"}}')
         if len(calls) == 2:
             raise HttpError(429, 7.0, b"slow down")
+        if len(calls) == 3:
+            raise HttpError(429, None, b"quota")
         return answer('{"criteria": []}')
 
-    client = ChatCompletions(BASE, "llama", busy_then_ok, slept.append, retries=2)
+    client = ChatCompletions(BASE, "llama", busy_then_ok, slept.append, retries=3)
     assert client.complete("s", "u") == '{"criteria": []}'
-    assert len(calls) == 3 and slept == [3.0, 7.0]  # back-off, then the Retry-After header
+    # back-off, then the Retry-After header, then the per-minute floor for a bare 429
+    assert len(calls) == 4 and slept == [3.0, 7.0, 20.0]
 
 
 def test_retries_run_out_and_say_so() -> None:

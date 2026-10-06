@@ -6,6 +6,10 @@ settle_minutes = 30              # a session counts as closed this long after it
                                  # so a start at or after close + settle may begin the nightly before 15:00
 max_catch_up = 5                 # after missed nights, ingest at most this many sessions (the latest ones)
 
+[schedule]                       # ADR 0043: a step whose source has not published the session yet WAITS
+data_deadline = "23:00"          # (not FAILED) until this time on the session's date, America/Los_Angeles;
+                                 # after it, FAILED. Override one step: [steps.<name>] deadline = "HH:MM"
+
 [alerts]
 max_duration_minutes = 150       # a nightly run longer than this is recorded as a WARN (paced Cboe chains take ~75 min)
 

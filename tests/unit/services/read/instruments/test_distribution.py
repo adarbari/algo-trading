@@ -30,7 +30,7 @@ def test_a_stored_null_is_counted_as_a_null(ctx: ReadContext) -> None:
 
 def test_other_features_count_their_values(ctx: ReadContext) -> None:
     found = load_distribution(ctx, "instrument.security_type")
-    assert {c.value: c.count for c in found.categories} == {"COMMON_STOCK": 1, "ETF": 1}
+    assert {c.value: c.count for c in found.categories} == {"COMMON_STOCK": 2, "ETF": 1}
     assert found.quantiles == ()
 
 
