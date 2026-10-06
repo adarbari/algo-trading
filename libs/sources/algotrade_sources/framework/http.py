@@ -144,6 +144,10 @@ class RetryPolicy:
     # answers a missing chain with S3's 403 AccessDenied). Such a response returns None and
     # does not count towards the circuit breaker. Anything it does not match stays an error.
     not_found: Callable[[HttpError], bool] | None = None
+    # A vendor refusal of what the request asks (FRED's "too many vintage dates"): retrying the
+    # same URL cannot help, and the caller can change the request. Raised at once as the
+    # ``HttpError`` (body kept), not retried, not counted as a vendor failure.
+    rejected: Callable[[HttpError], bool] | None = None
 
     def gives_up(self, exc: HttpError) -> bool:
         return exc.status in self.give_up_statuses or (
@@ -203,6 +207,21 @@ class AdaptivePacer(Pacer, Protocol):
     def record(self, outcome: Literal["ok", "missing", "error"]) -> None: ...
 
 
+def _raise_if_rejected(
+    exc: HttpError,
+    policy: RetryPolicy,
+    limiter: AdaptivePacer | None,
+    breaker: CircuitBreaker | None,
+) -> None:
+    """Re-raise ``exc`` when the policy calls it a rejected request: the vendor answered, so
+    it is neither an outage (breaker) nor an error to slow down for (limiter)."""
+    if policy.rejected is not None and policy.rejected(exc):
+        _report(limiter, "missing")
+        if breaker is not None:
+            breaker.record(None)
+        raise exc
+
+
 def get_with_retry(
     transport: Transport,
     url: str,
@@ -232,6 +251,7 @@ def get_with_retry(
         try:
             body = transport(url)
         except HttpError as exc:
+            _raise_if_rejected(exc, policy, limiter, breaker)
             missing = policy.gives_up(exc)
             if breaker is not None:
                 breaker.record(None if missing else exc.status)

@@ -10,6 +10,7 @@ import pytest
 
 from algotrade.config.site.settings import load_macro
 from algotrade.storage.configs.files import FileConfigStore
+from algotrade_sources.framework.base import TransientFetchError
 from algotrade_sources.framework.series import SERIES_COLUMNS, SERIES_FRAME, SeriesRequest
 from algotrade_sources.vendors.published.csv_series import PublishedSeries, parse_series
 from algotrade_sources.vendors.published.parsers import PARSERS
@@ -62,17 +63,27 @@ def test_unreadable_values_are_null_and_unreadable_dates_are_dropped() -> None:
 
 
 def test_a_file_without_the_columns_or_with_an_unknown_parser_raises() -> None:
-    with pytest.raises(ValueError, match="no column"):
+    with pytest.raises(TransientFetchError, match="no column"):
         parse_series(STOOQ, files.NO_DATA)
-    with pytest.raises(ValueError, match="no column"):
+    with pytest.raises(TransientFetchError, match="no column"):
         parse_series(STOOQ, files.EBP)
     with pytest.raises(ValueError, match="unknown parser"):
         parse_series(SeriesRequest("X", parser="nope"), files.EBP)
 
 
-def test_an_empty_file_is_an_empty_frame() -> None:
-    frame = parse_series(STOOQ, b"")
-    assert frame.empty and tuple(frame.columns) == SERIES_COLUMNS
+def test_an_empty_file_is_an_error_not_an_empty_series() -> None:
+    with pytest.raises(TransientFetchError, match="empty"):
+        parse_series(STOOQ, b"  \n")
+
+
+def test_an_html_page_raises_with_the_start_of_the_body() -> None:
+    """Stooq's download now answers a browser-verification page (a 200 with HTML)."""
+    with pytest.raises(TransientFetchError) as caught:
+        parse_series(STOOQ, files.JS_CHALLENGE)
+    message = str(caught.value)
+    assert "'SPX'" in message and "HTML" in message
+    assert files.JS_CHALLENGE.decode()[:80] in message
+    assert files.JS_CHALLENGE.decode()[:81] not in message  # only the first 80 characters
 
 
 def test_shiller_xls_is_not_readable_yet() -> None:

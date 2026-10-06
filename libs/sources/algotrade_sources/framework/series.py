@@ -43,6 +43,7 @@ class SeriesRequest(FetchRequest):
     date_column: str = "date"
     value_column: str = "value"
     parser: str = "csv"
+    vintages: bool = True  # FRED: every vintage (ALFRED); False: the current values only
     start: date | None = None
     end: date | None = None
 

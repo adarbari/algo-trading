@@ -203,6 +203,20 @@ def test_vendor_not_found_errors_return_none_and_do_not_trip_the_breaker() -> No
     assert http.get("u") == b"chain"
 
 
+def test_a_rejected_request_raises_at_once_unretried_and_does_not_trip_the_breaker() -> None:
+    refusal = HttpError(400, body=b"too many vintage dates")
+    policy = replace(FAST, rejected=lambda exc: b"vintage" in exc.body)
+    breaker, limiter = CircuitBreaker("fred", 1), CountingLimiter()
+    # one scripted answer: a retry would run the script dry (StopIteration)
+    http = Http(scripted(refusal), policy, limiter, breaker, sleep=lambda s: None)
+    with pytest.raises(HttpError) as caught:
+        http.get("u")
+    assert caught.value is refusal and limiter.waits == 1 and not breaker.open
+    other = Http(scripted(HttpError(400, body=b"bad key")), replace(policy, tries=1))
+    with pytest.raises(GaveUpError):  # any other 400 is still retried, then given up on
+        other.get("u")
+
+
 def test_a_block_is_still_an_error_even_with_a_not_found_rule() -> None:
     policy = replace(FAST, tries=1, not_found=missing_chain)
     breaker = CircuitBreaker("cboe", 2)

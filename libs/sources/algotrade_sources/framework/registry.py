@@ -45,7 +45,11 @@ from algotrade_sources.framework.http import (
 from algotrade_sources.framework.limiter import Limiter, Pacing
 from algotrade_sources.llm.chat import ChatCompletions
 from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource, missing_chain
-from algotrade_sources.vendors.fred.observations import FredObservations, missing_series
+from algotrade_sources.vendors.fred.observations import (
+    FredObservations,
+    missing_series,
+    too_many_vintages,
+)
 from algotrade_sources.vendors.ibkr.gateway import GatewayConfig, IbkrMarketData
 from algotrade_sources.vendors.ibkr.market_data import IbkrSource
 from algotrade_sources.vendors.ishares.etf_holdings import IsharesHoldings, no_file
@@ -171,6 +175,7 @@ class SourceSpec:
     headers: Callable[[str | None], dict[str, str]] = _no_headers  # from the env value
     tries: int = 7
     not_found: Callable[[HttpError], bool] | None = None  # vendor's "no such object" errors
+    rejected: Callable[[HttpError], bool] | None = None  # refusals to re-ask differently
     switch: str | None = None  # a further on/off key of the section that must not be false
     # A vendor that takes its key only as a query parameter (FRED ``api_key``): the transport
     # appends it to every URL, so sources, retry messages and raw paths never hold it.
@@ -241,6 +246,7 @@ SOURCES: dict[str, SourceSpec] = {
             "create a free FRED account (fredaccount.stlouisfed.org) and add the key to .env",
             tries=4,
             not_found=missing_series,
+            rejected=too_many_vintages,
             query_param="api_key",
             options=_fred_options,
         ),
@@ -430,6 +436,7 @@ def build_sources(
                 tries=spec.tries,
                 max_total_s=settings.http_max_retry_s,
                 not_found=spec.not_found,
+                rejected=spec.rejected,
             ),
             limiters[key],
             breakers[key],
