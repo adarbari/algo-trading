@@ -315,4 +315,5 @@ GROUP = FeatureGroup(
     FEATURES,
     compute,
     PutWingParams(),
+    applies_to="optionable",
 )

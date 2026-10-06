@@ -9,12 +9,13 @@ from graphql import GraphQLError
 from strawberry.http import GraphQLHTTPResponse
 from strawberry.types import ExecutionResult
 
-from algotrade.core.model.errors import ConfigurationError, MissingDataError
+from algotrade.core.model.errors import ConfigurationError, MissingDataError, PermissionDeniedError
 from algotrade.services.read.context import NotFoundError
 from algotrade.services.read.instruments.catalogue import UnknownFeatureError
 
 NOT_FOUND = "NOT_FOUND"
 BAD_REQUEST = "BAD_REQUEST"  # a malformed request, a failed validation or limit, bad arguments
+FORBIDDEN = "FORBIDDEN"  # the caller's role may not read this field (ADR 0040: ops are admin-only)
 UNKNOWN_FEATURE = "UNKNOWN_FEATURE"  # a feature name that is not in the caller's catalogue
 NO_DATA = "NO_DATA"  # a stored table a read needs is unreadable (not merely absent)
 INTERNAL = "INTERNAL"  # a bug: anything not mapped above
@@ -23,6 +24,7 @@ INTERNAL = "INTERNAL"  # a bug: anything not mapped above
 _CODES: tuple[tuple[type[Exception], str], ...] = (
     (UnknownFeatureError, UNKNOWN_FEATURE),
     (NotFoundError, NOT_FOUND),
+    (PermissionDeniedError, FORBIDDEN),
     (MissingDataError, NO_DATA),
     (ConfigurationError, BAD_REQUEST),
 )

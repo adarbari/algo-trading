@@ -7,7 +7,11 @@ description: Record an architectural decision (new layer, boundary change, stora
 
 1. Copy the format of an existing ADR in `docs/adr/`: Title, **Status** (with date),
    Context, Decision, Consequences. Keep it under a page.
-2. Number it with the next free 4-digit number. Name the file `NNNN-short-slug.md`.
+2. Number it with the next free 4-digit number **on `origin/main`** (`git fetch` first):
+   an ADR on an unmerged branch does not reserve a number, and the docs fitness test
+   requires contiguous numbers, so whichever PR lands second renumbers its ADR (file name,
+   `docs/adr/README.md` row and every `ADR NNNN` reference; one `sed`). Name the file
+   `NNNN-short-slug.md`.
 3. Superseding a decision? Set the old ADR's status to `superseded by NNNN`; do not delete
    or rewrite it.
 4. Add a row to `docs/adr/README.md` (CI checks every ADR is listed).

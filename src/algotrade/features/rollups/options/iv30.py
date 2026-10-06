@@ -58,6 +58,9 @@ RATES = "rates/treasury"
 DIVIDENDS = "rollups/instrument/div_yield@v1"  # the materialised expression feature
 # Expiry-level failures, most informative last: an underlying reports the worst it reached.
 FAILURES = ("NO_QUOTES", "WIDE_SPREADS", "ILLIQUID", "IV_FAILED")
+# Statuses where the chain is too thin to price (ADR 0042): the read says ILLIQUID for a null
+# ``iv30`` with one of these; the other statuses (NO_CHAIN, NO_SPOT, IV_FAILED...) stay NULL.
+ILLIQUID_STATUSES = frozenset({"NO_QUOTES", "WIDE_SPREADS", "ILLIQUID"})
 
 _STATUSES = (
     "OK", "SINGLE_EXPIRY", "NO_SPOT", "NO_CHAIN", "NO_EXPIRY", "NO_QUOTES", "WIDE_SPREADS",
@@ -73,7 +76,8 @@ FEATURES = (
         "Our 30-calendar-day at-the-money implied volatility: forward ATM vols of the two "
         "expiries around 30 days, interpolated in total variance (ADR 0021)",
         "iv30_status is neither OK nor SINGLE_EXPIRY (the status says why)", "chain",
-        valid_range=(0, 5),
+        valid_range=(0, 5), null_status="iv30_status",
+        illiquid_statuses=tuple(sorted(ILLIQUID_STATUSES)),
         inputs=(*_QUOTES, _SPOT, f"{RATES}.rate_cont", "div_yield@v1"),
     ),
     Feature(
@@ -398,4 +402,5 @@ GROUP = FeatureGroup(
     FEATURES,
     compute,
     Iv30Params(),
+    applies_to="optionable",
 )

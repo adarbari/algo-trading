@@ -7,6 +7,8 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+ALICE = {"X-Act-For": "alice"}  # an admin writing for another declared user
+
 DETAIL = """query S($id: String!) {
   screenDetail(screenerId: $id) {
     screenerId user draft draftError versions latest hash layers resolved error working
@@ -67,7 +69,7 @@ def test_copy_finalise_and_rebase(writer_client: TestClient, root: Path) -> None
     versions = _read(c, VERSIONS, "my_vrp")
     assert [v["version"] for v in versions] == [1, 2]
     assert versions[0]["document"]["extends"] == "vrp@3"  # v1 is untouched
-    alice = c.post("/screeners/alices/copy?user=alice", json={"preset": "vrp"})
+    alice = c.post("/screeners/alices/copy", json={"preset": "vrp"}, headers=ALICE)
     assert alice.status_code == 201
     assert _detail(c, "alices") is None  # alice's screens are hers only
 
@@ -92,17 +94,21 @@ def test_draft_put_delete_and_fail_closed_finalise(writer_client: TestClient, ro
 
 
 @pytest.mark.parametrize(
-    "url",
+    ("url", "act_for"),
     [
-        "/screeners/mine/draft?user=site",
-        "/screeners/mine/draft?user=..%2Fetc",
-        "/screeners/mine/draft?user=Alice",
-        "/screeners/Mine/draft",
-        "/screeners/mine..x/draft",
+        ("/screeners/mine/draft", "site"),
+        ("/screeners/mine/draft", "../etc"),
+        ("/screeners/mine/draft", "Alice"),
+        ("/screeners/mine/draft", "mallory"),  # a valid id the registry does not declare
+        ("/screeners/Mine/draft", None),
+        ("/screeners/mine..x/draft", None),
     ],
 )
-def test_ids_and_user_labels_are_strict(writer_client: TestClient, root: Path, url: str) -> None:
-    assert writer_client.put(url, json={"document": OWN}).status_code == 400
+def test_ids_and_user_labels_are_strict(
+    writer_client: TestClient, root: Path, url: str, act_for: str | None
+) -> None:
+    headers = {} if act_for is None else {"X-Act-For": act_for}
+    assert writer_client.put(url, json={"document": OWN}, headers=headers).status_code == 400
     assert not (root / "users").exists()  # nothing written anywhere
 
 
@@ -125,9 +131,24 @@ def test_list_has_finalised_and_draft_only_screens(writer_client: TestClient) ->
     c.post("/screeners/vrp/copy", json={"preset": "vrp"})  # a copy: draft only
     c.put("/screeners/mine/draft", json={"document": OWN})
     c.post("/screeners/mine/finalise")
-    c.put("/screeners/alices/draft?user=alice", json={"document": OWN})  # not the API's user
+    c.put("/screeners/alices/draft", json={"document": OWN}, headers=ALICE)  # not the API's user
     listed = {s["screenerId"]: s for s in _read(c, MINE)}
     assert set(listed) == {"vrp", "mine"}
     assert (listed["vrp"]["status"], listed["vrp"]["presetId"]) == ("DRAFT", "vrp")
     assert (listed["vrp"]["hasDraft"], listed["mine"]["hasDraft"]) == (True, False)
     assert (listed["mine"]["status"], listed["mine"]["latest"]) == ("FINAL", 1)
+
+
+def test_a_trader_writes_for_themselves_only(trader_client: TestClient, root: Path) -> None:
+    c = trader_client
+    refused = c.put("/screeners/mine/draft", json={"document": OWN}, headers=ALICE)
+    assert refused.status_code == 403
+    assert c.delete("/screeners/mine", headers=ALICE).status_code == 403
+    assert not (root / "users").exists()  # nothing written for alice
+    # ``?user=`` is retired: it is ignored, so the write is bob's own.
+    own = c.put("/screeners/mine/draft", params={"user": "alice"}, json={"document": OWN})
+    assert own.status_code == 200
+    assert (root / "users" / "bob" / "screeners" / "mine" / "draft.toml").is_file()
+    assert not (root / "users" / "alice").exists()
+    named = c.put("/screeners/mine/draft", headers={"X-Act-For": "bob"}, json={"document": OWN})
+    assert named.status_code == 200  # naming oneself is allowed

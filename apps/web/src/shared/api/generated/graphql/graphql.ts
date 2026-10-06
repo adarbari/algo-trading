@@ -17,7 +17,9 @@ export type FeatureFormat =
 
 /** Why a value is UNKNOWN for the session */
 export type UnknownCode =
+  | 'ILLIQUID'
   | 'LICENCE'
+  | 'NOT_APPLICABLE'
   | 'NOT_IN_CATALOGUE'
   | 'NOT_RUN'
   | 'NO_PARTITION'

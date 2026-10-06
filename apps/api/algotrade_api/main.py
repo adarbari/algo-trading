@@ -1,10 +1,10 @@
 """The app factory: routers, the GraphQL read layer at ``POST /graphql`` (ADR 0037), the
 authenticator every route but ``GET /health`` resolves its caller through (ADR 0040: no or
-bad token -> 401, a caller the registry refuses -> 403), CORS for the local web dev server
+bad token -> 401, a caller the registry refuses -> 403), CORS for the configured web origins
 (outermost, so a 401 still carries it), the live quotes (closed when the app stops), and error
 handlers that map library errors to HTTP (not found -> 404, bad configuration or parameters
--> 400, a write that clashes with what exists -> 409, the drafting model off or not answering
--> 503)."""
+-> 400, another user's job -> 403, a write that clashes with what exists -> 409, the drafting
+model off or not answering -> 503)."""
 
 import json
 from collections.abc import AsyncIterator, Callable
@@ -19,7 +19,12 @@ from fastapi.responses import JSONResponse
 from algotrade.config.site.settings import load_users
 from algotrade.config.site.users import Role, UserRecord
 from algotrade.config.user import DEFAULT_USER, UserContext
-from algotrade.core.model.errors import ConfigurationError, MissingDataError, ModelUnavailableError
+from algotrade.core.model.errors import (
+    ConfigurationError,
+    MissingDataError,
+    ModelUnavailableError,
+    PermissionDeniedError,
+)
 from algotrade.services.authoring.scope import ConfigWriter, ConflictError, ScreenNotFoundError
 from algotrade.services.drafting.model import TextModel
 from algotrade.services.live.quotes import LiveQuotes
@@ -56,6 +61,10 @@ def _bad_request(request: Request, exc: Exception) -> JSONResponse:
 
 def _conflict(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+
+def _forbidden(request: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(status_code=403, content={"detail": str(exc)})
 
 
 def _unavailable(request: Request, exc: Exception) -> JSONResponse:
@@ -106,8 +115,9 @@ def create_app(
     if ondemand is None and settings.live:
         ondemand = open_ondemand(settings.data_url, app.state.store.configs)
     app.state.ondemand = ondemand
+    users = load_users(app.state.store.configs)
+    app.state.users = users
     if authenticator is None:
-        users = load_users(app.state.store.configs)
         authenticator = open_authenticator(settings.auth, users, settings.user)
     app.state.authenticator = authenticator
     if drafter is None and settings.live:
@@ -124,6 +134,7 @@ def create_app(
     app.add_exception_handler(ScreenNotFoundError, _not_found)
     app.add_exception_handler(ConflictError, _conflict)
     app.add_exception_handler(ConfigurationError, _bad_request)
+    app.add_exception_handler(PermissionDeniedError, _forbidden)
     app.add_exception_handler(ModelUnavailableError, _unavailable)
     for router in PUBLIC_ROUTERS:
         app.include_router(router)

@@ -25,7 +25,8 @@ not own, and a hosted identity provider stops being over-engineering.
    unchanged. At least one admin must exist; an unknown id is refused everywhere.
 2. **Configs belong to the registry's users.** A user's configs stay in `config/users/<id>/`;
    `services/authoring` writes only for a declared user, and the `?user=` query parameter is
-   replaced by the authenticated user (an admin may still name another user).
+   replaced by the authenticated user (an admin may still name another user: ID4 made it the `X-Act-For` header on writes and
+   the body's `user` on the preview POSTs; the Admin GraphQL fields are `AdminOnly`).
 3. **Supabase Auth authenticates users (amended 2026-10-05; replaces the local login).** The
    web signs in through `supabase-js` (email and password first; social providers are Supabase
    configuration, not code) inside `src/shared/api`, the one HTTP layer, and sends the Supabase

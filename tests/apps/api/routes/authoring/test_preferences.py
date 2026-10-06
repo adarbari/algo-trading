@@ -7,7 +7,9 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-URL = "/preferences/ideas?user=alice"
+URL = "/preferences/ideas"
+ALICE = {"X-Act-For": "alice"}
+SITE = {"X-Act-For": "site"}
 
 
 def test_saves_the_priority_of_site_presets_and_keeps_other_preferences(
@@ -16,7 +18,7 @@ def test_saves_the_priority_of_site_presets_and_keeps_other_preferences(
     prefs = root / "users" / "alice" / "preferences.toml"
     prefs.parent.mkdir(parents=True)
     prefs.write_text('[theme]\nname = "dark"\n')
-    saved = writer_client.put(URL, json={"priority": ["vrp"]})
+    saved = writer_client.put(URL, json={"priority": ["vrp"]}, headers=ALICE)
     assert (saved.status_code, saved.json()) == (200, {"priority": ["vrp"]})
     text = prefs.read_text()
     assert 'priority = ["vrp"]' in text and 'name = "dark"' in text
@@ -24,10 +26,9 @@ def test_saves_the_priority_of_site_presets_and_keeps_other_preferences(
 
 def test_unknown_duplicate_or_site_users_are_refused(writer_client: TestClient, root: Path) -> None:
     for body in ({"priority": ["nope"]}, {"priority": ["vrp", "vrp"]}, {"priority": ["Bad Id"]}):
-        assert writer_client.put(URL, json=body).status_code == 400
-    assert (
-        writer_client.put("/preferences/ideas?user=site", json={"priority": []}).status_code == 400
-    )
+        assert writer_client.put(URL, json=body, headers=ALICE).status_code == 400
+    site = writer_client.put(URL, json={"priority": []}, headers=SITE)
+    assert site.status_code == 400
     assert not (root / "users").exists()
 
 
@@ -62,7 +63,7 @@ def test_a_view_is_saved_per_user_read_back_and_keeps_other_preferences(
     assert read(writer_client) == saved.json()
     text = prefs.read_text()
     assert 'priority = ["vrp"]' in text and CLOSE in text and '[views."screener:vrp".view]' in text
-    assert writer_client.put(f"{VIEW}?user=bob", json=BODY).status_code == 200
+    assert writer_client.put(VIEW, json=BODY, headers={"X-Act-For": "bob"}).status_code == 200
     assert (root / "users" / "bob" / "preferences.toml").exists()  # bob's own file
     cleared = writer_client.put(VIEW, json={"columns": [], "sort": None, "decisions": []})
     assert cleared.json()["sort"] is None and cleared.json()["columns"] == []
@@ -98,7 +99,7 @@ def test_a_view_is_checked_before_it_is_saved(writer_client: TestClient, root: P
     for scope in ("screener:nope", "vrp", "explore:vrp", "screener:Bad Id"):
         url = f"/preferences/views/{scope}/view"
         assert writer_client.put(url, json=BODY).status_code == 400, scope
-    assert writer_client.put(f"{VIEW}?user=site", json=BODY).status_code == 400
+    assert writer_client.put(VIEW, json=BODY, headers=SITE).status_code == 400
     assert not (root / "users").exists()
 
 

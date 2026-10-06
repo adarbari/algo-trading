@@ -56,6 +56,7 @@ def test_unknown_names_its_reason_and_where() -> None:
     assert unknown.code == "NO_PARTITION"
     assert [c.value for c in UnknownCode] == [
         "NO_PARTITION", "NO_ROW", "NULL", "NOT_IN_CATALOGUE", "LICENCE", "NOT_RUN", "PRE_SNAPSHOT",
+        "NOT_APPLICABLE", "ILLIQUID",
     ]  # fmt: skip
     with pytest.raises(AttributeError):
         unknown.code = UnknownCode.NULL  # type: ignore[misc]

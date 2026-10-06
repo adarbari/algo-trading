@@ -15,6 +15,7 @@ import { formatValue, type KeyValueItem, type StatItem, type ValueFormat } from 
 import {
   isUnknown,
   shownValue,
+  unknownLabel,
   unknownReason,
   valueFormat,
   type ServedValue,
@@ -261,7 +262,12 @@ const asStat = (item: Fact): StatItem => ({
 function nextEarnings(values: Values): Fact {
   const next = values.get(EARNINGS.next);
   if (!next || isUnknown(next)) {
-    return { id: 'next', label: 'Next earnings', value: UNKNOWN, hint: unknownReason(next) };
+    return {
+      id: 'next',
+      label: 'Next earnings',
+      value: unknownLabel(next?.unknown?.code),
+      hint: unknownReason(next),
+    };
   }
   const when = [
     sessionsText(known(values, EARNINGS.days)),
@@ -305,7 +311,12 @@ export function earningsGroup(values: Values, events: readonly InstrumentEvent[]
   const last = values.get(EARNINGS.last);
   const lastDate = text(known(values, EARNINGS.last));
   if (!lastDate) {
-    items.push({ id: 'last', label: 'Last earnings', value: UNKNOWN, hint: unknownReason(last) });
+    items.push({
+      id: 'last',
+      label: 'Last earnings',
+      value: unknownLabel(last?.unknown?.code),
+      hint: unknownReason(last),
+    });
     return { id: 'earnings', title: 'Earnings', items };
   }
   items.push({ id: 'last', label: 'Last earnings', value: lastDate, format: { kind: 'date' } });

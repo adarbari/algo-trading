@@ -1,5 +1,6 @@
 """A client over a temporary config root (site defaults + features from the repo, a rule
-preset at ``vrp/v3.toml``) whose user configs the write routes change."""
+preset at ``vrp/v3.toml``) whose user configs the write routes change, with a registry of
+local (the admin the API runs as), alice and bob."""
 
 from dataclasses import replace
 from pathlib import Path
@@ -7,6 +8,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from algotrade.config.site.users import Role
 from algotrade.config.user import UserContext
 from algotrade.storage.configs.writer import FileConfigWriter
 from algotrade_api.deps import ApiSettings, ReadStore
@@ -31,6 +33,20 @@ value = 5
 """
 
 
+USERS = """[[user]]
+id = "local"
+role = "admin"
+
+[[user]]
+id = "alice"
+role = "trader"
+
+[[user]]
+id = "bob"
+role = "trader"
+"""
+
+
 @pytest.fixture
 def root(tmp_path: Path) -> Path:
     site = tmp_path / "site"
@@ -38,6 +54,7 @@ def root(tmp_path: Path) -> Path:
     (site / "presets" / "screeners" / "vrp").mkdir(parents=True)
     (site / "features").symlink_to(REPO_ROOT / "config" / "site" / "features")
     (site / "defaults.toml").symlink_to(REPO_ROOT / "config" / "site" / "defaults.toml")
+    (site / "users.toml").write_text(USERS)
     (site / "presets" / "selections" / "all_active.toml").write_text(SELECTION)
     (site / "presets" / "screeners" / "vrp" / "v3.toml").write_text(PRESET)
     return tmp_path
@@ -50,3 +67,15 @@ def writer_client(api_golden: tuple[ReadStore, dict[str, str]], root: Path) -> T
     return TestClient(
         create_app(ApiSettings("memory://", str(root)), store, writer, authenticator=as_user())
     )
+
+
+@pytest.fixture
+def trader_client(api_golden: tuple[ReadStore, dict[str, str]], root: Path) -> TestClient:
+    """The same configs, called by bob (a trader of the registry)."""
+    writer = FileConfigWriter(root)
+    store = replace(api_golden[0], configs=writer, user=UserContext("bob"))
+    authenticator = as_user("bob", Role.TRADER)
+    app = create_app(
+        ApiSettings("memory://", str(root)), store, writer, authenticator=authenticator
+    )
+    return TestClient(app)

@@ -7,7 +7,7 @@
 import { formatValue } from '@algotrade/ui';
 
 import { factOf, IDEA_FACTS, type Idea } from '@/entities/idea';
-import { isUnknown, unknownReason } from '@/entities/feature';
+import { isUnknown, unknownLabel, unknownReason } from '@/entities/feature';
 
 /** The label of a value the server does not have for the session. */
 export const UNKNOWN_LABEL = 'Unknown';
@@ -39,7 +39,7 @@ export function earningsCell(idea: Idea): FactCell {
   const last = text(factOf(idea, IDEA_FACTS.lastEarnings)?.value);
   const shown = last
     ? `Last ${formatValue(last, { kind: 'date', style: 'day' }).text}`
-    : UNKNOWN_LABEL;
+    : unknownLabel(nextFact?.unknown?.code);
   return isUnknown(nextFact)
     ? { text: shown, muted: true, title: unknownReason(nextFact) }
     : { text: shown, muted: true };
