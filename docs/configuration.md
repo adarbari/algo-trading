@@ -329,6 +329,21 @@ feature.drawdown_pct  expression float  (config/users/alice/features/momentum.to
   2026-10-02: 9840/10215 instruments with a value; e.g. EQ:BBG000B9XRY4=-3.1, ...
 ```
 
+
+## Field guide
+
+How to read each catalogue field, which criterion means what, and when the reading lies:
+`config/site/field_guide/<theme>.toml` (`momentum`, `liquidity`, `volatility`, `events`,
+`fundamentals`) plus `situations.toml` (ADR 0041, amended). Each `[[field]]` names a catalogue
+field, its `theme`, `reads` (what the number means), `caveats` (each ending with the field to
+check), `sources`, and `[[field.use]]` entries: an intent (`for`) with the criterion as a rule
+screen takes it (`op`, `value`, `mode`, `tolerance`, `on_miss`, `note`). A `[[situation]]`
+(`name`, `signs`, `affects`, `do`) is one state of the world that fools several thresholds. The
+loader checks shape and vocabulary; `tests/architecture/test_features.py` checks that every name
+is a catalogue field and every value fits its type, categories and range. `make features-doc`
+renders [data/field-guide.md](data/field-guide.md); the drafting prompt and the Builder read
+the same files.
+
 ## Vendor pacing
 
 One limiter per vendor key (`libs/sources/algotrade_sources/framework/limiter.py`), shared by every

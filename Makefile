@@ -73,7 +73,7 @@ rest-allowlist:  ## REST GET routes only shrink (ADR 0037): architecture/rest_al
 rest-allowlist-update: ## after retiring GET routes (removing their entries): lower the committed count
 	$(PY) scripts/check_rest_allowlist.py --update
 
-features-doc:    ## regenerate the feature catalogue docs/data/features.md from the registry
+features-doc:    ## regenerate docs/data/features.md (catalogue) and docs/data/field-guide.md (field guide)
 	$(PY) scripts/features_doc.py
 
 filelen:         ## no file over 1000 lines

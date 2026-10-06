@@ -49,6 +49,15 @@ which field is the gate, which a confirmation or a score, and the usual threshol
 a free model gets the mapping right; extend it by PR when a sentence maps badly (every field
 it names must exist in the catalogue: a test checks).
 
+The prompt ends with the site **field guide** (`config/site/field_guide/*.toml`): for each
+catalogue field how to read it, the usual criterion for each intent a trader has (the
+operator, value, mode and tolerance as this grammar takes them), and the caveats where the
+number is right and the conclusion wrong (a pending takeover pins RSI high with no trend
+behind it; an earnings gap inflates realised volatility for a month), plus the situations that
+fool several thresholds at once. The model takes thresholds from it and adds the check a
+caveat names. The same file is rendered to [field-guide.md](../data/field-guide.md)
+(`make features-doc`) for people building a screen by hand.
+
 ## Example
 
 ```toml

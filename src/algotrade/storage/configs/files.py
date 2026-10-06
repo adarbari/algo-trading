@@ -3,6 +3,7 @@
 site/defaults.toml                         L3 defaults (screening, backtest)
 site/<name>.toml                           L3 site settings (kind ``settings``)
 site/features/<theme>.toml                 L3 expression features (kind ``features``)
+site/field_guide/<theme>.toml              L3 field guide (kind ``field_guide``, ADR 0041)
 site/presets/strategies/<id>.toml          L3 shared strategy / screener configs
 site/presets/selections/<id>.toml          L3 shared selections
 users/<user>/strategies/<id>.toml          L4 (git-ignored locally)
@@ -32,6 +33,7 @@ from algotrade.storage.configs.store import KINDS, split_version
 SITE = "site"
 SCREENERS = "screeners"
 USER_FILES = ("preferences", "identity")  # one document per user, never the site's
+SITE_FOLDERS = ("features", "field_guide")  # site/<kind>/<name>.toml
 DRAFT = "draft.toml"
 _ID_NAME = re.compile(r"[a-z0-9_-]{1,64}")  # core.model.ids: other names are not screens
 _VERSION_FILE = re.compile(r"v([1-9][0-9]{0,8})\.toml")
@@ -71,8 +73,8 @@ class FileConfigStore:
                 return self.root / SITE / "defaults.toml"
             if kind == "settings":
                 return self.root / SITE / f"{validate_id(kind, name)}.toml"
-            if kind == "features":
-                return self.root / SITE / "features" / f"{validate_id(kind, name)}.toml"
+            if kind in SITE_FOLDERS:
+                return self.root / SITE / kind / f"{validate_id(kind, name)}.toml"
             return self.root / SITE / "presets" / kind / f"{validate_id(kind, name)}.toml"
         user = validate_id("user", scope)
         if kind in USER_FILES:  # one file per user: users/<id>/<kind>.toml
@@ -129,7 +131,7 @@ class FileConfigStore:
     def load(self, scope: str, kind: str, name: str) -> Mapping[str, Any] | None:
         if kind in USER_FILES and scope == SITE:  # a user's, never the site's
             return None
-        if kind in ("defaults", "settings") and scope != SITE:
+        if kind in ("defaults", "settings", "field_guide") and scope != SITE:
             return None
         if kind == SCREENERS:
             return self._screen(scope, name)

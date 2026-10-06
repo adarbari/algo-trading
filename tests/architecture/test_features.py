@@ -10,23 +10,32 @@
 - a null explained by a status column (ADRs 0042, 0046) names statuses that are ``NullReason``
   values and that the status column declares as categories;
 - the generated catalogue (``docs/data/features.md``) is up to date;
+- the site field guide (``config/site/field_guide/*.toml``, ADR 0041) names only catalogue fields,
+  in its entries, its situations and its prose, with values that fit each field's type,
+  categories and range, and its generated page (``docs/data/field-guide.md``) is up to date;
 - inputs come only through ``algotrade.data.feature_inputs``: no module under ``features/``
   imports storage or a domain reader, and the framework has no loaders of its own.
 """
 
 import ast
+import re
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
+from algotrade.config.site.field_guide import GuideUse
+from algotrade.config.site.settings import load_field_guide
 from algotrade.data import StoreReader
 from algotrade.features.catalogue import PATH, render
 from algotrade.features.framework.feature import NullReason, in_range, is_feature_ref
 from algotrade.features.framework.graph import dependencies
 from algotrade.features.framework.runner import compute_in_memory
+from algotrade.features.guide import PATH as GUIDE_PATH
+from algotrade.features.guide import render as render_guide
 from algotrade.features.registry import GROUPS, feature
 from algotrade.features.site import site_features
+from algotrade.services.read.instruments.catalogue import feature_infos
 from algotrade.storage.configs.files import FileConfigStore
 from tests.conftest import REPO_ROOT
 
@@ -186,3 +195,74 @@ def test_features_read_only_through_data_feature_inputs() -> None:
             assert not module.startswith("algotrade.storage"), f"{path.name} imports {module}"
             if module.startswith("algotrade.data"):
                 assert module in allowed, f"{path.name}: ask data.feature_inputs, not {module}"
+
+
+# ----------------------------------------------------------------------- the field guide
+
+GUIDE = load_field_guide(FileConfigStore(REPO_ROOT / "config"))
+CATALOGUE = feature_infos(SITE)  # name -> FeatureInfo, every field of the site catalogue
+FIELD_REF = re.compile(r"\b(?:feature|rollup|instrument)\.[A-Za-z0-9_@.]+")
+NUMERIC_OPS = {"gt", "gte", "lt", "lte", "between", "eq", "ne"}
+CATEGORY_OPS = {"eq", "ne", "in", "not_in"}
+
+
+def _mentioned(text: str) -> set[str]:
+    return {m.rstrip(".,;:)") for m in FIELD_REF.findall(text)}
+
+
+def test_field_guide_names_catalogue_fields_everywhere() -> None:
+    names = set(CATALOGUE)
+    for e in GUIDE.fields:
+        assert e.name in names, f"field guide: {e.name} is not a catalogue field"
+        prose = " ".join([e.reads, *e.caveats, *(u.note for u in e.uses)])
+        unknown = _mentioned(prose) - names
+        assert not unknown, (
+            f"field guide {e.name}: names fields the catalogue lacks: {sorted(unknown)}"
+        )
+    for s in GUIDE.situations:
+        unknown = (set(s.affects) | _mentioned(s.signs + " " + s.do)) - names
+        assert not unknown, (
+            f"situation {s.name!r}: names fields the catalogue lacks: {sorted(unknown)}"
+        )
+
+
+def _check_numeric(name: str, use: GuideUse, lo: float | None, hi: float | None) -> None:
+    values = use.value if use.op == "between" else [use.value]
+    if use.op == "between":
+        assert isinstance(use.value, list) and len(use.value) == 2, (
+            f"{name} {use.intent}: between takes two"
+        )
+    for v in values:
+        assert isinstance(v, int | float) and not isinstance(v, bool), f"{name} {use.intent}: {v!r}"
+        assert lo is None or v >= lo, f"{name} {use.intent}: {v} is below the field's range"
+        assert hi is None or v <= hi, f"{name} {use.intent}: {v} is above the field's range"
+
+
+def test_field_guide_values_fit_their_fields() -> None:
+    for e in GUIDE.fields:
+        info = CATALOGUE[e.name]
+        lo, hi = info.range or (None, None)
+        for use in e.uses:
+            where = f"{e.name} {use.intent!r}"
+            if use.op in ("is_null", "not_null"):
+                continue
+            if info.categories:
+                assert use.op in CATEGORY_OPS, f"{where}: {use.op} on a category"
+                chosen = use.value if isinstance(use.value, list) else [use.value]
+                assert set(chosen) <= set(info.categories), (
+                    f"{where}: {chosen} not in {info.categories}"
+                )
+            elif info.dtype == "bool":
+                assert use.op == "eq" and isinstance(use.value, bool), (
+                    f"{where}: a flag takes eq true/false"
+                )
+            else:
+                assert use.op in NUMERIC_OPS, f"{where}: {use.op} on a number"
+                _check_numeric(e.name, use, lo, hi)
+            if isinstance(use.tolerance, dict):
+                assert use.op in NUMERIC_OPS, f"{where}: a relative tolerance needs a number"
+
+
+def test_field_guide_page_is_up_to_date() -> None:
+    committed = (REPO_ROOT / GUIDE_PATH).read_text()
+    assert committed == render_guide(GUIDE), f"{GUIDE_PATH} is out of date: run `make features-doc`"

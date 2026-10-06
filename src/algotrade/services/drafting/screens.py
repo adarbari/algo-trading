@@ -1,5 +1,6 @@
 """``draft_screen``: a sentence to a draft rule screen (ADR 0041). The prompt is the task, the
-caller's catalogue and the site phrasebook (``config/site/phrasebook.toml``). The model's JSON
+caller's catalogue, the site phrasebook (``config/site/phrasebook.toml``) and the site field guide
+(``config/site/field_guide/*.toml``: thresholds and caveats per field). The model's JSON
 is parsed strictly (ids, fields, ops, modes, values, tolerances); a criterion on a field outside the
 caller's catalogue, or one the validator rejects, is dropped with the reason (never saved,
 never silently kept); the rest is validated with ``resolve_rule_draft`` as finalise does. Reads
@@ -11,7 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from algotrade.config.site.settings import load_phrasebook
+from algotrade.config.site.settings import load_field_guide, load_phrasebook
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
 from algotrade.core.model.predicates import NO_VALUE_OPS, OPS
 from algotrade.services.configs import resolve_rule_draft
@@ -68,7 +69,8 @@ def draft_screen(
         raise ConfigurationError(f"{screener_id}: the sentence is over {MAX_TEXT} characters")
     infos = feature_infos(ctx.features)
     phrasebook = load_phrasebook(ctx.configs).phrases
-    system = system_prompt(infos.values(), phrasebook)
+    guide = load_field_guide(ctx.configs)
+    system = system_prompt(infos.values(), phrasebook, guide)
     user = user_prompt(screener_id, sentence, current)
     answer = model.complete(system, user)
     proposal = parse_answer(answer)

@@ -1,0 +1,49 @@
+# L3 site setting: the field guide (ADR 0041, amended 2026-10-06), one <theme>.toml per theme
+# plus situations.toml; loaded together by config/site/settings.py load_field_guide. Every
+# [[field]] says how to read one catalogue field, which criterion means what, and when the
+# reading lies; a [[situation]] is one state of the world that fools several thresholds at once.
+# The keys are documented in momentum.toml. Edit by PR; `make features-doc` renders the page.
+
+[[field]]
+name = "rollup.earnings@v1.days_to_earnings"
+theme = "events"
+reads = "Exchange sessions until the next report: 0 reports today, 1 tomorrow, 10 is two weeks out. Options price the report from about ten sessions before (the IV ramp accelerates in the last two or three) and lose that premium within a session after it. 'Avoid earnings' for a short option held a month is days_to_earnings above the holding period; 'play earnings' is under 5."
+caveats = [
+  "Null means no report date is known for the name, not 'no report soon': ETFs have none, and a company's next date is often unknown until it announces it (two to four weeks before). A hard 'gt 10' therefore rejects every ETF and every company that has not announced; use soft with EVENT_RISK.",
+  "Unconfirmed dates move: rollup.earnings@v1.date_confirmed false (the Nasdaq calendar never confirms) means the date is an estimate from last year's pattern and can shift by days.",
+  "rollup.earnings@v1.earnings_time says before the open (pre) or after the close (post): 'reports tomorrow, pre' means the move happens before you can act.",
+]
+sources = [
+  "IV ramp and crush around earnings: https://flashalpha.com/articles/iv-crush-explained-earnings-volatility-collapse and https://optionalpha.com/learn/iv-crush",
+]
+[[field.use]]
+for = "no earnings in the next N sessions (short options)"
+op = "gt"
+value = 10
+mode = "soft"
+tolerance = 2
+on_miss = "EVENT_RISK"
+note = "N is the holding period; 25 for a 30-day short option held to expiry; or feature.earnings_before_expiry eq false"
+[[field.use]]
+for = "earnings this week (an event play)"
+op = "lte"
+value = 5
+mode = "hard"
+note = "add rollup.earnings@v1.date_confirmed eq true when the date must be right"
+
+[[field]]
+name = "feature.earnings_before_expiry"
+theme = "events"
+reads = "True when the next report falls on or before the nearest listed expiry: a short option held to that expiry carries the earnings move. False is the clean case for premium selling at the nearest expiry; for a later expiry read rollup.earnings@v1.days_to_earnings against its days."
+caveats = [
+  "Null when the report date or the nearest expiry is unknown (no date announced, no stored chain): a hard 'eq false' rejects those names; soft with EVENT_RISK keeps them listed.",
+  "The nearest expiry can be a weekly a few days out; a 30-day short option needs days_to_earnings against its own expiry, not this flag.",
+]
+sources = ["Site convention over the earnings calendar and the stored chains"]
+[[field.use]]
+for = "no earnings before the nearest expiry"
+op = "eq"
+value = false
+mode = "soft"
+tolerance = 0
+on_miss = "EVENT_RISK"
