@@ -12,7 +12,7 @@ from algotrade.storage.configs.files import FileConfigStore
 from algotrade_api.deps import ApiSettings
 from algotrade_api.main import create_app
 from tests.apps.api.graphql.conftest import Graph
-from tests.helpers.api_store import store_over
+from tests.helpers.api_store import as_user, store_over
 
 IDEAS = """query Ideas($limit: Int!, $names: [FeatureName!]!, $date: Date) {
   ideas(limit: $limit, date: $date) {
@@ -100,7 +100,9 @@ def test_screeners_and_a_view(graph: Graph) -> None:
 
 def test_an_empty_store_has_no_ideas_not_an_error(tmp_path: Path) -> None:
     store = store_over(MemoryBackend(), FileConfigStore(tmp_path), UserContext("local"))
-    client = TestClient(create_app(ApiSettings("memory://", "config"), store))
+    client = TestClient(
+        create_app(ApiSettings("memory://", "config"), store, authenticator=as_user())
+    )
     query = '{ ideas(limit: 5) { total } screeners { id } view(scope: "x") { scope } }'
     body = client.post("/graphql", json={"query": query}).json()
     assert body == {"data": {"ideas": None, "screeners": [], "view": None}}

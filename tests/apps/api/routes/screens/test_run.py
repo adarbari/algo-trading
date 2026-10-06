@@ -10,7 +10,7 @@ from algotrade.config.user import UserContext
 from algotrade.services.ondemand.screens import OnDemandScreens
 from algotrade_api.deps import ApiSettings
 from algotrade_api.main import create_app
-from tests.helpers.api_store import store_over
+from tests.helpers.api_store import as_user, store_over
 from tests.helpers.ondemand_store import DAY, seeded_backend, site_configs
 
 RUN = "/screens/big_liquid/run"
@@ -21,7 +21,10 @@ def client() -> Iterator[TestClient]:
     backend, configs = seeded_backend(), site_configs()
     store = store_over(backend, configs, UserContext("local"))
     app = create_app(
-        ApiSettings("memory://", "config"), store, ondemand=OnDemandScreens(backend, configs)
+        ApiSettings("memory://", "config"),
+        store,
+        ondemand=OnDemandScreens(backend, configs),
+        authenticator=as_user(),
     )
     with TestClient(app) as test_client:
         yield test_client
@@ -62,6 +65,8 @@ def test_what_cannot_be_run_is_refused(client: TestClient) -> None:
 def test_runs_are_off_without_a_runner() -> None:
     backend, configs = seeded_backend(), site_configs()
     app = create_app(
-        ApiSettings("memory://", "config"), store_over(backend, configs, UserContext("local"))
+        ApiSettings("memory://", "config"),
+        store_over(backend, configs, UserContext("local")),
+        authenticator=as_user(),
     )
     assert TestClient(app).post(RUN).status_code == 400

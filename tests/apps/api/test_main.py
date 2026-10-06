@@ -10,6 +10,7 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade_api import cli
 from algotrade_api.deps import DEV_ORIGINS, ApiSettings, ReadStore
 from algotrade_api.main import create_app, openapi_json
+from tests.helpers.api_store import as_user
 
 REPO = Path(__file__).resolve().parents[3]
 
@@ -40,7 +41,7 @@ def test_configuration_errors_are_400(
         raise ConfigurationError("bad config")
 
     monkeypatch.setattr("algotrade.services.preview.screens.preview_screen", broken)
-    app = create_app(ApiSettings("memory://", "config"), api_golden[0])
+    app = create_app(ApiSettings("memory://", "config"), api_golden[0], authenticator=as_user())
     response = TestClient(app).post("/screeners/preview", json={"spec": {}})
     assert (response.status_code, response.json()) == (400, {"detail": "bad config"})
 
@@ -51,10 +52,12 @@ def test_settings_from_env_open_the_named_store(
     monkeypatch.setenv("ALGOTRADE_DATA_URL", f"file://{tmp_path}")
     monkeypatch.setenv("ALGOTRADE_CONFIG_DIR", str(tmp_path))
     monkeypatch.setenv("ALGOTRADE_USER", "alice")
+    monkeypatch.setenv("ALGOTRADE_AUTH", "off")
     settings = ApiSettings.from_env()
+    assert settings.auth.mode == "off"
     assert (settings.user, settings.config_dir) == ("alice", str(tmp_path))
     assert settings.debug is False  # GraphiQL only with ALGOTRADE_API_DEBUG=1
-    body = TestClient(create_app(settings)).get("/health").json()
+    body = TestClient(create_app(settings, authenticator=as_user())).get("/health").json()
     assert (body["storage"], body["latest_session"], body["tables"]) == ("file", None, [])
 
 
@@ -68,6 +71,8 @@ def test_cli_runs_uvicorn_on_localhost(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_asgi_app_is_configured_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ALGOTRADE_DATA_URL", "memory://")
+    monkeypatch.setenv("ALGOTRADE_AUTH", "off")
+    monkeypatch.delenv("ALGOTRADE_USER", raising=False)
     from algotrade_api import app  # noqa: PLC0415  (built at import, from the environment)
 
     assert app.app.state.store.kind == "memory"

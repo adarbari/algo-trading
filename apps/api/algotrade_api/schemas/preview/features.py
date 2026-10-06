@@ -10,7 +10,9 @@ from algotrade_api.schemas.health import Schema
 
 class CheckBody(BaseModel):
     expr: str = Field(description="the formula (the expression feature language)")
-    user: str | None = Field(None, description="whose catalogue (default the API's)")
+    user: str | None = Field(
+        None, description="whose catalogue (default: the caller's; another user's: admins only)"
+    )
     sample: int = Field(5, ge=0, le=50, description="how many sample values to return")
 
 

@@ -9,6 +9,7 @@ from algotrade.config.site.settings import IbkrSettings
 from algotrade.services.live.quotes import LiveQuotes
 from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.main import create_app
+from tests.helpers.api_store import as_user
 
 
 def test_live_chain_serves_the_stored_chain_when_live_quotes_are_off(client: TestClient) -> None:
@@ -44,7 +45,9 @@ def test_live_chain_from_a_feed(api_golden: tuple[ReadStore, dict[str, str]]) ->
 
     live = LiveQuotes(Feed(), None, IbkrSettings(live_strikes=2))
     with TestClient(
-        create_app(ApiSettings("memory://", "config"), api_golden[0], live=live)
+        create_app(
+            ApiSettings("memory://", "config"), api_golden[0], live=live, authenticator=as_user()
+        )
     ) as app:
         body = app.get("/chains/AAA/live", params={"expiry": "2022-12-23"}).json()
     assert (body["source"], body["status"], body["delayed"]) == ("ibkr", "LIVE", False)

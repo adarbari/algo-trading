@@ -7,7 +7,7 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.main import create_app
 from tests.apps.api.graphql.conftest import Graph
-from tests.helpers.api_store import store_over
+from tests.helpers.api_store import as_user, store_over
 
 CONFIGS = """query C($kind: String) {
   configs(kind: $kind) { configId scope kind impl selection hash error }
@@ -36,7 +36,9 @@ def test_configs_answer_on_a_store_with_no_market_data(
     """Configs are not session data: a fresh store still lists them (and the user's drafts)."""
     store = api_golden[0]
     empty = store_over(MemoryBackend(), store.configs, store.user)
-    client = TestClient(create_app(ApiSettings("memory://", "config"), empty))
+    client = TestClient(
+        create_app(ApiSettings("memory://", "config"), empty, authenticator=as_user())
+    )
     query = "{ session { date } configs { configId } myScreens { screenerId } backtests { runId } }"
     body = client.post("/graphql", json={"query": query}).json()
     assert "errors" not in body, body

@@ -19,6 +19,7 @@ from algotrade.storage.configs.files import FileConfigStore
 from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.main import create_app
 from tests.conftest import REPO_ROOT
+from tests.helpers.api_store import as_user
 
 
 @pytest.fixture(scope="session")
@@ -28,7 +29,9 @@ def ids(api_golden: tuple[ReadStore, dict[str, str]]) -> dict[str, str]:
 
 @pytest.fixture(scope="session")
 def client(api_golden: tuple[ReadStore, dict[str, str]]) -> TestClient:
-    return TestClient(create_app(ApiSettings("memory://", "config"), api_golden[0]))
+    return TestClient(
+        create_app(ApiSettings("memory://", "config"), api_golden[0], authenticator=as_user())
+    )
 
 
 # A user feature of alice's (config/users/alice/features/vol.toml): hv20 in percent.
@@ -54,7 +57,11 @@ def user_client(
 
     def client_for(user: str) -> TestClient:
         store = replace(api_golden[0], configs=FileConfigStore(root), user=UserContext(user))
-        return TestClient(create_app(ApiSettings("memory://", str(root), user), store))
+        return TestClient(
+            create_app(
+                ApiSettings("memory://", str(root), user), store, authenticator=as_user(user)
+            )
+        )
 
     return client_for
 
