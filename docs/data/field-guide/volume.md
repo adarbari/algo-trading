@@ -73,7 +73,7 @@ Sources: Average daily trading volume, Investopedia: https://www.investopedia.co
 - An earnings day or an index event in the last 5 sessions lifts the ratio with no trend behind it; a high ratio with a flat close (rollup.momentum@v1.ret_5d near 0) is usually one of these.
 - Null after a gap in the last 20 sessions, a shorter history, or no volume at all over the 20.
 
-Sources: Volume contraction before breakouts (O'Neil, How to Make Money in Stocks: volume drying up in a base); Volume analysis, StockCharts ChartSchool: https://chartschool.stockcharts.com/table-of-contents/overlays/volume-by-price
+Sources: Volume contraction before breakouts (O'Neil, How to Make Money in Stocks: volume drying up in a base); Reading volume against its average: https://www.investopedia.com/articles/technical/02/010702.asp
 
 ### `rollup.volume@v1.volume_z_20d`
 
@@ -110,7 +110,7 @@ Sources: Standard score, Wikipedia: https://en.wikipedia.org/wiki/Standard_score
 **When the reading lies**
 
 - One heavy day can be most of the window: an earnings gap up on 10 times normal volume pushes the share above 0.6 on its own. Check rollup.earnings@v1.last_earnings_date and rollup.price_moves@v1.one_day_move.
-- It counts closes, not how far they moved: twenty small up days and one large down day read as accumulation. Pair with rollup.price_stats@v2.ret_20d.
+- It counts closes, not how far they moved: nineteen small up days and one large down day read as accumulation. Pair with rollup.price_stats@v2.ret_20d.
 - Null after a gap in the last 21 sessions (the first session needs the close before it), a shorter history, or no volume at all.
 
 Sources: On-balance volume (Granville), Wikipedia: https://en.wikipedia.org/wiki/On-balance_volume; Accumulation / distribution, StockCharts ChartSchool: https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/accumulation-distribution-line

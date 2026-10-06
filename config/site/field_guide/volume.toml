@@ -73,7 +73,7 @@ caveats = [
 ]
 sources = [
   "Volume contraction before breakouts (O'Neil, How to Make Money in Stocks: volume drying up in a base)",
-  "Volume analysis, StockCharts ChartSchool: https://chartschool.stockcharts.com/table-of-contents/overlays/volume-by-price",
+  "Reading volume against its average: https://www.investopedia.com/articles/technical/02/010702.asp",
 ]
 [[field.use]]
 for = "volume drying up"
@@ -125,7 +125,7 @@ theme = "volume"
 reads = "The share of the last 20 sessions' volume that traded on up days (a close above the previous close), 0 to 1: 0.5 is balanced, 0.6 and above is accumulation (buyers did the heavy trading), 0.4 and below distribution. A session closing unchanged counts in the total only. It is the 20-session form of on-balance volume's idea: volume follows the side in control."
 caveats = [
   "One heavy day can be most of the window: an earnings gap up on 10 times normal volume pushes the share above 0.6 on its own. Check rollup.earnings@v1.last_earnings_date and rollup.price_moves@v1.one_day_move.",
-  "It counts closes, not how far they moved: twenty small up days and one large down day read as accumulation. Pair with rollup.price_stats@v2.ret_20d.",
+  "It counts closes, not how far they moved: nineteen small up days and one large down day read as accumulation. Pair with rollup.price_stats@v2.ret_20d.",
   "Null after a gap in the last 21 sessions (the first session needs the close before it), a shorter history, or no volume at all.",
 ]
 sources = [
