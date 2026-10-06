@@ -28,7 +28,7 @@ from algotrade.config.site.coverage import CoverageRule
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.core.model.fields import REFERENCE_TABLE
 from algotrade.data import StoreReader
-from algotrade.data.reference import UNIVERSE_TABLE, snapshot
+from algotrade.data.reference import UNIVERSE_TABLE, companies, snapshot
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.framework.feature import Feature, not_applicable
 from algotrade.services.features import site_features, site_store
@@ -77,6 +77,13 @@ def _population(reader: StoreReader, session: date) -> pd.DataFrame | None:
         )
     )
     pop["is_etf"] = pop["security_type"].astype(str) == ETF
+    company = companies(reader, session)  # on or before the session, never a later snapshot
+    sic = {}
+    if company is not None and "sic" in company.columns:
+        sic = dict(zip(company["instrument_id"].astype(str), company["sic"], strict=True))
+    pop["sic"] = [sic.get(str(i)) for i in pop["instrument_id"]]
+    for fact in ("security_type", "sic"):  # "" is null (not_applicable never rules it out)
+        pop[fact] = pop[fact].map(lambda v: "" if v is None or pd.isna(v) else str(v))
     pop["optionable"] = pop["optionable"].map(lambda v: None if pd.isna(v) else bool(v))
     return pop
 
@@ -160,8 +167,10 @@ def cells(
         table, column, feat = _locate(fs, rule.feature)
         have, scope, stale = _covered(reader.table(table, day), column, feat, rule, day)
         applies = [
-            not not_applicable([feat.applies_to], opt, etf)
-            for opt, etf in zip(pop["optionable"], pop["is_etf"], strict=True)
+            not not_applicable([feat.applies_to], opt, kind, sic)
+            for opt, kind, sic in zip(
+                pop["optionable"], pop["security_type"], pop["sic"], strict=True
+            )
         ]
         for tier in TIERS:
             mine = pop[(pop["tier"] == tier) & pd.Series(applies, index=pop.index)]

@@ -99,7 +99,7 @@ export function codeReason(
     case 'NULL':
       return nullMeaning || 'not known for this session';
     case 'NOT_APPLICABLE':
-      return 'does not apply to this instrument (e.g. not optionable, or an ETF has no earnings)';
+      return 'does not apply to this instrument (e.g. not optionable; an ETF, fund, preferred or blank-check company has no earnings)';
     case 'ILLIQUID':
       return 'options too thin to price: no near-the-money quote within the spread limit';
     case null:

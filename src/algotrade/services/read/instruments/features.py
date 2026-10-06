@@ -12,9 +12,10 @@ for company facts: no company snapshot on or before it),
 ``NO_ROW`` (the instrument has no row: not in the reference snapshot, or no row in the rollup
 or in any input of the expression), ``NULL`` (stored or computed null; ``FeatureInfo.null_meaning``
 says what null means), ``NOT_APPLICABLE`` (the feature is not defined for this kind of
-instrument: option features of a non-optionable one, earnings of an ETF; from the session's
-reference snapshot) and ``ILLIQUID`` (an option feature null because the chain is too thin: its
-status column says so). A present value wins over both; they win over NO_ROW and NULL, so a
+instrument: option features of a non-optionable one, earnings of an ETF, preferred or
+blank-check company; from the session's reference snapshot and its company snapshot's SIC) and
+``ILLIQUID`` (an option feature null because the chain is too thin: its status column says so).
+A present value wins over both; they win over NO_ROW and NULL, so a
 non-optionable instrument with no option rows is n/a, not a gap (ADR 0042). ``LICENCE``
 waits for a second user (ADR 0028: personal-licence values are hidden from users other than
 the owner once there are any). A name outside the caller's catalogue is an error
@@ -35,11 +36,10 @@ from algotrade.core.model.fields import (
 )
 from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.features.expressions.feature_set import FeatureSet
-from algotrade.features.framework.feature import not_applicable
+from algotrade.features.framework.feature import BLANK_CHECK_SIC, OPERATING_TYPES, not_applicable
 from algotrade.services.features import field_view
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
-from algotrade.services.read.instruments.identity import ETF
 from algotrade.services.read.session import Grain, grain_of
 from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
 
@@ -48,6 +48,7 @@ from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
 _ROW = "instrument_id"
 _OPTIONABLE = "instrument.optionable"
 _SECURITY_TYPE = "instrument.security_type"
+_SIC = "instrument.sic"  # company snapshot on or before the session (ADR 0045)
 type Reasons = tuple[frozenset[str], tuple[tuple[str, frozenset[str]], ...]]  # applicability
 
 
@@ -74,7 +75,7 @@ def _reason_fields(reasons: Reasons) -> list[str]:
     applies, statuses = reasons
     return [
         *([_OPTIONABLE] if "optionable" in applies else []),
-        *([_SECURITY_TYPE] if "not_etf" in applies else []),
+        *([_SECURITY_TYPE, _SIC] if "operating_company" in applies else []),
         *(field for field, _ in statuses),
     ]
 
@@ -99,21 +100,31 @@ def _flag(value: Any) -> bool | None:
     return None if scalar is None else bool(scalar)
 
 
+def _text(value: Any) -> str | None:
+    """A reference / company string fact (``None``: null)."""
+    scalar = to_scalar(value)
+    return None if scalar is None else str(scalar)
+
+
 def _not_applicable(
     applies: frozenset[str], row: Mapping[str, Any], ctx: ReadContext, iid: str
 ) -> str:
-    """Why the feature does not apply to the instrument (the reference snapshot's facts; a
-    null ``optionable`` is not "no"), or ``""``."""
+    """Why the feature does not apply to the instrument (the reference snapshot's facts and
+    the company snapshot's SIC; a null fact is not "no"), or ``""``."""
     snapshot = f"(reference snapshot {ctx.session.reference_snapshot})"
     ruled_out = not_applicable(
         applies,
         _flag(row.get(_OPTIONABLE)) if "optionable" in applies else None,
-        to_scalar(row.get(_SECURITY_TYPE)) == ETF if "not_etf" in applies else False,
+        _text(row.get(_SECURITY_TYPE)) if "operating_company" in applies else None,
+        _text(row.get(_SIC)) if "operating_company" in applies else None,
     )
     if ruled_out == "optionable":
         return f"{iid} is not optionable {snapshot}"
-    if ruled_out == "not_etf":
-        return f"{iid} is an ETF {snapshot}: no earnings"
+    if ruled_out == "operating_company":
+        kind = _text(row.get(_SECURITY_TYPE)) or ""
+        if kind in OPERATING_TYPES:
+            return f"{iid} is a blank-check company (SIC {BLANK_CHECK_SIC}): no earnings"
+        return f"{iid} is not an operating company: {kind} {snapshot}: no earnings"
     return ""
 
 
@@ -218,7 +229,11 @@ def load_feature_values(
             str(r["instrument_id"]): cast(dict[str, Any], r) for r in view.frame.to_dict("records")
         }
         # A company snapshot taken after the session is not known on it (no lookahead).
-        missing = (*view.missing, COMPANY_TABLE) if view.company_pre_snapshot else view.missing
+        missing = view.missing
+        if view.company_pre_snapshot:
+            missing = (*missing, COMPANY_TABLE)
+            # its sic is not known either: never a false n/a
+            rows = {i: {**row, _SIC: None} for i, row in rows.items()}
     if instrument_ids is None:
         instrument_ids = list(rows)
     return {
