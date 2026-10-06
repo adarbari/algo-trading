@@ -5,6 +5,7 @@ ADR 0019 ``site-settings``. Each file becomes a frozen dataclass that apps recei
     sources.toml   -> SourcesSettings   (vendors, [http], [quality], retention; [ibkr])
     verification.toml -> VerificationSettings (live verification vs IBKR)
     llm.toml       -> LlmSettings       (the text model behind screener drafts, ADR 0041)
+    phrasebook.toml -> PhrasebookSettings (trader vocabulary -> catalogue fields, ADR 0041)
     universe.toml  -> UniverseSettings  (+ overrides/leveraged_etfs.csv, overrides/figi.csv)
     nightly.toml   -> NightlySettings
     users.toml     -> UsersSettings     (config/site/users.py: the user registry, ADR 0040)
@@ -38,6 +39,7 @@ from algotrade.config.site.holdings import (
 from algotrade.config.site.ibkr import IbkrSettings as IbkrSettings  # noqa: PLC0414 - re-export
 from algotrade.config.site.ibkr import load_ibkr
 from algotrade.config.site.llm import LlmSettings as LlmSettings  # noqa: PLC0414 - re-export
+from algotrade.config.site.llm import PhrasebookSettings as PhrasebookSettings  # noqa: PLC0414
 from algotrade.config.site.nightly import (
     NightlySettings as NightlySettings,  # noqa: PLC0414 - re-export
 )
@@ -906,6 +908,11 @@ def load_verification(configs: SiteDocuments) -> VerificationSettings:
 def load_llm(configs: SiteDocuments) -> LlmSettings:
     """``llm.toml`` (ADR 0041); missing: drafting off."""
     return LlmSettings.from_document(site_document(configs.load, "llm"))
+
+
+def load_phrasebook(configs: SiteDocuments) -> PhrasebookSettings:
+    """``phrasebook.toml`` (ADR 0041); missing: no phrases."""
+    return PhrasebookSettings.from_document(site_document(configs.load, "phrasebook"))
 
 
 def load_rollups(

@@ -1,17 +1,21 @@
-"""Site settings for the text model behind natural-language screener drafts (ADR 0041,
-``config/site/llm.toml``): which OpenAI-compatible endpoint and model answer, and how long a
-request may take. Off by default; the key comes only from the environment (``config/env.py``)."""
+"""Site settings for natural-language screener drafts (ADR 0041): the text model
+(``config/site/llm.toml``: which OpenAI-compatible endpoint and model answer, how long a request
+may take; off by default, the key only from the environment, ``config/env.py``) and the
+phrasebook (``config/site/phrasebook.toml``: trader vocabulary mapped to catalogue fields with a
+hint on thresholds, listed in the prompt after the catalogue)."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlsplit
 
 from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.core.model.errors import ConfigurationError
 
-KEYS = ("enabled", "base_url", "model", "timeout_s", "answer_limit")
+KEYS = ("enabled", "base_url", "model", "timeout_s", "answer_limit", "retries", "request")
+RESERVED_REQUEST_KEYS = ("model", "messages", "temperature", "max_tokens", "response_format")
 LOOPBACK = ("localhost", "127.0.0.1", "::1")
+PHRASE_KEYS = ("say", "fields", "hint")
 
 
 @dataclass(frozen=True)
@@ -19,13 +23,20 @@ class LlmSettings:
     """``llm.toml``: ``base_url`` is the provider's OpenAI-compatible root (the one with
     ``/chat/completions`` under it: Gemini, Groq, OpenRouter, Ollama, Anthropic's compatibility
     endpoint); ``model`` its model id; ``timeout_s`` the longest one request may take;
-    ``answer_limit`` the longest answer asked for, in tokens (a draft is a few hundred)."""
+    ``answer_limit`` the longest answer asked for, in tokens (a draft is a few hundred, but a
+    model that thinks first, Gemini 3.x, spends thinking tokens from the same budget: ~2,000);
+    ``retries`` how many times a busy provider (429, 5xx) or a dropped connection is retried
+    before "drafting unavailable" (0: never); ``request`` extra fields sent with every request
+    as given (``[request] reasoning_effort = "low"`` tells Gemini to think briefly), never the
+    ones the adapter sets."""
 
     enabled: bool = False
     base_url: str = "http://localhost:11434/v1"  # Ollama's default: nothing leaves the machine
     model: str = "llama3.1"
     timeout_s: float = 60.0
-    answer_limit: int = 2000
+    answer_limit: int = 8000
+    retries: int = 2
+    request: Mapping[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_document(cls, doc: Mapping[str, Any] | None) -> "LlmSettings":
@@ -40,7 +51,21 @@ class LlmSettings:
             model=t.text("model", d.model),
             timeout_s=t.number("timeout_s", d.timeout_s, 1),
             answer_limit=t.integer("answer_limit", d.answer_limit, 1),
+            retries=t.integer("retries", d.retries, 0),
+            request=_request(t),
         )
+
+
+def _request(t: Table) -> dict[str, Any]:
+    raw = t.raw("request")
+    if raw is None:
+        return {}
+    if not isinstance(raw, Mapping):
+        raise ConfigurationError(f"{t.where} request: expected a table ([request])")
+    reserved = sorted(set(raw) & set(RESERVED_REQUEST_KEYS))
+    if reserved:
+        raise ConfigurationError(f"{t.where} [request]: the adapter sets {reserved}; remove them")
+    return dict(raw)
 
 
 def _endpoint(url: str, where: str) -> str:
@@ -52,3 +77,42 @@ def _endpoint(url: str, where: str) -> str:
     if parts.scheme == "http" and parts.hostname not in LOOPBACK:
         raise ConfigurationError(f"{where}: a remote endpoint must use https, got {url!r}")
     return url.rstrip("/")
+
+
+@dataclass(frozen=True)
+class Phrase:
+    """One phrasebook entry: what the trader ``say``s (any of the words), the catalogue
+    ``fields`` that express it (exact names) and a ``hint`` on how to use them (the gate, a
+    confirmation or a score, typical thresholds, what not to combine)."""
+
+    say: tuple[str, ...]
+    fields: tuple[str, ...]
+    hint: str = ""
+
+
+@dataclass(frozen=True)
+class PhrasebookSettings:
+    """``phrasebook.toml``: the phrases in file order (none without the file)."""
+
+    phrases: tuple[Phrase, ...] = ()
+
+    @classmethod
+    def from_document(cls, doc: Mapping[str, Any] | None) -> "PhrasebookSettings":
+        where = "phrasebook.toml"
+        reject_secrets(doc or {}, where)
+        root = Table(doc, where)
+        root.only(("phrase",))
+        raw = root.raw("phrase") or []
+        if not isinstance(raw, list) or not all(isinstance(e, Mapping) for e in raw):
+            raise ConfigurationError(f"{where} phrase: expected a list of tables ([[phrase]])")
+        return cls(tuple(_phrase(Table(e, f"{where} [[phrase]][{i}]")) for i, e in enumerate(raw)))
+
+
+def _phrase(t: Table) -> Phrase:
+    t.only(PHRASE_KEYS)
+    say, fields = t.strings("say", ()), t.strings("fields", ())
+    if not say or not all(s.strip() for s in say):
+        raise ConfigurationError(f"{t.where} say: expected one or more non-empty strings")
+    if not fields or not all(f.strip() for f in fields):
+        raise ConfigurationError(f"{t.where} fields: expected one or more catalogue field names")
+    return Phrase(tuple(s.strip() for s in say), tuple(fields), t.text("hint", "").strip())

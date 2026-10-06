@@ -74,6 +74,11 @@ def urllib_transport(
 type JsonTransport = Callable[[str, bytes], bytes]
 
 
+def pause(seconds: float) -> None:
+    """Wait between a client's retries (``llm.chat``); tests inject a recorder instead."""
+    time.sleep(seconds)
+
+
 def json_post_transport(
     user_agent: str = DEFAULT_USER_AGENT,
     timeout: float = 60.0,

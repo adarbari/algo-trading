@@ -1,13 +1,16 @@
 """The prompt a screener draft is asked with (ADR 0041): the task, the rule-screen grammar
-(``docs/screeners/rules.md``), the caller's field catalogue in catalogue order (name, type, unit,
-description, the values of a category) and the sentence. Rendered from the catalogue with no
-timestamps or ids, so the same catalogue gives the same bytes (a provider's prompt cache hits
-and a recorded test stays valid). The prompt carries no market data, results or credentials."""
+(``docs/screeners/rules.md``), two worked examples, the caller's field catalogue in catalogue
+order (name, type, unit, description, the values of a category), the site phrasebook (trader
+vocabulary -> fields, ``config/site/phrasebook.toml``; a phrase keeps only the fields this
+catalogue has) and the sentence. Rendered with no timestamps or ids, so the same catalogue and
+phrasebook give the same bytes (a provider's prompt cache hits and a recorded test stays
+valid). The prompt carries no market data, results or credentials."""
 
 import json
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from algotrade.config.site.llm import Phrase
 from algotrade.services.read.instruments.catalogue import FeatureInfo
 
 TASK = """\
@@ -43,11 +46,163 @@ Rules:
   first); otherwise "tie_break" is null.
 - When current criteria are given, keep every one the sentence does not change and answer
   with the complete new list.
+- The phrasebook after the catalogue says which fields a trader's words mean and how to
+  use them (the gate, a confirmation, a score; typical thresholds). Follow it; prefer its
+  thresholds to your own; say in "notes" when you had to choose one.
 
 Answer shape:
 {"criteria": [ ... ], "tie_break": {"field": "...", "descending": true} or null,
  "notes": ["anything you could not map, or assumed"]}
 """
+
+# Two worked examples (sentence -> answer), rendered into the task so a smaller model sees the
+# shape and the judgement expected. Their fields exist in the site catalogue (a test checks).
+EXAMPLES: tuple[tuple[str, dict[str, Any]], ...] = (
+    (
+        "stocks with upward momentum that are close to their 52-week low",
+        {
+            "criteria": [
+                {
+                    "id": "active",
+                    "field": "instrument.status",
+                    "op": "eq",
+                    "value": "ACTIVE",
+                    "mode": "hard",
+                    "why": "stocks (listed)",
+                },
+                {
+                    "id": "stocks",
+                    "field": "instrument.security_type",
+                    "op": "in",
+                    "value": ["COMMON_STOCK", "ADR"],
+                    "mode": "hard",
+                    "why": "stocks",
+                },
+                {
+                    "id": "near_low",
+                    "field": "feature.pct_from_low_52w",
+                    "op": "lte",
+                    "value": 0.10,
+                    "mode": "soft",
+                    "tolerance": 0.05,
+                    "why": "close to their 52-week low",
+                },
+                {
+                    "id": "momentum",
+                    "field": "rollup.price_stats@v2.ret_20d",
+                    "op": "gt",
+                    "value": 0,
+                    "mode": "hard",
+                    "why": "upward momentum",
+                },
+                {
+                    "id": "above_sma20",
+                    "field": "feature.pct_vs_sma_20",
+                    "op": "gt",
+                    "value": 0,
+                    "mode": "soft",
+                    "tolerance": 0.02,
+                    "why": "upward momentum (confirmation)",
+                },
+                {
+                    "id": "rsi",
+                    "field": "rollup.momentum@v1.rsi_14",
+                    "op": "gte",
+                    "value": 50,
+                    "mode": "score",
+                    "tolerance": 20,
+                    "why": "upward momentum (strength)",
+                },
+            ],
+            "tie_break": {"field": "rollup.price_stats@v2.ret_20d", "descending": True},
+            "notes": [
+                "momentum read as a positive 20-day return, confirmed above the 20-day average; "
+                "RSI only scores",
+                "near the low read as within 10% of the 52-week low (5% near-miss band)",
+            ],
+        },
+    ),
+    (
+        "liquid optionable stocks over $10 with IV rank above 50% and no earnings in the next "
+        "10 sessions, rank by IV rank",
+        {
+            "criteria": [
+                {
+                    "id": "active",
+                    "field": "instrument.status",
+                    "op": "eq",
+                    "value": "ACTIVE",
+                    "mode": "hard",
+                    "why": "stocks (listed)",
+                },
+                {
+                    "id": "stocks",
+                    "field": "instrument.security_type",
+                    "op": "in",
+                    "value": ["COMMON_STOCK", "ADR"],
+                    "mode": "hard",
+                    "why": "stocks",
+                },
+                {
+                    "id": "optionable",
+                    "field": "instrument.optionable",
+                    "op": "eq",
+                    "value": True,
+                    "mode": "hard",
+                    "why": "optionable",
+                },
+                {
+                    "id": "price",
+                    "field": "rollup.price_stats@v2.close",
+                    "op": "gt",
+                    "value": 10,
+                    "mode": "hard",
+                    "why": "over $10",
+                },
+                {
+                    "id": "liquid",
+                    "field": "rollup.price_stats@v2.adv_usd_20d",
+                    "op": "gte",
+                    "value": 50000000,
+                    "mode": "soft",
+                    "tolerance": {"relative": 0.2},
+                    "on_miss": "LIQUIDITY_RISK",
+                    "why": "liquid",
+                },
+                {
+                    "id": "iv_rank",
+                    "field": "feature.iv_rank",
+                    "op": "gte",
+                    "value": 0.5,
+                    "mode": "soft",
+                    "tolerance": 0.1,
+                    "why": "IV rank above 50%",
+                },
+                {
+                    "id": "no_earnings",
+                    "field": "rollup.earnings@v1.days_to_earnings",
+                    "op": "gt",
+                    "value": 10,
+                    "mode": "soft",
+                    "tolerance": 2,
+                    "on_miss": "EVENT_RISK",
+                    "why": "no earnings in the next 10 sessions",
+                },
+            ],
+            "tie_break": {"field": "feature.iv_rank", "descending": True},
+            "notes": ["liquid read as $50M a day traded (no amount given)"],
+        },
+    ),
+)
+
+
+def examples_text() -> str:
+    """The worked examples as the task shows them."""
+    parts = []
+    for n, (sentence, answer) in enumerate(EXAMPLES, 1):
+        parts.append(f"Example {n}\nSentence: {sentence}\nAnswer: {json.dumps(answer)}")
+    return "\n\n".join(parts) + "\n"
+
 
 DESCRIPTION_CHARS = 160
 
@@ -63,10 +218,31 @@ def catalogue_line(info: FeatureInfo) -> str:
     return " | ".join(parts)
 
 
-def system_prompt(catalogue: Iterable[FeatureInfo]) -> str:
-    """The task and the catalogue (in the order given: the caller's catalogue order)."""
-    lines = "\n".join(catalogue_line(info) for info in catalogue)
-    return f"{TASK}\nCatalogue (name | type | unit | description | values):\n{lines}\n"
+def phrase_line(phrase: Phrase, catalogue: set[str]) -> str | None:
+    """One phrasebook entry with the fields this catalogue has (None: it has none of them)."""
+    fields = [f for f in phrase.fields if f in catalogue]
+    if not fields:
+        return None
+    hint = " ".join(phrase.hint.split())
+    return f"{' / '.join(phrase.say)} | {', '.join(fields)} | {hint or '-'}"
+
+
+def system_prompt(catalogue: Iterable[FeatureInfo], phrasebook: Iterable[Phrase] = ()) -> str:
+    """The task with its examples, the catalogue (in the order given: the caller's catalogue
+    order) and the phrasebook (file order; entries with none of this catalogue's fields left
+    out)."""
+    infos = list(catalogue)
+    names = {info.name for info in infos}
+    lines = "\n".join(catalogue_line(info) for info in infos)
+    phrases = [line for p in phrasebook if (line := phrase_line(p, names)) is not None]
+    out = (
+        f"{TASK}\n{examples_text()}\n"
+        f"Catalogue (name | type | unit | description | values):\n{lines}\n"
+    )
+    if phrases:
+        out += "\nPhrasebook (what the trader says | fields | how to use them):\n"
+        out += "\n".join(phrases) + "\n"
+    return out
 
 
 def user_prompt(screener_id: str, text: str, current: Mapping[str, Any] | None) -> str:

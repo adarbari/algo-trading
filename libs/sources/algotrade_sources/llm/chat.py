@@ -1,29 +1,39 @@
 """``ChatCompletions``: one request to an OpenAI-compatible ``/chat/completions`` endpoint
 (ADR 0041). System text and user text in, the assistant's text out, at temperature 0 and asking
-for a JSON object, so the same prompt gets the same draft (as far as the provider allows).
-Anything but a well-formed answer is a ``ModelUnavailableError`` (``core``) naming what went
-wrong, never the credential: the API answers 503 with it."""
+for a JSON object, so the same prompt gets the same draft (as far as the provider allows). A
+provider that is busy (429, 500, 502, 503, 504) or unreachable is retried ``retries`` times
+with a doubling pause (``Retry-After`` wins); anything else, or the last failure, is a
+``ModelUnavailableError`` (``core``) naming what went wrong, never the credential: the API
+answers 503 with it."""
 
 import json
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
 from typing import Any
 
 from algotrade.core.model.errors import ModelUnavailableError
 from algotrade_sources.framework.http import HttpError, JsonTransport
 
 COMPLETIONS = "/chat/completions"
+RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
 
 
 @dataclass(frozen=True)
 class ChatCompletions:
     """A client for one endpoint and model. ``transport`` POSTs a JSON body to a URL and
     returns the response body (``framework.http.json_post_transport`` with the credential
-    header, or a fake in tests)."""
+    header, or a fake in tests); ``pause`` waits between retries (``framework.http.pause``, or
+    a recorder in tests): the registry supplies both, so this module never paces itself."""
 
     base_url: str
     model: str
     transport: JsonTransport
+    pause: Callable[[float], None]
     max_tokens: int = 2000
+    retries: int = 2  # attempts after the first, on a busy provider or a transport failure
+    backoff_s: float = 3.0  # the wait before the first retry; doubled each time
+    throttle_s: float = 20.0  # the wait after a 429 without Retry-After (a per-minute quota)
+    extra: Mapping[str, Any] = field(default_factory=dict)  # provider fields sent as given
 
     @property
     def url(self) -> str:
@@ -32,6 +42,7 @@ class ChatCompletions:
     def request(self, system: str, user: str) -> dict[str, Any]:
         """The body sent (stable key order: a provider's prompt cache sees the same bytes)."""
         return {
+            **self.extra,
             "model": self.model,
             "messages": [
                 {"role": "system", "content": system},
@@ -44,15 +55,30 @@ class ChatCompletions:
 
     def complete(self, system: str, user: str) -> str:
         body = json.dumps(self.request(system, user), separators=(",", ":")).encode()
-        try:
-            raw = self.transport(self.url, body)
-        except HttpError as exc:
-            detail = exc.body.decode("utf-8", "replace").strip()[:200]
-            where = f"{self.model} at {self.base_url}"
-            raise ModelUnavailableError(f"{where}: HTTP {exc.status} {detail}") from exc
-        except (OSError, TimeoutError) as exc:
-            raise ModelUnavailableError(f"{self.model} at {self.base_url}: {exc}") from exc
-        return content_of(raw, f"{self.model} at {self.base_url}")
+        where = f"{self.model} at {self.base_url}"
+        attempts = self.retries + 1
+        for attempt in range(attempts):
+            last = attempt + 1 == attempts
+            tried = f" (after {attempts} attempts)" if attempts > 1 else ""
+            try:
+                raw = self.transport(self.url, body)
+            except HttpError as exc:
+                detail = exc.body.decode("utf-8", "replace").strip()[:200]
+                if exc.status not in RETRY_STATUSES or last:
+                    tried = tried if exc.status in RETRY_STATUSES else ""
+                    raise ModelUnavailableError(
+                        f"{where}: HTTP {exc.status}{tried} {detail}"
+                    ) from exc
+                floor = self.throttle_s if exc.status == 429 else 0.0
+                delay = exc.retry_after or max(floor, self.backoff_s * 2**attempt)
+            except (OSError, TimeoutError) as exc:
+                if last:
+                    raise ModelUnavailableError(f"{where}{tried}: {exc}") from exc
+                delay = self.backoff_s * 2**attempt
+            else:
+                return content_of(raw, where)
+            self.pause(delay)
+        raise AssertionError("unreachable")  # pragma: no cover
 
 
 def content_of(raw: bytes, where: str) -> str:
@@ -65,11 +91,18 @@ def content_of(raw: bytes, where: str) -> str:
         message = parsed["error"].get("message") or parsed["error"]
         raise ModelUnavailableError(f"{where}: {message}")
     try:
-        content = parsed["choices"][0]["message"]["content"]
+        choice = parsed["choices"][0]
+        content = choice["message"]["content"]
     except (KeyError, IndexError, TypeError) as exc:
         raise ModelUnavailableError(
             f"{where}: no choices[0].message.content in the answer"
         ) from exc
+    if isinstance(choice, dict) and choice.get("finish_reason") == "length":
+        # A model that thinks before answering (Gemini 3.x) spends the budget on thinking first.
+        raise ModelUnavailableError(
+            f"{where}: the answer was cut off at answer_limit tokens (thinking counts against "
+            "it on some models); raise answer_limit in config/site/llm.toml"
+        )
     if not isinstance(content, str) or not content.strip():
         raise ModelUnavailableError(f"{where}: the answer is empty")
     return content

@@ -22,4 +22,6 @@ def open_drafting(configs: SiteDocuments) -> TextModel | None:
         settings.timeout_s,
         settings.answer_limit,
         credential(LLM_API_KEY),
+        settings.retries,
+        settings.request,
     )
