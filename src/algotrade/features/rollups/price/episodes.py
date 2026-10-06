@@ -48,7 +48,7 @@ import pandas as pd
 from algotrade.core.time.calendar import sessions_between, sessions_ending
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
-from algotrade.features.rollups.price.price_stats import BARS, CLOSE, panel
+from algotrade.features.rollups.price.price_stats import BARS, CLOSE, panel, traded_rows
 from algotrade.quant.turning_points import drawdowns
 
 type Matrix = npt.NDArray[np.float64]
@@ -231,20 +231,13 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     bars = inputs[BARS]
     assert bars is not None  # required input
     px = panel(bars, sessions_ending(session, BETA_SESSIONS + 1))
-    traded = ~np.isnan(px.close[-1])
-    ids = px.ids[traded]
     beta, corr = beta_corr(px.close, _spy_column(inputs[SYMBOLS], px.ids))
-    values: dict[str, Matrix] = {
-        f"beta_{BETA_SESSIONS}d": beta[traded],
-        f"corr_{BETA_SESSIONS}d": corr[traded],
-    }
+    values: dict[str, Matrix] = {f"beta_{BETA_SESSIONS}d": beta, f"corr_{BETA_SESSIONS}d": corr}
     for index, e in enumerate(EPISODES):
         values[f"dd_{e.key}"], values[f"recovery_sessions_{e.key}"] = episode_columns(
-            inputs[CLOSES], index, e, session, ids
+            inputs[CLOSES], index, e, session, px.ids
         )
-    frame = pd.DataFrame({"instrument_id": ids})
-    for column in COLUMNS:
-        frame[column] = values[column]
+    frame = traded_rows(px, values, COLUMNS)
     for e in EPISODES:  # whole sessions, null where unknown
         name = f"recovery_sessions_{e.key}"
         frame[name] = frame[name].astype("Int64")

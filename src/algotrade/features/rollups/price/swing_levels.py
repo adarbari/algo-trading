@@ -30,7 +30,7 @@ import pandas as pd
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
-from algotrade.features.rollups.price.price_stats import panel
+from algotrade.features.rollups.price.price_stats import panel, traded_rows
 
 type Matrix = npt.NDArray[np.float64]
 
@@ -97,9 +97,9 @@ def pivots(prices: Matrix, high: bool, width: int = PIVOT_WIDTH) -> npt.NDArray[
 
 def latest_level(
     prices: Matrix, close: Matrix, high: bool, days: list[date]
-) -> tuple[Matrix, list[date | None]]:
+) -> tuple[Matrix, npt.NDArray[np.object_]]:
     """Per column, the most recent confirmed pivot strictly beyond the last close (above it
-    for highs, below it for lows): its price (NaN: none) and session."""
+    for highs, below it for lows): its price (NaN: none) and session (``None``: none)."""
     centre = prices[PIVOT_WIDTH : len(prices) - PIVOT_WIDTH]
     beyond = centre > close if high else centre < close
     hits = pivots(prices, high) & beyond
@@ -107,7 +107,7 @@ def latest_level(
     has = hits.any(axis=0)
     level = np.where(has, centre[last, np.arange(centre.shape[1])], np.nan)
     when = [days[i + PIVOT_WIDTH] if ok else None for i, ok in zip(last, has, strict=True)]
-    return level, when
+    return level, np.array(when, dtype=object)
 
 
 def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
@@ -115,19 +115,16 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     assert bars is not None  # required input
     days = sessions_ending(session, WINDOW)
     px = panel(bars, days)
-    traded = ~np.isnan(px.close[-1])
     close = px.close[-1]
     swing_high, high_on = latest_level(px.high, close, True, days)
     swing_low, low_on = latest_level(px.low, close, False, days)
-    return pd.DataFrame(
-        {
-            "instrument_id": px.ids[traded],
-            "swing_high": swing_high[traded],
-            "swing_high_date": [d for d, t in zip(high_on, traded, strict=True) if t],
-            "swing_low": swing_low[traded],
-            "swing_low_date": [d for d, t in zip(low_on, traded, strict=True) if t],
-        }
-    )
+    values = {
+        "swing_high": swing_high,
+        "swing_high_date": high_on,
+        "swing_low": swing_low,
+        "swing_low_date": low_on,
+    }
+    return traded_rows(px, values, COLUMNS)
 
 
 GROUP = FeatureGroup(
