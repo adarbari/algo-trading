@@ -1,0 +1,496 @@
+# L3 site setting: the names in the event-sensitivity scope (ADR 0050; docs/event-sensitivity-plan.md
+# section 6), typed in src/algotrade/config/site/events/scope.py.
+#
+# The event study (reactions, peers, attribution, the deep dive) runs for the optionable names
+# whose short-put side is tier A or B plus every name here, and for the reference instruments
+# the funds here map to (a leveraged fund inherits its reference's events, ADR 0050). Symbols,
+# never ids: SymbolResolver turns them into instrument ids on each run (ADR 0018). An unknown
+# symbol is reported, never silently dropped. Until the Admin screen writes this file (EV8), it
+# is edited by hand through a PR.
+#
+# symbol     the listed ticker as the vendors spell it (BRK.B, not BRK-B)
+# added_on   the date it joined the list (the study's history starts in 2018 regardless)
+# note       why it is here, optional
+
+# --- the owner's lists, 2026-10-06: single-stock leveraged funds (reference in the note)
+
+[[name]]
+symbol = "AAPU"
+added_on = 2026-10-06
+note = "2x AAPL"
+
+[[name]]
+symbol = "AMZU"
+added_on = 2026-10-06
+note = "2x AMZN"
+
+[[name]]
+symbol = "ASMU"
+added_on = 2026-10-06
+note = "2x ASML"
+
+[[name]]
+symbol = "AVL"
+added_on = 2026-10-06
+note = "2x AVGO (Direxion)"
+
+[[name]]
+symbol = "AVGG"
+added_on = 2026-10-06
+note = "2x AVGO (Leverage Shares)"
+
+[[name]]
+symbol = "AVGU"
+added_on = 2026-10-06
+note = "2x AVGO (GraniteShares)"
+
+[[name]]
+symbol = "AVGX"
+added_on = 2026-10-06
+note = "2x AVGO (Defiance)"
+
+[[name]]
+symbol = "BRKD"
+added_on = 2026-10-06
+note = "-2x BRK.B"
+
+[[name]]
+symbol = "BRKU"
+added_on = 2026-10-06
+note = "2x BRK.B"
+
+[[name]]
+symbol = "GGLL"
+added_on = 2026-10-06
+note = "2x GOOGL"
+
+[[name]]
+symbol = "MCDL"
+added_on = 2026-10-06
+note = "2x MCD (unverified)"
+
+[[name]]
+symbol = "METU"
+added_on = 2026-10-06
+note = "2x META"
+
+[[name]]
+symbol = "MSFU"
+added_on = 2026-10-06
+note = "2x MSFT"
+
+[[name]]
+symbol = "NVDL"
+added_on = 2026-10-06
+note = "2x NVDA"
+
+[[name]]
+symbol = "TSLL"
+added_on = 2026-10-06
+note = "2x TSLA"
+
+[[name]]
+symbol = "TSLQ"
+added_on = 2026-10-06
+note = "-2x TSLA"
+
+[[name]]
+symbol = "UBRL"
+added_on = 2026-10-06
+note = "2x UBER"
+
+[[name]]
+symbol = "UNHG"
+added_on = 2026-10-06
+note = "2x UNH"
+
+# --- index, sector and thematic funds
+
+[[name]]
+symbol = "SOXL"
+added_on = 2026-10-06
+note = "3x semiconductors"
+
+[[name]]
+symbol = "SOXS"
+added_on = 2026-10-06
+note = "-3x semiconductors"
+
+[[name]]
+symbol = "TQQQ"
+added_on = 2026-10-06
+note = "3x Nasdaq-100"
+
+[[name]]
+symbol = "SQQQ"
+added_on = 2026-10-06
+note = "-3x Nasdaq-100"
+
+[[name]]
+symbol = "QLD"
+added_on = 2026-10-06
+note = "2x Nasdaq-100"
+
+[[name]]
+symbol = "SSO"
+added_on = 2026-10-06
+note = "2x S&P 500"
+
+[[name]]
+symbol = "UPRO"
+added_on = 2026-10-06
+note = "3x S&P 500"
+
+[[name]]
+symbol = "DFEN"
+added_on = 2026-10-06
+note = "3x aerospace and defence"
+
+[[name]]
+symbol = "NAIL"
+added_on = 2026-10-06
+note = "3x homebuilders"
+
+[[name]]
+symbol = "UTSL"
+added_on = 2026-10-06
+note = "3x utilities"
+
+[[name]]
+symbol = "NUGT"
+added_on = 2026-10-06
+note = "2x gold miners (GDX)"
+
+[[name]]
+symbol = "TNA"
+added_on = 2026-10-06
+note = "3x Russell 2000"
+
+[[name]]
+symbol = "IFRA"
+added_on = 2026-10-06
+note = "US infrastructure"
+
+[[name]]
+symbol = "CLIX"
+added_on = 2026-10-06
+note = "long online retail, short stores"
+
+[[name]]
+symbol = "EWZ"
+added_on = 2026-10-06
+note = "Brazil"
+
+# --- option-overlay, rates, long/short, risk-parity, futures and bullion funds (macro only)
+
+[[name]]
+symbol = "QBUL"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "QBER"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "RFIX"
+added_on = 2026-10-06
+note = "rates"
+
+[[name]]
+symbol = "SHRT"
+added_on = 2026-10-06
+note = "long/short"
+
+[[name]]
+symbol = "SLTY"
+added_on = 2026-10-06
+note = "short option income"
+
+[[name]]
+symbol = "UPAR"
+added_on = 2026-10-06
+note = "risk parity"
+
+[[name]]
+symbol = "BITO"
+added_on = 2026-10-06
+note = "bitcoin futures"
+
+[[name]]
+symbol = "BITX"
+added_on = 2026-10-06
+note = "2x bitcoin futures"
+
+[[name]]
+symbol = "ETHU"
+added_on = 2026-10-06
+note = "2x ether futures"
+
+[[name]]
+symbol = "UCO"
+added_on = 2026-10-06
+note = "2x crude oil"
+
+[[name]]
+symbol = "SLV"
+added_on = 2026-10-06
+note = "silver"
+
+# --- stocks
+
+[[name]]
+symbol = "AAPL"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "ACN"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "ACVA"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "AMD"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "AMAT"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "AMZN"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "APLD"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "APP"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "ARW"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "ASML"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "AVGO"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "AXTI"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "BRK.B"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "CART"
+added_on = 2026-10-06
+note = "Instacart (Maplebear)"
+
+[[name]]
+symbol = "CGC"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "CHWY"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "CIFR"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "COIN"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "CON"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "CPNG"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "CRWV"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "CVNA"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "DDOG"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "FLNC"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "FPS"
+added_on = 2026-10-06
+note = "Forgent Power Solutions (a stock; FPSX is its 2x fund)"
+
+[[name]]
+symbol = "GLOO"
+added_on = 2026-10-06
+note = "2025 listing: short history"
+
+[[name]]
+symbol = "GM"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "HOOD"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "INTC"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "IREN"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "IRDM"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "KLAC"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "LQDA"
+added_on = 2026-10-06
+note = "biotech: FDA dates from the dossier"
+
+[[name]]
+symbol = "LRCX"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "LUXE"
+added_on = 2026-10-06
+note = "2025 listing: short history"
+
+[[name]]
+symbol = "MARA"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "MAT"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "MEDS"
+added_on = 2026-10-06
+note = "small cap"
+
+[[name]]
+symbol = "META"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "MRNA"
+added_on = 2026-10-06
+note = "biotech: FDA and HHS dates from the dossier"
+
+[[name]]
+symbol = "MSFT"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "MSTR"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "MU"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "NFLX"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "NOW"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "NU"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "PLTR"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "ROOT"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "SMCI"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "SMMT"
+added_on = 2026-10-06
+note = "biotech: FDA dates from the dossier"
+
+[[name]]
+symbol = "SMTC"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "SNAP"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "SNDK"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "SNOW"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "STX"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "TEM"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "TSLA"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "TSM"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "VKTX"
+added_on = 2026-10-06
+note = "biotech: FDA dates from the dossier"
+
+[[name]]
+symbol = "VST"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "WING"
+added_on = 2026-10-06
+
+[[name]]
+symbol = "WULF"
+added_on = 2026-10-06
