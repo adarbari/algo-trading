@@ -8,6 +8,12 @@ reads its value from (``market.regime_indicators@v1.<key>``, written by the RG3 
 display ``range`` of its meter (in the value's stored unit) and ``how`` it is calculated, one
 plain sentence whose ``terms`` link to an explainer (returned pre-split, ``terms.py``).
 
+A card whose value comes from one of two sources by session (the S&P 500 trend: SPY's bars, or
+the SPX level before they reach back far enough) says which in ``source_by``: the catalogue
+field that names the session's source, and per value of it the lineage inputs it means. The
+read marks those sources active or not for the session; the card's other inputs are always
+active.
+
 ``[[source]]`` names the stored inputs that are not macro series (``bars/1d``,
 ``rates/treasury``, ``universe``): what a card's lineage reaches there is shown as that
 source (``services/read/regime/sources.py``; a series is described by ``macro.toml``).
@@ -46,11 +52,13 @@ KEYS = (
     "range",
     "how",
     "terms",
+    "source_by",
 )
 LINK_KEYS = ("title", "url")
 TERM_KEYS = ("text", "url")
 RANGE_KEYS = ("min", "max")
 SOURCE_KEYS = ("input", "label", "cadence", "url")
+SWITCH_KEYS = ("feature", "inputs")
 
 
 class Documents(Protocol):
@@ -88,6 +96,15 @@ class InputSource:
 
 
 @dataclass(frozen=True)
+class SourceSwitch:
+    """``source_by``: ``feature`` (a catalogue field) names the session's source; ``inputs``:
+    per value of it, the lineage inputs (``bars/1d``, ``series:SPX``) that value means."""
+
+    feature: str
+    inputs: Mapping[str, tuple[str, ...]]
+
+
+@dataclass(frozen=True)
 class RegimeCard:
     """One indicator's card. ``before``: episode label (``"2008"``) -> one line, in file order;
     ``pace``: ``slow`` (macro) or ``fast`` (market); ``feature``: the catalogue field of its
@@ -108,6 +125,7 @@ class RegimeCard:
     range: CardRange
     how: tuple[TextPart, ...]
     before: Mapping[str, str] = field(default_factory=dict)
+    source_by: SourceSwitch | None = None
 
 
 @dataclass(frozen=True)
@@ -185,6 +203,31 @@ def _how(t: Table) -> tuple[TextPart, ...]:
     return split(_line(t, "how"), tuple(terms), t.where)
 
 
+def _switch(t: Table) -> SourceSwitch | None:
+    raw = t.raw("source_by")
+    if raw is None:
+        return None
+    if not isinstance(raw, Mapping):
+        raise ConfigurationError(f"{t.where} source_by: expected a table {{feature, inputs}}")
+    sub = Table(raw, f"{t.where} source_by")
+    sub.only(SWITCH_KEYS)
+    inputs = sub.raw("inputs")
+    ok = (
+        isinstance(inputs, Mapping)
+        and inputs
+        and all(
+            isinstance(v, list) and v and all(isinstance(i, str) and i for i in v)
+            for v in inputs.values()
+        )
+    )
+    if not ok:
+        raise ConfigurationError(f"{sub.where} inputs: expected value = [input, ...] per source")
+    seen = [i for v in inputs.values() for i in v]
+    if len(seen) != len(set(seen)):
+        raise ConfigurationError(f"{sub.where} inputs: an input is listed under two values")
+    return SourceSwitch(_line(sub, "feature"), {str(k): tuple(v) for k, v in inputs.items()})
+
+
 def _source(t: Table) -> InputSource:
     t.only(SOURCE_KEYS)
     cadence = _line(t, "cadence")
@@ -239,4 +282,5 @@ def _card(t: Table) -> RegimeCard:
         range=_range(t),
         how=_how(t),
         before=_before(t),
+        source_by=_switch(t),
     )

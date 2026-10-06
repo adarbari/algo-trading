@@ -356,7 +356,7 @@ type IndicatorRange {
 }
 
 """
-One source of an indicator's value, from the catalogue's lineage: a macro series (`series`: its key; `releaseLagDays`, `terms` and the provenance only for one) or a stored table. `lastObservation`: the latest observation the session knew, public on `vintageDate` (`vintageKind`: alfred or lagged); `firstVintage`: the series' earliest ALFRED vintage the session knew, before which the history is today's revised figures (null: an unrevised series, or nothing stored)
+One source of an indicator's value, from the catalogue's lineage: a macro series (`series`: its key; `releaseLagDays`, `terms` and the provenance only for one) or a stored table. `lastObservation`: the latest observation the session knew, public on `vintageDate` (`vintageKind`: alfred or lagged); `firstVintage`: the series' earliest ALFRED vintage the session knew, before which the history is today's revised figures (null: an unrevised series, or nothing stored). `active`: it fed the value for the session (false: the source a per-session switch did not choose, e.g. SPY's bars when the S&P 500 trend came from the index level)
 """
 type IndicatorSource {
   label: String!
@@ -370,6 +370,7 @@ type IndicatorSource {
   vintageDate: Date
   vintageKind: String
   firstVintage: Date
+  active: Boolean!
 }
 
 """An indicator's own verdict: ON, OFF or UNKNOWN"""
@@ -842,7 +843,7 @@ type RegimeBand {
 }
 
 """
-One indicator card with its value for the session: the plain-language text first, the technical name and `value` behind it. `value` is null exactly when `unknown` says why (format it with `format`); `status` is the indicator's own verdict and `changed` whether it differs from 5 sessions earlier (null: not stored; the verdict's field is `verdictFeature`). `pace`: slow (macro) or fast (market). `range` is the meter's display range and `threshold` the site's primary threshold (both in the value's stored unit; null: no rule in code), `direction` the side that is the risk; `how` the calculation as linked parts; `sources` where the value comes from
+One indicator card with its value for the session: the plain-language text first, the technical name and `value` behind it. `value` is null exactly when `unknown` says why (format it with `format`); `status` is the indicator's own verdict and `changed` whether it differs from 5 sessions earlier (null: not stored; the verdict's field is `verdictFeature`). `pace`: slow (macro) or fast (market). `range` is the meter's display range and `threshold` the site's primary threshold (both in the value's stored unit; null: no rule in code), `direction` the side that is the risk; `how` the calculation as linked parts; `sources` where the value comes from. `range` and `threshold` format with `format`; when `format` is null (NOT_IN_CATALOGUE) the web falls back to NUMBER
 """
 type RegimeIndicator {
   key: String!

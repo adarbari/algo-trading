@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
 
+from algotrade.config.site.settings import load_rollup
 from algotrade.config.strategy.regime import site_regime
 from algotrade.features.rollups.market import regime as scores
 from algotrade.services.read.context import ReadContext
@@ -31,7 +32,6 @@ from algotrade.services.read.regime.fields import (
     MARKET_STRESS,
     Reading,
     read_fields,
-    site_params,
 )
 from algotrade.services.read.regime.indicators import (
     IndicatorStatus,
@@ -158,7 +158,7 @@ def _score(
 
 def _scores(ctx: ReadContext, read: Mapping[str, Reading]) -> RegimeScores:
     """The three scores with their fields and the site's thresholds for a high score."""
-    p = site_params(ctx, scores.GROUP)
+    p = load_rollup(ctx.configs, scores.GROUP.key, scores.GROUP.params)
     return RegimeScores(
         _score(read[MACRO_RISK], MACRO_RISK, MACRO_COVERAGE, p.macro_high),
         _score(read[MARKET_STRESS], MARKET_STRESS, MARKET_COVERAGE, p.market_high),

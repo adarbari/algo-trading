@@ -58,7 +58,9 @@ class TextPart:
     "a stored table. `lastObservation`: the latest observation the session knew, public on "
     "`vintageDate` (`vintageKind`: alfred or lagged); `firstVintage`: the series' earliest "
     "ALFRED vintage the session knew, before which the history is today's revised figures "
-    "(null: an unrevised series, or nothing stored)"
+    "(null: an unrevised series, or nothing stored). `active`: it fed the value for the "
+    "session (false: the source a per-session switch did not choose, e.g. SPY's bars when "
+    "the S&P 500 trend came from the index level)"
 )
 class IndicatorSource:
     label: str
@@ -72,6 +74,7 @@ class IndicatorSource:
     vintage_date: dt.date | None
     vintage_kind: str | None
     first_vintage: dt.date | None
+    active: bool
 
     @classmethod
     def of(cls, d: sources.IndicatorSource) -> Self:
@@ -87,6 +90,7 @@ class IndicatorSource:
             vintage_date=d.vintage_date,
             vintage_kind=d.vintage_kind,
             first_vintage=d.first_vintage,
+            active=d.active,
         )
 
 
@@ -108,7 +112,8 @@ class IndicatorBefore:
     "`verdictFeature`). `pace`: slow (macro) or fast (market). `range` is the meter's display "
     "range and `threshold` the site's primary threshold (both in the value's stored unit; "
     "null: no rule in code), `direction` the side that is the risk; `how` the calculation as "
-    "linked parts; `sources` where the value comes from"
+    "linked parts; `sources` where the value comes from. `range` and `threshold` format with "
+    "`format`; when `format` is null (NOT_IN_CATALOGUE) the web falls back to NUMBER"
 )
 class RegimeIndicator:
     key: str

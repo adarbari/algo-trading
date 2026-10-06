@@ -16,6 +16,9 @@
 #   (features/rollups/market/indicators.py Card, the values from rollups.toml), never from here.
 # - how: one plain sentence on how the value is calculated; terms: {text, url} links, each text
 #   exactly once in how (a whole phrase; not counting inside a longer term), https only.
+# - source_by: for a value whose source is chosen per session, {feature, inputs}: the catalogue
+#   field naming the session's source and, per value of it, the lineage inputs it means (the
+#   page marks the session's source active; the other stays listed).
 # Values and thresholds are computed by the RG3 groups; the read model (RG1e) joins them.
 #
 # [[source]]: a stored input that is not a macro series, as a card's lineage reaches it (the
@@ -199,6 +202,7 @@ how = "The S&P 500's latest close divided by its 200-day average, minus 1: below
 terms = [
   { text = "200-day average", url = "https://www.investopedia.com/terms/m/movingaverage.asp" },
 ]
+source_by = { feature = "market.market_trend@v2.spx_source", inputs = { bars = ["bars/1d", "instruments/symbol_ids"], index = ["series:SPX"] } }
 links = [
   { title = "Quantified Strategies: Faber's trend rule on the S&P 500", url = "https://quantifiedstrategies.substack.com/p/trend-following-strategy-in-s-and-005" },
   { title = "StockCharts: trend signals after whipsaws", url = "https://articles.stockcharts.com/article/articles-arthurhill-2023-02-should-we-continue-taking-tren-946/" },

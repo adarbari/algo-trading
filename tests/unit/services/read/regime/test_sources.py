@@ -4,7 +4,7 @@ one source), and each series carries its provenance as the session knew it, read
 publish."""
 
 from dataclasses import replace
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
@@ -18,7 +18,13 @@ from algotrade.features.framework.feature import Feature
 from algotrade.services.features import catalogue
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.regime import sources
-from algotrade.services.read.regime.sources import leaves, load_sources, series_of, table_source
+from algotrade.services.read.regime.sources import (
+    activate,
+    leaves,
+    load_sources,
+    series_of,
+    table_source,
+)
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.tables.writers import StoreWriter
 from tests.conftest import REPO_ROOT
@@ -50,7 +56,22 @@ def test_every_shipped_cards_lineage_resolves_to_exactly_one_source_each() -> No
     assert not unused, f"[[source]] no card reaches: {sorted(unused)}"
 
 
+def test_every_per_session_switch_names_a_catalogue_label_over_the_cards_own_inputs() -> None:
+    switched = [c for c in CARDS.cards if c.source_by is not None]
+    assert [c.key for c in switched] == ["spx_trend_200d"]
+    for card in switched:
+        assert card.source_by is not None
+        selector = SITE.feature(card.source_by.feature)
+        assert selector is not None, card.source_by.feature
+        assert set(card.source_by.inputs) == set(selector.categories)
+        governed = {i for inputs in card.source_by.inputs.values() for i in inputs}
+        assert governed <= set(leaves(SITE, (card.feature, card.feature + "_on")))
+
+
 def test_the_lineage_follows_inputs_through_features() -> None:
+    # market_trend@v2: SPY's bars when their window is complete, else the SPX level
+    spx = ("bars/1d", "instruments/symbol_ids", "series:SPX")
+    assert leaves(SITE, names("spx_trend_200d")) == spx
     assert leaves(SITE, names("curve_10y3m")) == ("rates/treasury", "series:T10Y3M")
     assert leaves(SITE, names("sahm")) == ("series:UNRATE",)
     assert leaves(SITE, names("vix_term")) == ("series:VIX", "series:VIX3M")
@@ -161,3 +182,28 @@ def test_the_vintages_are_read_once_per_publish(monkeypatch: pytest.MonkeyPatch)
     first, again = _cards(ctx), _cards(ctx)
     assert first == again and len(calls) == 1
     assert "MACRO:UNRATE" in calls[0] and "IDX:VIX" in calls[0]
+
+
+def test_a_publish_drops_the_cached_vintages() -> None:
+    writers: list[StoreWriter] = []
+    ctx = replace(context(store_with(_macro, writers.append)), features=SITE)
+    [before] = _cards(ctx)["unrate_trend"]
+    seq = ctx.reader.visible_seq()
+    row = _row("MACRO:UNRATE", date(2026, 9, 1), date(2026, 9, 30), "alfred")
+    frame = stamped([row], D1, "macro-2")
+    writers[0].write_table("macro/series", D1, "macro-2", frame, pending=True)
+    writers[0]._backend.tables.commit_run("macro-2", datetime(2026, 10, 2, tzinfo=UTC))
+    assert ctx.reader.visible_seq() != seq  # the commit published
+    [after] = _cards(ctx)["unrate_trend"]
+    assert (before.last_observation, after.last_observation) == (date(2026, 8, 1), date(2026, 9, 1))
+
+
+def test_only_the_sessions_source_of_a_switched_card_is_active() -> None:
+    found = _cards(replace(context(store_with()), features=SITE))["spx_trend_200d"]
+    switch = next(c.source_by for c in CARDS.cards if c.key == "spx_trend_200d")
+    by_index = {s.input: s.active for s in activate(found, switch, "index")}
+    assert by_index == {"bars/1d": False, "instruments/symbol_ids": False, "series:SPX": True}
+    by_bars = {s.input: s.active for s in activate(found, switch, "bars")}
+    assert by_bars == {"bars/1d": True, "instruments/symbol_ids": True, "series:SPX": False}
+    assert not any(s.active for s in activate(found, switch, None))  # not stored: none fed it
+    assert activate(found, None, None) == found and all(s.active for s in found)

@@ -105,6 +105,26 @@ def test_bad_cards_fail_naming_the_card(cards: list[dict[str, Any]], message: st
         load(*cards)
 
 
+def test_a_per_session_source_switch_is_typed_and_checked() -> None:
+    switch = {
+        "feature": "market.t@v2.spx_source",
+        "inputs": {"bars": ["bars/1d"], "index": ["series:SPX"]},
+    }
+    [card] = load(changed(source_by=switch)).cards
+    assert card.source_by is not None and card.source_by.feature == "market.t@v2.spx_source"
+    assert dict(card.source_by.inputs) == {"bars": ("bars/1d",), "index": ("series:SPX",)}
+    assert load(CARD).cards[0].source_by is None
+    for bad, message in [
+        ("x", r"source_by: expected a table"),
+        ({"feature": "f", "inputs": {"bars": []}}, r"source_by inputs: expected value = "),
+        ({"feature": "f", "inputs": {"a": ["x"], "b": ["x"]}}, r"listed under two values"),
+        ({"inputs": {"a": ["x"]}}, r"source_by feature: required"),
+        ({"feature": "f", "inputs": {"a": ["x"]}, "kind": 1}, r"unknown keys \['kind'\]"),
+    ]:
+        with pytest.raises(ConfigurationError, match=message):
+            load(changed(source_by=bad))
+
+
 def test_the_sources_are_typed_and_checked() -> None:
     ours = {k: v for k, v in SOURCE.items() if k != "url"} | {"input": "universe"}
     sources = RegimeCards.from_document({"card": [CARD], "source": [SOURCE, ours]}).sources

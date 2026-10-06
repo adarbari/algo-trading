@@ -21,7 +21,7 @@ REGIME = """query R($date: Date) {
       value unknown { code } format status changed range { min max } threshold direction
       how { text url } verdictFeature
       sources { label series cadence releaseLagDays url licence terms lastObservation
-                vintageDate vintageKind firstVintage } }
+                vintageDate vintageKind firstVintage active } }
   }
 }"""
 BANDS = """query B($start: Date!, $end: Date!, $date: Date) {
@@ -85,6 +85,9 @@ def test_each_card_explains_its_value_from_code_config_and_lineage(graph: Graph)
     assert (fred["label"], fred["series"], fred["cadence"]) == ("FRED T10Y3M", "T10Y3M", "daily")
     assert fred["url"] == "https://fred.stlouisfed.org/series/T10Y3M" and fred["terms"]
     assert fred["lastObservation"] is None and fred["firstVintage"] is None  # none stored here
+    assert treasury["active"] and fred["active"]  # no per-session switch on this card
+    spx = next(c for c in regime["indicators"] if c["key"] == "spx_trend_200d")
+    assert [s["active"] for s in spx["sources"]] == [False, False, False]  # no source stored
     macro = regime["scores"]["macroRisk"]
     assert (macro["feature"], macro["coverageFeature"], macro["threshold"]) == (
         "market.regime@v2.macro_risk", "market.regime@v2.macro_coverage", 50.0,

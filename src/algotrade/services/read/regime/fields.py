@@ -11,11 +11,8 @@ from 5 sessions earlier), named by the suffixes below from the card's ``feature`
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
 
-from algotrade.config.site.settings import rollup_params, site_document
 from algotrade.core.views.feature_view import FeatureValue as Scalar
-from algotrade.features.framework.declaration import FeatureGroup
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import FeatureFormat
 from algotrade.services.read.market.features import load_market_feature_values
@@ -57,11 +54,3 @@ def read_fields(ctx: ReadContext, names: Sequence[str]) -> dict[str, Reading]:
             detail = f"{name} is not in the market catalogue: the regime has not been computed yet"
             out[name] = Reading(None, Unknown(UnknownCode.NOT_IN_CATALOGUE, detail))
     return out
-
-
-def site_params(ctx: ReadContext, group: FeatureGroup) -> Any:
-    """``group``'s params as the site sets them: its ``rollups.toml`` section over its
-    defaults (the thresholds the nightly computed with), the other sections not read."""
-    doc = site_document(ctx.configs.load, "rollups") or {}
-    section = {group.key: doc[group.key]} if group.key in doc else {}
-    return rollup_params(section, {group.key: group.params})[group.key]

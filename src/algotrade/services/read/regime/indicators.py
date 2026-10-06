@@ -15,13 +15,13 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from algotrade.config.site.regime.cards import RegimeCard, load_cards
-from algotrade.config.site.settings import load_macro
+from algotrade.config.site.settings import load_macro, load_rollup
 from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.features.rollups.market import indicators as rules
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import FeatureFormat
-from algotrade.services.read.regime.fields import CHANGED, ON, Reading, read_fields, site_params
-from algotrade.services.read.regime.sources import IndicatorSource, load_sources
+from algotrade.services.read.regime.fields import CHANGED, ON, Reading, read_fields
+from algotrade.services.read.regime.sources import IndicatorSource, activate, load_sources
 from algotrade.services.read.values import Unknown
 
 
@@ -123,7 +123,7 @@ def _status(verdict: Reading) -> IndicatorStatus:
 def _rules(ctx: ReadContext) -> dict[str, Rule]:
     """Per card key of the code, its threshold under the site's ``rollups.toml`` and its
     direction."""
-    params = site_params(ctx, rules.GROUP)
+    params = load_rollup(ctx.configs, rules.GROUP.key, rules.GROUP.params)
     lower, higher = RiskDirection.LOWER_IS_RISK, RiskDirection.HIGHER_IS_RISK
     return {
         c.key: Rule(c.threshold_of(params), lower if c.lower_is_risk else higher)
@@ -175,8 +175,20 @@ def load_indicators(ctx: ReadContext) -> tuple[RegimeIndicator, ...]:
     doc = load_cards(ctx.configs)
     cards = doc.cards
     names = [n for c in cards for n in (c.feature, c.feature + ON, c.feature + CHANGED)]
-    read = read_fields(ctx, names)
+    switches = [c.source_by.feature for c in cards if c.source_by is not None]
+    read = read_fields(ctx, [*names, *switches])
     lineage = {c.key: (c.feature, c.feature + ON) for c in cards}
     sources = load_sources(ctx, lineage, load_macro(ctx.configs), doc.sources)
     found = _rules(ctx)
-    return tuple(_indicator(card, read, found.get(card.key), sources[card.key]) for card in cards)
+    return tuple(
+        _indicator(card, read, found.get(card.key), _active(card, read, sources[card.key]))
+        for card in cards
+    )
+
+
+def _active(
+    card: RegimeCard, read: dict[str, Reading], found: tuple[IndicatorSource, ...]
+) -> tuple[IndicatorSource, ...]:
+    """``found`` with the session's source marked (``source_by``: read for the session)."""
+    switch = card.source_by
+    return activate(found, switch, read[switch.feature].value if switch else None)
