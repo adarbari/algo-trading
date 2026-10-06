@@ -7,7 +7,8 @@ materialise expression features, ``features.site``): every declared group
   loads through the one settings loader;
 - reads only inputs ``algotrade.data.feature_inputs`` knows how to read, and the
   rollups it reads are registered, acyclic and computed before it (registry order);
-- has exactly one producer, the ``rollups`` task, in ``architecture/tables.toml``;
+- has exactly one producer, its entity's task (``rollups`` for instrument groups,
+  ``market-rollups`` for market groups), in ``architecture/tables.toml``;
 - is reachable from the selection catalogue as ``rollup.<name>@v<N>.<column>``.
 """
 
@@ -21,7 +22,8 @@ from algotrade.config.site.settings import rollup_params
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.fields import FIELD_TYPES
 from algotrade.data.feature_inputs import has_input
-from algotrade.features.framework.declaration import declaration_problems
+from algotrade.features.framework.declaration import FeatureGroup, declaration_problems
+from algotrade.features.framework.feature import ENTITIES
 from algotrade.features.framework.graph import dependencies, dependency_order
 from algotrade.features.registry import GROUPS
 from algotrade.features.site import site_features
@@ -30,10 +32,15 @@ from algotrade.storage.configs.files import FileConfigStore
 from algotrade_ingestion.tasks.framework.registry import TASKS
 from algotrade_ingestion.workflows.nightly.nightly import NIGHTLY
 from tests.conftest import REPO_ROOT
+from tests.helpers.rollup_store import MARKET_COUNTS
 
 SITE_ROLLUPS = tomllib.loads((REPO_ROOT / "config" / "site" / "rollups.toml").read_text())
 TABLES = tomllib.loads((REPO_ROOT / "architecture" / "tables.toml").read_text())["table"]
-TASK_MODULE = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+DERIVED = "apps/ingestion/algotrade_ingestion/tasks/derived"
+PRODUCER = {  # entity -> (registry task, its module): the one producer of that entity's groups
+    "instrument": ("rollups", f"{DERIVED}/rollups.py"),
+    "market": ("market-rollups", f"{DERIVED}/market_rollups.py"),
+}
 SITE = site_features(FileConfigStore(REPO_ROOT / "config"))
 ALL = SITE.groups  # code groups + materialised expression features, in dependency order
 
@@ -79,12 +86,30 @@ def test_dependency_graph_is_registered_acyclic_and_in_order() -> None:
             assert order.index(upstream) < order.index(key), f"{key} runs before {upstream}"
 
 
+def test_every_entity_has_a_producer() -> None:
+    assert set(PRODUCER) == set(ENTITIES)
+    for task, module in PRODUCER.values():
+        assert task in TASKS and TASKS[task].module.__file__ == str(REPO_ROOT / module)
+
+
+@pytest.mark.parametrize("group", [*ALL.values(), MARKET_COUNTS], ids=lambda g: g.key)
+def test_one_producer_per_entity(group: FeatureGroup) -> None:
+    """A group of either entity is produced by exactly one task: its entity's."""
+    task, module = PRODUCER[group.entity]
+    owners = [t["owner"] for t in TABLES if _covers(t["name"], group.table)]
+    assert owners == [module]
+    others = [n for n, t in TASKS.items() if group.table in t.tables]
+    assert others in ([], [task])  # a declared table is registered on that task only
+
+
 @pytest.mark.parametrize("key", sorted(ALL))
-def test_one_producer_the_rollups_task(key: str) -> None:
-    table = ALL[key].table
-    owners = [t["owner"] for t in TABLES if t["name"] == table]
-    assert owners == [TASK_MODULE]
-    assert table in TASKS["rollups"].tables
+def test_a_declared_group_is_registered_on_its_entity_task(key: str) -> None:
+    group = ALL[key]
+    assert group.table in TASKS[PRODUCER[group.entity][0]].tables
+
+
+def _covers(declared: str, table: str) -> bool:
+    return declared == table or (declared.endswith("*") and table.startswith(declared[:-1]))
 
 
 @pytest.mark.parametrize("key", sorted(GROUPS))
@@ -106,6 +131,14 @@ def test_expression_features_are_in_the_catalogue_and_stale_fields_say_where_the
         catalog.check_field("rollup.liquidity_class@v1.rule_hash", "sel")
     with pytest.raises(ConfigurationError, match=re.escape("unknown field 'rollup.nope@v1.x'")):
         catalog.check_field("rollup.nope@v1.x", "sel")
+
+
+def test_nightly_computes_market_rollups_after_rollups_and_never_blocks_the_screens() -> None:
+    names = [s.name for s in NIGHTLY]
+    step = next(s for s in NIGHTLY if s.name == "market-rollups")
+    assert step.needs == ("rollups",) and not step.critical
+    assert names.index("rollups") < names.index("market-rollups") < names.index("screens")
+    assert "market-rollups" not in next(s for s in NIGHTLY if s.name == "screens").needs
 
 
 def test_nightly_computes_rollups_after_the_data_they_read() -> None:

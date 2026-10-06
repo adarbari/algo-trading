@@ -14,7 +14,7 @@ from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs
 from algotrade.features.framework.feature import Feature
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
-from tests.helpers.stored_frames import stamped
+from tests.helpers.stored_frames import stamped, universe_rows, write_reference
 
 END = date(2026, 10, 2)
 
@@ -241,3 +241,17 @@ MARKET_COUNTS = FeatureGroup(
     _market_counts,
     entity="market",
 )
+
+
+SPY = "EQ:BBG000BDTBL9"
+
+
+def market_store() -> tuple[StoreWriter, StoreReader, list[date]]:
+    """A store for ``MARKET_COUNTS``: six sessions of bars for A, SPY and B (3 sessions), a
+    reference snapshot and universe snapshots that change on the 3rd and 5th session."""
+    writer, reader = store()
+    days = write_bars(writer, {"EQ:A": series(6), SPY: series(6, seed=3), "EQ:B": series(3)})
+    write_reference(writer, days[0], {"A": "EQ:A", "SPY": SPY, "B": "EQ:B"})
+    write_rows(writer, "universe", days[2], universe_rows(["A", "B", "C"]))
+    write_rows(writer, "universe", days[4], universe_rows(["A", "B"]))
+    return writer, reader, days

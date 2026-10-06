@@ -19,15 +19,14 @@ from tests.helpers.rollup_store import (
     END,
     MARKET_COUNTS,
     chain_rows,
+    market_store,
     series,
     store,
     write_bars,
     write_chains,
     write_curve,
     write_dividends,
-    write_rows,
 )
-from tests.helpers.stored_frames import universe_rows, write_reference
 
 NEAR, FAR = date(2026, 10, 16), date(2026, 11, 20)
 
@@ -88,17 +87,7 @@ def test_a_failed_rollup_blocks_its_dependents(monkeypatch: pytest.MonkeyPatch) 
     assert record.items["earnings@v1"] == "NO_INPUT"
 
 
-SPY = "EQ:BBG000BDTBL9"
 STAMPS = ["knowledge_ts", "run_id"]
-
-
-def _market_store() -> tuple[object, object, list[date]]:
-    writer, reader = store()
-    days = write_bars(writer, {"EQ:A": series(6), SPY: series(6, seed=3), "EQ:B": series(3)})
-    write_reference(writer, days[0], {"A": "EQ:A", "SPY": SPY, "B": "EQ:B"})
-    write_rows(writer, "universe", days[2], universe_rows(["A", "B", "C"]))
-    write_rows(writer, "universe", days[4], universe_rows(["A", "B"]))
-    return writer, reader, days
 
 
 @pytest.fixture
@@ -108,13 +97,13 @@ def with_market(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.usefixtures("with_market")
 def test_a_market_backfill_writes_the_rows_of_nightly_runs() -> None:
-    nightly_writer, nightly, days = _market_store()
+    nightly_writer, nightly, days = market_store()
     for day in days[-3:]:
         record = compute_rollups(task_ctx(nightly_writer), day, entity="market")  # type: ignore[arg-type]
         assert record.job == "market-rollups" and record.items == {
             MARKET_COUNTS.key: "OK: 1 sessions, 1 rows"
         }
-    backfill_writer, backfill, _ = _market_store()
+    backfill_writer, backfill, _ = market_store()
     record = compute_rollups(  # type: ignore[arg-type]
         task_ctx(backfill_writer), days[-1], start=days[-3], end=days[-1], entity="market"
     )
@@ -131,7 +120,7 @@ def test_a_market_backfill_writes_the_rows_of_nightly_runs() -> None:
 
 @pytest.mark.usefixtures("with_market")
 def test_market_groups_run_only_as_the_market_entity() -> None:
-    writer, _, days = _market_store()
+    writer, _, days = market_store()
     with pytest.raises(KeyError, match="unknown rollups"):
         compute_rollups(task_ctx(writer), days[-1], only=[MARKET_COUNTS.key])  # type: ignore[arg-type]
 
@@ -142,7 +131,7 @@ def test_a_market_group_with_two_rows_fails(monkeypatch: pytest.MonkeyPatch) -> 
 
     broken = dataclasses.replace(MARKET_COUNTS, compute=twice)
     monkeypatch.setitem(site_features(SITE).groups, MARKET_COUNTS.key, broken)
-    writer, reader, days = _market_store()
+    writer, reader, days = market_store()
     record = compute_rollups(task_ctx(writer), days[-1], entity="market")  # type: ignore[arg-type]
     assert record.status is RunStatus.PARTIAL
     assert "returns one MKT:US row, got ['MKT:US', 'MKT:US']" in record.items[MARKET_COUNTS.key]
