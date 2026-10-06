@@ -72,9 +72,10 @@ def test_every_column_is_a_documented_feature(key: str) -> None:
     assert list(group.columns) == [f.name for f in group.features]
     for f in group.features:
         assert f.description and f.unit and f.null_meaning, f.key
-        assert (f.group, f.version, f.entity) == (key, group.version, "instrument")
+        assert (f.group, f.version, f.entity) == (key, group.version, group.entity)
         assert feature(f.key) is f and feature(f.field) is f
-        assert f.field == f"rollup.{key}.{f.name}"
+        prefix = "rollup" if group.entity == "instrument" else group.entity  # ADR 0047
+        assert f.field == f"{prefix}.{key}.{f.name}"
 
 
 def test_feature_keys_are_unique_and_complete() -> None:

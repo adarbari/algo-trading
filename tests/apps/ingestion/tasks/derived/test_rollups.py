@@ -20,6 +20,7 @@ from tests.helpers.rollup_store import (
     MARKET_COUNTS,
     chain_rows,
     market_store,
+    only_market_counts,
     series,
     store,
     write_bars,
@@ -92,7 +93,7 @@ STAMPS = ["knowledge_ts", "run_id"]
 
 @pytest.fixture
 def with_market(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setitem(site_features(SITE).groups, MARKET_COUNTS.key, MARKET_COUNTS)
+    only_market_counts(monkeypatch, site_features(SITE))
 
 
 @pytest.mark.usefixtures("with_market")
