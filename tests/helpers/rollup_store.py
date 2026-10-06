@@ -1,15 +1,18 @@
 """Builders for rollup tests: a memory store with daily bars, splits and earnings snapshots,
-and a toy market-entity group (``MARKET_COUNTS``, ADR 0047)."""
+and a toy market-entity group (``MARKET_COUNTS``, ADR 0047) that task tests run in place of
+the site's market groups (``only_market_counts``)."""
 
 from collections.abc import Mapping, Sequence
 from datetime import date
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from algotrade.core.model.instruments import market_id
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.data import StoreReader
+from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs
 from algotrade.features.framework.feature import Feature
 from algotrade.storage.backends.memory import MemoryBackend
@@ -241,6 +244,20 @@ MARKET_COUNTS = FeatureGroup(
     _market_counts,
     entity="market",
 )
+
+
+def without_market_groups(monkeypatch: pytest.MonkeyPatch, *sites: FeatureSet) -> None:
+    """Remove the site's market groups from each feature set for the test."""
+    for site in sites:
+        for key in [k for k, g in site.groups.items() if g.entity == "market"]:
+            monkeypatch.delitem(site.groups, key)
+
+
+def only_market_counts(monkeypatch: pytest.MonkeyPatch, *sites: FeatureSet) -> None:
+    """``MARKET_COUNTS`` as the one market group of each feature set for the test."""
+    without_market_groups(monkeypatch, *sites)
+    for site in sites:
+        monkeypatch.setitem(site.groups, MARKET_COUNTS.key, MARKET_COUNTS)
 
 
 SPY = "EQ:BBG000BDTBL9"

@@ -10,8 +10,9 @@ import pandas as pd
 import pytest
 
 from algotrade.core.model.errors import MissingDataError
-from algotrade.core.time.calendar import sessions_between
+from algotrade.core.time.calendar import next_session, sessions_between
 from algotrade.data import feature_inputs as inputs
+from algotrade.data import prices
 from algotrade.data.macro.series import TABLE as MACRO_SERIES
 from algotrade.data.shares import TABLE as SHARES
 from tests.helpers.rollup_store import (
@@ -234,7 +235,10 @@ def test_bar_windows_are_the_closes_of_each_window_up_to_the_session() -> None:
     assert loaded.at(first - timedelta(days=20), 0) is None
 
 
-def test_bar_windows_share_one_adjustment_so_a_split_inside_one_leaves_its_ratios() -> None:
+def test_bar_windows_share_one_adjustment_so_a_split_inside_one_leaves_its_ratios(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(prices, "WINDOW_PIECE", 4)  # the split is in a later piece than most bars
     writer, reader = store()
     days = sessions_between(date(2020, 2, 12), date(2020, 3, 13))
     write_bars(writer, {"EQ:A": [100.0] * 10 + [50.0] * (len(days) - 10)}, days[-1])
@@ -248,3 +252,64 @@ def test_windows_are_only_for_tables_that_declare_them() -> None:
     _, reader = store()
     with pytest.raises(ValueError, match="no fixed windows"):
         inputs.load_input(reader, "events/earnings", [END], 0, windows=((END, END),))
+
+
+def test_bars_by_symbol_read_only_the_ids_the_reference_resolves_each_session() -> None:
+    """``symbols`` narrows ``bars/1d`` to the ids the tickers resolve to in the snapshot each
+    session of the chunk sees (the union): a ticker whose id changes inside the chunk keeps
+    both ids' bars; other instruments are not read."""
+    writer, reader = store()
+    days = write_bars(writer, {"EQ:OLD": series(4), "EQ:NEW": series(4, 2), "EQ:X": series(4, 3)})
+    write_reference(writer, days[0], {"SPY": "EQ:OLD", "X": "EQ:X"})
+    write_reference(writer, days[2], {"SPY": "EQ:NEW", "X": "EQ:X"}, run_id="ref2")
+    loaded = inputs.load_input(reader, "bars/1d", days, 1, symbols=("SPY", "QQQ"))
+    for day in (days[1], days[3]):
+        frame = loaded.at(day, 1)
+        assert frame is not None and set(frame["instrument_id"]) == {"EQ:OLD", "EQ:NEW"}
+    early = inputs.load_input(reader, "bars/1d", days[:2], 1, symbols=("SPY",))
+    assert set(early.at(days[1], 1)["instrument_id"]) == {"EQ:OLD"}  # type: ignore[index]
+    unlisted = inputs.load_input(reader, "bars/1d", days, 0, symbols=("QQQ",)).at(days[3], 0)
+    assert unlisted is not None and unlisted.empty  # bars are stored: input, none of QQQ's
+    assert loaded.at(next_session(days[3]), 0) is None  # no bars stored for the session
+    with pytest.raises(ValueError, match="symbols are only for"):
+        inputs.load_input(reader, "events/split", days, 0, symbols=("SPY",))
+
+
+def test_bars_by_symbol_without_a_reference_are_empty_and_without_bars_none() -> None:
+    writer, reader = store()
+    assert inputs.load_input(reader, "bars/1d", [END], 0, symbols=("A",)).at(END, 0) is None
+    days = write_bars(writer, {"EQ:A": series(3)})
+    frame = inputs.load_input(reader, "bars/1d", days, 0, symbols=("A",)).at(days[-1], 0)
+    assert frame is not None and frame.empty and "close" in frame.columns
+
+
+def test_a_bar_window_never_spans_a_missing_session() -> None:
+    writer, reader = store()
+    days = write_bars(writer, {"EQ:A": series(30)}, skip={"EQ:A": [12]})  # no bars that session
+    window = ((days[0], days[-1]),)
+    with pytest.raises(MissingDataError, match=f"no bars for {days[12]} in the window"):
+        inputs.load_input(reader, "bars/1d", [days[-1]], 0, windows=window)
+    # a window that ends before the gap, or starts before the first stored session, is whole
+    whole = ((days[0], days[11]),)
+    assert (
+        inputs.load_input(reader, "bars/1d", [days[-1]], 0, windows=whole).at(days[-1], 0)
+        is not None
+    )
+    early = ((days[0] - timedelta(days=40), days[5]),)
+    assert (
+        inputs.load_input(reader, "bars/1d", [days[-1]], 0, windows=early).at(days[-1], 0)
+        is not None
+    )
+
+
+def test_bar_windows_hold_only_instruments_with_a_bar_in_the_chunk() -> None:
+    writer, reader = store()  # EQ:GONE trades only on the first ten sessions
+    days = write_bars(
+        writer, {"EQ:A": series(30), "EQ:GONE": series(30)}, skip={"EQ:GONE": list(range(10, 30))}
+    )
+    loaded = inputs.load_input(reader, "bars/1d", [days[-1]], 0, windows=((days[0], days[-1]),))
+    frame = loaded.at(days[-1], 0)
+    assert frame is not None and set(frame["instrument_id"].astype(str)) == {"EQ:A"}
+    both = inputs.load_input(reader, "bars/1d", days[5:], 0, windows=((days[0], days[-1]),))
+    seen = both.at(days[-1], 0)
+    assert seen is not None and set(seen["instrument_id"].astype(str)) == {"EQ:A", "EQ:GONE"}

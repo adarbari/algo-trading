@@ -34,6 +34,7 @@ function setup() {
           onNewScreener={vi.fn()}
           onScreeners={vi.fn()}
           onOpenScreener={vi.fn()}
+          onOpenRegime={vi.fn()}
         />
       </QueryClientProvider>
     </ToastProvider>,
@@ -62,6 +63,10 @@ describe('the Ideas page with the real query client', () => {
     expect(
       await screen.findByText('The ideas failed to load.', {}, { timeout: 500 }),
     ).toBeVisible();
-    expect(GQL).toHaveBeenCalledTimes(1);
+    // The regime strip reads too; the Ideas read itself is asked once (no retry).
+    const asked = GQL.mock.calls.filter(([document]) =>
+      String(document).includes('query IdeasPage'),
+    );
+    expect(asked).toHaveLength(1);
   });
 });

@@ -3,10 +3,11 @@ drawdown and recovery, on synthetic series with known falls (32-bit floats), inc
 nulls (before ``known_from``, thin coverage, not recovered, bars that do not reach the
 episode), a backfill equal to the per-session compute, and the episode constants against
 ``config/site/regime/episodes.toml``. The cost of one nightly session over a store sized up
-to 1,500 instruments is the ``perf`` test (``make perf``, an idle machine) with a loose
+to 2,000 instruments is the ``perf`` test (``make perf``, an idle machine) with a loose
 ceiling in the default run, as in ``services/preview/test_performance.py``."""
 
 import time
+import tracemalloc
 from datetime import date
 
 import numpy as np
@@ -21,7 +22,7 @@ from algotrade.features.rollups.price import episodes as ep
 from algotrade.storage.configs.files import FileConfigStore
 from tests.conftest import REPO_ROOT
 from tests.helpers.rollup_store import series, store, write_bars
-from tests.helpers.stored_frames import stamped, write_reference
+from tests.helpers.stored_frames import write_reference
 
 GROUP = ep.GROUP
 COVID = ep.EPISODES[0]
@@ -212,17 +213,19 @@ def test_the_episode_constants_equal_episodes_toml() -> None:
 
 
 # ------------------------------------------------------------------------------- the budget
-N = 1_500  # instruments: an eighth of the stored universe (12.6k); about 0.2 s measured
-BUDGET = 1.0  # CPU seconds for one session over N instruments (the strict, perf test)
+N = 2_000  # instruments: a sixth of the stored universe (12.6k)
+SESSION = date(2026, 10, 2)  # every episode window, from 2020-02-12 to now, is stored
+# Strict budgets for one session over N instruments (measured: 1.2-1.7 s, 210 MB).
+BUDGET = 2.5  # CPU seconds
+MEMORY = 300e6  # bytes of peak allocation
 LOOSE = 5.0  # the default run's ceiling multiple
 
 
 def sized_store() -> tuple:
-    """N instruments with a bar on every session from a year before the COVID window start to
-    60 sessions after its trough: the beta window and the whole episode window are stored."""
+    """N instruments with a bar on every session from the first COVID window session to
+    ``SESSION``: the beta window and all three episode windows are stored (1,700 sessions)."""
     writer, reader = store()
-    end = sessions_between(COVID.trough, date(2020, 8, 31))[60]
-    days = sessions_between(date(2019, 1, 2), end)
+    days = sessions_between(COVID.first, SESSION)
     rng = np.random.default_rng(5)
     levels = 100.0 * np.exp(np.cumsum(rng.normal(0, 0.01, (len(days), N)), axis=0))
     ids = [f"EQ:I{i}" for i in range(N)]
@@ -233,33 +236,43 @@ def sized_store() -> tuple:
                 "ts": pd.Timestamp(day, tz="UTC") + pd.Timedelta(hours=20),
                 "open": levels[i], "high": levels[i], "low": levels[i],
                 "close": levels[i], "volume": 1000.0,
+                "session_date": day, "knowledge_ts": pd.Timestamp(day, tz="UTC"),
+                "source": "test", "run_id": "b",
             }
         )  # fmt: skip
-        writer.write_table(
-            "bars/1d", day, f"bars-{day}", stamped(rows.to_dict("records"), day, "b")
-        )
+        writer.write_table("bars/1d", day, f"bars-{day}", rows)
     write_reference(writer, days[0], {"SPY": ids[0]})
-    return reader, end
+    return reader
 
 
-def measure() -> float:
-    reader, end = sized_store()
-    compute_one(reader, GROUP, end)  # warm the imports and caches
+def measure() -> tuple[float, float]:
+    """(CPU seconds, peak bytes allocated) of one nightly session over the sized store."""
+    reader = sized_store()
+    compute_one(reader, GROUP, SESSION)  # warm the imports and caches
     started = time.process_time()
-    result = compute_one(reader, GROUP, end)
+    result = compute_one(reader, GROUP, SESSION)
     seconds = time.process_time() - started
     assert result.frame is not None and len(result.frame) == N
     assert result.frame["dd_covid_2020"].notna().all()
-    return seconds
+    assert result.frame["dd_tariffs_2025"].notna().all()
+    tracemalloc.start()
+    try:
+        compute_one(reader, GROUP, SESSION)
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+    return seconds, float(peak)
 
 
 @pytest.mark.slow
 def test_a_nightly_session_over_a_sized_store_has_a_ceiling() -> None:
-    seconds = measure()
+    seconds, peak = measure()
     assert seconds <= BUDGET * LOOSE, f"{seconds:.2f}s (ceiling {BUDGET * LOOSE}s)"
+    assert peak <= MEMORY * LOOSE, f"{peak / 1e6:.0f} MB (ceiling {MEMORY * LOOSE / 1e6:.0f} MB)"
 
 
 @pytest.mark.perf
 def test_a_nightly_session_meets_the_budget() -> None:
-    seconds = measure()
+    seconds, peak = measure()
     assert seconds <= BUDGET, f"{seconds:.2f}s (budget {BUDGET}s)"
+    assert peak <= MEMORY, f"{peak / 1e6:.0f} MB (budget {MEMORY / 1e6:.0f} MB)"

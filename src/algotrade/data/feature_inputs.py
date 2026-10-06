@@ -10,14 +10,22 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        return), the session plus ``lookback`` earlier sessions; ``None`` when
                        the session has no bars stored; ``MissingDataError`` when a session in
                        the window (on or after the first stored one) has no bars: a rollup
-                       never computes over a gap (ADR 0039)
+                       never computes over a gap (ADR 0039). With ``symbols`` (``Input.symbols``)
+                       only the ids those tickers resolve to in the reference snapshot each
+                       session of the chunk sees (``reference.ids_for_symbols``, the union: a
+                       superset of each session's), so a market group reading a few tickers
+                       does not load every instrument (ADR 0047); ``None`` only when the session
+                       has no bars stored, as for a whole read (an empty frame when none of the
+                       tickers resolves or has bars)
 - ``bars/1d`` windows  ``prices.window_closes`` (``Input.windows``: fixed date ranges, handed to
                        ``compute`` as ``bars/1d#windows``): the closes of each window from its
                        first session to the earlier of its last and the session, column-pruned
-                       and compact, ``window`` / ``day`` / ``instrument_id`` / ``close``; a
-                       window before the stored history has no rows; ``None`` when no window
-                       has a row yet. For a history years back that a trailing lookback would
-                       load whole (every instrument's every column)
+                       and compact, ``window`` / ``day`` / ``instrument_id`` / ``close``, of
+                       the instruments with a bar in the chunk; a window before the stored
+                       history has no rows; ``MissingDataError`` when a session of a window
+                       (on or after the first stored one) has no bars (ADR 0039); ``None`` when
+                       no window has a row yet. For a history years back that a trailing
+                       lookback would load whole (every instrument's every column)
 - ``events/earnings``  ``events.stored_events``: every calendar snapshot stored on or before
                        the session (what was known then); ``None`` when there is none
 - ``chains/*``         ``chains``: the session's own partition, read per session (chains are
@@ -70,26 +78,29 @@ from typing import Protocol
 
 import numpy as np
 import pandas as pd
-from pandas.api.types import union_categoricals
 
 from algotrade.core.model.errors import MissingDataError
 from algotrade.core.model.fields import group_of_table
-from algotrade.core.time.calendar import sessions_ending
+from algotrade.core.time.calendar import sessions_between, sessions_ending
 from algotrade.data.chains import chain_status, option_quotes, underlying_quotes
 from algotrade.data.events import events_by_event_date, stored_events
 from algotrade.data.macro.series import TABLE as MACRO_SERIES
 from algotrade.data.macro.series import stored_vintages
-from algotrade.data.prices import SessionBars, session_bars
+from algotrade.data.prices import DateWindow, SessionBars, session_bars, window_closes
 from algotrade.data.rates import TABLE as TREASURY
 from algotrade.data.rates import curve_as_rows
-from algotrade.data.reference import UNIVERSE_TABLE, instruments, load_universe, symbol_ids
+from algotrade.data.reference import (
+    UNIVERSE_TABLE,
+    ids_for_symbols,
+    instruments,
+    load_universe,
+    symbol_ids,
+)
 from algotrade.data.rollups import rollup_rows
 from algotrade.data.shares import TABLE as SHARES
 from algotrade.data.shares import share_facts
 from algotrade.data.volatility import IBKR_IV30, ibkr_iv30
 from algotrade.storage.tables.readers import StoreReader
-
-type DateWindow = tuple[date, date]  # fixed first and last session (``Input.windows``)
 
 
 class Loaded(Protocol):
@@ -116,12 +127,18 @@ def _days(values: pd.Series) -> np.ndarray:
 class _Bars:
     bars: SessionBars | None
     stored: frozenset[date] = frozenset()  # every session with a bars partition
+    # Narrowed to some instruments (``symbols``): the session has input when it has a bars
+    # partition, even if those instruments have no bar on it (as for a whole-store read).
+    narrowed: bool = False
 
     def at(self, session: date, lookback: int) -> pd.DataFrame | None:
         if self.bars is None:
             return None
         window = self.bars.window(sessions_before(session, lookback), session)
-        if window.empty or window["session_date"].iloc[-1] != session:
+        if self.narrowed:
+            if session not in self.stored:
+                return None
+        elif window.empty or window["session_date"].iloc[-1] != session:
             return None
         first = min(self.stored)
         missing = [
@@ -137,12 +154,26 @@ class _Bars:
         return window
 
 
-def _bars(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+BARS = "bars/1d"
+
+
+def _bars(
+    reader: StoreReader,
+    sessions: Sequence[date],
+    lookback: int,
+    instruments: Sequence[str] | None = None,
+) -> Loaded:
+    first = sessions_before(sessions[0], lookback)
+    stored = frozenset(reader.dates(BARS))
+    narrowed = instruments is not None
+    empty = _Bars(SessionBars.empty(), stored, narrowed) if narrowed and stored else _Bars(None)
+    if narrowed and not instruments:
+        return empty  # never a read filtered on no ids (a typed empty filter fails in Parquet)
     try:
-        loaded = session_bars(reader, sessions_before(sessions[0], lookback), sessions[-1])
+        loaded = session_bars(reader, first, sessions[-1], instruments)
     except MissingDataError:
-        return _Bars(None)
-    return _Bars(loaded, frozenset(reader.dates("bars/1d")))
+        return empty
+    return _Bars(loaded, stored, narrowed)
 
 
 @dataclass(frozen=True)
@@ -155,62 +186,6 @@ class _Snapshots:
     def at(self, session: date, lookback: int) -> pd.DataFrame | None:
         end = np.searchsorted(self.days, np.datetime64(session, "D"), side="right")
         return self.frame.iloc[:end] if end else None
-
-
-def _window_closes(
-    reader: StoreReader, windows: Sequence[DateWindow], through: date
-) -> pd.DataFrame:
-    """Closes of fixed ``(first, last)`` windows up to ``through``: columns ``window`` (the index
-    into ``windows``, int8), ``day`` (datetime64[ns]), ``instrument_id`` (categorical) and
-    ``close`` (float64), sorted by ``day`` so that the rows on or before a session are a prefix.
-
-    Each window is read once, from ``first`` to the earlier of ``last`` and ``through``, one
-    window after another and only the close column, then kept compact (a categorical id and
-    two numbers per row), so a window of years of every instrument is a few hundred MB, not the
-    GB of the full bars. Splits with an ex-date inside the window are applied, the later ones
-    are not: every price of one instrument in a window then shares one adjustment, so the
-    ratios the caller takes (drawdown, recovery) do not depend on how far the read went. A
-    window with no stored bars (before the history we hold) contributes no rows.
-    """
-    parts = []
-    for index, (first, last) in enumerate(windows):
-        end = min(last, through)
-        if end < first:
-            continue
-        try:
-            frame = session_bars(reader, first, end, columns=("close",)).frame
-        except MissingDataError:
-            continue
-        parts.append(
-            pd.DataFrame(
-                {
-                    "window": np.full(len(frame), index, dtype=np.int8),
-                    "day": pd.to_datetime(frame["session_date"]).to_numpy(dtype="datetime64[ns]"),
-                    "instrument_id": pd.Categorical(frame["instrument_id"].astype(str)),
-                    "close": frame["close"].to_numpy(dtype=np.float64),
-                }
-            )
-        )
-        del frame
-    if not parts:
-        return pd.DataFrame(
-            {
-                "window": np.array([], dtype=np.int8),
-                "day": np.array([], dtype="datetime64[ns]"),
-                "instrument_id": pd.Categorical([]),
-                "close": np.array([], dtype=np.float64),
-            }
-        )
-    ids = union_categoricals([p["instrument_id"] for p in parts])  # one category set, codes kept
-    out = pd.DataFrame(
-        {
-            "window": np.concatenate([p["window"].to_numpy() for p in parts]),
-            "day": np.concatenate([p["day"].to_numpy() for p in parts]),
-            "instrument_id": ids,
-            "close": np.concatenate([p["close"].to_numpy() for p in parts]),
-        }
-    )
-    return out.iloc[np.argsort(out["day"].to_numpy(), kind="stable")].reset_index(drop=True)
 
 
 @dataclass(frozen=True)
@@ -228,7 +203,23 @@ class _Closes:
 def _bar_windows(
     reader: StoreReader, sessions: Sequence[date], windows: Sequence[DateWindow]
 ) -> Loaded:
-    frame = _window_closes(reader, windows, sessions[-1])
+    """The windows' closes through the last session of the chunk, of the instruments with a bar
+    in the chunk (a name gone before it has no row to compute). A window with a session
+    missing (on or after the first stored one) is a gap: ADR 0039."""
+    stored = frozenset(reader.dates("bars/1d"))
+    if stored:
+        for first, last in windows:
+            end = min(last, sessions[-1])
+            missing = [d for d in sessions_between(max(first, min(stored)), end) if d not in stored]
+            if missing:
+                raise MissingDataError(
+                    "bars/1d",
+                    f"no bars for {missing[0]} in the window {first}..{end}",
+                    f"algotrade-ingest bars --date {missing[0].isoformat()}",
+                )
+    present = reader.table_range("bars/1d", sessions[0], sessions[-1], None, None, ("close",))
+    alive = [] if present is None else sorted(present["instrument_id"].astype(str).unique())
+    frame = window_closes(reader, windows, sessions[-1], alive)
     return _Closes(frame, frame["day"].to_numpy(dtype="datetime64[D]"))
 
 
@@ -335,7 +326,7 @@ def _group_rows(
 
 
 INPUTS: Mapping[str, Loader] = {
-    "bars/1d": _bars,
+    BARS: _bars,
     "events/earnings": _event_snapshots("events/earnings"),
     "chains/status": _partition(chain_status),
     "chains/option_quotes": _partition(option_quotes),
@@ -376,15 +367,21 @@ def load_input(
     lookback: int,
     produced: Produced | None = None,
     ids: Sequence[str] = (),
+    symbols: Sequence[str] = (),
     windows: Sequence[DateWindow] = (),
 ) -> Loaded:
     """``table`` for ``sessions`` (ascending) and ``lookback`` earlier sessions, read once.
-    ``ids``: only these instruments, for a table that reads by id (``ID_INPUTS``).
+    ``ids``: only these instruments, for a table that reads by id (``ID_INPUTS``);
+    ``symbols``: only the ids these tickers resolve to (``bars/1d`` only);
     ``windows``: fixed date ranges instead of a lookback (``WINDOW_INPUTS``)."""
     if windows:
         if table not in WINDOW_INPUTS:
             raise ValueError(f"{table!r} has no fixed windows: only {sorted(WINDOW_INPUTS)}")
         return WINDOW_INPUTS[table](reader, sessions, windows)
+    if symbols:
+        if table != BARS or ids:
+            raise ValueError(f"{table!r}: symbols are only for {BARS!r}, and never with ids")
+        return _bars(reader, sessions, lookback, ids_for_symbols(reader, sessions, symbols))
     if table in ID_INPUTS:
         return ID_INPUTS[table](reader, sessions, lookback, ids)
     if ids:

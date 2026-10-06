@@ -103,6 +103,8 @@ def _rollup(**changes: Any) -> FeatureGroup:
         ({"features": (replace(features({"a": "float"})[0], entity="market"),)}, "the group's"),
         ({"inputs": (Input("rollups/market/breadth@v1"),)}, "broadcasting market values"),
         ({"entity": "market", "applies_to": "optionable"}, "applies to the whole market"),
+        ({"inputs": (Input("universe", symbols=("SPY",)),)}, "symbols are only for"),
+        ({"inputs": (Input("bars/1d", ids=("EQ:A",), symbols=("A",)),)}, "never with ids"),
         (
             {
                 "entity": "market",

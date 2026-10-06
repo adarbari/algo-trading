@@ -104,7 +104,9 @@ def _compute_chunk(
 ) -> Iterator[SessionResult]:
     lookbacks = {i.key: i.sessions_back(params) for i in rollup.inputs}
     loaded = {
-        i.key: load_input(reader, i.table, sessions, lookbacks[i.key], produced, i.ids, i.windows)
+        i.key: load_input(
+            reader, i.table, sessions, lookbacks[i.key], produced, i.ids, i.symbols, i.windows
+        )
         for i in rollup.inputs
     }
     for session in sessions:
