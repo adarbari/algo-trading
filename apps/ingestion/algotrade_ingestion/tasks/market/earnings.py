@@ -20,6 +20,14 @@ kept, its failed days asked again); a run for a later session fetches the whole 
 again, so each backfill partition holds the full window. Before the reference history starts
 a ticker resolves through the earliest snapshot (a reused ticker goes to today's holder):
 counted as ``pre_snapshot_rows``.
+
+A calendar day the run failed to fetch carries the previous snapshot's forecasts forward
+(``carried_from``), so a failed fetch never cancels knowledge (ADR 0050 decision 3): the
+rows the latest earlier snapshot holds for that report day are copied unchanged into this
+one (their ``known_from`` kept) with ``carried_from`` = the session of the snapshot that
+fetched them (null on fetched rows). So are a fetched day's rows of a ticker that does not
+resolve today (it would otherwise lose its id). A day no earlier snapshot holds stays
+uncovered. Counted as ``carried_rows``, with the days in ``carried_days``.
 """
 
 from datetime import date, timedelta
@@ -30,8 +38,8 @@ import pandas as pd
 
 from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
-from algotrade.storage.tables.schemas import KNOWN_FROM
-from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
+from algotrade.storage.tables.schemas import CARRIED_FROM, COMMON, KNOWN_FROM
+from algotrade_ingestion.tasks.framework.run import FAILURES, IngestRun, TaskContext, status_label
 from algotrade_sources.framework.base import FetchRequest, Source
 
 TASK = "earnings_calendar"
@@ -49,6 +57,60 @@ def with_known_from(rows: pd.DataFrame, session: date) -> pd.DataFrame:
     """``rows`` with ``known_from`` = min(``session``, the report date) (module doc)."""
     reports = pd.to_datetime(rows["ts"], utc=True).dt.date
     return rows.assign(**{KNOWN_FROM: [min(session, day) for day in reports]})
+
+
+class _Previous:
+    """The latest snapshot stored before the run's session, read once: what was known then."""
+
+    def __init__(self, run: IngestRun) -> None:
+        earlier = [d for d in run.reader.dates(TABLE) if d < run.session]
+        frame = run.reader.table(TABLE, max(earlier)) if earlier else None
+        self.rows = frame if frame is not None else pd.DataFrame(columns=["instrument_id", "ts"])
+        self.days = pd.to_datetime(self.rows["ts"], utc=True).dt.date
+
+    def carried(
+        self, day: date, have: pd.DataFrame | None, symbols: set[str] | None = None
+    ) -> pd.DataFrame:
+        """Its rows for report ``day`` (of ``symbols`` only, when given) that ``have`` lacks,
+        ready to store again: stamps dropped, ``carried_from`` set (module doc)."""
+        rows = self.rows[self.days == day]
+        if symbols is not None:
+            rows = rows[rows["symbol"].isin(symbols)] if "symbol" in rows.columns else rows[:0]
+        if have is not None and len(have):
+            rows = rows[~rows["instrument_id"].isin(set(have["instrument_id"]))]
+        if rows.empty:
+            return pd.DataFrame()
+        origin = pd.to_datetime(rows["session_date"]).dt.date
+        if CARRIED_FROM in rows.columns:  # a row carried before keeps the session that fetched it
+            origin = rows[CARRIED_FROM].where(rows[CARRIED_FROM].notna(), origin)
+        return rows.drop(columns=list(COMMON)).assign(**{CARRIED_FROM: list(origin)})
+
+
+def _carry_forward(
+    run: IngestRun, previous: _Previous, days: list[date], fetched: pd.DataFrame
+) -> pd.DataFrame:
+    """The previous snapshot's rows for the window's failed days and for today's unresolved
+    tickers, counted in the run stats (module doc)."""
+    report = pd.to_datetime(fetched["ts"], utc=True).dt.date if len(fetched) else None
+    resolver = run.resolver()
+    parts = []
+    for day in days:
+        mine = fetched[report == day] if report is not None else None
+        if status_label(run.items.get(day.isoformat(), "")) in FAILURES:
+            parts.append(previous.carried(day, mine))
+        elif mine is not None and len(mine) and "symbol" in mine.columns:
+            lost = {str(s) for s in mine["symbol"] if not resolver.knows(str(s))}
+            if lost:
+                parts.append(previous.carried(day, mine, lost))
+    parts = [p for p in parts if len(p)]
+    if not parts:
+        return pd.DataFrame()
+    carried = pd.concat(parts, ignore_index=True)
+    run.stats["carried_rows"] = len(carried)
+    run.stats["carried_days"] = sorted(
+        {d.isoformat() for d in pd.to_datetime(carried["ts"], utc=True).dt.date}
+    )
+    return carried
 
 
 def _fetch_day(run: IngestRun, source: Source, day: date) -> pd.DataFrame | None:
@@ -77,6 +139,10 @@ def ingest_earnings(
         if not rows.empty:
             rows = run.resolve(rows).drop_duplicates(subset=["instrument_id", "ts"], keep="last")
             rows = with_known_from(rows.replace({np.nan: None}), session)
+        window = report_days(start or session, days)
+        carried = _carry_forward(run, _Previous(run), window, rows)
+        rows = pd.concat([rows, carried], ignore_index=True) if len(carried) else rows
+        if not rows.empty:
             rows = rows.sort_values(["ts", "instrument_id"]).reset_index(drop=True)
             run.write(TABLE, rows, source.name)
         run.stats.update(
@@ -86,14 +152,17 @@ def ingest_earnings(
             companies=int(rows["symbol"].nunique()) if len(rows) else 0,
             reported=int(rows["reported"].sum()) if len(rows) else 0,
             unresolved=run.unresolved,
+            carried_rows=run.stats.get("carried_rows", 0),
         )
     return run.record
 
 
 def _stage_day(run: IngestRun, source: Source, day: date) -> str:
-    """One backfill day: fetched, resolved as of the day, staged with ``known_from``."""
+    """One backfill day: fetched, resolved as of the day, staged with ``known_from`` (an
+    empty day stages nothing, replacing what an earlier attempt carried for it)."""
     rows = _fetch_day(run, source, day)
     if rows is None:
+        run.stage(TABLE, day.isoformat(), pd.DataFrame(), source.name)
         return "EMPTY"
     rows = run.resolve(rows, as_of=day).drop_duplicates(["instrument_id", "ts"], keep="last")
     snapshot = run.resolver(day).snapshot
@@ -119,6 +188,13 @@ def backfill_earnings(
             run.attempt(day, partial(_stage_day, run, source, date.fromisoformat(day)))
             if i % CHECKPOINT_EVERY == 0:
                 run.checkpoint()
+        previous, failed = _Previous(run), [date.fromisoformat(d) for d in run.retryable()]
+        carried = _carry_forward(run, previous, failed, pd.DataFrame())
+        report = pd.to_datetime(carried["ts"], utc=True).dt.date if len(carried) else None
+        for failed_day in failed:
+            part = carried[report == failed_day] if report is not None else carried
+            if len(part):
+                run.stage(TABLE, failed_day.isoformat(), part.reset_index(drop=True), source.name)
         rows = run.publish(TABLE, sort_by="ts")
         run.stats.update(
             window=[start.isoformat(), end.isoformat()],
@@ -126,6 +202,7 @@ def backfill_earnings(
             fetched=len(todo),
             already_done=len(window) - len(todo),
             pre_snapshot_rows=run.stats.get("pre_snapshot_rows", 0),
+            carried_rows=run.stats.get("carried_rows", 0),
             dates_failed=run.failures(),
             rows=rows,
             unresolved=run.unresolved,

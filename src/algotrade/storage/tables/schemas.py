@@ -376,12 +376,17 @@ ETF_HOLDINGS = _fixed(
 # the session that stored it) for the facts of record (``data.events.FACTS_OF_RECORD``:
 # splits, dividends, reference and index changes).
 KNOWN_FROM = "known_from"
+# A calendar row copied forward over a day the fetch failed: the session of the snapshot that
+# fetched it (null on fetched rows), so a failed fetch never cancels knowledge (ADR 0050).
+CARRIED_FROM = "carried_from"
 EARNINGS_EVENTS = TableSpec(
     "events/earnings",
     "event",
     ("instrument_id", "ts", KNOWN_FROM),
     open_ended=True,
-    columns=_columns("instrument_id string!", "ts timestamp_utc!", f"{KNOWN_FROM} date!"),
+    columns=_columns(
+        "instrument_id string!", "ts timestamp_utc!", f"{KNOWN_FROM} date!", f"{CARRIED_FROM} date"
+    ),
     runs="merge",
 )
 MACRO_SERIES = _fixed(

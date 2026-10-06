@@ -168,3 +168,23 @@ def test_a_history_row_is_known_from_its_report_date_in_an_earlier_session() -> 
     assert compute_one(reader, GROUP, date(2019, 4, 30)).no_input
     frame = compute_one(reader, GROUP, date(2019, 5, 2)).frame
     assert row(frame, "EQ:A")["last_earnings_date"] == report
+
+
+def test_a_carried_forecast_stays_a_forecast() -> None:
+    """A row carried forward (``carried_from``) keeps the kind it had where it was fetched: a
+    later calendar that moves the report still cancels it."""
+    stored = pd.DataFrame(
+        {
+            "instrument_id": ["EQ:A", "EQ:A"],
+            "ts": [pd.Timestamp(2026, 10, 20, tz="UTC"), pd.Timestamp(2026, 10, 27, tz="UTC")],
+            "session_date": [date(2026, 10, 2), date(2026, 10, 5)],
+            "known_from": [date(2026, 10, 1), date(2026, 10, 5)],
+            "carried_from": [date(2026, 10, 1), None],
+        }
+    )
+    stored = pd.concat(
+        [stored, stored.iloc[[1]].assign(ts=pd.Timestamp(2026, 10, 15, tz="UTC"))],
+        ignore_index=True,
+    )  # the 10-05 calendar covers 10-15..10-27 and does not list 10-20
+    valid = earnings.valid_events(stored)
+    assert sorted(valid["report"]) == [date(2026, 10, 15), date(2026, 10, 27)]

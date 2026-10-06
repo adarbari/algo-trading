@@ -149,3 +149,87 @@ def test_backfill_is_known_from_each_report_date_and_resumes() -> None:
     assert later.stats["pre_snapshot_rows"] == 4  # 10-02 resolves through its own snapshot
     with pytest.raises(ValueError, match="after"):
         backfill_earnings(ctx, source, DAY, date(2026, 10, 1), date(2026, 9, 1))
+
+
+def test_a_failed_day_carries_the_previous_forecasts_forward() -> None:
+    """A failed fetch never cancels knowledge (ADR 0050): the previous snapshot's rows for the
+    day are stored again with ``carried_from``, and ``earnings@v1`` keeps the date."""
+    from algotrade.features.framework.runner import compute_one  # noqa: PLC0415
+    from algotrade.features.rollups.corporate.earnings import GROUP  # noqa: PLC0415
+
+    report, failing = date(2026, 10, 6), {"on": False}
+
+    def transport(url: str) -> bytes:
+        if url.endswith(report.isoformat()):
+            if failing["on"]:
+                raise HttpError(500)
+            return calendar([("AAPL", "time-after-hours")])
+        return calendar([("MSFT", "time-pre-market")])
+
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    write_reference(writer, date(2026, 10, 1), {"AAPL": "EQ:BBG000B9XRY4"})
+    source = NasdaqEarningsSource(http_for(transport, RetryPolicy(tries=1)))
+    ctx = task_ctx(writer, StoreReader(backend), CLOCK)
+    ingest_earnings(ctx, source, date(2026, 10, 1), days=8)
+    failing["on"] = True
+    second = ingest_earnings(ctx, source, DAY, days=8)
+    assert second.status is RunStatus.PARTIAL
+    assert (second.stats["carried_rows"], second.stats["carried_days"]) == (1, ["2026-10-06"])
+    stored = StoreReader(backend).table("events/earnings", DAY)
+    assert stored is not None
+    aapl = stored[stored["instrument_id"] == "EQ:BBG000B9XRY4"].iloc[0]
+    assert (aapl["carried_from"], aapl["known_from"]) == (date(2026, 10, 1), date(2026, 10, 1))
+    assert stored[stored["instrument_id"] != "EQ:BBG000B9XRY4"]["carried_from"].isna().all()
+    third = ingest_earnings(ctx, source, date(2026, 10, 5), days=8)  # fails again
+    again = StoreReader(backend).table("events/earnings", date(2026, 10, 5))
+    assert third.stats["carried_rows"] == 1 and again is not None
+    carried = again[again["instrument_id"] == "EQ:BBG000B9XRY4"].iloc[0]
+    assert carried["carried_from"] == date(2026, 10, 1)  # the session that fetched it
+    frame = compute_one(StoreReader(backend), GROUP, date(2026, 10, 5)).frame
+    assert frame is not None
+    row = frame.set_index("instrument_id").loc["EQ:BBG000B9XRY4"]
+    assert row["next_earnings_date"] == report  # the failed day cancelled nothing
+
+
+def test_a_ticker_that_no_longer_resolves_keeps_its_previous_row() -> None:
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    write_reference(writer, date(2026, 10, 1), {"AAPL": "EQ:BBG000B9XRY4"})
+    source = NasdaqEarningsSource(
+        http_for(lambda url: calendar([("AAPL", "time-after-hours")]), RetryPolicy(tries=1))
+    )
+    ctx = task_ctx(writer, StoreReader(backend), CLOCK)
+    ingest_earnings(ctx, source, date(2026, 10, 1), days=2)
+    write_reference(writer, DAY, {"OTHER": "EQ:BBG000OTHER0"}, run_id="ref2")  # AAPL gone
+    record = ingest_earnings(ctx, source, DAY, start=date(2026, 10, 1), days=2)
+    stored = StoreReader(backend).table("events/earnings", DAY)
+    assert stored is not None and record.stats["carried_rows"] == 2  # 10-01 and 10-02
+    old = stored[stored["instrument_id"] == "EQ:BBG000B9XRY4"]
+    assert list(old["carried_from"]) == [date(2026, 10, 1)] * 2
+    assert "EQ:AAPL" in set(stored["instrument_id"])  # today's unresolved row is kept too
+
+
+def test_a_failed_backfill_day_carries_the_previous_forecasts_until_retried() -> None:
+    broken = {"on": False}
+
+    def transport(url: str) -> bytes:
+        if url.endswith("2026-09-29") and broken["on"]:
+            raise HttpError(500)
+        return calendar([("AAPL", "time-pre-market")])
+
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    source = NasdaqEarningsSource(http_for(transport, RetryPolicy(tries=1)))
+    ctx = task_ctx(writer, StoreReader(backend), CLOCK)
+    ingest_earnings(ctx, source, date(2026, 9, 28), days=3)  # the calendar knew 09-29
+    broken["on"] = True
+    first = backfill_earnings(ctx, source, DAY, date(2026, 9, 29), date(2026, 9, 30))
+    assert first.stats["carried_rows"] == 1
+    stored = StoreReader(backend).table("events/earnings", DAY)
+    assert stored is not None and list(stored["carried_from"].dropna()) == [date(2026, 9, 28)]
+    broken["on"] = False
+    backfill_earnings(ctx, source, DAY, date(2026, 9, 29), date(2026, 9, 30))  # the resume
+    stored = StoreReader(backend).table("events/earnings", DAY)
+    assert stored is not None and len(stored) == 2  # 09-29 fetched, replacing the carried row
+    assert "carried_from" not in stored.columns or stored["carried_from"].isna().all()

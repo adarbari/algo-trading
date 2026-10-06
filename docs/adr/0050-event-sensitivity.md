@@ -51,7 +51,9 @@ not answered: a fact of record stored years after it happened.
    session of its import. `knowledge_ts` stays the storage stamp (stamping overwrites it;
    nothing is keyed on it). Splits, dividends, reference and index changes are facts of
    record applied to bars at read time (ADR 0016): they are read by event date without a
-   knowledge bound and carry no `known_from`. **The one read rule**: as of session S the
+   knowledge bound and carry no `known_from`. A calendar day the nightly failed to fetch
+   carries the previous snapshot's forecasts forward (`carried_from`), so a failed fetch never
+   cancels knowledge. **The one read rule**: as of session S the
    data layer serves rows with `known_from <= S`, and a **statistic** as of S uses only events
    whose inputs are complete on or before S (the reaction session for a move, the reaction
    session plus 5 for `revert_rate`, plus 1 for `iv_crush`), with every lookback window

@@ -8,9 +8,12 @@ read rule, ADR 0050: its ``known_from``, else the session that stored it). Two k
   date X the authority is the LATEST snapshot whose date range covers X (from its own
   session, or its earliest row if earlier, to its latest row); a forecast another snapshot
   listed for X but the authority omits was moved or cancelled, and is ignored;
-- a **history** row (known before the session that stored it: last week's results in a
+- a **history** row (known before the session that fetched it: last week's results in a
   nightly window, a backfilled report known from its report date): a fact of record, always
   kept, whatever a later snapshot lists. Its day still counts in its snapshot's range.
+
+A row a snapshot carried forward over a day its fetch failed (``carried_from``: the session
+that fetched it) keeps the kind it had there, so the failed day cancels nothing.
 
 One row per (instrument, report date): a history row over a forecast, then the latest
 snapshot.
@@ -44,6 +47,9 @@ TIMES = {"pre_market": "pre", "after_hours": "post"}
 # The row's knowable date (``data.events``' one read rule, ADR 0050); before its stored session:
 # a history row (a reported result), else a forecast row of that session's calendar.
 KNOWN_FROM = "known_from"
+# A forecast copied forward over a day the fetch failed: the session that fetched it, which
+# decides its kind (a forecast stays a forecast in every snapshot that carries it).
+CARRIED_FROM = "carried_from"
 
 _REPORT = f"{EVENTS}.ts"
 _NO_NEXT = "no report date on or after the session in the calendars stored by then"
@@ -100,7 +106,11 @@ def valid_events(stored: pd.DataFrame, since: date | None = None) -> pd.DataFram
     history = np.zeros(len(stored), dtype=bool)
     if KNOWN_FROM in stored.columns:
         known = pd.to_datetime(stored[KNOWN_FROM]).to_numpy(dtype="datetime64[D]")
-        history = ~np.isnat(known) & (known < snap_day)
+        fetched_on = snap_day
+        if CARRIED_FROM in stored.columns:
+            carried = pd.to_datetime(stored[CARRIED_FROM]).to_numpy(dtype="datetime64[D]")
+            fetched_on = np.where(np.isnat(carried), snap_day, carried)
+        history = ~np.isnat(known) & (known < fetched_on)
     ranges = pd.DataFrame({"snapshot": snap_day, "report": report_day}).groupby("snapshot")
     lo, hi = ranges["report"].min(), ranges["report"].max()
     snaps = lo.index.to_numpy(dtype="datetime64[D]")
