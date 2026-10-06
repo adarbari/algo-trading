@@ -3,8 +3,9 @@ app and shared by every request), a REST read's ``ReadContext`` (``Context``: th
 context for the latest session, opened as GraphQL opens it), the live quotes (ADR 0028),
 the config writer (ADR 0029: user configs only, through ``services.authoring``), the
 on-request screen runner (ADR 0033), the caller (``Caller``: the registry user the app's
-authenticator resolves, once per request, ADR 0040), the user a write is for, and the query
-parameters several routes share (comma-separated lists).
+authenticator resolves, once per request, ADR 0040), the text model behind screener drafts
+(ADR 0041), the user a write is for, and the query parameters several routes share
+(comma-separated lists).
 
 Settings come from the environment through ``algotrade.config.env`` (the one reader):
 ``ALGOTRADE_DATA_URL``, ``ALGOTRADE_CONFIG_DIR``, ``ALGOTRADE_USER`` (the user
@@ -31,8 +32,9 @@ from algotrade.config.env import (
 )
 from algotrade.config.site.users import Role, UserRecord
 from algotrade.config.user import DEFAULT_USER, UserContext
-from algotrade.core.model.errors import ConfigurationError
+from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
 from algotrade.services.authoring.scope import ConfigWriter, open_writer
+from algotrade.services.drafting.model import TextModel
 from algotrade.services.live.quotes import LiveQuotes
 from algotrade.services.ondemand.screens import OnDemandScreens
 from algotrade.services.read.context import (
@@ -206,6 +208,18 @@ def get_ondemand(request: Request) -> OnDemandScreens:
 
 
 OnDemand = Annotated[OnDemandScreens, Depends(get_ondemand)]
+
+
+def get_drafter(request: Request) -> TextModel:
+    """The text model behind screener drafts ``create_app`` set up (ADR 0041); off (no
+    ``llm.toml`` enabling it, tests, the OpenAPI export): 503 with the reason."""
+    model = cast(TextModel | None, request.app.state.drafter)
+    if model is None:
+        raise ModelUnavailableError(cast(str, request.app.state.drafter_off))
+    return model
+
+
+Drafter = Annotated[TextModel, Depends(get_drafter)]
 
 
 def name_list(value: str | None) -> list[str]:

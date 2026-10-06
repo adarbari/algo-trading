@@ -67,6 +67,8 @@ export interface ScreenerBuilder {
   /** A blank criterion row; returns its id. */
   addCriterion: (field?: string) => string;
   setTieBreak: (field: string | null, order: 'asc' | 'desc') => void;
+  /** Replace the working document with one drafted elsewhere (a sentence, ADR 0041): an unsaved edit. */
+  loadDocument: (document: Readonly<Record<string, unknown>>) => void;
   save: () => Promise<void>;
   discard: () => Promise<void>;
   saving: boolean;
@@ -179,6 +181,9 @@ export function ScreenerBuilderProvider({ id, children }: { id: string; children
     },
     setTieBreak: (field, order) => {
       edit(withTieBreak(document, field, order));
+    },
+    loadDocument: (next) => {
+      edit(toDocument(next, id));
     },
     save: saved,
     discard: async () => {

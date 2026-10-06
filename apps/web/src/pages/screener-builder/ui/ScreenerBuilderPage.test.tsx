@@ -14,6 +14,7 @@ vi.mock('@/features/screener-builder', () => ({
   },
 }));
 vi.mock('@/widgets/draft-bar', () => ({ DraftBar: () => <Text>draft bar</Text> }));
+vi.mock('@/widgets/describe-screen', () => ({ DescribeScreen: () => <Text>describe</Text> }));
 vi.mock('@/widgets/criteria-table', () => ({ CriteriaTable: () => <Text>criteria</Text> }));
 vi.mock('@/widgets/screen-summary', () => ({ ScreenSummary: () => <Text>summary</Text> }));
 vi.mock('@/widgets/screen-funnel', () => ({ ScreenFunnel: () => <Text>funnel</Text> }));
@@ -37,7 +38,7 @@ describe('ScreenerBuilderPage', () => {
     const onOpenTicker = vi.fn();
     render(<ScreenerBuilderPage id="my-vrp" onOpenTicker={onOpenTicker} onDeleted={vi.fn()} />);
     expect(probe.id).toBe('my-vrp');
-    for (const text of ['draft bar', 'criteria', 'summary', 'funnel'])
+    for (const text of ['draft bar', 'describe', 'criteria', 'summary', 'funnel'])
       expect(screen.getByText(text)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'open ticker' }));
     expect(onOpenTicker).toHaveBeenCalledWith('AAPL');

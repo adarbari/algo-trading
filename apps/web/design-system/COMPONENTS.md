@@ -599,6 +599,20 @@ Source: `design-system/components/Legend`
 | `label` | `string` | no | Accessible name of the list, e.g. "Status key". |
 | `size` | `'sm' \| 'xs'` | no | Text size: `sm` 12 px (default) or `xs` 11.5 px. |
 
+### LoginForm
+
+LoginForm: sign in with an email and a password. Presentational: it holds the two typed values and hands them to `onSubmit`; the page does the request and passes back `pending` (the button shows a spinner and the fields lock) and `error` (one message for the whole attempt, shown above the fields and announced as an alert; both fields are marked invalid and described by it). Enter submits from either field, and the browser checks that the email is filled and shaped like one.
+
+Source: `design-system/components/LoginForm`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `onSubmit` | `(credentials: LoginCredentials) => void` | yes | Called with the credentials when the form is submitted (never while `pending`). |
+| `pending` | `boolean` | no | A sign-in request is running: the button shows a spinner and the fields are disabled. |
+| `error` | `string \| undefined` | no | Why the last attempt failed ("Wrong email or password"); shown until the page clears it. |
+| `title` | `string` | no | The form's heading (an h1: the form is the page's one task); "Sign in" by default. |
+| `defaultEmail` | `string` | no | An email to start with (the one used last time). |
+
 ### NavTabs
 
 NavTabs: a workspace's section links in the top bar (Ideas, Screeners, Explore, ...), the current one marked with `aria-current="page"` and the accent tint. Router-agnostic: links are plain anchors unless `renderLink` renders the app's router link with the given props (the design system never imports the router). For switching views inside a page use Tabs.

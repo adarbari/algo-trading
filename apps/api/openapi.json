@@ -145,6 +145,58 @@
         "title": "DraftBody",
         "type": "object"
       },
+      "DraftFromTextBody": {
+        "properties": {
+          "document": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the Builder's current document (its criteria are kept unless changed)",
+            "title": "Document"
+          },
+          "text": {
+            "description": "the screen in plain English",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "DraftFromTextBody",
+        "type": "object"
+      },
+      "DroppedCriterion": {
+        "properties": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "field",
+          "reason"
+        ],
+        "title": "DroppedCriterion",
+        "type": "object"
+      },
       "ExpressionCheck": {
         "properties": {
           "categories": {
@@ -1183,6 +1235,44 @@
           "inputs"
         ],
         "title": "SavedFeature",
+        "type": "object"
+      },
+      "ScreenDraft": {
+        "properties": {
+          "document": {
+            "additionalProperties": true,
+            "description": "the draft for the Builder (never saved here)",
+            "title": "Document",
+            "type": "object"
+          },
+          "dropped": {
+            "description": "proposed criteria the draft does not keep",
+            "items": {
+              "$ref": "#/components/schemas/DroppedCriterion"
+            },
+            "title": "Dropped",
+            "type": "array"
+          },
+          "notes": {
+            "description": "what the model could not map or assumed",
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "screener_id": {
+            "title": "Screener Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "screener_id",
+          "document",
+          "dropped",
+          "notes"
+        ],
+        "title": "ScreenDraft",
         "type": "object"
       },
       "ScreenPreview": {
@@ -2302,6 +2392,58 @@
           }
         },
         "summary": "Save Draft",
+        "tags": [
+          "screeners"
+        ]
+      }
+    },
+    "/screeners/{screener_id}/draft-from-text": {
+      "post": {
+        "operationId": "draft_from_text_screeners__screener_id__draft_from_text_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "screener_id",
+            "required": true,
+            "schema": {
+              "title": "Screener Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftFromTextBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenDraft"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Draft From Text",
         "tags": [
           "screeners"
         ]

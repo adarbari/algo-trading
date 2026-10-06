@@ -182,6 +182,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/screeners/{screener_id}/draft-from-text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Draft From Text */
+        post: operations["draft_from_text_screeners__screener_id__draft_from_text_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/screeners/{screener_id}/finalise": {
         parameters: {
             query?: never;
@@ -338,6 +355,30 @@ export interface components {
             document: {
                 [key: string]: unknown;
             };
+        };
+        /** DraftFromTextBody */
+        DraftFromTextBody: {
+            /**
+             * Document
+             * @description the Builder's current document (its criteria are kept unless changed)
+             */
+            document?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Text
+             * @description the screen in plain English
+             */
+            text: string;
+        };
+        /** DroppedCriterion */
+        DroppedCriterion: {
+            /** Field */
+            field: string;
+            /** Id */
+            id: string;
+            /** Reason */
+            reason: string;
         };
         /** ExpressionCheck */
         ExpressionCheck: {
@@ -804,6 +845,28 @@ export interface components {
             name: string;
             /** Theme */
             theme: string;
+        };
+        /** ScreenDraft */
+        ScreenDraft: {
+            /**
+             * Document
+             * @description the draft for the Builder (never saved here)
+             */
+            document: {
+                [key: string]: unknown;
+            };
+            /**
+             * Dropped
+             * @description proposed criteria the draft does not keep
+             */
+            dropped: components["schemas"]["DroppedCriterion"][];
+            /**
+             * Notes
+             * @description what the model could not map or assumed
+             */
+            notes: string[];
+            /** Screener Id */
+            screener_id: string;
         };
         /** ScreenPreview */
         ScreenPreview: {
@@ -1359,6 +1422,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    draft_from_text_screeners__screener_id__draft_from_text_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screener_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftFromTextBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenDraft"];
+                };
             };
             /** @description Validation Error */
             422: {
