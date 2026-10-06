@@ -268,7 +268,7 @@ readable until `algotrade-ingest retire-features --group <name>@v1` deletes them
 |---|---|---|---|
 | `option_liquidity@v1` | `liq_status`, put/call tiers, target expiry + DTE, short strike, spreads, zone OI / volume, chain OI / volume, `underlying_price`, `iv30`, `stock_volume`, `chain_asof` (date) | the session's `chains/status` (required), `chains/option_quotes`, `chains/underlying_quotes` | built |
 | `price_stats@v2` | `close`, `sma_20/50/200`, `ret_20d/60d`, `high_52w`, `low_52w`, `hv20`, `hv30` (close-to-close), `hv20_yz` (Yang-Zhang), `adv_usd_20d`, `history_days` | `bars/1d` split-adjusted as of the session (not total return), 252 sessions back | built |
-| `price_history@v1` | `bar_status` (TRADED / NO_TRADE), `last_bar_session`, `range_sessions`, `range_status` (FULL / SINCE_LISTING / NEW_LISTING / FEW_BARS), `high_avail`, `low_avail` | `bars/1d` split-adjusted as of the session, 252 + 60 sessions back; params in `config/site/rollups.toml` | built |
+| `price_history@v1` | `bar_status` (TRADED / NO_TRADE), `last_bar_session`, `range_sessions`, `range_status` (FULL / SINCE_LISTING / NEW_LISTING / FEW_BARS / NO_HISTORY), `high_avail`, `low_avail` | `bars/1d` split-adjusted as of the session, 252 + 60 sessions back; params in `config/site/rollups.toml` | built |
 | `earnings@v1` | `next_earnings_date`, `earnings_time` (pre / post / unknown), `days_to_earnings` (sessions), `date_confirmed` (null: the source does not say), `last_earnings_date` | every `events/earnings` snapshot stored on or before the session | built |
 | `dividends@v2` | `div_ttm`, `div_count_ttm`, `last_ex_date` | `events/dividend`, `events/split` (by event date), `price_stats@v2` | built |
 | `div_yield@v1` | `div_yield` (the materialised expression feature) | `dividends@v2`, `price_stats@v2` | built |
@@ -337,7 +337,9 @@ whole `instruments/shares` table is read once per `rollups` run and filtered per
 `close` reads "No trade", never an older close). `range_status` is FULL with `full_bars` (240)
 bars in the window (as the 52-week high / low), SINCE_LISTING when no bar falls in the
 `listing_quiet` (60) sessions before the window's first bar and that bar is at least
-`min_listing_sessions` (20) sessions back, NEW_LISTING when younger, else FEW_BARS;
+`min_listing_sessions` (20) sessions back, NEW_LISTING when younger, FEW_BARS for an older
+name trading too rarely, and NO_HISTORY when a session these rules rest on has no bars in the
+store at all (it starts inside the lookback): never a false "new listing", the range stays UNKNOWN;
 `high_avail` / `low_avail` exist for FULL and SINCE_LISTING (`feature.pct_from_high_avail`).
 
 **`price_stats@v2` rules.** Windows are exchange sessions, not "the instrument's last n bars":

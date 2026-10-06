@@ -18,8 +18,10 @@ close, never an older close (ADR 0036). Only bars on or before the session are r
                                     bar of the window (a listing, or a return after a long
                                     halt), and at least ``min_listing_sessions`` sessions since
                      NEW_LISTING    a listing with fewer sessions than that
-                     FEW_BARS       otherwise: an older listing that trades too rarely to fill
-                                    the window
+                     FEW_BARS       an older listing that trades too rarely to fill the window
+                     NO_HISTORY     the store has no bars at all on a session these rules need
+                                    (it starts inside the lookback, or a market-wide gap): not
+                                    a fact about the instrument, so its range stays UNKNOWN
     high_avail       highest daily high over the window's bars when FULL or SINCE_LISTING
     low_avail        lowest daily low, likewise
 
@@ -45,7 +47,7 @@ type Matrix = npt.NDArray[np.float64]
 NAME = "price_history"
 VERSION = 1
 TRADED, NO_TRADE = "TRADED", NullReason.NO_TRADE.value
-FULL, SINCE_LISTING = "FULL", "SINCE_LISTING"
+FULL, SINCE_LISTING, NO_HISTORY = "FULL", "SINCE_LISTING", "NO_HISTORY"
 NEW_LISTING, FEW_BARS = NullReason.NEW_LISTING.value, NullReason.FEW_BARS.value
 SHORT = (FEW_BARS, NEW_LISTING)  # the range statuses with no range: EXPLAINED (ADR 0046)
 _SHORT_MEANING = (
@@ -75,8 +77,8 @@ FEATURES = (
         "How much history the range covers: FULL (at least full_bars, 240, bars in the "
         "window), SINCE_LISTING (listed inside the window, at least min_listing_sessions, 20, "
         "sessions ago), NEW_LISTING (listed more recently), FEW_BARS (an older listing that "
-        "trades too rarely)",
-        "never", "label", categories=(FULL, SINCE_LISTING, NEW_LISTING, FEW_BARS),
+        "trades too rarely), NO_HISTORY (the store lacks a session these rules need)",
+        "never", "label", categories=(FULL, SINCE_LISTING, NEW_LISTING, FEW_BARS, NO_HISTORY),
         inputs=(CLOSE,),
     ),
     Feature(
@@ -125,7 +127,10 @@ def history(
 ) -> dict[str, npt.NDArray[np.generic]]:
     """Every column but ``last_bar_session`` (as the index of the last bar in the panel) for
     the LAST session of the panel (``listing_quiet + year_sessions`` sessions x instruments,
-    NaN: no bar), one value per instrument, for the instruments with a bar in the window."""
+    NaN: no bar), one value per instrument, for the instruments with a bar in the window.
+    A session with no bar for any instrument is one the store lacks: a listing (nothing
+    before the first bar) or FEW_BARS is claimed only where every session it rests on is
+    stored."""
     quiet, year = p.listing_quiet, p.year_sessions
     traded = ~np.isnan(close)
     window = traded[-year:]
@@ -137,10 +142,13 @@ def history(
     start = len(close) - year + first  # the first bar's row in the panel
     before = (rows >= start - quiet) & (rows < start)
     listing = ~(traded & before).any(axis=0)
+    unstored = ~traded.any(axis=1)[:, None]  # a session the store has no bars for
+    listed = listing & ~(unstored & (rows >= start - quiet)).any(axis=0)
+    thin = ~listing & ~unstored[-year:].any()
     status = np.select(
-        [bars >= p.full_bars, listing & (since >= p.min_listing_sessions), listing],
-        [FULL, SINCE_LISTING, NEW_LISTING],
-        FEW_BARS,
+        [bars >= p.full_bars, listed & (since >= p.min_listing_sessions), listed, thin],
+        [FULL, SINCE_LISTING, NEW_LISTING, FEW_BARS],
+        NO_HISTORY,
     )
     ranged = (status == FULL) | (status == SINCE_LISTING)
     with np.errstate(invalid="ignore"):

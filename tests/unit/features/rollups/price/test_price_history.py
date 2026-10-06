@@ -3,6 +3,7 @@ NEW_LISTING, FEW_BARS) and the high / low over the history available; on stored 
 and as properties of ``history`` over random bar masks (gaps, listings, determinism, no
 lookahead)."""
 
+import tomllib
 from dataclasses import replace
 
 import numpy as np
@@ -11,9 +12,12 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from algotrade.config.site.settings import rollup_params
 from algotrade.features.framework.runner import compute_one
+from algotrade.features.registry import GROUPS
 from algotrade.features.rollups.price import price_history as ph
 from algotrade.features.rollups.price import price_stats as ps
+from tests.conftest import REPO_ROOT
 from tests.helpers.rollup_store import END, series, store, write_bars
 
 P = ph.PriceHistoryParams()
@@ -62,6 +66,22 @@ def test_on_stored_bars() -> None:
 def test_full_matches_price_stats_52_week_rule() -> None:
     stats = ps.PriceStatsParams()
     assert (P.year_sessions, P.full_bars) == (stats.year_sessions, stats.min_year_sessions)
+    doc = tomllib.loads((REPO_ROOT / "config" / "site" / "rollups.toml").read_text())
+    site = rollup_params(doc, {k: g.params for k, g in GROUPS.items()})
+    here, there = site[ph.GROUP.key], site[ps.GROUP.key]
+    assert (here.year_sessions, here.full_bars) == (there.year_sessions, there.min_year_sessions)
+
+
+def test_a_store_starting_inside_the_lookback_claims_no_listing() -> None:
+    """Sessions before the store's first bars are not "no trade before listing"."""
+    writer, reader = store()
+    write_bars(writer, {"EQ:AAPL": series(100), "EQ:THIN": series(100)},
+               skip={"EQ:THIN": [i for i in range(100) if i % 5]})  # fmt: skip
+    frame = compute_one(reader, ph.GROUP, END).frame
+    for iid in ("EQ:AAPL", "EQ:THIN"):
+        got = row(frame, iid)
+        assert got["range_status"] == "NO_HISTORY" and pd.isna(got["high_avail"]), iid
+    assert row(frame, "EQ:AAPL")["bar_status"] == "TRADED"
 
 
 @pytest.mark.parametrize(
@@ -110,9 +130,16 @@ def test_history_properties(mask: np.ndarray) -> None:
         if ranged:  # the window's own bars, never zero or a filled gap
             assert out["high_avail"][j] == np.nanmax(high[-SMALL.year_sessions :, j])
             assert out["low_avail"][j] == np.nanmin(low[-SMALL.year_sessions :, j])
-        if status in ("SINCE_LISTING", "NEW_LISTING"):  # nothing in the quiet sessions before
-            start = len(mask) - SMALL.year_sessions + first
-            assert not mask[max(0, start - SMALL.listing_quiet) : start, j].any()
+        start = len(mask) - SMALL.year_sessions + first
+        stored = mask.any(axis=1)  # sessions the store has bars for
+        if status in ("SINCE_LISTING", "NEW_LISTING"):  # nothing stored before, all stored
+            assert not mask[start - SMALL.listing_quiet : start, j].any()
+            assert stored[start - SMALL.listing_quiet :].all()
+        if status == "FEW_BARS":  # traded before the window, the whole window stored
+            assert mask[start - SMALL.listing_quiet : start, j].any()
+            assert stored[-SMALL.year_sessions :].all()
+        if status == "NO_HISTORY":  # only where a session it rests on is not stored
+            assert not stored[start - SMALL.listing_quiet :].all()
     again = ph.history(high.copy(), low.copy(), close.copy(), SMALL)
     assert all(_same(out[k], again[k]) for k in out)  # deterministic
 
