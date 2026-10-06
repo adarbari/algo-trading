@@ -45,7 +45,8 @@ versus planned. Detail lives in companion docs:
    features/    framework/ · rollups/ · expressions/ · registry · site  analytics/   metrics, reports
    storage/     tables/ (schemas, readers / writers) · backends/ · configs/ (config store) · runs, locks
    config/      site/ (L3 settings) · strategy/ (configs, selections, resolution + hash) · env, user
-   quant/       pure numerics: Black-Scholes price + Greeks, IV, realised vol, rate conventions
+   quant/       pure numerics: Black-Scholes price + Greeks, IV, realised vol, rate conventions,
+                cross-asset turbulence and absorption, bull / bear dating
    core/        model/ (value objects, instruments, options, ids, errors) · time/ · views/ · validation/
 ```
 
@@ -375,7 +376,7 @@ Extra contracts:
 | `config/` | `site/`: L3 site settings loader. `strategy/`: typed `StrategyConfig` / `Selection` / `Rule`, field catalogue, layered resolution and the config hash. `env.py` (environment), `user.py` (L4 users). Pure. | core |
 | `storage/` | Generic data contract. `tables/`: schemas, a `Protocol` per store, the generic reader (tables, ranges, dates, runs) and writer / result-writer facades. `backends/`: `local` (Parquet) and `memory`. `configs/`: the `ConfigStore` and its file / memory stores (never imports `tables/` or `backends/`). `runs.py`, `locks.py`, `factory.py`. No domain rules. | core, pandas, pyarrow (backends only) |
 | `data/` | The domain read API, the only way consumers read market data: `reference` (one snapshot rule, instruments, terms, `InstrumentView`, universe, `SymbolResolver`), `prices` (bars + split / dividend adjustment), `events` (by event date), `chains` (filter by underlying), `rates` (the Treasury curve a date sees), `rollups` (stored group rows), `shares` (share counts by filing date), `feature_inputs` (what a feature group reads, by table name; ADR 0023). | storage, quant, core |
-| `quant/` | Pure numerics (ADR 0021): `black_scholes` (European price + Greeks, continuous q and r), `implied_vol` (safeguarded Newton, NaN + status code on failure), `realized_vol` (close-to-close, Parkinson, Garman-Klass, Yang-Zhang; 252), `rates` (par → continuous, tenor days, curve interpolation). | numpy, core |
+| `quant/` | Pure numerics (ADR 0021): `black_scholes` (European price + Greeks, continuous q and r), `implied_vol` (safeguarded Newton, NaN + status code on failure), `realized_vol` (close-to-close, Parkinson, Garman-Klass, Yang-Zhang; 252), `rates` (par → continuous, tenor days, curve interpolation), `covariance` (Kritzman-Li turbulence, the absorption ratio and its shift; eigenvalues only), `turning_points` (Pagan-Sossounov and Lunde-Timmermann bull / bear dating, drawdowns). | numpy, core |
 | `strategies/` → `trading/` | Backtest strategies: `MarketView` in, target weights out, plus their registry. | core, quant |
 | `strategies/` → `screeners/` | Screener contract, shared `Decision` categories, `short_premium_liquidity`. | core, quant |
 | `features/` | The feature store (ADR 0023): `framework/` (`Feature`: one typed, documented column with kind, unit, null meaning, range; `FeatureGroup`: inputs + lookback, params from `rollups.toml`, its features; the dependency graph and the per-session runner, point in time, chunked backfills), `rollups/` (the groups: `FEATURES` + a pure compute; only core, quant, numpy, pandas), `registry.py` (`GROUPS`, `FEATURES`, `feature(name)`, `SUPERSEDED`), `expressions/` (the typed expression language: lexer, parser, type checker, vectorised evaluator, never Python `eval`; expression features from `config/site/features/*.toml` resolved into a `FeatureSet` with the code groups and the groups that materialise expressions), `site.py` (the site's `FeatureSet`; the selection catalogue and the `rollups` task are built from it), `catalogue.py` (renders `docs/data/features.md`). Inputs are asked of `data.feature_inputs` by table name; expression features are computed on read (`services/features.py`) unless materialised. | data (`data.feature_inputs` only), config.site, quant, core |
@@ -409,7 +410,8 @@ src/algotrade/
     tables/       interfaces, readers, writers, schemas, result_writer
     backends/     local, memory, arrow, run_selection        the only Parquet / Arrow code
     configs/      store.py (ConfigStore), files.py            config documents only
-  quant/          black_scholes, implied_vol, realized_vol, rates   pure numerics (numpy)
+  quant/          black_scholes, implied_vol, realized_vol, rates,  pure numerics (numpy)
+                  covariance, turning_points
   data/           reference, prices, events, chains, rates, resolver
   features/       framework/ (declaration, columns, graph, runner), rollups/, expressions/, registry, site, catalogue
   strategies/{trading,screeners}/  engines/{backtest,screening,selection}/  analytics/
