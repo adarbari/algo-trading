@@ -39,9 +39,12 @@ type and, later, UI and email labels (ADR 0023).
 - ``null_status`` the status column saying why this one is null: a sibling column of the same
                   group (``iv30_status``) or another group's (``iv30.iv30_status@v1``, for a
                   feature derived from it); when its value is an illiquid status the read
-                  says ILLIQUID (ADR 0042)
-- ``illiquid_statuses``  which ``null_status`` values mean the chain is too thin (the others
-                  stay NULL); declared with ``null_status``, each needs the other
+                  says ILLIQUID (ADR 0042), when it is an explained one EXPLAINED (ADR 0046)
+- ``illiquid_statuses``  which ``null_status`` values mean the chain is too thin
+- ``explained_statuses``  which ``null_status`` values explain the null in words a reader
+                  acts on; each is a ``NullReason`` value and the status value is the reason
+                  (``bar_status`` ``NO_TRADE``: "No trade"). Other values stay NULL. A
+                  ``null_status`` needs at least one of the two lists, and either list needs it
 - ``version``     the feature's definition version: a group feature's is its group's (a
                   group is re-versioned only when its stored columns change); an expression
                   feature's is its own
@@ -50,6 +53,7 @@ type and, later, UI and email labels (ADR 0023).
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Literal
 
 from algotrade.core.model.fields import FIELD_TYPES, NUMERIC_TYPES
@@ -59,6 +63,8 @@ type Kind = Literal["window", "chain", "expression", "cross_section", "label"]
 type Range = tuple[float | None, float | None]
 type Licence = Literal["open", "personal"]
 type AppliesTo = Literal["any", "optionable", "operating_company"]
+# A status field with the values of it that read ILLIQUID and those that read EXPLAINED.
+type StatusRule = tuple[str, frozenset[str], frozenset[str]]
 
 ENTITIES = frozenset({"instrument"})
 KINDS = frozenset({"window", "chain", "expression", "cross_section", "label"})
@@ -81,6 +87,19 @@ UNITS = frozenset(
         "text",  # an identifier or free text
     }
 )
+
+
+class NullReason(StrEnum):
+    """Why a value is null when the data is complete and the null itself is the fact (ADR
+    0046): a closed set, so every client can label each one. A status column whose value
+    explains a null holds one of these names."""
+
+    NO_TRADE = "NO_TRADE"  # no bar on the session: the instrument did not trade
+    NOT_ANNOUNCED = "NOT_ANNOUNCED"  # the company has not announced its next report date
+    NEW_LISTING = "NEW_LISTING"  # too few sessions since listing for the window
+    FEW_BARS = "FEW_BARS"  # trades too rarely to fill the window
+
+
 _NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 _FEATURE_REF = re.compile(r"^([a-z][a-z0-9_]*\.)?[a-z][a-z0-9_]*@v[1-9][0-9]*$")
 _RAW_REF = re.compile(r"^[a-z0-9_/]+\.[a-z][a-z0-9_]*$")
@@ -104,6 +123,7 @@ class Feature:
     applies_to: AppliesTo = "any"
     null_status: str = ""  # a sibling status column; "": null always means UNKNOWN
     illiquid_statuses: tuple[str, ...] = ()  # the null_status values that mean "too thin"
+    explained_statuses: tuple[str, ...] = ()  # the null_status values that are a NullReason
 
     @property
     def key(self) -> str:
@@ -176,8 +196,13 @@ def _absence_problems(f: Feature) -> list[str]:
         problems.append(f"{f.name}: applies_to {f.applies_to!r} must be one of {list(APPLIES_TO)}")
     if "@" in f.null_status and not is_feature_ref(f.null_status):
         problems.append(f"{f.name}: null_status {f.null_status!r} is not <group>.<column>@vN")
-    if bool(f.null_status) != bool(f.illiquid_statuses):
-        problems.append(f"{f.name}: null_status and illiquid_statuses go together")
+    if bool(f.null_status) != bool(f.illiquid_statuses or f.explained_statuses):
+        problems.append(f"{f.name}: null_status goes with illiquid_statuses or explained_statuses")
+    bad = sorted(set(f.explained_statuses) - set(NullReason))
+    if bad:
+        problems.append(f"{f.name}: explained_statuses {bad} are not NullReason values")
+    if set(f.explained_statuses) & set(f.illiquid_statuses):
+        problems.append(f"{f.name}: a status is either illiquid or explained, not both")
     return problems
 
 

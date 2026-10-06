@@ -19,7 +19,8 @@ from algotrade_api.graphql.types.session import Session
 @strawberry.type(
     description="Instruments x catalogue features for one session, one page of the rows "
     "matching the filters in the sort order (`total`: every page). `rows[i][j]` is the value "
-    "of `columns[j]` for `instruments[i]`, null exactly when `unknown[i][j]` says why. "
+    "of `columns[j]` for `instruments[i]`, null exactly when `unknown[i][j]` says why "
+    "(`reasons[i][j]`: its NullReason when EXPLAINED). "
     "`missing`: tables the filters and sort read with nothing for the session (no row passes "
     "a filter on them); the nightly tables missing for it are `session.missing`"
 )
@@ -31,6 +32,7 @@ class FeatureTable:
     instruments: list[Instrument]
     rows: list[list[JSON | None]]
     unknown: list[list[values.UnknownCode | None]]
+    reasons: list[list[values.NullReason | None]]
     sort: str | None
     total: int
     page: int
@@ -47,6 +49,7 @@ class FeatureTable:
             instruments=[Instrument.of(i, ctx) for i in d.instruments],
             rows=[[JSON(v) for v in row] for row in d.rows],
             unknown=[list(row) for row in d.unknown],
+            reasons=[list(row) for row in d.reasons],
             sort=d.sort,
             total=d.total,
             page=d.page,
