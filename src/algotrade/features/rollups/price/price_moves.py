@@ -22,7 +22,7 @@ import pandas as pd
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
-from algotrade.features.rollups.price.price_stats import panel
+from algotrade.features.rollups.price.price_stats import panel, traded_rows
 
 NAME = "price_moves"
 VERSION = 1
@@ -56,9 +56,7 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     bars = inputs[BARS]
     assert bars is not None  # required input
     px = panel(bars, sessions_ending(session, WINDOW + 1))  # price_stats' session axis
-    traded = ~np.isnan(px.close[-1])
-    values = largest_move(px.close[:, traded])
-    return pd.DataFrame({"instrument_id": px.ids[traded], "one_day_move": values})
+    return traded_rows(px, {"one_day_move": largest_move(px.close)}, COLUMNS)
 
 
 GROUP = FeatureGroup(

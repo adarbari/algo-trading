@@ -189,9 +189,12 @@ def panel(bars: pd.DataFrame, days: list[date]) -> Panel:
     )
 
 
-def traded_rows(px: Panel, values: Mapping[str, Matrix], columns: Iterable[str]) -> pd.DataFrame:
+def traded_rows(
+    px: Panel, values: Mapping[str, npt.NDArray[Any]], columns: Iterable[str]
+) -> pd.DataFrame:
     """One row per instrument with a bar on the panel's last session: ``instrument_id`` and
-    each of ``columns`` from ``values`` (one value per instrument)."""
+    each of ``columns`` from ``values`` (one value per instrument, of any dtype: a float, a
+    whole-number count, a session date or ``None``)."""
     traded = ~np.isnan(px.close[-1])
     frame = pd.DataFrame({"instrument_id": px.ids[traded]})
     for column in columns:
