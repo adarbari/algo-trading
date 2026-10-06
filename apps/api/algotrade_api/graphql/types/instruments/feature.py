@@ -1,6 +1,8 @@
 """``FeatureValue`` and ``FeatureInfo`` (ADR 0038): a catalogue field's value for an
 instrument and the session, the reason when it is UNKNOWN, and the field's metadata with the
-display ``format`` the server derives (the client never guesses one from the name)."""
+display ``format`` the server derives (the client never guesses one from the name) and, on
+the catalogue read, the site field guide's entry (``FieldGuide``: how to read it, the
+criterion per intent, caveats; ADR 0041 amended)."""
 
 from typing import Self
 
@@ -31,7 +33,61 @@ class Unknown:
         return cls(code=d.code, detail=d.detail, reason=d.reason)
 
 
-@strawberry.type(description="One catalogue field: what it is and how to show it")
+@strawberry.type(
+    description="One intent a trader has for a field and the criterion that expresses it, as "
+    "a rule screen takes it: `op`, `value` (in the field's unit), `mode`, `tolerance` (a "
+    "number in the unit, or `{relative}` as a share of the threshold), `onMiss` for soft; "
+    "`note` says how to combine it"
+)
+class GuideUse:
+    intent: str
+    op: str
+    value: JSON | None
+    mode: str
+    tolerance: JSON | None
+    on_miss: str | None
+    note: str
+
+    @classmethod
+    def of(cls, d: catalogue.GuideUse) -> Self:
+        return cls(
+            intent=d.intent,
+            op=d.op,
+            value=d.value,
+            mode=d.mode,
+            tolerance=None if d.tolerance is None else JSON(d.tolerance),
+            on_miss=d.on_miss,
+            note=d.note,
+        )
+
+
+@strawberry.type(
+    description="The site field guide's entry for a field (docs/data/field-guide.md): how to "
+    "read it, the criterion per intent, when the reading lies (each caveat names the field "
+    "that exposes it), and the sources"
+)
+class FieldGuide:
+    theme: str
+    reads: str
+    uses: list[GuideUse]
+    caveats: list[str]
+    sources: list[str]
+
+    @classmethod
+    def of(cls, d: catalogue.FieldGuide) -> Self:
+        return cls(
+            theme=d.theme,
+            reads=d.reads,
+            uses=[GuideUse.of(u) for u in d.uses],
+            caveats=list(d.caveats),
+            sources=list(d.sources),
+        )
+
+
+@strawberry.type(
+    description="One catalogue field: what it is and how to show it; `guide` is the site "
+    "field guide's entry (on the catalogue read; null for a field without one)"
+)
 class FeatureInfo:
     name: str
     kind: str
@@ -50,6 +106,7 @@ class FeatureInfo:
     scope: str
     owner: str | None
     licence: str
+    guide: FieldGuide | None
 
     @classmethod
     def of(cls, d: catalogue.FeatureInfo) -> Self:
@@ -71,6 +128,7 @@ class FeatureInfo:
             scope=d.scope,
             owner=d.owner,
             licence=d.licence,
+            guide=FieldGuide.of(d.guide) if d.guide is not None else None,
         )
 
 

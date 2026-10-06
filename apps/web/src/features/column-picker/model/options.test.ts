@@ -22,6 +22,7 @@ const feature = (patch: Partial<CatalogueFeature>): CatalogueFeature => ({
   scope: 'site',
   owner: null,
   licence: 'open',
+  guide: null,
   ...patch,
 });
 

@@ -1,6 +1,7 @@
 /**
- * Read hooks for the feature catalogue and one feature's distribution across the universe, over
- * GraphQL (`Query.catalogue`, `Query.distribution`; ADR 0037). The distribution is for exactly
+ * Read hooks for the feature catalogue (each field with the site field guide's entry, ADR 0041
+ * amended) and one feature's distribution across the universe, over GraphQL (`Query.catalogue`,
+ * `Query.distribution`; ADR 0037). The distribution is for exactly
  * the latest session: a feature not stored for it comes back with `unknown` and no counts.
  */
 import { useQuery, type QueryClient } from '@tanstack/react-query';
@@ -30,6 +31,21 @@ const FeatureCatalogue = graphql(`
       scope
       owner
       licence
+      guide {
+        theme
+        reads
+        caveats
+        sources
+        uses {
+          intent
+          op
+          value
+          mode
+          tolerance
+          onMiss
+          note
+        }
+      }
     }
   }
 `);

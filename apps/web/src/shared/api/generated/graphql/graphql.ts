@@ -78,7 +78,7 @@ export type ComparePricesQuery = { table: { instruments: Array<{ instrumentId: s
 export type FeatureCatalogueQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type FeatureCatalogueQuery = { catalogue: Array<{ name: string, kind: string, source: string, dtype: string, format: FeatureFormat, description: string, nullMeaning: string, version: number | null, group: string | null, key: string | null, inputs: Array<string>, unit: string | null, range: Array<number | null> | null, categories: Array<string>, scope: string, owner: string | null, licence: string }> };
+export type FeatureCatalogueQuery = { catalogue: Array<{ name: string, kind: string, source: string, dtype: string, format: FeatureFormat, description: string, nullMeaning: string, version: number | null, group: string | null, key: string | null, inputs: Array<string>, unit: string | null, range: Array<number | null> | null, categories: Array<string>, scope: string, owner: string | null, licence: string, guide: { theme: string, reads: string, caveats: Array<string>, sources: Array<string>, uses: Array<{ intent: string, op: string, value: unknown, mode: string, tolerance: unknown, onMiss: string | null, note: string }> } | null }> };
 
 export type FeatureDistributionQueryVariables = Exact<{
   name: string;
@@ -401,6 +401,21 @@ export const FeatureCatalogueDocument = new TypedDocumentString(`
     scope
     owner
     licence
+    guide {
+      theme
+      reads
+      caveats
+      sources
+      uses {
+        intent
+        op
+        value
+        mode
+        tolerance
+        onMiss
+        note
+      }
+    }
   }
 }
     `) as unknown as TypedDocumentString<FeatureCatalogueQuery, FeatureCatalogueQueryVariables>;
