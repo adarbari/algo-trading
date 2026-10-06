@@ -24,7 +24,7 @@ from algotrade.storage.tables.schemas import SCHEMA_VERSION
 
 BARS = "bars/1d"
 # The architecture registry at the repo root (the workspace installs this package editable).
-OWNERSHIP = Path(__file__).resolve().parents[4] / "architecture" / "ownership.toml"
+TABLES = Path(__file__).resolve().parents[4] / "architecture" / "tables.toml"
 
 
 class NotFoundError(AlgoTradeError):
@@ -72,15 +72,15 @@ def grain_of(table: str) -> Grain:
 
 
 # Session-grain tables expected for every session: the declared ``[[table]]`` entries
-# (architecture/ownership.toml) under rollups/instrument/, chains/ and results/, plus bars/1d.
+# (architecture/tables.toml) under rollups/instrument/, chains/ and results/, plus bars/1d.
 # verification/* and live/* are not produced nightly and are never listed. Read once.
 _NIGHTLY_PREFIXES = ("rollups/instrument/", "chains/", "results/")
 
 
-def expected_tables(ownership: Path = OWNERSHIP) -> tuple[str, ...]:
+def expected_tables(tables: Path = TABLES) -> tuple[str, ...]:
     """The session-grain tables a complete session has, sorted (wildcard entries such as
     ``results/*`` name a family, not a table, and are skipped)."""
-    declared = tomllib.loads(ownership.read_text())["table"]
+    declared = tomllib.loads(tables.read_text())["table"]
     names = {t["name"] for t in declared if t["name"].startswith(_NIGHTLY_PREFIXES)}
     return tuple(sorted({n for n in names if "*" not in n} | {BARS}))
 

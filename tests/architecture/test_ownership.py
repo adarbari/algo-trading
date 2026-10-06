@@ -1,6 +1,6 @@
 """Fitness tests for the ownership registry (ADR 0019).
 
-- every stored table has exactly one producing owner in ``architecture/ownership.toml``;
+- every stored table has exactly one producing owner in ``architecture/tables.toml``;
 - every path the registry and its ratchets name exists, and every doc section it cites does;
 - every L3 site setting is read by code (ignored settings, like ``cboe.workers`` once was,
   are listed in ``KNOWN_UNREAD``, which may only shrink);
@@ -26,6 +26,7 @@ from tests.conftest import REPO_ROOT
 
 REGISTRY = tomllib.loads((REPO_ROOT / "architecture" / "ownership.toml").read_text())
 WEB_REGISTRY = tomllib.loads((REPO_ROOT / "architecture" / "web_ownership.toml").read_text())
+TABLES = tomllib.loads((REPO_ROOT / "architecture" / "tables.toml").read_text())["table"]
 KNOWN = tomllib.loads((REPO_ROOT / "architecture" / "known_violations.toml").read_text())
 CODE_FILES = sorted(
     p
@@ -76,19 +77,19 @@ def _slugs(markdown: str) -> set[str]:
 
 
 def test_every_known_table_has_exactly_one_producing_owner() -> None:
-    names = Counter(t["name"] for t in REGISTRY["table"])
+    names = Counter(t["name"] for t in TABLES)
     duplicated = [name for name, n in names.items() if n > 1]
     assert not duplicated, f"tables with more than one producing owner: {duplicated}"
     missing = sorted(set(schemas.KNOWN) - set(names))
-    assert not missing, f"add a [[table]] entry with its owner to ownership.toml: {missing}"
+    assert not missing, f"add a [[table]] entry with its owner to tables.toml: {missing}"
 
 
 def test_every_open_table_family_has_a_producing_owner() -> None:
-    names = [t["name"] for t in REGISTRY["table"]]
+    names = [t["name"] for t in TABLES]
     families = [*schemas.OPEN_PREFIXES, "bars/"]
     orphans = [f for f in families if not any(n.startswith(f) for n in names)]
     assert not orphans, f"no producing owner registered for: {orphans}"
-    for table in REGISTRY["table"]:
+    for table in TABLES:
         assert isinstance(table["owner"], str), f"{table['name']}: owner must be ONE module"
         if "*" not in table["name"]:
             schemas.spec_for(table["name"])  # a registered table must be a valid table
@@ -101,7 +102,7 @@ def test_registry_paths_exist() -> None:
     missing = []
     for resp in REGISTRY["responsibility"]:
         missing += [f"{resp['id']}: {g}" for g in resp["owner"] if not _paths_matching(g)]
-    for table in REGISTRY["table"]:
+    for table in TABLES:
         for path in [table["owner"], *table.get("also_written_by", [])]:
             if not (REPO_ROOT / path).is_file():
                 missing.append(f"table {table['name']}: {path}")

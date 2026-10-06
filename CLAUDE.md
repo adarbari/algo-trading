@@ -41,7 +41,7 @@ Read in this order, **by section and only when the task needs it** (grep, then r
 ## Ownership (ADR 0019; enforced by `make ownership`, `make dupes`, `make arch`)
 
 **Before writing code that does X, find X's owner:** `grep <keyword> architecture/*ownership.toml`
-(authoritative: every responsibility and stored table). Extend the owner; never re-implement it elsewhere. **A new responsibility needs an entry + owner in the same PR** (`.claude/skills/add-responsibility`). The ownership ratchet
+(authoritative: every responsibility; stored tables are in `architecture/tables.toml`). Extend the owner; never re-implement it elsewhere. **A new responsibility needs an entry + owner in the same PR** (`.claude/skills/add-responsibility`). The ownership ratchet
 (`architecture/known_violations.toml`) is **at zero**: any violation fails CI, and a fitness
 test forbids parking new ones there or adding pending contracts. A genuine exception needs an
 ADR and an `allowed` entry with the reason. **Never game a check** (e.g. reordering fields to

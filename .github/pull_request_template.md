@@ -6,7 +6,7 @@
 ## Ownership (ADR 0019)
 - Owner module(s) this change extends (from `architecture/ownership.toml`):
 - [ ] No responsibility re-implemented outside its owner; a new responsibility has an entry + owner in `architecture/ownership.toml`
-- [ ] A new stored table has exactly one producing owner (`[[table]]`)
+- [ ] A new stored table has exactly one producing owner (`[[table]]` in `architecture/tables.toml`)
 - [ ] `make ownership` passes; `architecture/known_violations.toml` did not grow (shrunk if violations were fixed)
 - [ ] `make dupes` passes; `architecture/dupes_baseline.txt` did not grow
 - [ ] Architecture checks pass (`make arch`, `tests/architecture/`); boundary changes come with an ADR and the matching contract
