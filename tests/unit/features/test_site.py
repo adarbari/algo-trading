@@ -413,6 +413,45 @@ def test_swing_breakout_and_pullback_rules(fs: FeatureSet) -> None:
     assert pull["EQ:BREAK"] is False  # 11 above SMA20
 
 
+VOLUME = "rollups/instrument/volume@v1"
+
+
+def test_volume_dry_up_climax_and_bias(fs: FeatureSet) -> None:
+    ids = ["EQ:DRY", "EQ:EDGE", "EQ:BUSY", "EQ:LOW", "EQ:NONE"]
+    vol = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "volume_ratio_5d_20d": [0.4, 0.6, 1.5, 0.59, np.nan],
+            "volume_z_20d": [3.5, 3.0, 0.2, -1.0, np.nan],
+            "up_volume_share_20d": [0.7, 0.6, 0.4, 0.5, np.nan],
+        }
+    ).astype({"volume_ratio_5d_20d": "float32", "volume_z_20d": "float32"})
+    names = ["volume_dry_up", "volume_climax", "volume_bias"]
+    out = fs.evaluate({VOLUME: vol}, names).set_index("instrument_id")
+    assert out["volume_dry_up"].to_dict() == {
+        "EQ:DRY": True,  # 0.4 < 0.6
+        "EQ:EDGE": False,  # 0.6 is not under 0.6
+        "EQ:BUSY": False,
+        "EQ:LOW": True,
+        "EQ:NONE": None,  # ratio unknown
+    }
+    assert out["volume_climax"].to_dict() == {
+        "EQ:DRY": True,
+        "EQ:EDGE": True,  # 3 standard deviations: the edge counts
+        "EQ:BUSY": False,
+        "EQ:LOW": False,
+        "EQ:NONE": None,
+    }
+    assert out["volume_bias"].to_dict() == {
+        "EQ:DRY": "ACCUMULATION",
+        "EQ:EDGE": "ACCUMULATION",  # 0.6: the edge counts
+        "EQ:BUSY": "DISTRIBUTION",  # 0.4: the edge counts
+        "EQ:LOW": "NEUTRAL",
+        "EQ:NONE": None,
+    }
+
+
 def test_earnings_before_expiry_compares_the_two_dates(fs: FeatureSet) -> None:
     day = pd.Timestamp(END).date()
     expiry = day + pd.Timedelta(days=7)

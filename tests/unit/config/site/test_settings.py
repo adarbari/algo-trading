@@ -466,6 +466,7 @@ def test_the_committed_feature_files_load() -> None:
         "regime",
         "swing",
         "volatility",
+        "volume",
         "vrp",
     ]
     definitions = load_features(store)
