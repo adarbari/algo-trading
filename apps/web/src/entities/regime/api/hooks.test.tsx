@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { gql, GraphQLRequestError } from '@/shared/api';
 
-import { useRegime, useRegimeBands, useRegimeEpisodes } from './hooks';
+import { useMarketHistory, useRegime, useRegimeBands, useRegimeEpisodes } from './hooks';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -104,5 +104,50 @@ describe('useRegimeEpisodes', () => {
       expect(result.current.isSuccess).toBe(true);
     });
     expect(result.current.data).toEqual({ episodes: [], recessions: [] });
+  });
+});
+
+describe('useMarketHistory', () => {
+  const history = {
+    name: 'market.regime@v2.macro_risk',
+    bucketSessions: 5,
+    points: [
+      { session: '2020-01-02', value: 41 },
+      { session: '2020-01-09', value: null },
+    ],
+    segments: [],
+  };
+
+  it('asks the MarketHistory operation with the names, window and point budget', async () => {
+    GQL.mockResolvedValue({ market: { history: [history] } });
+    const { result } = renderHook(
+      () => useMarketHistory(['market.regime@v2.macro_risk'], '1971-01-01', '2026-10-02', 600),
+      { wrapper },
+    );
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(String(GQL.mock.calls[0]?.[0])).toContain('query MarketHistory');
+    expect(GQL.mock.calls[0]?.[1]).toEqual({
+      names: ['market.regime@v2.macro_risk'],
+      start: '1971-01-01',
+      end: '2026-10-02',
+      points: 600,
+    });
+    expect(result.current.data).toEqual([history]);
+  });
+
+  it('waits for the window end and serves none for a null market', async () => {
+    const { result, rerender } = renderHook(
+      ({ end }: { end: string | undefined }) => useMarketHistory(['x'], '1971-01-01', end, 600),
+      { wrapper, initialProps: { end: undefined as string | undefined } },
+    );
+    expect(result.current.fetchStatus).toBe('idle');
+    GQL.mockResolvedValue({ market: null });
+    rerender({ end: '2026-10-02' });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(result.current.data).toEqual([]);
   });
 });

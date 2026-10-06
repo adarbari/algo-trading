@@ -25,6 +25,38 @@ export interface RegimeUnknown {
 export interface RegimeScore {
   value: number | null;
   unknown: RegimeUnknown | null;
+  /** The catalogue field the history chart reads (`market.regime@v2.macro_risk`). */
+  feature: string;
+  /** The field of the share of the score's weight known (null: the score has none). */
+  coverageFeature: string | null;
+  /** At or above it the score is high for the label (null: context only). */
+  threshold: number | null;
+}
+
+/** A piece of a sentence, a link when `url` is set (`IndicatorSource.terms` is plain text). */
+export interface TextPart {
+  text: string;
+  url: string | null;
+}
+
+/** Where an indicator's value comes from (one series or table), with its provenance. */
+export interface IndicatorSource {
+  label: string;
+  series: string | null;
+  /** "weekly", "daily, after the close". */
+  cadence: string;
+  releaseLagDays: number | null;
+  url: string | null;
+  licence: string;
+  terms: string | null;
+  /** The latest observation the session knew, and the day it became public. */
+  lastObservation: string | null;
+  vintageDate: string | null;
+  vintageKind: string | null;
+  /** The earliest ALFRED vintage the session knew: before it the history is revised figures. */
+  firstVintage: string | null;
+  /** It fed today's value (false: the source a per-session switch did not choose). */
+  active: boolean;
 }
 
 export interface RegimeIndicator {
@@ -46,6 +78,18 @@ export interface RegimeIndicator {
   status: gqlTypes.IndicatorStatus;
   /** The verdict differs from five sessions ago (null: not stored). */
   changed: boolean | null;
+  /** The catalogue field of the value (the history chart's line). */
+  feature: string;
+  /** The catalogue field of the verdict (`<card>_on`: a flag; the history chart's lane). */
+  verdictFeature: string;
+  /** The meter's display range, in the value's stored unit. */
+  range: { min: number; max: number };
+  /** Where the indicator turns on (null: no rule in code), and which side is the risk. */
+  threshold: number | null;
+  direction: gqlTypes.RiskDirection | null;
+  /** How the value is calculated, as linked parts. */
+  how: readonly TextPart[];
+  sources: readonly IndicatorSource[];
 }
 
 /**
@@ -82,6 +126,15 @@ export interface Recession {
 /** The plain name of an episode key (an unnamed key reads as itself, spaced). */
 export function episodeName(episodes: readonly RegimeEpisode[], key: string): string {
   return episodes.find((episode) => episode.key === key)?.name ?? key.replace(/_/g, ' ');
+}
+
+/**
+ * The stored regime label's field: the regime group names it beside its scores
+ * (`market.regime@v2.label` next to `market.regime@v2.macro_risk`), so the history reads it
+ * from the group the scores came from.
+ */
+export function regimeLabelFeature(regime: Regime): string {
+  return regime.scores.macroRisk.feature.replace(/\.[^.]*$/, '.label');
 }
 
 /** A screener of the caller and the labels its picks are PAUSED in (calmest first). */
