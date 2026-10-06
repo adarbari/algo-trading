@@ -7,7 +7,16 @@ from typing import Any, Protocol
 
 from algotrade.core.model.errors import ConfigurationError
 
-KINDS = ("defaults", "strategies", "selections", "settings", "features", "screeners", "preferences")
+KINDS = (
+    "defaults",
+    "strategies",
+    "selections",
+    "settings",
+    "features",
+    "screeners",
+    "preferences",
+    "identity",
+)
 
 
 class ConfigStore(Protocol):
@@ -15,7 +24,9 @@ class ConfigStore(Protocol):
         """``scope`` is "site" or a user id; ``kind`` one of ``KINDS``. ``settings`` are site-only
         documents read by ingestion (``universe``, ``sources``, ``rollups``, ...); ``features``
         are expression-feature files (``site/features/<theme>.toml``, or a user's
-        ``users/<id>/features/<theme>.toml``). ``screeners`` are versioned rule screens:
+        ``users/<id>/features/<theme>.toml``). ``preferences`` and ``identity`` are one file
+        per user (``users/<id>/<kind>.toml``; identity holds the sign-in email, ADR 0040), never
+        the site's. ``screeners`` are versioned rule screens:
         ``name`` loads the latest version, ``name@N`` exactly version N; drafts are never
         loaded here."""
         ...

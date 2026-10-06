@@ -303,7 +303,7 @@ export interface components {
             sample: number;
             /**
              * User
-             * @description whose catalogue (default the API's)
+             * @description whose catalogue (default: the caller's; another user's: admins only)
              */
             user?: string | null;
         };
@@ -629,7 +629,7 @@ export interface components {
             };
             /**
              * User
-             * @description whose catalogue and presets (default the API's)
+             * @description whose catalogue and presets (default: the caller's; another: admins only)
              */
             user?: string | null;
         };
@@ -1109,7 +1109,7 @@ export interface operations {
     save_user_feature_features_user_post: {
         parameters: {
             query?: {
-                /** @description whose configs (a label until auth; default the API's) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;
@@ -1185,7 +1185,7 @@ export interface operations {
     save_ideas_priority_preferences_ideas_put: {
         parameters: {
             query?: {
-                /** @description whose configs (a label until auth; default the API's) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;
@@ -1223,7 +1223,7 @@ export interface operations {
             query?: {
                 /** @description a named view (default: the table's default view) */
                 name?: string | null;
-                /** @description whose configs (a label until auth; default the API's) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;
@@ -1263,7 +1263,7 @@ export interface operations {
             query: {
                 /** @description the named view to remove */
                 name: string;
-                /** @description whose configs (a label until auth; default the API's) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;
@@ -1297,7 +1297,7 @@ export interface operations {
     delete_screener_screeners__screener_id__delete: {
         parameters: {
             query?: {
-                /** @description whose configs (a label until auth; default the API's) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;
@@ -1329,7 +1329,7 @@ export interface operations {
     copy_screeners__screener_id__copy_post: {
         parameters: {
             query?: {
-                /** @description whose configs (a label until auth; default the API's) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;
@@ -1367,7 +1367,7 @@ export interface operations {
     save_draft_screeners__screener_id__draft_put: {
         parameters: {
             query?: {
-                /** @description whose configs (a label until auth; default the API's) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;
@@ -1405,7 +1405,7 @@ export interface operations {
     discard_draft_screeners__screener_id__draft_delete: {
         parameters: {
             query?: {
-                /** @description whose configs (a label until auth; default the API's) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;
@@ -1472,7 +1472,7 @@ export interface operations {
     finalise_screeners__screener_id__finalise_post: {
         parameters: {
             query?: {
-                /** @description whose configs (a label until auth; default the API's) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;
@@ -1506,7 +1506,7 @@ export interface operations {
     rebase_screeners__screener_id__rebase_post: {
         parameters: {
             query?: {
-                /** @description whose configs (a label until auth; default the API's) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;
@@ -1575,7 +1575,7 @@ export interface operations {
             query?: {
                 /** @description default: the latest session with data */
                 date?: string | null;
-                /** @description default: the API's user (a label until auth) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;

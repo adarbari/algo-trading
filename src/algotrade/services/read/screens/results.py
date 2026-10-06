@@ -25,7 +25,7 @@ import pandas as pd
 
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.views.feature_view import FeatureValue as Scalar
-from algotrade.services.read.context import ReadContext, at_session, partition
+from algotrade.services.read.context import ReadContext, at_session, catalogue_key, partition
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
 from algotrade.services.read.instruments.features import load_feature_values
 from algotrade.services.read.instruments.identity import Instrument, load_instruments
@@ -352,7 +352,8 @@ def _sorted(ids: list[str], values: Mapping[str, Any], descending: bool) -> list
 
 
 def _ordered(ctx: ReadContext, run: ScreenerRun, query: ResultQuery, seq: int) -> _Order:
-    key = ("screen_results", run.run_id, ctx.session.date, query, ctx.user.user_id, seq)
+    user = (ctx.user.user_id, catalogue_key(ctx))  # a sort on an edited feature: a new order
+    key = ("screen_results", run.run_id, ctx.session.date, query, user, seq)
     found: _Order | None = ctx.cache.get(key)
     if found is not None:
         return found

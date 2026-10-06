@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from algotrade.core.model.errors import ModelUnavailableError
 from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.main import create_app
+from tests.helpers.api_store import as_user
 
 PRICE = "rollup.price_stats@v2.close"
 ANSWER = {
@@ -44,7 +45,11 @@ class Down:
 
 
 def app_with(store: ReadStore, model: Any) -> TestClient:
-    return TestClient(create_app(ApiSettings("memory://", "config"), store, drafter=model))
+    return TestClient(
+        create_app(
+            ApiSettings("memory://", "config"), store, drafter=model, authenticator=as_user()
+        )
+    )
 
 
 def test_a_sentence_becomes_a_draft_with_what_was_dropped(

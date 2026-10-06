@@ -58,7 +58,11 @@ __all__ = [
 
 class ResultCache:
     """A small LRU of computed results. Callers key on ``StoreReader.visible_seq()`` (read
-    before computing), so a publish makes every earlier entry unreachable (ADR 0022)."""
+    before computing), so a publish makes every earlier entry unreachable (ADR 0022). One
+    cache serves every caller of the API (ADR 0040): a result that depends on the request's
+    user has ``ctx.user.user_id`` in its key, and one that depends on their catalogue (a user
+    feature's formula) also ``catalogue_key(ctx)``, so an edited feature never hits a stale
+    entry; stored rows of a named run (the run names its owner) and market data need not."""
 
     def __init__(self, size: int = 8) -> None:
         self._size = size
@@ -113,6 +117,11 @@ class StoreContext:
 
 # What a session-free loader takes: a ``StoreContext``, or a ``ReadContext`` (a superset).
 Stores = StoreContext | ReadContext
+
+
+def catalogue_key(ctx: Stores) -> str:
+    """The caller's expression features as text, for a cache key over their catalogue."""
+    return repr(sorted((n, repr(e.definition)) for n, e in ctx.features.expressions.items()))
 
 
 def open_read_stores(data_url: str, config_dir: str | Path) -> tuple[StoreReader, ConfigStore]:

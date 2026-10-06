@@ -2,7 +2,8 @@
 one session (``END``, the last golden session) of everything else a page shows: universe,
 reference facts with review marks, company details, rollups, events, an option chain, the
 verification vs IBKR, run records (incl. data-quality checks), screen results and a saved
-backtest."""
+backtest. ``as_user``: the authenticator the API tests run as (a stand-in for a verified
+token, ADR 0040)."""
 
 import atexit
 import shutil
@@ -12,8 +13,10 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import pandas as pd
+from starlette.requests import Request
 
-from algotrade.config.user import SITE_USER, UserContext
+from algotrade.config.site.users import Role, UserRecord
+from algotrade.config.user import DEFAULT_USER, SITE_USER, UserContext
 from algotrade.data import StoreReader
 from algotrade.services.backtests.run import EQUITY, FILLS, PORTFOLIO
 from algotrade.services.backtests.run import run_job_name as backtest_job
@@ -37,6 +40,23 @@ NOW = datetime(2022, 11, 24, 2, tzinfo=UTC)
 SYMBOLS = ["AAA", "BBB", "BULL", "CCC"]
 SPLIT_DAY = date(2022, 6, 1)
 CONFIG_ROOT = Path(__file__).resolve().parents[2] / "config"
+
+
+class StubAuthenticator:
+    """Every request is ``user``; ``calls`` counts the resolutions (one per request)."""
+
+    def __init__(self, user: UserRecord) -> None:
+        self.user = user
+        self.calls = 0
+
+    def authenticate(self, request: Request) -> UserRecord:
+        self.calls += 1
+        return self.user
+
+
+def as_user(user_id: str = DEFAULT_USER, role: Role = Role.ADMIN) -> StubAuthenticator:
+    """The API's authenticator for tests: every request is ``user_id`` with ``role``."""
+    return StubAuthenticator(UserRecord(user_id, role))
 
 
 def store_over(

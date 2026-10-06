@@ -12,6 +12,7 @@ from algotrade.storage.configs.writer import FileConfigWriter
 from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.main import create_app
 from tests.conftest import REPO_ROOT
+from tests.helpers.api_store import as_user
 
 SELECTION = """name = "all_active"
 [where]
@@ -46,4 +47,6 @@ def root(tmp_path: Path) -> Path:
 def writer_client(api_golden: tuple[ReadStore, dict[str, str]], root: Path) -> TestClient:
     writer = FileConfigWriter(root)
     store = replace(api_golden[0], configs=writer, user=UserContext("local"))
-    return TestClient(create_app(ApiSettings("memory://", str(root)), store, writer))
+    return TestClient(
+        create_app(ApiSettings("memory://", str(root)), store, writer, authenticator=as_user())
+    )

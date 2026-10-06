@@ -10,26 +10,22 @@ from fastapi import APIRouter, Query, Response
 
 from algotrade.config.user import UserContext
 from algotrade.services.ondemand.screens import READY, RunRequest
-from algotrade_api.deps import OnDemand, Store
+from algotrade_api.deps import OnDemand, User
 
 router = APIRouter(prefix="/screens", tags=["screens"])
 
 
 @router.post("/{config_id}/run")
 def run(
-    store: Store,
     runner: OnDemand,
     response: Response,
     config_id: str,
+    user: User,
     on: Annotated[
         date | None, Query(alias="date", description="default: the latest session with data")
     ] = None,
-    user: Annotated[
-        str | None, Query(description="default: the API's user (a label until auth)")
-    ] = None,
 ) -> RunRequest:
-    who = UserContext(user) if user else store.user
-    request = runner.request(config_id, who, on)
+    request = runner.request(config_id, UserContext(user), on)
     response.status_code = 200 if request.state in (READY, "complete", "partial") else 202
     return request
 

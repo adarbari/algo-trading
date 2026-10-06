@@ -5,12 +5,15 @@ ADMIN workspace and the ops reads; ``trader`` the TRADER workspace). Their confi
 ``config/users/<id>/`` (ADR 0015): the registry only says who exists and what they may do. A
 missing file is the single-user install: ``local`` as ``admin`` and ``site`` for scheduled
 site screens, so nothing changes until a second user is declared. How a user proves who they
-are (login) is the API's concern (ADR 0040); ``settings.load_users`` reads the file, this
-module does no I/O.
+are (login) is the API's concern (ADR 0040); the email a sign-in maps to is not in the public
+site file but in the user's own git-ignored ``config/users/<id>/identity.toml`` (``email``, and
+optionally ``subject``: the Supabase user id a token's ``sub`` must then equal), attached by
+``with_identities``. ``settings.load_users`` reads the files, this module does no I/O.
 """
 
+import uuid
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Any
 
@@ -20,6 +23,8 @@ from algotrade.core.model.errors import ConfigurationError
 
 WHERE = "users.toml"
 USER_KEYS = ("id", "role", "name")
+IDENTITY = "identity"  # config/users/<id>/identity.toml: the user's sign-in identity
+IDENTITY_KEYS = ("email", "subject")
 
 
 class Role(StrEnum):
@@ -39,9 +44,23 @@ class UserRecord:
     user_id: str
     role: Role
     name: str = ""
+    email: str | None = None  # lowercased; from identity.toml (never committed: ADR 0040)
+    subject: str | None = None  # the pinned Supabase user id (a UUID), when set
 
     def __post_init__(self) -> None:
         validate_id("user", self.user_id)
+        if self.subject is not None:
+            object.__setattr__(self, "subject", _subject(self.subject, f"user '{self.user_id}'"))
+        if self.email is None and self.subject is None:
+            return
+        if self.user_id == SITE_USER:
+            raise ConfigurationError(f"user '{SITE_USER}' runs scheduled screens: no identity")
+        if self.email is None:
+            raise ConfigurationError(f"user '{self.user_id}': a subject needs an email")
+        email = self.email.strip().lower()
+        if "@" not in email:
+            raise ConfigurationError(f"user '{self.user_id}' email: expected an email address")
+        object.__setattr__(self, "email", email)  # frozen: normalised once, here
 
 
 DEFAULT_USERS: tuple[UserRecord, ...] = (
@@ -62,10 +81,29 @@ class UsersSettings:
             seen.add(user.user_id)
         if not any(u.role is Role.ADMIN for u in self.users):
             raise ConfigurationError(f"{WHERE}: at least one user must have role = 'admin'")
+        emails = [u.email for u in self.users if u.email is not None]
+        if len(emails) != len(set(emails)):
+            raise ConfigurationError(f"{IDENTITY}.toml: two users have the same email")
 
     def get(self, user_id: str) -> UserRecord | None:
         """The declared user, or ``None`` for an unknown id (callers refuse it)."""
         return next((u for u in self.users if u.user_id == user_id), None)
+
+    def by_email(self, email: str) -> UserRecord | None:
+        """The user whose identity email is ``email`` (case ignored), or ``None``."""
+        wanted = email.strip().lower()
+        return next((u for u in self.users if u.email is not None and u.email == wanted), None)
+
+    def with_identities(self, identities: Mapping[str, "Identity"]) -> "UsersSettings":
+        """These users with the identities ``identities`` maps their ids to (``identity``)."""
+        none = Identity()
+        return UsersSettings(
+            tuple(
+                replace(u, email=found.email, subject=found.subject)
+                for u in self.users
+                for found in (identities.get(u.user_id, none),)
+            )
+        )
 
     def role_of(self, user_id: str) -> Role:
         user = self.get(user_id)
@@ -105,3 +143,43 @@ def _user(doc: Mapping[str, Any], index: int) -> UserRecord:
     if name is not None and not isinstance(name, str):
         raise ConfigurationError(f"{where} name: expected a string")
     return UserRecord(user_id, Role(role), name or "")
+
+
+@dataclass(frozen=True)
+class Identity:
+    """What ``identity.toml`` says about a user: the sign-in email and the pinned subject."""
+
+    email: str | None = None
+    subject: str | None = None
+
+
+def identity(doc: Mapping[str, Any] | None, user_id: str) -> Identity:
+    """``user_id``'s ``identity.toml``: the email (lowercased) and the optional ``subject``
+    (the Supabase user id, a UUID); empty without the file. Messages never repeat a value
+    (personal data)."""
+    if doc is None:
+        return Identity()
+    where = f"users/{user_id}/{IDENTITY}.toml"
+    table = Table(doc, where)
+    table.only(IDENTITY_KEYS)
+    email, subject = table.raw("email"), table.raw("subject")
+    if email is not None and (not isinstance(email, str) or "@" not in email):
+        raise ConfigurationError(f"{where} email: expected an email address")
+    if subject is not None and email is None:
+        raise ConfigurationError(f"{where} subject: needs an email")
+    return Identity(
+        email.strip().lower() if isinstance(email, str) else None,
+        _subject(subject, where) if subject is not None else None,
+    )
+
+
+def _subject(value: object, where: str) -> str:
+    """A Supabase user id, normalised (lowercase, hyphenated); never echoed."""
+    try:
+        return str(uuid.UUID(str(value))) if isinstance(value, str) else _bad(where)
+    except ValueError:
+        return _bad(where)
+
+
+def _bad(where: str) -> str:
+    raise ConfigurationError(f"{where} subject: expected the Supabase user id (a UUID)")

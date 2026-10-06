@@ -481,6 +481,11 @@ type Quantile {
 
 """Reads for the web app, each for one session (ADR 0036)"""
 type Query {
+  """
+  Who this request is for: the signed-in registry user, their role and workspaces (ADR 0040; not session data)
+  """
+  viewer: Viewer!
+
   """The session `date` resolves to; null: nothing stored"""
   session(
     """
@@ -931,4 +936,14 @@ type Verification {
   byCheck: [CheckCounts!]!
   failing: [JSON!]!
   unknown: Unknown
+}
+
+"""
+The user this request is for: the registry user the token maps to, their `role` (admin or trader) and the `workspaces` (trader, admin) the role opens; the web's role gate reads it, the server enforces it
+"""
+type Viewer {
+  id: String!
+  name: String!
+  role: String!
+  workspaces: [String!]!
 }

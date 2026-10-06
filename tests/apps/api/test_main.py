@@ -1,15 +1,26 @@
-"""The app factory: error mapping, CORS, OpenAPI export, the CLI and the latency budget."""
+"""The app factory: error mapping, CORS, authentication (ADR 0040: every route but the
+health check resolves its caller once), OpenAPI export, the CLI and the latency budget."""
 
+import re
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
+from algotrade.config.site.settings import load_users
+from algotrade.config.site.users import UserRecord
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.storage.configs.files import FileConfigStore
 from algotrade_api import cli
+from algotrade_api.auth.mode import AuthConfig, AuthMode, open_authenticator
+from algotrade_api.auth.protocol import UnauthenticatedError
 from algotrade_api.deps import DEV_ORIGINS, ApiSettings, ReadStore
 from algotrade_api.main import create_app, openapi_json
+from tests.apps.api.conftest import SUPABASE_URL, Tokens
+from tests.helpers.api_store import as_user
 
 REPO = Path(__file__).resolve().parents[3]
 
@@ -40,7 +51,7 @@ def test_configuration_errors_are_400(
         raise ConfigurationError("bad config")
 
     monkeypatch.setattr("algotrade.services.preview.screens.preview_screen", broken)
-    app = create_app(ApiSettings("memory://", "config"), api_golden[0])
+    app = create_app(ApiSettings("memory://", "config"), api_golden[0], authenticator=as_user())
     response = TestClient(app).post("/screeners/preview", json={"spec": {}})
     assert (response.status_code, response.json()) == (400, {"detail": "bad config"})
 
@@ -51,10 +62,12 @@ def test_settings_from_env_open_the_named_store(
     monkeypatch.setenv("ALGOTRADE_DATA_URL", f"file://{tmp_path}")
     monkeypatch.setenv("ALGOTRADE_CONFIG_DIR", str(tmp_path))
     monkeypatch.setenv("ALGOTRADE_USER", "alice")
+    monkeypatch.setenv("ALGOTRADE_AUTH", "off")
     settings = ApiSettings.from_env()
+    assert settings.auth.mode == "off"
     assert (settings.user, settings.config_dir) == ("alice", str(tmp_path))
     assert settings.debug is False  # GraphiQL only with ALGOTRADE_API_DEBUG=1
-    body = TestClient(create_app(settings)).get("/health").json()
+    body = TestClient(create_app(settings, authenticator=as_user())).get("/health").json()
     assert (body["storage"], body["latest_session"], body["tables"]) == ("file", None, [])
 
 
@@ -68,9 +81,143 @@ def test_cli_runs_uvicorn_on_localhost(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_asgi_app_is_configured_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ALGOTRADE_DATA_URL", "memory://")
+    monkeypatch.setenv("ALGOTRADE_AUTH", "off")
+    monkeypatch.delenv("ALGOTRADE_USER", raising=False)
     from algotrade_api import app  # noqa: PLC0415  (built at import, from the environment)
 
     assert app.app.state.store.kind == "memory"
+
+
+def _supabase_app(
+    api_golden: tuple[ReadStore, dict[str, str]], user_configs: Path, tokens: Tokens
+) -> TestClient:
+    """The app over the multi-user configs, verifying tokens of the test Supabase project
+    against the registry those configs declare (users.toml + identity.toml)."""
+    store = replace(api_golden[0], configs=FileConfigStore(user_configs))
+    config = AuthConfig(AuthMode.SUPABASE, SUPABASE_URL)
+    auth = open_authenticator(config, load_users(store.configs), "local", tokens.fetch())
+    settings = ApiSettings("memory://", str(user_configs))
+    return TestClient(create_app(settings, store, authenticator=auth))
+
+
+@pytest.fixture(scope="module")
+def signed(
+    api_golden: tuple[ReadStore, dict[str, str]], user_configs: Path, tokens: Tokens
+) -> TestClient:
+    return _supabase_app(api_golden, user_configs, tokens)
+
+
+SESSION = {"query": "{ session { date } }"}
+
+
+def _as(tokens: Tokens, email: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {tokens.mint(email=email)}"}
+
+
+def test_no_token_is_401_with_a_challenge_and_cors(signed: TestClient) -> None:
+    origin = DEV_ORIGINS[0]
+    response = signed.post("/graphql", json=SESSION, headers={"Origin": origin})
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"
+    assert response.headers["access-control-allow-origin"] == origin  # the browser can read it
+    assert signed.post("/features/check", json={"expr": "1"}).status_code == 401
+    assert signed.get("/health").status_code == 200  # the one public route
+
+
+def test_a_token_for_nobody_in_the_registry_is_403(signed: TestClient, tokens: Tokens) -> None:
+    response = signed.post("/graphql", json=SESSION, headers=_as(tokens, "eve@example.com"))
+    assert response.status_code == 403 and "eve" not in response.text
+    viewer = {"query": "{ viewer { id role workspaces } }"}
+    me = signed.post("/graphql", json=viewer, headers=_as(tokens, "ana@example.com"))
+    assert me.json() == {
+        "data": {"viewer": {"id": "ana", "role": "admin", "workspaces": ["admin", "trader"]}}
+    }
+
+
+def test_graphql_over_websocket_is_not_served(signed: TestClient) -> None:
+    with pytest.raises(WebSocketDisconnect), signed.websocket_connect("/graphql"):
+        pass  # no subscriptions: the only way in is a request the caller guard sees
+
+
+def test_two_callers_on_one_app_read_their_own_configs(signed: TestClient, tokens: Tokens) -> None:
+    # One app, one result cache: alice's sorted table (her user feature) must not leak to bob.
+    query = """query($columns: [FeatureName!]!, $sort: String) {
+      table(columns: $columns, sort: $sort) { instruments { symbol } rows } }"""
+    variables = {"columns": ["feature.hv20_pct"], "sort": "-feature.hv20_pct"}
+    body = {"query": query, "variables": variables}
+    for _ in range(2):  # the second read of each comes from the cache
+        alice = signed.post("/graphql", json=body, headers=_as(tokens, "alice@example.com"))
+        mine = alice.json()["data"]["table"]
+        assert mine["rows"][0][0] == pytest.approx(22.0)
+        # carol's feature has alice's name and the opposite sign: the cached order is keyed on
+        # the caller and their catalogue, never shared.
+        carol = signed.post("/graphql", json=body, headers=_as(tokens, "carol@example.com"))
+        theirs = carol.json()["data"]["table"]
+        assert [i["symbol"] for i in mine["instruments"]] == ["BULL", "BBB", "AAA", "CCC"]
+        assert [i["symbol"] for i in theirs["instruments"]] == ["AAA", "BBB", "BULL", "CCC"]
+        bob = signed.post("/graphql", json=body, headers=_as(tokens, "BOB@example.com"))
+        assert bob.json()["errors"][0]["extensions"]["code"] == "UNKNOWN_FEATURE"
+    formula = {"expr": "hv20_pct / 100"}
+    check = signed.post("/features/check", json=formula, headers=_as(tokens, "bob@example.com"))
+    assert check.status_code == 400  # REST reads are the caller's too
+
+
+def test_a_trader_cannot_act_for_another_user(signed: TestClient, tokens: Tokens) -> None:
+    body = {"expr": "hv20_pct / 100", "user": "alice"}
+
+    def status(email: str) -> int:
+        return signed.post("/features/check", json=body, headers=_as(tokens, email)).status_code
+
+    assert status("bob@example.com") == 403  # a trader naming someone else
+    assert status("ana@example.com") == 200 and status("alice@example.com") == 200
+
+
+class Refuse:
+    """An authenticator that lets nobody in."""
+
+    def authenticate(self, request: object) -> UserRecord:
+        raise UnauthenticatedError("no")
+
+
+def test_every_route_but_the_health_check_resolves_its_caller(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    app = create_app(ApiSettings("memory://", "config"), api_golden[0], authenticator=Refuse())
+    client = TestClient(app)
+    paths = app.openapi()["paths"]
+    assert "/graphql" in paths
+    for path, operations in paths.items():
+        url = re.sub(r"\{[^}]+\}", "x", path)
+        for method in operations:
+            status = client.request(method.upper(), url, json={}).status_code
+            assert status == (200 if path == "/health" else 401), (method, path, status)
+
+
+def test_the_caller_is_resolved_once_per_request(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    stub = as_user()
+    app = create_app(ApiSettings("memory://", "config"), api_golden[0], authenticator=stub)
+    client = TestClient(app)
+    query = {"query": "{ session { date } catalogue { name } }"}
+    assert client.post("/graphql", json=query).status_code == 200
+    assert stub.calls == 1  # the route's guard and the GraphQL context share it
+    formula = {"expr": "price_stats.close > 10"}
+    assert client.post("/features/check", json=formula).status_code == 200
+    assert stub.calls == 2  # guard, Reads -> Context, and the route's own Caller: one call
+
+
+def test_cli_refuses_auth_off_on_a_public_address(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(cli.uvicorn, "run", lambda app, **kw: calls.append(kw["host"]))
+    monkeypatch.setattr(cli, "load_dotenv", lambda: None)
+    monkeypatch.setenv("ALGOTRADE_AUTH", "off")
+    with pytest.raises(SystemExit):
+        cli.main(["--host", "0.0.0.0"])
+    cli.main(["--host", "127.0.0.1"])
+    monkeypatch.setenv("ALGOTRADE_AUTH", "supabase")
+    cli.main(["--host", "0.0.0.0"])
+    assert calls == ["127.0.0.1", "0.0.0.0"]
 
 
 ENDPOINTS = (
