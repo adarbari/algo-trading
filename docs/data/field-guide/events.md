@@ -42,6 +42,12 @@ Sources: Site convention over the earnings calendar and the stored chains
 
 **How to read it.** For a leveraged or inverse fund, the one stock it tracks (TSLL: Tesla), as an instrument id. The fund has no events of its own: its earnings, ex-dividends and big moves are its reference's, scaled by its leverage (instrument.leverage, negative for an inverse fund). Null for a fund that tracks a basket, and for every instrument that is not a leveraged or inverse fund.
 
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| funds that track one stock (their events are the stock's) | `not_null` | hard | - | pair with rollup.fund_reference@v1.reference_kind eq single_stock |
+
 **When the reading lies**
 
 - Null does not mean 'no events': a basket fund (rollup.fund_reference@v1.reference_kind index, sector or commodity) inherits macro and market-structure events and, for an index or sector, the earnings of its largest holdings; read the kind before the id.
@@ -71,6 +77,12 @@ Sources: Site convention (ADR 0050)
 
 **How to read it.** What settled a leveraged or inverse fund's link: holdings (its stored holdings name one stock, or show the basket) or name_rule (its name states the ticker or the kind). Null when nothing did. Holdings are the stronger evidence: they are what the fund owns today, while the name is a parse of text.
 
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| links settled by the holdings, not a parse of the name | `eq "holdings"` | hard | - | - |
+
 **When the reading lies**
 
 - name_rule is the only source for a fund whose holdings are not stored; after etf-holdings reads it the same fund can move to holdings and, rarely, to a different reference.
@@ -80,6 +92,12 @@ Sources: Site convention (ADR 0050)
 ### `rollup.fund_reference@v1.reference_status`
 
 **How to read it.** Why a leveraged or inverse fund's reference is what it is: LINKED (one stock found), BASKET (an index, sector or commodity fund: no one stock by design), UNLISTED (a stock is named but is not in the reference snapshot, so no id) or NO_REFERENCE (neither holdings nor the name say what it tracks).
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| funds whose single-stock link is found | `eq "LINKED"` | hard | - | - |
 
 **When the reading lies**
 

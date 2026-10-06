@@ -58,6 +58,11 @@ caveats = [
   "A fund whose holdings are not stored yet (etf-holdings has not read it) is linked by its name only; a NO_REFERENCE status is a gap in our data, not a fact about the fund.",
 ]
 sources = ["Site convention (ADR 0050 decision 2: the holdings table, ADR 0035, with a name rule as the fallback)"]
+[[field.use]]
+for = "funds that track one stock (their events are the stock's)"
+op = "not_null"
+mode = "hard"
+note = "pair with rollup.fund_reference@v1.reference_kind eq single_stock"
 
 [[field]]
 name = "rollup.fund_reference@v1.reference_kind"
@@ -83,6 +88,11 @@ caveats = [
   "name_rule is the only source for a fund whose holdings are not stored; after etf-holdings reads it the same fund can move to holdings and, rarely, to a different reference.",
 ]
 sources = ["Site convention (ADR 0050)"]
+[[field.use]]
+for = "links settled by the holdings, not a parse of the name"
+op = "eq"
+value = "holdings"
+mode = "hard"
 
 [[field]]
 name = "rollup.fund_reference@v1.reference_status"
@@ -92,3 +102,8 @@ caveats = [
   "Only BASKET with rollup.fund_reference@v1.reference_kind none is a settled 'tracks nothing' (a volatility fund); NO_REFERENCE is a gap to close by reading the fund's holdings.",
 ]
 sources = ["Site convention (ADR 0050)"]
+[[field.use]]
+for = "funds whose single-stock link is found"
+op = "eq"
+value = "LINKED"
+mode = "hard"
