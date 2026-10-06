@@ -159,3 +159,27 @@ def test_the_rule_level_decides_whether_a_breach_fails() -> None:
 def test_no_universe_fails_loudly() -> None:
     checks = check_coverage(StoreReader(MemoryBackend()), D, rules(CLOSE))
     assert [(c.name, c.status) for c in checks] == [("coverage", "FAIL")]
+
+
+def test_the_previous_session_is_found_per_feature_table() -> None:
+    writer, reader = store()
+    names = ("C1", "C2", "R1", "R2", "N1", "E1")
+    put(writer, PRICES, BEFORE, {s: {"close": 1.0} for s in names})
+    put(writer, PRICES, D, {s: {"close": 1.0} for s in names})
+    put(writer, IV30, D, {s: {"iv30": 0.3, "iv30_status": "OK"} for s in ("C1", "C2", "R1", "R2")})
+    iv = CoverageRule("iv30.iv30", 0.5, 0.5, max_drop=0.1)
+    checks = check_coverage(reader, D, rules(CLOSE, iv))
+    # iv30 has no earlier partition (prices do): its drop is skipped, not read as 0 -> fine
+    got = only(checks, "iv30.iv30")
+    assert got.status == "PASS" and "drop not checked" in got.detail
+    assert got.data["previous_session"] == ""
+    assert only(checks, "price_stats.close").data["previous_session"] == BEFORE.isoformat()
+    put(
+        writer,
+        IV30,
+        BEFORE,
+        {s: {"iv30": 0.3, "iv30_status": "OK"} for s in ("C1", "C2", "R1", "R2", "E1")},
+    )
+    again = only(check_coverage(reader, D, rules(iv)), "iv30.iv30")
+    assert again.data["previous_session"] == BEFORE.isoformat()
+    assert cell(again, "rest")["previous"] == 1.0

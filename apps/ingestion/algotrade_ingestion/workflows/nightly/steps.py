@@ -84,7 +84,9 @@ class StepResult:
     result: Any = None
     reason: str | None = None  # why it FAILED acceptance, was NOT_RUN, SKIPPED or WAIVED
     error: str | None = None  # the exception when it raised
-    checks: list[dict[str, Any]] = field(default_factory=list)  # checks that did not PASS
+    checks: list[dict[str, Any]] = field(
+        default_factory=list
+    )  # checks that did not PASS, and those carrying data
     held_by_wait: bool = False  # NOT_RUN only because a need is WAITING (transitively)
 
     def as_dict(self) -> dict[str, Any]:

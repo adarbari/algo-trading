@@ -241,6 +241,17 @@ allowed = [
 detect = [{ call = "Tiers" }, { call = "load_tiers" }]
 
 [[responsibility]]
+id = "feature-applicability"
+description = "Whether a feature applies to an instrument (Feature.applies_to over the reference snapshot's optionable / ETF facts): the one decision behind the read layer's NOT_APPLICABLE and the nightly coverage check (ADR 0042)"
+owner = ["src/algotrade/features/framework/feature.py"]
+allowed = [
+    "src/algotrade/services/read/instruments/features.py",  # NOT_APPLICABLE on a read
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/coverage.py",  # which names a feature is expected for
+]
+section = "docs/adr/0042-not-applicable-and-illiquid-values.md#decision"
+detect = [{ call = "not_applicable" }]
+
+[[responsibility]]
 id = "coverage-acceptance"
 description = "Per key feature and tier, the share of the instruments it applies to (Feature.applies_to) that have a value for the session, graded against [quality.coverage.*] (minimum per tier, day-over-day drop, WARN or FAIL): the acceptance check of the rollups step and a quality check (ADR 0043)"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/maintenance/coverage.py"]

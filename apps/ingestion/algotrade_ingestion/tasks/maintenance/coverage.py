@@ -148,10 +148,11 @@ def cells(
 
 
 def _previous(
-    reader: StoreReader, session: date, fs: FeatureSet, rules: tuple[CoverageRule, ...]
+    reader: StoreReader, session: date, fs: FeatureSet, rule: CoverageRule
 ) -> date | None:
-    """The latest session before ``session`` that has partitions of the rules' tables."""
-    days = [d for r in rules for d in reader.dates(_locate(fs, r.feature)[0]) if d < session]
+    """The latest session before ``session`` with a partition of the rule's own table (one
+    feature's table may lack a session the others have: chains run only for the latest)."""
+    days = [d for d in reader.dates(_locate(fs, rule.feature)[0]) if d < session]
     return max(days) if days else None
 
 
@@ -167,13 +168,17 @@ def check_coverage(reader: StoreReader, session: date, s: SourcesSettings) -> li
     today = cells(reader, session, s.coverage, s.cboe_priority_symbols, fs)
     if today is None:
         return [Check("coverage", "FAIL", "no universe or reference snapshot to measure against")]
-    before_day = _previous(reader, session, fs, s.coverage)
-    before = (
-        cells(reader, before_day, s.coverage, s.cboe_priority_symbols, fs) if before_day else None
-    )
-    prev = {(c.feature, c.tier): c.share for c in before or []}
+    days = {r.feature: _previous(reader, session, fs, r) for r in s.coverage}
+    prev: dict[tuple[str, str], float | None] = {}
+    for day in {d for d in days.values() if d}:
+        rules = tuple(r for r in s.coverage if days[r.feature] == day)
+        prev |= {
+            (c.feature, c.tier): c.share
+            for c in cells(reader, day, rules, s.cboe_priority_symbols, fs) or []
+        }
     checks = []
     for rule in s.coverage:
+        before_day = days[rule.feature]
         mine = [c for c in today if c.feature == rule.feature]
         status, notes = "PASS", []
         rows: list[dict[str, Any]] = []
@@ -201,6 +206,8 @@ def check_coverage(reader: StoreReader, session: date, s: SourcesSettings) -> li
                 }
             )
         figures = ", ".join(f"{c.tier} {_percent(c.share)} of {c.applicable}" for c in mine)
+        if before_day is None:
+            notes.append("no earlier partition: drop not checked")
         detail = f"{figures}" + (f" ({'; '.join(notes)})" if notes else "")
         checks.append(
             Check(
