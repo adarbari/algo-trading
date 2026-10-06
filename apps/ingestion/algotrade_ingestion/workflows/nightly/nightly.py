@@ -136,16 +136,18 @@ NIGHTLY: tuple[Step, ...] = (
         latest_only=True,
         critical=False,
     ),
-    # Economic series and index levels with their vintages (ADR 0048): needs nothing but the
-    # session, sources serving their current state (latest session only), and its failure
-    # (FRED down, a moved file) only warns: regime inputs go UNKNOWN, the screens still run.
-    Step("macro", critical=False, latest_only=True, accept=(check_macro,)),
     # Every session (catch-up too), after the market data it reads. A rollup that raises
     # (a gap in a lookback window included) fails the step.
     # Its acceptance is the coverage of the key features by tier (ADR 0043): a FAIL-level breach
     # (core-tier prices) fails the step and holds the screens back; the rest are warnings.
     Step("rollups", needs=MARKET_DATA, accept=(check_coverage,), task_complete=True),
     Step(SCREENS, needs=("chains", "rollups"), requires=universe_exists, latest_only=True),
+    # Economic series and index levels with their vintages (ADR 0048): after the screens, which
+    # nothing here reads until RG3. Its time budget bounds a FRED outage, but until then it must
+    # not sit on the critical path at all; RG3 moves it back before `market-rollups`, when the
+    # regime group needs it. Latest session only (the sources serve their current state); its
+    # failure only warns.
+    Step("macro", critical=False, latest_only=True, accept_with=(check_macro,)),
     # Company and ETF descriptions (ADR 0034): after the screens, so the Massive requests
     # (capped per night, ~21 min) do not delay them. Optional.
     Step("descriptions", latest_only=True, critical=False),

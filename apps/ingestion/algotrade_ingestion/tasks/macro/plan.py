@@ -15,6 +15,8 @@ data writes nothing:
 
 - an ``alfred`` row is a key (id, observation, vintage) a vintage never changes: written when
   the key is new (or, were ALFRED to correct one, when its value differs);
+- a value that turns null where a number is stored is never written (a null would mask the
+  number the series was known by);
 - a ``lagged`` row is a key whose value CAN change (a source corrects a number): when the
   stored value differs, the new one is a NEW vintage dated the run's session, never an
   overwrite, so a session before the run still sees the old value. The one exception: the
@@ -120,7 +122,8 @@ def _new_alfred(rows: pd.DataFrame, held: pd.DataFrame) -> pd.DataFrame:
     kept = held[[*KEY, "value"]].rename(columns={"value": "held"})
     merged = rows.merge(kept, on=KEY, how="left", indicator=True)
     unchanged = (merged["_merge"] == "both") & _same(merged["value"], merged["held"])
-    return merged[~unchanged].drop(columns=["held", "_merge"])
+    erased = (merged["_merge"] == "both") & merged["value"].isna() & merged["held"].notna()
+    return merged[~unchanged & ~erased].drop(columns=["held", "_merge"])
 
 
 def _changed_lagged(rows: pd.DataFrame, held: pd.DataFrame, session: date) -> pd.DataFrame:
@@ -133,7 +136,8 @@ def _changed_lagged(rows: pd.DataFrame, held: pd.DataFrame, session: date) -> pd
     newest = newest.rename(columns={"vintage_date": "held_vintage", "value": "held"})
     merged = rows.merge(newest, on=DAY_KEY, how="left")
     unchanged = merged["held_vintage"].notna() & _same(merged["value"], merged["held"])
-    changed = merged[~unchanged].copy()
+    erased = merged["held_vintage"].notna() & merged["value"].isna() & merged["held"].notna()
+    changed = merged[~unchanged & ~erased].copy()  # a number never gives way to a null
     today, stored_on = pd.Timestamp(session), changed["held_vintage"]
     corrected = stored_on.where(stored_on.isna() | (stored_on >= today), today)  # the later one
     changed["vintage_date"] = corrected.fillna(changed["vintage_date"])

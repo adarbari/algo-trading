@@ -14,8 +14,14 @@ credential, ``ALGOTRADE_FRED_API_KEY``, is missing) or a ``FETCH_ERROR``. A skip
 never an error: ``stats["skipped_series"]`` lists them. ``stats["vintages"]`` is each series'
 stored vintage count after the run, which ``check_macro`` compares with the table later.
 
-``since`` bounds the observations fetched (a backfill from that date; default all of them) and,
-like ``only`` (the keys to run), fetches published files whatever their cadence.
+``since`` bounds the observations stored (a backfill from that date; default all of them) and,
+like ``only`` (the keys to run), fetches published files whatever their cadence. An ALFRED
+series is always fetched whole: its first vintage, which dates what ALFRED's archive predates
+(``plan.py``), is only known from every observation, so ``since`` drops rows afterwards.
+
+The run has a time budget (``[macro] run_budget_s``): once spent, the series not yet fetched
+are recorded as skipped (``over_budget``) and the run is PARTIAL, so a FRED outage cannot hold
+the nightly up; they are still graded by ``check_macro`` (they were fetchable).
 """
 
 from collections.abc import Mapping, Sequence
@@ -71,7 +77,7 @@ def _request(spec: MacroSeries, session: date, since: date | None) -> SeriesRequ
         date_column=spec.date_column,
         value_column=spec.value_column,
         parser=spec.parser,
-        start=since,
+        start=None if spec.pit == "alfred" else since,
     )
 
 
@@ -102,7 +108,10 @@ def _fetch_one(
     fetched = normalized.parsed[SERIES_FRAME] if normalized else None
     if fetched is None or fetched.empty:
         return "NO_DATA"
-    new = rows_to_write(vintage_rows(spec, fetched), stored, run.session)
+    target = vintage_rows(spec, fetched)
+    if since is not None:
+        target = target[target["obs_date"] >= since]
+    new = rows_to_write(target, stored, run.session)
     if new.empty:
         return "UNCHANGED"
     run.stage(TABLE, spec.key, new, source.name)
@@ -123,6 +132,8 @@ def ingest_macro(
     last = _last_fetched(ctx)
     counts: dict[str, int] = {}
     skipped: dict[str, str] = {}
+    over_budget: list[str] = []
+    started = ctx.clock()
     with IngestRun(ctx, TASK, session) as run:
         held = stored_vintages(run.reader, [s.instrument_id for s in chosen])
         by_id = {str(i): rows.reset_index(drop=True) for i, rows in held.groupby("instrument_id")}
@@ -134,15 +145,23 @@ def ingest_macro(
                 run.record_item(spec.key, f"SKIPPED: {skipped[spec.key]}")
             elif not forced and _not_due(spec, session, last):
                 run.record_item(spec.key, "NOT_DUE")
+            elif (ctx.clock() - started).total_seconds() > registry.run_budget_s:
+                over_budget.append(spec.key)
+                run.record_item(spec.key, f"SKIPPED: run budget of {registry.run_budget_s}s spent")
             else:
                 run.attempt(spec.key, partial(_fetch_one, run, spec, source, stored, since, counts))
             run.checkpoint()
+        if over_budget:
+            run.partial(
+                f"run budget of {registry.run_budget_s}s spent: {len(over_budget)} not fetched"
+            )
         written = run.publish(TABLE)
         run.stats.update(
             series=len(chosen),
             rows=written,
             since=since.isoformat() if since else None,
             skipped_series=skipped,
+            over_budget=over_budget,
             vintages={**_stored_counts(by_id, chosen), **counts},
             items=run.counts(),
         )

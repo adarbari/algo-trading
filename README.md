@@ -224,7 +224,8 @@ cat var/logs/macro.status   # appears when the run ends; the run record lists ev
 ```
 
 The nightly's `macro` step is optional (a failure warns, `check_macro` grades staleness and lost
-vintages) and refetches a published file by its cadence, at most weekly.
+vintages), runs after the screens (until the regime group needs it) within a time budget
+(`macro.toml [macro] run_budget_s`) and refetches a published file by its cadence, at most weekly.
 
 ## API
 

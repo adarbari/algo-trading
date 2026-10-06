@@ -10,13 +10,15 @@ from algotrade.config.site.macro import MacroSettings
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
+from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.runs import RunStatus, start_run
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.maintenance.quality import check_macro, macro_checks
+from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.stored_frames import stamped
 
 D = date(2026, 10, 5)
-DAILY = {"cadence": "daily", "release_lag_days": 1}  # stale after 1 + 1 + 2 = 4 days
+DAILY = {"cadence": "daily", "release_lag_days": 1}  # stale after 1 + 1 + 3 = 5 days
 
 
 def registry(*keys: str, source: str = "fred") -> MacroSettings:
@@ -54,9 +56,9 @@ def by_name(checks: list) -> dict[str, tuple[str, str]]:  # type: ignore[type-ar
 @pytest.mark.parametrize(
     ("ages", "status"),
     [
-        ([0, 1, 4, 3, 0], "PASS"),  # 4 days is the edge: not stale
-        ([0, 1, 5, 3, 0], "WARN"),  # one of five (20%) is not above 20%: a warning
-        ([0, 1, 5, 6, 0], "FAIL"),  # two of five
+        ([0, 1, 5, 3, 0], "PASS"),  # 5 days is the edge: not stale
+        ([0, 1, 6, 3, 0], "WARN"),  # one of five (20%) is not above 20%: a warning
+        ([0, 1, 6, 7, 0], "FAIL"),  # two of five
     ],
 )
 def test_stale_series_fail_above_the_share(ages: list[int], status: str) -> None:
@@ -120,10 +122,34 @@ def test_no_lost_vintages_passes_with_the_totals() -> None:
     assert status == "PASS" and "2 vintages of 1 series" in detail
 
 
-def test_check_macro_reads_the_sites_registry() -> None:
-    checks = check_macro(store({}), D, SourcesSettings())
-    status, detail = by_name(checks)["macro_fresh"]
-    assert status == "FAIL" and "series stale" in detail
+def test_a_lag_zero_daily_series_survives_a_monday_holiday() -> None:
+    """A close dated Friday is 4 days old on the Tuesday after a Monday holiday."""
+    tuesday = date(2026, 10, 6)
+    reader = store({"A": tuesday - timedelta(days=4)})
+    entry = {"cadence": "daily", "release_lag_days": 0}
+    one = MacroSettings.from_document(
+        {
+            "series": [
+                {"key": "A", "source": "fred", "kind": "macro", "pit": "lag", "terms": "t", **entry}
+            ]
+        }
+    )
+    assert (
+        by_name(macro_checks(reader, tuesday, SourcesSettings(), one))["macro_fresh"][0] == "PASS"
+    )
+    assert one.series[0].stale_after_days == 4 and registry("A").series[0].stale_after_days == 5
+
+
+def test_check_macro_grades_the_registry_the_run_was_given() -> None:
+    """``ctx.configs`` (not a config directory on disk) says which series there are."""
+    doc = {"series": [{"key": "ONLY", "source": "fred", "kind": "macro", "cadence": "daily",
+                       "pit": "lag", "terms": "t"}]}  # fmt: skip
+    ctx = task_ctx(StoreWriter(MemoryBackend()))
+    ctx.configs = MemoryConfigStore({("site", "settings", "macro"): doc})
+    status, detail = by_name(check_macro(ctx, D))["macro_fresh"]
+    assert status == "FAIL" and "1 of 1 series stale" in detail and "ONLY" in detail
+    ctx.configs = None
+    assert check_macro(ctx, D) == []
 
 
 NO_KEY = "ALGOTRADE_FRED_API_KEY is not set"

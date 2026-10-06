@@ -216,12 +216,12 @@ def test_a_partial_task_names_its_failed_items() -> None:
     )
 
 
-def test_the_macro_step_is_optional_latest_only_and_before_the_rollups() -> None:
+def test_the_macro_step_is_optional_latest_only_and_after_the_screens() -> None:
     names = [s.name for s in NIGHTLY]
     step = NIGHTLY[names.index("macro")]
     assert (step.critical, step.latest_only, step.needs) == (False, True, ())
-    assert step.accept == (check_macro,)
-    assert names.index("macro") < names.index("rollups")
+    assert step.accept_with == (check_macro,) and step.accept == ()
+    assert names.index("macro") > names.index(SCREENS)  # off the critical path until RG3
 
 
 def test_a_failing_macro_step_only_warns(fake: Callable[..., Calls]) -> None:

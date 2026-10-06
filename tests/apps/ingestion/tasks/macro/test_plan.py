@@ -131,3 +131,18 @@ def test_a_lagged_row_is_compared_with_the_stored_lagged_vintage_not_an_alfred_o
         fetched(("2019-01-01", "2019-06-01", 1.0), ("2019-01-01", "2019-08-01", 2.0)),
     )
     assert rows_to_write(target, stored, D).empty
+
+
+def test_a_null_never_replaces_a_stored_number() -> None:
+    old = held((date(2026, 10, 1), date(2026, 10, 3), "lagged", 1.0))
+    target = vintage_rows(spec(pit="lag"), fetched(("2026-10-01", None, None)))
+    assert rows_to_write(target, old, D).empty  # the number the series was known by stays
+    alfred = vintage_rows(
+        spec(pit="alfred", release_lag_days=1), fetched(("2026-06-01", "2026-06-02", None))
+    )
+    stored = held((date(2026, 6, 1), date(2026, 6, 2), "alfred", 1.0))
+    assert rows_to_write(alfred, stored, D).empty
+    # a number replacing a stored null is a change
+    nulls = held((date(2026, 10, 1), date(2026, 10, 3), "lagged", None))
+    number = vintage_rows(spec(pit="lag"), fetched(("2026-10-01", None, 2.0)))
+    assert triples(rows_to_write(number, nulls, D)) == [(date(2026, 10, 1), D, "lagged", 2.0)]

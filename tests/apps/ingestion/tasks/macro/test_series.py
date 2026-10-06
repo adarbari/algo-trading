@@ -50,6 +50,7 @@ class Feeds:
     def __init__(self) -> None:
         self.fred = {"GDPC1": fred_payloads.payload(), "T10Y3M": fred_payloads.CURVE}
         self.urls: list[str] = []
+        self.spent = 0  # clock seconds each request takes (a slow source)
 
     def transport(self, url: str) -> bytes:
         self.urls.append(url)
@@ -72,7 +73,7 @@ def context(
         policy = RetryPolicy(tries=1, not_found=missing_series)
         sources["fred"] = FredObservations(http_for(feeds.transport, policy))
     ticks = count()  # every run gets its own run id, as real runs do
-    clock = lambda: FIXED + timedelta(minutes=next(ticks))  # noqa: E731
+    clock = lambda: FIXED + timedelta(seconds=next(ticks) * 3 + feeds.spent * len(feeds.urls))  # noqa: E731
     ctx = task_ctx(StoreWriter(MemoryBackend()), sources=sources, clock=clock)
     ctx.unavailable = {} if fred else {"fred": "ALGOTRADE_FRED_API_KEY is not set"}
     return ctx
@@ -259,3 +260,40 @@ def test_the_registry_entry_runs_the_task_from_the_site_registry() -> None:
     )
     assert set(record.items) == {"SPX", "T10Y3M"} and record.stats["since"] == "2026-09-01"
     assert record.status is RunStatus.COMPLETE
+
+
+def test_since_never_trims_an_alfred_request_and_drops_the_older_rows_afterwards() -> None:
+    """The first vintage dates what ALFRED's archive predates: it is only known from the whole
+    history, so a window would make a late release look pre-archive and date it too early."""
+    feeds = Feeds()
+    ctx = context(feeds)
+    ingest_macro(ctx, REGISTRY, D1, only=["GDP_REAL"])
+    full = rows(table(ctx), "GDP_REAL")
+    ctx = context(feeds)
+    record = ingest_macro(ctx, REGISTRY, D1, only=["GDP_REAL"], since=date(2020, 4, 1))
+    assert "observation_start" not in feeds.urls[-1]
+    assert record.items["GDP_REAL"] == "OK: 3 rows"
+    assert rows(table(ctx), "GDP_REAL") == [r for r in full if r[0] >= date(2020, 4, 1)]
+
+
+def test_a_spent_run_budget_skips_the_rest_and_makes_the_run_partial() -> None:
+    feeds = Feeds()
+    feeds.spent = 1000  # every request takes 1000 s: the 900 s budget goes with the first
+    ctx = context(feeds)
+    record = ingest_macro(ctx, REGISTRY, D1)
+    assert record.status is RunStatus.PARTIAL
+    assert record.items["GDP_REAL"].startswith("OK")
+    assert record.items["T10Y3M"] == "SKIPPED: run budget of 900s spent"
+    assert record.items["SPX"] == "SKIPPED: run budget of 900s spent"
+    assert record.stats["over_budget"] == ["T10Y3M", "SPX"]
+    assert record.stats["skipped_series"] == {}  # fetchable: check_macro still grades them
+    assert len(feeds.urls) == 1
+    assert set(table(ctx)["instrument_id"]) == {"MACRO:GDP_REAL"}
+
+
+def test_the_budget_is_a_typed_macro_setting() -> None:
+    assert REGISTRY.run_budget_s == 900
+    tight = MacroSettings.from_document({"macro": {"run_budget_s": 60}, "series": [CURVE]})
+    assert tight.run_budget_s == 60
+    with pytest.raises(Exception, match="run_budget_s"):
+        MacroSettings.from_document({"macro": {"run_budget_s": 0}})

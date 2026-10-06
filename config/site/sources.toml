@@ -180,7 +180,7 @@ max_chain_stale_share = 0.20     # chains: FAIL if over 20% of the "rest" tier's
 max_chain_stale_share_core = 0.02  # same for the "core" tier (S&P 500, priority symbols, HIGH liquidity)
 max_verify_failures = 0.10       # verification vs IBKR: FAIL if over 10% of checks FAIL (any FAIL: WARN)
 max_macro_stale_share = 0.20     # macro (ADR 0048): FAIL if over 20% of the enabled series have no observation newer
-                                 # than their cadence + release lag + 2 days, or any series lost stored vintages
+                                 # than their cadence + release lag + 2 days (3 for a daily series), or any series lost stored vintages
 
 # Coverage (ADR 0043): per key feature, the share of the instruments it applies to (applies_to) that
 # have a value for the session, by tier (core: S&P 500, priority symbols, HIGH liquidity). core_min /

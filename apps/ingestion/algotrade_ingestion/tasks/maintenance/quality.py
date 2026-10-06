@@ -14,14 +14,12 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.config.env import config_dir
 from algotrade.config.site.macro import MacroSeries, MacroSettings
 from algotrade.config.site.settings import SourcesSettings, load_macro
 from algotrade.data import StoreReader
 from algotrade.data.chains import chain_status
 from algotrade.data.macro.series import latest_vintages, stored_vintages
 from algotrade.data.reference import snapshot
-from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import PUBLISHED, IngestRun, TaskContext
 from algotrade_ingestion.tasks.reference.classify import security_type
@@ -288,9 +286,12 @@ MACRO_TASK = "macro"  # the macro task's run-record job name (tasks/macro/series
 EXAMPLES_MACRO = 6  # stale or shrunken series named in a detail
 
 
-def check_macro(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:
-    """The ``macro`` step's acceptance over the site's series (``config/site/macro.toml``)."""
-    return macro_checks(reader, session, s, load_macro(FileConfigStore(config_dir())))
+def check_macro(ctx: TaskContext, session: date) -> list[Check]:
+    """The ``macro`` step's acceptance over the series of the registry the task ran with
+    (``ctx.configs``, ``macro.toml``); nothing without a config store."""
+    if ctx.configs is None:
+        return []
+    return macro_checks(ctx.reader, session, ctx.settings, load_macro(ctx.configs))
 
 
 def macro_checks(
