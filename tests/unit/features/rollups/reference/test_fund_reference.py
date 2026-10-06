@@ -14,6 +14,8 @@ from tests.helpers.stored_frames import holdings_rows, stamped
 
 SESSION = date(2026, 10, 5)
 STOCKS = {"TSLA": "EQ:TSLA", "NVDA": "EQ:NVDA", "AAPL": "EQ:AAPL", "MSFT": "EQ:MSFT"}
+# Listed companies whose tickers are words of index and commodity swap lines (Dow Inc, Barrick).
+WORDS = {"DOW": "EQ:DOW", "GOLD": "EQ:GOLD", "REAL": "EQ:REAL"}
 
 
 def line(
@@ -42,9 +44,10 @@ def result(
     plain = [
         {"instrument_id": i, "symbol": s, "name": f"{s} Inc", "security_type": "COMMON_STOCK",
          "is_leveraged": False, "is_inverse": False}
-        for s, i in STOCKS.items()
+        for s, i in {**STOCKS, **WORDS}.items()
     ]  # fmt: skip
-    etf = [fund("QQQ", "Invesco QQQ Trust", is_leveraged=False)]
+    etf = [fund("QQQ", "Invesco QQQ Trust", is_leveraged=False),
+           fund("SPY", "SPDR S&P 500 ETF Trust", is_leveraged=False)]  # fmt: skip
     reference = pd.DataFrame([*plain, *etf, *funds])
     symbols = pd.DataFrame(
         {"symbol": reference["symbol"], "instrument_id": reference["instrument_id"]}
@@ -68,7 +71,7 @@ def row(found: dict[str, dict[str, object]], symbol: str) -> tuple[object, ...]:
 def test_only_leveraged_and_inverse_funds_get_a_row() -> None:
     found = result([fund("TSLQ", "Direxion Daily TSLA Bear 1X Shares", is_leveraged=False,
                          is_inverse=True)])  # fmt: skip
-    assert set(found) == {"EQ:TSLQ"}  # not the stocks, not QQQ
+    assert set(found) == {"EQ:TSLQ"}  # not the stocks, not the ETFs
     assert row(found, "TSLQ") == ("EQ:TSLA", "single_stock", "name_rule", "LINKED")
 
 
@@ -110,7 +113,7 @@ def test_an_index_fund_holding_many_stocks_is_a_basket_not_one_stock() -> None:
 
 def test_a_basket_without_a_keyword_takes_its_kind_from_the_holdings_sectors() -> None:
     def held(sectors: list[str | None]) -> list[dict[str, object]]:
-        stocks = list(STOCKS)
+        stocks = list(STOCKS)[:4]
         return [
             line("EQ:BSK", s or "x", "Equity", t, 0.2, s)
             for t, s in zip(stocks, sectors, strict=True)
@@ -131,9 +134,11 @@ def test_a_fund_with_no_holdings_stored_is_read_by_its_name() -> None:
     assert row(result([soxl]), "SOXL") == (None, "sector", "name_rule", "BASKET")
 
 
-def test_a_swap_naming_two_stocks_is_a_basket_and_the_name_is_not_asked_for_a_stock() -> None:
-    pair = fund("PAIR", "Direxion Daily NVDA Bull 2X Shares")
+def test_a_swap_naming_two_stocks_is_a_basket_unless_the_name_states_one() -> None:
     lines = [line("EQ:PAIR", "Swap long NVDA short AAPL", "Derivative")]
+    named = fund("PAIR", "Direxion Daily NVDA Bull 2X Shares")  # the name settles it: NVDA
+    assert row(result([named], lines), "PAIR")[:2] == ("EQ:NVDA", "single_stock")
+    pair = fund("PAIR", "Leveraged Pair Fund")
     assert row(result([pair], lines), "PAIR")[0] is None
     assert row(result([pair], lines), "PAIR")[3] == "BASKET"
 
@@ -214,3 +219,51 @@ def test_computed_from_the_stored_reference_holdings_and_symbols_point_in_time()
         "EQ:AAPL",
         "holdings",
     ]
+
+
+def test_a_swap_line_word_that_is_a_listed_ticker_does_not_settle_an_index_or_a_commodity() -> None:
+    """Dow Inc, Barrick (GOLD) and REAL are listed: the words of the swap lines of the Dow, gold
+    bullion and real estate funds, which are baskets, not those stocks."""
+    cases = {
+        "UDOW": ("ProShares UltraPro Dow30", "DOW JONES INDUSTRIAL AVERAGE SWAP Goldman Sachs",
+                 "index"),
+        "UGL": ("ProShares Ultra Gold", "GOLD BULLION SWAP Bank of America NA", "commodity"),
+        "URE": ("ProShares Ultra Real Estate", "DJ U.S. REAL ESTATE INDEX SWAP Citibank NA",
+                "sector"),
+    }  # fmt: skip
+    funds = [fund(symbol, name) for symbol, (name, _, _) in cases.items()]
+    lines = [line(f"EQ:{s}", swap, "Derivative") for s, (_, swap, _) in cases.items()]
+    found = result(funds, lines)
+    for symbol, (_, _, kind) in cases.items():
+        assert row(found, symbol) == (None, kind, "name_rule", "BASKET"), symbol
+
+
+def test_a_swap_line_that_names_no_stock_signals_a_basket_when_the_name_says_nothing() -> None:
+    thing = fund("THNG", "Leveraged Thing Fund")
+    gold = [line("EQ:THNG", "GOLD BULLION SWAP Citibank NA", "Derivative")]
+    assert row(result([thing], gold), "THNG") == (None, "commodity", "holdings", "BASKET")
+    index = [line("EQ:THNG", "REAL ESTATE INDEX SWAP Citibank NA", "Derivative")]
+    assert row(result([thing], index), "THNG") == (None, "index", "holdings", "BASKET")
+
+
+def test_a_swap_ticker_the_name_states_is_the_reference_even_on_an_index_line() -> None:
+    tsll = fund("TSLL", "Direxion Daily TSLA Bull 2X Shares")
+    lines = [line("EQ:TSLL", "TSLA INDEX SWAP Citibank NA", "Derivative")]
+    assert row(result([tsll], lines), "TSLL") == ("EQ:TSLA", "single_stock", "holdings", "LINKED")
+
+
+def test_inverse_names_that_end_in_daily_are_read() -> None:
+    axs = fund("TSLQ", "AXS TSLA Bear Daily ETF", is_leveraged=False, is_inverse=True)
+    assert row(result([axs]), "TSLQ") == ("EQ:TSLA", "single_stock", "name_rule", "LINKED")
+
+
+def test_a_name_ticker_that_is_an_etf_is_an_index_basket_not_no_reference() -> None:
+    spy = fund("SPYU", "Tradr 2X Long SPY Daily ETF")
+    assert row(result([spy]), "SPYU") == (None, "index", "name_rule", "BASKET")
+    gdx = fund("GDXU", "Tradr 2X Long SPY Gold Miners Daily ETF")  # the name's kind wins
+    assert row(result([gdx]), "GDXU")[1] == "sector"
+
+
+def test_a_name_of_two_tickers_has_no_single_reference() -> None:
+    pair = fund("PAIR", "GraniteShares 2X Long TSLA vs NVDA Daily ETF")
+    assert row(result([pair]), "PAIR") == (None, "none", None, "NO_REFERENCE")

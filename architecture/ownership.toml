@@ -818,9 +818,12 @@ description = "Which names the event-sensitivity study covers (ADR 0050 decision
 owner = ["src/algotrade/services/events/*"]
 allowed = [
     "src/algotrade/config/site/events/scope.py",  # the typed loader of the list's file (ADR 0050); the owner is its one caller
+    "src/algotrade/features/rollups/options/option_liquidity.py",  # declares short_put_ok
+    "src/algotrade/strategies/screeners/short_premium_liquidity.py",  # a screener's own read of the flag per row
+    "src/algotrade/services/screening/exports.py",  # the export's column of the flag
 ]
 section = "docs/adr/0050-event-sensitivity.md#decision"
-detect = [{ call = "load_event_scope" }]
+detect = [{ call = "load_event_scope" }, { string = "fund_reference@v1" }, { string = "short_put_ok" }]
 
 [[responsibility]]
 id = "screen-preview"

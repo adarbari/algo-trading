@@ -4,7 +4,8 @@ when the holdings table does not settle it.
 
 A ticker is read only in the spellings leveraged-fund names use, with the ticker in upper case
 (a company written "Tesla" is not read): ``Daily TSLA Bull 2X`` (Direxion), ``2x Long TSLA
-Daily`` / ``2X Long TSLA`` (GraniteShares, Leverage Shares, Tradr, Defiance) and ``TSLA 2X Bull``.
+Daily`` / ``2X Long TSLA`` (GraniteShares, Leverage Shares, Tradr, Defiance), ``TSLA 2X Bull`` and
+``AXS TSLA Bear Daily``; a name of two tickers (``TSLA vs NVDA``) states none.
 A name written wholly in capitals is never read for a ticker (``DAILY GOLD BULL 2X``: a word is
 not told from a ticker). Whether the ticker is listed, and is a stock, is the caller's check
 (``SymbolResolver``'s map, never an id built here).
@@ -21,8 +22,11 @@ _TICKER_PATTERNS = tuple(
         rf"\b(?i:daily)\s+(?P<t>{TICKER})\s+{_SIDE}\b",  # Direxion Daily TSLA Bull 2X Shares
         rf"\b{_LEVER}\s+{_SIDE}\s+(?P<t>{TICKER})\b",  # GraniteShares 2x Long TSLA Daily ETF
         rf"\b(?P<t>{TICKER})\s+{_LEVER}\s+{_SIDE}\b",  # TSLA 2X Bull
+        rf"\b(?P<t>{TICKER})\s+{_SIDE}\s+(?i:daily)\b",  # AXS TSLA Bear Daily ETF
     )
 )
+# Two tickers in one name ("2X Long TSLA vs NVDA", "TSLA/NVDA"): a pair has no single reference.
+_PAIR = re.compile(r"\b[A-Z][A-Z0-9]{1,5}\s*(?:/|&|\+|(?i:\bvs\.?|\band\b))\s*[A-Z][A-Z0-9]{1,5}\b")
 # Capitalised words of a fund name that sit where a ticker would: never one.
 _NOT_TICKERS = frozenset(
     [
@@ -65,8 +69,8 @@ _KINDS = tuple(
         ),
         (
             "index",
-            r"s&p|nasdaq|\bqqq|russell|\bdow\b|mid ?cap|small ?cap|large ?cap|\bindex\b|china"
-            r"|brazil|india|emerging|europe|japan",
+            r"s&p|nasdaq|\bqqq|russell|\bdow(?:\d|\b)|mid ?cap|small ?cap|large ?cap|\bindex\b"
+            r"|china|brazil|india|emerging|europe|japan",
         ),
     )
 )
@@ -74,8 +78,8 @@ _KINDS = tuple(
 
 def name_ticker(name: str) -> str | None:
     """The ticker a single-stock fund's name states (``None``: none read, or the name is in
-    capitals throughout)."""
-    if name.upper() == name:
+    capitals throughout, or it names a pair of tickers)."""
+    if name.upper() == name or _PAIR.search(name):
         return None
     for pattern in _TICKER_PATTERNS:
         for found in pattern.finditer(name):

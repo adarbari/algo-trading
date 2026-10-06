@@ -14,9 +14,10 @@ The link, in order:
 
 1. **Holdings.** A fund whose holdings name exactly one equity (money-market sweeps and cash
    aside) tracks it; so does one that holds no equity but whose swap lines name exactly one
-   ticker (a word of the line that is a listed stock, never a counterparty or a common word).
-   Two or more equities (or swaps naming two stocks) are a basket: the reference is not one
-   stock.
+   listed ticker, when that is the ticker the name states, or the name states no kind and the
+   line is no index, bullion, futures, trust or ETF line (a line that is one is a basket
+   signal: "DOW JONES INDUSTRIAL AVERAGE SWAP" is the Dow, not Dow Inc). Two or more equities
+   (or swaps naming two stocks) are a basket: the reference is not one stock.
 2. **The name** when the holdings are absent or silent (``fund_names``: ``Daily TSLA Bull 2X``,
    ``2x Long TSLA Daily``): the ticker must be a listed stock (an ETF is a basket).
 3. The kind of a basket (``index``, ``sector``, ``commodity``) from the name's keywords, else
@@ -67,6 +68,9 @@ _SWEEP = re.compile(
     re.IGNORECASE,
 )
 _SWAP = re.compile(r"\bswaps?\b", re.IGNORECASE)
+# Words of a swap line that say the underlying is a basket or a commodity, not one stock.
+_BASKET_WORDS = re.compile(r"\b(?:INDEX|AVERAGE|BULLION|FUTURES?|TRUST|ETF)\b")
+_COMMODITY_WORDS = frozenset({"BULLION", "FUTURE", "FUTURES"})
 _WORDS = re.compile(r"[A-Z][A-Z0-9]*(?:\.[A-Z])?")
 # Words of a swap line that are also listed tickers or counterparties: never a reference.
 _STOP = (
@@ -146,14 +150,32 @@ def _equities(lines: pd.DataFrame) -> pd.DataFrame:
     return lines[equity & ~sweep]
 
 
-def _swap_tickers(lines: pd.DataFrame, symbols: Mapping[str, str]) -> set[str]:
-    """The listed tickers named by the swap lines (a word of the name that is in the map)."""
+def _swap_tickers(
+    lines: pd.DataFrame, name: str, symbols: Mapping[str, str]
+) -> tuple[set[str], str | None]:
+    """The listed tickers the swap lines name as the fund's reference, and the kind a line that
+    names none signals (``commodity``, ``index``; ``None``: no line did).
+
+    A word of a swap line that is a listed ticker is the reference only when it is the ticker
+    the name states, or when the name states no kind and the line is no index, bullion, futures,
+    trust or ETF line: "DOW JONES INDUSTRIAL AVERAGE SWAP" is the Dow, not Dow Inc, and
+    "GOLD BULLION SWAP" is gold, not Barrick. Such a line is a basket signal instead."""
     swaps = lines["asset_class"].astype(str).str.lower().eq("derivative")
     swaps |= lines["holding_name"].astype(str).map(lambda n: bool(_SWAP.search(n)))
+    own, kind = name_ticker(name), name_kind(name)
     found: set[str] = set()
+    signal: str | None = None
     for text in lines.loc[swaps, "holding_name"].dropna().astype(str):
-        found |= {w for w in _WORDS.findall(text.upper()) if len(w) > 1 and w not in _NOT_TICKERS}
-    return {w for w in found if w in symbols}
+        words = {w for w in _WORDS.findall(text.upper()) if len(w) > 1 and w not in _NOT_TICKERS}
+        words = {w for w in words if w in symbols}
+        basket = _BASKET_WORDS.search(text.upper())
+        if own in words:
+            found.add(str(own))
+        elif kind is None and not basket:
+            found |= words
+        elif basket:
+            signal = "commodity" if basket.group() in _COMMODITY_WORDS else (signal or "index")
+    return found, signal
 
 
 def _basket_kind(lines: pd.DataFrame) -> str:
@@ -178,6 +200,10 @@ def _single(instrument_id: str | None, source: str, types: Mapping[str, str]) ->
     return Link(instrument_id, "single_stock", source, LINKED)
 
 
+def _basket(kind: str, source: str = "name_rule") -> Link:
+    return Link(None, kind, None if kind == "none" else source, BASKET)
+
+
 def _from_holdings(
     lines: pd.DataFrame, name: str, symbols: Mapping[str, str], types: Mapping[str, str]
 ) -> Link | None:
@@ -193,29 +219,34 @@ def _from_holdings(
         if found is not None:
             return found
     elif not distinct:
-        named = _swap_tickers(lines, symbols)
+        named, signal = _swap_tickers(lines, name, symbols)
         if len(named) == 1:
             found = _single(symbols[next(iter(named))], "holdings", types)
             if found is not None:
                 return found
         elif not named:
-            return None
+            if signal is None:
+                return None
+            named_kind = name_kind(name)
+            return _basket(named_kind, "name_rule") if named_kind else _basket(signal, "holdings")
     # Two or more stocks (or one that is an ETF): a basket; the name's keywords name it first.
     kind = name_kind(name)
-    if kind is not None:
-        return Link(None, kind, None if kind == "none" else "name_rule", BASKET)
-    return Link(None, _basket_kind(equities), "holdings", BASKET)
+    return _basket(kind) if kind else _basket(_basket_kind(equities), "holdings")
 
 
 def _from_name(name: str, symbols: Mapping[str, str], types: Mapping[str, str]) -> Link | None:
     ticker, kind = name_ticker(name), name_kind(name)
     if ticker is not None:
-        found = _single(symbols.get(ticker), "name_rule", types)
-        if found is not None and (found.reference_status == LINKED or kind is None):
-            return found  # an unlisted ticker yields to a kind its name states ("Daily NASDAQ")
-    if kind is not None:
-        return Link(None, kind, None if kind == "none" else "name_rule", BASKET)
-    return None
+        instrument_id = symbols.get(ticker)
+        if instrument_id is not None and _is_stock(instrument_id, types):
+            return Link(instrument_id, "single_stock", "name_rule", LINKED)
+        if (
+            instrument_id is not None
+        ):  # a listed ETF ("2X Long SPY"): a basket, an index unless said
+            return _basket(kind or "index")
+        if kind is None:  # an unlisted ticker yields to a kind its name states ("Daily NASDAQ")
+            return Link(None, "single_stock", "name_rule", UNLISTED)
+    return None if kind is None else _basket(kind)
 
 
 def link(
