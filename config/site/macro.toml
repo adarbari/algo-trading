@@ -12,7 +12,8 @@
 # pit               "alfred" (every vintage from ALFRED; fred only) or "lag" (unrevised series:
 #                   vintage_date = obs_date + release_lag_days, vintage_kind = "lagged")
 # transform         how the macro group reads it: level, yoy (year-over-year change) or diff
-# licence, terms    "personal" for data licensed for personal use only (ICE BofA, Stooq; ADR 0028)
+# licence, terms    "personal" for data licensed for personal use only: third-party series on FRED
+#                   (ICE BofA, Moody's, Nasdaq, Cboe) and Stooq (ADR 0028)
 
 # --- Recession risk: the curve, credit, policy and oil (daily market series: unrevised)
 
@@ -66,7 +67,8 @@ cadence = "daily"
 release_lag_days = 1
 pit = "lag"
 transform = "level"
-terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+licence = "personal"
+terms = "Moody's data via FRED: personal use only (copyright notice on the series page)"
 
 [[series]]
 key = "DFII10"                # 10y TIPS real yield
@@ -83,7 +85,7 @@ key = "DCOILWTICO"            # WTI spot (EIA publishes with a lag of days)
 source = "fred"
 kind = "macro"
 cadence = "daily"
-release_lag_days = 7
+release_lag_days = 10
 pit = "lag"
 transform = "yoy"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
@@ -197,7 +199,7 @@ key = "UNRATE"                # unemployment rate
 source = "fred"
 kind = "macro"
 cadence = "monthly"
-release_lag_days = 35
+release_lag_days = 40
 pit = "alfred"
 transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
@@ -207,7 +209,7 @@ key = "SAHMREALTIME"          # Sahm rule, real time
 source = "fred"
 kind = "macro"
 cadence = "monthly"
-release_lag_days = 35
+release_lag_days = 40
 pit = "alfred"
 transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
@@ -217,7 +219,7 @@ key = "PAYEMS"                # nonfarm payrolls
 source = "fred"
 kind = "macro"
 cadence = "monthly"
-release_lag_days = 35
+release_lag_days = 40
 pit = "alfred"
 transform = "yoy"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
@@ -247,7 +249,7 @@ key = "CFNAIMA3"              # Chicago Fed activity, 3-month average
 source = "fred"
 kind = "macro"
 cadence = "monthly"
-release_lag_days = 55
+release_lag_days = 60
 pit = "alfred"
 transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
@@ -267,7 +269,7 @@ key = "CPIAUCSL"              # CPI, all items
 source = "fred"
 kind = "macro"
 cadence = "monthly"
-release_lag_days = 45
+release_lag_days = 47
 pit = "alfred"
 transform = "yoy"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
@@ -277,7 +279,7 @@ key = "PCEPILFE"              # core PCE price index
 source = "fred"
 kind = "macro"
 cadence = "monthly"
-release_lag_days = 60
+release_lag_days = 65
 pit = "alfred"
 transform = "yoy"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
@@ -307,7 +309,7 @@ key = "RECPROUSM156N"         # Chauvet-Piger recession probability
 source = "fred"
 kind = "macro"
 cadence = "monthly"
-release_lag_days = 95
+release_lag_days = 125  # a lagged row (before ALFRED's first vintage) holds the final value, known 120+ days on
 pit = "alfred"
 transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
@@ -327,7 +329,7 @@ key = "GDPNOW"                # Atlanta Fed GDPNow
 source = "fred"
 kind = "macro"
 cadence = "quarterly"
-release_lag_days = 30
+release_lag_days = 125  # a lagged row (before ALFRED's first vintage) holds the final value, known 120+ days on
 pit = "alfred"
 transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
@@ -359,7 +361,8 @@ cadence = "daily"
 release_lag_days = 0
 pit = "lag"
 transform = "level"
-terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+licence = "personal"
+terms = "Nasdaq data via FRED: personal use only (copyright notice on the series page)"
 
 [[series]]
 key = "VIX"                   # Cboe VIX close
@@ -370,7 +373,8 @@ cadence = "daily"
 release_lag_days = 0
 pit = "lag"
 transform = "level"
-terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+licence = "personal"
+terms = "Cboe data via FRED: personal use only (copyright notice on the series page)"
 
 [[series]]
 key = "VIX3M"                 # Cboe 3-month VIX close
@@ -381,4 +385,5 @@ cadence = "daily"
 release_lag_days = 0
 pit = "lag"
 transform = "level"
-terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+licence = "personal"
+terms = "Cboe data via FRED: personal use only (copyright notice on the series page)"

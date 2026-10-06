@@ -9,7 +9,9 @@ partition and keeps the latest stored version of each row.
 Point in time is the VINTAGE date, not the partition or ``knowledge_ts``: a 2008 vintage that a
 2026 backfill stored was public in 2008. ``series_as_of`` gives each observation's value as a
 session knew it: the latest vintage with ``vintage_date`` on or before the session, never a
-later revision. Feature groups read the same rows through ``data.feature_inputs`` (every
+later revision. Values are end-of-night like ``bars/1d``: ``vintage_date <= session`` means
+known by the session's nightly run, so a fill at the session's close must not use them. Feature
+groups read the same rows through ``data.feature_inputs`` (every
 vintage known by the session, sorted by ``vintage_date``) and pick the latest themselves.
 """
 
@@ -63,14 +65,17 @@ def series_as_of(
     as_of: datetime | None = None,
 ) -> pd.DataFrame:
     """Each observation of ``ids`` (every series when ``None`` or empty) as ``session`` knew
-    it: the latest vintage with ``vintage_date <= session``, for observations dated from
-    ``lookback`` exchange sessions before the session on (``lookback`` 0: the session's own).
-    Columns ``COLUMNS``, one row per (``instrument_id``, ``obs_date``), sorted by both, so
-    ``frame.pivot(index="obs_date", columns="instrument_id", values="value")`` gives one column
-    per series. ``as_of`` pins what the store held (``knowledge_ts``), as for every table."""
+    it: the latest vintage with ``vintage_date <= session``. Returned: the observations dated
+    from ``lookback`` exchange sessions before the session on, and always each series' latest
+    known observation (a monthly or lagged series has none in a short window: ``lookback`` 0
+    still gives the latest UNRATE). Columns ``COLUMNS``, one row per (``instrument_id``,
+    ``obs_date``), sorted by both, so ``frame.pivot(index="obs_date", columns="instrument_id",
+    values="value")`` gives one column per series. ``as_of`` pins what the store held
+    (``knowledge_ts``), as for every table."""
     if lookback < 0:
         raise ValueError(f"lookback must be >= 0, got {lookback}")
     first = sessions_ending(session, lookback + 1)[0]
     known = latest_vintages(stored_vintages(reader, ids, as_of), session)
-    window = known[known["obs_date"] >= first]
+    newest = known.groupby("instrument_id")["obs_date"].transform("max")
+    window = known[(known["obs_date"] >= first) | (known["obs_date"] == newest)]
     return window.reindex(columns=COLUMNS).reset_index(drop=True)

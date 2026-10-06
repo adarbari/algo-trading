@@ -95,7 +95,11 @@ def test_lookback_bounds_the_observation_dates_and_frames_pivot() -> None:
     both = series_as_of(reader, None, date(2008, 3, 10), 60)
     wide = both.pivot(index="obs_date", columns="instrument_id", values="value")
     assert list(wide.columns) == [VIX, UNRATE] and len(wide) == 3
-    assert series_as_of(reader, [], session, 0).empty  # lookback 0: the session's own dates
+    latest = series_as_of(reader, [], session, 0)  # lookback 0: each series' latest known
+    assert list(zip(latest["instrument_id"], latest["obs_date"], strict=True)) == [
+        (VIX, date(2008, 3, 3)),
+        (UNRATE, date(2008, 2, 1)),
+    ]
     with pytest.raises(ValueError, match="lookback"):
         series_as_of(reader, [UNRATE], session, -1)
 
@@ -106,3 +110,12 @@ def test_latest_vintages_is_pure() -> None:
     assert list(known["instrument_id"]) == [VIX, UNRATE, UNRATE]
     assert list(known["value"]) == [26.5, 5.0, 4.8]
     assert list(latest_vintages(frame, date(2008, 2, 29))["value"]) == [4.9]
+
+
+def test_a_monthly_series_at_lookback_0_is_its_latest_release() -> None:
+    reader = store((BACKFILL, "backfill", HISTORY))
+    before_march = series_as_of(reader, [UNRATE], date(2008, 3, 6), 0)
+    assert list(before_march["obs_date"]) == [date(2008, 1, 1)]  # February is not out yet
+    assert list(before_march["value"]) == [4.9]
+    after = series_as_of(reader, [UNRATE], date(2008, 6, 30), 0)
+    assert list(after["obs_date"]) == [date(2008, 2, 1)] and list(after["value"]) == [4.8]

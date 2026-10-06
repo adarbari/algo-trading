@@ -1,5 +1,6 @@
 """``macro.toml`` (ADR 0048): the shipped registry loads (tier-1 FRED series, the four index
-levels, ICE BofA and Stooq personal), ids come from kind and key, and every rule names the entry."""
+levels, third-party and Stooq series personal), ids come from kind and key, and every rule
+names the entry."""
 
 from typing import Any
 
@@ -49,7 +50,12 @@ def test_the_shipped_registry() -> None:
         "IDX:VIX3M": "VXVCLS",
     }
     personal = {s.key for s in macro.series if s.licence == "personal"}
-    assert personal == {"BAMLH0A0HYM2", "BAMLC0A0CM", "SPX"}
+    third_party = {"BAMLH0A0HYM2", "BAMLC0A0CM", "BAA10Y", "COMP", "VIX", "VIX3M"}
+    assert personal == {*third_party, "SPX"}  # third-party series on FRED, and Stooq
+    revised_late = {
+        s.key: s.release_lag_days for s in macro.series if s.key in ("GDPNOW", "RECPROUSM156N")
+    }
+    assert min(revised_late.values()) >= 125  # a final value before ALFRED's first vintage
     assert all(s.terms for s in macro.series)
     assert load_macro(MemoryConfigStore({})).series == ()
 

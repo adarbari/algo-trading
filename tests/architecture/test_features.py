@@ -107,7 +107,11 @@ def test_inputs_resolve(key: str) -> None:
 def series_input_problems(group: FeatureGroup, macro: MacroSettings) -> list[str]:
     """Why the group's ``series:<KEY>`` inputs do not resolve (empty: they do)."""
     read = next((i for i in group.inputs if i.table == MACRO_SERIES), None)
-    problems = []
+    declared = {s.instrument_id for s in macro.series}
+    unknown = sorted(set(read.ids) - declared) if read else []
+    problems = (
+        [f"{group.key}: {MACRO_SERIES} ids {unknown} are not in macro.toml"] if unknown else []
+    )
     for f in group.features:
         for ref in filter(is_series_ref, f.inputs):
             key = ref.removeprefix(SERIES_REF)
@@ -309,7 +313,7 @@ def test_series_inputs_are_checked_against_the_macro_registry() -> None:
 
     ok = group(("MACRO:T10Y3M",), feature("slope", "series:T10Y3M"))
     assert series_input_problems(ok, MACRO) == []
-    assert series_input_problems(group((), feature("vix", "series:VIX")), MACRO) == []
+    assert series_input_problems(group((), feature("vix", "series:VIX", "personal")), MACRO) == []
     problems = series_input_problems(
         group(
             ("MACRO:T10Y3M",),
@@ -328,4 +332,8 @@ def test_series_inputs_are_checked_against_the_macro_registry() -> None:
     assert (
         series_input_problems(group((), feature("hy", "series:BAMLH0A0HYM2", "personal")), MACRO)
         == []
+    )
+    typo = group(("MACRO:T10Y3N",), feature("slope", "series:T10Y3M"))
+    assert series_input_problems(typo, MACRO)[0] == (
+        "toy@v1: macro/series ids ['MACRO:T10Y3N'] are not in macro.toml"
     )

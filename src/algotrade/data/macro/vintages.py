@@ -15,7 +15,9 @@ from algotrade.storage.tables.schemas import LAGGED
 def lagged_vintages(observations: pd.DataFrame, release_lag_days: int) -> pd.DataFrame:
     """``observations`` (an ``obs_date`` column, any others kept) with ``vintage_date`` =
     ``obs_date`` + ``release_lag_days`` and ``vintage_kind`` = ``lagged``; dates as ``date``.
-    One vintage per observation: the value it was published with is the only one."""
+    One vintage per observation per call: when a later fetch of a ``lagged`` key brings a
+    different value, the writer stores it as a NEW vintage dated the run's session, never as an
+    overwrite of the stored one (a session before the run must still see the old value)."""
     if release_lag_days < 0:
         raise ValueError(f"release_lag_days must be >= 0, got {release_lag_days}")
     out = observations.copy()
