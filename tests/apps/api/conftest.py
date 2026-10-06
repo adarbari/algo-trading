@@ -14,7 +14,6 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi.testclient import TestClient
 from jwt.algorithms import ECAlgorithm
 
-from algotrade.config.user import UserContext
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade_api.deps import ApiSettings, ReadStore
 from algotrade_api.main import create_app
@@ -44,24 +43,50 @@ null_meaning = "hv20 is null"
 """
 
 
+# The registry of the multi-user configs: alice and bob are traders who signed up with these
+# emails (config/users/<id>/identity.toml), ana is the admin.
+USERS_TOML = """[[user]]
+id = "ana"
+role = "admin"
+
+[[user]]
+id = "alice"
+role = "trader"
+
+[[user]]
+id = "bob"
+role = "trader"
+"""
+
+
 @pytest.fixture(scope="session")
-def user_client(
-    api_golden: tuple[ReadStore, dict[str, str]], tmp_path_factory: pytest.TempPathFactory
-) -> Callable[[str], TestClient]:
-    """A client for ``user`` (``ALGOTRADE_USER``) over configs where alice has a feature."""
+def user_configs(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """A config root over the repo's site configs with three users (``USERS_TOML``), each
+    with an identity email, where alice has a user feature."""
     root: Path = tmp_path_factory.mktemp("configs")
-    (root / "site").symlink_to(REPO_ROOT / "config" / "site")
+    for item in (REPO_ROOT / "config" / "site").iterdir():
+        if item.name != "users.toml":
+            (root / "site" / item.name).parent.mkdir(exist_ok=True)
+            (root / "site" / item.name).symlink_to(item)
+    (root / "site" / "users.toml").write_text(USERS_TOML)
     (root / "users" / "alice" / "features").mkdir(parents=True)
     (root / "users" / "alice" / "features" / "vol.toml").write_text(USER_FEATURES)
-    (root / "users" / "bob").mkdir()
+    for user in ("ana", "alice", "bob"):
+        (root / "users" / user).mkdir(parents=True, exist_ok=True)
+        (root / "users" / user / "identity.toml").write_text(f'email = "{user}@example.com"\n')
+    return root
+
+
+@pytest.fixture(scope="session")
+def user_client(
+    api_golden: tuple[ReadStore, dict[str, str]], user_configs: Path
+) -> Callable[[str], TestClient]:
+    """A client for ``user`` over configs where alice has a feature."""
 
     def client_for(user: str) -> TestClient:
-        store = replace(api_golden[0], configs=FileConfigStore(root), user=UserContext(user))
-        return TestClient(
-            create_app(
-                ApiSettings("memory://", str(root), user), store, authenticator=as_user(user)
-            )
-        )
+        store = replace(api_golden[0], configs=FileConfigStore(user_configs))
+        settings = ApiSettings("memory://", str(user_configs), user)
+        return TestClient(create_app(settings, store, authenticator=as_user(user)))
 
     return client_for
 

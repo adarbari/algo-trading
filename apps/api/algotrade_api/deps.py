@@ -59,9 +59,10 @@ DEV_ORIGINS = (
 
 @dataclass(frozen=True)
 class ReadStore:
-    """What the app reads: market data (read-only) and configs (``user``: the API's own user,
-    ``ALGOTRADE_USER``; a request reads as its caller). API wiring only: a request reads
-    through the ``ReadContext`` opened over it (``Context``, GraphQL)."""
+    """What the app reads: market data (read-only) and configs (``user``: ``ALGOTRADE_USER``,
+    kept for the stores' callers outside a request; a request always reads as its caller).
+    API wiring only: a request reads through the ``ReadContext`` opened over it (``Context``,
+    GraphQL)."""
 
     reader: StoreReader
     configs: ConfigStore
@@ -88,7 +89,9 @@ class ApiSettings:
     user: str = DEFAULT_USER  # the user ALGOTRADE_AUTH=off serves
     cors_origins: tuple[str, ...] = field(default=DEV_ORIGINS)
     live: bool = False  # read live quotes from IB Gateway (the served app; off in tests)
-    debug: bool = False  # serve the GraphiQL IDE at GET /graphql (local development only)
+    # Serve the GraphiQL IDE at GET /graphql (local development only; a browser GET carries
+    # no token, so it is usable with ALGOTRADE_AUTH=off only).
+    debug: bool = False
     auth: AuthConfig = field(default_factory=AuthConfig)  # who may call (ADR 0040)
 
     @classmethod

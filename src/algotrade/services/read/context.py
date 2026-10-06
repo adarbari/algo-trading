@@ -58,7 +58,10 @@ __all__ = [
 
 class ResultCache:
     """A small LRU of computed results. Callers key on ``StoreReader.visible_seq()`` (read
-    before computing), so a publish makes every earlier entry unreachable (ADR 0022)."""
+    before computing), so a publish makes every earlier entry unreachable (ADR 0022). One
+    cache serves every caller of the API (ADR 0040): a result that depends on the request's
+    user (their catalogue, their features, their screens) has ``ctx.user.user_id`` in its key;
+    stored rows of a named run (the run names its owner) and market data need not."""
 
     def __init__(self, size: int = 8) -> None:
         self._size = size
