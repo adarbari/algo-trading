@@ -133,6 +133,22 @@ def test_a_value_with_a_later_vintage_is_not_seen() -> None:
     assert row(reader, later)["unrate"] == pytest.approx(0.048, rel=F32)
 
 
+def test_a_yoy_uses_the_year_ago_value_as_the_session_knew_it() -> None:
+    writer, reader = store()
+    year_ago, now, revised_on = date(2025, 8, 1), date(2026, 8, 1), END + timedelta(days=3)
+    write(
+        writer,
+        [
+            obs("CPIAUCSL", year_ago, date(2025, 9, 10), 100.0),
+            obs("CPIAUCSL", year_ago, revised_on, 90.0),  # revised after END
+            obs("CPIAUCSL", now, date(2026, 9, 10), 103.0),
+        ],
+    )
+    assert row(reader)["cpi_yoy"] == pytest.approx(0.03, rel=F32)
+    later = sessions_ending(revised_on + timedelta(days=3), 1)[0]
+    assert row(reader, later)["cpi_yoy"] == pytest.approx(103 / 90 - 1, rel=F32)
+
+
 def test_the_curve_comes_from_fred_when_the_session_has_no_curve_of_its_own() -> None:
     writer, reader = store()
     write_curve(writer, END - timedelta(days=1), {"3M": 0.05, "2Y": 0.045, "10Y": 0.04})

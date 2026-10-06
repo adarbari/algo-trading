@@ -12,6 +12,9 @@ A verdict is null (UNKNOWN) when a value it needs is null; an "either" rule (the
 spread) is on as soon as one side is on. ``_changed`` is null unless both verdicts are known.
 The expression language has no look-back across sessions, so the verdicts live here, not in
 ``config/site/features/regime.toml``.
+
+Licence (ADR 0047, on ADR 0028): a ``<key>`` value keeps its source's licence (the high-yield
+spread and the VIX ratio are personal-use values); a verdict is our own aggregate and is open.
 """
 
 from collections.abc import Callable, Mapping
@@ -143,11 +146,10 @@ def _features(c: Card) -> tuple[Feature, ...]:
         Feature(c.key, "float32", source.unit, f"{source.description} (the {c.key} card's value)",
                 unknown, valid_range=source.valid_range, inputs=(source.key,), licence=licence),
         Feature(f"{c.key}_on", "bool", "flag", f"The {c.key} card is on: {c.rule}",
-                f"a value the rule needs is null ({', '.join(reads)})", inputs=reads,
-                licence=licence),
+                f"a value the rule needs is null ({', '.join(reads)})", inputs=reads),
         Feature(f"{c.key}_changed", "bool", "flag", f"The {c.key} verdict differs from "
                 f"{D.changed_sessions} sessions earlier (recomputed from that session's inputs)",
-                "the verdict now or then is null", inputs=reads, licence=licence),
+                "the verdict now or then is null", inputs=reads),
     )  # fmt: skip
 
 
@@ -156,8 +158,9 @@ COLUMNS = column_types(FEATURES)
 
 
 def session_values(inputs: Inputs, day: date) -> dict[str, object]:
-    """The columns of every input group's row for ``day`` (later inputs win on a shared name;
-    none share one), empty when no input has a row for it."""
+    """The columns of every input group's row for ``day``, empty when no input has a row for
+    it. A name two inputs share (an indicator's value column copies its ``market_macro``
+    column) holds the same value in both, so the later input winning is harmless."""
     out: dict[str, object] = {}
     for frame in inputs.values():
         if frame is None or frame.empty or "session_date" not in frame.columns:

@@ -139,3 +139,8 @@ def test_backfill_equals_nightly_and_runs_are_deterministic() -> None:
     got = [r.frame.iloc[0]["label"] for r in backfill[regime.GROUP.key][9:]]  # type: ignore[union-attr]
     # no breadth group stored: breadth unknown, trend + VIX term + drawdown = 50 with 80% known
     assert got == ["STRESS"] * 5 + ["CALM"]
+
+
+def test_every_regime_column_is_open() -> None:
+    """Scores and labels are our own aggregate, never a third-party value (ADR 0047 on 0028)."""
+    assert {f.licence for f in regime.GROUP.features} == {"open"}

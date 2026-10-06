@@ -21,6 +21,9 @@ known ``raw_label`` of the last ``hold_sessions`` sessions (null when the sessio
 a regime is left only after that many sessions below it; it is recomputed from the inputs of
 those sessions, never from this group's earlier rows (stateless: a backfill equals the
 nightly). ``label_changed``: the label differs from ``changed_sessions`` sessions earlier.
+
+Every column is open (ADR 0047, on ADR 0028): the scores and labels are our own aggregate of
+verdicts, never a third-party value.
 """
 
 from collections.abc import Callable, Mapping
@@ -34,7 +37,7 @@ import pandas as pd
 from algotrade.core.model.instruments import market_id
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
-from algotrade.features.framework.feature import Feature, Licence, strictest
+from algotrade.features.framework.feature import Feature
 from algotrade.features.rollups.market import cross_asset, indicators, macro, trend
 from algotrade.features.rollups.market.indicators import (
     Values,
@@ -253,15 +256,8 @@ def _reads(which: Score | None = None) -> tuple[str, ...]:
     return tuple(dict.fromkeys(keys))
 
 
-def _licence(reads: tuple[str, ...]) -> Licence:
-    """The most restrictive licence of the features read (ADR 0028)."""
-    by_key = {f.key: f for g in GROUPS.values() for f in g.features}
-    return strictest(by_key[r].licence for r in reads)
-
-
 D = Params()
 _SCORE_READS = _reads("macro") + _reads("market")
-_LABEL = _licence(_SCORE_READS)
 
 
 def _weights(which: Score) -> str:
@@ -270,18 +266,16 @@ def _weights(which: Score) -> str:
 
 def _score(name: str, which: Score, words: str) -> tuple[Feature, ...]:
     reads = _reads(which)
-    licence = _licence(reads)
     return (
         Feature(name, "float32", "pct_points", f"{words}: the weight of its signals that are "
                 f"on, 0 to 100 (weights {_weights(which)}); an unknown signal adds 0",
                 "never: an unknown signal adds 0 (see the coverage)", valid_range=(0, 100),
-                inputs=reads, licence=licence),
+                inputs=reads),
         Feature(f"{which}_coverage", "float32", "decimal", f"Share of {name}'s weight whose "
                 "signals are known (below min_coverage, 0.5: no label)", "never",
-                valid_range=(0, 1), inputs=reads, licence=licence),
+                valid_range=(0, 1), inputs=reads),
         Feature(f"{which}_missing", "int", "count", f"How many of {name}'s signals are "
-                "unknown (an input is null)", "never", valid_range=(0, 20), inputs=reads,
-                licence=licence),
+                "unknown (an input is null)", "never", valid_range=(0, 20), inputs=reads),
     )  # fmt: skip
 
 
@@ -294,22 +288,20 @@ FEATURES = (
             f"last {D.hold_sessions} sessions (CALM, CAUTION: macro risk high, STRESS: market "
             "stress high, CRISIS: both), so a regime is left only after that many calmer "
             "sessions", f"the session's raw_label is unknown: {_UNKNOWN}", kind="label",
-            categories=LABELS, inputs=_SCORE_READS, licence=_LABEL),
+            categories=LABELS, inputs=_SCORE_READS),
     Feature("raw_label", "str", "category", f"The session's regime before hysteresis: "
             f"macro_risk >= {D.macro_high:g} is macro high, market_stress >= {D.market_high:g} "
             "market high; CALM neither, CAUTION macro only, STRESS market only, CRISIS both",
-            _UNKNOWN, kind="label", categories=LABELS, inputs=_SCORE_READS, licence=_LABEL),
+            _UNKNOWN, kind="label", categories=LABELS, inputs=_SCORE_READS),
     *_score("macro_risk", "macro", "Slow macro recession risk"),
     *_score("market_stress", "market", "Fast market stress"),
     Feature("fragility", "float32", "pct_points", f"Context only (never the label): how deep a "
             f"fall could be, the weight of its signals on, 0 to 100 ({_weights('fragility')}: "
             f"bank credit up more than {D.credit_boom_above:.0%} on the year, SPY up more than "
             f"{D.runup_above:.0%} on the year)", "neither bank credit growth nor SPY's one-year "
-            "return is known", valid_range=(0, 100), inputs=_reads("fragility"),
-            licence=_licence(_reads("fragility"))),
+            "return is known", valid_range=(0, 100), inputs=_reads("fragility")),
     Feature("label_changed", "bool", "flag", f"The label differs from {D.changed_sessions} "
-            "sessions earlier", "the label now or then is unknown", inputs=_SCORE_READS,
-            licence=_LABEL),
+            "sessions earlier", "the label now or then is unknown", inputs=_SCORE_READS),
 )  # fmt: skip
 COLUMNS = column_types(FEATURES)
 

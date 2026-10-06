@@ -64,3 +64,14 @@ input loads only the ids those tickers resolve to in the reference snapshot each
 chunk sees (`reference.ids_for_symbols`, the union), instead of every instrument's bars, and the
 group still picks each session's ids through `instruments/symbol_ids`. The prefilter is a
 superset of every session's ids, so point in time and ADR 0018 (no built ids) are unchanged.
+
+## Amendment (2026-10-06, RG3a review): licences of the regime's verdicts, scores and label
+ADR 0028 marks values derived from a personal-use source `personal` so that the licensed data
+itself is never shown to other users; it does not mean every conclusion we draw from it is
+hidden. So a raw third-party value keeps its licence (`market_macro@v1.hy_oas`, `vix`,
+`vix_term_ratio` and the card values `regime_indicators@v1.hy_oas` / `vix_term` are personal),
+while a verdict, score or label we compute is our own aggregate and is `open`: every
+`<key>_on` and `<key>_changed` of `regime_indicators@v1` and every column of `regime@v1`.
+Otherwise the regime, which reads the high-yield spread and the VIX, would be hidden from every
+non-owner user (the traders being onboarded). An expression feature still takes the most
+restrictive licence of what it reads (`vix_band` is personal).

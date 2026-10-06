@@ -91,5 +91,6 @@ def test_the_contract_columns_of_the_read_model() -> None:
     assert [c.key for c in CARDS] == keys
     assert list(indicators.COLUMNS) == [f"{k}{s}" for k in keys for s in ("", "_on", "_changed")]
     assert indicators.GROUP.key == "regime_indicators@v1" and indicators.GROUP.entity == "market"
+    # raw licensed values stay personal; our verdicts are open (ADR 0047 on ADR 0028)
     personal = {f.name for f in indicators.FEATURES if f.licence == "personal"}
-    assert personal == {f"{k}{s}" for k in ("hy_oas", "vix_term") for s in ("", "_on", "_changed")}
+    assert personal == {"hy_oas", "vix_term"}
