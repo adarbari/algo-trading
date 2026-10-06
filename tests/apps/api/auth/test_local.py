@@ -47,3 +47,10 @@ def test_serves_the_fixed_user_on_loopback_only() -> None:
     for server in (("10.0.0.2", 8000), ("testserver", 80), None):
         with pytest.raises(UnauthenticatedError):
             auth.authenticate(_request(server))
+
+
+@pytest.mark.parametrize("header", [b"forwarded", b"x-forwarded-for"])
+def test_a_proxied_request_is_refused_even_on_loopback(header: bytes) -> None:
+    scope = {"type": "http", "headers": [(header, b"203.0.113.9")], "server": ("127.0.0.1", 80)}
+    with pytest.raises(UnauthenticatedError):
+        LocalAuthenticator(LOCAL).authenticate(Request(scope))

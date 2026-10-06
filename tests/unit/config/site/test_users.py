@@ -88,6 +88,12 @@ def test_an_email_belongs_to_one_user() -> None:
         users.with_emails({"ana": "a@example.com", "tom": "a@example.com"})
 
 
+def test_a_records_email_is_normalised_and_checked() -> None:
+    assert UserRecord("ana", Role.ADMIN, email=" Ana@Example.com ").email == "ana@example.com"
+    with pytest.raises(ConfigurationError, match="expected an email address"):
+        UserRecord("ana", Role.ADMIN, email="nope")
+
+
 def test_the_site_user_has_no_email() -> None:
     with pytest.raises(ConfigurationError, match="no email"):
         UserRecord("site", Role.ADMIN, email="s@example.com")

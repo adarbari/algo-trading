@@ -13,7 +13,7 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from jwt import PyJWK, PyJWKClient, PyJWKSet
-from jwt.exceptions import PyJWKSetError, PyJWTError
+from jwt.exceptions import PyJWKSetError
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +25,9 @@ FETCH_TIMEOUT_S = 5
 
 def jwks_fetch(supabase_url: str) -> Fetch:
     """The project's JWKS over HTTPS (PyJWT's client, its own cache off: ``KeySet`` caches)."""
-    client = PyJWKClient(f"{supabase_url}{JWKS_PATH}", cache_jwk_set=False, timeout=FETCH_TIMEOUT_S)
+    client = PyJWKClient(
+        f"{supabase_url.rstrip('/')}{JWKS_PATH}", cache_jwk_set=False, timeout=FETCH_TIMEOUT_S
+    )
     return client.fetch_data
 
 
@@ -78,7 +80,7 @@ class KeySet:
         self._tried = now
         try:
             keys = parse_keys(self._fetch())
-        except (PyJWTError, OSError, ValueError, TypeError) as exc:
+        except Exception as exc:  # never raises: a bad fetch keeps the keys
             kept = len(self._keys)
             log.warning("JWKS fetch failed (%s); keeping %d keys", type(exc).__name__, kept)
             return False

@@ -6,11 +6,12 @@ request with an unknown key fetches again). Off mode serves a declared user only
 
 from dataclasses import dataclass, field
 from enum import StrEnum
+from urllib.parse import urlparse
 
 from algotrade.config.site.users import UsersSettings
 from algotrade.core.model.errors import ConfigurationError
 from algotrade_api.auth.keys import Fetch, KeySet, jwks_fetch
-from algotrade_api.auth.local import LocalAuthenticator
+from algotrade_api.auth.local import LocalAuthenticator, is_loopback
 from algotrade_api.auth.protocol import Authenticator
 from algotrade_api.auth.supabase import SupabaseAuthenticator
 
@@ -49,6 +50,12 @@ def open_authenticator(
         raise ConfigurationError(
             "ALGOTRADE_AUTH=supabase needs SUPABASE_URL (ALGOTRADE_AUTH=off: a local-only API)"
         )
-    keys = KeySet(fetch if fetch is not None else jwks_fetch(config.supabase_url))
+    url = config.supabase_url.rstrip("/")
+    parsed = urlparse(url)
+    if parsed.scheme != "https" and not (
+        parsed.scheme == "http" and is_loopback(parsed.hostname or "")
+    ):
+        raise ConfigurationError("SUPABASE_URL: expected https:// (http:// only on loopback)")
+    keys = KeySet(fetch if fetch is not None else jwks_fetch(url))
     keys.refresh()
-    return SupabaseAuthenticator(config.supabase_url, users, keys, config.jwt_secret)
+    return SupabaseAuthenticator(url, users, keys, config.jwt_secret)

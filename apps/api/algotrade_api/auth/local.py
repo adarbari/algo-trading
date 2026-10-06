@@ -1,7 +1,9 @@
 """``ALGOTRADE_AUTH=off`` (ADR 0040): the development shortcut that serves one fixed registry
 user without a token, and only on a loopback address. The CLI refuses to start that way on
 another ``--host`` (``require_loopback``), and every request is checked again against the
-address the server accepted it on, so a misconfigured bind still answers 401."""
+address the server accepted it on, so a misconfigured bind still answers 401. A request a
+proxy forwarded (``Forwarded`` / ``X-Forwarded-For``: a tunnel or reverse proxy on this
+machine makes remote callers look local) is 401 too."""
 
 import ipaddress
 
@@ -12,6 +14,7 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade_api.auth.protocol import UnauthenticatedError
 
 LOCALHOST = "localhost"
+FORWARDED = ("forwarded", "x-forwarded-for")  # set by a proxy in front of the app
 
 
 def is_loopback(host: str) -> bool:
@@ -42,4 +45,6 @@ class LocalAuthenticator:
         server = request.scope.get("server")
         if not server or not is_loopback(str(server[0])):
             raise UnauthenticatedError("authentication is off: only loopback requests are served")
+        if any(h in request.headers for h in FORWARDED):
+            raise UnauthenticatedError("authentication is off: forwarded requests are refused")
         return self._user

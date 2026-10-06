@@ -192,3 +192,13 @@ def test_errors_never_carry_the_token(auth: SupabaseAuthenticator, tokens: Token
     with pytest.raises(UnauthenticatedError) as raised:
         auth.authenticate(bearer(token))
     assert token not in str(raised.value) and "other.supabase" not in str(raised.value)
+
+
+def test_a_symmetric_key_in_the_jwks_is_never_used(users: UsersSettings, tokens: Tokens) -> None:
+    secret = "an-oct-key-published-in-the-jwks-32b"
+    oct_key = {"kty": "oct", "k": base64.urlsafe_b64encode(secret.encode()).decode().rstrip("=")}
+    keys = KeySet(Fetch({"keys": [{**oct_key, "kid": "k1", "alg": "HS256"}]}))
+    for configured in (None, tokens.secret):
+        auth = SupabaseAuthenticator(SUPABASE_URL, users, keys, configured)
+        with pytest.raises(UnauthenticatedError):
+            auth.authenticate(bearer(tokens.mint("HS256", kid="k1", key=secret)))

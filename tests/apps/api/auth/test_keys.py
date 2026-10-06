@@ -1,6 +1,7 @@
 """The JWKS key cache: one fetch serves until stale, an unknown ``kid`` refetches once (not
 more often than the cooldown), a failed fetch keeps the keys, an empty set is no keys."""
 
+import http.client
 import logging
 
 import pytest
@@ -79,3 +80,13 @@ def test_a_malformed_document_is_a_failed_fetch() -> None:
 def test_the_default_fetch_reads_the_projects_jwks_url() -> None:
     fetch = jwks_fetch(SUPABASE_URL)
     assert fetch.__self__.uri == f"{SUPABASE_URL}{JWKS_PATH}"  # type: ignore[attr-defined]
+
+
+def test_any_fetch_error_keeps_the_keys(tokens: Tokens) -> None:
+    fetch = tokens.fetch()
+    keys = KeySet(fetch, max_age=0, cooldown=0, clock=Clock())
+    keys.refresh()
+    fetch.failure = http.client.IncompleteRead(b"{")  # not an OSError
+    assert keys.key_for(KID) is not None
+    fetch.failure, fetch.document = None, {"keys": ["not-a-jwk", 3]}
+    keys.key_for(KID)  # a malformed set never raises

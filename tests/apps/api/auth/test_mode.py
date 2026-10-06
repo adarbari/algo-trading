@@ -28,9 +28,14 @@ def test_off_serves_a_declared_user(users: UsersSettings) -> None:
         open_authenticator(AuthConfig(AuthMode.OFF), users, "nobody")
 
 
-def test_supabase_needs_the_project_url(users: UsersSettings) -> None:
+def test_supabase_needs_the_project_url_over_https(users: UsersSettings, tokens: Tokens) -> None:
     with pytest.raises(ConfigurationError, match="SUPABASE_URL"):
         open_authenticator(AuthConfig(), users, "local")
+    plain = AuthConfig(AuthMode.SUPABASE, "http://ref.supabase.co")
+    with pytest.raises(ConfigurationError, match="https"):
+        open_authenticator(plain, users, "local", tokens.fetch())
+    local = AuthConfig(AuthMode.SUPABASE, "http://127.0.0.1:54321/")  # `supabase start`
+    assert isinstance(open_authenticator(local, users, "x", tokens.fetch()), SupabaseAuthenticator)
 
 
 def test_supabase_fetches_the_keys_once_at_startup(users: UsersSettings, tokens: Tokens) -> None:

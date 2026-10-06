@@ -46,8 +46,14 @@ class UserRecord:
 
     def __post_init__(self) -> None:
         validate_id("user", self.user_id)
-        if self.email is not None and self.user_id == SITE_USER:
+        if self.email is None:
+            return
+        if self.user_id == SITE_USER:
             raise ConfigurationError(f"user '{SITE_USER}' runs scheduled screens: no email")
+        email = self.email.strip().lower()
+        if "@" not in email:
+            raise ConfigurationError(f"user '{self.user_id}' email: expected an email address")
+        object.__setattr__(self, "email", email)  # frozen: normalised once, here
 
 
 DEFAULT_USERS: tuple[UserRecord, ...] = (
@@ -136,6 +142,6 @@ def identity_email(doc: Mapping[str, Any] | None, user_id: str) -> str | None:
     email = table.raw("email")
     if email is None:
         return None
-    if not isinstance(email, str) or "@" not in email.strip():
+    if not isinstance(email, str) or "@" not in email:
         raise ConfigurationError(f"{where} email: expected an email address")
     return email.strip().lower()
