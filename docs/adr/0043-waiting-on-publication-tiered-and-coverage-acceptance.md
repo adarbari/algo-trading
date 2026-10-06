@@ -61,6 +61,11 @@ not published yet" is not a failure until the day's deadline has passed.
   The `coverage_<feature>` checks (`tasks/maintenance/coverage.py`) accept the `rollups` step (a
   FAIL fails it and holds the screens back; WARN is reported), run with `run_quality`, and the
   email's Coverage section shows feature x tier with the change and the missing names.
+- [x] **Overdue earnings** (implemented): `covered_by = "recent"` grades a date rather than its
+  presence: of the names with a row, a `last_earnings_date` over `max_age_days` (100) before the
+  session with no `or_value` (`next_earnings_date`) is missing, listed with its last date. Core
+  only (`rest_min` 0), WARN. It catches a hole in the source that the row rule counts as covered:
+  FDX on 2026-10-02, last report 2026-06-23 and absent from Nasdaq's calendar for Sep-Dec 2026.
 
 ## Consequences
 - A late source no longer pages the owner; the session still FAILS at 23:00 PT if the data

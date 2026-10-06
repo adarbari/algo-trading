@@ -229,3 +229,23 @@ def test_coverage_section_lists_feature_by_tier_with_missing_names_of_failing_ce
 def test_no_coverage_data_means_no_coverage_section() -> None:
     report = build_report(fx.summary(), fx.records(), LABELS)
     assert report.coverage == () and "COVERAGE" not in render_text(report)
+
+
+def test_overdue_earnings_are_listed_with_their_date_and_the_source_hint() -> None:
+    data = {
+        "previous_session": "2026-10-01",
+        "cells": [
+            {"tier": "core", "applicable": 503, "covered": 502, "share": 502 / 503,
+             "previous": 502 / 503, "ok": False, "missing": ["FDX (last 2026-06-23)"]},
+            {"tier": "rest", "applicable": 4000, "covered": 3990, "share": 3990 / 4000,
+             "previous": 3990 / 4000, "ok": True, "missing": ["AAC (last 2026-05-01)"]},
+        ],
+    }  # fmt: skip
+    check = {"name": "coverage_earnings.last_earnings_date", "status": "WARN", "detail": "x"}
+    summary = fx.summary()
+    summary["runs"][0]["steps"]["rollups"]["checks"] = [{**check, "data": data}]
+    report = build_report(summary, fx.records(), LABELS)
+    assert "core: FDX (last 2026-06-23)" in render_text(report)
+    assert "FDX (last 2026-06-23)" in render_html(report)
+    assert any("has dropped this company; check the source" in h for h in report.hints)
+    assert not any("coverage_<feature>" in h for h in report.hints)  # no "re-run the task"

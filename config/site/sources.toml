@@ -198,3 +198,17 @@ rest_min = 0.75
 max_drop = 0.05
 level = "WARN"
 covered_by = "row"
+
+# Overdue earnings: of the core names with an earnings row, the share whose last report is at most
+# max_age_days before the session or that have a next date. A company past both is overdue: the
+# calendar source (Nasdaq) has dropped it, and the row rule above still counts it covered (FDX on
+# 2026-10-02: last report 2026-06-23, no next date). Core only (rest_min 0); the email lists each
+# name with its last report date.
+[quality.coverage.earnings.last_earnings_date]
+covered_by = "recent"
+max_age_days = 100
+or_value = "next_earnings_date"
+core_min = 1.0
+rest_min = 0.0
+max_drop = 1.0
+level = "WARN"

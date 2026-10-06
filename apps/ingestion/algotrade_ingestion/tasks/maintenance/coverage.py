@@ -10,7 +10,10 @@ name missing). Applicability is ``Feature.applies_to`` decided by ``features.fra
 session's reference snapshot; the population is the universe snapshot of the session; tiers are
 ``tasks.market.tiers`` (core: S&P 500, priority symbols, HIGH liquidity). A value is covered when
 present, or null for a reason the feature declares as "too illiquid to price" (ADR 0042: not a
-gap); any other missing value is missing, never counted as zero or filled. The previous
+gap); any other missing value is missing, never counted as zero or filled. A ``recent`` rule
+grades a date instead (overdue earnings): of the names with a row, a date older than
+``max_age_days`` with no ``or_value`` is missing, listed with that date (FDX on 2026-10-02: last
+report 2026-06-23 and no next date, because the Nasdaq calendar had dropped it). The previous
 session's shares are recomputed from its stored partitions (no new table); the nightly runs
 this as the acceptance check of ``rollups`` and ``run_quality`` runs it with the rest.
 """
@@ -87,6 +90,24 @@ def _illiquid(stored: pd.DataFrame, feat: Feature) -> pd.Series:
     return stored[status].isin(feat.illiquid_statuses)
 
 
+def _recent(
+    stored: pd.DataFrame, column: str, rule: CoverageRule, day: date
+) -> tuple[set[str], dict[str, str]]:
+    """``covered_by = "recent"``: the ids with a ``column`` date at most ``max_age_days``
+    before ``day`` or a value in ``or_value``, and the stale date (ISO) of each other id."""
+    stamps = pd.to_datetime(stored[column], errors="coerce")
+    recent = stamps.notna() & (stamps >= pd.Timestamp(day) - pd.Timedelta(days=rule.max_age_days))
+    dates = stamps.dt.date
+    if rule.or_value and rule.or_value in stored.columns:
+        recent |= stored[rule.or_value].notna()
+    ids = stored["instrument_id"].astype(str)
+    stale = {
+        i: "" if pd.isna(d) else d.isoformat()
+        for i, d in zip(ids[~recent], dates[~recent], strict=True)
+    }
+    return set(ids[recent]), stale
+
+
 def _locate(fs: FeatureSet, feature: str) -> tuple[str, str, Feature]:
     """``<group>.<column>`` -> its stored table, column and declaration."""
     group, _, column = feature.partition(".")
@@ -96,6 +117,24 @@ def _locate(fs: FeatureSet, feature: str) -> tuple[str, str, Feature]:
     if not found:
         raise ValueError(f"coverage: {feature!r} is not a stored feature of the catalogue")
     return fs.table(group), column, found[0]
+
+
+def _covered(
+    stored: pd.DataFrame | None, column: str, feat: Feature, rule: CoverageRule, day: date
+) -> tuple[set[str], set[str] | None, dict[str, str]]:
+    """The covered ids of the session's partition, the ids graded at all (``None``: every
+    applicable name; "recent" grades only the names with a row, none without a partition: the
+    row rule reports that gap) and the stale date of each "recent" id that is not covered."""
+    recent = rule.covered_by == "recent"
+    if stored is None or column not in stored.columns:
+        return set(), (set() if recent else None), {}
+    ids = stored["instrument_id"].astype(str)
+    if recent:
+        have, stale = _recent(stored, column, rule, day)
+        return have, set(ids), stale
+    if rule.covered_by == "row":
+        return set(ids), None, {}
+    return set(ids[stored[column].notna() | _illiquid(stored, feat)]), None, {}
 
 
 def cells(
@@ -119,22 +158,22 @@ def cells(
     out: list[Cell] = []
     for rule in rules:
         table, column, feat = _locate(fs, rule.feature)
-        stored = reader.table(table, day)
-        if stored is None or column not in stored.columns:
-            have: set[str] = set()
-        elif rule.covered_by == "row":
-            have = set(stored["instrument_id"].astype(str))
-        else:
-            explained = _illiquid(stored, feat)
-            have = set(stored.loc[stored[column].notna() | explained, "instrument_id"].astype(str))
+        have, scope, stale = _covered(reader.table(table, day), column, feat, rule, day)
         applies = [
             not not_applicable([feat.applies_to], opt, etf)
             for opt, etf in zip(pop["optionable"], pop["is_etf"], strict=True)
         ]
         for tier in TIERS:
             mine = pop[(pop["tier"] == tier) & pd.Series(applies, index=pop.index)]
+            if scope is not None:
+                mine = mine[mine["instrument_id"].astype(str).isin(scope)]
             ids = mine["instrument_id"].astype(str)
-            gone = mine.loc[~ids.isin(have), "symbol"].astype(str)
+            out_ids = ids[~ids.isin(have)]
+            syms = mine.loc[out_ids.index, "symbol"].astype(str)
+            gone = [
+                f"{sym} (last {stale[i]})" if stale.get(i) else sym
+                for i, sym in zip(out_ids, syms, strict=True)
+            ]
             out.append(
                 Cell(
                     rule.feature,
@@ -206,6 +245,9 @@ def check_coverage(reader: StoreReader, session: date, s: SourcesSettings) -> li
                 }
             )
         figures = ", ".join(f"{c.tier} {_percent(c.share)} of {c.applicable}" for c in mine)
+        if rule.covered_by == "recent":
+            or_value = f" and no {rule.or_value}" if rule.or_value else ""
+            notes.append(f"overdue: over {rule.max_age_days} days since the date{or_value}")
         if before_day is None:
             notes.append("no earlier partition: drop not checked")
         detail = f"{figures}" + (f" ({'; '.join(notes)})" if notes else "")
