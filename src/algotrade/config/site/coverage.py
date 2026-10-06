@@ -9,8 +9,13 @@ from algotrade.config.site.fields import Table
 from algotrade.core.model.errors import ConfigurationError
 
 LEVELS = ("WARN", "FAIL")
-COVERED_BY = ("value", "row")  # a non-null value, or a stored row (a null date is not a gap)
-KEYS = ("core_min", "rest_min", "max_drop", "level", "core_level", "covered_by")
+# a non-null value; a stored row (a null date is not a gap); "recent": a date at most
+# max_age_days before the session, or a value in or_value (overdue earnings)
+COVERED_BY = ("value", "row", "recent")
+KEYS = (
+    "core_min", "rest_min", "max_drop", "level", "core_level", "covered_by", "max_age_days",
+    "or_value",
+)  # fmt: skip
 
 
 @dataclass(frozen=True)
@@ -19,7 +24,10 @@ class CoverageRule:
     ``rest_min``: the least covered share of the applicable names of that tier; ``max_drop``:
     the largest fall in a tier's share against the previous session; ``level`` (and
     ``core_level`` for the core tier) is what a breach is: WARN is reported, FAIL fails the
-    step. ``covered_by`` row: the instrument having a row in the group's table counts."""
+    step. ``covered_by`` row: the instrument having a row in the group's table counts; recent: of
+    the names with a row, those whose date is at most ``max_age_days`` before the session or
+    whose ``or_value`` column has a value (a company long past its last report with no next date
+    is overdue: the calendar source dropped it)."""
 
     feature: str
     core_min: float = 0.95
@@ -28,6 +36,8 @@ class CoverageRule:
     level: str = "WARN"
     core_level: str = ""  # "": the same as ``level``
     covered_by: str = "value"
+    max_age_days: int = 100
+    or_value: str = ""  # "recent": a sibling column whose value also covers
 
     def level_of(self, tier: str) -> str:
         return (self.core_level or self.level) if tier == "core" else self.level
@@ -58,6 +68,8 @@ def load_coverage(quality: Table, defaults: tuple[CoverageRule, ...]) -> tuple[C
                 level=level,
                 core_level=core_level,
                 covered_by=t.choice("covered_by", base.covered_by, COVERED_BY),
+                max_age_days=t.integer("max_age_days", base.max_age_days, minimum=1),
+                or_value=t.text("or_value", base.or_value),
             )
     unknown = [f for f in rules if f.count(".") != 1]
     if unknown:
@@ -67,10 +79,19 @@ def load_coverage(quality: Table, defaults: tuple[CoverageRule, ...]) -> tuple[C
 
 # Used when sources.toml has no [quality.coverage] section: the key features of a night; mins sit
 # a little under the session 2026-10-02 coverage (core 98-100%, rest 79-99%); every core name
-# has an earnings row.
+# has an earnings row; no core company is overdue (last report over 100 days ago, no next date:
+# FDX on 2026-10-02, dropped from the Nasdaq calendar).
 DEFAULT_COVERAGE = (
     CoverageRule("price_stats.close", core_min=0.99, rest_min=0.95, core_level="FAIL"),
     CoverageRule("price_stats.high_52w", core_min=0.95, rest_min=0.70),
     CoverageRule("iv30.iv30", core_min=0.99, rest_min=0.75),
     CoverageRule("earnings.next_earnings_date", core_min=1.0, rest_min=0.75, covered_by="row"),
+    CoverageRule(
+        "earnings.last_earnings_date",
+        core_min=1.0,
+        rest_min=0.0,
+        max_drop=1.0,
+        covered_by="recent",
+        or_value="next_earnings_date",
+    ),
 )

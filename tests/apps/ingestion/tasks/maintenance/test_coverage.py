@@ -183,3 +183,55 @@ def test_the_previous_session_is_found_per_feature_table() -> None:
     again = only(check_coverage(reader, D, rules(iv)), "iv30.iv30")
     assert again.data["previous_session"] == BEFORE.isoformat()
     assert cell(again, "rest")["previous"] == 1.0
+
+
+OVERDUE = CoverageRule(
+    "earnings.last_earnings_date",
+    core_min=1.0,
+    rest_min=0.0,
+    max_drop=1.0,
+    covered_by="recent",
+    max_age_days=100,
+    or_value="next_earnings_date",
+)
+
+
+def test_an_overdue_core_company_is_flagged_with_its_last_date() -> None:
+    # FDX on 2026-10-02: last report 2026-06-23 (101 days), no next date (dropped by Nasdaq)
+    writer, reader = store()
+    rows = {
+        "C1": {"last_earnings_date": date(2026, 6, 23), "next_earnings_date": None},
+        "C2": {"last_earnings_date": date(2026, 6, 24), "next_earnings_date": None},  # 100 days
+        "R1": {"last_earnings_date": date(2026, 5, 1), "next_earnings_date": None},
+        "R2": {"last_earnings_date": date(2026, 5, 1), "next_earnings_date": date(2026, 10, 9)},
+        "E1": {"last_earnings_date": date(2026, 1, 1), "next_earnings_date": None},  # an ETF
+    }
+    put(writer, EARNINGS, D, rows)
+    check = only(check_coverage(reader, D, rules(OVERDUE)), "earnings.last_earnings_date")
+    core, rest = cell(check, "core"), cell(check, "rest")
+    assert (core["covered"], core["applicable"], core["ok"]) == (1, 2, False)
+    assert core["missing"] == ["C1 (last 2026-06-23)"]
+    # rest is measured, never flagged; N1 (no row) is the row rule's gap; E1 is not expected
+    assert (rest["covered"], rest["applicable"], rest["ok"]) == (1, 2, True)
+    assert check.status == "WARN" and "overdue: over 100 days" in check.detail
+
+
+def test_a_next_date_or_a_recent_report_is_not_overdue() -> None:
+    writer, reader = store()
+    rows = {
+        "C1": {"last_earnings_date": date(2026, 9, 1), "next_earnings_date": None},
+        "C2": {"last_earnings_date": None, "next_earnings_date": date(2026, 10, 20)},
+    }
+    put(writer, EARNINGS, D, rows)
+    check = only(check_coverage(reader, D, rules(OVERDUE)), "earnings.last_earnings_date")
+    assert check.status == "PASS" and cell(check, "core")["covered"] == 2
+
+
+def test_overdue_grades_only_names_with_a_row() -> None:
+    writer, reader = store()
+    check = only(check_coverage(reader, D, rules(OVERDUE)), "earnings.last_earnings_date")
+    assert check.status == "PASS"  # no partition: the row rule reports that gap, not this one
+    assert cell(check, "core")["share"] is None
+    put(writer, EARNINGS, D, {"C1": {"last_earnings_date": None, "next_earnings_date": None}})
+    check = only(check_coverage(reader, D, rules(OVERDUE)), "earnings.last_earnings_date")
+    assert cell(check, "core")["missing"] == ["C1"]  # a row with neither date is overdue too

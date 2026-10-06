@@ -403,7 +403,15 @@ HINTS: tuple[tuple[re.Pattern[str], str], ...] = tuple(
             "--date D --symbols X` after fixing the producing task.",
         ),
         (
-            r"^coverage",
+            r"^coverage_earnings\.last_earnings_date",
+            "coverage_earnings.last_earnings_date (overdue earnings): a company's last report is "
+            "over [quality.coverage.earnings.last_earnings_date] max_age_days old and it has no "
+            "next date: the earnings calendar (Nasdaq) has dropped this company; check the "
+            "source (re-running `earnings` will not add it). The Coverage section lists each "
+            "name with its last report date.",
+        ),
+        (
+            r"^coverage(?!_earnings\.last_earnings_date)",
             "coverage_<feature>: too few of the names the feature applies to have a value "
             "(under [quality.coverage.*] core_min / rest_min), or the share fell more than "
             "max_drop since the session before. See the Coverage section for the missing names; "
