@@ -7,9 +7,23 @@ import createClient from 'openapi-fetch';
 
 import { apiBaseUrl } from '@/shared/config';
 
+import { accessToken, handleUnauthorized } from './auth';
 import type { paths } from './generated/schema';
 
 export const api = createClient<paths>({ baseUrl: apiBaseUrl });
+
+// Every request carries the Supabase access token (ADR 0040); a 401 ends the session.
+api.use({
+  async onRequest({ request }) {
+    const token = await accessToken();
+    if (token) request.headers.set('authorization', `Bearer ${token}`);
+    return request;
+  },
+  async onResponse({ response }) {
+    if (response.status === 401) await handleUnauthorized();
+    return response;
+  },
+});
 
 /** An HTTP error from the API, carrying the status and the server's `detail`. */
 export class ApiError extends Error {

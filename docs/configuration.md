@@ -386,6 +386,8 @@ call `load_dotenv()` once (a local `.env`, never overriding what is already set)
 | `ALGOTRADE_IBKR_API_CLIENT_ID` | `api_credential()`: the client id of the API's live option quotes (ADR 0028) | `ALGOTRADE_IBKR_CLIENT_ID` + 1 |
 | `ALGOTRADE_NOTIFY_EMAIL_TO`, `ALGOTRADE_NOTIFY_EMAIL_FROM`, `ALGOTRADE_SMTP_USER`, `ALGOTRADE_SMTP_PASSWORD` | `credential()`, read by the nightly email notifier (`workflows/nightly/notify.py`) when `[notify.email] enabled`; recipients comma-separated, FROM defaults to the first recipient; Gmail needs an app password | unset with email enabled: a `notify` WARN "email not configured", the nightly carries on |
 
+**The web app's build-time variables** (`apps/web`, read only in `src/shared/config/env.ts`; Vite reads them from `apps/web/.env.local`, git-ignored, not from the repo `.env`): `VITE_SUPABASE_URL` (the same project URL as `SUPABASE_URL`) and `VITE_SUPABASE_ANON_KEY` (Project Settings -> API -> the public `anon` key, which is safe in a browser) let the web sign users in. Unset (the API runs `ALGOTRADE_AUTH=off`), there is no session and no login page: the API's `viewer` answers and counts as signed in; trying to sign in then says the keys are missing. `VITE_API_BASE_URL` (default `/api`) is the API's address.
+
 **Creating the Supabase project** (ADR 0040; the API maps a token to a user by its email, so
 these settings are required, not optional):
 
@@ -395,6 +397,9 @@ these settings are required, not optional):
 - [ ] **Allow anonymous sign-ins** off (the API refuses anonymous tokens with 403 anyway).
 - [ ] Copy the project URL into `SUPABASE_URL` (and, for a project still on the legacy JWT
   secret, that secret into `SUPABASE_JWT_SECRET`), then set `ALGOTRADE_AUTH=supabase`.
+- [ ] Put the same URL and the `anon` key in `apps/web/.env.local` as `VITE_SUPABASE_URL` and
+  `VITE_SUPABASE_ANON_KEY` (the web signs in with them; add the web's origin to Authentication
+  -> URL Configuration when it is hosted).
 - [ ] After each user's first sign-in, pin their `subject` in `identity.toml` (below) from
   Authentication -> Users (the user's UID).
 

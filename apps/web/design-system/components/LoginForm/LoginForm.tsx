@@ -4,7 +4,7 @@
  * (the button shows a spinner and the fields lock) and `error` (one message for the whole
  * attempt, shown above the fields and announced as an alert; both fields are marked invalid
  * and described by it). Enter submits from either field, and the browser checks that the
- * email is filled and shaped like one.
+ * email is filled and shaped like one. `onEdit` tells the page the user is typing again.
  */
 import { useId, useState, type SyntheticEvent } from 'react';
 
@@ -37,6 +37,8 @@ export interface LoginFormProps {
   title?: string;
   /** An email to start with (the one used last time). */
   defaultEmail?: string;
+  /** Called when either field is edited, so the page can clear a stale `error`. */
+  onEdit?: () => void;
 }
 
 export function LoginForm({
@@ -45,6 +47,7 @@ export function LoginForm({
   error,
   title = 'Sign in',
   defaultEmail = '',
+  onEdit,
 }: LoginFormProps) {
   const ids = useId();
   const headingId = `${ids}heading`;
@@ -80,7 +83,10 @@ export function LoginForm({
               autoComplete="email"
               spellCheck={false}
               value={email}
-              onValueChange={setEmail}
+              onValueChange={(value) => {
+                setEmail(value);
+                onEdit?.();
+              }}
               invalid={Boolean(error)}
               aria-describedby={errorId}
             />
@@ -90,7 +96,10 @@ export function LoginForm({
               type="password"
               autoComplete="current-password"
               value={password}
-              onValueChange={setPassword}
+              onValueChange={(value) => {
+                setPassword(value);
+                onEdit?.();
+              }}
               invalid={Boolean(error)}
               aria-describedby={errorId}
             />

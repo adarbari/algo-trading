@@ -8,6 +8,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { expectAccessible } from './a11y';
 import { ADMIN_FIXTURES, FAIL, mockAdminApi } from './admin-api';
+import { mockViewer } from './auth-api';
 
 function collectErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -18,6 +19,7 @@ function collectErrors(page: Page): string[] {
 for (const theme of ['dark', 'light'] as const) {
   test(`shows completeness, quality and verification (${theme})`, async ({ page }) => {
     const errors = collectErrors(page);
+    await mockViewer(page);
     await mockAdminApi(page);
     await page.goto('/admin/ingestion');
     await page.evaluate((t) => {
@@ -45,6 +47,7 @@ for (const theme of ['dark', 'light'] as const) {
 
 test('a cell drills in, opens its run record and downloads its items', async ({ page }) => {
   const errors = collectErrors(page);
+  await mockViewer(page);
   await mockAdminApi(page, {
     'ingestionCell:bars/1d/2026-10-02': {
       ...(ADMIN_FIXTURES['ingestionCell:chains/option_quotes/2026-10-02'] as object),
@@ -83,6 +86,7 @@ test('a cell drills in, opens its run record and downloads its items', async ({ 
 test('warns when the latest session is not ingested; a failed section shows its error', async ({
   page,
 }) => {
+  await mockViewer(page);
   await mockAdminApi(page, {
     completeness: {
       ...(ADMIN_FIXTURES['completeness'] as object),
