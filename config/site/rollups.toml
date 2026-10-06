@@ -71,6 +71,10 @@ prefer_monthly = true    # standard monthlies in the window first (where OI conc
 ["market_breadth@v1"]      # the universe's breadth (ADR 0047)
 min_coverage = 0.9         # share of member stocks with a bar on the session, else every breadth column is null
 
+["market_macro@v3"]         # the regime model's macro readings (ADR 0048): monthly windows tolerate gaps
+min_months_12 = 10          # a 12-month mean or low needs this many of its months (Oct 2025: shutdown)
+min_months_3 = 2            # a 3-month mean needs this many of its months
+
 ["regime_indicators@v1"]     # the regime cards' verdicts (ADR 0047; docs/market-regime-plan.md 3-4)
 changed_sessions = 5         # <card>_changed compares the verdict with this many sessions earlier
 curve_min_inverted_days = 21 # curve: 10y - 3m below 0 now and on this many of the last 252 sessions

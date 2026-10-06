@@ -294,7 +294,7 @@ range; every feature is listed in the generated **[feature catalogue](features.m
   session's universe stocks above their averages and in a bear, new highs minus lows, the Zweig
   thrust, 90% down days; null below `min_coverage`) and `market_cross_asset@v1` (turbulence and
   the absorption ratio of an ETF basket, leadership ratios), all from `bars/1d`;
-  `market_macro@v2` (the curve from the session's own `rates/treasury` curve else FRED, credit
+  `market_macro@v3` (the curve from the session's own `rates/treasury` curve else FRED, credit
   spreads, labour, financial conditions, lending, policy, inflation, activity, the excess bond
   premium, the OFR stress index, policy uncertainty, VIX / VIX3M: each the latest observation of `macro/series` known by the session, by vintage, with the
   registry's `yoy` / `diff` transform applied here; null without FRED data, the row still

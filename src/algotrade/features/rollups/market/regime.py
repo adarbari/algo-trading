@@ -4,7 +4,7 @@ row per session (ADR 0047; docs/market-regime-plan.md section 4).
 Each score is a weighted count of signals that are on (``SIGNALS``; weights and thresholds in
 ``Params``, ``config/site/rollups.toml ["regime@v2"]``, each score's weights summing to 100).
 The cards' signals are ``regime_indicators@v1``'s verdicts; the others are thresholds on
-``market_macro@v2``, ``market_trend@v1`` and ``market_cross_asset@v1`` here.
+``market_macro@v3``, ``market_trend@v1`` and ``market_cross_asset@v1`` here.
 
 - ``macro_risk`` (slow): curve, credit (the high-yield card's verdict, else, when the high-yield
   spread is unknown, as before 1997, the excess bond premium above ``ebp_above``), labour

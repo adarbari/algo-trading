@@ -474,7 +474,7 @@ def test_the_bear_state_probit_and_its_source(fs: FeatureSet) -> None:
         }
     )
     out = fs.evaluate(
-        {"rollups/market/market_macro@v2": macro}, ["bear_prob_6m", "bear_prob_source"]
+        {"rollups/market/market_macro@v3": macro}, ["bear_prob_6m", "bear_prob_source"]
     )
     out = out.set_index("instrument_id")
     z = -1.0 - 40 * -0.005 + 15 * 0.04 + 10 * 0.05
