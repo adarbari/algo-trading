@@ -75,7 +75,7 @@ describe('DescribeForm', () => {
   it("shows the API's refusal as the field's error", async () => {
     POST.mockResolvedValue({
       error: {
-        detail: 'natural-language drafts are off: enable them in config/site/llm.toml (ADR 0040)',
+        detail: 'natural-language drafts are off: enable them in config/site/llm.toml (ADR 0041)',
       },
       response: new Response(null, { status: 503 }),
     });

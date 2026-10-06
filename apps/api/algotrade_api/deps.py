@@ -2,7 +2,7 @@
 app and shared by every request), a REST read's ``ReadContext`` (``Context``: the read model's
 context for the latest session, opened as GraphQL opens it), the live quotes (ADR 0028),
 the config writer (ADR 0029: user configs only, through ``services.authoring``), the
-on-request screen runner (ADR 0033), the text model behind screener drafts (ADR 0040), the
+on-request screen runner (ADR 0033), the text model behind screener drafts (ADR 0041), the
 user a write is for, and the query parameters several routes share (comma-separated lists).
 
 Settings come from the environment through ``algotrade.config.env`` (the one reader):
@@ -161,7 +161,7 @@ OnDemand = Annotated[OnDemandScreens, Depends(get_ondemand)]
 
 
 def get_drafter(request: Request) -> TextModel:
-    """The text model behind screener drafts ``create_app`` set up (ADR 0040); off (no
+    """The text model behind screener drafts ``create_app`` set up (ADR 0041); off (no
     ``llm.toml`` enabling it, tests, the OpenAPI export): 503 with the reason."""
     model = cast(TextModel | None, request.app.state.drafter)
     if model is None:

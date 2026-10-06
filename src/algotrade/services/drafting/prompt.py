@@ -1,4 +1,4 @@
-"""The prompt a screener draft is asked with (ADR 0040): the task, the rule-screen grammar
+"""The prompt a screener draft is asked with (ADR 0041): the task, the rule-screen grammar
 (``docs/screeners/rules.md``), the caller's field catalogue in catalogue order (name, type, unit,
 description, the values of a category) and the sentence. Rendered from the catalogue with no
 timestamps or ids, so the same catalogue gives the same bytes (a provider's prompt cache hits

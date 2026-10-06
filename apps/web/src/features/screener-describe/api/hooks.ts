@@ -1,5 +1,5 @@
 /**
- * The draft-from-text POST (`POST /screeners/{id}/draft-from-text`, ADR 0040): the sentence and
+ * The draft-from-text POST (`POST /screeners/{id}/draft-from-text`, ADR 0041): the sentence and
  * the Builder's current document in, a draft document with what was dropped and the model's
  * notes out. Nothing is saved: the Builder loads the answer as an unsaved edit.
  */

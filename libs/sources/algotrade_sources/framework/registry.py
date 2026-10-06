@@ -447,7 +447,7 @@ def limiter_keys(
 def build_text_model(
     base_url: str, model: str, timeout_s: float, max_tokens: int, credential: str | None
 ) -> ChatCompletions:
-    """The text model behind screener drafts (ADR 0040): an OpenAI-compatible chat client at
+    """The text model behind screener drafts (ADR 0041): an OpenAI-compatible chat client at
     ``base_url`` for ``model``, the credential (``$ALGOTRADE_LLM_API_KEY``; a local server
     needs none) as a bearer header, never in the URL. Built here, like every vendor client,
     so the API imports only the registry."""

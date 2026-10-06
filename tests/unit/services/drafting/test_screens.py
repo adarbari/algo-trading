@@ -1,4 +1,4 @@
-"""``draft_screen`` (ADR 0040): the model's criteria become a valid draft; an invented field,
+"""``draft_screen`` (ADR 0041): the model's criteria become a valid draft; an invented field,
 a bad op or value and one the validator rejects are dropped with their reason; the tie-break
 and notes come through; the sentence is bounded; a model that cannot answer is unavailable;
 nothing is written."""

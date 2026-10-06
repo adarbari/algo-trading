@@ -1,4 +1,4 @@
-# L3 site setting: the text model behind "Describe it" in the screener Builder (ADR 0040).
+# L3 site setting: the text model behind "Describe it" in the screener Builder (ADR 0041).
 # Off by default. The key never goes here: set ALGOTRADE_LLM_API_KEY in .env (a local Ollama
 # server needs none). What leaves the machine is the typed sentence and the field catalogue.
 #

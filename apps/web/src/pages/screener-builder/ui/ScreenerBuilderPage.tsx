@@ -1,6 +1,6 @@
 /**
  * Trader > Screeners > one screener (Builder): the draft bar, the "Describe it" box (a sentence
- * to a draft, ADR 0040), the criteria beside the run summary and funnel, and the live preview's
+ * to a draft, ADR 0041), the criteria beside the run summary and funnel, and the live preview's
  * top rows. The widgets share the Builder's state
  * through its provider (a draft with its 300 ms debounced preview).
  */

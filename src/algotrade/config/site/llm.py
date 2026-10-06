@@ -1,4 +1,4 @@
-"""Site settings for the text model behind natural-language screener drafts (ADR 0040,
+"""Site settings for the text model behind natural-language screener drafts (ADR 0041,
 ``config/site/llm.toml``): which OpenAI-compatible endpoint and model answer, and how long a
 request may take. Off by default; the key comes only from the environment (``config/env.py``)."""
 

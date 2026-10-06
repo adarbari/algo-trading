@@ -67,7 +67,7 @@ export interface ScreenerBuilder {
   /** A blank criterion row; returns its id. */
   addCriterion: (field?: string) => string;
   setTieBreak: (field: string | null, order: 'asc' | 'desc') => void;
-  /** Replace the working document with one drafted elsewhere (a sentence, ADR 0040): an unsaved edit. */
+  /** Replace the working document with one drafted elsewhere (a sentence, ADR 0041): an unsaved edit. */
   loadDocument: (document: Readonly<Record<string, unknown>>) => void;
   save: () => Promise<void>;
   discard: () => Promise<void>;

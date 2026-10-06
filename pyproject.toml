@@ -280,7 +280,7 @@ allow_indirect_imports = true
 # ---- ADR 0024, ADR 0037: the API is a thin HTTP layer; page reads are GraphQL over services.read.
 
 [[tool.importlinter.contracts]]
-name = "API: routes reach the library only through services.read, services.preview, services.drafting, services.authoring, config and core (ADR 0024, ADR 0037, ADR 0040)"
+name = "API: routes reach the library only through services.read, services.preview, services.drafting, services.authoring, config and core (ADR 0024, ADR 0037, ADR 0041)"
 type = "forbidden"
 source_modules = ["algotrade_api"]
 forbidden_modules = [
@@ -302,7 +302,7 @@ allow_indirect_imports = true  # services.read and services.preview read the sto
 # services.live (ADR 0028) is the API's other library entry: live quotes, recorded to live/*.
 
 [[tool.importlinter.contracts]]
-name = "Drafting is read-only: no writers, no jobs, no vendors (ADR 0040)"
+name = "Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"
 type = "forbidden"
 source_modules = ["algotrade.services.drafting"]
 forbidden_modules = [

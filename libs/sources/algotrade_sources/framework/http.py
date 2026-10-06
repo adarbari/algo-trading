@@ -71,7 +71,7 @@ def json_post_transport(
     headers: dict[str, str] | None = None,
 ) -> JsonTransport:
     """POST a JSON body to a URL and return the response body (a text model's chat endpoint,
-    ADR 0040). ``headers`` carry credentials, as for ``urllib_transport``; a non-2xx answer is
+    ADR 0041). ``headers`` carry credentials, as for ``urllib_transport``; a non-2xx answer is
     an ``HttpError`` with the start of the body."""
     all_headers = {
         "User-Agent": user_agent,

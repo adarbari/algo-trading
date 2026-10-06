@@ -1,4 +1,4 @@
-"""``llm.toml`` (ADR 0040): defaults (off, a local server), typed keys, https for anything that
+"""``llm.toml`` (ADR 0041): defaults (off, a local server), typed keys, https for anything that
 is not this machine, no secrets in the file."""
 
 from typing import Any

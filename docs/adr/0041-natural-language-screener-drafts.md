@@ -1,7 +1,6 @@
-# ADR 0040: Natural-language screener drafts through a swappable text model
+# ADR 0041: Natural-language screener drafts through a swappable text model
 
-**Status:** accepted (2026-10-05; owner decision; implementation: roadmap NL1; the identity ADR in review at the same time takes
-0041 if it lands second). Extends
+**Status:** accepted (2026-10-05; owner decision; implementation: roadmap NL1). Extends
 [0027](0027-vendor-sources-shared-package.md) (an external text model is a vendor adapter in
 `libs/sources`), [0029](0029-rule-screener.md) (a draft is still the only thing the Builder
 edits) and [0037](0037-domain-read-model-served-by-graphql.md) decision 4 (a compute over a request body

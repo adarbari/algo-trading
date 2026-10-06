@@ -67,7 +67,7 @@ def create_app(
     ``ondemand``: the on-request screen runner (default: over the store when ``settings.live``,
     the served app; else off: a request answers 400). ``drafter``: the text model behind
     screener drafts (default: the one ``config/site/llm.toml`` enables when ``settings.live``,
-    else off: a request answers 503; ADR 0040)."""
+    else off: a request answers 503; ADR 0041)."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:

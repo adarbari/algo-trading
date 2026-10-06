@@ -4,9 +4,10 @@ ADR 0019 ``site-settings``. Each file becomes a frozen dataclass that apps recei
 
     sources.toml   -> SourcesSettings   (vendors, [http], [quality], retention; [ibkr])
     verification.toml -> VerificationSettings (live verification vs IBKR)
-    llm.toml       -> LlmSettings       (the text model behind screener drafts, ADR 0040)
+    llm.toml       -> LlmSettings       (the text model behind screener drafts, ADR 0041)
     universe.toml  -> UniverseSettings  (+ overrides/leveraged_etfs.csv, overrides/figi.csv)
     nightly.toml   -> NightlySettings
+    users.toml     -> UsersSettings     (config/site/users.py: the user registry, ADR 0040)
     rollups.toml   -> each rollup's params dataclass (declared by the rollup, typed here)
     features/<theme>.toml -> FeatureDefinition per expression feature (ADR 0023 step 3)
     users/<id>/features/<theme>.toml -> the same, owned by a user (always virtual; step 4)
@@ -36,6 +37,7 @@ from algotrade.config.site.holdings import (
 from algotrade.config.site.ibkr import IbkrSettings as IbkrSettings  # noqa: PLC0414 - re-export
 from algotrade.config.site.ibkr import load_ibkr
 from algotrade.config.site.llm import LlmSettings as LlmSettings  # noqa: PLC0414 - re-export
+from algotrade.config.site.users import UsersSettings as UsersSettings  # noqa: PLC0414 - re-export
 from algotrade.config.user import SITE_USER
 from algotrade.core.model.errors import ConfigurationError
 
@@ -918,12 +920,18 @@ def load_nightly(configs: SiteDocuments) -> NightlySettings:
     return NightlySettings.from_document(site_document(configs.load, "nightly"))
 
 
+def load_users(configs: SiteDocuments) -> UsersSettings:
+    """The declared users and roles (``config/site/users.toml``, ADR 0040; the single-user
+    defaults without it)."""
+    return UsersSettings.from_document(site_document(configs.load, "users"))
+
+
 def load_verification(configs: SiteDocuments) -> VerificationSettings:
     return VerificationSettings.from_document(site_document(configs.load, "verification"))
 
 
 def load_llm(configs: SiteDocuments) -> LlmSettings:
-    """``llm.toml`` (ADR 0040); missing: drafting off."""
+    """``llm.toml`` (ADR 0041); missing: drafting off."""
     return LlmSettings.from_document(site_document(configs.load, "llm"))
 
 

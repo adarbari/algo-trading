@@ -27,6 +27,6 @@ class MissingDataError(AlgoTradeError):
 
 
 class ModelUnavailableError(AlgoTradeError):
-    """The text model behind a screener draft (ADR 0040) cannot answer now: drafting is off in
+    """The text model behind a screener draft (ADR 0041) cannot answer now: drafting is off in
     the site settings, the provider refused or timed out, or its answer was not text. The
     message says which; it never carries a credential."""

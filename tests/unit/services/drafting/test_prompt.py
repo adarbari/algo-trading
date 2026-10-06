@@ -1,4 +1,4 @@
-"""The prompt (ADR 0040): the catalogue rendered in its order with types, units, descriptions
+"""The prompt (ADR 0041): the catalogue rendered in its order with types, units, descriptions
 and category values; stable bytes for the same catalogue; the sentence with the current
 criteria; nothing but the sentence and the catalogue."""
 

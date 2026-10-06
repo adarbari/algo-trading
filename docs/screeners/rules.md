@@ -24,7 +24,7 @@ fault (`<id>.criteria.<criterion_id>.field`, `.value` or `.tolerance`), so the B
 the row; preview and finalise report the same paths. There is no schedule switch (ADR 0033): finalising a screen puts it on the nightly, and every
 site screener preset runs nightly too. An old `schedule` key in a document is ignored.
 
-## Drafting from a sentence (ADR 0040)
+## Drafting from a sentence (ADR 0041)
 
 The Builder's "Describe it" box sends a sentence ("optionable stocks over $5 with IV rank
 above 50%") to `POST /screeners/{id}/draft-from-text`. The text model `config/site/llm.toml`

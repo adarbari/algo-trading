@@ -31,7 +31,7 @@ IBKR_API_CLIENT_ID = "ALGOTRADE_IBKR_API_CLIENT_ID"  # default: ALGOTRADE_IBKR_C
 # SEC fair-access contact. Everything else is optional or defaulted. `make doctor` lists them.
 MASSIVE_API_KEY = "ALGOTRADE_MASSIVE_API_KEY"
 SEC_CONTACT = "ALGOTRADE_SEC_CONTACT"
-# The text model behind natural-language screener drafts (ADR 0040): optional (a local server
+# The text model behind natural-language screener drafts (ADR 0041): optional (a local server
 # needs none); the provider is `config/site/llm.toml`, never the environment.
 LLM_API_KEY = "ALGOTRADE_LLM_API_KEY"
 REQUIRED_KEYS = (MASSIVE_API_KEY, SEC_CONTACT)

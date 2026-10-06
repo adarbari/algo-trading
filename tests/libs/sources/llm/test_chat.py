@@ -1,4 +1,4 @@
-"""``ChatCompletions`` (ADR 0040): the request an OpenAI-compatible endpoint gets (JSON mode,
+"""``ChatCompletions`` (ADR 0041): the request an OpenAI-compatible endpoint gets (JSON mode,
 temperature 0, the key only in a header), the content it returns, and every way it fails as a
 ``ModelUnavailableError`` that names the endpoint but never the key."""
 

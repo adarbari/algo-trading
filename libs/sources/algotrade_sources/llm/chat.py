@@ -1,5 +1,5 @@
 """``ChatCompletions``: one request to an OpenAI-compatible ``/chat/completions`` endpoint
-(ADR 0040). System text and user text in, the assistant's text out, at temperature 0 and asking
+(ADR 0041). System text and user text in, the assistant's text out, at temperature 0 and asking
 for a JSON object, so the same prompt gets the same draft (as far as the provider allows).
 Anything but a well-formed answer is a ``ModelUnavailableError`` (``core``) naming what went
 wrong, never the credential: the API answers 503 with it."""
