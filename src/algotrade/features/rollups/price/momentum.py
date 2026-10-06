@@ -34,7 +34,7 @@ import pandas as pd
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
-from algotrade.features.rollups.price.price_stats import Panel, panel
+from algotrade.features.rollups.price.price_stats import Panel, panel, traded_rows
 
 type Matrix = npt.NDArray[np.float64]
 
@@ -174,13 +174,9 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     bars = inputs[BARS]
     assert bars is not None  # required input
     px = panel(bars, sessions_ending(session, WARMUP))
-    traded = ~np.isnan(px.close[-1])
     atr, rsi = wilder_atr_rsi(px)
     values = {f"atr_{PERIOD}": atr, f"rsi_{PERIOD}": rsi, **channels(px)}
-    frame = pd.DataFrame({"instrument_id": px.ids[traded]})
-    for column in COLUMNS:
-        frame[column] = values[column][traded]
-    return frame
+    return traded_rows(px, values, COLUMNS)
 
 
 GROUP = FeatureGroup(

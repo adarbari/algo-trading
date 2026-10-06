@@ -56,6 +56,7 @@ from algotrade.features.rollups.price import (
     price_moves,
     price_stats,
     swing_levels,
+    volume,
 )
 
 GROUPS: dict[str, FeatureGroup] = {
@@ -76,6 +77,7 @@ GROUPS: dict[str, FeatureGroup] = {
             put_wing.GROUP,
             price_moves.GROUP,
             momentum.GROUP,
+            volume.GROUP,
             swing_levels.GROUP,
             anchored_vwap.GROUP,
             episodes.GROUP,
