@@ -24,6 +24,16 @@ fault (`<id>.criteria.<criterion_id>.field`, `.value` or `.tolerance`), so the B
 the row; preview and finalise report the same paths. There is no schedule switch (ADR 0033): finalising a screen puts it on the nightly, and every
 site screener preset runs nightly too. An old `schedule` key in a document is ignored.
 
+## Drafting from a sentence (ADR 0041)
+
+The Builder's "Describe it" box sends a sentence ("optionable stocks over $5 with IV rank
+above 50%") to `POST /screeners/{id}/draft-from-text`. The text model `config/site/llm.toml`
+names (off by default; any OpenAI-compatible endpoint, the key only in the environment) maps it
+onto the user's field catalogue; the answer is parsed strictly, every criterion on a field
+the catalogue does not have is dropped with a reason, the rest is validated exactly as
+finalise does, and the Builder loads the result as unsaved rows. The model's notes say what it
+could not map. Nothing is saved or run until the user saves and finalises as usual.
+
 ## Example
 
 ```toml

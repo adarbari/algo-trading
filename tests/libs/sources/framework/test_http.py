@@ -17,6 +17,7 @@ from algotrade_sources.framework.http import (
     HttpError,
     RetryPolicy,
     get_with_retry,
+    json_post_transport,
     urllib_transport,
 )
 from algotrade_sources.framework.limiter import Limiter, Pacing
@@ -83,6 +84,23 @@ def test_urllib_transport_asks_for_gzip_and_decompresses() -> None:
     with mock.patch("urllib.request.urlopen", return_value=response) as opened:
         assert urllib_transport()("https://example.com") == b'{"cik": 1}'
     assert opened.call_args.args[0].get_header("Accept-encoding") == "gzip"
+
+
+def test_json_post_transport_posts_json_with_the_headers_given() -> None:
+    response = mock.MagicMock()
+    response.__enter__.return_value.read.return_value = b'{"choices": []}'
+    with mock.patch("urllib.request.urlopen", return_value=response) as opened:
+        post = json_post_transport(timeout=5.0, headers={"Authorization": "Bearer k"})
+        assert post("https://example.com/v1/chat/completions", b'{"a": 1}') == b'{"choices": []}'
+    request = opened.call_args.args[0]
+    assert request.get_method() == "POST" and request.data == b'{"a": 1}'
+    assert request.get_header("Content-type") == "application/json"
+    assert request.get_header("Authorization") == "Bearer k"
+    assert opened.call_args.kwargs["timeout"] == 5.0
+    err = urllib.error.HTTPError("u", 401, "no", Message(), io.BytesIO(b'{"error": "bad key"}'))
+    with mock.patch("urllib.request.urlopen", side_effect=err), pytest.raises(HttpError) as exc:
+        json_post_transport()("https://example.com", b"{}")
+    assert exc.value.status == 401 and b"bad key" in exc.value.body
 
 
 def test_source_builds_url() -> None:

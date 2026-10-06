@@ -219,18 +219,18 @@ purpose = "use cases (the backend's interface for apps); shared helpers: configs
 [[dir]]
 path = "src/algotrade/services/backtests"
 purpose = "use case: run a configured backtest, record its run and results"
-contracts = ["Layout: use-case packages are independent (backtests, screening, authoring)"]
+contracts = ["Layout: use-case packages are independent (backtests, screening, authoring, drafting)"]
 
 [[dir]]
 path = "src/algotrade/services/screening"
 purpose = "use case: run a screener over the universe, record the run, export its rows"
-contracts = ["Layout: use-case packages are independent (backtests, screening, authoring)"]
+contracts = ["Layout: use-case packages are independent (backtests, screening, authoring, drafting)"]
 
 [[dir]]
 path = "src/algotrade/services/authoring"
 purpose = "use case: author L4 user configs (ADR 0029): rule-screen drafts, immutable versions, preset copy / rebase, schedule switch, user features; the only config writer the API calls"
 contracts = [
-    "Layout: use-case packages are independent (backtests, screening, authoring)",
+    "Layout: use-case packages are independent (backtests, screening, authoring, drafting)",
     "Config writes go only through services.authoring (ADR 0029)",
 ]
 
@@ -242,6 +242,11 @@ purpose = "use case: evaluate every strategy on every golden dataset against the
 path = "src/algotrade/services/preview"
 purpose = "read-only dry runs of unsaved Builder input (ADR 0029) over the request's ReadContext: a draft rule screen previewed with the nightly evaluator on the context's session (cached field frame), a formula type checked and sampled; the API serves them as POSTs"
 contracts = ["Preview is read-only: no writers, no jobs (ADR 0029)"]
+
+[[dir]]
+path = "src/algotrade/services/drafting"
+purpose = "use case: a rule screen drafted from a sentence (ADR 0041): the TextModel protocol the API injects, the prompt over the caller's catalogue, strict parsing of the answer, invented fields dropped with a reason, the rest validated as finalise does; never a write, never a run"
+contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"]
 
 [[dir]]
 path = "src/algotrade/services/read"
@@ -315,6 +320,10 @@ kind = "vendor"
 contracts = ["Layout: vendors never import each other (one folder per vendor)"]
 
 [[dir]]
+path = "libs/sources/algotrade_sources/llm"
+purpose = "the text-model adapter (ADR 0041): one OpenAI-compatible chat-completions client over the framework's POST transport, which any provider answers by base_url alone; built by the registry, injected into the API"
+
+[[dir]]
 path = "libs/sources/algotrade_sources/fixtures"
 purpose = "the golden synthetic fixture source (generators, catalogue, CSV files)"
 
@@ -322,9 +331,9 @@ purpose = "the golden synthetic fixture source (generators, catalogue, CSV files
 
 [[dir]]
 path = "apps/api/algotrade_api"
-purpose = "the API app: app factory (main), dependencies (deps), the live-quotes feed over IB Gateway (live, ADR 0028), the ASGI app and the algotrade-api CLI"
+purpose = "the API app: app factory (main), dependencies (deps), the live-quotes feed over IB Gateway (live, ADR 0028), the text model behind screener drafts (drafting, ADR 0041), the ASGI app and the algotrade-api CLI"
 contracts = [
-    "API: routes reach the library only through services.read, services.preview, services.authoring, config and core (ADR 0024, ADR 0037)",
+    "API: routes reach the library only through services.read, services.preview, services.drafting, services.authoring, config and core (ADR 0024, ADR 0037, ADR 0041)",
     "Apps never import each other (ADR 0004)",
 ]
 
@@ -346,8 +355,16 @@ path = "apps/api/algotrade_api/routes/preview"
 purpose = "read-only dry-run routes over unsaved Builder input (ADR 0029): POST bodies, never a write; each calls one services.preview dry run"
 
 [[dir]]
+path = "apps/api/algotrade_api/routes/drafting"
+purpose = "the drafting route (ADR 0041): a sentence to a draft rule screen through the app's text model; a POST body, never a write; calls the one services.drafting use case"
+
+[[dir]]
 path = "apps/api/algotrade_api/schemas"
 purpose = "pydantic response models per area: the public contract (OpenAPI -> the web client)"
+
+[[dir]]
+path = "apps/api/algotrade_api/schemas/drafting"
+purpose = "request body and response of the drafting route (ADR 0041)"
 
 [[dir]]
 path = "apps/api/algotrade_api/schemas/preview"
