@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-250 stored features in 25 groups, in dependency order; 48 expression features.
+257 stored features in 26 groups, in dependency order; 51 expression features.
 
 ## `option_liquidity@v1`
 
@@ -152,6 +152,20 @@ Wilder ATR and RSI (14), 5-session return, relative volume and the 20 / 50-sessi
 | `high_50d` | window | float32 | usd_per_share | open | >= 0 | Highest daily high over the last 50 sessions, the session included | a session among the last 50 has no bar (a gap), or the history is shorter | `bars/1d.high` |
 | `low_50d` | window | float32 | usd_per_share | open | >= 0 | Lowest daily low over the last 50 sessions, the session included | a session among the last 50 has no bar (a gap), or the history is shorter | `bars/1d.low` |
 | `prior_high_20d` | window | float32 | usd_per_share | open | >= 0 | Highest daily high over the 20 sessions before the session (the session excluded): the level a breakout close must clear | a session among the 20 before the session has no bar (a gap), or the history is shorter | `bars/1d.high` |
+
+## `volume@v1`
+
+Session volume and dollar volume, 20-session average volume, the 5 / 20 volume ratio, the volume z-score, the up-volume share and Chaikin money flow. Stored as `rollups/instrument/volume@v1`; reads `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `session_volume` | window | float32 | shares | open | >= 0 | The session's share volume, split-adjusted as of the session | never null: a row exists only for an instrument with a bar on the session | `bars/1d.volume` |
+| `dollar_volume` | window | float32 | usd | open | >= 0 | Close x share volume on the session: the dollars traded that day | never null: a row exists only for an instrument with a bar on the session | `bars/1d.close`, `bars/1d.volume` |
+| `adv_shares_20d` | window | float32 | shares | open | >= 0 | Mean share volume over the last 20 sessions, the session included | a session among the last 20 has no bar (a gap), or the history is shorter | `bars/1d.volume` |
+| `volume_ratio_5d_20d` | window | float32 | ratio | open | >= 0 | Mean volume of the last 5 sessions / mean volume of the last 20 (both the session included): below 1 the last week was quieter than the month, above 1 busier | a session among the last 20 has no bar (a gap), or the history is shorter; or the last 20 sessions had no volume at all | `bars/1d.volume` |
+| `volume_z_20d` | window | float32 | ratio | open |  | (The session's volume - the mean volume of the 20 sessions before it) / the sample standard deviation (ddof 1) of those 20: the volume surprise in standard deviations, on the same base as momentum.rel_volume | a session among the last 21 has no bar (a gap), or the history is shorter; or the 20 sessions before the session all had the same volume (zero standard deviation, all zero included) | `bars/1d.volume` |
+| `up_volume_share_20d` | window | float32 | decimal | open | 0 .. 1 | Volume traded on sessions closing above the previous close / total volume, over the last 20 sessions: 0.5 is balanced, above is accumulation, below distribution; a session closing unchanged counts in the total only | a session among the last 21 has no bar (a gap), or the history is shorter (the first session needs the close before it); or the last 20 sessions had no volume at all | `bars/1d.close`, `bars/1d.volume` |
+| `cmf_20d` | window | float32 | decimal | open | -1 .. 1 | Chaikin money flow over the last 20 sessions: sum(mfm x volume) / sum(volume), mfm = ((close - low) - (high - close)) / (high - low), 0 when high equals low: above 0 closes sat in the upper half of the day's range on volume | a session among the last 20 has no bar (a gap), or the history is shorter; or the last 20 sessions had no volume at all | `bars/1d.close`, `bars/1d.high`, `bars/1d.low`, `bars/1d.volume` |
 
 ## `swing_levels@v1`
 
@@ -533,6 +547,14 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | `iv_rank` | expression | float | decimal | personal | 0 .. 1 | IV rank over 252 sessions: IBKR's (ibkr_iv) where it has one, else ours (iv_history); iv_rank_source says which | neither has a rank: both rank statuses are UNKNOWN (under 60 sessions of IV), there is no IV today, or every IV in the window is equal | `coalesce(ibkr_iv.iv_rank_252d_ibkr, iv_history.iv_rank_252d)` | virtual |
 | `iv_percentile` | expression | float | decimal | personal | 0 .. 1 | IV percentile over 252 sessions: IBKR's (ibkr_iv) where it has one, else ours (iv_history); iv_rank_source says which | neither has a percentile: both rank statuses are UNKNOWN, there is no IV today, or no earlier IV | `coalesce(ibkr_iv.iv_percentile_252d_ibkr, iv_history.iv_percentile_252d)` | virtual |
 | `iv_rank_source` | label | str | category | personal | ibkr, ours | Where iv_rank and iv_percentile came from: ibkr (IBKR's IV history) or ours (iv_history, from Cboe chains) | iv_rank is null (neither source has a rank) | `if(not is_null(ibkr_iv.iv_rank_252d_ibkr), "ibkr", if(not is_null(iv_history.iv_rank_252d), "ours", null))` | virtual |
+
+### `volume.toml`
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Formula | Stored |
+|---|---|---|---|---|---|---|---|---|---|
+| `volume_dry_up` | expression | bool | flag | open |  | The last 5 sessions traded under 60% (params.max_ratio) of the 20-session average volume: the contraction that often precedes a breakout | volume_ratio_5d_20d is null (a gap among the last 20 sessions, a shorter history, or no volume at all over the 20) | `volume.volume_ratio_5d_20d < max_ratio` (max_ratio = 0.6) | virtual |
+| `volume_climax` | expression | bool | flag | open |  | The session's volume is 3 (params.min_z) or more standard deviations above the 20 sessions before it: an event-sized day (earnings, news, an index event or a capitulation) | volume_z_20d is null (a gap among the last 21 sessions, a shorter history, or the 20 sessions before all had the same volume) | `volume.volume_z_20d >= min_z` (min_z = 3.0) | virtual |
+| `volume_bias` | label | str | category | open | ACCUMULATION, DISTRIBUTION, NEUTRAL | ACCUMULATION when 60% (params.accumulation_at) or more of the last 20 sessions' volume traded on up days, DISTRIBUTION at 40% (params.distribution_at) or less, else NEUTRAL | up_volume_share_20d is null (a gap among the last 21 sessions, a shorter history, or no volume at all over the 20) | `if(is_null(volume.up_volume_share_20d), null, if(volume.up_volume_share_20d >= accumulation_at, "ACCUMULATION", if(volume.up_volume_share_20d <= distribution_at, "DISTRIBUTION", "NEUTRAL")))` (accumulation_at = 0.6, distribution_at = 0.4) | virtual |
 
 ### `vrp.toml`
 
