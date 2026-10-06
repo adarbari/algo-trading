@@ -11,6 +11,7 @@ import { PriceChartPanel } from './PriceChartPanel';
 const hooks = vi.hoisted(() => ({
   useInstrumentPrices: vi.fn(),
   useInstrumentEvents: vi.fn(),
+  useRegimeBands: vi.fn(),
   chart: vi.fn(),
 }));
 
@@ -37,6 +38,11 @@ vi.mock('@/entities/instrument', async (importOriginal) => ({
   useInstrumentEvents: hooks.useInstrumentEvents,
 }));
 
+vi.mock('@/entities/regime', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useRegimeBands: hooks.useRegimeBands,
+}));
+
 const bar = (session: string, close: number) => ({ session, close, volume: 1000 });
 const dividend = (date: string, cash: number) => ({
   table: 'events/dividend',
@@ -52,6 +58,13 @@ beforeEach(() => {
   hooks.chart.mockClear();
   hooks.useInstrumentPrices.mockReturnValue(
     fakeQuery([bar('2026-08-07', 220), bar('2026-08-10', 229)]),
+  );
+  hooks.useRegimeBands.mockReturnValue(
+    fakeQuery([
+      { start: '2026-08-03', end: '2026-08-06', label: 'CALM' },
+      { start: '2026-08-07', end: '2026-08-10', label: 'STRESS' },
+      { start: '2026-08-11', end: '2026-08-12', label: 'UNKNOWN' },
+    ]),
   );
   hooks.useInstrumentEvents.mockReturnValue(
     fakeQuery([dividend('2026-08-10', 0.27), dividend('2024-08-10', 0.25)]),
@@ -76,5 +89,14 @@ describe('PriceChartPanel', () => {
     await expectNoA11yViolations(container);
     await userEvent.setup().click(screen.getByRole('radio', { name: '3M' }));
     expect(onRangeChange).toHaveBeenCalledWith('3M');
+  });
+
+  it('shades the Storm sessions up to the last stored bar, and nothing for Clear or UNKNOWN', () => {
+    render(<PriceChartPanel symbol="AAPL" range="1Y" onRangeChange={vi.fn()} />);
+    expect(hooks.useRegimeBands).toHaveBeenCalledWith('2025-10-03', '2026-08-10');
+    const chart = hooks.chart.mock.lastCall?.[0] as ChartProps;
+    expect(chart.bands).toEqual([
+      { start: '2026-08-07', end: '2026-08-10', tone: 'negative', label: 'Storm' },
+    ]);
   });
 });

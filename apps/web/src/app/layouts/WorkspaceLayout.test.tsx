@@ -1,5 +1,6 @@
 /**
- * The top bar of a workspace layout for each kind of viewer: the switch lists only the
+ * The top bar of a workspace layout for each kind of viewer: the regime chip opens the Regime
+ * page, the switch lists only the
  * workspaces the registry role allows, the name shows, sign-out appears only with a Supabase
  * session, and a viewer that turns null goes back to the login page.
  */
@@ -44,13 +45,18 @@ beforeEach(() => {
 function setup() {
   const root = createRootRoute({ component: () => <WorkspaceLayout workspace={TRADER} /> });
   const ideas = createRoute({ getParentRoute: () => root, path: '/ideas', component: () => null });
+  const regime = createRoute({
+    getParentRoute: () => root,
+    path: '/regime',
+    component: () => <Text>regime page</Text>,
+  });
   const login = createRoute({
     getParentRoute: () => root,
     path: '/login',
     component: () => <Text>login page</Text>,
   });
   const router = createRouter({
-    routeTree: root.addChildren([ideas, login]),
+    routeTree: root.addChildren([ideas, regime, login]),
     history: createMemoryHistory({ initialEntries: ['/ideas'] }),
   });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -71,6 +77,14 @@ describe('WorkspaceLayout top bar', () => {
     expect(await screen.findByText('Bo')).toBeVisible();
     expect(screen.getByRole('radio', { name: 'Trader' })).toBeVisible();
     expect(screen.getByRole('radio', { name: 'Admin' })).toBeVisible();
+  });
+
+  it('shows the regime chip beside the name and opens the Regime page', async () => {
+    // The mocked API answers every operation with the viewer: `regime` is missing, so not computed.
+    vi.mocked(gql).mockResolvedValue({ viewer: TRADER_VIEWER });
+    setup();
+    await userEvent.click(await screen.findByRole('button', { name: 'Regime: not computed' }));
+    expect(await screen.findByText('regime page')).toBeVisible();
   });
 
   it('hides the admin workspace from a trader', async () => {

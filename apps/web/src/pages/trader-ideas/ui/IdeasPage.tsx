@@ -6,6 +6,7 @@ import { Grid, Stack, Text } from '@algotrade/ui';
 
 import type { IdeaCompareSearch } from '@/features/idea-compare';
 import { IdeasHeading } from '@/widgets/ideas-heading';
+import { RegimeStrip } from '@/widgets/regime-strip';
 import { ScreenerRanking } from '@/widgets/screener-ranking';
 import { TopIdeas } from '@/widgets/top-ideas';
 
@@ -20,6 +21,8 @@ export interface IdeasPageProps {
   onScreeners: () => void;
   /** Open one screener's results. */
   onOpenScreener: (screenerId: string) => void;
+  /** Open the Regime page (the strip's chip). */
+  onOpenRegime: () => void;
 }
 
 export function IdeasPage({
@@ -28,6 +31,7 @@ export function IdeasPage({
   onNewScreener,
   onScreeners,
   onOpenScreener,
+  onOpenRegime,
 }: IdeasPageProps) {
   return (
     <Stack gap={3}>
@@ -37,6 +41,7 @@ export function IdeasPage({
           Ranked by your screener priority, then score. Reorder the screeners to change the ranking.
         </Text>
       </Stack>
+      <RegimeStrip onOpen={onOpenRegime} />
       <Grid columns="sidebar-start" gap={4} collapse="lg" align="start">
         <ScreenerRanking onNewScreener={onNewScreener} />
         <TopIdeas

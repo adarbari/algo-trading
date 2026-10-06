@@ -41,6 +41,12 @@ export const TRADER: Workspace = {
       summary:
         'One page for universe, instruments, chains and features: a filterable ticker table with columns from the feature catalogue, multi-select compare, and detail tabs (Overview, Chart, Options, Features, Events, Screener hits).',
     },
+    {
+      path: '/regime',
+      label: 'Regime',
+      summary:
+        'The market as weather: Clear, Clouds building, Storm or Severe storm, the slow and fast warning signs behind it in plain words, what changed this week and a reading list.',
+    },
     { path: '/backtests', label: 'Backtests', summary: 'Run backtests and compare their results.' },
   ],
 };

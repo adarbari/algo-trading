@@ -41,6 +41,7 @@ export {
 } from './Distribution';
 export { Drawer, type DrawerProps } from './Drawer';
 export { EmptyState, type EmptyStateProps } from './EmptyState';
+export { ExternalLink, type ExternalLinkProps } from './ExternalLink';
 export { ErrorState, type ErrorStateProps } from './ErrorState';
 export { Field, type FieldProps } from './Field';
 export {

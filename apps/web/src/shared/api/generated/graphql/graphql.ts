@@ -16,12 +16,26 @@ export type FeatureFormat =
   | 'PERCENT'
   | 'TEXT';
 
+/** An indicator's own verdict: ON, OFF or UNKNOWN */
+export type IndicatorStatus =
+  | 'OFF'
+  | 'ON'
+  | 'UNKNOWN';
+
 /** Why a value is null when the null is the fact (EXPLAINED) */
 export type NullReason =
   | 'FEW_BARS'
   | 'NEW_LISTING'
   | 'NOT_ANNOUNCED'
   | 'NO_TRADE';
+
+/** The regime; UNKNOWN when it is not stored */
+export type RegimeLabel =
+  | 'CALM'
+  | 'CAUTION'
+  | 'CRISIS'
+  | 'STRESS'
+  | 'UNKNOWN';
 
 /** Why a value is UNKNOWN for the session */
 export type UnknownCode =
@@ -162,6 +176,19 @@ export type InstrumentHistoryQueryVariables = Exact<{
 
 
 export type InstrumentHistoryQuery = { instrument: { instrumentId: string, series: { names: Array<string>, points: Array<{ session: string, values: Array<unknown> }> } } | null };
+
+export type RegimeQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type RegimeQuery = { regime: { session: string, label: RegimeLabel, headline: string, unknownReason: { code: UnknownCode, detail: string } | null, scores: { macroRisk: { value: number | null, unknown: { code: UnknownCode, detail: string } | null }, marketStress: { value: number | null, unknown: { code: UnknownCode, detail: string } | null }, fragility: { value: number | null, unknown: { code: UnknownCode, detail: string } | null } }, sizing: { label: RegimeLabel, multiplier: number | null }, indicators: Array<{ key: string, pace: string, plainName: string, technicalName: string, oneLiner: string, whyItMatters: string, whatOnMeans: string, leadTime: string, falseAlarms: string, value: unknown, format: FeatureFormat | null, status: IndicatorStatus, changed: boolean | null, before: Array<{ episode: string, line: string }>, links: Array<{ title: string, url: string }>, unknown: { code: UnknownCode, detail: string } | null }> } | null };
+
+export type RegimeBandsQueryVariables = Exact<{
+  start: string;
+  end: string;
+}>;
+
+
+export type RegimeBandsQuery = { regime: { bands: Array<{ start: string, end: string, label: RegimeLabel }> } | null };
 
 export type FigiReviewQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -707,6 +734,84 @@ export const InstrumentHistoryDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<InstrumentHistoryQuery, InstrumentHistoryQueryVariables>;
+export const RegimeDocument = new TypedDocumentString(`
+    query Regime {
+  regime {
+    session
+    label
+    headline
+    unknownReason {
+      code
+      detail
+    }
+    scores {
+      macroRisk {
+        value
+        unknown {
+          code
+          detail
+        }
+      }
+      marketStress {
+        value
+        unknown {
+          code
+          detail
+        }
+      }
+      fragility {
+        value
+        unknown {
+          code
+          detail
+        }
+      }
+    }
+    sizing {
+      label
+      multiplier
+    }
+    indicators {
+      key
+      pace
+      plainName
+      technicalName
+      oneLiner
+      whyItMatters
+      whatOnMeans
+      before {
+        episode
+        line
+      }
+      leadTime
+      falseAlarms
+      links {
+        title
+        url
+      }
+      value
+      unknown {
+        code
+        detail
+      }
+      format
+      status
+      changed
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<RegimeQuery, RegimeQueryVariables>;
+export const RegimeBandsDocument = new TypedDocumentString(`
+    query RegimeBands($start: Date!, $end: Date!) {
+  regime {
+    bands(start: $start, end: $end) {
+      start
+      end
+      label
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<RegimeBandsQuery, RegimeBandsQueryVariables>;
 export const FigiReviewDocument = new TypedDocumentString(`
     query FigiReview {
   figiReview {

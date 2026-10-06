@@ -17,6 +17,14 @@ vi.mock('@/widgets/screener-ranking', async () => {
     },
   };
 });
+vi.mock('@/widgets/regime-strip', async () => {
+  const { Button } = await import('@algotrade/ui');
+  return {
+    RegimeStrip: (props: { onOpen: () => void }) => (
+      <Button onClick={props.onOpen}>regime strip</Button>
+    ),
+  };
+});
 vi.mock('@/widgets/ideas-heading', async () => {
   const { Heading } = await import('@algotrade/ui');
   return { IdeasHeading: () => <Heading level={1}>Ideas for Fri 2 Oct</Heading> };
@@ -60,6 +68,7 @@ describe('IdeasPage', () => {
     const onOpen = vi.fn();
     const onNewScreener = vi.fn();
     const onScreeners = vi.fn();
+    const onOpenRegime = vi.fn();
     const { container } = render(
       <IdeasPage
         onCompare={onCompare}
@@ -67,9 +76,12 @@ describe('IdeasPage', () => {
         onNewScreener={onNewScreener}
         onScreeners={onScreeners}
         onOpenScreener={vi.fn()}
+        onOpenRegime={onOpenRegime}
       />,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Ideas for Fri 2 Oct' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'regime strip' }));
+    expect(onOpenRegime).toHaveBeenCalledOnce();
     await user.click(screen.getByRole('button', { name: 'new screener' }));
     expect(onNewScreener).toHaveBeenCalledOnce();
     await user.click(screen.getByRole('button', { name: 'compare' }));
