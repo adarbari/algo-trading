@@ -9,13 +9,13 @@ else is rest (ADR 0043).
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
 
-from algotrade.core.model.errors import MissingDataError
+from algotrade.core.model.fields import REFERENCE_TABLE
 from algotrade.data import StoreReader
-from algotrade.data.reference import instruments, snapshot
+from algotrade.data.reference import snapshot
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.features import read_expressions, site_features, site_store
 from algotrade.storage.configs.store import ConfigStore
@@ -34,6 +34,15 @@ class Tiers:
     pinned: dict[str, int]  # upper-case priority symbol -> its position
     members: set[str]  # S&P 500 instrument ids
     liquidity: dict[str, tuple[int, float]]  # instrument id -> (class rank, -chain OI)
+    reference_date: date | None = None  # the reference snapshot the members came from
+    liquidity_date: date | None = None  # the price_stats session the liquidity came from
+
+    def sources(self) -> dict[str, str | None]:
+        """The snapshot dates used (for the run record)."""
+        return {
+            "reference": self.reference_date.isoformat() if self.reference_date else None,
+            "liquidity": self.liquidity_date.isoformat() if self.liquidity_date else None,
+        }
 
     def tier(self, instrument_id: str, symbol: str) -> str:
         """``CORE`` or ``REST`` for one instrument."""
@@ -54,35 +63,36 @@ def load_tiers(
 ) -> Tiers:
     """The tier inputs for ``session_date`` (an empty store: only the pinned symbols are core)."""
     pinned = {s.upper(): n for n, s in enumerate(dict.fromkeys(priority_symbols))}
-    return Tiers(
-        pinned,
-        _sp500(reader, session_date),
-        _liquidity(reader, session_date, site_features(site_store(configs))),
-    )
+    members, reference_date = _sp500(reader, session_date)
+    liquidity, liquidity_date = _liquidity(reader, session_date, site_features(site_store(configs)))
+    return Tiers(pinned, members, liquidity, reference_date, liquidity_date)
 
 
-def _sp500(reader: StoreReader, session_date: date) -> set[str]:
-    """Instrument ids in the S&P 500 per the reference snapshot (none when there is none)."""
-    try:
-        frame = instruments(reader, session_date)
-    except MissingDataError:
-        return set()
-    if "in_sp500" not in frame.columns:
-        return set()
+def _sp500(reader: StoreReader, session_date: date) -> tuple[set[str], date | None]:
+    """Instrument ids in the S&P 500 per the reference snapshot on or before ``session_date``
+    (never a later one: a backfill must not tier on future membership), and its date. Empty
+    when there is none."""
+    snap = snapshot(reader, REFERENCE_TABLE, session_date)
+    if snap is None or snap.pre_snapshot:
+        return set(), None
+    frame = reader.table(REFERENCE_TABLE, snap.snapshot_date)
+    if frame is None or "in_sp500" not in frame.columns:
+        return set(), snap.snapshot_date
     members = frame[frame["in_sp500"].fillna(False).astype(bool)]
-    return set(members["instrument_id"].astype(str))
+    return set(members["instrument_id"].astype(str)), snap.snapshot_date
 
 
 def _liquidity(
     reader: StoreReader, session_date: date, features: FeatureSet
-) -> dict[str, tuple[int, float]]:
+) -> tuple[dict[str, tuple[int, float]], date | None]:
     """instrument id -> (class rank, -chain OI) from the expression features
-    ``liquidity_class`` and ``option_chain_oi`` on the latest session on or before
-    ``session_date`` with ``price_stats`` rows (chains are fetched before the session's
-    rollups, so usually the previous session). Instruments with neither are left out."""
-    snap = snapshot(reader, features.table(PRICE_GROUP), session_date)
+    ``liquidity_class`` and ``option_chain_oi`` on the latest session strictly before
+    ``session_date`` with ``price_stats`` rows (the session's own rollups, which exist once
+    chains are re-run later, would make the tier circular and change it run to run), and
+    that session. Instruments with neither are left out."""
+    snap = snapshot(reader, features.table(PRICE_GROUP), session_date - timedelta(days=1))
     if snap is None or snap.pre_snapshot:
-        return {}
+        return {}, None
     frame = read_expressions(
         reader, [LIQUIDITY_CLASS, CHAIN_OI], snap.snapshot_date, features=features
     ).frame
@@ -94,4 +104,4 @@ def _liquidity(
         if has_label or has_oi:
             rank = CLASS_RANK.get(label.upper(), unknown) if has_label else unknown
             out[str(row.instrument_id)] = (rank, -float(oi) if has_oi else 0.0)
-    return out
+    return out, snap.snapshot_date

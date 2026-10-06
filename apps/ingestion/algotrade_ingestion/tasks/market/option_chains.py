@@ -186,7 +186,12 @@ def ingest_option_chains(
         _publish(run, universe, tier_rule, source.name)
         counts = run.counts()
         no_chain_share = counts.get("NO_CHAIN", 0) / len(universe) if universe else 0.0
-        run.stats.update(universe=len(universe), statuses=counts, order_tiers=tiers)
+        run.stats.update(
+            universe=len(universe),
+            statuses=counts,
+            order_tiers=tiers,
+            tier_sources=tier_rule.sources(),
+        )
         if no_chain_share > MAX_NO_CHAIN_SHARE:
             run.partial(f"{no_chain_share:.0%} of optionable names returned no chain")
     return run.record  # staging: dropped by IngestRun unless retryable items remain

@@ -192,10 +192,20 @@ def test_core_chains_have_a_stricter_stale_limit_than_the_rest() -> None:
     )
 
 
-def test_an_empty_tier_passes_and_a_status_without_a_tier_counts_as_rest() -> None:
-    result = tiered_checks([("A", "rest", "OK")])
-    assert result["chains_stale_core"]["status"] == "PASS"
+def test_a_status_without_a_tier_column_counts_as_rest() -> None:
+    result = {c["name"]: c for c in run_quality(
+        task_ctx(StoreWriter(MemoryBackend()), seed(1000, 1000, 100, 100, ["OK"] * 20), CLOCK), D2
+    ).stats["checks"]}  # fmt: skip
+    assert result["chains_stale_core"]["status"] == "PASS"  # legacy partition: nothing to grade
     assert "0 of 0 core" in result["chains_stale_core"]["detail"]
+
+
+def test_a_tiered_status_with_no_core_name_fails_and_does_not_wait() -> None:
+    check = tiered_checks(
+        [("A", "rest", "OK")],
+    )["chains_stale_core"]
+    assert (check["status"], check["pending"]) == ("FAIL", False)
+    assert "no core names" in check["detail"]
 
 
 def test_stale_chains_are_pending_but_fetch_failures_never_are() -> None:

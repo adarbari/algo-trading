@@ -176,6 +176,11 @@ def _stale_check(
     stored = frame["tier"] if "tier" in frame.columns else pd.Series("rest", index=frame.index)
     in_tier = stored.fillna("rest").astype(str) == tier
     total = int(in_tier.sum())
+    if tier == "core" and total == 0 and "tier" in frame.columns:
+        # a tiered status with no core name means the tier inputs were missing: no gate
+        return Check(
+            "chains_stale_core", "FAIL", f"no core names in a tiered chain status; {detail}"
+        )
     stale = in_tier & (labels == STALE)
     count = int(stale.sum())
     share = count / total if total else 0.0

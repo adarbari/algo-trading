@@ -40,3 +40,44 @@ def test_core_is_sp500_priority_symbols_and_high_liquidity() -> None:
 def test_an_empty_store_leaves_only_the_pinned_symbols_core() -> None:
     tiers = load_tiers(StoreReader(MemoryBackend()), DAY, ["SPY"])
     assert (tiers.tier("EQ:SPY", "spy"), tiers.tier("EQ:AAA", "AAA")) == (CORE, REST)
+
+
+def _reference(writer: StoreWriter, day: date, members: set[str]) -> None:
+    rows = [
+        {"instrument_id": f"EQ:{s}", "symbol": s, "asset_class": "EQ", "multiplier": 1.0,
+         "security_type": "COMMON_STOCK", "status": "ACTIVE", "in_sp500": s in members}
+        for s in ("OLD", "NEW")
+    ]  # fmt: skip
+    writer.write_table("instruments/reference", day, "ref", stamped(rows, day, "ref"))
+
+
+def test_membership_never_comes_from_a_later_snapshot() -> None:
+    backend = MemoryBackend()
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    _reference(writer, DAY + timedelta(days=30), {"NEW"})  # a backfill of DAY: only a later one
+    assert load_tiers(reader, DAY).tier("EQ:NEW", "NEW") == REST
+    _reference(writer, DAY - timedelta(days=1), {"OLD"})
+    tiers = load_tiers(reader, DAY)
+    assert (tiers.tier("EQ:OLD", "OLD"), tiers.tier("EQ:NEW", "NEW")) == (CORE, REST)
+    assert tiers.sources()["reference"] == (DAY - timedelta(days=1)).isoformat()
+
+
+def test_liquidity_comes_from_the_session_strictly_before() -> None:
+    backend = MemoryBackend()
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    big = {"adv_usd_20d": 2e8, "close": 50.0}
+    tier_a = {"liq_status": "OK", "put_tier": "A", "call_tier": "A", "chain_volume": 9000}
+    for day, run in ((DAY, "r2"),):  # the session's own rollups exist (a later re-run)
+        prices = [{"instrument_id": "EQ:HIGH", **big}]
+        options = [{"instrument_id": "EQ:HIGH", **tier_a, "chain_oi": 60_000}]
+        writer.write_table(PRICE_STATS, day, run, stamped(prices, day, run))
+        writer.write_table(OPTION_LIQ, day, run, stamped(options, day, run))
+    tiers = load_tiers(reader, DAY)
+    assert tiers.tier("EQ:HIGH", "HIGH") == REST and tiers.sources()["liquidity"] is None
+    before = DAY - timedelta(days=1)
+    writer.write_table(PRICE_STATS, before, "r1", stamped(prices, before, "r1"))
+    writer.write_table(OPTION_LIQ, before, "r1", stamped(options, before, "r1"))
+    tiers = load_tiers(reader, DAY)
+    assert (
+        tiers.tier("EQ:HIGH", "HIGH") == CORE and tiers.sources()["liquidity"] == before.isoformat()
+    )
