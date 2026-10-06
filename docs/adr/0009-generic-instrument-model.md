@@ -1,6 +1,6 @@
 # ADR 0009: A generic instrument model, so futures need no redesign
 
-**Status:** accepted (2026-10-02). Spec: [docs/data/instruments.md](../data/instruments.md).
+**Status:** accepted (2026-10-02); amended by [0046](0046-market-entity-features-and-non-tradable-ids.md) (non-tradable id namespaces `MKT`, `MACRO`, `IDX`, minted only in `core/model/instruments.py`). Spec: [docs/data/instruments.md](../data/instruments.md).
 
 ## Context
 We start with stocks, ETFs and options, and futures come later. The architecture must not

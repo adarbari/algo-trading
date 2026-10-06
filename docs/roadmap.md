@@ -8,15 +8,15 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 - Nothing long-running. IBKR IV history backfill finished 2026-10-05 05:30 (all 4,200 names: 4,197 OK, 3 genuine NO_DATA; `ibkr_iv@v1` rollups over 502 sessions, rank FULL for 4,789 of 5,415 names on 2026-10-02).
 
 **Next**
+- **Market regime (RG, ADRs 0046-0048):** RG0 done (ADRs, reference config); next RG1a and RG2a in parallel ([RG section](#market-regime-rg-recession-risk-and-market-stress-as-features-a-regime-gate-for-sizing-adrs-0046-0048); plan [market-regime-plan.md](market-regime-plan.md)).
 - **Workflows (WF, ADR 0039):** WF1-WF3 done; next WF3b, then WF4 ([WF section](#workflows-wf-dependencies-succeed-or-fail-cadence-adr-0039)). **Owner action first:** Massive returned 403 for the 2026-10-05 bars and that nightly finished PARTIAL, so nothing retries it: once Massive serves the day run `algotrade-ingest bars --date 2026-10-05 --wait`, then `rollups --date 2026-10-05 --wait`, then the 2026-10-05 screens (until then lookback rollups from 2026-10-06 compute over the gap).
 - ETF holdings (ADR 0035, accepted): after merge run `algotrade-ingest etf-holdings` once (reads the ~1,140 covered funds, plus the non-optionable N-PORT funds with a 20-session dollar volume of $5M or more, up to ~900 (`fallback_scope = "liquid"`, `fallback_min_adv_usd`): about 1.5 hours per 1,140, extrapolated from the sample, mostly SEC header lookups; or let the nightly fill it, 200 funds a night, 6 weekday nights), ProShares funds (173, the VIX funds UVXY / SVXY / VIXY and the leveraged and inverse ones) are read from their daily file by the same run (weights are shares of gross exposure, ADR 0035), then the Overview tab renders `<HoldingsPanel symbol onSelectSymbol>` (`widgets/holdings-panel`) for ETFs.
 - ETF descriptions for funds with no SEC prospectus objective: SPY, DIA, GLD, SLV, USO, IBIT, SOXL and the like (unit trusts, commodity and crypto trusts, some leveraged funds); 246 of the 1,464 ETFs trading $5M or more a day have none (2026-10-05). The SEC series match closes 83 of them; the rest need issuer pages (iShares and State Street page text for IBIT, SLV, SPY, DIA; ProShares and Direxion 497K or pages for SOXL, TSLL, UVXY) and an ADR.
 - Optional IBKR pace trial: `[ibkr] historical_min_interval_s` 5, then 3, watching timeouts and error 162 (the backfill ran at 10 s, IV only, about 6 names a minute). The nightly keeps the history current (100 names a night of any new gap).
 - **Read-model track (RM, ADRs 0036-0038, [api/read-model.md](api/read-model.md)): done** (RM1-RM10b; RM10b deleted `services/explore`: the Builder's dry runs are `services/preview` over the request's `ReadContext`, READ 2 covers every use case and the API). Every page reads GraphQL; REST is writes, job polling, health, live quotes and preview POSTs. **R (RM5):** the Ideas Expiry DTE column is UNKNOWN until `nearest_expiry@v1` is backfilled (the RM3 owner action). What the track left open is the [deferred list](#deferred-from-the-rm-track). **Owner action (RM3):** after merge run `algotrade-ingest rollups --from 2024-10-03 --to <last session> --only nearest_expiry@v1` (only sessions with a stored chain get rows; the store holds chains from 2026-10-02, so this takes seconds); the nightly computes it from then on.
 - **Identity (ID, ADR 0040, Supabase Auth; outside users within a week of 2026-10-05):** ID1-ID4 done (the registry; `apps/api/algotrade_api/auth/` verifies Supabase tokens, email (+ optional pinned `subject`) in the git-ignored `config/users/<id>/identity.toml` -> registry user, 401 / 403 on every route but `/health`, `Query.viewer`; ID3: the web signs in through `@supabase/supabase-js` in `src/shared/api/auth.ts`, `/login`, `guard.ts` reads `viewer`, the web's `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` go in `apps/web/.env.local`; ID4: `?user=` retired: writes act for the caller, an admin names another user in the `X-Act-For` header, the preview POSTs in a body `user`; `services/authoring` refuses undeclared users; the nine Admin GraphQL fields are `AdminOnly`, a trader gets `FORBIDDEN`; `GET /screens/{id}/run/{job}` is 403 for another user's job; `ALGOTRADE_CORS_ORIGINS`). **Owner action:** the Supabase project exists and passed the [configuration.md](configuration.md#environment) checklist on 2026-10-05 (sign-ups off, confirm email on, anonymous off, ES256 keys): set `ALGOTRADE_AUTH=supabase` in `.env`, write each user's `config/users/<id>/identity.toml`, and declare outside users in `config/site/users.toml`. **Hosting (H1, ADR 0044): done** in code: the owner's Mac behind Tailscale Funnel, one origin (the API serves the built web from `ALGOTRADE_WEB_DIST`, `make web-build` -> `var/web`), `algotrade-api schedule` (launchd agent, `127.0.0.1:8000`), `make doctor` checks the build and the installed agents, runbook [hosting.md](hosting.md). **Owner action**, in order ([hosting.md](hosting.md)): `make web-build`; `.env`: `ALGOTRADE_AUTH=supabase`, `SUPABASE_URL`, `ALGOTRADE_WEB_DIST=var/web`; `.venv/bin/algotrade-api schedule` and run the install commands it prints; install Tailscale (Standalone app or Homebrew `tailscaled`: the App Store app has no Funnel), sign in, enable MagicDNS + HTTPS certificates and the `funnel` node attribute; `tailscale funnel --bg localhost:8000`; Supabase Site URL + Redirect URLs = the `https://<machine>.<tailnet>.ts.net` address; onboard users (Supabase Add user, `users.toml`, `identity.toml`). Redo `make web-build` after every web change.
-- VRP live spread check in the UI via `GET /chains/{id}/live`.
 - Company financials (`financials@v1`, `feature.pe_ratio`, `feature.revenue_growth_yoy`; Explore Overview reads them): after merge run `algotrade-ingest shares --force` (about 30 to 40 minutes, resumable), then `algotrade-ingest rollups --from 2024-10-03 --to <last session> --only financials@v1` (a few seconds a session, estimated), and spot-check a few names ([vendors.md](data/vendors.md) "SEC EDGAR company facts").
-- Flaky tests: preview timing under load, smoke axe admin light, one builder e2e, the Ideas e2e "shows the stored display values and the watch-outs" (failed once under `make web-check` with `WEB_WORKERS=2` on 2026-10-05, passed on re-run).
+- VRP live spread check in the UI via `GET /chains/{id}/live`. Flaky tests: preview timing under load, smoke axe admin light, one builder e2e, the Ideas e2e "shows the stored display values and the watch-outs" (failed once under `make web-check` with `WEB_WORKERS=2` on 2026-10-05, passed on re-run).
 - Descriptions (ADR 0034, accepted): after merge run `algotrade-ingest descriptions --only funds --force` (ETFs, ~2 min; `--force` rereads the 6 quarters so the ~870 ETFs matched through the SEC series file get their text, 83 of the 246 liquid gaps), then stocks in chunks (`descriptions --limit 300`, ~1 h each, S&P 500 first, each run holds the ingest lock; the nightly adds 100). Then the Overview tab reads `reference.description` from `GET /instruments/{id}`.
 
 **Facts**
@@ -136,7 +136,32 @@ catalogue of every feature is [data/features.md](data/features.md).
 | FS5 | Features by name for group features: unique group-independent names, copies become references | next |
 | FS6 | `cross_section` features (ranks, z-scores within the universe or a sector) | later |
 | FS7 | Feature quality: null rates and `valid_range` checks in nightly (out-of-range values reported, never clipped) | later |
-| FS8 | New grains (`market`, `contract`, `sector`) when a feature needs one | later |
+| FS8 | New grains (`market`, `contract`, `sector`) when a feature needs one; market: RG track (ADR 0046) | later |
+
+## Market regime (RG): recession risk and market stress as features, a regime gate for sizing (ADRs 0046-0048)
+
+Plan: [market-regime-plan.md](market-regime-plan.md). Phases 1 and 2 run in parallel; every PR
+branches from `main`. `architect` review after RG1a, RG1d, RG2a, RG3 and RG4. Reference data:
+`config/site/regime/` (the twelve episodes, the indicator cards).
+
+| # | Delivers | Status |
+|---|---|---|
+| RG0 | ADRs 0046-0048, this track, `config/site/regime/{episodes,cards}.toml`, the plan doc | **done** |
+| RG1a | `FeatureGroup.entity`, the `rollups/market/` table family, `MKT` / `IDX` / `MACRO` ids, `field_source`, inputs `universe` and `instruments/symbol_ids`, catalogue "Market features", the expression entity check (a toy market group: backfilled rows equal nightly rows) | next |
+| RG1b | The `market-rollups` task and its non-critical step before the screens | next |
+| RG1c | Market groups `trend` and `breadth` | next |
+| RG1d | `cross_asset` group: turbulence and absorption ratio (`eigvalsh`) in `quant/covariance.py` | next |
+| RG1e | Market reads and `Query.regime` (label UNKNOWN until RG3) | next |
+| RG1f | Design-system pieces: `ScoreMeter`, `IndicatorRow`, `Chart.bands` | next |
+| RG1g | `entities/regime` (`useRegime`, `useRegimeBands`, `RegimeChip`, `toChartBands`), the top-bar chip, the page header and cards | next |
+| RG1h | Per-instrument episode features `episode_behaviour@v1` (`features/rollups/price/episodes.py`) | next |
+| RG2a | The `macro/series` table, `data/macro.py`, `Input.ids`, `config/site/macro.py` settings | next |
+| RG2b | FRED / ALFRED and published-file adapters against recorded payloads | next |
+| RG2c | The `macro` task, step and `check_macro`; then a detached backfill | next |
+| RG3 | The macro group; regime expression features (with an `ncdf` built-in for the probit); the regime group; Pagan-Sossounov dating in `quant/turning_points.py`; the episode scorecard in `services/evaluation` | next |
+| RG4 | Overlays (`engines/overlays/`), `Decision.PAUSED`, `[regime]` config, with-versus-without evaluation | next |
+| RG5 | The embeddings (Ideas strip and paused section, results header, Explore and Backtests bands) and the full Regime page | next |
+| RG6 | On-demand explanation: the text-model seam (ADR 0041 amended), `services/explaining`, `POST /regime/explain`, its cache | next |
 
 ## Swing levels and momentum (SW): support, resistance and momentum from daily bars
 
