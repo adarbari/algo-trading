@@ -386,6 +386,18 @@ call `load_dotenv()` once (a local `.env`, never overriding what is already set)
 | `ALGOTRADE_IBKR_API_CLIENT_ID` | `api_credential()`: the client id of the API's live option quotes (ADR 0028) | `ALGOTRADE_IBKR_CLIENT_ID` + 1 |
 | `ALGOTRADE_NOTIFY_EMAIL_TO`, `ALGOTRADE_NOTIFY_EMAIL_FROM`, `ALGOTRADE_SMTP_USER`, `ALGOTRADE_SMTP_PASSWORD` | `credential()`, read by the nightly email notifier (`workflows/nightly/notify.py`) when `[notify.email] enabled`; recipients comma-separated, FROM defaults to the first recipient; Gmail needs an app password | unset with email enabled: a `notify` WARN "email not configured", the nightly carries on |
 
+**Creating the Supabase project** (ADR 0040; the API maps a token to a user by its email, so
+these settings are required, not optional):
+
+- [ ] Authentication -> Sign In / Providers: **Allow new users to sign up** off (users are
+  invited from Authentication -> Users -> Invite user, with the email in their `identity.toml`).
+- [ ] Email provider: **Confirm email** on.
+- [ ] **Allow anonymous sign-ins** off (the API refuses anonymous tokens with 403 anyway).
+- [ ] Copy the project URL into `SUPABASE_URL` (and, for a project still on the legacy JWT
+  secret, that secret into `SUPABASE_JWT_SECRET`), then set `ALGOTRADE_AUTH=supabase`.
+- [ ] After each user's first sign-in, pin their `subject` in `identity.toml` (below) from
+  Authentication -> Users (the user's UID).
+
 ## Users
 
 The users are declared in `config/site/users.toml` (id, role, name; ADR 0040). The email a
@@ -394,9 +406,14 @@ in their git-ignored `config/users/<id>/identity.toml`:
 
 ```toml
 email = "alice@example.com"   # the address the user signs in with (case ignored, unique)
+subject = "7b1c1d2e-..."      # optional: the user's Supabase UID; then the token must be theirs
 ```
 
-A user without the file cannot sign in to the API (403); `site` never has one. The CLIs ignore it.
+A user without the file cannot sign in to the API (403); `site` never has one. Without
+`subject` the email alone identifies the user (safe under the project settings above); with
+it, a token for another Supabase account carrying the same email is 403. Pin it from the
+Supabase dashboard (Authentication -> Users, the UID column) after the user's first sign-in;
+the API reads the file at startup, so restart it after a change. The CLIs ignore the file.
 
 Phase 0 identity is a **label for namespacing, not authentication**: `--user` on both CLIs,
 defaulting to `$ALGOTRADE_USER`, else `local` (`site` for runs scheduled from site presets). Market data and rollups are

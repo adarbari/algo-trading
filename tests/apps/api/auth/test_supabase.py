@@ -13,7 +13,7 @@ import pytest
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from starlette.requests import Request
 
-from algotrade.config.site.users import Role, UsersSettings
+from algotrade.config.site.users import Identity, Role, UsersSettings
 from algotrade_api.auth.keys import KeySet
 from algotrade_api.auth.protocol import ForbiddenError, UnauthenticatedError
 from algotrade_api.auth.supabase import SupabaseAuthenticator, bearer_token
@@ -202,3 +202,28 @@ def test_a_symmetric_key_in_the_jwks_is_never_used(users: UsersSettings, tokens:
         auth = SupabaseAuthenticator(SUPABASE_URL, users, keys, configured)
         with pytest.raises(UnauthenticatedError):
             auth.authenticate(bearer(tokens.mint("HS256", kid="k1", key=secret)))
+
+
+PINNED = "7b1c1d2e-0000-4000-8000-0000000000aa"
+
+
+@pytest.fixture
+def pinned(users: UsersSettings, fetch: Fetch) -> SupabaseAuthenticator:
+    """ana's subject is pinned in her identity.toml; tom's is not."""
+    pins = {
+        u.user_id: Identity(u.email, PINNED if u.user_id == "ana" else None) for u in users.users
+    }
+    return SupabaseAuthenticator(SUPABASE_URL, users.with_identities(pins), KeySet(fetch))
+
+
+def test_a_pinned_subject_must_match(pinned: SupabaseAuthenticator, tokens: Tokens) -> None:
+    assert pinned.authenticate(bearer(tokens.mint(sub=PINNED.upper()))).user_id == "ana"
+    with pytest.raises(ForbiddenError) as raised:  # her email, someone else's account
+        pinned.authenticate(bearer(tokens.mint()))
+    assert PINNED not in str(raised.value) and "@" not in str(raised.value)
+
+
+def test_without_a_pinned_subject_the_email_decides(
+    pinned: SupabaseAuthenticator, tokens: Tokens
+) -> None:
+    assert pinned.authenticate(bearer(tokens.mint(email="tom@example.com"))).user_id == "tom"

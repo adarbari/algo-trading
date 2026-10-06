@@ -7,7 +7,7 @@ ADR 0019 ``site-settings``. Each file becomes a frozen dataclass that apps recei
     universe.toml  -> UniverseSettings  (+ overrides/leveraged_etfs.csv, overrides/figi.csv)
     nightly.toml   -> NightlySettings
     users.toml     -> UsersSettings     (config/site/users.py: the user registry, ADR 0040)
-    users/<id>/identity.toml -> the user's sign-in email on its UserRecord (git-ignored)
+    users/<id>/identity.toml -> the user's sign-in email / subject on its UserRecord (git-ignored)
     rollups.toml   -> each rollup's params dataclass (declared by the rollup, typed here)
     features/<theme>.toml -> FeatureDefinition per expression feature (ADR 0023 step 3)
     users/<id>/features/<theme>.toml -> the same, owned by a user (always virtual; step 4)
@@ -36,7 +36,7 @@ from algotrade.config.site.holdings import (
 )
 from algotrade.config.site.ibkr import IbkrSettings as IbkrSettings  # noqa: PLC0414 - re-export
 from algotrade.config.site.ibkr import load_ibkr
-from algotrade.config.site.users import IDENTITY, identity_email
+from algotrade.config.site.users import IDENTITY, identity
 from algotrade.config.site.users import UsersSettings as UsersSettings  # noqa: PLC0414 - re-export
 from algotrade.config.user import SITE_USER
 from algotrade.core.model.errors import ConfigurationError
@@ -922,15 +922,15 @@ def load_nightly(configs: SiteDocuments) -> NightlySettings:
 
 def load_users(configs: SiteDocuments) -> UsersSettings:
     """The declared users and roles (``config/site/users.toml``, ADR 0040; the single-user
-    defaults without it), each with the email of its git-ignored
+    defaults without it), each with the email (and pinned subject) of its git-ignored
     ``config/users/<id>/identity.toml`` when there is one."""
     users = UsersSettings.from_document(site_document(configs.load, "users"))
-    emails = {
-        u.user_id: identity_email(configs.load(u.user_id, IDENTITY, IDENTITY), u.user_id)
+    found = {
+        u.user_id: identity(configs.load(u.user_id, IDENTITY, IDENTITY), u.user_id)
         for u in users.users
         if u.user_id != SITE_USER
     }
-    return users.with_emails(emails)
+    return users.with_identities(found)
 
 
 def load_verification(configs: SiteDocuments) -> VerificationSettings:

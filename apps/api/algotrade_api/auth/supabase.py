@@ -7,10 +7,12 @@ configured. Anything else (``none``, another algorithm, an unknown key) is refus
 signature is looked at, so a token can never choose how it is verified. The claims must carry
 ``exp``, ``iat``, ``iss`` (the project's ``/auth/v1``), ``aud`` (``authenticated``) and ``sub``,
 with 30 s of clock leeway. A verified token maps to the registry user whose identity email it
-carries; anonymous sign-ins, tokens without an email (the project's anon and service-role
-keys fail ``aud`` before that) and unknown emails are 403. Nothing here logs a token, a claim
-or an email."""
+carries, and when that user has a pinned ``subject`` the token's ``sub`` must equal it;
+anonymous sign-ins, tokens without an email (the project's anon and service-role keys fail
+``aud`` before that), unknown emails and a subject that is not the user's are 403. Nothing
+here logs a token, a claim or an email."""
 
+import uuid
 from collections.abc import Mapping
 from typing import Any
 
@@ -102,4 +104,14 @@ class SupabaseAuthenticator:
         user = self._users.by_email(email)
         if user is None:
             raise ForbiddenError("no registered user has this email")
+        if user.subject is not None and _subject(claims.get("sub")) != user.subject:
+            raise ForbiddenError("the token's subject is not this user's")
         return user
+
+
+def _subject(sub: object) -> str | None:
+    """A token's ``sub`` as the registry stores a subject (a normalised UUID), else None."""
+    try:
+        return str(uuid.UUID(sub)) if isinstance(sub, str) else None
+    except ValueError:
+        return None
