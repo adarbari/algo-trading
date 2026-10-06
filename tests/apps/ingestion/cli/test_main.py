@@ -170,6 +170,9 @@ def test_nightly_pipeline_end_to_end(env: Path, capsys: pytest.CaptureFixture[st
 def test_arrivals_command_prints_the_first_published_percentiles(
     env: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    with pytest.raises(SystemExit):
+        cli.main(["arrivals", "--sessions", "0"])
+    capsys.readouterr()
     assert cli.main(["arrivals"]) == 0
     assert "no arrival records yet" in capsys.readouterr().out
     import_universe(env, capsys, DAY)

@@ -218,9 +218,11 @@ def minutes_after_close(start: datetime, close: datetime) -> float:
 class ArrivalStat:
     step: str
     sessions: int  # sessions with an observed attempt
-    published: int  # of them, sessions where some attempt found the data published
-    p50: float | None  # minutes after close of the first published attempt
+    bracketed: int  # an attempt saw "not published" before the first that saw it published
+    p50: float | None  # minutes after close of the first published attempt, bracketed sessions
     p90: float | None
+    immediate: int = 0  # the first attempt already found it published: arrival unknown, earlier
+    earliest_immediate: float | None = None  # the earliest such first look (an upper bound)
 
 
 def percentile(values: Sequence[float], q: float) -> float | None:
@@ -238,7 +240,11 @@ def arrival_stats(
     attempts: Sequence[tuple[date, Mapping[str, Any]]], sessions: int = DEFAULT_SESSIONS
 ) -> tuple[ArrivalStat, ...]:
     """``attempts``: (session, a nightly attempt's steps) in any order. Per observed step, over
-    the latest ``sessions`` sessions that have one: the first published attempt's minutes."""
+    the latest ``sessions`` sessions that have one. The arrival is known only between the last
+    attempt that saw "not published" and the first that saw it published, so p50 / p90 use only
+    those bracketed sessions (the first published attempt's minutes); a session whose first
+    attempt already found it published is counted apart (``immediate``) with the earliest such
+    first look, an upper bound that must not tune a wait."""
     out = []
     for step in OBSERVED:
         seen: dict[date, list[Mapping[str, Any]]] = {}
@@ -249,25 +255,45 @@ def arrival_stats(
             ):
                 seen.setdefault(session, []).append(arrival)
         latest = sorted(seen)[-sessions:]
-        first = [
-            min(a["minutes_after_close"] for a in seen[d] if a.get("published"))
-            for d in latest
-            if any(a.get("published") for a in seen[d])
-        ]
+        bracketed: list[float] = []
+        immediate: list[float] = []
+        for day in latest:
+            tries = sorted(seen[day], key=lambda a: a["minutes_after_close"])
+            first = next((a for a in tries if a.get("published")), None)
+            if first is None:
+                continue
+            if tries[0] is first:
+                immediate.append(first["minutes_after_close"])
+            else:
+                bracketed.append(first["minutes_after_close"])
         if latest:
             out.append(
                 ArrivalStat(
-                    step, len(latest), len(first), percentile(first, 0.5), percentile(first, 0.9)
+                    step,
+                    len(latest),
+                    len(bracketed),
+                    percentile(bracketed, 0.5),
+                    percentile(bracketed, 0.9),
+                    len(immediate),
+                    min(immediate) if immediate else None,
                 )
             )
     return tuple(out)
 
 
 def arrival_line(stat: ArrivalStat) -> str:
-    """``bars first published: p50 X min, p90 Y min after close (n sessions)``."""
+    """``first published: p50 X min, p90 Y min after close (b of n sessions)`` over the
+    bracketed sessions, then the sessions already published at the first look."""
     if stat.p50 is None or stat.p90 is None:
-        return f"never published yet in {stat.sessions} observed sessions"
-    return (
-        f"first published: p50 {stat.p50:.0f} min, p90 {stat.p90:.0f} min after close "
-        f"({stat.published} of {stat.sessions} sessions)"
-    )
+        text = f"no bracketed arrival yet in {stat.sessions} observed sessions"
+    else:
+        text = (
+            f"first published: p50 {stat.p50:.0f} min, p90 {stat.p90:.0f} min after close "
+            f"({stat.bracketed} of {stat.sessions} sessions)"
+        )
+    if stat.immediate:
+        text += (
+            f"; {stat.immediate} already published at the first look (earliest "
+            f"{stat.earliest_immediate:.0f} min after close, an upper bound)"
+        )
+    return text

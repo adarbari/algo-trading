@@ -197,11 +197,14 @@ def test_vendor_pacing_per_step_in_run_timing() -> None:
 
 
 def test_run_timing_shows_when_the_data_first_appeared() -> None:
-    stat = ArrivalStat("bars", 12, 11, 185.0, 240.4)
+    stat = ArrivalStat("bars", 12, 9, 185.0, 240.4, 2, 150.0)
     report = build_report(fx.summary(), fx.records(), LABELS, 5, (), None, [stat])
     text = render_text(report)
     assert "Bars arrival:" in text
-    assert "first published: p50 185 min, p90 240 min after close (11 of 12 sessions)" in text
+    assert (
+        "first published: p50 185 min, p90 240 min after close (9 of 12 sessions); "
+        "2 already published at the first look" in text
+    )
     assert "arrival" not in render_text(build_report(fx.summary(), fx.records(), LABELS))
     assert "first published" in render_html(report)
 

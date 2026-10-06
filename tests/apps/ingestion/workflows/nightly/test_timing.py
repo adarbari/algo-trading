@@ -66,37 +66,45 @@ def _attempt(minutes: float, published: bool, step: str = "bars") -> dict:
     return {step: {"arrival": {"minutes_after_close": minutes, "published": published}}}
 
 
-def test_arrival_stats_use_the_first_published_attempt_per_session() -> None:
-    d = [date(2026, 10, i) for i in (1, 2, 5)]
+def test_arrival_stats_bracket_the_first_published_attempt() -> None:
+    d = [date(2026, 10, i) for i in (1, 2, 5, 6)]
     attempts = [
         (d[0], _attempt(60, False)),
         (d[0], _attempt(240, True)),
         (d[0], _attempt(300, True)),  # later attempts do not count
+        (d[1], _attempt(100, False)),
         (d[1], _attempt(120, True)),
-        (d[2], _attempt(60, False)),  # never published in the window
+        (d[2], _attempt(150, True)),  # first look already published: no bracket
+        (d[3], _attempt(60, False)),  # never published in the window
     ]
     (stat,) = arrival_stats(attempts)
-    assert (stat.step, stat.sessions, stat.published) == ("bars", 3, 2)
+    assert (stat.step, stat.sessions, stat.bracketed) == ("bars", 4, 2)
     assert (stat.p50, stat.p90) == (180.0, 228.0)
-    assert (
-        arrival_line(stat)
-        == "first published: p50 180 min, p90 228 min after close (2 of 3 sessions)"
+    assert (stat.immediate, stat.earliest_immediate) == (1, 150.0)
+    assert arrival_line(stat) == (
+        "first published: p50 180 min, p90 228 min after close (2 of 4 sessions); "
+        "1 already published at the first look (earliest 150 min after close, an upper bound)"
     )
+
+
+def test_arrival_stats_never_tune_from_first_looks_alone() -> None:
+    (stat,) = arrival_stats([(date(2026, 10, 1), _attempt(90, True))])
+    assert stat.p50 is None and stat.p90 is None and (stat.bracketed, stat.immediate) == (0, 1)
+    assert "no bracketed arrival" in arrival_line(stat) and "earliest 90 min" in arrival_line(stat)
 
 
 def test_arrival_stats_with_few_or_no_sessions() -> None:
     assert arrival_stats([]) == ()
     assert arrival_stats([(date(2026, 10, 1), {"bars": {"status": "SUCCEEDED"}})]) == ()
-    (one,) = arrival_stats([(date(2026, 10, 1), _attempt(90, True))])
-    assert (one.p50, one.p90) == (90.0, 90.0)
     (never,) = arrival_stats([(date(2026, 10, 1), _attempt(90, False))])
-    assert never.p50 is None and "never published" in arrival_line(never)
+    assert never.p50 is None and "no bracketed arrival" in arrival_line(never)
 
 
 def test_arrival_stats_keep_only_the_latest_sessions() -> None:
-    attempts = [(date(2026, 10, i), _attempt(i * 10, True)) for i in range(1, 6)]
+    attempts = [(date(2026, 10, i), _attempt(i, False)) for i in range(1, 6)]
+    attempts += [(date(2026, 10, i), _attempt(i * 10, True)) for i in range(1, 6)]
     (stat,) = arrival_stats(attempts, sessions=2)
-    assert stat.sessions == 2 and stat.p50 == 45.0
+    assert stat.sessions == 2 and stat.bracketed == 2 and stat.p50 == 45.0
 
 
 def test_percentile_interpolates() -> None:

@@ -97,6 +97,14 @@ LOCKED_EXIT = 3  # another run holds the store's ingest lock
 STEP_NAMES = tuple(s.name for s in NIGHTLY)  # what --waive accepts
 
 
+def positive(text: str) -> int:
+    """An argparse type: an integer of at least 1."""
+    value = int(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"must be at least 1, got {value}")
+    return value
+
+
 def add_wait(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--wait", action="store_true", help="queue behind a running ingest instead of exiting 3"
@@ -205,7 +213,9 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
     r.add_argument("--send", action="store_true", help="email it ([notify.email] + .env)")
     r.add_argument("--max-examples", type=int, help="examples per failure group")
     a = sub.add_parser("arrivals", help="when each source's data first appeared after the close")
-    a.add_argument("--sessions", type=int, default=DEFAULT_SESSIONS, help="last N sessions")
+    a.add_argument(
+        "--sessions", type=positive, default=DEFAULT_SESSIONS, help="last N sessions (>= 1)"
+    )
     g = sub.add_parser(
         "golden", help="golden test datasets: build CSVs, verify, load into the store"
     )

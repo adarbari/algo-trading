@@ -113,16 +113,14 @@ def test_arrivals_read_the_stored_attempts() -> None:
     backend = MemoryBackend()
     writer = StoreWriter(backend)
     for day, minutes in ((date(2026, 10, 1), 200.0), (date(2026, 10, 2), 100.0)):
-        arrival = {"minutes_after_close": minutes, "published": True}
-        writer.save_run(
-            RunRecord(
-                f"r-{day}",
-                "nightly",
-                day,
-                fx.START,
-                stats={"steps": {"bars": {"arrival": arrival}}},
-            )
-        )
+        for n, (at, published) in enumerate(((minutes - 50, False), (minutes, True))):
+            arrival = {"minutes_after_close": at, "published": published}
+            writer.save_run(
+                RunRecord(
+                    f"r-{day}-{n}", "nightly", day, fx.START,
+                    stats={"steps": {"bars": {"arrival": arrival}}},
+                )
+            )  # fmt: skip
     (stat,) = records.arrivals(StoreReader(backend))
-    assert (stat.sessions, stat.p50) == (2, 150.0)
+    assert (stat.sessions, stat.bracketed, stat.p50) == (2, 2, 150.0)
     assert records.arrivals(StoreReader(MemoryBackend())) == ()
