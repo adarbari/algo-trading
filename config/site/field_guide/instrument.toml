@@ -1,0 +1,90 @@
+# L3 site setting: the field guide (ADR 0041, amended 2026-10-06), one <theme>.toml per theme
+# plus situations.toml; loaded together by config/site/settings.py load_field_guide. Every
+# [[field]] says how to read one catalogue field, which criterion means what, and when the
+# reading lies; a [[situation]] is one state of the world that fools several thresholds at once.
+# The keys are documented in momentum.toml. Edit by PR; `make features-doc` renders the page.
+
+[[field]]
+name = "instrument.status"
+theme = "instrument gates"
+reads = "Whether the listing is live: ACTIVE for a name in the current reference snapshot, DELISTED for one that left it (instrument.delisted_on says when). A screen almost always gates on ACTIVE; the drafting examples do. It is identity, not a measure, so it is hard, never soft or scored."
+caveats = [
+  "DELISTED names keep their history: a backtest or a results table can show one with stored features. The gate is what keeps them out of today's picks.",
+  "A name that was acquired is DELISTED only after the deal closes; before that it is ACTIVE and pinned (see the 'pending takeover' situation).",
+]
+sources = ["Site convention (docs/data/instruments.md)"]
+[[field.use]]
+for = "listed today (always)"
+op = "eq"
+value = "ACTIVE"
+mode = "hard"
+
+[[field]]
+name = "instrument.security_type"
+theme = "instrument gates"
+reads = "What kind of listing it is: COMMON_STOCK, ADR (a foreign company's US receipt) or ETF, among others. 'Stocks' is COMMON_STOCK and ADR; 'ETFs' is ETF. A company screen (P/E, revenue growth, market cap) wants stocks only: funds have no financials and ADRs have no P/E here."
+caveats = [
+  "An ADR passes a 'stocks' gate but feature.pe_ratio is null for it (the ADR ratio is not stored) and its filings are foreign; add rollup.financials@v1.is_adr eq false when the screen reads earnings.",
+  "ETFs include leveraged and inverse funds; a fund screen that wants plain index exposure adds instrument.is_leveraged eq false and instrument.is_inverse eq false.",
+]
+sources = ["Site convention (docs/data/instruments.md; the vendor's type wins over the name rules)"]
+[[field.use]]
+for = "stocks"
+op = "in"
+value = ["COMMON_STOCK", "ADR"]
+mode = "hard"
+[[field.use]]
+for = "ETFs"
+op = "in"
+value = ["ETF"]
+mode = "hard"
+[[field.use]]
+for = "stocks and funds (options screens)"
+op = "in"
+value = ["COMMON_STOCK", "ADR", "ETF"]
+mode = "hard"
+
+[[field]]
+name = "instrument.optionable"
+theme = "instrument gates"
+reads = "Whether listed options exist on the name. True is the gate for any options screen; it says nothing about how tradable those options are, which is feature.option_tier and the chain's open interest and volume."
+caveats = [
+  "Optionable with feature.option_tier D is a chain nobody trades: gate on the tier as well for a trade, not only on the flag.",
+  "A newly optionable name has no IV history: feature.iv_rank is null for its first 60 sessions.",
+]
+sources = ["Site convention (the reference snapshot's optionable flag)"]
+[[field.use]]
+for = "has listed options"
+op = "eq"
+value = true
+mode = "hard"
+note = "add feature.option_tier in [A, B] for tradable ones"
+
+[[field]]
+name = "instrument.is_leveraged"
+theme = "instrument gates"
+reads = "True for a fund that targets a multiple of its index's daily return (instrument.leverage gives the multiple). Such funds reset daily and drift from the index over time (volatility decay), so trend, momentum and volatility readings describe the fund's path, not the market's."
+caveats = [
+  "A stock screen that does not exclude these finds 2x and 3x funds at the top of every momentum and volatility list; see the 'leveraged or inverse fund' situation.",
+]
+sources = ["StockCharts, Why technical analysis does not work for leveraged ETFs: https://articles.stockcharts.com/article/articles-finalbar-2024-06-why-technical-analysis-does-no-911/"]
+[[field.use]]
+for = "no leveraged funds"
+op = "eq"
+value = false
+mode = "hard"
+note = "pair with instrument.is_inverse eq false"
+
+[[field]]
+name = "instrument.is_inverse"
+theme = "instrument gates"
+reads = "True for a fund that targets the opposite of its index's daily return. An inverse fund in a 'downtrend' is a rising market; every directional reading on it is reversed and decays like a leveraged one."
+caveats = [
+  "Exclude from stock and trend screens with the leveraged flag; screen them deliberately or not at all (the 'leveraged or inverse fund' situation).",
+]
+sources = ["StockCharts, Why technical analysis does not work for leveraged ETFs: https://articles.stockcharts.com/article/articles-finalbar-2024-06-why-technical-analysis-does-no-911/"]
+[[field.use]]
+for = "no inverse funds"
+op = "eq"
+value = false
+mode = "hard"

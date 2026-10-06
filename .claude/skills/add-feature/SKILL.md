@@ -30,6 +30,14 @@ high_52w - 1`, a HIGH / LOW label from thresholds, `shares x close`.) Then it is
    `architecture/tables.toml`).
 3. `make features-doc`; tests: a case in `tests/unit/features/test_site.py` (values, nulls,
    categories). A bad formula fails at load naming the file, the feature and the position.
+4. **Its field guide entry, same PR** (ADR 0041 amended): a `[[field]]` in
+   `config/site/field_guide/<theme>.toml` naming `feature.<name>`: how to read it (low to
+   high, in its unit), the criterion per intent as the rule grammar takes it (`[[field.use]]`:
+   `for`, `op`, `value`, `mode`, `tolerance`, `on_miss`, `note`), the caveats (when the number
+   is right and the conclusion wrong, each naming the field that exposes it) and the sources.
+   The Builder, the drafting prompt and `docs/data/field-guide.md` read it; `make features-doc`
+   lists the fields still without one, and a field the phrasebook or a site preset screener
+   uses must have one (`tests/architecture/test_features.py`).
 
 **Site or user?** A formula one person wants for their own screens is a **user feature**:
 the same `[name]` entry in `config/users/<id>/features/<theme>.toml` (git-ignored; ADR 0023
@@ -108,7 +116,11 @@ loader under `features/`, and never write a new task for a group. `make ownershi
    (`tests/helpers/rollup_store.py`), missing history / gaps are null, a backfill equals the
    per-session compute, and anything adjustment-sensitive (splits) as of each session.
 8. **Docs:** the generated catalogue (`make features-doc`), the groups table in
-   `docs/data/layers.md` and the selectable fields in `docs/configuration.md`.
+   `docs/data/layers.md` and the selectable fields in `docs/configuration.md`; and the
+   field guide entry of every column a person would set a threshold on (`[[field]]` in
+   `config/site/field_guide/<theme>.toml`, as in the expression-feature step 4 above:
+   reading, criterion per intent, caveats, sources). `make features-doc` lists what is
+   still unguided; screened or phrased fields must be guided.
 9. **Baseline:** if strategies or screeners use it, run `make baseline` and explain the diff.
 10. Run `make check`; after merge, backfill with `algotrade-ingest rollups --from D --to D
     --only <name>@v1`.

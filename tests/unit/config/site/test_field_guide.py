@@ -134,6 +134,7 @@ def test_the_shipped_guide_is_complete() -> None:
     assert store.names("site", "field_guide") == [
         "events",
         "fundamentals",
+        "instrument",
         "liquidity",
         "momentum",
         "situations",
