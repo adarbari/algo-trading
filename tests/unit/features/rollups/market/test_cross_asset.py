@@ -10,7 +10,7 @@ import pandas as pd
 import pytest
 
 from algotrade.data import StoreReader
-from algotrade.features.framework.runner import compute_one
+from algotrade.features.framework.runner import compute_one, compute_sessions
 from algotrade.features.rollups.market import cross_asset as ca
 from algotrade.quant.covariance import absorption_ratio, absorption_shift, turbulence
 from tests.helpers.rollup_store import END, series, store, write_bars
@@ -25,11 +25,17 @@ def closes_for(tickers: tuple[str, ...], n: int) -> dict[str, np.ndarray]:
     return {t: series(n, seed=i + 1) for i, t in enumerate(tickers)}
 
 
-def stored(closes: Mapping[str, np.ndarray], ids: Mapping[str, str] | None = None) -> StoreReader:
-    """Bars for each ticker under ``ids[ticker]`` (default ``EQ:<ticker>``) and a reference."""
+def stored(
+    closes: Mapping[str, np.ndarray],
+    ids: Mapping[str, str] | None = None,
+    skip: Mapping[str, list[int]] | None = None,
+) -> StoreReader:
+    """Bars for each ticker under ``ids[ticker]`` (default ``EQ:<ticker>``; ``skip``: session
+    indexes without a bar) and a reference."""
     ids = ids or {t: f"EQ:{t}" for t in closes}
     writer, reader = store()
-    days = write_bars(writer, {ids[t]: c for t, c in closes.items()})
+    gaps = {ids[t]: list(i) for t, i in (skip or {}).items()}
+    days = write_bars(writer, {ids[t]: c for t, c in closes.items()}, skip=gaps)
     write_reference(writer, days[0], {t: ids[t] for t in closes})
     return reader
 
@@ -97,3 +103,26 @@ def test_a_permutation_of_ids_changes_nothing() -> None:
     shuffled = dict(zip(ca.BASKET, reversed([f"EQ:ID{i:02d}" for i in range(14)]), strict=True))
     same, permuted = market_row(stored(closes)), market_row(stored(closes, shuffled))
     pd.testing.assert_series_equal(pd.Series(same), pd.Series(permuted), check_exact=True)
+
+
+@pytest.mark.parametrize(("back", "kept"), [(62, False), (63, True)])
+def test_a_ticker_is_skipped_exactly_when_turbulence_would_see_its_gap(
+    back: int, kept: bool
+) -> None:
+    """Turbulence reads 61 returns (62 closes): a gap 62 sessions back skips the ticker, one
+    63 back does not reach it."""
+    closes = closes_for(ca.BASKET, 120)
+    row = market_row(stored(closes, skip={"XLF": [120 - back]}))
+    basket = [t for t in ca.BASKET if kept or t != "XLF"]
+    returns = np.diff(np.log(np.column_stack([closes[t] for t in basket])), axis=0)
+    assert row["basket_size"] == len(basket)
+    assert row["turbulence_60d"] == pytest.approx(turbulence(returns, 60)[-1], rel=F32)
+
+
+def test_backfill_equals_nightly() -> None:
+    reader = stored(closes_for(ca.TICKERS, 120))
+    sessions = reader.dates("bars/1d")[-4:]
+    for result in compute_sessions(reader, GROUP, sessions):
+        nightly = compute_one(reader, GROUP, result.session).frame
+        assert result.frame is not None and nightly is not None
+        pd.testing.assert_frame_equal(result.frame, nightly)

@@ -74,15 +74,27 @@ def test_a_member_without_bars_is_never_counted() -> None:
 def test_below_the_coverage_floor_every_breadth_column_is_null() -> None:
     writer, reader = store()
     symbols = names(10)
-    closes = {f"EQ:{s}": RISING if i < 7 else RISING[-100:] for i, s in enumerate(symbols)}
-    days = write_bars(writer, closes)
+    closes = {f"EQ:{s}": RISING for s in symbols}
+    days = write_bars(writer, closes, skip={f"EQ:{s}": [259] for s in symbols[7:]})
     write_rows(writer, "universe", days[0], universe_rows(symbols))
-    row = market_row(reader)
+    row = market_row(reader)  # 3 of 10 members have no bar on the session
     assert (row["breadth_status"], row["universe_members"]) == ("LOW_COVERAGE", 10)
     assert row["universe_coverage"] == pytest.approx(0.7, rel=F32)
     assert all(pd.isna(row[c]) for c in BREADTH)
     lower = market_row(reader, replace(P, min_coverage=0.7))
     assert lower["breadth_status"] == "OK" and lower["pct_above_sma200"] == 1.0
+
+
+def test_new_listings_keep_coverage_and_count_only_where_their_window_is_complete() -> None:
+    writer, reader = store()
+    symbols = names(10)
+    young = {f"EQ:{s}": FALLING[-100:] for s in symbols[7:]}  # listed 100 sessions ago
+    days = write_bars(writer, {**{f"EQ:{s}": RISING for s in symbols[:7]}, **young})
+    write_rows(writer, "universe", days[0], universe_rows(symbols))
+    row = market_row(reader)
+    assert (row["breadth_status"], row["universe_coverage"]) == ("OK", 1.0)
+    assert row["pct_above_sma200"] == 1.0  # over the 7 with 200 sessions of bars
+    assert row["pct_above_sma50"] == pytest.approx(0.7, rel=F32)  # over all 10
 
 
 def test_before_the_first_universe_snapshot_everything_is_null() -> None:

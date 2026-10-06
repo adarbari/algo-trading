@@ -57,3 +57,10 @@ for no gain); a synthetic index instrument (breadth is a property of the univers
   only on the window we hold.
 - An expression cannot yet combine a market and an instrument feature (e.g. beta-scaled stress):
   that needs the broadcasting ADR.
+
+## Amendment (2026-10-06, RG1c review)
+A group that reads only a few tickers declares them as `Input("bars/1d", symbols=(...))`: the
+input loads only the ids those tickers resolve to in the reference snapshot each session of the
+chunk sees (`reference.ids_for_symbols`, the union), instead of every instrument's bars, and the
+group still picks each session's ids through `instruments/symbol_ids`. The prefilter is a
+superset of every session's ids, so point in time and ADR 0018 (no built ids) are unchanged.

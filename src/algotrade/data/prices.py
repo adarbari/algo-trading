@@ -203,6 +203,12 @@ class SessionBars:
     _days: np.ndarray  # frame session dates as datetime64[D], for slicing
     _rows: dict[str, np.ndarray]  # frame row positions of each instrument with a split
 
+    @classmethod
+    def empty(cls) -> "SessionBars":
+        """No bars (a narrowed read whose instruments have none in the range)."""
+        splits = pd.DataFrame({"instrument_id": [], "ex_date": [], "ratio": []})
+        return cls(pd.DataFrame(columns=_WINDOW_COLUMNS), splits, np.array([], "datetime64[D]"), {})
+
     def window(self, first: date, session: date) -> pd.DataFrame:
         """Bars with ``first <= session_date <= session``, adjusted as of ``session``."""
         lo = int(np.searchsorted(self._days, np.datetime64(first, "D"), side="left"))

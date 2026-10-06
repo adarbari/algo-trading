@@ -79,6 +79,8 @@ def test_short_history_gap_and_unlisted_ticker_are_null() -> None:
 
 
 def test_without_a_reference_every_column_is_null() -> None:
+    """The bars are read for the ids SPY and QQQ resolve to (``Input.symbols``): none, so the
+    session has input (bars are stored) but every column is unknown."""
     writer, reader = store()
     write_bars(writer, {SPY: series(300)})
     row = market_row(reader)

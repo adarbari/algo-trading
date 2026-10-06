@@ -8,7 +8,8 @@ breadth. One ``MKT:US`` row per session.
 
 A member counts towards a column only when its window for that column is complete; a member
 without one is never counted as above or below anything. ``universe_coverage`` is the share of
-members with a bar on every one of the last 200 sessions (the 200-day average's window). Below
+members with a bar on the session (each column keeps its own complete-window denominator, so a
+wave of new listings never flips breadth to unknown). Below
 ``min_coverage`` (``config/site/rollups.toml``) every breadth column is null and
 ``breadth_status`` says ``LOW_COVERAGE``; without a universe snapshot everything is null and it
 says ``NO_UNIVERSE``.
@@ -81,7 +82,7 @@ FEATURES = (
     ),
     Feature(
         "universe_coverage", "float32", "decimal",
-        "Share of members with a bar on every one of the last 200 sessions",
+        "Share of members with a bar on the session",
         "no universe snapshot on or before the session (NO_UNIVERSE), or it lists no stocks",
         kind="cross_section", valid_range=_SHARE, inputs=(MEMBERS, CLOSE),
     ),
@@ -128,7 +129,7 @@ COLUMNS = column_types(FEATURES)
 
 @dataclass(frozen=True)
 class MarketBreadthParams:
-    min_coverage: float = 0.8  # below this share of members with bars, breadth is null
+    min_coverage: float = 0.9  # below this share of members with a bar today, breadth is null
 
     def __post_init__(self) -> None:
         if not 0 <= self.min_coverage <= 1:
@@ -210,7 +211,7 @@ def _row(
             "universe_coverage": coverage,
         }
     px = panel(mine, sessions_ending(session, LOOKBACK + 1))
-    covered = int((~np.isnan(px.close[-SMA_WINDOWS[0] :]).any(axis=0)).sum())
+    covered = int((~np.isnan(px.close[-1])).sum())
     row: dict[str, object] = {
         "universe_members": len(members),
         "universe_coverage": covered / len(members),

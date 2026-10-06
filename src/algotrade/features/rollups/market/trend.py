@@ -139,7 +139,10 @@ GROUP = FeatureGroup(
     VERSION,
     "Index trend of SPY and QQQ: distance from the 200-day average, death cross, drawdown "
     "from the 52-week closing high, realised vol and returns",
-    (Input(BARS, lookback=LOOKBACK), Input(SYMBOL_IDS, required=False)),
+    (
+        Input(BARS, lookback=LOOKBACK, symbols=tuple(INDEXES.values())),
+        Input(SYMBOL_IDS, required=False),
+    ),
     FEATURES,
     compute,
     entity="market",

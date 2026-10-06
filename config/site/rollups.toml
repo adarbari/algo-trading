@@ -69,4 +69,4 @@ search_hi = 0.35
 prefer_monthly = true    # standard monthlies in the window first (where OI concentrates), else any
 
 ["market_breadth@v1"]      # the universe's breadth (ADR 0047)
-min_coverage = 0.8         # share of member stocks with 200 sessions of bars, else every breadth column is null
+min_coverage = 0.9         # share of member stocks with a bar on the session, else every breadth column is null

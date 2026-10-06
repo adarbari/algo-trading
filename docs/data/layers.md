@@ -279,7 +279,10 @@ range; every feature is listed in the generated **[feature catalogue](features.m
   tables), plus `universe` (the session's universe snapshot, `None` before the first one: a
   later list would count today's survivors) and `instruments/symbol_ids` (symbol -> id from the
   reference snapshot, to find SPY without building an id). `symbol_ids` is a lookup only, never
-  a population (it may come from a later snapshot); `universe` is the population. The runner
+  a population (it may come from a later snapshot); `universe` is the population. A group that
+  reads a few tickers declares `Input("bars/1d", symbols=(...))` and loads only the bars of the
+  ids they resolve to in each session's reference snapshot (the union over the chunk), not every
+  instrument's. The runner
   fails the group unless it returns exactly that one row. An instrument group never reads a
   market group (broadcasting needs its own ADR), and a market group's `applies_to` is `any`.
   An expression feature takes the entity of what it reads; one

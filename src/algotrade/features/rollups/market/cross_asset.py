@@ -6,8 +6,9 @@ per session.
 
 The basket is ``BASKET`` in that fixed order (columns of the returns panel; never the order of
 the ids, so a run is bit-reproducible). A ticker that is not in the reference, or misses a bar
-on one of the last 61 sessions, is skipped; ``basket_size`` says how many remain (turbulence
-and absorption are null below ``MIN_BASKET``). Returns are daily log returns.
+on one of the last 62 sessions (61 returns), is skipped; ``basket_size`` says how many remain
+(turbulence and absorption are null below ``MIN_BASKET``). Returns are daily log returns. Only
+the tickers' bars are read (``Input.symbols``).
 
     turbulence_60d          Kritzman-Li turbulence (``quant.covariance.turbulence``): the
                             squared Mahalanobis distance of the session's returns from the
@@ -53,12 +54,16 @@ TURBULENCE_WINDOW = 60
 AR_WINDOW, AR_HALF_LIFE = 500, 250.0
 SHIFT_SHORT, SHIFT_LONG = 15, 252
 RATIO_WINDOW = 63
+TURBULENCE_CLOSES = TURBULENCE_WINDOW + 2  # the session's return and the 60 before it
 # Returns: the absorption shift needs SHIFT_LONG ratios, each over AR_WINDOW returns.
 LOOKBACK = max(AR_WINDOW + SHIFT_LONG - 1, TURBULENCE_WINDOW + 1, RATIO_WINDOW)
 
 CLOSE = f"{BARS}.close"
 ID = f"{SYMBOL_IDS}.instrument_id"
-_SHORT_BASKET = f"fewer than {MIN_BASKET} basket tickers with a bar on each of the last 61 sessions"
+_SHORT_BASKET = (
+    f"fewer than {MIN_BASKET} basket tickers with a bar on each of the last {TURBULENCE_CLOSES} "
+    "sessions"
+)
 
 
 def ratio_column(a: str, b: str) -> str:
@@ -69,7 +74,7 @@ FEATURES = (
     Feature(
         "basket_size", "int", "count",
         f"Basket ETFs ({', '.join(BASKET)}) in the reference with a bar on each of the last "
-        f"{TURBULENCE_WINDOW + 1} sessions: the columns of turbulence and absorption",
+        f"{TURBULENCE_CLOSES} sessions: the columns of turbulence and absorption",
         "never", valid_range=(0, len(BASKET)), inputs=(CLOSE, ID),
     ),
     Feature(
@@ -114,7 +119,7 @@ COLUMNS = column_types(FEATURES)
 def stress(close: Matrix) -> dict[str, float]:
     """Basket size, turbulence, absorption ratio and shift for the LAST session; ``close`` is
     sessions x ``BASKET`` (NaN: no bar)."""
-    recent = close[-(TURBULENCE_WINDOW + 1) :]
+    recent = close[-TURBULENCE_CLOSES:]
     keep = ~np.isnan(recent).any(axis=0)
     out = {"basket_size": float(keep.sum())}
     nan = dict.fromkeys(("turbulence_60d", f"absorption_ratio_{AR_WINDOW}d", "absorption_shift"))
@@ -156,7 +161,7 @@ GROUP = FeatureGroup(
     VERSION,
     "Cross-asset stress over an ETF basket (turbulence, absorption ratio and its shift) and "
     "the leadership ratios' 63-session relative returns",
-    (Input(BARS, lookback=LOOKBACK), Input(SYMBOL_IDS, required=False)),
+    (Input(BARS, lookback=LOOKBACK, symbols=TICKERS), Input(SYMBOL_IDS, required=False)),
     FEATURES,
     compute,
     entity="market",
