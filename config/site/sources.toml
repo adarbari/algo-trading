@@ -127,6 +127,14 @@ enabled = true                   # ALGOTRADE_FRED_API_KEY (free: fredaccount.stl
 min_interval_s = 0.5             # FRED allows 120 requests a minute
 base_url = "https://api.stlouisfed.org/fred"
 
+[tiingo]                         # daily prices from 2018 for the event-study names (`bars-history`, ADR 0050); key in .env
+enabled = true                   # ALGOTRADE_TIINGO_API_KEY (free: tiingo.com account); no key: the source is skipped
+min_interval_s = 72              # free tier: 50 requests an hour (3600 / 50), 1,000 a day, 500 UNIQUE symbols a month
+                                 # (a refetch of a symbol already fetched that month is free). The ~140 scoped names
+                                 # take ~3 hours; the whole tier A / B set needs the Power tier ($10 a month: no
+                                 # symbol cap, 5,000 requests an hour), then lower this to 1 or less.
+licence = "personal"             # Tiingo's terms: personal use; features derived from its bars inherit it
+
 [published]                      # published series files (Stooq, Fed EBP, OFR FSI, Shiller): one request per file
 enabled = true
 min_interval_s = 1.0             # a few static files a day; no published limit, stay polite

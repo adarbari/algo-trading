@@ -9,12 +9,14 @@ import { useQuery } from '@tanstack/react-query';
 
 import { gql, graphql, queryKeys } from '@/shared/api';
 
+import type { SeriesHistory } from '../model/history';
 import type { Recession, Regime, RegimeBand, RegimeEpisode } from '../model/regime';
 
 /** The GraphQL operations' names: their cached responses share these key prefixes. */
 export const REGIME_OPERATION = 'Regime';
 export const REGIME_BANDS_OPERATION = 'RegimeBands';
 export const REGIME_EPISODES_OPERATION = 'RegimeEpisodes';
+export const MARKET_HISTORY_OPERATION = 'MarketHistory';
 
 const RegimeQuery = graphql(`
   query Regime {
@@ -33,6 +35,9 @@ const RegimeQuery = graphql(`
             code
             detail
           }
+          feature
+          coverageFeature
+          threshold
         }
         marketStress {
           value
@@ -40,6 +45,9 @@ const RegimeQuery = graphql(`
             code
             detail
           }
+          feature
+          coverageFeature
+          threshold
         }
         fragility {
           value
@@ -47,6 +55,9 @@ const RegimeQuery = graphql(`
             code
             detail
           }
+          feature
+          coverageFeature
+          threshold
         }
       }
       sizing {
@@ -91,6 +102,32 @@ const RegimeQuery = graphql(`
         format
         status
         changed
+        feature
+        verdictFeature
+        range {
+          min
+          max
+        }
+        threshold
+        direction
+        how {
+          text
+          url
+        }
+        sources {
+          label
+          series
+          cadence
+          releaseLagDays
+          url
+          licence
+          terms
+          lastObservation
+          vintageDate
+          vintageKind
+          firstVintage
+          active
+        }
       }
     }
   }
@@ -137,6 +174,26 @@ const RegimeEpisodesQuery = graphql(`
   }
 `);
 
+const MarketHistoryQuery = graphql(`
+  query MarketHistory($names: [String!]!, $start: Date!, $end: Date!, $points: Int!) {
+    market {
+      history(names: $names, start: $start, end: $end, points: $points) {
+        name
+        bucketSessions
+        points {
+          session
+          value
+        }
+        segments {
+          start
+          end
+          value
+        }
+      }
+    }
+  }
+`);
+
 /** The session's regime (null: nothing stored for the session; UNKNOWN is a label, not null). */
 export function useRegime() {
   return useQuery({
@@ -173,5 +230,25 @@ export function useRegimeEpisodes() {
       episodes: data.regime?.episodes ?? [],
       recessions: data.regime?.recessions ?? [],
     }),
+  });
+}
+
+/**
+ * Stored market fields over `start..end` (`market.<group>@v<N>.<column>` names; the server cuts
+ * `end` to the session): numbers as at most `points` points with gaps as null values, flags and
+ * labels as segments. Waits until `end` is known; none when nothing is stored for the session.
+ */
+export function useMarketHistory(
+  names: readonly string[],
+  start: string,
+  end: string | undefined,
+  points: number,
+) {
+  const variables = { names: [...names], start, end: end ?? '', points };
+  return useQuery({
+    queryKey: queryKeys.gql(MARKET_HISTORY_OPERATION, variables),
+    queryFn: () => gql(MarketHistoryQuery, variables),
+    enabled: end !== undefined && names.length > 0,
+    select: (data): readonly SeriesHistory[] => data.market?.history ?? [],
   });
 }

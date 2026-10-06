@@ -17,6 +17,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+from algotrade.config.site.events.scope import load_event_scope
 from algotrade.config.site.settings import load_macro, load_universe
 from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
@@ -32,6 +33,7 @@ from algotrade_ingestion.tasks.maintenance import (
 )
 from algotrade_ingestion.tasks.market import (
     bars,
+    bars_history,
     corporate_actions,
     earnings,
     etf_holdings,
@@ -216,6 +218,22 @@ def _bars(ctx: TaskContext, p: Params) -> RunRecord:
     # Exchange sessions in the window; an explicit non-session date is fetched as asked.
     sessions = sessions_between(p.get("start") or session, p.get("end") or session) or [session]
     return bars.ingest_daily_bars(ctx, ctx.sources["massive_bars"], sessions, bool(p.get("force")))
+
+
+def _bars_history(ctx: TaskContext, p: Params) -> RunRecord:
+    assert ctx.configs is not None
+    # The event-study scope list (EV0) plus any --symbols; ids come from the reference (ADR 0018).
+    symbols = [*load_event_scope(ctx.configs).symbols, *_symbols(p)]
+    since = p.get("since") or bars_history.DEFAULT_SINCE
+    return bars_history.ingest_bars_history(
+        ctx,
+        ctx.sources["tiingo_prices"],
+        symbols,
+        since,
+        p.get("until") or session_of(p),
+        bool(p.get("force")),
+        p.get("limit"),
+    )
 
 
 def _rates(ctx: TaskContext, p: Params) -> RunRecord:
@@ -513,6 +531,24 @@ TASKS: dict[str, Task] = {
             sources=("massive_bars",),
             settings="sources.toml [massive]",
             params=(SESSION, FROM, TO, Param("force", ("--force",), None, "re-fetch stored")),
+        ),
+        Task(
+            "bars-history",
+            "unadjusted daily bars from Tiingo since 2018 for the event-study names "
+            "(resumable backfill: 50 requests an hour on the free tier)",
+            bars_history,
+            ("bars/1d",),
+            _bars_history,
+            sources=("tiingo_prices",),
+            settings="sources.toml [tiingo]; events/scope.toml",
+            params=(
+                SESSION,
+                Param("since", ("--since",), date.fromisoformat, "first session (default 2018)"),
+                Param("until", ("--until",), date.fromisoformat, "last session (default --date)"),
+                Param("symbols", ("--symbols",), str, "tickers on top of the scope list"),
+                Param("limit", ("--limit",), int, "fetch at most N names this run"),
+                Param("force", ("--force",), None, "also names already fetched for the window"),
+            ),
         ),
         Task(
             "rates",
