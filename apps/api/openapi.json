@@ -1798,8 +1798,8 @@
         "parameters": [
           {
             "description": "whose configs (default: the caller's; another user's: admins only)",
-            "in": "query",
-            "name": "user",
+            "in": "header",
+            "name": "X-Act-For",
             "required": false,
             "schema": {
               "anyOf": [
@@ -1811,7 +1811,7 @@
                 }
               ],
               "description": "whose configs (default: the caller's; another user's: admins only)",
-              "title": "User"
+              "title": "X-Act-For"
             }
           }
         ],
@@ -1899,8 +1899,8 @@
         "parameters": [
           {
             "description": "whose configs (default: the caller's; another user's: admins only)",
-            "in": "query",
-            "name": "user",
+            "in": "header",
+            "name": "X-Act-For",
             "required": false,
             "schema": {
               "anyOf": [
@@ -1912,7 +1912,7 @@
                 }
               ],
               "description": "whose configs (default: the caller's; another user's: admins only)",
-              "title": "User"
+              "title": "X-Act-For"
             }
           }
         ],
@@ -1980,8 +1980,8 @@
           },
           {
             "description": "whose configs (default: the caller's; another user's: admins only)",
-            "in": "query",
-            "name": "user",
+            "in": "header",
+            "name": "X-Act-For",
             "required": false,
             "schema": {
               "anyOf": [
@@ -1993,7 +1993,7 @@
                 }
               ],
               "description": "whose configs (default: the caller's; another user's: admins only)",
-              "title": "User"
+              "title": "X-Act-For"
             }
           }
         ],
@@ -2056,8 +2056,8 @@
           },
           {
             "description": "whose configs (default: the caller's; another user's: admins only)",
-            "in": "query",
-            "name": "user",
+            "in": "header",
+            "name": "X-Act-For",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2069,7 +2069,7 @@
                 }
               ],
               "description": "whose configs (default: the caller's; another user's: admins only)",
-              "title": "User"
+              "title": "X-Act-For"
             }
           }
         ],
@@ -2168,8 +2168,8 @@
           },
           {
             "description": "whose configs (default: the caller's; another user's: admins only)",
-            "in": "query",
-            "name": "user",
+            "in": "header",
+            "name": "X-Act-For",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2181,7 +2181,7 @@
                 }
               ],
               "description": "whose configs (default: the caller's; another user's: admins only)",
-              "title": "User"
+              "title": "X-Act-For"
             }
           }
         ],
@@ -2221,8 +2221,8 @@
           },
           {
             "description": "whose configs (default: the caller's; another user's: admins only)",
-            "in": "query",
-            "name": "user",
+            "in": "header",
+            "name": "X-Act-For",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2234,7 +2234,7 @@
                 }
               ],
               "description": "whose configs (default: the caller's; another user's: admins only)",
-              "title": "User"
+              "title": "X-Act-For"
             }
           }
         ],
@@ -2291,8 +2291,8 @@
           },
           {
             "description": "whose configs (default: the caller's; another user's: admins only)",
-            "in": "query",
-            "name": "user",
+            "in": "header",
+            "name": "X-Act-For",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2304,7 +2304,7 @@
                 }
               ],
               "description": "whose configs (default: the caller's; another user's: admins only)",
-              "title": "User"
+              "title": "X-Act-For"
             }
           }
         ],
@@ -2342,8 +2342,8 @@
           },
           {
             "description": "whose configs (default: the caller's; another user's: admins only)",
-            "in": "query",
-            "name": "user",
+            "in": "header",
+            "name": "X-Act-For",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2355,7 +2355,7 @@
                 }
               ],
               "description": "whose configs (default: the caller's; another user's: admins only)",
-              "title": "User"
+              "title": "X-Act-For"
             }
           }
         ],
@@ -2464,8 +2464,8 @@
           },
           {
             "description": "whose configs (default: the caller's; another user's: admins only)",
-            "in": "query",
-            "name": "user",
+            "in": "header",
+            "name": "X-Act-For",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2477,7 +2477,7 @@
                 }
               ],
               "description": "whose configs (default: the caller's; another user's: admins only)",
-              "title": "User"
+              "title": "X-Act-For"
             }
           }
         ],
@@ -2524,8 +2524,8 @@
           },
           {
             "description": "whose configs (default: the caller's; another user's: admins only)",
-            "in": "query",
-            "name": "user",
+            "in": "header",
+            "name": "X-Act-For",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2537,7 +2537,7 @@
                 }
               ],
               "description": "whose configs (default: the caller's; another user's: admins only)",
-              "title": "User"
+              "title": "X-Act-For"
             }
           }
         ],
@@ -2603,8 +2603,8 @@
           },
           {
             "description": "whose configs (default: the caller's; another user's: admins only)",
-            "in": "query",
-            "name": "user",
+            "in": "header",
+            "name": "X-Act-For",
             "required": false,
             "schema": {
               "anyOf": [
@@ -2616,7 +2616,7 @@
                 }
               ],
               "description": "whose configs (default: the caller's; another user's: admins only)",
-              "title": "User"
+              "title": "X-Act-For"
             }
           }
         ],
@@ -2650,6 +2650,7 @@
     },
     "/screens/{config_id}/run/{job_id}": {
       "get": {
+        "description": "403 for another user's job unless the caller is an admin (the job's owner is its user).",
         "operationId": "run_status_screens__config_id__run__job_id__get",
         "parameters": [
           {

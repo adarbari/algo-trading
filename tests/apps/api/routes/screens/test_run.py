@@ -6,12 +6,13 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 
+from algotrade.config.site.users import Role, UserRecord
 from algotrade.config.user import UserContext
 from algotrade.services.ondemand.screens import OnDemandScreens
 from algotrade_api.deps import ApiSettings
 from algotrade_api.main import create_app
 from tests.helpers.api_store import as_user, store_over
-from tests.helpers.ondemand_store import DAY, seeded_backend, site_configs
+from tests.helpers.ondemand_store import DAY, SCREEN, seeded_backend, site_configs
 
 RUN = "/screens/big_liquid/run"
 
@@ -70,3 +71,38 @@ def test_runs_are_off_without_a_runner() -> None:
         authenticator=as_user(),
     )
     assert TestClient(app).post(RUN).status_code == 400
+
+
+def test_a_job_is_polled_by_its_owner_or_an_admin_only() -> None:
+    """403 for another user's job; a site preset's run is the site's, shared by everyone."""
+    backend = seeded_backend()
+    users = {
+        "user": [
+            {"id": u, "role": r}
+            for u, r in (("alice", "trader"), ("bob", "trader"), ("ana", "admin"))
+        ]
+    }
+    configs = site_configs(
+        {
+            ("alice", "strategies", "mine"): {**SCREEN, "id": "mine"},
+            ("site", "settings", "users"): users,
+        }
+    )
+    stub = as_user("alice", Role.TRADER)
+    app = create_app(
+        ApiSettings("memory://", "config"),
+        store_over(backend, configs, UserContext("alice")),
+        ondemand=OnDemandScreens(backend, configs),
+        authenticator=stub,
+    )
+    with TestClient(app) as http:
+        own = http.post("/screens/mine/run", params={"date": DAY.isoformat()}).json()
+        shared = http.post(RUN, params={"date": DAY.isoformat()}).json()
+        poll(http, f"/screens/mine/run/{own['job_id']}")
+        poll(http, f"{RUN}/{shared['job_id']}")
+        stub.user = UserRecord("bob", Role.TRADER)
+        refused = http.get(f"/screens/mine/run/{own['job_id']}")
+        assert refused.status_code == 403
+        assert http.get(f"{RUN}/{shared['job_id']}").status_code == 200  # the site's run
+        stub.user = UserRecord("ana", Role.ADMIN)
+        assert http.get(f"/screens/mine/run/{own['job_id']}").status_code == 200

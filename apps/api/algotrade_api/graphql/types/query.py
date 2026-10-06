@@ -6,7 +6,8 @@ backtests, the user's screens, the nightly runs and run records) are not session
 take no ``date`` and read the request's session-free context (``info.context.stores()``), so
 they answer on a store with no market data yet. The Admin reads about a session (its quality
 checks and verification, the completeness window ending at it, one completeness cell, the
-review lists over its reference snapshot) take ``date`` like any other."""
+review lists over its reference snapshot) take ``date`` like any other. Every Admin field
+is ``AdminOnly`` (ADR 0040: a trader gets ``FORBIDDEN``)."""
 
 import datetime as dt
 from typing import Annotated
@@ -22,6 +23,7 @@ from algotrade.services.read.screens import documents, ideas, screeners, views
 from algotrade.services.read.users.viewer import load_viewer
 from algotrade_api.graphql.context import RequestContext
 from algotrade_api.graphql.limits import MAX_NAMES, MAX_PAGE, MaxItems
+from algotrade_api.graphql.permissions import AdminOnly
 from algotrade_api.graphql.scalars import FeatureName
 from algotrade_api.graphql.types.instruments.distribution import FeatureDistribution
 from algotrade_api.graphql.types.instruments.feature import FeatureInfo
@@ -244,7 +246,7 @@ class Query:
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The `limit` most recent nightly session runs, newest first",
-        extensions=[MaxItems("limit", MAX_RUNS)],
+        extensions=[AdminOnly(), MaxItems("limit", MAX_RUNS)],
     )
     def nightly_runs(self, info: Ctx, limit: int = 10) -> list[NightlyRun]:
         ctx = info.context.stores()
@@ -253,7 +255,8 @@ class Query:
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The run record `runId` (any job): items summarised, failures grouped by "
-        "reason; null: no such run"
+        "reason; null: no such run",
+        extensions=[AdminOnly()],
     )
     def run(self, info: Ctx, run_id: str) -> RunDetail | None:
         ctx = info.context.stores()
@@ -261,7 +264,8 @@ class Query:
         return RunDetail.of(found) if found is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
-        description="Every item of the run `runId` with its status, by key; null: no such run"
+        description="Every item of the run `runId` with its status, by key; null: no such run",
+        extensions=[AdminOnly()],
     )
     def run_items(self, info: Ctx, run_id: str) -> list[RunItem] | None:
         ctx = info.context.stores()
@@ -270,7 +274,8 @@ class Query:
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The session's data-quality checks (NOT_RUN when it has no data-quality "
-        "run); null: nothing stored"
+        "run); null: nothing stored",
+        extensions=[AdminOnly()],
     )
     def quality(self, info: Ctx, date: Day = None) -> QualityReport | None:
         ctx = info.context.read(date)
@@ -279,7 +284,8 @@ class Query:
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The session's live verification vs IBKR (NO_PARTITION when it did not "
-        "run for the session); null: nothing stored"
+        "run for the session); null: nothing stored",
+        extensions=[AdminOnly()],
     )
     async def verification(self, info: Ctx, date: Day = None) -> Verification | None:
         ctx = info.context.read(date)
@@ -292,7 +298,7 @@ class Query:
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Ingestion completeness: every dataset x the last `sessions` exchange "
         "sessions ending at the session; null: nothing stored",
-        extensions=[MaxItems("sessions", MAX_SESSIONS)],
+        extensions=[AdminOnly(), MaxItems("sessions", MAX_SESSIONS)],
     )
     async def completeness(
         self, info: Ctx, sessions: int = 10, date: Day = None
@@ -308,7 +314,8 @@ class Query:
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="One completeness cell, `dataset` on the session `date`, with the reasons "
-        "behind it; null: a dataset the grid does not list"
+        "behind it; null: a dataset the grid does not list",
+        extensions=[AdminOnly()],
     )
     async def ingestion_cell(self, info: Ctx, dataset: str, date: dt.date) -> CellDetail | None:
         ctx = info.context.read(date)
@@ -321,7 +328,8 @@ class Query:
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Listings marked for FIGI review (the universe build's list on or before "
-        "the session, else its reference snapshot); null: nothing stored"
+        "the session, else its reference snapshot); null: nothing stored",
+        extensions=[AdminOnly()],
     )
     def figi_review(self, info: Ctx, date: Day = None) -> ReviewList | None:
         ctx = info.context.read(date)
@@ -330,7 +338,8 @@ class Query:
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Active ETFs in the session's reference snapshot whose leverage the rules "
-        "could not classify; null: nothing stored"
+        "could not classify; null: nothing stored",
+        extensions=[AdminOnly()],
     )
     def leverage_review(self, info: Ctx, date: Day = None) -> ReviewList | None:
         ctx = info.context.read(date)

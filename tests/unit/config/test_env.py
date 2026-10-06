@@ -72,3 +72,15 @@ def test_auth_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     assert env.auth_mode() == "off"
     assert env.supabase_url() == "https://ref.supabase.co"
     assert env.supabase_jwt_secret() == "s3cret"
+
+
+def test_cors_origins_come_from_the_environment_else_the_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    default = ("http://localhost:5173",)
+    monkeypatch.delenv(env.CORS_ORIGINS, raising=False)
+    assert env.cors_origins(default) == default
+    monkeypatch.setenv(env.CORS_ORIGINS, " https://app.example.com/ ,, https://b.example.com")
+    assert env.cors_origins(default) == ("https://app.example.com", "https://b.example.com")
+    monkeypatch.setenv(env.CORS_ORIGINS, " , ")
+    assert env.cors_origins(default) == default

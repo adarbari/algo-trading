@@ -379,6 +379,7 @@ call `load_dotenv()` once (a local `.env`, never overriding what is already set)
 | `ALGOTRADE_CONFIG_DIR` | `config_dir()`, passed to `open_config_store(dir)`; `--config-dir` wins | `./config` |
 | `ALGOTRADE_USER` | `user_id()`, the default `--user` | `local` (`site` for site screens) |
 | `ALGOTRADE_AUTH` | `auth_mode()`: how the API resolves its caller (ADR 0040): `supabase` verifies a Supabase access token on every request (401 without a valid one, 403 when its email maps to no registry user); `off` serves `ALGOTRADE_USER` without a token and the API refuses to start that way on a non-loopback `--host` | `supabase` |
+| `ALGOTRADE_CORS_ORIGINS` | `cors_origins()`: the web origins the API allows (CORS), comma-separated, e.g. `https://app.example.com`; replaces the list, so include the local dev server too if it is still wanted | `http://localhost:5173`, `http://127.0.0.1:5173`, `http://localhost:3000`, `http://127.0.0.1:3000` |
 | `SUPABASE_URL` | `supabase_url()`: the Supabase project (`https://<ref>.supabase.co`); the API fetches its JWKS once at startup (refetched on an unknown `kid`) and checks the token's issuer against it | unset with `ALGOTRADE_AUTH=supabase`: the API refuses to start |
 | `SUPABASE_JWT_SECRET` | `supabase_jwt_secret()`: the project's legacy HS256 signing secret, for projects not yet on asymmetric keys | unset: only JWKS-signed (ES256 / RS256) tokens are accepted |
 | `ALGOTRADE_MASSIVE_API_KEY`, `ALGOTRADE_SEC_CONTACT` | `credential()`, handed to the source registry | unset: the source is skipped with the reason |

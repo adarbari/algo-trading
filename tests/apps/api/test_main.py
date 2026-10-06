@@ -36,12 +36,52 @@ def test_openapi_is_served(client: TestClient) -> None:
     assert not [p for p in paths if p.startswith("/admin")]  # Admin reads are GraphQL
 
 
+def test_no_route_takes_a_user_query_parameter(client: TestClient) -> None:
+    """``?user=`` retired (ADR 0040): writes act for the caller, an admin names another user in
+    the ``X-Act-For`` header (a body field on the preview POSTs), never in the URL."""
+    document = client.get("/openapi.json").json()
+    named = [
+        (path, method)
+        for path, operations in document["paths"].items()
+        for method, operation in operations.items()
+        for p in operation.get("parameters", [])
+        if p["name"] == "user" and p["in"] == "query"
+    ]
+    assert named == []
+    draft = document["paths"]["/screeners/{screener_id}/draft"]["put"]
+    assert any(p["name"] == "X-Act-For" and p["in"] == "header" for p in draft["parameters"])
+
+
 def test_cors_allows_the_local_web_dev_server(client: TestClient) -> None:
     origin = DEV_ORIGINS[0]
     response = client.get("/health", headers={"Origin": origin})
     assert response.headers["access-control-allow-origin"] == origin
     other = client.get("/health", headers={"Origin": "https://example.com"})
     assert "access-control-allow-origin" not in other.headers
+
+
+def test_cors_origins_come_from_the_environment(
+    api_golden: tuple[ReadStore, dict[str, str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("ALGOTRADE_CORS_ORIGINS", raising=False)
+    assert ApiSettings.from_env().cors_origins == DEV_ORIGINS
+    monkeypatch.setenv("ALGOTRADE_CORS_ORIGINS", "https://app.example.com, https://b.example.com/")
+    settings = ApiSettings.from_env()
+    assert settings.cors_origins == ("https://app.example.com", "https://b.example.com")
+    app = create_app(settings, api_golden[0], authenticator=as_user())
+    http = TestClient(app)
+    preflight = http.options(
+        "/graphql",
+        headers={
+            "Origin": "https://app.example.com",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization,content-type",
+        },
+    )
+    assert preflight.headers["access-control-allow-origin"] == "https://app.example.com"
+    assert "authorization" in preflight.headers["access-control-allow-headers"]
+    dev = http.get("/health", headers={"Origin": DEV_ORIGINS[0]})
+    assert "access-control-allow-origin" not in dev.headers  # the list replaces the default
 
 
 def test_configuration_errors_are_400(
@@ -170,6 +210,11 @@ def test_a_trader_cannot_act_for_another_user(signed: TestClient, tokens: Tokens
 
     assert status("bob@example.com") == 403  # a trader naming someone else
     assert status("ana@example.com") == 200 and status("alice@example.com") == 200
+    # The registry decides who exists: an admin previewing as an undeclared id or the site.
+    for ghost in ("mallory", "site"):
+        body = {"expr": "hv20_pct / 100", "user": ghost}
+        refused = signed.post("/features/check", json=body, headers=_as(tokens, "ana@example.com"))
+        assert refused.status_code == 400
 
 
 class Refuse:

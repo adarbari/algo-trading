@@ -421,6 +421,21 @@ query IdeasPage($date: Date, $limit: Int!, $names: [FeatureName!]!) {
 
 Every read for a trader page goes to GraphQL. No new GET serving stored data.
 
+**Who a REST write is for (ADR 0040):** the caller, from their token; there is no `?user=`
+query parameter on any route (`tests/apps/api/test_main.py` asserts it). An admin acting for
+another user names them in the `X-Act-For` header on a write (one dependency, `deps.write_user`;
+a trader naming someone else is 403, and `services.authoring` refuses an id the registry does
+not declare: 400) or, on the preview POSTs, in the body's `user`. A route never reads either by
+hand. `GET /screens/{id}/run/{job_id}` is 403 for another user's job unless the caller is an
+admin (a site preset's run is the site's: shared by everyone who may request the preset).
+
+**Who a GraphQL field is for:** the Admin area (nightly runs, run records, quality,
+verification, completeness, ingestion cells, review lists: `Query` fields returning the
+`types/ops/{run,quality,ingestion,review}` objects) is admin-only. Each carries the
+`AdminOnly` field extension (`graphql/permissions.py`, the one check): a trader gets a
+`FORBIDDEN` error. `tests/apps/api/graphql/test_permissions.py` finds those fields in the
+schema, so a new one cannot skip it.
+
 ## What the browser may not derive
 
 `architecture/web_forbidden_derivations.toml`, checked by
