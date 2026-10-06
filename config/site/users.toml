@@ -1,0 +1,16 @@
+# The user registry (ADR 0040): who may use the API and the CLIs, and their role.
+#   id    the user id (its configs live in config/users/<id>/, ADR 0015)
+#   role  "admin" (TRADER and ADMIN workspaces, ops reads, waivers) or "trader" (TRADER only)
+#   name  display name (optional)
+# Without this file the install is single-user: `local` and `site` as admins. How a user logs
+# in is the API's concern (ADR 0040): no credentials live here.
+
+[[user]]
+id = "local"
+role = "admin"
+name = "Local user"
+
+[[user]]
+id = "site"
+role = "admin"
+name = "Scheduled site screens"
