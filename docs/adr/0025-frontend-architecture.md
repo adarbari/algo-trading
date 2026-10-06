@@ -119,7 +119,7 @@ official Playwright image locally (`npm run visual:update`) and in CI.
 labels; axe runs in unit tests, on every story (both themes) and in the end-to-end smoke test.
 
 ### Ownership
-Web responsibilities are `[[web_responsibility]]` entries in `architecture/ownership.toml`
+Web responsibilities are `[[web_responsibility]]` entries in `architecture/web_ownership.toml`
 (styling, tokens, HTTP, data access, routing, workspace access, env), each naming the lint
 rule or check that keeps it in its owner.
 

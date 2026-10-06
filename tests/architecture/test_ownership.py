@@ -25,6 +25,7 @@ from algotrade.storage.tables import schemas
 from tests.conftest import REPO_ROOT
 
 REGISTRY = tomllib.loads((REPO_ROOT / "architecture" / "ownership.toml").read_text())
+WEB_REGISTRY = tomllib.loads((REPO_ROOT / "architecture" / "web_ownership.toml").read_text())
 KNOWN = tomllib.loads((REPO_ROOT / "architecture" / "known_violations.toml").read_text())
 CODE_FILES = sorted(
     p
@@ -225,7 +226,7 @@ def test_ownership_ratchet_passes() -> None:
 
 def test_web_responsibilities_name_existing_owners_and_sections() -> None:
     """ADR 0025: web owners are enforced by lint, not AST rules; the registry stays honest."""
-    entries = REGISTRY.get("web_responsibility", [])
+    entries = WEB_REGISTRY.get("web_responsibility", [])
     assert entries, "the web app's responsibilities are registered ([[web_responsibility]])"
     ids = [e["id"] for e in entries] + [r["id"] for r in REGISTRY["responsibility"]]
     assert len(ids) == len(set(ids)), "duplicate responsibility ids"

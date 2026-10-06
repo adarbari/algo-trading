@@ -34,6 +34,7 @@ features (``config/site/features/price.toml``), computed on read.
 
 from dataclasses import dataclass
 from datetime import date
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -58,6 +59,15 @@ ADV_WINDOW = 20
 CLOSE, HIGH, LOW, OPEN, VOLUME = (f"{BARS}.{c}" for c in ("close", "high", "low", "open", "volume"))
 
 
+# Why close / the 52-week range are null, from price_history@v1 (ADR 0046): no trade on the
+# session; a listing too young, or a name trading too rarely, for the window.
+_BAR_STATUS = "price_history.bar_status@v1"
+_SHORT_RANGE: dict[str, Any] = {
+    "null_status": "price_history.range_status@v1",
+    "explained_statuses": ("FEW_BARS", "NEW_LISTING"),
+}
+
+
 def _gap(n: int) -> str:
     return f"a session among the last {n} has no bar (a gap), or the history is shorter"
 
@@ -66,8 +76,10 @@ FEATURES = (
     Feature(
         "close", "float32", "usd_per_share",
         "The session's close, split-adjusted as of the session",
-        "never: a row exists only for an instrument with a bar on the session",
+        "no bar on the session (no row): price_history bar_status says NO_TRADE when the "
+        "instrument has an earlier bar in the last 252 sessions",
         valid_range=(0, None), inputs=(CLOSE,),
+        null_status=_BAR_STATUS, explained_statuses=("NO_TRADE",),
     ),
     *(
         Feature(
@@ -88,14 +100,14 @@ FEATURES = (
         "Highest daily high over the last 52 weeks (252 sessions), split-adjusted (not "
         "dividend-adjusted)",
         "fewer than min_year_sessions (240) bars among the last year_sessions (252)",
-        valid_range=(0, None), inputs=(HIGH,),
+        valid_range=(0, None), inputs=(HIGH,), **_SHORT_RANGE,
     ),
     Feature(
         "low_52w", "float32", "usd_per_share",
         "Lowest daily low over the last 52 weeks (252 sessions), split-adjusted (not "
         "dividend-adjusted)",
         "fewer than min_year_sessions (240) bars among the last year_sessions (252)",
-        valid_range=(0, None), inputs=(LOW,),
+        valid_range=(0, None), inputs=(LOW,), **_SHORT_RANGE,
     ),
     *(
         Feature(
