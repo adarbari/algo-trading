@@ -103,12 +103,9 @@ def _explained(
     an id with no row in ``stored`` too (no trade: no ``price_stats`` row)."""
     if not feat.null_status:
         return {}
-    if "@" in feat.null_status:
-        group, _, rest = feat.null_status.partition(".")
-        column, _, version = rest.partition("@")
-        status = reader.table(f"{ROLLUP_TABLE_PREFIX}{group}@{version}", day)
-    else:
-        status, column = stored, feat.null_status
+    column = feat.status_column[1]
+    own = feat.status_table == f"{ROLLUP_TABLE_PREFIX}{feat.group}"
+    status = stored if own else reader.table(feat.status_table, day)
     if status is None or column not in status.columns:
         return {}
     explains = status[column].isin({*feat.illiquid_statuses, *feat.explained_statuses})

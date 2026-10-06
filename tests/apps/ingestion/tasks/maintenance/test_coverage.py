@@ -286,3 +286,13 @@ def test_an_explained_absence_covers_except_no_trade_in_the_core_tier() -> None:
     # R1 (no row) and R2 (a null close) did not trade; N1 traded with no close and E1 has
     # neither a row nor a status: gaps
     assert (rest.covered, rest.missing) == (2, ("E1", "N1"))
+
+
+def test_close_with_the_site_catalogue_no_trade_covers_only_outside_the_core() -> None:
+    writer, reader = store()
+    put(writer, PRICES, D, {s: {"close": 10.0} for s in ("C1", "R2", "N1", "E1")})
+    put(writer, "rollups/instrument/price_history@v1", D,
+        {s: {"bar_status": "NO_TRADE"} for s in ("C2", "R1")})  # fmt: skip
+    check = only(check_coverage(reader, D, rules(CLOSE)), "price_stats.close")
+    assert (cell(check, "core")["covered"], cell(check, "core")["missing"]) == (1, ["C2"])
+    assert cell(check, "rest")["covered"] == 4  # R1 did not trade: not a gap
