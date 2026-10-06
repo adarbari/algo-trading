@@ -209,6 +209,7 @@ class SourcesSettings:
     http_max_error_rate: float = 0.10
     max_bar_count_drop: float = 0.10
     max_universe_change: float = 0.05
+    max_type_disagreement: float = 0.10  # reference_classification (ADR 0045)
     max_bar_unresolved: float = 0.01
     max_chain_fetch_failures: float = 0.02
     max_chain_stale_share: float = 0.20  # the "rest" tier
@@ -250,6 +251,7 @@ class SourcesSettings:
             [
                 "max_bar_count_drop",
                 "max_universe_change",
+                "max_type_disagreement",
                 "max_bar_unresolved",
                 "max_chain_fetch_failures",
                 "max_chain_stale_share",
@@ -315,6 +317,9 @@ class SourcesSettings:
             http_max_error_rate=http.fraction("max_error_rate", d.http_max_error_rate),
             max_bar_count_drop=quality.fraction("max_bar_count_drop", d.max_bar_count_drop),
             max_universe_change=quality.fraction("max_universe_change", d.max_universe_change),
+            max_type_disagreement=quality.fraction(
+                "max_type_disagreement", d.max_type_disagreement
+            ),
             max_bar_unresolved=quality.fraction("max_bar_unresolved", d.max_bar_unresolved),
             max_chain_fetch_failures=quality.fraction(
                 "max_chain_fetch_failures", d.max_chain_fetch_failures

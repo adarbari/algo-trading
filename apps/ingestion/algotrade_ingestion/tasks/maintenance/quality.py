@@ -20,6 +20,7 @@ from algotrade.data.chains import chain_status
 from algotrade.data.reference import snapshot
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
+from algotrade_ingestion.tasks.reference.classify import security_type
 
 TASK = "data_quality"
 
@@ -133,6 +134,42 @@ def check_universe(reader: StoreReader, session: date, s: SourcesSettings) -> li
             status,
             f"{today} vs {before} instruments ({change:+.1%}); "
             "an unexplained jump means UNIVERSE INCOMPLETE",
+        )
+    ]
+
+
+def check_reference_classification(
+    reader: StoreReader, session: date, s: SourcesSettings
+) -> list[Check]:
+    """FAIL when the vendor's security type and our name rules disagree on too many ACTIVE
+    rows (ADR 0045): a vendor that retyped its list, or a name rule gone wrong, moves the
+    universe silently. Counts the rows typed by ``name_over_vendor`` and those whose stored
+    type differs from the name rule's (a vendor type that stood, ``CEF`` for a fund, counts)."""
+    latest = _latest(reader, "instruments/reference", session)
+    frame = None if latest is None else reader.table("instruments/reference", latest)
+    if frame is None or frame.empty or "security_type_source" not in frame.columns:
+        return [Check("reference_classification", "FAIL", "no reference snapshot to classify")]
+    active = frame[frame["status"].eq("ACTIVE")]
+    named = pd.Series(
+        [
+            security_type(str(n), str(y), bool(e))
+            for n, y, e in zip(active["name"], active["symbol"], active["is_etf"], strict=True)
+        ],
+        index=active.index,
+    )
+    from_vendor = active["security_type_source"].isin(["vendor", "name_over_vendor"])
+    over = int(active["security_type_source"].eq("name_over_vendor").sum())
+    disagree = int((from_vendor & active["security_type"].ne(named)).sum()) + over
+    total = len(active)
+    worst = max(over, disagree) / total
+    return [
+        Check(
+            "reference_classification",
+            "FAIL" if worst > s.max_type_disagreement else "PASS",
+            f"{disagree} of {total} ACTIVE rows ({disagree / total:.1%}) typed differently by "
+            f"the vendor and the name rules, {over} ({over / total:.1%}) decided by the name "
+            f"(max {s.max_type_disagreement:.0%})",
+            data={"disagreements": disagree, "name_over_vendor": over, "active": total},
         )
     ]
 
