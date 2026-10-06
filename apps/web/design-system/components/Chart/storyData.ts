@@ -3,7 +3,14 @@
  * from 30 Sep 2024 to 2 Oct 2026, ending on fixed closes, with sample events and volume. Not
  * market data.
  */
-import type { ChartBand, ChartEvent, ChartPoint, ChartSeries } from './chartData';
+import type {
+  ChartBand,
+  ChartEvent,
+  ChartLane,
+  ChartPoint,
+  ChartReferenceLine,
+  ChartSeries,
+} from './chartData';
 
 /** Seeded PRNG (mulberry32): the same numbers on every run, so screenshots are stable. */
 function random(seed: number): () => number {
@@ -102,4 +109,48 @@ export const sampleBands: ChartBand[] = [
   cautionBand,
   stressBand,
   { start: '2026-08-03', end: '2026-09-04', tone: 'warning', label: 'Caution' },
+];
+
+/** A hatched band that overlaps the caution and stress bands: the overlap stays readable. */
+export const hatchedBand: ChartBand = {
+  start: '2026-02-02',
+  end: '2026-04-10',
+  tone: 'negative',
+  label: 'Recession',
+  pattern: 'hatch',
+};
+
+/** The sample close with a missing stretch (null): the line breaks there. Not market data. */
+export const aaplWithGap: ChartSeries = {
+  ...aapl,
+  points: aapl.points.map((p) =>
+    p.time >= '2026-05-04' && p.time <= '2026-06-12' ? { ...p, value: null } : p,
+  ),
+};
+
+/** Sample reference lines (a floor and a target) around the sample price. Not market data. */
+export const sampleReferenceLines: ChartReferenceLine[] = [
+  { value: 300, label: 'Floor', tone: 'negative', dash: true },
+  { value: 340, label: 'Target', tone: 'positive' },
+];
+
+/** Sample lanes: a state over time in two rows (labelled and unlabelled spans). Not market data. */
+export const sampleLanes: ChartLane[] = [
+  {
+    id: 'trend',
+    label: 'Trend',
+    segments: [
+      { start: '2025-10-02', end: '2026-01-09', tone: 'positive', label: 'Rising' },
+      { start: '2026-01-12', end: '2026-03-27', tone: 'negative', label: 'Falling' },
+      { start: '2026-03-30', end: '2026-10-02', tone: 'positive', label: 'Rising' },
+    ],
+  },
+  {
+    id: 'volatility',
+    label: 'Volatility',
+    segments: [
+      { start: '2026-02-02', end: '2026-04-10', tone: 'warning', label: 'Elevated' },
+      { start: '2026-08-03', end: '2026-09-04', tone: 'warning', label: 'Elevated' },
+    ],
+  },
 ];

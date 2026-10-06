@@ -5,7 +5,18 @@ import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { SegmentedControl } from '../SegmentedControl';
 import { Chart, type ChartProps } from './Chart';
 import { CHART_RANGES, type ChartRange } from './chartData';
-import { aapl, aaplEvents, aaplVolume, msft, nvda, sampleBands } from './storyData';
+import {
+  aapl,
+  aaplEvents,
+  aaplVolume,
+  aaplWithGap,
+  hatchedBand,
+  msft,
+  nvda,
+  sampleBands,
+  sampleLanes,
+  sampleReferenceLines,
+} from './storyData';
 
 /** The chart with the caller's range control, as screens use it. */
 function WithRange(props: ChartProps) {
@@ -64,7 +75,7 @@ export const WithVolume: Story = {
 /** Hundreds of millions of shares: the volume axis reads 800M, the price axis stays currency. */
 export const WithLargeVolume: Story = {
   args: {
-    volume: aaplVolume.map((p) => ({ ...p, value: p.value * 10 })),
+    volume: aaplVolume.map((p) => ({ ...p, value: (p.value ?? 0) * 10 })),
     range: '1Y',
     height: 'lg',
   },
@@ -75,6 +86,32 @@ export const WithLargeVolume: Story = {
  * and listed for screen readers. Two bands touch on 20 / 21 Feb. Sample data.
  */
 export const WithBands: Story = { args: { bands: sampleBands, events: aaplEvents } };
+
+/**
+ * With reference lines: horizontal lines across the price pane with their label at the right end
+ * (a floor dashed in the negative tone, a target solid in the positive one). Sample data.
+ */
+export const WithReferenceLines: Story = {
+  args: { referenceLines: sampleReferenceLines, range: '1Y' },
+};
+
+/**
+ * With lanes and bands: thin strips under the price pane on the chart's own time scale (the
+ * crosshair names the span under it), shaded bands behind the line and a hatched band that
+ * overlaps two of them; all named in the key. Sample data.
+ */
+export const WithLanesAndBands: Story = {
+  args: {
+    bands: [...sampleBands, hatchedBand],
+    lanes: sampleLanes,
+    referenceLines: sampleReferenceLines,
+    range: '1Y',
+    height: 'lg',
+  },
+};
+
+/** A missing stretch (null values): the line breaks instead of drawing a zero or joining. */
+export const WithGap: Story = { args: { series: [aaplWithGap], range: '1Y' } };
 
 /** The table fallback: the same numbers in a DataTable. */
 export const TableView: Story = {

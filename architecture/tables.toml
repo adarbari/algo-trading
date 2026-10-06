@@ -179,8 +179,9 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
 note = "market-entity feature groups (ADR 0047): one MKT:US row per session, the market-rollups task (compute_rollups(entity='market')); each group's own table is declared here when the group is added"
 
 [[table]]
-name = "rollups/market/market_trend@v1"
+name = "rollups/market/market_trend@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
+note = "v2 falls back to the S&P 500 index level (macro/series IDX:SPX) when SPY's 253-session bars window is incomplete and adds the Nasdaq Composite (IDX:COMP); v1 rows on the owner's store are superseded and read by nothing, deleted by hand once v2 is backfilled"
 
 [[table]]
 name = "rollups/market/market_breadth@v1"

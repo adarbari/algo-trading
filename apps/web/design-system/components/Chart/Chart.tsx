@@ -4,13 +4,16 @@
  * series colours s1-s6, optionally rebased to 100 at the start of the window; event markers
  * (ex-dividend, split, earnings) with a shape and letter each plus a key; optional shaded bands
  * (spans of days in a status tint behind the lines: regimes, drawdowns, recessions), named in a
- * key and in a text list for assistive technology; an optional volume pane; a crosshair read-out with tabular values (formatValue). The caller owns the time window
+ * key and in a text list for assistive technology; optional horizontal reference lines (a
+ * threshold, a target) with an end label, also listed for assistive technology; optional lanes
+ * (thin strips of tinted spans under the price pane, one row per lane, drawn on the chart's own
+ * time scale: a state over time; lanes.ts); an optional volume pane; a crosshair read-out with tabular values (formatValue). The caller owns the time window
  * (`range`, usually a SegmentedControl passed as `toolbar`). Resizes with its container, redraws
  * in the active theme's tokens when the theme changes, and has no animation (scroll / zoom
  * off). Accessible: an image with a generated text summary, and a "View as table" switch that
  * shows the same numbers in a DataTable. Loading, empty and error states.
  */
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 import { formatValue, type ValueFormat } from '../../format';
 import { Button } from '../Button';
@@ -27,8 +30,10 @@ import {
   tableRows,
   type ChartBand,
   type ChartEvent,
+  type ChartLane,
   type ChartPoint,
   type ChartRange,
+  type ChartReferenceLine,
   type ChartSeries,
   type ChartTableRow,
 } from './chartData';
@@ -55,7 +60,18 @@ export interface ChartProps {
    * tone and a label. Their labels are listed for screen readers and keyed under the chart.
    */
   bands?: readonly ChartBand[];
-  /** Show the bands in the key (default true; the hidden list for screen readers stays). */
+  /**
+   * Horizontal lines on the price pane at a value, each with its label at the right end:
+   * `{ y, label?, tone?, dash? }` (default `neutral`, solid). Kept inside the price range.
+   */
+  referenceLines?: readonly ChartReferenceLine[];
+  /**
+   * Thin strips under the price pane, one row per lane: `{ id, label, segments: { start, end,
+   * tone, label? }[] }`, drawn on the chart's own time scale. A segment's label is in the
+   * crosshair read-out, the key and a text list for screen readers.
+   */
+  lanes?: readonly ChartLane[];
+  /** Show the bands and lane segments in the key (default true; the hidden list for screen readers stays). */
   bandKey?: boolean;
   /** Daily volume in a pane under the price. */
   volume?: readonly ChartPoint[];
@@ -77,7 +93,9 @@ export interface ChartProps {
 
 /** A Map of day -> value for each series (read-out lookups). */
 function byDay(points: readonly ChartPoint[]): Map<string, number> {
-  return new Map(points.map((p) => [p.time, p.value]));
+  return new Map(
+    points.flatMap((p): [string, number][] => (p.value === null ? [] : [[p.time, p.value]])),
+  );
 }
 
 const dateText = (day: string) => formatValue(day, { kind: 'date', style: 'short' }).text;
@@ -93,6 +111,8 @@ export function Chart({
   rebase = false,
   events,
   bands,
+  referenceLines,
+  lanes,
   bandKey = true,
   volume,
   format,
@@ -113,9 +133,11 @@ export function Chart({
         rebase,
         ...(events ? { events } : {}),
         ...(bands ? { bands } : {}),
+        ...(referenceLines ? { referenceLines } : {}),
+        ...(lanes ? { lanes } : {}),
         ...(volume ? { volume } : {}),
       }),
-    [series, range, rebase, events, bands, volume],
+    [series, range, rebase, events, bands, referenceLines, lanes, volume],
   );
   const summary = describeChart(label, chart, { rebase, format: valueFormat });
   const [view, setView] = useState<'chart' | 'table'>('chart');
@@ -171,6 +193,8 @@ export function Chart({
           series: chart.series,
           events: chart.events,
           bands: chart.bands,
+          referenceLines: chart.referenceLines,
+          lanes: chart.lanes,
           volume: chart.volume,
           rebase,
           formatValue: (v) => formatValue(v, axisFormat).text,
@@ -240,6 +264,12 @@ export function Chart({
           },
         ]
       : []),
+    ...chart.lanes.map((lane): DataTableColumn<ChartTableRow> => ({
+      id: `lane-${lane.id}`,
+      header: lane.label,
+      value: (r) => r.lanes[lane.id],
+      width: 'md',
+    })),
     ...(chart.events.length > 0
       ? [
           {
@@ -284,8 +314,39 @@ export function Chart({
           </ul>
         </VisuallyHidden>
       )}
+      {view === 'chart' && chart.lanes.length > 0 && (
+        <VisuallyHidden as="div">
+          {chart.lanes.map((lane) => (
+            <ul key={lane.id} aria-label={`${label}: ${lane.label}`}>
+              {lane.segments.map((g) => (
+                <li key={`${g.start}-${g.end}`}>
+                  {`${g.label ?? lane.label}: ${dateText(g.start)} to ${dateText(g.end)}`}
+                </li>
+              ))}
+            </ul>
+          ))}
+        </VisuallyHidden>
+      )}
+      {view === 'chart' && chart.referenceLines.length > 0 && (
+        <VisuallyHidden as="div">
+          <ul aria-label={`${label}: reference lines`}>
+            {chart.referenceLines.map((l) => (
+              <li key={`${String(l.value)}-${l.label ?? ''}`}>
+                {[l.label, formatValue(l.value, valueFormat).text].filter(Boolean).join(': ')}
+              </li>
+            ))}
+          </ul>
+        </VisuallyHidden>
+      )}
       {view === 'chart' ? (
-        <div className={styles.plot} data-height={height} data-ready={ready || undefined}>
+        <div
+          className={styles.plot}
+          data-height={height}
+          data-ready={ready || undefined}
+          style={
+            { '--lanes': chart.lanes.length > 0 ? chart.lanes.length + 1 : 0 } as CSSProperties
+          }
+        >
           {/* The text alternative: an image over the canvas (the canvas host holds the library's
               attribution link, which must not sit inside role="img"). */}
           <div className={styles.summary} role="img" aria-label={summary} />
@@ -297,6 +358,7 @@ export function Chart({
               values={lookups.values}
               volume={lookups.volume}
               events={lookups.events}
+              lanes={chart.lanes}
               format={valueFormat}
               width={crosshair.width}
             />

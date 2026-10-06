@@ -15,7 +15,8 @@ export const CHART_RANGES: readonly ChartRange[] = ['3M', '1Y', '2Y', 'All'];
 export interface ChartPoint {
   /** ISO calendar day, `2026-10-02`. */
   time: string;
-  value: number;
+  /** The value; `null` is a gap: the line breaks there (no value that day, not a zero). */
+  value: number | null;
 }
 
 export interface ChartSeries {
@@ -38,8 +39,11 @@ export interface ChartEvent {
   detail?: string;
 }
 
-/** The tones a shaded band takes: the StatusBadge tones (`accent` is the one accent hue). */
-export type ChartBandTone = StatusTone;
+/** The tones a band, lane segment or reference line takes: the StatusBadge tones. */
+export type ChartTone = StatusTone;
+
+/** The tones a shaded band takes (`accent` is the one accent hue). */
+export type ChartBandTone = ChartTone;
 
 export interface ChartBand {
   /** First day of the span, ISO. A non-trading day shades from the next day with data. */
@@ -50,6 +54,41 @@ export interface ChartBand {
   tone: ChartBandTone;
   /** What the span is ("Stress"): its name for assistive technology, the key and the table. */
   label: string;
+  /**
+   * `solid` (default) tint, or `hatch`: diagonal lines in the tone, so overlapping spans stay
+   * readable and colour is not the only signal (recessions).
+   */
+  pattern?: 'solid' | 'hatch';
+}
+
+/** A horizontal line across the price pane at a value: a threshold, a target, a baseline. */
+export interface ChartReferenceLine {
+  /** Where the line sits, on the axis' scale (the value as drawn, so rebased when `rebase`). */
+  value: number;
+  /** Its name ("Inversion"), drawn at the right end of the line and read to screen readers. */
+  label?: string;
+  /** Colour of the line (default `neutral`). */
+  tone?: ChartTone;
+  /** Dashed instead of solid (default false). */
+  dash?: boolean;
+}
+
+/** One span of a lane: a start and end day (inclusive), a tone and an optional name. */
+export interface ChartLaneSegment {
+  start: string;
+  end: string;
+  tone: ChartTone;
+  /** What the span is ("Inverted"): the hover title, the key and the screen-reader list. */
+  label?: string;
+}
+
+/** A thin strip under the x axis: a state over time (one lane per row). */
+export interface ChartLane {
+  /** Stable key. */
+  id: string;
+  /** The row's name ("Yield curve"), written above its strip. */
+  label: string;
+  segments: readonly ChartLaneSegment[];
 }
 
 /** Marker key: a shape and a letter per kind, so colour is never the only key. */
@@ -85,16 +124,22 @@ export function inWindow<T extends { time: string }>(points: readonly T[], start
   return start === null ? [...points] : points.filter((p) => p.time >= start);
 }
 
-/** An event on a non-trading day sits on the next day with data (or the last one). */
+/** An event on a non-trading day (or in a gap) sits on the next day with a value (or the last one). */
 export function snapToData(time: string, points: readonly ChartPoint[]): string | undefined {
-  return (points.find((p) => p.time >= time) ?? points.at(-1))?.time;
+  const valued = points.filter((p) => p.value !== null);
+  return (valued.find((p) => p.time >= time) ?? valued.at(-1))?.time;
 }
 
 /** Each value as a multiple of the first one, x 100. */
 export function rebased(points: readonly ChartPoint[]): ChartPoint[] {
-  const base = points.find((p) => Number.isFinite(p.value) && p.value !== 0)?.value;
-  if (base === undefined) return [];
-  return points.map((p) => ({ time: p.time, value: (p.value / base) * 100 }));
+  const base = points.find(
+    (p) => p.value !== null && Number.isFinite(p.value) && p.value !== 0,
+  )?.value;
+  if (base === undefined || base === null) return [];
+  return points.map((p) => ({
+    time: p.time,
+    value: p.value === null ? null : (p.value / base) * 100,
+  }));
 }
 
 export interface PreparedSeries extends ChartSeries {
@@ -105,6 +150,8 @@ export interface PreparedChart {
   series: PreparedSeries[];
   events: ChartEvent[];
   bands: ChartBand[];
+  referenceLines: ChartReferenceLine[];
+  lanes: ChartLane[];
   volume: ChartPoint[];
   start: string | null;
   end: string | null;
@@ -118,6 +165,8 @@ export function prepare(
     rebase: boolean;
     events?: readonly ChartEvent[];
     bands?: readonly ChartBand[];
+    referenceLines?: readonly ChartReferenceLine[];
+    lanes?: readonly ChartLane[];
     volume?: readonly ChartPoint[];
   },
 ): PreparedChart {
@@ -135,21 +184,26 @@ export function prepare(
   const first = times[0] ?? null;
   const end = times.at(-1) ?? null;
   return {
-    series: prepared.filter((s) => s.points.length > 0),
+    series: prepared.filter((s) => s.points.some((p) => p.value !== null)),
     events: inWindow(options.events ?? [], start).filter((e) => last === null || e.time <= last),
     bands: clampBands(options.bands ?? [], first, end),
+    referenceLines: (options.referenceLines ?? []).filter((l) => Number.isFinite(l.value)),
+    lanes: (options.lanes ?? []).map((lane) => ({
+      ...lane,
+      segments: clampBands(lane.segments, first, end),
+    })),
     volume: inWindow(options.volume ?? [], start),
     start: first,
     end,
   };
 }
 
-/** The bands that overlap the window, cut to its first and last day, oldest first. */
-export function clampBands(
-  bands: readonly ChartBand[],
+/** The spans (bands, lane segments) that overlap the window, cut to its first and last day, oldest first. */
+export function clampBands<T extends { start: string; end: string }>(
+  bands: readonly T[],
   first: string | null,
   last: string | null,
-): ChartBand[] {
+): T[] {
   if (first === null || last === null) return [];
   return bands
     .filter((b) => b.start <= b.end && b.end >= first && b.start <= last)
@@ -166,7 +220,7 @@ export function clampBands(
  * sessions inside it), or undefined when it holds no session.
  */
 export function bandSpan(
-  band: ChartBand,
+  band: { start: string; end: string },
   points: readonly ChartPoint[],
 ): { from: string; to: string } | undefined {
   const inside = points.filter((p) => p.time >= band.start && p.time <= band.end);
@@ -190,10 +244,12 @@ export function describeChart(
     `${label}${options.rebase ? ', rebased to 100' : ''}, ${date(chart.start)} to ${date(chart.end)}`,
   ];
   for (const s of chart.series) {
-    const first = s.points[0];
-    const last = s.points.at(-1);
+    // Gaps (null) are skipped: the first and last value, and the extremes, are of what is drawn.
+    const known = s.points.filter((p): p is { time: string; value: number } => p.value !== null);
+    const first = known[0];
+    const last = known.at(-1);
     if (!first || !last) continue;
-    const values = s.points.map((p) => p.value);
+    const values = known.map((p) => p.value);
     const change = formatValue(last.value / first.value - 1, { kind: 'delta', unit: 'percent' });
     parts.push(
       `${s.label} ${value(first.value)} to ${value(last.value)} (${change.text}), low ${value(Math.min(...values))}, high ${value(Math.max(...values))}`,
@@ -211,6 +267,15 @@ export function describeChart(
       `${String(chart.bands.length)} shaded ${chart.bands.length === 1 ? 'period' : 'periods'}`,
     );
   }
+  if (chart.referenceLines.length > 0) {
+    const lines = chart.referenceLines.map((l) =>
+      [l.label, value(l.value)].filter(Boolean).join(' '),
+    );
+    parts.push(`reference lines: ${lines.join(', ')}`);
+  }
+  if (chart.lanes.length > 0) {
+    parts.push(`lanes under the axis: ${chart.lanes.map((l) => l.label).join(', ')}`);
+  }
   return `${parts.join('; ')}.`;
 }
 
@@ -222,6 +287,8 @@ export interface ChartTableRow {
   events: string;
   /** Labels of the bands covering the day, joined. */
   shaded: string;
+  /** Per lane id: the label of the segment covering the day ("" when none). */
+  lanes: Record<string, string>;
 }
 
 /** Newest first, every day any series has a value. */
@@ -230,14 +297,15 @@ export function tableRows(chart: PreparedChart): ChartTableRow[] {
   const row = (time: string) => {
     let found = byTime.get(time);
     if (!found) {
-      found = { time, values: {}, volume: undefined, events: '', shaded: '' };
+      found = { time, values: {}, volume: undefined, events: '', shaded: '', lanes: {} };
       byTime.set(time, found);
     }
     return found;
   };
-  for (const s of chart.series) for (const p of s.points) row(p.time).values[s.id] = p.value;
+  for (const s of chart.series)
+    for (const p of s.points) row(p.time).values[s.id] = p.value ?? undefined;
   for (const v of chart.volume) {
-    if (byTime.has(v.time)) row(v.time).volume = v.value;
+    if (byTime.has(v.time)) row(v.time).volume = v.value ?? undefined;
   }
   for (const e of chart.events) {
     const r = row(e.time);
@@ -249,6 +317,13 @@ export function tableRows(chart: PreparedChart): ChartTableRow[] {
       .filter((b) => r.time >= b.start && r.time <= b.end)
       .map((b) => b.label)
       .join('; ');
+    for (const lane of chart.lanes) {
+      r.lanes[lane.id] = lane.segments
+        .filter((g) => r.time >= g.start && r.time <= g.end)
+        .map((g) => g.label ?? '')
+        .filter(Boolean)
+        .join('; ');
+    }
   }
   return [...byTime.values()].sort((a, b) => (a.time < b.time ? 1 : -1));
 }

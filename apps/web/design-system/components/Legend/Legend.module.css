@@ -49,6 +49,23 @@
   background: var(--tone-tint);
 }
 
+.swatch[data-swatch='hatch'] {
+  position: relative;
+  overflow: hidden;
+  border-color: var(--tone-border);
+  background: transparent;
+}
+
+.hatch {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: var(--tone-fill);
+  stroke-width: 1.5;
+}
+
 .swatch[data-tone='empty'] {
   border-color: var(--color-border);
 }
