@@ -2,8 +2,9 @@
  * Chart: THE time-series chart (price history, rebased comparisons, a feature over time), one
  * wrapper around lightweight-charts, which stays inside this folder. Lines (or one area) in the
  * series colours s1-s6, optionally rebased to 100 at the start of the window; event markers
- * (ex-dividend, split, earnings) with a shape and letter each plus a key; an optional volume pane;
- * a crosshair read-out with tabular values (formatValue). The caller owns the time window
+ * (ex-dividend, split, earnings) with a shape and letter each plus a key; optional shaded bands
+ * (spans of days in a status tint behind the lines: regimes, drawdowns, recessions), named in a
+ * key and in a text list for assistive technology; an optional volume pane; a crosshair read-out with tabular values (formatValue). The caller owns the time window
  * (`range`, usually a SegmentedControl passed as `toolbar`). Resizes with its container, redraws
  * in the active theme's tokens when the theme changes, and has no animation (scroll / zoom
  * off). Accessible: an image with a generated text summary, and a "View as table" switch that
@@ -16,6 +17,7 @@ import { Button } from '../Button';
 import { DataTable, type DataTableColumn } from '../DataTable';
 import { EmptyState } from '../EmptyState';
 import { ErrorState } from '../ErrorState';
+import { VisuallyHidden } from '../../primitives/VisuallyHidden';
 import { Skeleton } from '../Skeleton';
 import styles from './Chart.module.css';
 import {
@@ -23,6 +25,7 @@ import {
   prepare,
   snapToData,
   tableRows,
+  type ChartBand,
   type ChartEvent,
   type ChartPoint,
   type ChartRange,
@@ -47,6 +50,13 @@ export interface ChartProps {
   rebase?: boolean;
   /** Ex-dividend, split and earnings markers on the first series. */
   events?: readonly ChartEvent[];
+  /**
+   * Shaded spans of days behind the series, in the price pane: a start and end day, a status
+   * tone and a label. Their labels are listed for screen readers and keyed under the chart.
+   */
+  bands?: readonly ChartBand[];
+  /** Show the bands in the key (default true; the hidden list for screen readers stays). */
+  bandKey?: boolean;
   /** Daily volume in a pane under the price. */
   volume?: readonly ChartPoint[];
   /** How values read on the axis, read-out and table (default currency; rebased: 1 decimal). */
@@ -70,6 +80,8 @@ function byDay(points: readonly ChartPoint[]): Map<string, number> {
   return new Map(points.map((p) => [p.time, p.value]));
 }
 
+const dateText = (day: string) => formatValue(day, { kind: 'date', style: 'short' }).text;
+
 /** Volume is a count of shares: compact (800M), whatever the price format is. */
 const VOLUME_FORMAT = { kind: 'compact' } as const satisfies ValueFormat;
 
@@ -80,6 +92,8 @@ export function Chart({
   range = 'All',
   rebase = false,
   events,
+  bands,
+  bandKey = true,
   volume,
   format,
   height = 'md',
@@ -98,9 +112,10 @@ export function Chart({
         range,
         rebase,
         ...(events ? { events } : {}),
+        ...(bands ? { bands } : {}),
         ...(volume ? { volume } : {}),
       }),
-    [series, range, rebase, events, volume],
+    [series, range, rebase, events, bands, volume],
   );
   const summary = describeChart(label, chart, { rebase, format: valueFormat });
   const [view, setView] = useState<'chart' | 'table'>('chart');
@@ -155,6 +170,7 @@ export function Chart({
           type,
           series: chart.series,
           events: chart.events,
+          bands: chart.bands,
           volume: chart.volume,
           rebase,
           formatValue: (v) => formatValue(v, axisFormat).text,
@@ -214,6 +230,16 @@ export function Chart({
           },
         ]
       : []),
+    ...(chart.bands.length > 0
+      ? [
+          {
+            id: 'shaded',
+            header: 'Shaded',
+            value: (r: ChartTableRow) => r.shaded,
+            width: 'md' as const,
+          },
+        ]
+      : []),
     ...(chart.events.length > 0
       ? [
           {
@@ -230,7 +256,7 @@ export function Chart({
   return (
     <div className={styles.root}>
       <div className={styles.bar}>
-        <ChartLegend chart={chart} />
+        <ChartLegend chart={chart} bandKey={bandKey} />
         <div className={styles.tools}>
           {toolbar}
           {tableView && (
@@ -247,6 +273,17 @@ export function Chart({
           )}
         </div>
       </div>
+      {view === 'chart' && chart.bands.length > 0 && (
+        <VisuallyHidden as="div">
+          <ul aria-label={`${label}: shaded periods`}>
+            {chart.bands.map((b) => (
+              <li key={`${b.start}-${b.label}`}>
+                {`${b.label}: ${dateText(b.start)} to ${dateText(b.end)}`}
+              </li>
+            ))}
+          </ul>
+        </VisuallyHidden>
+      )}
       {view === 'chart' ? (
         <div className={styles.plot} data-height={height} data-ready={ready || undefined}>
           {/* The text alternative: an image over the canvas (the canvas host holds the library's

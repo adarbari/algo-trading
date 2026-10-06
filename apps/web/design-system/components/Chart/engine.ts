@@ -1,9 +1,9 @@
 /**
  * The chart engine: the ONLY module that touches lightweight-charts (TradingView, Apache-2.0;
  * the lint boundary allows the import only under components/Chart). Draws prepared series as
- * lines or an area, event markers (shape + letter per kind), a dashed 100 line when rebased and
- * an optional volume pane, in the colours and font read from the tokens; reports the crosshair
- * position. A theme or data change redraws from scratch (cheap at daily resolution) instead of
+ * lines or an area, event markers (shape + letter per kind), a dashed 100 line when rebased,
+ * shaded bands behind the lines (bands.ts, a series primitive) and an optional volume pane, in the
+ * colours and font read from the tokens; reports the crosshair position. A theme or data change redraws from scratch (cheap at daily resolution) instead of
  * patching options. Scrolling and zooming are off: the caller's range control sets the window.
  */
 import {
@@ -22,9 +22,11 @@ import {
 } from 'lightweight-charts';
 
 import type { Series } from '../../tokens';
+import { bandsPrimitive, type BandColours } from './bands';
 import {
   EVENT_KINDS,
   snapToData,
+  type ChartBand,
   type ChartEvent,
   type ChartEventKind,
   type ChartPoint,
@@ -44,6 +46,8 @@ export interface EngineTheme {
   track: string;
   fontFamily: string;
   fontSize: number;
+  /** Flat tints of the shaded bands, by tone. */
+  bands: BandColours;
   series: Record<Series, string>;
 }
 
@@ -51,6 +55,8 @@ export interface EngineInput {
   type: 'line' | 'area';
   series: readonly PreparedSeries[];
   events: readonly ChartEvent[];
+  /** Shaded spans behind the series, in the price pane. */
+  bands: readonly ChartBand[];
   volume: readonly ChartPoint[];
   /** Draw the dashed reference line at 100. */
   rebase: boolean;
@@ -154,6 +160,9 @@ export function drawChart(
       lineStyle: LineStyle.Dashed,
       axisLabelVisible: false,
     });
+  }
+  if (first && input.bands.length > 0) {
+    first.attachPrimitive(bandsPrimitive(input.bands, firstPoints, theme.bands));
   }
   if (first && input.events.length > 0) {
     const markers = input.events

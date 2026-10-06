@@ -5,7 +5,7 @@ import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { SegmentedControl } from '../SegmentedControl';
 import { Chart, type ChartProps } from './Chart';
 import { CHART_RANGES, type ChartRange } from './chartData';
-import { aapl, aaplEvents, aaplVolume, msft, nvda } from './storyData';
+import { aapl, aaplEvents, aaplVolume, msft, nvda, sampleBands } from './storyData';
 
 /** The chart with the caller's range control, as screens use it. */
 function WithRange(props: ChartProps) {
@@ -69,6 +69,12 @@ export const WithLargeVolume: Story = {
     height: 'lg',
   },
 };
+
+/**
+ * With bands: shaded spans behind the line (a market regime, a drawdown), keyed under the chart
+ * and listed for screen readers. Two bands touch on 20 / 21 Feb. Sample data.
+ */
+export const WithBands: Story = { args: { bands: sampleBands, events: aaplEvents } };
 
 /** The table fallback: the same numbers in a DataTable. */
 export const TableView: Story = {

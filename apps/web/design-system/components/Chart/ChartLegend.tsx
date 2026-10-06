@@ -1,7 +1,8 @@
 /**
  * The chart's key: one line swatch per series (Legend) and, when events are drawn, one marker
  * glyph per event kind with its letter and name, the same shapes the canvas draws (circle,
- * square, arrow), so neither series nor events rely on colour alone.
+ * square, arrow), so neither series nor events rely on colour alone; and, with `bandKey`, one
+ * tinted cell per distinct shaded band (tone and label).
  */
 import { Legend } from '../Legend';
 import { EVENT_KINDS, type ChartEventKind, type PreparedChart } from './chartData';
@@ -17,9 +18,12 @@ function Glyph({ kind }: { kind: ChartEventKind }) {
   );
 }
 
-export function ChartLegend({ chart }: { chart: PreparedChart }) {
+export function ChartLegend({ chart, bandKey }: { chart: PreparedChart; bandKey: boolean }) {
   const kinds = (Object.keys(EVENT_KINDS) as ChartEventKind[]).filter((kind) =>
     chart.events.some((e) => e.kind === kind),
+  );
+  const bands = chart.bands.filter(
+    (b, i) => chart.bands.findIndex((o) => o.label === b.label && o.tone === b.tone) === i,
   );
   return (
     <div className={styles.legend}>
@@ -29,6 +33,14 @@ export function ChartLegend({ chart }: { chart: PreparedChart }) {
         label="Series"
         items={chart.series.map((s) => ({ id: s.id, label: s.label, tone: s.tone }))}
       />
+      {bandKey && bands.length > 0 && (
+        <Legend
+          swatch="cell"
+          size="xs"
+          label="Shaded periods"
+          items={bands.map((b) => ({ id: `${b.tone}-${b.label}`, label: b.label, tone: b.tone }))}
+        />
+      )}
       {kinds.length > 0 && (
         <ul className={styles.events} aria-label="Event markers">
           {kinds.map((kind) => (

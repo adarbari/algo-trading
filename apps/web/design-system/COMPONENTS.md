@@ -228,7 +228,7 @@ Source: `design-system/components/Button`
 
 ### Chart
 
-Chart: THE time-series chart (price history, rebased comparisons, a feature over time), one wrapper around lightweight-charts, which stays inside this folder. Lines (or one area) in the series colours s1-s6, optionally rebased to 100 at the start of the window; event markers (ex-dividend, split, earnings) with a shape and letter each plus a key; an optional volume pane; a crosshair read-out with tabular values (formatValue). The caller owns the time window (`range`, usually a SegmentedControl passed as `toolbar`). Resizes with its container, redraws in the active theme's tokens when the theme changes, and has no animation (scroll / zoom off). Accessible: an image with a generated text summary, and a "View as table" switch that shows the same numbers in a DataTable. Loading, empty and error states.
+Chart: THE time-series chart (price history, rebased comparisons, a feature over time), one wrapper around lightweight-charts, which stays inside this folder. Lines (or one area) in the series colours s1-s6, optionally rebased to 100 at the start of the window; event markers (ex-dividend, split, earnings) with a shape and letter each plus a key; optional shaded bands (spans of days in a status tint behind the lines: regimes, drawdowns, recessions), named in a key and in a text list for assistive technology; an optional volume pane; a crosshair read-out with tabular values (formatValue). The caller owns the time window (`range`, usually a SegmentedControl passed as `toolbar`). Resizes with its container, redraws in the active theme's tokens when the theme changes, and has no animation (scroll / zoom off). Accessible: an image with a generated text summary, and a "View as table" switch that shows the same numbers in a DataTable. Loading, empty and error states.
 
 Source: `design-system/components/Chart`
 
@@ -240,6 +240,8 @@ Source: `design-system/components/Chart`
 | `range` | `ChartRange` | no | The time window, counted back from the latest point: 3M, 1Y, 2Y or All (default). |
 | `rebase` | `boolean` | no | Show each series as 100 x value / first value in the window (compare performance). |
 | `events` | `readonly ChartEvent[]` | no | Ex-dividend, split and earnings markers on the first series. |
+| `bands` | `readonly ChartBand[]` | no | Shaded spans of days behind the series, in the price pane: a start and end day, a status tone and a label. Their labels are listed for screen readers and keyed under the chart. |
+| `bandKey` | `boolean` | no | Show the bands in the key (default true; the hidden list for screen readers stays). |
 | `volume` | `readonly ChartPoint[]` | no | Daily volume in a pane under the price. |
 | `format` | `ValueFormat` | no | How values read on the axis, read-out and table (default currency; rebased: 1 decimal). |
 | `height` | `'sm' \| 'md' \| 'lg'` | no | Plot height: `sm` 160 px, `md` 240 px (default), `lg` 320 px. |
@@ -523,6 +525,30 @@ Source: `design-system/components/IconButton`
 | `tabIndex` | `0 \| -1` | no | -1 keeps it out of the tab order (a control reachable another way, e.g. Escape). |
 | `ref` | `Ref<HTMLButtonElement>` | no |  |
 
+### IndicatorRow
+
+IndicatorRow: one row of an indicator list: a status (a StatusBadge, or a dot for a dense list) with its text, a plain-language name with the technical name muted beside it, a one-line description, and the current value with its unit at the right, plus an optional "changed" marker (up, down or new; its words are for screen readers). Given children it becomes an expandable row built on Disclosure: the whole header is one button that toggles the detail (why it matters, what it did before, links). Without children it is a plain row. Put rows in a list element of the caller's; compact and comfortable follow the density tokens.
+
+Source: `design-system/components/IndicatorRow`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `status` | `IndicatorStatus` | yes | The state of the indicator. |
+| `indicator` | `'badge' \| 'dot'` | no | `badge` (default, the state as a StatusBadge) or `dot` (a dense list: a dot, the state read aloud). |
+| `name` | `string` | yes | The plain-language name ("Are banks still lending?"). |
+| `technicalName` | `string` | no | The technical name, muted beside the plain one ("Senior loan officer survey"). |
+| `description` | `ReactNode` | no | One line on what it measures. |
+| `value` | `number \| string \| null` | no | The current value; `null` shows an em dash, omitted shows no value. |
+| `unit` | `string` | no | The unit after the value ("bp", "pts", "%"). |
+| `format` | `ValueFormat` | no | How a numeric value reads (default `text`: as given). |
+| `changed` | `IndicatorChange` | no | The change marker. |
+| `changedLabel` | `string` | no | What the marker says to a screen reader (default "Increased", "Decreased" or "New"). |
+| `children` | `ReactNode` | no | The detail shown when expanded; without it the row is not expandable. |
+| `open` | `boolean` | no | Controlled open state (pair with `onOpenChange`). |
+| `defaultOpen` | `boolean` | no | Initial open state when uncontrolled. |
+| `onOpenChange` | `(open: boolean) => void` | no |  |
+| `loading` | `boolean` | no | Placeholder while the row loads. |
+
 ### Input
 
 Input: a single-line text box at the density's control height, with optional `start` / `end` adornments (an icon, a unit, a clear button). Inside a Field it is labelled, described and marked invalid automatically; outside one, give `aria-label`. SearchInput, NumberInput and Combobox are built on it.
@@ -692,6 +718,27 @@ Source: `design-system/components/Popover`
 | `padding` | `'default' \| 'none'` | no | Inner padding: `default` or `none` (a list that draws its own rows). |
 | `trapFocus` | `boolean` | no | Keep keyboard focus inside the panel while it is open (a small form). |
 | `children` | `ReactNode` | yes |  |
+
+### ScoreMeter
+
+ScoreMeter: a horizontal meter for one score on a bounded scale (0-100 by default): a filled track with a marker at the value, optional threshold ticks with their labels under the track ("50 caution", "75 stress"), and a tone taken from the band the value sits in (the status tones of StatusBadge). The band's label is written next to the value, so colour is never the only signal. Exposed as a meter (`role="meter"`) whose text names the band; an unknown score draws a dashed empty track with the reason as text (an image named "<label>: unknown").
+
+Source: `design-system/components/ScoreMeter`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `value` | `number \| null \| undefined` | yes | The score. `null` / `undefined` = unknown: a dashed empty track and `unknownReason`. |
+| `min` | `number` | no | Scale start (default 0). |
+| `max` | `number` | no | Scale end (default 100). |
+| `thresholds` | `readonly ScoreThreshold[]` | no | Band starts, in any order: the value takes the tone of the last threshold it has reached. |
+| `baseTone` | `DataTone` | no | Tone below the first threshold, and for a meter without thresholds (default `accent`). |
+| `baseLabel` | `string` | no | Name of the band below the first threshold ("calm"); without it that band has no text. |
+| `label` | `string` | yes | Name of the score ("Slow-warning score"): shown above the track, names the meter. |
+| `caption` | `ReactNode` | no | A line under the meter: what the score means, or when it changed. |
+| `unknownReason` | `string` | no | Why there is no score ("No macro data for 2 Oct"). Shown instead of the value. |
+| `format` | `ValueFormat` | no | How the value reads (default a whole number). |
+| `size` | `'sm' \| 'md'` | no | Track thickness: `sm` 6 px (lists, default) or `md` 10 px (a headline meter). |
+| `loading` | `boolean` | no | Placeholder while the score loads. |
 
 ### SearchInput
 
