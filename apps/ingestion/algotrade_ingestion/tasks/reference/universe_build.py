@@ -65,6 +65,9 @@ from algotrade_sources.framework.base import DirectorySource, FetchRequest, Sour
 TASK = "universe_build"
 HISTORY = "instruments/symbol_history"
 REFERENCE = "instruments/reference"
+# Massive types preferreds, notes and rights as CS / OS / LT too, so these say nothing about
+# being common. The ADR name rule ("ADS" in "ADS-TEC ENERGY") is too loose to override them.
+GENERIC_VENDOR_TYPES = frozenset({"COMMON_STOCK"})
 SP500_TRACKED = 100  # a previous snapshot with fewer members is not a real index list
 SP500_MIN_SHARE = 0.9  # fewer than this share of the last snapshot's members is a bad file
 SP500_MAX_CHANGE = 12  # more members than this joining or leaving in one day is a bad file
@@ -138,7 +141,8 @@ def build_reference(
 def apply_identifiers(
     reference: pd.DataFrame, tickers: pd.DataFrame | None
 ) -> tuple[pd.DataFrame, int]:
-    """Add FIGI / CIK and prefer the vendor's security type over our name rules.
+    """Add FIGI / CIK and prefer the vendor's security type over our name rules, except a
+    generic one (``GENERIC_VENDOR_TYPES``), which a more specific name rule overrides.
 
     -> (reference, rows where the vendor type disagreed with the name rules)."""
     if tickers is None or tickers.empty:
@@ -151,9 +155,14 @@ def apply_identifiers(
         ), 0
     merged = reference.merge(tickers, on="symbol", how="left")
     vendor = merged["vendor_security_type"]
-    disagree = int((vendor.notna() & vendor.ne(merged["security_type"])).sum())
-    merged["security_type_source"] = vendor.notna().map({True: "vendor", False: "name_rule"})
-    merged["security_type"] = vendor.where(vendor.notna(), merged["security_type"])
+    named = merged["security_type"]
+    disagree = int((vendor.notna() & vendor.ne(named)).sum())
+    # A generic vendor type (Massive CS / OS / LT: ~90 preferreds and notes are typed "CS")
+    # yields to a more specific name-rule result; a specific vendor type still wins (ADR 0045).
+    yields = vendor.isin(GENERIC_VENDOR_TYPES) & named.ne(vendor) & named.ne("ADR")
+    source = vendor.notna().map({True: "vendor", False: "name_rule"})
+    merged["security_type_source"] = source.mask(yields, "name_over_vendor")
+    merged["security_type"] = named.where(yields | vendor.isna(), vendor)
     return merged.drop(columns=["vendor_security_type"]), disagree
 
 

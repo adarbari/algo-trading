@@ -43,6 +43,7 @@ from algotrade_ingestion.tasks.maintenance.quality import (
     check_bars_resolved,
     check_chains,
     check_earnings,
+    check_reference_classification,
     check_universe,
     check_verification,
 )
@@ -83,7 +84,12 @@ def universe_exists(ctx: TaskContext, session: date) -> str | None:
 
 
 NIGHTLY: tuple[Step, ...] = (
-    Step("universe-build", latest_only=True, accept=(check_universe,), task_complete=True),
+    Step(
+        "universe-build",
+        latest_only=True,
+        accept=(check_universe, check_reference_classification),
+        task_complete=True,
+    ),
     # Reference data (ADR 0039: moves to the weekly `reference` workflow in WF4): optional.
     Step("company-details", latest_only=True, critical=False),
     Step("shares", latest_only=True, critical=False),

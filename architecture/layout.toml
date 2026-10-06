@@ -481,6 +481,10 @@ purpose = "the nightly workflow: sessions, steps, screens, the summary report an
 # --------------------------------------------------------------------------- shared helpers
 
 [[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/reference/classify.py"
+reason = "the name rules of the security type: the universe build applies them, and `reference_classification` (ADR 0045) re-applies them to measure disagreement with the vendor"
+
+[[shared]]
 module = "apps/ingestion/algotrade_ingestion/tasks/reference/instrument_ids.py"
 reason = "the ingestion id rule (ADR 0018, `id-resolution`): golden and migrate-ids reuse it"
 

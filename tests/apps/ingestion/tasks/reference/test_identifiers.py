@@ -76,6 +76,51 @@ def test_vendor_type_wins_and_disagreements_are_counted() -> None:
     assert none == 0 and plain["figi"].isna().all()
 
 
+def type_after_precedence(name: str, vendor: str, is_etf: bool = False) -> tuple[str, str]:
+    from algotrade_ingestion.tasks.reference.classify import security_type  # noqa: PLC0415
+
+    reference = pd.DataFrame({"symbol": ["X"], "security_type": [security_type(name, "X", is_etf)]})
+    enriched, _ = apply_identifiers(reference, parse_tickers([ticker("X", vendor, "F1")]))
+    row = enriched.iloc[0]
+    return row["security_type"], row["security_type_source"]
+
+
+def test_a_generic_vendor_type_yields_to_a_specific_name_rule() -> None:
+    adamg = "Adamas Trust, Inc. - 9.125% Senior Notes Due 2030"
+    acgln = "Arch Capital Group Ltd. - Depositary Shares, each Representing a 1/1,000th "
+    acgln += "Interest in a 4.550% Non-Cumulative Preferred Share, Series G"
+    adaml = "Adamas Trust, Inc. - 6.875% Series F Cumulative Redeemable Preferred Stock"
+    assert type_after_precedence(adamg, "CS") == ("NOTE", "name_over_vendor")
+    assert type_after_precedence(acgln, "CS") == ("PREFERRED", "name_over_vendor")
+    assert type_after_precedence(adaml, "OS") == ("PREFERRED", "name_over_vendor")
+
+
+def test_operating_companies_adrs_and_spacs_keep_their_type() -> None:
+    assert type_after_precedence("Acme Corp. - Common Stock", "CS") == ("COMMON_STOCK", "vendor")
+    adr = "Toyota Motor Corp American Depositary Shares"
+    assert type_after_precedence(adr, "ADRC") == ("ADR", "vendor")
+    spac = "Harvard Ave Acquisition Corporation - Class A Ordinary Shares"
+    assert type_after_precedence(spac, "CS") == ("COMMON_STOCK", "vendor")
+    # the ADR name rule is loose ("ADS-TEC"): it does not override a generic vendor type
+    assert type_after_precedence("ADS-TEC ENERGY PLC - Ordinary Shares", "CS") == (
+        "COMMON_STOCK",
+        "vendor",
+    )
+
+
+def test_banks_named_preferred_and_common_ordinary_shares_are_not_preferred() -> None:
+    assert type_after_precedence("Preferred Bank - Common Stock", "CS") == (
+        "COMMON_STOCK",
+        "vendor",
+    )
+    bns = "Bank of Nova Scotia Pfd 3 Ordinary Shares"
+    assert type_after_precedence(bns, "CS") == ("COMMON_STOCK", "vendor")
+
+
+def test_a_specific_vendor_type_beats_the_name_rules() -> None:
+    assert type_after_precedence("Acme Income Fund Preferred", "FUND") == ("CEF", "vendor")
+
+
 def test_symbol_history_tracks_ticker_changes() -> None:
     day1 = pd.DataFrame(
         {"symbol": ["FB", "AAPL", "OLD"], "figi": ["F_META", "F_AAPL", "F_OLD"], "status": "ACTIVE"}
