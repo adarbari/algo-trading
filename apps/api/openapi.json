@@ -35,6 +35,24 @@
         "title": "CheckBody",
         "type": "object"
       },
+      "Citation": {
+        "properties": {
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "url"
+        ],
+        "title": "Citation",
+        "type": "object"
+      },
       "CopyBody": {
         "properties": {
           "preset": {
@@ -195,6 +213,38 @@
           "reason"
         ],
         "title": "DroppedCriterion",
+        "type": "object"
+      },
+      "ExplainBody": {
+        "properties": {
+          "card": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "a regime card's key",
+            "title": "Card"
+          },
+          "question": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "only \"what is happening?\"",
+            "title": "Question"
+          }
+        },
+        "title": "ExplainBody",
         "type": "object"
       },
       "ExpressionCheck": {
@@ -1100,6 +1150,54 @@
           "narrow_misses"
         ],
         "title": "PreviewSummary",
+        "type": "object"
+      },
+      "RegimeExplanation": {
+        "properties": {
+          "cached": {
+            "description": "read from the cache, not asked of the model",
+            "title": "Cached",
+            "type": "boolean"
+          },
+          "checked": {
+            "description": "every number in the text is one of the facts",
+            "title": "Checked",
+            "type": "boolean"
+          },
+          "citations": {
+            "description": "allowed links the explanation used",
+            "items": {
+              "$ref": "#/components/schemas/Citation"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "why the text is withheld, when it is",
+            "title": "Note"
+          },
+          "text": {
+            "description": "plain-text explanation; empty when checked is false",
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "citations",
+          "checked",
+          "note",
+          "cached"
+        ],
+        "title": "RegimeExplanation",
         "type": "object"
       },
       "RunRequest": {
@@ -2108,6 +2206,47 @@
         "summary": "Save View",
         "tags": [
           "ideas"
+        ]
+      }
+    },
+    "/regime/explain": {
+      "post": {
+        "operationId": "explain_regime_explain_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplainBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegimeExplanation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Explain",
+        "tags": [
+          "regime"
         ]
       }
     },

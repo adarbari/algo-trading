@@ -36,6 +36,10 @@ class ChatCompletions:
     extra: Mapping[str, Any] = field(default_factory=dict)  # provider fields sent as given
 
     @property
+    def name(self) -> str:
+        return self.model
+
+    @property
     def url(self) -> str:
         return self.base_url.rstrip("/") + COMPLETIONS
 

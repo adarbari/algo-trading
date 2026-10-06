@@ -9,6 +9,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { expectAccessible } from './a11y';
 import { mockApi } from './mock-api';
+import { EXPLANATION, mockExplain, mockRegimeComputed } from './regime-api';
 
 function collectErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -63,4 +64,30 @@ test('the top-bar chip says not computed and opens the Regime page; Ideas shows 
   await expect(page).toHaveURL(/\/regime$/);
   await expect(page.getByRole('link', { name: 'Regime' })).toHaveAttribute('aria-current', 'page');
   expect(errors).toEqual([]);
+});
+
+test('the explain button is hidden when no text model is configured', async ({ page }) => {
+  const errors = collectErrors(page);
+  await mockRegimeComputed(page);
+  await mockExplain(page, false);
+  await page.goto('/regime');
+  await expect(page.getByRole('heading', { level: 3, name: 'Clouds building' })).toBeVisible();
+  await expect(page.getByText('2 of 5 slow-moving warning signs are on.')).toBeVisible();
+  await expect(page.getByRole('button', { name: /plain words/ })).toHaveCount(0);
+  expect(errors.filter((e) => !e.includes('503'))).toEqual([]);
+});
+
+test('with a text model the button explains the regime, with its citation and footer', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await mockRegimeComputed(page);
+  await mockExplain(page, true);
+  await page.goto('/regime');
+  await page.getByRole('button', { name: 'Explain in plain words' }).click();
+  await expect(page.getByText(EXPLANATION.text)).toBeVisible();
+  await expect(page.getByRole('link', { name: /FRED: T10Y3M/ })).toBeVisible();
+  await expect(page.getByText(/it may be wrong/)).toBeVisible();
+  await expectAccessible(page);
+  expect(errors.filter((e) => !e.includes('400'))).toEqual([]);
 });

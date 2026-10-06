@@ -737,18 +737,41 @@ detect = [{ call = "load_ideas" }]
 
 [[responsibility]]
 id = "screen-drafting"
-description = "A rule screen drafted from a sentence (ADR 0041): the TextModel protocol, the prompt over the caller's catalogue (name, type, unit, description, category values), the phrasebook and the field guide (config/site/field_guide/*.toml: how to read a field, the criterion per intent, caveats, situations; no market data, results or credentials), strict parsing of the model's JSON, invented fields and rejected criteria dropped with a reason, the rest validated with resolve_rule_draft; the one OpenAI-compatible adapter (built by the source registry, the key only in a header) and the API's wiring of it from llm.toml; a draft the Builder loads, never a write, never a run"
-owner = [
-    "src/algotrade/services/drafting/*",
-    "libs/sources/algotrade_sources/llm/*",
-    "apps/api/algotrade_api/drafting.py",
-]
+description = "A rule screen drafted from a sentence (ADR 0041): the prompt over the caller's catalogue (name, type, unit, description, category values), the phrasebook and the field guide (config/site/field_guide/*.toml: how to read a field, the criterion per intent, caveats, situations; no market data, results or credentials), strict parsing of the model's JSON, invented fields and rejected criteria dropped with a reason, the rest validated with resolve_rule_draft; a draft the Builder loads, never a write, never a run"
+owner = ["src/algotrade/services/drafting/*"]
 allowed = [
-    "libs/sources/algotrade_sources/framework/registry.py",  # builds the adapter, as every vendor client (source-construction)
     "apps/api/algotrade_api/routes/drafting/*",  # the thin route calls the one use case
 ]
 section = "docs/adr/0041-natural-language-screener-drafts.md#decision"
-detect = [{ call = "draft_screen" }, { call = "ChatCompletions" }, { call = "build_text_model" }, { string = "chat/completions" }]
+detect = [{ call = "draft_screen" }]
+
+[[responsibility]]
+id = "text-model-seam"
+description = "The text model both on-demand text features are asked through (ADR 0041, amended 2026-10-06): the TextModel protocol, the one OpenAI-compatible adapter (built by the source registry, the key only in a header) and the API's wiring of it from llm.toml (off by default; 503 with the reason when off or down)"
+owner = [
+    "src/algotrade/services/text_model/*",
+    "libs/sources/algotrade_sources/llm/*",
+    "apps/api/algotrade_api/text_model.py",
+]
+allowed = [
+    "libs/sources/algotrade_sources/framework/registry.py",  # builds the adapter, as every vendor client (source-construction)
+]
+section = "docs/adr/0041-natural-language-screener-drafts.md#amended-2026-10-06-the-text-model-seam"
+detect = [{ call = "ChatCompletions" }, { call = "build_text_model" }, { string = "chat/completions" }]
+
+[[responsibility]]
+id = "regime-explaining"
+description = "The market regime explained in plain words on request (ADR 0041, amended 2026-10-06): the prompt of the regime's facts and the allowed links (no market data beyond them, no user data, no credentials), the answer cleaned (links outside the list dropped, markdown removed) and number-checked against the facts, the explanation cache keyed by session, signals, question and model (the API's one derived-cache write, ADR 0005 exception), and the per-user rate limit; nothing is asked of the model unasked"
+owner = [
+    "src/algotrade/services/explaining/*",
+    "src/algotrade/storage/backends/text_cache.py",
+]
+allowed = [
+    "apps/api/algotrade_api/routes/regime/*",  # the thin route calls the one use case
+    "src/algotrade/storage/factory.py",  # opens every backend from its URL
+]
+section = "docs/adr/0041-natural-language-screener-drafts.md#amended-2026-10-06-the-text-model-seam"
+detect = [{ call = "explain_regime" }, { call = "LocalTextCache" }, { call = "MemoryTextCache" }]
 
 [[responsibility]]
 id = "screen-preview"

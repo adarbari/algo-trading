@@ -13,6 +13,15 @@ vi.mock('@/entities/regime', async (importOriginal) => ({
   useRegime: hooks.useRegime,
 }));
 
+vi.mock('@/features/regime-explain', async () => {
+  const { Button } = await import('@algotrade/ui');
+  return {
+    ExplainRegime: ({ card }: { card?: string }) => (
+      <Button>{`Explain ${card ?? 'the regime'}`}</Button>
+    ),
+  };
+});
+
 beforeEach(() => {
   hooks.useRegime.mockReset();
 });
@@ -74,5 +83,15 @@ describe('RegimeIndicators', () => {
     hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(undefined, { isError: true }));
     rerender(<RegimeIndicators />);
     expect(screen.getByText('The warning signs failed to load.')).toBeVisible();
+  });
+
+  it('offers to explain each card when the regime is computed, and not when it is not', () => {
+    hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(regimeFixture()));
+    const { unmount } = render(<RegimeIndicators />);
+    expect(screen.getAllByRole('button', { name: /^Explain /, hidden: true })).toHaveLength(3);
+    unmount();
+    hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(unknownRegimeFixture()));
+    render(<RegimeIndicators />);
+    expect(screen.queryByRole('button', { name: /^Explain /, hidden: true })).toBeNull();
   });
 });

@@ -25,9 +25,11 @@ from algotrade.core.model.errors import (
     MissingDataError,
     ModelUnavailableError,
     PermissionDeniedError,
+    RateLimitedError,
 )
 from algotrade.services.authoring.scope import ConfigWriter, ConflictError, ScreenNotFoundError
-from algotrade.services.drafting.model import TextModel
+from algotrade.services.explaining.cache import open_text_cache
+from algotrade.services.explaining.limits import RateLimiter
 from algotrade.services.live.quotes import LiveQuotes
 from algotrade.services.ondemand.screens import OnDemandScreens, open_ondemand
 from algotrade.services.read.context import (
@@ -38,16 +40,17 @@ from algotrade.services.read.context import (
     open_context,
     open_stores,
 )
+from algotrade.services.text_model.model import TextModel
 from algotrade_api import __version__
 from algotrade_api.auth.local import LocalAuthenticator
 from algotrade_api.auth.mode import open_authenticator
 from algotrade_api.auth.protocol import Authenticator
 from algotrade_api.deps import ApiSettings, ReadStore, get_caller
-from algotrade_api.drafting import OFF as DRAFTING_OFF
-from algotrade_api.drafting import open_drafting
 from algotrade_api.graphql.schema import graphql_router
 from algotrade_api.live import no_live, open_live
 from algotrade_api.routes import PUBLIC_ROUTERS, ROUTERS
+from algotrade_api.text_model import OFF as TEXT_MODEL_OFF
+from algotrade_api.text_model import open_text_model
 from algotrade_api.web import web_router
 
 TITLE = "algotrade API"
@@ -73,6 +76,15 @@ def _unavailable(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 
+def _rate_limited(request: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, RateLimitedError)
+    return JSONResponse(
+        status_code=429,
+        content={"detail": str(exc)},
+        headers={"Retry-After": str(exc.retry_after_s)},
+    )
+
+
 def create_app(
     settings: ApiSettings,
     store: ReadStore | None = None,
@@ -80,14 +92,14 @@ def create_app(
     live: LiveQuotes | None = None,
     ondemand: OnDemandScreens | None = None,
     authenticator: Authenticator | None = None,
-    drafter: TextModel | None = None,
+    text_model: TextModel | None = None,
 ) -> FastAPI:
     """The API over ``store`` (default: the store and configs ``settings`` name); user
     configs are written through ``writer`` (default: the files under ``settings.config_dir``).
     ``live``: the live quotes (default: IB Gateway when ``settings.live``, else switched off).
     ``ondemand``: the on-request screen runner (default: over the store when ``settings.live``,
     the served app; else off: a request answers 400). ``authenticator``: who is calling
-    (default: ``settings.auth`` over the store's user registry; ADR 0040). ``drafter``: the
+    (default: ``settings.auth`` over the store's user registry; ADR 0040). ``text_model``: the
     text model behind screener drafts (default: the one ``config/site/llm.toml`` enables
     when ``settings.live``, else off: a request answers 503; ADR 0041)."""
 
@@ -122,10 +134,12 @@ def create_app(
     if authenticator is None:
         authenticator = open_authenticator(settings.auth, users, settings.user)
     app.state.authenticator = authenticator
-    drafter_off = DRAFTING_OFF
-    if drafter is None and settings.live:
-        drafter, drafter_off = open_drafting(app.state.store.configs)
-    app.state.drafter, app.state.drafter_off = drafter, drafter_off
+    text_model_off = TEXT_MODEL_OFF
+    if text_model is None and settings.live:
+        text_model, text_model_off = open_text_model(app.state.store.configs)
+    app.state.text_model, app.state.text_model_off = text_model, text_model_off
+    app.state.explain_cache = open_text_cache(settings.data_url)  # ADR 0041 (amended): derived
+    app.state.explain_limiter = RateLimiter()
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),
@@ -139,6 +153,7 @@ def create_app(
     app.add_exception_handler(ConfigurationError, _bad_request)
     app.add_exception_handler(PermissionDeniedError, _forbidden)
     app.add_exception_handler(ModelUnavailableError, _unavailable)
+    app.add_exception_handler(RateLimitedError, _rate_limited)
     for router in PUBLIC_ROUTERS:
         app.include_router(router)
     caller = [Depends(get_caller)]

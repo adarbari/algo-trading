@@ -161,7 +161,7 @@ branches from `main`. `architect` review after RG1a, RG1d, RG2a, RG3 and RG4. Re
 | RG3 | The macro group; regime expression features (with an `ncdf` built-in for the probit); the regime group; Pagan-Sossounov dating in `quant/turning_points.py`; the episode scorecard in `services/evaluation` | next |
 | RG4 | Overlays (`engines/overlays/`), `Decision.PAUSED`, `[regime]` config, with-versus-without evaluation | next |
 | RG5 | The embeddings (Ideas strip and paused section, results header, Explore and Backtests bands) and the full Regime page | next |
-| RG6 | On-demand explanation: the text-model seam (ADR 0041 amended), `services/explaining`, `POST /regime/explain`, its cache | next |
+| RG6 | On-demand explanation: the text-model seam (ADR 0041 amended), `services/explaining`, `POST /regime/explain`, its cache | **done** |
 
 ## Swing levels and momentum (SW): support, resistance and momentum from daily bars
 

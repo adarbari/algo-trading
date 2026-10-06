@@ -27,9 +27,18 @@ class MissingDataError(AlgoTradeError):
 
 
 class ModelUnavailableError(AlgoTradeError):
-    """The text model behind a screener draft (ADR 0041) cannot answer now: drafting is off in
-    the site settings, the provider refused or timed out, or its answer was not text. The
+    """The text model (ADR 0041: screener drafts, regime explanations) cannot answer now: it is
+    off in the site settings, the provider refused or timed out, or its answer was not text. The
     message says which; it never carries a credential."""
+
+
+class RateLimitedError(AlgoTradeError):
+    """The caller asked for something too often (an on-demand model call, ADR 0041): the API
+    answers 429 with ``retry_after_s`` as ``Retry-After``."""
+
+    def __init__(self, what: str, retry_after_s: int) -> None:
+        self.retry_after_s = retry_after_s
+        super().__init__(f"{what}: too many requests, try again in {retry_after_s} s")
 
 
 class PermissionDeniedError(AlgoTradeError):
