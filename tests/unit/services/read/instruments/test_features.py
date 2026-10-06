@@ -236,7 +236,7 @@ def _why(row: dict[str, object], applies: frozenset[str] = frozenset(), *rules: 
     return _absence(info, (PRICE_STATS,), row, ctx, "EQ:AAA", (applies, tuple(rules)))  # type: ignore[arg-type]
 
 
-NO_TRADE = (BAR_STATUS, frozenset(), frozenset({"NO_TRADE"}))
+NO_TRADE = (BAR_STATUS, frozenset(), frozenset({"NO_TRADE"}), PRICE_STATS)
 
 
 def test_an_explained_status_names_its_reason() -> None:
@@ -252,12 +252,20 @@ def test_a_status_that_explains_nothing_leaves_the_gap() -> None:
     assert unstatused.code is UnknownCode.NULL
 
 
+def test_an_explained_input_never_hides_a_gap_in_another_input() -> None:
+    elsewhere = (BAR_STATUS, frozenset(), frozenset({"NOT_ANNOUNCED"}), "rollups/x/earnings@v2")
+    gap = _why({BAR_STATUS: "NOT_ANNOUNCED"}, frozenset(), elsewhere)  # no price_stats row
+    assert (gap.code, gap.reason) == (UnknownCode.NO_ROW, None)
+    covered = _why({BAR_STATUS: "NOT_ANNOUNCED", STATS_ROW: "EQ:AAA"}, frozenset(), elsewhere)
+    assert covered.reason is NullReason.NOT_ANNOUNCED  # every input has its row: explained
+
+
 def test_absence_precedence_not_applicable_then_illiquid_then_explained() -> None:
-    thin = ("rollup.iv30@v1.iv30_status", frozenset({"WIDE_SPREADS"}), frozenset())
+    thin = ("rollup.iv30@v1.iv30_status", frozenset({"WIDE_SPREADS"}), frozenset(), IV_STATUS)
     row = {BAR_STATUS: "NO_TRADE", thin[0]: "WIDE_SPREADS", "instrument.optionable": False}
     assert _why(row, frozenset(), NO_TRADE, thin).code is UnknownCode.ILLIQUID
     assert _why(row, frozenset({"optionable"}), NO_TRADE, thin).code is UnknownCode.NOT_APPLICABLE
-    first = (BAR_STATUS, frozenset(), frozenset({"NO_TRADE", "FEW_BARS"}))
+    first = (BAR_STATUS, frozenset(), frozenset({"NO_TRADE", "FEW_BARS"}), PRICE_STATS)
     assert _why(row, frozenset(), first).reason is NullReason.NO_TRADE
 
 

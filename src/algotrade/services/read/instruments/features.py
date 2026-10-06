@@ -92,7 +92,7 @@ def _reason_fields(reasons: Reasons) -> list[str]:
     return [
         *([_OPTIONABLE] if "optionable" in applies else []),
         *([_SECURITY_TYPE, _SIC] if "operating_company" in applies else []),
-        *(field for field, _, _ in statuses),
+        *(field for field, _, _, _ in statuses),
     ]
 
 
@@ -147,7 +147,7 @@ def _not_applicable(
 def _illiquid(statuses: Sequence[StatusRule], row: Mapping[str, Any], iid: str, day: date) -> str:
     """Why an option feature is null for want of a tradeable chain (the status column), or
     ``""``."""
-    for field, thin, _ in statuses:
+    for field, thin, _, _ in statuses:
         status = to_scalar(row.get(field))
         if status in thin:
             return (
@@ -158,20 +158,31 @@ def _illiquid(statuses: Sequence[StatusRule], row: Mapping[str, Any], iid: str, 
 
 
 def _explained(
-    statuses: Sequence[StatusRule], row: Mapping[str, Any], iid: str, day: date
+    statuses: Sequence[StatusRule],
+    row: Mapping[str, Any],
+    rowless: Sequence[str],
+    iid: str,
+    day: date,
 ) -> Unknown | None:
     """The ``NullReason`` a status column gives for the null (the first that does), or
-    ``None``."""
-    for field, _, explained in statuses:
-        status = to_scalar(row.get(field))
-        if status in explained:
-            reason = NullReason(status)
-            detail = (
-                f"{field.rpartition('.')[2]} is {status} for {iid} on {day.isoformat()}: "
-                f"{_EXPLAINED[reason]}"
-            )
-            return Unknown(UnknownCode.EXPLAINED, detail, reason)
-    return None
+    ``None``. Only when the explaining statuses cover every table with no row for the
+    instrument: an expression's explained input never hides a real gap in another input
+    (``close / days_to_earnings`` with no ``price_stats`` row stays NO_ROW whatever the
+    earnings status says)."""
+    found = [
+        (field, str(status), table)
+        for field, _, explained, table in statuses
+        if (status := to_scalar(row.get(field))) in explained
+    ]
+    if not found or not set(rowless) <= {table for _, _, table in found}:
+        return None
+    field, status, _ = found[0]
+    reason = NullReason(status)
+    detail = (
+        f"{field.rpartition('.')[2]} is {status} for {iid} on {day.isoformat()}: "
+        f"{_EXPLAINED[reason]}"
+    )
+    return Unknown(UnknownCode.EXPLAINED, detail, reason)
 
 
 def _value(
@@ -215,14 +226,14 @@ def _absence(
     why = _illiquid(reasons[1], row, iid, day)
     if why:
         return Unknown(UnknownCode.ILLIQUID, why)
-    explained = _explained(reasons[1], row, iid, day)
-    if explained is not None:
-        return explained
     rowless = [
         t
         for t in tables
         if t.startswith(ROLLUP_TABLE_PREFIX) and to_scalar(row.get(_marker(t))) is None
     ]
+    explained = _explained(reasons[1], row, rowless, iid, day)
+    if explained is not None:
+        return explained
     if rowless:
         detail = f"{' / '.join(rowless)} has no row for {iid} on {day.isoformat()}"
         return Unknown(UnknownCode.NO_ROW, detail)

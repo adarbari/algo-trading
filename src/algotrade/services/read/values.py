@@ -15,9 +15,9 @@ import pandas as pd
 
 from algotrade.core.views.feature_view import FeatureValue
 from algotrade.features.framework.feature import NullReason
+from algotrade.storage.tables.schemas import COMMON
 
 __all__ = ["NullReason", "Unknown", "UnknownCode", "records", "stored_values", "to_scalar"]
-from algotrade.storage.tables.schemas import COMMON
 
 
 class UnknownCode(StrEnum):

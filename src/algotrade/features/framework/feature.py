@@ -63,8 +63,9 @@ type Kind = Literal["window", "chain", "expression", "cross_section", "label"]
 type Range = tuple[float | None, float | None]
 type Licence = Literal["open", "personal"]
 type AppliesTo = Literal["any", "optionable", "operating_company"]
-# A status field with the values of it that read ILLIQUID and those that read EXPLAINED.
-type StatusRule = tuple[str, frozenset[str], frozenset[str]]
+# A status field, the values of it that read ILLIQUID and those that read EXPLAINED, and the
+# stored table of the feature declaring it (an EXPLAINED status covers a missing row there only).
+type StatusRule = tuple[str, frozenset[str], frozenset[str], str]
 
 ENTITIES = frozenset({"instrument"})
 KINDS = frozenset({"window", "chain", "expression", "cross_section", "label"})

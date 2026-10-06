@@ -30,7 +30,10 @@ our data, and "Unknown" hides the cells that are.
    value, `NOT_APPLICABLE`, `ILLIQUID`, `EXPLAINED`, `NO_ROW`, `NULL`. `EXPLAINED` wins over
    `NO_ROW` so a close with no `price_stats` row on the session reads "no trade" when a stored
    status for that session says so; without that status it stays a gap. The status is a fact
-   stored for the session (ADR 0036): an older partition's value is never served.
+   stored for the session (ADR 0036): an older partition's value is never served. An
+   explained status covers a missing row only in the table of the feature that declares it:
+   when a value reads several tables, `EXPLAINED` needs every table without a row to be
+   covered, so one input's "not announced" never hides another input's dropped row.
 4. **Inherited by expressions** like ADR 0042's statuses (`FeatureSet.applicability`).
 5. **The read model carries the reason**: GraphQL `Unknown.reason: NullReason`, and the
    columnar `FeatureTable` / `ScreenResultPage` gain `reasons[i][j]` beside `unknown[i][j]`.

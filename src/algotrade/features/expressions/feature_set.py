@@ -131,7 +131,7 @@ class FeatureSet:
         """What a value's absence may be put down to (ADRs 0042, 0046), inherited by an
         expression from everything it reads like its licence: -> (the non-``any``
         ``applies_to`` values of the stored features it reads, each ``null_status`` field with
-        its ``illiquid_statuses`` and ``explained_statuses``).
+        its ``illiquid_statuses``, ``explained_statuses`` and the declaring feature's table).
         ``name``: a selection field (``rollup.<group>.<col>``, ``feature.<name>``)."""
         applies: set[str] = set()
         statuses: list[StatusRule] = []
@@ -145,6 +145,7 @@ class FeatureSet:
                         feature.status_field,
                         frozenset(feature.illiquid_statuses),
                         frozenset(feature.explained_statuses),
+                        f"{ROLLUP_TABLE_PREFIX}{feature.group}",
                     )
                 )
 
