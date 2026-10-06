@@ -13,7 +13,7 @@
 #                   vintage_date = obs_date + release_lag_days, vintage_kind = "lagged")
 # transform         how the macro group reads it: level, yoy (year-over-year change) or diff
 # licence, terms    "personal" for data licensed for personal use only: third-party series on FRED
-#                   (ICE BofA, Moody's, Nasdaq, Cboe) and Stooq (ADR 0028)
+#                   (ICE BofA, Moody's, S&P, Nasdaq, Cboe; ADR 0028)
 # revised           true for a pit = "lag" file whose history is re-estimated in place (EBP, OFR
 #                   FSI, EPU): its values are revised although they have no vintages, so the
 #                   regime scorecard reports episodes that relied on them (ALFRED series are)
@@ -405,23 +405,22 @@ date_column = "date"          # built from the file's day, month and year column
 value_column = "daily_policy_index"
 parser = "epu_daily"
 
-# --- Index levels (ADR 0047: index levels are series, never bars; the close is public on its day)
+# --- Index levels (ADR 0047: index levels are series, never bars; FRED posts a close the next business day)
 
+# The S&P 500 is not fetched from Stooq: its daily download now sits behind a JavaScript
+# challenge (a browser-verification page instead of the CSV). FRED's SP500 has only the last 10
+# years; the scorecard's older episodes need another source (docs/market-regime-plan.md 3F).
 [[series]]
-key = "SPX"                     # S&P 500 (Stooq daily CSV, decades of history)
-code = "^SPX"
-source = "published"
+key = "SPX"                   # S&P 500 (FRED SP500: daily, 10 years of history)
+code = "SP500"
+source = "fred"
 kind = "index"
 cadence = "daily"
-release_lag_days = 0
+release_lag_days = 1          # FRED posts a day's close the next business day
 pit = "lag"
 transform = "level"
 licence = "personal"
-terms = "Stooq free daily download (https://stooq.com): personal use only, no redistribution"
-url = "https://stooq.com/q/d/l/?s=^spx&i=d"
-date_column = "Date"
-value_column = "Close"
-parser = "csv"
+terms = "S&P Dow Jones Indices via FRED: personal use only, display only (copyright notice on the series page)"
 
 [[series]]
 key = "COMP"                  # Nasdaq Composite (1971-)
@@ -429,7 +428,7 @@ code = "NASDAQCOM"
 source = "fred"
 kind = "index"
 cadence = "daily"
-release_lag_days = 0
+release_lag_days = 1
 pit = "lag"
 transform = "level"
 licence = "personal"
@@ -441,7 +440,7 @@ code = "VIXCLS"
 source = "fred"
 kind = "index"
 cadence = "daily"
-release_lag_days = 0
+release_lag_days = 1
 pit = "lag"
 transform = "level"
 licence = "personal"
@@ -453,7 +452,7 @@ code = "VXVCLS"
 source = "fred"
 kind = "index"
 cadence = "daily"
-release_lag_days = 0
+release_lag_days = 1
 pit = "lag"
 transform = "level"
 licence = "personal"

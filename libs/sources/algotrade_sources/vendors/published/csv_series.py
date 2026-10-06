@@ -7,14 +7,16 @@ about a particular file lives here, so one more CSV is a ``config/site/macro.tom
 A published file has no vintages: ``vintage_date`` is null and the registry's release lag
 (the ``lagged`` rule) is applied downstream. The whole file is read each time (raw saved as
 received); the request's ``start`` / ``end`` bound the rows ``normalize`` returns. A cell that
-does not read as a number is a null value; a row whose date does not read is dropped. A file
-without the requested columns (a site answering ``No data`` or an HTML page) raises
-``ValueError`` naming what it has.
+does not read as a number is a null value; a row whose date does not read is dropped. A body
+that is not the expected table (an HTML page such as a browser-verification challenge, nothing
+at all, or a table without the requested columns) raises ``TransientFetchError`` with the
+first ``PREVIEW`` characters of the body, so the task records a ``FETCH_ERROR`` and never a
+silent empty series.
 """
 
 import pandas as pd
 
-from algotrade_sources.framework.base import FetchRequest, Normalized
+from algotrade_sources.framework.base import FetchRequest, Normalized, TransientFetchError
 from algotrade_sources.framework.http import Http
 from algotrade_sources.framework.series import (
     SERIES_FRAME,
@@ -27,6 +29,12 @@ from algotrade_sources.vendors.published.parsers import PARSERS
 SOURCE = "published"
 DATASET = "series_file"
 SCHEMES = ("https://", "http://")
+PREVIEW = 80  # characters of a refused body quoted in the error
+
+
+def _refused(request: SeriesRequest, payload: bytes, why: str) -> TransientFetchError:
+    head = payload.decode("utf-8", errors="replace").strip()[:PREVIEW]
+    return TransientFetchError(f"series {request.key!r}: {why}; the body starts {head!r}")
 
 
 def parse_series(request: SeriesRequest, payload: bytes) -> pd.DataFrame:
@@ -34,14 +42,17 @@ def parse_series(request: SeriesRequest, payload: bytes) -> pd.DataFrame:
     parser = PARSERS.get(request.parser)
     if parser is None:
         raise ValueError(f"series {request.key!r}: unknown parser {request.parser!r}")
+    if not payload.strip():
+        raise _refused(request, payload, "the file is empty")
+    if payload.lstrip(b"\xef\xbb\xbf \t\r\n").startswith(b"<"):
+        raise _refused(request, payload, "an HTML page, not the table")
     table = parser(payload)
-    if table.empty and not len(table.columns):
-        return normalise_series_frame(_rows(request, [], []))
     missing = [c for c in (request.date_column, request.value_column) if c not in table.columns]
     if missing:
-        raise ValueError(
-            f"series {request.key!r}: no column {missing} in the file (has "
-            f"{[str(c) for c in table.columns][:8]})"
+        raise _refused(
+            request,
+            payload,
+            f"no column {missing} in the file (has {[str(c) for c in table.columns][:8]})",
         )
     dates = pd.to_datetime(table[request.date_column], errors="coerce")
     frame = _rows(request, dates, table[request.value_column])

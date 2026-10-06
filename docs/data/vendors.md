@@ -186,7 +186,7 @@ Veterans Day), so a session can lack its own curve: `data.rates.curve` uses the 
 ## FRED and ALFRED (implemented adapter, ADR 0048)
 
 `https://api.stlouisfed.org/fred/series/observations` (St. Louis Fed; free, **key required**:
-`ALGOTRADE_FRED_API_KEY`, from a free account at fredaccount.stlouisfed.org). We ask for the
+`ALGOTRADE_FRED_API_KEY`, from a free account at fredaccount.stlouisfed.org). For a revised series we ask for the
 full real-time period (`realtime_start=1776-07-04`, `realtime_end=9999-12-31`,
 `file_type=json`), so ALFRED returns **one row per observation and per value it has had**:
 `realtime_start` is the day that value became known, our `vintage_date`. FRED writes a missing
@@ -196,6 +196,15 @@ is a few thousand rows, a daily market series (`DGS10`, `T10Y3M`) one row per da
 `sources/vendors/fred/observations.py` returns the one normalised series shape
 (`sources/framework/series.py`: `series`, `obs_date`, `vintage_date`, `value`, `code`).
 
+- **The 2,000-vintage cap.** FRED refuses a real-time period holding more than 2,000 vintage
+  dates (HTTP 400 `exceeds the maximum number of vintage dates`), which any daily series does
+  over the full period. The unrevised daily market series (`T10Y3M`, `T10Y2Y`, `BAMLH0A0HYM2`,
+  `BAMLC0A0CM`, `BAA10Y`, `DFII10`, `RRPONTSYD`, `DCOILWTICO`, and the index levels `SPX`
+  (`SP500`), `COMP`, `VIX`, `VIX3M`) are `pit = "lag"`: one plain request for the current values
+  (no real-time period), the vintage dated by the registry's release lag. A revised (`alfred`)
+  series that is refused anyway is split: the adapter halves the real-time period until FRED
+  accepts each window, unites the windows' rows (deduplicated on `date` and `realtime_start`,
+  a span cut at a window edge rejoined) and saves them as one document.
 - **The key is a query parameter** (FRED has no header form): the registry's transport appends
   `api_key` to every URL (`SourceSpec.query_param`), so the URL the adapter builds, the retry
   loop's messages and the raw-store path (keyed by series, not URL) never hold it.
@@ -225,15 +234,18 @@ Paced by `[published] min_interval_s` (1 s); one request per file, refetched by 
 |---|---|---|---|
 | Fed Excess Bond Premium, `ebp_csv.csv` (Federal Reserve Board) | `csv`: `date,gz_spread,ebp,est_prob`, monthly, `value_column = "ebp"` | credit risk premium | public Fed Notes data: `open` |
 | OFR Financial Stress Index (financialresearch.gov) | `csv`: `Date,OFR FSI,Credit,Equity valuation,...`, daily | market stress | OFR public data: `open` |
-| Stooq daily history (`stooq.com/q/d/l/?s=<symbol>&i=d`) | `csv`: `Date,Open,High,Low,Close,Volume`, `value_column = "Close"` | index levels (S&P 500, VIX) | free for personal use, no redistribution: **`personal`** |
+| Stooq daily history (`stooq.com/q/d/l/?s=<symbol>&i=d`) | `csv`: `Date,Open,High,Low,Close,Volume`, `value_column = "Close"` | not used: it now answers a JavaScript browser-verification page (HTML), so `SPX` comes from FRED `SP500` | free for personal use, no redistribution: **`personal`** |
 | Shiller `ie_data.xls` (Yale) | `shiller_xls`: a legacy `.xls` workbook | CAPE, long-run earnings | academic data, credit the author: `open` |
 
 The fixtures in `tests/helpers/payloads/` are written from these documented formats, not
 recorded: CI never calls the network. **Follow-up:** `shiller_xls` raises
 `NotImplementedError` because reading `.xls` needs `xlrd`, which is not a dependency
-(`openpyxl` reads only `.xlsx`); adding it is its own PR. Stooq has begun asking some clients
-for a download key; if it does for ours, the Stooq entries move to a keyed variant or another
-index source, and the macro step fails for that series only (ADR 0048).
+(`openpyxl` reads only `.xlsx`); adding it is its own PR. Stooq's download now sits behind a
+JavaScript challenge: the `published` adapter raises on a body that is not the expected table
+(HTML, empty, missing columns), quoting its first 80 characters, so the macro step records a
+`FETCH_ERROR` for that series only (ADR 0048). FRED's `SP500` has only 10 years of daily
+history: a long daily SPX series (before 2016) needs another source, and Shiller's monthly file
+(the `xlrd` follow-up above) covers the scorecard's older episodes at monthly resolution.
 
 ## ETF holdings (implemented, ADR 0035)
 

@@ -44,14 +44,22 @@ def test_the_shipped_registry() -> None:
     assert {"T10Y3M", "BAMLH0A0HYM2", "UNRATE", "NFCI", "RRPONTSYD"} <= macro.keys
     indices = {s.instrument_id: s.vendor_code for s in macro.series if s.kind == "index"}
     assert indices == {
-        "IDX:SPX": "^SPX",
+        "IDX:SPX": "SP500",
         "IDX:COMP": "NASDAQCOM",
         "IDX:VIX": "VIXCLS",
         "IDX:VIX3M": "VXVCLS",
     }
     personal = {s.key for s in macro.series if s.licence == "personal"}
-    third_party = {"BAMLH0A0HYM2", "BAMLC0A0CM", "BAA10Y", "COMP", "VIX", "VIX3M"}
-    assert personal == {*third_party, "SPX"}  # third-party series on FRED, and Stooq
+    third_party = {"BAMLH0A0HYM2", "BAMLC0A0CM", "BAA10Y", "COMP", "VIX", "VIX3M", "SPX"}
+    assert personal == third_party  # third-party series on FRED
+    unrevised = {  # FRED's daily market series: never revised, so one plain request each
+        "T10Y3M", "T10Y2Y", "BAMLH0A0HYM2", "BAMLC0A0CM", "BAA10Y", "DFII10", "RRPONTSYD",
+        "SPX", "COMP", "VIX", "VIX3M",
+    }  # fmt: skip
+    for key in unrevised:
+        spec = macro.by_key(key)
+        assert (spec.source, spec.pit, spec.release_lag_days) == ("fred", "lag", 1), key
+    assert all(macro.by_key(k).pit == "alfred" for k in ("UNRATE", "PAYEMS", "CPIAUCSL", "NFCI"))
     revised_late = {
         s.key: s.release_lag_days for s in macro.series if s.key in ("GDPNOW", "RECPROUSM156N")
     }

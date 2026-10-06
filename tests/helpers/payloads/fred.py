@@ -75,3 +75,11 @@ CURVE_REVISED = daily(
     ("2026-10-01", "2026-10-02", "0.13"),  # the source corrected a number
     ("2026-10-02", "2026-10-03", "."),
 )
+
+# FRED's answer for a real-time period holding more than 2,000 vintage dates (a daily series
+# over the full period), recorded from T10Y3M.
+TOO_MANY_VINTAGES = (
+    b'{"error_code":400,"error_message":"Bad Request.  There are 3134 vintage dates in the '
+    b"specified real-time period: 1776-07-04 to 9999-12-31. This exceeds the maximum number of "
+    b'vintage dates allowed for this file type (2000)."}'
+)

@@ -26,3 +26,10 @@ OFR_FSI = b"""Date,OFR FSI,Credit,Equity valuation,Safe assets,Funding,Volatilit
 """
 
 NO_DATA = b"No data"
+
+# What stooq.com/q/d/l now answers a script: a 200 with a browser-verification page.
+JS_CHALLENGE = (
+    b'<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="robots" content="noindex">'
+    b"</head><body><noscript>This site requires JavaScript to verify your browser.</noscript>"
+    b"<script>(async()=>{})()</script></body></html>"
+)

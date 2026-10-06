@@ -1,11 +1,13 @@
 """The ``macro`` task: economic series and index levels -> ``macro/series`` (ADR 0048).
 
 Every enabled series of the registry (``config/site/macro.toml``) is fetched whole (every
-vintage ALFRED has; a published file entire), given its vintage by the registry's ``pit`` rule
-and compared with what is stored (``plan.py``); only the rows the table lacks are written, as
-the run's session partition (the table merges runs on its key, so a rerun on unchanged data
-writes nothing). Values are stored as published: ``transform`` (``yoy``, ``diff``) is how the
-macro feature group reads a series, not an ingestion step.
+vintage ALFRED has for ``pit = "alfred"``; the current values for ``pit = "lag"``, which FRED
+serves in one plain request, never a real-time period; a published file entire), given its
+vintage by the registry's ``pit`` rule and compared with what is stored (``plan.py``); only
+the rows the table lacks are written, as the run's session partition (the table merges
+runs on its key, so a rerun on unchanged data writes nothing). Values are stored as published:
+``transform`` (``yoy``, ``diff``) is how the macro feature group reads a series, not an
+ingestion step.
 
 Per series, an item of the run: ``OK`` (rows added), ``UNCHANGED``, ``NO_DATA`` (the source has
 no such series), ``NOT_DUE`` (a published file fetched less than ``REFETCH_DAYS`` ago; FRED
@@ -77,6 +79,7 @@ def _request(spec: MacroSeries, session: date, since: date | None) -> SeriesRequ
         date_column=spec.date_column,
         value_column=spec.value_column,
         parser=spec.parser,
+        vintages=spec.pit == "alfred",  # a lag series: FRED's current values, one plain request
         start=None if spec.pit == "alfred" else since,
     )
 

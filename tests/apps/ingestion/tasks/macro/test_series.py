@@ -97,6 +97,17 @@ def rows(frame: pd.DataFrame, key: str) -> list[tuple[Any, ...]]:
     ]  # fmt: skip
 
 
+def test_only_an_alfred_series_asks_for_a_realtime_period() -> None:
+    feeds = Feeds()
+    ingest_macro(context(feeds), REGISTRY, D1)
+    fred = {u.split("series_id=")[1].split("&")[0]: u for u in feeds.urls if "series_id" in u}
+    assert (
+        "realtime_start=1776-07-04" in fred["GDPC1"] and "realtime_end=9999-12-31" in fred["GDPC1"]
+    )
+    assert "realtime" not in fred["T10Y3M"]  # a lag series: the current values, one request
+    assert sum("series_id=T10Y3M" in u for u in feeds.urls) == 1
+
+
 def test_a_run_stores_every_series_with_its_vintages() -> None:
     ctx = context(Feeds())
     record = ingest_macro(ctx, REGISTRY, D1)

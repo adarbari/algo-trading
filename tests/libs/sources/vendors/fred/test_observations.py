@@ -1,5 +1,6 @@
 """FRED / ALFRED observations against payloads written from the documented format (no network)."""
 
+from collections.abc import Callable
 from datetime import date
 
 import pandas as pd
@@ -11,9 +12,11 @@ from algotrade_sources.framework.series import SERIES_COLUMNS, SERIES_FRAME, Ser
 from algotrade_sources.vendors.fred.observations import (
     BASE_URL,
     FredObservations,
+    join_spans,
     missing_series,
     parse_documents,
     parse_observations,
+    too_many_vintages,
 )
 from tests.helpers.ingest_fakes import CountingLimiter, http_for
 from tests.helpers.payloads import fred as fred_payloads
@@ -149,6 +152,110 @@ def test_an_unknown_series_is_nothing_there_but_a_bad_key_is_an_error() -> None:
     with pytest.raises(GaveUpError):
         FredObservations(http_for(bad_key, policy)).fetch(REQUEST)
     assert not missing_series(HttpError(500, body=fred_payloads.UNKNOWN_SERIES))
+
+
+# --- the real-time period FRED refuses, and the series that never asks for one
+
+TRUE_ROWS = [  # what an unbounded real-time period would hold, one row per value a date had
+    fred_payloads.row("2020-01-01", "2020-04-29", "1", "2020-05-27"),
+    fred_payloads.row("2020-01-01", "2020-05-28", "2", "2020-07-01"),
+    fred_payloads.row("2020-01-01", "2020-07-02", "1"),  # reverted: not joined with the first
+    fred_payloads.row("2020-04-01", "2020-07-30", "7", "2020-08-26"),
+    fred_payloads.row("2020-04-01", "2020-08-27", "8"),
+    fred_payloads.row("2020-07-01", "2020-10-29", "."),
+]
+CAP = 3  # vintage dates a window may hold (FRED: 2,000)
+
+
+def clipped(rows: list[dict[str, str]], first: str, last: str) -> list[dict[str, str]]:
+    """The rows as FRED answers for the real-time period ``first``..``last``: cut to it."""
+    out = []
+    for r in rows:
+        start, end = max(r["realtime_start"], first), min(r["realtime_end"], last)
+        if start <= end:
+            out.append({**r, "realtime_start": start, "realtime_end": end})
+    return out
+
+
+def capped_transport(urls: list[str]) -> Callable[[str], bytes]:
+    def transport(url: str) -> bytes:
+        urls.append(url)
+        query = dict(p.split("=") for p in url.split("?")[1].split("&"))
+        first, last = query["realtime_start"], query["realtime_end"]
+        in_window = {r["realtime_start"] for r in TRUE_ROWS if first <= r["realtime_start"] <= last}
+        if len(in_window) > CAP:
+            raise HttpError(400, body=fred_payloads.TOO_MANY_VINTAGES)
+        return fred_payloads.page(clipped(TRUE_ROWS, first, last))
+
+    return transport
+
+
+def sorted_rows(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    return sorted(rows, key=lambda r: (r["date"], r["realtime_start"]))
+
+
+def test_a_refused_realtime_period_is_split_and_the_windows_united() -> None:
+    urls: list[str] = []
+    policy = RetryPolicy(tries=4, rejected=too_many_vintages)
+    source = FredObservations(http_for(capped_transport(urls), policy))
+    payload = source.fetch(REQUEST)
+    assert payload is not None
+    assert len(urls) > 3 and "realtime_start=1776-07-04&realtime_end=9999-12-31" in urls[0]
+    assert len(set(urls)) == len(urls)  # a refused request is never retried
+    (document,) = parse_documents(payload)
+    assert document["observations"] == sorted_rows(TRUE_ROWS)  # spans cut at an edge rejoined
+    assert document["count"] == len(TRUE_ROWS)
+    normalized = source.normalize(REQUEST, payload)
+    assert normalized is not None and len(normalized.parsed[SERIES_FRAME]) == len(TRUE_ROWS)
+
+
+def test_windows_union_dedupes_on_date_and_realtime_start() -> None:
+    row = fred_payloads.row("2020-01-01", "2020-04-29", "1")
+    cut = fred_payloads.row("2020-02-01", "2020-04-29", "2", "2020-06-30")
+    rest = fred_payloads.row("2020-02-01", "2020-07-01", "2")
+    assert join_spans([row, row, cut, rest]) == [
+        row,
+        fred_payloads.row("2020-02-01", "2020-04-29", "2"),
+    ]
+    assert join_spans([]) == []
+
+
+def test_other_refusals_and_a_one_day_window_still_raise() -> None:
+    def bad_key(url: str) -> bytes:
+        raise HttpError(400, body=fred_payloads.BAD_KEY)
+
+    policy = RetryPolicy(tries=1, rejected=too_many_vintages)
+    with pytest.raises(GaveUpError):
+        FredObservations(http_for(bad_key, policy)).fetch(REQUEST)
+
+    def always(url: str) -> bytes:
+        raise HttpError(400, body=fred_payloads.TOO_MANY_VINTAGES)
+
+    with pytest.raises(HttpError):
+        FredObservations(http_for(always, policy)).fetch(REQUEST)
+    assert too_many_vintages(HttpError(400, body=fred_payloads.TOO_MANY_VINTAGES))
+    assert not too_many_vintages(HttpError(500, body=fred_payloads.TOO_MANY_VINTAGES))
+
+
+def test_a_lag_series_makes_one_plain_request_without_a_realtime_period() -> None:
+    urls: list[str] = []
+
+    def transport(url: str) -> bytes:
+        urls.append(url)
+        return fred_payloads.CURVE
+
+    source = FredObservations(http_for(transport))
+    request = SeriesRequest("T10Y3M", code="T10Y3M", vintages=False, start=date(2000, 1, 1))
+    payload = source.fetch(request)
+    (url,) = urls
+    assert (
+        "realtime" not in url
+        and "series_id=T10Y3M" in url
+        and "observation_start=2000-01-01" in url
+    )
+    assert "api_key" not in url
+    normalized = source.normalize(request, payload or b"")
+    assert normalized is not None and len(normalized.parsed[SERIES_FRAME]) == 3
 
 
 def test_the_request_must_be_a_series_request_with_a_code() -> None:

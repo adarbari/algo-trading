@@ -153,8 +153,11 @@ count of conditions, a probability, and sizing.
 | 4 | **Page-level or link-only** | FINRA margin statistics (monthly HTML table), AAII weekly survey (free email or page), Conference Board LEI headline (press release only; the series is paid), Yale confidence indices (display only), Google Trends "unemployment benefits" (Choi and Varian; unofficial API) | scrape only where terms allow; otherwise the card links out and we store nothing |
 | gap | **Not free**: ISM PMI, Conference Board LEI series, NAAIM (from Aug 2026), Sornette LPPLS confidence feed, S&P Global PMI history | replaced by the FRED regional surveys, the Fed and Chicago Fed indices, and our own run-up features |
 
-Index history for the scorecard: `NASDAQCOM` (FRED, 1971-) and `^SPX` daily from Stooq
-(free CSV, decades), as `IDX:` instruments (section 5.1).
+Index history for the scorecard: `NASDAQCOM` (FRED, 1971-) and `SP500` (FRED, the last 10
+years), as `IDX:` instruments (section 5.1). Stooq's `^SPX` download (decades) now sits behind a
+JavaScript challenge, so a long daily SPX history (before 2016) needs another source; Shiller's
+monthly file (the `xlrd` parser follow-up, `docs/data/vendors.md`) covers the scorecard's older
+episodes at monthly resolution.
 
 ## 4. The regime model we would ship
 
@@ -206,7 +209,7 @@ change architecture and need `write-adr` plus an `architect` review.
 2. **Index history (small ADR or an amendment to ADR 0009).** Our bars start when our
    ingestion started, so the 1990-2020 episodes cannot be replayed from `bars/1d`. Add
    `asset_class = "index"` instruments (`IDX:SPX`, `IDX:COMP`, `IDX:VIX`, `IDX:VIX3M`) fed
-   from FRED (`NASDAQCOM` from 1971, `VIXCLS`, `VXVCLS`) and Stooq (`^SPX` daily, decades),
+   from FRED (`NASDAQCOM` from 1971, `SP500` for 10 years, `VIXCLS`, `VXVCLS`),
    stored in the existing `bars/1d` table so every price feature group applies to them.
    Breadth cannot be rebuilt before our universe history begins; the scorecard says so and
    validates breadth only on the window we have.
