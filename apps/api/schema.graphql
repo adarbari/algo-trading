@@ -207,7 +207,7 @@ type FeatureSeries {
 }
 
 """
-Instruments x catalogue features for one session, one page of the rows matching the filters in the sort order (`total`: every page). `rows[i][j]` is the value of `columns[j]` for `instruments[i]`, null exactly when `unknown[i][j]` says why. `missing`: tables the filters and sort read with nothing for the session (no row passes a filter on them); the nightly tables missing for it are `session.missing`
+Instruments x catalogue features for one session, one page of the rows matching the filters in the sort order (`total`: every page). `rows[i][j]` is the value of `columns[j]` for `instruments[i]`, null exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED). `missing`: tables the filters and sort read with nothing for the session (no row passes a filter on them); the nightly tables missing for it are `session.missing`
 """
 type FeatureTable {
   session: Session!
@@ -217,6 +217,7 @@ type FeatureTable {
   instruments: [Instrument!]!
   rows: [[JSON]!]!
   unknown: [[UnknownCode]!]!
+  reasons: [[NullReason]!]!
   sort: String
   total: Int!
   page: Int!
@@ -379,6 +380,14 @@ type NightlyRun {
   durationS: Float
   steps: [RunStep!]!
   problems: [String!]!
+}
+
+"""Why a value is null when the null is the fact (EXPLAINED)"""
+enum NullReason {
+  NO_TRADE
+  NOT_ANNOUNCED
+  NEW_LISTING
+  FEW_BARS
 }
 
 """
@@ -795,7 +804,7 @@ type ScreenResult {
 }
 
 """
-One page of a run's rows matching the filters, in the sort order (`total`: every page). `rows[i][j]` is the catalogue column `columns[j]` for `results[i]`, null exactly when `unknown[i][j]` says why. `missing`: tables the search and sort read with nothing for the session
+One page of a run's rows matching the filters, in the sort order (`total`: every page). `rows[i][j]` is the catalogue column `columns[j]` for `results[i]`, null exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED). `missing`: tables the search and sort read with nothing for the session
 """
 type ScreenResultPage {
   runId: String!
@@ -807,6 +816,7 @@ type ScreenResultPage {
   results: [ScreenResult!]!
   rows: [[JSON]!]!
   unknown: [[UnknownCode]!]!
+  reasons: [[NullReason]!]!
   missing: [String!]!
 }
 
@@ -908,10 +918,13 @@ type TableView {
   names: [String!]!
 }
 
-"""A value not known for the session: why, and where it looked"""
+"""
+A value not known for the session: why, and where it looked; `reason` is set exactly when `code` is EXPLAINED
+"""
 type Unknown {
   code: UnknownCode!
   detail: String!
+  reason: NullReason
 }
 
 """Why a value is UNKNOWN for the session"""
@@ -925,6 +938,7 @@ enum UnknownCode {
   PRE_SNAPSHOT
   NOT_APPLICABLE
   ILLIQUID
+  EXPLAINED
 }
 
 """

@@ -25,9 +25,10 @@ import pandas as pd
 
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.views.feature_view import FeatureValue as Scalar
+from algotrade.features.framework.feature import NullReason
 from algotrade.services.read.context import ReadContext, at_session, catalogue_key, partition
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
-from algotrade.services.read.instruments.features import load_feature_values
+from algotrade.services.read.instruments.features import cell_codes, load_feature_values
 from algotrade.services.read.instruments.identity import Instrument, load_instruments
 from algotrade.services.read.instruments.table import DEFAULT_SIZE, catalogue_values
 from algotrade.services.read.screens.runs import (
@@ -146,6 +147,7 @@ class ResultPage:
     results: tuple[ScreenResult, ...]
     rows: tuple[tuple[Scalar, ...], ...]
     unknown: tuple[tuple[UnknownCode | None, ...], ...]
+    reasons: tuple[tuple[NullReason | None, ...], ...]  # the NullReason of each EXPLAINED cell
     missing: tuple[str, ...]
 
 
@@ -432,6 +434,7 @@ def load_result_page(
     found = load_results(ctx, {run.run_id: shown}, [run], changes)
     results = [found[(run.run_id, i)] for i in shown if (run.run_id, i) in found]
     cells = load_feature_values(ctx, shown, wanted) if wanted and shown else {}
+    codes = cell_codes(cells, [r.instrument_id for r in results])
     return ResultPage(
         run_id=run.run_id,
         sort=query.sort or "rank",
@@ -441,9 +444,7 @@ def load_result_page(
         columns=tuple(infos[n] for n in wanted),
         results=tuple(results),
         rows=tuple(tuple(v.value for v in cells.get(r.instrument_id, ())) for r in results),
-        unknown=tuple(
-            tuple(v.unknown.code if v.unknown else None for v in cells.get(r.instrument_id, ()))
-            for r in results
-        ),
+        unknown=codes[0],
+        reasons=codes[1],
         missing=order.missing,
     )

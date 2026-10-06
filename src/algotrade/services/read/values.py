@@ -14,7 +14,10 @@ from typing import Any
 import pandas as pd
 
 from algotrade.core.views.feature_view import FeatureValue
+from algotrade.features.framework.feature import NullReason
 from algotrade.storage.tables.schemas import COMMON
+
+__all__ = ["NullReason", "Unknown", "UnknownCode", "records", "stored_values", "to_scalar"]
 
 
 class UnknownCode(StrEnum):
@@ -29,15 +32,18 @@ class UnknownCode(StrEnum):
     PRE_SNAPSHOT = "PRE_SNAPSHOT"  # identity came from a later snapshot (survivorship)
     NOT_APPLICABLE = "NOT_APPLICABLE"  # the feature is not defined for this instrument (ADR 0042)
     ILLIQUID = "ILLIQUID"  # an option feature null because the chain is too thin (ADR 0042)
+    EXPLAINED = "EXPLAINED"  # the null is a fact: ``Unknown.reason`` says which (ADR 0046)
 
 
 @dataclass(frozen=True)
 class Unknown:
     """A value that is not known for the session, with the reason and where it was looked for
-    (``"rollups/instrument/earnings@v1 has no partition for 2026-10-03"``)."""
+    (``"rollups/instrument/earnings@v1 has no partition for 2026-10-03"``). ``reason`` is set
+    exactly when ``code`` is EXPLAINED."""
 
     code: UnknownCode
     detail: str
+    reason: NullReason | None = None
 
 
 def to_scalar(value: Any) -> FeatureValue:

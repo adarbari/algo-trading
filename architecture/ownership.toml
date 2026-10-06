@@ -242,10 +242,10 @@ detect = [{ call = "Tiers" }, { call = "load_tiers" }]
 
 [[responsibility]]
 id = "feature-applicability"
-description = "Whether a feature applies to an instrument (Feature.applies_to over the reference snapshot's optionable and security_type facts and the company snapshot's SIC): the one decision behind the read layer's NOT_APPLICABLE and the nightly coverage check (ADRs 0042, 0045)"
+description = "Whether a feature applies to an instrument (Feature.applies_to over the reference snapshot's optionable and security_type facts and the company snapshot's SIC): the one decision behind the read layer's NOT_APPLICABLE and the nightly coverage check (ADRs 0042, 0045); and the declared explanations of a null (null_status with illiquid_statuses / explained_statuses, the closed NullReason) behind ILLIQUID and EXPLAINED (ADR 0046)"
 owner = ["src/algotrade/features/framework/feature.py"]
 allowed = [
-    "src/algotrade/services/read/instruments/features.py",  # NOT_APPLICABLE on a read
+    "src/algotrade/services/read/instruments/features.py",  # NOT_APPLICABLE / ILLIQUID / EXPLAINED on a read
     "apps/ingestion/algotrade_ingestion/tasks/maintenance/coverage.py",  # which names a feature is expected for
 ]
 section = "docs/adr/0042-not-applicable-and-illiquid-values.md#decision"

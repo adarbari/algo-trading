@@ -10,6 +10,7 @@ from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.framework.declaration import FeatureGroup, Input
 from algotrade.features.framework.feature import (
     Feature,
+    NullReason,
     feature_problems,
     in_range,
     is_feature_ref,
@@ -52,13 +53,29 @@ def test_a_valid_feature_has_no_problems() -> None:
         ({"inputs": ("close",)}, "neither"),
         ({"licence": "public"}, "licence 'public' must be one of"),
         ({"applies_to": "stocks"}, "applies_to 'stocks' must be one of"),
-        ({"null_status": "status"}, "go together"),
-        ({"illiquid_statuses": ("A",)}, "go together"),
+        ({"null_status": "status"}, "goes with illiquid_statuses or explained_statuses"),
+        ({"illiquid_statuses": ("A",)}, "goes with"),
+        ({"explained_statuses": ("NO_TRADE",)}, "goes with"),
+        ({"null_status": "s", "explained_statuses": ("STALE",)}, "['STALE'] are not NullReason"),
+        (
+            {
+                "null_status": "s",
+                "illiquid_statuses": ("NO_TRADE",),
+                "explained_statuses": ("NO_TRADE",),
+            },
+            "either illiquid or explained",
+        ),
         ({"null_status": "iv30.status@x"}, "null_status 'iv30.status@x' is not"),
     ],
 )
 def test_problems_are_named(changes: dict[str, Any], problem: str) -> None:
     assert any(problem in p for p in feature_problems(_feature(**changes)))
+
+
+def test_explained_statuses_are_null_reasons() -> None:
+    f = _feature(null_status="bar_status", explained_statuses=("NO_TRADE", "FEW_BARS"))
+    assert feature_problems(f) == []
+    assert {r.value for r in NullReason} == {"NO_TRADE", "NOT_ANNOUNCED", "NEW_LISTING", "FEW_BARS"}
 
 
 def test_ranges_and_references() -> None:

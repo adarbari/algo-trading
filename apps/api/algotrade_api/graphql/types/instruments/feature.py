@@ -11,17 +11,24 @@ from algotrade.services.read import values
 from algotrade.services.read.instruments import catalogue, features
 
 strawberry.enum(values.UnknownCode, description="Why a value is UNKNOWN for the session")
+strawberry.enum(
+    values.NullReason, description="Why a value is null when the null is the fact (EXPLAINED)"
+)
 strawberry.enum(catalogue.FeatureFormat, description="How a client shows a feature's value")
 
 
-@strawberry.type(description="A value not known for the session: why, and where it looked")
+@strawberry.type(
+    description="A value not known for the session: why, and where it looked; `reason` is "
+    "set exactly when `code` is EXPLAINED"
+)
 class Unknown:
     code: values.UnknownCode
     detail: str
+    reason: values.NullReason | None
 
     @classmethod
     def of(cls, d: values.Unknown) -> Self:
-        return cls(code=d.code, detail=d.detail)
+        return cls(code=d.code, detail=d.detail, reason=d.reason)
 
 
 @strawberry.type(description="One catalogue field: what it is and how to show it")
