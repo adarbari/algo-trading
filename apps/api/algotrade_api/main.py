@@ -5,7 +5,7 @@ bad token -> 401, a caller the registry refuses -> 403), CORS for the configured
 handlers that map library errors to HTTP (not found -> 404, bad configuration or parameters
 -> 400, another user's job -> 403, a write that clashes with what exists -> 409, the drafting
 model off or not answering -> 503), and, when ``settings.web_dist`` is set, the built web app
-on the same origin (``web``, ADR 0043: mounted last, so every API route keeps precedence)."""
+on the same origin (``web``, ADR 0044: mounted last, so every API route keeps precedence)."""
 
 import json
 from collections.abc import AsyncIterator, Callable

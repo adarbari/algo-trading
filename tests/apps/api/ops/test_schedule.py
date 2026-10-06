@@ -1,4 +1,4 @@
-"""The API's launchd agent (ADR 0043): written with absolute paths, never installed."""
+"""The API's launchd agent (ADR 0044): written with absolute paths, never installed."""
 
 import json
 import plistlib

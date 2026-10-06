@@ -231,7 +231,7 @@ without a token, and refuses to start on a non-loopback `--host`. After changing
 route or schema run `.venv/bin/python scripts/export_openapi.py` and commit
 `apps/api/openapi.json` (CI fails when it is stale); the web client is generated from it.
 
-**Hosting for outside users** ([ADR 0043](docs/adr/0043-hosting-from-the-owners-mac.md)): the
+**Hosting for outside users** ([ADR 0044](docs/adr/0044-hosting-from-the-owners-mac.md)): the
 API also serves the built web app on its own origin when `ALGOTRADE_WEB_DIST` is set
 (`make web-build` writes `var/web`; redo it after a web change), `algotrade-api schedule`
 writes its launchd agent, and Tailscale Funnel gives it a public HTTPS address. Runbook:

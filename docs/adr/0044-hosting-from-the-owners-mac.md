@@ -1,4 +1,4 @@
-# ADR 0043: Hosting from the owner's Mac behind Tailscale Funnel; the API serves the built web
+# ADR 0044: Hosting from the owner's Mac behind Tailscale Funnel; the API serves the built web
 
 **Status:** accepted (2026-10-05; owner decision on the host, roadmap H1). Amends
 [0037](0037-domain-read-model-served-by-graphql.md) decision 4 (the "files" kept by REST

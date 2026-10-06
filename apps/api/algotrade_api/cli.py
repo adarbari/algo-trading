@@ -1,7 +1,7 @@
 """``algotrade-api``: serve the API with uvicorn on 127.0.0.1:8000 (``--reload`` for dev).
 With ``ALGOTRADE_AUTH=off`` (no token, ADR 0040) it refuses a non-loopback ``--host``.
 ``algotrade-api schedule`` writes the launchd agent that keeps it serving on this Mac
-(``ops/schedule.py``, ADR 0043) and prints the commands to install it; it never installs."""
+(``ops/schedule.py``, ADR 0044) and prints the commands to install it; it never installs."""
 
 import argparse
 import json

@@ -1,6 +1,6 @@
 # Hosting from the owner's Mac (Tailscale Funnel)
 
-How outside users reach the app: [ADR 0043](adr/0043-hosting-from-the-owners-mac.md). One
+How outside users reach the app: [ADR 0044](adr/0044-hosting-from-the-owners-mac.md). One
 public HTTPS address, `https://<machine>.<tailnet>.ts.net`, which Tailscale Funnel forwards to
 the API on `127.0.0.1:8000`; the API answers its own routes and serves the built web app for
 every other path. Sign-in is Supabase ([ADR 0040](adr/0040-identity-and-roles.md),

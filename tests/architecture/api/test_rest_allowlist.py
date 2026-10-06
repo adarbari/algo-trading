@@ -17,7 +17,7 @@ REST_ALLOWLIST = "architecture/rest_allowlist.toml"
 
 def _served_get_routes(web_dist: Path) -> set[str]:
     """Every GET path the API serves, from its OpenAPI document (the app as served, with every
-    optional part switched on: the built web app of ``web_dist``, ADR 0043)."""
+    optional part switched on: the built web app of ``web_dist``, ADR 0044)."""
     (web_dist / "index.html").write_text("<!doctype html>")
     settings = ApiSettings("memory://", "config", web_dist=web_dist)
     paths = create_app(settings, authenticator=as_user()).openapi()["paths"]

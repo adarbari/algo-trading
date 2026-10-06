@@ -1,4 +1,4 @@
-"""The built web app on the API's origin (ADR 0043): files of the build, the SPA fallback to
+"""The built web app on the API's origin (ADR 0044): files of the build, the SPA fallback to
 index.html, API routes first, nothing outside the build directory, and ``ALGOTRADE_AUTH=off``
 still refusing what a tunnel forwards."""
 
@@ -118,7 +118,7 @@ def test_settings_read_the_build_directory_from_the_environment(
 @pytest.mark.parametrize("header", ["X-Forwarded-For", "Forwarded", "Tailscale-Funnel-Request"])
 def test_auth_off_serves_the_page_but_refuses_forwarded_api_calls(dist: Path, header: str) -> None:
     """Funnel hands requests to the API on loopback: with ``ALGOTRADE_AUTH=off`` the headers
-    a tunnel adds make every API call 401 (ADR 0040, 0043); the page itself holds no data."""
+    a tunnel adds make every API call 401 (ADR 0040, 0044); the page itself holds no data."""
     local = LocalAuthenticator(UserRecord("local", Role.ADMIN))
     app = create_app(ApiSettings("memory://", "config", web_dist=dist), authenticator=local)
     client = TestClient(app, base_url="http://127.0.0.1:8000")

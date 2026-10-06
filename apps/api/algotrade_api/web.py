@@ -1,4 +1,4 @@
-"""Serve the built web app on the API's own origin (ADR 0043): ``GET /{path}`` answers a file
+"""Serve the built web app on the API's own origin (ADR 0044): ``GET /{path}`` answers a file
 under the build directory (``ALGOTRADE_WEB_DIST``), else the app's ``index.html`` (the SPA
 fallback: the browser router owns deep links such as ``/login``).
 
@@ -70,7 +70,7 @@ def web_router(dist: Path) -> APIRouter:
             raise HTTPException(404, f"no such build asset: {path}")
         return FileResponse(index, headers=REVALIDATE)
 
-    summary = "The built web app: a file of the build, else index.html (ADR 0043)"
+    summary = "The built web app: a file of the build, else index.html (ADR 0044)"
     for method in ("GET", "HEAD"):  # one route each: one OpenAPI operation id each
         router.add_api_route(
             "/{path:path}",

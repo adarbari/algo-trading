@@ -248,7 +248,7 @@ def check_store(p: Probes) -> Result:
 
 
 def check_web_dist(p: Probes) -> Result:
-    """The API serves the built web from ``ALGOTRADE_WEB_DIST`` when set (ADR 0043) and
+    """The API serves the built web from ``ALGOTRADE_WEB_DIST`` when set (ADR 0044) and
     refuses to start without its ``index.html``."""
     dist = p.web_dist()
     if dist is None:

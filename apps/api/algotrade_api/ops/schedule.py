@@ -1,4 +1,4 @@
-"""Generate the macOS launchd agent that keeps the API serving on this Mac (ADR 0043).
+"""Generate the macOS launchd agent that keeps the API serving on this Mac (ADR 0044).
 
 The file is only written, never installed: loading it changes the machine's configuration,
 so the owner runs ``launchctl load`` themselves (as for the nightly,

@@ -46,4 +46,4 @@ reason = "live quotes (ADR 0028): latency-bound, records to live/*, bypasses the
 method = "GET"
 path = "/{path}"
 keep = true
-reason = "files (ADR 0043, amending 0037): the built web app on the API's origin when ALGOTRADE_WEB_DIST is set; a build file, else index.html; public, no data; mounted last so API routes keep precedence"
+reason = "files (ADR 0044, amending 0037): the built web app on the API's origin when ALGOTRADE_WEB_DIST is set; a build file, else index.html; public, no data; mounted last so API routes keep precedence"

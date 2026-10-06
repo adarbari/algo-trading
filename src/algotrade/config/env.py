@@ -16,7 +16,7 @@ DEFAULT_CONFIG_DIR = "config"
 USER = "ALGOTRADE_USER"
 API_DEBUG = "ALGOTRADE_API_DEBUG"  # "1": the API serves the GraphiQL IDE (local development)
 CORS_ORIGINS = "ALGOTRADE_CORS_ORIGINS"  # comma-separated web origins the API allows (hosting)
-# The built web app the API serves on its own origin (ADR 0043): `var/web` after
+# The built web app the API serves on its own origin (ADR 0044): `var/web` after
 # `make web-build`; unset: the API serves no files (development runs the Vite dev server).
 WEB_DIST = "ALGOTRADE_WEB_DIST"
 # Who may call the API (ADR 0040): "supabase" (default) verifies a Supabase access token per

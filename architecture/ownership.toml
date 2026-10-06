@@ -438,6 +438,7 @@ description = "Load and type L3 site settings (config/site/*.toml: sources, univ
 owner = [
     "src/algotrade/config/site/settings.py",
     "src/algotrade/config/site/users.py",
+    "src/algotrade/config/site/nightly.py",
     "src/algotrade/storage/configs/store.py",
     "src/algotrade/storage/configs/files.py",
 ]
@@ -545,9 +546,9 @@ detect = [{ import = "fastapi" }, { import = "starlette" }, { import = "uvicorn"
 
 [[responsibility]]
 id = "web-on-api-origin"
-description = "Serve the built web app on the API's origin (ADR 0043): the files of ALGOTRADE_WEB_DIST, the SPA fallback to index.html, confinement to the build directory, cache headers; create_app mounts it last so every API route keeps precedence"
+description = "Serve the built web app on the API's origin (ADR 0044): the files of ALGOTRADE_WEB_DIST, the SPA fallback to index.html, confinement to the build directory, cache headers; create_app mounts it last so every API route keeps precedence"
 owner = ["apps/api/algotrade_api/web.py"]
-section = "docs/adr/0043-hosting-from-the-owners-mac.md#decision"
+section = "docs/adr/0044-hosting-from-the-owners-mac.md#decision"
 detect = [
     { call = "FileResponse" },
     { import = "starlette.staticfiles" },
@@ -556,12 +557,12 @@ detect = [
 
 [[responsibility]]
 id = "launchd-agents"
-description = "Generate the macOS launchd agents that run the apps on the owner's Mac, written and never installed (the owner runs launchctl): the nightly (ingestion ops/schedule.py) and the API kept serving behind Tailscale Funnel (api ops/schedule.py, ADR 0043)"
+description = "Generate the macOS launchd agents that run the apps on the owner's Mac, written and never installed (the owner runs launchctl): the nightly (ingestion ops/schedule.py) and the API kept serving behind Tailscale Funnel (api ops/schedule.py, ADR 0044)"
 owner = [
     "apps/ingestion/algotrade_ingestion/ops/schedule.py",
     "apps/api/algotrade_api/ops/schedule.py",
 ]
-section = "docs/adr/0043-hosting-from-the-owners-mac.md#decision"
+section = "docs/adr/0044-hosting-from-the-owners-mac.md#decision"
 detect = [{ import = "plistlib" }]
 
 [[responsibility]]

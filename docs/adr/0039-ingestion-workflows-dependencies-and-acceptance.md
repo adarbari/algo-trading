@@ -1,6 +1,6 @@
 # ADR 0039: Ingestion workflows by cadence; steps succeed or fail by an acceptance rule; a failed critical step holds the workflow back
 
-**Status:** accepted (2026-10-05; owner decisions; implementation: roadmap WF1-WF5), amended 2026-10-05 (below). Amends the nightly workflow of R5
+**Status:** accepted (2026-10-05; owner decisions; implementation: roadmap WF1-WF5), amended 2026-10-05 (below) and by [0043](0043-waiting-on-publication-tiered-and-coverage-acceptance.md). Amends the nightly workflow of R5
 (`docs/architecture.md`, "The nightly workflow"), [0033](0033-screeners-run-nightly-and-on-request.md)
 (when the screens step runs), [0034](0034-instrument-descriptions.md) and
 [0035](0035-etf-holdings.md) (descriptions and ETF holdings leave the nightly), and
@@ -138,3 +138,9 @@ Decisions the owner delegated while away (a Fable review), and details settled i
 - **A critical step whose source is not configured FAILS** (an optional one is SKIPPED).
 - **The NYSE calendar gains special closures** (2025-01-09 and 2018-12-05, national days of
   mourning): the gap check found 2025-01-09 "missing" from the stored bars.
+
+## Amendment (ADR 0043)
+A step whose source has not published the latest session yet is WAITING, not FAILED, until
+its deadline (`nightly.toml [schedule]`); a WAITING session is not done, holds later sessions
+back like a FAILED one, is resumed by the hourly run and sends no alert. After the deadline it
+is FAILED as above.

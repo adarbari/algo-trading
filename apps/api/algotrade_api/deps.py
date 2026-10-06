@@ -11,7 +11,7 @@ header; never a query parameter), and the query parameters several routes share
 Settings come from the environment through ``algotrade.config.env`` (the one reader):
 ``ALGOTRADE_DATA_URL``, ``ALGOTRADE_CONFIG_DIR``, ``ALGOTRADE_USER`` (the user
 ``ALGOTRADE_AUTH=off`` serves), the authentication settings (``auth.mode.AuthConfig``) and
-``ALGOTRADE_WEB_DIST`` (the built web app the API serves, ADR 0043);
+``ALGOTRADE_WEB_DIST`` (the built web app the API serves, ADR 0044);
 ``ALGOTRADE_API_DEBUG=1`` serves the GraphiQL IDE. The store is opened once per app and
 shared by every request; every read is for the caller.
 """
@@ -99,7 +99,7 @@ class ApiSettings:
     # no token, so it is usable with ALGOTRADE_AUTH=off only).
     debug: bool = False
     auth: AuthConfig = field(default_factory=AuthConfig)  # who may call (ADR 0040)
-    web_dist: Path | None = None  # the built web app served on this origin (ADR 0043); None: none
+    web_dist: Path | None = None  # the built web app served on this origin (ADR 0044); None: none
 
     @classmethod
     def from_env(cls) -> "ApiSettings":

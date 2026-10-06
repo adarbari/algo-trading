@@ -4,11 +4,13 @@ from datetime import UTC, date, datetime
 import pytest
 
 from algotrade.config.env import credential, load_dotenv
+from algotrade.config.site.settings import SourcesSettings
 from algotrade.core.time.calendar import sessions_between
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
-from algotrade.storage.runs import RunStatus
+from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.writers import StoreWriter
+from algotrade_ingestion.tasks.maintenance.quality import check_bars
 from algotrade_ingestion.tasks.market.bars import ingest_daily_bars
 from algotrade_ingestion.tasks.market.corporate_actions import ingest_corporate_actions
 from algotrade_sources.framework.base import FetchRequest
@@ -176,3 +178,56 @@ def test_env_loading_and_missing_key(
     assert credential("ALGOTRADE_MASSIVE_API_KEY") is None  # empty counts as missing
     load_dotenv(tmp_path / "missing")  # type: ignore[operator]
     assert json.loads('{"ok": true}')["ok"]
+
+
+CUR, BEFORE = date(2026, 10, 2), date(2026, 10, 1)  # CLOCK: CUR is the last closed session
+GOOD = fx.grouped(D1, [("AAPL", 10, 11, 9, 10.5, 1000)])
+
+
+def _bars_run(answers: dict[str, object], sessions: list[date]) -> tuple[StoreReader, RunRecord]:
+    """The bars task at CLOCK against canned answers per date (a payload, or the HTTP status
+    to fail with); D1 is stored first, so the store has bars for an earlier session."""
+
+    def transport(url: str) -> bytes:
+        answer = answers[next(d for d in answers if d in url)]
+        if isinstance(answer, int):
+            raise HttpError(answer)
+        assert isinstance(answer, bytes)
+        return answer
+
+    backend = MemoryBackend()
+    writer, reader = StoreWriter(backend), StoreReader(backend)
+    source = MassiveDailyBars(http_for(transport, NO_RETRY))
+    ingest_daily_bars(task_ctx(writer, reader, CLOCK), source, [D1])
+    return reader, ingest_daily_bars(task_ctx(writer, reader, CLOCK), source, sessions)
+
+
+def test_a_403_for_the_current_session_is_not_published_when_the_session_before_answers() -> None:
+    reader, record = _bars_run({"2026-09-30": GOOD, "2026-10-01": GOOD, "2026-10-02": 403}, [CUR])
+    assert record.items["2026-10-02"].startswith("NOT_PUBLISHED: HTTP 403")
+    assert record.status is RunStatus.COMPLETE  # not an error
+    (fresh, *_) = check_bars(reader, CUR, SourcesSettings())
+    assert (fresh.name, fresh.status, fresh.pending) == ("bars_fresh", "FAIL", True)
+
+
+def test_a_403_stays_a_failure_when_the_session_before_fails_too() -> None:
+    reader, record = _bars_run({"2026-09-30": GOOD, "2026-10-01": 403, "2026-10-02": 403}, [CUR])
+    assert record.items["2026-10-02"].startswith("FETCH_ERROR")  # an expired key or plan
+    assert record.status is RunStatus.PARTIAL
+    (fresh, *_) = check_bars(reader, CUR, SourcesSettings())
+    assert fresh.status == "FAIL" and not fresh.pending
+
+
+def test_an_empty_answer_for_the_current_session_is_not_published_only_with_a_live_probe() -> None:
+    empty = fx.grouped(CUR, [])
+    _, waiting = _bars_run({"2026-09-30": GOOD, "2026-10-01": GOOD, "2026-10-02": empty}, [CUR])
+    assert waiting.items["2026-10-02"].startswith("NOT_PUBLISHED: empty")
+    _, dead = _bars_run({"2026-09-30": GOOD, "2026-10-01": 403, "2026-10-02": empty}, [CUR])
+    assert dead.items["2026-10-02"] == "NO_SESSION"
+
+
+def test_only_the_current_session_is_probed_and_only_a_403_counts() -> None:
+    _, old = _bars_run({"2026-09-30": GOOD, "2026-10-01": 403, "2026-09-29": GOOD}, [BEFORE])
+    assert old.items["2026-10-01"].startswith("FETCH_ERROR")  # past session: an error as before
+    _, server = _bars_run({"2026-09-30": GOOD, "2026-10-01": GOOD, "2026-10-02": 500}, [CUR])
+    assert server.items["2026-10-02"].startswith("FETCH_ERROR")  # a 500 is not "not published"

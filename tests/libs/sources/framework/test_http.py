@@ -13,6 +13,7 @@ from algotrade_sources.framework.base import FetchRequest
 from algotrade_sources.framework.http import (
     CircuitBreaker,
     CircuitOpenError,
+    GaveUpError,
     Http,
     HttpError,
     RetryPolicy,
@@ -251,3 +252,23 @@ def test_outcomes_reported_to_the_limiter() -> None:
     no_header = RetryPolicy(tries=2, max_delay=9.0)
     get_with_retry(scripted(HttpError(429), b"x"), "u", no_header, lambda s: None, limiter=limiter)
     assert limiter.outcomes[-2:] == ["429", "ok"] and limiter.held == 5.0  # exponential default
+
+
+def test_giving_up_keeps_the_last_http_status_and_status_probes_once() -> None:
+    with pytest.raises(GaveUpError) as blocked:
+        get_with_retry(scripted(HttpError(403), HttpError(403), HttpError(403)), "u", FAST, str)
+    assert blocked.value.status == 403
+    with pytest.raises(GaveUpError) as reset:
+        get_with_retry(scripted(OSError("x"), OSError("x"), OSError("x")), "u", FAST, str)
+    assert reset.value.status is None
+    seen: list[str] = []
+
+    def transport(url: str) -> bytes:
+        seen.append(url)
+        if url == "blocked":
+            raise HttpError(403)
+        return b"ok"
+
+    http = http_for(transport)
+    assert (http.status("fine"), http.status("blocked")) == (200, 403)
+    assert seen == ["fine", "blocked"]  # one attempt each, never retried

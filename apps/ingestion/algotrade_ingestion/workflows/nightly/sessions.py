@@ -2,12 +2,13 @@
 
 Every session after the last nightly that finished done (SUCCEEDED, or COMPLETE / PARTIAL
 in records written before ADR 0039), up to the last closed session
-(``core/calendar.last_closed_session``), oldest first. A FAILED nightly does not count as
-done, so its session comes first and is retried; the run stops at a session that fails again
-(``nightly.run_nightly``), so a later session never runs past a failed one and lookback
-windows never span a gap. One run takes at most ``max_catch_up`` sessions, the oldest; the
-others wait for the next run (the hourly watchdog). No session is dropped: a dropped session
-would leave a permanent gap in the bars. With no earlier nightly, only the last closed one.
+(``core/calendar.last_closed_session``), oldest first. A FAILED or WAITING nightly (ADR 0043: a
+source has not published the session yet) does not count as done, so its session comes first
+and is retried; the run stops at a session that fails or waits again (``nightly.run_nightly``),
+so a later session never runs past it and lookback windows never span a gap. One run takes at
+most ``max_catch_up`` sessions, the oldest; the others wait for the next run (the hourly
+watchdog). No session is dropped: a dropped session would leave a permanent gap in the bars.
+With no earlier nightly, only the last closed one.
 """
 
 from dataclasses import dataclass, field

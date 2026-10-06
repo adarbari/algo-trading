@@ -38,6 +38,7 @@ TYPED_SETTINGS_FILES = (
     "src/algotrade/config/site/settings.py",
     "src/algotrade/config/site/holdings.py",
     "src/algotrade/config/site/ibkr.py",
+    "src/algotrade/config/site/nightly.py",
 )
 TYPED_SETTINGS = (
     "SourcesSettings",

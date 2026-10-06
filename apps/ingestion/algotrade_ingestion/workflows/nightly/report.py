@@ -25,7 +25,7 @@ from algotrade_ingestion.workflows.nightly.timing import (
     vendor_pacing,
 )
 
-BAD_STEPS = ("FAILED", "NOT_RUN", "PARTIAL", "BLOCKED")  # PARTIAL / BLOCKED: before ADR 0039
+BAD_STEPS = ("FAILED", "NOT_RUN", "WAITING", "PARTIAL", "BLOCKED")  # PARTIAL / BLOCKED: before 0039
 # Key counts per step (result keys); other steps show their top-level numbers.
 KEY_COUNTS: Mapping[str, tuple[str, ...]] = {
     "universe-build": ("covered", "delisted_carried"),

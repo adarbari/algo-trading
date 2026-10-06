@@ -138,7 +138,7 @@ web-real: $(WEB)/node_modules/.package-lock.json golden-store  ## real-app smoke
 web-visual:      ## screenshots + axe over every story, in the CI Linux image (needs Docker)
 	cd $(WEB) && $(NPM) run visual:docker
 
-# The build the API serves on its own origin (ADR 0043, docs/hosting.md): API calls go to the
+# The build the API serves on its own origin (ADR 0044, docs/hosting.md): API calls go to the
 # same origin's root (VITE_API_BASE_URL empty), Supabase keys from apps/web/.env.local. It goes
 # to var/web, not dist/ (which `make check` rebuilds for the dev setup). Redo after a web change.
 WEB_DIST ?= var/web

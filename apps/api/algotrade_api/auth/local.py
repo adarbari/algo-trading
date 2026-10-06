@@ -4,7 +4,7 @@ another ``--host`` (``require_loopback``), and every request is checked again ag
 address the server accepted it on, so a misconfigured bind still answers 401. A request a
 proxy forwarded (``Forwarded`` / ``X-Forwarded-For``, or Tailscale Funnel's
 ``Tailscale-Funnel-Request``: a tunnel or reverse proxy on this machine makes remote callers
-look local, ADR 0043) is 401 too."""
+look local, ADR 0044) is 401 too."""
 
 import ipaddress
 
@@ -16,7 +16,7 @@ from algotrade_api.auth.protocol import UnauthenticatedError
 
 LOCALHOST = "localhost"
 # Set by a proxy in front of the app; Tailscale Serve / Funnel set X-Forwarded-For, and Funnel
-# also Tailscale-Funnel-Request (ADR 0043).
+# also Tailscale-Funnel-Request (ADR 0044).
 FORWARDED = ("forwarded", "x-forwarded-for", "tailscale-funnel-request")
 
 
