@@ -219,6 +219,20 @@ def test_a_market_group_returns_its_one_row() -> None:
     assert first.frame["spy_close"].iloc[0] == pytest.approx(series(5, seed=2)[0])
 
 
+def test_a_market_group_writes_its_row_with_no_optional_input_but_an_instrument_group_not() -> None:
+    _, reader = store()
+
+    def nulls(frames: Inputs, session: date, params: None) -> pd.DataFrame:
+        assert all(f is None for f in frames.values())
+        return pd.DataFrame({"instrument_id": ["MKT:US"], "a": [None]})
+
+    optional = (Input("bars/1d", required=False),)
+    market = compute_one(reader, _rollup(inputs=optional, compute=nulls, entity="market"), END)
+    assert market.frame is not None and market.frame["a"].isna().all()
+    alone = compute_one(reader, _rollup(inputs=optional, compute=nulls), END)
+    assert alone.frame is None and alone.no_input == f"no input for {END}"
+
+
 @pytest.mark.parametrize(
     "ids", [["MKT:US", "MKT:US"], ["EQ:A"], []], ids=["two rows", "an instrument", "none"]
 )

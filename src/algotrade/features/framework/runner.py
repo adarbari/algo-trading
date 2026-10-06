@@ -14,7 +14,9 @@ rollup runs), or from ``produced``, frames computed in this process and not writ
 
 A market-entity group (ADR 0047) describes the whole market: its ``compute`` must return
 exactly one row, ``instrument_id = market_id("US")`` (``MARKET``); anything else fails the
-group loudly (``DataValidationError``), never a silently wrong or duplicated row.
+group loudly (``DataValidationError``), never a silently wrong or duplicated row. It writes
+that row on every session its required inputs allow, even when no optional input has rows
+(its columns are then null: UNKNOWN), so the market always has one row per session.
 
 ``rollup_params`` reads every rollup's parameters from ``config/site/rollups.toml`` through
 the one settings loader.
@@ -119,7 +121,8 @@ def _compute_chunk(
         if missing:
             yield SessionResult(session, None, f"no {', '.join(missing)} for {session}")
             continue
-        if all(f is None for f in frames.values()):  # every input optional, none has rows
+        if all(f is None for f in frames.values()) and rollup.entity != "market":
+            # every input optional, none has rows (a market group still writes its row)
             yield SessionResult(session, None, f"no input for {session}")
             continue
         out = rollup.compute(frames, session, params)
