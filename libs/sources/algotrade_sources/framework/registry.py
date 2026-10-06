@@ -38,6 +38,7 @@ from algotrade_sources.framework.http import (
     HttpError,
     RetryPolicy,
     json_post_transport,
+    pause,
     urllib_transport,
 )
 from algotrade_sources.framework.limiter import Limiter, Pacing
@@ -445,12 +446,17 @@ def limiter_keys(
 
 
 def build_text_model(
-    base_url: str, model: str, timeout_s: float, max_tokens: int, credential: str | None
+    base_url: str,
+    model: str,
+    timeout_s: float,
+    max_tokens: int,
+    credential: str | None,
+    retries: int = 2,
 ) -> ChatCompletions:
     """The text model behind screener drafts (ADR 0041): an OpenAI-compatible chat client at
     ``base_url`` for ``model``, the credential (``$ALGOTRADE_LLM_API_KEY``; a local server
-    needs none) as a bearer header, never in the URL. Built here, like every vendor client,
-    so the API imports only the registry."""
+    needs none) as a bearer header, never in the URL; a busy provider is retried ``retries``
+    times. Built here, like every vendor client, so the API imports only the registry."""
     headers = {"Authorization": f"Bearer {credential}"} if credential else {}
     transport = json_post_transport(timeout=timeout_s, headers=headers)
-    return ChatCompletions(base_url, model, transport, max_tokens)
+    return ChatCompletions(base_url, model, transport, pause, max_tokens, retries)

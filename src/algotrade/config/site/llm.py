@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.core.model.errors import ConfigurationError
 
-KEYS = ("enabled", "base_url", "model", "timeout_s", "answer_limit")
+KEYS = ("enabled", "base_url", "model", "timeout_s", "answer_limit", "retries")
 LOOPBACK = ("localhost", "127.0.0.1", "::1")
 PHRASE_KEYS = ("say", "fields", "hint")
 
@@ -22,13 +22,17 @@ class LlmSettings:
     """``llm.toml``: ``base_url`` is the provider's OpenAI-compatible root (the one with
     ``/chat/completions`` under it: Gemini, Groq, OpenRouter, Ollama, Anthropic's compatibility
     endpoint); ``model`` its model id; ``timeout_s`` the longest one request may take;
-    ``answer_limit`` the longest answer asked for, in tokens (a draft is a few hundred)."""
+    ``answer_limit`` the longest answer asked for, in tokens (a draft is a few hundred, but a
+    model that thinks first, Gemini 3.x, spends thinking tokens from the same budget: ~2,000);
+    ``retries`` how many times a busy provider (429, 5xx) or a dropped connection is retried
+    before "drafting unavailable" (0: never)."""
 
     enabled: bool = False
     base_url: str = "http://localhost:11434/v1"  # Ollama's default: nothing leaves the machine
     model: str = "llama3.1"
     timeout_s: float = 60.0
-    answer_limit: int = 2000
+    answer_limit: int = 8000
+    retries: int = 2
 
     @classmethod
     def from_document(cls, doc: Mapping[str, Any] | None) -> "LlmSettings":
@@ -43,6 +47,7 @@ class LlmSettings:
             model=t.text("model", d.model),
             timeout_s=t.number("timeout_s", d.timeout_s, 1),
             answer_limit=t.integer("answer_limit", d.answer_limit, 1),
+            retries=t.integer("retries", d.retries, 0),
         )
 
 

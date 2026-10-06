@@ -16,7 +16,7 @@ from tests.unit.config.site.test_settings import site
 def test_defaults_are_off_and_local() -> None:
     d = LlmSettings.from_document(None)
     assert not d.enabled and d.base_url == "http://localhost:11434/v1"
-    assert (d.timeout_s, d.answer_limit) == (60.0, 2000)
+    assert (d.timeout_s, d.answer_limit, d.retries) == (60.0, 8000, 2)
 
 
 def test_the_shipped_file_is_off() -> None:
@@ -32,10 +32,12 @@ def test_a_remote_provider() -> None:
             "model": "llama-3.3-70b-versatile",
             "timeout_s": 20,
             "answer_limit": 800,
+            "retries": 0,
         }
     )
     assert s.enabled and s.base_url == "https://api.groq.com/openai/v1"
     assert (s.model, s.timeout_s, s.answer_limit) == ("llama-3.3-70b-versatile", 20.0, 800)
+    assert s.retries == 0
 
 
 @pytest.mark.parametrize(
@@ -46,6 +48,7 @@ def test_a_remote_provider() -> None:
         ({"base_url": ""}, "non-empty string"),
         ({"timeout_s": 0}, "timeout_s"),
         ({"answer_limit": 0}, "answer_limit"),
+        ({"retries": -1}, "retries"),
         ({"api_key": "sk-123"}, "looks like a secret"),
         ({"provider": "groq"}, "unknown keys"),
     ],

@@ -13,4 +13,7 @@ enabled = false
 base_url = "http://localhost:11434/v1"
 model = "llama3.1"
 timeout_s = 60                   # one request may take this long before "drafting unavailable"
-answer_limit = 2000              # the longest answer asked for, in tokens (a draft is a few hundred)
+answer_limit = 8000              # tokens for the answer AND the model's thinking (Gemini 3.x thinks
+                                 # ~2,000 tokens first; a draft itself is a few hundred)
+retries = 2                      # a busy provider (429, 5xx: Gemini's "high demand") or a dropped
+                                 # connection is retried this many times, pausing 3 s then 6 s
