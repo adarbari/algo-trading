@@ -906,6 +906,13 @@ section = "docs/adr/0025-frontend-architecture.md#rule-4-only-sharedapi-talks-ht
 enforced_by = ["eslint no-restricted-globals / no-restricted-syntax / no-restricted-imports (apps/web/lint-rules/restrictions.js)", "npm run generated:check (schema matches the OpenAPI document)"]
 
 [[web_responsibility]]
+id = "web-session"
+description = "The browser's Supabase session: password sign-in and sign-out, the access token sent as the bearer on every request, a 401 ending the session (ADR 0040)"
+owner = ["apps/web/src/shared/api/auth.ts"]
+section = "docs/adr/0040-identity-and-roles.md#decision"
+enforced_by = ["eslint no-restricted-imports: @supabase/supabase-js only in src/shared/api (apps/web/lint-rules/restrictions.js)"]
+
+[[web_responsibility]]
 id = "web-data-access"
 description = "Server state: TanStack Query hooks over shared/api"
 owner = ["apps/web/src/entities/**", "apps/web/src/features/**", "apps/web/src/app/providers/*"]
@@ -921,7 +928,7 @@ enforced_by = ["eslint no-restricted-imports: @tanstack/react-router only in src
 
 [[web_responsibility]]
 id = "web-workspace-access"
-description = "Who may enter a workspace (TRADER, ADMIN): the role-gating seam"
+description = "Who may enter a workspace (TRADER, ADMIN): the role-gating seam, reading the viewer's registry workspaces (ADR 0040)"
 owner = ["apps/web/src/app/workspaces/guard.ts"]
 section = "docs/adr/0025-frontend-architecture.md#workspaces-and-routes"
 enforced_by = ["review: every workspace layout route calls workspaceGuard in beforeLoad"]

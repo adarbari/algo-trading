@@ -9,3 +9,7 @@ test-results/
 # The root .gitignore ignores Python build dirs named lib/; every lib/ here is source
 # (src/shared/lib, a slice's lib segment such as src/features/<feature>/lib).
 !lib/
+
+# Local env overrides (VITE_SUPABASE_*, API_PROXY_TARGET): never committed
+.env.local
+.env.*.local

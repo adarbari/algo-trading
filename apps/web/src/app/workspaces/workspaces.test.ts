@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { canEnter } from './guard';
 import { ADMIN, DEFAULT_WORKSPACE, section, TRADER, WORKSPACES } from './workspaces';
 
 describe('workspaces', () => {
@@ -18,9 +17,5 @@ describe('workspaces', () => {
   it('finds a section by path and fails loudly for an unknown one', () => {
     expect(section(TRADER, '/explore').label).toBe('Explore');
     expect(() => section(ADMIN, '/explore')).toThrow(/no section/);
-  });
-
-  it('lets the local single user into every workspace (role gating comes later)', () => {
-    expect(WORKSPACES.every((w) => canEnter(w.id))).toBe(true);
   });
 });

@@ -78,6 +78,7 @@
   },
   "dependencies": {
     "@algotrade/ui": "^0.0.0",
+    "@supabase/supabase-js": "^2.117.2",
     "@tanstack/react-query": "^5.104.1",
     "@tanstack/react-router": "^1.170.41",
     "openapi-fetch": "^0.17.0",

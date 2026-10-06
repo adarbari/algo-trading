@@ -35,6 +35,15 @@ describe('LoginForm', () => {
     });
   });
 
+  it('tells the page when either field is edited', async () => {
+    const onEdit = vi.fn();
+    render(<LoginForm onSubmit={vi.fn()} onEdit={onEdit} />);
+    await userEvent.type(screen.getByLabelText(/Email/), 'a');
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    await userEvent.type(screen.getByLabelText(/Password/), 'b');
+    expect(onEdit).toHaveBeenCalledTimes(2);
+  });
+
   it('submits on Enter from the password field', async () => {
     const onSubmit = vi.fn();
     render(<LoginForm onSubmit={onSubmit} defaultEmail="a@b.co" />);

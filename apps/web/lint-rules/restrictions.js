@@ -98,6 +98,8 @@ const HTTP_LIBRARIES = [
   'superagent',
   'node-fetch',
   'cross-fetch',
+  // The Supabase client (ADR 0040) talks to Supabase over fetch: only shared/api/auth.ts.
+  '@supabase/supabase-js',
   // GraphQL clients (ADR 0037): the one transport is gql() in src/shared/api/graphql.ts over
   // fetch and TanStack Query; Apollo / urql would add a second cache and are not used at all.
   'graphql-request',

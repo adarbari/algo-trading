@@ -1,0 +1,99 @@
+/**
+ * The top bar of a workspace layout for each kind of viewer: the switch lists only the
+ * workspaces the registry role allows, the name shows, sign-out appears only with a Supabase
+ * session, and a viewer that turns null goes back to the login page.
+ */
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { Text, UiProvider } from '@algotrade/ui';
+
+import { currentSession, gql, signOutSession, subscribeSession } from '@/shared/api';
+
+import { TRADER } from '../workspaces';
+import { WorkspaceLayout } from './WorkspaceLayout';
+
+vi.mock('@/shared/api', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    gql: vi.fn(),
+    currentSession: vi.fn(),
+    subscribeSession: vi.fn(() => () => undefined),
+    signOutSession: vi.fn(() => Promise.resolve()),
+  };
+});
+
+const TRADER_VIEWER = { id: 'ann', name: 'Ann', role: 'trader', workspaces: ['trader'] };
+const ADMIN_VIEWER = { id: 'bo', name: 'Bo', role: 'admin', workspaces: ['trader', 'admin'] };
+
+beforeEach(() => {
+  vi.mocked(currentSession).mockResolvedValue(null);
+  vi.mocked(subscribeSession).mockReturnValue(() => undefined);
+});
+
+function setup() {
+  const root = createRootRoute({ component: () => <WorkspaceLayout workspace={TRADER} /> });
+  const ideas = createRoute({ getParentRoute: () => root, path: '/ideas', component: () => null });
+  const login = createRoute({
+    getParentRoute: () => root,
+    path: '/login',
+    component: () => <Text>login page</Text>,
+  });
+  const router = createRouter({
+    routeTree: root.addChildren([ideas, login]),
+    history: createMemoryHistory({ initialEntries: ['/ideas'] }),
+  });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <UiProvider>
+      <QueryClientProvider client={client}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    </UiProvider>,
+  );
+  return { router };
+}
+
+describe('WorkspaceLayout top bar', () => {
+  it('shows an admin both workspaces and their name', async () => {
+    vi.mocked(gql).mockResolvedValue({ viewer: ADMIN_VIEWER });
+    setup();
+    expect(await screen.findByText('Bo')).toBeVisible();
+    expect(screen.getByRole('radio', { name: 'Trader' })).toBeVisible();
+    expect(screen.getByRole('radio', { name: 'Admin' })).toBeVisible();
+  });
+
+  it('hides the admin workspace from a trader', async () => {
+    vi.mocked(gql).mockResolvedValue({ viewer: TRADER_VIEWER });
+    setup();
+    expect(await screen.findByText('Ann')).toBeVisible();
+    expect(screen.getByRole('radio', { name: 'Trader' })).toBeVisible();
+    expect(screen.queryByRole('radio', { name: 'Admin' })).not.toBeInTheDocument();
+  });
+
+  it('offers no sign-out without a Supabase session (the API runs with auth off)', async () => {
+    vi.mocked(gql).mockResolvedValue({ viewer: ADMIN_VIEWER });
+    setup();
+    await screen.findByText('Bo');
+    expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument();
+  });
+
+  it('signs out and goes to the login page', async () => {
+    vi.mocked(gql).mockResolvedValue({ viewer: TRADER_VIEWER });
+    vi.mocked(currentSession).mockResolvedValue({ email: 'ann@example.com' });
+    setup();
+    await userEvent.click(await screen.findByRole('button', { name: 'Sign out' }));
+    expect(signOutSession).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('login page')).toBeVisible();
+  });
+});

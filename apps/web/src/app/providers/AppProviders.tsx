@@ -3,13 +3,17 @@
  * app: `useToast()` anywhere below) and the query client.
  */
 import { ToastProvider, UiProvider } from '@algotrade/ui';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
+import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 
-import { createQueryClient } from './query-client';
-
-export function AppProviders({ children }: { children: ReactNode }) {
-  const [queryClient] = useState(createQueryClient);
+export function AppProviders({
+  queryClient,
+  children,
+}: {
+  /** The app's one query client (also given to the router, so guards share its cache). */
+  queryClient: QueryClient;
+  children: ReactNode;
+}) {
   return (
     <UiProvider>
       <ToastProvider>
