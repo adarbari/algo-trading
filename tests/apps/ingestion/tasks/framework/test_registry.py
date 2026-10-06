@@ -43,6 +43,7 @@ def calls(monkeypatch: pytest.MonkeyPatch) -> Calls:
     for module, fn in (
         (corporate_actions, "ingest_corporate_actions"),
         (earnings, "ingest_earnings"),
+        (earnings, "backfill_earnings"),
         (bars, "ingest_daily_bars"),
         (option_chains, "ingest_option_chains"),
         (etf_holdings, "ingest_etf_holdings"),
@@ -80,6 +81,11 @@ def test_settings_defaults_are_applied_by_the_task(calls: Calls) -> None:
     assert calls.args[-1][1:4] == ("ea", DAY, date(2026, 7, 1)) and calls.args[-1][4] == {
         "days": 95
     }
+    backfill = {"session": DAY, "history_from": date(2018, 1, 2)}  # --from: the backfill
+    run_task("earnings", ctx(), backfill)
+    assert calls.args[-1][1:5] == ("ea", DAY, date(2018, 1, 2), DAY)  # --to: the session
+    run_task("earnings", ctx(), {**backfill, "history_to": date(2018, 12, 31)})
+    assert calls.args[-1][4] == date(2018, 12, 31)
     run_task("chains", ctx(), {"session": DAY, "symbols": "spy, aapl"})
     _, source, underlyings, _, config, _ = calls.args[-1]
     assert (source, underlyings, config.workers) == ("cb", ["spy", " aapl"], 8)

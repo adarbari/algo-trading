@@ -41,6 +41,27 @@ def test_loaders() -> None:
         inputs.load_input(reader, "bars/5m", [END], 0)
 
 
+def test_earnings_rows_are_given_to_the_sessions_they_were_known_on() -> None:
+    """ADR 0050: a report backfilled into a later partition with ``known_from`` = its report
+    date reaches the sessions from that date on; a row without it, its own session on."""
+    writer, reader = store()
+    first, report, backfill = date(2019, 4, 1), date(2019, 5, 1), date(2026, 10, 2)
+
+    def row(day: date, **extra: object) -> dict[str, object]:
+        return {"instrument_id": "EQ:A", "ts": pd.Timestamp(day, tz="UTC"), **extra}
+
+    nightly = stamped([row(report, known_from=first)], first, "n")
+    writer.write_table("events/earnings", first, "n", nightly)
+    rows = [row(report, known_from=report), row(date(2026, 11, 2), known_from=backfill)]
+    writer.write_table("events/earnings", backfill, "b", stamped(rows, backfill, "b"))
+    loaded = inputs.load_input(reader, "events/earnings", [first, report], 0)
+    assert loaded.at(date(2019, 3, 29), 0) is None
+    early = loaded.at(first, 0)
+    assert early is not None and list(early["session_date"]) == [first]
+    on_report = loaded.at(report, 0)
+    assert on_report is not None and list(on_report["session_date"]) == [first, backfill]
+
+
 def test_rollup_input_reads_store_and_this_runs_rows_win() -> None:
     writer, reader = store()
     days = write_bars(writer, {"EQ:A": series(5)})

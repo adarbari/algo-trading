@@ -26,8 +26,9 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        (on or after the first stored one) has no bars (ADR 0039); ``None`` when
                        no window has a row yet. For a history years back that a trailing
                        lookback would load whole (every instrument's every column)
-- ``events/earnings``  ``events.stored_events``: every calendar snapshot stored on or before
-                       the session (what was known then); ``None`` when there is none
+- ``events/earnings``  ``events.stored_events``: every calendar row known on or before the
+                       session (``known_from``, else the session that stored it: ADR 0050),
+                       as stored (what was known then); ``None`` when there is none
 - ``chains/*``         ``chains``: the session's own partition, read per session (chains are
                        large; a lookback is not supported)
 - ``events/dividend``, ``events/split``
@@ -102,6 +103,7 @@ from algotrade.data.shares import TABLE as SHARES
 from algotrade.data.shares import share_facts
 from algotrade.data.volatility import IBKR_IV30, ibkr_iv30
 from algotrade.storage.tables.readers import StoreReader
+from algotrade.storage.tables.schemas import KNOWN_FROM
 
 
 class Loaded(Protocol):
@@ -227,7 +229,7 @@ def _bar_windows(
 def _event_snapshots(table: str) -> Loader:
     def load(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
         frame = stored_events(reader, table, sessions[-1])
-        return _Snapshots(frame, _days(frame["session_date"]))
+        return _Snapshots(frame, _days(frame[KNOWN_FROM]))  # known on or before (ADR 0050)
 
     return load
 

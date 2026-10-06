@@ -25,7 +25,7 @@ from tests.helpers.stored_frames import write_reference
 
 DAY = date(2026, 10, 2)
 NOW = datetime(2026, 10, 2, 22, tzinfo=UTC)
-EVENTS = "events/earnings"
+EVENTS = "events/split"  # a generic event table (no required known_from)
 
 
 class FakeSource:
@@ -139,7 +139,7 @@ def test_staging_publish_and_rewrite() -> None:
         run.stage(EVENTS, "B", pd.DataFrame(rows), "fake")
         run.stage(EVENTS, "A", pd.DataFrame([{**rows[0], "instrument_id": "EQ:A"}]), "fake")
         assert run.publish(EVENTS) == 2
-        assert run.publish("events/split") == 0  # nothing staged
+        assert run.publish("events/dividend") == 0  # nothing staged
     assert writer.staging.keys(run.run_id, EVENTS) == []  # complete: staging dropped
     stored = reader.table(EVENTS, DAY)
     assert stored is not None and list(stored["instrument_id"]) == ["EQ:A", "EQ:B"]

@@ -199,6 +199,10 @@ def _etf_holdings(ctx: TaskContext, p: Params) -> RunRecord:
 
 def _earnings(ctx: TaskContext, p: Params) -> RunRecord:
     session = session_of(p)
+    source = ctx.sources["nasdaq_earnings"]
+    if p.get("history_from"):
+        end = p.get("history_to") or session
+        return earnings.backfill_earnings(ctx, source, session, p["history_from"], end)
     days = p.get("days") or ctx.settings.earnings_days
     start = p.get("start")
     if start is None:
@@ -206,7 +210,7 @@ def _earnings(ctx: TaskContext, p: Params) -> RunRecord:
         # `last_earnings_date` stays current. An explicit --start is taken as given.
         back = ctx.settings.earnings_lookback_days
         start, days = session - timedelta(days=back), days + back
-    return earnings.ingest_earnings(ctx, ctx.sources["nasdaq_earnings"], session, start, days=days)
+    return earnings.ingest_earnings(ctx, source, session, start, days=days)
 
 
 def _bars(ctx: TaskContext, p: Params) -> RunRecord:
@@ -503,7 +507,8 @@ TASKS: dict[str, Task] = {
         ),
         Task(
             "earnings",
-            "store the Nasdaq earnings calendar as events",
+            "store the Nasdaq earnings calendar as events, or a resumable history backfill "
+            "(--from/--to)",
             earnings,
             ("events/earnings",),
             _earnings,
@@ -513,6 +518,8 @@ TASKS: dict[str, Task] = {
                 SESSION,
                 Param("start", ("--start",), date.fromisoformat, "first date (default: --date)"),
                 Param("days", ("--days",), int, "calendar days (default: sources.toml)"),
+                Param("history_from", ("--from",), date.fromisoformat, "backfill: first day"),
+                Param("history_to", ("--to",), date.fromisoformat, "backfill: last day"),
             ),
         ),
         Task(

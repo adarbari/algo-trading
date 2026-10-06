@@ -106,7 +106,7 @@ Next and last earnings dates, report time and sessions to the next report. Store
 | `earnings_time` | label | str | category | open | pre, post, unknown | When the next report is due: pre (before the open), post (after the close), unknown | no report date on or after the session in the calendars stored by then | `events/earnings.time` |
 | `days_to_earnings` | window | int | sessions | open | >= 0 | Exchange sessions after the session up to the next report date (0: reports today) | no report date on or after the session in the calendars stored by then | `events/earnings.ts` |
 | `date_confirmed` | window | bool | flag | open |  | Whether the source confirmed the next report date | the source does not say (the Nasdaq calendar never does), or no report date on or after the session in the calendars stored by then | `events/earnings.date_confirmed` |
-| `last_earnings_date` | window | date | date | open |  | The latest report date before the session | no earlier report date in the calendars stored by then (they start with the first stored snapshot; a backfill does not invent history) | `events/earnings.ts` |
+| `last_earnings_date` | window | date | date | open |  | The latest report date before the session | no earlier report date known by the session (the calendars start with the first stored snapshot, the earnings backfill from its first day) | `events/earnings.ts` |
 
 ## `earnings_schedule@v1`
 
