@@ -15,6 +15,7 @@ function IdeasRoute() {
       onCompare={(search) => void navigate({ to: '/explore', search })}
       onNewScreener={() => void navigate({ to: '/screeners/new' })}
       onScreeners={() => void navigate({ to: '/screeners' })}
+      onOpenRegime={() => void navigate({ to: '/regime' })}
       onOpenScreener={(id) => void navigate({ to: '/screeners/$id', params: { id } })}
       onOpen={(symbol) => void navigate({ to: '/explore', search: { sel: symbol, focus: symbol } })}
     />

@@ -1,0 +1,19 @@
+/* ExternalLink: accent text with a trailing mark; underline on hover, the global focus ring. */
+.link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  color: var(--color-accent-strong);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  text-decoration: none;
+}
+
+.link[data-size='sm'] {
+  font-size: var(--font-size-sm);
+}
+
+.link:hover {
+  text-decoration: underline;
+}

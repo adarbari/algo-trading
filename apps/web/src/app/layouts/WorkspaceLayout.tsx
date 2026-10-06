@@ -4,7 +4,8 @@
  * WorkspaceSwitch and NavTabs come from the design system; this file supplies the router's
  * current path, its Link and navigation (the design system knows no routes). The switch lists
  * only the workspaces the viewer may enter; the end slot shows their name and, when they signed
- * in through Supabase, a sign-out action. A viewer that turns null (the API refused the token)
+ * in through Supabase, a sign-out action; the regime chip (ADR 0047) sits before the name, on both
+ * workspaces, and opens the Regime page. A viewer that turns null (the API refused the token)
  * goes back to the login page.
  */
 import {
@@ -20,6 +21,7 @@ import {
 import { Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { useEffect } from 'react';
 
+import { RegimeChip } from '@/entities/regime';
 import { useSession, useSignOut, useViewer } from '@/entities/viewer';
 
 import { canEnter, WORKSPACES, type Workspace, type WorkspaceId } from '../workspaces';
@@ -57,6 +59,7 @@ export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
           end={
             viewer && (
               <Stack direction="row" gap={2} align="center">
+                <RegimeChip onOpen={() => void navigate({ to: '/regime' })} />
                 <Text size="sm">{viewer.name}</Text>
                 {session && (
                   <Button variant="ghost" size="sm" onClick={() => void signOut()}>

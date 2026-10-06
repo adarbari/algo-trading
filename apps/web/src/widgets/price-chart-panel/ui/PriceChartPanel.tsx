@@ -1,6 +1,7 @@
 /**
  * Chart: the focused ticker's split-adjusted daily closes over the chosen window, with
- * ex-dividend, split and earnings markers and a volume pane.
+ * ex-dividend, split and earnings markers, a volume pane and the sessions the market regime
+ * called Storm or Severe storm shaded behind the line.
  */
 import { Chart, Panel, type ChartRange } from '@algotrade/ui';
 import { useMemo } from 'react';
@@ -12,6 +13,7 @@ import {
   useInstrumentEvents,
   useInstrumentPrices,
 } from '@/entities/instrument';
+import { toChartBands, useRegimeBands } from '@/entities/regime';
 
 export interface PriceChartPanelProps {
   symbol: string;
@@ -24,6 +26,9 @@ export function PriceChartPanel({ symbol, range, onRangeChange }: PriceChartPane
   const bars = useInstrumentPrices(symbol, from);
   const events = useInstrumentEvents(symbol);
   const items = useMemo(() => bars.data ?? [], [bars.data]);
+  // Storm and Severe-storm sessions shade the window, up to the last stored bar.
+  const regimeBands = useRegimeBands(from, items.at(-1)?.session);
+  const bands = useMemo(() => toChartBands(regimeBands.data ?? [], 'STRESS'), [regimeBands.data]);
   const series = useMemo(
     () => [
       {
@@ -49,6 +54,7 @@ export function PriceChartPanel({ symbol, range, onRangeChange }: PriceChartPane
         series={series}
         events={markers}
         volume={volume}
+        bands={bands}
         height="lg"
         toolbar={<RangeControl value={range} onChange={onRangeChange} />}
         status={bars.isError ? 'error' : bars.isPending ? 'loading' : 'ready'}
