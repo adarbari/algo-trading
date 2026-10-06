@@ -109,7 +109,20 @@ def regime_facts(regime: MarketRegime, card: RegimeIndicator | None = None) -> F
     lines = [
         f"The market's weather: {regime.plain_label}. {regime.headline}",
         "Scores:",
-        _score("Slow-warning score (macro risk, moves over weeks)", regime.scores.macro_risk),
+        _score(
+            "Slow-warning score (macro risk, moves over weeks; the higher of its two parts)",
+            regime.scores.macro_risk,
+        ),
+        _score(
+            "Slow-warning score, early part (yield curve inverted for a month within the last "
+            "year, Fed hikes, building permits, inflation)",
+            regime.scores.macro_early,
+        ),
+        _score(
+            "Slow-warning score, confirming part (credit spreads, jobs, financial conditions, "
+            "bank lending)",
+            regime.scores.macro_confirming,
+        ),
         _score(
             "Market stress score (trend, volatility, breadth, moves daily)",
             regime.scores.market_stress,

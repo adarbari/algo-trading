@@ -33,6 +33,15 @@ the text is ``regime_report``.
   history: month-end sessions with ``curve_10y3m``, ``cpi_yoy`` and ``hy_oas`` known, ``y`` = the
   S&P 500 in a Pagan-Sossounov bear ``HORIZON`` index sessions later; the coefficients, the
   in-sample hit rate (p >= 0.5 against y) and the lines to paste into ``rollups.toml``.
+- (g) **Per-indicator leads.** Each signal of the macro score (``regime.SIGNALS``, with the
+  site's thresholds, from the stored inputs it reads), per episode: the first session it was on
+  in the ``SEARCH_BEFORE`` sessions before the peak (else after it, up to the trough), and how
+  many of those sessions before the peak it was on; per signal, its hit rate (on in the
+  ``HIT_BEFORE`` sessions before a recession bear's peak) and its false alarms (runs on outside
+  every episode window, ``SEARCH_BEFORE`` sessions before a recession bear's peak as a slow
+  signal may lead by that much, ``WINDOW_BEFORE`` before a shock's; a run back on within
+  ``MERGE_GAP`` sessions is the same alarm) per year it was known there. The evidence the
+  macro tiers are set on (docs/market-regime-plan.md section 4).
 
 Dating is ex post (a turn needs the history after it): it is the ground truth, never a signal.
 """
@@ -46,13 +55,14 @@ import numpy as np
 import pandas as pd
 
 from algotrade.config.site.regime.episodes import Episode
+from algotrade.config.site.settings import load_rollup
 from algotrade.config.user import UserContext
 from algotrade.core.model.instruments import index_id, market_id
 from algotrade.core.time.calendar import next_session, sessions_ending, sessions_to
 from algotrade.data import StoreReader
 from algotrade.data.macro.series import known_window, latest_vintages, stored_vintages
 from algotrade.features.framework.declaration import FeatureGroup
-from algotrade.features.rollups.market import macro, regime
+from algotrade.features.rollups.market import indicators, macro, regime
 from algotrade.quant.probit import ProbitFit, fit, predict
 from algotrade.quant.turning_points import Phase, lunde_timmermann, pagan_sossounov
 from algotrade.services.read.context import ConfigStore, NotFoundError, ReadContext, open_context
@@ -87,6 +97,8 @@ ALL_TIME = (date(1900, 1, 1), date(9999, 12, 31))
 SCORE_SERIES = ("T10Y3M", "BAMLH0A0HYM2", "EBP", "UNRATE", "IC4WSA", "NFCI", "DRTSCILM",
                 "PERMIT", "FEDFUNDS", "CPIAUCSL")  # fmt: skip
 NO_DATA = "no data: run the macro backfill"
+HIT_BEFORE = 252  # sessions: a signal on within a year before a recession bear's peak is a hit
+MERGE_GAP = 63  # sessions: a signal back on within a quarter continues the same alarm
 BACKFILL = (
     "algotrade-ingest run macro --since 1970-01-01, then "
     "algotrade-ingest market-rollups --from <first session> --to <last session>"
@@ -96,13 +108,15 @@ BACKFILL = (
 @dataclass(frozen=True)
 class History:
     """What the scorecard reads: index closes by date (``levels``: key -> series), the regime
-    rows (``session_date`` + label and scores), the macro rows the probit reads, and every
-    stored vintage of the macro score's series."""
+    rows (``session_date`` + label and scores), the macro rows the probit reads, every stored
+    vintage of the macro score's series, and each macro signal's verdict per session
+    (``signals``: ``session_date`` + one column per signal, 1 on, 0 off, NaN unknown)."""
 
     levels: dict[str, pd.Series]
     regime: pd.DataFrame | None
     macro: pd.DataFrame | None
     vintages: pd.DataFrame
+    signals: pd.DataFrame | None = None
 
 
 @dataclass(frozen=True)
@@ -195,12 +209,46 @@ def load_history(reader: StoreReader, configs: ConfigStore, user: UserContext) -
     last = max((s.index[-1] for s in levels.values()), default=None)
     ctx = _context(reader, configs, user, last)
     vintages = stored_vintages(reader, [macro.ID[k] for k in SCORE_SERIES])
+    reads = _signal_columns()
+    macro_rows = _market_rows(ctx, macro.GROUP, [*REGRESSORS, *reads[macro.GROUP.key]])
+    cards = _market_rows(ctx, indicators.GROUP, reads[indicators.GROUP.key])
+    params = load_rollup(configs, regime.GROUP.key, regime.GROUP.params)
     return History(
         levels,
         _market_rows(ctx, regime.GROUP, REGIME_COLUMNS),
-        _market_rows(ctx, macro.GROUP, REGRESSORS),
+        macro_rows,
         vintages,
+        signal_verdicts(macro_rows, cards, params),
     )
+
+
+MACRO_SIGNALS = tuple(s for s in regime.SIGNALS if s.score == "macro")
+
+
+def _signal_columns() -> dict[str, list[str]]:
+    """The columns the macro signals read, by input group (beyond the probit's)."""
+    reads = {r for s in MACRO_SIGNALS for r in s.reads}
+    return {k: [f.name for f in g.features if f.key in reads and f.name not in REGRESSORS]
+            for k, g in regime.GROUPS.items()}  # fmt: skip
+
+
+def signal_verdicts(
+    rows: pd.DataFrame | None, cards: pd.DataFrame | None, params: regime.Params
+) -> pd.DataFrame | None:
+    """Each macro signal's verdict per session from its stored inputs (``None``: none)."""
+    parts = [f for f in (rows, cards) if f is not None]
+    if not parts:
+        return None
+    merged = parts[0] if len(parts) == 1 else parts[0].merge(parts[1], "outer", "session_date")
+    flags = set(_signal_columns()[indicators.GROUP.key])
+    out = {}
+    for day, values in zip(merged["session_date"], merged.to_dict("records"), strict=True):
+        v = {str(k): (None if pd.isna(x) else bool(x)) if k in flags else x
+             for k, x in values.items()}  # fmt: skip
+        verdicts = (s.verdict(v, params) for s in MACRO_SIGNALS)
+        out[day] = [np.nan if x is None else float(x) for x in verdicts]
+    frame = pd.DataFrame.from_dict(out, "index", columns=[s.name for s in MACRO_SIGNALS])
+    return frame.rename_axis("session_date").sort_index().reset_index()
 
 
 def offset(start: date, end: date) -> int:
@@ -348,11 +396,16 @@ def _after(day: date, n: int) -> date:
     return day
 
 
-def _windows(episodes: Sequence[Episode]) -> list[tuple[date, date]]:
-    return [
-        (sessions_ending(e.peak, WINDOW_BEFORE + 1)[0], _after(e.trough, WINDOW_AFTER))
-        for e in episodes
-    ]
+def _windows(
+    episodes: Sequence[Episode], recession_before: int = WINDOW_BEFORE
+) -> list[tuple[date, date]]:
+    """Each episode's window: ``recession_before`` (a recession bear) or ``WINDOW_BEFORE``
+    sessions before the peak to ``WINDOW_AFTER`` after the trough."""
+    out = []
+    for e in episodes:
+        before = recession_before if e.kind == "recession" else WINDOW_BEFORE
+        out.append((sessions_ending(e.peak, before + 1)[0], _after(e.trough, WINDOW_AFTER)))
+    return out
 
 
 def _runs(flags: Sequence[bool]) -> list[int]:
@@ -438,3 +491,70 @@ def fit_probit(history: History) -> ProbitResult | None:
     result = fit(x, y, max_iter=100, tol=1e-9)
     hits = (predict(x, result.coef) >= 0.5) == (y == 1)
     return ProbitResult(result, len(y), float(hits.mean()), float(y.mean()), through)
+
+
+# ----------------------------------------------------------------------------- (g) indicator leads
+
+
+@dataclass(frozen=True)
+class SignalLead:
+    """One macro signal: per episode key, ``(first, on)``: the first session it was on from the
+    peak (``None``: never) and its sessions on before the peak, or ``None`` when it is unknown
+    throughout; its hits over the graded recession bears; its false alarms over the ``years``
+    it was known outside every window, and the share of those sessions it was on."""
+
+    signal: str
+    tier: str
+    episodes: dict[str, tuple[int | None, int] | None]
+    hits: int
+    graded: int
+    alarms: int
+    years: float
+    share: float
+
+
+def _episode_lead(col: pd.Series, days: list[date], e: Episode) -> tuple[int | None, int] | None:
+    start = sessions_ending(e.peak, SEARCH_BEFORE + 1)[0]
+    seen = [
+        (d, x) for d, x in zip(days, col.to_numpy(float), strict=True) if start <= d <= e.trough
+    ]
+    if all(np.isnan(x) for _, x in seen):
+        return None
+    on = [d for d, x in seen if x == 1.0]
+    first = None if not on else offset(e.peak, on[0])
+    return first, sum(d <= e.peak for d in on)
+
+
+def _alarms(on: Sequence[bool]) -> int:
+    """Runs of ``on``, a run starting within ``MERGE_GAP`` sessions of the last one's end
+    continuing it."""
+    count, gap = 0, MERGE_GAP
+    for x in on:
+        if x and gap >= MERGE_GAP:
+            count += 1
+        gap = 0 if x else gap + 1
+    return count
+
+
+def signal_leads(history: History, episodes: Sequence[Episode]) -> list[SignalLead]:
+    """Every macro signal's leads, hit rate and false alarms over the stored history."""
+    frame = history.signals
+    if frame is None or frame.empty:
+        return []
+    days = list(frame["session_date"])
+    covered = [e for e in episodes if days[0] <= e.peak and e.trough <= days[-1]]
+    windows = _windows(episodes, SEARCH_BEFORE)
+    outside = [not any(a <= d <= b for a, b in windows) for d in days]
+    out = []
+    for s in MACRO_SIGNALS:
+        col = pd.Series(frame[s.name].to_numpy(float), index=days)
+        leads = {e.key: _episode_lead(col, days, e) for e in covered}
+        recent = [col[[sessions_ending(e.peak, HIT_BEFORE + 1)[0] <= d <= e.peak for d in days]]
+                  for e in covered if e.kind == "recession"]  # fmt: skip
+        graded = [w for w in recent if w.notna().any()]
+        known = [o and not np.isnan(x) for o, x in zip(outside, col, strict=True)]
+        flagged = [k and x == 1.0 for k, x in zip(known, col, strict=True)]
+        n, hits = sum(known), sum(bool((w == 1.0).any()) for w in graded)
+        out.append(SignalLead(s.name, str(s.tier), leads, hits, len(graded), _alarms(flagged),
+                              n / SESSIONS_PER_YEAR, sum(flagged) / n if n else 0.0))  # fmt: skip
+    return out

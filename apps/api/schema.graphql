@@ -952,12 +952,14 @@ type RegimeScore {
 }
 
 """
-`macroRisk` (slow, weekly), `marketStress` (fast, daily) and `fragility` (context only: it never changes the label)
+`macroRisk` (slow, weekly), `marketStress` (fast, daily) and `fragility` (context only: it never changes the label); `macroEarly` and `macroConfirming`, the macro score's two tiers (`macroRisk` is the higher; either at or above its threshold makes macro risk high)
 """
 type RegimeScores {
   macroRisk: RegimeScore!
   marketStress: RegimeScore!
   fragility: RegimeScore!
+  macroEarly: RegimeScore!
+  macroConfirming: RegimeScore!
 }
 
 """

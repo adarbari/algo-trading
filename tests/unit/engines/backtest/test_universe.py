@@ -116,7 +116,7 @@ def test_a_held_instrument_that_left_the_set_is_not_bought_back_by_an_overlay() 
     """ADR 0049: a hold strategy (``None``) resized by a regime change after A left the set
     trades only the set in force; A's exit is never replaced by a buy."""
     data = two()
-    label = "market.regime@v2.label"
+    label = "market.regime@v3.label"
     labels = ["CALM", "CALM", "STRESS", "STRESS", "CALM"]
     market = MarketFeatures(data["A"].timestamps, {label: labels})
     overlay = ScaleByLabel(label, {"CALM": 1.0, "STRESS": 0.5})
@@ -138,7 +138,7 @@ def test_an_instrument_that_re_enters_is_not_bought_back_from_old_targets() -> N
     a storm while A is out resizes B only, and A's return buys nothing (the strategy decides
     nothing new)."""
     data = {"A": series_from_closes([10.0] * 7, "A"), "B": series_from_closes([20.0] * 7, "B")}
-    label = "market.regime@v2.label"
+    label = "market.regime@v3.label"
     labels = ["CALM", "CALM", "CALM", "STRESS", "CALM", "CALM", "CALM"]
     market = MarketFeatures(data["A"].timestamps, {label: labels})
     overlay = ScaleByLabel(label, {"CALM": 1.0, "STRESS": 0.5})

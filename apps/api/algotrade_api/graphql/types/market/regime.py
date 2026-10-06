@@ -44,12 +44,16 @@ class RegimeScore:
 
 @strawberry.type(
     description="`macroRisk` (slow, weekly), `marketStress` (fast, daily) and `fragility` "
-    "(context only: it never changes the label)"
+    "(context only: it never changes the label); `macroEarly` and `macroConfirming`, the macro "
+    "score's two tiers (`macroRisk` is the higher; either at or above its threshold makes "
+    "macro risk high)"
 )
 class RegimeScores:
     macro_risk: RegimeScore
     market_stress: RegimeScore
     fragility: RegimeScore
+    macro_early: RegimeScore
+    macro_confirming: RegimeScore
 
     @classmethod
     def of(cls, d: regime.RegimeScores) -> Self:
@@ -57,6 +61,8 @@ class RegimeScores:
             macro_risk=RegimeScore.of(d.macro_risk),
             market_stress=RegimeScore.of(d.market_stress),
             fragility=RegimeScore.of(d.fragility),
+            macro_early=RegimeScore.of(d.macro_early),
+            macro_confirming=RegimeScore.of(d.macro_confirming),
         )
 
 

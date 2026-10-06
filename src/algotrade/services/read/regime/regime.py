@@ -26,7 +26,9 @@ from algotrade.services.read.context import ReadContext
 from algotrade.services.read.regime.fields import (
     FRAGILITY,
     LABEL,
+    MACRO_CONFIRMING,
     MACRO_COVERAGE,
+    MACRO_EARLY,
     MACRO_RISK,
     MARKET_COVERAGE,
     MARKET_STRESS,
@@ -80,11 +82,15 @@ class RegimeScore:
 @dataclass(frozen=True)
 class RegimeScores:
     """``macro_risk`` (slow, weekly), ``market_stress`` (fast, daily) and ``fragility``
-    (context only: never changes the label)."""
+    (context only: never changes the label); ``macro_early`` and ``macro_confirming``, the
+    macro score's two tiers (``macro_risk`` is the higher), so a CAUTION carried by the
+    curve's year of memory shows while the "inverted now" curve card reads off."""
 
     macro_risk: RegimeScore
     market_stress: RegimeScore
     fragility: RegimeScore
+    macro_early: RegimeScore
+    macro_confirming: RegimeScore
 
 
 @dataclass(frozen=True)
@@ -157,12 +163,14 @@ def _score(
 
 
 def _scores(ctx: ReadContext, read: Mapping[str, Reading]) -> RegimeScores:
-    """The three scores with their fields and the site's thresholds for a high score."""
+    """The scores with their fields and the site's thresholds for a high score."""
     p = load_rollup(ctx.configs, scores.GROUP.key, scores.GROUP.params)
     return RegimeScores(
         _score(read[MACRO_RISK], MACRO_RISK, MACRO_COVERAGE, p.macro_high),
         _score(read[MARKET_STRESS], MARKET_STRESS, MARKET_COVERAGE, p.market_high),
         _score(read[FRAGILITY], FRAGILITY, None, None),
+        _score(read[MACRO_EARLY], MACRO_EARLY, None, p.macro_high),
+        _score(read[MACRO_CONFIRMING], MACRO_CONFIRMING, None, p.macro_high),
     )
 
 
@@ -218,7 +226,9 @@ def headline(label: RegimeLabel, indicators: tuple[RegimeIndicator, ...]) -> str
 
 def load_regime(ctx: ReadContext) -> MarketRegime:
     """The regime for ``ctx.session``; never ``None`` (nothing stored is an UNKNOWN regime)."""
-    read = read_fields(ctx, [LABEL, MACRO_RISK, MARKET_STRESS, FRAGILITY])
+    read = read_fields(
+        ctx, [LABEL, MACRO_RISK, MARKET_STRESS, FRAGILITY, MACRO_EARLY, MACRO_CONFIRMING]
+    )
     label, reason = _label(read[LABEL])
     indicators = load_indicators(ctx)
     return MarketRegime(

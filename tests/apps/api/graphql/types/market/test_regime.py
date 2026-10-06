@@ -13,7 +13,8 @@ REGIME = """query R($date: Date) {
     session label plainLabel headline unknownReason { code detail }
     scores { macroRisk { value unknown { code } feature coverageFeature threshold }
              marketStress { value unknown { code } feature coverageFeature threshold }
-             fragility { value unknown { code } } }
+             fragility { value unknown { code } }
+             macroEarly { value feature threshold } macroConfirming { feature threshold } }
     sizing { label multiplier enabled unknownMultiplier multipliers { label multiplier }
              screeners { screenerId name enabled pauseIn } }
     indicators { key pace plainName technicalName oneLiner whyItMatters whatOnMeans
@@ -104,8 +105,11 @@ def test_each_card_explains_its_value_from_code_config_and_lineage(graph: Graph)
     assert [s["active"] for s in spx["sources"]] == [False, False, False]  # no source stored
     macro = regime["scores"]["macroRisk"]
     assert (macro["feature"], macro["coverageFeature"], macro["threshold"]) == (
-        "market.regime@v2.macro_risk", "market.regime@v2.macro_coverage", 50.0,
+        "market.regime@v3.macro_risk", "market.regime@v3.macro_coverage", 50.0,
     )  # fmt: skip
+    early, confirming = regime["scores"]["macroEarly"], regime["scores"]["macroConfirming"]
+    assert (early["feature"], early["threshold"]) == ("market.regime@v3.macro_early", 50.0)
+    assert confirming["feature"] == "market.regime@v3.macro_confirming"
 
 
 def test_the_bands_are_unknown_sessions_merged(graph: Graph) -> None:
@@ -144,13 +148,13 @@ def test_the_episodes_and_recessions_are_those_the_session_knew(graph: Graph) ->
 
 def test_the_history_of_a_stored_market_field(graph: Graph) -> None:
     variables = {"start": PREVIOUS.isoformat(), "end": "2030-01-01", "date": END.isoformat()}
-    flag = _data(graph(HISTORY, {**variables, "names": ["market.regime@v2.label"]}))
+    flag = _data(graph(HISTORY, {**variables, "names": ["market.regime@v3.label"]}))
     [label] = flag["market"]["history"]
     assert label["segments"] == [
         {"start": PREVIOUS.isoformat(), "end": END.isoformat(), "value": "UNKNOWN"}
     ]  # `end` is cut to the session; nothing is stored, so one UNKNOWN run
     assert label["points"] == [] and label["bucketSessions"] == 1
-    number = _data(graph(HISTORY, {**variables, "names": ["market.regime@v2.macro_risk"]}))
+    number = _data(graph(HISTORY, {**variables, "names": ["market.regime@v3.macro_risk"]}))
     [score] = number["market"]["history"]
     assert score["points"] == [{"session": PREVIOUS.isoformat(), "value": None}]  # one gap
     assert score["segments"] == []

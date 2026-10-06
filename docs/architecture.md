@@ -478,7 +478,7 @@ close of bar t  : Portfolio marked to market -> equity[t]
 strategy's targets is an `Overlay` the engine applies after `on_bar` and before
 `apply_limits`, never code inside a strategy (strategies see only `core` and `quant`). The
 first is `ScaleByLabel`, the regime overlay: each weight times the multiplier of session t's
-`market.regime@v2.label` (config `[regime]`), 0 in a paused label, `unknown_multiplier` (0)
+`market.regime@v3.label` (config `[regime]`), 0 in a paused label, `unknown_multiplier` (0)
 when the label is unknown (fail closed). Market values come in as `MarketFeatures`
 (`core/views/market_features.py`), one column per feature name on the bars' timeline, built by
 `services/backtests/market.py` from the market feature store; strategies read them through

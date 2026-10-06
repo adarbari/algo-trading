@@ -216,6 +216,6 @@ describe('episodeName', () => {
 
 describe('regimeLabelFeature', () => {
   it('names the label field in the group of the scores', () => {
-    expect(regimeLabelFeature(regimeFixture())).toBe('market.regime@v2.label');
+    expect(regimeLabelFeature(regimeFixture())).toBe('market.regime@v3.label');
   });
 });

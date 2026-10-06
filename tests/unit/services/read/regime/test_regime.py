@@ -13,7 +13,9 @@ from algotrade.services.features import catalogue
 from algotrade.services.read.instruments.catalogue import FeatureFormat
 from algotrade.services.read.regime.fields import (
     FRAGILITY,
+    MACRO_CONFIRMING,
     MACRO_COVERAGE,
+    MACRO_EARLY,
     MACRO_RISK,
     MARKET_COVERAGE,
     MARKET_STRESS,
@@ -47,6 +49,11 @@ def test_the_regime_for_the_session() -> None:
     assert (found.session, found.label, found.plain_label) == (D1, RegimeLabel.STRESS, "Storm")
     assert found.unknown_reason is None
     assert found.scores.macro_risk.value == 62.5 and found.scores.market_stress.value == 71.0
+    # the tiers: macro risk is the early tier (the curve's memory) while confirming is low
+    early, confirming = found.scores.macro_early, found.scores.macro_confirming
+    assert (early.value, confirming.value) == (62.5, 20.0)
+    assert (early.feature, early.coverage_feature) == ("market.regime@v3.macro_early", None)
+    assert confirming.feature == "market.regime@v3.macro_confirming"
     fragility = found.scores.fragility  # stored null: UNKNOWN with the reason, never 0
     assert fragility.value is None and fragility.unknown is not None
     assert fragility.unknown.code is UnknownCode.NULL
@@ -259,7 +266,7 @@ def test_the_gate_off_by_default_says_so() -> None:
 
 
 def test_an_indicator_carries_its_range_linked_how_and_the_codes_rule() -> None:
-    rollups = {"regime_indicators@v1": {"nfci_above": 0.25}, "regime@v2": {"macro_high": 40.0}}
+    rollups = {"regime_indicators@v1": {"nfci_above": 0.25}, "regime@v3": {"macro_high": 40.0}}
     cards = [card("nfci", "slow"), card("breadth_200d", "fast"), card("hy", "slow")]
     ctx = with_regime(context(store_with()), cards, docs={("site", "settings", "rollups"): rollups})
     found = load_regime(ctx)
@@ -276,15 +283,17 @@ def test_an_indicator_carries_its_range_linked_how_and_the_codes_rule() -> None:
     scores = found.scores
     macro, market, fragility = scores.macro_risk, scores.market_stress, scores.fragility
     assert (macro.feature, macro.coverage_feature, macro.threshold) == (
-        "market.regime@v2.macro_risk", "market.regime@v2.macro_coverage", 40.0
+        "market.regime@v3.macro_risk", "market.regime@v3.macro_coverage", 40.0
     )  # fmt: skip
-    assert (market.coverage_feature, market.threshold) == ("market.regime@v2.market_coverage", 50.0)
+    assert (market.coverage_feature, market.threshold) == ("market.regime@v3.market_coverage", 50.0)
+    assert scores.macro_early.threshold == scores.macro_confirming.threshold == 40.0
     assert (fragility.feature, fragility.coverage_feature, fragility.threshold) == (
-        "market.regime@v2.fragility", None, None
+        "market.regime@v3.fragility", None, None
     )  # fmt: skip
 
 
 def test_the_score_fields_are_in_the_shipped_catalogue() -> None:
     market = catalogue(FileConfigStore(REPO_ROOT / "config")).field_types("market")
-    for name in (MACRO_RISK, MARKET_STRESS, FRAGILITY, MACRO_COVERAGE, MARKET_COVERAGE):
+    for name in (MACRO_RISK, MARKET_STRESS, FRAGILITY, MACRO_COVERAGE, MARKET_COVERAGE,
+                 MACRO_EARLY, MACRO_CONFIRMING):  # fmt: skip
         assert name in market, name
