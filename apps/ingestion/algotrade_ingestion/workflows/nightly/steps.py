@@ -23,6 +23,7 @@ from algotrade.data import StoreReader
 from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade_ingestion.tasks.framework.run import FAILURES, TaskContext, status_label
 from algotrade_ingestion.tasks.maintenance.quality import Check
+from algotrade_ingestion.workflows.nightly.timing import observe
 
 
 class StepStatus(StrEnum):
@@ -88,6 +89,8 @@ class StepResult:
         default_factory=list
     )  # checks that did not PASS, and those carrying data
     held_by_wait: bool = False  # NOT_RUN only because a need is WAITING (transitively)
+    observed: dict[str, Any] | None = None  # what the attempt saw of the source (timing.observe)
+    arrival: dict[str, Any] | None = None  # ``observed`` + minutes_after_close, latest session
 
     def as_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -102,6 +105,8 @@ class StepResult:
             out["checks"] = self.checks
         if self.held_by_wait:
             out["held_by_wait"] = True
+        if self.arrival is not None:
+            out["arrival"] = self.arrival
         return out
 
 
@@ -113,6 +118,7 @@ class Outcome:
     result: Any = field(default=None)
     reason: str | None = None
     checks: list[dict[str, Any]] = field(default_factory=list)
+    observed: dict[str, Any] | None = None
 
 
 def judge(checks: Iterable[Check], result: Any = None, wait: bool = False) -> Outcome:
@@ -160,7 +166,9 @@ def from_record(
     if step is None or ctx is None or session is None:
         return Outcome(StepStatus.SUCCEEDED, record.stats)
     checks = [c for fn in step.accept for c in fn(ctx.reader, session, ctx.settings)]
-    return judge(checks, record.stats, wait)
+    outcome = judge(checks, record.stats, wait)
+    outcome.observed = observe(step.name, checks)
+    return outcome
 
 
 SHOWN_ITEMS = 3  # failed items named in a step's reason
@@ -194,6 +202,7 @@ def run_isolated(
             result=outcome.result,
             reason=outcome.reason,
             checks=outcome.checks,
+            observed=outcome.observed,
         )
     result.duration_s = round((clock() - started).total_seconds(), 3)
     return result

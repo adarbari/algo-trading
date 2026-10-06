@@ -195,6 +195,7 @@ def _stale_check(
         "FAIL" if share > limit else "PASS",
         f"{count} of {total} {tier} chains stale ({share:.1%}, max {limit:.0%}){names}; {detail}",
         pending=True,  # Cboe has not rolled to the session yet (ADR 0043)
+        data={"share": share},
     )
 
 

@@ -261,7 +261,7 @@ detect = [{ call = "check_coverage" }]
 
 [[responsibility]]
 id = "ingestion-report"
-description = "The nightly summary report (statistics per step, failed items grouped by reason with examples, failed checks, hints) and notifications: the desktop alert and the daily summary email over SMTP"
+description = "The nightly summary report (statistics per step, failed items grouped by reason with examples, failed checks, hints), run timing with the arrival record (each attempt stores when bars / chains data appeared; p50 / p90 over bracketed sessions, timing.py, ADR 0043) and notifications: the desktop alert and the daily summary email over SMTP"
 owner = [
     "apps/ingestion/algotrade_ingestion/workflows/nightly/records.py",
     "apps/ingestion/algotrade_ingestion/workflows/nightly/report.py",

@@ -233,3 +233,66 @@ def test_a_waiting_run_that_also_finished_sessions_is_still_reported(tmp_path: P
     assert len(notifier.notices) == 1  # D1 SUCCEEDED in this run: say so
     report({**base, "runs": runs[1:]}, settings, notifier)
     assert len(notifier.notices) == 1  # only the waiting session: quiet
+
+
+# ----------------------------------------------------------------------------- arrivals / settle
+
+
+def test_an_attempt_records_when_the_source_data_arrived(fake: Callable[..., Calls]) -> None:  # noqa: F811
+    fake(
+        checks={
+            "bars": [NOT_YET],
+            "chains": [Check("chains_stale_core", "PASS", "", data={"share": 0.05})],
+        }
+    )
+    writer = store()
+    summary = run_nightly(_ctx(writer, AFTER_CLOSE), Plan([D]))  # type: ignore[arg-type]
+    steps = steps_of(summary)
+    # 19:00 New York: three hours after D's 16:00 close
+    assert steps["bars"]["arrival"] == {"minutes_after_close": 180.0, "published": False}
+    assert steps["chains"]["arrival"] == {
+        "minutes_after_close": 180.0,
+        "published": True,
+        "stale_share": 0.05,
+    }
+    assert "arrival" not in steps["earnings"]
+    (record,) = writer.runs_for("nightly", D)
+    assert record.stats["steps"]["bars"]["arrival"]["published"] is False
+
+
+def test_a_catch_up_session_records_no_arrival(fake: Callable[..., Calls]) -> None:  # noqa: F811
+    fake(checks={"bars": [Check("bars_fresh", "PASS", "")]})
+    older = run_session(_ctx(store()), D1, latest=False)  # type: ignore[arg-type]
+    assert "arrival" not in older["steps"]["bars"]
+
+
+def test_chains_wait_without_fetching_until_the_settle_time(fake: Callable[..., Calls]) -> None:  # noqa: F811
+    calls = fake()
+    settings = NightlySettings.from_document({"steps": {"chains": {"settle_minutes": 240}}})
+    writer = store()
+    # 180 minutes after the close: chains wait for 240
+    summary = run_nightly(_ctx(writer, AFTER_CLOSE), Plan([D]), settings)  # type: ignore[arg-type]
+    steps = steps_of(summary)
+    assert steps["chains"]["status"] == "WAITING" and "settling" in steps["chains"]["reason"]
+    assert "arrival" not in steps["chains"]  # nothing fetched, nothing observed
+    assert calls.sessions("chains") == [] and calls.sessions("bars") == [D]
+    assert steps["rollups"]["held_by_wait"] and summary["status"] == "WAITING"
+
+    later = datetime(2026, 10, 3, 0, 1, tzinfo=UTC)  # 240+ minutes after the close
+    done = run_nightly(_ctx(writer, later), Plan([D]), settings)  # type: ignore[arg-type]
+    assert statuses(done)["chains"] == "SUCCEEDED" and calls.sessions("chains") == [D]
+
+
+def test_no_settle_time_is_the_current_behaviour(fake: Callable[..., Calls]) -> None:  # noqa: F811
+    calls = fake()
+    run_nightly(_ctx(store(), AFTER_CLOSE), Plan([D]))  # type: ignore[arg-type]
+    assert calls.sessions("chains") == [D]
+    assert NightlySettings().settle_for("chains") == 0
+    assert (
+        NightlySettings.from_document({"steps": {"chains": {"settle_minutes": 45}}}).settle_for(
+            "chains"
+        )
+        == 45
+    )
+    with pytest.raises(ConfigurationError, match="settle_minutes"):
+        NightlySettings.from_document({"steps": {"chains": {"settle_minutes": -1}}})

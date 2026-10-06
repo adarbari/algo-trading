@@ -22,7 +22,7 @@ from algotrade_ingestion.workflows.nightly.report import (
     Report,
     VerificationLine,
 )
-from algotrade_ingestion.workflows.nightly.timing import StepTiming
+from algotrade_ingestion.workflows.nightly.timing import StepTiming, arrival_line
 
 LOCAL = ZoneInfo("America/Los_Angeles")  # the owner's time zone for the email
 
@@ -123,6 +123,7 @@ def _timing_overall(report: Report) -> list[tuple[str, str]]:
         ("Sessions", sessions),
         ("Lock wait", "not recorded (the run lock is taken before the job starts)"),
     ]
+    rows += [(f"{a.step.capitalize()} arrival", arrival_line(a)) for a in report.arrivals]
     if slower:
         rows.append(("Slower than usual", ", ".join(slower) + " (>50% above the 7-run median)"))
     return rows

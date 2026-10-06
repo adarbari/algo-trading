@@ -167,6 +167,21 @@ def test_nightly_pipeline_end_to_end(env: Path, capsys: pytest.CaptureFixture[st
     assert (env / "r.html").read_text().startswith("<!doctype html>")
 
 
+def test_arrivals_command_prints_the_first_published_percentiles(
+    env: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit):
+        cli.main(["arrivals", "--sessions", "0"])
+    capsys.readouterr()
+    assert cli.main(["arrivals"]) == 0
+    assert "no arrival records yet" in capsys.readouterr().out
+    import_universe(env, capsys, DAY)
+    assert call(capsys, "nightly", "--date", DAY, "--workers", "1")[0] == 0
+    assert cli.main(["arrivals", "--sessions", "5"]) == 0
+    out = capsys.readouterr().out
+    assert "bars" in out and "chains" in out and "min after close" in out
+
+
 def test_report_command_errors_and_send(
     env: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:

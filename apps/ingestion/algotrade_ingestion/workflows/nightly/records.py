@@ -18,6 +18,11 @@ from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade_ingestion.tasks.framework.registry import TASKS
 from algotrade_ingestion.workflows.nightly.report import Report, build_report
 from algotrade_ingestion.workflows.nightly.sessions import NIGHTLY_RUN
+from algotrade_ingestion.workflows.nightly.timing import (
+    DEFAULT_SESSIONS,
+    ArrivalStat,
+    arrival_stats,
+)
 
 PURGE_STEP = "purge-raw"
 SLACK = timedelta(minutes=1)  # clock jitter between a task's record and the nightly's
@@ -138,6 +143,17 @@ def history(reader: StoreReader, before: datetime | None) -> list[dict[str, floa
     ]
 
 
+def arrivals(reader: StoreReader, sessions: int = DEFAULT_SESSIONS) -> tuple[ArrivalStat, ...]:
+    """First-published statistics of the source-fed steps over the last ``sessions`` sessions
+    (every stored ``nightly`` attempt)."""
+    attempts = [
+        (r.session_date, r.stats["steps"])
+        for r in reader.runs(NIGHTLY_RUN)
+        if isinstance(r.stats.get("steps"), dict)
+    ]
+    return arrival_stats(attempts, sessions)
+
+
 def load_report(
     reader: StoreReader,
     summary: Mapping[str, Any],
@@ -149,9 +165,10 @@ def load_report(
     records = task_records(reader, summary)
     started = summary.get("started_at")
     past = history(reader, datetime.fromisoformat(started) if started else None)
-    report = build_report(summary, records, None, max_examples, past, max_duration_s)
+    arrived = arrivals(reader)
+    report = build_report(summary, records, None, max_examples, past, max_duration_s, arrived)
     keys = [e.key for g in report.failures for e in g.examples]
     names = labels(reader, date.fromisoformat(report.sessions[-1]), keys) if report.sessions else {}
     if not names:
         return report
-    return build_report(summary, records, names, max_examples, past, max_duration_s)
+    return build_report(summary, records, names, max_examples, past, max_duration_s, arrived)
