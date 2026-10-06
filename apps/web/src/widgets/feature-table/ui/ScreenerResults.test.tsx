@@ -113,6 +113,7 @@ function served(total = 2) {
           ],
           rows: [[71.5], [null]],
           unknown: [[null], ['NO_ROW']],
+          reasons: [[null], [null]],
           results: [result(1, 'AAPL', 'QUALIFIED', 'new'), result(2, 'KO', 'WATCH')],
         },
       },

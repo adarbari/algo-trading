@@ -196,6 +196,18 @@ def resolver(reader: StoreReader, on: date, as_of: datetime | None = None) -> Sy
     return SymbolResolver.from_reference(frame, snap.snapshot_date)
 
 
+def symbol_ids(reader: StoreReader, on: date) -> pd.DataFrame | None:
+    """``symbol``, ``instrument_id`` (one row per ticker, sorted by symbol) and
+    ``pre_snapshot`` from the reference snapshot ``on`` sees, as ``resolver`` resolves them:
+    how a market-entity feature group finds SPY's id without building it (ADR 0047, ADR
+    0018). ``None`` when no reference is stored."""
+    found = resolver(reader, on)
+    if found.snapshot is None or not found.ids:
+        return None
+    frame = pd.DataFrame(sorted(found.ids.items()), columns=["symbol", "instrument_id"])
+    return frame.assign(pre_snapshot=found.snapshot > on)
+
+
 @dataclass(frozen=True)
 class InstrumentView:
     """L1 for one date: reference facts + rollups, one row per instrument (ADR 0016).
@@ -213,6 +225,19 @@ class InstrumentView:
     missing: tuple[str, ...]
     pre_snapshot: bool = False
     company_pre_snapshot: bool = False
+
+
+def join_fields(
+    out: pd.DataFrame, frame: pd.DataFrame, columns: Sequence[tuple[str, str]]
+) -> pd.DataFrame:
+    """``out`` left-joined on ``instrument_id`` with ``frame``'s ``(field, column)`` pairs,
+    each as its field name (a column ``frame`` lacks is left out)."""
+    # Build the joined columns by name so the join key itself is never renamed.
+    picked = pd.DataFrame({"instrument_id": frame["instrument_id"].astype(str)})
+    for name, column in columns:
+        if column in frame.columns:
+            picked[name] = frame[column].to_numpy()
+    return out.merge(picked, on="instrument_id", how="left")
 
 
 def instrument_view(
@@ -249,12 +274,7 @@ def instrument_view(
         if frame is None:
             missing.append(table)
             continue
-        # Build the joined columns by name so the join key itself is never renamed.
-        picked = pd.DataFrame({"instrument_id": frame["instrument_id"].astype(str)})
-        for name, column in columns:
-            if column in frame.columns:
-                picked[name] = frame[column].to_numpy()
-        out = out.merge(picked, on="instrument_id", how="left")
+        out = join_fields(out, frame, columns)
     return InstrumentView(
         session, ref.snapshot_date, out, tuple(sorted(missing)), ref.pre_snapshot, company_pre
     )

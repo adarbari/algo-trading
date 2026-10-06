@@ -130,15 +130,15 @@ def test_expected_tables_are_the_declared_nightly_session_tables() -> None:
 
 
 def test_expected_tables_skip_families_and_other_grains(tmp_path: Path) -> None:
-    ownership = tmp_path / "ownership.toml"
-    ownership.write_text(
+    tables = tmp_path / "tables.toml"
+    tables.write_text(
         "\n".join(
             f'[[table]]\nname = "{name}"\nowner = "x.py"\n'
             for name in ("results/*", "results/a", "chains/status", "live/option_quotes",
                          "verification/ibkr", "instruments/reference", "rollups/instrument/x@v1")
         )
     )  # fmt: skip
-    assert expected_tables(ownership) == (
+    assert expected_tables(tables) == (
         "bars/1d", "chains/status", "results/a", "rollups/instrument/x@v1",
     )  # fmt: skip
 

@@ -54,7 +54,7 @@ not published yet" is not a failure until the day's deadline has passed.
 - [x] **Coverage acceptance** (implemented): per key feature and tier, the share of the
   instruments the feature applies to (`Feature.applies_to`, decided by the function the read
   layer uses for NOT_APPLICABLE, ADR 0042) that have a value for the session; a null explained as
-  an illiquid chain counts as covered, a missing value never as zero. Config
+  an illiquid chain counts as covered (and, since ADR 0046, an explained absence except `NO_TRADE` for a core name), a missing value never as zero. Config
   `sources.toml [quality.coverage.<group>.<column>]`: `core_min`, `rest_min`, `max_drop` (against
   the previous session, recomputed from its stored partitions), `level` WARN or FAIL
   (`core_level`), `covered_by` `value` or `row` (earnings: a row without a next date is not a gap).

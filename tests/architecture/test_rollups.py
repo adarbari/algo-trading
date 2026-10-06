@@ -7,7 +7,7 @@ materialise expression features, ``features.site``): every declared group
   loads through the one settings loader;
 - reads only inputs ``algotrade.data.feature_inputs`` knows how to read, and the
   rollups it reads are registered, acyclic and computed before it (registry order);
-- has exactly one producer, the ``rollups`` task, in ``architecture/ownership.toml``;
+- has exactly one producer, the ``rollups`` task, in ``architecture/tables.toml``;
 - is reachable from the selection catalogue as ``rollup.<name>@v<N>.<column>``.
 """
 
@@ -32,7 +32,7 @@ from algotrade_ingestion.workflows.nightly.nightly import NIGHTLY
 from tests.conftest import REPO_ROOT
 
 SITE_ROLLUPS = tomllib.loads((REPO_ROOT / "config" / "site" / "rollups.toml").read_text())
-OWNERSHIP = tomllib.loads((REPO_ROOT / "architecture" / "ownership.toml").read_text())
+TABLES = tomllib.loads((REPO_ROOT / "architecture" / "tables.toml").read_text())["table"]
 TASK_MODULE = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 SITE = site_features(FileConfigStore(REPO_ROOT / "config"))
 ALL = SITE.groups  # code groups + materialised expression features, in dependency order
@@ -82,7 +82,7 @@ def test_dependency_graph_is_registered_acyclic_and_in_order() -> None:
 @pytest.mark.parametrize("key", sorted(ALL))
 def test_one_producer_the_rollups_task(key: str) -> None:
     table = ALL[key].table
-    owners = [t["owner"] for t in OWNERSHIP["table"] if t["name"] == table]
+    owners = [t["owner"] for t in TABLES if t["name"] == table]
     assert owners == [TASK_MODULE]
     assert table in TASKS["rollups"].tables
 

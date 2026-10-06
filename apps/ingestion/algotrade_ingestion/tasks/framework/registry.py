@@ -1,7 +1,7 @@
 """The ingestion task registry: every task declared ONCE (ADR 0019).
 
 A ``Task`` names what it writes (must match the ``[[table]]`` producers in
-``architecture/ownership.toml``), the sources it needs from ``TaskContext.sources``, the
+``architecture/tables.toml``), the sources it needs from ``TaskContext.sources``, the
 site settings section it reads, its parameters (which the CLI turns into flags) and its
 ``run(ctx, params)`` entry. Defaults that come from settings (corporate-actions window,
 earnings days, chain workers) are applied here, so the CLI and nightly cannot drift.

@@ -1,0 +1,170 @@
+# The twelve S&P 500 drawdowns of 19% or more (closing basis) since 1970: the regime track's
+# reference episodes (docs/market-regime-plan.md section 2; ADR 0047).
+#
+# Dates are re-derived by the Pagan-Sossounov dating in RG3 (quant/turning_points.py) from
+# index history; these are the reference values that dating is checked against.
+# - peak / trough: closing-basis S&P 500 peak and trough sessions.
+# - spx_drawdown / nasdaq_drawdown: peak-to-trough fractions (negative); Nasdaq values marked
+#   "about" in the plan are approximate, and its own window can differ (see notes).
+# - recession: an NBER recession overlaps the episode; nber_start / nber_end are the NBER
+#   peak and trough months, written as the first day of the month.
+# - kind: "recession" (a recession bear) or "shock" (a shock or re-rating, no recession).
+# - known_from: the trough date, the earliest session a feature about the episode may be
+#   non-null (no feature may know an episode's depth before it ended).
+# - notes: the warnings that were visible before or during the fall.
+
+[[episode]]
+key = "oil_1973"
+peak = 1973-01-11
+trough = 1974-10-03
+spx_drawdown = -0.48
+nasdaq_drawdown = -0.60
+recession = true
+nber_start = 1973-11-01
+nber_end = 1975-03-01
+kind = "recession"
+cause = "The oil embargo, high inflation and Fed funds rising from 3.5% to 13% hit stretched Nifty-Fifty valuations as Bretton Woods collapsed."
+known_from = 1974-10-03
+notes = "A hiking Fed and stretched valuations before the embargo; Nasdaq depth is approximate."
+
+[[episode]]
+key = "volcker_1980"
+peak = 1980-11-28
+trough = 1982-08-12
+spx_drawdown = -0.27
+nasdaq_drawdown = -0.25
+recession = true
+nber_start = 1981-07-01
+nber_end = 1982-11-01
+kind = "recession"
+cause = "Volcker's hikes to 19-20% caused a double-dip recession with unemployment reaching 10.8%."
+known_from = 1982-08-12
+notes = "Policy rates near 20% and an inverted curve; the first dip (Jan - Jul 1980) came before this peak; Nasdaq depth is approximate."
+
+[[episode]]
+key = "crash_1987"
+peak = 1987-08-25
+trough = 1987-12-04
+spx_drawdown = -0.34
+nasdaq_drawdown = -0.36
+recession = false
+kind = "shock"
+cause = "Rates up 300 bp in 1987, dollar tension after the Louvre accord and portfolio insurance turned stretched valuations into a one-day 20.5% fall."
+known_from = 1987-12-04
+notes = "No recession warning; stretched valuations and a Fed hiking into a high market."
+
+[[episode]]
+key = "gulf_1990"
+peak = 1990-07-16
+trough = 1990-10-11
+spx_drawdown = -0.20
+nasdaq_drawdown = -0.33
+recession = true
+nber_start = 1990-07-01
+nber_end = 1991-03-01
+kind = "recession"
+cause = "Iraq's invasion of Kuwait doubled the oil price on top of the savings and loan crisis and a credit crunch."
+known_from = 1990-10-11
+notes = "Tightening bank lending standards and the S&L credit crunch before the oil shock."
+
+[[episode]]
+key = "ltcm_1998"
+peak = 1998-07-17
+trough = 1998-10-08
+spx_drawdown = -0.19
+nasdaq_drawdown = -0.30
+recession = false
+kind = "shock"
+cause = "The Asian crisis, Russia's default on August 17 and the LTCM collapse; the Fed cut three times."
+known_from = 1998-10-08
+notes = "No recession signal; a brief curve inversion (a false alarm) and credit spreads gapping; -22% intraday."
+
+[[episode]]
+key = "dotcom_2000"
+peak = 2000-03-24
+trough = 2002-10-09
+spx_drawdown = -0.49
+nasdaq_drawdown = -0.78
+recession = true
+nber_start = 2001-03-01
+nber_end = 2001-11-01
+kind = "recession"
+cause = "Dot-com valuations (CAPE 44), Fed funds to 6.5% and a capex bust, then 9/11 and the Enron and WorldCom frauds."
+known_from = 2002-10-09
+notes = "Extreme valuation, a hiking Fed, an inverted curve and breadth that broke a year before the index."
+
+[[episode]]
+key = "gfc_2007"
+peak = 2007-10-09
+trough = 2009-03-09
+spx_drawdown = -0.57
+nasdaq_drawdown = -0.56
+recession = true
+nber_start = 2007-12-01
+nber_end = 2009-06-01
+kind = "recession"
+cause = "The housing bust and subprime losses at leveraged banks ended in the Lehman failure and a credit freeze."
+known_from = 2009-03-09
+notes = "An inverted curve in 2006-07, permits down over 20% a year, tighter lending standards and widening credit spreads."
+
+[[episode]]
+key = "downgrade_2011"
+peak = 2011-04-29
+trough = 2011-10-03
+spx_drawdown = -0.19
+nasdaq_drawdown = -0.19
+recession = false
+kind = "shock"
+cause = "The US credit downgrade on August 5, the debt-ceiling fight and the euro sovereign crisis."
+known_from = 2011-10-03
+notes = "No recession signal; VIX term structure inverted and credit spreads widened around the downgrade; -22% intraday."
+
+[[episode]]
+key = "qt_2018"
+peak = 2018-09-20
+trough = 2018-12-24
+spx_drawdown = -0.20
+nasdaq_drawdown = -0.24
+recession = false
+kind = "shock"
+cause = "Fed hikes with balance-sheet runoff on autopilot, the trade war and a growth scare; the Fed pivoted in January 2019."
+known_from = 2018-12-24
+notes = "A Fed tightening into a high market and narrowing breadth; VIX backwardation and wider HY spreads confirmed fast."
+
+[[episode]]
+key = "covid_2020"
+peak = 2020-02-19
+trough = 2020-03-23
+spx_drawdown = -0.34
+nasdaq_drawdown = -0.30
+recession = true
+nber_start = 2020-02-01
+nber_end = 2020-04-01
+kind = "recession"
+cause = "COVID shutdowns froze credit markets until the Fed cut to zero and began unlimited QE."
+known_from = 2020-03-23
+notes = "The curve had inverted in 2019 and manufacturing was weak for five months; the fast signs fired within days."
+
+[[episode]]
+key = "hikes_2022"
+peak = 2022-01-03
+trough = 2022-10-12
+spx_drawdown = -0.25
+nasdaq_drawdown = -0.36
+recession = false
+kind = "shock"
+cause = "CPI near 9%, Fed funds from 0 to 4.5% in a year, QT and the war in Ukraine re-rated long-duration growth stocks."
+known_from = 2022-10-12
+notes = "Inflation, a fast-hiking Fed and narrow breadth in late 2021; two negative GDP quarters but no NBER recession; the Nasdaq fell from Nov 2021 to Dec 2022."
+
+[[episode]]
+key = "tariffs_2025"
+peak = 2025-02-19
+trough = 2025-04-08
+spx_drawdown = -0.19
+nasdaq_drawdown = -0.24
+recession = false
+kind = "shock"
+cause = "The April 2 'Liberation Day' tariffs; the 90-day pause on April 9 began the recovery, with a new high by June 27."
+known_from = 2025-04-08
+notes = "VIX closed at 45 with its term structure inverted and HY spreads gapping; -21% intraday; the Nasdaq fell from Dec 2024."

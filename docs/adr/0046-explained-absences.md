@@ -44,8 +44,11 @@ our data, and "Unknown" hides the cells that are.
 
 ## Consequences
 - The statuses come from features: a stored price-history group with `bar_status` and a
-  range status (high since listing), and an `earnings` re-version with `next_status`; each is
-  its own PR under this ADR.
+  range status (high since listing), and a status-only group `earnings_schedule@v1`
+  (`next_status`) beside `earnings@v1`; each is its own PR under this ADR. A status column
+  is added as its own small group, not by re-versioning the group it explains: a re-version
+  would rewrite the published screener presets that name the old fields (their config
+  hashes, ADR 0015).
 - Screeners, backtests and `core.views` still see a null (ADR 0015): an explained null never
   passes a filter.
 - GraphQL and the web codegen gain `EXPLAINED`, `NullReason` and `reasons`.

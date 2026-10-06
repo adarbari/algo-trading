@@ -99,7 +99,7 @@ detect = [{ call_regex = "(^|\\.)(find_peaks|argrelextrema|argrelmax|argrelmin)$
 
 [[responsibility]]
 id = "rollup-computation"
-description = "Compute feature groups (rollups): the FeatureGroup declaration (inputs + lookback, params from rollups.toml, declared features), asking algotrade.data for inputs by table name, point in time per session, backfills; groups are pure compute modules (a materialised expression feature is a one-feature group built by the FeatureSet), stored only by the rollups task"
+description = "Compute feature groups (rollups): the FeatureGroup declaration (inputs + lookback, params from rollups.toml, declared features, the entity one row describes: instrument, or market with one MKT:US row checked by the runner, ADR 0047), asking algotrade.data for inputs by table name, point in time per session, backfills; groups are pure compute modules (a materialised expression feature is a one-feature group built by the FeatureSet), stored only by the rollups task (compute_rollups, per entity)"
 owner = [
     "src/algotrade/features/framework/*",
     "src/algotrade/features/registry.py",
@@ -112,13 +112,14 @@ detect = [{ call = "compute_sessions" }, { call = "compute_one" }, { call = "Fea
 
 [[responsibility]]
 id = "feature-metadata"
-description = "Feature definitions and their catalogue: each stored column is a Feature (kind, dtype, unit, description, null meaning, range, categories, inputs) declared in its group, each expression feature one built from its site definition; the registry and the FeatureSet index them and catalogue.py renders docs/data/features.md (ADR 0023)"
+description = "Feature definitions and their catalogue: each stored column is a Feature (kind, dtype, unit, description, null meaning, range, categories, inputs) declared in its group, each expression feature one built from its site definition; the registry and the FeatureSet index them and catalogue.py renders docs/data/features.md (ADR 0023); guide.py renders docs/data/field-guide.md from the site field guide (ADR 0041)"
 owner = [
     "src/algotrade/features/framework/feature.py",
     "src/algotrade/features/rollups/*",
     "src/algotrade/features/expressions/definitions.py",
     "src/algotrade/features/registry.py",
     "src/algotrade/features/catalogue.py",
+    "src/algotrade/features/guide.py",  # renders docs/data/field-guide.md from the site field guide (ADR 0041)
 ]
 section = "docs/adr/0023-feature-store.md#decision"
 detect = [{ call = "Feature" }, { string = "docs/data/features.md" }]
@@ -175,7 +176,7 @@ detect = [{ attr = "tables.drop" }, { call = "drop_table" }]
 
 [[responsibility]]
 id = "feature-input-loading"
-description = "What a feature group reads, by table name: each input table's point-in-time read for features (from its data owner), slicing per session and lookback, other groups' stored rows with this run's rows winning; features never read storage or a domain reader"
+description = "What a feature group reads, by table name: each input table's point-in-time read for features (from its data owner), slicing per session and lookback, other groups' stored rows (rollups/instrument/ and rollups/market/) with this run's rows winning, the session's universe snapshot (the population; none before the first) and the symbol -> id map of its reference snapshot (instruments/symbol_ids, a lookup only; ADR 0047); features never read storage or a domain reader"
 owner = ["src/algotrade/data/feature_inputs.py"]
 allowed = [
     # ADR 0024 / 0037: the API shows stored group rows (a feature's series in the read
@@ -190,6 +191,7 @@ detect = [
     { call = "share_facts" },
     { call = "curve_as_rows" },
     { call = "rollup_rows" },
+    { call = "symbol_ids" },
 ]
 
 # --------------------------------------------------------------------------- the ingest loop
@@ -221,7 +223,7 @@ detect = [{ call = "stamp" }]
 
 [[responsibility]]
 id = "id-resolution"
-description = "Turn vendor tickers into instrument ids (ADR 0018); build EQ: ids only through the id rule"
+description = "Turn vendor tickers into instrument ids (ADR 0018); build EQ: ids only through the id rule, and the non-tradable MKT: market ids only through core.model.instruments.market_id (ADR 0047)"
 owner = [
     "src/algotrade/core/model/instruments.py",
     "src/algotrade/data/resolver.py",
@@ -229,7 +231,7 @@ owner = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/run.py",
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
-detect = [{ call = "with_ids" }, { call = "equity_id" }, { string_prefix = "EQ:" }]
+detect = [{ call = "with_ids" }, { call = "equity_id" }, { string_prefix = "EQ:" }, { string_prefix = "MKT:" }]
 
 [[responsibility]]
 id = "ingestion-step-dispatch"
@@ -478,11 +480,12 @@ detect = [{ import = "fcntl" }, { call = "flock" }]
 
 [[responsibility]]
 id = "site-settings"
-description = "Load and type L3 site settings (config/site/*.toml: sources, universe + overrides, nightly, defaults, users with roles per ADR 0040): one loader, frozen dataclasses; the store only reads files"
+description = "Load and type L3 site settings (config/site/*.toml: sources, universe + overrides, nightly, defaults, users with roles per ADR 0040, the field guide per ADR 0041): one loader, frozen dataclasses; the store only reads files"
 owner = [
     "src/algotrade/config/site/settings.py",
     "src/algotrade/config/site/users.py",
     "src/algotrade/config/site/nightly.py",
+    "src/algotrade/config/site/field_guide.py",
     "src/algotrade/storage/configs/store.py",
     "src/algotrade/storage/configs/files.py",
 ]
@@ -661,12 +664,12 @@ allowed = [
     "src/algotrade/data/*",  # the generic table reads (R1)
     "src/algotrade/features/*",  # feature groups name their own tables
     "src/algotrade/core/model/fields.py",  # ROLLUP_TABLE_PREFIX: catalogue names -> tables, in one place
-    "src/algotrade/storage/tables/schemas.py",  # declares the rollups/instrument/* table family
+    "src/algotrade/storage/tables/schemas.py",  # declares the rollups/instrument/* and rollups/market/* table families
     "src/algotrade/strategies/screeners/*",  # a screener declares the feature table it reads through core.views (engine input, not a display read)
     "apps/ingestion/*",  # producers and the verification checks name the tables they write or compare
 ]
 section = "docs/api/read-model.md#the-domain-objects"
-detect = [{ string_prefix = "rollups/instrument/" }, { call = "chain_expiries" }]
+detect = [{ string_prefix = "rollups/instrument/" }, { string_prefix = "rollups/market/" }, { call = "chain_expiries" }]
 
 [[responsibility]]
 id = "scalar-coercion"
@@ -704,7 +707,7 @@ detect = [{ call = "load_ideas" }]
 
 [[responsibility]]
 id = "screen-drafting"
-description = "A rule screen drafted from a sentence (ADR 0041): the TextModel protocol, the prompt over the caller's catalogue (name, type, unit, description, category values; no market data, results or credentials), strict parsing of the model's JSON, invented fields and rejected criteria dropped with a reason, the rest validated with resolve_rule_draft; the one OpenAI-compatible adapter (built by the source registry, the key only in a header) and the API's wiring of it from llm.toml; a draft the Builder loads, never a write, never a run"
+description = "A rule screen drafted from a sentence (ADR 0041): the TextModel protocol, the prompt over the caller's catalogue (name, type, unit, description, category values), the phrasebook and the field guide (config/site/field_guide/*.toml: how to read a field, the criterion per intent, caveats, situations; no market data, results or credentials), strict parsing of the model's JSON, invented fields and rejected criteria dropped with a reason, the rest validated with resolve_rule_draft; the one OpenAI-compatible adapter (built by the source registry, the key only in a header) and the API's wiring of it from llm.toml; a draft the Builder loads, never a write, never a run"
 owner = [
     "src/algotrade/services/drafting/*",
     "libs/sources/algotrade_sources/llm/*",
@@ -724,212 +727,4 @@ owner = ["src/algotrade/services/preview/*"]
 section = "docs/adr/0029-rule-screener.md#preview--nightly"
 detect = [{ call = "field_frame" }]
 
-# --------------------------------------------------------------------------- stored tables
-# Every stored table has exactly one producing owner (tests/architecture/test_ownership.py),
-# and every ingestion task in tasks/framework/registry.py declares exactly the tables its module produces.
-# `also_written_by` lists today's extra writers: each is restructure work, not precedent.
-
-[[table]]
-name = "universe"
-owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_build.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"
-also_written_by = ["apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"]
-
-[[table]]
-name = "instruments/reference"
-owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_build.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"
-also_written_by = [
-    "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py",
-    "apps/ingestion/algotrade_ingestion/tasks/maintenance/golden.py",
-]
-
-[[table]]
-name = "instruments/symbol_history"
-owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_build.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"
-
-[[table]]
-name = "instruments/id_map"
-owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_build.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"
-
-[[table]]
-name = "instruments/company"
-owner = "apps/ingestion/algotrade_ingestion/tasks/reference/company_details.py"
-
-[[table]]
-name = "instruments/shares"
-owner = "apps/ingestion/algotrade_ingestion/tasks/reference/shares.py"
-
-[[table]]
-name = "instruments/description"
-owner = "apps/ingestion/algotrade_ingestion/tasks/profile/descriptions.py"
-
-[[table]]
-name = "chains/underlying_quotes"
-owner = "apps/ingestion/algotrade_ingestion/tasks/market/option_chains.py"
-
-[[table]]
-name = "chains/option_quotes"
-owner = "apps/ingestion/algotrade_ingestion/tasks/market/option_chains.py"
-
-[[table]]
-name = "chains/status"
-owner = "apps/ingestion/algotrade_ingestion/tasks/market/option_chains.py"
-
-[[table]]
-name = "bars/1d"
-owner = "apps/ingestion/algotrade_ingestion/tasks/market/bars.py"
-also_written_by = ["apps/ingestion/algotrade_ingestion/tasks/maintenance/golden.py"]
-
-[[table]]
-name = "events/split"
-owner = "apps/ingestion/algotrade_ingestion/tasks/market/corporate_actions.py"
-
-[[table]]
-name = "events/dividend"
-owner = "apps/ingestion/algotrade_ingestion/tasks/market/corporate_actions.py"
-
-[[table]]
-name = "events/earnings"
-owner = "apps/ingestion/algotrade_ingestion/tasks/market/earnings.py"
-
-[[table]]
-name = "events/reference_change"
-owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_build.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"
-
-[[table]]
-name = "events/index_change"
-owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_build.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/reference/universe_import.py"
-
-[[table]]
-name = "rates/treasury"
-owner = "apps/ingestion/algotrade_ingestion/tasks/market/rates.py"
-
-[[table]]
-name = "rollups/instrument/option_liquidity@v1"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-
-[[table]]
-name = "rollups/instrument/price_stats@v2"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-
-[[table]]
-name = "rollups/instrument/price_history@v1"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-
-[[table]]
-name = "rollups/instrument/earnings@v1"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-
-[[table]]
-name = "rollups/instrument/dividends@v2"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-
-[[table]]
-name = "rollups/instrument/fundamentals@v2"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-
-[[table]]
-name = "rollups/instrument/financials@v1"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-
-[[table]]
-name = "rollups/instrument/div_yield@v1"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-note = "the materialised expression feature div_yield (config/site/features/fundamentals.toml)"
-
-[[table]]
-name = "rollups/instrument/iv30@v1"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-
-[[table]]
-name = "rollups/instrument/iv_history@v2"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-
-[[table]]
-name = "rollups/instrument/ibkr_iv@v1"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-note = "derived from IBKR market data: personal-use licence (ADR 0028)"
-
-[[table]]
-name = "rollups/instrument/put_wing@v1"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-
-[[table]]
-name = "rollups/instrument/price_moves@v1"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-
-[[table]]
-name = "rollups/instrument/momentum@v1"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-
-[[table]]
-name = "rollups/instrument/swing_levels@v1"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-
-[[table]]
-name = "rollups/instrument/anchored_vwap@v1"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-
-[[table]]
-name = "rollups/instrument/oi_walls@v1"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-
-[[table]]
-name = "rollups/instrument/nearest_expiry@v1"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-
-[[table]]
-name = "rollups/daily/*"
-owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
-note = "none produced yet (phase 6); rollups are computed only by the rollups task"
-
-[[table]]
-name = "results/rule_screen"
-owner = "src/algotrade/storage/tables/result_writer.py"
-note = "every rule screen's rows (ADR 0029), framed by services/screening/rule_results.py, written by services/screening/run.py"
-
-[[table]]
-name = "results/rule_screen_values"
-owner = "src/algotrade/storage/tables/result_writer.py"
-note = "every rule screen's per-criterion values (ADR 0029), published with results/rule_screen"
-
-[[table]]
-name = "results/*"
-owner = "src/algotrade/storage/tables/result_writer.py"
-note = "one results/<name> per screener (services/screening/run.py) or backtest output (services/backtests/run.py)"
-
-[[table]]
-name = "instruments/ibkr_contracts"
-owner = "apps/ingestion/algotrade_ingestion/tasks/reference/ibkr_contracts.py"
-
-[[table]]
-name = "volatility/ibkr_iv30"
-owner = "apps/ingestion/algotrade_ingestion/tasks/market/ibkr_iv.py"
-
-[[table]]
-name = "holdings/etf"
-owner = "apps/ingestion/algotrade_ingestion/tasks/market/etf_holdings.py"
-
-[[table]]
-name = "live/option_quotes"
-owner = "src/algotrade/services/live/recorder.py"
-note = "the API's one write (ADR 0028): live IBKR quotes it served; personal-use licence"
-
-[[table]]
-name = "verification/ibkr"
-owner = "apps/ingestion/algotrade_ingestion/tasks/verification/verify.py"
-
-[[table]]
-name = "catalog/golden_datasets"
-owner = "apps/ingestion/algotrade_ingestion/tasks/maintenance/golden.py"
-
-# Superseded group tables (price_stats@v1, dividends@v1, fundamentals@v1, iv_history@v1,
-# liquidity_class@v1; ADR 0023 step 3) have no producer: they stay readable until
-# `algotrade-ingest retire-features` (tasks/maintenance/retire_features.py) deletes them.
-# Every table may additionally be rewritten by the one-off id migration (ADR 0018):
-# apps/ingestion/algotrade_ingestion/tasks/maintenance/migrate_ids.py (an admin command, not a producer).
+# Stored tables: architecture/tables.toml (one producing owner each).

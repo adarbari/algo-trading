@@ -8,7 +8,7 @@ description: Add a new stored dataset or data grain (e.g. intraday bars, earning
 Read first: `docs/data/storage.md`, `docs/data/instruments.md`, ADRs 0006, 0007 and 0009.
 
 **Ownership check (ADR 0019):** add a `[[table]]` entry with exactly **one** producing
-module to `architecture/ownership.toml` (a test enforces it). Reading it for consumers goes
+module to `architecture/tables.toml` (a test enforces it). Reading it for consumers goes
 through the market-data read owner (`algotrade/data/`: add a function to the matching module; the folder is at the 10-module
 cap, so a new module needs a **split by kind first**), with the one snapshot rule (`data.reference.snapshot`);
 never add another `latest_date(` call site. Writing it goes through the

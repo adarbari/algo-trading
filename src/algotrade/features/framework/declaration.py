@@ -2,7 +2,9 @@
 their parameters and the pure ``compute``.
 
 A group is ``<name>@v<N>``, stored as ``rollups/instrument/<name>@v<N>`` with one row per
-instrument per session (today's groups are the rollups). It declares its features
+instrument per session (today's groups are the rollups), or, with ``entity = "market"``, as
+``rollups/market/<name>@v<N>`` with one ``MKT:US`` row per session (ADR 0047; the runner
+checks it). It declares its features
 (``framework.feature.Feature``: one typed, documented column each) and everything else is
 derived from the declaration: the selection catalogue (``rollup.<name>@v<N>.<column>``), the
 stored column types (``framework.columns``), the ``rollups.toml`` section (``params``), the
@@ -10,7 +12,8 @@ inputs the runner loads (through ``data.feature_inputs``) and the feature catalo
 
 ``compute(inputs, session, params)`` is pure: ``inputs`` maps each declared input table to
 its frame for the session (rows on or before the session only, ``None`` when an optional
-input has nothing), and it returns ``instrument_id`` plus the declared feature columns.
+input has nothing), and it returns ``instrument_id`` plus the declared feature columns (a
+market group: one row, ``instrument_id = market_id("US")``).
 
 A group is re-versioned only when its stored columns change (a new column, a changed
 definition or window); each feature records its own version, equal to the group's for now.
@@ -24,8 +27,8 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.core.model.fields import ROLLUP_TABLE_PREFIX
-from algotrade.features.framework.feature import AppliesTo, Feature, feature_problems
+from algotrade.core.model.fields import group_of_table, rollup_table
+from algotrade.features.framework.feature import AppliesTo, Entity, Feature, feature_problems
 
 type Inputs = Mapping[str, pd.DataFrame | None]
 type Compute = Callable[[Inputs, date, Any], pd.DataFrame]
@@ -71,6 +74,9 @@ class FeatureGroup:
     # Which instruments the group's features are defined for (``Feature.applies_to``); a
     # feature's own non-"any" value wins.
     applies_to: AppliesTo = "any"
+    # What one row describes (``Feature.entity``), inherited by its features: ``instrument``
+    # (``rollups/instrument/``) or ``market`` (``rollups/market/``, ADR 0047).
+    entity: Entity = "instrument"
 
     def __post_init__(self) -> None:
         owned = tuple(
@@ -79,6 +85,7 @@ class FeatureGroup:
                 version=f.version or self.version,
                 group=self.key,
                 applies_to=f.applies_to if f.applies_to != "any" else self.applies_to,
+                entity=f.entity if f.entity != "instrument" else self.entity,
             )
             for f in self.features
         )
@@ -93,7 +100,7 @@ class FeatureGroup:
 
     @property
     def table(self) -> str:
-        return f"{ROLLUP_TABLE_PREFIX}{self.key}"
+        return rollup_table(self.entity, self.key)
 
     @property
     def columns(self) -> Mapping[str, str]:
@@ -140,6 +147,27 @@ def declaration_problems(group: FeatureGroup) -> list[str]:
             problems.append(f"{f.name}: null_status {f.null_status!r} is not a column of the group")
         if f.version != group.version:
             problems.append(f"{f.name}: version must be the group's ({group.version}) for now")
+        if f.entity != group.entity:
+            problems.append(f"{f.name}: entity must be the group's ({group.entity})")
     if group.params is not None and not is_dataclass(group.params):
         problems.append("params must be a dataclass instance (or None)")
+    return problems + _entity_problems(group)
+
+
+def _entity_problems(group: FeatureGroup) -> list[str]:
+    """An instrument group never reads a market group (that would broadcast one market value
+    to every instrument); a market group's features apply to the market as a whole."""
+    problems = []
+    read = [(group_of_table(i.table) or ("", ""))[0] for i in group.inputs]
+    market = [i.table for i, entity in zip(group.inputs, read, strict=True) if entity == "market"]
+    if group.entity == "instrument" and market:
+        problems.append(
+            f"an instrument group reads market groups {market}: broadcasting market values "
+            "to instruments needs its own ADR (ADR 0047)"
+        )
+    narrowed = sorted({f.applies_to for f in group.features} - {"any"})
+    if group.entity == "market" and narrowed:
+        problems.append(
+            f"a market group applies to the whole market (applies_to 'any'), not {narrowed}"
+        )
     return problems

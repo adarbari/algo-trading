@@ -255,6 +255,22 @@ range; every feature is listed in the generated **[feature catalogue](features.m
   exactly as the nightly run would have. Nightly runs it for every session it ingests, after
   earnings, bars, corporate actions, rates and chains. `--only` computes just the named
   rollups; their dependencies are read from the store.
+- **Market-entity groups** (ADR 0047). A group declared with `entity = "market"` describes the
+  whole market, not an instrument: breadth, trend, stress. It is stored as
+  `rollups/market/<name>@v<N>` with **one row per session**, `instrument_id = MKT:US`
+  (`core.model.instruments.market_id`, the only place that id is built; the column is the
+  storage key, as `RATE:UST-3M` is for rates), the point-in-time columns unchanged, and is
+  read as `market.<name>@v<N>.<column>`, never selected per instrument. Its compute has the
+  same signature and reads ordinary multi-instrument frames (all of `bars/1d`, other groups'
+  tables), plus `universe` (the session's universe snapshot, `None` before the first one: a
+  later list would count today's survivors) and `instruments/symbol_ids` (symbol -> id from the
+  reference snapshot, to find SPY without building an id). `symbol_ids` is a lookup only, never
+  a population (it may come from a later snapshot); `universe` is the population. The runner
+  fails the group unless it returns exactly that one row. An instrument group never reads a
+  market group (broadcasting needs its own ADR), and a market group's `applies_to` is `any`.
+  An expression feature takes the entity of what it reads; one
+  that reads two entities is a definition error. `compute_rollups(..., entity="market")`
+  computes them after the instrument groups; the catalogue lists them under "Market features".
 
 Per-column meanings, units, ranges and null meanings: [features.md](features.md). Floats of
 the v2 groups are stored as 32-bit (`float32`). Columns computed from other columns are
@@ -270,6 +286,7 @@ readable until `algotrade-ingest retire-features --group <name>@v1` deletes them
 | `price_stats@v2` | `close`, `sma_20/50/200`, `ret_20d/60d`, `high_52w`, `low_52w`, `hv20`, `hv30` (close-to-close), `hv20_yz` (Yang-Zhang), `adv_usd_20d`, `history_days` | `bars/1d` split-adjusted as of the session (not total return), 252 sessions back | built |
 | `price_history@v1` | `bar_status` (TRADED / NO_TRADE), `last_bar_session`, `range_sessions`, `range_status` (FULL / SINCE_LISTING / NEW_LISTING / FEW_BARS / NO_HISTORY), `high_avail`, `low_avail` | `bars/1d` split-adjusted as of the session, 252 + 60 sessions back; params in `config/site/rollups.toml` | built |
 | `earnings@v1` | `next_earnings_date`, `earnings_time` (pre / post / unknown), `days_to_earnings` (sessions), `date_confirmed` (null: the source does not say), `last_earnings_date` | every `events/earnings` snapshot stored on or before the session | built |
+| `earnings_schedule@v1` | `next_status` (SCHEDULED / NOT_ANNOUNCED): the status of `earnings@v1`'s next-report features (ADR 0046) | `events/earnings`, through `earnings@v1`'s compute (same rows) | built |
 | `dividends@v2` | `div_ttm`, `div_count_ttm`, `last_ex_date` | `events/dividend`, `events/split` (by event date), `price_stats@v2` | built |
 | `div_yield@v1` | `div_yield` (the materialised expression feature) | `dividends@v2`, `price_stats@v2` | built |
 | `iv30@v1` | `iv30` (ours), `iv30_cboe`, `iv30_status`, `near_expiry`, `far_expiry`, `atm_strike_near`, `spot`, `rate`, `div_yield`, `n_quotes_used` | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `div_yield@v1` | built |

@@ -1,0 +1,124 @@
+# L3 site setting: the field guide (ADR 0041, amended 2026-10-06), one <theme>.toml per theme
+# plus situations.toml; loaded together by config/site/settings.py load_field_guide. Every
+# [[field]] says how to read one catalogue field, which criterion means what, and when the
+# reading lies; a [[situation]] is one state of the world that fools several thresholds at once.
+# The keys are documented in momentum.toml. Edit by PR; `make features-doc` renders the page.
+
+[[field]]
+name = "feature.market_cap"
+theme = "fundamentals"
+reads = "Shares outstanding times the close, in dollars. The usual US buckets: micro under $300M, small $300M to $2B, mid $2B to $10B, large $10B to $200B, mega above $200B. They are conventions, not rules: index providers draw the lines differently and names migrate across them as prices move."
+caveats = [
+  "The count is the company total and the price is this share class's, so a company with two listed classes shows the same cap on both only when they trade at the same price. Check rollup.fundamentals@v2.market_cap_status.",
+  "Null for funds (no share count filed), for a stale count (rollup.fundamentals@v2.market_cap_status STALE) and for a company with no SEC filing (foreign private issuers); a hard size gate drops ETFs and many ADRs.",
+  "Cap is size, not quality or liquidity: a $20B name can trade $5M a day (a controlled company) and a $500M name $50M (a meme). Pair with rollup.price_stats@v2.adv_usd_20d.",
+]
+sources = [
+  "Market-cap bucket conventions: https://en.wikipedia.org/wiki/Market_capitalization and Morningstar's definitions",
+]
+[[field.use]]
+for = "large cap"
+op = "gte"
+value = 10000000000
+mode = "hard"
+[[field.use]]
+for = "mid cap"
+op = "between"
+value = [2000000000, 10000000000]
+mode = "hard"
+[[field.use]]
+for = "small cap"
+op = "between"
+value = [300000000, 2000000000]
+mode = "hard"
+note = "under 300000000 is micro cap; pair with a liquidity gate"
+
+[[field]]
+name = "feature.pe_ratio"
+theme = "fundamentals"
+reads = "Close over diluted earnings per share of the trailing twelve months. The long-run market average is around 15 to 20; under 10 is cheap on its face, above 30 is priced for growth. It is only shown when the company earned money, when the figure is recent and when the shares are not an ADR, so a null is common and meaningful."
+caveats = [
+  "Cyclicals look cheapest at the top of their cycle: an oil producer or a chip maker at a P/E of 6 on peak earnings becomes 18 when earnings normalise without the price moving. Pair a low P/E with feature.revenue_growth_yoy and instrument.sector, or compare against several years of earnings (not stored).",
+  "A low P/E is often a value trap: the market has priced in falling earnings, a shrinking industry or heavy debt. A low P/E in feature.trend_state DOWNTREND is the market disagreeing with the ratio.",
+  "One-offs inside the twelve months (an asset sale, a tax gain, a write-down) swing EPS and the ratio; nothing here separates them.",
+  "Null for loss makers (EPS at or below 0), ADRs and stale filings: a hard 'pe_ratio lt 15' silently removes every unprofitable company and every ADR. If that is not the intent, use mode score, or add rollup.financials@v1.financials_status.",
+  "Sector ranges differ by a factor of three (banks and energy low, software high); a single market-wide cut-off mostly selects sectors.",
+]
+sources = [
+  "Problems with taking P/E at face value: https://anurimabanerjee.substack.com/p/problems-with-taking-pe-at-face-value",
+  "Cyclical peak earnings and value traps: https://moneyweek.com/10368/the-pitfalls-of-value-investing-53516",
+  "Graham and Dodd; Shiller's cyclically adjusted P/E for the multi-year averaging idea",
+]
+[[field.use]]
+for = "cheap on trailing earnings"
+op = "lt"
+value = 15
+mode = "soft"
+tolerance = 3
+note = "with feature.revenue_growth_yoy gte 0 to keep out shrinking businesses; remember loss makers are null, not cheap"
+[[field.use]]
+for = "not priced for perfection"
+op = "lte"
+value = 30
+mode = "score"
+tolerance = 10
+
+[[field]]
+name = "feature.revenue_growth_yoy"
+theme = "fundamentals"
+reads = "Trailing-twelve-month revenue against the same twelve months a year earlier, as a fraction: 0.10 is 10% growth. Around 0.03 to 0.05 is nominal GDP-like; above 0.15 is a growth company; above 0.30 is rare outside early-stage names; negative is a shrinking business. It lags: the TTM ends at the last filed quarter, which can be four months old."
+caveats = [
+  "Acquisitions inflate reported growth and divestitures deflate it; companies report 'organic' growth for that reason and the catalogue has only the reported figure. A jump from 5% to 40% is usually a deal. Check instrument.sic or the company's filings before reading it as demand.",
+  "A tiny year-ago base makes huge percentages (a company going from $10M to $30M is 200%); pair with feature.market_cap or rollup.financials@v1.revenue_ttm.",
+  "Currency moves show up as growth or shrinkage for companies that earn abroad.",
+  "Null with under two years of filings (recent IPOs, foreign filers, funds): a hard criterion rejects them. rollup.financials@v1.financials_status says why.",
+]
+sources = [
+  "Organic versus reported revenue growth, as defined in issuers' filings (e.g. PepsiCo, Moody's 10-K definitions on sec.gov)",
+]
+[[field.use]]
+for = "growing revenue"
+op = "gte"
+value = 0.10
+mode = "soft"
+tolerance = 0.03
+[[field.use]]
+for = "fast growth"
+op = "gte"
+value = 0.25
+mode = "soft"
+tolerance = 0.05
+note = "check for an acquisition when the jump is sudden"
+[[field.use]]
+for = "not shrinking"
+op = "gte"
+value = 0
+mode = "soft"
+tolerance = 0.03
+
+[[field]]
+name = "feature.div_yield"
+theme = "fundamentals"
+reads = "Dividends paid in the trailing twelve months over the close, as a fraction: 0.03 is a 3% yield. The S&P 500 yields about 0.013 to 0.02; 0.03 to 0.05 is a solid income name; above 0.08 is where the market is usually pricing a cut (a yield trap: the yield rose because the price fell on the news that the payout cannot last); above 0.10 is a warning, not an opportunity."
+caveats = [
+  "A yield trap looks best right before the cut: a high yield with feature.trend_state DOWNTREND or rollup.price_stats@v2.ret_60d well below 0 is the market expecting the cut. Pair high-yield rules with a trend filter or with earnings coverage (rollup.financials@v1.eps_diluted_ttm above the dividend).",
+  "A special dividend inflates the trailing twelve months for a year: rollup.dividends@v2.div_count_ttm above 4 for a quarterly payer is the sign.",
+  "REITs, MLPs, BDCs and bond or covered-call ETFs yield 0.06 to 0.12 by structure; a market-wide 'above 5%' screen is mostly a list of those. Check instrument.sector and instrument.is_etf.",
+  "Null for a non-payer with too little history to say so; 0 for a known non-payer. A hard 'gte 0.03' drops both, which is usually intended.",
+]
+sources = [
+  "Yield traps and payout ratios (yields above 10% and payouts above 100% precede cuts): https://www.livewiremarkets.com/wires/how-to-avoid-dividend-traps and https://indexes.morningstar.com/insights/perspective/bltdb6d3e043f097825/not-all-dividend-stocks-are-safe-heres-how-to-avoid-dividend-traps",
+]
+[[field.use]]
+for = "pays a meaningful dividend"
+op = "gte"
+value = 0.03
+mode = "soft"
+tolerance = 0.005
+[[field.use]]
+for = "not a yield trap"
+op = "lte"
+value = 0.08
+mode = "soft"
+tolerance = 0.01
+note = "with feature.trend_state ne DOWNTREND"

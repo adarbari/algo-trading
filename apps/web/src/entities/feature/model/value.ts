@@ -9,6 +9,7 @@ import type { gqlTypes } from '@/shared/api';
 
 export type FeatureFormatName = gqlTypes.FeatureFormat;
 export type UnknownCodeName = gqlTypes.UnknownCode;
+export type NullReasonName = gqlTypes.NullReason;
 
 /** The parts of `FeatureInfo` the formatting reads. */
 export interface ServedInfo {
@@ -22,7 +23,10 @@ export interface ServedInfo {
 export interface ServedValue {
   name: string;
   value?: unknown;
-  unknown?: { code: UnknownCodeName; detail: string } | null | undefined;
+  unknown?:
+    | { code: UnknownCodeName; detail: string; reason?: NullReasonName | null | undefined }
+    | null
+    | undefined;
   info: ServedInfo;
 }
 
@@ -61,12 +65,53 @@ export function isUnknown(value: ServedValue | undefined): boolean {
   return value === undefined || value.value === null || value.value === undefined;
 }
 
+/** The word for a stored null that is the fact (ADR 0046, EXPLAINED); exhaustive over the server's reasons. */
+export function reasonLabel(reason: NullReasonName): string {
+  switch (reason) {
+    case 'NO_TRADE':
+      return 'No trade';
+    case 'NOT_ANNOUNCED':
+      return 'Not announced';
+    case 'NEW_LISTING':
+      return 'New listing';
+    case 'FEW_BARS':
+      return 'Too few trades';
+    default: {
+      const unreachable: never = reason;
+      return unreachable;
+    }
+  }
+}
+
+/** One line on what an explained absence means. */
+function reasonText(reason: NullReasonName): string {
+  switch (reason) {
+    case 'NO_TRADE':
+      return 'no trade on this session: no bar';
+    case 'NOT_ANNOUNCED':
+      return 'the next report date is not announced';
+    case 'NEW_LISTING':
+      return 'listed too recently for the window';
+    case 'FEW_BARS':
+      return 'trades too rarely to fill the window';
+    default: {
+      const unreachable: never = reason;
+      return unreachable;
+    }
+  }
+}
+
 /**
- * What a cell with no value says (ADR 0042): "n/a" where the feature does not apply to the
- * instrument, "Illiquid" where the options are too thin to price, else "Unknown". The one place
- * the label is chosen; the server decides the code.
+ * What a cell with no value says (ADR 0042, 0046): the reason's word where the absence is
+ * explained, "n/a" where the feature does not apply to the instrument, "Illiquid" where the
+ * options are too thin to price, else "Unknown". The one place the label is chosen; the server
+ * decides the code and the reason.
  */
-export function unknownLabel(code: UnknownCodeName | null | undefined): string {
+export function unknownLabel(
+  code: UnknownCodeName | null | undefined,
+  reason?: NullReasonName | null,
+): string {
+  if (code === 'EXPLAINED' && reason) return reasonLabel(reason);
   if (code === 'NOT_APPLICABLE') return 'n/a';
   if (code === 'ILLIQUID') return 'Illiquid';
   return 'Unknown';
@@ -79,6 +124,9 @@ export function unknownLabel(code: UnknownCodeName | null | undefined): string {
 export function unknownReason(value: ServedValue | undefined): string {
   const unknown = value?.unknown;
   if (!value || !unknown) return 'not known';
+  if (unknown.code === 'EXPLAINED') {
+    return unknown.detail || codeReason(unknown.code, value.info.nullMeaning, unknown.reason);
+  }
   if (unknown.code === 'NO_PARTITION') return `not stored for this session (${unknown.detail})`;
   if (unknown.code === 'NO_ROW' || unknown.code === 'NULL') {
     return codeReason(unknown.code, value.info.nullMeaning);
@@ -90,8 +138,11 @@ export function unknownReason(value: ServedValue | undefined): string {
 export function codeReason(
   code: UnknownCodeName | null,
   nullMeaning: string | null | undefined,
+  reason?: NullReasonName | null,
 ): string {
   switch (code) {
+    case 'EXPLAINED':
+      return reason ? reasonText(reason) : 'not known for this session';
     case 'NO_PARTITION':
       return 'not stored for this session';
     case 'NO_ROW':

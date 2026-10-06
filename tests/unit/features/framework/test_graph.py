@@ -30,6 +30,19 @@ def test_dependency_order_is_topological_and_stable() -> None:
     assert dependents([a, b, c, d], "a@v1") == {"c@v1", "b@v1"}
 
 
+def test_market_groups_depend_on_the_groups_they_read() -> None:
+    a = make("a")
+    m = FeatureGroup(
+        "m", 1, "", (Input("rollups/instrument/a@v1"),), features({"v": "float"}), passthrough,
+        entity="market",
+    )  # fmt: skip
+    n = FeatureGroup(
+        "n", 1, "", (Input(m.table),), features({"v": "float"}), passthrough, entity="market"
+    )
+    assert dependencies(n) == ("m@v1",) and dependencies(m) == ("a@v1",)
+    assert [r.key for r in dependency_order([n, m, a])] == ["a@v1", "m@v1", "n@v1"]
+
+
 def test_cycles_unknown_and_duplicate_rollups_fail() -> None:
     with pytest.raises(ValueError, match=r"cycle: (x@v1 -> y@v1 -> x@v1|y@v1 -> x@v1 -> y@v1)"):
         dependency_order([make("x", "y"), make("y", "x")])

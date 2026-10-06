@@ -48,7 +48,7 @@ a genuine exception, write an ADR and list the module in `allowed` with the reas
    Splitting a folder: move modules into kind subfolders, update imports and
    `architecture/ownership.toml` paths, and move the tests to mirror (no re-export shims).
    `tests/architecture/test_layout.py` and `test_layout_buckets.py` check all of it.
-4. **New stored table:** add a `[[table]]` with exactly one producing `owner`.
+4. **New stored table:** add a `[[table]]` to `architecture/tables.toml` with exactly one producing `owner`.
 5. **Moving a responsibility:** move the code and make the new module the `owner` in the
    same PR (a `target_owner` may bridge a multi-PR move; remove it when done). Run
    `make dupes-update` if duplicates went away (it fails when counts go down without the

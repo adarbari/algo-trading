@@ -175,6 +175,8 @@ max_verify_failures = 0.10       # verification vs IBKR: FAIL if over 10% of che
 # have a value for the session, by tier (core: S&P 500, priority symbols, HIGH liquidity). core_min /
 # rest_min: least share; max_drop: largest fall vs the previous session; level (core_level for the
 # core tier): WARN is reported, FAIL fails the rollups step; covered_by "row": a stored row counts.
+# A null its status column explains counts as covered (illiquid, ADR 0042; no trade, not announced,
+# a new listing, ADR 0046), except NO_TRADE for a core name.
 # Set from the session 2026-10-02 (core 98-100%, rest 79-99%).
 [quality.coverage.price_stats.close]
 core_min = 0.99
@@ -196,15 +198,14 @@ max_drop = 0.05
 level = "WARN"
 
 [quality.coverage.earnings.next_earnings_date]
-core_min = 1.0      # every core name has an earnings row; a company with no announced date still has one
+core_min = 1.0      # every core name has a next date or reads "not announced" (earnings_schedule@v1, ADR 0046)
 rest_min = 0.75
 max_drop = 0.05
 level = "WARN"
-covered_by = "row"
 
 # Overdue earnings: of the core names with an earnings row, the share whose last report is at most
 # max_age_days before the session or that have a next date. A company past both is overdue: the
-# calendar source (Nasdaq) has dropped it, and the row rule above still counts it covered (FDX on
+# calendar source (Nasdaq) has dropped it, and the rule above still counts it covered (not announced) (FDX on
 # 2026-10-02: last report 2026-06-23, no next date). Core only (rest_min 0); the email lists each
 # name with its last report date.
 [quality.coverage.earnings.last_earnings_date]

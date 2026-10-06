@@ -5,7 +5,8 @@ groups that materialise expressions.
 
 - checks every expression (``definitions.build_expressions``) against the code groups;
 - turns each ``materialise = true`` expression into a one-feature group ``<name>@v<N>``
-  (table ``rollups/instrument/<name>@v<N>``; a new expression version is a new table) whose
+  (table ``rollups/instrument/<name>@v<N>``, ``rollups/market/`` for a market-entity one;
+  a new expression version is a new table) whose
   compute evaluates the formula over its inputs' rows, so the ``rollups`` task stores it
   after its inputs, and a group may read it like any group (``iv30@v1`` reads ``div_yield``);
 - orders all groups by dependency (an unknown dependency or a cycle fails here).
@@ -29,7 +30,7 @@ import pandas as pd
 
 from algotrade.config.site.settings import FeatureDefinition
 from algotrade.core.model.errors import ConfigurationError
-from algotrade.core.model.fields import ROLLUP_TABLE_PREFIX
+from algotrade.core.model.fields import rollup_table
 from algotrade.features.expressions.definitions import Expression, build_expressions, formula_type
 from algotrade.features.expressions.evaluator import (
     KIND_OF,
@@ -116,16 +117,18 @@ class FeatureSet:
             return self.expressions[name].feature
         return self.features.get(name) or self._by_field.get(name)
 
-    def field_types(self) -> dict[str, str]:
-        """Every selectable feature field -> its dtype."""
-        return {f.field: f.dtype for f in self.features.values()}
+    def field_types(self, entity: str | None = None) -> dict[str, str]:
+        """Every selectable feature field (of ``entity`` only, when given) -> its dtype."""
+        return {
+            f.field: f.dtype for f in self.features.values() if entity is None or f.entity == entity
+        }
 
     def table(self, name: str) -> str:
         """The stored table of a code group or a materialised expression (by name)."""
         if name in self._by_name:
             return self._by_name[name].table
         e = self.expressions[name]
-        return f"{ROLLUP_TABLE_PREFIX}{e.name}@v{e.feature.version}"
+        return rollup_table(e.feature.entity, f"{e.name}@v{e.feature.version}")
 
     def applicability(self, name: str) -> tuple[frozenset[str], tuple[StatusRule, ...]]:
         """What a value's absence may be put down to (ADRs 0042, 0046), inherited by an
@@ -145,7 +148,7 @@ class FeatureSet:
                         feature.status_field,
                         frozenset(feature.illiquid_statuses),
                         frozenset(feature.explained_statuses),
-                        f"{ROLLUP_TABLE_PREFIX}{feature.group}",
+                        rollup_table(feature.entity, feature.group),
                     )
                 )
 
@@ -271,6 +274,7 @@ class FeatureSet:
             tuple(Input(t, required=False) for t in tables),
             (e.feature,),
             partial(_compute_materialised, self, e.name),
+            entity=e.feature.entity,
         )
 
 

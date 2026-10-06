@@ -73,7 +73,7 @@ Every piece of data or configuration belongs to exactly one layer
 | Layer | What | Tables / files | Format | Written by |
 |---|---|---|---|---|
 | **L1 Instrument** | What each instrument *is* (facts) and what we *know* about it as of a date (derived) | `instruments/reference`, `rollups/instrument/<name>@vN`, read together as `InstrumentView(as_of)` | Parquet, one full snapshot per date | `apps/ingestion` |
-| **L2 Instrument × time** | Values over time and events | `bars/<interval>` (1m…1d, unadjusted), `chains/*`, `events/<type>`, `rates/treasury`, `rollups/daily/<name>@vN` | Parquet, partitioned by session date | `apps/ingestion` |
+| **L2 Instrument × time** | Values over time and events | `bars/<interval>` (1m…1d, unadjusted), `chains/*`, `events/<type>`, `rates/treasury`, `rollups/daily/<name>@vN`; market-entity rollups `rollups/market/<name>@vN` (one `MKT:US` row per session, ADR 0047) and economic series with vintages `macro/series` (ADR 0048) | Parquet, partitioned by session date | `apps/ingestion` |
 | **L3 Site config** | Shared choices: coverage, sources, rollup thresholds, defaults, presets, curated overrides | `config/site/*.toml`, `config/site/overrides/*.csv` | TOML / CSV, changed by PR | the repo |
 | **L4 User config** | One user's selections, strategy configs, watchlists, preferences | `config/users/<id>/*.toml` | TOML now, DB later | the user |
 
@@ -379,7 +379,7 @@ Extra contracts:
 | `quant/` | Pure numerics (ADR 0021): `black_scholes` (European price + Greeks, continuous q and r), `implied_vol` (safeguarded Newton, NaN + status code on failure), `realized_vol` (close-to-close, Parkinson, Garman-Klass, Yang-Zhang; 252), `rates` (par → continuous, tenor days, curve interpolation), `covariance` (Kritzman-Li turbulence, the absorption ratio and its shift; eigenvalues only), `turning_points` (Pagan-Sossounov and Lunde-Timmermann bull / bear dating, drawdowns). | numpy, core |
 | `strategies/` → `trading/` | Backtest strategies: `MarketView` in, target weights out, plus their registry. | core, quant |
 | `strategies/` → `screeners/` | Screener contract, shared `Decision` categories, `short_premium_liquidity`. | core, quant |
-| `features/` | The feature store (ADR 0023): `framework/` (`Feature`: one typed, documented column with kind, unit, null meaning, range; `FeatureGroup`: inputs + lookback, params from `rollups.toml`, its features; the dependency graph and the per-session runner, point in time, chunked backfills), `rollups/` (the groups: `FEATURES` + a pure compute; only core, quant, numpy, pandas), `registry.py` (`GROUPS`, `FEATURES`, `feature(name)`, `SUPERSEDED`), `expressions/` (the typed expression language: lexer, parser, type checker, vectorised evaluator, never Python `eval`; expression features from `config/site/features/*.toml` resolved into a `FeatureSet` with the code groups and the groups that materialise expressions), `site.py` (the site's `FeatureSet`; the selection catalogue and the `rollups` task are built from it), `catalogue.py` (renders `docs/data/features.md`). Inputs are asked of `data.feature_inputs` by table name; expression features are computed on read (`services/features.py`) unless materialised. | data (`data.feature_inputs` only), config.site, quant, core |
+| `features/` | The feature store (ADR 0023): `framework/` (`Feature`: one typed, documented column with kind, unit, null meaning, range; `FeatureGroup`: inputs + lookback, params from `rollups.toml`, its features; the dependency graph and the per-session runner, point in time, chunked backfills), `rollups/` (the groups: `FEATURES` + a pure compute; only core, quant, numpy, pandas), `registry.py` (`GROUPS`, `FEATURES`, `feature(name)`, `SUPERSEDED`), `expressions/` (the typed expression language: lexer, parser, type checker, vectorised evaluator, never Python `eval`; expression features from `config/site/features/*.toml` resolved into a `FeatureSet` with the code groups and the groups that materialise expressions), `site.py` (the site's `FeatureSet`; the selection catalogue and the `rollups` task are built from it), `catalogue.py` (renders `docs/data/features.md`). A group's `entity` is `instrument` (default) or `market` (ADR 0047: one `MKT:US` row per session in `rollups/market/<name>@vN`; an expression never mixes entities). Inputs are asked of `data.feature_inputs` by table name; expression features are computed on read (`services/features.py`) unless materialised. | data (`data.feature_inputs` only), config.site, quant, core |
 | `analytics/` | Metrics and report formatting from equity curves + fills. | core |
 | `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. `selection/`: three-valued evaluation with a per-rule audit; `schedule.py`, the rebalance sessions and the audit of each change. `backtest/universe.py`: the tradable set per bar (fixed, or from a rebalance schedule; exits on removal). | strategies, config, analytics, core |
 | `services/` | Use cases: `backtests/`, `screening/` (run + `exports`), `jobs/`, `evaluation/`; shared by several: `configs`, `selection`, golden `datasets`, `views` (FeatureView builder), `features` (expression features on read: only the stored columns they need). | everything below except `storage.tables.writers` and `storage.tables.readers` (through `data/`) |
@@ -673,7 +673,7 @@ An ingestion **task** produces stored tables and one run record; a **job** is so
   decides the status in one place: any failed item or explicit `partial` → PARTIAL; an
   exception → a saved FAILED record, re-raised. The clock is injected (`TaskContext.clock`).
 - `framework/registry.py`: every task declared once: name, description, tables it writes (checked
-  against `[[table]]` producers in `architecture/ownership.toml`), sources it needs (by name
+  against `[[table]]` producers in `architecture/tables.toml`), sources it needs (by name
   in `TaskContext.sources`), the settings section it reads, its parameters (the CLI turns
   them into flags) and `run(ctx, params)`. Defaults from settings are applied here, so
   `algotrade-ingest <task>`, `algotrade-ingest run <task>` and nightly cannot drift.
@@ -693,7 +693,7 @@ Rules: **R1** only `data/` reads market data for consumers; **R2** storage has n
 knowledge; **R3** tasks get sources from the registry, never import vendor modules; **R4**
 sources never import storage; **R5** everything runs through the job runner. All five are
 import-linter contracts; none is pending. Every stored table has exactly one producing owner
-(`[[table]]` in the registry).
+(`[[table]]` in `architecture/tables.toml`).
 
 Gates (all in `make check` and CI): `make ownership` (the ratchet
 `architecture/known_violations.toml` is empty, and a fitness test keeps it empty with no

@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-140 stored features in 17 groups, in dependency order; 38 expression features.
+141 stored features in 18 groups, in dependency order; 38 expression features.
 
 ## `option_liquidity@v1`
 
@@ -107,6 +107,14 @@ Next and last earnings dates, report time and sessions to the next report. Store
 | `days_to_earnings` | window | int | sessions | open | >= 0 | Exchange sessions after the session up to the next report date (0: reports today) | no report date on or after the session in the calendars stored by then | `events/earnings.ts` |
 | `date_confirmed` | window | bool | flag | open |  | Whether the source confirmed the next report date | the source does not say (the Nasdaq calendar never does), or no report date on or after the session in the calendars stored by then | `events/earnings.date_confirmed` |
 | `last_earnings_date` | window | date | date | open |  | The latest report date before the session | no earlier report date in the calendars stored by then (they start with the first stored snapshot; a backfill does not invent history) | `events/earnings.ts` |
+
+## `earnings_schedule@v1`
+
+Whether the next earnings date is announced (scheduled) on the session. Stored as `rollups/instrument/earnings_schedule@v1`; reads `events/earnings`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `next_status` | label | str | category | open | SCHEDULED, NOT_ANNOUNCED | SCHEDULED: a next report date on or after the session is in the calendars stored by then; NOT_ANNOUNCED: none, only a last report date | never | `events/earnings.ts` |
 
 ## `ibkr_iv@v1`
 

@@ -1,11 +1,13 @@
-"""Stored rollup rows (``rollups/instrument/<name>@v<N>``): a range of sessions, one session,
-or one instrument's latest row.
+"""Stored rollup rows (``rollups/instrument/<name>@v<N>``, ``rollups/market/<name>@v<N>``): a
+range of sessions, one session, or one instrument's latest row.
 
 ``rollup_rows``: for the rollup framework, when one rollup reads another's output
 (``iv_history@v2`` reads 252 sessions of ``iv30@v1``; ``data.feature_inputs``), and for the
 read model's range reads (feature series); ``rollup_on`` one session's rows for a consumer
-comparing them (the live verification). ``feature_rows``: for the read path of expression
-features (``services.features``), only the columns a formula needs. Each partition is one
+comparing them (the live verification); ``group_view`` the fields of feature groups for one
+session of some entities that are not instruments (a market group's ``MKT:US`` row, ADR 0047;
+instruments go through ``reference.instrument_view``). ``feature_rows``: for the read path of
+expression features (``services.features``), only the columns a formula needs. Each partition is one
 session's rows from the latest run that wrote it (or the run current at ``as_of``). The stamp
 columns (``knowledge_ts``, ``source``, ``run_id``) are dropped; ``session_date`` is kept as a
 ``date``.
@@ -16,7 +18,8 @@ from datetime import date, datetime
 
 import pandas as pd
 
-from algotrade.data.reference import snapshot
+from algotrade.core.model.fields import field_source, group_of_table
+from algotrade.data.reference import join_fields, snapshot
 from algotrade.storage.tables.readers import StoreReader
 
 STAMPS = ("knowledge_ts", "source", "run_id")
@@ -103,3 +106,30 @@ def rollup_on(
     if frame is None or frame.empty:
         return None
     return frame.drop(columns=[c for c in STAMPS if c in frame.columns]).reset_index(drop=True)
+
+
+def group_view(
+    reader: StoreReader,
+    session: date,
+    fields: Sequence[str],
+    ids: Sequence[str],
+    as_of: datetime | None = None,
+) -> tuple[pd.DataFrame, tuple[str, ...]]:
+    """``instrument_id`` (each of ``ids``) and each of ``fields`` (feature group fields only,
+    ``market.<group>@v<N>.<column>``) from exactly ``session``'s partition -> (the frame, the
+    tables with no partition for it, whose fields are absent)."""
+    wanted: dict[str, list[tuple[str, str]]] = {}
+    for name in fields:
+        table, column = field_source(name)
+        if group_of_table(table) is None:
+            raise ValueError(f"{name}: not a feature group field")
+        wanted.setdefault(table, []).append((name, column))
+    out = pd.DataFrame({"instrument_id": [str(i) for i in ids]})
+    missing = []
+    for table, columns in wanted.items():
+        frame = reader.table(table, session, as_of, list(ids))
+        if frame is None:
+            missing.append(table)
+            continue
+        out = join_fields(out, frame, columns)
+    return out, tuple(sorted(missing))

@@ -20,7 +20,8 @@ the grains below. A few others are needed for a trading system.
 | **chain snapshot** | a derivative contract × an observation time | end-of-day option chain: bid, ask, last, volume, open interest, IV, Greeks | nightly |
 | **tick** | a single trade or quote | trades, NBBO quotes | reserved; not planned on free data |
 | **universe** | an instrument × a date it belongs to a universe | "in S&P 500 on 2026-10-02", "optionable", "leveraged ETF" | daily snapshot |
-| **cross-section / market** | a date (or time) for the whole market | breadth, VIX level, sector aggregates | nightly |
+| **cross-section / market** | a date (or time) for the whole market | `rollups/market/<name>@vN`: one `instrument_id = "MKT:US"` row per session (breadth, index trend, cross-asset stress; [ADR 0047](../adr/0047-market-entity-features-and-non-tradable-ids.md)) | nightly |
+| **macro series** | a series × an observation date × a vintage | `macro/series`: FRED / ALFRED and published economic series and index levels (`MACRO:` / `IDX:` ids), `vintage_date` separate from `knowledge_ts`, runs merge ([ADR 0048](../adr/0048-macro-series-with-vintages.md)) | nightly, by each series' cadence |
 | **feature** | an instrument (or market) × as-of time × feature@version | `sma_20@v1`, `iv_rank_252d@v1` | nightly, more often later |
 | **result** | a run × an output row | screener hits, backtest equity curves, fills, metrics | per run |
 

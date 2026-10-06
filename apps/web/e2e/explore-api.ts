@@ -64,8 +64,12 @@ const CATALOGUE = new Map(
   ]),
 );
 
+/** The recorded fixtures predate `pct_from_high_avail`: it reads as the 52-week one. */
+const AVAIL = 'feature.pct_from_high_avail';
+const HIGH_52W = 'feature.pct_from_high_52w';
+
 function columnInfo(name: string): Json {
-  const feature = CATALOGUE.get(name);
+  const feature = CATALOGUE.get(name === AVAIL ? HIGH_52W : name);
   return {
     name,
     description: feature?.['description'] ?? name,
@@ -79,7 +83,9 @@ function columnInfo(name: string): Json {
 }
 
 const valueOf = (row: Row, name: string): unknown =>
-  row[name] ?? COMPARED.get(String(row['instrument_id']))?.[name] ?? null;
+  row[name === AVAIL ? HIGH_52W : name] ??
+  COMPARED.get(String(row['instrument_id']))?.[name] ??
+  null;
 
 function compare(a: unknown, b: unknown): number {
   if (typeof a === 'number' && typeof b === 'number') return a - b;
@@ -133,6 +139,7 @@ function featureTable(variables: Record<string, unknown>): Json {
         })),
         rows: shown.map((r) => columns.map((c) => valueOf(r, c))),
         unknown: shown.map((r) => columns.map((c) => (valueOf(r, c) === null ? 'NULL' : null))),
+        reasons: shown.map(() => columns.map(() => null)),
       },
     },
   };

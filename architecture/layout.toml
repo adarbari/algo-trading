@@ -259,6 +259,11 @@ purpose = "read objects at instrument grain for one session: Instrument identity
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
+path = "src/algotrade/services/read/market"
+purpose = "read objects at market grain for one session (ADR 0047): the market-entity feature values by catalogue name (the MKT:US row), through the instrument feature-value read"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
 path = "src/algotrade/services/read/screens"
 purpose = "read objects over stored screen results for one session: Screener, ScreenerRun (the one latest-run rule), ScreenResult rows, the Ideas ranking, the user's table views; and the user's rule-screen documents the Builder reads (drafts, versions, preset pin)"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
@@ -876,8 +881,16 @@ path = "config/site"
 purpose = "L3 site settings: one <name>.toml per settings group, each loaded by config/site/settings.py"
 
 [[config_dir]]
+path = "config/site/field_guide"
+purpose = "L3 field guide, one <theme>.toml per theme plus situations.toml: how to read each catalogue field, the criterion per intent, caveats (loaded by config/site/settings.py load_field_guide; ADR 0041 amended)"
+
+[[config_dir]]
 path = "config/site/features"
 purpose = "L3 expression features, one <theme>.toml per theme (loaded by config/site/settings.py load_features; ADR 0023 step 3)"
+
+[[config_dir]]
+path = "config/site/regime"
+purpose = "regime track reference data: the crash episodes and the plain-language indicator cards (ADR 0047)"
 
 [[config_dir]]
 path = "config/site/presets"
@@ -925,7 +938,7 @@ kind = "log"
 
 [[docs_dir]]
 path = "docs/data"
-purpose = "data specs: layers, storage, instruments, vendors, nightly footprint, feature catalogue, options positioning, swing levels"
+purpose = "data specs: layers, storage, instruments, vendors, nightly footprint, feature catalogue and field guide (both generated), options positioning, swing levels"
 
 [[docs_dir]]
 path = "docs/screeners"

@@ -14,9 +14,14 @@ export function resultRows(page: ResultsPage): TableRow[] {
   return page.results.map((result, i) => {
     const values = page.rows[i] ?? [];
     const codes = page.unknown[i] ?? [];
+    const reasons = page.reasons[i] ?? [];
     const cells: Record<string, TableCell> = {};
     page.columns.forEach((column: ColumnInfo, j) => {
-      cells[column.name] = { value: values[j] ?? null, unknown: codes[j] ?? null };
+      cells[column.name] = {
+        value: values[j] ?? null,
+        unknown: codes[j] ?? null,
+        reason: reasons[j] ?? null,
+      };
     });
     return {
       symbol: result.instrument?.symbol ?? result.instrumentId,

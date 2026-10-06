@@ -4,7 +4,14 @@
 2026-10-06 (the prompt also carries two worked examples and a site phrasebook,
 `config/site/phrasebook.toml`: trader vocabulary mapped to catalogue fields with threshold
 hints, so a free model maps "momentum" or "near the low" the way the owner means; the owner
-chose free providers and a phrasebook over a paid model). Extends
+chose free providers and a phrasebook over a paid model), and again 2026-10-06 (a site
+**field guide**, `config/site/field_guide/*.toml`: per catalogue field how to read it, the
+usual criterion for each intent, the caveats where the number is right and the conclusion
+wrong (a pending takeover pins RSI high and realised volatility near zero; an earnings gap
+inflates a month of realised volatility), and the situations that fool several thresholds
+at once; one source for the Builder's field help, the generated page
+`docs/data/field-guide.md` and the prompt, because drafts chose the right fields but poor
+thresholds; the owner wants the same explanation for people as for the model). Extends
 [0027](0027-vendor-sources-shared-package.md) (an external text model is a vendor adapter in
 `libs/sources`), [0029](0029-rule-screener.md) (a draft is still the only thing the Builder
 edits) and [0037](0037-domain-read-model-served-by-graphql.md) decision 4 (a compute over a request body
@@ -85,3 +92,6 @@ only through `services.*`, and the API never writes market or feature data (ADR 
   same protocol; it does not reopen this decision.
 - Quality is bounded by the catalogue descriptions: a field with a vague description is a
   field the model maps badly. Improving `description` on a `Feature` improves drafts.
+- Thresholds are bounded by the field guide: a field without an entry gets the model's own
+  number. A bad threshold in a draft is fixed in `config/site/field_guide/`, with its source, once
+  for the page, the Builder and the prompt; `make features-doc` regenerates the page.

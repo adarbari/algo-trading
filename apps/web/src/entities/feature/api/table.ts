@@ -64,6 +64,7 @@ const FeatureTable = graphql(`
       }
       rows
       unknown
+      reasons
     }
   }
 `);
