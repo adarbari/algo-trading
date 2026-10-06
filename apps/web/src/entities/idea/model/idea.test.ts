@@ -39,7 +39,9 @@ const item = (
 const screener = (id: string, name: string, notRun = false): Served['screeners'][number] => ({
   screener: { id, name, owner: 'abhinav', version: 3 },
   run: notRun ? null : { runId: `run-${id}`, configVersion: 2 },
-  notRun: notRun ? { code: 'NOT_RUN', detail: `${id} has no run for 2026-10-02` } : null,
+  notRun: notRun
+    ? { code: 'NOT_RUN', detail: `${id} has no run for 2026-10-02`, reason: null }
+    : null,
   picked: notRun ? 0 : 7,
   top: notRun ? [] : [{ instrumentId: 'id-1', score: 84, instrument: { symbol: 'AAPL' } }],
 });

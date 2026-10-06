@@ -10,6 +10,8 @@ const config: CodegenConfig = {
   schema: '../api/schema.graphql',
   documents: ['src/**/*.{ts,tsx}', '!src/shared/api/generated/**'],
   ignoreNoDocuments: true,
+  // The first line names the generator (the file-length check exempts such files).
+  hooks: { afterOneFileWrite: ['tsx scripts/mark-generated.ts'] },
   generates: {
     'src/shared/api/generated/graphql/': {
       preset: 'client',

@@ -10,11 +10,13 @@ import {
   decisionColumn,
   featureColumn,
   flagsColumn,
+  fromHighColumn,
   rankColumn,
   reasonsColumn,
   scoreColumn,
   screenColumn,
   tickerColumn,
+  withCompanions,
   type ColumnPlan,
 } from './columns';
 import type { ColumnInfo, TableRow } from './table';
@@ -145,6 +147,57 @@ describe('column factories', () => {
       expect.stringMatching(/too thin/),
     );
     expect(within(grid).queryByText('Unknown')).not.toBeInTheDocument();
+  });
+
+  it('say what an explained absence is, not Unknown (ADR 0046)', () => {
+    const quiet: TableRow = {
+      symbol: 'THIN',
+      instrumentId: 'EQ:T',
+      name: 'Thin Co',
+      cells: { [EARN.name]: { value: null, unknown: 'EXPLAINED', reason: 'NO_TRADE' } },
+    };
+    render(
+      <DataTable
+        columns={[tickerColumn(), featureColumn(EARN)]}
+        rows={[quiet]}
+        getRowId={(r) => r.symbol}
+        label="Explained"
+        rowLines={2}
+      />,
+    );
+    const grid = screen.getByRole('grid', { name: 'Explained' });
+    expect(within(grid).getByText('No trade')).toHaveAttribute(
+      'title',
+      'no trade on this session: no bar',
+    );
+    expect(within(grid).queryByText('Unknown')).not.toBeInTheDocument();
+  });
+
+  it('title the from-high column with its window, and ask for the window beside it', () => {
+    const high = info('feature.pct_from_high_avail', { format: 'PERCENT' });
+    const sessions = 'rollup.price_history@v1.range_sessions';
+    const row: TableRow = {
+      symbol: 'NEW',
+      instrumentId: 'EQ:N',
+      name: 'New Co',
+      cells: {
+        [high.name]: { value: -0.12, unknown: null },
+        [sessions]: { value: 131, unknown: null },
+      },
+    };
+    render(
+      <DataTable
+        columns={[tickerColumn(), fromHighColumn(high)]}
+        rows={[row]}
+        getRowId={(r) => r.symbol}
+        label="High"
+        rowLines={2}
+      />,
+    );
+    const grid = screen.getByRole('grid', { name: 'High' });
+    expect(within(grid).getByText(/12/)).toHaveAttribute('title', 'High over 131 sessions');
+    expect(withCompanions([high.name, 'feature.x'])).toEqual([high.name, 'feature.x', sessions]);
+    expect(withCompanions([high.name, sessions])).toEqual([high.name, sessions]);
   });
 
   it('mark personal-licence features and describe a column from its catalogue entry', () => {

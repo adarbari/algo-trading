@@ -12,7 +12,12 @@ import type { DataTableSort, IconName } from '@algotrade/ui';
 import { useMemo, type ReactNode } from 'react';
 
 import { FeaturePicker } from '@/features/column-picker';
-import { useFeatureTable, type TableFilters, type TableRow } from '@/entities/feature';
+import {
+  useFeatureTable,
+  withCompanions,
+  type TableFilters,
+  type TableRow,
+} from '@/entities/feature';
 
 import { usePageOf } from '../model/paging';
 import { pageCount, tablePlan } from '../model/plan';
@@ -81,14 +86,15 @@ export function FeatureTable({
   const [page, setPage] = usePageOf(
     JSON.stringify([columns, keys, filters, server ? sortParam(sort) : null]),
   );
+  const asked = useMemo(() => withCompanions(columns), [columns]);
   const table = useFeatureTable(
     server
-      ? { columns, keys, filters, sort: sortParam(sort), page, size: pageSize }
-      : { columns, keys, filters },
+      ? { columns: asked, keys, filters, sort: sortParam(sort), page, size: pageSize }
+      : { columns: asked, keys, filters },
     !keys || keys.length > 0,
   );
   const data = table.data;
-  const plan = useMemo(() => tablePlan(data?.columns ?? []), [data?.columns]);
+  const plan = useMemo(() => tablePlan(data?.columns ?? [], columns), [data?.columns, columns]);
   const rows: readonly TableRow[] = data?.rows ?? [];
   const full = maxSelected !== undefined && (selected?.length ?? 0) >= maxSelected;
   const summary = data

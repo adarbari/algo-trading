@@ -37,6 +37,7 @@ const IdeasPage = graphql(`
         notRun {
           code
           detail
+          reason
         }
         picked
         top {

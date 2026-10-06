@@ -81,6 +81,7 @@ const ScreenerResults = graphql(`
           }
           rows
           unknown
+          reasons
           results {
             instrumentId
             rank
