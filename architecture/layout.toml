@@ -94,7 +94,7 @@ contracts = ["Layout: site settings never import strategy configs (resolve layer
 
 [[dir]]
 path = "src/algotrade/config/site/regime"
-purpose = "L3 regime settings: the plain-language indicator cards and the reference crash episodes (config/site/regime/*.toml, ADR 0047), typed and validated (split from config/site, at its module cap)"
+purpose = "L3 regime settings: the plain-language indicator cards and the reference crash episodes and NBER recessions (config/site/regime/*.toml, ADR 0047), typed and validated (split from config/site, at its module cap)"
 contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
 
 [[dir]]
@@ -290,12 +290,12 @@ contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
 path = "src/algotrade/services/read/market"
-purpose = "read objects at market grain for one session (ADR 0047): Market, and the market-entity feature values by catalogue name (the MKT:US row), through the instrument feature-value read"
+purpose = "read objects at market grain (ADR 0047): Market for one session, the market-entity feature values by catalogue name (the MKT:US row, through the instrument feature-value read), and the history of its stored fields over a named window (loader + the pure bucketing a chart takes)"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
 path = "src/algotrade/services/read/regime"
-purpose = "read objects of the market regime for one session (ADR 0047): MarketRegime (label as weather, scores, indicator cards joined to their values, the sizing rule) and the regime label's history as bands over a named window"
+purpose = "read objects of the market regime for one session (ADR 0047): MarketRegime (label as weather, scores, indicator cards joined to their values, the sizing rule), the regime label's history as bands over a named window, and the reference episodes and NBER recessions the session knew"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
@@ -453,7 +453,7 @@ contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037
 
 [[dir]]
 path = "apps/api/algotrade_api/graphql/types/market"
-purpose = "GraphQL types at market grain (mirrors services/read/market and services/read/regime): Market and MarketRegime with its scores, indicator cards, sizing rule and label bands"
+purpose = "GraphQL types at market grain (mirrors services/read/market and services/read/regime): Market (values and the history of its stored fields) and MarketRegime with its scores, indicator cards, sizing rule, label bands, episodes and recessions"
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 [[dir]]
@@ -693,7 +693,7 @@ purpose = "L3 expression features, one <theme>.toml per theme (loaded by config/
 
 [[config_dir]]
 path = "config/site/regime"
-purpose = "regime track reference data: the crash episodes and the plain-language indicator cards (ADR 0047)"
+purpose = "regime track reference data: the crash episodes, the NBER recession chronology and the plain-language indicator cards (ADR 0047)"
 
 [[config_dir]]
 path = "config/site/presets"

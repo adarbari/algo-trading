@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { gql, GraphQLRequestError } from '@/shared/api';
 
-import { useRegime, useRegimeBands } from './hooks';
+import { useRegime, useRegimeBands, useRegimeEpisodes } from './hooks';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -81,5 +81,28 @@ describe('useRegimeBands', () => {
       expect(result.current.isSuccess).toBe(true);
     });
     expect(result.current.data).toEqual([]);
+  });
+});
+
+describe('useRegimeEpisodes', () => {
+  it('asks the RegimeEpisodes operation and serves the episodes and recessions the session knows', async () => {
+    const episode = { key: 'covid_2020', name: 'Covid crash, early 2020', recovered: '2020-08-18' };
+    const recession = { start: '2020-02-01', end: null, announcedStart: '2020-06-08' };
+    GQL.mockResolvedValue({ regime: { episodes: [episode], recessions: [recession] } });
+    const { result } = renderHook(() => useRegimeEpisodes(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(String(GQL.mock.calls[0]?.[0])).toContain('query RegimeEpisodes');
+    expect(result.current.data).toEqual({ episodes: [episode], recessions: [recession] });
+  });
+
+  it('serves none for a null regime', async () => {
+    GQL.mockResolvedValue({ regime: null });
+    const { result } = renderHook(() => useRegimeEpisodes(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(result.current.data).toEqual({ episodes: [], recessions: [] });
   });
 });

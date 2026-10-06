@@ -23,6 +23,20 @@ REGIME = """query R($date: Date) {
 BANDS = """query B($start: Date!, $end: Date!, $date: Date) {
   regime(date: $date) { bands(start: $start, end: $end) { start end label } }
 }"""
+EPISODES = """query E($date: Date) {
+  regime(date: $date) {
+    episodes { key name kind peak trough recovered spxDrawdown nasdaqDrawdown recession
+               nberStart nberEnd cause notes knownFrom }
+    recessions { start end announcedStart announcedEnd }
+  }
+}"""
+HISTORY = """query H($names: [String!]!, $start: Date!, $end: Date!, $points: Int, $date: Date) {
+  market(date: $date) {
+    history(names: $names, start: $start, end: $end, points: $points) {
+      name bucketSessions points { session value } segments { start end value }
+    }
+  }
+}"""
 MARKET = """query M($names: [String!]!, $date: Date) {
   market(date: $date) { session marketId features(names: $names) { name value } }
 }"""
@@ -81,3 +95,42 @@ def test_the_market_values_by_name_are_checked_against_the_market_catalogue(grap
     assert market["marketId"] == "MKT:US" and market["features"] == []
     body = graph(MARKET, {"names": ["market.nope@v1.x"]})
     assert body["errors"][0]["extensions"]["code"] == "UNKNOWN_FEATURE"
+
+
+def test_the_episodes_and_recessions_are_those_the_session_knew(graph: Graph) -> None:
+    regime = _data(graph(EPISODES, {"date": END.isoformat()}))["regime"]
+    episodes = {e["key"]: e for e in regime["episodes"]}
+    assert len(episodes) == 11 and "tariffs_2025" not in episodes  # its trough is in 2025
+    assert episodes["covid_2020"]["name"] == "Covid crash, early 2020"
+    assert episodes["covid_2020"]["recovered"] == "2020-08-18"
+    assert episodes["hikes_2022"]["recovered"] is None  # regained only in 2024
+    assert episodes["gfc_2007"]["spxDrawdown"] == -0.57 and episodes["gfc_2007"]["recession"]
+    assert [r["start"] for r in regime["recessions"]][-1] == "2020-02-01"
+    assert regime["recessions"][-1]["announcedEnd"] == "2021-07-19"
+    old = _data(graph(EPISODES, {"date": PREVIOUS.isoformat()}))["regime"]
+    assert len(old["episodes"]) == 11  # the same on the previous session
+
+
+def test_the_history_of_a_stored_market_field(graph: Graph) -> None:
+    variables = {"start": PREVIOUS.isoformat(), "end": "2030-01-01", "date": END.isoformat()}
+    flag = _data(graph(HISTORY, {**variables, "names": ["market.regime@v2.label"]}))
+    [label] = flag["market"]["history"]
+    assert label["segments"] == [
+        {"start": PREVIOUS.isoformat(), "end": END.isoformat(), "value": "UNKNOWN"}
+    ]  # `end` is cut to the session; nothing is stored, so one UNKNOWN run
+    assert label["points"] == [] and label["bucketSessions"] == 1
+    number = _data(graph(HISTORY, {**variables, "names": ["market.regime@v2.macro_risk"]}))
+    [score] = number["market"]["history"]
+    assert score["points"] == [{"session": PREVIOUS.isoformat(), "value": None}]  # one gap
+    assert score["segments"] == []
+
+
+def test_a_history_of_a_computed_or_unknown_name_is_refused(graph: Graph) -> None:
+    variables = {"start": PREVIOUS.isoformat(), "end": END.isoformat()}
+    body = graph(HISTORY, {**variables, "names": ["feature.anything"]})
+    assert body["errors"][0]["extensions"]["code"] == "BAD_REQUEST"
+    assert "feature.* expression" in body["errors"][0]["message"]
+    body = graph(HISTORY, {**variables, "names": ["market.nope@v1.x"]})
+    assert body["errors"][0]["extensions"]["code"] == "UNKNOWN_FEATURE"
+    body = graph(HISTORY, {**variables, "names": [], "points": 1})
+    assert body["errors"][0]["extensions"]["code"] == "BAD_REQUEST"

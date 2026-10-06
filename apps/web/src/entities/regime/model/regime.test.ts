@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { regimeFixture, unknownRegimeFixture } from './fixtures';
 import {
   changedIndicators,
+  episodeName,
   indicatorChange,
   indicatorsOfPace,
   indicatorStatus,
@@ -15,6 +16,7 @@ import {
   storedLabel,
   toChartBands,
   type RegimeBand,
+  type RegimeEpisode,
   type RegimeLabel,
 } from './regime';
 
@@ -193,5 +195,20 @@ describe('gatePauses', () => {
     expect(gatePauses({ ...gate, pauseIn: [] })).toBe('Never pauses');
     expect(gatePauses({ ...gate, enabled: false })).toBe('Gate off (set to pause in Storm)');
     expect(gatePauses({ ...gate, enabled: false, pauseIn: [] })).toBe('Gate off');
+  });
+});
+
+describe('episodeName', () => {
+  const episodes = [
+    { key: 'tariffs_2025', name: 'Tariff shock, spring 2025' },
+  ] as unknown as readonly RegimeEpisode[];
+
+  it('is the name the API gives the episode', () => {
+    expect(episodeName(episodes, 'tariffs_2025')).toBe('Tariff shock, spring 2025');
+  });
+
+  it('spaces the key of an episode the API does not name', () => {
+    expect(episodeName(episodes, 'crash_1987')).toBe('crash 1987');
+    expect(episodeName([], 'tariffs_2025')).toBe('tariffs 2025');
   });
 });
