@@ -39,6 +39,20 @@ def test_asks_for_json_at_temperature_zero_and_returns_the_content() -> None:
     assert request["response_format"] == {"type": "json_object"}
     assert [m["role"] for m in request["messages"]] == ["system", "user"]
     assert request["messages"][0]["content"] == "task"
+    assert "reasoning_effort" not in request
+
+
+def test_extra_request_fields_are_sent_but_cannot_override_the_adapters() -> None:
+    client = ChatCompletions(
+        BASE,
+        "gemini",
+        lambda u, b: answer("{}"),
+        NO_WAIT,
+        extra={"reasoning_effort": "low", "model": "other", "temperature": 1},
+    )
+    request = client.request("s", "u")
+    assert request["reasoning_effort"] == "low"
+    assert request["model"] == "gemini" and request["temperature"] == 0
 
 
 @pytest.mark.parametrize(
@@ -124,7 +138,10 @@ def test_the_registry_builds_it_with_the_key_in_a_header_only() -> None:
     model = build_text_model(BASE, "llama", 30.0, 1000, "sk-secret", retries=3)
     assert model.url == BASE + "/chat/completions" and model.max_tokens == 1000
     assert model.retries == 3 and build_text_model(BASE, "m", 1.0, 1, None).retries == 2
-    assert model.pause is pause
+    assert model.pause is pause and model.extra == {}
+    assert build_text_model(BASE, "m", 1.0, 1, None, extra={"reasoning_effort": "low"}).extra == {
+        "reasoning_effort": "low"
+    }
     assert "sk-secret" not in model.url and "sk-secret" not in json.dumps(model.request("s", "u"))
     local = build_text_model("http://localhost:11434/v1", "llama3.1", 60.0, 2000, None)
     assert local.url == "http://localhost:11434/v1/chat/completions"

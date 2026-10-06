@@ -7,8 +7,8 @@ with a doubling pause (``Retry-After`` wins); anything else, or the last failure
 answers 503 with it."""
 
 import json
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
 from typing import Any
 
 from algotrade.core.model.errors import ModelUnavailableError
@@ -32,6 +32,7 @@ class ChatCompletions:
     max_tokens: int = 2000
     retries: int = 2  # attempts after the first, on a busy provider or a transport failure
     backoff_s: float = 3.0  # the wait before the first retry; doubled each time
+    extra: Mapping[str, Any] = field(default_factory=dict)  # provider fields sent as given
 
     @property
     def url(self) -> str:
@@ -40,6 +41,7 @@ class ChatCompletions:
     def request(self, system: str, user: str) -> dict[str, Any]:
         """The body sent (stable key order: a provider's prompt cache sees the same bytes)."""
         return {
+            **self.extra,
             "model": self.model,
             "messages": [
                 {"role": "system", "content": system},

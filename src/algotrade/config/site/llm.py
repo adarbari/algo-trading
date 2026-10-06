@@ -5,14 +5,15 @@ phrasebook (``config/site/phrasebook.toml``: trader vocabulary mapped to catalog
 hint on thresholds, listed in the prompt after the catalogue)."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlsplit
 
 from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.core.model.errors import ConfigurationError
 
-KEYS = ("enabled", "base_url", "model", "timeout_s", "answer_limit", "retries")
+KEYS = ("enabled", "base_url", "model", "timeout_s", "answer_limit", "retries", "request")
+RESERVED_REQUEST_KEYS = ("model", "messages", "temperature", "max_tokens", "response_format")
 LOOPBACK = ("localhost", "127.0.0.1", "::1")
 PHRASE_KEYS = ("say", "fields", "hint")
 
@@ -25,7 +26,9 @@ class LlmSettings:
     ``answer_limit`` the longest answer asked for, in tokens (a draft is a few hundred, but a
     model that thinks first, Gemini 3.x, spends thinking tokens from the same budget: ~2,000);
     ``retries`` how many times a busy provider (429, 5xx) or a dropped connection is retried
-    before "drafting unavailable" (0: never)."""
+    before "drafting unavailable" (0: never); ``request`` extra fields sent with every request
+    as given (``[request] reasoning_effort = "low"`` tells Gemini to think briefly), never the
+    ones the adapter sets."""
 
     enabled: bool = False
     base_url: str = "http://localhost:11434/v1"  # Ollama's default: nothing leaves the machine
@@ -33,6 +36,7 @@ class LlmSettings:
     timeout_s: float = 60.0
     answer_limit: int = 8000
     retries: int = 2
+    request: Mapping[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_document(cls, doc: Mapping[str, Any] | None) -> "LlmSettings":
@@ -48,7 +52,20 @@ class LlmSettings:
             timeout_s=t.number("timeout_s", d.timeout_s, 1),
             answer_limit=t.integer("answer_limit", d.answer_limit, 1),
             retries=t.integer("retries", d.retries, 0),
+            request=_request(t),
         )
+
+
+def _request(t: Table) -> dict[str, Any]:
+    raw = t.raw("request")
+    if raw is None:
+        return {}
+    if not isinstance(raw, Mapping):
+        raise ConfigurationError(f"{t.where} request: expected a table ([request])")
+    reserved = sorted(set(raw) & set(RESERVED_REQUEST_KEYS))
+    if reserved:
+        raise ConfigurationError(f"{t.where} [request]: the adapter sets {reserved}; remove them")
+    return dict(raw)
 
 
 def _endpoint(url: str, where: str) -> str:

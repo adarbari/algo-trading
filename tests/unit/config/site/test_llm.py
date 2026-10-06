@@ -106,3 +106,13 @@ def test_the_shipped_phrasebook_loads() -> None:
 def test_phrasebook_errors_name_the_entry(doc: dict[str, Any], message: str) -> None:
     with pytest.raises(ConfigurationError, match=message):
         PhrasebookSettings.from_document(doc)
+
+
+def test_request_extras_pass_through_but_never_the_adapters_keys() -> None:
+    s = LlmSettings.from_document({"request": {"reasoning_effort": "low", "seed": 7}})
+    assert s.request == {"reasoning_effort": "low", "seed": 7}
+    assert LlmSettings.from_document({}).request == {}
+    with pytest.raises(ConfigurationError, match=r"the adapter sets \['model', 'temperature'\]"):
+        LlmSettings.from_document({"request": {"model": "x", "temperature": 1}})
+    with pytest.raises(ConfigurationError, match="expected a table"):
+        LlmSettings.from_document({"request": "low"})
