@@ -57,3 +57,21 @@ BAD_KEY = (
     b'{"error_code":400,"error_message":"Bad Request.  The value for variable api_key is not '
     b'registered.  Read https://fred.stlouisfed.org/docs/api/api_key.html"}'
 )
+
+
+def daily(*points: tuple[str, str, str]) -> bytes:
+    """An unrevised daily series: ``(date, first known, value)`` per observation."""
+    return page([row(d, start, value) for d, start, value in points])
+
+
+# T10Y3M-like: a close published the next day, one holiday as ".".
+CURVE = daily(
+    ("2026-09-30", "2026-10-01", "0.10"),
+    ("2026-10-01", "2026-10-02", "0.12"),
+    ("2026-10-02", "2026-10-03", "."),
+)
+CURVE_REVISED = daily(
+    ("2026-09-30", "2026-10-01", "0.10"),
+    ("2026-10-01", "2026-10-02", "0.13"),  # the source corrected a number
+    ("2026-10-02", "2026-10-03", "."),
+)

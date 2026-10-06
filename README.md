@@ -211,6 +211,21 @@ The nightly step continues the backfill on its own, `[ibkr] iv_backfill_per_nigh
 names a night (~17 min), so new names fill in without a command; the email's `ibkr-iv` line
 shows coverage, names still pending and the estimated hours left.
 
+The `macro` task (economic series and index levels with their vintages, ADR 0048) refetches
+each series whole, so its first run is the history: run it detached, the published files first
+when there is no FRED key (the FRED series are skipped and counted until `ALGOTRADE_FRED_API_KEY`
+is in `.env`; run them later with `--only KEY[,KEY]`). A rerun only adds what changed:
+
+```bash
+mkdir -p var/logs
+nohup sh -c '.venv/bin/algotrade-ingest run macro --since 1970-01-01 \
+  > var/logs/macro.log 2>&1; echo "exit=$? $(date -u +%FT%TZ)" > var/logs/macro.status' >/dev/null 2>&1 &
+cat var/logs/macro.status   # appears when the run ends; the run record lists every series' status
+```
+
+The nightly's `macro` step is optional (a failure warns, `check_macro` grades staleness and lost
+vintages) and refetches a published file by its cadence, at most weekly.
+
 ## API
 
 A read-only HTTP API over everything above, the web app's only backend

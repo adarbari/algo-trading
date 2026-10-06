@@ -24,6 +24,8 @@ WHERE = "macro.toml"
 SOURCES = ("fred", "published")
 KINDS = ("macro", "index")
 CADENCES = ("daily", "weekly", "monthly", "quarterly")
+CADENCE_DAYS = {"daily": 1, "weekly": 7, "monthly": 31, "quarterly": 92}  # a release's period
+STALE_MARGIN_DAYS = 2  # a series may run this long past its cadence plus its release lag
 PITS = ("alfred", "lag")
 TRANSFORMS = ("level", "yoy", "diff")
 LICENCES = ("open", "personal")  # as a feature's licence (ADR 0028)
@@ -77,6 +79,16 @@ class MacroSeries:
     @property
     def vendor_code(self) -> str:
         return self.code or self.key
+
+    @property
+    def cadence_days(self) -> int:
+        return CADENCE_DAYS[self.cadence]
+
+    @property
+    def stale_after_days(self) -> int:
+        """How old the newest observation may be, in calendar days, before the series counts as
+        stale: its cadence + ``release_lag_days`` + ``STALE_MARGIN_DAYS`` (ADR 0048)."""
+        return self.cadence_days + self.release_lag_days + STALE_MARGIN_DAYS
 
 
 @dataclass(frozen=True)

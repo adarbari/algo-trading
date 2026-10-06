@@ -68,6 +68,12 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     cboe.write_text(
         cboe.read_text().replace("priority_symbols = [", 'priority_symbols = [ "AAPL",', 1)
     )
+    # No economic-series feed here: the macro step's sources are off, so it has nothing to grade.
+    import re  # noqa: PLC0415
+
+    off = re.sub(r"(\[(?:fred|published)\][^\n]*\nenabled = )true", r"\1false", cboe.read_text())
+    assert off.count("enabled = false") >= 2
+    cboe.write_text(off)
     # Every site screener runs nightly (ADR 0033); the rule preset reads rollups this fixture
     # does not build, so the pipeline test keeps to the one screener its data supports.
     shutil.rmtree(tmp_path / "config" / "site" / "presets" / "screeners")

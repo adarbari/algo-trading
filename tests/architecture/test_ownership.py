@@ -40,6 +40,7 @@ TYPED_SETTINGS_FILES = (
     "src/algotrade/config/site/settings.py",
     "src/algotrade/config/site/holdings.py",
     "src/algotrade/config/site/ibkr.py",
+    "src/algotrade/config/site/macro.py",
     "src/algotrade/config/site/nightly.py",
 )
 TYPED_SETTINGS = (
@@ -54,6 +55,7 @@ TYPED_SETTINGS = (
     "IbkrSettings",
     "EtfHoldingsSettings",
     "VerificationSettings",
+    "MacroSettings",
 )
 # Settings that are parsed but drive nothing today. This list may only shrink: wire the
 # setting up (docs/roadmap.md, track R) or delete it from config/site, then remove it here.

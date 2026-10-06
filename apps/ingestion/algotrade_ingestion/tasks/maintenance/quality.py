@@ -14,12 +14,16 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.config.site.settings import SourcesSettings
+from algotrade.config.env import config_dir
+from algotrade.config.site.macro import MacroSeries, MacroSettings
+from algotrade.config.site.settings import SourcesSettings, load_macro
 from algotrade.data import StoreReader
 from algotrade.data.chains import chain_status
+from algotrade.data.macro.series import latest_vintages, stored_vintages
 from algotrade.data.reference import snapshot
+from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
+from algotrade_ingestion.tasks.framework.run import PUBLISHED, IngestRun, TaskContext
 from algotrade_ingestion.tasks.reference.classify import security_type
 
 TASK = "data_quality"
@@ -278,6 +282,73 @@ def check_verification(reader: StoreReader, session: date, s: SourcesSettings) -
             f"(max {s.max_verify_failures:.0%}); {breakdown}{worst}",
         )
     ]
+
+
+MACRO_TASK = "macro"  # the macro task's run-record job name (tasks/macro/series.py)
+EXAMPLES_MACRO = 6  # stale or shrunken series named in a detail
+
+
+def check_macro(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:
+    """The ``macro`` step's acceptance over the site's series (``config/site/macro.toml``)."""
+    return macro_checks(reader, session, s, load_macro(FileConfigStore(config_dir())))
+
+
+def macro_checks(
+    reader: StoreReader, session: date, s: SourcesSettings, macro: MacroSettings
+) -> list[Check]:
+    """FAIL when over ``max_macro_stale_share`` of the enabled series (their source is
+    enabled in ``sources.toml``) have no observation newer than ``stale_after_days`` (WARN on
+    any fewer), and when a series holds fewer vintages than an earlier ``macro`` run recorded
+    (a stored vintage is never removed: ADR 0048)."""
+    enabled = [x for x in macro.series if s.vendor(x.source).enabled]
+    if not enabled:
+        return []
+    stored = stored_vintages(reader, [x.instrument_id for x in enabled])
+    return [
+        _macro_fresh(stored, session, s.max_macro_stale_share, enabled),
+        _macro_vintages(stored, reader.runs(MACRO_TASK), enabled),
+    ]
+
+
+def _macro_fresh(
+    stored: pd.DataFrame, session: date, max_share: float, enabled: list[MacroSeries]
+) -> Check:
+    known = latest_vintages(stored, session)
+    newest = known[known["value"].notna()].groupby("instrument_id")["obs_date"].max()
+    stale = [
+        x.key
+        for x in enabled
+        if x.instrument_id not in newest.index
+        or (session - newest[x.instrument_id]).days > x.stale_after_days
+    ]
+    share = len(stale) / len(enabled)
+    named = ", ".join(stale[:EXAMPLES_MACRO]) + (" ..." if len(stale) > EXAMPLES_MACRO else "")
+    detail = f"{len(stale)} of {len(enabled)} series stale ({share:.0%}, max {max_share:.0%})"
+    return Check(
+        "macro_fresh",
+        "FAIL" if share > max_share else "WARN" if stale else "PASS",
+        f"{detail}: {named}" if stale else detail,
+    )
+
+
+def _macro_vintages(
+    stored: pd.DataFrame, runs: list[RunRecord], enabled: list[MacroSeries]
+) -> Check:
+    held = stored.groupby("instrument_id").size()
+    recorded: dict[str, int] = {}
+    for run in runs:
+        if run.status in PUBLISHED:
+            for key, n in dict(run.stats.get("vintages") or {}).items():
+                recorded[key] = max(recorded.get(key, 0), int(n))
+    now = {x.key: int(held.get(x.instrument_id, 0)) for x in enabled}
+    shrunk = [k for k, n in recorded.items() if k in now and now[k] < n]
+    if not shrunk:
+        return Check(
+            "macro_vintages", "PASS", f"{int(held.sum())} vintages of {len(held)} series, none lost"
+        )
+    listed = ", ".join(f"{k} ({now[k]} < {recorded[k]})" for k in shrunk[:EXAMPLES_MACRO])
+    detail = f"{len(shrunk)} series hold fewer vintages than a macro run recorded: {listed}"
+    return Check("macro_vintages", "FAIL", detail)
 
 
 CHECKS: tuple[Callable[[StoreReader, date, SourcesSettings], list[Check]], ...] = (

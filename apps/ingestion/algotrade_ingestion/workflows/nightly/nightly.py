@@ -43,6 +43,7 @@ from algotrade_ingestion.tasks.maintenance.quality import (
     check_bars_resolved,
     check_chains,
     check_earnings,
+    check_macro,
     check_reference_classification,
     check_universe,
     check_verification,
@@ -135,6 +136,10 @@ NIGHTLY: tuple[Step, ...] = (
         latest_only=True,
         critical=False,
     ),
+    # Economic series and index levels with their vintages (ADR 0048): needs nothing but the
+    # session, sources serving their current state (latest session only), and its failure
+    # (FRED down, a moved file) only warns: regime inputs go UNKNOWN, the screens still run.
+    Step("macro", critical=False, latest_only=True, accept=(check_macro,)),
     # Every session (catch-up too), after the market data it reads. A rollup that raises
     # (a gap in a lookback window included) fails the step.
     # Its acceptance is the coverage of the key features by tier (ADR 0043): a FAIL-level breach
