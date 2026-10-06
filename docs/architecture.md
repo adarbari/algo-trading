@@ -526,8 +526,10 @@ thresholds in `config/site/sources.toml` `[quality]`); any FAIL marks the nightl
 Option chains are judged on two separate counts: **fetch failures** (`FETCH_ERROR`, including
 an open circuit breaker, or never attempted) above `max_chain_fetch_failures` (5% of the
 universe) FAIL `chains_fetch`, because the night's data is missing; **stale chains**
-(`STALE_DATA`: the feed served an older session) above `max_chain_stale_share` (20%) only WARN
-`chains_stale`, because screens already treat those names as UNKNOWN. Both details report the
+(`STALE_DATA`: the feed served an older session) are graded per tier, the tier stored with each
+status row at fetch time (`tasks/market/tiers.py`: core = S&P 500, `[cboe] priority_symbols`,
+HIGH liquidity): above `max_chain_stale_share_core` (2%) of core chains FAIL `chains_stale_core`,
+above `max_chain_stale_share` (20%) of the rest FAIL `chains_stale_rest`. Both details report the
 OK / STALE_DATA / NO_CHAIN / NO_STANDARD_SERIES counts. It is scheduled
 locally by a launchd agent (`algotrade-ingest schedule`, `ops/schedule.py`): weekdays at 15:00
 local (Pacific; close 13:00 PT), `RunAtLoad` (login / boot, for a Mac that was off) and an

@@ -86,6 +86,7 @@ def test_missing_files_fall_back_to_defaults() -> None:
         ({"http": 3}, "unknown keys"),
         ({"quality": {"max_chain_fetch_failures": 1.5}}, "a fraction between 0 and 1"),
         ({"quality": {"max_chain_stale_share": -0.1}}, "max_chain_stale_share: expected a number"),
+        ({"quality": {"max_chain_stale_share_core": 2}}, "a fraction between 0 and 1"),
         ({"quality": {"min_chain_coverage": 0.95}}, r"\[quality\]: unknown keys"),
         (
             {"cboe": {"min_interval_s": 2, "max_interval_s": 1}},

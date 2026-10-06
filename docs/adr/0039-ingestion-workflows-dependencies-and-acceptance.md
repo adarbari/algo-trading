@@ -126,7 +126,7 @@ Decisions the owner delegated while away (a Fable review), and details settled i
   fetched only for the current session, and a failed `universe-build` already fails the
   session (it is critical) and holds the screens back. Blocking chains on it would lose the
   day's chains for no extra safety. Chains still start after the build ends.
-- **Stale chains FAIL**: over `max_chain_stale_share` (20%) of chains STALE_DATA fails the
+- **Stale chains FAIL**: over `max_chain_stale_share` (20% of the rest tier; 2% of the core tier, `max_chain_stale_share_core`) of chains STALE_DATA fails the
   `chains` step (was a WARN), so the hourly retry refetches them instead of the screens
   failing on UNKNOWN names with chains already marked done. Follow-up: a retry should
   refetch only the STALE_DATA / FETCH_ERROR names, not all ~4,200.
