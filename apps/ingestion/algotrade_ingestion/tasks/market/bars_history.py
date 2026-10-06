@@ -1,15 +1,19 @@
 """Unadjusted daily bars from Tiingo back to 2018 for the event-study names (ADR 0050).
 
-``algotrade-ingest run bars-history`` fetches ONE request per symbol (the scope list,
-``config/site/events/scope.toml``, plus ``--symbols``) for ``--since`` (default 2018-01-01) to
-``--until`` (default: the last session) and stores the rows in ``bars/1d`` with ``source =
-"tiingo"``, one partition per session. Prices are stored unadjusted, as Massive's are
-(ADR 0016). The free tier allows 50 requests an hour, so the source paces one every 72 s and
-~140 names take ~3 hours: run it detached (README "Long runs").
+``algotrade-ingest run bars-history`` fetches ONE request per name of the event-study scope
+(``services.events.scope.scoped_instruments``: the tier A / B short-put names, the site list
+``config/site/events/scope.toml`` and the stocks the scoped leveraged funds track, plus
+``--symbols``) for ``--since`` (default 2018-01-01) to ``--until`` (default: the last session)
+and stores the rows in ``bars/1d`` with ``source = "tiingo"``, one partition per session. Prices
+are stored unadjusted, as Massive's are (ADR 0016). The free tier allows 50 requests an hour, so
+the source paces one every 72 s and ~140 names take ~3 hours: run it detached (README "Long
+runs"); ``stats["pending"]`` and ``eta_h`` say how many are left.
 
-- **Symbols** become ids through the reference snapshot of the latest session (ADR 0018). A
-  symbol it does not know is NEVER fetched under a made-up id: it is an item ``sym:<SYMBOL>``
-  (``UNKNOWN``) and listed in ``stats["unknown_symbols"]``.
+- **Scope** is resolved once, by the owner, as of ``--until``'s session (ADR 0018): ids come
+  from that session's reference snapshot. A symbol it does not know is NEVER fetched under a
+  made-up id: it is an item ``sym:<SYMBOL>`` (``UNKNOWN``) and listed in
+  ``stats["unknown_symbols"]``; ``stats["by_reason"]`` counts the names per reason (tier, list,
+  requested, reference).
 - **Resumable**, like ``ibkr-iv``: a name an earlier finished run fetched for the whole window
   (item ``hist:<id>``, ``OK: <since>..<until>`` or ``NO_DATA: ...``) is skipped (``--force``
   fetches it again); an interrupted run resumes from its staging when started again with the
@@ -31,6 +35,7 @@
 """
 
 import math
+from collections import Counter
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -39,11 +44,10 @@ from functools import partial
 import pandas as pd
 
 from algotrade.data.events import read_events
-from algotrade.data.reference import snapshot
+from algotrade.services.events.scope import ScopedInstruments, scoped_instruments
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import (
     FETCH_ERROR,
-    REFERENCE,
     IngestRun,
     NoResponseError,
     TaskContext,
@@ -72,28 +76,13 @@ class Name:
     instrument_id: str
 
 
+def names_of(scope: ScopedInstruments) -> list[Name]:
+    """The scoped names that have a ticker in the reference snapshot (one is fetched by it)."""
+    return [Name(n.symbol, n.instrument_id) for n in scope.names if n.symbol]
+
+
 def _window(since: date, until: date) -> str:
     return f"{since.isoformat()}..{until.isoformat()}"
-
-
-def resolve_names(
-    run: IngestRun, symbols: Sequence[str]
-) -> tuple[list[Name], list[str], date | None]:
-    """``symbols`` (upper-cased, first spelling wins) -> (names with an id, symbols the
-    reference does not know, the reference snapshot used) as of the latest reference snapshot."""
-    latest = snapshot(run.reader, REFERENCE)  # no date: the latest snapshot
-    snapshot_day = latest.snapshot_date if latest else None
-    resolver = run.resolver(snapshot_day)
-    names: list[Name] = []
-    unknown: list[str] = []
-    seen: set[str] = set()
-    for symbol in dict.fromkeys(s.strip().upper() for s in symbols if s.strip()):
-        if not resolver.knows(symbol):
-            unknown.append(symbol)
-        elif (instrument_id := resolver.id_for(symbol)) not in seen:
-            seen.add(instrument_id)
-            names.append(Name(symbol, instrument_id))
-    return names, unknown, snapshot_day
 
 
 def history_done(runs: Sequence[RunRecord], since: date, until: date) -> set[str]:
@@ -242,20 +231,24 @@ def _fetch_pending(
 def ingest_bars_history(
     ctx: TaskContext,
     source: Source,
-    symbols: Sequence[str],
+    requested: Sequence[str],
     since: date,
     until: date,
     force: bool = False,
     limit: int | None = None,
 ) -> RunRecord:
-    """Daily bars of ``symbols`` from ``since`` to ``until`` (``limit``: fetch at most that many
-    names this run; ``force``: also the names an earlier run fetched for the window)."""
+    """Daily bars of the event-study scope plus ``requested`` symbols from ``since`` to ``until``
+    (``limit``: fetch at most that many names this run; ``force``: also the names an earlier run
+    fetched for the window)."""
     if until < since:
         raise ValueError(f"--until {until} is before --since {since}")
     with IngestRun(ctx, TASK, until, resume=True) as run:
-        names, unknown, snapshot_day = resolve_names(run, symbols)
+        scope = scoped_instruments(run.reader, ctx.configs, until, requested)
+        names, unknown = names_of(scope), scope.unresolved
         for symbol in unknown:
-            run.record_item(f"sym:{symbol}", f"{UNKNOWN}: not in the reference of {snapshot_day}")
+            run.record_item(
+                f"sym:{symbol}", f"{UNKNOWN}: not in the reference of {scope.reference_snapshot}"
+            )
         done: Collection[str] = (
             set() if force else history_done(finished_runs(run.writer, TASK), since, until)
         )
@@ -275,7 +268,9 @@ def ingest_bars_history(
             window=_window(since, until),
             licence=ctx.settings.tiingo_licence,  # the rows' terms, in the run record
             symbols=len(names) + len(unknown),
-            unknown_symbols=unknown,
+            by_reason=dict(Counter(r for n in scope.names for r in n.reasons)),
+            tier_session=scope.tier_session,
+            unknown_symbols=list(unknown),
             skipped_done=len(names) - len(pending),
             fetched=len(todo),
             pending=left,

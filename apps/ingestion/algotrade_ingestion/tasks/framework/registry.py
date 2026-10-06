@@ -17,7 +17,6 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
-from algotrade.config.site.events.scope import load_event_scope
 from algotrade.config.site.settings import load_macro, load_universe
 from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
@@ -217,14 +216,14 @@ def _bars(ctx: TaskContext, p: Params) -> RunRecord:
 
 
 def _bars_history(ctx: TaskContext, p: Params) -> RunRecord:
-    assert ctx.configs is not None
-    # The event-study scope list (EV0) plus any --symbols; ids come from the reference (ADR 0018).
-    symbols = [*load_event_scope(ctx.configs).symbols, *_symbols(p)]
+    assert ctx.configs is not None  # the scope list is read from the site configs
+    # The scope (tier names, the list, fund references) is resolved by the task through
+    # ``services.events``; --symbols only adds to it.
     since = p.get("since") or bars_history.DEFAULT_SINCE
     return bars_history.ingest_bars_history(
         ctx,
         ctx.sources["tiingo_prices"],
-        symbols,
+        _symbols(p),
         since,
         p.get("until") or session_of(p),
         bool(p.get("force")),

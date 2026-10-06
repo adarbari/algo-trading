@@ -36,7 +36,7 @@ not answered: a fact of record stored years after it happened.
    A leveraged or inverse fund has no events of its own: it **inherits its reference
    instrument's events**, scaled by `leverage`. The link is a catalogue feature
    (`fund_reference@v1.reference_instrument_id`, ADR 0038) computed from the holdings table,
-   with a name rule resolved through `SymbolResolver` as the fallback. Scoped names get bars
+   with a name rule resolved through `SymbolResolver` as the fallback. The group's `applies_to` is `leveraged_fund` (ADR 0042 amended): every other instrument reads NOT_APPLICABLE. One owner, `services/events`, resolves the scope as of a session (the tier A / B names, the list, the funds' references, each with its reason; unresolved symbols returned). Scoped names get bars
    and earnings dates from 2018-01-01 (Stooq split-adjusted daily files stored under their own
    `source`; the Nasdaq calendar by past date, SEC 8-K Item 2.02 as the authoritative source
    of the report date and time).

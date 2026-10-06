@@ -17,9 +17,9 @@ ones that distort many fields at once; a screen that ignores them finds the same
 positives whatever its thresholds. A null never passes a `hard` criterion (missing data never
 passes); a field's own catalogue entry ([features.md](features.md)) says when it is null.
 
-## Themes (177 fields)
+## Themes (181 fields)
 
-- [Events](field-guide/events.md) (2): `rollup.earnings@v1.days_to_earnings`, `feature.earnings_before_expiry`
+- [Events](field-guide/events.md) (6): `rollup.earnings@v1.days_to_earnings`, `feature.earnings_before_expiry`, `rollup.fund_reference@v1.reference_instrument_id`, `rollup.fund_reference@v1.reference_kind`, `rollup.fund_reference@v1.reference_source`, `rollup.fund_reference@v1.reference_status`
 - [Fundamentals](field-guide/fundamentals.md) (8): `feature.market_cap`, `feature.pe_ratio`, `feature.revenue_growth_yoy`, `feature.div_yield`, `rollup.financials@v1.eps_diluted_ttm`, `rollup.financials@v1.net_income_ttm`, `rollup.financials@v1.revenue_ttm`, `rollup.dividends@v2.div_count_ttm`
 - [Instrument gates](field-guide/instrument-gates.md) (9): `instrument.status`, `instrument.security_type`, `instrument.optionable`, `instrument.is_leveraged`, `instrument.is_inverse`, `instrument.in_sp500`, `instrument.sector`, `instrument.industry`, `instrument.is_etf`
 - [Price levels](field-guide/price-levels.md) (19): `rollup.price_stats@v2.sma_20`, `rollup.price_stats@v2.sma_50`, `rollup.price_stats@v2.sma_200`, `rollup.price_stats@v2.high_52w`, `rollup.price_stats@v2.low_52w`, `rollup.price_stats@v2.history_days`, `rollup.momentum@v1.atr_14`, `rollup.momentum@v1.high_20d`, `rollup.momentum@v1.low_20d`, `rollup.momentum@v1.high_50d`, `rollup.momentum@v1.low_50d`, `rollup.momentum@v1.prior_high_20d`, `rollup.swing_levels@v1.swing_high`, `rollup.swing_levels@v1.swing_high_date`, `rollup.swing_levels@v1.swing_low`, `rollup.swing_levels@v1.swing_low_date`, `feature.pct_from_high_avail`, `feature.dist_to_resistance_atr`, `feature.dist_to_support_atr`

@@ -8,7 +8,14 @@ import pytest
 
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data.prices import adjusted_bars
-from algotrade.data.rollups import feature_rows, group_rows, group_view, rollup_row, rollup_rows
+from algotrade.data.rollups import (
+    feature_rows,
+    group_rows,
+    group_view,
+    latest_rollup,
+    rollup_row,
+    rollup_rows,
+)
 from tests.helpers.rollup_store import store, write_rows
 from tests.helpers.stored_frames import stamped
 
@@ -27,6 +34,21 @@ def test_rollup_row_is_the_latest_partition_on_or_before() -> None:
     assert rollup_row(reader, TABLE, "EQ:C") is None
     only_a = rollup_rows(reader, TABLE, D1, D2, instruments=["EQ:A"])
     assert only_a is not None and list(only_a["close"]) == [1.0, 2.0]
+
+
+def test_latest_rollup_is_the_newest_partition_on_or_before_with_its_rows() -> None:
+    writer, reader = store()
+    for day, close in ((D1, 1.0), (D2, 2.0)):
+        rows = [{"instrument_id": "EQ:A", "close": close}, {"instrument_id": "EQ:B", "close": 9.0}]
+        writer.write_table(TABLE, day, f"r-{day}", stamped(rows, day, f"r-{day}"))
+    day, frame = latest_rollup(reader, TABLE, date(2026, 10, 5)) or (None, None)
+    assert day == D2 and list(frame["close"]) == [2.0, 9.0]  # type: ignore[index]
+    assert "run_id" not in frame.columns  # type: ignore[union-attr]  # stamps dropped
+    day, frame = latest_rollup(reader, TABLE, D1, ["EQ:B"]) or (None, None)
+    assert day == D1 and list(frame["instrument_id"]) == ["EQ:B"]  # type: ignore[index]
+    assert latest_rollup(reader, TABLE, date(2026, 9, 1)) is None  # a later partition is not used
+    assert latest_rollup(reader, "rollups/instrument/none@v1", D2) is None
+    assert latest_rollup(reader, TABLE, D2, ["EQ:ZZ"]) is None  # none of the ids has a row
 
 
 def test_adjusted_bars_rejects_an_unknown_adjustment() -> None:

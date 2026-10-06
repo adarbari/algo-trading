@@ -37,3 +37,52 @@ Sources: IV ramp and crush around earnings: https://flashalpha.com/articles/iv-c
 - The nearest expiry can be a weekly a few days out; a 30-day short option needs days_to_earnings against its own expiry, not this flag.
 
 Sources: Site convention over the earnings calendar and the stored chains
+
+### `rollup.fund_reference@v1.reference_instrument_id`
+
+**How to read it.** For a leveraged or inverse fund, the one stock it tracks (TSLL: Tesla), as an instrument id. The fund has no events of its own: its earnings, ex-dividends and big moves are its reference's, scaled by its leverage (instrument.leverage, negative for an inverse fund). Null for a fund that tracks a basket, and for every instrument that is not a leveraged or inverse fund.
+
+**When the reading lies**
+
+- Null does not mean 'no events': a basket fund (rollup.fund_reference@v1.reference_kind index, sector or commodity) inherits macro and market-structure events and, for an index or sector, the earnings of its largest holdings; read the kind before the id.
+- The link comes from the fund's stored holdings when they name exactly one stock, else from its name (rollup.fund_reference@v1.reference_source says which). A name rule is a parse of text: check a surprising link against the fund's own page, and rollup.fund_reference@v1.reference_status UNLISTED means the stock is named but not in the reference snapshot.
+- A fund whose holdings are not stored yet (etf-holdings has not read it) is linked by its name only; a NO_REFERENCE status is a gap in our data, not a fact about the fund.
+
+Sources: Site convention (ADR 0050 decision 2: the holdings table, ADR 0035, with a name rule as the fallback)
+
+### `rollup.fund_reference@v1.reference_kind`
+
+**How to read it.** What a leveraged or inverse fund tracks: single_stock (TSLL), index (TQQQ, SPXL), sector (SOXL, NAIL), commodity (UCO, gold and bitcoin funds) or none (a volatility fund, or a fund nothing is known of). It decides which events the fund inherits: a single stock's own calendar, the macro and market-structure events plus the top holdings' earnings, or macro events only.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| single-stock leveraged funds | `eq "single_stock"` | hard | - | then rollup.fund_reference@v1.reference_instrument_id is the stock |
+
+**When the reading lies**
+
+- 'none' covers two different things: a fund that tracks no stock, index or commodity (a volatility fund) and a fund we know nothing about; rollup.fund_reference@v1.reference_status says which (BASKET with kind none is volatility, NO_REFERENCE is unknown).
+- index versus sector is read from the name's keywords first and the holdings' sectors second; a fund with neither is an index by default, so a thematic fund can read as an index until its holdings are stored.
+
+Sources: Site convention (ADR 0050)
+
+### `rollup.fund_reference@v1.reference_source`
+
+**How to read it.** What settled a leveraged or inverse fund's link: holdings (its stored holdings name one stock, or show the basket) or name_rule (its name states the ticker or the kind). Null when nothing did. Holdings are the stronger evidence: they are what the fund owns today, while the name is a parse of text.
+
+**When the reading lies**
+
+- name_rule is the only source for a fund whose holdings are not stored; after etf-holdings reads it the same fund can move to holdings and, rarely, to a different reference.
+
+Sources: Site convention (ADR 0050)
+
+### `rollup.fund_reference@v1.reference_status`
+
+**How to read it.** Why a leveraged or inverse fund's reference is what it is: LINKED (one stock found), BASKET (an index, sector or commodity fund: no one stock by design), UNLISTED (a stock is named but is not in the reference snapshot, so no id) or NO_REFERENCE (neither holdings nor the name say what it tracks).
+
+**When the reading lies**
+
+- Only BASKET with rollup.fund_reference@v1.reference_kind none is a settled 'tracks nothing' (a volatility fund); NO_REFERENCE is a gap to close by reading the fund's holdings.
+
+Sources: Site convention (ADR 0050)

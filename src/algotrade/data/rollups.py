@@ -1,5 +1,6 @@
 """Stored rollup rows (``rollups/instrument/<name>@v<N>``, ``rollups/market/<name>@v<N>``): a
-range of sessions, one session, or one instrument's latest row.
+range of sessions, one session, one instrument's latest row, or the newest partition on or
+before a date.
 
 ``rollup_rows``: for the rollup framework, when one rollup reads another's output
 (``iv_history@v2`` reads 252 sessions of ``iv30@v1``; ``data.feature_inputs``), and for the
@@ -92,6 +93,24 @@ def rollup_row(
         return None
     row = frame.drop(columns=[c for c in (*STAMPS, "session_date") if c in frame.columns])
     return snap.snapshot_date, {str(k): v for k, v in row.iloc[0].items()}
+
+
+def latest_rollup(
+    reader: StoreReader,
+    table: str,
+    on: date,
+    ids: Sequence[str] | None = None,
+    as_of: datetime | None = None,
+) -> tuple[date, pd.DataFrame] | None:
+    """The rows of the newest partition of ``table`` on or before ``on`` (only ``ids``' when
+    given), stamps dropped -> (its session, rows); ``None`` when there is no such partition (a
+    snapshot taken after ``on`` is never used) or it has no row. What a use case that needs the
+    latest stored group output for a date reads, as ``rollup_row`` does for one instrument."""
+    snap = snapshot(reader, table, on)
+    if snap is None or snap.pre_snapshot:
+        return None
+    frame = rollup_on(reader, table, snap.snapshot_date, ids, as_of)
+    return None if frame is None else (snap.snapshot_date, frame)
 
 
 def rollup_on(

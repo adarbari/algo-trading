@@ -319,3 +319,36 @@ def test_a_next_report_not_in_the_calendar_reads_not_announced(reader: StoreRead
     assert nxt.unknown is not None and nxt.unknown.reason is NullReason.NOT_ANNOUNCED
     assert nxt.unknown.detail.endswith("the next report date is not announced")
     assert values(ctx, "EQ:ETFX", NEXT)[NEXT] == (None, UnknownCode.NOT_APPLICABLE)  # still n/a
+
+
+LINK = "rollup.fund_reference@v1.reference_instrument_id"
+
+
+def _funds(writer: StoreWriter) -> None:
+    """A D1 reference with a stock, a leveraged fund with a link, an inverse fund and an ETF
+    whose leverage flags are unknown (null), and the group's partition with the funds' rows."""
+    base = {"asset_class": "EQ", "exchange": "NYSE", "multiplier": 1.0, "status": "ACTIVE",
+            "optionable": True}  # fmt: skip
+    kinds = {  # symbol -> (security type, leveraged, inverse)
+        "AAA": ("COMMON_STOCK", False, False), "TSLL": ("ETF", True, False),
+        "TSLQ": ("ETF", False, True), "UNK": ("ETF", None, None),
+    }  # fmt: skip
+    rows = [
+        {"instrument_id": f"EQ:{s}", "symbol": s, "name": s, "security_type": t,
+         "is_etf": t == "ETF", "is_leveraged": lev, "is_inverse": inv, **base}
+        for s, (t, lev, inv) in kinds.items()
+    ]  # fmt: skip
+    write_rows(writer, "instruments/reference", D1, rows)
+    link = [{"instrument_id": "EQ:TSLL", "reference_instrument_id": "EQ:AAA"},
+            {"instrument_id": "EQ:TSLQ", "reference_instrument_id": None}]  # fmt: skip
+    write_rows(writer, "rollups/instrument/fund_reference@v1", D1, link)
+
+
+def test_fund_reference_applies_to_leveraged_and_inverse_funds_only() -> None:
+    ctx = context(store_with(_funds))
+    assert values(ctx, "EQ:TSLL", LINK)[LINK] == ("EQ:AAA", None)
+    assert values(ctx, "EQ:TSLQ", LINK)[LINK] == (None, UnknownCode.NULL)  # a basket: a stored null
+    assert values(ctx, "EQ:AAA", LINK)[LINK] == (None, UnknownCode.NOT_APPLICABLE)
+    [stock] = load_feature_values(ctx, ["EQ:AAA"], [LINK])["EQ:AAA"]
+    assert stock.unknown is not None and "not a leveraged or inverse fund" in stock.unknown.detail
+    assert values(ctx, "EQ:UNK", LINK)[LINK] == (None, UnknownCode.NO_ROW)  # unknown: never n/a

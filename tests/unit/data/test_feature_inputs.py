@@ -24,7 +24,9 @@ from tests.helpers.rollup_store import (
     write_dividends,
     write_split,
 )
-from tests.helpers.stored_frames import stamped, universe_rows, write_reference
+from tests.helpers.stored_frames import holdings_rows, stamped, universe_rows, write_reference
+
+LINES = [("AAA", "Alpha", 0.6), ("BBB", "Beta", 0.4)]
 
 
 def test_loaders() -> None:
@@ -169,11 +171,42 @@ def test_reference_input_is_the_security_types_the_session_sees() -> None:
     ]  # fmt: skip
     writer.write_table("instruments/reference", END, "r", stamped(rows, END, "r"))
     seen = inputs.load_input(reader, "instruments/reference", [END], 0).at(END, 0)
-    assert seen is not None and list(seen.columns) == ["instrument_id", "security_type"]
+    assert seen is not None and list(seen.columns) == ["instrument_id", "security_type", "symbol"]
     assert dict(zip(seen["instrument_id"], seen["security_type"], strict=True)) == {
         "EQ:A": "ADR",
         "EQ:B": "COMMON_STOCK",
     }
+
+
+def test_reference_input_carries_the_fund_facts_when_stored() -> None:
+    writer, reader = store()
+    rows = [
+        {"instrument_id": "EQ:F", "symbol": "F", "name": "Direxion Daily TSLA Bull 2X Shares",
+         "asset_class": "equity", "multiplier": 1.0, "security_type": "ETF", "status": "ACTIVE",
+         "is_leveraged": True, "is_inverse": False, "optionable": True},
+    ]  # fmt: skip
+    writer.write_table("instruments/reference", END, "r", stamped(rows, END, "r"))
+    seen = inputs.load_input(reader, "instruments/reference", [END], 0).at(END, 0)
+    assert seen is not None and list(seen.columns) == list(inputs.REFERENCE_FACTS)
+    assert seen.iloc[0]["name"].endswith("Bull 2X Shares") and bool(seen.iloc[0]["is_leveraged"])
+
+
+def test_holdings_input_is_the_leveraged_funds_latest_holdings_the_session_sees() -> None:
+    writer, reader = store()
+    assert inputs.load_input(reader, "holdings/etf", [END], 0).at(END, 0) is None  # no reference
+    rows = [
+        {"instrument_id": f"EQ:{s}", "symbol": s, "asset_class": "equity", "multiplier": 1.0,
+         "security_type": "ETF", "status": "ACTIVE", "is_leveraged": lev, "is_inverse": inv}
+        for s, lev, inv in (("LEV", True, False), ("INV", False, True), ("PLAIN", False, False))
+    ]  # fmt: skip
+    writer.write_table("instruments/reference", END, "r", stamped(rows, END, "r"))
+    assert inputs.load_input(reader, "holdings/etf", [END], 0).at(END, 0) is None  # none stored
+    held = [r for f in ("EQ:LEV", "EQ:INV", "EQ:PLAIN") for r in holdings_rows(f, END, LINES)]
+    writer.write_table("holdings/etf", END, "h", stamped(held, END, "h"))
+    seen = inputs.load_input(reader, "holdings/etf", [END], 0).at(END, 0)
+    assert seen is not None and set(seen["instrument_id"]) == {"EQ:LEV", "EQ:INV"}  # not PLAIN
+    earlier = inputs.load_input(reader, "holdings/etf", [END - timedelta(days=2)], 0)
+    assert earlier.at(END - timedelta(days=2), 0) is None  # stored after that session
 
 
 def test_a_bars_window_never_spans_a_missing_session() -> None:

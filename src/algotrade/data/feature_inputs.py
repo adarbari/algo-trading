@@ -41,8 +41,13 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        time by filing date), sorted by ``filed``; ``None`` when there is none
 - ``instruments/reference``
                        ``reference.instruments``: the snapshot the session sees, only
-                       ``instrument_id`` and ``security_type`` (read per session); ``None`` when
-                       there is none
+                       ``instrument_id``, ``security_type`` and, when stored, the fund facts
+                       ``symbol``, ``name``, ``is_leveraged`` and ``is_inverse`` (read per
+                       session); ``None`` when there is none
+- ``holdings/etf``     ``funds.holdings.funds_holdings``: the latest stored holdings on or before
+                       the session (public by then: ``as_of`` and ``filed``) of the leveraged and
+                       inverse funds of the reference snapshot the session sees, by fund and rank
+                       (read per session); ``None`` when none has holdings stored
 - ``universe``         ``reference.load_universe``: the universe snapshot the session sees
                        (read per session); ``None`` when there is none, or when the only one
                        was taken after the session (``pre_snapshot``: a later list of names
@@ -85,6 +90,8 @@ from algotrade.core.model.fields import group_of_table
 from algotrade.core.time.calendar import sessions_between, sessions_ending
 from algotrade.data.chains import chain_status, option_quotes, underlying_quotes
 from algotrade.data.events import events_by_event_date, stored_events
+from algotrade.data.funds.holdings import TABLE as HOLDINGS
+from algotrade.data.funds.holdings import funds_holdings
 from algotrade.data.macro.series import TABLE as MACRO_SERIES
 from algotrade.data.macro.series import known_window, stored_vintages
 from algotrade.data.prices import DateWindow, SessionBars, session_bars, window_closes
@@ -302,12 +309,31 @@ def _events_by_date(table: str) -> Loader:
     return load
 
 
-def _security_types(reader: StoreReader, session: date) -> pd.DataFrame | None:
+REFERENCE_FACTS = ("instrument_id", "security_type", "symbol", "name", "is_leveraged", "is_inverse")
+
+
+def _reference_facts(reader: StoreReader, session: date) -> pd.DataFrame | None:
     try:
         frame = instruments(reader, session)
     except MissingDataError:
         return None
-    return frame[["instrument_id", "security_type"]] if "security_type" in frame.columns else None
+    if "security_type" not in frame.columns:
+        return None
+    return frame[[c for c in REFERENCE_FACTS if c in frame.columns]]
+
+
+def _leveraged_holdings(reader: StoreReader, session: date) -> pd.DataFrame | None:
+    """The session's leveraged and inverse funds' latest holdings (``None``: no reference
+    snapshot, no such fund, or none of them has holdings stored)."""
+    try:
+        frame = instruments(reader, session)
+    except MissingDataError:
+        return None
+    geared = pd.Series(False, index=frame.index)
+    for flag in ("is_leveraged", "is_inverse"):
+        if flag in frame.columns:
+            geared |= frame[flag].fillna(False).astype(bool)
+    return funds_holdings(reader, frame.loc[geared, "instrument_id"].astype(str).tolist(), session)
 
 
 def _universe(reader: StoreReader, session: date) -> pd.DataFrame | None:
@@ -350,7 +376,8 @@ INPUTS: Mapping[str, Loader] = {
     "events/split": _events_by_date("events/split"),
     TREASURY: _partition(curve_as_rows),
     SHARES: _share_facts,
-    "instruments/reference": _partition(_security_types),
+    "instruments/reference": _partition(_reference_facts),
+    HOLDINGS: _partition(_leveraged_holdings),
     "instruments/symbol_ids": _partition(symbol_ids),
     UNIVERSE_TABLE: _partition(_universe),
     IBKR_IV30: _ibkr_vols,
