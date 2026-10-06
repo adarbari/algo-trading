@@ -51,8 +51,16 @@ not published yet" is not a failure until the day's deadline has passed.
 
 ## Later PRs under this ADR (not in this change)
 - [x] **Tiered stale limits** (implemented): `max_chain_stale_share_core` (2%) for core names (S&P 500, priority symbols, HIGH liquidity; `chains/status.tier`, recorded at fetch time), `max_chain_stale_share` (20%) for the rest; checks `chains_stale_core` / `chains_stale_rest`.
-- **Coverage acceptance:** acceptance by share of the universe covered (names with a usable
-  value), not by the count of failed items.
+- [x] **Coverage acceptance** (implemented): per key feature and tier, the share of the
+  instruments the feature applies to (`Feature.applies_to`, decided by the function the read
+  layer uses for NOT_APPLICABLE, ADR 0042) that have a value for the session; a null explained as
+  an illiquid chain counts as covered, a missing value never as zero. Config
+  `sources.toml [quality.coverage.<group>.<column>]`: `core_min`, `rest_min`, `max_drop` (against
+  the previous session, recomputed from its stored partitions), `level` WARN or FAIL
+  (`core_level`), `covered_by` `value` or `row` (earnings: a row without a next date is not a gap).
+  The `coverage_<feature>` checks (`tasks/maintenance/coverage.py`) accept the `rollups` step (a
+  FAIL fails it and holds the screens back; WARN is reported), run with `run_quality`, and the
+  email's Coverage section shows feature x tier with the change and the missing names.
 
 ## Consequences
 - A late source no longer pages the owner; the session still FAILS at 23:00 PT if the data

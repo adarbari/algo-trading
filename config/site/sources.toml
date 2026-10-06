@@ -167,3 +167,34 @@ max_chain_stale_share = 0.20     # chains: FAIL if over 20% of the "rest" tier's
                                  # served an older session; a later retry usually gets the session's chains)
 max_chain_stale_share_core = 0.02  # same for the "core" tier (S&P 500, priority symbols, HIGH liquidity)
 max_verify_failures = 0.10       # verification vs IBKR: FAIL if over 10% of checks FAIL (any FAIL: WARN)
+
+# Coverage (ADR 0043): per key feature, the share of the instruments it applies to (applies_to) that
+# have a value for the session, by tier (core: S&P 500, priority symbols, HIGH liquidity). core_min /
+# rest_min: least share; max_drop: largest fall vs the previous session; level (core_level for the
+# core tier): WARN is reported, FAIL fails the rollups step; covered_by "row": a stored row counts.
+# Set from the session 2026-10-02 (core 98-100%, rest 79-99%).
+[quality.coverage.price_stats.close]
+core_min = 0.99
+rest_min = 0.95
+max_drop = 0.05
+level = "WARN"
+core_level = "FAIL"
+
+[quality.coverage.price_stats.high_52w]
+core_min = 0.95
+rest_min = 0.70
+max_drop = 0.05
+level = "WARN"
+
+[quality.coverage.iv30.iv30]
+core_min = 0.99
+rest_min = 0.75
+max_drop = 0.05
+level = "WARN"
+
+[quality.coverage.earnings.next_earnings_date]
+core_min = 1.0      # every core name has an earnings row; a company with no announced date still has one
+rest_min = 0.75
+max_drop = 0.05
+level = "WARN"
+covered_by = "row"

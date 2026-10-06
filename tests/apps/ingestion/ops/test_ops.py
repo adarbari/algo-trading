@@ -106,7 +106,12 @@ def seed(
 
 def checks(reader: StoreReader) -> dict[str, str]:
     record = run_quality(task_ctx(StoreWriter(MemoryBackend()), reader, CLOCK), D2)
-    return {c["name"]: c["status"] for c in record.stats["checks"]}
+    # coverage (test_coverage.py) needs rollups and a reference snapshot these stores lack
+    return {
+        c["name"]: c["status"]
+        for c in record.stats["checks"]
+        if not c["name"].startswith("coverage")
+    }
 
 
 def test_quality_passes_on_healthy_data() -> None:
@@ -139,7 +144,7 @@ def chain_check(chains: list[str], name: str) -> dict[str, str]:
 
 def test_chain_fetch_failures_up_to_the_threshold_pass() -> None:
     check = chain_check(["OK"] * 49 + [CIRCUIT], "chains_fetch")  # 2%: not over 2%
-    assert check["status"] == "PASS" and check["run"] == RunStatus.COMPLETE.value
+    assert check["status"] == "PASS"  # (the run is PARTIAL here: this store has no coverage data)
     assert chain_check(["OK"] * 19 + [CIRCUIT], "chains_fetch")["status"] == "FAIL"  # 5%
 
 

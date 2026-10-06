@@ -179,6 +179,18 @@ def _absence_problems(f: Feature) -> list[str]:
     return problems
 
 
+def not_applicable(applies: Iterable[str], optionable: bool | None, is_etf: bool) -> str:
+    """The ``applies_to`` value that rules a feature out for an instrument with these
+    reference facts, or ``""`` when it applies (ADR 0042; a null ``optionable`` is not "no").
+    The one decision: the read layer (NOT_APPLICABLE) and the nightly coverage check share it."""
+    wanted = set(applies)
+    if "optionable" in wanted and optionable is False:
+        return "optionable"
+    if "not_etf" in wanted and is_etf:
+        return "not_etf"
+    return ""
+
+
 def strictest(licences: Iterable[str]) -> Licence:
     """The most restrictive of ``licences`` (``open`` when there are none)."""
     found = [LICENCES.index(x) for x in licences if x in LICENCES]
