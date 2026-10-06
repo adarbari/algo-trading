@@ -33,7 +33,7 @@ algotrade-ingest rollups --from 2024-10-03 --to 2026-10-02   # backfill rollups 
 algotrade-ingest rollups [--date D] [--only price_stats@v2]    # one session (alias: features); config/site/rollups.toml
 algotrade-ingest market-rollups [--date D | --from D --to D] [--only G]  # the market-entity groups (ADR 0047), after rollups
 algotrade-ingest retire-features --group price_stats@v1 [--dry-run]   # delete a superseded group's tables once v2 covers them
-algotrade-ingest nightly --export-dir out/      # catch up missed sessions (a quiet no-op when up to date; --force re-runs); universe -> company details -> shares -> earnings -> bars -> rates -> corporate actions -> chains -> rollups -> market-rollups -> screen jobs -> descriptions -> quality -> purge
+algotrade-ingest nightly --export-dir out/      # catch up missed sessions (a quiet no-op when up to date; --force re-runs); universe -> company details -> shares -> earnings -> bars -> rates -> corporate actions -> chains -> rollups -> macro -> market-rollups -> screen jobs -> descriptions -> quality -> purge
 algotrade-ingest report --date D [--out r.html] [--send]   # the nightly summary email for a past session (read-only)
 algotrade-ingest quality                        # data-quality checks for a session
 algotrade-ingest schedule                       # writes a launchd agent (weekdays 15:00, at login, hourly); prints install commands

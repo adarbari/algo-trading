@@ -187,6 +187,18 @@ name = "rollups/market/market_cross_asset@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
 
 [[table]]
+name = "rollups/market/market_macro@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
+
+[[table]]
+name = "rollups/market/regime_indicators@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
+
+[[table]]
+name = "rollups/market/regime@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
+
+[[table]]
 name = "rollups/daily/*"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "none produced yet (phase 6); rollups are computed only by the rollups task"
