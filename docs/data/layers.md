@@ -289,11 +289,17 @@ range; every feature is listed in the generated **[feature catalogue](features.m
   An expression feature takes the entity of what it reads; one
   that reads two entities is a definition error. `compute_rollups(..., entity="market")`
   computes them after the instrument groups; the catalogue lists them under "Market features".
-  The groups (`features/rollups/market/`): `market_trend@v1` (SPY / QQQ vs their 200-day
-  average, death cross, drawdown, realised vol, returns), `market_breadth@v1` (the shares of the
+  The groups (`features/rollups/market/`): `market_trend@v2` (the S&P 500, the Nasdaq-100 and
+  the Nasdaq Composite vs their 200-day average, death cross, drawdown, realised vol, returns:
+  `spx_` from SPY's bars when its 253-session window is complete, else from the `IDX:SPX`
+  level of `macro/series`, `ndx_` from QQQ's bars, `comp_` from the `IDX:COMP` level; one
+  source per prefix and session, never mixed in a window, said by `spx_source` / `comp_source`;
+  an index window counts the last observations known by the session, which is the previous
+  session's close (`pit = "lag"`), null when the newest is more than 2 sessions old; the
+  index-fed columns are `personal`), `market_breadth@v1` (the shares of the
   session's universe stocks above their averages and in a bear, new highs minus lows, the Zweig
   thrust, 90% down days; null below `min_coverage`) and `market_cross_asset@v1` (turbulence and
-  the absorption ratio of an ETF basket, leadership ratios), all from `bars/1d`;
+  the absorption ratio of an ETF basket, leadership ratios), from `bars/1d`;
   `market_macro@v3` (the curve from the session's own `rates/treasury` curve else FRED, credit
   spreads, labour, financial conditions, lending, policy, inflation, activity, the excess bond
   premium, the OFR stress index, policy uncertainty, VIX / VIX3M: each the latest observation of `macro/series` known by the session, by vintage, with the

@@ -15,6 +15,7 @@ KINDS = (
     "features",
     "field_guide",
     "regime",
+    "events",
     "screeners",
     "preferences",
     "identity",
@@ -28,7 +29,9 @@ class ConfigStore(Protocol):
         are expression-feature files (``site/features/<theme>.toml``, or a user's
         ``users/<id>/features/<theme>.toml``); ``field_guide`` the site's field guide files
         (``site/field_guide/<theme>.toml``, site-only); ``regime`` the site's regime reference
-        files (``site/regime/{cards,episodes}.toml``, ADR 0047, site-only). ``preferences`` and
+        files (``site/regime/{cards,episodes}.toml``, ADR 0047, site-only); ``events`` the site's
+        event-sensitivity files (``site/events/scope.toml``, ADR 0050, site-only).
+        ``preferences`` and
         ``identity`` are one file per user (``users/<id>/<kind>.toml``; identity holds the
         sign-in email, ADR 0040), never the site's. ``screeners`` are versioned rule screens:
         ``name`` loads the latest version, ``name@N`` exactly version N; drafts are never

@@ -228,7 +228,7 @@ Source: `design-system/components/Button`
 
 ### Chart
 
-Chart: THE time-series chart (price history, rebased comparisons, a feature over time), one wrapper around lightweight-charts, which stays inside this folder. Lines (or one area) in the series colours s1-s6, optionally rebased to 100 at the start of the window; event markers (ex-dividend, split, earnings) with a shape and letter each plus a key; optional shaded bands (spans of days in a status tint behind the lines: regimes, drawdowns, recessions), named in a key and in a text list for assistive technology; an optional volume pane; a crosshair read-out with tabular values (formatValue). The caller owns the time window (`range`, usually a SegmentedControl passed as `toolbar`). Resizes with its container, redraws in the active theme's tokens when the theme changes, and has no animation (scroll / zoom off). Accessible: an image with a generated text summary, and a "View as table" switch that shows the same numbers in a DataTable. Loading, empty and error states.
+Chart: THE time-series chart (price history, rebased comparisons, a feature over time), one wrapper around lightweight-charts, which stays inside this folder. Lines (or one area) in the series colours s1-s6, optionally rebased to 100 at the start of the window; event markers (ex-dividend, split, earnings) with a shape and letter each plus a key; optional shaded bands (spans of days in a status tint behind the lines: regimes, drawdowns, recessions), named in a key and in a text list for assistive technology; optional horizontal reference lines (a threshold, a target) with an end label, also listed for assistive technology; optional lanes (thin strips of tinted spans under the price pane, one row per lane, drawn on the chart's own time scale: a state over time; lanes.ts); an optional volume pane; a crosshair read-out with tabular values (formatValue). The caller owns the time window (`range`, usually a SegmentedControl passed as `toolbar`). Resizes with its container, redraws in the active theme's tokens when the theme changes, and has no animation (scroll / zoom off). Accessible: an image with a generated text summary, and a "View as table" switch that shows the same numbers in a DataTable. Loading, empty and error states.
 
 Source: `design-system/components/Chart`
 
@@ -241,7 +241,9 @@ Source: `design-system/components/Chart`
 | `rebase` | `boolean` | no | Show each series as 100 x value / first value in the window (compare performance). |
 | `events` | `readonly ChartEvent[]` | no | Ex-dividend, split and earnings markers on the first series. |
 | `bands` | `readonly ChartBand[]` | no | Shaded spans of days behind the series, in the price pane: a start and end day, a status tone and a label. Their labels are listed for screen readers and keyed under the chart. |
-| `bandKey` | `boolean` | no | Show the bands in the key (default true; the hidden list for screen readers stays). |
+| `referenceLines` | `readonly ChartReferenceLine[]` | no | Horizontal lines on the price pane at a value, each with its label at the right end: `{ y, label?, tone?, dash? }` (default `neutral`, solid). Kept inside the price range. |
+| `lanes` | `readonly ChartLane[]` | no | Thin strips under the price pane, one row per lane: `{ id, label, segments: { start, end, tone, label? }[] }`, drawn on the chart's own time scale. A segment's label is in the crosshair read-out, the key and a text list for screen readers. |
+| `bandKey` | `boolean` | no | Show the bands and lane segments in the key (default true; the hidden list for screen readers stays). |
 | `volume` | `readonly ChartPoint[]` | no | Daily volume in a pane under the price. |
 | `format` | `ValueFormat` | no | How values read on the axis, read-out and table (default currency; rebased: 1 decimal). |
 | `height` | `'sm' \| 'md' \| 'lg'` | no | Plot height: `sm` 160 px, `md` 240 px (default), `lg` 320 px. |
@@ -465,7 +467,8 @@ Source: `design-system/components/ExternalLink`
 |---|---|---|---|
 | `href` | `string` | yes | The page's address (an absolute http(s) URL). |
 | `children` | `string` | yes | What the page is ("Chicago Fed NFCI"): the visible text. |
-| `size` | `'sm' \| 'base'` | no | Smaller text for a dense list (`sm`) or the body size (default). |
+| `size` | `'sm' \| 'base' \| 'inherit'` | no | Smaller text for a dense list (`sm`), the body size (default) or the surrounding text's (`inherit`, inside a sentence). |
+| `title` | `string` | no | Hover text about the page ("Chicago Fed, weekly"). |
 
 ### Field
 
@@ -633,9 +636,21 @@ Source: `design-system/components/Legend`
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `items` | `readonly LegendItem[]` | yes |  |
-| `swatch` | `'cell' \| 'solid' \| 'line'` | no | Swatch shape: `cell` (tinted fill + border, matches HeatGrid cells), `solid` (bars and areas, the default) or `line` (chart lines). |
+| `swatch` | `'cell' \| 'solid' \| 'line' \| 'hatch'` | no | Swatch shape: `cell` (tinted fill + border, matches HeatGrid cells), `solid` (bars and areas, the default), `line` (chart lines) or `hatch` (diagonal lines in the tone, for a hatched chart band). |
 | `label` | `string` | no | Accessible name of the list, e.g. "Status key". |
 | `size` | `'sm' \| 'xs'` | no | Text size: `sm` 12 px (default) or `xs` 11.5 px. |
+
+### LinkedText
+
+LinkedText: a sentence given as parts, some of them links: a part with an `href` is an ExternalLink (real anchor, `rel="noopener"`, visible focus, the external mark and "opens in a new tab" for screen readers), the rest is plain Text in the chosen tone and size. The parts come split from the caller (a server-written sentence arrives already cut); `splitTerms` cuts a sentence at the first occurrence of each term, for stories and tests, and reports the terms it could not place (absent, empty, or overlapping an earlier one) instead of dropping them silently.
+
+Source: `design-system/components/LinkedText`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `parts` | `readonly LinkedTextPart[]` | yes | The sentence in order; the parts are joined as written (put the spaces in them). |
+| `tone` | `TextTone` | no | Colour role of the plain text, as on Text. |
+| `size` | `FontSize` | no | Type-scale step, as on Text; the links take the same size. |
 
 ### LoginForm
 
@@ -733,7 +748,7 @@ Source: `design-system/components/Popover`
 
 ### ScoreMeter
 
-ScoreMeter: a horizontal meter for one score on a bounded scale (0-100 by default): a filled track with a marker at the value, optional threshold ticks with their labels under the track ("50 caution", "75 stress"), and a tone taken from the band the value sits in (the status tones of StatusBadge). The band's label is written next to the value, so colour is never the only signal. Exposed as a meter (`role="meter"`) whose text names the band; an unknown score draws a dashed empty track with the reason as text (an image named "<label>: unknown").
+ScoreMeter: a horizontal meter for one score on a bounded scale (0-100 by default): a filled track with a marker at the value, optional threshold ticks with their labels under the track ("50 caution", "75 stress"), and a tone taken from the band the value sits in (the status tones of StatusBadge). The band's label is written next to the value, so colour is never the only signal. The axis always runs from low risk (left) to high risk (right): `direction` `lower-is-risk` (a cushion, a margin) turns the scale around, so a falling value moves toward the risky end and a threshold's band runs below it; a value off the scale pins the marker to the nearer end and the reading says "above range" or "below range". Exposed as a meter (`role="meter"`) whose text names the band; an unknown score draws a dashed empty track with the reason as text (an image named "<label>: unknown").
 
 Source: `design-system/components/ScoreMeter`
 
@@ -742,13 +757,15 @@ Source: `design-system/components/ScoreMeter`
 | `value` | `number \| null \| undefined` | yes | The score. `null` / `undefined` = unknown: a dashed empty track and `unknownReason`. |
 | `min` | `number` | no | Scale start (default 0). |
 | `max` | `number` | no | Scale end (default 100). |
-| `thresholds` | `readonly ScoreThreshold[]` | no | Band starts, in any order: the value takes the tone of the last threshold it has reached. |
-| `baseTone` | `DataTone` | no | Tone below the first threshold, and for a meter without thresholds (default `accent`). |
-| `baseLabel` | `string` | no | Name of the band below the first threshold ("calm"); without it that band has no text. |
+| `thresholds` | `readonly ScoreThreshold[]` | no | Band starts, in any order: the value takes the tone of the last threshold it has reached (at it counts as reached). |
+| `baseTone` | `DataTone` | no | Tone on the low-risk side of the first threshold, and for a meter without thresholds (default `accent`). |
+| `baseLabel` | `string` | no | Name of the band on the low-risk side of the first threshold ("calm"); without it that band has no text. |
 | `label` | `string` | yes | Name of the score ("Slow-warning score"): shown above the track, names the meter. |
 | `caption` | `ReactNode` | no | A line under the meter: what the score means, or when it changed. |
 | `unknownReason` | `string` | no | Why there is no score ("No macro data for 2 Oct"). Shown instead of the value. |
 | `format` | `ValueFormat` | no | How the value reads (default a whole number). |
+| `unit` | `string` | no | The unit after the value and the thresholds ("%", "bp", "pts"). |
+| `direction` | `ScoreDirection` | no | `higher-is-risk` (default) or `lower-is-risk`: which end of `min`-`max` is the risky one. |
 | `size` | `'sm' \| 'md'` | no | Track thickness: `sm` 6 px (lists, default) or `md` 10 px (a headline meter). |
 | `loading` | `boolean` | no | Placeholder while the score loads. |
 
@@ -858,6 +875,16 @@ Source: `design-system/components/SortableList`
 | `label` | `string` | yes | Accessible name of the list ("Screener priority"). |
 | `disabled` | `boolean` | no | Handles are inert; the order cannot change. |
 | `empty` | `ReactNode` | no | Shown instead of the list when `items` is empty (an `EmptyState`). |
+
+### SourceLine
+
+SourceLine: a muted one-liner naming where a figure comes from: "Source: FRED NFCI · weekly", each source an ExternalLink (the label) with its update cadence in plain text after a middle dot; several sources read "Sources: A · weekly   B · monthly" (a wider gap between them) and wrap. A list of none renders nothing. Sits under a chart, meter or indicator row, in the small muted size.
+
+Source: `design-system/components/SourceLine`
+
+| Prop | Type | Required | Description |
+|---|---|---|---|
+| `sources` | `readonly SourceLineItem[]` | yes | One or more sources, in the order to read them. |
 
 ### Sparkline
 

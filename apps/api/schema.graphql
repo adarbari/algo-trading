@@ -116,7 +116,7 @@ type DecisionCount {
 }
 
 """
-One reference market drawdown, with its plain `name`. `recovered`: the session the S&P 500 regained its peak, null while the session did not know it yet; `nberStart` / `nberEnd`: the NBER recession months (first days) it overlapped, if any. Listed from `knownFrom` (its trough)
+One reference market drawdown, with its plain `name`. `recovered`: the session the S&P 500 regained its peak, null while the session did not know it yet; `recession` / `nberStart` / `nberEnd`: the NBER recession months (first days) it overlapped, shown only once NBER had announced them (`kind` reads `shock` until the peak is announced; `nberEnd` is null until the trough is). Listed from `knownFrom` (its trough)
 """
 type Episode {
   key: String!
@@ -382,6 +382,30 @@ type IndicatorBefore {
 type IndicatorLink {
   title: String!
   url: String!
+}
+
+"""An indicator meter's display range, in the value's stored unit"""
+type IndicatorRange {
+  min: Float!
+  max: Float!
+}
+
+"""
+One source of an indicator's value, from the catalogue's lineage: a macro series (`series`: its key; `releaseLagDays`, `terms` and the provenance only for one) or a stored table. `lastObservation`: the latest observation the session knew, public on `vintageDate` (`vintageKind`: alfred or lagged); `firstVintage`: the series' earliest ALFRED vintage the session knew, before which the history is today's revised figures (null: an unrevised series, or nothing stored). `active`: it fed the value for the session (false: the source a per-session switch did not choose, e.g. SPY's bars when the S&P 500 trend came from the index level)
+"""
+type IndicatorSource {
+  label: String!
+  series: String
+  cadence: String!
+  releaseLagDays: Int
+  url: String
+  licence: String!
+  terms: String
+  lastObservation: Date
+  vintageDate: Date
+  vintageKind: String
+  firstVintage: Date
+  active: Boolean!
 }
 
 """An indicator's own verdict: ON, OFF or UNKNOWN"""
@@ -879,7 +903,7 @@ type RegimeBand {
 }
 
 """
-One indicator card with its value for the session: the plain-language text first, the technical name and `value` behind it. `value` is null exactly when `unknown` says why (format it with `format`); `status` is the indicator's own verdict and `changed` whether it differs from 5 sessions earlier (null: not stored). `pace`: slow (macro) or fast (market)
+One indicator card with its value for the session: the plain-language text first, the technical name and `value` behind it. `value` is null exactly when `unknown` says why (format it with `format`); `status` is the indicator's own verdict and `changed` whether it differs from 5 sessions earlier (null: not stored; the verdict's field is `verdictFeature`). `pace`: slow (macro) or fast (market). `range` is the meter's display range and `threshold` the site's primary threshold (both in the value's stored unit; null: no rule in code), `direction` the side that is the risk; `how` the calculation as linked parts; `sources` where the value comes from. `range` and `threshold` format with `format`; when `format` is null (NOT_IN_CATALOGUE) the web falls back to NUMBER
 """
 type RegimeIndicator {
   key: String!
@@ -899,6 +923,12 @@ type RegimeIndicator {
   format: FeatureFormat
   status: IndicatorStatus!
   changed: Boolean
+  range: IndicatorRange!
+  threshold: Float
+  direction: RiskDirection
+  how: [TextPart!]!
+  sources: [IndicatorSource!]!
+  verdictFeature: String!
 }
 
 """The regime; UNKNOWN when it is not stored"""
@@ -910,10 +940,15 @@ enum RegimeLabel {
   UNKNOWN
 }
 
-"""A 0-100 score; `value` is null exactly when `unknown` says why"""
+"""
+A 0-100 score; `value` is null exactly when `unknown` says why. `feature`: its catalogue field; `coverageFeature`: the field of the share of its weight known (null: fragility has none); `threshold`: at or above it the score is high for the label (null: context only)
+"""
 type RegimeScore {
   value: Float
   unknown: Unknown
+  feature: String!
+  coverageFeature: String
+  threshold: Float
 }
 
 """
@@ -950,6 +985,14 @@ type ReviewList {
   session: Date
   source: String!
   items: [JSON!]!
+}
+
+"""
+Which side of its threshold an indicator warns on: HIGHER_IS_RISK (on above it) or LOWER_IS_RISK (on below it)
+"""
+enum RiskDirection {
+  HIGHER_IS_RISK
+  LOWER_IS_RISK
 }
 
 """
@@ -1187,6 +1230,12 @@ type TableView {
   sort: String
   decisions: [String!]!
   names: [String!]!
+}
+
+"""A run of a sentence: plain text, or a term linked to `url`"""
+type TextPart {
+  text: String!
+  url: String
 }
 
 """

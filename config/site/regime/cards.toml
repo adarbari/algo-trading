@@ -11,7 +11,42 @@
 #   <key>_on (the indicator's own on / off verdict for the session) and <key>_changed (the verdict
 #   differs from 5 sessions earlier); both are read by suffix on the same name, and a column the
 #   catalogue does not have yet reads UNKNOWN (never derived by the read).
+# - range: the meter's display range {min, max}, in the value's stored unit (the catalogue's:
+#   decimal 0.05 = 5%, ratio as is); the threshold and the direction of risk come from the code
+#   (features/rollups/market/indicators.py Card, the values from rollups.toml), never from here.
+# - how: one plain sentence on how the value is calculated; terms: {text, url} links, each text
+#   exactly once in how (a whole phrase; not counting inside a longer term), https only.
+# - source_by: for a value whose source is chosen per session, {feature, inputs}: the catalogue
+#   field naming the session's source and, per value of it, the lineage inputs it means (the
+#   page marks the session's source active; the other stays listed).
 # Values and thresholds are computed by the RG3 groups; the read model (RG1e) joins them.
+#
+# [[source]]: a stored input that is not a macro series, as a card's lineage reaches it (the
+# feature catalogue's inputs; a series:<KEY> is described by macro.toml). Every input a card's
+# lineage reaches has exactly one source (a fitness test). url: omit for our own data.
+
+[[source]]
+input = "rates/treasury"
+label = "Treasury daily par yield curve"
+cadence = "daily"
+url = "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve"
+
+[[source]]
+input = "bars/1d"
+label = "Daily bars (Massive)"
+cadence = "daily"
+url = "https://massive.com/"
+
+[[source]]
+input = "instruments/symbol_ids"
+label = "Our ticker-to-id map (OpenFIGI)"
+cadence = "weekly"
+url = "https://www.openfigi.com/"
+
+[[source]]
+input = "universe"
+label = "Our universe snapshot"
+cadence = "daily"
 
 [[card]]
 key = "curve_10y3m"
@@ -24,6 +59,12 @@ why_it_matters = "Normally lenders want more to lend for longer. When the 10-yea
 what_on_means = "On when the gap has been below zero for a month or more. The return to a positive gap after a long inversion is the later, more urgent warning."
 lead_time = "6 to 18 months before a recession."
 false_alarms = "Warned before all 8 recessions since 1969; false alarms in 1998 (brief) and 2022-24 (inverted for two years, no recession so far)."
+range = { min = -0.02, max = 0.04 }
+how = "The 10-year Treasury yield minus the 3-month bill yield, from the Treasury's daily par yield curve (FRED's T10Y3M on a day it lacks), and on how many of the last 252 sessions that gap was below zero."
+terms = [
+  { text = "10-year Treasury yield", url = "https://fred.stlouisfed.org/series/DGS10" },
+  { text = "3-month bill", url = "https://fred.stlouisfed.org/series/DGS3MO" },
+]
 links = [
   { title = "FRED: 10-year minus 3-month Treasury spread (T10Y3M)", url = "https://fred.stlouisfed.org/series/T10Y3M" },
   { title = "FRED: 10-year minus 2-year Treasury spread (T10Y2Y)", url = "https://fred.stlouisfed.org/series/T10Y2Y" },
@@ -47,6 +88,11 @@ why_it_matters = "Bond investors are often the first to worry about defaults. Wh
 what_on_means = "On when the spread is above 5%, or 1.5 percentage points above its low of the last six months."
 lead_time = "3 to 9 months before a recession, and it confirms stress as it happens."
 false_alarms = "Flagged all 5 recessions since 1996, but it also widens in shocks that do not become recessions (2018, 2025)."
+range = { min = 0.02, max = 0.12 }
+how = "The high-yield bond spread each day (the extra yield on riskier companies' bonds over Treasuries), and how far it is above its lowest level of the last 126 sessions."
+terms = [
+  { text = "high-yield bond spread", url = "https://fred.stlouisfed.org/series/BAMLH0A0HYM2" },
+]
 links = [
   { title = "FRED: ICE BofA US High Yield option-adjusted spread (BAMLH0A0HYM2)", url = "https://fred.stlouisfed.org/series/BAMLH0A0HYM2" },
   { title = "Federal Reserve: recession risk and the excess bond premium", url = "https://www.federalreserve.gov/econres/notes/feds-notes/updating-the-recession-risk-and-the-excess-bond-premium-20161006.html" },
@@ -69,6 +115,11 @@ why_it_matters = "Unemployment rarely rises a little: once firms start cutting j
 what_on_means = "On when this month's unemployment rate is above its 12-month average."
 lead_time = "About 3.5 months before a recession on average, earlier than the Sahm rule."
 false_alarms = "Brief crossings without a recession happen, most recently in 2024; it needs a second sign to confirm."
+range = { min = -0.01, max = 0.01 }
+how = "The latest monthly unemployment rate minus its average over the 12 months up to it."
+terms = [
+  { text = "unemployment rate", url = "https://fred.stlouisfed.org/series/UNRATE" },
+]
 links = [
   { title = "FRED: unemployment rate (UNRATE)", url = "https://fred.stlouisfed.org/series/UNRATE" },
   { title = "Cleveland Fed: recessions and the trend in the unemployment rate", url = "https://www.clevelandfed.org/publications/economic-commentary/ec-202101-recessions-and-the-trend-in-the-us-unemployment-rate" },
@@ -91,6 +142,12 @@ why_it_matters = "A half-point rise in unemployment from its low has marked the 
 what_on_means = "On when the 3-month average unemployment rate is 0.5 percentage points or more above its 12-month low."
 lead_time = "Concurrent: it fires around the start of a recession."
 false_alarms = "Right every time before 2020; false alarms in November 1976 and July 2024."
+range = { min = 0, max = 0.015 }
+how = "The Sahm rule, computed from the unemployment rate: its 3-month average minus the lowest 3-month average of the previous 12 months."
+terms = [
+  { text = "Sahm rule", url = "https://fred.stlouisfed.org/series/SAHMREALTIME" },
+  { text = "unemployment rate", url = "https://fred.stlouisfed.org/series/UNRATE" },
+]
 links = [
   { title = "FRED: real-time Sahm rule recession indicator (SAHMREALTIME)", url = "https://fred.stlouisfed.org/series/SAHMREALTIME" },
   { title = "FRED: unemployment rate (UNRATE)", url = "https://fred.stlouisfed.org/series/UNRATE" },
@@ -113,6 +170,11 @@ why_it_matters = "When money is tight, the bad outcomes for the economy become m
 what_on_means = "On when the index is above zero, meaning conditions are tighter than their long-run average."
 lead_time = "Concurrent to a few months; weekly, so it moves fast."
 false_alarms = "It reacts to market stress as well as the economy, so it also tightens in shocks that never become recessions."
+range = { min = -1, max = 2 }
+how = "The Chicago Fed's financial conditions index as published each week: 0 is the long-run average, above 0 is tighter than average."
+terms = [
+  { text = "Chicago Fed's financial conditions index", url = "https://fred.stlouisfed.org/series/NFCI" },
+]
 links = [
   { title = "FRED: Chicago Fed National Financial Conditions Index (NFCI)", url = "https://fred.stlouisfed.org/series/NFCI" },
   { title = "FRED blog: posts on the NFCI", url = "https://fredblog.stlouisfed.org/tag/nfci/" },
@@ -126,7 +188,7 @@ links = [
 
 [[card]]
 key = "spx_trend_200d"
-technical_name = "SPY close vs its 200-day moving average"
+technical_name = "S&P 500 close (SPY, else the index level) vs its 200-day moving average"
 pace = "fast"
 feature = "market.regime_indicators@v1.spx_trend_200d"
 plain_name = "Is the market below its long-term trend?"
@@ -135,6 +197,12 @@ why_it_matters = "Big falls rarely happen with the market above its long-term tr
 what_on_means = "On when SPY closes below its 200-day average; a 50-day average falling below the 200-day (a 'death cross') confirms it."
 lead_time = "None: it fires 2 to 6 weeks after the peak, then stays on for the rest of the fall."
 false_alarms = "Caught every episode, but whipsaws in choppy markets (2023, 2025): on, then off again within weeks."
+range = { min = -0.3, max = 0.3 }
+how = "The S&P 500's latest close divided by its 200-day average, minus 1: below 0 means it closed under that average."
+terms = [
+  { text = "200-day average", url = "https://www.investopedia.com/terms/m/movingaverage.asp" },
+]
+source_by = { feature = "market.market_trend@v2.spx_source", inputs = { bars = ["bars/1d", "instruments/symbol_ids"], index = ["series:SPX"] } }
 links = [
   { title = "Quantified Strategies: Faber's trend rule on the S&P 500", url = "https://quantifiedstrategies.substack.com/p/trend-following-strategy-in-s-and-005" },
   { title = "StockCharts: trend signals after whipsaws", url = "https://articles.stockcharts.com/article/articles-arthurhill-2023-02-should-we-continue-taking-tren-946/" },
@@ -156,6 +224,12 @@ why_it_matters = "Normally protection for the near future is cheaper than for la
 what_on_means = "On when VIX is above VIX3M (the ratio is above 1.0)."
 lead_time = "Days: it confirms stress as it happens rather than predicting it."
 false_alarms = "Brief spikes on one-day scares that reverse within a week; it fired in 2008, 2011, 2018, 2020 and 2025."
+range = { min = 0.7, max = 1.3 }
+how = "The VIX (the swing in the S&P 500 that options price in over the next month) divided by the three-month VIX (the same over three months)."
+terms = [
+  { text = "VIX", url = "https://fred.stlouisfed.org/series/VIXCLS" },
+  { text = "three-month VIX", url = "https://fred.stlouisfed.org/series/VXVCLS" },
+]
 links = [
   { title = "FRED: CBOE Volatility Index, VIX (VIXCLS)", url = "https://fred.stlouisfed.org/series/VIXCLS" },
   { title = "FRED: CBOE S&P 500 3-Month Volatility Index (VXVCLS)", url = "https://fred.stlouisfed.org/series/VXVCLS" },
@@ -178,6 +252,11 @@ why_it_matters = "An index can keep rising on a handful of giants while most sto
 what_on_means = "On when fewer than 40% of stocks are above their 200-day average. A washout below 15% followed by a quick rebound above 55% is a classic bottoming sign."
 lead_time = "Months when it narrows with the index at a high; days in a crash."
 false_alarms = "Narrow markets can run for a long time before they fall. Our history starts with our universe snapshots, so older episodes cannot be checked."
+range = { min = 0, max = 1 }
+how = "The share of the stocks in our universe whose latest close is above their own 200-day average."
+terms = [
+  { text = "200-day average", url = "https://www.investopedia.com/terms/m/movingaverage.asp" },
+]
 links = [
   { title = "VanEck: market breadth whitepaper", url = "https://www.vaneck.com/globalassets/home/us/insights/blogs/guided-allocation/market-breadth-whitepaper_2019.11.pdf" },
 ]

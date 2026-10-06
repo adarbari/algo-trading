@@ -4,7 +4,10 @@ a page for an old session never shows what only a later one could know).
 
 - An episode is listed from its ``known_from`` (its trough: the depth is not known before the
   episode ended); its ``recovered`` date is shown only once that session has come (``None``
-  before: "not recovered yet" is what the session knew).
+  before: "not recovered yet" is what the session knew). What it says about a recession is
+  gated by the matching recession's announcements: ``recession`` / ``nber_start`` and ``kind``
+  (``shock`` until then) only from the day NBER announced the peak, ``nber_end`` only from the
+  day it announced the trough (so a trough listed in March 2020 is not yet "a recession").
 - A recession is listed from ``announced_start`` (the day the NBER committee dated its peak;
   ``start`` where NBER published none) and its ``end`` is shown only from ``announced_end``
   (``end`` where none): before that the recession is ongoing as far as the session knew.
@@ -63,19 +66,30 @@ class RegimeEpisodes:
     recessions: tuple[Recession, ...]
 
 
-def _episode(e: EpisodeConfig, day: date) -> Episode:
+def _known(r: RecessionConfig, day: date) -> tuple[bool, bool]:
+    """``(peak announced, trough announced)`` by ``day`` (the month itself where none)."""
+    return (r.announced_start or r.start) <= day, (r.announced_end or r.end) <= day
+
+
+def _episode(e: EpisodeConfig, day: date, chronology: tuple[RecessionConfig, ...]) -> Episode:
+    started = ended = True  # an episode with no recession: nothing to gate
+    if e.recession:
+        match = next(
+            (r for r in chronology if (r.start, r.end) == (e.nber_start, e.nber_end)), None
+        )
+        started, ended = _known(match, day) if match else (True, True)
     return Episode(
         key=e.key,
         name=e.name,
-        kind=e.kind,
+        kind=e.kind if started else "shock",
         peak=e.peak,
         trough=e.trough,
         recovered=e.recovered if e.recovered is not None and e.recovered <= day else None,
         spx_drawdown=e.spx_drawdown,
         nasdaq_drawdown=e.nasdaq_drawdown,
-        recession=e.recession,
-        nber_start=e.nber_start,
-        nber_end=e.nber_end,
+        recession=e.recession and started,
+        nber_start=e.nber_start if started else None,
+        nber_end=e.nber_end if started and ended else None,
         cause=e.cause,
         notes=e.notes,
         known_from=e.known_from,
@@ -85,7 +99,7 @@ def _episode(e: EpisodeConfig, day: date) -> Episode:
 def _recession(r: RecessionConfig, day: date) -> Recession | None:
     if (r.announced_start or r.start) > day:
         return None
-    ended = (r.announced_end or r.end) <= day
+    ended = _known(r, day)[1]
     return Recession(
         start=r.start,
         end=r.end if ended else None,
@@ -99,6 +113,8 @@ def load_regime_episodes(ctx: ReadContext) -> RegimeEpisodes:
     day = ctx.session.date
     config = load_episodes(ctx.configs)
     return RegimeEpisodes(
-        episodes=tuple(_episode(e, day) for e in config.episodes if e.known_from <= day),
+        episodes=tuple(
+            _episode(e, day, config.recessions) for e in config.episodes if e.known_from <= day
+        ),
         recessions=tuple(r for c in config.recessions if (r := _recession(c, day)) is not None),
     )

@@ -4,6 +4,7 @@ numbers bucketed with their extremes kept, flags and labels merged into segments
 cut to the session, and computed (``feature.*``) or unknown names refused."""
 
 from datetime import date
+from typing import Any
 
 import pytest
 
@@ -112,3 +113,37 @@ def test_the_window_and_the_point_budget_are_checked() -> None:
             load_market_history(ctx, [RISK], SEP28, D1, points=points)
     [after] = load_market_history(regime_ctx(D0), [RISK], date(2026, 10, 5), date(2026, 10, 9))
     assert after.points == ()  # a window that starts after the session has no session
+
+
+def _spy_reads(monkeypatch: pytest.MonkeyPatch, ctx: Any) -> list[tuple[Any, ...]]:
+    reads: list[tuple[Any, ...]] = []
+    original = ctx.reader.table_range
+
+    def spy(table: str, start: date, end: date, *args: Any, **kwargs: Any) -> Any:
+        reads.append((table, start, end))
+        return original(table, start, end, *args, **kwargs)
+
+    monkeypatch.setattr(ctx.reader, "table_range", spy)
+    return reads
+
+
+def test_every_window_slices_one_cached_read_until_something_is_published(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctx = regime_ctx()
+    reads = _spy_reads(monkeypatch, ctx)
+    whole = load_market_history(ctx, [RISK], SEP28, D1)
+    recent = load_market_history(ctx, [RISK], SEP30, D1)  # another window, same session
+    narrow = load_market_history(ctx, [RISK, LABEL], SEP29, SEP29)
+    assert reads == [("rollups/market/regime@v2", date.min, D1)]  # one read: the whole range
+    assert [p.session for p in whole[0].points] == [SEP28, SEP29, SEP30, D1]
+    assert [p.session for p in recent[0].points] == [SEP30, D1]
+    assert narrow[0].points == (Point(SEP29, 10.0),)
+    assert load_market_history(ctx, [RISK], SEP28, D1) == whole and len(reads) == 1
+    seq = ctx.reader.visible_seq()
+    monkeypatch.setattr(ctx.reader, "visible_seq", lambda: seq + 1)  # a publish
+    load_market_history(ctx, [RISK], SEP28, D1)
+    assert len(reads) == 2
+    # a window with no stored row at all is still a gap series, from the cached read
+    [empty] = load_market_history(ctx, [RISK], date(2020, 1, 1), date(2020, 1, 10))
+    assert [p.value for p in empty.points] == [None] and len(reads) == 2

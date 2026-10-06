@@ -10,6 +10,7 @@ export const UNITS = [
   'ratio',
   'usd',
   'usd_per_share',
+  'index_points',
   'shares',
   'count',
   'sessions',

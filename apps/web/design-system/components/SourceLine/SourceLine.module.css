@@ -1,0 +1,16 @@
+/* SourceLine: the lead word and each source on one wrapping line. */
+.root {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-0-5) var(--space-3);
+  align-items: baseline;
+  margin: 0;
+  font-family: var(--font-sans);
+}
+
+.source {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: baseline;
+}

@@ -13,13 +13,20 @@ history does not reach back to its start (within ``tolerance`` calendar days, fo
 weekly dates) gives null. A monthly window is the observations dated in its calendar months and
 tolerates gaps (a month never published, as October 2025's unemployment rate in the
 government shutdown): ``trailing_mean`` needs a minimum of its months present, else null.
+
+A daily level read as a price series (an index's closes, ``last_observations``) counts its
+observations, not calendar sessions: the last ``n`` non-null values known by the session, and
+nothing when the newest is more than ``max_age`` exchange sessions old (a stale series).
 """
 
 from collections.abc import Mapping
 from datetime import date
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
+
+from algotrade.core.time.calendar import sessions_to
 
 type Series = pd.Series  # float values by observation date (a DatetimeIndex), ascending
 # Sessions of observations a group reads (about 800 calendar days: a year back from a month
@@ -98,3 +105,25 @@ def trailing_mean(months: Months, last: int, n: int, minimum: int) -> float:
     ``last``, when at least ``minimum`` of them are present (NaN otherwise)."""
     present = [months[m] for m in range(last - n + 1, last + 1) if m in months]
     return float(np.mean(present)) if len(present) >= minimum else np.nan
+
+
+def fresh(s: Series | None, session: date, max_age: int) -> bool:
+    """Whether ``s`` has an observation and its newest is at most ``max_age`` exchange
+    sessions before ``session`` (``core.time.calendar.sessions_to``: 1 is the previous
+    session's close, what a series lagged one day knows)."""
+    if s is None or s.empty:
+        return False
+    return sessions_to(pd.Timestamp(s.index[-1]).date(), session) <= max_age
+
+
+def last_observations(
+    s: Series | None, session: date, n: int, max_age: int
+) -> npt.NDArray[np.float64] | None:
+    """The last ``n`` observations of ``s`` (its non-null values: a FRED "." is no observation,
+    skipped, never counted), oldest first, padded at the front with NaN to ``n`` when the
+    series is shorter; ``None`` unless ``fresh(s, session, max_age)``."""
+    known = None if s is None else s.dropna()
+    if known is None or not fresh(known, session, max_age):
+        return None
+    values = known.to_numpy(float)[-n:]
+    return np.concatenate([np.full(n - len(values), np.nan), values])

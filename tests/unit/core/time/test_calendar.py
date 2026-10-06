@@ -3,6 +3,7 @@ from datetime import UTC, date, datetime, time, timedelta
 import pytest
 
 from algotrade.core.time.calendar import (
+    SPECIAL_CLOSURES,
     close_time,
     early_closes,
     easter,
@@ -183,3 +184,66 @@ def test_special_closures_are_not_sessions() -> None:
 def test_local_deadline_follows_daylight_saving_in_los_angeles() -> None:
     assert local_deadline(date(2026, 10, 5), time(23, 0)) == datetime(2026, 10, 6, 6, tzinfo=UTC)
     assert local_deadline(date(2026, 12, 1), time(23, 0)) == datetime(2026, 12, 2, 7, tzinfo=UTC)
+
+
+def test_martin_luther_king_day_only_from_1998() -> None:
+    assert is_session(date(1997, 1, 20))  # the 3rd Monday: the NYSE stayed open
+    assert not is_session(date(1998, 1, 19))  # the first MLK Day closure
+    assert date(1997, 1, 20) not in holidays(1997)
+
+
+@pytest.mark.parametrize(
+    "closed",
+    [
+        date(1972, 11, 7),  # presidential election days, closed through 1980
+        date(1976, 11, 2),
+        date(1980, 11, 4),
+        date(1972, 12, 28),  # Truman
+        date(1973, 1, 25),  # Johnson
+        date(1977, 7, 14),  # New York blackout
+        date(1985, 9, 27),  # Hurricane Gloria
+        date(1994, 4, 27),  # Nixon
+        date(2001, 9, 11),
+        date(2001, 9, 12),
+        date(2001, 9, 13),
+        date(2001, 9, 14),
+        date(2004, 6, 11),  # Reagan
+        date(2007, 1, 2),  # Ford
+        date(2012, 10, 29),  # Hurricane Sandy
+        date(2012, 10, 30),
+        date(2018, 12, 5),  # G. H. W. Bush
+        date(2025, 1, 9),  # Carter
+    ],
+)
+def test_unscheduled_closures_are_not_sessions(closed: date) -> None:
+    assert closed in SPECIAL_CLOSURES
+    assert not is_session(closed)
+    assert is_session(next_session(closed))  # the exchange reopened
+
+
+def test_closures_do_not_swallow_neighbours() -> None:
+    assert is_session(date(2001, 9, 10)) and is_session(date(2001, 9, 17))
+    assert is_session(date(2012, 10, 26)) and is_session(date(2012, 10, 31))
+    assert is_session(date(1984, 11, 6))  # election day after 1980: open
+    assert is_session(date(1973, 11, 6))  # off-year election day: open
+
+
+def test_christmas_and_independence_day_observed_on_friday_in_the_1980s() -> None:
+    assert not is_session(date(1981, 7, 3)) and not is_session(date(1982, 12, 24))
+    assert date(1984, 1, 2) in holidays(1984)  # New Year's Sunday -> Monday
+    assert is_session(date(1993, 12, 31))  # New Year's Day 1994 was a Saturday
+
+
+@pytest.mark.parametrize(
+    ("year", "count"),
+    [
+        # weekdays minus holidays: 1990 261 - 8, 2001 261 - 9 - 4 (Sept 11-14), 2012 261 - 9 - 2
+        # (Sandy), 2020 262 - 9 (the NYSE's published session counts)
+        (1990, 253),
+        (2001, 248),
+        (2012, 250),
+        (2020, 253),
+    ],
+)
+def test_session_counts_match_nyse_history(year: int, count: int) -> None:
+    assert len(sessions_between(date(year, 1, 1), date(year, 12, 31))) == count

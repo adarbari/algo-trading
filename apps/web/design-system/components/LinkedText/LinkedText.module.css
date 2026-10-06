@@ -1,0 +1,5 @@
+/* LinkedText: the sentence wraps like a paragraph, and a long link or word breaks rather than overflows. */
+.root {
+  display: inline;
+  overflow-wrap: anywhere;
+}

@@ -68,3 +68,35 @@ def test_a_recession_with_no_published_announcement_is_known_from_its_own_months
 def test_without_the_file_there_is_nothing() -> None:
     ctx = replace(context(store_with()), configs=MemoryConfigStore({}))
     assert load_regime_episodes(ctx) == RegimeEpisodes((), ())
+
+
+COVID = {**EPISODE, "key": "covid", "peak": date(2020, 2, 19), "trough": date(2020, 3, 23),
+         "known_from": date(2020, 3, 23), "recovered": date(2020, 8, 18),
+         "nber_start": date(2020, 2, 1), "nber_end": date(2020, 4, 1)}  # fmt: skip
+COVID_NBER = {"start": date(2020, 2, 1), "end": date(2020, 4, 1),
+              "announced_start": date(2020, 6, 8), "announced_end": date(2021, 7, 19)}  # fmt: skip
+
+
+def test_an_episodes_recession_facts_wait_for_the_nber_announcements() -> None:
+    trough = date(2020, 3, 23)
+    [early] = known(trough, [COVID], [COVID_NBER]).episodes  # listed, but not yet "a recession"
+    assert (early.recession, early.kind, early.nber_start, early.nber_end) == (
+        False,
+        "shock",
+        None,
+        None,
+    )
+    [peak_known] = known(date(2020, 6, 8), [COVID], [COVID_NBER]).episodes
+    assert (peak_known.recession, peak_known.kind) == (True, "recession")
+    assert (peak_known.nber_start, peak_known.nber_end) == (date(2020, 2, 1), None)
+    [done] = known(date(2021, 7, 19), [COVID], [COVID_NBER]).episodes
+    assert done.nber_end == date(2020, 4, 1)
+
+
+def test_a_recession_announced_before_the_trough_shows_but_not_its_end() -> None:
+    # the GFC: peak announced 2008-12-01, before the 2009-03-09 trough; trough announced 2010-09-20
+    [at_trough] = known(date(2009, 3, 9), [EPISODE], [GFC]).episodes
+    assert (at_trough.recession, at_trough.kind) == (True, "recession")
+    assert (at_trough.nber_start, at_trough.nber_end) == (date(2007, 12, 1), None)
+    [later] = known(date(2010, 9, 20), [EPISODE], [GFC]).episodes
+    assert later.nber_end == date(2009, 6, 1)

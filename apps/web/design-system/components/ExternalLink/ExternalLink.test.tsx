@@ -24,6 +24,16 @@ describe('ExternalLink', () => {
     expect(screen.getByRole('link')).toHaveAttribute('data-size', 'sm');
   });
 
+  it('passes a hover title through', () => {
+    render(
+      <ExternalLink href="https://example.org/" title="Chicago Fed, weekly" size="inherit">
+        NFCI
+      </ExternalLink>,
+    );
+    expect(screen.getByRole('link')).toHaveAttribute('title', 'Chicago Fed, weekly');
+    expect(screen.getByRole('link')).toHaveAttribute('data-size', 'inherit');
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <ExternalLink href="https://example.org/">An explainer</ExternalLink>,

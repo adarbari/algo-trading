@@ -7,98 +7,39 @@ from typing import Self
 
 import strawberry
 from anyio import to_thread
-from strawberry.scalars import JSON
 from strawberry.types import Info
 
 from algotrade.services.read.context import ReadContext
-from algotrade.services.read.instruments.catalogue import FeatureFormat
 from algotrade.services.read.regime import episodes as episodes_read
-from algotrade.services.read.regime import history, indicators, regime
+from algotrade.services.read.regime import history, regime
 from algotrade_api.graphql.types.instruments.feature import Unknown
+from algotrade_api.graphql.types.market.indicator import RegimeIndicator
 
 strawberry.enum(regime.RegimeLabel, description="The regime; UNKNOWN when it is not stored")
-strawberry.enum(
-    indicators.IndicatorStatus, description="An indicator's own verdict: ON, OFF or UNKNOWN"
-)
-
-
-@strawberry.type(description="One reading-list entry of an indicator card")
-class IndicatorLink:
-    title: str
-    url: str
-
-    @classmethod
-    def of(cls, d: indicators.IndicatorLink) -> Self:
-        return cls(title=d.title, url=d.url)
-
-
-@strawberry.type(description="What an indicator did before one episode, in one line")
-class IndicatorBefore:
-    episode: str
-    line: str
-
-    @classmethod
-    def of(cls, d: indicators.IndicatorBefore) -> Self:
-        return cls(episode=d.episode, line=d.line)
 
 
 @strawberry.type(
-    description="One indicator card with its value for the session: the plain-language text "
-    "first, the technical name and `value` behind it. `value` is null exactly when `unknown` "
-    "says why (format it with `format`); `status` is the indicator's own verdict and `changed` "
-    "whether it differs from 5 sessions earlier (null: not stored). `pace`: slow (macro) or "
-    "fast (market)"
+    description="A 0-100 score; `value` is null exactly when `unknown` says why. `feature`: its "
+    "catalogue field; `coverageFeature`: the field of the share of its weight known (null: "
+    "fragility has none); `threshold`: at or above it the score is high for the label (null: "
+    "context only)"
 )
-class RegimeIndicator:
-    key: str
-    pace: str
-    plain_name: str
-    technical_name: str
-    one_liner: str
-    why_it_matters: str
-    what_on_means: str
-    before: list[IndicatorBefore]
-    lead_time: str
-    false_alarms: str
-    links: list[IndicatorLink]
-    feature: str
-    value: JSON | None
-    unknown: Unknown | None
-    format: FeatureFormat | None
-    status: indicators.IndicatorStatus
-    changed: bool | None
-
-    @classmethod
-    def of(cls, d: indicators.RegimeIndicator) -> Self:
-        return cls(
-            key=d.key,
-            pace=d.pace,
-            plain_name=d.plain_name,
-            technical_name=d.technical_name,
-            one_liner=d.one_liner,
-            why_it_matters=d.why_it_matters,
-            what_on_means=d.what_on_means,
-            before=[IndicatorBefore.of(b) for b in d.before],
-            lead_time=d.lead_time,
-            false_alarms=d.false_alarms,
-            links=[IndicatorLink.of(link) for link in d.links],
-            feature=d.feature,
-            value=JSON(d.value),
-            unknown=Unknown.of(d.unknown) if d.unknown is not None else None,
-            format=d.format,
-            status=d.status,
-            changed=d.changed,
-        )
-
-
-@strawberry.type(description="A 0-100 score; `value` is null exactly when `unknown` says why")
 class RegimeScore:
     value: float | None
     unknown: Unknown | None
+    feature: str
+    coverage_feature: str | None
+    threshold: float | None
 
     @classmethod
     def of(cls, d: regime.RegimeScore) -> Self:
-        return cls(value=d.value, unknown=Unknown.of(d.unknown) if d.unknown is not None else None)
+        return cls(
+            value=d.value,
+            unknown=Unknown.of(d.unknown) if d.unknown is not None else None,
+            feature=d.feature,
+            coverage_feature=d.coverage_feature,
+            threshold=d.threshold,
+        )
 
 
 @strawberry.type(
@@ -193,8 +134,10 @@ class RegimeBand:
 @strawberry.type(
     description="One reference market drawdown, with its plain `name`. `recovered`: the "
     "session the S&P 500 regained its peak, null while the session did not know it yet; "
-    "`nberStart` / `nberEnd`: the NBER recession months (first days) it overlapped, if any. "
-    "Listed from `knownFrom` (its trough)"
+    "`recession` / `nberStart` / `nberEnd`: the NBER recession months (first days) it "
+    "overlapped, shown only once NBER had announced them (`kind` reads `shock` until the "
+    "peak is announced; `nberEnd` is null until the trough is). Listed from `knownFrom` "
+    "(its trough)"
 )
 class Episode:
     key: str
