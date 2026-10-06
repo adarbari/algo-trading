@@ -9,7 +9,7 @@ from algotrade.core.views.market_features import MarketFeatures
 from algotrade.core.views.market_view import MarketView
 from tests.helpers.domain_objects import series_from_closes
 
-LABEL = "market.regime@v1.label"
+LABEL = "market.regime@v2.label"
 LABELS = ["CALM", "STRESS", None, "CRISIS"]
 
 

@@ -83,7 +83,7 @@ spx_trend_below = 0.0        # SPY below its 200-day mean
 vix_term_above = 1.0         # VIX above VIX3M (backwardation)
 breadth_below = 0.40         # fewer than 40% of the universe above their 200-day mean
 
-["regime@v1"]                # the regime scores and label (plan section 4; starting values, tuned
+["regime@v2"]                # the regime scores and label (plan section 4; starting values, tuned
                              # on the episode scorecard in RG3b). Each score's w_* sum to 100.
 hold_sessions = 5            # label: the most severe raw label of this many sessions (hysteresis)
 changed_sessions = 5         # label_changed compares the label with this many sessions earlier

@@ -1,11 +1,12 @@
-"""``regime@v1``: the scores' arithmetic by hand (credit from high yield, else the EBP), the
-coverage rule (no macro data is UNKNOWN, never CALM), the stateless 5-session hold (a one-day
-STRESS blip holds for 5 sessions), and a backfill equal to the nightly, deterministic run after
-run."""
+"""``regime@v2``: the scores' arithmetic by hand (credit from high yield, else the EBP), the
+covered-weight scale (an unknown signal neither adds nor dilutes; below the coverage floor a
+score is UNKNOWN, never CALM), the stateless 5-session hold (a one-day STRESS blip holds for 5
+sessions), and a backfill equal to the nightly, deterministic run after run."""
 
 from collections.abc import Mapping
 from datetime import date
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -28,41 +29,71 @@ SHOCK = {"spx_trend_200d_on": True, "vix_term_on": True, "breadth_200d_on": True
 
 
 def test_the_scores_by_hand() -> None:
-    assert (score(CALM, P, "macro").value, score(CALM, P, "market").value) == (0.0, 0.0)
+    assert (score(CALM, P, "macro").raw, score(CALM, P, "market").raw) == (0.0, 0.0)
     late_cycle = {**CALM, "curve_10y3m_on": True, "hy_oas_on": True, "sahm_on": True,
                   "claims_4w_vs_52w_low": 1.15, "cpi_yoy": 0.05}  # fmt: skip
     m = score(late_cycle, P, "macro")
-    assert (m.value, m.coverage, m.missing) == (20 + 20 + 7 + 6 + 5, 1.0, 0)
+    assert (m.raw, m.coverage, m.missing) == (20 + 20 + 7 + 6 + 5, 1.0, 0)
+    assert m.scaled(P.min_coverage) == 58.0  # everything known: the two scales agree
     stressed = {**CALM, **SHOCK, "spx_drawdown_252d": -0.10, "xly_vs_xlp": -0.01,
                 "turbulence_60d": 28.0}  # fmt: skip
     k = score(stressed, P, "market")
-    assert k.value == 20 + 20 + 20 + 10 + 8 + 8  # leadership: both ratios falling
-    assert score({**CALM, "bank_credit_yoy": 0.11}, P, "fragility").value == 50.0
+    assert k.raw == 20 + 20 + 20 + 10 + 8 + 8  # leadership: both ratios falling
+    assert score({**CALM, "bank_credit_yoy": 0.11}, P, "fragility").raw == 50.0
     assert raw_label(CALM, P) == "CALM"
     assert raw_label(late_cycle, P) == "CAUTION"
     assert raw_label(stressed, P) == "STRESS"
     assert raw_label({**late_cycle, **SHOCK}, P) == "CRISIS"
 
 
-def test_unknown_signals_add_nothing_and_count_as_missing() -> None:
+def test_unknown_signals_neither_add_nor_dilute_and_count_as_missing() -> None:
     market = {*cross_asset.GROUP.columns, *trend.GROUP.columns, *SHOCK}
     no_macro = {k: v for k, v in CALM.items() if k in market}
     m = score(no_macro, P, "macro")
-    assert (m.value, m.coverage, m.missing) == (0.0, 0.0, 10)
+    assert (m.raw, m.coverage, m.missing) == (0.0, 0.0, 10)
+    assert np.isnan(m.scaled(P.min_coverage))
     assert raw_label(no_macro, P) is None  # never a false CALM
     half = {**no_macro, "curve_10y3m_on": True, "hy_oas_on": False, "nfci_on": False}
     m = score(half, P, "macro")
-    assert (m.value, m.coverage, m.missing) == (20.0, 0.55, 7)
+    assert (m.raw, m.coverage, m.missing) == (20.0, 0.55, 7)
+    assert m.scaled(P.min_coverage) == pytest.approx(100 * 20 / 55)  # 36.4 of what is known
     assert raw_label(half, P) == "CALM"  # 55% of the weight known: enough for a label
     assert score({}, P, "fragility").coverage == 0.0
+
+
+def test_every_known_fast_signal_on_reads_100_not_the_share_of_all_weight() -> None:
+    """Signals whose windows are longer than the stored bars (turbulence, absorption) are
+    unknown: they no longer hold the score below the threshold however many others are on."""
+    young = {k: v for k, v in {**CALM, **SHOCK}.items() if k not in ("turbulence_60d",
+             "absorption_shift")}  # fmt: skip
+    young |= {"spx_drawdown_252d": -0.12, "xly_vs_xlp": -0.01, "hyg_vs_lqd": -0.01}
+    k = score(young, P, "market")
+    assert (k.raw, k.coverage, k.missing) == (85.0, 0.85, 2)  # v1's market_stress: 85
+    assert k.scaled(P.min_coverage) == 100.0
+    calmer = {**young, "breadth_200d_on": False, "vix_term_on": False}
+    assert score(calmer, P, "market").scaled(P.min_coverage) == pytest.approx(100 * 45 / 85)
+    assert raw_label(calmer, P) == "STRESS"  # 52.9 >= 50; v1 read 45: CALM
+
+
+def test_below_the_coverage_floor_a_score_is_unknown_and_its_raw_is_kept() -> None:
+    sparse = {"vix_term_on": True, "xly_vs_xlp": -0.01, "iwm_vs_spy": -0.01, "hyg_vs_lqd": -0.01,
+              "turbulence_60d": 28.0, "basket_size": 14}  # fmt: skip
+    k = score(sparse, P, "market")
+    assert (k.raw, k.coverage) == (43.0, 0.43)  # 2025-04-08 on the owner's store
+    assert np.isnan(k.scaled(P.min_coverage))
+    young = ("spx_trend_200d_on", "breadth_200d_on", "spx_drawdown_252d", "absorption_shift")
+    day = {k: v for k, v in {**CALM, **sparse}.items() if k not in young}
+    row = regime.compute(frames(dict.fromkeys(sessions_ending(END, 10), day)), END, P).iloc[0]
+    assert pd.isna(row["market_stress"]) and row["market_stress_raw"] == 43.0
+    assert row["raw_label"] is None and row["label"] is None
 
 
 def test_credit_is_the_high_yield_verdict_else_the_excess_bond_premium() -> None:
     no_hy = {k: v for k, v in CALM.items() if k != "hy_oas_on"}
     assert score(no_hy, P, "macro").missing == 1  # neither known: the credit signal is unknown
-    assert score({**no_hy, "ebp": 0.006}, P, "macro").value == 20.0  # before 1997: EBP
+    assert score({**no_hy, "ebp": 0.006}, P, "macro").raw == 20.0  # before 1997: EBP
     assert score({**no_hy, "ebp": 0.004}, P, "macro") == score(CALM, P, "macro")
-    assert score({**CALM, "ebp": 0.03}, P, "macro").value == 0.0  # high yield known: it decides
+    assert score({**CALM, "ebp": 0.03}, P, "macro").raw == 0.0  # high yield known: it decides
 
 
 def test_weights_must_sum_to_100() -> None:
@@ -106,7 +137,8 @@ def test_an_unknown_session_is_unknown_and_never_holds_an_older_label() -> None:
     by_day[END] = None  # nothing stored for the session
     row = regime.compute(frames(by_day), END, P).iloc[0]
     assert row["label"] is None and row["raw_label"] is None and row["label_changed"] is None
-    assert (row["macro_risk"], row["macro_coverage"], row["macro_missing"]) == (0.0, 0.0, 10)
+    assert (row["macro_risk_raw"], row["macro_coverage"], row["macro_missing"]) == (0.0, 0.0, 10)
+    assert pd.isna(row["macro_risk"]) and pd.isna(row["market_stress"])
     assert pd.isna(row["fragility"])
 
 
@@ -146,8 +178,10 @@ def test_backfill_equals_nightly_and_runs_are_deterministic() -> None:
         nightly = compute_one(reader, regime.GROUP, result.session).frame
         pd.testing.assert_frame_equal(result.frame, nightly)
     got = [r.frame.iloc[0]["label"] for r in backfill[regime.GROUP.key][9:]]  # type: ignore[union-attr]
-    # no breadth group stored: breadth unknown, trend + VIX term + drawdown = 50 with 80% known
+    # no breadth group stored: breadth unknown, trend + VIX term + drawdown = 50 of the 80 known
     assert got == ["STRESS"] * 5 + ["CALM"]
+    stress = backfill[regime.GROUP.key][9].frame.iloc[0]  # type: ignore[union-attr]
+    assert (stress["market_stress"], stress["market_stress_raw"]) == (62.5, 50.0)
 
 
 def test_every_regime_column_is_open() -> None:

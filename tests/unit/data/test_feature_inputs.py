@@ -235,6 +235,29 @@ def test_macro_series_keep_the_lookback_window_and_each_series_latest() -> None:
     ]
 
 
+def test_the_newest_session_reads_what_it_knew_from_its_own_partition() -> None:
+    """The backfill's partition date is the last session of the chunk: a lag-1 series whose
+    last observation is that session (public the day after) gives the previous day's value; an
+    ALFRED vintage dated on the session is known by it."""
+    writer, reader = store()
+    days = sessions_between(END - timedelta(days=10), END)
+    lagged = [
+        {"instrument_id": "MACRO:HY", "series": "HY", "obs_date": d, "vintage_date": nxt,
+         "value": float(i), "vintage_kind": "lagged"}
+        for i, (d, nxt) in enumerate(zip(days, [*days[1:], END + timedelta(days=1)], strict=True))
+    ]  # fmt: skip
+    alfred = {"instrument_id": "MACRO:UR", "series": "UR", "obs_date": END - timedelta(days=35),
+              "vintage_date": END, "value": 4.2, "vintage_kind": "alfred"}  # fmt: skip
+    writer.write_table(MACRO_SERIES, END, "r1", stamped([*lagged, alfred], END, "r1"))
+    loaded = inputs.load_input(reader, MACRO_SERIES, days, 0)
+    seen = loaded.at(END, 0)
+    assert seen is not None
+    latest = seen.groupby("instrument_id").tail(1).set_index("instrument_id")
+    assert latest.loc["MACRO:HY", "obs_date"] == days[-2]  # END's own is public tomorrow
+    assert latest.loc["MACRO:HY", "value"] == float(len(days) - 2)
+    assert latest.loc["MACRO:UR", "value"] == 4.2  # a vintage on the session is known by it
+
+
 def test_bar_windows_are_the_closes_of_each_window_up_to_the_session() -> None:
     writer, reader = store()
     first, last = date(2020, 2, 12), date(2020, 3, 13)

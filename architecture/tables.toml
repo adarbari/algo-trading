@@ -196,8 +196,9 @@ name = "rollups/market/regime_indicators@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
 
 [[table]]
-name = "rollups/market/regime@v1"
+name = "rollups/market/regime@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
+note = "v2 put macro_risk and market_stress on the covered-weight scale (v1's scores kept as *_raw); v1 rows on the owner's store are superseded and read by nothing, deleted by hand once v2 is backfilled (retire-features handles instrument groups only)"
 
 [[table]]
 name = "rollups/daily/*"

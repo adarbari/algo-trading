@@ -175,9 +175,12 @@ point-in-time like everything else (ADR 0023).
 - `fragility_score@v1` (0-100, monthly, context only): valuation (CAPE), credit expansion,
   sector run-ups, margin debt. It never changes the regime label; it changes the text ("a
   fall from here would likely be deep") and the deep-dive links.
-- `regime@v1`: `CALM` (both low), `CAUTION` (macro high, market calm: late cycle), `STRESS`
+- `regime@v2`: `CALM` (both low), `CAUTION` (macro high, market calm: late cycle), `STRESS`
   (market high, macro low: a shock), `CRISIS` (both high). Hysteresis: a regime is left only
-  after 5 sessions below its threshold, to cut whipsaw.
+  after 5 sessions below its threshold, to cut whipsaw. Both scores are on the covered-weight
+  scale (`100 * weight on / weight known`, null when less than half the weight is known), so a
+  signal not computable yet (turbulence before three years of bars) neither adds nor dilutes;
+  the unnormalised score stays as `macro_risk_raw` / `market_stress_raw` (`regime@v2`).
 - `regime_size_multiplier@v1`: site default 1.0 / 0.75 / 0.5 / 0.25, user-overridable
   (ADR 0015 layering), plus per-idea-kind rules: short-volatility ideas (the VRP scanner)
   are off in `STRESS` and `CRISIS`; momentum longs halve in `CAUTION`; defined-risk

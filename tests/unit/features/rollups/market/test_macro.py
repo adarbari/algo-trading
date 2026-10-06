@@ -221,6 +221,26 @@ def test_backfill_equals_nightly() -> None:
     assert backfill[0].frame["hy_oas"].iloc[0] < backfill[-1].frame["hy_oas"].iloc[0]  # type: ignore[index]
 
 
+def test_the_last_session_of_a_backfill_reads_its_own_partition_as_known() -> None:
+    """Every series stored in one partition dated the newest session (a backfill): that session
+    reads each lagged series' previous observation (its own is public the next day), an ALFRED
+    vintage dated on it, and the index levels, exactly as the session before reads its own."""
+    writer, reader = store()
+    days = sessions_ending(END, 30)
+    known = list(zip(days, [*days[1:], END + timedelta(days=1)], strict=True))  # lag 1
+    rows = [obs("BAMLH0A0HYM2", d, v, 3.0 + i / 100) for i, (d, v) in enumerate(known)]
+    rows += [obs("VIX", d, v, 15.0 + i / 10) for i, (d, v) in enumerate(known)]
+    rows += [{**obs("UNRATE", date(2026, 8, 1), END, 4.2), "vintage_kind": "alfred"}]
+    write(writer, rows)
+    chunk = {r.session: r.frame.iloc[0] for r in compute_sessions(reader, GROUP, days[-3:])}  # type: ignore[union-attr]
+    newest, before = chunk[END], chunk[days[-2]]
+    assert newest["hy_oas"] == pytest.approx((3.0 + 28 / 100) / 100, rel=F32)  # days[-2]'s
+    assert before["hy_oas"] == pytest.approx((3.0 + 27 / 100) / 100, rel=F32)
+    assert newest["vix"] == pytest.approx(15.0 + 2.8, rel=F32)
+    assert newest["unrate"] == pytest.approx(0.042, rel=F32) and pd.isna(before["unrate"])
+    pd.testing.assert_series_equal(newest, compute_one(reader, GROUP, END).frame.iloc[0])  # type: ignore[union-attr]
+
+
 def test_transforms_and_licences_follow_the_registry() -> None:
     registry = load_macro(FileConfigStore(REPO / "config"))
     for key, use in macro.SERIES.items():

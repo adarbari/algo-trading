@@ -26,7 +26,7 @@ allow_short = false
 # Off until enabled here, in a user's config or for one run.
 [regime]
 enabled = false
-label = "market.regime@v1.label"  # the session's regime: CALM, CAUTION, STRESS, CRISIS
+label = "market.regime@v2.label"  # the session's regime: CALM, CAUTION, STRESS, CRISIS
 unknown_multiplier = 0.0          # size when the label is unknown: fail closed
 pause_in = []                     # labels in which screeners' picks are PAUSED
 

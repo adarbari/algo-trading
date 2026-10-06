@@ -6,28 +6,28 @@
       "headline": "Not computed yet",
       "unknownReason": {
         "code": "NOT_IN_CATALOGUE",
-        "detail": "market.regime@v1.label is not in the market catalogue: the regime has not been computed yet"
+        "detail": "market.regime@v2.label is not in the market catalogue: the regime has not been computed yet"
       },
       "scores": {
         "macroRisk": {
           "value": null,
           "unknown": {
             "code": "NOT_IN_CATALOGUE",
-            "detail": "market.regime@v1.macro_risk is not in the market catalogue: the regime has not been computed yet"
+            "detail": "market.regime@v2.macro_risk is not in the market catalogue: the regime has not been computed yet"
           }
         },
         "marketStress": {
           "value": null,
           "unknown": {
             "code": "NOT_IN_CATALOGUE",
-            "detail": "market.regime@v1.market_stress is not in the market catalogue: the regime has not been computed yet"
+            "detail": "market.regime@v2.market_stress is not in the market catalogue: the regime has not been computed yet"
           }
         },
         "fragility": {
           "value": null,
           "unknown": {
             "code": "NOT_IN_CATALOGUE",
-            "detail": "market.regime@v1.fragility is not in the market catalogue: the regime has not been computed yet"
+            "detail": "market.regime@v2.fragility is not in the market catalogue: the regime has not been computed yet"
           }
         }
       },
