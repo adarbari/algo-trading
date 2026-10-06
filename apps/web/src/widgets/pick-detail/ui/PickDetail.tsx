@@ -1,6 +1,6 @@
 /**
  * One pick of a screener's results, beside the table: the ticker with its decision and score, why
- * it is not simply qualified, every criterion with the value it was judged on and whether it
+ * it is not simply qualified (a pick the regime gate paused says so, with the rule that did), every criterion with the value it was judged on and whether it
  * passed, came near or missed, and the review actions (open in Explore, add to the compare set,
  * dismiss) with their keys. The chart and anything else about the ticker is composed beside it.
  */
@@ -101,6 +101,12 @@ export function PickDetail({
             .filter(Boolean)
             .join(' · ')}
         </Text>
+        {row.decision === 'PAUSED' ? (
+          <Text size="sm" tone="secondary">
+            The regime gate held this pick back, so it is not an idea for this session. The rule
+            that paused it:
+          </Text>
+        ) : null}
         {row.reasons ? <Text size="sm">{row.reasons}</Text> : null}
         {row.flags && row.flags.length > 0 ? (
           <Text size="sm" tone="muted">{`Flags: ${row.flags.join(', ')}`}</Text>

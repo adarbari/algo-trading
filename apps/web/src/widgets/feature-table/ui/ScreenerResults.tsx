@@ -3,7 +3,9 @@
  * filtered, sorted and paged on the server. Decision chips (with the run's counts) and New /
  * Dropped chips filter it, the search box finds a ticker, and the user's own catalogue
  * columns, sort and decisions are their view of this screener (`features/table-view`: saved at
- * once, never part of the screener). Enter on a row opens the ticker in Explore.
+ * once, never part of the screener). The header says the regime the run stamped, and the picks
+ * the regime gate paused are a decision chip of their own (PAUSED, reason in the row's detail).
+ * Enter on a row opens the ticker in Explore.
  */
 import { Button, Chip, Grid, SearchInput, Stack, Text, type DataTableSort } from '@algotrade/ui';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -17,6 +19,7 @@ import {
   ViewControls,
 } from '@/features/table-view';
 import { byName, useFeatureCatalogue, type CriterionInfo, type TableRow } from '@/entities/feature';
+import { RunRegimeChip } from '@/entities/regime';
 import {
   DEFAULT_DECISIONS,
   decisionLabel,
@@ -132,6 +135,7 @@ export function ScreenerResults({
           : undefined,
         actions: (
           <Stack direction="row" gap={2} align="center" wrap>
+            {run ? <RunRegimeChip label={run.regime ?? null} /> : null}
             <Text size="sm" tone="muted">
               {runner.error ? 'The run could not be started' : runMessage(runner.run)}
             </Text>

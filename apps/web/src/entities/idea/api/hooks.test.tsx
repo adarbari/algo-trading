@@ -31,6 +31,8 @@ describe('useIdeas', () => {
         session: '2026-10-02',
         priority: ['vrp'],
         total: 0,
+        pausedTotal: 0,
+        paused: [],
         screeners: [
           {
             screener: { id: 'vrp', name: 'VRP scanner', owner: 'abhinav', version: 1 },

@@ -4,8 +4,10 @@ of the run with the latest ``knowledge_ts`` (a later run of the same session sup
 earlier one). No run stored for the session is ``NOT_RUN``; an older session's run is never
 shown (the Ideas 20-session lookback is gone: owner decision, docs/api/read-model.md).
 
-A ticker is *picked* when its decision is not in ``NOT_PICKED`` (REJECT, SKIPPED, UNKNOWN);
-``ScreenerRun.decisions`` and ``picked`` count the whole run, never a page of it. A run is
+A ticker is *picked* when its decision is not in ``NOT_PICKED`` (REJECT, SKIPPED, UNKNOWN,
+PAUSED: a pick the regime gate held back is counted in ``ScreenerRun.paused``, never in
+``picked``, ADR 0049); ``ScreenerRun.decisions``, ``picked`` and ``paused`` count the whole
+run, never a page of it. A run is
 compared with the screener's run in the previous stored session of ``results/rule_screen``
 (``load_previous_run``: that date is named explicitly through ``context.previous_session``,
 and the same latest-run rule applies there)."""
@@ -25,9 +27,10 @@ RULE_SCREEN = result_table("rule_screen")
 # Read column-pruned (the row key and the point-in-time columns come with them).
 ROW_COLUMNS = (
     "user_id", "config_id", "config_version", "decision", "score", "rank", "tie_break", "flags",
-    "reasons",
+    "reasons", "regime", "size_multiplier",
 )  # fmt: skip
-NOT_PICKED = frozenset({"REJECT", "SKIPPED", "UNKNOWN"})
+PAUSED = "PAUSED"  # the regime gate held the pick back (ADR 0049)
+NOT_PICKED = frozenset({"REJECT", "SKIPPED", "UNKNOWN", PAUSED})
 
 RunKey = tuple[str, str]  # (owner, config id)
 
@@ -48,7 +51,9 @@ class ScreenerRun:
     """One screener's run for the session. ``status``: its run record's (COMPLETE, PARTIAL,
     ...; None: no record stored); ``config_version``: the version that ran; ``decisions``:
     every decision of the run with its count (most first); ``picked``: the tickers it picked;
-    ``audit``: its run record's stats (coverage, the selection's audit; empty: no record)."""
+    ``paused``: the picks the regime gate held back; ``regime``: the session's label the run
+    stamped on its rows (None: gate off, unknown, or a run before the stamp); ``audit``: its
+    run record's stats (coverage, the selection's audit; empty: no record)."""
 
     run_id: str
     config_id: str
@@ -59,6 +64,8 @@ class ScreenerRun:
     config_version: int | None
     decisions: tuple[DecisionCount, ...]
     picked: int
+    paused: int
+    regime: str | None
     audit: Mapping[str, Any]
 
 
@@ -85,6 +92,14 @@ def _version(value: object) -> int | None:
     return None if found is None else int(found)
 
 
+def _regime(rows: pd.DataFrame) -> str | None:
+    """The label the run stamped (every row of a run carries the session's)."""
+    if "regime" not in rows.columns:
+        return None
+    found = [str(r) for r in rows["regime"] if to_scalar(r) is not None]
+    return found[0] if found else None
+
+
 def _run(ctx: ReadContext, owner: str, config_id: str, rows: pd.DataFrame) -> ScreenerRun:
     """The run of ``rows`` (one owner's rows of one config) with the latest ``knowledge_ts``."""
     last = rows.sort_values("knowledge_ts", kind="stable").iloc[-1]
@@ -105,6 +120,8 @@ def _run(ctx: ReadContext, owner: str, config_id: str, rows: pd.DataFrame) -> Sc
             for d, n in sorted(counts.items(), key=lambda dn: (-int(dn[1]), str(dn[0])))
         ),
         picked=int(sum(int(n) for d, n in counts.items() if is_picked(str(d)))),
+        paused=int(counts.get(PAUSED, 0)),
+        regime=_regime(mine),
         audit={} if record is None else dict(record.stats),
     )
 

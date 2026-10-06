@@ -19,6 +19,8 @@ describe('withPriority', () => {
         session: '2026-10-02',
         priority: ['a', 'b'],
         total: 0,
+        pausedTotal: 0,
+        paused: [],
         screeners: [screener('a'), screener('b'), screener('c')],
         items: [],
       },

@@ -8,6 +8,8 @@ export { episodeName, EPISODES, type Episode } from './model/episodes';
 export { regimeFixture, unknownRegimeFixture } from './model/fixtures';
 export {
   changedIndicators,
+  gateLine,
+  gatePauses,
   indicatorChange,
   indicatorsOfPace,
   indicatorStatus,
@@ -15,14 +17,18 @@ export {
   readingList,
   regimeTone,
   sizingLine,
+  storedLabel,
   toChartBands,
   type Regime,
   type RegimeBand,
   type RegimeIndicator,
   type RegimeLabel,
   type RegimeScore,
+  type RegimeSizing,
+  type ScreenerGate,
   type RegimeUnknown,
   type ReadingLink,
 } from './model/regime';
 export { RegimeChip, type RegimeChipProps } from './ui/RegimeChip';
 export { RegimeHeadline, type RegimeHeadlineProps } from './ui/RegimeHeadline';
+export { RunRegimeChip, type RunRegimeChipProps } from './ui/RunRegimeChip';

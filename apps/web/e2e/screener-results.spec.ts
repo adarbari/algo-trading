@@ -40,6 +40,9 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(dkng).toContainText('Apple Inc.');
     await expect(dkng).toContainText('61.0%'); // IV30 in the catalogue's unit
     await expect(dkng).toContainText('New');
+    await expect(page.getByText('Regime: Clouds building')).toBeVisible();
+    // A pick the regime gate paused is listed, badged, never hidden.
+    await expect(grid(page).getByRole('row', { name: /XOM/ })).toContainText('Paused');
     // SOXS missed IV/HV within tolerance: its cell is tinted, the value is still text.
     await expect(
       grid(page).getByRole('row', { name: /SOXS/ }).locator('[data-fill="warning"]'),
@@ -61,6 +64,7 @@ test('decision chips filter the run and the view is saved as yours', async ({ pa
     'WATCH',
     'LIQUIDITY_RISK',
     'EVENT_RISK',
+    'PAUSED',
   ]);
   await page.getByRole('button', { name: /^Liquidity risk/ }).click();
   await expect
@@ -68,11 +72,11 @@ test('decision chips filter the run and the view is saved as yours', async ({ pa
     .toEqual({
       id: 'vrp_scanner',
       name: null,
-      view: { columns: [], sort: null, decisions: ['QUALIFIED', 'WATCH', 'EVENT_RISK'] },
+      view: { columns: [], sort: null, decisions: ['QUALIFIED', 'WATCH', 'EVENT_RISK', 'PAUSED'] },
     });
   await expect
     .poll(() => mock.tables.at(-1)?.['decisions'])
-    .toEqual(['QUALIFIED', 'WATCH', 'EVENT_RISK']);
+    .toEqual(['QUALIFIED', 'WATCH', 'EVENT_RISK', 'PAUSED']);
   await page.getByRole('button', { name: /^New/ }).click();
   await expect.poll(() => mock.tables.at(-1)?.['change']).toBe('new');
 });
@@ -91,7 +95,7 @@ test('a view can be saved under a name, switched to and deleted', async ({ page 
     .toMatchObject({
       id: 'vrp_scanner',
       name: 'VRP review',
-      view: { decisions: ['QUALIFIED', 'WATCH', 'EVENT_RISK'] },
+      view: { decisions: ['QUALIFIED', 'WATCH', 'EVENT_RISK', 'PAUSED'] },
     });
   const views = page.getByRole('combobox', { name: 'View' });
   await expect(views).toHaveValue('VRP review');

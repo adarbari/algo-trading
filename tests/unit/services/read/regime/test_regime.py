@@ -175,3 +175,71 @@ def test_the_headline_counts_only_known_verdicts() -> None:
     assert headline(RegimeLabel.CALM, (_ind("slow", off, False),)) == (
         "0 of 1 slow-moving warning signs are on. The fast signs are not available."
     )
+
+
+def _screen(config_id: str, name: str, **extra: object) -> dict[str, object]:
+    return {
+        "id": config_id, "kind": "screener", "impl": "rules", "version": 1, "name": name,
+        "selection": "all_active",
+        "criteria": {"price": {"field": "rollup.price_stats@v2.close", "op": "gt", "value": 5,
+                               "mode": "hard"}},
+        **extra,
+    }  # fmt: skip
+
+
+SELECTION = {
+    ("site", "selections", "all_active"): {
+        "name": "all_active",
+        "where": {"all": [{"field": "instrument.status", "op": "eq", "value": "ACTIVE"}]},
+    },
+}
+GATED = {
+    "regime": {
+        "enabled": True,
+        "pause_in": ["CRISIS"],
+        "unknown_multiplier": 0.1,
+        "screeners": {"vrp_scanner": {"pause_in": ["STRESS", "CRISIS"]}},
+    }
+}
+
+
+def test_sizing_carries_the_multipliers_the_unknown_size_and_each_screeners_pauses() -> None:
+    docs = {
+        **SELECTION,
+        ("site", "screeners", "vrp_scanner@1"): _screen("vrp_scanner", "VRP scanner"),
+        ("site", "screeners", "momentum@1"): _screen("momentum", "Momentum"),
+    }
+    sizing = load_regime(with_regime(regime_ctx(), defaults=GATED, docs=docs, user="me")).sizing
+    assert sizing.enabled and sizing.unknown_multiplier == 0.1
+    assert [(m.label.value, m.multiplier) for m in sizing.multipliers] == [
+        ("CALM", 1.0), ("CAUTION", 0.75), ("STRESS", 0.5), ("CRISIS", 0.25)
+    ]  # fmt: skip
+    gates = [(g.screener_id, g.name, g.enabled, [p.value for p in g.pause_in])
+             for g in sizing.screeners]  # fmt: skip
+    assert gates == [
+        ("momentum", "Momentum", True, ["CRISIS"]),
+        ("vrp_scanner", "VRP scanner", True, ["STRESS", "CRISIS"]),
+    ]  # fmt: skip
+
+
+def test_a_users_own_regime_layer_changes_their_screeners_pauses_only() -> None:
+    docs = {
+        **SELECTION,
+        ("site", "screeners", "momentum@1"): _screen("momentum", "Momentum"),
+        ("me", "screeners", "momentum@2"): _screen(
+            "momentum", "My momentum", regime={"enabled": True, "pause_in": ["CAUTION"]}
+        ),
+    }
+    mine = load_regime(with_regime(regime_ctx(), docs=docs, user="me")).sizing
+    assert mine.enabled  # site gate off, the user's own turned it on for their screener
+    assert [(g.name, g.enabled, [p.value for p in g.pause_in]) for g in mine.screeners] == [
+        ("My momentum", True, ["CAUTION"])
+    ]  # fmt: skip
+    other = load_regime(with_regime(regime_ctx(), docs=docs, user="you")).sizing
+    assert not other.enabled  # another user sees the site's preset: the gate is off
+    assert [(g.name, g.enabled) for g in other.screeners] == [("Momentum", False)]
+
+
+def test_the_gate_off_by_default_says_so() -> None:
+    sizing = load_regime(regime_ctx()).sizing
+    assert not sizing.enabled and sizing.screeners == ()

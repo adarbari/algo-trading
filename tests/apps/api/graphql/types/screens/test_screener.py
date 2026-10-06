@@ -1,6 +1,7 @@
 """``Query.screener``, ``ScreenerRun.results`` and ``Instrument.screenerHits`` over the golden
 API store (``tests/helpers/api_store.py``): the site preset ``vrp_scanner`` ran on END (AAA
-QUALIFIED, BBB WATCH, CCC REJECT) and on PREVIOUS (AAA REJECT, BBB and CCC QUALIFIED)."""
+QUALIFIED, BBB WATCH, CCC PAUSED by the gate in CAUTION) and on PREVIOUS (AAA REJECT, BBB and
+CCC QUALIFIED)."""
 
 from typing import Any
 
@@ -12,7 +13,7 @@ RESULTS = """query Results($id: String!, $decisions: [String!], $change: String,
   screener(id: $id, date: $date) {
     id criteria { id field mode } displayColumns { name field }
     latestRun {
-      runId session previousSession audit
+      runId session previousSession audit paused regime
       decisions { decision count }
       changes { change count }
       results(decisions: $decisions, change: $change, q: $q, sort: $sort, columns: $columns,
@@ -21,7 +22,7 @@ RESULTS = """query Results($id: String!, $decisions: [String!], $change: String,
         columns { name format }
         rows unknown
         results {
-          rank decision score reasons flags change previousDecision
+          rank decision score reasons flags change previousDecision regime sizeMultiplier
           instrument { symbol name }
           criteria { id outcome value }
           columns { name value }
@@ -50,8 +51,9 @@ def test_the_run_as_a_review_table(graph: Graph) -> None:
     run = found["latestRun"]
     assert (run["session"], run["previousSession"]) == ("2022-11-23", "2022-11-22")
     assert {d["decision"]: d["count"] for d in run["decisions"]} == {
-        "QUALIFIED": 1, "WATCH": 1, "REJECT": 1
+        "QUALIFIED": 1, "WATCH": 1, "PAUSED": 1
     }  # fmt: skip
+    assert (run["paused"], run["regime"]) == (1, "CAUTION")
     assert run["changes"] == [{"change": "new", "count": 1}, {"change": "dropped", "count": 1}]
     page = run["results"]
     assert (page["sort"], page["total"], page["page"], page["missing"]) == ("rank", 3, 1, [])
@@ -63,6 +65,8 @@ def test_the_run_as_a_review_table(graph: Graph) -> None:
         0.62, "PASS"
     )  # fmt: skip
     assert (bbb["reasons"], bbb["criteria"][0]["outcome"]) == ("iv rank 40 < 50", "NEAR")
+    assert (ccc["decision"], ccc["regime"], ccc["sizeMultiplier"]) == ("PAUSED", "CAUTION", 0.75)
+    assert ccc["reasons"] == "regime=CAUTION: vrp_scanner pauses in CAUTION"
     assert [(r["change"], r["previousDecision"]) for r in (aaa, bbb, ccc)] == [
         ("new", "REJECT"), (None, "QUALIFIED"), ("dropped", "QUALIFIED")
     ]  # fmt: skip
@@ -70,6 +74,7 @@ def test_the_run_as_a_review_table(graph: Graph) -> None:
 
 def test_filters_search_sort_and_page(graph: Graph) -> None:
     assert symbols(results(graph, decisions=["qualified", "watch"])) == ["AAA", "BBB"]
+    assert symbols(results(graph, decisions=["paused"])) == ["CCC"]
     assert symbols(results(graph, change="dropped")) == ["CCC"]
     assert symbols(results(graph, q="bb")) == ["BBB"]
     assert symbols(results(graph, sort="-score")) == ["BBB", "AAA", "CCC"]
@@ -110,4 +115,4 @@ def test_an_instruments_screener_hits(graph: Graph) -> None:
     aaa = graph(query, {"key": "AAA"})["data"]["instrument"]["screenerHits"]
     assert aaa == [{"screener": {"id": "vrp_scanner", "name": "VRP"},
                     "result": {"decision": "QUALIFIED", "rank": 1, "change": "new"}}]  # fmt: skip
-    assert graph(query, {"key": "CCC"})["data"]["instrument"]["screenerHits"] == []  # REJECT
+    assert graph(query, {"key": "CCC"})["data"]["instrument"]["screenerHits"] == []  # PAUSED

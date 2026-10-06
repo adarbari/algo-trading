@@ -301,12 +301,16 @@ type Holdings {
   items: [Holding!]!
 }
 
-"""A ticker some screener picked: its picks, best screener first"""
+"""
+A ticker some screener picked: its picks, best screener first. `regime` and `sizeMultiplier`: the session's label and the size of its best pick, as the run stamped them (null: gate off, regime unknown, or a run before the stamp)
+"""
 type Idea {
   rank: Int!
   instrumentId: String!
   instrument: Instrument
   picks: [ScreenResult!]!
+  regime: String
+  sizeMultiplier: Float
 }
 
 """
@@ -321,7 +325,7 @@ type IdeaScreener {
 }
 
 """
-The ideas for the session: `screeners` in the user's priority order (then the rest by id), `items` the first `limit` of `total` picked tickers
+The ideas for the session: `screeners` in the user's priority order (then the rest by id), `items` the first `limit` of `total` picked tickers, `paused` the first `limit` of `pausedTotal` picks the regime gate held back (never counted in `total`)
 """
 type Ideas {
   session: Date!
@@ -329,6 +333,8 @@ type Ideas {
   screeners: [IdeaScreener!]!
   total: Int!
   items: [Idea!]!
+  pausedTotal: Int!
+  paused: [PausedIdea!]!
 }
 
 """What an indicator did before one episode, in one line"""
@@ -413,6 +419,12 @@ type Instrument {
 The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
 """
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
+
+"""New positions are sized at `multiplier` of the normal size in `label`"""
+type LabelSize {
+  label: RegimeLabel!
+  multiplier: Float!
+}
 
 """
 A market (`marketId` `MKT:US`) for the session. Per-session values (breadth, trend, the regime's inputs) are market catalogue features: `features(names)`
@@ -507,6 +519,15 @@ type OptionQuote {
   theta: Float
   vega: Float
   rho: Float
+}
+
+"""
+A ticker one screener picked and the regime gate held back: that screener's PAUSED row, whose `reasons` say why
+"""
+type PausedIdea {
+  instrumentId: String!
+  instrument: Instrument
+  result: ScreenResult!
 }
 
 """
@@ -845,11 +866,15 @@ type RegimeScores {
 }
 
 """
-The site's sizing rule in force: new positions are sized at `multiplier` of the normal size while the regime is `label` (null: the regime is UNKNOWN)
+The sizing rule in force for the caller: new positions are sized at `multiplier` of the normal size while the regime is `label` (null: the regime is UNKNOWN). `enabled`: the gate is on (off: sizes are 100% and nothing pauses); `multipliers` per label (the site's `[regime]`), `unknownMultiplier` for a label not stored, and `screeners`: each of the caller's screeners with the labels it pauses in
 """
 type RegimeSizing {
   label: RegimeLabel!
   multiplier: Float
+  enabled: Boolean!
+  multipliers: [LabelSize!]!
+  unknownMultiplier: Float!
+  screeners: [ScreenerGate!]!
 }
 
 """One of the screen's display columns for the instrument"""
@@ -946,7 +971,7 @@ type ScreenListing {
 }
 
 """
-One instrument's row of a screener's run; `instrument` is null when the session's reference snapshot does not have it. `change`: `new` (picked now, not by the previous run) or `dropped` (the reverse); null when the same or not compared (Ideas); `previousDecision`: the previous run's
+One instrument's row of a screener's run; `instrument` is null when the session's reference snapshot does not have it. `change`: `new` (picked now, not by the previous run) or `dropped` (the reverse); null when the same or not compared (Ideas); `previousDecision`: the previous run's. `regime` / `sizeMultiplier`: the session's regime label and the size the gate applied, as the run stamped them (null: gate off, regime unknown, or a run before the stamp); a PAUSED row says why first in `reasons`
 """
 type ScreenResult {
   runId: String!
@@ -963,6 +988,8 @@ type ScreenResult {
   columns: [ResultColumn!]!
   change: String
   previousDecision: String
+  regime: String
+  sizeMultiplier: Float
 }
 
 """
@@ -1009,6 +1036,16 @@ type Screener {
 }
 
 """
+One of the caller's screeners and the labels its picks are PAUSED in, calmest first, as the config layers resolve it for them; `enabled`: its `[regime]` gate is on (off, nothing is paused)
+"""
+type ScreenerGate {
+  screenerId: String!
+  name: String!
+  enabled: Boolean!
+  pauseIn: [RegimeLabel!]!
+}
+
+"""
 A screener that picked the instrument in the session (its run for exactly the session), and its result for it
 """
 type ScreenerHit {
@@ -1017,7 +1054,7 @@ type ScreenerHit {
 }
 
 """
-A screener's run for the session: whose, which version ran, its run record's status and `audit` (coverage, the selection's audit), and every decision with its count over the whole run (`picked`: the tickers it picked)
+A screener's run for the session: whose, which version ran, its run record's status and `audit` (coverage, the selection's audit), and every decision with its count over the whole run (`picked`: the tickers it picked, `paused`: the picks the regime gate held back, never counted as picked; `regime`: the label the run stamped, null when the gate was off or the label unknown)
 """
 type ScreenerRun {
   runId: String!
@@ -1029,6 +1066,8 @@ type ScreenerRun {
   configVersion: Int
   decisions: [DecisionCount!]!
   picked: Int!
+  paused: Int!
+  regime: String
   audit: JSON!
 
   """

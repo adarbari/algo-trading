@@ -8,6 +8,8 @@ describe('decisions', () => {
     expect(decisionTone('QUALIFIED')).toBe('positive');
     expect(decisionTone('WATCH')).toBe('accent');
     expect(decisionTone('EVENT_RISK')).toBe('warning');
+    expect(decisionLabel('PAUSED')).toBe('Paused');
+    expect(decisionTone('PAUSED')).toBe('warning');
     expect(decisionTone('OTHER')).toBe('neutral');
   });
 

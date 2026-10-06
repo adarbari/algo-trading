@@ -6,6 +6,7 @@ import { Grid, Stack, Text } from '@algotrade/ui';
 
 import type { IdeaCompareSearch } from '@/features/idea-compare';
 import { IdeasHeading } from '@/widgets/ideas-heading';
+import { PausedIdeas } from '@/widgets/paused-ideas';
 import { RegimeStrip } from '@/widgets/regime-strip';
 import { ScreenerRanking } from '@/widgets/screener-ranking';
 import { TopIdeas } from '@/widgets/top-ideas';
@@ -42,6 +43,7 @@ export function IdeasPage({
         </Text>
       </Stack>
       <RegimeStrip onOpen={onOpenRegime} />
+      <PausedIdeas onOpen={onOpen} />
       <Grid columns="sidebar-start" gap={4} collapse="lg" align="start">
         <ScreenerRanking onNewScreener={onNewScreener} />
         <TopIdeas

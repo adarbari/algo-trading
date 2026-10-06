@@ -76,6 +76,22 @@ test('shows the stored display values and the watch-outs', async ({ page }) => {
   await expect(grid(page).getByRole('row', { name: /TSLA/ })).toContainText('Large move');
 });
 
+test('shows the size the regime allows and lists the paused picks with their reason', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await page.goto('/ideas');
+  await expect(grid(page).getByRole('columnheader')).toContainText(['Size']);
+  await expect(grid(page).getByRole('row', { name: /AAPL/ })).toContainText('50%');
+  const paused = page.getByRole('button', { name: /Paused by regime/ });
+  await expect(paused).toHaveAttribute('aria-expanded', 'false');
+  await expect(paused).toContainText('(1)');
+  await paused.click();
+  await expect(page.getByText('regime=STRESS: vrp-scanner pauses in STRESS')).toBeVisible();
+  await expectAccessible(page);
+  expect(errors).toEqual([]);
+});
+
 test('+ New screener opens the Builder', async ({ page }) => {
   await page.goto('/ideas');
   await page.getByRole('button', { name: '+ New screener' }).click();

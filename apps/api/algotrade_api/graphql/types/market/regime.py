@@ -119,16 +119,60 @@ class RegimeScores:
 
 
 @strawberry.type(
-    description="The site's sizing rule in force: new positions are sized at `multiplier` of "
-    "the normal size while the regime is `label` (null: the regime is UNKNOWN)"
+    description="New positions are sized at `multiplier` of the normal size in `label`"
+)
+class LabelSize:
+    label: regime.RegimeLabel
+    multiplier: float
+
+    @classmethod
+    def of(cls, d: regime.LabelSize) -> Self:
+        return cls(label=d.label, multiplier=d.multiplier)
+
+
+@strawberry.type(
+    description="One of the caller's screeners and the labels its picks are PAUSED in, calmest "
+    "first, as the config layers resolve it for them; `enabled`: its `[regime]` gate is on "
+    "(off, nothing is paused)"
+)
+class ScreenerGate:
+    screener_id: str
+    name: str
+    enabled: bool
+    pause_in: list[regime.RegimeLabel]
+
+    @classmethod
+    def of(cls, d: regime.ScreenerGate) -> Self:
+        return cls(
+            screener_id=d.screener_id, name=d.name, enabled=d.enabled, pause_in=list(d.pause_in)
+        )
+
+
+@strawberry.type(
+    description="The sizing rule in force for the caller: new positions are sized at "
+    "`multiplier` of the normal size while the regime is `label` (null: the regime is UNKNOWN). "
+    "`enabled`: the gate is on (off: sizes are 100% and nothing pauses); `multipliers` per "
+    "label (the site's `[regime]`), `unknownMultiplier` for a label not stored, and "
+    "`screeners`: each of the caller's screeners with the labels it pauses in"
 )
 class RegimeSizing:
     label: regime.RegimeLabel
     multiplier: float | None
+    enabled: bool
+    multipliers: list[LabelSize]
+    unknown_multiplier: float
+    screeners: list[ScreenerGate]
 
     @classmethod
     def of(cls, d: regime.RegimeSizing) -> Self:
-        return cls(label=d.label, multiplier=d.multiplier)
+        return cls(
+            label=d.label,
+            multiplier=d.multiplier,
+            enabled=d.enabled,
+            multipliers=[LabelSize.of(m) for m in d.multipliers],
+            unknown_multiplier=d.unknown_multiplier,
+            screeners=[ScreenerGate.of(g) for g in d.screeners],
+        )
 
 
 @strawberry.type(

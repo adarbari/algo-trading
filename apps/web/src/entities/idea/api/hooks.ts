@@ -1,6 +1,7 @@
 /**
  * The Ideas page's one read (ADR 0037): `IdeasPage` over GraphQL, the ranked ideas for the
- * latest session with every pick, the user's screeners with their run (or why not run) and
+ * latest session with every pick (the size each gets from the regime, ADR 0049), the picks the
+ * regime gate paused with their reasons, the user's screeners with their run (or why not run) and
  * picked counts over the whole run, and each idea's facts by catalogue name (earnings, nearest
  * expiry, IV: ADR 0038). The cache holds the response; `select` shapes it.
  */
@@ -23,6 +24,19 @@ const IdeasPage = graphql(`
       session
       priority
       total
+      pausedTotal
+      paused {
+        instrumentId
+        instrument {
+          symbol
+        }
+        result {
+          configId
+          score
+          reasons
+          regime
+        }
+      }
       screeners {
         screener {
           id
@@ -33,6 +47,7 @@ const IdeasPage = graphql(`
         run {
           runId
           configVersion
+          paused
         }
         notRun {
           code
@@ -51,6 +66,8 @@ const IdeasPage = graphql(`
       items {
         rank
         instrumentId
+        regime
+        sizeMultiplier
         instrument {
           symbol
           features(names: $names) {

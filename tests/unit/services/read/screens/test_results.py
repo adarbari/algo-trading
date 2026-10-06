@@ -3,6 +3,7 @@ from collections.abc import Sequence
 import pytest
 
 from algotrade.core.model.errors import ConfigurationError
+from algotrade.data import StoreReader
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import UnknownFeatureError
 from algotrade.services.read.screens.results import (
@@ -17,7 +18,8 @@ from algotrade.services.read.screens.results import (
     load_run_changes,
 )
 from algotrade.services.read.screens.runs import latest_run
-from tests.unit.services.read.screens.conftest import D0
+from algotrade.storage.backends.memory import MemoryBackend
+from tests.unit.services.read.screens.conftest import D0, context, write_gated
 
 
 def test_results_carry_criteria_columns_flags_and_identity(ctx: ReadContext) -> None:
@@ -139,3 +141,39 @@ def test_bad_queries_name_the_problem(ctx: ReadContext) -> None:
         _page(ctx, ResultQuery(sort="nope"))
     with pytest.raises(UnknownFeatureError):
         _page(ctx, columns=["feature.no_such"])
+
+
+def test_a_paused_row_carries_its_reason_the_label_and_the_size(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    write_gated(backend)
+    ctx = context(reader)
+    run = latest_run(ctx, "site", "alpha").run
+    assert run is not None and run.run_id == "r2"
+    found = load_results(ctx, {"r2": ["EQ:AAA", "EQ:BBB"]}, [run])
+    aaa, bbb = found[("r2", "EQ:AAA")], found[("r2", "EQ:BBB")]
+    assert (bbb.decision, bbb.reasons) == ("PAUSED", "regime=STRESS: alpha")
+    assert (bbb.regime, bbb.size_multiplier) == ("STRESS", 0.5)
+    assert (aaa.regime, aaa.size_multiplier) == ("STRESS", 0.5)
+
+
+def test_a_run_before_the_stamp_has_no_regime_on_its_rows(ctx: ReadContext) -> None:
+    run = latest_run(ctx, "site", "alpha").run
+    assert run is not None
+    row = load_results(ctx, {"r1": ["EQ:AAA"]}, [run])[("r1", "EQ:AAA")]
+    assert (row.regime, row.size_multiplier) == (None, None)
+
+
+def test_a_paused_pick_is_dropped_against_the_previous_run_and_filters_by_decision(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    write_gated(backend)
+    ctx = context(reader)
+    run = latest_run(ctx, "site", "alpha").run
+    assert run is not None
+    assert load_run_changes(ctx, run).by_instrument["EQ:BBB"] == ("dropped", "QUALIFIED")
+    page = load_result_page(ctx, run, ResultQuery(decisions=("paused",)))
+    assert page.total == 2
+    assert [(r.instrument_id, r.decision) for r in page.results] == [
+        ("EQ:BBB", "PAUSED"), ("EQ:DDD", "PAUSED")
+    ]  # fmt: skip

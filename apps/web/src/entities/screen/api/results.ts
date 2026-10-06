@@ -47,6 +47,8 @@ const ScreenerResults = graphql(`
         runId
         session
         previousSession
+        regime
+        paused
         decisions {
           decision
           count

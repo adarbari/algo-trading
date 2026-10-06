@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { regimeFixture } from './fixtures';
+import { regimeFixture, unknownRegimeFixture } from './fixtures';
 import {
   changedIndicators,
   indicatorChange,
@@ -9,7 +9,10 @@ import {
   plainLabel,
   readingList,
   regimeTone,
+  gateLine,
+  gatePauses,
   sizingLine,
+  storedLabel,
   toChartBands,
   type RegimeBand,
   type RegimeLabel,
@@ -109,15 +112,86 @@ describe('readingList', () => {
 });
 
 describe('sizingLine', () => {
-  it('says 100% and that the regime is not computed while it is UNKNOWN', () => {
-    expect(sizingLine(regimeFixture({ sizing: { label: 'UNKNOWN', multiplier: null } }))).toBe(
-      'New positions sized at 100% (regime not computed)',
+  it('says the size in force and who pauses where, from what the server sent', () => {
+    expect(sizingLine(regimeFixture())).toBe(
+      'New positions sized at 75% in Clouds building; Momentum pauses in Severe storm; VRP scanner pauses in Storm and Severe storm',
     );
   });
 
-  it('says the multiplier in force for a known label', () => {
-    expect(sizingLine(regimeFixture({ sizing: { label: 'CAUTION', multiplier: 0.75 } }))).toBe(
-      'New positions sized at 75% (clouds building)',
+  it('says the unknown size while the regime is not computed', () => {
+    expect(sizingLine(unknownRegimeFixture())).toBe(
+      'New positions sized at 0% (regime not computed); Momentum pauses in Severe storm; VRP scanner pauses in Storm and Severe storm',
     );
+  });
+
+  it('says the gate is off, and names no pause, when it is', () => {
+    const base = regimeFixture().sizing;
+    expect(sizingLine(regimeFixture({ sizing: { ...base, enabled: false } }))).toBe(
+      'New positions at full size (the regime gate is off)',
+    );
+  });
+
+  it('leaves out a screener whose gate is off or that pauses nowhere', () => {
+    const base = regimeFixture().sizing;
+    const sizing = {
+      ...base,
+      screeners: [
+        { screenerId: 'a', name: 'A', enabled: false, pauseIn: ['STRESS'] as const },
+        { screenerId: 'b', name: 'B', enabled: true, pauseIn: [] },
+      ],
+    };
+    expect(sizingLine(regimeFixture({ sizing }))).toBe(
+      'New positions sized at 75% in Clouds building',
+    );
+  });
+});
+
+describe('gateLine', () => {
+  const { sizing } = regimeFixture();
+
+  it('lists the labels the screen pauses in', () => {
+    expect(gateLine(sizing, 'vrp_scanner')).toBe('This screen pauses in Storm and Severe storm');
+    expect(gateLine(sizing, 'momentum')).toBe('This screen pauses in Severe storm');
+  });
+
+  it('says there is no gate for a screen that pauses nowhere or is not saved yet', () => {
+    expect(gateLine(sizing, 'quiet')).toBe('No regime gate');
+    expect(gateLine(sizing, 'unsaved')).toBe('No regime gate');
+    expect(
+      gateLine(
+        {
+          ...sizing,
+          screeners: [
+            {
+              screenerId: 'vrp_scanner',
+              name: 'VRP',
+              enabled: false,
+              pauseIn: ['STRESS'] as const,
+            },
+          ],
+        },
+        'vrp_scanner',
+      ),
+    ).toBe('No regime gate');
+  });
+});
+
+describe('storedLabel', () => {
+  it('accepts the four labels and nothing else', () => {
+    expect(storedLabel('STRESS')).toBe('STRESS');
+    expect(storedLabel('UNKNOWN')).toBeNull();
+    expect(storedLabel('SUNNY')).toBeNull();
+    expect(storedLabel(null)).toBeNull();
+    expect(storedLabel(undefined)).toBeNull();
+  });
+});
+
+describe('gatePauses', () => {
+  it('says what a screener does in words, and what a gate that is off is set to', () => {
+    const gate = { screenerId: 'a', name: 'A', enabled: true, pauseIn: ['STRESS'] as const };
+    expect(gatePauses(gate)).toBe('Pauses in Storm');
+    expect(gatePauses({ ...gate, pauseIn: [] })).toBe('Never pauses');
+    expect(gatePauses({ ...gate, enabled: false })).toBe('Gate off (set to pause in Storm)');
+    expect(gatePauses({ ...gate, enabled: false, pauseIn: [] })).toBe('Gate off');
   });
 });

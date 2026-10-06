@@ -48,13 +48,35 @@ export interface RegimeIndicator {
   changed: boolean | null;
 }
 
+/** A screener of the caller and the labels its picks are PAUSED in (calmest first). */
+export interface ScreenerGate {
+  screenerId: string;
+  name: string;
+  /** Its `[regime]` gate is on; off, nothing is paused. */
+  enabled: boolean;
+  pauseIn: readonly RegimeLabel[];
+}
+
+/** The sizing rule in force for the caller (`Query.regime.sizing`). */
+export interface RegimeSizing {
+  /** The session's label, and the size new positions get in it (null: UNKNOWN). */
+  label: RegimeLabel;
+  multiplier: number | null;
+  /** The gate is on; off, sizes are 100% and nothing pauses. */
+  enabled: boolean;
+  multipliers: readonly { label: RegimeLabel; multiplier: number }[];
+  /** The size when the label is not stored (the gate fails closed: 0 by default). */
+  unknownMultiplier: number;
+  screeners: readonly ScreenerGate[];
+}
+
 export interface Regime {
   session: string;
   label: RegimeLabel;
   headline: string;
   scores: { macroRisk: RegimeScore; marketStress: RegimeScore; fragility: RegimeScore };
   indicators: readonly RegimeIndicator[];
-  sizing: { label: RegimeLabel; multiplier: number | null };
+  sizing: RegimeSizing;
   /** Why the regime is not computed (UNKNOWN), else null. */
   unknownReason: RegimeUnknown | null;
 }
@@ -190,11 +212,71 @@ export function readingList(regime: Regime): readonly ReadingLink[] {
   return [...byUrl].map(([url, { title, cards }]) => ({ title, url, cards }));
 }
 
-/** The sizing line under the headline (RG4 gives real sizing; until then the site default). */
+const percent = (value: number): string => formatValue(value, { kind: 'percent', digits: 0 }).text;
+
+/** "Storm", "Storm and Severe storm", "Clouds building, Storm and Severe storm". */
+function labelList(labels: readonly RegimeLabel[]): string {
+  const words = labels.map(plainLabel);
+  const last = words.at(-1);
+  return words.length < 2 || last === undefined
+    ? words.join('')
+    : `${words.slice(0, -1).join(', ')} and ${last}`;
+}
+
+/** The screeners that pause in some label, as sentences ("VRP scanner pauses in Storm"). */
+function pauseSentences(sizing: RegimeSizing): string[] {
+  return sizing.screeners
+    .filter((s) => s.enabled && s.pauseIn.length > 0)
+    .map((s) => `${s.name} pauses in ${labelList(s.pauseIn)}`);
+}
+
+/**
+ * The sizing line under the headline: the size new positions get now (the multiplier of the
+ * session's label; the unknown size while the regime is not computed; 100% with the gate off)
+ * and which of the caller's screeners pause in which labels. Words only: every number and list
+ * is the server's.
+ */
 export function sizingLine(regime: Regime): string {
-  const { label, multiplier } = regime.sizing;
-  if (label === 'UNKNOWN' || multiplier === null) {
-    return 'New positions sized at 100% (regime not computed)';
+  const { sizing } = regime;
+  if (!sizing.enabled) return 'New positions at full size (the regime gate is off)';
+  const size =
+    sizing.label === 'UNKNOWN' || sizing.multiplier === null
+      ? `New positions sized at ${percent(sizing.unknownMultiplier)} (regime not computed)`
+      : `New positions sized at ${percent(sizing.multiplier)} in ${plainLabel(sizing.label)}`;
+  return [size, ...pauseSentences(sizing)].join('; ');
+}
+
+/**
+ * The Builder's one-line gate summary for screener `screenerId`: the labels its picks pause in
+ * ("This screen pauses in Storm and Severe storm"), else "No regime gate" (also for a screen
+ * the caller has not saved yet).
+ */
+export function gateLine(sizing: RegimeSizing, screenerId: string): string {
+  const gate = sizing.screeners.find((s) => s.screenerId === screenerId);
+  if (!gate?.enabled || gate.pauseIn.length === 0) return 'No regime gate';
+  return `This screen pauses in ${labelList(gate.pauseIn)}`;
+}
+
+/**
+ * One screener's gate in words: "Pauses in Storm", "Never pauses", or with its gate off
+ * "Gate off" (naming the labels it is set to pause in, for when it is turned on).
+ */
+export function gatePauses(gate: ScreenerGate): string {
+  if (!gate.enabled) {
+    return gate.pauseIn.length === 0
+      ? 'Gate off'
+      : `Gate off (set to pause in ${labelList(gate.pauseIn)})`;
   }
-  return `New positions sized at ${formatValue(multiplier, { kind: 'percent', digits: 0 }).text} (${plainLabel(label).toLowerCase()})`;
+  return gate.pauseIn.length === 0 ? 'Never pauses' : `Pauses in ${labelList(gate.pauseIn)}`;
+}
+
+const LABELS: readonly string[] = ['CALM', 'CAUTION', 'STRESS', 'CRISIS'];
+
+/** A run's stored label (a string) as a label, or null when it is not one of the four. */
+export function storedLabel(
+  value: string | null | undefined,
+): Exclude<RegimeLabel, 'UNKNOWN'> | null {
+  return value !== null && value !== undefined && LABELS.includes(value)
+    ? (value as Exclude<RegimeLabel, 'UNKNOWN'>)
+    : null;
 }

@@ -14,6 +14,14 @@ vi.mock('@/features/screener-builder', () => ({
   },
 }));
 vi.mock('@/widgets/draft-bar', () => ({ DraftBar: () => <Text>draft bar</Text> }));
+vi.mock('@/widgets/regime-gate', async () => {
+  const { Button } = await import('@algotrade/ui');
+  return {
+    RegimeGateLine: (props: { screenerId: string; onOpenRegime: () => void }) => (
+      <Button onClick={props.onOpenRegime}>{`gate ${props.screenerId}`}</Button>
+    ),
+  };
+});
 vi.mock('@/widgets/describe-screen', () => ({ DescribeScreen: () => <Text>describe</Text> }));
 vi.mock('@/widgets/criteria-table', () => ({ CriteriaTable: () => <Text>criteria</Text> }));
 vi.mock('@/widgets/screen-summary', () => ({ ScreenSummary: () => <Text>summary</Text> }));
@@ -36,11 +44,21 @@ vi.mock('@/widgets/feature-table', async () => {
 describe('ScreenerBuilderPage', () => {
   it('lays the Builder out around one provider and passes navigation through', async () => {
     const onOpenTicker = vi.fn();
-    render(<ScreenerBuilderPage id="my-vrp" onOpenTicker={onOpenTicker} onDeleted={vi.fn()} />);
+    const onOpenRegime = vi.fn();
+    render(
+      <ScreenerBuilderPage
+        id="my-vrp"
+        onOpenTicker={onOpenTicker}
+        onDeleted={vi.fn()}
+        onOpenRegime={onOpenRegime}
+      />,
+    );
     expect(probe.id).toBe('my-vrp');
     for (const text of ['draft bar', 'describe', 'criteria', 'summary', 'funnel'])
       expect(screen.getByText(text)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'open ticker' }));
     expect(onOpenTicker).toHaveBeenCalledWith('AAPL');
+    await userEvent.click(screen.getByRole('button', { name: 'gate my-vrp' }));
+    expect(onOpenRegime).toHaveBeenCalledOnce();
   });
 });

@@ -1,6 +1,7 @@
 /**
  * The top-ideas table's columns: rank, ticker, the screeners that picked it (by name; each
- * opens that screener's results), the best decision, score, the served facts for the session
+ * opens that screener's results), the best decision, score, the regime's size for it (when
+ * the run stamped one), the served facts for the session
  * (next earnings, else when the last one was; days to the nearest expiry, flagged when the
  * server says earnings come first; IV30), the screeners' stored display values (HV30, IV / HV
  * and the best put) and the watch-outs. A fact or display-value column appears only when some
@@ -226,6 +227,18 @@ const DECISION: DataTableColumn<Idea>[] = [
   },
 ];
 
+/** The size the regime gives a new position (the best pick's run stamped it): a column when some
+ * idea has one. */
+const SIZE: DataTableColumn<Idea> = {
+  id: 'size',
+  header: 'Size',
+  description:
+    "The share of the normal position size the regime allows for a new position (the best pick's run stamped it)",
+  value: (idea) => idea.sizeMultiplier,
+  format: { kind: 'percent', digits: 0 },
+  width: 'sm',
+};
+
 /** The columns for these ideas (the IV and display-value columns depend on what is served). */
 export function ideaColumns(
   ideas: readonly Idea[],
@@ -235,6 +248,7 @@ export function ideaColumns(
     ...FRONT,
     screenersColumn(onOpenScreener),
     ...DECISION,
+    ...(anyValue(ideas, (idea) => idea.sizeMultiplier) ? [SIZE] : []),
     earningsColumn,
     dteColumn,
     ...ivColumns(ideas),

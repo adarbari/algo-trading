@@ -5,7 +5,12 @@ listing every screener that picked it, ranked by the user's screener priority
 Each screener contributes its run for exactly ``ctx.session.date`` (``runs`` THE latest-run
 rule); one with no run for it is listed ``NOT_RUN`` and picks nothing (no lookback). Its
 ``picked`` count and best picks are over the whole run, not over the rows shown. Per-ticker
-facts (earnings, expiry, IV) are not here: the page asks ``Instrument.features(names)``."""
+facts (earnings, expiry, IV) are not here: the page asks ``Instrument.features(names)``.
+
+A pick the regime gate held back (``PAUSED``, ADR 0049) is no idea: it is listed apart in
+``Ideas.paused`` (one entry per screener and ticker, screener priority then rank, the first
+``limit``; ``paused_total`` counts them all) with the stored reason, so the page can show it
+and never hide it. An idea's ``regime`` and ``size_multiplier`` are those of its best pick."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -15,7 +20,13 @@ from typing import Any
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.identity import Instrument
 from algotrade.services.read.screens.results import ScreenResult, load_results
-from algotrade.services.read.screens.runs import ScreenerRun, is_picked, load_latest_runs, run_rows
+from algotrade.services.read.screens.runs import (
+    PAUSED,
+    ScreenerRun,
+    is_picked,
+    load_latest_runs,
+    run_rows,
+)
 from algotrade.services.read.screens.screeners import Screener, load_screeners
 from algotrade.services.read.values import Unknown, to_scalar
 
@@ -43,18 +54,33 @@ class Idea:
     instrument_id: str
     instrument: Instrument | None
     picks: tuple[ScreenResult, ...]
+    regime: str | None
+    size_multiplier: float | None
+
+
+@dataclass(frozen=True)
+class PausedIdea:
+    """A ticker one screener picked and the regime gate held back: that screener's ``PAUSED``
+    row (``result.reasons`` says why, ``result.regime`` the label)."""
+
+    instrument_id: str
+    instrument: Instrument | None
+    result: ScreenResult
 
 
 @dataclass(frozen=True)
 class Ideas:
     """``screeners``: the user's screeners in priority order, then the rest by id; ``total``:
-    every ticker picked (``items`` holds the first ``limit``)."""
+    every ticker picked (``items`` holds the first ``limit``); ``paused_total``: every pick the
+    gate held back (``paused`` holds the first ``limit``)."""
 
     session: date
     priority: tuple[str, ...]
     screeners: tuple[IdeaScreener, ...]
     total: int
     items: tuple[Idea, ...]
+    paused_total: int = 0
+    paused: tuple[PausedIdea, ...] = ()
 
 
 def screener_priority(ctx: ReadContext) -> tuple[str, ...]:
@@ -108,6 +134,17 @@ def _top(ctx: ReadContext, run: ScreenerRun) -> list[str]:
     return [str(i) for i in picked["instrument_id"].head(TOP_PER_SCREENER)]
 
 
+def _paused(ctx: ReadContext, runs: Sequence[ScreenerRun], limit: int) -> list[tuple[str, str]]:
+    """``(run id, instrument id)`` of the first ``limit`` PAUSED rows, runs in the order given
+    (the user's priority), each in rank order."""
+    out: list[tuple[str, str]] = []
+    for run in runs:
+        rows = run_rows(ctx, run)
+        held = rows[rows["decision"].astype(str) == PAUSED]
+        out.extend((run.run_id, str(i)) for i in held["instrument_id"])
+    return out[: max(limit, 0)]
+
+
 def load_ideas(ctx: ReadContext, limit: int) -> Ideas:
     """The ``limit`` best tickers over the user's screeners' runs for ``ctx.session``."""
     priority = screener_priority(ctx)
@@ -122,15 +159,24 @@ def load_ideas(ctx: ReadContext, limit: int) -> Ideas:
     for iid in shown:
         for _, run_id in candidates[iid]:
             wanted[run_id].append(iid)
+    held = _paused(ctx, runs, limit)
+    for run_id, iid in held:
+        wanted[run_id].append(iid)
     results = load_results(ctx, wanted, runs)
     items = tuple(
         Idea(
             rank=n,
             instrument_id=iid,
-            instrument=results[(candidates[iid][0][1], iid)].instrument,
+            instrument=(best := results[(candidates[iid][0][1], iid)]).instrument,
             picks=tuple(results[(run_id, iid)] for _, run_id in candidates[iid]),
+            regime=best.regime,
+            size_multiplier=best.size_multiplier,
         )
         for n, iid in enumerate(shown, start=1)
+    )
+    paused = tuple(
+        PausedIdea(iid, results[(run_id, iid)].instrument, results[(run_id, iid)])
+        for run_id, iid in held
     )
     listed = []
     for s in screeners:
@@ -138,4 +184,7 @@ def load_ideas(ctx: ReadContext, limit: int) -> Ideas:
         run = found.run
         top = () if run is None else tuple(results[(run.run_id, i)] for i in tops[run.run_id])
         listed.append(IdeaScreener(s, run, found.not_run, 0 if run is None else run.picked, top))
-    return Ideas(ctx.session.date, priority, tuple(listed), len(ranked), items)
+    paused_total = sum(r.paused for r in runs)
+    return Ideas(
+        ctx.session.date, priority, tuple(listed), len(ranked), items, paused_total, paused
+    )

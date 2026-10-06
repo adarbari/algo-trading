@@ -15,7 +15,14 @@ describe('IdeasHeading', () => {
   });
 
   it('names the session the ideas come from', async () => {
-    const data: IdeasData = { session: '2026-10-02', total: 0, ideas: [], screeners: [] };
+    const data: IdeasData = {
+      session: '2026-10-02',
+      total: 0,
+      ideas: [],
+      pausedTotal: 0,
+      paused: [],
+      screeners: [],
+    };
     hooks.useIdeas.mockReturnValue(fakeQuery<IdeasData>(data));
     const { container } = render(<IdeasHeading />);
     expect(screen.getByRole('heading', { level: 1, name: 'Ideas for Fri 2 Oct' })).toBeVisible();

@@ -16,16 +16,18 @@ from tests.helpers.api_store import as_user, store_over
 
 IDEAS = """query Ideas($limit: Int!, $names: [FeatureName!]!, $date: Date) {
   ideas(limit: $limit, date: $date) {
-    session priority total
+    session priority total pausedTotal
+    paused { instrumentId instrument { symbol }
+             result { configId decision reasons regime sizeMultiplier } }
     screeners {
       screener { id owner scope name version latestRun { runId } notRun { code } }
-      run { runId status configVersion picked decisions { decision count } }
+      run { runId status configVersion picked paused regime decisions { decision count } }
       notRun { code detail }
       picked
       top { rank instrumentId instrument { symbol } }
     }
     items {
-      rank instrumentId
+      rank instrumentId regime sizeMultiplier
       instrument { symbol features(names: $names) { name value unknown { code } } }
       picks {
         configId decision score reasons flags
@@ -50,8 +52,9 @@ def test_ideas_rank_the_runs_of_the_session_with_every_pick(graph: Graph) -> Non
     }  # fmt: skip
     run = screener["run"]
     assert (run["status"], run["configVersion"], run["picked"]) == ("complete", 1, 2)
+    assert (run["paused"], run["regime"]) == (1, "CAUTION")  # CCC: held back, not picked
     assert {d["decision"]: d["count"] for d in run["decisions"]} == {
-        "QUALIFIED": 1, "WATCH": 1, "REJECT": 1
+        "QUALIFIED": 1, "WATCH": 1, "PAUSED": 1
     }  # fmt: skip
     assert (screener["picked"], screener["notRun"]) == (2, None)
     assert [t["instrument"]["symbol"] for t in screener["top"]] == ["AAA", "BBB"]
@@ -65,6 +68,15 @@ def test_ideas_rank_the_runs_of_the_session_with_every_pick(graph: Graph) -> Non
         {"id": "iv30", "field": "feature.vrp_iv30", "outcome": "PASS", "value": 0.62,
          "distance": None}
     ]  # fmt: skip
+    assert (second["regime"], second["sizeMultiplier"]) == ("CAUTION", 0.75)
+    assert ideas["pausedTotal"] == 1
+    [held] = ideas["paused"]  # shown with its reason, never hidden
+    assert (held["instrumentId"], held["instrument"]["symbol"]) == ("EQ:CCC", "CCC")
+    assert held["result"] == {
+        "configId": "vrp_scanner", "decision": "PAUSED", "regime": "CAUTION",
+        "sizeMultiplier": 0.75,
+        "reasons": "regime=CAUTION: vrp_scanner pauses in CAUTION",
+    }  # fmt: skip
     earnings = {f["name"]: f for f in second["instrument"]["features"]}
     assert earnings[NAMES[0]]["value"] == "2022-12-01"
     assert first["picks"][0]["criteria"][0]["outcome"] == "NEAR"

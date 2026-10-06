@@ -20,12 +20,16 @@ export interface ScreenResultsQuery {
   size?: number | undefined;
 }
 
-/** The decisions a review opens on: every pick, not the rejects (about 11k rows of misses). */
+/**
+ * The decisions a review opens on: every pick and the picks the regime gate paused (never
+ * hidden), not the rejects (about 11k rows of misses).
+ */
 export const DEFAULT_DECISIONS: readonly string[] = [
   'QUALIFIED',
   'WATCH',
   'LIQUIDITY_RISK',
   'EVENT_RISK',
+  'PAUSED',
 ];
 
 /** The operation's variables (paging only when asked: the server's defaults). */
