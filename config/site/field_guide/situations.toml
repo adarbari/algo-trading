@@ -1,0 +1,47 @@
+# L3 site setting: the field guide (ADR 0041, amended 2026-10-06), one <theme>.toml per theme
+# plus situations.toml; loaded together by config/site/settings.py load_field_guide. Every
+# [[field]] says how to read one catalogue field, which criterion means what, and when the
+# reading lies; a [[situation]] is one state of the world that fools several thresholds at once.
+# The keys are documented in momentum.toml. Edit by PR; `make features-doc` renders the page.
+
+[[situation]]
+name = "pending takeover"
+signs = "One day up 15% to 40% (rollup.price_moves@v1.one_day_move), then a dead tape: feature.atr_pct under 0.005, rollup.price_stats@v2.hv20 under 0.10, feature.range_20d_pct tiny, rollup.iv_history@v2.iv30 collapsed and feature.iv_rank near 0, the close a few percent under a round number (the offer) for weeks. The merger-arbitrage spread of 2% to 3% that then shrinks toward 0 is all the price will do until the deal closes or breaks."
+affects = ["rollup.momentum@v1.rsi_14", "rollup.price_stats@v2.ret_20d", "rollup.price_stats@v2.ret_60d", "feature.pct_from_high_52w", "feature.near_52w", "feature.trend_state", "feature.breakout_20d", "feature.pullback_to_sma20", "feature.iv_rank", "feature.iv_percentile", "feature.iv_hv_ratio", "feature.atr_pct", "feature.range_20d_pct", "rollup.price_stats@v2.hv20"]
+do = "The catalogue has no deal flag yet (a planned feature). Until then every momentum, breakout, calm-name and cheap-options screen should carry feature.atr_pct gte 0.005 (soft) and treat a name whose one_day_move is most of its ret_20d as an event, not a trend."
+
+[[situation]]
+name = "earnings gap inside the window"
+signs = "rollup.earnings@v1.last_earnings_date within the last 20 to 30 sessions and rollup.price_moves@v1.one_day_move of 0.05 or more."
+affects = ["rollup.price_stats@v2.hv20", "rollup.price_stats@v2.hv30", "feature.iv_hv_spread", "feature.iv_hv_ratio", "rollup.price_stats@v2.ret_20d", "rollup.momentum@v1.rel_volume", "feature.breakout_20d", "feature.atr_pct", "rollup.momentum@v1.rsi_14"]
+do = "Realised volatility and the ATR are inflated by one day for the length of their window, so IV-over-HV premiums look thin and 'volatile' flags fire. After earnings a large move tends to continue (the post-earnings drift), which makes a post-earnings breakout more trustworthy than one on no news; a large move with no report behind it more often partly reverses. Prefer rollup.price_stats@v2.hv20_yz when comparing volatility across names."
+
+[[situation]]
+name = "recent listing, spin-off or long halt"
+signs = "instrument.listed_on or instrument.first_seen within the last year; rollup.price_stats@v2.history_days under 240; rollup.iv_history@v2.history_days under 60."
+affects = ["feature.pct_from_high_52w", "feature.pct_from_low_52w", "feature.near_52w", "feature.pct_vs_sma_200", "feature.trend_state", "feature.iv_rank", "feature.iv_percentile", "feature.revenue_growth_yoy", "feature.pe_ratio"]
+do = "These fields are null, and a null never passes a hard criterion (missing data never passes), so a screen with hard long-window criteria silently excludes every new name. Use soft or score for those criteria when new listings are wanted, or state instrument.listed_on explicitly."
+
+[[situation]]
+name = "leveraged or inverse fund"
+signs = "instrument.is_leveraged eq true or instrument.is_inverse eq true (instrument.leverage gives the multiple)."
+affects = ["feature.pct_vs_sma_20", "feature.pct_vs_sma_50", "feature.pct_vs_sma_200", "feature.trend_state", "rollup.price_stats@v2.ret_20d", "rollup.price_stats@v2.ret_60d", "feature.atr_pct", "rollup.price_stats@v2.hv20", "feature.pct_from_high_52w", "feature.pct_from_low_52w"]
+do = "Daily resetting funds drift from their index (volatility decay), so trend and momentum readings describe the fund's path, not the market, and an inverse fund in a 'downtrend' is a rising market. Exclude them from stock screens with instrument.is_leveraged eq false and instrument.is_inverse eq false; screen them deliberately or not at all."
+
+[[situation]]
+name = "low-priced or thin name"
+signs = "rollup.price_stats@v2.close under 5 or rollup.price_stats@v2.adv_usd_20d under 1000000."
+affects = ["feature.atr_pct", "rollup.momentum@v1.rsi_14", "rollup.momentum@v1.rel_volume", "rollup.price_moves@v1.one_day_move", "feature.breakout_20d", "rollup.price_stats@v2.hv20"]
+do = "Every volatility and momentum reading is inflated by the tick size, wide spreads and single orders: a 10% day, a 5x volume day and an RSI of 100 are noise here. Put a price floor and a dollar-volume gate first in every screen; the drafting examples do."
+
+[[situation]]
+name = "index and expiry days"
+signs = "A quarterly expiry Friday (third Friday of March, June, September, December), the Russell reconstitution (the last Friday of June), an S&P index change, a large ETF rebalance."
+affects = ["rollup.momentum@v1.rel_volume", "feature.breakout_20d", "feature.option_chain_volume"]
+do = "Volume is several times normal across the market with no information in it; a volume rule fires everywhere. Read a breakout or an unusual-volume screen from such a session with that in mind, or require the price condition on its own (the close above the prior high, rollup.momentum@v1.ret_5d) before trusting the volume."
+
+[[situation]]
+name = "a null is not a value"
+signs = "The field is often null by construction: feature.pe_ratio (loss makers, ADRs), feature.iv_rank (under 60 sessions of IV), the 52-week fields (under 240 bars), rollup.earnings@v1.days_to_earnings (no announced date, every ETF), feature.option_tier (a failed chain run)."
+affects = ["feature.pe_ratio", "feature.revenue_growth_yoy", "feature.iv_rank", "feature.iv_percentile", "feature.pct_from_high_52w", "feature.pct_from_low_52w", "rollup.earnings@v1.days_to_earnings", "feature.earnings_before_expiry", "feature.option_tier", "feature.market_cap"]
+do = "A null never passes a hard criterion and a soft one lists it as a near miss; so a hard 'pe_ratio lt 15' drops every unprofitable company and 'days_to_earnings gt 10' drops every ETF. Choose hard only when excluding the unknown is the intent; otherwise soft (listed with the reason) or score (ranked lower). 'not_null' is the explicit way to require the fact."

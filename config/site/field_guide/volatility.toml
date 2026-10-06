@@ -1,0 +1,217 @@
+# L3 site setting: the field guide (ADR 0041, amended 2026-10-06), one <theme>.toml per theme
+# plus situations.toml; loaded together by config/site/settings.py load_field_guide. Every
+# [[field]] says how to read one catalogue field, which criterion means what, and when the
+# reading lies; a [[situation]] is one state of the world that fools several thresholds at once.
+# The keys are documented in momentum.toml. Edit by PR; `make features-doc` renders the page.
+
+[[field]]
+name = "feature.atr_pct"
+theme = "volatility"
+reads = "Wilder's 14-day average true range as a share of price: the typical daily range. Under 0.015 is a calm large cap or a fund; 0.015 to 0.025 is a normal stock; 0.025 to 0.035 is a lively swing-trading range; 0.035 to 0.05 is volatile; above 0.05 is very volatile (small caps, biotech, crypto-linked names). A stop or a target is usually set in multiples of it (2 ATR is the Turtle stop)."
+caveats = [
+  "Near 0 for weeks after a takeover announcement: the price is pinned. Under 0.005 on a stock that is not a bond fund is that signature; see the 'pending takeover' situation.",
+  "One gap day raises the 14-day ATR for two weeks; a 'volatile' reading right after earnings is the event. Check rollup.price_moves@v1.one_day_move and rollup.earnings@v1.last_earnings_date.",
+  "Low-priced names show a high ratio partly because the tick is a large share of the price; gate on rollup.price_stats@v2.close.",
+  "Leveraged funds run at two or three times their index's range by construction; exclude with instrument.is_leveraged eq false unless that is the point.",
+]
+sources = [
+  "ATR-percent bands used by swing traders (under 2.5% stable, 2.5 to 3.5% normal, 3.5 to 4.5% volatile, over 5% very volatile): https://oneoption.com/?p=59457",
+  "Wilder (1978) for the ATR; the Turtle rules for ATR-sized stops",
+]
+[[field.use]]
+for = "moves enough to trade (swing range)"
+op = "gte"
+value = 0.02
+mode = "soft"
+tolerance = 0.005
+[[field.use]]
+for = "volatile"
+op = "gte"
+value = 0.03
+mode = "soft"
+tolerance = 0.005
+[[field.use]]
+for = "calm (premium selling, income)"
+op = "lte"
+value = 0.02
+mode = "soft"
+tolerance = 0.005
+note = "with feature.atr_pct gte 0.005 so pinned takeover targets do not pass as calm"
+
+[[field]]
+name = "feature.range_20d_pct"
+theme = "volatility"
+reads = "The height of the last 20 sessions' high-low channel as a share of price: 0.08 means the month's range was 8% of the price. Under about 0.06 for a stock is a tight consolidation (the volatility contraction that precedes many breakouts); above 0.25 is a wide, choppy month."
+caveats = [
+  "A pinned takeover target has the tightest range on the board; a tight range with feature.atr_pct under 0.005 is a deal, not a setup.",
+  "A tight range that includes a gap is two ranges; check rollup.price_moves@v1.one_day_move.",
+]
+sources = [
+  "Volatility contraction before breakouts (Minervini's VCP; Bollinger's squeeze) as practitioner conventions",
+]
+[[field.use]]
+for = "tight consolidation (a breakout setup)"
+op = "lte"
+value = 0.08
+mode = "soft"
+tolerance = 0.02
+note = "with feature.trend_state eq UPTREND and feature.atr_pct gte 0.01"
+
+[[field]]
+name = "rollup.price_stats@v2.hv20"
+theme = "volatility"
+reads = "Realised (historical) volatility over 20 sessions, annualised, as a fraction: 0.20 is 20% a year, the long-run average for a large-cap index is about 0.15 to 0.20, a typical single stock 0.25 to 0.40, a biotech or a meme name above 0.60. It is the denominator of every 'IV over HV' comparison (the 30-session version, hv30, is the one feature.iv_hv_ratio uses)."
+caveats = [
+  "Close-to-close volatility is dominated by one gap: a 15% earnings day alone puts hv20 near 0.50 for the next 20 sessions, then it drops out overnight. rollup.price_stats@v2.hv20_yz (Yang-Zhang, which weighs the overnight gap and the intraday range separately) is steadier; check rollup.earnings@v1.last_earnings_date.",
+  "Very low readings (under 0.10 on a stock) are a pinned takeover or a halted name, not a calm company.",
+  "Null after any missing bar in the window.",
+]
+sources = [
+  "Yang and Zhang (2000); why one gap day distorts close-to-close estimates: https://flashalpha.com/articles/yang-zhang-vs-close-to-close-realized-volatility",
+]
+[[field.use]]
+for = "a volatile name (realised)"
+op = "gte"
+value = 0.40
+mode = "soft"
+tolerance = 0.05
+[[field.use]]
+for = "a calm name (realised)"
+op = "lte"
+value = 0.25
+mode = "soft"
+tolerance = 0.05
+note = "with rollup.price_stats@v2.hv20 gte 0.08 so pinned names do not pass"
+
+[[field]]
+name = "rollup.iv_history@v2.iv30"
+theme = "volatility"
+reads = "Our 30-day at-the-money implied volatility as a fraction: 0.30 is 30% a year. It is the market's price of the next month's movement. Levels are relative to the name: 0.20 is high for a utility and low for a chip maker, so compare it with the name's own history (feature.iv_rank, feature.iv_percentile) and with realised movement (feature.iv_hv_spread) rather than against one number. Options are 'expensive' when IV is high versus both."
+caveats = [
+  "A report inside the next 30 days inflates it: the earnings move is priced in and IV collapses right after the report (20% to 60% of it in a session). Check rollup.earnings@v1.days_to_earnings before calling options expensive.",
+  "High IV with no earnings ahead usually means a known binary event the catalogue does not store (an FDA decision, a court ruling, a deal vote). It is not a free premium; treat it as EVENT_RISK.",
+  "IV collapses after a takeover announcement (the price will not move): a very low iv30 with feature.atr_pct near 0 is a deal, not cheap options.",
+  "Null when the session's chain gave no usable ATM quotes (rollup.iv30@v1.iv30_status says why).",
+]
+sources = [
+  "IV behaviour around earnings: https://optionalpha.com/learn/iv-crush and https://flashalpha.com/articles/complete-guide-trading-earnings-volatility",
+]
+[[field.use]]
+for = "high implied volatility (absolute)"
+op = "gte"
+value = 0.40
+mode = "soft"
+tolerance = 0.05
+note = "prefer feature.iv_rank gte 0.5 (relative to the name's own year)"
+[[field.use]]
+for = "low implied volatility (absolute)"
+op = "lte"
+value = 0.25
+mode = "soft"
+tolerance = 0.05
+note = "with feature.atr_pct gte 0.005; prefer feature.iv_rank lte 0.3"
+
+[[field]]
+name = "feature.iv_rank"
+theme = "volatility"
+reads = "Where today's IV30 sits between the lowest and highest IV30 of the last 252 sessions, 0 to 1: 0.5 is halfway up the year's range, 0.8 is near the year's high. The premium-selling convention is above 0.5 (IV is high for this name), premium buying below 0.3. The source is IBKR's history where it has one, else ours (feature.iv_rank_source says which)."
+caveats = [
+  "One spike (a market crash, one wild earnings) sets the year's maximum and squashes every later reading toward 0 for 252 sessions: a rank of 0.3 can be a normal IV after an abnormal year. feature.iv_percentile (the share of days below today) is not distorted by a single day; when the two disagree, trust the percentile.",
+  "A report in the next ten sessions lifts the rank by itself; a high rank with rollup.earnings@v1.days_to_earnings under 10 is the earnings premium, which disappears after the report.",
+  "After a takeover announcement IV collapses and the rank goes to 0 and stays there: 'cheap options' on a name that will not move. Check feature.atr_pct.",
+  "Null under 60 sessions of IV history (new listings, newly optionable names) and when every IV in the window is equal; a hard criterion rejects them.",
+]
+sources = [
+  "IV rank versus IV percentile, and the 50 / 30 convention: https://flashalpha.com/articles/iv-rank-vs-iv-percentile-difference-which-matters",
+  "tastylive on IV rank for premium selling",
+]
+[[field.use]]
+for = "options expensive for this name (sell premium)"
+op = "gte"
+value = 0.5
+mode = "soft"
+tolerance = 0.1
+note = "add rollup.earnings@v1.days_to_earnings gt 10 (soft, EVENT_RISK) and feature.iv_hv_spread gte 0.05"
+[[field.use]]
+for = "options cheap for this name (buy premium)"
+op = "lte"
+value = 0.3
+mode = "soft"
+tolerance = 0.1
+note = "with feature.atr_pct gte 0.01 so pinned names are out"
+
+[[field]]
+name = "feature.iv_percentile"
+theme = "volatility"
+reads = "The share of the last 252 sessions whose IV30 was below today's, 0 to 1: 0.9 means IV was lower on 90% of days this year. It answers the same question as feature.iv_rank but counts days instead of measuring the span, so one extreme day cannot squash it; it is the more robust of the two for premium selling."
+caveats = [
+  "The earnings and takeover caveats of feature.iv_rank apply unchanged.",
+  "A percentile near 1 after a long calm stretch can be a modest IV (every earlier day was lower, but not by much); read the level too (rollup.iv_history@v2.iv30).",
+]
+sources = ["https://flashalpha.com/articles/iv-rank-vs-iv-percentile-difference-which-matters"]
+[[field.use]]
+for = "IV high for the name (robust)"
+op = "gte"
+value = 0.7
+mode = "soft"
+tolerance = 0.1
+[[field.use]]
+for = "IV low for the name (robust)"
+op = "lte"
+value = 0.3
+mode = "soft"
+tolerance = 0.1
+
+[[field]]
+name = "feature.iv_hv_spread"
+theme = "volatility"
+reads = "IV30 minus HV30, in volatility points as a fraction: 0.05 means options price 5 points more movement than the stock delivered last month. Across markets implied volatility exceeds realised by about 3 to 4 points on average (the variance risk premium, Carr and Wu 2009), so a spread near 0.04 is just the normal insurance premium; 0.08 and above is a rich one, and a negative spread means the stock moved more than its options expected."
+caveats = [
+  "A report inside 30 days inflates IV and the spread with it; the premium is the earnings move, not free. Check rollup.earnings@v1.days_to_earnings.",
+  "A quiet month depresses HV30 and widens the spread; after a report drops out of the HV window the spread jumps with no change in IV. Check rollup.price_moves@v1.one_day_move and rollup.earnings@v1.last_earnings_date.",
+  "A report inside the HV window (the last 30 sessions) inflates HV and hides a real premium: the spread looks negative while the forward month is calm.",
+  "Null without an IV for the session or with a gap in the last 31 bars.",
+]
+sources = [
+  "Carr and Wu (2009), Variance risk premiums, Review of Financial Studies: implied exceeds realised by 3 to 4 points on average",
+  "IV minus HV as a premium-selling signal: https://www.optionsanalysissuite.com/screeners/highest-vrp",
+]
+[[field.use]]
+for = "a volatility premium worth selling"
+op = "gte"
+value = 0.05
+mode = "soft"
+tolerance = 0.02
+note = "with feature.iv_hv_ratio gte 1.2 (both: a spread of 0.05 on a 0.10 HV is a ratio of 1.5, on a 0.60 HV it is noise)"
+[[field.use]]
+for = "options cheaper than the stock's movement (buy premium)"
+op = "lte"
+value = 0
+mode = "soft"
+tolerance = 0.02
+
+[[field]]
+name = "feature.iv_hv_ratio"
+theme = "volatility"
+reads = "IV30 over HV30: 1 means options price exactly last month's movement, 1.2 means 20% more, 0.8 means less. Around 1.1 to 1.2 is the normal premium; 1.5 and above is rich; under 1 the market expects calmer times than the last month delivered (often right after a shock)."
+caveats = [
+  "The ratio explodes when HV30 is tiny: a pinned takeover target with HV 0.03 and IV 0.10 shows 3.3, the richest 'premium' on the board and the worst trade. Require rollup.price_stats@v2.hv30 gte 0.10 or feature.atr_pct gte 0.01, and read feature.iv_hv_spread alongside.",
+  "A report inside the HV window compresses the ratio (HV inflated), a report ahead inflates it (IV inflated); check rollup.earnings@v1.days_to_earnings and last_earnings_date.",
+  "The VRP scanner's version, feature.vrp_iv_hv_ratio, uses the lower of IBKR's and Cboe's IV30 (a conservative premium); this one uses our Cboe-derived IV30 only.",
+]
+sources = [
+  "Carr and Wu (2009); practitioner IV/HV screens: https://www.optionsanalysissuite.com/documentation/iv-hv-history",
+]
+[[field.use]]
+for = "a volatility premium worth selling"
+op = "gte"
+value = 1.2
+mode = "soft"
+tolerance = 0.1
+note = "with feature.iv_hv_spread gte 0.05 and rollup.price_stats@v2.hv30 gte 0.10"
+[[field.use]]
+for = "options cheaper than realised (buy premium)"
+op = "lte"
+value = 0.9
+mode = "soft"
+tolerance = 0.1

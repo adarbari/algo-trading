@@ -1,0 +1,119 @@
+# L3 site setting: the field guide (ADR 0041, amended 2026-10-06), one <theme>.toml per theme
+# plus situations.toml; loaded together by config/site/settings.py load_field_guide. Every
+# [[field]] says how to read one catalogue field, which criterion means what, and when the
+# reading lies; a [[situation]] is one state of the world that fools several thresholds at once.
+# The keys are documented in momentum.toml. Edit by PR; `make features-doc` renders the page.
+
+[[field]]
+name = "rollup.price_stats@v2.adv_usd_20d"
+theme = "liquidity"
+reads = "Average dollars traded a day over 20 sessions (close times volume). The usual sizing rule is to hold no more than 1% to 2% of a day's volume, so the threshold follows from the position: a $50,000 position wants about $5M a day, $500,000 wants $50M. $5M is 'some volume', $50M is liquid, $100M and above is very liquid; under $1M a day is where spreads and slippage dominate any edge."
+caveats = [
+  "An ETF's on-screen volume understates its liquidity: market makers create and redeem shares, so a fund with thin volume can still absorb a large order if its holdings are liquid. For funds (instrument.is_etf eq true) a low ADV is not disqualifying by itself.",
+  "One event day (earnings, an index inclusion) lifts a 20-day average for 20 sessions; a name just over a threshold may be thinner than it looks. Check rollup.momentum@v1.rel_volume history through rollup.price_moves@v1.one_day_move.",
+  "Dollar volume, not shares: a $2 stock trading 10M shares is $20M a day, the same as a $200 stock trading 100k shares, and the $2 one has a far wider spread. Pair with rollup.price_stats@v2.close.",
+]
+sources = [
+  "The 1% to 2% of ADV sizing rule: https://daytradingtoolkit.com/dictionary/liquidity",
+  "Position-level liquidity (days to exit, share of daily volume): https://www.alphatheory.com/blog/managing-portfolio-liquidity-position-level-calculation",
+]
+[[field.use]]
+for = "liquid (a $500k position)"
+op = "gte"
+value = 50000000
+mode = "soft"
+tolerance = { relative = 0.2 }
+on_miss = "LIQUIDITY_RISK"
+note = "'very liquid' 100000000; 'some volume' 5000000; or feature.liquidity_class in [HIGH, MEDIUM]"
+[[field.use]]
+for = "tradable at all (a small account)"
+op = "gte"
+value = 5000000
+mode = "soft"
+tolerance = { relative = 0.2 }
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.price_stats@v2.close"
+theme = "liquidity"
+reads = "The session's closing price in dollars. Under $5 is 'penny' territory (many brokers and funds exclude it; the tick is a large share of the price); under $10 spreads and ATR as a share of price are elevated; a price floor is almost always a hard gate."
+caveats = [
+  "A high price is not 'expensive' and a low price is not 'cheap'; valuation is feature.pe_ratio and size is feature.market_cap.",
+  "Split-adjusted history: a stock that reverse-split 1:10 last month shows a continuous series and a 'high' price with the same thin market it had before.",
+]
+sources = ["Broker and index conventions (the $5 penny-stock line)"]
+[[field.use]]
+for = "a price floor"
+op = "gt"
+value = 10
+mode = "hard"
+note = "5 for a looser floor; 'penny stocks' is close lt 5"
+
+[[field]]
+name = "feature.liquidity_class"
+theme = "liquidity"
+reads = "HIGH when every HIGH threshold holds ($100M a day, close at least $10, option tier A, chain open interest 50k and volume 5k), MEDIUM when every MEDIUM one does ($10M, $5, tier A or B, open interest 5k), else LOW; UNKNOWN when an input is missing. A composite for stock plus options liquidity in one word."
+caveats = [
+  "It bundles option liquidity: a very liquid stock with no options is LOW. For a stock-only screen use rollup.price_stats@v2.adv_usd_20d instead.",
+  "UNKNOWN, not LOW, when the chain run did not cover the session; a hard 'in [HIGH, MEDIUM]' rejects those names on a day the chains failed.",
+]
+sources = ["Site thresholds (config/site/features/liquidity.toml)"]
+[[field.use]]
+for = "liquid stock and options"
+op = "in"
+value = ["HIGH", "MEDIUM"]
+mode = "hard"
+
+[[field]]
+name = "feature.option_tier"
+theme = "liquidity"
+reads = "The worse of the put and call liquidity tiers at the target expiry, A (tight, deep) to D (no usable options). A and B are tradable for a retail account; C fills badly; D has no usable series. The tiers come from the near-the-money spread as a share of the mid, open interest and volume."
+caveats = [
+  "Graded at the target expiry (30 to 45 days); a weekly or a far LEAPS series can be worse. For a specific expiry read rollup.option_liquidity@v1.put_spread_pct and call_spread_pct.",
+  "Null when the session's chain run failed for the name (STALE_DATA, FETCH_ERROR), which is not the same as D; a hard criterion rejects it that day.",
+]
+sources = [
+  "Options liquidity checklist (volume, open interest, spread, size): https://www.tastylive.com/concepts-strategies/options-liquidity",
+  "Spread as a share of the premium (a $0.20 spread on a $2 option is 10% round trip): https://www.thetaedge.ai/blog/assess-liquidity-trading-options",
+]
+[[field.use]]
+for = "tradable options"
+op = "in"
+value = ["A", "B"]
+mode = "hard"
+note = "add instrument.optionable eq true; A alone for 'tight spreads'"
+
+[[field]]
+name = "feature.option_chain_oi"
+theme = "liquidity"
+reads = "Open interest summed over the chain: contracts outstanding. Thousands is a thin chain, tens of thousands is tradable, hundreds of thousands and above is an index-like chain. It measures depth for exiting a position; a strike you trade can still be empty, so it is a gate, not a guarantee."
+caveats = [
+  "0 when the session's chain run did not list the name (no options), null when the run failed; the two differ.",
+  "Open interest piles up at a few strikes and expiries; the chain total says little about the strike you want. Check rollup.option_liquidity@v1.put_strike_oi for the target strike.",
+]
+sources = ["https://www.tastylive.com/concepts-strategies/options-liquidity"]
+[[field.use]]
+for = "a chain with depth"
+op = "gte"
+value = 10000
+mode = "soft"
+tolerance = { relative = 0.3 }
+on_miss = "LIQUIDITY_RISK"
+note = "50000 for 'deep'; the site's HIGH class uses 50000, MEDIUM 5000"
+
+[[field]]
+name = "feature.option_chain_volume"
+theme = "liquidity"
+reads = "Contracts traded across the chain on the session. Hundreds is quiet, a few thousand is active, tens of thousands is heavy. Volume is one day's activity, open interest the standing depth; both low means fills at the market maker's price."
+caveats = [
+  "An earnings week or an expiry Friday multiplies option volume; check rollup.earnings@v1.days_to_earnings before reading a spike as unusual activity.",
+  "0 when the run did not list the name, null when it failed.",
+]
+sources = ["https://www.tastylive.com/concepts-strategies/options-liquidity"]
+[[field.use]]
+for = "active options"
+op = "gte"
+value = 1000
+mode = "soft"
+tolerance = { relative = 0.3 }
+on_miss = "LIQUIDITY_RISK"
