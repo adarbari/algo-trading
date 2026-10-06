@@ -11,7 +11,8 @@ The cards' signals are ``regime_indicators@v1``'s verdicts; the others are thres
   macro risk high:
 
   - early (leads a recession bear's peak by 6 to 24 months, measured on the 1971-2026 store):
-    the curve (10y - 3m inverted on at least ``curve_inverted_days`` of the last 252 sessions:
+    the curve (10y - 3m inverted on at least ``curve_inverted_days`` of the last
+    ``macro.CURVE_SESSIONS`` sessions, ``regime_indicators@v1``'s ``curve_min_inverted_days``:
     a month of inversion in the last year, so the warning outlasts the un-inversion that
     usually comes a few months before the peak), Fed hikes, permits and inflation;
   - confirming (moves with the downturn): credit (the high-yield card's verdict, else, when
@@ -103,7 +104,7 @@ class Params:
     w_permits: float = 5.0
     w_fed: float = 5.0
     w_inflation: float = 5.0
-    curve_inverted_days: int = 21  # curve: inverted on this many of the last 252 sessions
+    curve_inverted_days: int = 21  # curve: inverted on this many of macro.CURVE_SESSIONS
     claims_at_least: float = 1.15  # 4-week claims 15% or more above their 52-week low
     sloos_above: float = 0.20  # more than 20% of banks tightening
     permits_at_most: float = -0.20  # permits down 20% or more on the year
@@ -134,9 +135,10 @@ class Params:
             raise ValueError("hold_sessions and changed_sessions must be >= 1")
         if not 0.0 <= self.min_coverage <= 1.0:
             raise ValueError(f"min_coverage must be in [0, 1], got {self.min_coverage}")
-        if not 1 <= self.curve_inverted_days <= 252:
+        if not 1 <= self.curve_inverted_days <= macro.CURVE_SESSIONS:
             raise ValueError(
-                f"curve_inverted_days must be in [1, 252], got {self.curve_inverted_days}"
+                f"curve_inverted_days must be in [1, {macro.CURVE_SESSIONS}], "
+                f"got {self.curve_inverted_days}"
             )
         weights = [f.name for f in fields(self) if f.name.startswith("w_")]
         if any(getattr(self, w) < 0 for w in weights):
@@ -276,16 +278,20 @@ def tiers(v: Values, p: Params) -> tuple[float, float]:
     return early, confirming
 
 
-def macro_risk(early: float, confirming: float) -> float:
-    """The higher known tier; NaN when neither is known."""
+def macro_risk(
+    early: float, confirming: float, coverage: float = 1.0, min_coverage: float = 0.0
+) -> float:
+    """The higher known tier; NaN when neither is known, or when less than ``min_coverage`` of
+    the whole macro weight is known (``coverage``), so one known tier never reads a calm
+    macro score while most of the weight is unknown."""
     known = [x for x in (early, confirming) if not np.isnan(x)]
-    return max(known) if known else np.nan
+    return max(known) if known and coverage >= min_coverage else np.nan
 
 
 def raw_label(v: Values, p: Params) -> str | None:
     """The session's label before hysteresis, from the covered-weight scores; ``None`` when a
     score's coverage is too low."""
-    macro = macro_risk(*tiers(v, p))
+    macro = macro_risk(*tiers(v, p), score(v, p, "macro").coverage, p.min_coverage)
     stress = score(v, p, "market").scaled(p.min_coverage)
     if np.isnan(macro) or np.isnan(stress):
         return None
@@ -314,7 +320,7 @@ def compute(inputs: Inputs, session: date, params: Params) -> pd.DataFrame:
         "instrument_id": market_id("US"),
         "label": label,
         "raw_label": raws[session],
-        "macro_risk": macro_risk(early, confirming),
+        "macro_risk": macro_risk(early, confirming, m.coverage, p.min_coverage),
         "market_stress": k.scaled(p.min_coverage),
         "macro_early": early,
         "macro_confirming": confirming,
@@ -359,9 +365,16 @@ def _scaled(name: str, which: Score, words: str, tier: Tier | None = None) -> Fe
 _MACRO = Feature(
     "macro_risk", "float32", "pct_points", "Slow macro recession risk: the higher of macro_early "
     "and macro_confirming, 0 to 100, so either tier alone can make it high (a tier that is "
-    "unknown is left out)", "both tiers are unknown (less than min_coverage of each tier's "
-    "weight is known)", valid_range=(0, 100), inputs=_reads("macro"),
+    "unknown is left out)", f"less than min_coverage ({D.min_coverage:g}) of the whole macro "
+    "weight is known, or of each tier's", valid_range=(0, 100), inputs=_reads("macro"),
 )  # fmt: skip
+
+
+_COVERAGE = {
+    "macro": "Share of the macro score's whole weight (both tiers) whose signals are known "
+    f"(below min_coverage, {D.min_coverage:g}: macro_risk and the label are unknown, whichever "
+    "tier is known)"
+}
 
 
 def _score(name: str, which: Score, words: str) -> tuple[Feature, ...]:
@@ -372,8 +385,9 @@ def _score(name: str, which: Score, words: str) -> tuple[Feature, ...]:
                 "its signals that are on, 0 to 100, an unknown signal adding 0 (the scale of "
                 "regime@v1)", "never: an unknown signal adds 0 (see the coverage)",
                 valid_range=(0, 100), inputs=reads),
-        Feature(f"{which}_coverage", "float32", "decimal", f"Share of {name}'s weight whose "
-                "signals are known (below min_coverage, 0.5: no label)", "never",
+        Feature(f"{which}_coverage", "float32", "decimal", _COVERAGE.get(which, f"Share of "
+                f"{name}'s weight whose signals are known (below min_coverage, "
+                f"{D.min_coverage:g}: {name} and the label are unknown)"), "never",
                 valid_range=(0, 1), inputs=reads),
         Feature(f"{which}_missing", "int", "count", f"How many of {name}'s signals are "
                 "unknown (an input is null)", "never", valid_range=(0, 20), inputs=reads),
@@ -397,7 +411,8 @@ FEATURES = (
     *_score("macro_risk", "macro", "Slow macro recession risk"),
     _scaled("macro_early", "macro", "The macro score's early tier (leads a recession bear's peak "
             "by months: the curve inverted on at least "
-            f"{D.curve_inverted_days} of the last 252 sessions, Fed hikes, permits, inflation)",
+            f"{D.curve_inverted_days} of the last {macro.CURVE_SESSIONS} sessions, Fed hikes, "
+            "permits, inflation)",
             "early"),
     _scaled("macro_confirming", "macro", "The macro score's confirming tier (moves with the "
             "downturn: credit, labour, financial conditions, lending standards)", "confirming"),

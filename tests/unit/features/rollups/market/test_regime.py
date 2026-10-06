@@ -7,11 +7,13 @@ the nightly, deterministic run after run."""
 
 from collections.abc import Mapping
 from datetime import date
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
+from algotrade.config.site.settings import load_rollup
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.framework.runner import compute_in_memory, compute_one
 from algotrade.features.rollups.market import cross_asset, indicators, macro, regime, trend
@@ -23,6 +25,7 @@ from algotrade.features.rollups.market.regime import (
     score,
     tiers,
 )
+from algotrade.storage.configs.files import FileConfigStore
 from tests.helpers.rollup_store import END, store, write_rows
 
 P = Params()
@@ -153,6 +156,30 @@ def test_a_tier_below_its_coverage_floor_is_left_out() -> None:
     assert raw_label({**no_curve, "hy_oas_on": True, "nfci_on": True, "sahm_on": True}, P) == (
         "CAUTION"
     )
+
+
+def test_one_known_tier_never_reads_calm_with_most_of_the_macro_weight_unknown() -> None:
+    """The curve known and off, every other macro signal unknown: the early tier is known (20
+    of 35) and reads 0, but only 20 of the macro score's 100 is known, below min_coverage:
+    macro risk and the label are unknown, never CALM."""
+    market = {*cross_asset.GROUP.columns, *trend.GROUP.columns, *SHOCK}
+    curve_only = {k: v for k, v in CALM.items() if k in market} | {"curve_inverted_days_252d": 0}
+    assert tiers(curve_only, P)[0] == 0.0 and score(curve_only, P, "macro").coverage == 0.2
+    assert raw_label(curve_only, P) is None
+    assert np.isnan(macro_risk(0.0, np.nan, 0.2, P.min_coverage))
+    row = regime.compute(frames(dict.fromkeys(sessions_ending(END, 10), curve_only)), END, P)
+    assert pd.isna(row.iloc[0]["macro_risk"]) and row.iloc[0]["macro_early"] == 0.0
+    assert row.iloc[0]["label"] is None
+
+
+def test_the_curve_memory_is_the_curve_cards_month() -> None:
+    """One threshold in two groups' params: the tier's curve_inverted_days equals the card's
+    curve_min_inverted_days, by default and in the site's rollups.toml."""
+    assert P.curve_inverted_days == indicators.Params().curve_min_inverted_days
+    site = FileConfigStore(Path(__file__).resolve().parents[5] / "config")
+    tier = load_rollup(site, regime.GROUP.key, regime.GROUP.params).curve_inverted_days
+    card = load_rollup(site, indicators.GROUP.key, indicators.GROUP.params)
+    assert tier == card.curve_min_inverted_days
 
 
 def test_weights_must_sum_to_100() -> None:

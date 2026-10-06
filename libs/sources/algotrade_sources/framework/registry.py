@@ -73,6 +73,7 @@ from algotrade_sources.vendors.sec.nport_holdings import NportHoldings
 from algotrade_sources.vendors.sec.submissions import SecFilings
 from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource
+from algotrade_sources.vendors.tiingo.prices import TiingoDailyPrices
 from algotrade_sources.vendors.treasury.par_yields import TreasuryParYields
 
 type Env = Callable[[str], str | None]  # variable name -> value (``env.credential``)
@@ -189,6 +190,11 @@ def _bearer(key: str | None) -> dict[str, str]:
     return {"Authorization": f"Bearer {key}"}  # in a header, never in URLs or logs
 
 
+def _token(key: str | None) -> dict[str, str]:
+    """Tiingo: ``Authorization: Token <key>`` (in a header, never in URLs or logs)."""
+    return {"Authorization": f"Token {key}", "Content-Type": "application/json"}
+
+
 def _sec_agent(contact: str | None) -> dict[str, str]:
     return {"User-Agent": user_agent(str(contact))}
 
@@ -264,6 +270,17 @@ SOURCES: dict[str, SourceSpec] = {
             tries=4,
             query_param="api_key",
             options=_fred_options,
+        ),
+        SourceSpec(
+            "tiingo_prices",
+            "tiingo",
+            "tiingo",
+            TiingoDailyPrices,
+            72.0,  # free tier: 50 requests an hour
+            env_names.TIINGO_API_KEY,
+            "create a free Tiingo account (tiingo.com) and add the key to .env",
+            _token,
+            tries=4,
         ),
         SourceSpec("published", "published", "published", PublishedSeries, 1.0),
     )

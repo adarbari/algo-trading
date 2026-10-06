@@ -19,7 +19,9 @@ from algotrade.services.read.regime.regime import MarketRegime
 FACTS = """\
 The market's weather: Storm. 1 of 1 slow-moving warning signs are on. The fast signs are quiet. 1 changed in the last 5 sessions.
 Scores:
-- Slow-warning score (macro risk, moves over weeks): 62 out of 100
+- Slow-warning score (macro risk, moves over weeks; the higher of its two parts): 62 out of 100
+- Slow-warning score, early part (yield curve inverted for a month within the last year, Fed hikes, building permits, inflation): 62 out of 100
+- Slow-warning score, confirming part (credit spreads, jobs, financial conditions, bank lending): 20 out of 100
 - Market stress score (trend, volatility, breadth, moves daily): 71 out of 100
 - Fragility (context only: how deep a fall from here could be): not available
 Warning signs that are on or changed:

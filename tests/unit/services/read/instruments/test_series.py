@@ -3,6 +3,7 @@ and expression features, in the order asked, ``None`` where a session has no val
 outside the catalogue and instrument facts are request errors."""
 
 from datetime import date
+from typing import Any
 
 import pytest
 
@@ -43,3 +44,18 @@ def test_unknown_names_and_instrument_facts_are_refused() -> None:
         load_series(ctx, ["EQ:AAA"], ["instrument.sector"], D0)
     with pytest.raises(ConfigurationError, match="after the session"):
         load_series(context(store_with(), D0), ["EQ:AAA"], [CLOSE], D0, D1)
+
+
+def test_instrument_frames_are_not_cached(monkeypatch: pytest.MonkeyPatch) -> None:
+    ctx = context(store_with())
+    reads: list[str] = []
+    original = ctx.reader.table_range
+
+    def spy(table: str, *args: Any, **kwargs: Any) -> Any:
+        reads.append(table)
+        return original(table, *args, **kwargs)
+
+    monkeypatch.setattr(ctx.reader, "table_range", spy)
+    for _ in range(2):  # batches of instruments must not evict the session's entries
+        load_series(ctx, ["EQ:AAA"], [CLOSE], D0)
+    assert len(reads) == 2 and not [k for k in ctx.cache._items if k[0] == "series-frame"]

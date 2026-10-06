@@ -64,7 +64,7 @@ class ResultCache:
     feature's formula) also ``catalogue_key(ctx)``, so an edited feature never hits a stale
     entry; stored rows of a named run (the run names its owner) and market data need not."""
 
-    def __init__(self, size: int = 8) -> None:
+    def __init__(self, size: int = 32) -> None:
         self._size = size
         self._items: OrderedDict[Hashable, Any] = OrderedDict()
         self._lock = threading.Lock()

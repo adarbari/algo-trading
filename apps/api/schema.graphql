@@ -115,6 +115,26 @@ type DecisionCount {
   count: Int!
 }
 
+"""
+One reference market drawdown, with its plain `name`. `recovered`: the session the S&P 500 regained its peak, null while the session did not know it yet; `recession` / `nberStart` / `nberEnd`: the NBER recession months (first days) it overlapped, shown only once NBER had announced them (`kind` reads `shock` until the peak is announced; `nberEnd` is null until the trough is). Listed from `knownFrom` (its trough)
+"""
+type Episode {
+  key: String!
+  name: String!
+  kind: String!
+  peak: Date!
+  trough: Date!
+  recovered: Date
+  spxDrawdown: Float!
+  nasdaqDrawdown: Float!
+  recession: Boolean!
+  nberStart: Date
+  nberEnd: Date
+  cause: String!
+  notes: String!
+  knownFrom: Date!
+}
+
 """The portfolio after one bar: equity and gross exposure"""
 type EquityPoint {
   ts: String!
@@ -271,6 +291,21 @@ type GuideUse {
   tolerance: JSON
   onMiss: String
   note: String!
+}
+
+"""One point of a numeric history; `value` null is a gap"""
+type HistoryPoint {
+  session: Date!
+  value: Float
+}
+
+"""
+Consecutive sessions `start..end` (the first and last of the run) with one `value`: ON / OFF / UNKNOWN for a flag, the label text for a label, UNKNOWN where nothing is stored
+"""
+type HistorySegment {
+  start: Date!
+  end: Date!
+  value: String!
 }
 
 """
@@ -461,6 +496,11 @@ type Market {
   The values of `names` (market catalogue fields: `market.<group>@v<N>.<column>`, or a `feature.<name>` over them; in the order asked) for the session; a name outside the market's catalogue is an UNKNOWN_FEATURE error
   """
   features(names: [String!]!): [FeatureValue!]!
+
+  """
+  The history of `names` (stored market fields only: `market.<group>@v<N>.<column>`; a `feature.*` name is a BAD_REQUEST, it would be computed for thousands of sessions) over the exchange sessions of `start..end` (`end` is cut to the session's date), each session from its own partition: one with no stored row is a gap, never carried forward. Numbers come as at most `points` points (2 to 5000); flags and labels as `segments`
+  """
+  history(names: [String!]!, start: Date!, end: Date!, points: Int! = 600): [SeriesHistory!]!
 }
 
 """
@@ -480,6 +520,16 @@ type MarketRegime {
   The regime label of every exchange session of `start..end` (`end` on or before the session's date), consecutive equal labels merged into bands, oldest first; a session with no stored label is an UNKNOWN band
   """
   bands(start: Date!, end: Date!): [RegimeBand!]!
+
+  """
+  The reference drawdowns the session knows (those whose trough has come), oldest first
+  """
+  episodes: [Episode!]!
+
+  """
+  The NBER recessions since 1969 the session knows (listed from the day the committee dated the peak), oldest first
+  """
+  recessions: [Recession!]!
 }
 
 """
@@ -834,6 +884,16 @@ type Query {
 }
 
 """
+One NBER recession as the session knew it: `start` / `end` are the first days of its peak and trough months; `end` is null while the committee had not yet dated its end, and the announcement dates are null where none was published or it is not past
+"""
+type Recession {
+  start: Date!
+  end: Date
+  announcedStart: Date
+  announcedEnd: Date
+}
+
+"""
 Consecutive sessions `start..end` (the first and last of the run) with the same regime label; UNKNOWN where none is stored
 """
 type RegimeBand {
@@ -892,12 +952,14 @@ type RegimeScore {
 }
 
 """
-`macroRisk` (slow, weekly), `marketStress` (fast, daily) and `fragility` (context only: it never changes the label)
+`macroRisk` (slow, weekly), `marketStress` (fast, daily) and `fragility` (context only: it never changes the label); `macroEarly` and `macroConfirming`, the macro score's two tiers (`macroRisk` is the higher; either at or above its threshold makes macro risk high)
 """
 type RegimeScores {
   macroRisk: RegimeScore!
   marketStress: RegimeScore!
   fragility: RegimeScore!
+  macroEarly: RegimeScore!
+  macroConfirming: RegimeScore!
 }
 
 """
@@ -1127,6 +1189,16 @@ type ScreenerRun {
   Its rows as a review table: `decisions` (none: all; any case), `change` (`new` / `dropped`) and `q` (the symbol or name contains it) filtered, sorted by `sort` (`rank`, `score`, `symbol`, `decision`, `change`, `criterion:<id>`, `column:<name>` or a catalogue name; `-` prefix: descending; missing values last; default: rank) and paged (`page` from 1, `size` rows), with the catalogue `columns` for the page's rows
   """
   results(decisions: [String!] = null, change: String = null, q: String = null, sort: String = null, columns: [FeatureName!] = null, page: Int! = 1, size: Int! = 100): ScreenResultPage!
+}
+
+"""
+One market field over a window. A number: `points` (oldest first), one bucket of `bucketSessions` consecutive sessions yielding its minimum and its maximum at their own sessions; a null `value` is a gap that breaks the line; `segments` is empty. A flag or a label: `segments`, `points` empty, `bucketSessions` 1
+"""
+type SeriesHistory {
+  name: String!
+  bucketSessions: Int!
+  points: [HistoryPoint!]!
+  segments: [HistorySegment!]!
 }
 
 """One session's values, in the order of `FeatureSeries.names`"""

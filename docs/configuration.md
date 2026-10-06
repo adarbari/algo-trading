@@ -106,6 +106,7 @@ Selectable rollup fields today ([data/layers.md](data/layers.md#rollups-as-built
 | `put_wing@v1` | `wing_status` (str); `target_expiry` (date); `target_dte`, `n_unpriced`, `n_strikes`, `wing_oi`, `wing_volume`, `best_put_oi`, `best_put_volume` (int); `wing_spread_pct`, `delta_band_distance`, `best_put_strike`, `best_put_delta`, `best_put_iv`, `best_put_mid`, `best_put_spread_pct`, `best_put_roc` (float32) |
 | `price_moves@v1` | `one_day_move` (float32) |
 | `momentum@v1` | `atr_14`, `rsi_14`, `ret_5d`, `rel_volume`, `high_20d`, `low_20d`, `high_50d`, `low_50d`, `prior_high_20d` (float32) |
+| `volume@v1` | `session_volume`, `dollar_volume`, `adv_shares_20d`, `volume_ratio_5d_20d`, `volume_z_20d`, `up_volume_share_20d`, `cmf_20d` (float32) |
 | `swing_levels@v1` | `swing_high`, `swing_low` (float32); `swing_high_date`, `swing_low_date` (date) |
 | `anchored_vwap@v1` | `avwap_earnings` (float32); `avwap_anchor_date` (date) |
 | `oi_walls@v1` | `wall_status` (str); `call_wall`, `put_wall` (float32); `call_wall_oi`, `put_wall_oi` (int) |

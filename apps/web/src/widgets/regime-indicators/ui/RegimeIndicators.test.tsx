@@ -13,6 +13,19 @@ vi.mock('@/entities/regime', async (importOriginal) => ({
   useRegime: hooks.useRegime,
 }));
 
+vi.mock('@/features/indicator-history', async () => {
+  const { Text } = await import('@algotrade/ui');
+  return {
+    IndicatorHistory: ({
+      indicator,
+      window,
+    }: {
+      indicator: { key: string };
+      window: { start: string; end: string };
+    }) => <Text>{`history of ${indicator.key} from ${window.start} to ${window.end}`}</Text>,
+  };
+});
+
 vi.mock('@/features/regime-explain', async () => {
   const { Button } = await import('@algotrade/ui');
   return {
@@ -45,9 +58,11 @@ describe('RegimeIndicators', () => {
     expect(
       screen.getByText('An inverted curve has come before every recent recession.'),
     ).not.toBeVisible();
-    await userEvent
-      .setup()
-      .click(screen.getByRole('button', { name: /Is the yield curve inverted/ }));
+    await userEvent.setup().click(
+      screen.getAllByRole('button', {
+        name: /Why it matters, what it did before/,
+      })[0] as HTMLElement,
+    );
     expect(
       screen.getByText('An inverted curve has come before every recent recession.'),
     ).toBeVisible();
@@ -58,6 +73,57 @@ describe('RegimeIndicators', () => {
       'href',
       'https://fred.stlouisfed.org/series/T10Y3M',
     );
+  });
+
+  it('places each value on its range with the threshold marked and the rule in words', () => {
+    hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(regimeFixture()));
+    render(<RegimeIndicators />);
+    const curve = screen.getByRole('meter', { name: '10y minus 3m Treasury spread' });
+    expect(curve).toHaveAttribute('aria-valuemin', '-1.5');
+    expect(curve).toHaveAttribute('aria-valuemax', '3');
+    expect(curve).toHaveAttribute('aria-valuetext', '0.42, off');
+    expect(screen.getByText('On when below 0.00')).toBeVisible();
+    const nfci = screen.getByRole('meter', { name: 'Chicago Fed NFCI' });
+    expect(nfci).toHaveAttribute('aria-valuetext', '0.30, off');
+    expect(screen.getByText('On when above 0.50')).toBeVisible();
+  });
+
+  it('writes how it is calculated with its terms linked', () => {
+    hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(regimeFixture()));
+    render(<RegimeIndicators />);
+    expect(screen.getByRole('link', { name: /10-year Treasury yield/ })).toHaveAttribute(
+      'href',
+      'https://fred.stlouisfed.org/series/DGS10',
+    );
+    expect(screen.getByText('The VIX divided by the 3-month VIX.')).toBeVisible();
+  });
+
+  it('names the exact series and cadence, the one in use first, and its provenance', () => {
+    hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(regimeFixture()));
+    render(<RegimeIndicators />);
+    const nfci = screen.getByRole('link', { name: /FRED NFCI/ });
+    expect(nfci).toHaveAttribute('href', 'https://fred.stlouisfed.org/series/NFCI');
+    const anfci = screen.getByRole('link', { name: /FRED ANFCI/ });
+    expect(nfci.compareDocumentPosition(anfci) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText(/weekly, not used today/)).toBeVisible();
+    expect(
+      screen.getByText(
+        /FRED NFCI: last observation .*released .*; before .* values are today's revised figures/,
+      ),
+    ).toBeVisible();
+    expect(screen.getByText(/FRED T10Y3M: last observation .*released /)).toBeVisible();
+    expect(screen.queryByText(/FRED T10Y3M: .*revised figures/)).toBeNull();
+  });
+
+  it('mounts the history chart only once its disclosure is opened, on the shared window', async () => {
+    hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(regimeFixture()));
+    render(<RegimeIndicators />);
+    expect(screen.queryByText(/^history of /)).toBeNull();
+    await userEvent
+      .setup()
+      .click(screen.getAllByRole('button', { name: 'Show history' })[0] as HTMLElement);
+    expect(screen.getByText('history of curve_10y3m from 1971-01-01 to 2026-10-02')).toBeVisible();
+    expect(screen.queryByText(/history of nfci/)).toBeNull();
   });
 
   it('marks a changed card and shows the reason of an UNKNOWN value', () => {
@@ -71,6 +137,10 @@ describe('RegimeIndicators', () => {
     hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(unknownRegimeFixture()));
     render(<RegimeIndicators />);
     expect(screen.getAllByText(/Unknown: not stored for this session/)).toHaveLength(3);
+    expect(
+      screen.getAllByRole('img', { name: /: unknown\. not stored for this session/ }),
+    ).toHaveLength(3);
+    expect(screen.queryByRole('meter')).toBeNull();
   });
 
   it('is empty when nothing is stored, loading before the answer, an error on failure', () => {

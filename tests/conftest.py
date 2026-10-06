@@ -72,6 +72,7 @@ def _no_live_vendor_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ALGOTRADE_MASSIVE_API_KEY", "")
     monkeypatch.setenv("ALGOTRADE_SEC_CONTACT", "")
     monkeypatch.setenv("ALGOTRADE_FRED_API_KEY", "")
+    monkeypatch.setenv("ALGOTRADE_TIINGO_API_KEY", "")
 
 
 def _is_loopback(host: object) -> bool:

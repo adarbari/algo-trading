@@ -32,7 +32,14 @@ REGIME = FeatureGroup(
     "test regime group",
     (Input("bars/1d"),),
     features(
-        {"label": "str", "macro_risk": "float", "market_stress": "float", "fragility": "float"}
+        {
+            "label": "str",
+            "macro_risk": "float",
+            "market_stress": "float",
+            "fragility": "float",
+            "macro_early": "float",
+            "macro_confirming": "float",
+        }
     ),
     _never,
     entity="market",
@@ -108,7 +115,8 @@ def with_regime(
 
 def write_regime(writer: Any, day: date, label: str | None, **scores: float | None) -> None:
     row = {"instrument_id": market_id("US"), "label": label, "macro_risk": None,
-           "market_stress": None, "fragility": None, **scores}  # fmt: skip
+           "market_stress": None, "fragility": None, "macro_early": None,
+           "macro_confirming": None, **scores}  # fmt: skip
     write_rows(writer, REGIME.table, day, [row])
 
 
@@ -119,7 +127,8 @@ def write_indicators(writer: Any, day: date, **values: Any) -> None:
 def stored(writer: Any) -> None:
     for day in (SEP28, SEP29):
         write_regime(writer, day, "CALM", macro_risk=10.0, market_stress=12.0)
-    write_regime(writer, D1, "STRESS", macro_risk=62.5, market_stress=71.0, fragility=None)
+    write_regime(writer, D1, "STRESS", macro_risk=62.5, market_stress=71.0, fragility=None,
+                 macro_early=62.5, macro_confirming=20.0)  # fmt: skip
     write_indicators(
         writer, D1, curve=-0.2, curve_on=True, curve_changed=True,
         trend=0.9, trend_on=False, trend_changed=False, vix=1.1,

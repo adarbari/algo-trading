@@ -44,7 +44,7 @@ SESSIONS = sessions_between(START, END)
 def episode(key: str, peak: date, trough: date, depth: float, kind: str) -> Episode:
     recession = kind == "recession"
     nber = {"nber_start": date(2001, 3, 1), "nber_end": date(2001, 11, 1)} if recession else {}
-    return Episode(key, peak, trough, depth, depth, recession, kind, "c", trough, "n", **nber)
+    return Episode(key, peak, trough, depth, depth, recession, kind, "c", trough, "n", key, **nber)
 
 
 EPISODES = (

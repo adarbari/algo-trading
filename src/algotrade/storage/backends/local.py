@@ -29,10 +29,10 @@ import shutil
 from collections.abc import Sequence
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 from algotrade.storage.backends.arrow import (
@@ -149,7 +149,6 @@ class LocalTables:
         ``upto``: the commit sequence the read captured before opening any index.
         ``columns``: only those (and the key / point-in-time columns) are decoded."""
         directory = self._dir(table, session_date)
-        filters = [("instrument_id", "in", list(instruments))] if instruments is not None else None
         entries = visible_entries(read_index(directory), upto)
         own = self._own(table, session_date, own_run)
         if own_run is not None and own is not None:
@@ -159,7 +158,7 @@ class LocalTables:
             return None
         try:
             parts = [
-                _read_file(directory / run_file(run, entries[run]), filters, columns)
+                _read_file(directory / run_file(run, entries[run]), instruments, columns)
                 for run in runs
             ]
         except FileNotFoundError as gone:  # a commit replaced the version and removed its file
@@ -265,12 +264,21 @@ class LocalTables:
             shutil.rmtree(day)
 
 
-def _read_file(path: Path, filters: list[Any] | None, columns: Sequence[str] | None) -> pa.Table:
-    if columns is None:
-        return pq.read_table(path, filters=filters)
-    keep = keep_columns(columns)
-    present = [c for c in pq.read_schema(path).names if c in keep]
-    return pq.read_table(path, filters=filters, columns=present)
+def _read_file(
+    path: Path, instruments: Sequence[str] | None, columns: Sequence[str] | None
+) -> pa.Table:
+    """One version file (``columns``: only those and ``keep_columns``), its rows of
+    ``instruments`` in file order. ``ParquetFile`` + an Arrow filter, not ``read_table``: a
+    third of the cost on a small file (no dataset discovery), the same columns and types. An
+    empty ``instruments`` raises ``ArrowTypeError`` (a null-typed set), as ``read_table`` did."""
+    with pq.ParquetFile(path) as parquet:
+        keep = None if columns is None else keep_columns(columns)
+        present = None if keep is None else [c for c in parquet.schema_arrow.names if c in keep]
+        data = parquet.read(columns=present)
+    if instruments is None:
+        return data
+    ids = data.column("instrument_id")
+    return data.filter(pc.is_in(ids, value_set=pa.array(list(instruments))))
 
 
 class LocalRaw:

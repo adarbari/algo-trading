@@ -118,3 +118,18 @@ hint = "near support: dist_to_support lte 0.03 (fraction of price); room to run:
 say = ["stocks", "ETFs", "optionable", "active"]
 fields = ["instrument.security_type", "instrument.optionable", "instrument.status"]
 hint = "stocks: security_type in [COMMON_STOCK, ADR]; ETFs: security_type in [ETF]; optionable: optionable eq true; always status eq ACTIVE"
+
+[[phrase]]
+say = ["volume drying up", "quiet volume", "volume contraction", "dried-up volume", "tight and quiet"]
+fields = ["feature.volume_dry_up", "rollup.volume@v1.volume_ratio_5d_20d"]
+hint = "volume_dry_up eq true (the last 5 sessions under 60% of the 20-session average); or volume_ratio_5d_20d lte 0.6 soft with tolerance 0.1 to rank how dry; pair with feature.range_20d_pct lte for a tight base"
+
+[[phrase]]
+say = ["accumulation", "being accumulated", "buyers in control", "distribution", "under distribution", "sellers in control", "money flowing in"]
+fields = ["feature.volume_bias", "rollup.volume@v1.up_volume_share_20d", "rollup.volume@v1.cmf_20d"]
+hint = "volume_bias eq ACCUMULATION (DISTRIBUTION for the sellers); or up_volume_share_20d gte 0.6 (lte 0.4) soft with tolerance 0.05 to rank; 'money flowing in' is cmf_20d gte 0.1 soft (lte -0.1 for out); check rollup.earnings@v1.last_earnings_date: one earnings day can set the whole window"
+
+[[phrase]]
+say = ["volume climax", "capitulation volume", "climactic volume", "unusual volume", "volume spike"]
+fields = ["feature.volume_climax", "rollup.volume@v1.volume_z_20d", "rollup.momentum@v1.rel_volume"]
+hint = "volume_climax eq true (3 standard deviations above the 20 sessions before); 'unusual volume' alone is volume_z_20d gte 2 soft or rel_volume gte 3; most climaxes are earnings: check rollup.earnings@v1.last_earnings_date"

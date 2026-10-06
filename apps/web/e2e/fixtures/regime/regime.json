@@ -5,30 +5,39 @@
       "label": "UNKNOWN",
       "headline": "Not computed yet",
       "unknownReason": {
-        "code": "NOT_IN_CATALOGUE",
-        "detail": "market.regime@v3.label is not in the market catalogue: the regime has not been computed yet"
+        "code": "NO_PARTITION",
+        "detail": "rollups/market/regime@v3 has no partition for 2022-11-23"
       },
       "scores": {
         "macroRisk": {
           "value": null,
           "unknown": {
-            "code": "NOT_IN_CATALOGUE",
-            "detail": "market.regime@v3.macro_risk is not in the market catalogue: the regime has not been computed yet"
-          }
+            "code": "NO_PARTITION",
+            "detail": "rollups/market/regime@v3 has no partition for 2022-11-23"
+          },
+          "feature": "market.regime@v3.macro_risk",
+          "coverageFeature": "market.regime@v3.macro_coverage",
+          "threshold": 50.0
         },
         "marketStress": {
           "value": null,
           "unknown": {
-            "code": "NOT_IN_CATALOGUE",
-            "detail": "market.regime@v3.market_stress is not in the market catalogue: the regime has not been computed yet"
-          }
+            "code": "NO_PARTITION",
+            "detail": "rollups/market/regime@v3 has no partition for 2022-11-23"
+          },
+          "feature": "market.regime@v3.market_stress",
+          "coverageFeature": "market.regime@v3.market_coverage",
+          "threshold": 50.0
         },
         "fragility": {
           "value": null,
           "unknown": {
-            "code": "NOT_IN_CATALOGUE",
-            "detail": "market.regime@v3.fragility is not in the market catalogue: the regime has not been computed yet"
-          }
+            "code": "NO_PARTITION",
+            "detail": "rollups/market/regime@v3 has no partition for 2022-11-23"
+          },
+          "feature": "market.regime@v3.fragility",
+          "coverageFeature": null,
+          "threshold": null
         }
       },
       "sizing": {
@@ -57,7 +66,7 @@
         "screeners": [
           {
             "screenerId": "vrp_scanner",
-            "name": "VRP scanner",
+            "name": "VRP",
             "enabled": false,
             "pauseIn": ["STRESS", "CRISIS"]
           }
@@ -108,12 +117,72 @@
           ],
           "value": null,
           "unknown": {
-            "code": "NOT_IN_CATALOGUE",
-            "detail": "market.regime_indicators@v1.curve_10y3m is not in the market catalogue: the regime has not been computed yet"
+            "code": "NO_PARTITION",
+            "detail": "rollups/market/regime_indicators@v1 has no partition for 2022-11-23"
           },
-          "format": null,
+          "format": "PERCENT",
           "status": "UNKNOWN",
-          "changed": null
+          "changed": null,
+          "feature": "market.regime_indicators@v1.curve_10y3m",
+          "verdictFeature": "market.regime_indicators@v1.curve_10y3m_on",
+          "range": {
+            "min": -0.02,
+            "max": 0.04
+          },
+          "threshold": 0.0,
+          "direction": "LOWER_IS_RISK",
+          "how": [
+            {
+              "text": "The ",
+              "url": null
+            },
+            {
+              "text": "10-year Treasury yield",
+              "url": "https://fred.stlouisfed.org/series/DGS10"
+            },
+            {
+              "text": " minus the ",
+              "url": null
+            },
+            {
+              "text": "3-month bill",
+              "url": "https://fred.stlouisfed.org/series/DGS3MO"
+            },
+            {
+              "text": " yield, from the Treasury's daily par yield curve (FRED's T10Y3M on a day it lacks), and on how many of the last 252 sessions that gap was below zero.",
+              "url": null
+            }
+          ],
+          "sources": [
+            {
+              "label": "Treasury daily par yield curve",
+              "series": null,
+              "cadence": "daily",
+              "releaseLagDays": null,
+              "url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve",
+              "licence": "open",
+              "terms": null,
+              "lastObservation": null,
+              "vintageDate": null,
+              "vintageKind": null,
+              "firstVintage": null,
+              "active": true
+            },
+            {
+              "label": "FRED T10Y3M",
+              "series": "T10Y3M",
+              "cadence": "daily",
+              "releaseLagDays": 1,
+              "url": "https://fred.stlouisfed.org/series/T10Y3M",
+              "licence": "open",
+              "terms": "FRED terms of use (https://fred.stlouisfed.org/legal/)",
+              "lastObservation": null,
+              "vintageDate": null,
+              "vintageKind": null,
+              "firstVintage": null,
+              "active": true
+            }
+          ]
         },
         {
           "key": "hy_oas",
@@ -155,12 +224,50 @@
           ],
           "value": null,
           "unknown": {
-            "code": "NOT_IN_CATALOGUE",
-            "detail": "market.regime_indicators@v1.hy_oas is not in the market catalogue: the regime has not been computed yet"
+            "code": "NO_PARTITION",
+            "detail": "rollups/market/regime_indicators@v1 has no partition for 2022-11-23"
           },
-          "format": null,
+          "format": "PERCENT",
           "status": "UNKNOWN",
-          "changed": null
+          "changed": null,
+          "feature": "market.regime_indicators@v1.hy_oas",
+          "verdictFeature": "market.regime_indicators@v1.hy_oas_on",
+          "range": {
+            "min": 0.02,
+            "max": 0.12
+          },
+          "threshold": 0.05,
+          "direction": "HIGHER_IS_RISK",
+          "how": [
+            {
+              "text": "The ",
+              "url": null
+            },
+            {
+              "text": "high-yield bond spread",
+              "url": "https://fred.stlouisfed.org/series/BAMLH0A0HYM2"
+            },
+            {
+              "text": " each day (the extra yield on riskier companies' bonds over Treasuries), and how far it is above its lowest level of the last 126 sessions.",
+              "url": null
+            }
+          ],
+          "sources": [
+            {
+              "label": "FRED BAMLH0A0HYM2",
+              "series": "BAMLH0A0HYM2",
+              "cadence": "daily",
+              "releaseLagDays": 1,
+              "url": "https://fred.stlouisfed.org/series/BAMLH0A0HYM2",
+              "licence": "personal",
+              "terms": "ICE BofA indices via FRED: personal use only (ICE notice on each series page)",
+              "lastObservation": null,
+              "vintageDate": null,
+              "vintageKind": null,
+              "firstVintage": null,
+              "active": true
+            }
+          ]
         },
         {
           "key": "unrate_trend",
@@ -202,12 +309,50 @@
           ],
           "value": null,
           "unknown": {
-            "code": "NOT_IN_CATALOGUE",
-            "detail": "market.regime_indicators@v1.unrate_trend is not in the market catalogue: the regime has not been computed yet"
+            "code": "NO_PARTITION",
+            "detail": "rollups/market/regime_indicators@v1 has no partition for 2022-11-23"
           },
-          "format": null,
+          "format": "PERCENT",
           "status": "UNKNOWN",
-          "changed": null
+          "changed": null,
+          "feature": "market.regime_indicators@v1.unrate_trend",
+          "verdictFeature": "market.regime_indicators@v1.unrate_trend_on",
+          "range": {
+            "min": -0.01,
+            "max": 0.01
+          },
+          "threshold": 0.0,
+          "direction": "HIGHER_IS_RISK",
+          "how": [
+            {
+              "text": "The latest monthly ",
+              "url": null
+            },
+            {
+              "text": "unemployment rate",
+              "url": "https://fred.stlouisfed.org/series/UNRATE"
+            },
+            {
+              "text": " minus its average over the 12 months up to it.",
+              "url": null
+            }
+          ],
+          "sources": [
+            {
+              "label": "FRED UNRATE",
+              "series": "UNRATE",
+              "cadence": "monthly",
+              "releaseLagDays": 40,
+              "url": "https://fred.stlouisfed.org/series/UNRATE",
+              "licence": "open",
+              "terms": "FRED terms of use (https://fred.stlouisfed.org/legal/)",
+              "lastObservation": null,
+              "vintageDate": null,
+              "vintageKind": null,
+              "firstVintage": null,
+              "active": true
+            }
+          ]
         },
         {
           "key": "sahm",
@@ -249,12 +394,58 @@
           ],
           "value": null,
           "unknown": {
-            "code": "NOT_IN_CATALOGUE",
-            "detail": "market.regime_indicators@v1.sahm is not in the market catalogue: the regime has not been computed yet"
+            "code": "NO_PARTITION",
+            "detail": "rollups/market/regime_indicators@v1 has no partition for 2022-11-23"
           },
-          "format": null,
+          "format": "PERCENT",
           "status": "UNKNOWN",
-          "changed": null
+          "changed": null,
+          "feature": "market.regime_indicators@v1.sahm",
+          "verdictFeature": "market.regime_indicators@v1.sahm_on",
+          "range": {
+            "min": 0.0,
+            "max": 0.015
+          },
+          "threshold": 0.005,
+          "direction": "HIGHER_IS_RISK",
+          "how": [
+            {
+              "text": "The ",
+              "url": null
+            },
+            {
+              "text": "Sahm rule",
+              "url": "https://fred.stlouisfed.org/series/SAHMREALTIME"
+            },
+            {
+              "text": ", computed from the ",
+              "url": null
+            },
+            {
+              "text": "unemployment rate",
+              "url": "https://fred.stlouisfed.org/series/UNRATE"
+            },
+            {
+              "text": ": its 3-month average minus the lowest 3-month average of the previous 12 months.",
+              "url": null
+            }
+          ],
+          "sources": [
+            {
+              "label": "FRED UNRATE",
+              "series": "UNRATE",
+              "cadence": "monthly",
+              "releaseLagDays": 40,
+              "url": "https://fred.stlouisfed.org/series/UNRATE",
+              "licence": "open",
+              "terms": "FRED terms of use (https://fred.stlouisfed.org/legal/)",
+              "lastObservation": null,
+              "vintageDate": null,
+              "vintageKind": null,
+              "firstVintage": null,
+              "active": true
+            }
+          ]
         },
         {
           "key": "nfci",
@@ -296,12 +487,50 @@
           ],
           "value": null,
           "unknown": {
-            "code": "NOT_IN_CATALOGUE",
-            "detail": "market.regime_indicators@v1.nfci is not in the market catalogue: the regime has not been computed yet"
+            "code": "NO_PARTITION",
+            "detail": "rollups/market/regime_indicators@v1 has no partition for 2022-11-23"
           },
-          "format": null,
+          "format": "NUMBER",
           "status": "UNKNOWN",
-          "changed": null
+          "changed": null,
+          "feature": "market.regime_indicators@v1.nfci",
+          "verdictFeature": "market.regime_indicators@v1.nfci_on",
+          "range": {
+            "min": -1.0,
+            "max": 2.0
+          },
+          "threshold": 0.0,
+          "direction": "HIGHER_IS_RISK",
+          "how": [
+            {
+              "text": "The ",
+              "url": null
+            },
+            {
+              "text": "Chicago Fed's financial conditions index",
+              "url": "https://fred.stlouisfed.org/series/NFCI"
+            },
+            {
+              "text": " as published each week: 0 is the long-run average, above 0 is tighter than average.",
+              "url": null
+            }
+          ],
+          "sources": [
+            {
+              "label": "FRED NFCI",
+              "series": "NFCI",
+              "cadence": "weekly",
+              "releaseLagDays": 5,
+              "url": "https://fred.stlouisfed.org/series/NFCI",
+              "licence": "open",
+              "terms": "FRED terms of use (https://fred.stlouisfed.org/legal/)",
+              "lastObservation": null,
+              "vintageDate": null,
+              "vintageKind": null,
+              "firstVintage": null,
+              "active": true
+            }
+          ]
         },
         {
           "key": "spx_trend_200d",
@@ -339,12 +568,78 @@
           ],
           "value": null,
           "unknown": {
-            "code": "NOT_IN_CATALOGUE",
-            "detail": "market.regime_indicators@v1.spx_trend_200d is not in the market catalogue: the regime has not been computed yet"
+            "code": "NO_PARTITION",
+            "detail": "rollups/market/regime_indicators@v1 has no partition for 2022-11-23"
           },
-          "format": null,
+          "format": "PERCENT",
           "status": "UNKNOWN",
-          "changed": null
+          "changed": null,
+          "feature": "market.regime_indicators@v1.spx_trend_200d",
+          "verdictFeature": "market.regime_indicators@v1.spx_trend_200d_on",
+          "range": {
+            "min": -0.3,
+            "max": 0.3
+          },
+          "threshold": 0.0,
+          "direction": "LOWER_IS_RISK",
+          "how": [
+            {
+              "text": "The S&P 500's latest close divided by its ",
+              "url": null
+            },
+            {
+              "text": "200-day average",
+              "url": "https://www.investopedia.com/terms/m/movingaverage.asp"
+            },
+            {
+              "text": ", minus 1: below 0 means it closed under that average.",
+              "url": null
+            }
+          ],
+          "sources": [
+            {
+              "label": "Daily bars (Massive)",
+              "series": null,
+              "cadence": "daily",
+              "releaseLagDays": null,
+              "url": "https://massive.com/",
+              "licence": "open",
+              "terms": null,
+              "lastObservation": null,
+              "vintageDate": null,
+              "vintageKind": null,
+              "firstVintage": null,
+              "active": false
+            },
+            {
+              "label": "Our ticker-to-id map (OpenFIGI)",
+              "series": null,
+              "cadence": "weekly",
+              "releaseLagDays": null,
+              "url": "https://www.openfigi.com/",
+              "licence": "open",
+              "terms": null,
+              "lastObservation": null,
+              "vintageDate": null,
+              "vintageKind": null,
+              "firstVintage": null,
+              "active": false
+            },
+            {
+              "label": "FRED SP500",
+              "series": "SPX",
+              "cadence": "daily",
+              "releaseLagDays": 1,
+              "url": "https://fred.stlouisfed.org/series/SP500",
+              "licence": "personal",
+              "terms": "S&P Dow Jones Indices via FRED: personal use only, display only (copyright notice on the series page)",
+              "lastObservation": null,
+              "vintageDate": null,
+              "vintageKind": null,
+              "firstVintage": null,
+              "active": false
+            }
+          ]
         },
         {
           "key": "vix_term",
@@ -386,12 +681,72 @@
           ],
           "value": null,
           "unknown": {
-            "code": "NOT_IN_CATALOGUE",
-            "detail": "market.regime_indicators@v1.vix_term is not in the market catalogue: the regime has not been computed yet"
+            "code": "NO_PARTITION",
+            "detail": "rollups/market/regime_indicators@v1 has no partition for 2022-11-23"
           },
-          "format": null,
+          "format": "NUMBER",
           "status": "UNKNOWN",
-          "changed": null
+          "changed": null,
+          "feature": "market.regime_indicators@v1.vix_term",
+          "verdictFeature": "market.regime_indicators@v1.vix_term_on",
+          "range": {
+            "min": 0.7,
+            "max": 1.3
+          },
+          "threshold": 1.0,
+          "direction": "HIGHER_IS_RISK",
+          "how": [
+            {
+              "text": "The ",
+              "url": null
+            },
+            {
+              "text": "VIX",
+              "url": "https://fred.stlouisfed.org/series/VIXCLS"
+            },
+            {
+              "text": " (the swing in the S&P 500 that options price in over the next month) divided by the ",
+              "url": null
+            },
+            {
+              "text": "three-month VIX",
+              "url": "https://fred.stlouisfed.org/series/VXVCLS"
+            },
+            {
+              "text": " (the same over three months).",
+              "url": null
+            }
+          ],
+          "sources": [
+            {
+              "label": "FRED VIXCLS",
+              "series": "VIX",
+              "cadence": "daily",
+              "releaseLagDays": 1,
+              "url": "https://fred.stlouisfed.org/series/VIXCLS",
+              "licence": "personal",
+              "terms": "Cboe data via FRED: personal use only (copyright notice on the series page)",
+              "lastObservation": null,
+              "vintageDate": null,
+              "vintageKind": null,
+              "firstVintage": null,
+              "active": true
+            },
+            {
+              "label": "FRED VXVCLS",
+              "series": "VIX3M",
+              "cadence": "daily",
+              "releaseLagDays": 1,
+              "url": "https://fred.stlouisfed.org/series/VXVCLS",
+              "licence": "personal",
+              "terms": "Cboe data via FRED: personal use only (copyright notice on the series page)",
+              "lastObservation": null,
+              "vintageDate": null,
+              "vintageKind": null,
+              "firstVintage": null,
+              "active": true
+            }
+          ]
         },
         {
           "key": "breadth_200d",
@@ -425,12 +780,64 @@
           ],
           "value": null,
           "unknown": {
-            "code": "NOT_IN_CATALOGUE",
-            "detail": "market.regime_indicators@v1.breadth_200d is not in the market catalogue: the regime has not been computed yet"
+            "code": "NO_PARTITION",
+            "detail": "rollups/market/regime_indicators@v1 has no partition for 2022-11-23"
           },
-          "format": null,
+          "format": "PERCENT",
           "status": "UNKNOWN",
-          "changed": null
+          "changed": null,
+          "feature": "market.regime_indicators@v1.breadth_200d",
+          "verdictFeature": "market.regime_indicators@v1.breadth_200d_on",
+          "range": {
+            "min": 0.0,
+            "max": 1.0
+          },
+          "threshold": 0.4,
+          "direction": "LOWER_IS_RISK",
+          "how": [
+            {
+              "text": "The share of the stocks in our universe whose latest close is above their own ",
+              "url": null
+            },
+            {
+              "text": "200-day average",
+              "url": "https://www.investopedia.com/terms/m/movingaverage.asp"
+            },
+            {
+              "text": ".",
+              "url": null
+            }
+          ],
+          "sources": [
+            {
+              "label": "Our universe snapshot",
+              "series": null,
+              "cadence": "daily",
+              "releaseLagDays": null,
+              "url": null,
+              "licence": "open",
+              "terms": null,
+              "lastObservation": null,
+              "vintageDate": null,
+              "vintageKind": null,
+              "firstVintage": null,
+              "active": true
+            },
+            {
+              "label": "Daily bars (Massive)",
+              "series": null,
+              "cadence": "daily",
+              "releaseLagDays": null,
+              "url": "https://massive.com/",
+              "licence": "open",
+              "terms": null,
+              "lastObservation": null,
+              "vintageDate": null,
+              "vintageKind": null,
+              "firstVintage": null,
+              "active": true
+            }
+          ]
         }
       ]
     }
