@@ -177,3 +177,11 @@ def last_closed_session(now: datetime, settle: timedelta = DEFAULT_SETTLE) -> da
     while close_time(day) + settle > now:
         day = previous_session(day)
     return day
+
+
+OWNER_ZONE = "America/Los_Angeles"  # the zone of the owner's schedules (nightly deadlines)
+
+
+def local_deadline(day: date, at: time, zone: str = OWNER_ZONE) -> datetime:
+    """The instant ``day`` at wall-clock ``at`` in ``zone`` (DST-correct), as UTC."""
+    return datetime.combine(day, at, tzinfo=ZoneInfo(zone)).astimezone(UTC)

@@ -2,13 +2,18 @@
 
 ``Notifier`` is the one interface: ``notify(notice)`` delivers a ``Notice`` and returns a
 warning when it could not (it never raises). ``MacNotifier`` shows a macOS notification
-(``osascript``; never under pytest) when the status is not SUCCEEDED; ``EmailNotifier`` mails
-the full report (statistics + failure deep dive, ``report.py`` / ``render.py``) after every
-run over SMTP (STARTTLS; port 465: implicit TLS). ``config/site/nightly.toml`` ``[notify]``
-turns notifications off or moves the summary file (``var/logs/nightly-latest.json``);
+(``osascript``; never under pytest) when the status is not SUCCEEDED or WAITING;
+``EmailNotifier`` mails the full report (statistics + failure deep dive, ``report.py`` /
+``render.py``) after every run over SMTP (STARTTLS; port 465: implicit TLS).
+``config/site/nightly.toml`` ``[notify]`` turns notifications off or moves the summary
+file (``var/logs/nightly-latest.json``);
 ``[notify.email]`` enables the email. Addresses and credentials come only from the
 environment (``config/env.py``); a missing one, or an SMTP error, becomes a WARN in the run
-summary and never fails the nightly. Credentials are never logged.
+summary and never fails the nightly. Credentials are never logged. A WAITING run (a source has
+not published the session yet; ADR 0043) whose only session is the waiting one writes its
+summary file only: no desktop alert and no
+email, because the next hourly run resumes it and the run that ends it (SUCCEEDED, or FAILED
+at the deadline) sends the report.
 """
 
 import json
@@ -38,7 +43,7 @@ type Env = Callable[[str], str | None]
 class Notice:
     """What a nightly run tells its notifiers: one line, and the full report when built."""
 
-    status: str  # SUCCEEDED / FAILED
+    status: str  # SUCCEEDED / WAITING / FAILED
     title: str
     message: str  # one line: status, sessions, steps that did not complete
     subject: str = ""
@@ -47,7 +52,7 @@ class Notice:
 
     @property
     def alert(self) -> bool:
-        return self.status not in ("SUCCEEDED", "COMPLETE")  # COMPLETE: before ADR 0039
+        return self.status not in ("SUCCEEDED", "WAITING", "COMPLETE")  # COMPLETE: before 0039
 
 
 class Notifier(Protocol):
@@ -182,7 +187,7 @@ def default_notifier(settings: NightlySettings, lookup: Env = env.credential) ->
     return chosen[0] if len(chosen) == 1 else Notifiers(chosen)
 
 
-BAD = ("FAILED", "NOT_RUN", "BLOCKED", "PARTIAL")  # BLOCKED / PARTIAL: before ADR 0039
+BAD = ("FAILED", "NOT_RUN", "WAITING", "BLOCKED", "PARTIAL")  # BLOCKED / PARTIAL: before 0039
 
 
 def message(summary: Mapping[str, Any]) -> str:
@@ -236,7 +241,8 @@ def report(
     out = dict(summary)
     path = Path(settings.summary_path)
     _write(path, out)
-    if not settings.notify_enabled:
+    only_waiting = out["status"] == "WAITING" and len(out.get("runs", [])) <= 1
+    if not settings.notify_enabled or only_waiting:  # catch-up sessions that finished still mail
         return out
     note, problem = notice(out, reader, settings)
     try:
