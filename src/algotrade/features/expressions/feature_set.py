@@ -69,6 +69,20 @@ class FeatureSet:
             f.key: f for g in self.code.values() for f in g.features
         } | {e.feature.key: e.feature for e in self.expressions.values()}
         self._by_field = {f.field: f for f in self.features.values()}
+        self._check_statuses()
+
+    def _check_statuses(self) -> None:
+        """A ``null_status`` naming another group's column (``<group>.<col>@vN``) must name a
+        declared one (ADR 0041)."""
+        for f in self.features.values():
+            if "@" not in f.null_status:
+                continue
+            group, _, rest = f.null_status.partition(".")
+            owner = self.code.get(f"{group}@{rest.partition('@')[2]}")
+            if owner is None or rest.partition("@")[0] not in owner.columns:
+                raise ConfigurationError(
+                    f"{f.key}: null_status {f.null_status!r} is not a declared feature column"
+                )
 
     @classmethod
     def build(
@@ -113,19 +127,21 @@ class FeatureSet:
         e = self.expressions[name]
         return f"{ROLLUP_TABLE_PREFIX}{e.name}@v{e.feature.version}"
 
-    def applicability(self, name: str) -> tuple[frozenset[str], tuple[str, ...]]:
+    def applicability(
+        self, name: str
+    ) -> tuple[frozenset[str], tuple[tuple[str, frozenset[str]], ...]]:
         """What a value's absence may be put down to (ADR 0041), inherited by an expression
         from everything it reads like its licence: -> (the non-``any`` ``applies_to`` values
-        of the stored features it reads, the selection fields of their ``null_status`` columns).
+        of the stored features it reads, each ``null_status`` field with its ``illiquid_statuses``).
         ``name``: a selection field (``rollup.<group>.<col>``, ``feature.<name>``)."""
         applies: set[str] = set()
-        statuses: list[str] = []
+        statuses: list[tuple[str, frozenset[str]]] = []
 
         def add(feature: Feature) -> None:
             if feature.applies_to != "any":
                 applies.add(feature.applies_to)
             if feature.null_status:
-                statuses.append(feature.status_field)
+                statuses.append((feature.status_field, frozenset(feature.illiquid_statuses)))
 
         def visit(expression: str) -> None:
             e = self.expressions[expression]

@@ -30,6 +30,9 @@ def _reference(writer: StoreWriter) -> None:
         {"instrument_id": "EQ:ETFX", "symbol": "ETFX", "name": "X Fund ETF", "asset_class": "EQ",
          "security_type": "ETF", "exchange": "NYSE_ARCA", "multiplier": 1.0, "status": "ACTIVE",
          "is_etf": True, "optionable": False},
+        {"instrument_id": "EQ:NOOPT", "symbol": "NOOPT", "name": "No Flag Inc", "asset_class": "EQ",
+         "security_type": "COMMON_STOCK", "exchange": "NYSE", "multiplier": 1.0,
+         "status": "ACTIVE", "is_etf": False, "optionable": None},
     ]  # fmt: skip
     write_rows(writer, "instruments/reference", D0, rows)
     company = {"instrument_id": "EQ:AAA", "symbol": "AAA", "cik": "1", "name": "AAA Holdings",

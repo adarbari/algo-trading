@@ -35,7 +35,6 @@ from algotrade.core.model.fields import (
 )
 from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.features.expressions.feature_set import FeatureSet
-from algotrade.features.rollups.options.iv30 import ILLIQUID_STATUSES
 from algotrade.services.features import field_view
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
@@ -48,7 +47,7 @@ from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
 _ROW = "instrument_id"
 _OPTIONABLE = "instrument.optionable"
 _SECURITY_TYPE = "instrument.security_type"
-type Reasons = tuple[frozenset[str], tuple[str, ...]]  # FeatureSet.applicability
+type Reasons = tuple[frozenset[str], tuple[tuple[str, frozenset[str]], ...]]  # applicability
 
 
 @dataclass(frozen=True)
@@ -75,7 +74,7 @@ def _reason_fields(reasons: Reasons) -> list[str]:
     return [
         *([_OPTIONABLE] if "optionable" in applies else []),
         *([_SECURITY_TYPE] if "not_etf" in applies else []),
-        *statuses,
+        *(field for field, _ in statuses),
     ]
 
 
@@ -106,12 +105,14 @@ def _not_applicable(
     return ""
 
 
-def _illiquid(statuses: Sequence[str], row: Mapping[str, Any], iid: str, day: date) -> str:
+def _illiquid(
+    statuses: Sequence[tuple[str, frozenset[str]]], row: Mapping[str, Any], iid: str, day: date
+) -> str:
     """Why an option feature is null for want of a tradeable chain (the status column), or
     ``""``."""
-    for field in statuses:
+    for field, thin in statuses:
         status = to_scalar(row.get(field))
-        if status in ILLIQUID_STATUSES:
+        if status in thin:
             return (
                 f"{field.rpartition('.')[2]} is {status} for {iid} on {day.isoformat()}: "
                 "no near-the-money quote within the spread limit"

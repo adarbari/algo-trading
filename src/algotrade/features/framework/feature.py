@@ -38,6 +38,8 @@ type and, later, UI and email labels (ADR 0023).
                   group (``iv30_status``) or another group's (``iv30.iv30_status@v1``, for a
                   feature derived from it); when its value is an illiquid status the read
                   says ILLIQUID (ADR 0041)
+- ``illiquid_statuses``  which ``null_status`` values mean the chain is too thin (the others
+                  stay NULL); declared with ``null_status``, each needs the other
 - ``version``     the feature's definition version: a group feature's is its group's (a
                   group is re-versioned only when its stored columns change); an expression
                   feature's is its own
@@ -99,6 +101,7 @@ class Feature:
     licence: Licence = "open"
     applies_to: AppliesTo = "any"
     null_status: str = ""  # a sibling status column; "": null always means UNKNOWN
+    illiquid_statuses: tuple[str, ...] = ()  # the null_status values that mean "too thin"
 
     @property
     def key(self) -> str:
@@ -171,6 +174,8 @@ def _absence_problems(f: Feature) -> list[str]:
         problems.append(f"{f.name}: applies_to {f.applies_to!r} must be one of {list(APPLIES_TO)}")
     if "@" in f.null_status and not is_feature_ref(f.null_status):
         problems.append(f"{f.name}: null_status {f.null_status!r} is not <group>.<column>@vN")
+    if bool(f.null_status) != bool(f.illiquid_statuses):
+        problems.append(f"{f.name}: null_status and illiquid_statuses go together")
     return problems
 
 

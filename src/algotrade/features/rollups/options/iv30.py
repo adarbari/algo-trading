@@ -77,6 +77,7 @@ FEATURES = (
         "expiries around 30 days, interpolated in total variance (ADR 0021)",
         "iv30_status is neither OK nor SINGLE_EXPIRY (the status says why)", "chain",
         valid_range=(0, 5), null_status="iv30_status",
+        illiquid_statuses=tuple(sorted(ILLIQUID_STATUSES)),
         inputs=(*_QUOTES, _SPOT, f"{RATES}.rate_cont", "div_yield@v1"),
     ),
     Feature(

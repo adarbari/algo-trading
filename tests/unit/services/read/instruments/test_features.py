@@ -158,3 +158,16 @@ def test_not_applicable_wins_over_illiquid_for_an_expression() -> None:
     ctx = context(_chain_rows("WIDE_SPREADS"))
     got = values(ctx, "EQ:ETFX", "feature.iv_hv_ratio")
     assert got["feature.iv_hv_ratio"][1] is not UnknownCode.ILLIQUID
+
+
+IV_RANK = "rollup.iv_history@v2.iv_rank_252d"
+
+
+def test_a_null_optionable_is_not_not_applicable() -> None:
+    ctx = context(_chain_rows("OK"))  # EQ:NOOPT: optionable unknown, no iv30 row
+    assert values(ctx, "EQ:NOOPT", IV30)[IV30] == (None, UnknownCode.NO_ROW)
+
+
+def test_a_null_rank_with_an_ok_status_is_null_not_illiquid() -> None:
+    ctx = context(_chain_rows("OK"))
+    assert values(ctx, "EQ:AAA", IV_RANK)[IV_RANK] == (None, UnknownCode.NULL)
