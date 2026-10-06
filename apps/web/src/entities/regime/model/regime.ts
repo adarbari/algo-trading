@@ -25,7 +25,7 @@ export interface RegimeUnknown {
 export interface RegimeScore {
   value: number | null;
   unknown: RegimeUnknown | null;
-  /** The catalogue field the history chart reads (`market.regime@v2.macro_risk`). */
+  /** The catalogue field the history chart reads (`market.regime@v3.macro_risk`). */
   feature: string;
   /** The field of the share of the score's weight known (null: the score has none). */
   coverageFeature: string | null;
@@ -130,7 +130,7 @@ export function episodeName(episodes: readonly RegimeEpisode[], key: string): st
 
 /**
  * The stored regime label's field: the regime group names it beside its scores
- * (`market.regime@v2.label` next to `market.regime@v2.macro_risk`), so the history reads it
+ * (`market.regime@v3.label` next to `market.regime@v3.macro_risk`), so the history reads it
  * from the group the scores came from.
  */
 export function regimeLabelFeature(regime: Regime): string {

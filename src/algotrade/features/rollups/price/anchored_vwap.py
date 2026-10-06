@@ -30,7 +30,7 @@ from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
 from algotrade.features.rollups.corporate.earnings import EVENTS, valid_events
-from algotrade.features.rollups.price.price_stats import panel
+from algotrade.features.rollups.price.price_stats import panel, traded_rows
 
 NAME = "anchored_vwap"
 VERSION = 1
@@ -88,7 +88,6 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     assert stored is not None and bars is not None  # required inputs
     days = sessions_ending(session, MAX_SESSIONS + 2)  # the window plus the session before it
     px = panel(bars, days[1:])
-    traded = ~np.isnan(px.close[-1])
     # A report before days[0] anchors at row 0 at the latest: too old, never used.
     reports = valid_events(stored, session, since=days[0])
     rows = anchors(reports[reports["report"] <= session], days).reindex(px.ids) - 1
@@ -105,14 +104,10 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     ok = has & (gaps[at, cols] == 0) & (len(days) - 2 - at >= 1) & (total > 0)
     with np.errstate(divide="ignore", invalid="ignore"):
         avwap = np.where(ok, weighted[at, cols] / total, np.nan)
-    anchor = [days[1 + a] if h else None for a, h in zip(at, has, strict=True)]
-    return pd.DataFrame(
-        {
-            "instrument_id": px.ids[traded],
-            "avwap_earnings": avwap[traded],
-            "avwap_anchor_date": [d for d, t in zip(anchor, traded, strict=True) if t],
-        }
+    anchor = np.array(
+        [days[1 + a] if h else None for a, h in zip(at, has, strict=True)], dtype=object
     )
+    return traded_rows(px, {"avwap_earnings": avwap, "avwap_anchor_date": anchor}, COLUMNS)
 
 
 GROUP = FeatureGroup(
