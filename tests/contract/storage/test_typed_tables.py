@@ -87,14 +87,14 @@ def test_uncastable_data_and_undeclared_columns_fail(backend: Backend) -> None:
 
 
 def test_known_from_is_stored_as_a_date_on_events_and_rejected_on_bars(backend: Backend) -> None:
-    rows = [
-        {"instrument_id": "EQ:A", "ts": T0, "known_from": pd.Timestamp(2019, 5, 1)},
-        {"instrument_id": "EQ:B", "ts": T0, "known_from": None},
-    ]
+    rows = [{"instrument_id": "EQ:A", "ts": T0, "known_from": pd.Timestamp(2019, 5, 1)}]
     backend.tables.write("events/earnings", D2, "r1", stamped(rows, D2, "r1"))
     out = backend.tables.read("events/earnings", D2)
-    assert out is not None
-    assert out["known_from"].iloc[0] == date(2019, 5, 1) and pd.isna(out["known_from"].iloc[1])
+    assert out is not None and out["known_from"].iloc[0] == date(2019, 5, 1)
+    null = [{"instrument_id": "EQ:B", "ts": T0, "known_from": None}]
+    with pytest.raises(DataValidationError, match="known_from: nulls"):
+        backend.tables.write("events/earnings", D2, "r2", stamped(null, D2, "r2"))
+    backend.tables.write("events/split", D2, "r1", stamped(null, D2, "r1"))  # optional there
     with pytest.raises(DataValidationError, match="undeclared column 'known_from'"):
         backend.tables.write("bars/1d", D1, "r1", bars(["EQ:A"], D1, known_from=D1))
 

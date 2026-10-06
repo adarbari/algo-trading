@@ -42,15 +42,10 @@ def test_the_window_is_by_event_date_not_the_stored_partition() -> None:
     assert [e.kind for e in old] == ["split"]
 
 
-def test_a_past_session_sees_only_what_was_stored_by_then() -> None:
-    reader = store_with(_events)
-    past = load_events(context(reader, D0), ["EQ:AAA"], None, None)["EQ:AAA"]
-    assert [e.kind for e in past] == ["split"]  # the dividend was stored on D1
-    now = load_events(context(reader, D1), ["EQ:AAA"], None, None)["EQ:AAA"]
-    assert [e.kind for e in now] == ["split", "dividend"]
+def test_facts_of_record_are_read_without_a_knowledge_bound() -> None:
+    """Splits and dividends adjust bars at read time (ADR 0016): a past session shows the ones
+    stored after it, at their latest version, as its adjusted bars use them."""
 
-
-def test_a_revised_event_shows_the_version_known_on_the_session() -> None:
     def revisions(writer: StoreWriter) -> None:
         write_dividends(writer, [("EQ:AAA", date(2026, 9, 1), 0.25, "CD")], D0)
         row = {
@@ -64,11 +59,24 @@ def test_a_revised_event_shows_the_version_known_on_the_session() -> None:
         writer.write_table("events/dividend", D1, "rev", stamped([row], D1, "rev", later))
 
     reader = store_with(revisions)
-    amounts = []
     for day in (D0, D1):
         found = load_events(context(reader, day), ["EQ:AAA"], None, None)["EQ:AAA"]
-        amounts.append([e.values["cash_amount"] for e in found])
-    assert amounts == [[0.25], [0.30]]
+        assert [e.values["cash_amount"] for e in found] == [0.30]
+
+
+def test_a_past_session_sees_only_the_earnings_known_by_then() -> None:
+    def calendars(writer: StoreWriter) -> None:
+        for stored, report in ((D0, date(2026, 10, 20)), (D1, date(2026, 10, 27))):
+            row = {"instrument_id": "EQ:AAA", "ts": pd.Timestamp(report, tz="UTC")}
+            run = f"e{stored}"
+            frame = stamped([{**row, "known_from": stored}], stored, run)
+            writer.write_table("events/earnings", stored, run, frame)
+
+    reader = store_with(calendars)
+    past = load_events(context(reader, D0), ["EQ:AAA"], None, None)["EQ:AAA"]
+    assert [e.date for e in past] == [date(2026, 10, 20)]  # the 10-27 row was stored on D1
+    now = load_events(context(reader, D1), ["EQ:AAA"], None, None)["EQ:AAA"]
+    assert [e.date for e in now] == [date(2026, 10, 20), date(2026, 10, 27)]
 
 
 def test_a_backfilled_report_is_known_from_its_report_date() -> None:

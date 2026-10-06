@@ -129,3 +129,42 @@ def test_valid_events_equals_the_full_reading_with_and_without_since(seed: int) 
         pd.testing.assert_frame_equal(
             earnings.valid_events(stored, since), want[want["report"] >= since]
         )
+
+
+def _store_rows(writer: object, stored: date, rows: list[tuple[str, date, date]]) -> None:
+    """Rows stored on ``stored``: (instrument, report date, known_from)."""
+    from tests.helpers.stored_frames import stamped  # noqa: PLC0415
+
+    frame = [
+        {"instrument_id": i, "ts": pd.Timestamp(d, tz="UTC"), "time": "pre_market", "known_from": k}
+        for i, d, k in rows
+    ]
+    run = f"r{stored}-{len(rows)}"
+    writer.write_table("events/earnings", stored, run, stamped(frame, stored, run))  # type: ignore[attr-defined]
+
+
+def test_a_second_backfill_never_cancels_the_reports_of_the_first() -> None:
+    """Regression (architect review of EV1a): a later backfill partition holding only a retried
+    day, merged with that night's calendar, spans 09-29..11-06; its range used to make it the
+    authority there and drop A's 10-01 report, stored by the first backfill."""
+    writer, reader = store()
+    first, second = date(2026, 10, 6), date(2026, 10, 7)
+    a, b = ("EQ:A", date(2026, 10, 1)), ("EQ:B", date(2026, 9, 30))
+    _store_rows(writer, first, [(*a, a[1]), (*b, b[1]), ("EQ:C", date(2026, 10, 20), first)])
+    retried = date(2026, 9, 29)  # failed in the first backfill
+    _store_rows(writer, second, [("EQ:D", retried, retried), ("EQ:C", date(2026, 11, 6), second)])
+    frame = compute_one(reader, GROUP, date(2026, 10, 8)).frame
+    assert row(frame, "EQ:A")["last_earnings_date"] == a[1]
+    assert row(frame, "EQ:B")["last_earnings_date"] == b[1]
+    assert row(frame, "EQ:D")["last_earnings_date"] == retried
+    c = row(frame, "EQ:C")  # a forecast moved by the later calendar
+    assert c["next_earnings_date"] == date(2026, 11, 6)
+
+
+def test_a_history_row_is_known_from_its_report_date_in_an_earlier_session() -> None:
+    writer, reader = store()
+    report = date(2019, 5, 1)
+    _store_rows(writer, date(2026, 10, 6), [("EQ:A", report, report)])
+    assert compute_one(reader, GROUP, date(2019, 4, 30)).no_input
+    frame = compute_one(reader, GROUP, date(2019, 5, 2)).frame
+    assert row(frame, "EQ:A")["last_earnings_date"] == report

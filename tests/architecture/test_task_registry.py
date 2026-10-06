@@ -5,8 +5,8 @@
   the registry;
 - every task is reachable from the CLI, by its own command and as ``run <task>``;
 - every source a task names is declared in the source registry;
-- every task that writes an ``events/*`` table sets ``known_from`` on its rows (ADR 0050
-  decision 3), or the table is listed in ``STORES_ON_LEARNING`` with the reason.
+- every ``events/*`` table's spec requires a non-null ``known_from`` (ADR 0050 decision 3), or
+  the table is a fact of record (``data.events.FACTS_OF_RECORD``) listed with its reason.
 """
 
 import tomllib
@@ -15,6 +15,8 @@ from pathlib import Path
 
 import pytest
 
+from algotrade.data.events import FACTS_OF_RECORD
+from algotrade.storage.tables.schemas import KNOWN_FROM, spec_for
 from algotrade_ingestion.cli import main as cli
 from algotrade_ingestion.tasks.framework.registry import TASKS
 from algotrade_ingestion.workflows.nightly.nightly import FINALLY, NIGHTLY, SCREENS
@@ -23,18 +25,15 @@ from tests.conftest import REPO_ROOT
 
 TABLES = tomllib.loads((REPO_ROOT / "architecture" / "tables.toml").read_text())["table"]
 TASKS_DIR = "apps/ingestion/algotrade_ingestion/tasks/"
-# Event tables whose rows are known from the session that stored them (``known_from`` null:
-# ``data.events`` reads ``session_date``), with the reason. A new events/* writer sets
-# ``known_from`` (``schemas.KNOWN_FROM``) or is listed here.
-STORES_ON_LEARNING = {
-    "events/split": "corporate actions (the Massive window around the session, or a --from/--to "
-    "backfill): not in ADR 0050 decision 3's tables, so known from the session that stored it",
-    "events/dividend": "corporate actions, as events/split; its declaration_date is a candidate "
-    "known_from not adopted by ADR 0050",
-    "events/reference_change": "the diff of two reference snapshots: learned on the session that "
-    "built the newer one",
-    "events/index_change": "the diff of two reference snapshots (S&P 500 membership): learned on "
-    "the session that built the newer one",
+# The event tables read without a knowledge bound and stored without ``known_from``, with the
+# reason (``data.events.FACTS_OF_RECORD``). Every other event table requires ``known_from``.
+FACTS_OF_RECORD_REASONS = {
+    "events/split": "applied to bars at read time (ADR 0016): read by event date, unbounded",
+    "events/dividend": "applied to bars at read time (ADR 0016), as events/split",
+    "events/reference_change": "the diff of two reference snapshots: a fact of record of the "
+    "listing, read by event date",
+    "events/index_change": "the diff of two reference snapshots (S&P 500 membership), as "
+    "events/reference_change",
 }
 
 
@@ -116,19 +115,22 @@ def test_every_nightly_step_has_a_status_in_the_result() -> None:
         assert "duration_s" in step and isinstance(step["critical"], bool)
 
 
-@pytest.mark.parametrize("name", sorted(TASKS))
-def test_every_event_writer_sets_known_from(name: str) -> None:
-    spec = TASKS[name]
-    events = [t for t in spec.tables if t.startswith("events/") and t not in STORES_ON_LEARNING]
-    if not events:
+EVENT_TABLES = sorted(t["name"] for t in TABLES if t["name"].startswith("events/"))
+
+
+@pytest.mark.parametrize("table", EVENT_TABLES)
+def test_every_event_table_requires_known_from_or_is_a_fact_of_record(table: str) -> None:
+    spec = spec_for(table)
+    if table in FACTS_OF_RECORD:
+        assert table in FACTS_OF_RECORD_REASONS, f"{table}: give the reason it is unbounded"
         return
-    source = Path(str(spec.module.__file__)).read_text()
-    assert "KNOWN_FROM" in source, (
-        f"{name} writes {events} without known_from (ADR 0050 decision 3): set it on every "
-        "row (schemas.KNOWN_FROM), or list the table in STORES_ON_LEARNING with the reason"
+    column = spec.column(KNOWN_FROM)
+    assert KNOWN_FROM in spec.required and column is not None and not column.nullable, (
+        f"{table} must require a non-null known_from (ADR 0050 decision 3): declare its "
+        "TableSpec in storage/tables/schemas.py like EARNINGS_EVENTS"
     )
 
 
-def test_stores_on_learning_lists_only_stored_event_tables() -> None:
-    written = {t for spec in TASKS.values() for t in spec.tables if t.startswith("events/")}
-    assert set(STORES_ON_LEARNING) <= written, sorted(set(STORES_ON_LEARNING) - written)
+def test_the_facts_of_record_are_the_listed_stored_tables() -> None:
+    assert set(FACTS_OF_RECORD) == set(FACTS_OF_RECORD_REASONS)
+    assert set(FACTS_OF_RECORD) <= set(EVENT_TABLES)

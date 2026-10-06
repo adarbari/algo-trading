@@ -50,7 +50,8 @@ def test_earnings_rows_are_given_to_the_sessions_they_were_known_on() -> None:
     def row(day: date, **extra: object) -> dict[str, object]:
         return {"instrument_id": "EQ:A", "ts": pd.Timestamp(day, tz="UTC"), **extra}
 
-    writer.write_table("events/earnings", first, "n", stamped([row(report)], first, "n"))
+    nightly = stamped([row(report, known_from=first)], first, "n")
+    writer.write_table("events/earnings", first, "n", nightly)
     rows = [row(report, known_from=report), row(date(2026, 11, 2), known_from=backfill)]
     writer.write_table("events/earnings", backfill, "b", stamped(rows, backfill, "b"))
     loaded = inputs.load_input(reader, "events/earnings", [first, report], 0)

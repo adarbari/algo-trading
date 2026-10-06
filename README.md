@@ -227,8 +227,9 @@ cat var/logs/macro.status   # appears when the run ends; the run record lists ev
 The earnings history (`events/earnings` from 2018, ADR 0050) is one Nasdaq calendar request per
 exchange session (about 2,200 since 2018 at the vendor's pace, about 20 minutes). Each row is
 stored with `known_from` = its report date, so past sessions see the reports from their dates
-on. A rerun skips the days already fetched and a rerun the same day continues an interrupted
-run; the run record lists every day's status:
+on. A rerun the same day continues an interrupted or partial run (only its failed days are
+asked again); a run on a later day fetches the whole window again. The run record lists every
+day's status and `pre_snapshot_rows` (rows resolved through the earliest reference snapshot):
 
 ```bash
 mkdir -p var/logs

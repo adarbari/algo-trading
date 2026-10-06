@@ -87,9 +87,16 @@ def write_split(writer: StoreWriter, iid: str, ex_date: date, ratio: float, stor
 def write_earnings(
     writer: StoreWriter, snapshot: date, rows: Sequence[tuple[str, date, str]]
 ) -> None:
-    """One calendar snapshot stored on ``snapshot``: (instrument, report date, time)."""
+    """One calendar snapshot stored on ``snapshot``: (instrument, report date, time), every
+    row a forecast known from ``snapshot``."""
     frame = [
-        {"instrument_id": iid, "symbol": iid[3:], "ts": pd.Timestamp(day, tz="UTC"), "time": t}
+        {
+            "instrument_id": iid,
+            "symbol": iid[3:],
+            "ts": pd.Timestamp(day, tz="UTC"),
+            "time": t,
+            "known_from": snapshot,
+        }
         for iid, day, t in rows
     ]
     run = f"earnings-{snapshot}"

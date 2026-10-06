@@ -13,9 +13,13 @@ backfilled 2019 report to the 2019 sessions after it.
 
 The backfill (``backfill_earnings``, ``algotrade-ingest earnings --from D1 --to D2``) fetches
 one calendar day per exchange session of a past window, staged day by day and published at
-the end into the run session's partition. It is resumable: a rerun for the same session
-continues an interrupted run (its staged days are kept), and any run skips the days an
-earlier finished backfill fetched (``OK`` / ``EMPTY``), so only failed days are asked again.
+the end into the run session's partition: its rows are history rows (known before that
+session), facts of record ``earnings@v1`` never cancels. It is resumable within its session:
+a rerun for the same session continues an interrupted or partial run (its staged days are
+kept, its failed days asked again); a run for a later session fetches the whole window
+again, so each backfill partition holds the full window. Before the reference history starts
+a ticker resolves through the earliest snapshot (a reused ticker goes to today's holder):
+counted as ``pre_snapshot_rows``.
 """
 
 from datetime import date, timedelta
@@ -27,18 +31,12 @@ import pandas as pd
 from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
 from algotrade.storage.tables.schemas import KNOWN_FROM
-from algotrade_ingestion.tasks.framework.run import (
-    IngestRun,
-    TaskContext,
-    finished_runs,
-    status_label,
-)
+from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_sources.framework.base import FetchRequest, Source
 
 TASK = "earnings_calendar"
 HISTORY_TASK = "earnings_history"
 TABLE = "events/earnings"
-DONE = ("OK", "EMPTY")  # backfill day statuses that need no refetch
 CHECKPOINT_EVERY = 20  # backfill days between saves of the run record
 
 
@@ -98,6 +96,9 @@ def _stage_day(run: IngestRun, source: Source, day: date) -> str:
     if rows is None:
         return "EMPTY"
     rows = run.resolve(rows, as_of=day).drop_duplicates(["instrument_id", "ts"], keep="last")
+    snapshot = run.resolver(day).snapshot
+    if snapshot is not None and snapshot > day:  # before the reference history starts
+        run.stats["pre_snapshot_rows"] = run.stats.get("pre_snapshot_rows", 0) + len(rows)
     rows = with_known_from(rows.replace({np.nan: None}), run.session)
     run.stage(TABLE, day.isoformat(), rows.reset_index(drop=True), source.name)
     return f"OK: {len(rows)} rows"
@@ -106,19 +107,14 @@ def _stage_day(run: IngestRun, source: Source, day: date) -> str:
 def backfill_earnings(
     ctx: TaskContext, source: Source, session: date, start: date, end: date
 ) -> RunRecord:
-    """The calendar of every exchange session in ``start..end`` that no earlier finished
-    backfill fetched, one request a day, into ``session``'s partition (module doc)."""
+    """The calendar of every exchange session in ``start..end``, one request a day, into
+    ``session``'s partition; a resumed run asks only the days it has not fetched (module
+    doc)."""
     if start > end:
         raise ValueError(f"--from {start} is after --to {end}")
     with IngestRun(ctx, HISTORY_TASK, session, resume=True) as run:
-        done = {
-            key
-            for record in finished_runs(run.writer, HISTORY_TASK)
-            for key, status in record.items.items()
-            if status_label(status) in DONE
-        }
         window = [d.isoformat() for d in sessions_between(start, end)]
-        todo = [d for d in window if d not in done and d not in run.items]
+        todo = [d for d in window if d not in run.items]  # a resume keeps its fetched days
         for i, day in enumerate(todo, 1):
             run.attempt(day, partial(_stage_day, run, source, date.fromisoformat(day)))
             if i % CHECKPOINT_EVERY == 0:
@@ -129,6 +125,7 @@ def backfill_earnings(
             sessions=len(window),
             fetched=len(todo),
             already_done=len(window) - len(todo),
+            pre_snapshot_rows=run.stats.get("pre_snapshot_rows", 0),
             dates_failed=run.failures(),
             rows=rows,
             unresolved=run.unresolved,

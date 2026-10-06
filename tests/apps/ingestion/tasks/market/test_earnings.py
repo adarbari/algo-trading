@@ -143,8 +143,9 @@ def test_backfill_is_known_from_each_report_date_and_resumes() -> None:
     assert events is not None
     assert list(events["known_from"]) == list(events["earnings_date"])  # each its report date
     assert len(events) == 4 and set(events["instrument_id"]) == {"EQ:BBG000B9XRY4"}
+    assert resumed.stats["pre_snapshot_rows"] == 1  # before the 10-02 reference snapshot
     later = backfill_earnings(ctx, source, date(2026, 10, 5), date(2026, 9, 28), date(2026, 10, 2))
-    assert asked[1:] == ["2026-10-02"]  # a later run skips the days fetched before
-    assert later.stats["already_done"] == 4
+    assert len(asked) == 6 and later.stats["already_done"] == 0  # a new session: the window
+    assert later.stats["pre_snapshot_rows"] == 4  # 10-02 resolves through its own snapshot
     with pytest.raises(ValueError, match="after"):
         backfill_earnings(ctx, source, DAY, date(2026, 10, 1), date(2026, 9, 1))

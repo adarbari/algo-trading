@@ -369,6 +369,21 @@ ETF_HOLDINGS = _fixed(
 # ``instruments/shares`` keeps ``filed``. ``value`` is null where FRED prints ".". The
 # partition is the run's session; runs are increments, so they merge on the key; readers union
 # every partition and keep the vintages on or before their session (``data.macro.series``).
+# Event rows say when the fact became knowable (ADR 0050 decision 3): ``known_from``, the
+# session it was knowable on (a backfilled report: its report date); ``data.events`` applies
+# it. Every event table with a spec of its own REQUIRES it, non-null (``EARNINGS_EVENTS``; a
+# new event table declares it the same way). The generic event grain keeps it optional (null:
+# the session that stored it) for the facts of record (``data.events.FACTS_OF_RECORD``:
+# splits, dividends, reference and index changes).
+KNOWN_FROM = "known_from"
+EARNINGS_EVENTS = TableSpec(
+    "events/earnings",
+    "event",
+    ("instrument_id", "ts", KNOWN_FROM),
+    open_ended=True,
+    columns=_columns("instrument_id string!", "ts timestamp_utc!", f"{KNOWN_FROM} date!"),
+    runs="merge",
+)
 MACRO_SERIES = _fixed(
     "macro/series",
     "reference",
@@ -483,6 +498,7 @@ KNOWN: dict[str, TableSpec] = {
         LIVE_OPTION_QUOTES,
         ETF_HOLDINGS,
         MACRO_SERIES,
+        EARNINGS_EVENTS,
     )
 }
 # Open-ended tables: the producing rollup, event source, catalogue or screener defines the
@@ -490,11 +506,6 @@ KNOWN: dict[str, TableSpec] = {
 # nightly -7..+30-day windows into the same session), so they merge; rollups, catalogues and
 # results are full snapshots per run. Bars and chains (fixed, above) are snapshots too: a
 # re-fetched session replaces the earlier fetch.
-# Event rows may say when the fact became knowable (ADR 0050 decision 3): ``known_from``, the
-# session it was knowable on (a backfilled report: its report date). Null: the session that
-# stored it (``session_date``). Declared (typed) on every ``events/*`` table; ``data.events``
-# applies it.
-KNOWN_FROM = "known_from"
 OPEN_PREFIXES = {
     "rollups/daily/": "rollup",
     "rollups/instrument/": "rollup",

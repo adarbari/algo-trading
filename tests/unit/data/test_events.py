@@ -122,7 +122,11 @@ def test_stored_events_keep_each_snapshot_up_to_a_date() -> None:
     writer, reader = StoreWriter(backend), StoreReader(backend)
     assert stored_events(reader, "events/earnings", BACKFILLED_ON).empty
     for day in (date(2026, 9, 1), date(2026, 10, 1), date(2026, 10, 2)):
-        row = {"instrument_id": "EQ:A", "ts": pd.Timestamp(2026, 11, 2, tz="UTC")}
+        row = {
+            "instrument_id": "EQ:A",
+            "ts": pd.Timestamp(2026, 11, 2, tz="UTC"),
+            "known_from": day,
+        }
         writer.write_table("events/earnings", day, f"r{day}", stamped([row], day, f"r{day}"))
     frame = stored_events(reader, "events/earnings", date(2026, 10, 1))
     assert list(frame["session_date"]) == [date(2026, 9, 1), date(2026, 10, 1)]  # not merged
@@ -136,7 +140,11 @@ def test_stored_events_include_later_partitions_known_by_the_date() -> None:
 
     backend = MemoryBackend()
     writer, reader = StoreWriter(backend), StoreReader(backend)
-    nightly = {"instrument_id": "EQ:A", "ts": pd.Timestamp(2019, 4, 1, tz="UTC")}
+    nightly = {
+        "instrument_id": "EQ:A",
+        "ts": pd.Timestamp(2019, 4, 1, tz="UTC"),
+        "known_from": date(2019, 3, 1),
+    }
     writer.write_table(
         "events/earnings", date(2019, 3, 1), "n", stamped([nightly], date(2019, 3, 1), "n")
     )

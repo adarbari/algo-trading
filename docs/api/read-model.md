@@ -237,7 +237,7 @@ Rules by **table grain** (the only place grain decides anything):
 |---|---|---|
 | session | `rollups/instrument/*`, `chains/*`, `results/*`, `bars/1d` (the day's bar), `verification/*`, `live/*` | **exactly the date**; absent: `Unknown(NO_PARTITION)` |
 | snapshot | `instruments/reference`, `instruments/company`, `universe`, `instruments/id_map`, `instruments/ibkr_contracts` | `data.reference.snapshot` (ADR 0007's one rule: latest on or before, else earliest with `pre_snapshot`); **disclosed** as `Session.referenceSnapshot` / `preSnapshot` |
-| event | `events/*` | by event date (ADR 0007), among the rows known on or before the date: `known_from` (null: the row's `session_date`; ADR 0050 decision 3), the latest version of each event |
+| event | `events/*` | by event date (ADR 0007), among the rows known on or before the date: `known_from` (null: the row's `session_date`; ADR 0050 decision 3), the latest version of each event; splits, dividends, reference and index changes (facts of record the adjusted bars use, ADR 0016: `data.events.FACTS_OF_RECORD`) unbounded |
 | issuer-dated | `holdings/etf` | latest `as_of` on or before the date with `filed <= date`; `Holdings.asOf` disclosed |
 | incremental | `instruments/description` | the latest stored row per instrument (text, not a fact) |
 | range | bars, feature series | `[start, end]` given explicitly, `end` not after the date (`prices` / `series` refuse it); never "latest" |

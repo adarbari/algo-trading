@@ -1,14 +1,19 @@
 """``earnings@v1``: the next and last earnings dates as known on the session.
 
 Input: every ``events/earnings`` row known on or before the session (``data.events``' one
-read rule, ADR 0050: its ``known_from``, else the session that stored it). The earnings task
-stores, on each session, the calendar for the days ahead (known from that session) and the
-past reports (known from their report dates, so a later backfill is seen by the sessions
-after each report). Knowledge is as stored: a snapshot (the rows of one stored session) says
-"by session S we knew these companies would report on these dates", and dates move, so for
-each report date X the authority is the LATEST snapshot among the known rows whose date range
-covers X (from its own session, or its earliest row if earlier, to its latest row). A row an
-earlier snapshot listed for X but that snapshot omits was moved or cancelled, and is ignored.
+read rule, ADR 0050: its ``known_from``, else the session that stored it). Two kinds of row:
+
+- a **forecast** row (known from the session that stored it): a snapshot's calendar, "by
+  session S we knew this company would report on this date". Dates move, so for each report
+  date X the authority is the LATEST snapshot whose date range covers X (from its own
+  session, or its earliest row if earlier, to its latest row); a forecast another snapshot
+  listed for X but the authority omits was moved or cancelled, and is ignored;
+- a **history** row (known before the session that stored it: last week's results in a
+  nightly window, a backfilled report known from its report date): a fact of record, always
+  kept, whatever a later snapshot lists. Its day still counts in its snapshot's range.
+
+One row per (instrument, report date): a history row over a forecast, then the latest
+snapshot.
 
     next_earnings_date  the first valid report date on or after the session
     earnings_time       pre / post (after the close) / unknown, for that date
@@ -36,6 +41,9 @@ NAME = "earnings"
 VERSION = 1
 EVENTS = "events/earnings"
 TIMES = {"pre_market": "pre", "after_hours": "post"}
+# The row's knowable date (``data.events``' one read rule, ADR 0050); before its stored session:
+# a history row (a reported result), else a forecast row of that session's calendar.
+KNOWN_FROM = "known_from"
 
 _REPORT = f"{EVENTS}.ts"
 _NO_NEXT = "no report date on or after the session in the calendars stored by then"
@@ -69,15 +77,17 @@ FEATURES = (
     ),
     Feature(
         "last_earnings_date", "date", "date", "The latest report date before the session",
-        "no earlier report date in the calendars stored by then (they start with the first "
-        "stored snapshot; a backfill does not invent history)", inputs=(_REPORT,),
+        "no earlier report date known by the session (the calendars start with the first "
+        "stored snapshot, the earnings backfill from its first day)", inputs=(_REPORT,),
     ),
 )  # fmt: skip
 COLUMNS = column_types(FEATURES)
 
 
 def valid_events(stored: pd.DataFrame, since: date | None = None) -> pd.DataFrame:
-    """The rows of the authoritative snapshot for each report date (see the module doc).
+    """The valid rows for each report date (see the module doc): every history row, and the
+    forecast rows of the authority snapshot; one row per (instrument, report date), a history
+    row over a forecast, then the latest snapshot.
 
     ``since``: only report dates on or after it (``anchored_vwap@v1`` needs none older). The
     snapshots' ranges still come from all their rows, so the rows kept are exactly those the
@@ -87,11 +97,15 @@ def valid_events(stored: pd.DataFrame, since: date | None = None) -> pd.DataFram
         pd.to_datetime(stored["ts"], utc=True).dt.tz_localize(None).to_numpy(dtype="datetime64[D]")
     )
     snap_day = pd.to_datetime(stored["session_date"]).to_numpy(dtype="datetime64[D]")
+    history = np.zeros(len(stored), dtype=bool)
+    if KNOWN_FROM in stored.columns:
+        known = pd.to_datetime(stored[KNOWN_FROM]).to_numpy(dtype="datetime64[D]")
+        history = ~np.isnat(known) & (known < snap_day)
     ranges = pd.DataFrame({"snapshot": snap_day, "report": report_day}).groupby("snapshot")
     lo, hi = ranges["report"].min(), ranges["report"].max()
     snaps = lo.index.to_numpy(dtype="datetime64[D]")
     # A snapshot covers from its own session (the calendar it fetched starts there) or its
-    # earliest row (a backfill of past dates), to its latest row.
+    # earliest row (the past days its window fetched), to its latest row.
     first = np.minimum(lo.to_numpy(dtype="datetime64[D]"), snaps)
     last_day = hi.to_numpy(dtype="datetime64[D]")
     keep = np.ones(len(stored), dtype=bool)
@@ -102,12 +116,18 @@ def valid_events(stored: pd.DataFrame, since: date | None = None) -> pd.DataFram
     # Snapshots are sorted ascending: the last covering one is the authority.
     authority = snaps[covers.shape[1] - 1 - np.argmax(covers[:, ::-1], axis=1)]
     kept = np.flatnonzero(keep)
-    valid = kept[snap_day[kept] == authority[np.searchsorted(reports, report_day[kept])]]
-    rows: pd.DataFrame = stored.iloc[valid]
-    return rows.assign(
+    from_authority = snap_day[kept] == authority[np.searchsorted(reports, report_day[kept])]
+    valid = kept[from_authority | history[kept]]
+    rows: pd.DataFrame = stored.iloc[valid].assign(_history=history[valid])
+    rows = rows.assign(
         report=pd.to_datetime(rows["ts"], utc=True).dt.date,
         snapshot=pd.to_datetime(rows["session_date"]).dt.date,
     )
+    if rows["_history"].any():  # a report kept twice: the history row, then the latest
+        ranked = rows.sort_values(["_history", "snapshot"], kind="stable")
+        last = ranked.drop_duplicates(["instrument_id", "report"], keep="last").index
+        rows = rows[rows.index.isin(last)]
+    return rows.drop(columns="_history")
 
 
 def _column(frame: pd.DataFrame, name: str) -> list[object]:

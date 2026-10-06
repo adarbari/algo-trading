@@ -14,6 +14,11 @@ column is absent or null, from the session that stored it (``session_date``). So
 report backfilled into a 2026 partition with ``known_from = 2019-05-01`` is visible to a
 2019-05-01 session, and a row without ``known_from`` is invisible before the session that
 stored it. ``through`` is S; ``None`` keeps every row.
+
+**Facts of record** (``FACTS_OF_RECORD``: splits, dividends, reference and index changes) are
+applied to bars at read time (ADR 0016) and read by event date without a knowledge bound:
+they carry no ``known_from``, and ``knowledge_bound`` gives them none, so a pinned past
+session shows the split its own adjusted bars used.
 """
 
 from collections.abc import Sequence
@@ -26,6 +31,10 @@ from algotrade.storage.tables.readers import StoreReader
 from algotrade.storage.tables.schemas import KNOWN_FROM
 
 ALL_TIME = (date(1900, 1, 1), date(9999, 12, 31))
+# Read by event date with no knowledge bound (module doc): applied to bars at read time.
+FACTS_OF_RECORD = frozenset(
+    {"events/split", "events/dividend", "events/reference_change", "events/index_change"}
+)
 
 
 @dataclass(frozen=True)
@@ -53,6 +62,12 @@ def _known_by(frame: pd.DataFrame, through: date | None) -> pd.DataFrame:
     if through is None:
         return frame
     return frame[known_from(frame) <= pd.Timestamp(through)]
+
+
+def knowledge_bound(table: str, session: date) -> date | None:
+    """The ``through`` a read as of ``session`` passes for ``table``: the session, or None for
+    a fact of record (module doc)."""
+    return None if table in FACTS_OF_RECORD else session
 
 
 def read_events(

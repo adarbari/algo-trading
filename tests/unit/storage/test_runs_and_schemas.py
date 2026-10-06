@@ -64,15 +64,21 @@ def test_tables_declare_how_their_runs_combine() -> None:
         TableSpec("t", "event", ("instrument_id",), runs="append")
 
 
-def test_known_from_is_declared_on_every_event_table_only() -> None:
+def test_known_from_is_required_on_earnings_optional_on_facts_of_record() -> None:
     from algotrade.storage.tables.schemas import KNOWN_FROM  # noqa: PLC0415
 
-    for table in ("events/earnings", "events/split", "events/macro_release"):
+    earnings = spec_for("events/earnings")
+    column = earnings.column(KNOWN_FROM)
+    assert KNOWN_FROM in earnings.required and column is not None and not column.nullable
+    assert earnings.grain == "event" and earnings.runs == "merge" and earnings.open_ended
+    for table in ("events/split", "events/dividend"):
         column = spec_for(table).column(KNOWN_FROM)
         assert column is not None and column.type == "date" and column.nullable, table
+        assert KNOWN_FROM not in spec_for(table).required
     for table in ("bars/1d", "rollups/instrument/x@v1", "instruments/reference"):
         assert spec_for(table).column(KNOWN_FROM) is None, table
     row = {"instrument_id": "EQ:A", "ts": datetime(2019, 5, 1, tzinfo=UTC)}
-    validate_frame(
-        "events/earnings", stamped([{**row, KNOWN_FROM: date(2019, 5, 1)}], date(2026, 10, 2), "r")
-    )
+    day = date(2026, 10, 2)
+    validate_frame("events/earnings", stamped([{**row, KNOWN_FROM: date(2019, 5, 1)}], day, "r"))
+    with pytest.raises(DataValidationError, match="missing columns"):
+        validate_frame("events/earnings", stamped([row], day, "r"))
