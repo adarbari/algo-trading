@@ -261,3 +261,35 @@ def test_installed_agents_must_run_the_main_checkout(tmp_path: Path) -> None:
     assert bad.level == doctor.FAIL and "algotrade-api schedule" in bad.fix
     (agents / "com.algotrade.nightly.plist").write_bytes(b"not a plist")
     assert doctor.check_agents(p)[0].level == doctor.FAIL
+
+
+def test_low_disk_only_warns_and_points_at_the_prune(tmp_path: Path) -> None:
+    low = probes(tmp_path, {}, main=lambda: tmp_path, free_bytes=lambda path: 5 * 10**9)
+    r = doctor.check_disk(low)
+    assert r.level == doctor.WARN and "--prune-merged" in r.fix
+    ok = probes(tmp_path, {}, main=lambda: tmp_path, free_bytes=lambda path: 50 * 10**9)
+    assert doctor.check_disk(ok).level == "ok"
+
+
+def _worktrees(tmp_path: Path, rc: int, merged: int) -> "doctor.Result":
+    lines = [f"would remove /w/algo-trading-{i} (feat/{i})" for i in range(merged)]
+    lines += [
+        "kept /w/algo-trading-open (feat/open): open PR",
+        f"would remove {merged} worktree(s)",
+    ]
+    return doctor.check_worktrees(
+        probes(
+            tmp_path, {}, main=lambda: tmp_path, run=lambda cmd, cwd=None: (rc, "\n".join(lines))
+        )
+    )
+
+
+def test_many_merged_worktrees_warn_with_the_prune_fix(tmp_path: Path) -> None:
+    assert _worktrees(tmp_path, 0, 10).level == "ok"
+    r = _worktrees(tmp_path, 0, 11)
+    assert r.level == doctor.WARN and "11 worktrees" in r.detail
+    assert r.fix.endswith("scripts/worktree.sh --prune-merged")
+
+
+def test_worktree_check_is_skipped_without_gh(tmp_path: Path) -> None:
+    assert _worktrees(tmp_path, 1, 50).level == doctor.INFO

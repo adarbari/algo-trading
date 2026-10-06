@@ -1,7 +1,8 @@
 ## What & why
 
 <!-- This PR merges automatically once every CI check passes. Mark it as a draft or add
-     the `no-automerge` label to keep it open for review. -->
+     the `no-automerge` label to keep it open for review (also while an `architect` review is
+     pending). -->
 
 ## Ownership (ADR 0019)
 - Owner module(s) this change extends (from `architecture/ownership.toml`):

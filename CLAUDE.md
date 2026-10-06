@@ -128,7 +128,8 @@ the skill with the fix.
    library's), then `uv lock`; commit `uv.lock`.
 9. Before finishing any change, run `make check`.
 10. **Push and open the PR yourself, then move on.** When `make check` passes, push the
-    feature branch (never `main`, never force-push), open the PR from the template and start
+    feature branch (never `main`, never force-push; merge `origin/main` right before every push
+    when other sessions are landing PRs), open the PR from the template and start
     the next work item; do not ask the owner first and do not wait for CI (owner decision
     2026-10-04). Only merging is off limits (below). A harness-learning PR still follows
     `capture-learning`.
@@ -165,7 +166,8 @@ the skill with the fix.
 
 Worktrees: `scripts/worktree.sh <branch> [base]` makes `../algo-trading-<slug>` off
 `origin/main` (links `.venv`, writes `worktree.env` with the worktree's absolute `PYTHONPATH`,
-runs its own `npm ci`); `source` that file; `--remove` cleans up. Never symlink `node_modules`
+runs its own `npm ci`); `source` that file; `--remove` cleans up one, `--prune-merged` removes the worktrees of merged PRs
+(leftovers filled the disk 2026-10-06; `make doctor` warns). Never symlink `node_modules`
 to main's: `make check`'s `npm ci` through the link empties main's. **Never `uv sync` /
 `make install` in a worktree** (agent worktrees too): through the `.venv` link it points the
 main checkout's venv, which launchd's nightly and the API run, at the worktree's code
