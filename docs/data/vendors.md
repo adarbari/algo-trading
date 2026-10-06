@@ -98,6 +98,24 @@ days; `[massive]` in `config/site/sources.toml`). Massive preferred tickers (`KI
 Prices are adjusted at read time (`none`, `splits`, `total_return`; setting
 `[backtest] price_adjustment`).
 
+## Tiingo daily prices from 2018 (implemented, ADR 0050)
+
+Host `https://api.tiingo.com`; the key (`ALGOTRADE_TIINGO_API_KEY` in `.env`, a free account) is
+sent as an `Authorization: Token` header, never in URLs, raw files or logs. Licence `personal`
+(`[tiingo] licence`). One request per ticker returns the whole window:
+`/tiingo/daily/{ticker}/prices?startDate=2018-01-01&endDate=D&format=json` (a share class is
+written `BRK-B`; an unknown ticker answers 404). The payload's `open` / `high` / `low` /
+`close` / `volume` are **unadjusted**; they are stored as `bars/1d` rows with `source =
+"tiingo"` by the `bars-history` task (the `adj*` fields are ignored: corporate actions apply at
+read time, ADR 0016). `splitFactor` and `divCash` stay in the parsed payload for the task's
+split check against `events/split`.
+
+Free tier: 500 unique symbols a month, 50 requests an hour, 1,000 a day, so requests are spaced
+72 s apart (`[tiingo] min_interval_s`) and the ~140 scoped names take about 3 hours. The Power
+tier ($10 a month) lifts the symbol cap (5,000 requests an hour) for the full tier A / B set.
+Why Tiingo: Stooq's daily CSV now answers with a browser-verification page, and Massive's free
+tier stops at two years.
+
 ## Company and fund descriptions (implemented, ADR 0034)
 
 One table, `instruments/description` (columns in [layers.md](layers.md)), written by the

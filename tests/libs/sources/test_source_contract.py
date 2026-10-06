@@ -40,6 +40,7 @@ from algotrade_sources.vendors.sec.fund_objectives import (
 from algotrade_sources.vendors.sec.nport_holdings import NportHoldings
 from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource
+from algotrade_sources.vendors.tiingo.prices import TiingoDailyPrices
 from algotrade_sources.vendors.treasury.par_yields import TreasuryParYields
 from tests.conftest import GOLDEN_DIR, REPO_ROOT
 from tests.helpers.fake_ib import FakeIB
@@ -50,6 +51,7 @@ from tests.helpers.payloads import massive as massive_payloads
 from tests.helpers.payloads import nasdaq_earnings as earnings_payloads
 from tests.helpers.payloads import published as published_payloads
 from tests.helpers.payloads import sec as sec_payloads
+from tests.helpers.payloads import tiingo as tiingo_payloads
 from tests.helpers.payloads import treasury as treasury_payloads
 from tests.helpers.payloads import universe as universe_payloads
 
@@ -137,6 +139,11 @@ def massive_bars() -> Adapter:
     return source, FetchRequest(fx.SESSION.isoformat())
 
 
+def tiingo_prices() -> Adapter:
+    source = TiingoDailyPrices(http_for(lambda url: tiingo_payloads.sample()))
+    return source, FetchRequest("AAPL:2020-08-27:2020-11-06")
+
+
 def massive_actions() -> Adapter:
     payload = massive_payloads.page(
         [{"ticker": "NVDA", "execution_date": "2026-09-30", "split_from": 1, "split_to": 10}]
@@ -218,6 +225,7 @@ ADAPTERS: dict[str, Callable[[], Adapter]] = {
     "sec_submissions": sec_submissions,
     "sec_company_facts": sec_company_facts,
     "massive_bars": massive_bars,
+    "tiingo_prices": tiingo_prices,
     "massive_actions": massive_actions,
     "nasdaq_earnings": nasdaq_earnings,
     "cboe": cboe,

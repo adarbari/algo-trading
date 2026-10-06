@@ -41,6 +41,9 @@ IBKR_API_CLIENT_ID = "ALGOTRADE_IBKR_API_CLIENT_ID"  # default: ALGOTRADE_IBKR_C
 # SEC fair-access contact. Everything else is optional or defaulted. `make doctor` lists them.
 MASSIVE_API_KEY = "ALGOTRADE_MASSIVE_API_KEY"
 SEC_CONTACT = "ALGOTRADE_SEC_CONTACT"
+# Tiingo daily prices (the event-study history from 2018, ADR 0050): optional, free key; no key:
+# the source is skipped and `bars-history` with it.
+TIINGO_API_KEY = "ALGOTRADE_TIINGO_API_KEY"
 # The text model behind natural-language screener drafts (ADR 0041): optional (a local server
 # needs none); the provider is `config/site/llm.toml`, never the environment.
 LLM_API_KEY = "ALGOTRADE_LLM_API_KEY"

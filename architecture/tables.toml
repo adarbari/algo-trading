@@ -59,7 +59,12 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/market/option_chains.py"
 [[table]]
 name = "bars/1d"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/bars.py"
-also_written_by = ["apps/ingestion/algotrade_ingestion/tasks/maintenance/golden.py"]
+also_written_by = [
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/golden.py",
+    # Tiingo history from 2018 (ADR 0050): same table, rows keyed by (instrument, session) that
+    # Massive's partitions do not hold; it rewrites a partition whole and never replaces a row.
+    "apps/ingestion/algotrade_ingestion/tasks/market/bars_history.py",
+]
 
 [[table]]
 name = "events/split"

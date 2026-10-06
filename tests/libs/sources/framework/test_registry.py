@@ -16,6 +16,7 @@ import pytest
 from algotrade.config.site.settings import SourcesSettings
 from algotrade.core.model.errors import ConfigurationError
 from algotrade_sources.framework import registry
+from algotrade_sources.framework.base import FetchRequest
 from algotrade_sources.framework.http import Http
 from algotrade_sources.framework.registry import (
     RAW_SECTIONS,
@@ -38,6 +39,7 @@ ENV = {
     "ALGOTRADE_MASSIVE_API_KEY": "key",
     "ALGOTRADE_SEC_CONTACT": "ops@example.org",
     "ALGOTRADE_FRED_API_KEY": "fred-key",
+    "ALGOTRADE_TIINGO_API_KEY": "tiingo-key",
 }
 
 
@@ -101,6 +103,34 @@ def test_fred_needs_its_key_and_sends_it_only_as_a_query_parameter(
     assert len(seen) == 1 and seen[0].endswith("&api_key=s3cret")
     assert seen[0].startswith("https://fred.example/v1/series/observations?")  # [fred] base_url
     assert "api_key" not in source.url(request)  # type: ignore[attr-defined]
+
+
+def test_tiingo_needs_its_key_sends_it_as_a_token_header_and_paces_for_the_free_tier(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    missing = build_sources(settings(), lambda name: None, ["tiingo_prices"], tmp_path)
+    assert missing.skipped["tiingo_prices"].startswith("ALGOTRADE_TIINGO_API_KEY is not set")
+
+    sent: list[dict[str, str] | None] = []
+    urls: list[str] = []
+
+    def fake_transport(headers: dict[str, str] | None = None) -> Callable[[str], bytes]:
+        sent.append(headers)
+
+        def answer(url: str) -> bytes:
+            urls.append(url)
+            return b"[]"
+
+        return answer
+
+    monkeypatch.setattr(registry, "urllib_transport", fake_transport)
+    env = {"ALGOTRADE_TIINGO_API_KEY": "s3cret"}.get
+    built = build_sources(settings(), env, ["tiingo_prices"], tmp_path)
+    built.sources["tiingo_prices"].fetch(FetchRequest("AAPL:2018-01-01:2018-02-01"))
+    assert sent[0] is not None and sent[0]["Authorization"] == "Token s3cret"
+    assert "s3cret" not in urls[0]  # a header, never in the URL
+    assert built.limiters["tiingo"].min_interval_s == 72.0  # 50 requests an hour
+    assert settings().tiingo_licence == "personal"
 
 
 def test_one_limiter_and_breaker_per_key_with_configured_or_default_pace(
