@@ -108,14 +108,17 @@ asks the same `TextModel` for plain words about the market weather.
    plain name, and the route accepts nothing else. Rendered byte-stable. Nothing calls the model
    unasked.
 3. **The answer is checked, not trusted.** It is a JSON object `{text, links}` (the adapter asks
-   the provider for a JSON object). A URL that is not an allowed link is dropped; the allowed
+   the provider for a JSON object), parsed strictly: anything else is `ModelUnavailableError`. A URL that is not an allowed link is dropped; the allowed
    ones become citations; markdown marks are removed. Every number in the text must be one of
-   the facts' numbers, to the precision the text shows; one that is not withholds the whole
+   the facts' numbers, with the same sign and to the precision the text shows (the as-of date
+   is not a fact); the check is magnitude and sign only, it does not read spelled-out numbers
+   or units; one that is not withholds the whole
    answer (`checked = false`, a note, no text) and the page shows its templated text instead.
 4. **A derived cache, an ADR 0005 write exception.** The API writes the model's raw answer,
    only when it checked, to JSON files under `var/cache/explanations/` through
    `storage/backends/text_cache.py` (the `TextCache` protocol, keyed by session date and a hash
-   of the signals' verdicts, the question and the model), like its live-quote log (ADR 0028):
+   of the signals' verdicts, the question, the model and the prompt's version),
+   like its live-quote log (ADR 0028):
    derived, losable (a lost file is one more model call), never read by a backtest or a screen.
    A cached answer is checked again on every read. Per-user rate limit: 6 model calls a
    minute (in memory; a cache hit does not count); a seventh is a 429 with `Retry-After`.

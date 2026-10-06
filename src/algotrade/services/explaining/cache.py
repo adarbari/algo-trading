@@ -2,8 +2,9 @@
 protocol (``get`` / ``put`` a text by key); its backend is ``storage/backends/text_cache.py``
 (JSON files under ``var/cache/explanations/``), opened here from the store's URL like the live
 recorder's. The key is the session date and the hash of what the answer depends on: which
-signals are on and their verdicts, the question and the model's name, so the first click of a
-session pays the model and the rest of the team reads the file. What is cached is the model's
+signals are on and their verdicts, the question, the model's name and the prompt's version (a
+changed prompt never serves an old answer), so the first click of a session pays the model and
+the rest of the team reads the file. What is cached is the model's
 raw answer, which is verified again on every read. A derived cache, not data: the API's one
 write outside user configs, the live-quote log and screener runs (ADR 0005 exception)."""
 
@@ -11,6 +12,7 @@ import hashlib
 import json
 from typing import Protocol
 
+from algotrade.services.explaining.prompt import PROMPT_VERSION, TASK
 from algotrade.services.read.regime.regime import MarketRegime
 from algotrade.storage.factory import open_text_cache as open_backend_cache
 
@@ -33,9 +35,16 @@ def signals_hash(regime: MarketRegime) -> str:
     return hashlib.sha256(document.encode()).hexdigest()
 
 
+def prompt_id() -> str:
+    """Which prompt an answer was asked with: ``PROMPT_VERSION`` and a hash of the task text."""
+    return f"{PROMPT_VERSION}-{hashlib.sha256(TASK.encode()).hexdigest()[:12]}"
+
+
 def cache_key(regime: MarketRegime, question: str, model_name: str) -> str:
-    """``<session date>_<hash of the signals, the question and the model>``."""
-    document = json.dumps([signals_hash(regime), question, model_name], separators=(",", ":"))
+    """``<session date>_<hash of the signals, the question, the model and the prompt>``."""
+    document = json.dumps(
+        [signals_hash(regime), question, model_name, prompt_id()], separators=(",", ":")
+    )
     digest = hashlib.sha256(document.encode()).hexdigest()[:32]
     return f"{regime.session.isoformat()}_{digest}"
 

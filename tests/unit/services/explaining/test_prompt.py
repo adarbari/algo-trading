@@ -17,7 +17,6 @@ from algotrade.services.read.regime.indicators import IndicatorStatus
 from algotrade.services.read.regime.regime import MarketRegime
 
 FACTS = """\
-As of 2026-10-01.
 The market's weather: Storm. 1 of 1 slow-moving warning signs are on. The fast signs are quiet. 1 changed in the last 5 sessions.
 Scores:
 - Slow-warning score (macro risk, moves over weeks): 62 out of 100
@@ -32,6 +31,7 @@ def test_the_facts_are_byte_stable_and_only_what_is_on_or_changed(regime: Market
     facts = regime_facts(regime)
     assert facts.text == FACTS
     assert regime_facts(regime) == facts
+    assert facts.as_of == "As of 2026-10-01."  # shown to the model, not a quotable number
     assert [(link.title, link.url) for link in facts.links] == [
         ("curve page", "https://example.org/curve")
     ]
@@ -42,7 +42,7 @@ def test_the_system_prompt_is_the_task_the_facts_and_the_allowed_links(
 ) -> None:
     system = system_prompt(regime_facts(regime))
     assert system == (
-        f"{TASK}\nFACTS\n{FACTS}\n\nALLOWED LINKS\n- curve page: https://example.org/curve\n"
+        f"{TASK}\nFACTS\nAs of 2026-10-01.\n{FACTS}\n\nALLOWED LINKS\n- curve page: https://example.org/curve\n"
     )
     assert "describe what is happening; never advise" in system.lower()
     assert "under 150 words" in system.lower() and "no markdown" in system.lower()

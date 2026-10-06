@@ -149,3 +149,12 @@ def test_a_model_that_cannot_answer_is_a_503(
 ) -> None:
     response = app_with(api_golden[0], Down()).post("/regime/explain", json=ASK)
     assert response.status_code == 503 and "timed out" in response.json()["detail"]
+
+
+def test_an_answer_that_is_not_the_envelope_is_a_503_and_not_cached(
+    api_golden: tuple[ReadStore, dict[str, str]],
+) -> None:
+    client = app_with(api_golden[0], Canned("A storm, but not JSON."))
+    response = client.post("/regime/explain", json=ASK)
+    assert response.status_code == 503 and "not the JSON envelope" in response.json()["detail"]
+    assert client.app.state.explain_cache._items == {}  # type: ignore[attr-defined]

@@ -60,7 +60,13 @@ def test_an_invented_number_withholds_the_answer_with_a_note(regime: MarketRegim
         ("Macro risk is about 63.", False),  # not what the facts say
         ("Macro risk is about 65.", False),  # not a rounding of any fact
         ("Stress is 71.4.", False),  # more precise than the fact
-        ("As of 1 Oct 2026 it is 1 of 1.", True),  # the date and counts are facts
+        ("It is 1 of 1.", True),  # the counts are facts
+        ("As of 1 Oct 2026 it is stormy.", False),  # the as-of date is not a fact
+        ("The curve is at -0.2.", True),  # signed as the fact is
+        ("The curve is at 0.2, inverted.", False),  # the sign is part of the number
+        ("The curve is at \u22120.2.", True),  # a typographic minus is a minus
+        ("Stress is up .7 from nothing.", False),  # a leading decimal is read as a number
+        ("The 10-year and the 3-month, 2008-09.", False),  # 10, 3, 2008, 9 are not facts
         ("Numbers like 1,000 are not facts.", False),
         ("No numbers at all, only words.", True),
     ],
@@ -71,34 +77,50 @@ def test_numbers_are_checked_against_the_facts_to_the_precision_shown(
     assert verify(answer(text), regime_facts(regime)).checked is checked
 
 
-def test_numbers_are_read_with_their_places() -> None:
+def test_numbers_are_read_with_their_places_and_signs() -> None:
     assert numbers_in("a 6.80 and 1,234.5, then 3.") == [
         (6.8, 2, "6.80"),
         (1234.5, 1, "1,234.5"),
         (3.0, 0, "3"),
     ]
+    assert numbers_in("down -3.2 or \u22121 or .5, in a 10-year, 5-10") == [
+        (-3.2, 1, "-3.2"),
+        (-1.0, 0, "\u22121"),
+        (0.5, 1, ".5"),
+        (10.0, 0, "10"),
+        (5.0, 0, "5"),
+        (10.0, 0, "10"),
+    ]
     facts = regime_facts_text("Value 6.8.")
     assert unverified("It is 7 or 6.8 or 7.4", facts) == ["7.4"]
+    assert unverified("It rose 3.2%", regime_facts_text("A fall of -3.2%.")) == ["3.2"]
+    assert unverified("It fell -3.2%", regime_facts_text("A fall of -3.2%.")) == []
 
 
 def regime_facts_text(text: str) -> Facts:  # a Facts over plain text
     return Facts(text, ())
 
 
-def test_markdown_marks_are_removed_and_plain_text_is_accepted(regime: MarketRegime) -> None:
+def test_markdown_marks_are_removed_and_a_fence_is_tolerated(regime: MarketRegime) -> None:
     marked = answer("# Weather\n**Storm** with `71` stress\n- one\n- two")
     assert verify(marked, regime_facts(regime)).text == "Weather Storm with 71 stress one two"
-    raw = verify("A storm, no JSON at all.", regime_facts(regime))
-    assert raw.checked and raw.text == "A storm, no JSON at all." and raw.citations == ()
     fenced = verify('```json\n{"text": "Fenced.", "links": []}\n```', regime_facts(regime))
     assert fenced.text == "Fenced."
 
 
-def test_parse_takes_the_envelope_or_the_text() -> None:
+@pytest.mark.parametrize(
+    "raw", ["A storm, no JSON at all.", '{"nothing": 1}', '{"text": 3}', "[1]", "null", ""]
+)
+def test_an_answer_that_is_not_the_envelope_is_the_model_not_answering(
+    regime: MarketRegime, raw: str
+) -> None:
+    with pytest.raises(ModelUnavailableError, match="not the JSON envelope"):
+        verify(raw, regime_facts(regime))
+
+
+def test_parse_takes_the_envelope() -> None:
     assert parse('{"text": "x", "links": ["u", 3]}') == ("x", ["u"])
     assert parse('{"text": "x"}') == ("x", [])
-    assert parse('{"nothing": 1}') == ('{"nothing": 1}', [])
-    assert parse("plain") == ("plain", [])
 
 
 def test_an_empty_answer_is_the_model_not_answering(regime: MarketRegime) -> None:

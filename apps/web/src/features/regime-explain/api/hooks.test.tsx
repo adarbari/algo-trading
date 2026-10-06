@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { api, TestQueryProvider } from '@/shared/api';
 
-import { useExplainAvailable, useExplainRegime } from './hooks';
+import { PROBE_ANSWER, useExplainAvailable, useExplainRegime } from './hooks';
 
 vi.mock('@/shared/api', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -28,7 +28,7 @@ beforeEach(() => {
 
 describe('useExplainAvailable', () => {
   it('probes with an empty body: 400 means a model is configured', async () => {
-    POST.mockResolvedValue(refusal(400, 'ask one of question or card'));
+    POST.mockResolvedValue(refusal(400, PROBE_ANSWER));
     const { result } = renderHook(() => useExplainAvailable(), { wrapper });
     await waitFor(() => {
       expect(result.current.data).toBe(true);
@@ -43,6 +43,14 @@ describe('useExplainAvailable', () => {
     const { result } = renderHook(() => useExplainAvailable(), { wrapper });
     await waitFor(() => {
       expect(result.current.data).toBe(false);
+    });
+  });
+
+  it("a 400 that is not the route's own answer is not availability", async () => {
+    POST.mockResolvedValue(refusal(400, 'the session could not be resolved'));
+    const { result } = renderHook(() => useExplainAvailable(), { wrapper });
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
     });
   });
 

@@ -14,6 +14,9 @@ from algotrade.services.read.regime.indicators import IndicatorStatus, RegimeInd
 from algotrade.services.read.regime.regime import MarketRegime, RegimeScore
 
 WHAT_IS_HAPPENING = "what is happening?"
+# Bump when the facts' wording or layout changes (the task text is hashed on its own): cached
+# answers are keyed by it, so a changed prompt never serves an answer to the old one.
+PROMPT_VERSION = 1
 
 TASK = """\
 You explain the state of the stock market to someone who does not follow markets. The facts
@@ -25,6 +28,7 @@ Rules:
   Every number you write must appear in the facts.
 - Name the one or two signals that matter most, in the plain words of the facts.
 - Under 150 words, plain text, no markdown, no lists, no headings.
+- Write a number exactly as the facts do, with its sign: a fall to -3.2 is "-3.2", never "3.2".
 - Cite a link only when you used it, and only from the allowed links, spelled exactly.
 
 Answer with ONE JSON object and nothing else (no code fence):
@@ -42,11 +46,13 @@ class Link:
 
 @dataclass(frozen=True)
 class Facts:
-    """What the model may use: ``text`` (every number the answer may quote is in it) and the
+    """What the model may use: ``text`` (every number the answer may quote is in it), the
+    ``as_of`` line (the session's date, shown to the model but not a quotable number) and the
     ``links`` it may cite, in a stable order."""
 
     text: str
     links: tuple[Link, ...]
+    as_of: str = ""
 
 
 def _trim(number: float, places: int) -> str:
@@ -101,7 +107,6 @@ def regime_facts(regime: MarketRegime, card: RegimeIndicator | None = None) -> F
         if i.status is IndicatorStatus.ON or i.changed or (card is not None and i.key == card.key)
     ]
     lines = [
-        f"As of {regime.session.isoformat()}.",
         f"The market's weather: {regime.plain_label}. {regime.headline}",
         "Scores:",
         _score("Slow-warning score (macro risk, moves over weeks)", regime.scores.macro_risk),
@@ -123,13 +128,13 @@ def regime_facts(regime: MarketRegime, card: RegimeIndicator | None = None) -> F
     for indicator in shown_cards:
         for link in indicator.links:
             links.setdefault(link.url, Link(link.title, link.url))
-    return Facts("\n".join(lines), tuple(links.values()))
+    return Facts("\n".join(lines), tuple(links.values()), f"As of {regime.session.isoformat()}.")
 
 
 def system_prompt(facts: Facts) -> str:
     """The task, the facts and the allowed links."""
     allowed = "\n".join(f"- {link.title}: {link.url}" for link in facts.links) or "- none"
-    return f"{TASK}\nFACTS\n{facts.text}\n\nALLOWED LINKS\n{allowed}\n"
+    return f"{TASK}\nFACTS\n{facts.as_of}\n{facts.text}\n\nALLOWED LINKS\n{allowed}\n"
 
 
 def user_prompt(question: str) -> str:

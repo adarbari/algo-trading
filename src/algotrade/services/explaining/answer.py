@@ -1,10 +1,12 @@
 """``explain``: the regime in plain words from the text model (ADR 0041, amended 2026-10-06).
-The model's answer is a JSON object ``{"text", "links"}`` (the provider is asked for a JSON
-object; text that is not one is taken as the text). It is cleaned and checked before anyone
+The model's answer is a JSON object ``{"text", "links"}``, parsed strictly (anything else
+is ``ModelUnavailableError``). It is cleaned and checked before anyone
 reads it: a URL that is not one of the allowed links is dropped (the allowed ones become
 ``citations``, with the card's title; none stays in the text), markdown marks are removed, and
-every number in the text must be one of the facts' numbers, to the precision the text shows
-(``7`` matches ``6.8``; ``6.8`` does not match ``7``). A number the facts do not contain makes
+every number in the text must be one of the facts' numbers, same sign and to the precision the
+text shows (``7`` matches ``6.8``; ``6.8`` does not match ``7``; ``3.2`` does not match
+``-3.2``). The check is magnitude and sign only: it does not read spelled-out numbers ("three")
+or units ("percent" for "points"). A number the facts do not contain makes
 the answer unchecked: ``checked`` is False, the text and citations are withheld and ``note``
 says why, so the page shows the plain description instead. A model that cannot answer raises
 ``ModelUnavailableError``, as drafting does."""
@@ -27,11 +29,14 @@ from algotrade.services.read.regime.indicators import RegimeIndicator
 from algotrade.services.read.regime.regime import MarketRegime
 from algotrade.services.text_model.model import TextModel
 
-_NUMBER = re.compile(r"(?<![A-Za-z\d.])\d[\d,]*(?:\.\d+)?")
+# A number as written: an optional sign (not inside a word: "10-year" has no minus), digits with
+# thousands commas and decimals, or a leading-decimal ".5".
+_NUMBER = re.compile(r"(?<![\w.])[-\u2212]?(?:\d[\d,]*(?:\.\d+)?|\.\d+)")
 _URL = re.compile(r"https?://[^\s\"'<>)\]]+")
 _FENCE = re.compile(r"^```[a-zA-Z]*\s*|\s*```$")
 _MARKS = re.compile(r"\*\*|__|`|^#+\s*|^\s*[-*]\s+", re.MULTILINE)
 _SLACK = 1e-9
+ENVELOPE = "the model's answer is not the JSON envelope"
 
 
 @dataclass(frozen=True)
@@ -54,18 +59,19 @@ class Explanation:
 
 
 def numbers_in(text: str) -> list[tuple[float, int, str]]:
-    """Every number in ``text``: ``(value, decimals shown, as written)``, so ``"6.80"`` is
-    ``(6.8, 2, "6.80")``."""
+    """Every number in ``text``: ``(signed value, decimals shown, as written)``, so ``"-6.80"``
+    is ``(-6.8, 2, "-6.80")``."""
     found: list[tuple[float, int, str]] = []
     for match in _NUMBER.findall(text):
         written = match.rstrip(",")
-        digits = written.replace(",", "")
+        digits = written.replace(",", "").replace("\u2212", "-")
         found.append((float(digits), len(digits.partition(".")[2]), written))
     return found
 
 
 def unverified(text: str, facts: Facts) -> list[str]:
-    """The numbers of ``text`` that no fact contains (each as written), in order."""
+    """The numbers of ``text`` that no fact contains (each as written), in order. A match is
+    the same signed value to the places the text shows; the as-of date is not a fact."""
     known = [value for value, _, _ in numbers_in(facts.text)]
     return [
         written
@@ -75,18 +81,17 @@ def unverified(text: str, facts: Facts) -> list[str]:
 
 
 def parse(raw: str) -> tuple[str, list[str]]:
-    """The model's ``(text, links)``: the JSON object's fields, or the raw text with no links."""
-    stripped = _FENCE.sub("", raw.strip())
+    """The model's ``(text, links)`` from its JSON envelope (a code fence is tolerated); an
+    answer that is not the envelope is ``ModelUnavailableError``, as a draft's is."""
     try:
-        parsed: Any = json.loads(stripped)
-    except ValueError:
-        return stripped, []
+        parsed: Any = json.loads(_FENCE.sub("", raw.strip()))
+    except ValueError as exc:
+        raise ModelUnavailableError(ENVELOPE) from exc
     if not isinstance(parsed, Mapping) or not isinstance(parsed.get("text"), str):
-        return stripped, []
+        raise ModelUnavailableError(ENVELOPE)
     links = parsed.get("links")
-    return parsed["text"], [u for u in links if isinstance(u, str)] if isinstance(
-        links, list
-    ) else []
+    urls = [u for u in links if isinstance(u, str)] if isinstance(links, list) else []
+    return parsed["text"], urls
 
 
 def verify(raw: str, facts: Facts) -> Explanation:

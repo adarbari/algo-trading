@@ -14,12 +14,15 @@ export type RegimeExplanation = components['schemas']['RegimeExplanation'];
 /** The one question the API accepts besides a card key. */
 export const WHAT_IS_HAPPENING = 'what is happening?';
 
+/** The route's own 400 for a body that asks for nothing (any other 400 is not the probe's). */
+export const PROBE_ANSWER = 'ask one of question or card';
+
 export interface ExplainAsk {
   /** A card key of the regime, or `undefined` for "what is happening?". */
   card?: string | undefined;
 }
 
-const AVAILABLE_KEY = ['regime-explain', 'available'] as const;
+export const AVAILABLE_KEY = ['regime-explain', 'available'] as const;
 
 export function useExplainAvailable() {
   return useQuery({
@@ -29,7 +32,9 @@ export function useExplainAvailable() {
         await unwrap(api.POST('/regime/explain', { body: { question: null, card: null } }));
         return true;
       } catch (error) {
-        if (error instanceof ApiError && error.status === 400) return true;
+        if (error instanceof ApiError && error.status === 400 && error.detail === PROBE_ANSWER) {
+          return true;
+        }
         if (error instanceof ApiError && error.status === 503) return false;
         throw error;
       }

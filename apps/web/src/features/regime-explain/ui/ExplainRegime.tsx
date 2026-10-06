@@ -11,7 +11,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { ApiError, errorDetail } from '@/shared/api';
 
-import { useExplainAvailable, useExplainRegime } from '../api/hooks';
+import { AVAILABLE_KEY, useExplainAvailable, useExplainRegime } from '../api/hooks';
 
 export interface ExplainRegimeProps {
   /** A card key: explain that card; omitted: "what is happening?". */
@@ -21,7 +21,6 @@ export interface ExplainRegimeProps {
 }
 
 const FOOTER = 'Written by a text model from the facts on this page; it may be wrong.';
-const AVAILABLE_KEY = ['regime-explain', 'available'] as const;
 
 export function ExplainRegime({ card, label = 'Explain in plain words' }: ExplainRegimeProps) {
   const available = useExplainAvailable();

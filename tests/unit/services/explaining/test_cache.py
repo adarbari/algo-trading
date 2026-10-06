@@ -6,6 +6,7 @@ from dataclasses import replace
 import pytest
 
 from algotrade.core.model.errors import RateLimitedError
+from algotrade.services.explaining import cache as cache_module
 from algotrade.services.explaining.cache import cache_key, open_text_cache, signals_hash
 from algotrade.services.explaining.limits import RateLimiter
 from algotrade.services.read.regime.indicators import IndicatorStatus
@@ -31,6 +32,17 @@ def test_the_key_changes_with_the_session_signals_question_and_model(
         ),
     )
     assert signals_hash(flipped) != signals_hash(regime)
+
+
+def test_a_changed_prompt_never_serves_an_old_answer(
+    regime: MarketRegime, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    key = cache_key(regime, "q", "m")
+    monkeypatch.setattr(cache_module, "PROMPT_VERSION", 2)
+    assert cache_key(regime, "q", "m") != key
+    monkeypatch.setattr(cache_module, "PROMPT_VERSION", 1)
+    monkeypatch.setattr(cache_module, "TASK", cache_module.TASK + " Be brief.")
+    assert cache_key(regime, "q", "m") != key
 
 
 def test_a_value_moving_within_its_verdict_keeps_the_key(regime: MarketRegime) -> None:
