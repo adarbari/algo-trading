@@ -137,6 +137,12 @@ def test_a_row_massive_already_holds_is_kept_and_counted(writer: StoreWriter) ->
     assert list(frame["source"]) == ["massive", "tiingo", "massive"]
     assert list(frame["close"]) == [51.0, 20.5, 51.0]  # Massive's AAA stands
     assert frame["vwap"].notna().tolist() == [True, False, True]
+    # Massive's rows are carried over as they were stored, never restamped as this run's
+    assert list(frame["run_id"])[0::2] == ["massive-run", "massive-run"]
+    assert list(frame["run_id"])[1] == record.run_id
+    massive_known = pd.Timestamp("2020-01-01", tz="UTC")
+    assert frame["knowledge_ts"][0] == frame["knowledge_ts"][2] == massive_known
+    assert frame["knowledge_ts"][1] > frame["knowledge_ts"][0]
 
 
 def test_a_missing_session_in_massives_window_is_left_for_the_nightly(writer: StoreWriter) -> None:
