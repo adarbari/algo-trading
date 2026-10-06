@@ -264,6 +264,11 @@ purpose = "read objects over run records and the configs they run: backtests, th
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
+path = "src/algotrade/services/read/users"
+purpose = "read objects about the app's users (ADR 0040): the Viewer (the request's registry user, role, workspaces)"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
 path = "src/algotrade/services/ondemand"
 purpose = "use case: the API's on-request screen runs (ADR 0033): a local job runner for the `screen` job (no wait for ingestion: atomic publication); writes only result tables and run records"
 
@@ -385,6 +390,11 @@ contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037
 [[dir]]
 path = "apps/api/algotrade_api/graphql/types/ops"
 purpose = "GraphQL types over run records and the configs they run (mirrors services/read/ops): Backtest, BacktestDetail, Config"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
+path = "apps/api/algotrade_api/graphql/types/users"
+purpose = "GraphQL types about users (mirrors services/read/users): Viewer"
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 # --------------------------------------------------------------------------- ingestion app

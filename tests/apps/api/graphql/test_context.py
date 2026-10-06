@@ -10,7 +10,7 @@ from algotrade.services.read.context import NotFoundError, ReadContext, StoreCon
 from algotrade_api.graphql.context import RequestContext, context_getter
 from algotrade_api.graphql.loaders import Loaders
 
-ANA = UserRecord("ana", Role.TRADER)
+ANA = UserRecord("ana", Role.ADMIN)
 
 
 def test_one_read_context_per_date_per_request(ctx: ReadContext) -> None:

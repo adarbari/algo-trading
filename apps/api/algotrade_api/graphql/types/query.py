@@ -19,6 +19,7 @@ from algotrade.services.read.instruments import catalogue, distribution, identit
 from algotrade.services.read.instruments import table as tables
 from algotrade.services.read.ops import backtests, configs, ingestion, quality, review, runs
 from algotrade.services.read.screens import documents, ideas, screeners, views
+from algotrade.services.read.users.viewer import load_viewer
 from algotrade_api.graphql.context import RequestContext
 from algotrade_api.graphql.limits import MAX_NAMES, MAX_PAGE, MaxItems
 from algotrade_api.graphql.scalars import FeatureName
@@ -37,6 +38,7 @@ from algotrade_api.graphql.types.screens.ideas import Ideas
 from algotrade_api.graphql.types.screens.screener import Screener
 from algotrade_api.graphql.types.screens.view import TableView
 from algotrade_api.graphql.types.session import Session
+from algotrade_api.graphql.types.users.viewer import Viewer
 
 Day = Annotated[
     dt.date | None,
@@ -52,6 +54,13 @@ MAX_SESSIONS = 60  # completeness(sessions)
 
 @strawberry.type(description="Reads for the web app, each for one session (ADR 0036)")
 class Query:
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="Who this request is for: the signed-in registry user, their role and "
+        "workspaces (ADR 0040; not session data)"
+    )
+    def viewer(self, info: Ctx) -> Viewer:
+        return Viewer.of(load_viewer(info.context.viewer))
+
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="The session `date` resolves to; null: nothing stored"
     )

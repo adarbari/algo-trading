@@ -43,8 +43,8 @@ null_meaning = "hv20 is null"
 """
 
 
-# The registry of the multi-user configs: alice and bob are traders who signed up with these
-# emails (config/users/<id>/identity.toml), ana is the admin.
+# The registry of the multi-user configs: alice, bob and carol are traders who signed up with
+# these emails (config/users/<id>/identity.toml), ana is the admin.
 USERS_TOML = """[[user]]
 id = "ana"
 role = "admin"
@@ -56,13 +56,18 @@ role = "trader"
 [[user]]
 id = "bob"
 role = "trader"
+
+[[user]]
+id = "carol"
+role = "trader"
 """
 
 
 @pytest.fixture(scope="session")
 def user_configs(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """A config root over the repo's site configs with three users (``USERS_TOML``), each
-    with an identity email, where alice has a user feature."""
+    """A config root over the repo's site configs with four users (``USERS_TOML``), each
+    with an identity email, where alice has a user feature and carol one of the same name
+    with another formula (bob has none)."""
     root: Path = tmp_path_factory.mktemp("configs")
     for item in (REPO_ROOT / "config" / "site").iterdir():
         if item.name != "users.toml":
@@ -71,7 +76,11 @@ def user_configs(tmp_path_factory: pytest.TempPathFactory) -> Path:
     (root / "site" / "users.toml").write_text(USERS_TOML)
     (root / "users" / "alice" / "features").mkdir(parents=True)
     (root / "users" / "alice" / "features" / "vol.toml").write_text(USER_FEATURES)
-    for user in ("ana", "alice", "bob"):
+    (root / "users" / "carol" / "features").mkdir(parents=True)
+    # Same name, the opposite sign: the reverse order.
+    carol = USER_FEATURES.replace("price_stats.hv20 * 100", "0 - price_stats.hv20 * 100")
+    (root / "users" / "carol" / "features" / "vol.toml").write_text(carol)
+    for user in ("ana", "alice", "bob", "carol"):
         (root / "users" / user).mkdir(parents=True, exist_ok=True)
         (root / "users" / user / "identity.toml").write_text(f'email = "{user}@example.com"\n')
     return root

@@ -28,7 +28,7 @@ from algotrade.core.model.fields import COMPANY_TABLE, field_source, is_feature_
 from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.data.reference import load_universe
 from algotrade.services.features import field_view
-from algotrade.services.read.context import NotFoundError, ReadContext
+from algotrade.services.read.context import NotFoundError, ReadContext, catalogue_key
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
 from algotrade.services.read.instruments.features import load_feature_values
 from algotrade.services.read.instruments.identity import Instrument, load_instruments, resolve_id
@@ -164,11 +164,6 @@ def _fields(f: UniverseFilter, column: str | None) -> list[str]:
     return list(dict.fromkeys([_SYMBOL, _NAME, *used, *([column] if column else [])]))
 
 
-def _catalogue_key(ctx: ReadContext) -> str:
-    """The caller's catalogue as text: an edited user feature must not hit a stale order."""
-    return repr(sorted((n, repr(e.definition)) for n, e in ctx.features.expressions.items()))
-
-
 def _company(name: str) -> bool:
     return not is_feature_field(name) and field_source(name)[0] == COMPANY_TABLE
 
@@ -210,7 +205,7 @@ def _ordered(
         f,
         sort,
         ctx.user.user_id,
-        _catalogue_key(ctx),
+        catalogue_key(ctx),
         seq,
     )
     found = ctx.cache.get(key)

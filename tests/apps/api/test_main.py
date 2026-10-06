@@ -127,8 +127,11 @@ def test_no_token_is_401_with_a_challenge_and_cors(signed: TestClient) -> None:
 def test_a_token_for_nobody_in_the_registry_is_403(signed: TestClient, tokens: Tokens) -> None:
     response = signed.post("/graphql", json=SESSION, headers=_as(tokens, "eve@example.com"))
     assert response.status_code == 403 and "eve" not in response.text
-    me = signed.post("/graphql", json=SESSION, headers=_as(tokens, "ana@example.com"))
-    assert me.status_code == 200
+    viewer = {"query": "{ viewer { id role workspaces } }"}
+    me = signed.post("/graphql", json=viewer, headers=_as(tokens, "ana@example.com"))
+    assert me.json() == {
+        "data": {"viewer": {"id": "ana", "role": "admin", "workspaces": ["admin", "trader"]}}
+    }
 
 
 def test_graphql_over_websocket_is_not_served(signed: TestClient) -> None:
@@ -144,7 +147,14 @@ def test_two_callers_on_one_app_read_their_own_configs(signed: TestClient, token
     body = {"query": query, "variables": variables}
     for _ in range(2):  # the second read of each comes from the cache
         alice = signed.post("/graphql", json=body, headers=_as(tokens, "alice@example.com"))
-        assert alice.json()["data"]["table"]["rows"][0][0] == pytest.approx(22.0)
+        mine = alice.json()["data"]["table"]
+        assert mine["rows"][0][0] == pytest.approx(22.0)
+        # carol's feature has alice's name and the opposite sign: the cached order is keyed on
+        # the caller and their catalogue, never shared.
+        carol = signed.post("/graphql", json=body, headers=_as(tokens, "carol@example.com"))
+        theirs = carol.json()["data"]["table"]
+        assert [i["symbol"] for i in mine["instruments"]] == ["BULL", "BBB", "AAA", "CCC"]
+        assert [i["symbol"] for i in theirs["instruments"]] == ["AAA", "BBB", "BULL", "CCC"]
         bob = signed.post("/graphql", json=body, headers=_as(tokens, "BOB@example.com"))
         assert bob.json()["errors"][0]["extensions"]["code"] == "UNKNOWN_FEATURE"
     formula = {"expr": "hv20_pct / 100"}
