@@ -23,6 +23,7 @@ import type { ReactNode } from 'react';
 import { useMemo } from 'react';
 
 import { useInstrumentEvents, useInstrumentFacts } from '@/entities/instrument';
+import { useRegimeEpisodes } from '@/entities/regime';
 
 import {
   earningsGroup,
@@ -46,13 +47,15 @@ export interface OverviewPanelProps {
 export function OverviewPanel({ symbol, fund }: OverviewPanelProps) {
   const facts = useInstrumentFacts(symbol, FEATURES);
   const events = useInstrumentEvents(symbol);
+  const episodes = useRegimeEpisodes();
   const view = useMemo(() => {
     const instrument = facts.data?.instrument;
     if (!instrument) return null;
     const values = valuesOf(instrument);
     const groups = factGroups(values);
     const earnings = earningsGroup(values, events.data ?? []);
-    const rough = roughMarketsGroup(values);
+    // The plain names come from the API: the group waits for them rather than flash keys
+    const rough = roughMarketsGroup(values, episodes.data?.episodes ?? []);
     return {
       profile: profileOf(instrument, values),
       stats: headlineStats(values),
@@ -60,10 +63,10 @@ export function OverviewPanel({ symbol, fund }: OverviewPanelProps) {
         ...groups.slice(0, 2),
         earnings,
         ...groups.slice(2),
-        ...(rough.items.length > 0 ? [rough] : []),
+        ...(rough.items.length > 0 && !episodes.isPending ? [rough] : []),
       ],
     };
-  }, [facts.data, events.data]);
+  }, [facts.data, events.data, episodes.data, episodes.isPending]);
   const session = facts.data?.session;
   const profile = view?.profile;
   const missing = missingTables(session?.missing ?? []);

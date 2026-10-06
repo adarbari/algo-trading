@@ -7,7 +7,9 @@ are read for the sessions stored in the window (``data.rollups.rollup_rows``) an
 features computed for them (``services.features.read_expressions``, the evaluation a selection
 uses). A session with no value for a name has ``None`` there. ``instrument.*`` facts are
 snapshot facts with no history: asking for one is a request error, and so is a name outside the
-caller's catalogue (``UnknownFeatureError``)."""
+caller's catalogue (``UnknownFeatureError``). The rows of a stored table are shared through
+``ctx.cache`` (keyed on the table, ids, window and the published state), so a chart that asks
+again, or a page that asks for the same history twice, reads the store once."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -68,11 +70,21 @@ def _groups(
 def _frame(
     ctx: ReadContext, table: str, columns: list[str], ids: list[str], start: date, end: date
 ) -> pd.DataFrame | None:
-    if table == EXPRESSIONS:
+    if table == EXPRESSIONS:  # computed from the caller's formulas: never shared
         return read_expressions(
             ctx.reader, columns, start, end, instruments=ids, features=ctx.features
         ).frame
-    return rollup_rows(ctx.reader, table, start, end, instruments=ids)
+    if ctx.reader.own_run is not None:  # a run's pending writes do not move visible_seq
+        return rollup_rows(ctx.reader, table, start, end, instruments=ids)
+    # A stored table's rows do not depend on the caller, so every request shares them; the
+    # published state is in the key (read before the rows, ADR 0022), so a publish makes the
+    # entry unreachable. The frame is only read, never changed, by its callers.
+    key = ("series-frame", table, tuple(ids), start, end, ctx.reader.visible_seq())
+    cached: tuple[pd.DataFrame | None] | None = ctx.cache.get(key)
+    if cached is None:
+        cached = (rollup_rows(ctx.reader, table, start, end, instruments=ids),)
+        ctx.cache.put(key, cached)
+    return cached[0]
 
 
 def load_series(

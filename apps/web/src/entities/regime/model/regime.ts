@@ -48,6 +48,42 @@ export interface RegimeIndicator {
   changed: boolean | null;
 }
 
+/**
+ * One reference market drawdown (`Query.regime.episodes`), known as of the session. `recovered`
+ * is null until the session has seen the S&P 500 regain its peak.
+ */
+export interface RegimeEpisode {
+  /** The `episodes.toml` key and the suffix of the `episode_behaviour@v1` feature names. */
+  key: string;
+  /** "Tariff shock, spring 2025". */
+  name: string;
+  kind: string;
+  peak: string;
+  trough: string;
+  recovered: string | null;
+  spxDrawdown: number;
+  nasdaqDrawdown: number;
+  recession: boolean;
+  nberStart: string | null;
+  nberEnd: string | null;
+  cause: string;
+  notes: string;
+  knownFrom: string;
+}
+
+/** One NBER recession as the session knew it (`end` null: not yet dated over). */
+export interface Recession {
+  start: string;
+  end: string | null;
+  announcedStart: string | null;
+  announcedEnd: string | null;
+}
+
+/** The plain name of an episode key (an unnamed key reads as itself, spaced). */
+export function episodeName(episodes: readonly RegimeEpisode[], key: string): string {
+  return episodes.find((episode) => episode.key === key)?.name ?? key.replace(/_/g, ' ');
+}
+
 /** A screener of the caller and the labels its picks are PAUSED in (calmest first). */
 export interface ScreenerGate {
   screenerId: string;
