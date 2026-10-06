@@ -21,6 +21,8 @@ import {
   cautionBand,
   msft,
   sampleBands,
+  sampleLanes,
+  sampleReferenceLines,
   stressBand,
 } from './storyData';
 
@@ -269,6 +271,140 @@ describe('Chart', () => {
     expect(screen.queryByRole('list', { name: 'AAPL: shaded periods' })).toBeNull();
   });
 
+  it('passes reference lines to the engine and lists them for screen readers', async () => {
+    render(<Chart label="AAPL" series={[aapl]} range="1Y" referenceLines={sampleReferenceLines} />);
+    await waitFor(() => {
+      expect(engine.draw).toHaveBeenCalled();
+    });
+    expect(lastInput().referenceLines).toEqual(sampleReferenceLines);
+    const list = screen.getByRole('list', { name: 'AAPL: reference lines' });
+    expect(
+      within(list)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(['Floor: $300.00', 'Target: $340.00']);
+    expect(screen.getByRole('img').getAttribute('aria-label')).toContain(
+      'reference lines: Floor $300.00, Target $340.00',
+    );
+  });
+
+  it('drops a reference line without a finite value', async () => {
+    render(
+      <Chart
+        label="AAPL"
+        series={[aapl]}
+        referenceLines={[{ value: Number.NaN }, { value: 310 }]}
+      />,
+    );
+    await waitFor(() => {
+      expect(engine.draw).toHaveBeenCalled();
+    });
+    expect(lastInput().referenceLines).toEqual([{ value: 310 }]);
+  });
+
+  it('passes lanes to the engine, keyed by distinct segment labels and listed for screen readers', async () => {
+    render(<Chart label="AAPL" series={[aapl]} range="1Y" lanes={sampleLanes} />);
+    await waitFor(() => {
+      expect(engine.draw).toHaveBeenCalled();
+    });
+    expect(lastInput().lanes.map((l) => l.id)).toEqual(['trend', 'volatility']);
+    expect(lastInput().lanes[0]?.segments).toHaveLength(3);
+    const trend = screen.getByRole('list', { name: 'AAPL: Trend' });
+    expect(within(trend).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(trend).getAllByRole('listitem')[1]).toHaveTextContent(
+      'Falling: 12 Jan 2026 to 27 Mar 2026',
+    );
+    expect(screen.getByRole('list', { name: 'AAPL: Volatility' })).toBeInTheDocument();
+    const key = screen.getByRole('list', { name: 'Lane states' });
+    expect(
+      within(key)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(['Rising', 'Falling', 'Elevated']);
+    expect(screen.getByRole('img').getAttribute('aria-label')).toContain(
+      'lanes under the axis: Trend, Volatility',
+    );
+  });
+
+  it('cuts lane segments to the window and reads the covering segment in the crosshair', async () => {
+    render(<Chart label="AAPL" series={[aapl]} range="3M" lanes={sampleLanes} />);
+    await waitFor(() => {
+      expect(engine.crosshair).toBeDefined();
+    });
+    expect(lastInput().lanes[0]?.segments).toHaveLength(1);
+    act(() => {
+      engine.crosshair?.({ time: '2026-09-01', x: 10, y: 20 });
+    });
+    const readout = screen.getByText(/^1 Sep/).parentElement as HTMLElement;
+    expect(within(readout).getByText('Trend')).toBeInTheDocument();
+    expect(within(readout).getByText('Rising')).toBeInTheDocument();
+    expect(within(readout).getByText('Elevated')).toBeInTheDocument();
+  });
+
+  it('hatches a band and keys it apart from the solid ones', async () => {
+    render(
+      <Chart
+        label="AAPL"
+        series={[aapl]}
+        range="1Y"
+        bands={[{ ...stressBand, pattern: 'hatch', label: 'Recession' }, cautionBand]}
+      />,
+    );
+    await waitFor(() => {
+      expect(engine.draw).toHaveBeenCalled();
+    });
+    expect(lastInput().bands.map((b) => b.pattern)).toEqual([undefined, 'hatch']);
+    expect(
+      within(screen.getByRole('list', { name: 'Shaded periods' })).getByText('Caution'),
+    ).toBeInTheDocument();
+    const hatched = screen.getByRole('list', { name: 'Hatched periods' });
+    expect(hatched).toHaveTextContent('Recession');
+    expect(hatched.querySelector('[data-swatch="hatch"]')).not.toBeNull();
+  });
+
+  it('breaks the line at a null value and leaves it out of the summary and the table', async () => {
+    const gap = {
+      ...aapl,
+      points: aapl.points.map((p) => (p.time === '2026-09-15' ? { ...p, value: null } : p)),
+    };
+    render(<Chart label="AAPL" series={[gap]} range="3M" />);
+    await waitFor(() => {
+      expect(engine.draw).toHaveBeenCalled();
+    });
+    expect(lastInput().series[0]?.points.find((p) => p.time === '2026-09-15')?.value).toBeNull();
+    expect(screen.getByRole('img').getAttribute('aria-label')).toContain('low $');
+    await userEvent.click(screen.getByRole('button', { name: 'View as table' }));
+    expect(screen.getByRole('grid', { name: 'AAPL: data' })).toBeInTheDocument();
+  });
+
+  it('rebases around a gap and never rebases a gap into a number', () => {
+    expect(
+      rebased([
+        { time: 'a', value: null },
+        { time: 'b', value: 50 },
+        { time: 'c', value: 75 },
+      ]).map((p) => p.value),
+    ).toEqual([null, 100, 150]);
+  });
+
+  it('adds a column per lane to the table', async () => {
+    render(<Chart label="AAPL" series={[aapl]} range="1Y" lanes={sampleLanes} />);
+    await userEvent.click(screen.getByRole('button', { name: 'View as table' }));
+    expect(screen.getByRole('columnheader', { name: /Trend/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Volatility/ })).toBeInTheDocument();
+    expect(document.querySelector('[data-lanes]')).toBeNull();
+  });
+
+  it('is unchanged without reference lines or lanes', async () => {
+    render(<Chart label="AAPL" series={[aapl]} range="1Y" />);
+    await waitFor(() => {
+      expect(engine.draw).toHaveBeenCalled();
+    });
+    expect(lastInput().referenceLines).toEqual([]);
+    expect(document.querySelector('[data-lanes]')).toBeNull();
+    expect(screen.queryByRole('list', { name: 'AAPL: reference lines' })).toBeNull();
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <Chart
@@ -278,6 +414,8 @@ describe('Chart', () => {
         rebase
         events={aaplEvents}
         bands={sampleBands}
+        lanes={sampleLanes}
+        referenceLines={sampleReferenceLines}
       />,
     );
     await expectNoA11yViolations(container);

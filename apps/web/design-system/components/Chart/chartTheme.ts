@@ -32,6 +32,22 @@ export function readTheme(element: Element): EngineTheme {
       info: read('--color-info-bg'),
       accent: read('--color-accent-soft'),
     },
+    tones: {
+      positive: read('--color-positive'),
+      warning: read('--color-warning'),
+      negative: read('--color-negative'),
+      neutral: read('--color-neutral'),
+      info: read('--color-info'),
+      accent: read('--color-accent'),
+    },
+    borders: {
+      positive: read('--color-positive-border'),
+      warning: read('--color-warning-border'),
+      negative: read('--color-negative-border'),
+      neutral: read('--color-neutral-border'),
+      info: read('--color-info-border'),
+      accent: read('--color-accent-border'),
+    },
     series: Object.fromEntries(SERIES.map((s) => [s, read(`--color-${s}`)])) as Record<
       Series,
       string

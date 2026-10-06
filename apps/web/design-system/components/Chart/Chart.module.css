@@ -61,15 +61,15 @@
 }
 
 .plot[data-height='sm'] {
-  height: calc(var(--space-10) * 4);
+  height: calc(var(--space-10) * 4 + var(--lanes, 0) * var(--space-6));
 }
 
 .plot[data-height='md'] {
-  height: calc(var(--space-10) * 6);
+  height: calc(var(--space-10) * 6 + var(--lanes, 0) * var(--space-6));
 }
 
 .plot[data-height='lg'] {
-  height: var(--size-sidebar);
+  height: calc(var(--size-sidebar) + var(--lanes, 0) * var(--space-6));
 }
 
 .canvas,

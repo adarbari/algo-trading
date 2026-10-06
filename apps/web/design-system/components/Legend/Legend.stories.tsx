@@ -32,6 +32,18 @@ type Story = StoryObj<typeof meta>;
 /** Status tones as tinted cells: the key of the ingestion completeness grid. */
 export const Default: Story = {};
 
+/** Hatched swatches: the key of a chart band drawn as diagonal lines (recessions). */
+export const Hatched: Story = {
+  args: {
+    label: 'Hatched periods',
+    swatch: 'hatch',
+    items: [
+      { label: 'Recession', tone: 'negative' },
+      { label: 'Slowdown', tone: 'warning' },
+    ],
+  },
+};
+
 /** The six data series in their fixed order. */
 export const Series: Story = {
   args: {

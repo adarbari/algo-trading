@@ -4,7 +4,7 @@
  * right half). Visual only: the same numbers are in the summary and the table view.
  */
 import { formatValue, type ValueFormat } from '../../format';
-import { EVENT_KINDS, type ChartEvent, type PreparedChart } from './chartData';
+import { EVENT_KINDS, type ChartEvent, type ChartLane, type PreparedChart } from './chartData';
 import styles from './Chart.module.css';
 import type { CrosshairInfo } from './engine';
 
@@ -15,6 +15,8 @@ export interface ChartTooltipProps {
   values: ReadonlyMap<string, ReadonlyMap<string, number>>;
   volume: ReadonlyMap<string, number>;
   events: ReadonlyMap<string, readonly ChartEvent[]>;
+  /** The lanes: the segment of each that covers the day is read out under the values. */
+  lanes: readonly ChartLane[];
   format: ValueFormat;
   /** Plot width in px: past the middle the box flips to the crosshair's left. */
   width: number;
@@ -26,6 +28,7 @@ export function ChartTooltip({
   values,
   volume,
   events,
+  lanes,
   format,
   width,
 }: ChartTooltipProps) {
@@ -56,6 +59,17 @@ export function ChartTooltip({
           <span className={styles.tooltipValue}>{formatValue(vol, { kind: 'compact' }).text}</span>
         </div>
       )}
+      {lanes.flatMap((lane) => {
+        const segment = lane.segments.find((g) => at.time >= g.start && at.time <= g.end);
+        return segment?.label === undefined
+          ? []
+          : [
+              <div key={lane.id} className={styles.tooltipRow}>
+                <span className={styles.tooltipLabel}>{lane.label}</span>
+                <span className={styles.tooltipValue}>{segment.label}</span>
+              </div>,
+            ];
+      })}
       {day.map((e) => (
         <div key={`${e.kind}-${e.time}`} className={styles.tooltipEvent}>
           {EVENT_KINDS[e.kind].letter} {EVENT_KINDS[e.kind].label}
