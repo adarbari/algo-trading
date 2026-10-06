@@ -245,3 +245,31 @@ def test_a_carried_forecast_stays_a_forecast() -> None:
     )  # the 10-05 calendar covers 10-15..10-27 and does not list 10-20
     valid = earnings.valid_events(stored, date(2026, 10, 5))
     assert sorted(valid["report"]) == [date(2026, 10, 15), date(2026, 10, 27)]
+
+
+def test_recomputing_a_session_after_later_nights_changes_nothing() -> None:
+    """Idempotence (architect review): a session computed with only its own partitions and
+    again with later ones stored (lookback rows of the same reports with other fields, a
+    carried copy, a moved forecast) gives identical earnings@v1 and earnings_schedule@v1."""
+    from algotrade.features.rollups.corporate import earnings_schedule  # noqa: PLC0415
+
+    def own(writer: object) -> None:
+        _store_rows(writer, date(2026, 10, 2), [("EQ:C", date(2026, 9, 30), date(2026, 9, 30))])
+        _store_rows(writer, MON, [("EQ:A", MON, MON), ("EQ:B", WED, MON), ("EQ:D", THU, MON)])
+
+    def later(writer: object) -> None:
+        lookback = [("EQ:A", MON, MON), ("EQ:C", date(2026, 9, 30), date(2026, 9, 30))]
+        _store_rows(writer, TUE, lookback, time="after_hours", date_confirmed=True)
+        _store_rows(writer, TUE, [("EQ:B", THU, TUE)])  # B moved
+        _store_rows(writer, WED, [("EQ:D", THU, MON)], carried_from=MON, reported=False)
+
+    frames = []
+    for writes in ((own,), (own, later)):
+        writer, reader = store()
+        for write in writes:
+            write(writer)
+        for group in (GROUP, earnings_schedule.GROUP):
+            frames.append(compute_one(reader, group, MON).frame)
+    for alone, with_later in zip(frames[:2], frames[2:], strict=True):
+        assert alone is not None and with_later is not None
+        pd.testing.assert_frame_equal(alone, with_later)

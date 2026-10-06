@@ -16,9 +16,10 @@ A row a snapshot carried forward over a day its fetch failed (``carried_from``: 
 that fetched it) keeps the kind it had there, so the failed day cancels nothing.
 
 Only snapshots stored on or before the session decide (ranges, authorities): a later
-partition contributes only its reported history rows (known by the session), never its
-forecasts or carried copies, so recomputing a session after later nights changes nothing it
-knew.
+partition contributes only its reported history rows (known by the session) for reports the
+session's own partitions do not hold, never its forecasts or carried copies and never a field
+of a report the session already had, so recomputing a session after later nights changes
+nothing it knew.
 
 One row per (instrument, report date): a history row over a forecast, then the latest
 snapshot.
@@ -149,16 +150,21 @@ def valid_events(stored: pd.DataFrame, session: date, since: date | None = None)
             from_authority[target] = snap_day[target] == authority[at]
     later_fact = ~stored_by & history & reported & ~carried
     valid = np.flatnonzero(keep & ((stored_by & (from_authority | history)) | later_fact))
-    rows: pd.DataFrame = stored.iloc[valid].assign(_history=history[valid])
+    rows: pd.DataFrame = stored.iloc[valid].assign(
+        _stored_by=stored_by[valid], _history=history[valid]
+    )
     rows = rows.assign(
         report=pd.to_datetime(rows["ts"], utc=True).dt.date,
         snapshot=pd.to_datetime(rows["session_date"]).dt.date,
     )
-    if rows["_history"].any():  # a report kept twice: the history row, then the latest
-        ranked = rows.sort_values(["_history", "snapshot"], kind="stable")
+    if rows["_history"].any():
+        # A report kept twice: a row stored by the session wins (a later partition only adds
+        # reports the session's own did not have, never changes a field of one), then the
+        # history row, then the latest snapshot.
+        ranked = rows.sort_values(["_stored_by", "_history", "snapshot"], kind="stable")
         last = ranked.drop_duplicates(["instrument_id", "report"], keep="last").index
         rows = rows[rows.index.isin(last)]
-    return rows.drop(columns="_history")
+    return rows.drop(columns=["_stored_by", "_history"])
 
 
 def _column(frame: pd.DataFrame, name: str) -> list[object]:
