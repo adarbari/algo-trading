@@ -193,3 +193,39 @@ def test_vendor_pacing_per_step_in_run_timing() -> None:
     assert line in render_text(report)
     assert "Vendor pacing" in render_html(report)
     assert build_report(fx.summary(), fx.records()).pacing == ()
+
+
+def _with_coverage() -> dict:  # type: ignore[type-arg]
+    data = {
+        "previous_session": "2026-10-01",
+        "cells": [
+            {"tier": "core", "applicable": 504, "covered": 502, "share": 502 / 504,
+             "previous": 1.0, "ok": False, "missing": ["FDXF", "VYLR", "X3", "X4"]},
+            {"tier": "rest", "applicable": 5195, "covered": 4269, "share": 4269 / 5195,
+             "previous": 0.82, "ok": True, "missing": ["AAC"]},
+        ],
+    }  # fmt: skip
+    check = {"name": "coverage_earnings.next_earnings_date", "status": "WARN", "detail": "x"}
+    summary = fx.summary()
+    summary["runs"][0]["steps"]["rollups"]["checks"] = [{**check, "data": data}]
+    return summary
+
+
+def test_coverage_section_lists_feature_by_tier_with_missing_names_of_failing_cells() -> None:
+    report = build_report(_with_coverage(), fx.records(), LABELS, max_examples=2)
+    assert [(c.tier, c.ok, c.missing) for c in report.coverage] == [
+        ("core", False, ("FDXF", "VYLR")),  # capped at max_examples
+        ("rest", True, ()),  # a passing cell lists nobody
+    ]
+    text = render_text(report)
+    assert "COVERAGE" in text and "earnings.next_earnings_date" in text
+    assert "! 99.6% (502/504) -0.4pp" in text and "core: FDXF, VYLR" in text
+    assert "82.2% (4,269/5,195) +0.2pp" in text
+    html = render_html(report)
+    assert "<h2" in html and "Coverage" in html and "FDXF, VYLR" in html
+    assert any("coverage_<feature>" in h for h in report.hints)
+
+
+def test_no_coverage_data_means_no_coverage_section() -> None:
+    report = build_report(fx.summary(), fx.records(), LABELS)
+    assert report.coverage == () and "COVERAGE" not in render_text(report)

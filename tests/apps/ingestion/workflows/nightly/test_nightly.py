@@ -33,7 +33,7 @@ from algotrade_ingestion.workflows.nightly.nightly import (
 )
 from algotrade_ingestion.workflows.nightly.notify import Notice
 from algotrade_ingestion.workflows.nightly.sessions import Plan, last_done, plan_sessions
-from algotrade_ingestion.workflows.nightly.steps import from_record
+from algotrade_ingestion.workflows.nightly.steps import StepStatus, from_record, judge
 from tests.helpers.ingest_fakes import task_ctx
 from tests.helpers.stored_frames import stamped, universe_rows
 
@@ -571,3 +571,11 @@ def test_nightly_settings() -> None:
         465,
         2,
     )
+
+
+def test_acceptance_keeps_the_figures_of_a_check_even_when_it_passes() -> None:
+    outcome = judge([Check("coverage_x", "PASS", "ok", data={"cells": []}), Check("b", "PASS", "")])
+    assert outcome.status is StepStatus.SUCCEEDED
+    assert outcome.checks == [
+        {"name": "coverage_x", "status": "PASS", "detail": "ok", "data": {"cells": []}}
+    ]

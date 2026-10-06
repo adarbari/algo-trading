@@ -492,6 +492,14 @@ reason = "the option-chain coverage (`select_underlyings`: every active optionab
 module = "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py"
 reason = "the data-quality checks are the nightly steps' acceptance checks (ADR 0039): the workflow declares which check accepts which step and runs it right after the step"
 
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/market/tiers.py"
+reason = "the one core / rest tier rule (ADR 0043): the chain fetch order, the chain acceptance check and the coverage check (tasks/maintenance/coverage.py) all grade by it"
+
+[[shared]]
+module = "apps/ingestion/algotrade_ingestion/tasks/maintenance/coverage.py"
+reason = "the coverage check is the rollups step's acceptance check (ADR 0043): the workflow declares which check accepts which step and runs it right after the step"
+
 # --------------------------------------------------------------------------- web app (apps/web)
 # ADR 0025 (frontend architecture). Every directory under apps/web (build output and
 # node_modules skipped) is a declared [[web_dir]]; enforced by

@@ -8,8 +8,9 @@ for a session by hand (any FAIL makes that run PARTIAL). Thresholds come from
 """
 
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import date
+from typing import Any
 
 import pandas as pd
 
@@ -29,6 +30,7 @@ class Check:
     status: str  # PASS | WARN | FAIL
     detail: str
     pending: bool = False  # a FAIL that only means "the source has not published it yet" (ADR 0043)
+    data: dict[str, Any] = field(default_factory=dict)  # figures behind it (coverage: its cells)
 
 
 def _rows(reader: StoreReader, table: str, day: date | None) -> int | None:
@@ -250,8 +252,13 @@ CHECKS: tuple[Callable[[StoreReader, date, SourcesSettings], list[Check]], ...] 
 
 
 def run_quality(ctx: TaskContext, session: date) -> RunRecord:
+    # imported here: coverage.py imports ``Check`` from this module
+    from algotrade_ingestion.tasks.maintenance.coverage import check_coverage  # noqa: PLC0415
+
     with IngestRun(ctx, TASK, session) as run:
-        checks = [c for fn in CHECKS for c in fn(ctx.reader, session, ctx.settings)]
+        checks = [
+            c for fn in (*CHECKS, check_coverage) for c in fn(ctx.reader, session, ctx.settings)
+        ]
         for check in checks:
             run.record_item(check.name, check.status)
         failed = [c.name for c in checks if c.status == "FAIL"]

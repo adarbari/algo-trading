@@ -117,6 +117,22 @@ class VerificationLine:
 
 
 @dataclass(frozen=True)
+class CoverageLine:
+    """One feature in one tier for a session (the ``coverage_*`` check of the rollups step):
+    ``covered`` of ``applicable`` names have it, ``previous`` the share the session before."""
+
+    session: str
+    feature: str
+    tier: str
+    applicable: int
+    covered: int
+    share: float | None
+    previous: float | None
+    ok: bool  # within its minimum and its day-over-day drop
+    missing: tuple[str, ...]  # symbols of a failing cell, at most max_examples
+
+
+@dataclass(frozen=True)
 class Report:
     sessions: tuple[str, ...]
     status: str
@@ -136,6 +152,7 @@ class Report:
     catch_up_held: tuple[str, ...] = ()  # sessions held back behind a failed one
     catch_up_waiting: tuple[str, ...] = ()  # pending sessions over the cap, for the next run
     verification: tuple[VerificationLine, ...] = ()  # the verify step per session
+    coverage: tuple[CoverageLine, ...] = ()  # feature x tier coverage per session (ADR 0043)
 
     @property
     def bad_steps(self) -> tuple[StepLine, ...]:
@@ -278,6 +295,32 @@ def _checks(session: str, holder: Any) -> list[Check]:
     ]
 
 
+def _coverage(session: str, step: Mapping[str, Any], max_examples: int) -> list[CoverageLine]:
+    """The cells of the step's ``coverage_<feature>`` checks (their stored ``data``)."""
+    out = []
+    for c in step.get("checks", []) if isinstance(step, Mapping) else []:
+        name = str(c.get("name", ""))
+        if not name.startswith("coverage_") or not isinstance(c.get("data"), Mapping):
+            continue
+        for cell in c["data"].get("cells", []):
+            ok = bool(cell.get("ok", True))
+            missing = tuple(str(m) for m in cell.get("missing", []))
+            out.append(
+                CoverageLine(
+                    session,
+                    name.removeprefix("coverage_"),
+                    str(cell.get("tier")),
+                    int(cell.get("applicable", 0)),
+                    int(cell.get("covered", 0)),
+                    cell.get("share"),
+                    cell.get("previous"),
+                    ok,
+                    () if ok else missing[:max_examples],
+                )
+            )
+    return out
+
+
 def _steps(summary: Mapping[str, Any]) -> Iterable[tuple[str, str, Mapping[str, Any]]]:
     for run in summary.get("runs", []):
         for name, step in run.get("steps", {}).items():
@@ -360,6 +403,14 @@ HINTS: tuple[tuple[re.Pattern[str], str], ...] = tuple(
             "--date D --symbols X` after fixing the producing task.",
         ),
         (
+            r"^coverage",
+            "coverage_<feature>: too few of the names the feature applies to have a value "
+            "(under [quality.coverage.*] core_min / rest_min), or the share fell more than "
+            "max_drop since the session before. See the Coverage section for the missing names; "
+            "re-run the producing task (iv30: `chains` then `rollups`; earnings: `earnings`; "
+            "price_stats: `bars`) for the session. Only a FAIL level holds the screens back.",
+        ),
+        (
             r"^bars_fresh|^bars_count",
             "Bars check failed: re-run `algotrade-ingest bars --date D` "
             "and check the Massive key and plan.",
@@ -392,6 +443,7 @@ def build_report(
     labels = labels or {}
     lines, failures, checks, screens, rollups = [], [], [], [], []
     verification: list[VerificationLine] = []
+    coverage: list[CoverageLine] = []
     for session, name, step in _steps(summary):
         record = records.get((session, name))
         result = step.get("result")
@@ -414,6 +466,7 @@ def build_report(
         screens += _screens(session, result) if name == "screens" else []
         rollups += _rollups(session, result) if name == "rollups" else []
         verification += _verification(session, step) if name == "verify" else []
+        coverage += _coverage(session, step, max_examples)
     warnings = tuple(
         str(w.get("detail", w)) if isinstance(w, Mapping) else str(w)
         for w in summary.get("warnings", [])
@@ -434,6 +487,7 @@ def build_report(
         catch_up_held=tuple((summary.get("catch_up") or {}).get("held", [])),
         catch_up_waiting=tuple((summary.get("catch_up") or {}).get("waiting", [])),
         verification=tuple(verification),
+        coverage=tuple(coverage),
     )
     items = {key: len(r.items) for key, r in records.items() if r.items}
     timings = step_timings(list(_steps(summary)), report.started, report.duration_s, items, history)

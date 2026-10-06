@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 
 from algotrade_ingestion.workflows.nightly.report import (
     BAD_STEPS,
+    CoverageLine,
     Example,
     Report,
     VerificationLine,
@@ -193,6 +194,33 @@ def _step_rows(report: Report) -> list[list[str]]:
 STEP_HEAD = ["Step", "Status", "Time", "Items", "Key counts"]
 
 
+COVERAGE_HEAD = ["Feature", "Core", "Rest", "Missing (failing cells)"]
+
+
+def _coverage_cell(c: CoverageLine | None) -> str:
+    """``99.6% (502/504) -0.1pp``, ``!`` marking a cell outside its limits."""
+    if c is None or c.share is None:
+        return "n/a"
+    change = f" {(c.share - c.previous) * 100:+.1f}pp" if c.previous is not None else ""
+    return f"{'' if c.ok else '! '}{c.share:.1%} ({c.covered:,}/{c.applicable:,}){change}"
+
+
+def _coverage_rows(report: Report) -> list[list[str]]:
+    """One row per (session, feature): its core and rest cells, and the missing names of the
+    failing ones."""
+    grouped: dict[tuple[str, str], dict[str, CoverageLine]] = {}
+    for c in report.coverage:
+        grouped.setdefault((c.session, c.feature), {})[c.tier] = c
+    rows = []
+    for (session, feature), tiers in grouped.items():
+        label = feature if len({s for s, _ in grouped}) == 1 else f"{session} {feature}"
+        missing = "; ".join(f"{t}: {', '.join(c.missing)}" for t, c in tiers.items() if c.missing)
+        rows.append(
+            [label, _coverage_cell(tiers.get("core")), _coverage_cell(tiers.get("rest")), missing]
+        )
+    return rows
+
+
 def _lines(texts: Iterable[str]) -> str:
     return "\n".join(texts)
 
@@ -232,6 +260,9 @@ def render_text(report: Report) -> str:
         for _, name, rows, no_input in report.rollups:
             gap = f", no input for {no_input} session(s)" if no_input else ""
             out.append(f"  {name:<22}{rows:>12,}{gap}")
+    if report.coverage:
+        out += ["", "COVERAGE (share of the applicable names with a value; change vs previous)", ""]
+        out += _table(COVERAGE_HEAD, _coverage_rows(report))
     if report.verification:
         out += ["", "VERIFICATION VS IBKR", ""]
         for v in report.verification:
@@ -375,6 +406,11 @@ def render_html(report: Report) -> str:
     if report.rollups:
         rows = [[n, _num(r), _num(g)] for _, n, r, g in report.rollups]
         parts += [h3.format("Rollups"), _html_table(["Rollup", "Rows", "No-input sessions"], rows)]
+    if report.coverage:
+        parts += [
+            h2.format("Coverage"),
+            _html_table(COVERAGE_HEAD, _coverage_rows(report)),
+        ]
     if report.verification:
         rows = [
             [v.session, v.status, _verification_summary(v).split(": ", 1)[-1], _lines(v.examples)]

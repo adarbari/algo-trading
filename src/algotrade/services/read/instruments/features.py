@@ -35,6 +35,7 @@ from algotrade.core.model.fields import (
 )
 from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.features.expressions.feature_set import FeatureSet
+from algotrade.features.framework.feature import not_applicable
 from algotrade.services.features import field_view
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
@@ -92,15 +93,26 @@ def _absent(tables: Sequence[str], day: date) -> str:
     return "; ".join(why(t) for t in tables)
 
 
+def _flag(value: Any) -> bool | None:
+    """A reference flag as a bool (``None``: null)."""
+    scalar = to_scalar(value)
+    return None if scalar is None else bool(scalar)
+
+
 def _not_applicable(
     applies: frozenset[str], row: Mapping[str, Any], ctx: ReadContext, iid: str
 ) -> str:
     """Why the feature does not apply to the instrument (the reference snapshot's facts; a
     null ``optionable`` is not "no"), or ``""``."""
     snapshot = f"(reference snapshot {ctx.session.reference_snapshot})"
-    if "optionable" in applies and to_scalar(row.get(_OPTIONABLE)) is False:
+    ruled_out = not_applicable(
+        applies,
+        _flag(row.get(_OPTIONABLE)) if "optionable" in applies else None,
+        to_scalar(row.get(_SECURITY_TYPE)) == ETF if "not_etf" in applies else False,
+    )
+    if ruled_out == "optionable":
         return f"{iid} is not optionable {snapshot}"
-    if "not_etf" in applies and to_scalar(row.get(_SECURITY_TYPE)) == ETF:
+    if ruled_out == "not_etf":
         return f"{iid} is an ETF {snapshot}: no earnings"
     return ""
 
