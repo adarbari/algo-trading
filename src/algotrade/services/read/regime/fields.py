@@ -3,7 +3,7 @@ read of them: each name is a ``market.<group>@v<N>.<column>`` field of the marke
 row for exactly ``ctx.session``, or ``Unknown(NOT_IN_CATALOGUE)`` while its group does not exist
 yet (the regime is UNKNOWN until RG3 writes it, never an error and never an older partition).
 
-``market.regime@v2``: ``label`` (CALM, CAUTION, STRESS, CRISIS), and the scores ``macro_risk``,
+``market.regime@v3``: ``label`` (CALM, CAUTION, STRESS, CRISIS), and the scores ``macro_risk``,
 ``market_stress`` and ``fragility`` (0 to 100). ``market.regime_indicators@v1``: per card
 (``config/site/regime/cards.toml``) its value column ``<key>``, and the bool columns
 ``<key>_on`` (the indicator's own on / off verdict) and ``<key>_changed`` (the verdict differs
@@ -18,7 +18,7 @@ from algotrade.services.read.instruments.catalogue import FeatureFormat
 from algotrade.services.read.market.features import load_market_feature_values
 from algotrade.services.read.values import Unknown, UnknownCode
 
-REGIME = "market.regime@v2"
+REGIME = "market.regime@v3"
 LABEL = f"{REGIME}.label"
 MACRO_RISK = f"{REGIME}.macro_risk"
 MARKET_STRESS = f"{REGIME}.market_stress"

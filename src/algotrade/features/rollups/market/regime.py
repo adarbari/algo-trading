@@ -1,25 +1,33 @@
-"""``regime@v2``: the regime model's two scores, its context score and its label, one ``MKT:US``
-row per session (ADR 0047; docs/market-regime-plan.md section 4).
+"""``regime@v3``: the regime model's two scores, the macro score's two tiers, its context score
+and its label, one ``MKT:US`` row per session (ADR 0047; docs/market-regime-plan.md section 4).
 
 Each score is a weighted count of signals that are on (``SIGNALS``; weights and thresholds in
-``Params``, ``config/site/rollups.toml ["regime@v2"]``, each score's weights summing to 100).
+``Params``, ``config/site/rollups.toml ["regime@v3"]``, each score's weights summing to 100).
 The cards' signals are ``regime_indicators@v1``'s verdicts; the others are thresholds on
 ``market_macro@v3``, ``market_trend@v2`` and ``market_cross_asset@v1`` here.
 
-- ``macro_risk`` (slow): curve, credit (the high-yield card's verdict, else, when the high-yield
-  spread is unknown, as before 1997, the excess bond premium above ``ebp_above``), labour
-  (unemployment trend, Sahm, claims), financial conditions, lending standards, permits, Fed
-  hikes and inflation.
+- ``macro_risk`` (slow) is the higher of its two tiers, each a weighted count on its own
+  covered-weight scale (``macro_early``, ``macro_confirming``), so either tier alone can make
+  macro risk high:
+
+  - early (leads a recession bear's peak by 6 to 24 months, measured on the 1971-2026 store):
+    the curve (10y - 3m inverted on at least ``curve_inverted_days`` of the last 252 sessions:
+    a month of inversion in the last year, so the warning outlasts the un-inversion that
+    usually comes a few months before the peak), Fed hikes, permits and inflation;
+  - confirming (moves with the downturn): credit (the high-yield card's verdict, else, when
+    the high-yield spread is unknown, the excess bond premium above ``ebp_above``), labour
+    (unemployment trend, Sahm, claims), financial conditions and lending standards.
 - ``market_stress`` (fast): trend, VIX term structure, drawdown, breadth, leadership and credit
   ETFs, turbulence and absorption.
 - ``fragility`` (context only, never the label): credit expansion and the index's one-year
   run-up (CAPE and margin debt are not stored yet); null when neither is known.
 
 A signal whose inputs are null counts in ``<score>_missing``; ``<score>_coverage`` is the share
-of the score's weight that is known. ``macro_risk`` and ``market_stress`` are on the
+of the score's weight that is known. ``market_stress`` and each macro tier are on the
 covered-weight scale: ``100 * on weight / known weight``, so a signal that cannot be computed
 yet (its window is longer than the stored bars) neither adds nor dilutes; null (UNKNOWN) when
-the coverage is below ``min_coverage``. ``<score>_raw`` keeps the unnormalised weight on (an
+the coverage (of the score, or of the tier) is below ``min_coverage``; ``macro_risk`` is null
+when both tiers are. ``<score>_raw`` keeps the unnormalised weight on (an
 unknown signal adds 0). ``raw_label`` is CALM (neither score high), CAUTION (macro only), STRESS
 (market only) or CRISIS (both), and null (UNKNOWN) when either score is: no data never reads
 CALM. ``label`` is the most severe known ``raw_label`` of the last ``hold_sessions`` sessions
@@ -31,13 +39,14 @@ it is recomputed from the inputs of those sessions, never from this group's earl
 Every column is open (ADR 0047, on ADR 0028): the scores and labels are our own aggregate of
 verdicts, never a third-party value.
 
-v2 moved the two scores to the covered-weight scale and added ``macro_risk_raw`` and
-``market_stress_raw`` (v1's scores, in which an unknown signal counted as off, so a young
-history read calm however many of its known signals were on). v1 is superseded but not in
-``features.registry.SUPERSEDED``: that map, ``moved_field`` and ``retire-features`` handle
-instrument groups only (``rollup.`` fields, ``rollups/instrument/`` tables); nothing reads
-``rollups/market/regime@v1`` (every read names ``regime@v2``), and its table is deleted by hand
-once v2 is backfilled.
+v3 split ``macro_risk`` into the two tiers (new columns ``macro_early``, ``macro_confirming``;
+``macro_risk`` is their maximum) and gave the curve signal its year of memory; v2's columns are
+kept with the same names. v2 moved the two scores to the covered-weight scale and added
+``macro_risk_raw`` and ``market_stress_raw`` (v1's scores, in which an unknown signal counted as
+off). Earlier versions are superseded but not in ``features.registry.SUPERSEDED``: that map,
+``moved_field`` and ``retire-features`` handle instrument groups only (``rollup.`` fields,
+``rollups/instrument/`` tables); nothing reads ``rollups/market/regime@v1`` or ``@v2`` (every
+read names ``regime@v3``), and their tables are deleted by hand once v3 is backfilled.
 """
 
 from collections.abc import Callable, Mapping
@@ -63,23 +72,27 @@ from algotrade.features.rollups.market.indicators import (
 )
 
 NAME = "regime"
-VERSION = 2
+VERSION = 3
 LABELS = ("CALM", "CAUTION", "STRESS", "CRISIS")  # least to most severe
 type Score = Literal["macro", "market", "fragility"]
 SCORES: tuple[Score, ...] = ("macro", "market", "fragility")
+type Tier = Literal["early", "confirming"]  # the macro score's two tiers
+TIERS: tuple[Tier, ...] = ("early", "confirming")
 
 
 @dataclass(frozen=True)
 class Params:
     """Weights (``w_*``: each score's sum to 100) and thresholds of the regime model (the
-    plan's starting values, to be tuned on the episode scorecard)."""
+    plan's starting values; the macro tiers and the curve's memory set on the 1971-2026
+    episode scorecard, docs/market-regime-plan.md section 4)."""
 
     hold_sessions: int = 5  # the label is the most severe raw label of this many sessions
     changed_sessions: int = 5  # label_changed compares with this many sessions earlier
     min_coverage: float = 0.5  # below this share of known weight a score gives no label
-    macro_high: float = 50.0  # macro_risk at or above: high
+    macro_high: float = 50.0  # macro_risk (the higher tier) at or above: high
     market_high: float = 50.0  # market_stress at or above: high
-    # macro_risk: curve 20, credit 20, labour 20, NFCI 15, lending 10, permits 5, Fed + CPI 10
+    # macro_risk: early tier curve 20, permits 5, Fed 5, CPI 5; confirming tier credit 20,
+    # labour 20, NFCI 15, lending 10
     w_curve: float = 20.0
     w_credit: float = 20.0
     w_unrate_trend: float = 7.0
@@ -90,6 +103,7 @@ class Params:
     w_permits: float = 5.0
     w_fed: float = 5.0
     w_inflation: float = 5.0
+    curve_inverted_days: int = 21  # curve: inverted on this many of the last 252 sessions
     claims_at_least: float = 1.15  # 4-week claims 15% or more above their 52-week low
     sloos_above: float = 0.20  # more than 20% of banks tightening
     permits_at_most: float = -0.20  # permits down 20% or more on the year
@@ -120,6 +134,10 @@ class Params:
             raise ValueError("hold_sessions and changed_sessions must be >= 1")
         if not 0.0 <= self.min_coverage <= 1.0:
             raise ValueError(f"min_coverage must be in [0, 1], got {self.min_coverage}")
+        if not 1 <= self.curve_inverted_days <= 252:
+            raise ValueError(
+                f"curve_inverted_days must be in [1, 252], got {self.curve_inverted_days}"
+            )
         weights = [f.name for f in fields(self) if f.name.startswith("w_")]
         if any(getattr(self, w) < 0 for w in weights):
             raise ValueError("weights must be >= 0")
@@ -154,6 +172,11 @@ class Signal:
     weight: str  # its ``Params`` weight field
     reads: tuple[str, ...]  # the feature keys of the columns it reads
     verdict: Callable[[Values, Params], Verdict]
+    tier: Tier | None = None  # a macro signal's tier
+
+    def __post_init__(self) -> None:
+        if (self.score == "macro") != (self.tier is not None):
+            raise ValueError(f"{self.name}: a macro signal has a tier, no other signal has")
 
 
 def _keys(group: str, *columns: str) -> tuple[str, ...]:
@@ -165,28 +188,34 @@ GROUPS = {g.key: g for g in (indicators.GROUP, macro.GROUP, trend.GROUP, cross_a
 CARD, M, T, X = indicators.GROUP.key, macro.GROUP.key, trend.GROUP.key, cross_asset.GROUP.key
 
 
-def _card(name: str, score: Score, weight: str, key: str) -> Signal:
-    return Signal(name, score, weight, _keys(CARD, f"{key}_on"), lambda v, p: flag(v, f"{key}_on"))
+def _card(name: str, score: Score, weight: str, key: str, tier: Tier | None = None) -> Signal:
+    return Signal(name, score, weight, _keys(CARD, f"{key}_on"),
+                  lambda v, p: flag(v, f"{key}_on"), tier)  # fmt: skip
 
 
 def _over(
-    name: str, score: Score, weight: str, group: str, column: str, op: str, at: str
-) -> Signal:
+    name: str, score: Score, weight: str, group: str, column: str, op: str, at: str,
+    tier: Tier | None = None,
+) -> Signal:  # fmt: skip
     return Signal(name, score, weight, _keys(group, column),
-                  lambda v, p: compare(number(v, column), op, getattr(p, at)))  # fmt: skip
+                  lambda v, p: compare(number(v, column), op, getattr(p, at)), tier)  # fmt: skip
 
 
+E: Tier = "early"
+C: Tier = "confirming"
 SIGNALS: tuple[Signal, ...] = (
-    _card("curve", "macro", "w_curve", "curve_10y3m"),
-    Signal("credit", "macro", "w_credit", (*_keys(CARD, "hy_oas_on"), *_keys(M, "ebp")), _credit),
-    _card("unrate_trend", "macro", "w_unrate_trend", "unrate_trend"),
-    _card("sahm", "macro", "w_sahm", "sahm"),
-    _over("claims", "macro", "w_claims", M, "claims_4w_vs_52w_low", ">=", "claims_at_least"),
-    _card("nfci", "macro", "w_nfci", "nfci"),
-    _over("sloos", "macro", "w_sloos", M, "sloos_ci_tightening", ">", "sloos_above"),
-    _over("permits", "macro", "w_permits", M, "permits_yoy", "<=", "permits_at_most"),
-    _over("fed", "macro", "w_fed", M, "fedfunds_chg_12m", ">", "fed_hikes_above"),
-    _over("inflation", "macro", "w_inflation", M, "cpi_yoy", ">", "cpi_above"),
+    _over("curve", "macro", "w_curve", M, "curve_inverted_days_252d", ">=", "curve_inverted_days",
+          E),
+    _over("permits", "macro", "w_permits", M, "permits_yoy", "<=", "permits_at_most", E),
+    _over("fed", "macro", "w_fed", M, "fedfunds_chg_12m", ">", "fed_hikes_above", E),
+    _over("inflation", "macro", "w_inflation", M, "cpi_yoy", ">", "cpi_above", E),
+    Signal("credit", "macro", "w_credit", (*_keys(CARD, "hy_oas_on"), *_keys(M, "ebp")), _credit,
+           C),
+    _card("unrate_trend", "macro", "w_unrate_trend", "unrate_trend", C),
+    _card("sahm", "macro", "w_sahm", "sahm", C),
+    _over("claims", "macro", "w_claims", M, "claims_4w_vs_52w_low", ">=", "claims_at_least", C),
+    _card("nfci", "macro", "w_nfci", "nfci", C),
+    _over("sloos", "macro", "w_sloos", M, "sloos_ci_tightening", ">", "sloos_above", C),
     _card("trend", "market", "w_trend", "spx_trend_200d"),
     _card("vol_term", "market", "w_vol_term", "vix_term"),
     _over("drawdown", "market", "w_drawdown", T, "spx_drawdown_252d", "<=", "drawdown_at_most"),
@@ -225,10 +254,11 @@ class Scored:
         return 100.0 * self.raw / self.known
 
 
-def score(v: Values, p: Params, which: Score) -> Scored:
+def score(v: Values, p: Params, which: Score, tier: Tier | None = None) -> Scored:
+    """``which`` score's signals (only ``tier``'s, when given) for one session."""
     total = known = on = 0.0
     missing = 0
-    for s in (s for s in SIGNALS if s.score == which):
+    for s in (s for s in SIGNALS if s.score == which and tier in (None, s.tier)):
         weight = getattr(p, s.weight)
         total += weight
         verdict = s.verdict(v, p)
@@ -240,14 +270,26 @@ def score(v: Values, p: Params, which: Score) -> Scored:
     return Scored(on, known, known / total if total else 0.0, missing)
 
 
+def tiers(v: Values, p: Params) -> tuple[float, float]:
+    """The macro tiers (early, confirming) on their covered-weight scales (NaN: unknown)."""
+    early, confirming = (score(v, p, "macro", t).scaled(p.min_coverage) for t in TIERS)
+    return early, confirming
+
+
+def macro_risk(early: float, confirming: float) -> float:
+    """The higher known tier; NaN when neither is known."""
+    known = [x for x in (early, confirming) if not np.isnan(x)]
+    return max(known) if known else np.nan
+
+
 def raw_label(v: Values, p: Params) -> str | None:
     """The session's label before hysteresis, from the covered-weight scores; ``None`` when a
     score's coverage is too low."""
-    macro_risk = score(v, p, "macro").scaled(p.min_coverage)
+    macro = macro_risk(*tiers(v, p))
     stress = score(v, p, "market").scaled(p.min_coverage)
-    if np.isnan(macro_risk) or np.isnan(stress):
+    if np.isnan(macro) or np.isnan(stress):
         return None
-    return LABELS[2 * (stress >= p.market_high) + (macro_risk >= p.macro_high)]
+    return LABELS[2 * (stress >= p.market_high) + (macro >= p.macro_high)]
 
 
 def held(raws: Mapping[date, str | None], day: date, hold: int) -> str | None:
@@ -265,14 +307,17 @@ def compute(inputs: Inputs, session: date, params: Params) -> pd.DataFrame:
     raws = {d: raw_label(session_values(inputs, d), p) for d in days}
     v = session_values(inputs, session)
     m, k, f = (score(v, p, s) for s in SCORES)
+    early, confirming = tiers(v, p)
     label = held(raws, session, p.hold_sessions)
     before = held(raws, days[-1 - p.changed_sessions], p.hold_sessions)
     row = {
         "instrument_id": market_id("US"),
         "label": label,
         "raw_label": raws[session],
-        "macro_risk": m.scaled(p.min_coverage),
+        "macro_risk": macro_risk(early, confirming),
         "market_stress": k.scaled(p.min_coverage),
+        "macro_early": early,
+        "macro_confirming": confirming,
         "macro_risk_raw": m.raw,
         "market_stress_raw": k.raw,
         "fragility": f.raw if f.coverage > 0 else np.nan,
@@ -285,8 +330,12 @@ def compute(inputs: Inputs, session: date, params: Params) -> pd.DataFrame:
     return pd.DataFrame([row], columns=["instrument_id", *COLUMNS])
 
 
-def _reads(which: Score | None = None) -> tuple[str, ...]:
-    keys = (r for s in SIGNALS if which is None or s.score == which for r in s.reads)
+def _of(s: Signal, which: Score | None, tier: Tier | None) -> bool:
+    return (which is None or s.score == which) and tier in (None, s.tier)
+
+
+def _reads(which: Score | None = None, tier: Tier | None = None) -> tuple[str, ...]:
+    keys = (r for s in SIGNALS if _of(s, which, tier) for r in s.reads)
     return tuple(dict.fromkeys(keys))
 
 
@@ -294,18 +343,31 @@ D = Params()
 _SCORE_READS = _reads("macro") + _reads("market")
 
 
-def _weights(which: Score) -> str:
-    return ", ".join(f"{s.name} {getattr(D, s.weight):g}" for s in SIGNALS if s.score == which)
+def _weights(which: Score, tier: Tier | None = None) -> str:
+    return ", ".join(f"{s.name} {getattr(D, s.weight):g}" for s in SIGNALS if _of(s, which, tier))
+
+
+def _scaled(name: str, which: Score, words: str, tier: Tier | None = None) -> Feature:
+    """A score (or a macro tier) on the covered-weight scale."""
+    return Feature(name, "float32", "pct_points", f"{words} on the covered-weight scale: the "
+                   "weight of its signals that are on over the weight of those known, 0 to "
+                   f"100 (weights {_weights(which, tier)}); an unknown signal neither adds nor "
+                   f"dilutes", f"less than min_coverage ({D.min_coverage:g}) of its weight is "
+                   "known", valid_range=(0, 100), inputs=_reads(which, tier))  # fmt: skip
+
+
+_MACRO = Feature(
+    "macro_risk", "float32", "pct_points", "Slow macro recession risk: the higher of macro_early "
+    "and macro_confirming, 0 to 100, so either tier alone can make it high (a tier that is "
+    "unknown is left out)", "both tiers are unknown (less than min_coverage of each tier's "
+    "weight is known)", valid_range=(0, 100), inputs=_reads("macro"),
+)  # fmt: skip
 
 
 def _score(name: str, which: Score, words: str) -> tuple[Feature, ...]:
     reads = _reads(which)
     return (
-        Feature(name, "float32", "pct_points", f"{words} on the covered-weight scale: the "
-                f"weight of its signals that are on over the weight of those known, 0 to 100 "
-                f"(weights {_weights(which)}); an unknown signal neither adds nor dilutes",
-                f"less than min_coverage ({D.min_coverage:g}) of its weight is known",
-                valid_range=(0, 100), inputs=reads),
+        _MACRO if which == "macro" else _scaled(name, which, words),
         Feature(f"{name}_raw", "float32", "pct_points", f"{words}, unnormalised: the weight of "
                 "its signals that are on, 0 to 100, an unknown signal adding 0 (the scale of "
                 "regime@v1)", "never: an unknown signal adds 0 (see the coverage)",
@@ -333,6 +395,12 @@ FEATURES = (
             "market high; CALM neither, CAUTION macro only, STRESS market only, CRISIS both",
             _UNKNOWN, kind="label", categories=LABELS, inputs=_SCORE_READS),
     *_score("macro_risk", "macro", "Slow macro recession risk"),
+    _scaled("macro_early", "macro", "The macro score's early tier (leads a recession bear's peak "
+            "by months: the curve inverted on at least "
+            f"{D.curve_inverted_days} of the last 252 sessions, Fed hikes, permits, inflation)",
+            "early"),
+    _scaled("macro_confirming", "macro", "The macro score's confirming tier (moves with the "
+            "downturn: credit, labour, financial conditions, lending standards)", "confirming"),
     *_score("market_stress", "market", "Fast market stress"),
     Feature("fragility", "float32", "pct_points", f"Context only (never the label): how deep a "
             f"fall could be, the weight of its signals on, 0 to 100 ({_weights('fragility')}: "
@@ -352,8 +420,9 @@ def _lookback(p: Params) -> int:
 GROUP = FeatureGroup(
     NAME,
     VERSION,
-    "The market regime: macro risk and market stress scores (weighted counts of signals on), "
-    "the fragility context score and the label with its 5-session hold",
+    "The market regime: macro risk (the higher of its early and confirming tiers) and market "
+    "stress scores (weighted counts of signals on), the fragility context score and the label "
+    "with its 5-session hold",
     tuple(Input(g.table, lookback=_lookback, required=False) for g in GROUPS.values()),
     FEATURES,
     compute,

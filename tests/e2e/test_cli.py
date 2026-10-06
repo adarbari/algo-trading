@@ -99,7 +99,7 @@ def test_regime_scorecard_says_no_data_on_a_store_without_macro_rows(
     report = tmp_path / "regime.txt"
     proc = cli("regime-scorecard", "--report", str(report))
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert proc.stdout.count("no data: run the macro backfill") == 5  # (a) (b) (c) (d) (f)
+    assert proc.stdout.count("no data: run the macro backfill") == 6  # (a)-(d), (f), (g)
     assert "algotrade-ingest run macro --since 1970-01-01" in proc.stdout
     assert report.read_text() == proc.stdout == cli("regime-scorecard").stdout  # deterministic
 

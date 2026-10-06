@@ -2,7 +2,8 @@
 bear the macro score saw 104 sessions early and the stress score 5 sessions after its peak,
 and a shock the stress score caught only 20 sessions late; two false alarms (a STRESS blip, a
 CRISIS blip) outside the windows; lagged UNRATE vintages; the probit fitted on month-end macro
-rows. Dating, leads, alarms, acceptance and the probit are checked by hand, the text twice."""
+rows. Dating, leads, alarms, acceptance and the probit are checked by hand, the text twice; the
+per-indicator leads (g) on engineered macro signal verdicts."""
 
 from datetime import date, timedelta
 from pathlib import Path
@@ -24,6 +25,7 @@ from algotrade.services.evaluation.regime_report import (
     acceptance_section,
     probit_section,
     render,
+    signal_section,
 )
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.tables.writers import StoreWriter
@@ -203,7 +205,7 @@ def test_the_probit_is_fitted_on_month_end_rows(reader: StoreReader) -> None:
 def test_without_data_every_section_says_so() -> None:
     _, empty = store()
     text = render(read_history(empty), EPISODES, ())
-    assert text.count(sc.NO_DATA) == 5 and sc.BACKFILL in text
+    assert text.count(sc.NO_DATA) == 6 and sc.BACKFILL in text
     assert sc.offset(date(2004, 6, 1), date(2004, 5, 28)) == -1
     assert sessions_ending(date(2004, 6, 1), 2)[0] == date(2004, 5, 28)
 
@@ -215,3 +217,49 @@ def test_a_fit_that_did_not_converge_is_never_offered_for_pasting() -> None:
     lines = probit_section(stuck)
     assert lines[-1] == "  not converged: do not paste"
     assert not any("params =" in line for line in lines)
+
+
+def signals_frame() -> pd.DataFrame:
+    """The curve on from ``MACRO_ON`` to A's trough and in two runs outside every window 30
+    sessions apart (one alarm) and a third 100 sessions later; the permits signal off
+    throughout; the SLOOS signal unknown throughout."""
+    on = {d for d in SESSIONS if MACRO_ON <= d <= A_TROUGH} | run_of(STRESS_BLIP, 3)
+    later = SESSIONS[SESSIONS.index(STRESS_BLIP) + 30]
+    on |= run_of(later, 2) | run_of(SESSIONS[SESSIONS.index(later) + 100], 1)
+    frame = pd.DataFrame({"session_date": SESSIONS})
+    for s in sc.MACRO_SIGNALS:
+        frame[s.name] = 0.0
+    frame["curve"] = [1.0 if d in on else 0.0 for d in SESSIONS]
+    frame["sloos"] = np.nan
+    return frame
+
+
+def test_per_indicator_leads_hits_and_false_alarms() -> None:
+    history = sc.History({}, None, None, sc.stored_vintages(store()[1]), signals_frame())
+    found = {f.signal: f for f in sc.signal_leads(history, EPISODES)}
+    curve, permits, sloos = found["curve"], found["permits"], found["sloos"]
+    before = len(sessions_between(MACRO_ON, A_PEAK))  # the peak included
+    assert curve.tier == "early" and sloos.tier == "confirming"
+    assert curve.episodes == {"a_recession": (-104, before), "b_shock": (None, 0)}
+    assert (curve.hits, curve.graded, curve.alarms) == (1, 1, 2)
+    assert permits.episodes["a_recession"] == (None, 0) and (permits.hits, permits.alarms) == (0, 0)
+    assert sloos.episodes == {"a_recession": None, "b_shock": None} and sloos.graded == 0
+    assert sloos.years == 0.0 and sloos.share == 0.0
+    assert curve.share == pytest.approx(6 / (curve.years * 252))
+    lines = signal_section(list(found.values()), EPISODES)
+    text = "\n".join(lines)
+    assert "curve         early       -104/105" in text and "never" in text and "n/a" in text
+    assert any(line.startswith("curve         early       1 of 1  2") for line in lines)
+
+
+def test_signal_verdicts_read_the_cards_and_the_macro_columns() -> None:
+    days = SESSIONS[:3]
+    rows = pd.DataFrame({"session_date": days, "curve_inverted_days_252d": [30.0, 20.0, np.nan],
+                         "ebp": [0.006, 0.001, np.nan]})  # fmt: skip
+    cards = pd.DataFrame({"session_date": days, "hy_oas_on": [np.nan, 1.0, np.nan]})
+    got = sc.signal_verdicts(rows, cards, regime.Params())
+    assert got is not None and list(got["session_date"]) == days
+    assert got["curve"].tolist()[:2] == [1.0, 0.0] and np.isnan(got["curve"].iloc[2])
+    assert got["credit"].tolist()[:2] == [1.0, 1.0]  # EBP before the high-yield card; the card
+    assert np.isnan(got["credit"].iloc[2])
+    assert sc.signal_verdicts(None, None, regime.Params()) is None

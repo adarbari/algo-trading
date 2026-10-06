@@ -88,29 +88,31 @@ spx_trend_below = 0.0        # the S&P 500 below its 200-day mean
 vix_term_above = 1.0         # VIX above VIX3M (backwardation)
 breadth_below = 0.40         # fewer than 40% of the universe above their 200-day mean
 
-["regime@v2"]                # the regime scores and label (plan section 4; starting values, tuned
-                             # on the episode scorecard in RG3b). Each score's w_* sum to 100.
+["regime@v3"]                # the regime scores and label (plan section 4: the macro tiers and the
+                             # curve's memory set on the 1971-2026 episode scorecard, the measured
+                             # leads in the plan's table). Each score's w_* sum to 100.
 hold_sessions = 5            # label: the most severe raw label of this many sessions (hysteresis)
 changed_sessions = 5         # label_changed compares the label with this many sessions earlier
-min_coverage = 0.5           # a score with less than this share of its weight known gives no label
-macro_high = 50.0            # macro_risk at or above: macro high (CAUTION, or CRISIS with stress)
+min_coverage = 0.5           # a score (or a macro tier) with less than this share of its weight known: unknown
+macro_high = 50.0            # macro_risk (the higher of its two tiers) at or above: macro high (CAUTION, or CRISIS with stress)
 market_high = 50.0           # market_stress at or above: market high (STRESS, or CRISIS)
-w_curve = 20.0               # macro_risk: the card verdicts curve_10y3m, hy_oas, unrate_trend,
-w_credit = 20.0              # sahm, nfci, and the thresholds below; labour (20) is split
-w_unrate_trend = 7.0         # unemployment trend 7, Sahm 7, claims 6
-w_sahm = 7.0
+w_curve = 20.0               # macro early tier (35): curve 20, permits 5, Fed hikes 5, inflation 5;
+w_permits = 5.0              # the curve alone is 57% of the tier, so a year with a month of
+w_fed = 5.0                  # inversion is macro high by itself
+w_inflation = 5.0
+w_credit = 20.0              # macro confirming tier (65): credit 20 (the hy_oas card, else EBP),
+w_unrate_trend = 7.0         # labour 20 (unemployment trend 7, Sahm 7, claims 6), NFCI 15,
+w_sahm = 7.0                 # lending standards 10
 w_claims = 6.0
 w_nfci = 15.0
 w_sloos = 10.0
-w_permits = 5.0
-w_fed = 5.0                  # Fed hikes and inflation (10), split 5 / 5
-w_inflation = 5.0
+curve_inverted_days = 21     # curve: 10y - 3m inverted on at least this many of the last 252 sessions
 claims_at_least = 1.15       # 4-week claims 15% or more above their 52-week low
 sloos_above = 0.20           # more than 20% of banks tightening C&I standards
 permits_at_most = -0.20      # permits down 20% or more on the year
 fed_hikes_above = 0.02       # fed funds up more than 200 bp on the year
 cpi_above = 0.04             # CPI inflation above 4%
-ebp_above = 0.005            # credit when the high-yield spread is unknown (before 1997): EBP above 50 bp
+ebp_above = 0.005            # credit when the high-yield spread is unknown (before 2023 on FRED): EBP above 50 bp
 w_trend = 20.0               # market_stress: the card verdicts spx_trend_200d, vix_term,
 w_vol_term = 20.0            # breadth_200d and the thresholds below
 w_drawdown = 10.0

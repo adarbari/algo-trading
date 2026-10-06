@@ -90,7 +90,7 @@ def test_each_card_explains_its_value_from_code_config_and_lineage(graph: Graph)
     assert [s["active"] for s in spx["sources"]] == [False, False, False]  # no source stored
     macro = regime["scores"]["macroRisk"]
     assert (macro["feature"], macro["coverageFeature"], macro["threshold"]) == (
-        "market.regime@v2.macro_risk", "market.regime@v2.macro_coverage", 50.0,
+        "market.regime@v3.macro_risk", "market.regime@v3.macro_coverage", 50.0,
     )  # fmt: skip
 
 

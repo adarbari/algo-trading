@@ -197,9 +197,9 @@ name = "rollups/market/regime_indicators@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
 
 [[table]]
-name = "rollups/market/regime@v2"
+name = "rollups/market/regime@v3"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
-note = "v2 put macro_risk and market_stress on the covered-weight scale (v1's scores kept as *_raw); v1 rows on the owner's store are superseded and read by nothing, deleted by hand once v2 is backfilled (retire-features handles instrument groups only)"
+note = "v2 put macro_risk and market_stress on the covered-weight scale (v1's scores kept as *_raw); v3 split macro_risk into an early and a confirming tier (macro_early, macro_confirming; macro_risk their maximum) and gave the curve signal a year of memory; v1 and v2 rows on the owner's store are superseded and read by nothing, deleted by hand once v3 is backfilled (retire-features handles instrument groups only)"
 
 [[table]]
 name = "rollups/daily/*"
