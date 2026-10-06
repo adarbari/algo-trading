@@ -39,11 +39,14 @@ RESERVED = frozenset({"instrument_id", "session_date", "knowledge_ts", "source",
 class Input:
     """One input table. ``lookback``: earlier exchange sessions also needed (an int, or a
     function of the params). ``required``: without data for the session the group has
-    nothing to compute (the runner reports NO_INPUT instead of calling ``compute``)."""
+    nothing to compute (the runner reports NO_INPUT instead of calling ``compute``).
+    ``ids``: only these instruments of a table read by id (``macro/series``: the group's
+    series, ``MACRO:<KEY>`` / ``IDX:<KEY>``); empty: all of them."""
 
     table: str
     lookback: Lookback = 0
     required: bool = True
+    ids: tuple[str, ...] = ()
 
     def sessions_back(self, params: Any) -> int:
         n = self.lookback(params) if callable(self.lookback) else self.lookback

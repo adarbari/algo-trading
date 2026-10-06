@@ -358,6 +358,33 @@ ETF_HOLDINGS = _fixed(
     runs="merge",
     key=("instrument_id", "as_of", "rank"),
 )
+# L1: economic series and index levels (ADR 0048), one row per series x observation date x
+# vintage. ``instrument_id`` is ``MACRO:<KEY>`` or ``IDX:<KEY>`` (``core.model.instruments``);
+# ``series`` is the vendor's code (FRED ``NASDAQCOM``, Stooq ``^SPX``). ``vintage_date`` is the
+# day the value became public: ALFRED's ``realtime_start`` (``vintage_kind`` ``alfred``), or
+# ``obs_date`` plus the series' release lag for unrevised series and observations before
+# ALFRED's first vintage (``lagged``, ``data.macro.vintages``). It is not ``knowledge_ts``,
+# which stays the storage stamp (ADR 0007: when we stored it; the stamping step overwrites
+# it): a 2008 vintage a 2026 backfill stored was public in 2008, exactly as
+# ``instruments/shares`` keeps ``filed``. ``value`` is null where FRED prints ".". The
+# partition is the run's session; runs are increments, so they merge on the key; readers union
+# every partition and keep the vintages on or before their session (``data.macro.series``).
+MACRO_SERIES = _fixed(
+    "macro/series",
+    "reference",
+    ("instrument_id", "obs_date", "vintage_date", "vintage_kind"),
+    "instrument_id string!",
+    "series string",
+    "obs_date date!",
+    "vintage_date date!",
+    "value float64",
+    "vintage_kind string!",
+    runs="merge",
+    key=("instrument_id", "obs_date", "vintage_date"),
+)
+# ``macro/series`` ``vintage_kind``: ALFRED's realtime_start, or obs_date + the release lag.
+ALFRED, LAGGED = "alfred", "lagged"
+VINTAGE_KINDS = frozenset({ALFRED, LAGGED})
 # Live verification (ADR 0026): our values vs another source's, one row per instrument and
 # check for a session. ``status`` is PASS / WARN / FAIL / NA; ``diff`` is in the check's
 # tolerance unit (relative or absolute, per ``note``).
@@ -453,6 +480,7 @@ KNOWN: dict[str, TableSpec] = {
         RULE_SCREEN_VALUES,
         LIVE_OPTION_QUOTES,
         ETF_HOLDINGS,
+        MACRO_SERIES,
     )
 }
 # Open-ended tables: the producing rollup, event source, catalogue or screener defines the
@@ -514,6 +542,8 @@ def validate_frame(table: str, frame: pd.DataFrame) -> None:
             problems.append("duplicate rows for the table key")
         if spec.grain == "bar":
             problems.extend(bar_problems(frame))
+        if spec is MACRO_SERIES:
+            problems.extend(vintage_problems(frame))
     if problems:
         raise DataValidationError(table, problems)
 
@@ -536,6 +566,15 @@ def table_key(spec: TableSpec, columns: Iterable[object]) -> list[str]:
 def bar_problems(frame: pd.DataFrame) -> list[str]:
     """OHLCV sanity checks on a bars frame (``core.validation.bars.ohlcv_problems``)."""
     return ohlcv_problems(*(frame[col].to_numpy(dtype=np.float64) for col in FIELDS))
+
+
+def vintage_problems(frame: pd.DataFrame) -> list[str]:
+    """``macro/series`` rows whose ``vintage_kind`` is not one of ``VINTAGE_KINDS``."""
+    kinds = frame["vintage_kind"]
+    bad = sorted({str(v) for v in kinds.dropna()} - VINTAGE_KINDS)
+    if kinds.isna().any():
+        bad.append("null")
+    return [f"vintage_kind must be one of {sorted(VINTAGE_KINDS)}, got {bad}"] if bad else []
 
 
 def require_retention(table: str) -> int:

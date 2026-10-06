@@ -77,3 +77,12 @@ def test_feature_view_is_read_only_and_sorted() -> None:
     assert view.as_of == date(2026, 10, 2)
     with pytest.raises(TypeError):
         view.row("EQ:A")["x"] = 3  # type: ignore[index]
+
+
+def test_index_and_macro_ids_are_minted_from_their_keys() -> None:
+    from algotrade.core.model.instruments import index_id, macro_id  # noqa: PLC0415
+
+    assert (index_id("spx"), macro_id("T10Y3M")) == ("IDX:SPX", "MACRO:T10Y3M")
+    assert key_of(macro_id("UNRATE")) == "UNRATE"
+    with pytest.raises(ValueError, match="empty"):
+        index_id(" ")

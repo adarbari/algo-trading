@@ -3,6 +3,8 @@
 - Equities and ETFs: ``EQ:<composite FIGI>`` (``EQ:BBG000B9XRY4``) when the FIGI is known,
   else the symbol id ``EQ:<SYMBOL>``. A FIGI id never changes, whatever the ticker does.
 - Options: ``OPT:<OCC symbol>`` (``OPT:SPY261231C00586000``).
+- Index levels and macro series (ADR 0048): ``IDX:<KEY>`` (``IDX:SPX``) and ``MACRO:<KEY>``
+  (``MACRO:T10Y3M``), not tradable; the keys come from ``config/site/macro.toml``.
 - Reference rates: ``RATE:<curve>-<tenor>`` (``RATE:UST-3M``, a Treasury par yield tenor).
 
 Every stored row is keyed by these ids, never by a raw ticker. Code that has a vendor ticker
@@ -18,6 +20,7 @@ from enum import StrEnum
 class AssetClass(StrEnum):
     EQUITY = "EQ"  # common stocks, ADRs and ETFs (security type is a reference attribute)
     INDEX = "IDX"
+    MACRO = "MACRO"  # an economic series (ADR 0048), not tradable
     OPTION = "OPT"
     FUTURE = "FUT"
     RATE = "RATE"  # a reference interest rate (one tenor of a yield curve), not tradable
@@ -48,6 +51,17 @@ def key_of(instrument: str) -> str:
     if not sep or not key:
         raise ValueError(f"not an instrument id: {instrument!r}")
     return key
+
+
+def index_id(key: str) -> str:
+    """The id of an index level series (``IDX:SPX``); the only place ``IDX:`` ids are minted."""
+    return instrument_id(AssetClass.INDEX, key)
+
+
+def macro_id(key: str) -> str:
+    """The id of an economic series (``MACRO:T10Y3M``); the only place ``MACRO:`` ids are
+    minted."""
+    return instrument_id(AssetClass.MACRO, key)
 
 
 def pad_cik(value: object) -> str | None:

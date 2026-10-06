@@ -136,6 +136,10 @@ path = "src/algotrade/data/funds"
 purpose = "reads about what a fund holds: ETF holdings (holdings/etf, ADR 0035), the latest rows per fund and the CUSIP to ticker bridge"
 
 [[dir]]
+path = "src/algotrade/data/macro"
+purpose = "reads of macro series and index levels (macro/series, ADR 0048): each observation's latest vintage a session knew, and the pit = lag vintage rule"
+
+[[dir]]
 path = "src/algotrade/features"
 purpose = "the feature store: the framework, the feature groups, expression features, the registry (registry.py), the site feature set (site.py) and the generated catalogue (catalogue.py)"
 contracts = [

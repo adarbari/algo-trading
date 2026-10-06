@@ -4,7 +4,9 @@
   a null meaning; its stored type is its ``dtype``, on real (golden) output too;
 - valid ranges and categories are sane, and golden output stays inside them;
 - feature inputs resolve: another feature, or a raw field of a table the group reads; an
-  expression feature a group reads is materialised and computed before it;
+  expression feature a group reads is materialised and computed before it; a ``series:<KEY>``
+  input is a series of ``config/site/macro.toml`` the group reads (ADR 0048), and a feature
+  over a personal-use series is personal itself;
 - every expression feature is documented like a stored one, and golden output of both
   (materialised and virtual) has the declared types, ranges and categories;
 - a null explained by a status column (ADRs 0042, 0046) names statuses that are ``NullReason``
@@ -25,10 +27,19 @@ import pandas as pd
 import pytest
 
 from algotrade.config.site.field_guide import GuideUse
-from algotrade.config.site.settings import load_field_guide
+from algotrade.config.site.settings import MacroSettings, load_field_guide, load_macro
 from algotrade.data import StoreReader
+from algotrade.data.macro.series import TABLE as MACRO_SERIES
 from algotrade.features.catalogue import PATH, render
-from algotrade.features.framework.feature import NullReason, in_range, is_feature_ref
+from algotrade.features.framework.declaration import FeatureGroup, Input
+from algotrade.features.framework.feature import (
+    SERIES_REF,
+    Feature,
+    NullReason,
+    in_range,
+    is_feature_ref,
+    is_series_ref,
+)
 from algotrade.features.framework.graph import dependencies
 from algotrade.features.framework.runner import compute_in_memory
 from algotrade.features.guide import PATH as GUIDE_PATH
@@ -40,6 +51,7 @@ from algotrade.storage.configs.files import FileConfigStore
 from tests.conftest import REPO_ROOT
 
 SITE = site_features(FileConfigStore(REPO_ROOT / "config"))
+MACRO = load_macro(FileConfigStore(REPO_ROOT / "config"))
 FEATURES = SITE.features  # stored + expression features, by key
 
 FEATURES_SRC = REPO_ROOT / "src" / "algotrade" / "features"
@@ -87,8 +99,27 @@ def test_inputs_resolve(key: str) -> None:
                 assert source in upstream, f"{f.key}: {ref} is not an input"
                 if not FEATURES[ref].group:
                     assert SITE.expressions[FEATURES[ref].name].materialise, ref
-            else:
+            elif not is_series_ref(ref):
                 assert ref.rpartition(".")[0] in reads, f"{f.key}: {ref} is not a table it reads"
+    assert not series_input_problems(group, MACRO)
+
+
+def series_input_problems(group: FeatureGroup, macro: MacroSettings) -> list[str]:
+    """Why the group's ``series:<KEY>`` inputs do not resolve (empty: they do)."""
+    read = next((i for i in group.inputs if i.table == MACRO_SERIES), None)
+    problems = []
+    for f in group.features:
+        for ref in filter(is_series_ref, f.inputs):
+            key = ref.removeprefix(SERIES_REF)
+            if key not in macro.keys:
+                problems.append(f"{f.key}: {ref} is not a series of config/site/macro.toml")
+                continue
+            series = macro.by_key(key)
+            if read is None or (read.ids and series.instrument_id not in read.ids):
+                problems.append(f"{f.key}: {ref} is not an input ({MACRO_SERIES} ids)")
+            if series.licence == "personal" and f.licence != "personal":
+                problems.append(f"{f.key}: {ref} is for personal use; so is the feature")
+    return problems
 
 
 @pytest.mark.parametrize(
@@ -266,3 +297,35 @@ def test_field_guide_values_fit_their_fields() -> None:
 def test_field_guide_page_is_up_to_date() -> None:
     committed = (REPO_ROOT / GUIDE_PATH).read_text()
     assert committed == render_guide(GUIDE), f"{GUIDE_PATH} is out of date: run `make features-doc`"
+
+
+def test_series_inputs_are_checked_against_the_macro_registry() -> None:
+    def feature(name: str, ref: str, licence: str = "open") -> Feature:
+        return Feature(name, "float", "decimal", "d", "n", inputs=(ref,), licence=licence)  # type: ignore[arg-type]
+
+    def group(ids: tuple[str, ...], *features: Feature) -> FeatureGroup:
+        reads = (Input(MACRO_SERIES, ids=ids),)
+        return FeatureGroup("toy", 1, "toy", reads, features, lambda i, s, p: pd.DataFrame())
+
+    ok = group(("MACRO:T10Y3M",), feature("slope", "series:T10Y3M"))
+    assert series_input_problems(ok, MACRO) == []
+    assert series_input_problems(group((), feature("vix", "series:VIX")), MACRO) == []
+    problems = series_input_problems(
+        group(
+            ("MACRO:T10Y3M",),
+            feature("nope", "series:NOPE"),
+            feature("unread", "series:UNRATE"),
+            feature("hy", "series:BAMLH0A0HYM2"),
+        ),
+        MACRO,
+    )
+    assert [p.split(":")[0] for p in problems] == [
+        "toy.nope@v1",
+        "toy.unread@v1",
+        "toy.hy@v1",
+        "toy.hy@v1",
+    ]
+    assert (
+        series_input_problems(group((), feature("hy", "series:BAMLH0A0HYM2", "personal")), MACRO)
+        == []
+    )

@@ -7,6 +7,7 @@ ADR 0019 ``site-settings``. Each file becomes a frozen dataclass that apps recei
     llm.toml       -> LlmSettings       (the text model behind screener drafts, ADR 0041)
     phrasebook.toml -> PhrasebookSettings (trader vocabulary -> catalogue fields, ADR 0041)
     field_guide/*.toml -> FieldGuideSettings (how to read a field, thresholds, caveats, ADR 0041)
+    macro.toml     -> MacroSettings     (config/site/macro.py: macro series, index levels; ADR 0048)
     universe.toml  -> UniverseSettings  (+ overrides/leveraged_etfs.csv, overrides/figi.csv)
     nightly.toml   -> NightlySettings
     users.toml     -> UsersSettings     (config/site/users.py: the user registry, ADR 0040)
@@ -43,6 +44,7 @@ from algotrade.config.site.ibkr import IbkrSettings as IbkrSettings  # noqa: PLC
 from algotrade.config.site.ibkr import load_ibkr
 from algotrade.config.site.llm import LlmSettings as LlmSettings  # noqa: PLC0414 - re-export
 from algotrade.config.site.llm import PhrasebookSettings as PhrasebookSettings  # noqa: PLC0414
+from algotrade.config.site.macro import MacroSettings as MacroSettings  # noqa: PLC0414 - re-export
 from algotrade.config.site.nightly import (
     NightlySettings as NightlySettings,  # noqa: PLC0414 - re-export
 )
@@ -936,6 +938,11 @@ def load_field_guide(configs: SiteDocuments) -> FieldGuideSettings:
     return FieldGuideSettings.from_documents(
         {n: configs.load("site", "field_guide", n) for n in names}
     )
+
+
+def load_macro(configs: SiteDocuments) -> MacroSettings:
+    """``macro.toml`` (ADR 0048); missing: no series."""
+    return MacroSettings.from_document(site_document(configs.load, "macro"))
 
 
 def load_rollups(

@@ -1,0 +1,384 @@
+# L3 site setting: the macro series and index levels stored in macro/series (ADR 0048), typed
+# in src/algotrade/config/site/macro.py. Feature groups read one as `series:<KEY>`; its id is
+# MACRO:<KEY> (kind = "macro") or IDX:<KEY> (kind = "index").
+#
+# key               the series' name here; `code` is the vendor's code when it differs
+# source            "fred" (FRED / ALFRED API, key from ALGOTRADE_FRED_API_KEY) or "published"
+#                   (a file at `url` read by `parser`, with `date_column` and `value_column`)
+# kind              "macro" (an economic series) or "index" (an index level)
+# cadence           daily, weekly, monthly or quarterly
+# release_lag_days  calendar days from an observation to its publication: the vintage date of a
+#                   pit = "lag" series and how stale a series may get; conservative (errs late)
+# pit               "alfred" (every vintage from ALFRED; fred only) or "lag" (unrevised series:
+#                   vintage_date = obs_date + release_lag_days, vintage_kind = "lagged")
+# transform         how the macro group reads it: level, yoy (year-over-year change) or diff
+# licence, terms    "personal" for data licensed for personal use only (ICE BofA, Stooq; ADR 0028)
+
+# --- Recession risk: the curve, credit, policy and oil (daily market series: unrevised)
+
+[[series]]
+key = "T10Y3M"                # 10y minus 3m Treasury (1982-)
+source = "fred"
+kind = "macro"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "T10Y2Y"                # 10y minus 2y Treasury (1976-)
+source = "fred"
+kind = "macro"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "BAMLH0A0HYM2"          # ICE BofA US high yield OAS
+source = "fred"
+kind = "macro"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+transform = "level"
+licence = "personal"
+terms = "ICE BofA indices via FRED: personal use only (ICE notice on each series page)"
+
+[[series]]
+key = "BAMLC0A0CM"            # ICE BofA US corporate (IG) OAS
+source = "fred"
+kind = "macro"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+transform = "level"
+licence = "personal"
+terms = "ICE BofA indices via FRED: personal use only (ICE notice on each series page)"
+
+[[series]]
+key = "BAA10Y"                # Moody's Baa minus 10y Treasury
+source = "fred"
+kind = "macro"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "DFII10"                # 10y TIPS real yield
+source = "fred"
+kind = "macro"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "DCOILWTICO"            # WTI spot (EIA publishes with a lag of days)
+source = "fred"
+kind = "macro"
+cadence = "daily"
+release_lag_days = 7
+pit = "lag"
+transform = "yoy"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "RRPONTSYD"             # Fed overnight reverse repos (net liquidity)
+source = "fred"
+kind = "macro"
+cadence = "daily"
+release_lag_days = 1
+pit = "lag"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+# --- Weekly series (revised: ALFRED vintages)
+
+[[series]]
+key = "ICSA"                  # initial jobless claims
+source = "fred"
+kind = "macro"
+cadence = "weekly"
+release_lag_days = 5
+pit = "alfred"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "IC4WSA"                # claims, 4-week average
+source = "fred"
+kind = "macro"
+cadence = "weekly"
+release_lag_days = 5
+pit = "alfred"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "NFCI"                  # Chicago Fed financial conditions
+source = "fred"
+kind = "macro"
+cadence = "weekly"
+release_lag_days = 5
+pit = "alfred"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "ANFCI"                 # adjusted NFCI
+source = "fred"
+kind = "macro"
+cadence = "weekly"
+release_lag_days = 5
+pit = "alfred"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "STLFSI4"               # St. Louis Fed financial stress
+source = "fred"
+kind = "macro"
+cadence = "weekly"
+release_lag_days = 6
+pit = "alfred"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "WEI"                   # NY Fed weekly economic index
+source = "fred"
+kind = "macro"
+cadence = "weekly"
+release_lag_days = 5
+pit = "alfred"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "WALCL"                 # Fed total assets (net liquidity)
+source = "fred"
+kind = "macro"
+cadence = "weekly"
+release_lag_days = 1
+pit = "alfred"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "WTREGEN"               # Treasury General Account (net liquidity)
+source = "fred"
+kind = "macro"
+cadence = "weekly"
+release_lag_days = 1
+pit = "alfred"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "TOTBKCR"               # bank credit (Baron-Xiong)
+source = "fred"
+kind = "macro"
+cadence = "weekly"
+release_lag_days = 9
+pit = "alfred"
+transform = "yoy"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+# --- Monthly and quarterly series (revised: ALFRED vintages; obs_date is the period's first day)
+
+[[series]]
+key = "UNRATE"                # unemployment rate
+source = "fred"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 35
+pit = "alfred"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "SAHMREALTIME"          # Sahm rule, real time
+source = "fred"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 35
+pit = "alfred"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "PAYEMS"                # nonfarm payrolls
+source = "fred"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 35
+pit = "alfred"
+transform = "yoy"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "PERMIT"                # housing permits
+source = "fred"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 50
+pit = "alfred"
+transform = "yoy"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "HOUST"                 # housing starts
+source = "fred"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 50
+pit = "alfred"
+transform = "yoy"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "CFNAIMA3"              # Chicago Fed activity, 3-month average
+source = "fred"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 55
+pit = "alfred"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "FEDFUNDS"              # effective fed funds rate
+source = "fred"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 32
+pit = "alfred"
+transform = "diff"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "CPIAUCSL"              # CPI, all items
+source = "fred"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+pit = "alfred"
+transform = "yoy"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "PCEPILFE"              # core PCE price index
+source = "fred"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 60
+pit = "alfred"
+transform = "yoy"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "BUSLOANS"              # C&I loans (Baron-Xiong)
+source = "fred"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 45
+pit = "alfred"
+transform = "yoy"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "KCFSI"                 # Kansas City Fed financial stress
+source = "fred"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 40
+pit = "alfred"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "RECPROUSM156N"         # Chauvet-Piger recession probability
+source = "fred"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 95
+pit = "alfred"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "DRTSCILM"              # SLOOS: net % tightening C&I standards
+source = "fred"
+kind = "macro"
+cadence = "quarterly"
+release_lag_days = 45
+pit = "alfred"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "GDPNOW"                # Atlanta Fed GDPNow
+source = "fred"
+kind = "macro"
+cadence = "quarterly"
+release_lag_days = 30
+pit = "alfred"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+# --- Index levels (ADR 0047: index levels are series, never bars; the close is public on its day)
+
+[[series]]
+key = "SPX"                     # S&P 500 (Stooq daily CSV, decades of history)
+code = "^SPX"
+source = "published"
+kind = "index"
+cadence = "daily"
+release_lag_days = 0
+pit = "lag"
+transform = "level"
+licence = "personal"
+terms = "Stooq free daily download (https://stooq.com): personal use only, no redistribution"
+url = "https://stooq.com/q/d/l/?s=^spx&i=d"
+date_column = "Date"
+value_column = "Close"
+parser = "csv"
+
+[[series]]
+key = "COMP"                  # Nasdaq Composite (1971-)
+code = "NASDAQCOM"
+source = "fred"
+kind = "index"
+cadence = "daily"
+release_lag_days = 0
+pit = "lag"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "VIX"                   # Cboe VIX close
+code = "VIXCLS"
+source = "fred"
+kind = "index"
+cadence = "daily"
+release_lag_days = 0
+pit = "lag"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
+
+[[series]]
+key = "VIX3M"                 # Cboe 3-month VIX close
+code = "VXVCLS"
+source = "fred"
+kind = "index"
+cadence = "daily"
+release_lag_days = 0
+pit = "lag"
+transform = "level"
+terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"

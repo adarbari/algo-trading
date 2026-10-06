@@ -104,6 +104,8 @@ class NullReason(StrEnum):
 _NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 _FEATURE_REF = re.compile(r"^([a-z][a-z0-9_]*\.)?[a-z][a-z0-9_]*@v[1-9][0-9]*$")
 _RAW_REF = re.compile(r"^[a-z0-9_/]+\.[a-z][a-z0-9_]*$")
+SERIES_REF = "series:"  # a macro series or index level by its macro.toml key (ADR 0048)
+_SERIES_REF = re.compile(r"^series:[A-Z0-9][A-Z0-9_]*$")
 
 
 @dataclass(frozen=True)
@@ -171,6 +173,11 @@ def is_feature_ref(ref: str) -> bool:
     return bool(_FEATURE_REF.match(ref))
 
 
+def is_series_ref(ref: str) -> bool:
+    """``series:<KEY>``: a ``macro/series`` series named by its ``macro.toml`` key."""
+    return bool(_SERIES_REF.match(ref))
+
+
 def feature_problems(feature: Feature) -> list[str]:
     """Why a feature declaration is invalid (empty: valid)."""
     f = feature
@@ -198,9 +205,12 @@ def feature_problems(feature: Feature) -> list[str]:
             problems.append(f"{f.name}: valid_range min > max")
     if f.categories and f.dtype != "str":
         problems.append(f"{f.name}: categories need dtype str")
-    bad = [r for r in f.inputs if not (is_feature_ref(r) or _RAW_REF.match(r))]
+    refs = (is_feature_ref, _RAW_REF.match, is_series_ref)
+    bad = [r for r in f.inputs if not any(ok(r) for ok in refs)]
     if bad:
-        problems.append(f"{f.name}: inputs {bad} are neither <group>.<column>@vN nor table.column")
+        problems.append(
+            f"{f.name}: inputs {bad} are neither <group>.<column>@vN, table.column nor series:<KEY>"
+        )
     return problems
 
 
