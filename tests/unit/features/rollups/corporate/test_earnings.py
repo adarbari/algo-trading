@@ -1,6 +1,7 @@
 """``earnings@v1``: next / last dates as known on each session (stored snapshots on or before
 it), moved dates, report time, and sessions to the report across holidays."""
 
+from collections.abc import Callable
 from datetime import date, timedelta
 
 import numpy as np
@@ -124,23 +125,79 @@ def random_snapshots(seed: int, n: int = 60) -> pd.DataFrame:
 def test_valid_events_equals_the_full_reading_with_and_without_since(seed: int) -> None:
     stored = random_snapshots(seed)
     want = _full_reading(stored)
-    pd.testing.assert_frame_equal(earnings.valid_events(stored), want)
+    last = date(2027, 1, 1)  # every snapshot stored by then
+    pd.testing.assert_frame_equal(earnings.valid_events(stored, last), want)
     for since in (date(2026, 3, 1), date(2026, 4, 10), date(2026, 5, 20), date(2027, 1, 1)):
         pd.testing.assert_frame_equal(
-            earnings.valid_events(stored, since), want[want["report"] >= since]
+            earnings.valid_events(stored, last, since), want[want["report"] >= since]
         )
 
 
-def _store_rows(writer: object, stored: date, rows: list[tuple[str, date, date]]) -> None:
-    """Rows stored on ``stored``: (instrument, report date, known_from)."""
+def _store_rows(
+    writer: object, stored: date, rows: list[tuple[str, date, date]], **extra: object
+) -> None:
+    """Rows stored on ``stored``: (instrument, report date, known_from); a row known before
+    ``stored`` is a reported result."""
     from tests.helpers.stored_frames import stamped  # noqa: PLC0415
 
     frame = [
-        {"instrument_id": i, "ts": pd.Timestamp(d, tz="UTC"), "time": "pre_market", "known_from": k}
+        {
+            "instrument_id": i,
+            "ts": pd.Timestamp(d, tz="UTC"),
+            "time": "pre_market",
+            "known_from": k,
+            "reported": k < stored,
+            **extra,
+        }
         for i, d, k in rows
     ]
-    run = f"r{stored}-{len(rows)}"
+    run = f"r{stored}-{len(rows)}-{len(extra)}"
     writer.write_table("events/earnings", stored, run, stamped(frame, stored, run))  # type: ignore[attr-defined]
+
+
+MON, TUE, WED, THU = (date(2026, 10, d) for d in (5, 6, 7, 8))
+
+
+def _monday(with_tuesday: Callable[[object], None] | None) -> dict[str, object]:
+    """Monday's earnings@v1 rows by instrument, with Tuesday's partition stored or not."""
+    writer, reader = store()
+    _store_rows(writer, MON, [("EQ:A", MON, MON), ("EQ:B", WED, MON), ("EQ:D", WED, MON)])
+    if with_tuesday is not None:
+        with_tuesday(writer)
+    frame = compute_one(reader, GROUP, MON).frame
+    assert frame is not None
+    return frame.set_index("instrument_id").to_dict("index")
+
+
+def test_a_later_lookback_never_overrules_the_session_s_own_calendar() -> None:
+    """Architect review (lookahead): Tuesday's lookback rows for Monday (known on Monday)
+    omit A; at session Monday, Tuesday's partition must not become the authority for Monday."""
+
+    def tuesday(writer: object) -> None:
+        _store_rows(writer, TUE, [("EQ:C", MON, MON), ("EQ:B", THU, TUE)])
+
+    alone, later = _monday(None), _monday(tuesday)
+    for iid in ("EQ:A", "EQ:B", "EQ:D"):
+        assert later[iid] == alone[iid], iid
+    assert later["EQ:C"]["next_earnings_date"] == MON  # a reported fact known on Monday
+
+
+def test_a_later_carried_row_never_overrules_the_session_s_own_calendar() -> None:
+    """Architect review (lookahead): a forecast Tuesday carried for Thursday is visible at
+    Monday through its known_from; it must not make Tuesday the authority for Wednesday."""
+
+    def tuesday(writer: object) -> None:
+        _store_rows(
+            writer,
+            TUE,
+            [("EQ:E", THU, date(2026, 10, 2))],
+            carried_from=date(2026, 10, 2),
+            reported=False,
+        )
+        _store_rows(writer, TUE, [("EQ:B", THU, TUE)])
+
+    alone, later = _monday(None), _monday(tuesday)
+    assert later == alone
 
 
 def test_a_second_backfill_never_cancels_the_reports_of_the_first() -> None:
@@ -186,5 +243,5 @@ def test_a_carried_forecast_stays_a_forecast() -> None:
         [stored, stored.iloc[[1]].assign(ts=pd.Timestamp(2026, 10, 15, tz="UTC"))],
         ignore_index=True,
     )  # the 10-05 calendar covers 10-15..10-27 and does not list 10-20
-    valid = earnings.valid_events(stored)
+    valid = earnings.valid_events(stored, date(2026, 10, 5))
     assert sorted(valid["report"]) == [date(2026, 10, 15), date(2026, 10, 27)]

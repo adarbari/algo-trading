@@ -15,6 +15,11 @@ read rule, ADR 0050: its ``known_from``, else the session that stored it). Two k
 A row a snapshot carried forward over a day its fetch failed (``carried_from``: the session
 that fetched it) keeps the kind it had there, so the failed day cancels nothing.
 
+Only snapshots stored on or before the session decide (ranges, authorities): a later
+partition contributes only its reported history rows (known by the session), never its
+forecasts or carried copies, so recomputing a session after later nights changes nothing it
+knew.
+
 One row per (instrument, report date): a history row over a forecast, then the latest
 snapshot.
 
@@ -90,10 +95,15 @@ FEATURES = (
 COLUMNS = column_types(FEATURES)
 
 
-def valid_events(stored: pd.DataFrame, since: date | None = None) -> pd.DataFrame:
-    """The valid rows for each report date (see the module doc): every history row, and the
-    forecast rows of the authority snapshot; one row per (instrument, report date), a history
-    row over a forecast, then the latest snapshot.
+def valid_events(stored: pd.DataFrame, session: date, since: date | None = None) -> pd.DataFrame:
+    """The valid rows for each report date as of ``session`` (see the module doc): every
+    history row, and the forecast rows of the authority snapshot; one row per (instrument,
+    report date), a history row over a forecast, then the latest snapshot.
+
+    Only snapshots stored on or before ``session`` form ranges and act as authorities. A row
+    of a later partition (visible through its ``known_from``) stays only as a reported
+    history row: its forecasts are not known yet and its carried rows are copies of rows
+    their origin snapshot holds.
 
     ``since``: only report dates on or after it (``anchored_vwap@v1`` needs none older). The
     snapshots' ranges still come from all their rows, so the rows kept are exactly those the
@@ -103,31 +113,42 @@ def valid_events(stored: pd.DataFrame, since: date | None = None) -> pd.DataFram
         pd.to_datetime(stored["ts"], utc=True).dt.tz_localize(None).to_numpy(dtype="datetime64[D]")
     )
     snap_day = pd.to_datetime(stored["session_date"]).to_numpy(dtype="datetime64[D]")
-    history = np.zeros(len(stored), dtype=bool)
+    n = len(stored)
+    history, carried, fetched_on = np.zeros(n, dtype=bool), np.zeros(n, dtype=bool), snap_day
+    if CARRIED_FROM in stored.columns:
+        origin = pd.to_datetime(stored[CARRIED_FROM]).to_numpy(dtype="datetime64[D]")
+        carried = ~np.isnat(origin)
+        fetched_on = np.where(carried, origin, snap_day)
     if KNOWN_FROM in stored.columns:
         known = pd.to_datetime(stored[KNOWN_FROM]).to_numpy(dtype="datetime64[D]")
-        fetched_on = snap_day
-        if CARRIED_FROM in stored.columns:
-            carried = pd.to_datetime(stored[CARRIED_FROM]).to_numpy(dtype="datetime64[D]")
-            fetched_on = np.where(np.isnat(carried), snap_day, carried)
         history = ~np.isnat(known) & (known < fetched_on)
-    ranges = pd.DataFrame({"snapshot": snap_day, "report": report_day}).groupby("snapshot")
-    lo, hi = ranges["report"].min(), ranges["report"].max()
-    snaps = lo.index.to_numpy(dtype="datetime64[D]")
-    # A snapshot covers from its own session (the calendar it fetched starts there) or its
-    # earliest row (the past days its window fetched), to its latest row.
-    first = np.minimum(lo.to_numpy(dtype="datetime64[D]"), snaps)
-    last_day = hi.to_numpy(dtype="datetime64[D]")
-    keep = np.ones(len(stored), dtype=bool)
+    reported = np.zeros(n, dtype=bool)
+    if "reported" in stored.columns:
+        reported = stored["reported"].fillna(False).astype(bool).to_numpy()
+    stored_by = snap_day <= np.datetime64(session, "D")
+    keep = np.ones(n, dtype=bool)
     if since is not None:
         keep = report_day >= np.datetime64(since, "D")
-    reports = np.unique(report_day[keep])
-    covers = (first[None, :] <= reports[:, None]) & (reports[:, None] <= last_day[None, :])
-    # Snapshots are sorted ascending: the last covering one is the authority.
-    authority = snaps[covers.shape[1] - 1 - np.argmax(covers[:, ::-1], axis=1)]
-    kept = np.flatnonzero(keep)
-    from_authority = snap_day[kept] == authority[np.searchsorted(reports, report_day[kept])]
-    valid = kept[from_authority | history[kept]]
+    from_authority = np.zeros(n, dtype=bool)
+    if stored_by.any():
+        frame = pd.DataFrame({"snapshot": snap_day[stored_by], "report": report_day[stored_by]})
+        ranges = frame.groupby("snapshot")
+        lo, hi = ranges["report"].min(), ranges["report"].max()
+        snaps = lo.index.to_numpy(dtype="datetime64[D]")
+        # A snapshot covers from its own session (the calendar it fetched starts there) or its
+        # earliest row (the past days its window fetched), to its latest row.
+        first = np.minimum(lo.to_numpy(dtype="datetime64[D]"), snaps)
+        last_day = hi.to_numpy(dtype="datetime64[D]")
+        target = np.flatnonzero(stored_by & keep)
+        reports = np.unique(report_day[target])
+        if len(reports):
+            covers = (first[None, :] <= reports[:, None]) & (reports[:, None] <= last_day[None, :])
+            # Snapshots are sorted ascending: the last covering one is the authority.
+            authority = snaps[covers.shape[1] - 1 - np.argmax(covers[:, ::-1], axis=1)]
+            at = np.searchsorted(reports, report_day[target])
+            from_authority[target] = snap_day[target] == authority[at]
+    later_fact = ~stored_by & history & reported & ~carried
+    valid = np.flatnonzero(keep & ((stored_by & (from_authority | history)) | later_fact))
     rows: pd.DataFrame = stored.iloc[valid].assign(_history=history[valid])
     rows = rows.assign(
         report=pd.to_datetime(rows["ts"], utc=True).dt.date,
@@ -153,7 +174,7 @@ def _sessions_to(start: date, end: date) -> int:
 def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     stored = inputs[EVENTS]
     assert stored is not None  # required input
-    rows = valid_events(stored)
+    rows = valid_events(stored, session)
     rows = rows.sort_values(["instrument_id", "report"], kind="stable")
     upcoming = rows[rows["report"] >= session].drop_duplicates("instrument_id", keep="first")
     past = rows[rows["report"] < session].drop_duplicates("instrument_id", keep="last")

@@ -1,5 +1,6 @@
 from datetime import UTC, date, datetime
 
+import pandas as pd
 import pytest
 
 from algotrade.data import StoreReader
@@ -233,3 +234,28 @@ def test_a_failed_backfill_day_carries_the_previous_forecasts_until_retried() ->
     stored = StoreReader(backend).table("events/earnings", DAY)
     assert stored is not None and len(stored) == 2  # 09-29 fetched, replacing the carried row
     assert "carried_from" not in stored.columns or stored["carried_from"].isna().all()
+
+
+def test_a_row_carried_from_a_partition_without_known_from_gets_one() -> None:
+    """Partitions stored before ``known_from`` existed: a carried row gets min(its session,
+    its report date), so the write's required column is never null."""
+    from tests.helpers.stored_frames import stamped  # noqa: PLC0415
+
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    old = date(2026, 10, 1)
+    rows = [
+        {"instrument_id": "EQ:A", "symbol": "A", "ts": pd.Timestamp(date(2026, 10, 6), tz="UTC")},
+        {"instrument_id": "EQ:B", "symbol": "B", "ts": pd.Timestamp(date(2026, 9, 30), tz="UTC")},
+    ]
+    backend.tables.write("events/earnings", old, "legacy", stamped(rows, old, "legacy"))
+    source = NasdaqEarningsSource(
+        http_for(lambda url: (_ for _ in ()).throw(HttpError(500)), RetryPolicy(tries=1))
+    )
+    ctx = task_ctx(writer, StoreReader(backend), CLOCK)
+    record = ingest_earnings(ctx, source, DAY, start=date(2026, 9, 30), days=7)
+    assert record.stats["carried_rows"] == 2
+    stored = StoreReader(backend).table("events/earnings", DAY)
+    assert stored is not None
+    known = dict(zip(stored["instrument_id"], stored["known_from"], strict=True))
+    assert known == {"EQ:A": old, "EQ:B": date(2026, 9, 30)}

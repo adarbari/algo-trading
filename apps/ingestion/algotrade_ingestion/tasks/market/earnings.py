@@ -80,10 +80,19 @@ class _Previous:
             rows = rows[~rows["instrument_id"].isin(set(have["instrument_id"]))]
         if rows.empty:
             return pd.DataFrame()
-        origin = pd.to_datetime(rows["session_date"]).dt.date
+        stored = pd.to_datetime(rows["session_date"]).dt.date
+        origin = stored
         if CARRIED_FROM in rows.columns:  # a row carried before keeps the session that fetched it
-            origin = rows[CARRIED_FROM].where(rows[CARRIED_FROM].notna(), origin)
-        return rows.drop(columns=list(COMMON)).assign(**{CARRIED_FROM: list(origin)})
+            origin = rows[CARRIED_FROM].where(rows[CARRIED_FROM].notna(), stored)
+        # A row stored before known_from existed: known from min(its session, its report date).
+        report = pd.to_datetime(rows["ts"], utc=True).dt.date
+        fallback = [min(s, r) for s, r in zip(stored, report, strict=True)]
+        known = (
+            rows[KNOWN_FROM] if KNOWN_FROM in rows.columns else pd.Series(None, index=rows.index)
+        )
+        known = known.where(known.notna(), pd.Series(fallback, index=rows.index))
+        out = rows.drop(columns=list(COMMON)).assign(**{CARRIED_FROM: list(origin)})
+        return out.assign(**{KNOWN_FROM: list(known)})
 
 
 def _carry_forward(
@@ -149,8 +158,10 @@ def ingest_earnings(
             window=[(start or session).isoformat(), days],
             dates_failed=run.failures(),
             rows=len(rows),
-            companies=int(rows["symbol"].nunique()) if len(rows) else 0,
-            reported=int(rows["reported"].sum()) if len(rows) else 0,
+            companies=int(rows["symbol"].nunique()) if "symbol" in rows.columns else 0,
+            reported=int(rows["reported"].fillna(False).astype(bool).sum())
+            if "reported" in rows.columns
+            else 0,
             unresolved=run.unresolved,
             carried_rows=run.stats.get("carried_rows", 0),
         )

@@ -90,7 +90,7 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     px = panel(bars, days[1:])
     traded = ~np.isnan(px.close[-1])
     # A report before days[0] anchors at row 0 at the latest: too old, never used.
-    reports = valid_events(stored, since=days[0])
+    reports = valid_events(stored, session, since=days[0])
     rows = anchors(reports[reports["report"] <= session], days).reindex(px.ids) - 1
     typical = (px.high + px.low + px.close) / 3
     # sums from each row through the last one (a missing bar counts in ``gaps``)
