@@ -1,7 +1,7 @@
 """The app factory: routers, the GraphQL read layer at ``POST /graphql`` (ADR 0037), CORS for
 the local web dev server, the live quotes (closed when the app stops), and error handlers that
 map library errors to HTTP (not found -> 404, bad configuration or parameters -> 400, a write
-that clashes with what exists -> 409)."""
+that clashes with what exists -> 409, the drafting model off or not answering -> 503)."""
 
 import json
 from collections.abc import AsyncIterator, Callable
@@ -13,8 +13,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from algotrade.core.model.errors import ConfigurationError, MissingDataError
+from algotrade.core.model.errors import ConfigurationError, MissingDataError, ModelUnavailableError
 from algotrade.services.authoring.scope import ConfigWriter, ConflictError, ScreenNotFoundError
+from algotrade.services.drafting.model import TextModel
 from algotrade.services.live.quotes import LiveQuotes
 from algotrade.services.ondemand.screens import OnDemandScreens, open_ondemand
 from algotrade.services.read.context import (
@@ -27,6 +28,8 @@ from algotrade.services.read.context import (
 )
 from algotrade_api import __version__
 from algotrade_api.deps import ApiSettings, ReadStore
+from algotrade_api.drafting import OFF as DRAFTING_OFF
+from algotrade_api.drafting import open_drafting
 from algotrade_api.graphql.schema import graphql_router
 from algotrade_api.live import no_live, open_live
 from algotrade_api.routes import ROUTERS
@@ -46,18 +49,25 @@ def _conflict(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(status_code=409, content={"detail": str(exc)})
 
 
+def _unavailable(request: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+
 def create_app(
     settings: ApiSettings,
     store: ReadStore | None = None,
     writer: ConfigWriter | None = None,
     live: LiveQuotes | None = None,
     ondemand: OnDemandScreens | None = None,
+    drafter: TextModel | None = None,
 ) -> FastAPI:
     """The API over ``store`` (default: the store and configs ``settings`` name); user
     configs are written through ``writer`` (default: the files under ``settings.config_dir``).
     ``live``: the live quotes (default: IB Gateway when ``settings.live``, else switched off).
     ``ondemand``: the on-request screen runner (default: over the store when ``settings.live``,
-    the served app; else off: a request answers 400)."""
+    the served app; else off: a request answers 400). ``drafter``: the text model behind
+    screener drafts (default: the one ``config/site/llm.toml`` enables when ``settings.live``,
+    else off: a request answers 503; ADR 0040)."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -85,6 +95,9 @@ def create_app(
     if ondemand is None and settings.live:
         ondemand = open_ondemand(settings.data_url, app.state.store.configs)
     app.state.ondemand = ondemand
+    if drafter is None and settings.live:
+        drafter = open_drafting(app.state.store.configs)
+    app.state.drafter, app.state.drafter_off = drafter, DRAFTING_OFF
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),
@@ -96,6 +109,7 @@ def create_app(
     app.add_exception_handler(ScreenNotFoundError, _not_found)
     app.add_exception_handler(ConflictError, _conflict)
     app.add_exception_handler(ConfigurationError, _bad_request)
+    app.add_exception_handler(ModelUnavailableError, _unavailable)
     for router in ROUTERS:
         app.include_router(router)
     cache = ResultCache(READ_CACHE_SIZE)

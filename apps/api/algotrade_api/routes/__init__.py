@@ -8,6 +8,7 @@ from fastapi import APIRouter
 
 from algotrade_api.routes import chains, health
 from algotrade_api.routes.authoring import preferences, screeners, user_features
+from algotrade_api.routes.drafting import screeners as screen_drafting
 from algotrade_api.routes.preview import features as feature_check
 from algotrade_api.routes.preview import screeners as screen_preview
 from algotrade_api.routes.screens import run as screen_run
@@ -19,6 +20,7 @@ ROUTERS: tuple[APIRouter, ...] = (
     feature_check.router,
     screen_run.router,
     screen_preview.router,
+    screen_drafting.router,
     screeners.router,
     preferences.router,
 )

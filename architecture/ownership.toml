@@ -624,6 +624,21 @@ section = "docs/adr/0029-rule-screener.md#owner-decisions-2026-10-03"
 detect = [{ call = "load_ideas" }]
 
 [[responsibility]]
+id = "screen-drafting"
+description = "A rule screen drafted from a sentence (ADR 0040): the TextModel protocol, the prompt over the caller's catalogue (name, type, unit, description, category values; no market data, results or credentials), strict parsing of the model's JSON, invented fields and rejected criteria dropped with a reason, the rest validated with resolve_rule_draft; the one OpenAI-compatible adapter (built by the source registry, the key only in a header) and the API's wiring of it from llm.toml; a draft the Builder loads, never a write, never a run"
+owner = [
+    "src/algotrade/services/drafting/*",
+    "libs/sources/algotrade_sources/llm/*",
+    "apps/api/algotrade_api/drafting.py",
+]
+allowed = [
+    "libs/sources/algotrade_sources/framework/registry.py",  # builds the adapter, as every vendor client (source-construction)
+    "apps/api/algotrade_api/routes/drafting/*",  # the thin route calls the one use case
+]
+section = "docs/adr/0040-natural-language-screener-drafts.md#decision"
+detect = [{ call = "draft_screen" }, { call = "ChatCompletions" }, { call = "build_text_model" }, { string = "chat/completions" }]
+
+[[responsibility]]
 id = "screen-preview"
 description = "The Builder's dry runs (ADR 0029), over the request's ReadContext: an unsaved rule-screen draft resolved for a user and evaluated by the nightly evaluate_screen on the context's session (summary, funnel, coverage, top rows; the field frame cached per session, fields, user features and visible_seq), and a formula type checked and sampled on that session; never writes; REST POSTs by design"
 owner = ["src/algotrade/services/preview/*"]

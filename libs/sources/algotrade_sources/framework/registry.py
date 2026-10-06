@@ -37,9 +37,11 @@ from algotrade_sources.framework.http import (
     Http,
     HttpError,
     RetryPolicy,
+    json_post_transport,
     urllib_transport,
 )
 from algotrade_sources.framework.limiter import Limiter, Pacing
+from algotrade_sources.llm.chat import ChatCompletions
 from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource, missing_chain
 from algotrade_sources.vendors.ibkr.gateway import GatewayConfig, IbkrMarketData
 from algotrade_sources.vendors.ibkr.market_data import IbkrSource
@@ -440,3 +442,15 @@ def limiter_keys(
     for key, section in pairs:
         out.setdefault(key, set()).add(section)
     return out
+
+
+def build_text_model(
+    base_url: str, model: str, timeout_s: float, max_tokens: int, credential: str | None
+) -> ChatCompletions:
+    """The text model behind screener drafts (ADR 0040): an OpenAI-compatible chat client at
+    ``base_url`` for ``model``, the credential (``$ALGOTRADE_LLM_API_KEY``; a local server
+    needs none) as a bearer header, never in the URL. Built here, like every vendor client,
+    so the API imports only the registry."""
+    headers = {"Authorization": f"Bearer {credential}"} if credential else {}
+    transport = json_post_transport(timeout=timeout_s, headers=headers)
+    return ChatCompletions(base_url, model, transport, max_tokens)

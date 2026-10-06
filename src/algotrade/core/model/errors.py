@@ -24,3 +24,9 @@ class MissingDataError(AlgoTradeError):
     def __init__(self, dataset: str, detail: str, hint: str) -> None:
         self.dataset = dataset
         super().__init__(f"{dataset}: {detail}. To fill it: {hint}")
+
+
+class ModelUnavailableError(AlgoTradeError):
+    """The text model behind a screener draft (ADR 0040) cannot answer now: drafting is off in
+    the site settings, the provider refused or timed out, or its answer was not text. The
+    message says which; it never carries a credential."""

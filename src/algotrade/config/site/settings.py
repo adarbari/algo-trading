@@ -4,6 +4,7 @@ ADR 0019 ``site-settings``. Each file becomes a frozen dataclass that apps recei
 
     sources.toml   -> SourcesSettings   (vendors, [http], [quality], retention; [ibkr])
     verification.toml -> VerificationSettings (live verification vs IBKR)
+    llm.toml       -> LlmSettings       (the text model behind screener drafts, ADR 0040)
     universe.toml  -> UniverseSettings  (+ overrides/leveraged_etfs.csv, overrides/figi.csv)
     nightly.toml   -> NightlySettings
     rollups.toml   -> each rollup's params dataclass (declared by the rollup, typed here)
@@ -34,6 +35,7 @@ from algotrade.config.site.holdings import (
 )
 from algotrade.config.site.ibkr import IbkrSettings as IbkrSettings  # noqa: PLC0414 - re-export
 from algotrade.config.site.ibkr import load_ibkr
+from algotrade.config.site.llm import LlmSettings as LlmSettings  # noqa: PLC0414 - re-export
 from algotrade.config.user import SITE_USER
 from algotrade.core.model.errors import ConfigurationError
 
@@ -918,6 +920,11 @@ def load_nightly(configs: SiteDocuments) -> NightlySettings:
 
 def load_verification(configs: SiteDocuments) -> VerificationSettings:
     return VerificationSettings.from_document(site_document(configs.load, "verification"))
+
+
+def load_llm(configs: SiteDocuments) -> LlmSettings:
+    """``llm.toml`` (ADR 0040); missing: drafting off."""
+    return LlmSettings.from_document(site_document(configs.load, "llm"))
 
 
 def load_rollups(

@@ -1,12 +1,14 @@
 /**
- * Trader > Screeners > one screener (Builder): the draft bar, the criteria beside the run
- * summary and funnel, and the live preview's top rows. The widgets share the Builder's state
+ * Trader > Screeners > one screener (Builder): the draft bar, the "Describe it" box (a sentence
+ * to a draft, ADR 0040), the criteria beside the run summary and funnel, and the live preview's
+ * top rows. The widgets share the Builder's state
  * through its provider (a draft with its 300 ms debounced preview).
  */
 import { Grid, Stack } from '@algotrade/ui';
 
 import { ScreenerBuilderProvider } from '@/features/screener-builder';
 import { CriteriaTable } from '@/widgets/criteria-table';
+import { DescribeScreen } from '@/widgets/describe-screen';
 import { DraftBar } from '@/widgets/draft-bar';
 import { PreviewResults } from '@/widgets/feature-table';
 import { ScreenFunnel } from '@/widgets/screen-funnel';
@@ -26,6 +28,7 @@ export function ScreenerBuilderPage({ id, onOpenTicker, onDeleted }: ScreenerBui
     <ScreenerBuilderProvider id={id} key={id}>
       <Stack gap={3}>
         <DraftBar onDeleted={onDeleted} />
+        <DescribeScreen />
         <Grid columns="main-aside" gap={4} collapse="lg" align="start">
           <CriteriaTable />
           <Stack gap={3}>

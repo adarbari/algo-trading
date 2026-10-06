@@ -62,6 +62,38 @@ def urllib_transport(
     return get
 
 
+type JsonTransport = Callable[[str, bytes], bytes]
+
+
+def json_post_transport(
+    user_agent: str = DEFAULT_USER_AGENT,
+    timeout: float = 60.0,
+    headers: dict[str, str] | None = None,
+) -> JsonTransport:
+    """POST a JSON body to a URL and return the response body (a text model's chat endpoint,
+    ADR 0040). ``headers`` carry credentials, as for ``urllib_transport``; a non-2xx answer is
+    an ``HttpError`` with the start of the body."""
+    all_headers = {
+        "User-Agent": user_agent,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        **(headers or {}),
+    }
+
+    def post(url: str, body: bytes) -> bytes:
+        request = urllib.request.Request(url, data=body, headers=all_headers, method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                answer: bytes = response.read()
+                return answer
+        except urllib.error.HTTPError as exc:
+            header = exc.headers.get("Retry-After") if exc.headers else None
+            retry = float(header) if header and header.isdigit() else None
+            raise HttpError(exc.code, retry, _error_body(exc)) from exc
+
+    return post
+
+
 def _error_body(exc: urllib.error.HTTPError) -> bytes:
     try:
         body = exc.read(4096)
