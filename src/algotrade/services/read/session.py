@@ -46,6 +46,7 @@ class Grain(StrEnum):
 # (table name or prefix ending in "/", grain); the first match wins.
 GRAINS: tuple[tuple[str, Grain], ...] = (
     ("rollups/instrument/", Grain.SESSION),
+    ("rollups/market/", Grain.SESSION),  # market-entity groups: the MKT:US row (ADR 0047)
     ("chains/", Grain.SESSION),
     ("results/", Grain.SESSION),
     (BARS, Grain.SESSION),

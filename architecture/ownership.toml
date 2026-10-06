@@ -85,7 +85,7 @@ detect = [{ call = "log1p" }, { call = "interp" }]
 
 [[responsibility]]
 id = "rollup-computation"
-description = "Compute feature groups (rollups): the FeatureGroup declaration (inputs + lookback, params from rollups.toml, declared features), asking algotrade.data for inputs by table name, point in time per session, backfills; groups are pure compute modules (a materialised expression feature is a one-feature group built by the FeatureSet), stored only by the rollups task"
+description = "Compute feature groups (rollups): the FeatureGroup declaration (inputs + lookback, params from rollups.toml, declared features, the entity one row describes: instrument, or market with one MKT:US row checked by the runner, ADR 0047), asking algotrade.data for inputs by table name, point in time per session, backfills; groups are pure compute modules (a materialised expression feature is a one-feature group built by the FeatureSet), stored only by the rollups task (compute_rollups, per entity)"
 owner = [
     "src/algotrade/features/framework/*",
     "src/algotrade/features/registry.py",
@@ -162,7 +162,7 @@ detect = [{ attr = "tables.drop" }, { call = "drop_table" }]
 
 [[responsibility]]
 id = "feature-input-loading"
-description = "What a feature group reads, by table name: each input table's point-in-time read for features (from its data owner), slicing per session and lookback, other groups' stored rows with this run's rows winning; features never read storage or a domain reader"
+description = "What a feature group reads, by table name: each input table's point-in-time read for features (from its data owner), slicing per session and lookback, other groups' stored rows (rollups/instrument/ and rollups/market/) with this run's rows winning, the session's universe snapshot (the population; none before the first) and the symbol -> id map of its reference snapshot (instruments/symbol_ids, a lookup only; ADR 0047); features never read storage or a domain reader"
 owner = ["src/algotrade/data/feature_inputs.py"]
 allowed = [
     # ADR 0024 / 0037: the API shows stored group rows (a feature's series in the read
@@ -177,6 +177,7 @@ detect = [
     { call = "share_facts" },
     { call = "curve_as_rows" },
     { call = "rollup_rows" },
+    { call = "symbol_ids" },
 ]
 
 # --------------------------------------------------------------------------- the ingest loop
@@ -208,7 +209,7 @@ detect = [{ call = "stamp" }]
 
 [[responsibility]]
 id = "id-resolution"
-description = "Turn vendor tickers into instrument ids (ADR 0018); build EQ: ids only through the id rule"
+description = "Turn vendor tickers into instrument ids (ADR 0018); build EQ: ids only through the id rule, and the non-tradable MKT: market ids only through core.model.instruments.market_id (ADR 0047)"
 owner = [
     "src/algotrade/core/model/instruments.py",
     "src/algotrade/data/resolver.py",
@@ -216,7 +217,7 @@ owner = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/run.py",
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
-detect = [{ call = "with_ids" }, { call = "equity_id" }, { string_prefix = "EQ:" }, { string_prefix = "IDX:" }, { string_prefix = "MACRO:" }]
+detect = [{ call = "with_ids" }, { call = "equity_id" }, { string_prefix = "EQ:" }, { string_prefix = "MKT:" }, { string_prefix = "IDX:" }, { string_prefix = "MACRO:" }]
 
 [[responsibility]]
 id = "ingestion-step-dispatch"
@@ -657,12 +658,12 @@ allowed = [
     "src/algotrade/data/*",  # the generic table reads (R1)
     "src/algotrade/features/*",  # feature groups name their own tables
     "src/algotrade/core/model/fields.py",  # ROLLUP_TABLE_PREFIX: catalogue names -> tables, in one place
-    "src/algotrade/storage/tables/schemas.py",  # declares the rollups/instrument/* table family
+    "src/algotrade/storage/tables/schemas.py",  # declares the rollups/instrument/* and rollups/market/* table families
     "src/algotrade/strategies/screeners/*",  # a screener declares the feature table it reads through core.views (engine input, not a display read)
     "apps/ingestion/*",  # producers and the verification checks name the tables they write or compare
 ]
 section = "docs/api/read-model.md#the-domain-objects"
-detect = [{ string_prefix = "rollups/instrument/" }, { call = "chain_expiries" }]
+detect = [{ string_prefix = "rollups/instrument/" }, { string_prefix = "rollups/market/" }, { call = "chain_expiries" }]
 
 [[responsibility]]
 id = "scalar-coercion"

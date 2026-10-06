@@ -263,6 +263,11 @@ purpose = "read objects at instrument grain for one session: Instrument identity
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
+path = "src/algotrade/services/read/market"
+purpose = "read objects at market grain for one session (ADR 0047): the market-entity feature values by catalogue name (the MKT:US row), through the instrument feature-value read"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
 path = "src/algotrade/services/read/screens"
 purpose = "read objects over stored screen results for one session: Screener, ScreenerRun (the one latest-run rule), ScreenResult rows, the Ideas ranking, the user's table views; and the user's rule-screen documents the Builder reads (drafts, versions, preset pin)"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]

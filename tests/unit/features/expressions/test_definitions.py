@@ -1,15 +1,19 @@
 """Building expression features from definitions: names resolve to the registered group
-versions, params bind as literals, the dependency graph is ordered and cycles fail, and every
-problem names the file, the feature and (for a formula) the position."""
+versions, params bind as literals, the dependency graph is ordered and cycles fail, each
+takes the entity of what it reads (mixing entities fails, ADR 0047), and every problem names
+the file, the feature and (for a formula) the position."""
 
 from dataclasses import replace
 
 import pytest
 
 from algotrade.config.site.settings import FeatureDefinition
-from algotrade.features.expressions.definitions import build_expressions
+from algotrade.features.expressions.definitions import build_expressions, formula_type
 from algotrade.features.expressions.nodes import ExpressionError
 from algotrade.features.registry import GROUPS
+from tests.helpers.rollup_store import MARKET_COUNTS
+
+WITH_MARKET = {**GROUPS, MARKET_COUNTS.key: MARKET_COUNTS}
 
 
 def define(name: str, expr: str, dtype: str = "float", **kw: object) -> FeatureDefinition:
@@ -74,3 +78,45 @@ def test_option_liquidity_status_has_open_categories_but_tiers_are_closed() -> N
         GROUPS,
     )  # fmt: skip
     assert out["t"].type.categories == frozenset("ABCD")
+
+
+def test_an_expression_takes_the_entity_of_what_it_reads() -> None:
+    out = build_expressions(
+        [
+            define("coverage", "market_counts.with_bars / market_counts.names", unit="ratio"),
+            define("half", "coverage / 2", unit="ratio"),
+            define("seen", "exists(market_counts)", dtype="bool", unit="flag"),
+            define("ret", "price_stats.close / price_stats.sma_20 - 1"),
+            define("one", "1"),
+        ],
+        WITH_MARKET,
+    )
+    assert {n: e.feature.entity for n, e in out.items()} == {
+        "coverage": "market", "half": "market", "seen": "market", "ret": "instrument",
+        "one": "instrument",
+    }  # fmt: skip
+    assert out["coverage"].feature.field == "feature.coverage"
+
+
+@pytest.mark.parametrize(
+    ("defs", "names"),
+    [
+        ([define("a", "price_stats.close * market_counts.spy_close")],
+         "market_counts.spy_close (market), price_stats.close (instrument)"),
+        ([define("m", "market_counts.spy_close"), define("a", "m - price_stats.close")],
+         "m (market), price_stats.close (instrument)"),
+        ([define("a", "if(exists(market_counts), price_stats.close, null)")],
+         "market_counts (market), price_stats.close (instrument)"),
+    ],
+)  # fmt: skip
+def test_mixing_entities_is_a_definition_error(defs: list[FeatureDefinition], names: str) -> None:
+    with pytest.raises(ExpressionError, match=r"config/site/features/test\.toml") as info:
+        build_expressions(defs, WITH_MARKET)
+    assert "reads features of more than one entity (instrument and market)" in str(info.value)
+    assert names in str(info.value)
+
+
+def test_a_free_formula_may_not_mix_entities_either() -> None:
+    assert formula_type("market_counts.names * 2", WITH_MARKET, {}).kind == "num"
+    with pytest.raises(ExpressionError, match="more than one entity"):
+        formula_type("market_counts.names * price_stats.close", WITH_MARKET, {})

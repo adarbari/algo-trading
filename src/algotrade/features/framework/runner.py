@@ -12,6 +12,10 @@ A group that reads another group's output gets it the same way: from the store
 rollup runs), or from ``produced``, frames computed in this process and not written
 (``compute_in_memory``: a read-only evaluation of a chain of rollups).
 
+A market-entity group (ADR 0047) describes the whole market: its ``compute`` must return
+exactly one row, ``instrument_id = market_id("US")`` (``MARKET``); anything else fails the
+group loudly (``DataValidationError``), never a silently wrong or duplicated row.
+
 ``rollup_params`` reads every rollup's parameters from ``config/site/rollups.toml`` through
 the one settings loader.
 """
@@ -24,6 +28,8 @@ from typing import Any
 import pandas as pd
 
 from algotrade.config.site.settings import SiteDocuments, load_rollups
+from algotrade.core.model.errors import DataValidationError
+from algotrade.core.model.instruments import market_id
 from algotrade.data import StoreReader
 from algotrade.data.feature_inputs import Produced, load_input
 from algotrade.features.framework.columns import conform
@@ -31,6 +37,7 @@ from algotrade.features.framework.declaration import FeatureGroup
 from algotrade.features.framework.graph import dependency_order
 
 CHUNK = 126  # sessions per input load (half a year: ~2 GB of daily bars at most)
+MARKET = market_id("US")  # the one row of a market-entity group (ADR 0047)
 
 
 @dataclass(frozen=True)
@@ -56,6 +63,18 @@ def _check_point_in_time(
         latest = frame["session_date"].iloc[-1]
         if latest > session:
             raise AssertionError(f"{rollup.key}: {table} rows from {latest} reached {session}")
+
+
+def _check_entity_rows(rollup: FeatureGroup, frame: pd.DataFrame, session: date) -> None:
+    """A market group returns exactly one row, the ``MARKET`` row."""
+    if rollup.entity != "market":
+        return
+    ids = [str(i) for i in frame["instrument_id"]] if "instrument_id" in frame.columns else []
+    if ids != [MARKET]:
+        raise DataValidationError(
+            rollup.table,
+            [f"{rollup.key} on {session}: a market group returns one {MARKET} row, got {ids}"],
+        )
 
 
 def compute_sessions(
@@ -102,6 +121,7 @@ def _compute_chunk(
             yield SessionResult(session, None, f"no input for {session}")
             continue
         out = rollup.compute(frames, session, params)
+        _check_entity_rows(rollup, out, session)
         yield SessionResult(session, conform(rollup.table, out, rollup.columns))
 
 

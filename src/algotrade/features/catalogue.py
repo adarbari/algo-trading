@@ -4,8 +4,9 @@
 ``make features-doc`` from the repository's ``config/``; a fitness test keeps the committed
 file up to date). Per code group: its table, inputs and description; per feature: kind,
 type, unit, licence, valid values (range or categories), description, when it is null, and what it
-is computed from. Then the expression features by theme file (formula, and where it is
-stored when materialised) and the superseded group versions.
+is computed from. Then the market features (the market-entity groups, one ``MKT:US`` row
+per session; ADR 0047), when there are any, the expression features by theme file (formula,
+and where it is stored when materialised) and the superseded group versions.
 """
 
 from algotrade.features.expressions.definitions import Expression
@@ -66,10 +67,10 @@ def _row(f: Feature, *extra: str) -> str:
     return "| " + " | ".join(_cell(c) for c in cells) + " |"
 
 
-def _group(g: FeatureGroup) -> list[str]:
+def _group(g: FeatureGroup, level: str = "##") -> list[str]:
     inputs = ", ".join(f"`{i.table}`" + ("" if i.required else " (optional)") for i in g.inputs)
     lines = [
-        f"## `{g.key}`",
+        f"{level} `{g.key}`",
         "",
         f"{g.description}. Stored as `{g.table}`; reads {inputs}.",
         "",
@@ -78,6 +79,23 @@ def _group(g: FeatureGroup) -> list[str]:
     ]
     lines += [_row(f, ", ".join(f"`{r}`" for r in f.inputs)) for f in g.features]
     return [*lines, ""]
+
+
+def _market(groups: list[FeatureGroup]) -> list[str]:
+    if not groups:
+        return []
+    lines = [
+        "## Market features",
+        "",
+        "Market-entity groups (ADR 0047): one row per "
+        "session for the whole market (`instrument_id` `MKT:US`), stored as "
+        "`rollups/market/<group>@v<N>` and read as `market.<group>@v<N>.<column>`, never "
+        "selected per instrument.",
+        "",
+    ]
+    for g in groups:
+        lines += _group(g, "###")
+    return lines
 
 
 def _formula(e: Expression) -> str:
@@ -141,7 +159,9 @@ def render(fs: FeatureSet) -> str:
         "",
     ]
     for g in groups:
-        lines += _group(g)
+        if g.entity == "instrument":
+            lines += _group(g)
+    lines += _market([g for g in groups if g.entity == "market"])
     lines += _expressions(fs)
     lines += _superseded(fs)
     return "\n".join(lines).rstrip() + "\n"

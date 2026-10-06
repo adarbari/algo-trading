@@ -16,6 +16,12 @@ rollup's table runs after it and reads what it just wrote (stored rows for sessi
 not write). When a rollup fails, the rollups that read it in this run are not computed (a
 failed item each, naming the dependency), so they never read a stale or partial input.
 
+``entity`` picks the groups of one entity (``FeatureGroup.entity``; ADR 0047): the
+``rollups`` task computes the instrument groups, ``entity="market"`` the market-entity groups
+(``rollups/market/<name>@v<N>``, one ``MKT:US`` row per session, recorded as the
+``market-rollups`` run). A market group reads the instrument groups' stored rows, so it runs
+after them.
+
 ``TABLES`` (what the task may write) comes from the site config at import (``config_dir``):
 a materialised expression feature adds its table (``rollups/instrument/<name>@v<N>``).
 """
@@ -29,6 +35,7 @@ from typing import Any
 from algotrade.config.env import config_dir
 from algotrade.core.time.calendar import sessions_between
 from algotrade.features.framework.declaration import FeatureGroup
+from algotrade.features.framework.feature import Entity
 from algotrade.features.framework.graph import dependents
 from algotrade.features.framework.runner import by_key, compute_sessions, rollup_params
 from algotrade.features.site import site_features
@@ -79,15 +86,19 @@ def compute_rollups(
     start: date | None = None,
     end: date | None = None,
     only: Sequence[str] = (),
+    entity: Entity = "instrument",
 ) -> RunRecord:
-    """Rollups for ``session``, or for every exchange session in ``start..end``."""
+    """The ``entity`` rollups for ``session``, or for every exchange session in
+    ``start..end``."""
     sessions = sessions_between(start, end or session) if start else [session]
     if not sessions:
         raise ValueError(f"no exchange session in {start}..{end or session}")
     groups = site_features(ctx.configs or SITE).groups
-    rollups = by_key(groups, only)
+    mine = {k: g for k, g in groups.items() if g.entity == entity}
+    rollups = by_key(mine, only)
     params = rollup_params(ctx.configs, list(groups.values()))  # validates the whole file
-    with IngestRun(ctx, TASK, sessions[-1]) as run:
+    task = TASK if entity == "instrument" else f"{entity}-{TASK}"
+    with IngestRun(ctx, task, sessions[-1]) as run:
         run.stats["range"] = [sessions[0].isoformat(), sessions[-1].isoformat(), len(sessions)]
         blocked: dict[str, str] = {}
         for rollup in rollups:
