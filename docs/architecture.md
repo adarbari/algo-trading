@@ -671,7 +671,7 @@ An ingestion **task** produces stored tables and one run record; a **job** is so
   decides the status in one place: any failed item or explicit `partial` → PARTIAL; an
   exception → a saved FAILED record, re-raised. The clock is injected (`TaskContext.clock`).
 - `framework/registry.py`: every task declared once: name, description, tables it writes (checked
-  against `[[table]]` producers in `architecture/ownership.toml`), sources it needs (by name
+  against `[[table]]` producers in `architecture/tables.toml`), sources it needs (by name
   in `TaskContext.sources`), the settings section it reads, its parameters (the CLI turns
   them into flags) and `run(ctx, params)`. Defaults from settings are applied here, so
   `algotrade-ingest <task>`, `algotrade-ingest run <task>` and nightly cannot drift.
@@ -691,7 +691,7 @@ Rules: **R1** only `data/` reads market data for consumers; **R2** storage has n
 knowledge; **R3** tasks get sources from the registry, never import vendor modules; **R4**
 sources never import storage; **R5** everything runs through the job runner. All five are
 import-linter contracts; none is pending. Every stored table has exactly one producing owner
-(`[[table]]` in the registry).
+(`[[table]]` in `architecture/tables.toml`).
 
 Gates (all in `make check` and CI): `make ownership` (the ratchet
 `architecture/known_violations.toml` is empty, and a fitness test keeps it empty with no

@@ -27,7 +27,7 @@ high_52w - 1`, a HIGH / LOW label from thresholds, `shares x close`.) Then it is
    `expressions=`, `services.features.read_expressions` for a series). Set `materialise = true`
    only when a feature group reads it or reading it is too slow; it is then stored as
    `rollups/instrument/<name>@v<N>` by the `rollups` task (add its `[[table]]` to
-   `architecture/ownership.toml`).
+   `architecture/tables.toml`).
 3. `make features-doc`; tests: a case in `tests/unit/features/test_site.py` (values, nulls,
    categories). A bad formula fails at load naming the file, the feature and the position.
 
@@ -94,7 +94,7 @@ loader under `features/`, and never write a new task for a group. `make ownershi
    `rollup.<name>@v1.<column>`, and listed by `feature(name)`. Run `make features-doc` and
    commit `docs/data/features.md` (a fitness test fails when it is stale).
 5. **Harness, same PR:** a `[[table]]` entry for `rollups/instrument/<name>@v1` owned by
-   `tasks/derived/rollups.py` in `architecture/ownership.toml`; a `["<name>@v1"]` section in
+   `tasks/derived/rollups.py` in `architecture/tables.toml`; a `["<name>@v1"]` section in
    `config/site/rollups.toml` if it has params (every key must drive code);
    `tests/architecture/test_rollups.py` and `test_features.py` check all of this (every
    column documented, inputs resolve, golden output within ranges and categories).

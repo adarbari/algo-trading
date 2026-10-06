@@ -33,7 +33,8 @@ in several modules of the same layer. A review of the code found:
 Every responsibility has **exactly one owner module**, recorded in
 `architecture/ownership.toml` with AST patterns that detect anyone else doing that work.
 Before writing code that does X, find X's owner and extend it; a new responsibility gets an
-entry and an owner in the same PR. Target layout (moves land in PRs 2–6):
+entry and an owner in the same PR. (Addendum 2026-10-06: the stored-table entries, `[[table]]`,
+moved to `architecture/tables.toml` when `ownership.toml` reached the 1000-line cap.) Target layout (moves land in PRs 2–6):
 
 ```
 src/algotrade/

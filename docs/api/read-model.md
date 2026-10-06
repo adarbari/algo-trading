@@ -264,7 +264,7 @@ generic read (R1 unchanged); what goes is each consumer deciding which partition
   once per request), `cache: ResultCache`. `preview_cache` stays on explore's `ReadStore` (it
   moves with preview in PR 8). `loaders` is added by PR 4 (GraphQL), not PR 2.
 - **`Session.present` / `Session.missing`**: the expected session-grain tables are the
-  `[[table]]` entries in `architecture/ownership.toml` whose name starts with `rollups/instrument/`,
+  `[[table]]` entries in `architecture/tables.toml` whose name starts with `rollups/instrument/`,
   `chains/` or `results/`, plus `bars/1d`. `present` = those with a partition for the date
   (`reader.dates(table)`), `missing` = the rest. `verification/*` and `live/*` are not expected
   nightly and are never listed. The list is read once at import (a module constant), not per

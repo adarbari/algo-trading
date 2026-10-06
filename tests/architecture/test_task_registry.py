@@ -1,6 +1,6 @@
 """Fitness tests for the ingestion task registry (ADR 0019, "The ingest loop is written once").
 
-- every registry task declares exactly the tables ``architecture/ownership.toml`` says its
+- every registry task declares exactly the tables ``architecture/tables.toml`` says its
   module produces (``owner`` or ``also_written_by``), and every producing task module is in
   the registry;
 - every task is reachable from the CLI, by its own command and as ``run <task>``;
@@ -19,7 +19,7 @@ from algotrade_ingestion.workflows.nightly.nightly import FINALLY, NIGHTLY, SCRE
 from algotrade_sources.framework.registry import FIXTURES, SESSION_SOURCES, SOURCES
 from tests.conftest import REPO_ROOT
 
-REGISTRY = tomllib.loads((REPO_ROOT / "architecture" / "ownership.toml").read_text())
+TABLES = tomllib.loads((REPO_ROOT / "architecture" / "tables.toml").read_text())["table"]
 TASKS_DIR = "apps/ingestion/algotrade_ingestion/tasks/"
 
 
@@ -28,9 +28,9 @@ def _module_path(module: object) -> str:
 
 
 def _producers() -> dict[str, set[str]]:
-    """module path -> concrete tables it produces per ownership.toml (wildcards excluded)."""
+    """module path -> concrete tables it produces per tables.toml (wildcards excluded)."""
     out: dict[str, set[str]] = defaultdict(set)
-    for table in REGISTRY["table"]:
+    for table in TABLES:
         if "*" in table["name"]:
             continue
         for path in [table["owner"], *table.get("also_written_by", [])]:
@@ -44,7 +44,7 @@ def test_task_tables_match_the_ownership_registry(name: str) -> None:
     path = _module_path(spec.module)
     assert path.startswith(TASKS_DIR), f"{name}: tasks live in {TASKS_DIR}"
     assert set(spec.tables) == _producers().get(path, set()), (
-        f"{name}: declared tables {sorted(spec.tables)} differ from ownership.toml "
+        f"{name}: declared tables {sorted(spec.tables)} differ from tables.toml "
         f"[[table]] entries for {path}"
     )
 
