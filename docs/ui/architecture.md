@@ -78,7 +78,9 @@ request; a 401 ends the session):
 Explore is one page (ticker table with feature-catalogue columns, multi-select compare, detail
 tabs Overview / Compare / Chart / Options / Features / Events / Screener hits; one ticker opens
 on Overview, a compare set of two or more on Compare), not separate universe, instrument, chain
-and feature pages. Unbuilt sections render the placeholder page.
+and feature pages. The Overview ends with "In rough markets" (`episode_behaviour@v1` features
+read by name: beta to SPY, drawdown per reference episode; the episodes' plain names are the
+`entities/regime` map until the API serves `episodes.toml`). Unbuilt sections render the placeholder page.
 
 ## Rules and how they are enforced
 

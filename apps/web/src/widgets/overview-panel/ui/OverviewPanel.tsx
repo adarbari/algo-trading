@@ -2,9 +2,10 @@
  * Overview: what the focused ticker is, for the latest session. Name, kind and sector, the
  * stored description, the headline numbers (price, market cap, P/E, revenue, next earnings)
  * and grouped key facts (size, price range, dividends, options, earnings dates), all from one
- * GraphQL read (`useInstrumentFacts`). A value the session does not have says why (UNKNOWN
- * and its reason); the nightly tables missing for the session are named in a banner. An ETF
- * also shows the `fund` section the page passes in (its holdings).
+ * GraphQL read (`useInstrumentFacts`), then "In rough markets": beta to SPY and the drawdown
+ * in each reference episode (`model/rough-markets.ts`). A value the session does not have says
+ * why (UNKNOWN and its reason); the nightly tables missing for the session are named in a
+ * banner. An ETF also shows the `fund` section the page passes in (its holdings).
  */
 import {
   Banner,
@@ -32,6 +33,9 @@ import {
   profileOf,
   valuesOf,
 } from '../model/overview';
+import { ROUGH_MARKET_FEATURES, roughMarketsGroup } from '../model/rough-markets';
+
+const FEATURES = [...OVERVIEW_FEATURES, ...ROUGH_MARKET_FEATURES];
 
 export interface OverviewPanelProps {
   symbol: string;
@@ -40,7 +44,7 @@ export interface OverviewPanelProps {
 }
 
 export function OverviewPanel({ symbol, fund }: OverviewPanelProps) {
-  const facts = useInstrumentFacts(symbol, OVERVIEW_FEATURES);
+  const facts = useInstrumentFacts(symbol, FEATURES);
   const events = useInstrumentEvents(symbol);
   const view = useMemo(() => {
     const instrument = facts.data?.instrument;
@@ -48,10 +52,16 @@ export function OverviewPanel({ symbol, fund }: OverviewPanelProps) {
     const values = valuesOf(instrument);
     const groups = factGroups(values);
     const earnings = earningsGroup(values, events.data ?? []);
+    const rough = roughMarketsGroup(values);
     return {
       profile: profileOf(instrument, values),
       stats: headlineStats(values),
-      groups: [...groups.slice(0, 2), earnings, ...groups.slice(2)],
+      groups: [
+        ...groups.slice(0, 2),
+        earnings,
+        ...groups.slice(2),
+        ...(rough.items.length > 0 ? [rough] : []),
+      ],
     };
   }, [facts.data, events.data]);
   const session = facts.data?.session;

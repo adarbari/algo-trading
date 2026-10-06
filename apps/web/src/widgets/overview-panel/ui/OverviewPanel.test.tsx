@@ -59,6 +59,16 @@ const stock = {
       info: info('DATE'),
     },
     value('rollup.earnings@v1.last_earnings_date', '2026-08-27', 'DATE'),
+    value('rollup.episode_behaviour@v1.beta_252d', 0.62, 'NUMBER', 'ratio'),
+    value('rollup.episode_behaviour@v1.dd_tariffs_2025', -0.08, 'PERCENT', 'decimal'),
+    value('rollup.episode_behaviour@v1.recovery_sessions_tariffs_2025', 12, 'NUMBER', 'sessions'),
+    value('rollup.episode_behaviour@v1.dd_hikes_2022', -0.21, 'PERCENT', 'decimal'),
+    {
+      name: 'rollup.episode_behaviour@v1.dd_covid_2020',
+      value: null,
+      unknown: { code: 'NO_PARTITION', detail: 'rollups/instrument/episode_behaviour@v1' },
+      info: info('PERCENT', 'decimal'),
+    },
   ],
 };
 
@@ -108,6 +118,41 @@ describe('OverviewPanel', () => {
     expect(earnings).toHaveTextContent('Last earnings27 Aug 2026');
     expect(earnings).toHaveTextContent('EPS reportedforecast $0.80$0.82');
     expect(earnings).toHaveTextContent('no report date on or after the session');
+  });
+
+  it('shows beta and the drawdown in each rough episode, in plain names, newest first', () => {
+    render(<OverviewPanel symbol="KO" />);
+    const rough = screen.getByLabelText('In rough markets');
+    expect(rough).toHaveTextContent('Beta to SPY (1 year)0.62');
+    expect(rough).toHaveTextContent(
+      'Tariff shock, spring 2025Back at its pre-episode high 12 sessions after the low−8.00%',
+    );
+    expect(rough).toHaveTextContent('Rate-hike bear market, 2022−21.00%');
+    expect(hooks.useInstrumentFacts).toHaveBeenCalledWith(
+      'KO',
+      expect.arrayContaining(['rollup.episode_behaviour@v1.beta_252d']),
+    );
+  });
+
+  it('reads Unknown with the reason for an episode the session has no partition for', () => {
+    render(<OverviewPanel symbol="KO" />);
+    const rough = screen.getByLabelText('In rough markets');
+    expect(rough).toHaveTextContent('Covid crash, early 2020not stored for this session');
+    expect(rough).toHaveTextContent('Unknown');
+  });
+
+  it('leaves the line out for a name with no episode values', () => {
+    hooks.useInstrumentFacts.mockReturnValue(
+      fakeQuery({
+        session,
+        instrument: {
+          ...stock,
+          features: stock.features.filter((f) => !f.name.includes('episode_behaviour')),
+        },
+      }),
+    );
+    render(<OverviewPanel symbol="KO" />);
+    expect(screen.queryByText('In rough markets')).not.toBeInTheDocument();
   });
 
   it('names the nightly tables the session is missing', () => {
