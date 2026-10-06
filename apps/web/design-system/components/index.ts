@@ -54,6 +54,7 @@ export { Icon, ICON_NAMES, type IconName, type IconProps, type IconTone } from '
 export { IconButton, type IconButtonProps } from './IconButton';
 export { Input, type InputProps } from './Input';
 export { Kbd, type KbdProps } from './Kbd';
+export { LoginForm, type LoginCredentials, type LoginFormProps } from './LoginForm';
 export { KeyValue, type KeyValueItem, type KeyValueProps } from './KeyValue';
 export { Legend, type DataTone, type LegendItem, type LegendProps } from './Legend';
 export { NavTabs, type NavItem, type NavLinkRenderProps, type NavTabsProps } from './NavTabs';

@@ -1,0 +1,11 @@
+/* LoginForm: one narrow card; the error line sits above the fields like Field's messages. */
+.form {
+  inline-size: 100%;
+  max-inline-size: var(--size-sidebar);
+}
+
+.error {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+}
