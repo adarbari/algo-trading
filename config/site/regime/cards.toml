@@ -1,0 +1,157 @@
+# Plain-language cards for the regime indicators (docs/market-regime-plan.md sections 3 and 5.5;
+# ADR 0047). Reviewed by PR like any site preset; written for someone who does not follow
+# markets. The page shows plain_name and one_liner first, the rest behind "learn more".
+# - key: the indicator's stable key (the feature it describes is named when it exists).
+# - before: what the indicator did before the 2008, 2020 and 2022 falls, one line each.
+# - links: the curated reading list; the explanation model may cite only these.
+# Skeleton for RG0: values, thresholds and features are wired in RG1 / RG3.
+
+[[card]]
+key = "curve_10y3m"
+plain_name = "Are long-term rates below short-term ones?"
+one_liner = "The gap between the 10-year Treasury yield and the 3-month bill yield."
+why_it_matters = "Normally lenders want more to lend for longer. When the 10-year pays less than the 3-month bill, markets expect the Fed to cut because the economy will weaken, and banks earn less on new loans."
+what_on_means = "On when the gap has been below zero for a month or more. The return to a positive gap after a long inversion is the later, more urgent warning."
+lead_time = "6 to 18 months before a recession."
+false_alarms = "Warned before all 8 recessions since 1969; false alarms in 1998 (brief) and 2022-24 (inverted for two years, no recession so far)."
+links = [
+  { title = "FRED: 10-year minus 3-month Treasury spread (T10Y3M)", url = "https://fred.stlouisfed.org/series/T10Y3M" },
+  { title = "FRED: 10-year minus 2-year Treasury spread (T10Y2Y)", url = "https://fred.stlouisfed.org/series/T10Y2Y" },
+  { title = "Diamond Hill: yield curves, GDP and the Sahm rule", url = "https://www.diamond-hill.com/insights/a-703/articles/yield-curves-gdp-and-the-sahm-rule-navigating-recession-signals-for-fixed-income-investors/" },
+  { title = "eco3min: how accurate are recession indicators", url = "https://eco3min.fr/en/recession-indicators-accuracy/" },
+]
+
+[card.before]
+"2008" = "Inverted from mid-2006 into 2007, then turned positive as the Fed cut: the late warning before the fall."
+"2020" = "Inverted in 2019, months before anyone had heard of the virus."
+"2022" = "Inverted only in late 2022, after the fall had started, and stayed inverted into 2024 with no recession."
+
+[[card]]
+key = "hy_oas"
+plain_name = "Are riskier companies paying more to borrow?"
+one_liner = "The extra yield investors demand to hold high-yield (junk) corporate bonds instead of Treasuries."
+why_it_matters = "Bond investors are often the first to worry about defaults. When they demand much more to lend to weaker companies, credit gets harder to find and the economy and stocks usually follow."
+what_on_means = "On when the spread is above 5%, or 1.5 percentage points above its low of the last six months."
+lead_time = "3 to 9 months before a recession, and it confirms stress as it happens."
+false_alarms = "Flagged all 5 recessions since 1996, but it also widens in shocks that do not become recessions (2018, 2025)."
+links = [
+  { title = "FRED: ICE BofA US High Yield option-adjusted spread (BAMLH0A0HYM2)", url = "https://fred.stlouisfed.org/series/BAMLH0A0HYM2" },
+  { title = "Federal Reserve: recession risk and the excess bond premium", url = "https://www.federalreserve.gov/econres/notes/feds-notes/updating-the-recession-risk-and-the-excess-bond-premium-20161006.html" },
+  { title = "Gilchrist and Zakrajsek: credit spreads and business cycle fluctuations", url = "https://mfm.uchicago.edu/wp-content/uploads/2020/07/Gilchrist_Zakrajsek_Credit-Spreads-and-Business-Cycle-Fluctuations-UPDATED.pdf" },
+]
+
+[card.before]
+"2008" = "Widened from under 3% in mid-2007 to above 5% by late 2007, a year before Lehman."
+"2020" = "Jumped from under 4% to above 10% in four weeks: a confirmation, not an early warning."
+"2022" = "Rose toward 6% by mid-2022: real stress, but no recession followed."
+
+[[card]]
+key = "unrate_trend"
+plain_name = "Is unemployment starting to rise?"
+one_liner = "Whether the unemployment rate has moved above its own average of the last 12 months."
+why_it_matters = "Unemployment rarely rises a little: once firms start cutting jobs, spending falls and more cuts follow. A turn up from the low is one of the most reliable early signs of a recession."
+what_on_means = "On when this month's unemployment rate is above its 12-month average."
+lead_time = "About 3.5 months before a recession on average, earlier than the Sahm rule."
+false_alarms = "Brief crossings without a recession happen, most recently in 2024; it needs a second sign to confirm."
+links = [
+  { title = "FRED: unemployment rate (UNRATE)", url = "https://fred.stlouisfed.org/series/UNRATE" },
+  { title = "Cleveland Fed: recessions and the trend in the unemployment rate", url = "https://www.clevelandfed.org/publications/economic-commentary/ec-202101-recessions-and-the-trend-in-the-us-unemployment-rate" },
+  { title = "Philosophical Economics: in search of the perfect recession indicator", url = "https://www.philosophicaleconomics.com/?p=7644" },
+]
+
+[card.before]
+"2008" = "Turned up through its 12-month average during 2007, before the recession began in December."
+"2020" = "No warning: unemployment was near a 50-year low until the shutdowns."
+"2022" = "Stayed below its average through 2022: correctly, no recession signal."
+
+[[card]]
+key = "sahm"
+plain_name = "Has a recession already started?"
+one_liner = "The Sahm rule: the 3-month average unemployment rate against its lowest point of the past year."
+why_it_matters = "A half-point rise in unemployment from its low has marked the start of every US recession since 1970 before 2020. It does not warn early; it tells you the downturn is here."
+what_on_means = "On when the 3-month average unemployment rate is 0.5 percentage points or more above its 12-month low."
+lead_time = "Concurrent: it fires around the start of a recession."
+false_alarms = "Right every time before 2020; false alarms in November 1976 and July 2024."
+links = [
+  { title = "FRED: real-time Sahm rule recession indicator (SAHMREALTIME)", url = "https://fred.stlouisfed.org/series/SAHMREALTIME" },
+  { title = "FRED: unemployment rate (UNRATE)", url = "https://fred.stlouisfed.org/series/UNRATE" },
+  { title = "Diamond Hill: yield curves, GDP and the Sahm rule", url = "https://www.diamond-hill.com/insights/a-703/articles/yield-curves-gdp-and-the-sahm-rule-navigating-recession-signals-for-fixed-income-investors/" },
+]
+
+[card.before]
+"2008" = "Fired in early 2008, after the recession had begun and partway down the fall."
+"2020" = "Fired in April 2020, after the bottom: a confirmation, not a warning."
+"2022" = "Did not fire in 2022; it fired in July 2024 with no recession."
+
+[[card]]
+key = "nfci"
+plain_name = "Is money getting harder to get?"
+one_liner = "The Chicago Fed's National Financial Conditions Index: borrowing costs, credit, leverage and market stress in one weekly number."
+why_it_matters = "When money is tight, the bad outcomes for the economy become much more likely even if the average outlook barely moves. It sums up many markets so one quiet corner does not hide stress in another."
+what_on_means = "On when the index is above zero, meaning conditions are tighter than their long-run average."
+lead_time = "Concurrent to a few months; weekly, so it moves fast."
+false_alarms = "It reacts to market stress as well as the economy, so it also tightens in shocks that never become recessions."
+links = [
+  { title = "FRED: Chicago Fed National Financial Conditions Index (NFCI)", url = "https://fred.stlouisfed.org/series/NFCI" },
+  { title = "FRED blog: posts on the NFCI", url = "https://fredblog.stlouisfed.org/tag/nfci/" },
+  { title = "Adrian, Boyarchenko and Giannone: Vulnerable Growth", url = "https://www.aeaweb.org/doi/10.1257/aer.20161923" },
+]
+
+[card.before]
+"2008" = "Moved above zero in August 2007 and stayed there through 2009."
+"2020" = "Jumped above zero in March 2020 and fell back within months as the Fed acted."
+"2022" = "Tightened through 2022 but stayed looser than average."
+
+[[card]]
+key = "spx_trend_200d"
+plain_name = "Is the market below its long-term trend?"
+one_liner = "Whether the S&P 500 (SPY) closes below its average price of the last 200 trading days."
+why_it_matters = "Big falls rarely happen with the market above its long-term trend. Simple trend rules miss the first part of a fall but have stepped aside for most of the worst bear markets."
+what_on_means = "On when SPY closes below its 200-day average; a 50-day average falling below the 200-day (a 'death cross') confirms it."
+lead_time = "None: it fires 2 to 6 weeks after the peak, then stays on for the rest of the fall."
+false_alarms = "Caught every episode, but whipsaws in choppy markets (2023, 2025): on, then off again within weeks."
+links = [
+  { title = "Quantified Strategies: Faber's trend rule on the S&P 500", url = "https://quantifiedstrategies.substack.com/p/trend-following-strategy-in-s-and-005" },
+  { title = "StockCharts: trend signals after whipsaws", url = "https://articles.stockcharts.com/article/articles-arthurhill-2023-02-should-we-continue-taking-tren-946/" },
+]
+
+[card.before]
+"2008" = "Fell below its 200-day average in late 2007 and stayed there almost all of 2008."
+"2020" = "Broke below within days of the late-February fall."
+"2022" = "Below from January 2022 for most of the year."
+
+[[card]]
+key = "vix_term"
+plain_name = "Are traders paying up for protection right now?"
+one_liner = "The VIX (expected volatility over the next month) divided by VIX3M (over the next three months)."
+why_it_matters = "Normally protection for the near future is cheaper than for later. When the near-term number jumps above the longer one, traders are scrambling for cover today: the clearest short-term sign of panic."
+what_on_means = "On when VIX is above VIX3M (the ratio is above 1.0)."
+lead_time = "Days: it confirms stress as it happens rather than predicting it."
+false_alarms = "Brief spikes on one-day scares that reverse within a week; it fired in 2008, 2011, 2018, 2020 and 2025."
+links = [
+  { title = "FRED: CBOE Volatility Index, VIX (VIXCLS)", url = "https://fred.stlouisfed.org/series/VIXCLS" },
+  { title = "FRED: CBOE S&P 500 3-Month Volatility Index (VXVCLS)", url = "https://fred.stlouisfed.org/series/VXVCLS" },
+  { title = "Cboe: daily market statistics", url = "https://www.cboe.com/us/options/market_statistics/daily/" },
+]
+
+[card.before]
+"2008" = "Inverted repeatedly through 2008 and stayed inverted through the autumn crash."
+"2020" = "Inverted in late February 2020 as the fall began."
+"2022" = "Inverted only briefly in 2022: a slow grind, not a panic."
+
+[[card]]
+key = "breadth_200d"
+plain_name = "Are most stocks going up, or just a few?"
+one_liner = "The share of stocks in our universe trading above their own 200-day average."
+why_it_matters = "An index can keep rising on a handful of giants while most stocks fall. When fewer and fewer stocks hold up, the rally is fragile; in 2000 and 2021 breadth broke about a year before the index did."
+what_on_means = "On when fewer than 40% of stocks are above their 200-day average. A washout below 15% followed by a quick rebound above 55% is a classic bottoming sign."
+lead_time = "Months when it narrows with the index at a high; days in a crash."
+false_alarms = "Narrow markets can run for a long time before they fall. Our history starts with our universe snapshots, so older episodes cannot be checked."
+links = [
+  { title = "VanEck: market breadth whitepaper", url = "https://www.vaneck.com/globalassets/home/us/insights/blogs/guided-allocation/market-breadth-whitepaper_2019.11.pdf" },
+]
+
+[card.before]
+"2008" = "Weakened through 2007 while the index made its last highs."
+"2020" = "Collapsed to a handful of stocks in March 2020: a washout that marked the bottom."
+"2022" = "Narrowed through late 2021 while the index still rose: the warning came before the fall."
