@@ -43,6 +43,7 @@ from algotrade_ingestion.tasks.maintenance.quality import (
     check_bars_resolved,
     check_chains,
     check_earnings,
+    check_macro,
     check_market_rollups,
     check_reference_classification,
     check_universe,
@@ -145,6 +146,12 @@ NIGHTLY: tuple[Step, ...] = (
     # the instrument rollups they read. Optional: a failure here never holds back the screens.
     Step("market-rollups", needs=("rollups",), critical=False, accept=(check_market_rollups,)),
     Step(SCREENS, needs=("chains", "rollups"), requires=universe_exists, latest_only=True),
+    # Economic series and index levels with their vintages (ADR 0048): after the screens, which
+    # nothing here reads until RG3. Its time budget bounds a FRED outage, but until then it must
+    # not sit on the critical path at all; RG3 moves it back before `market-rollups`, when the
+    # regime group needs it. Latest session only (the sources serve their current state); its
+    # failure only warns.
+    Step("macro", critical=False, latest_only=True, accept_with=(check_macro,)),
     # Company and ETF descriptions (ADR 0034): after the screens, so the Massive requests
     # (capped per night, ~21 min) do not delay them. Optional.
     Step("descriptions", latest_only=True, critical=False),

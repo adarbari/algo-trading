@@ -202,9 +202,10 @@ is a few thousand rows, a daily market series (`DGS10`, `T10Y3M`) one row per da
 - **Pacing:** `[fred] min_interval_s = 0.5` (FRED allows 120 requests a minute);
   `[fred] base_url` is the API root. An unknown series id answers 400 `series does not exist`
   and reads as "nothing there"; any other 400 (a bad key) is an error.
-- **Cadence:** nightly, with the `macro` task (RG2c): FRED series change at their release
-  dates (daily to monthly; claims weekly), and a refetch returns the whole history so a new
-  vintage of an old observation is picked up.
+- **Cadence:** nightly, with the `macro` task (`tasks/macro/series.py`): FRED series change at
+  their release dates (daily to monthly; claims weekly), and a refetch returns the whole history
+  so a new vintage of an old observation is picked up; without `ALGOTRADE_FRED_API_KEY` the
+  task skips the FRED series, logs why and counts them in the run record.
 - **Terms:** FRED's own series are free to use, key and attribution; **licence `open`**. Series
   FRED republishes from third parties carry their own terms: the ICE BofA credit spreads
   (`BAML*`) are **licence `personal`** (FRED limits their history and forbids redistribution),

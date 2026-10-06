@@ -93,6 +93,11 @@ purpose = "L3 site settings: config/site/*.toml into frozen, validated dataclass
 contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
 
 [[dir]]
+path = "src/algotrade/config/site/regime"
+purpose = "L3 regime settings: the plain-language indicator cards and the reference crash episodes (config/site/regime/*.toml, ADR 0047), typed and validated (split from config/site, at its module cap)"
+contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
+
+[[dir]]
 path = "src/algotrade/config/strategy"
 purpose = "strategy / screener configs and selections: schema, layer resolution, field catalog, rule-screen spec parser"
 
@@ -269,7 +274,12 @@ contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
 path = "src/algotrade/services/read/market"
-purpose = "read objects at market grain for one session (ADR 0047): the market-entity feature values by catalogue name (the MKT:US row), through the instrument feature-value read"
+purpose = "read objects at market grain for one session (ADR 0047): Market, and the market-entity feature values by catalogue name (the MKT:US row), through the instrument feature-value read"
+contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
+
+[[dir]]
+path = "src/algotrade/services/read/regime"
+purpose = "read objects of the market regime for one session (ADR 0047): MarketRegime (label as weather, scores, indicator cards joined to their values, the sizing rule) and the regime label's history as bands over a named window"
 contracts = ["Read model is read-only: no writers, no jobs (ADR 0037)"]
 
 [[dir]]
@@ -418,6 +428,11 @@ purpose = "GraphQL types at instrument grain (mirrors services/read/instruments)
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
 
 [[dir]]
+path = "apps/api/algotrade_api/graphql/types/market"
+purpose = "GraphQL types at market grain (mirrors services/read/market and services/read/regime): Market and MarketRegime with its scores, indicator cards, sizing rule and label bands"
+contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
+
+[[dir]]
 path = "apps/api/algotrade_api/graphql/types/screens"
 purpose = "GraphQL types over stored screen results (mirrors services/read/screens): Screener, ScreenerRun, ScreenResult, Ideas, TableView"
 contracts = ["GraphQL types are thin: only services.read, config, core (ADR 0037)"]
@@ -467,6 +482,11 @@ kind = "task-domain"
 [[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/market"
 purpose = "market-data tasks: bars, corporate actions, earnings, option chains, Treasury rates, IBKR implied / historical vol, ETF holdings"
+kind = "task-domain"
+
+[[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/macro"
+purpose = "macro-series tasks: the macro task (FRED / ALFRED and published economic series and index levels into macro/series, with vintages) and the rows it adds to what is stored"
 kind = "task-domain"
 
 [[dir]]

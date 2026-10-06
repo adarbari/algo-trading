@@ -20,7 +20,7 @@ from algotrade.storage.runs import RunRecord, RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.framework import registry
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
-from algotrade_ingestion.tasks.maintenance.quality import Check
+from algotrade_ingestion.tasks.maintenance.quality import Check, check_macro
 from algotrade_ingestion.workflows.nightly import nightly as nightly_module
 from algotrade_ingestion.workflows.nightly import screens as screens_module
 from algotrade_ingestion.workflows.nightly.nightly import (
@@ -240,6 +240,23 @@ def test_a_partial_task_names_its_failed_items() -> None:
         "task finished partial: price_stats@v2: FAILED: bars/1d: no bars for 2026-10-05 ... "
         "--date 2026-10-05"
     )
+
+
+def test_the_macro_step_is_optional_latest_only_and_after_the_screens() -> None:
+    names = [s.name for s in NIGHTLY]
+    step = NIGHTLY[names.index("macro")]
+    assert (step.critical, step.latest_only, step.needs) == (False, True, ())
+    assert step.accept_with == (check_macro,) and step.accept == ()
+    assert names.index("macro") > names.index(SCREENS)  # off the critical path until RG3
+
+
+def test_a_failing_macro_step_only_warns(fake: Callable[..., Calls]) -> None:
+    fake(fail=("macro",))
+    summary = run_nightly(task_ctx(store()), Plan([D]))
+    assert statuses(summary)["macro"] == "FAILED"
+    assert summary["status"] == "SUCCEEDED"  # an optional step: screens and the rest still run
+    assert statuses(summary)["rollups"] == "SUCCEEDED"
+    assert [w["check"] for w in summary["warnings"]] == ["optional_step"]
 
 
 def test_task_complete_steps_fail_on_a_partial_task(fake: Callable[..., Calls]) -> None:

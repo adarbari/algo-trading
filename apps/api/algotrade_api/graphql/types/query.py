@@ -18,7 +18,9 @@ from strawberry.types import Info
 
 from algotrade.services.read.instruments import catalogue, distribution, identity
 from algotrade.services.read.instruments import table as tables
+from algotrade.services.read.market import market
 from algotrade.services.read.ops import backtests, configs, ingestion, quality, review, runs
+from algotrade.services.read.regime import regime
 from algotrade.services.read.screens import documents, ideas, screeners, views
 from algotrade.services.read.users.viewer import load_viewer
 from algotrade_api.graphql.context import RequestContext
@@ -29,6 +31,8 @@ from algotrade_api.graphql.types.instruments.distribution import FeatureDistribu
 from algotrade_api.graphql.types.instruments.feature import FeatureInfo
 from algotrade_api.graphql.types.instruments.instrument import Instrument
 from algotrade_api.graphql.types.instruments.table import FeatureTable
+from algotrade_api.graphql.types.market.market import Market
+from algotrade_api.graphql.types.market.regime import MarketRegime
 from algotrade_api.graphql.types.ops.backtest import Backtest, BacktestDetail
 from algotrade_api.graphql.types.ops.config import Config
 from algotrade_api.graphql.types.ops.ingestion import CellDetail, Completeness
@@ -132,6 +136,25 @@ class Query:
         # Off the event loop (a whole-run read); the items' `features` loads still batch.
         found = await to_thread.run_sync(ideas.load_ideas, ctx, limit) if ctx is not None else None
         return Ideas.of(found, ctx) if found is not None and ctx is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The US market for the session: the market-entity features by catalogue "
+        "name (ADR 0047). Null: nothing stored"
+    )
+    def market(self, info: Ctx, date: Day = None) -> Market | None:
+        ctx = info.context.read(date)
+        return Market.of(market.load_market(ctx), ctx) if ctx is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The market regime for the session as weather (Clear, Clouds building, "
+        "Storm, Severe storm), with its scores, indicator cards and sizing rule; UNKNOWN with "
+        "its reason when not computed for the session (ADR 0047). Null: nothing stored"
+    )
+    async def regime(self, info: Ctx, date: Day = None) -> MarketRegime | None:
+        ctx = info.context.read(date)
+        # Off the event loop: the market rows and the cards file.
+        found = await to_thread.run_sync(regime.load_regime, ctx) if ctx is not None else None
+        return MarketRegime.of(found, ctx) if found is not None and ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Every rule screen the user sees (their own config, else the site "

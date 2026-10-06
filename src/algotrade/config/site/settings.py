@@ -222,6 +222,7 @@ class SourcesSettings:
     max_chain_stale_share: float = 0.20  # the "rest" tier
     max_chain_stale_share_core: float = 0.02  # core tier (tasks/market/tiers.py)
     max_verify_failures: float = 0.10
+    max_macro_stale_share: float = 0.20  # macro series (ADR 0048)
     coverage: tuple[CoverageRule, ...] = DEFAULT_COVERAGE  # [quality.coverage.<group>.<column>]
     ibkr: IbkrSettings = field(default_factory=IbkrSettings)
     etf: EtfHoldingsSettings = field(default_factory=EtfHoldingsSettings)  # [etf_holdings]
@@ -265,6 +266,7 @@ class SourcesSettings:
                 "max_chain_stale_share",
                 "max_chain_stale_share_core",
                 "max_verify_failures",
+                "max_macro_stale_share",
                 "coverage",
             ],
         )
@@ -341,6 +343,9 @@ class SourcesSettings:
                 "max_chain_stale_share_core", d.max_chain_stale_share_core
             ),
             max_verify_failures=quality.fraction("max_verify_failures", d.max_verify_failures),
+            max_macro_stale_share=quality.fraction(
+                "max_macro_stale_share", d.max_macro_stale_share
+            ),
             coverage=load_coverage(quality, d.coverage),
             ibkr=load_ibkr(_extra(vendors, "ibkr")),
             etf=EtfHoldingsSettings.from_table(_extra(vendors, "etf_holdings")),

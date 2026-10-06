@@ -423,6 +423,14 @@ section = "docs/adr/0048-macro-series-with-vintages.md#decision"
 detect = [{ string = "macro/series" }]
 
 [[responsibility]]
+id = "macro-ingestion"
+description = "Store the registry's economic series and index levels in macro/series (ADR 0048): fetch each enabled series whole through the FRED / published sources, give every value its vintage (ALFRED's realtime_start, or the lagged rule: a changed lagged value is a new vintage dated the run's session) and write only the rows the table lacks; a series whose source is off or has no credential is skipped and counted, never an error"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/macro/*"]
+allowed = ["apps/ingestion/algotrade_ingestion/tasks/framework/registry.py"]  # declares the task's tables
+section = "docs/adr/0048-macro-series-with-vintages.md#decision"
+detect = [{ call = "lagged_vintages" }]
+
+[[responsibility]]
 id = "live-option-quotes"
 description = "The API's live option quotes, read-only (ADR 0028): IBKR quotes for an underlying's expiry through the facade on the API's own client id and session thread, a 60 s cache, the stored delayed chain + a status as the fallback, and the API's one write: the answers recorded in the background to live/option_quotes (only through LiveWriter, atomic per run); read back through data.chains"
 owner = [
@@ -501,12 +509,13 @@ detect = [{ import = "fcntl" }, { call = "flock" }]
 
 [[responsibility]]
 id = "site-settings"
-description = "Load and type L3 site settings (config/site/*.toml: sources, universe + overrides, nightly, defaults, users with roles per ADR 0040, the field guide per ADR 0041): one loader, frozen dataclasses; the store only reads files"
+description = "Load and type L3 site settings (config/site/*.toml: sources, universe + overrides, nightly, defaults, users with roles per ADR 0040, the field guide per ADR 0041, the regime cards and episodes per ADR 0047): one loader, frozen dataclasses; the store only reads files"
 owner = [
     "src/algotrade/config/site/settings.py",
     "src/algotrade/config/site/users.py",
     "src/algotrade/config/site/nightly.py",
     "src/algotrade/config/site/field_guide.py",
+    "src/algotrade/config/site/regime/*",
     "src/algotrade/storage/configs/store.py",
     "src/algotrade/storage/configs/files.py",
 ]
@@ -679,7 +688,7 @@ detect = [
 
 [[responsibility]]
 id = "domain-read-model"
-description = "Domain read objects and their loaders (ADR 0037): every read a page shows is a frozen dataclass built by one load_<object>(ctx, ...) in services/read/<area>/, for ctx.session only; per-instrument values by catalogue name (ADR 0038), never a table path. A fact a page needs is stored, not computed on read: chain_expiries (the nearest expiry, stored as rollup.nearest_expiry@v1 since read-model PR 3) is called only by data/ and the producing feature group (read-model PR 5 deleted its last read-time caller, explore ideas/ranking.py)"
+description = "Domain read objects and their loaders (ADR 0037): every read a page shows is a frozen dataclass built by one load_<object>(ctx, ...) in services/read/<area>/, for ctx.session only; per-instrument values by catalogue name (ADR 0038), never a table path. the market regime (ADR 0047: MarketRegime with its indicator cards and label bands, services/read/regime/) and the market entity (services/read/market/), read from the market-entity feature groups by catalogue name. A fact a page needs is stored, not computed on read: chain_expiries (the nearest expiry, stored as rollup.nearest_expiry@v1 since read-model PR 3) is called only by data/ and the producing feature group (read-model PR 5 deleted its last read-time caller, explore ideas/ranking.py)"
 owner = ["src/algotrade/services/read/*"]
 allowed = [
     "src/algotrade/data/*",  # the generic table reads (R1)
