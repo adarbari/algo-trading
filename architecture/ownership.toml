@@ -47,6 +47,7 @@ allowed = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
     "libs/sources/algotrade_sources/vendors/treasury/*",  # the vendor's frame key
     "src/algotrade/features/rollups/options/iv30.py",  # names its input; the framework reads it through data.rates (ADR 0021 IV30)
+    "src/algotrade/features/rollups/market/macro.py",  # names its input (the recent curve); read through data.rates (ADR 0048)
 ]
 section = "docs/adr/0021-option-pricing-conventions.md#rates"
 detect = [{ string = "rates/treasury" }]
@@ -418,7 +419,10 @@ detect = [{ string = "holdings/etf" }]
 id = "macro-series-reads"
 description = "Read macro series and index levels (macro/series, ADR 0048) point in time by vintage: each observation's latest vintage on or before a session (data.macro.series) and the pit = lag vintage rule (data.macro.vintages); consumers and feature groups read the table only through data.macro and data.feature_inputs"
 owner = ["src/algotrade/data/macro/*"]
-allowed = ["src/algotrade/storage/tables/schemas.py"]  # declares the table
+allowed = [
+    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/features/rollups/market/macro.py",  # names its input; read through data.feature_inputs (ADR 0048)
+]
 section = "docs/adr/0048-macro-series-with-vintages.md#decision"
 detect = [{ string = "macro/series" }]
 

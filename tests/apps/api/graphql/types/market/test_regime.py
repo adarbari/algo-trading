@@ -33,23 +33,23 @@ def _data(body: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
-def test_the_regime_is_unknown_until_the_groups_exist(graph: Graph) -> None:
+def test_the_regime_is_unknown_until_it_is_computed(graph: Graph) -> None:
     regime = _data(graph(REGIME, {"date": END.isoformat()}))["regime"]
     assert (regime["session"], regime["label"]) == (END.isoformat(), "UNKNOWN")
     assert (regime["plainLabel"], regime["headline"]) == ("Not computed yet", "Not computed yet")
-    assert regime["unknownReason"]["code"] == "NOT_IN_CATALOGUE"
+    assert regime["unknownReason"]["code"] == "NO_PARTITION"  # the groups exist, no rows yet
     assert regime["sizing"] == {"label": "UNKNOWN", "multiplier": None}
     assert regime["scores"]["fragility"] == {
-        "value": None, "unknown": {"code": "NOT_IN_CATALOGUE"},
+        "value": None, "unknown": {"code": "NO_PARTITION"},
     }  # fmt: skip
     cards = regime["indicators"]
     assert len(cards) == 8 and cards[0]["key"] == "curve_10y3m"
     first = cards[0]
     assert first["feature"] == "market.regime_indicators@v1.curve_10y3m"
     assert (first["value"], first["format"], first["status"], first["changed"]) == (
-        None, None, "UNKNOWN", None,
+        None, "PERCENT", "UNKNOWN", None,
     )  # fmt: skip
-    assert first["unknown"]["code"] == "NOT_IN_CATALOGUE"
+    assert first["unknown"]["code"] == "NO_PARTITION"
     assert first["plainName"] and first["whyItMatters"] and first["technicalName"]
     assert [b["episode"] for b in first["before"]] == ["2008", "2020", "2022"]
     assert all(link["url"].startswith("https://") for link in first["links"])

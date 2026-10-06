@@ -242,12 +242,21 @@ def test_a_partial_task_names_its_failed_items() -> None:
     )
 
 
-def test_the_macro_step_is_optional_latest_only_and_after_the_screens() -> None:
+def test_the_macro_step_is_optional_latest_only_and_before_the_market_rollups() -> None:
     names = [s.name for s in NIGHTLY]
     step = NIGHTLY[names.index("macro")]
     assert (step.critical, step.latest_only, step.needs) == (False, True, ())
     assert step.accept_with == (check_macro,) and step.accept == ()
-    assert names.index("macro") > names.index(SCREENS)  # off the critical path until RG3
+    assert names.index("macro") < names.index("market-rollups")  # the regime reads it (RG3)
+    # ... but never as a need: a failed macro step must not hold the regime back (ADR 0039)
+    assert "macro" not in NIGHTLY[names.index("market-rollups")].needs
+
+
+def test_a_failing_macro_step_still_runs_the_market_rollups(fake: Callable[..., Calls]) -> None:
+    fake(fail=("macro",))
+    summary = run_nightly(task_ctx(store()), Plan([D]))
+    assert statuses(summary)["macro"] == "FAILED"
+    assert statuses(summary)["market-rollups"] == "SUCCEEDED"
 
 
 def test_a_failing_macro_step_only_warns(fake: Callable[..., Calls]) -> None:

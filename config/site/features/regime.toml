@@ -1,0 +1,90 @@
+# Expression features of the market regime (L3; ADR 0023 step 3, ADR 0047;
+# docs/market-regime-plan.md sections 3B and 4): market-entity formulas over the market groups
+# (market_macro, market_trend), computed on read. They are the plan's context signals, shown
+# beside the regime but never counted in its scores: the cards' verdicts and the scores live in
+# the groups regime_indicators@v1 and regime@v1 (features/rollups/market/), whose thresholds are
+# in config/site/rollups.toml, because a verdict there compares with 5 sessions earlier, which
+# the expression language cannot. Features over VIX read a personal-use series (ADR 0028).
+# Language and keys: docs/configuration.md "Expression features".
+
+[vix_band]
+kind = "label"
+expr = '''
+if(is_null(market_macro.vix), null,
+   if(market_macro.vix >= stress_at, "STRESS",
+      if(market_macro.vix >= caution_at, "CAUTION", "CALM")))
+'''
+params = { caution_at = 25.0, stress_at = 35.0 }  # the plan's VIX levels (section 3B)
+dtype = "str"
+unit = "category"
+categories = ["CALM", "CAUTION", "STRESS"]
+description = "The VIX level as a band: CALM below 25, CAUTION from 25 (params.caution_at), STRESS from 35 (params.stress_at)"
+null_meaning = "no VIX close known by the session (no FRED key, or before 1990)"
+version = 1
+
+[spx_drawdown_band]
+kind = "label"
+expr = '''
+if(is_null(market_trend.spx_drawdown_252d), null,
+   if(market_trend.spx_drawdown_252d <= bear_at, "BEAR",
+      if(market_trend.spx_drawdown_252d <= correction_at, "CORRECTION", "NEAR_HIGH")))
+'''
+params = { correction_at = -0.10, bear_at = -0.20 }  # the plan's index drawdown levels (3B)
+dtype = "str"
+unit = "category"
+categories = ["NEAR_HIGH", "CORRECTION", "BEAR"]
+description = "SPY's distance from its 52-week closing high as a band: NEAR_HIGH, CORRECTION from 10% below (params.correction_at), BEAR from 20% below (params.bear_at)"
+null_meaning = "market_trend.spx_drawdown_252d is null (SPY is not in the reference, or misses a bar among the last 252 sessions)"
+version = 1
+
+[spx_death_cross]
+expr = "market_trend.spx_sma50_vs_sma200 < 0"
+dtype = "bool"
+unit = "flag"
+description = "SPY's 50-session mean close is below its 200-session mean (a death cross)"
+null_meaning = "market_trend.spx_sma50_vs_sma200 is null (a gap or a short history in the last 200 sessions)"
+version = 1
+
+[spx_vol_high]
+expr = "market_trend.spx_realised_vol_20d > vol_above"
+params = { vol_above = 0.25 }  # the plan's realised-vol level (3B): 1987, 2008, 2020, 2025
+dtype = "bool"
+unit = "flag"
+description = "SPY's 20-session realised volatility is above 25% (params.vol_above)"
+null_meaning = "market_trend.spx_realised_vol_20d is null (a gap in the last 21 sessions)"
+version = 1
+
+[curve_10y2y_inverted]
+expr = "market_macro.curve_10y2y < 0"
+dtype = "bool"
+unit = "flag"
+description = "The 10-year Treasury yield is below the 2-year (the second curve the plan watches beside 10y - 3m)"
+null_meaning = "market_macro.curve_10y2y is null (no curve for the session and no T10Y2Y observation)"
+version = 1
+
+[cfnai_recession]
+expr = "market_macro.cfnai_ma3 < below"
+params = { below = -0.7 }  # the Chicago Fed's recession rule for CFNAI-MA3
+dtype = "bool"
+unit = "flag"
+description = "The Chicago Fed National Activity Index's 3-month mean is below -0.7 (params.below): the economy is likely in recession"
+null_meaning = "no CFNAIMA3 observation known by the session (no FRED key)"
+version = 1
+
+[oil_shock]
+expr = "market_macro.wti_chg_12m > above"
+params = { above = 0.5 }  # WTI up more than 50% on the year: 1973, 1990, 2008
+dtype = "bool"
+unit = "flag"
+description = "WTI crude is up more than 50% on the year (params.above): an oil shock"
+null_meaning = "market_macro.wti_chg_12m is null (no DCOILWTICO observation a year before the latest)"
+version = 1
+
+[recession_prob_high]
+expr = "market_macro.recession_prob_smoothed > above"
+params = { above = 0.2 }  # the plan's first level for the smoothed recession probability
+dtype = "bool"
+unit = "flag"
+description = "The Chauvet-Piger smoothed recession probability is above 20% (params.above): a reference, not a driver"
+null_meaning = "no RECPROUSM156N observation known by the session (no FRED key)"
+version = 1

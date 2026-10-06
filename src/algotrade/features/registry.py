@@ -31,7 +31,14 @@ from algotrade.features.rollups.corporate import (
     financials,
     fundamentals,
 )
-from algotrade.features.rollups.market import breadth, cross_asset, trend
+from algotrade.features.rollups.market import (
+    breadth,
+    cross_asset,
+    indicators,
+    macro,
+    regime,
+    trend,
+)
 from algotrade.features.rollups.options import (
     ibkr_iv,
     iv30,
@@ -77,6 +84,9 @@ GROUPS: dict[str, FeatureGroup] = {
             trend.GROUP,
             breadth.GROUP,
             cross_asset.GROUP,
+            macro.GROUP,
+            indicators.GROUP,
+            regime.GROUP,
         ),
         # iv30@v1 and put_wing@v1 read the materialised div_yield@v1 (FeatureSet orders it)
         stored_ok=True,
