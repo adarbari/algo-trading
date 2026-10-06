@@ -1,6 +1,7 @@
 """Backtest output."""
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 
 from algotrade.analytics.metrics import PerformanceMetrics
 from algotrade.core.model.types import Fill
@@ -16,3 +17,5 @@ class BacktestResult:
     gross_exposure: FloatArray
     fills: tuple[Fill, ...]
     metrics: PerformanceMetrics
+    # bars on which an overlay changed the weights, per reason (ADR 0049); empty without one
+    overlay_reasons: Mapping[str, int] = field(default_factory=dict)

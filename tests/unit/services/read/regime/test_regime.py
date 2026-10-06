@@ -7,11 +7,11 @@ from dataclasses import replace
 import pytest
 
 from algotrade.config.site.regime.cards import load_cards
+from algotrade.config.strategy.regime import DEFAULT_MULTIPLIERS
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.services.read.instruments.catalogue import FeatureFormat
 from algotrade.services.read.regime.indicators import IndicatorStatus, RegimeIndicator
 from algotrade.services.read.regime.regime import (
-    DEFAULT_MULTIPLIERS,
     RegimeLabel,
     headline,
     load_regime,
@@ -132,25 +132,30 @@ def _labelled(writer: object) -> None:
     write_indicators(writer, D1, curve=1.0)
 
 
-def test_sizing_comes_from_the_site_defaults_when_they_have_a_regime_block() -> None:
-    mult = {"CALM": 1, "CAUTION": 0.9, "STRESS": 0.6, "CRISIS": 0}
+def test_sizing_comes_from_the_typed_regime_settings() -> None:
+    """ADR 0049: the multipliers are ``RegimeSettings``' (``defaults.toml [regime]``); a label
+    the file leaves out keeps the settings' default."""
+    mult = {"CALM": 1, "CAUTION": 0.9, "STRESS": 0.6}
     ctx = with_regime(
         context(store_with(_labelled)),
         defaults={"regime": {"multipliers": mult}},
     )
     found = load_regime(ctx)
     assert (found.sizing.label, found.sizing.multiplier) == (RegimeLabel.CALM, 1.0)
-    assert DEFAULT_MULTIPLIERS[RegimeLabel.CAUTION] == 0.75  # the plan's constants without a block
+    assert DEFAULT_MULTIPLIERS["CRISIS"] == 0.25  # the settings' default without a value
     assert load_regime(regime_ctx()).sizing.multiplier == 0.5
 
 
-def test_a_bad_multiplier_table_names_the_labels() -> None:
-    bad = {"CALM": 1, "CAUTION": True, "STRESS": "half"}
+def test_a_bad_multiplier_names_its_path() -> None:
+    bad = {"CALM": 1, "CAUTION": True}
     ctx = with_regime(context(store_with(_labelled)), defaults={"regime": {"multipliers": bad}})
     with pytest.raises(
-        ConfigurationError,
-        match=r"multipliers: expected numbers for \['CAUTION', 'STRESS', 'CRISIS'\]",
+        ConfigurationError, match=r"defaults.toml \[regime.multipliers\] CAUTION: expected"
     ):
+        load_regime(ctx)
+    over = {"CALM": 1.5}
+    ctx = with_regime(context(store_with(_labelled)), defaults={"regime": {"multipliers": over}})
+    with pytest.raises(ConfigurationError, match="CALM: expected a fraction between 0 and 1"):
         load_regime(ctx)
 
 

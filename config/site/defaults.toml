@@ -1,4 +1,4 @@
-# L3 site defaults. Every config inherits these; a config's own [screening]/[backtest]
+# L3 site defaults. Every config inherits these; a config's own [screening]/[backtest]/[regime]
 # tables override them. See docs/design/phase-0.md (Data Layers, L3).
 
 [screening]
@@ -21,3 +21,20 @@ slippage_bps = 5.0
 max_position_weight = 1.0
 max_gross_exposure = 1.0
 allow_short = false
+
+# The market regime overlay and screener gate (ADR 0049; docs/configuration.md#regime).
+# Off until enabled here, in a user's config or for one run.
+[regime]
+enabled = false
+label = "market.regime@v1.label"  # the session's regime: CALM, CAUTION, STRESS, CRISIS
+unknown_multiplier = 0.0          # size when the label is unknown: fail closed
+pause_in = []                     # labels in which screeners' picks are PAUSED
+
+[regime.multipliers]              # position size per label, in [0, 1]
+CALM = 1.0
+CAUTION = 0.75
+STRESS = 0.5
+CRISIS = 0.25
+
+[regime.screeners.vrp_scanner]    # short volatility pauses in Storm and Severe storm
+pause_in = ["STRESS", "CRISIS"]

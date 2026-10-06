@@ -5,13 +5,16 @@ import pytest
 
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.types import Side, TargetWeights
+from algotrade.core.views.market_features import MarketFeatures
 from algotrade.core.views.market_view import MarketView
 from algotrade.core.views.series import PriceSeries, panel
 from algotrade.engines.backtest.config import BacktestConfig
 from algotrade.engines.backtest.costs import CostModel
 from algotrade.engines.backtest.engine import run_backtest
 from algotrade.engines.backtest.universe import DynamicUniverse
+from algotrade.engines.overlays.scale import ScaleByLabel
 from algotrade.strategies.trading.base import Strategy
+from algotrade.strategies.trading.buy_and_hold import BuyAndHold
 from tests.helpers.domain_objects import series_from_closes
 
 FREE = BacktestConfig(initial_cash=1_000, costs=CostModel.free(), cash_buffer=0)
@@ -107,3 +110,52 @@ def test_a_set_after_the_last_bar_never_applies_and_empty_schedules_fail() -> No
     assert universe.members(4) == frozenset({"A"})
     with pytest.raises(ConfigurationError):
         DynamicUniverse(data, [], 1)
+
+
+def test_a_held_instrument_that_left_the_set_is_not_bought_back_by_an_overlay() -> None:
+    """ADR 0049: a hold strategy (``None``) resized by a regime change after A left the set
+    trades only the set in force; A's exit is never replaced by a buy."""
+    data = two()
+    label = "market.regime@v1.label"
+    labels = ["CALM", "CALM", "STRESS", "STRESS", "CALM"]
+    market = MarketFeatures(data["A"].timestamps, {label: labels})
+    overlay = ScaleByLabel(label, {"CALM": 1.0, "STRESS": 0.5})
+    schedule = [(day(0), frozenset({"A", "B"})), (day(2), frozenset({"B"}))]
+    result = run_backtest(
+        data, BuyAndHold(), FREE, schedule=schedule, overlays=(overlay,), market=market
+    )
+    fills = [(f.instrument_id, f.side, f.timestamp.date()) for f in result.fills]
+    assert fills == [
+        ("A", Side.BUY, day(1)),
+        ("B", Side.BUY, day(1)),
+        ("A", Side.SELL, day(2)),  # left the set: closed at the effective open
+        ("B", Side.SELL, day(3)),  # the storm at bar 2 halves B only
+    ]
+
+
+def test_an_instrument_that_re_enters_is_not_bought_back_from_old_targets() -> None:
+    """A leaves {A, B} and comes back while the hold strategy still holds its first targets;
+    a storm while A is out resizes B only, and A's return buys nothing (the strategy decides
+    nothing new)."""
+    data = {"A": series_from_closes([10.0] * 7, "A"), "B": series_from_closes([20.0] * 7, "B")}
+    label = "market.regime@v1.label"
+    labels = ["CALM", "CALM", "CALM", "STRESS", "CALM", "CALM", "CALM"]
+    market = MarketFeatures(data["A"].timestamps, {label: labels})
+    overlay = ScaleByLabel(label, {"CALM": 1.0, "STRESS": 0.5})
+    bars = [d.item() for d in data["A"].timestamps.astype("datetime64[D]")]
+    schedule = [
+        (bars[0], frozenset({"A", "B"})),
+        (bars[2], frozenset({"B"})),
+        (bars[4], frozenset({"A", "B"})),
+    ]
+    result = run_backtest(
+        data, BuyAndHold(), FREE, schedule=schedule, overlays=(overlay,), market=market
+    )
+    fills = [(f.instrument_id, f.side, f.timestamp.date()) for f in result.fills]
+    assert fills == [
+        ("A", Side.BUY, bars[1]),
+        ("B", Side.BUY, bars[1]),
+        ("A", Side.SELL, bars[2]),  # left the set
+        ("B", Side.SELL, bars[4]),  # the storm at bar 3 halves B
+        ("B", Side.BUY, bars[5]),  # calm again at bar 4: B back to its weight; A stays out
+    ]

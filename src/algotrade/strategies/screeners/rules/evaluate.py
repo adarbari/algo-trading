@@ -7,7 +7,7 @@ flags, columns, tie-break) and instrument, valid for one view. Each depends
 only on its part of the spec and the instrument's values, so an edit to one criterion
 re-evaluates only that one; the rows are the same either way."""
 
-from collections.abc import Hashable, Mapping, MutableMapping
+from collections.abc import Hashable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -28,6 +28,11 @@ class RuleScreenResult:
     spec: ScreenSpec
     rows: tuple[RuleRow, ...]  # ranked
     summary: RunSummary
+
+    def with_rows(self, rows: Sequence[RuleRow]) -> "RuleScreenResult":
+        """This result with ``rows`` in place of its own (same ranks; e.g. the regime gate's
+        PAUSED decisions, ADR 0049), the summary recounted."""
+        return RuleScreenResult(self.spec, tuple(rows), summarise(rows))
 
 
 def _number(value: FieldValue) -> float | None:

@@ -4,6 +4,9 @@ Rules from the screener specs (for example the VRP scanner):
 - every universe instrument is processed exactly once, and none is silently dropped;
 - data failures are reported, and a run below the coverage threshold is PARTIAL;
 - a COMPLETE run is the only kind that may claim "no qualified candidates".
+
+With the regime gate on (ADR 0049, ``engines.screening.gate``) the screener's picks are PAUSED
+in the regimes it pauses in before the rows are audited; PAUSED rows count as processed.
 """
 
 from collections import Counter
@@ -13,6 +16,7 @@ from enum import StrEnum
 
 from algotrade.core.model.errors import AlgoTradeError
 from algotrade.core.views.feature_view import FeatureView
+from algotrade.engines.screening.gate import RegimeGate, gate_rows
 from algotrade.strategies.screeners.base import Screener, ScreenRow
 
 DEFAULT_MIN_COVERAGE = 0.98
@@ -74,10 +78,11 @@ def run_screen(
     view: FeatureView,
     universe: Sequence[str],
     min_coverage: float = DEFAULT_MIN_COVERAGE,
+    gate: RegimeGate | None = None,
 ) -> ScreenRun:
     if sorted(set(universe)) and set(view.instruments) != set(universe):
         raise AlgoTradeError("FeatureView must contain exactly the universe instruments")
-    rows = screener.screen(view) if universe else []
+    rows = gate_rows(screener.screen(view), gate) if universe else []
     return audit_rows(screener.name, rows, universe, min_coverage)
 
 

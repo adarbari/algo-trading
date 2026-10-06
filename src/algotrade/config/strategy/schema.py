@@ -72,7 +72,7 @@ class StrategyConfig:
     selection: str | Selection | None = None
     selection_overrides: Group | None = None
     exports: tuple[str, ...] = ()
-    settings: Mapping[str, Any] = field(default_factory=dict)  # screening / backtest overrides
+    settings: Mapping[str, Any] = field(default_factory=dict)  # [screening] / [backtest] / [regime]
     rules: Mapping[str, Any] = field(default_factory=dict)  # RULE_SCREEN_KEYS, impl "rules" only
     name: str | None = None  # display name for pages (not part of the hash); the id when None
 
@@ -156,6 +156,7 @@ def parse_strategy(raw: Mapping[str, Any], path: str) -> StrategyConfig:
         "exports",
         "screening",
         "backtest",
+        "regime",
         "extends",
         "name",
         *RULE_SCREEN_KEYS,
@@ -186,7 +187,7 @@ def parse_strategy(raw: Mapping[str, Any], path: str) -> StrategyConfig:
     exports = raw.get("exports", [])
     if not isinstance(exports, list) or not all(isinstance(e, str) for e in exports):
         raise _fail(f"{path}.exports", "expected a list of export names")
-    settings = {k: raw[k] for k in ("screening", "backtest") if k in raw}
+    settings = {k: raw[k] for k in ("screening", "backtest", "regime") if k in raw}
     rules = {k: raw[k] for k in sorted(RULE_SCREEN_KEYS) if k in raw}
     if raw["impl"] == RULES_IMPL and "criteria" not in rules:
         raise _fail(path, "a rule screen (impl = 'rules') needs [criteria]")

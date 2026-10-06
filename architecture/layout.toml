@@ -219,8 +219,12 @@ path = "src/algotrade/engines/backtest"
 purpose = "the event-driven backtest engine: bar loop, risk, sizing, simulated broker, portfolio"
 
 [[dir]]
+path = "src/algotrade/engines/overlays"
+purpose = "run overlays (ADR 0049): rules the backtest engine applies to a strategy's target weights from the session's market features (the Overlay protocol, ScaleByLabel)"
+
+[[dir]]
 path = "src/algotrade/engines/screening"
-purpose = "the screening engine: run a screener and audit its coverage"
+purpose = "the screening engine: run a screener, apply the regime gate (ADR 0049) and audit its coverage"
 
 [[dir]]
 path = "src/algotrade/engines/selection"

@@ -2,7 +2,7 @@
 features (computed on read: ``services.features``). ``to_value`` is the read model's one
 scalar coercion (``services.read.values.to_scalar``), imported back so runs and reads agree."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 
 from algotrade.core.views.feature_view import FeatureValue, FeatureView
@@ -21,9 +21,11 @@ def feature_view(
     instruments: Sequence[str],
     as_of: datetime | None = None,
     expressions: Sequence[str] = (),
+    market: Mapping[str, FeatureValue] | None = None,
 ) -> FeatureView:
     """One row per instrument; instruments without features get an empty row (fail closed).
-    ``tables``' columns by column name; ``expressions`` (expression features) by name."""
+    ``tables``' columns by column name; ``expressions`` (expression features) by name;
+    ``market``: the session's market values the run read (``FeatureView.market``)."""
     rows: dict[str, dict[str, FeatureValue]] = {i: {} for i in instruments}
     if expressions:
         computed = read_expressions(reader, expressions, session_date, as_of=as_of)
@@ -39,4 +41,4 @@ def feature_view(
         for record in frame.to_dict("records"):
             if record["instrument_id"] in rows:
                 rows[record["instrument_id"]].update({c: to_value(record[c]) for c in columns})
-    return FeatureView(session_date, rows)
+    return FeatureView(session_date, rows, market)

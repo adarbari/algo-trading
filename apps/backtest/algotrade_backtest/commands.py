@@ -8,6 +8,7 @@ from algotrade.analytics.report import markdown_table
 from algotrade.config.env import config_dir, data_url
 from algotrade.config.site.regime.episodes import load_episodes
 from algotrade.config.site.settings import load_macro
+from algotrade.config.strategy.regime import site_regime
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.user import UserContext
 from algotrade.core.model.errors import AlgoTradeError, ConfigurationError
@@ -16,6 +17,7 @@ from algotrade.engines.backtest.engine import run_backtest
 from algotrade.services.configs import default_user, resolve_config
 from algotrade.services.datasets import list_datasets, load_dataset
 from algotrade.services.evaluation.baseline import compare_to_baseline, load_baseline, save_baseline
+from algotrade.services.evaluation.overlay import compare_overlay, overlay_report
 from algotrade.services.evaluation.regime_report import render
 from algotrade.services.evaluation.regime_scorecard import load_history
 from algotrade.services.evaluation.suite import run_suite, with_benchmark_excess
@@ -168,11 +170,15 @@ def cmd_backtest(args: argparse.Namespace) -> int:
 
 
 def cmd_evaluate(args: argparse.Namespace) -> int:
-    rows = run_suite(reader_for(args))
+    reader = reader_for(args)
+    rows = run_suite(reader)
     table = markdown_table(with_benchmark_excess(rows), SCORECARD_COLUMNS)
     print(table)
+    regime = site_regime(open_config_store(config_dir(args.config_dir)).load)
+    overlay = overlay_report(compare_overlay(reader, regime))  # ADR 0049: never gates the run
+    print(f"\n{overlay}")
     if args.report:
-        args.report.write_text(f"# Strategy scorecard\n\n{table}\n")
+        args.report.write_text(f"# Strategy scorecard\n\n{table}\n\n{overlay}\n")
 
     if args.update_baseline:
         save_baseline(rows, args.baseline)

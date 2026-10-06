@@ -10,8 +10,19 @@
 
 - Input: a point-in-time `FeatureView` holding exactly the production universe for the
   session. Output: **one `ScreenRow` per instrument**, with a shared `Decision`
-  (`QUALIFIED`, `WATCH`, `EVENT_RISK`, `LIQUIDITY_RISK`, `REJECT`, `UNKNOWN`), score and reasons.
+  (`QUALIFIED`, `WATCH`, `EVENT_RISK`, `LIQUIDITY_RISK`, `REJECT`, `UNKNOWN`; `SKIPPED` for rule
+  screens; `PAUSED` from the regime gate), score and reasons.
 - Missing or stale data is `UNKNOWN` (fail closed) and does not count as processed.
+- `PAUSED` (ADR 0049) is a pick (`QUALIFIED` or `WATCH`) held back by the regime gate, never
+  by the screener itself: with `[regime] enabled`, the screening engine pauses a screener's
+  picks when the session's `market.regime@v1.label` is one of its `pause_in` labels (reason
+  `regime=STRESS: vrp_scanner pauses in STRESS`), and all its picks when the label is
+  unknown and it pauses in any label (reason `regime unknown`: fail closed, never read as
+  CALM); a screener with an empty `pause_in` is never paused. A paused row keeps its
+  score, rank and other reasons and counts as processed, so a Storm run is not `PARTIAL`;
+  `SKIPPED` still means "no data". Every result row carries the session's `regime` (null with
+  the gate off or the label unknown) and `size_multiplier` (the label's multiplier; 0 when
+  paused or unknown; 1.0 with the gate off); the run record has a `regime` summary.
 - Every run saves an audit: universe snapshot, version and last-verified date, rows
   loaded, duplicates removed, processed, skipped with reasons, coverage %, decision
   counts, and a coverage status. Only `COMPLETE` runs may claim "no qualified candidates".

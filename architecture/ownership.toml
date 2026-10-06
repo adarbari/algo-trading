@@ -613,6 +613,20 @@ section = "docs/screeners/rules.md#decision"
 detect = [{ call = "evaluate_screen" }, { call = "evaluate_criterion" }, { call = "summarise" }]
 
 [[responsibility]]
+id = "run-overlays"
+description = "Run overlays and the regime gate (ADR 0049): the Overlay protocol and ScaleByLabel (engines/overlays), applied by the backtest engine after on_bar and before the risk limits; MarketFeatures on the bar timeline (session t's values at bar t, no lookahead) and the market features a run reads (services/backtests/market.py, services/screening/regime.py); the typed [regime] settings (config/strategy/regime.py); the screening engine's gate that PAUSES a screener's picks in the regimes it pauses in, and every pick of a gated screener (a non-empty pause_in) when the label is unknown (fail closed)"
+owner = [
+    "src/algotrade/engines/overlays/*",
+    "src/algotrade/engines/screening/gate.py",
+    "src/algotrade/core/views/market_features.py",
+    "src/algotrade/config/strategy/regime.py",
+    "src/algotrade/services/backtests/market.py",
+    "src/algotrade/services/screening/regime.py",
+]
+section = "docs/adr/0049-run-overlays-and-the-regime-gate.md#decision"
+detect = [{ string_prefix = "regime=" }, { call = "MarketFeatures" }, { call = "RegimeGate" }]
+
+[[responsibility]]
 id = "screen-execution"
 description = "Run a configured screen (select, screen, audit, write results); nightly submits `screen` jobs (workflows/nightly/screens.py)"
 owner = [
@@ -733,6 +747,8 @@ allowed = [
     "src/algotrade/services/screening/exports.py",  # run exports serialise through the same coercion, so runs and reads agree
     "src/algotrade/services/selection.py",  # the selection's field values, same coercion
     "src/algotrade/services/screening/rule_results.py",  # the rule-screen writer types value_num through the one coercion (_num calls to_value)
+    "src/algotrade/services/screening/regime.py",  # the session's market values for the regime gate (ADR 0049), same coercion as the FeatureView
+    "src/algotrade/services/backtests/market.py",  # a backtest's market feature values (ADR 0049), same coercion as screen runs
     "src/algotrade/storage/configs/writer.py",  # _float formats a TOML float literal (text out, not a stored value in)
     "src/algotrade/features/rollups/options/option_liquidity.py",  # _num is the rollup's arithmetic rule (no open interest / volume counts as 0), not display coercion
     "libs/sources/algotrade_sources/vendors/*",  # vendor payload parsers (_float / _text read a vendor's JSON, XML or CSV, never a stored value)

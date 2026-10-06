@@ -417,6 +417,8 @@ RULE_SCREEN = _fixed(
     "rank int64!",
     "tie_break float64",
     *_strings("flags", "reasons", "failed", "near_missed", "missing"),
+    "regime string",  # the session's regime label (ADR 0049); null: gate off or unknown
+    "size_multiplier float64",  # the regime's size for the screener; null in runs before it
     runs="merge",
     key=("user_id", "config_id", "instrument_id"),
 )
