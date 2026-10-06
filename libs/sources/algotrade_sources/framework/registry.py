@@ -50,6 +50,7 @@ from algotrade_sources.vendors.fred.observations import (
     missing_series,
     too_many_vintages,
 )
+from algotrade_sources.vendors.fred.releases import FredReleaseDates
 from algotrade_sources.vendors.ibkr.gateway import GatewayConfig, IbkrMarketData
 from algotrade_sources.vendors.ibkr.market_data import IbkrSource
 from algotrade_sources.vendors.ishares.etf_holdings import IsharesHoldings, no_file
@@ -69,6 +70,7 @@ from algotrade_sources.vendors.sec.fund_objectives import (
     SecFundTickerMap,
 )
 from algotrade_sources.vendors.sec.nport_holdings import NportHoldings
+from algotrade_sources.vendors.sec.submissions import SecFilings
 from algotrade_sources.vendors.ssga.etf_holdings import SsgaHoldings
 from algotrade_sources.vendors.ssga.spy_holdings import SpyHoldingsSource
 from algotrade_sources.vendors.treasury.par_yields import TreasuryParYields
@@ -230,6 +232,7 @@ SOURCES: dict[str, SourceSpec] = {
         _massive("massive_overview", MassiveOverview),
         _sec("sec_tickers", SecTickerMap),
         _sec("sec_submissions", SecSubmissions),
+        _sec("sec_filings", SecFilings),
         _sec("sec_company_facts", SecCompanyFacts),
         _sec("sec_nport_holdings", NportHoldings),
         _sec("sec_fund_tickers", SecFundTickerMap),
@@ -247,6 +250,18 @@ SOURCES: dict[str, SourceSpec] = {
             tries=4,
             not_found=missing_series,
             rejected=too_many_vintages,
+            query_param="api_key",
+            options=_fred_options,
+        ),
+        SourceSpec(
+            "fred_release_dates",
+            "fred",
+            "fred",
+            FredReleaseDates,
+            0.5,
+            FRED_KEY,
+            "create a free FRED account (fredaccount.stlouisfed.org) and add the key to .env",
+            tries=4,
             query_param="api_key",
             options=_fred_options,
         ),

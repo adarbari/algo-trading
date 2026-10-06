@@ -335,7 +335,7 @@ detect = [{ call = "MinInterval" }, { attr = "time.sleep" }]
 
 [[responsibility]]
 id = "economic-series-sources"
-description = "Fetch and normalise economic series into one shape (SERIES_COLUMNS): FRED / ALFRED observations with every vintage, and published dated files (Stooq, Fed EBP, OFR FSI, Shiller) through named parsers; the registry builds them, the macro task stores them (ADR 0048)"
+description = "Fetch and normalise economic series into one shape (SERIES_COLUMNS): FRED / ALFRED observations with every vintage, FRED release dates (the calendar of a release, ADR 0050), and published dated files (Stooq, Fed EBP, OFR FSI, Shiller) through named parsers; the registry builds them, the macro task stores them (ADR 0048)"
 owner = [
     "libs/sources/algotrade_sources/vendors/fred/*",
     "libs/sources/algotrade_sources/vendors/published/*",
