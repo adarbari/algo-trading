@@ -16,7 +16,9 @@ from algotrade_sources.fixtures.files import GoldenFiles
 from algotrade_sources.fixtures.source import GoldenCsvSource
 from algotrade_sources.framework.base import FetchRequest, Source
 from algotrade_sources.framework.http import RetryPolicy
+from algotrade_sources.framework.series import SeriesRequest
 from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource
+from algotrade_sources.vendors.fred.observations import FredObservations
 from algotrade_sources.vendors.ibkr.gateway import GatewayConfig, IbkrMarketData
 from algotrade_sources.vendors.ibkr.market_data import IbkrSource
 from algotrade_sources.vendors.ishares.etf_holdings import IsharesHoldings
@@ -27,6 +29,7 @@ from algotrade_sources.vendors.massive.tickers import MassiveTickers
 from algotrade_sources.vendors.nasdaq.earnings import NasdaqEarningsSource
 from algotrade_sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
 from algotrade_sources.vendors.proshares.etf_holdings import ProsharesHoldings
+from algotrade_sources.vendors.published.csv_series import PublishedSeries
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts
 from algotrade_sources.vendors.sec.edgar import SecSubmissions, SecTickerMap
 from algotrade_sources.vendors.sec.fund_objectives import (
@@ -42,8 +45,10 @@ from tests.conftest import GOLDEN_DIR, REPO_ROOT
 from tests.helpers.fake_ib import FakeIB
 from tests.helpers.ingest_fakes import http_for
 from tests.helpers.payloads import cboe as fx
+from tests.helpers.payloads import fred as fred_payloads
 from tests.helpers.payloads import massive as massive_payloads
 from tests.helpers.payloads import nasdaq_earnings as earnings_payloads
+from tests.helpers.payloads import published as published_payloads
 from tests.helpers.payloads import sec as sec_payloads
 from tests.helpers.payloads import treasury as treasury_payloads
 from tests.helpers.payloads import universe as universe_payloads
@@ -188,7 +193,21 @@ def treasury() -> Adapter:
     return TreasuryParYields(http_for(lambda url: payload)), FetchRequest("2025")
 
 
+def fred() -> Adapter:
+    request = SeriesRequest("GDP_REAL", code="GDPC1")
+    return FredObservations(http_for(lambda url: fred_payloads.payload())), request
+
+
+def published() -> Adapter:
+    request = SeriesRequest(
+        "SPX", url="https://stooq.com/q/d/l/?s=^spx&i=d", date_column="Date", value_column="Close"
+    )
+    return PublishedSeries(http_for(lambda url: published_payloads.STOOQ)), request
+
+
 ADAPTERS: dict[str, Callable[[], Adapter]] = {
+    "fred": fred,
+    "published": published,
     "treasury": treasury,
     "massive_tickers": massive_tickers,
     "massive_overview": massive_overview,

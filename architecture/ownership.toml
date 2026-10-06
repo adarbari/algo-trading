@@ -311,6 +311,18 @@ section = "docs/adr/0019-ownership-and-boundaries.md#r3-tasks-get-sources-from-t
 detect = [{ call = "MinInterval" }, { attr = "time.sleep" }]
 
 [[responsibility]]
+id = "economic-series-sources"
+description = "Fetch and normalise economic series into one shape (SERIES_COLUMNS): FRED / ALFRED observations with every vintage, and published dated files (Stooq, Fed EBP, OFR FSI, Shiller) through named parsers; the registry builds them, the macro task stores them (ADR 0048)"
+owner = [
+    "libs/sources/algotrade_sources/vendors/fred/*",
+    "libs/sources/algotrade_sources/vendors/published/*",
+    "libs/sources/algotrade_sources/framework/series.py",
+]
+allowed = ["libs/sources/algotrade_sources/framework/registry.py"]  # builds both sources, their key and error test
+section = "docs/adr/0048-macro-series-with-vintages.md#decision"
+detect = [{ string = "series/observations" }, { string = "realtime_start" }]
+
+[[responsibility]]
 id = "source-construction"
 description = "Build vendor sources (transport, credentials, pacing, retries) from config/site/sources.toml, and fixture sources (the golden CSVs) from a directory: each source declared once in sources/framework/registry.py; vendor specifics stay in sources/"
 owner = ["libs/sources/algotrade_sources/framework/registry.py"]
@@ -320,7 +332,7 @@ allowed = [
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#r3-tasks-get-sources-from-the-registry"
 detect = [
-    { import = "algotrade_sources", except = ["algotrade_sources.framework.base", "algotrade_sources.framework.holdings", "algotrade_sources.framework.registry", "algotrade_sources.framework.session_thread"] },
+    { import = "algotrade_sources", except = ["algotrade_sources.framework.base", "algotrade_sources.framework.holdings", "algotrade_sources.framework.registry", "algotrade_sources.framework.series", "algotrade_sources.framework.session_thread"] },
     { string = "nasdaqlisted" },
     { string = "otherlisted" },
     { string = "dividends" },

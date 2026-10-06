@@ -131,6 +131,7 @@ VENDOR_EXTRAS = {
     "massive": ("corporate_actions_window", "descriptions_per_night", "descriptions_refresh_days"),
     "sec_edgar": ("refresh_days", "facts_refresh_days", "fund_quarters"),
     "treasury": ("lookback_days",),
+    "fred": ("base_url",),
     "etf_holdings": ETF_KEYS,
     **VENDOR_FLAGS,
     "ibkr": (
@@ -200,6 +201,7 @@ class SourcesSettings:
     descriptions_per_night: int = 100  # Massive ticker overviews the nightly requests (0: none)
     descriptions_refresh_days: int = 365  # refetch a stock's description after this many days
     treasury_lookback_days: int = 10
+    fred_base_url: str = "https://api.stlouisfed.org/fred"  # [fred] base_url (ADR 0048)
     http_max_retry_s: float = 300.0
     http_breaker_failures: int = 10
     limits_dir: str = "var/run/limits"
@@ -311,6 +313,7 @@ class SourcesSettings:
             treasury_lookback_days=_extra(vendors, "treasury").integer(
                 "lookback_days", d.treasury_lookback_days, 1
             ),
+            fred_base_url=_extra(vendors, "fred").text("base_url", d.fred_base_url),
             http_max_retry_s=http.number("max_retry_s", d.http_max_retry_s, 0),
             http_breaker_failures=http.integer("breaker_failures", d.http_breaker_failures, 1),
             limits_dir=http.text("limits_dir", d.limits_dir),
