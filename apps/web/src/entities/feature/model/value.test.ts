@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   codeReason,
   isUnknown,
+  reasonLabel,
   shownValue,
   unknownLabel,
   unknownReason,
   valueFormat,
+  type NullReasonName,
   type ServedValue,
 } from './value';
 
@@ -74,5 +76,39 @@ describe('unknown values', () => {
     expect(codeReason('NOT_APPLICABLE', null)).toMatch(/does not apply/);
     expect(codeReason('ILLIQUID', null)).toMatch(/too thin to price/);
     expect(unknownReason(value('ILLIQUID'))).toMatch(/has no partition/); // the server's detail
+  });
+
+  it('words each explained absence, exhaustively (ADR 0046)', () => {
+    const reasons: NullReasonName[] = ['NO_TRADE', 'NOT_ANNOUNCED', 'NEW_LISTING', 'FEW_BARS'];
+    expect(reasons.map(reasonLabel)).toEqual([
+      'No trade',
+      'Not announced',
+      'New listing',
+      'Too few trades',
+    ]);
+    expect(reasons.map((r) => unknownLabel('EXPLAINED', r))).toEqual(reasons.map(reasonLabel));
+    expect(codeReason('EXPLAINED', null, 'NO_TRADE')).toBe('no trade on this session: no bar');
+    expect(codeReason('EXPLAINED', null, 'NOT_ANNOUNCED')).toBe(
+      'the next report date is not announced',
+    );
+    expect(codeReason('EXPLAINED', null, 'NEW_LISTING')).toBe('listed too recently for the window');
+    expect(codeReason('EXPLAINED', null, 'FEW_BARS')).toBe('trades too rarely to fill the window');
+  });
+
+  it('reads an EXPLAINED cell without a reason as Unknown, and keeps the server detail', () => {
+    expect(unknownLabel('EXPLAINED')).toBe('Unknown');
+    expect(unknownLabel('EXPLAINED', null)).toBe('Unknown');
+    expect(codeReason('EXPLAINED', null)).toBe('not known for this session');
+    const explained: ServedValue = {
+      name: 'rollup.earnings@v1.next_earnings_date',
+      value: null,
+      unknown: {
+        code: 'EXPLAINED',
+        detail: 'the next report is not announced',
+        reason: 'NOT_ANNOUNCED',
+      },
+      info: { format: 'DATE' },
+    };
+    expect(unknownReason(explained)).toBe('the next report is not announced');
   });
 });

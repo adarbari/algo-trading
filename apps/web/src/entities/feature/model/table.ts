@@ -7,7 +7,7 @@
 import type { PreviewRow } from '@/entities/screen';
 import type { gqlTypes } from '@/shared/api';
 
-import type { UnknownCodeName } from './value';
+import type { NullReasonName, UnknownCodeName } from './value';
 
 /** The server-side filters (catalogue fields; text matches ignore case). */
 export interface TableFilters {
@@ -37,6 +37,8 @@ export interface FeatureTableQuery {
 export interface TableCell {
   value: unknown;
   unknown: UnknownCodeName | null;
+  /** Why the null is the fact, when `unknown` is EXPLAINED (ADR 0046). */
+  reason?: NullReasonName | null;
 }
 
 type Served = NonNullable<gqlTypes.FeatureTableQuery['table']>;
@@ -98,9 +100,14 @@ export function toTableData(table: Served): FeatureTableData {
     rows: table.instruments.map((instrument, i) => {
       const values = table.rows[i] ?? [];
       const codes = table.unknown[i] ?? [];
+      const reasons = table.reasons[i] ?? [];
       const cells: Record<string, TableCell> = {};
       table.columns.forEach((column, j) => {
-        cells[column.name] = { value: values[j] ?? null, unknown: codes[j] ?? null };
+        cells[column.name] = {
+          value: values[j] ?? null,
+          unknown: codes[j] ?? null,
+          reason: reasons[j] ?? null,
+        };
       });
       return {
         symbol: instrument.symbol,

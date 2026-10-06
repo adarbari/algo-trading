@@ -115,7 +115,7 @@ describe('PreviewResults', () => {
   it('shows each criterion and display column in its unit, tinting a near miss', () => {
     const { container } = render(<PreviewResults onOpen={vi.fn()} />);
     const grid = screen.getByRole('grid', { name: 'Preview results' });
-    for (const header of ['IV30', 'IV/HV', 'From high']) expect(grid).toHaveTextContent(header);
+    for (const header of ['IV30', 'IV/HV', 'From 52w high']) expect(grid).toHaveTextContent(header);
     expect(within(grid).queryByText(/security type/i)).toBeNull(); // a gate: no column
     expect(screen.getByRole('row', { name: /AAPL/ })).toHaveTextContent('61.0%');
     expect(screen.getByRole('row', { name: /AAPL/ })).toHaveTextContent('−50.0%'); // From high

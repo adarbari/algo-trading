@@ -31,6 +31,7 @@ const InstrumentFacts = graphql(`
         unknown {
           code
           detail
+          reason
         }
         info {
           format

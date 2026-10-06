@@ -39,7 +39,7 @@ export function earningsCell(idea: Idea): FactCell {
   const last = text(factOf(idea, IDEA_FACTS.lastEarnings)?.value);
   const shown = last
     ? `Last ${formatValue(last, { kind: 'date', style: 'day' }).text}`
-    : unknownLabel(nextFact?.unknown?.code);
+    : unknownLabel(nextFact?.unknown?.code, nextFact?.unknown?.reason);
   return isUnknown(nextFact)
     ? { text: shown, muted: true, title: unknownReason(nextFact) }
     : { text: shown, muted: true };

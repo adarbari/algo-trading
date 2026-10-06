@@ -71,6 +71,7 @@
         "columns": [],
         "rows": [[], [], [], [], []],
         "unknown": [[], [], [], [], []],
+        "reasons": [[], [], [], [], []],
         "results": [
           {
             "instrumentId": "EQ:AAPL",

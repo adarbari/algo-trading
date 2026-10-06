@@ -18,6 +18,7 @@ import {
 } from '@algotrade/ui';
 
 import { DecisionBadge, OUTCOME_FILL, ScoreBreakdown, decisionLabel } from '@/entities/screen';
+import { feature } from '@/shared/api';
 
 import { featureLabel, featureMarks, unitLabel } from './catalogue';
 import type { ColumnInfo, TableRow } from './table';
@@ -60,9 +61,13 @@ function describe(info: ColumnInfo): string {
 /**
  * One catalogue feature: headed by its short label (personal-licence features marked `(P)`),
  * formatted by the server's `info.format`; a cell the session has no value for reads
- * "Unknown" (or "n/a" / "Illiquid", ADR 0042) with the reason.
+ * "Unknown" (or "n/a" / "Illiquid", ADR 0042; the reason's word where the absence is
+ * explained, ADR 0046) with the reason. `titleOf` adds a hover title to a cell with a value.
  */
-export function featureColumn(info: ColumnInfo): DataTableColumn<TableRow> {
+export function featureColumn(
+  info: ColumnInfo,
+  titleOf?: (row: TableRow) => string | undefined,
+): DataTableColumn<TableRow> {
   const format = valueFormat(info);
   const numeric = isNumericFormat(format);
   const label = featureLabel(info.name);
@@ -77,18 +82,57 @@ export function featureColumn(info: ColumnInfo): DataTableColumn<TableRow> {
       const cell = row.cells[info.name];
       if (!cell || cell.value === null || cell.value === undefined) {
         return (
-          <Text tone="muted" title={codeReason(cell?.unknown ?? null, info.nullMeaning)}>
-            {unknownLabel(cell?.unknown ?? null)}
+          <Text
+            tone="muted"
+            title={codeReason(cell?.unknown ?? null, info.nullMeaning, cell?.reason)}
+          >
+            {unknownLabel(cell?.unknown ?? null, cell?.reason)}
           </Text>
         );
       }
+      const title = titleOf?.(row);
       return (
-        <Text numeric={numeric} tone={formatted.tone}>
+        <Text numeric={numeric} tone={formatted.tone} {...(title ? { title } : {})}>
           {formatted.text}
         </Text>
       );
     },
   };
+}
+
+const FROM_HIGH = feature('feature.pct_from_high_avail');
+const RANGE_SESSIONS = feature('rollup.price_history@v1.range_sessions');
+
+/**
+ * Extra catalogue names a column's factory reads from the row, requested with the column but
+ * not shown as columns of their own.
+ */
+const COMPANIONS: Readonly<Record<string, readonly string[]>> = {
+  [FROM_HIGH]: [RANGE_SESSIONS],
+};
+
+/** `columns` plus the companions their factories need (once each; a column already asked for stays). */
+export function withCompanions(columns: readonly string[]): string[] {
+  const wanted = new Set(columns);
+  const extra = columns.flatMap((name) => COMPANIONS[name] ?? []).filter((n) => !wanted.has(n));
+  return [...columns, ...new Set(extra)];
+}
+
+/**
+ * Distance from the high over the window the server used (52 weeks, or since listing): a
+ * feature column whose hover reads "High over N sessions" from the row's stored
+ * `range_sessions` (display only).
+ */
+export function fromHighColumn(info: ColumnInfo): DataTableColumn<TableRow> {
+  return featureColumn(info, (row) => {
+    const sessions = row.cells[RANGE_SESSIONS]?.value;
+    return typeof sessions === 'number' ? `High over ${sessions} sessions` : undefined;
+  });
+}
+
+/** The column for a catalogue feature: its own factory where it has one, else `featureColumn`. */
+export function catalogueColumn(info: ColumnInfo): DataTableColumn<TableRow> {
+  return info.name === FROM_HIGH ? fromHighColumn(info) : featureColumn(info);
 }
 
 /** The rank in a screen's results (1 = best). */

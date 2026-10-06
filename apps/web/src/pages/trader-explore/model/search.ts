@@ -51,7 +51,7 @@ export const DEFAULT_COLUMNS: readonly string[] = [
   feature('rollup.price_stats@v2.close'),
   feature('rollup.iv30@v1.iv30'),
   feature('feature.iv_hv_ratio'),
-  feature('feature.pct_from_high_52w'),
+  feature('feature.pct_from_high_avail'),
   feature('rollup.earnings@v1.days_to_earnings'),
 ];
 
@@ -60,7 +60,7 @@ export const DEFAULT_DIMENSIONS: readonly string[] = [
   feature('rollup.iv30@v1.iv30'),
   feature('rollup.price_stats@v2.hv30'),
   feature('feature.iv_hv_spread'),
-  feature('feature.pct_from_high_52w'),
+  feature('feature.pct_from_high_avail'),
   feature('rollup.price_stats@v2.adv_usd_20d'),
   feature('feature.market_cap'),
   feature('feature.div_yield'),

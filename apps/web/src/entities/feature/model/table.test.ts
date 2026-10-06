@@ -35,15 +35,28 @@ describe('feature table', () => {
       ],
       unknown: [
         [null, null],
-        ['NO_PARTITION', 'NULL'],
+        ['NO_PARTITION', 'EXPLAINED'],
+      ],
+      reasons: [
+        [null, null],
+        [null, 'NO_TRADE'],
       ],
     });
     expect(data.rows.map((r) => r.symbol)).toEqual(['AAPL', 'MRVL']);
     expect(data.rows[0]?.cells).toEqual({
-      'rollup.a@v1.x': { value: 1.5, unknown: null },
-      'feature.y': { value: 'HIGH', unknown: null },
+      'rollup.a@v1.x': { value: 1.5, unknown: null, reason: null },
+      'feature.y': { value: 'HIGH', unknown: null, reason: null },
     });
-    expect(data.rows[1]?.cells['rollup.a@v1.x']).toEqual({ value: null, unknown: 'NO_PARTITION' });
+    expect(data.rows[1]?.cells['rollup.a@v1.x']).toEqual({
+      value: null,
+      unknown: 'NO_PARTITION',
+      reason: null,
+    });
+    expect(data.rows[1]?.cells['feature.y']).toEqual({
+      value: null,
+      unknown: 'EXPLAINED',
+      reason: 'NO_TRADE',
+    });
     expect([data.session, data.total, data.page, data.size]).toEqual([
       '2026-10-02',
       11_427,
