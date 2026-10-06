@@ -34,6 +34,14 @@ the catalogue does not have is dropped with a reason, the rest is validated exac
 finalise does, and the Builder loads the result as unsaved rows. The model's notes say what it
 could not map. Nothing is saved or run until the user saves and finalises as usual.
 
+`llm.toml` may carry a `[request]` table: extra fields sent with every chat-completions request
+as given (strings, numbers, booleans; never `model`, `messages`, `temperature`, `max_tokens`
+or `response_format`, which the adapter sets). The case that motivated it is Gemini 3.x, which
+thinks before answering: `reasoning_effort = "low"` keeps the thinking short. A `llm.toml` that
+does not load (an unknown key, a bad value) does not stop the API: it is logged at ERROR,
+drafting is off, and the Builder shows the file's message as the 503 reason; `make doctor`
+reports it too.
+
 The prompt carries two worked examples and the site **phrasebook**
 (`config/site/phrasebook.toml`): trader vocabulary ("momentum", "near the 52-week low",
 "liquid", "avoid earnings") mapped to the catalogue fields that express it, with a hint on

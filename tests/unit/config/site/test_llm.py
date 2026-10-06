@@ -111,8 +111,25 @@ def test_phrasebook_errors_name_the_entry(doc: dict[str, Any], message: str) -> 
 def test_request_extras_pass_through_but_never_the_adapters_keys() -> None:
     s = LlmSettings.from_document({"request": {"reasoning_effort": "low", "seed": 7}})
     assert s.request == {"reasoning_effort": "low", "seed": 7}
+    with pytest.raises(TypeError):
+        s.request["seed"] = 8  # type: ignore[index]
     assert LlmSettings.from_document({}).request == {}
     with pytest.raises(ConfigurationError, match=r"the adapter sets \['model', 'temperature'\]"):
         LlmSettings.from_document({"request": {"model": "x", "temperature": 1}})
     with pytest.raises(ConfigurationError, match="expected a table"):
         LlmSettings.from_document({"request": "low"})
+
+
+@pytest.mark.parametrize(
+    "value", [{"effort": "low"}, ["low"], [{"effort": "low"}]], ids=["table", "array", "tables"]
+)
+def test_request_extras_are_strings_numbers_or_booleans(value: Any) -> None:
+    with pytest.raises(ConfigurationError, match=r"\[request\] thinking: expected a string"):
+        LlmSettings.from_document({"request": {"thinking": value}})
+    ok = LlmSettings.from_document({"request": {"a": "x", "b": 1, "c": 0.5, "d": True}})
+    assert dict(ok.request) == {"a": "x", "b": 1, "c": 0.5, "d": True}
+
+
+def test_request_extras_refuse_a_secret_looking_key() -> None:
+    with pytest.raises(ConfigurationError, match="looks like a secret"):
+        LlmSettings.from_document({"request": {"api_key": "x"}})

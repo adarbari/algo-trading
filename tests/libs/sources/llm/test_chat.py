@@ -53,6 +53,14 @@ def test_extra_request_fields_are_sent_but_cannot_override_the_adapters() -> Non
     request = client.request("s", "u")
     assert request["reasoning_effort"] == "low"
     assert request["model"] == "gemini" and request["temperature"] == 0
+    assert list(request) == [
+        "model",
+        "messages",
+        "temperature",
+        "max_tokens",
+        "response_format",
+        "reasoning_effort",
+    ]  # the extras follow the standard keys
 
 
 @pytest.mark.parametrize(

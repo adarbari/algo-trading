@@ -122,9 +122,10 @@ def create_app(
     if authenticator is None:
         authenticator = open_authenticator(settings.auth, users, settings.user)
     app.state.authenticator = authenticator
+    drafter_off = DRAFTING_OFF
     if drafter is None and settings.live:
-        drafter = open_drafting(app.state.store.configs)
-    app.state.drafter, app.state.drafter_off = drafter, DRAFTING_OFF
+        drafter, drafter_off = open_drafting(app.state.store.configs)
+    app.state.drafter, app.state.drafter_off = drafter, drafter_off
     app.add_middleware(
         CORSMiddleware,
         allow_origins=list(settings.cors_origins),

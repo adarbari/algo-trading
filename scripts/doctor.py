@@ -12,6 +12,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tomllib
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -58,6 +59,7 @@ class Probes:
     main: Callable[[], Path] = _main_checkout
     required: tuple[str, ...] = ()
     web_dist: Callable[[], Path | None] = field(default=lambda: None)  # ALGOTRADE_WEB_DIST
+    llm_error: Callable[[Path], str | None] = field(default=lambda main: None)  # llm.toml's error
     launch_agents: Path = Path.home() / "Library" / "LaunchAgents"
 
 
@@ -264,6 +266,36 @@ def check_web_dist(p: Probes) -> Result:
     )
 
 
+def check_llm(p: Probes) -> Result:
+    """``config/site/llm.toml`` of the main checkout (the API's): one that does not load does not
+    stop the API (drafting is off with this message), so it is a warning, not a failure."""
+    error = p.llm_error(p.main())
+    if error is None:
+        return Result(OK, "llm.toml", "loads (natural-language drafts, ADR 0041)")
+    return Result(
+        WARN,
+        "llm.toml",
+        f"{error}: the API starts with drafting off and answers 503 with this message",
+        "edit config/site/llm.toml in the main checkout, then restart the API",
+    )
+
+
+def llm_error(main: Path) -> str | None:
+    """What stops ``main``'s ``config/site/llm.toml`` loading, or ``None`` (no file loads)."""
+    from algotrade.config.site.llm import LlmSettings  # noqa: PLC0415 (venv may lack it)
+    from algotrade.core.model.errors import ConfigurationError  # noqa: PLC0415
+
+    path = main / "config" / "site" / "llm.toml"
+    try:
+        document = tomllib.loads(path.read_text()) if path.is_file() else None
+        LlmSettings.from_document(document)
+    except tomllib.TOMLDecodeError as exc:
+        return f"llm.toml: not valid TOML ({exc})"
+    except ConfigurationError as exc:
+        return str(exc)
+    return None
+
+
 # The launchd agents (``algotrade-ingest schedule``, ``algotrade-api schedule``): label -> the
 # command that rewrites it. Each must run the main checkout's code from the main checkout.
 AGENTS = {
@@ -316,6 +348,7 @@ def run_checks(p: Probes) -> list[Result]:
         check_ibkr(p),
         check_store(p),
         check_web_dist(p),
+        check_llm(p),
         *check_agents(p),
     ]
 
@@ -350,6 +383,7 @@ def main() -> int:
             data_url=data_url,
             required=REQUIRED_KEYS,
             web_dist=web_dist,
+            llm_error=llm_error,
         )
         extra = []
     text, code = render(run_checks(probes) + extra)
