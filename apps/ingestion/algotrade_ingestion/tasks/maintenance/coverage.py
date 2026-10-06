@@ -9,8 +9,11 @@ name missing). Applicability is ``Feature.applies_to`` decided by ``features.fra
 .not_applicable``, the function the read layer's NOT_APPLICABLE uses (ADR 0042), over the
 session's reference snapshot; the population is the universe snapshot of the session; tiers are
 ``tasks.market.tiers`` (core: S&P 500, priority symbols, HIGH liquidity). A value is covered when
-present, or null for a reason the feature declares as "too illiquid to price" (ADR 0042: not a
-gap); any other missing value is missing, never counted as zero or filled. A ``recent`` rule
+present, or null for a reason its status column gives for the session that the feature declares
+as "too illiquid to price" (ADR 0042) or as an explained absence (ADR 0046: no trade, not
+announced, a new listing), the same statuses the read layer shows; except that NO_TRADE never
+covers a core name (a vendor-dropped AAPL bar must not pass as "no trade"). Any other missing
+value is missing, never counted as zero or filled. A ``recent`` rule
 grades a date instead (overdue earnings): of the names with a row, a date older than
 ``max_age_days`` with no ``or_value`` is missing, listed with that date (FDX on 2026-10-02: last
 report 2026-06-23 and no next date, because the Nasdaq calendar had dropped it). The previous
@@ -26,11 +29,11 @@ import pandas as pd
 
 from algotrade.config.site.coverage import CoverageRule
 from algotrade.config.site.settings import SourcesSettings
-from algotrade.core.model.fields import REFERENCE_TABLE
+from algotrade.core.model.fields import REFERENCE_TABLE, ROLLUP_TABLE_PREFIX
 from algotrade.data import StoreReader
 from algotrade.data.reference import UNIVERSE_TABLE, companies, snapshot
 from algotrade.features.expressions.feature_set import FeatureSet
-from algotrade.features.framework.feature import Feature, not_applicable
+from algotrade.features.framework.feature import Feature, NullReason, not_applicable
 from algotrade.services.features import site_features, site_store
 from algotrade_ingestion.tasks.maintenance.quality import Check
 from algotrade_ingestion.tasks.market.tiers import CORE, REST, load_tiers
@@ -38,6 +41,9 @@ from algotrade_ingestion.tasks.market.tiers import CORE, REST, load_tiers
 TIERS = (CORE, REST)
 STORED_EXAMPLES = 10  # missing names kept per cell in the check's data (the email shows fewer)
 ETF = "ETF"
+# Explained absences that still count as a gap for a core name (ADR 0046): a large stock with
+# no bar is far likelier a dropped bar than a day without a trade.
+GAP_IN_CORE = frozenset({NullReason.NO_TRADE.value})
 
 
 @dataclass(frozen=True)
@@ -88,13 +94,23 @@ def _population(reader: StoreReader, session: date) -> pd.DataFrame | None:
     return pop
 
 
-def _illiquid(stored: pd.DataFrame, feat: Feature) -> pd.Series:
-    """Rows whose null is explained as an illiquid chain by the feature's own sibling status
-    column (ADR 0042 reads these as ILLIQUID, not as a gap)."""
-    status = feat.null_status
-    if not status or "@" in status or status not in stored.columns:
-        return pd.Series(False, index=stored.index)
-    return stored[status].isin(feat.illiquid_statuses)
+def _explained(
+    reader: StoreReader, day: date, stored: pd.DataFrame | None, feat: Feature
+) -> dict[str, str]:
+    """The ids whose null the feature's status column explains on ``day`` (ADR 0042: an
+    illiquid chain; ADR 0046: an explained absence), each with its status. The status is a
+    sibling column of ``stored`` or another group's column, read for exactly ``day``; it covers
+    an id with no row in ``stored`` too (no trade: no ``price_stats`` row)."""
+    if not feat.null_status:
+        return {}
+    column = feat.status_column[1]
+    own = feat.status_table == f"{ROLLUP_TABLE_PREFIX}{feat.group}"
+    status = stored if own else reader.table(feat.status_table, day)
+    if status is None or column not in status.columns:
+        return {}
+    explains = status[column].isin({*feat.illiquid_statuses, *feat.explained_statuses})
+    rows = status[explains]
+    return dict(zip(rows["instrument_id"].astype(str), rows[column].astype(str), strict=True))
 
 
 def _recent(
@@ -127,21 +143,33 @@ def _locate(fs: FeatureSet, feature: str) -> tuple[str, str, Feature]:
 
 
 def _covered(
-    stored: pd.DataFrame | None, column: str, feat: Feature, rule: CoverageRule, day: date
-) -> tuple[set[str], set[str] | None, dict[str, str]]:
+    reader: StoreReader,
+    stored: pd.DataFrame | None,
+    column: str,
+    feat: Feature,
+    rule: CoverageRule,
+    day: date,
+) -> tuple[set[str], set[str] | None, dict[str, str], set[str]]:
     """The covered ids of the session's partition, the ids graded at all (``None``: every
     applicable name; "recent" grades only the names with a row, none without a partition: the
-    row rule reports that gap) and the stale date of each "recent" id that is not covered."""
+    row rule reports that gap), the stale date of each "recent" id that is not covered, and
+    the ids covered only by a status that is still a gap in the core tier (``GAP_IN_CORE``)."""
     recent = rule.covered_by == "recent"
+    if recent or rule.covered_by == "row":
+        explained: dict[str, str] = {}
+    else:
+        explained = _explained(reader, day, stored, feat)
+    core_gaps = {i for i, why in explained.items() if why in GAP_IN_CORE}
     if stored is None or column not in stored.columns:
-        return set(), (set() if recent else None), {}
+        return set(explained), (set() if recent else None), {}, core_gaps
     ids = stored["instrument_id"].astype(str)
     if recent:
         have, stale = _recent(stored, column, rule, day)
-        return have, set(ids), stale
+        return have, set(ids), stale, set()
     if rule.covered_by == "row":
-        return set(ids), None, {}
-    return set(ids[stored[column].notna() | _illiquid(stored, feat)]), None, {}
+        return set(ids), None, {}, set()
+    valued = set(ids[stored[column].notna()])
+    return valued | set(explained), None, {}, core_gaps - valued
 
 
 def cells(
@@ -165,7 +193,9 @@ def cells(
     out: list[Cell] = []
     for rule in rules:
         table, column, feat = _locate(fs, rule.feature)
-        have, scope, stale = _covered(reader.table(table, day), column, feat, rule, day)
+        have, scope, stale, core_gaps = _covered(
+            reader, reader.table(table, day), column, feat, rule, day
+        )
         applies = [
             not not_applicable([feat.applies_to], opt, kind, sic)
             for opt, kind, sic in zip(
@@ -177,7 +207,8 @@ def cells(
             if scope is not None:
                 mine = mine[mine["instrument_id"].astype(str).isin(scope)]
             ids = mine["instrument_id"].astype(str)
-            out_ids = ids[~ids.isin(have)]
+            covered = have - core_gaps if tier == CORE else have
+            out_ids = ids[~ids.isin(covered)]
             syms = mine.loc[out_ids.index, "symbol"].astype(str)
             gone = [
                 f"{sym} (last {stale[i]})" if stale.get(i) else sym

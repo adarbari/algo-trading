@@ -116,6 +116,10 @@ def test_applicability_is_inherited_from_the_group_and_status_fields_resolve() -
     assert group.feature("b").status_field == "rollup.demo@v1.status"
     other = _feature(null_status="iv30.iv30_status@v1", illiquid_statuses=("X",))
     assert other.status_field == "rollup.iv30@v1.iv30_status" and feature_problems(other) == []
+    assert other.status_column == ("iv30@v1", "iv30_status")
+    assert other.status_table == "rollups/instrument/iv30@v1"
+    assert group.feature("b").status_table == "rollups/instrument/demo@v1"
+    assert _feature().status_table == ""
     assert _feature().status_field == "" and _feature().applies_to == "any"
     own = FeatureGroup(
         "demo2", 1, "", (Input("bars/1d"),), (_feature(applies_to="operating_company"),),

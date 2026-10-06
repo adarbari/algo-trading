@@ -56,7 +56,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
 
-from algotrade.core.model.fields import FIELD_TYPES, NUMERIC_TYPES
+from algotrade.core.model.fields import FIELD_TYPES, NUMERIC_TYPES, ROLLUP_TABLE_PREFIX
 
 type Entity = Literal["instrument"]
 type Kind = Literal["window", "chain", "expression", "cross_section", "label"]
@@ -135,16 +135,29 @@ class Feature:
         return f"{self.group.partition('@')[0]}.{self.name}@v{self.version}"
 
     @property
+    def status_column(self) -> tuple[str, str]:
+        """Where ``null_status`` lives: (the group key ``<group>@v<N>``, the column); ``("",
+        "")`` when there is none. A sibling column is in this feature's own group."""
+        if not self.null_status:
+            return "", ""
+        if "@" not in self.null_status:
+            return self.group, self.null_status
+        group, _, rest = self.null_status.partition(".")
+        column, _, version = rest.partition("@")
+        return f"{group}@{version}", column
+
+    @property
+    def status_table(self) -> str:
+        """The stored table holding ``null_status`` (``""``: none)."""
+        group, _ = self.status_column
+        return f"{ROLLUP_TABLE_PREFIX}{group}" if group else ""
+
+    @property
     def status_field(self) -> str:
         """The selection field of ``null_status`` (``""``: none): a sibling column of this
         group, or ``<group>.<column>@v<N>`` of another."""
-        if not self.null_status:
-            return ""
-        if "@" not in self.null_status:
-            return f"rollup.{self.group}.{self.null_status}"
-        group, _, rest = self.null_status.partition(".")
-        column, _, version = rest.partition("@")
-        return f"rollup.{group}@{version}.{column}"
+        group, column = self.status_column
+        return f"rollup.{group}.{column}" if group else ""
 
     @property
     def field(self) -> str:
