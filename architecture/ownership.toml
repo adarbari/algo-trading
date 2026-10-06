@@ -81,6 +81,20 @@ owner = ["src/algotrade/quant/rates.py"]
 section = "docs/adr/0021-option-pricing-conventions.md#rates"
 detect = [{ call = "log1p" }, { call = "interp" }]
 
+[[responsibility]]
+id = "quant-covariance"
+description = "Cross-asset stress from a rolling covariance of a returns panel: Kritzman-Li turbulence (Mahalanobis distance, eigen pseudo-inverse), the absorption ratio and its standardised shift (eigenvalues only)"
+owner = ["src/algotrade/quant/covariance.py"]
+section = "docs/market-regime-plan.md#e-what-the-research-literature-adds"
+detect = [{ call_regex = "(^|\\.)linalg\\.(eigh|eigvalsh|eig|eigvals|pinv|svd|inv)$" }, { call = "cov" }]
+
+[[responsibility]]
+id = "quant-turning-points"
+description = "Bull and bear market dating of a level series (Pagan-Sossounov after Bry-Boschan, the Lunde-Timmermann threshold filter) into phases over array indices, and the running drawdown"
+owner = ["src/algotrade/quant/turning_points.py"]
+section = "docs/market-regime-plan.md#e-what-the-research-literature-adds"
+detect = [{ call_regex = "(^|\\.)(find_peaks|argrelextrema|argrelmax|argrelmin)$" }]
+
 # --------------------------------------------------------------------------- rollups
 
 [[responsibility]]
