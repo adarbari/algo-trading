@@ -9,6 +9,7 @@ import {
   indicatorStatus,
   plainLabel,
   readingList,
+  regimeLabelFeature,
   regimeTone,
   gateLine,
   gatePauses,
@@ -210,5 +211,11 @@ describe('episodeName', () => {
   it('spaces the key of an episode the API does not name', () => {
     expect(episodeName(episodes, 'crash_1987')).toBe('crash 1987');
     expect(episodeName([], 'tariffs_2025')).toBe('tariffs 2025');
+  });
+});
+
+describe('regimeLabelFeature', () => {
+  it('names the label field in the group of the scores', () => {
+    expect(regimeLabelFeature(regimeFixture())).toBe('market.regime@v2.label');
   });
 });

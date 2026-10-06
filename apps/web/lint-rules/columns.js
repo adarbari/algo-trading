@@ -27,6 +27,7 @@ const STRUCTURE = [
   'src/widgets/features-panel/model/rows.tsx', // one instrument's features, one row each
   'src/widgets/holdings-panel/model/columns.tsx', // an ETF's holdings (issuer-dated weights)
   'src/widgets/options-panel/model/columns.tsx', // an option chain's quotes by strike
+  'src/widgets/regime-episodes/model/columns.tsx', // the regime's reference market falls
   'src/widgets/screener-list/model/columns.tsx', // the user's screeners
   'src/widgets/quality-checks-panel/ui/QualityChecksPanel.tsx', // admin: data-quality checks
   'src/widgets/recent-runs-panel/ui/RecentRunsPanel.tsx', // admin: nightly runs
