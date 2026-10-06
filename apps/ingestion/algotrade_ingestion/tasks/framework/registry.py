@@ -20,7 +20,7 @@ from typing import Any
 from algotrade.config.site.settings import load_macro, load_universe
 from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.tasks.derived import rollups
+from algotrade_ingestion.tasks.derived import market_rollups, rollups
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.macro import series as macro_series
 from algotrade_ingestion.tasks.maintenance import (
@@ -244,8 +244,17 @@ def _chains(ctx: TaskContext, p: Params) -> RunRecord:
 
 
 def _rollups(ctx: TaskContext, p: Params) -> RunRecord:
-    only = [k.strip() for k in str(p.get("only") or "").split(",") if k.strip()]
-    return rollups.compute_rollups(ctx, session_of(p), p.get("start"), p.get("end"), only)
+    return rollups.compute_rollups(ctx, session_of(p), p.get("start"), p.get("end"), _only(p))
+
+
+def _market_rollups(ctx: TaskContext, p: Params) -> RunRecord:
+    return market_rollups.compute_market_rollups(
+        ctx, session_of(p), p.get("start"), p.get("end"), _only(p)
+    )
+
+
+def _only(p: Params) -> list[str]:
+    return [k.strip() for k in str(p.get("only") or "").split(",") if k.strip()]
 
 
 def _macro(ctx: TaskContext, p: Params) -> RunRecord:
@@ -563,6 +572,20 @@ TASKS: dict[str, Task] = {
                 FROM,
                 TO,
                 Param("only", ("--only",), str, "comma-separated rollups, e.g. price_stats@v2"),
+            ),
+        ),
+        Task(
+            "market-rollups",
+            "compute the market-entity rollups (ADR 0047) for a session or backfill a range",
+            market_rollups,
+            market_rollups.TABLES,
+            _market_rollups,
+            settings="rollups.toml",
+            params=(
+                SESSION,
+                FROM,
+                TO,
+                Param("only", ("--only",), str, "comma-separated market rollups, e.g. trend@v1"),
             ),
         ),
         Task(

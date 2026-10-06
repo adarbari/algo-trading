@@ -23,7 +23,8 @@ failed item each, naming the dependency), so they never read a stale or partial 
 after them.
 
 ``TABLES`` (what the task may write) comes from the site config at import (``config_dir``):
-a materialised expression feature adds its table (``rollups/instrument/<name>@v<N>``).
+a materialised expression feature adds its table (``rollups/instrument/<name>@v<N>``);
+``tables_of(entity)`` is the same for one entity (``market_rollups`` declares its own).
 """
 
 import time
@@ -51,8 +52,15 @@ from algotrade_ingestion.tasks.framework.run import (
 TASK = "rollups"
 SOURCE = "rollups"
 SITE = FileConfigStore(config_dir())  # the features when the task has no config store
-TABLES = tuple(r.table for r in site_features(SITE).groups.values())
 SHOWN = 5  # no-input sessions listed per rollup in the run stats
+
+
+def tables_of(entity: Entity) -> tuple[str, ...]:
+    """The tables of the site's groups of one entity (what that entity's task may write)."""
+    return tuple(g.table for g in site_features(SITE).groups.values() if g.entity == entity)
+
+
+TABLES = tables_of("instrument")
 
 
 def _one(

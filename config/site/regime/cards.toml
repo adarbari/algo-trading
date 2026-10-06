@@ -4,10 +4,20 @@
 # - key: the indicator's stable key (the feature it describes is named when it exists).
 # - before: what the indicator did before the 2008, 2020 and 2022 falls, one line each.
 # - links: the curated reading list; the explanation model may cite only these.
-# Skeleton for RG0: values, thresholds and features are wired in RG1 / RG3.
+# - technical_name: the indicator's name as the data sources know it (behind "learn more").
+# - pace: "slow" (macro, weeks to months) or "fast" (market, days): the headline counts each.
+# - feature: the catalogue feature the card reads (the RG3 contract, ADR 0047): the group
+#   market.regime_indicators@v1 has, per card, the value column <key>, and two bool columns
+#   <key>_on (the indicator's own on / off verdict for the session) and <key>_changed (the verdict
+#   differs from 5 sessions earlier); both are read by suffix on the same name, and a column the
+#   catalogue does not have yet reads UNKNOWN (never derived by the read).
+# Values and thresholds are computed by the RG3 groups; the read model (RG1e) joins them.
 
 [[card]]
 key = "curve_10y3m"
+technical_name = "10-year minus 3-month Treasury spread (T10Y3M)"
+pace = "slow"
+feature = "market.regime_indicators@v1.curve_10y3m"
 plain_name = "Are long-term rates below short-term ones?"
 one_liner = "The gap between the 10-year Treasury yield and the 3-month bill yield."
 why_it_matters = "Normally lenders want more to lend for longer. When the 10-year pays less than the 3-month bill, markets expect the Fed to cut because the economy will weaken, and banks earn less on new loans."
@@ -28,6 +38,9 @@ links = [
 
 [[card]]
 key = "hy_oas"
+technical_name = "ICE BofA US High Yield option-adjusted spread (BAMLH0A0HYM2)"
+pace = "slow"
+feature = "market.regime_indicators@v1.hy_oas"
 plain_name = "Are riskier companies paying more to borrow?"
 one_liner = "The extra yield investors demand to hold high-yield (junk) corporate bonds instead of Treasuries."
 why_it_matters = "Bond investors are often the first to worry about defaults. When they demand much more to lend to weaker companies, credit gets harder to find and the economy and stocks usually follow."
@@ -47,6 +60,9 @@ links = [
 
 [[card]]
 key = "unrate_trend"
+technical_name = "Unemployment rate above its 12-month average (UNRATE)"
+pace = "slow"
+feature = "market.regime_indicators@v1.unrate_trend"
 plain_name = "Is unemployment starting to rise?"
 one_liner = "Whether the unemployment rate has moved above its own average of the last 12 months."
 why_it_matters = "Unemployment rarely rises a little: once firms start cutting jobs, spending falls and more cuts follow. A turn up from the low is one of the most reliable early signs of a recession."
@@ -66,6 +82,9 @@ links = [
 
 [[card]]
 key = "sahm"
+technical_name = "Sahm rule: 3-month average unemployment vs its 12-month low (SAHMREALTIME)"
+pace = "slow"
+feature = "market.regime_indicators@v1.sahm"
 plain_name = "Has a recession already started?"
 one_liner = "The Sahm rule: the 3-month average unemployment rate against its lowest point of the past year."
 why_it_matters = "A half-point rise in unemployment from its low has marked the start of every US recession since 1970 before 2020. It does not warn early; it tells you the downturn is here."
@@ -85,6 +104,9 @@ links = [
 
 [[card]]
 key = "nfci"
+technical_name = "Chicago Fed National Financial Conditions Index (NFCI)"
+pace = "slow"
+feature = "market.regime_indicators@v1.nfci"
 plain_name = "Is money getting harder to get?"
 one_liner = "The Chicago Fed's National Financial Conditions Index: borrowing costs, credit, leverage and market stress in one weekly number."
 why_it_matters = "When money is tight, the bad outcomes for the economy become much more likely even if the average outlook barely moves. It sums up many markets so one quiet corner does not hide stress in another."
@@ -104,6 +126,9 @@ links = [
 
 [[card]]
 key = "spx_trend_200d"
+technical_name = "SPY close vs its 200-day moving average"
+pace = "fast"
+feature = "market.regime_indicators@v1.spx_trend_200d"
 plain_name = "Is the market below its long-term trend?"
 one_liner = "Whether the S&P 500 (SPY) closes below its average price of the last 200 trading days."
 why_it_matters = "Big falls rarely happen with the market above its long-term trend. Simple trend rules miss the first part of a fall but have stepped aside for most of the worst bear markets."
@@ -122,6 +147,9 @@ links = [
 
 [[card]]
 key = "vix_term"
+technical_name = "VIX / VIX3M term-structure ratio"
+pace = "fast"
+feature = "market.regime_indicators@v1.vix_term"
 plain_name = "Are traders paying up for protection right now?"
 one_liner = "The VIX (expected volatility over the next month) divided by VIX3M (over the next three months)."
 why_it_matters = "Normally protection for the near future is cheaper than for later. When the near-term number jumps above the longer one, traders are scrambling for cover today: the clearest short-term sign of panic."
@@ -141,6 +169,9 @@ links = [
 
 [[card]]
 key = "breadth_200d"
+technical_name = "Share of the universe above its 200-day moving average"
+pace = "fast"
+feature = "market.regime_indicators@v1.breadth_200d"
 plain_name = "Are most stocks going up, or just a few?"
 one_liner = "The share of stocks in our universe trading above their own 200-day average."
 why_it_matters = "An index can keep rising on a handful of giants while most stocks fall. When fewer and fewer stocks hold up, the rally is fragile; in 2000 and 2021 breadth broke about a year before the index did."

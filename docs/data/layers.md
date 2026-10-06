@@ -36,7 +36,7 @@ Two physical parts, always read together:
 | Part | Holds | Examples | Changes | Written by |
 |---|---|---|---|---|
 | `instruments/reference` | **sourced facts**: identity, company, classification, contract terms | ticker, FIGI, company name, website, description, sector/industry, country, exchange, security type, ETF flags (leveraged, inverse, leverage, tracks), optionable, multiplier, tick size, listing status, listed/delisted dates | rarely | universe and reference ingestion jobs |
-| `rollups/instrument/<name>@vN` | **derived state** "as of D", computed from L2 | next earnings date + time + days to it, ADV (20d $), liquidity class ("highly liquid"), option liquidity tiers, market cap, 52-week high/low, HV20/30, IV30 and IV rank | nightly | the `rollups` task |
+| `rollups/instrument/<name>@vN` | **derived state** "as of D", computed from L2 | next earnings date + time + days to it, ADV (20d $), liquidity class ("highly liquid"), option liquidity tiers, market cap, 52-week high/low, HV20/30, IV30 and IV rank | nightly | the `rollups` task (market-entity groups, `rollups/market/<name>@vN` with one `MKT:US` row per session, by the non-critical `market-rollups` task, ADR 0047) |
 
 - **Vendor contract ids**: `instruments/ibkr_contracts` (IBKR `conid`, primary exchange,
   `resolved_at`; one full snapshot per run, ADR 0028), read through

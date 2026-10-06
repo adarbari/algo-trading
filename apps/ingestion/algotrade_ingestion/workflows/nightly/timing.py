@@ -38,6 +38,7 @@ UNITS: Mapping[str, str] = {
     "corporate-actions": "windows",
     "chains": "underlyings",
     "rollups": "rows",
+    "market-rollups": "rows",
     "screens": "screens",
     "quality": "checks",
 }
@@ -117,7 +118,7 @@ def vendor_pacing(session: str, step: str, pacing: Any) -> list[PacingLine]:
 def _items(step: str, result: Any, record_items: int | None) -> int | None:
     if not isinstance(result, Mapping):
         return record_items
-    if step == "rollups":
+    if step in ("rollups", "market-rollups"):
         rows = [v.get("rows", 0) for k, v in result.items() if "@" in k and isinstance(v, Mapping)]
         return int(sum(rows)) if rows else record_items
     if step == "screens":

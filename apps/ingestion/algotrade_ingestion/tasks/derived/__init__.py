@@ -1,1 +1,1 @@
-"""Derived-data tasks: rollups computed from stored market data (``rollups``)."""
+"""Derived-data tasks: rollups from stored data (``rollups``, ``market-rollups``)."""

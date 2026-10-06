@@ -99,13 +99,14 @@ detect = [{ call_regex = "(^|\\.)(find_peaks|argrelextrema|argrelmax|argrelmin)$
 
 [[responsibility]]
 id = "rollup-computation"
-description = "Compute feature groups (rollups): the FeatureGroup declaration (inputs + lookback, params from rollups.toml, declared features, the entity one row describes: instrument, or market with one MKT:US row checked by the runner, ADR 0047), asking algotrade.data for inputs by table name, point in time per session, backfills; groups are pure compute modules (a materialised expression feature is a one-feature group built by the FeatureSet), stored only by the rollups task (compute_rollups, per entity)"
+description = "Compute feature groups (rollups): the FeatureGroup declaration (inputs + lookback, params from rollups.toml, declared features, the entity one row describes: instrument, or market with one MKT:US row checked by the runner, ADR 0047), asking algotrade.data for inputs by table name, point in time per session, backfills; groups are pure compute modules (a materialised expression feature is a one-feature group built by the FeatureSet), stored only by the rollups task (instrument groups) and the market-rollups task (market groups), both through compute_rollups per entity"
 owner = [
     "src/algotrade/features/framework/*",
     "src/algotrade/features/registry.py",
     "src/algotrade/features/rollups/*",
     "src/algotrade/features/expressions/feature_set.py",
     "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py",
+    "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py",  # the market entity's task
 ]
 section = "docs/data/layers.md#rollups-as-built"
 detect = [{ call = "compute_sessions" }, { call = "compute_one" }, { call = "FeatureGroup" }]
@@ -508,12 +509,13 @@ detect = [{ import = "fcntl" }, { call = "flock" }]
 
 [[responsibility]]
 id = "site-settings"
-description = "Load and type L3 site settings (config/site/*.toml: sources, universe + overrides, nightly, defaults, users with roles per ADR 0040, the field guide per ADR 0041): one loader, frozen dataclasses; the store only reads files"
+description = "Load and type L3 site settings (config/site/*.toml: sources, universe + overrides, nightly, defaults, users with roles per ADR 0040, the field guide per ADR 0041, the regime cards and episodes per ADR 0047): one loader, frozen dataclasses; the store only reads files"
 owner = [
     "src/algotrade/config/site/settings.py",
     "src/algotrade/config/site/users.py",
     "src/algotrade/config/site/nightly.py",
     "src/algotrade/config/site/field_guide.py",
+    "src/algotrade/config/site/regime/*",
     "src/algotrade/storage/configs/store.py",
     "src/algotrade/storage/configs/files.py",
 ]
@@ -686,7 +688,7 @@ detect = [
 
 [[responsibility]]
 id = "domain-read-model"
-description = "Domain read objects and their loaders (ADR 0037): every read a page shows is a frozen dataclass built by one load_<object>(ctx, ...) in services/read/<area>/, for ctx.session only; per-instrument values by catalogue name (ADR 0038), never a table path. A fact a page needs is stored, not computed on read: chain_expiries (the nearest expiry, stored as rollup.nearest_expiry@v1 since read-model PR 3) is called only by data/ and the producing feature group (read-model PR 5 deleted its last read-time caller, explore ideas/ranking.py)"
+description = "Domain read objects and their loaders (ADR 0037): every read a page shows is a frozen dataclass built by one load_<object>(ctx, ...) in services/read/<area>/, for ctx.session only; per-instrument values by catalogue name (ADR 0038), never a table path. the market regime (ADR 0047: MarketRegime with its indicator cards and label bands, services/read/regime/) and the market entity (services/read/market/), read from the market-entity feature groups by catalogue name. A fact a page needs is stored, not computed on read: chain_expiries (the nearest expiry, stored as rollup.nearest_expiry@v1 since read-model PR 3) is called only by data/ and the producing feature group (read-model PR 5 deleted its last read-time caller, explore ideas/ranking.py)"
 owner = ["src/algotrade/services/read/*"]
 allowed = [
     "src/algotrade/data/*",  # the generic table reads (R1)
