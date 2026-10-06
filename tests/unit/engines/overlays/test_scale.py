@@ -6,7 +6,7 @@ from algotrade.core.model.errors import MissingDataError
 from algotrade.engines.overlays.overlay import Overlay, OverlayStep
 from algotrade.engines.overlays.scale import UNKNOWN, ScaleByLabel
 
-LABEL = "market.regime@v1.label"
+LABEL = "market.regime@v2.label"
 MULTIPLIERS = {"CALM": 1.0, "CAUTION": 0.75, "STRESS": 0.5, "CRISIS": 0.25}
 WEIGHTS = {"EQ:A": 0.6, "EQ:B": 0.4}
 

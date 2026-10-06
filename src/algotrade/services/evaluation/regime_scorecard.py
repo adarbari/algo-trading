@@ -18,13 +18,17 @@ the text is ``regime_report``.
   after the peak up to the trough (a run that ended before the peak warned of nothing); the
   raw-label path from ``PATH_BEFORE`` sessions before the peak to the trough; and which revised
   series the macro score read through the ``lagged`` rule (no ALFRED vintage that early), from
-  ``vintage_kind`` as of the macro crossing (else the peak).
+  ``vintage_kind`` as of the macro crossing (else the peak). A score that never went high and
+  is null (its coverage below the regime's ``min_coverage``) on every session from the search
+  start to the trough is unknown for the episode: its highest coverage there is kept.
 - (c) **False alarms.** Sessions labelled STRESS or CRISIS outside every episode window
   (``WINDOW_BEFORE`` sessions before the peak to ``WINDOW_AFTER`` after the trough), and the
   alarms they form (a run of consecutive flagged sessions is one alarm), per decade.
 - (d) **Acceptance** (plan section 4): macro high at least ``MACRO_LEAD`` sessions before each
   recession bear's peak; stress high within ``STRESS_LAG`` sessions of each peak; fewer than one
-  false CRISIS per ``CRISIS_YEARS`` years. An episode without stored regime rows is not graded.
+  false CRISIS per ``CRISIS_YEARS`` years. An episode without stored regime rows is not graded,
+  nor, for one score's line, an episode where that score is unknown (b); a line is PASS / FAIL
+  over the graded episodes only, NO DATA when none is.
 - (f) **Probit fit.** The bear-state probit (``bear_prob_6m``) fitted on the stored
   history: month-end sessions with ``curve_10y3m``, ``cpi_yoy`` and ``hy_oas`` known, ``y`` = the
   S&P 500 in a Pagan-Sossounov bear ``HORIZON`` index sessions later; the coefficients, the
@@ -74,7 +78,9 @@ HORIZON = 126  # sessions: bear_prob_6m's six months (config/site/features/regim
 REGRESSORS = ("curve_10y3m", "cpi_yoy", "hy_oas")  # market_macro columns, coefficient order
 MIN_PROBIT_MONTHS = 24
 ALARMS = ("STRESS", "CRISIS")
-REGIME_COLUMNS = ("label", "raw_label", "macro_risk", "market_stress")
+REGIME_COLUMNS = ("label", "raw_label", "macro_risk", "market_stress", "macro_coverage",
+                  "market_coverage")  # fmt: skip
+COVERAGE = {"macro_risk": "macro_coverage", "market_stress": "market_coverage"}
 US = market_id("US")
 ALL_TIME = (date(1900, 1, 1), date(9999, 12, 31))
 # The series the macro score reads (its signals' inputs), checked for the lagged rule.
@@ -125,6 +131,10 @@ class Lead:
     stress: int | None
     path: str
     lagged: tuple[str, ...]  # revised series the macro score read through the lagged rule
+    # The score's highest coverage when it is unknown throughout the episode (not graded);
+    # None when it is known on some session of it.
+    macro_unknown: float | None = None
+    stress_unknown: float | None = None
 
 
 @dataclass(frozen=True)
@@ -275,6 +285,16 @@ def _first_high(rows: pd.DataFrame, column: str, start: date, peak: date, end: d
     return after[0] if after else None
 
 
+def _unknown(rows: pd.DataFrame, column: str, start: date, end: date) -> float | None:
+    """The score's highest coverage from ``start`` to ``end`` when it never went high and is
+    null on every session there (its coverage below ``min_coverage``); ``None`` otherwise."""
+    window = rows[(rows["session_date"] >= start) & (rows["session_date"] <= end)]
+    if window.empty or window[column].notna().any():
+        return None
+    coverage = window[COVERAGE[column]] if COVERAGE[column] in window.columns else None
+    return 0.0 if coverage is None or coverage.isna().all() else float(coverage.max())
+
+
 def _path(rows: pd.DataFrame, start: date, end: date) -> str:
     """The raw labels from ``start`` to ``end`` as runs: ``CALM 40 > CRISIS 12``."""
     labels = rows[(rows["session_date"] >= start) & (rows["session_date"] <= end)]["raw_label"]
@@ -312,8 +332,10 @@ def leads(history: History, episodes: Sequence[Episode], revised: Collection[str
         )
         path = _path(rows, sessions_ending(e.peak, PATH_BEFORE + 1)[0], e.trough)
         lagged = _lagged(history.vintages, m or e.peak, revised)
+        unknown = (_unknown(rows, c, start, e.trough) for c in ("macro_risk", "market_stress"))
         out.append(Lead(e, None if m is None else offset(e.peak, m),
-                        None if k is None else offset(e.peak, k), path, lagged))  # fmt: skip
+                        None if k is None else offset(e.peak, k), path, lagged,
+                        *unknown))  # fmt: skip
     return out
 
 

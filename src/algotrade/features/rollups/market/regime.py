@@ -1,10 +1,10 @@
-"""``regime@v1``: the regime model's two scores, its context score and its label, one ``MKT:US``
+"""``regime@v2``: the regime model's two scores, its context score and its label, one ``MKT:US``
 row per session (ADR 0047; docs/market-regime-plan.md section 4).
 
 Each score is a weighted count of signals that are on (``SIGNALS``; weights and thresholds in
-``Params``, ``config/site/rollups.toml ["regime@v1"]``, each score's weights summing to 100).
+``Params``, ``config/site/rollups.toml ["regime@v2"]``, each score's weights summing to 100).
 The cards' signals are ``regime_indicators@v1``'s verdicts; the others are thresholds on
-``market_macro@v2``, ``market_trend@v1`` and ``market_cross_asset@v1`` here.
+``market_macro@v3``, ``market_trend@v1`` and ``market_cross_asset@v1`` here.
 
 - ``macro_risk`` (slow): curve, credit (the high-yield card's verdict, else, when the high-yield
   spread is unknown, as before 1997, the excess bond premium above ``ebp_above``), labour
@@ -15,17 +15,29 @@ The cards' signals are ``regime_indicators@v1``'s verdicts; the others are thres
 - ``fragility`` (context only, never the label): credit expansion and the index's one-year
   run-up (CAPE and margin debt are not stored yet); null when neither is known.
 
-A signal whose inputs are null adds 0 and counts in ``<score>_missing``; ``<score>_coverage``
-is the share of the score's weight that is known. ``raw_label`` is CALM (neither score high),
-CAUTION (macro only), STRESS (market only) or CRISIS (both), and null (UNKNOWN) when either
-coverage is below ``min_coverage``: no data never reads CALM. ``label`` is the most severe
-known ``raw_label`` of the last ``hold_sessions`` sessions (null when the session's own is), so
-a regime is left only after that many sessions below it; it is recomputed from the inputs of
-those sessions, never from this group's earlier rows (stateless: a backfill equals the
-nightly). ``label_changed``: the label differs from ``changed_sessions`` sessions earlier.
+A signal whose inputs are null counts in ``<score>_missing``; ``<score>_coverage`` is the share
+of the score's weight that is known. ``macro_risk`` and ``market_stress`` are on the
+covered-weight scale: ``100 * on weight / known weight``, so a signal that cannot be computed
+yet (its window is longer than the stored bars) neither adds nor dilutes; null (UNKNOWN) when
+the coverage is below ``min_coverage``. ``<score>_raw`` keeps the unnormalised weight on (an
+unknown signal adds 0). ``raw_label`` is CALM (neither score high), CAUTION (macro only), STRESS
+(market only) or CRISIS (both), and null (UNKNOWN) when either score is: no data never reads
+CALM. ``label`` is the most severe known ``raw_label`` of the last ``hold_sessions`` sessions
+(null when the session's own is), so a regime is left only after that many sessions below it;
+it is recomputed from the inputs of those sessions, never from this group's earlier rows
+(stateless: a backfill equals the nightly). ``label_changed``: the label differs from
+``changed_sessions`` sessions earlier.
 
 Every column is open (ADR 0047, on ADR 0028): the scores and labels are our own aggregate of
 verdicts, never a third-party value.
+
+v2 moved the two scores to the covered-weight scale and added ``macro_risk_raw`` and
+``market_stress_raw`` (v1's scores, in which an unknown signal counted as off, so a young
+history read calm however many of its known signals were on). v1 is superseded but not in
+``features.registry.SUPERSEDED``: that map, ``moved_field`` and ``retire-features`` handle
+instrument groups only (``rollup.`` fields, ``rollups/instrument/`` tables); nothing reads
+``rollups/market/regime@v1`` (every read names ``regime@v2``), and its table is deleted by hand
+once v2 is backfilled.
 """
 
 from collections.abc import Callable, Mapping
@@ -51,7 +63,7 @@ from algotrade.features.rollups.market.indicators import (
 )
 
 NAME = "regime"
-VERSION = 1
+VERSION = 2
 LABELS = ("CALM", "CAUTION", "STRESS", "CRISIS")  # least to most severe
 type Score = Literal["macro", "market", "fragility"]
 SCORES: tuple[Score, ...] = ("macro", "market", "fragility")
@@ -196,12 +208,21 @@ SIGNALS: tuple[Signal, ...] = (
 
 @dataclass(frozen=True)
 class Scored:
-    """One score: the weight of its signals on, the share of its weight known, how many of its
-    signals are unknown."""
+    """One score: ``raw`` the weight of its signals on (an unknown signal adds 0), ``known``
+    the weight of its signals known, ``coverage`` the share of its weight known, ``missing``
+    how many of its signals are unknown."""
 
-    value: float
+    raw: float
+    known: float
     coverage: float
     missing: int
+
+    def scaled(self, min_coverage: float) -> float:
+        """The covered-weight scale, 0 to 100: the weight on over the weight known; NaN when
+        less than ``min_coverage`` of the weight is known."""
+        if self.known <= 0.0 or self.coverage < min_coverage:
+            return np.nan
+        return 100.0 * self.raw / self.known
 
 
 def score(v: Values, p: Params, which: Score) -> Scored:
@@ -216,15 +237,17 @@ def score(v: Values, p: Params, which: Score) -> Scored:
             continue
         known += weight
         on += weight if verdict else 0.0
-    return Scored(on, known / total if total else 0.0, missing)
+    return Scored(on, known, known / total if total else 0.0, missing)
 
 
 def raw_label(v: Values, p: Params) -> str | None:
-    """The session's label before hysteresis; ``None`` when a score's coverage is too low."""
-    m, k = score(v, p, "macro"), score(v, p, "market")
-    if m.coverage < p.min_coverage or k.coverage < p.min_coverage:
+    """The session's label before hysteresis, from the covered-weight scores; ``None`` when a
+    score's coverage is too low."""
+    macro_risk = score(v, p, "macro").scaled(p.min_coverage)
+    stress = score(v, p, "market").scaled(p.min_coverage)
+    if np.isnan(macro_risk) or np.isnan(stress):
         return None
-    return LABELS[2 * (k.value >= p.market_high) + (m.value >= p.macro_high)]
+    return LABELS[2 * (stress >= p.market_high) + (macro_risk >= p.macro_high)]
 
 
 def held(raws: Mapping[date, str | None], day: date, hold: int) -> str | None:
@@ -248,9 +271,11 @@ def compute(inputs: Inputs, session: date, params: Params) -> pd.DataFrame:
         "instrument_id": market_id("US"),
         "label": label,
         "raw_label": raws[session],
-        "macro_risk": m.value,
-        "market_stress": k.value,
-        "fragility": f.value if f.coverage > 0 else np.nan,
+        "macro_risk": m.scaled(p.min_coverage),
+        "market_stress": k.scaled(p.min_coverage),
+        "macro_risk_raw": m.raw,
+        "market_stress_raw": k.raw,
+        "fragility": f.raw if f.coverage > 0 else np.nan,
         "macro_coverage": m.coverage,
         "market_coverage": k.coverage,
         "macro_missing": m.missing,
@@ -276,10 +301,15 @@ def _weights(which: Score) -> str:
 def _score(name: str, which: Score, words: str) -> tuple[Feature, ...]:
     reads = _reads(which)
     return (
-        Feature(name, "float32", "pct_points", f"{words}: the weight of its signals that are "
-                f"on, 0 to 100 (weights {_weights(which)}); an unknown signal adds 0",
-                "never: an unknown signal adds 0 (see the coverage)", valid_range=(0, 100),
-                inputs=reads),
+        Feature(name, "float32", "pct_points", f"{words} on the covered-weight scale: the "
+                f"weight of its signals that are on over the weight of those known, 0 to 100 "
+                f"(weights {_weights(which)}); an unknown signal neither adds nor dilutes",
+                f"less than min_coverage ({D.min_coverage:g}) of its weight is known",
+                valid_range=(0, 100), inputs=reads),
+        Feature(f"{name}_raw", "float32", "pct_points", f"{words}, unnormalised: the weight of "
+                "its signals that are on, 0 to 100, an unknown signal adding 0 (the scale of "
+                "regime@v1)", "never: an unknown signal adds 0 (see the coverage)",
+                valid_range=(0, 100), inputs=reads),
         Feature(f"{which}_coverage", "float32", "decimal", f"Share of {name}'s weight whose "
                 "signals are known (below min_coverage, 0.5: no label)", "never",
                 valid_range=(0, 1), inputs=reads),

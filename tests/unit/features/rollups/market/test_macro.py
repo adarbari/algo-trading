@@ -1,4 +1,4 @@
-"""``market_macro@v2`` over a ``macro/series`` store written through the storage layer:
+"""``market_macro@v3`` over a ``macro/series`` store written through the storage layer:
 hand-computed levels, transforms and windows, vintages respected (a value with a later vintage
 is not seen), the curve from the session's own Treasury curve else FRED, one null-safe row with
 no macro data, and a backfill equal to the nightly."""
@@ -82,7 +82,7 @@ def test_without_macro_data_the_row_is_written_and_every_macro_column_is_null() 
     assert got["curve_source"] == "treasury"
     rest = [c for c in macro.COLUMNS if not c.startswith("curve_") or c.endswith("_252d")]
     assert all(pd.isna(got[c]) for c in rest), {c: got[c] for c in rest if not pd.isna(got[c])}
-    pure = macro.compute({macro.MACRO: None, macro.TREASURY: None}, END, None)
+    pure = macro.compute({macro.MACRO: None, macro.TREASURY: None}, END, macro.D)
     assert list(pure["instrument_id"]) == ["MKT:US"]
     assert pure.drop(columns="instrument_id").isna().all(axis=None)
 
@@ -173,9 +173,49 @@ def test_unemployment_trend_and_sahm_gap_by_hand() -> None:
     assert got["unrate_vs_12m_avg"] == pytest.approx((4.4 - np.mean(rates[-12:])) / 100, rel=1e-5)
     assert got["sahm_gap"] == pytest.approx((ma3[-1] - min(ma3[2:-1])) / 100, rel=1e-5)
     short = store()
-    write(short[0], monthly("UNRATE", rates[-14:]))  # 14 months: the trend, not the Sahm gap
+    write(short[0], monthly("UNRATE", rates[-11:]))  # 11 months: the trend, not the Sahm gap
     got = row(short[1])
-    assert not pd.isna(got["unrate_vs_12m_avg"]) and pd.isna(got["sahm_gap"])
+    assert got["unrate_vs_12m_avg"] == pytest.approx((4.4 - np.mean(rates[-11:])) / 100, rel=1e-5)
+    assert pd.isna(got["sahm_gap"])  # 9 of the previous 12 months have a 3-month mean
+
+
+def _unrate(rates: list[float], drop: tuple[int, ...]) -> dict[str, object]:
+    """UNRATE monthly to August 2026 (each released about 35 days later), without the months
+    at ``drop`` (positions in ``rates``): months never published."""
+    writer, reader = store()
+    rows = monthly("UNRATE", rates)
+    rows = [{**r, "vintage_date": r["obs_date"] + timedelta(days=35), "vintage_kind": "alfred"}
+            for i, r in enumerate(rows) if i not in drop]  # fmt: skip
+    write(writer, rows)
+    return row(reader)
+
+
+def test_one_missing_month_is_skipped_and_three_are_too_many() -> None:
+    """October 2025's unemployment rate was never published (the shutdown): v2 read nothing
+    for a year after it; one gap now leaves 11 of 12 months, three leave 9 (null)."""
+    rates = [3.5, 3.6, 3.4, 3.5, 3.5, 3.6, 3.7, 3.7, 3.8, 3.9, 4.0, 4.1, 4.2, 4.3, 4.4]
+    gap = 9  # a month inside both windows
+    got = _unrate(rates, (gap,))
+    kept = rates[3:gap] + rates[gap + 1 :]
+    assert got["unrate_vs_12m_avg"] == pytest.approx((4.4 - np.mean(kept)) / 100, rel=1e-5)
+    present = dict(enumerate(rates)) | {gap: None}
+
+    def ma3(i: int) -> float:
+        values = [present[j] for j in range(i - 2, i + 1) if present.get(j) is not None]
+        return float(np.mean(values)) if len(values) >= 2 else np.nan  # type: ignore[arg-type]
+
+    lows = [ma3(i) for i in range(2, 14)]
+    assert got["sahm_gap"] == pytest.approx((ma3(14) - np.nanmin(lows)) / 100, rel=1e-5)
+    three = _unrate(rates, (9, 10, 11))  # 9 of 12 months; 9 of the 12 lows
+    assert pd.isna(three["unrate_vs_12m_avg"]) and pd.isna(three["sahm_gap"])
+    assert three["unrate"] == pytest.approx(0.044, rel=F32)
+
+
+def test_params_bound_the_minimums() -> None:
+    with pytest.raises(ValueError, match="min_months_12"):
+        macro.Params(min_months_12=13)
+    with pytest.raises(ValueError, match="min_months_3"):
+        macro.Params(min_months_3=0)
 
 
 def test_claims_credit_and_curve_windows_by_hand() -> None:
@@ -219,6 +259,26 @@ def test_backfill_equals_nightly() -> None:
         assert result.frame is not None and nightly is not None
         pd.testing.assert_frame_equal(result.frame, nightly)
     assert backfill[0].frame["hy_oas"].iloc[0] < backfill[-1].frame["hy_oas"].iloc[0]  # type: ignore[index]
+
+
+def test_the_last_session_of_a_backfill_reads_its_own_partition_as_known() -> None:
+    """Every series stored in one partition dated the newest session (a backfill): that session
+    reads each lagged series' previous observation (its own is public the next day), an ALFRED
+    vintage dated on it, and the index levels, exactly as the session before reads its own."""
+    writer, reader = store()
+    days = sessions_ending(END, 30)
+    known = list(zip(days, [*days[1:], END + timedelta(days=1)], strict=True))  # lag 1
+    rows = [obs("BAMLH0A0HYM2", d, v, 3.0 + i / 100) for i, (d, v) in enumerate(known)]
+    rows += [obs("VIX", d, v, 15.0 + i / 10) for i, (d, v) in enumerate(known)]
+    rows += [{**obs("UNRATE", date(2026, 8, 1), END, 4.2), "vintage_kind": "alfred"}]
+    write(writer, rows)
+    chunk = {r.session: r.frame.iloc[0] for r in compute_sessions(reader, GROUP, days[-3:])}  # type: ignore[union-attr]
+    newest, before = chunk[END], chunk[days[-2]]
+    assert newest["hy_oas"] == pytest.approx((3.0 + 28 / 100) / 100, rel=F32)  # days[-2]'s
+    assert before["hy_oas"] == pytest.approx((3.0 + 27 / 100) / 100, rel=F32)
+    assert newest["vix"] == pytest.approx(15.0 + 2.8, rel=F32)
+    assert newest["unrate"] == pytest.approx(0.042, rel=F32) and pd.isna(before["unrate"])
+    pd.testing.assert_series_equal(newest, compute_one(reader, GROUP, END).frame.iloc[0])  # type: ignore[union-attr]
 
 
 def test_transforms_and_licences_follow_the_registry() -> None:

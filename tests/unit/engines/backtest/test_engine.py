@@ -95,7 +95,7 @@ def test_instruments_supply_multipliers() -> None:
 
 # ----------------------------------------------------------------------------- overlays (ADR 0049)
 
-LABEL = "market.regime@v1.label"
+LABEL = "market.regime@v2.label"
 REGIME = ScaleByLabel(LABEL, {"CALM": 1.0, "CAUTION": 0.75, "STRESS": 0.5, "CRISIS": 0.25})
 
 

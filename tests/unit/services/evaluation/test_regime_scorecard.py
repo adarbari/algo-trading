@@ -20,7 +20,11 @@ from algotrade.data.macro.series import TABLE as MACRO_SERIES
 from algotrade.features.rollups.market import macro, regime
 from algotrade.quant.probit import ProbitFit
 from algotrade.services.evaluation import regime_scorecard as sc
-from algotrade.services.evaluation.regime_report import probit_section, render
+from algotrade.services.evaluation.regime_report import (
+    acceptance_section,
+    probit_section,
+    render,
+)
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.rollup_store import store, write_rows
@@ -157,6 +161,33 @@ def test_false_alarms_and_acceptance(reader: StoreReader) -> None:
     assert "PASS     fewer than one false CRISIS per 3 years: 1 over" in text
     assert "no data" not in text
     assert text == render(read_history(reader), EPISODES, {macro_id("UNRATE")})  # deterministic
+
+
+def test_an_unknown_score_is_not_graded_and_says_its_coverage() -> None:
+    """Stress null (coverage 0.43) through the shock: unknown in (b), not graded in (d), and the
+    line is graded over the other episode only; with none graded it is NO DATA."""
+    days = sessions_between(date(2002, 6, 1), date(2004, 12, 30))
+    stress_b = {d for d in days if len(sessions_between(B_PEAK, d)) > 21 and d <= B_TROUGH}
+    frame = pd.DataFrame(
+        {"session_date": days, "label": None, "raw_label": None,
+         "macro_risk": [10.0] * len(days), "macro_coverage": 1.0,
+         "market_stress": [np.nan] * len(days), "market_coverage": 0.43}
+    )  # fmt: skip
+    history = sc.History({}, frame, None, sc.stored_vintages(store()[1]))
+    (b,) = sc.leads(history, EPISODES, ())
+    assert (b.episode.key, b.stress, b.stress_unknown) == ("b_shock", None, 0.43)
+    assert b.macro_unknown is None  # known (and low): graded
+    known = frame.assign(market_stress=[70.0 if d in stress_b else 20.0 for d in days])
+    (graded,) = sc.leads(sc.History({}, known, None, history.vintages), EPISODES, ())
+    assert graded.stress == 21 and graded.stress_unknown is None
+    text = render(history, EPISODES, ())
+    assert "b_shock  shock  never  unknown (coverage 0.43)" in text
+    name = "market_stress >= 50 within 15 sessions of each peak"
+    assert f"NO DATA  {name}\n         not graded (coverage 0.43): b_shock" in text
+    a = sc.Lead(EPISODES[0], -104, 5, "", ())
+    lines = acceptance_section([a, b], None)
+    assert f"PASS     {name}: 1 of 1" in lines
+    assert "         not graded (coverage 0.43): b_shock" in lines
 
 
 def test_the_probit_is_fitted_on_month_end_rows(reader: StoreReader) -> None:

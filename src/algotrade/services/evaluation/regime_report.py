@@ -37,7 +37,9 @@ def _pct(x: float) -> str:
     return f"{x * 100:+.1f}%"
 
 
-def _signed(n: int | None) -> str:
+def _signed(n: int | None, unknown: float | None = None) -> str:
+    if unknown is not None:
+        return f"unknown (coverage {unknown:.2f})"
     return "never" if n is None else f"{n:+d}"
 
 
@@ -74,7 +76,8 @@ def leads_section(found: Sequence[Lead]) -> list[str]:
     if not found:
         return head + _no_data()
     rows = [
-        [lead.episode.key, lead.episode.kind, _signed(lead.macro), _signed(lead.stress),
+        [lead.episode.key, lead.episode.kind, _signed(lead.macro, lead.macro_unknown),
+         _signed(lead.stress, lead.stress_unknown),
          ", ".join(lead.lagged) or "none"]
         for lead in found
     ]  # fmt: skip
@@ -94,26 +97,40 @@ def alarms_section(alarms: sc.Alarms | None) -> list[str]:
     return head + _table(["decade", "sessions", "alarms", "CRISIS alarms"], rows)
 
 
-def _grade(name: str, graded: Sequence[tuple[str, bool]]) -> str:
+type Graded = tuple[str, bool | float]  # episode key, passed, or the coverage: not graded
+
+
+def _grade(name: str, episodes: Sequence[Graded]) -> list[str]:
+    """PASS / FAIL over the graded episodes (NO DATA when none is), then one line per episode
+    not graded (its score unknown: the coverage)."""
+    graded = [(key, ok) for key, ok in episodes if isinstance(ok, bool)]
+    skipped = [f"         not graded (coverage {c:.2f}): {key}"
+               for key, c in episodes if not isinstance(c, bool)]  # fmt: skip
     if not graded:
-        return f"NO DATA  {name}"
+        return [f"NO DATA  {name}", *skipped]
     failed = [key for key, ok in graded if not ok]
     verdict = "FAIL" if failed else "PASS"
     detail = f" (failed: {', '.join(failed)})" if failed else ""
-    return f"{verdict}     {name}: {len(graded) - len(failed)} of {len(graded)}{detail}"
+    return [f"{verdict}     {name}: {len(graded) - len(failed)} of {len(graded)}{detail}", *skipped]
 
 
 def acceptance_section(found: Sequence[Lead], alarms: sc.Alarms | None) -> list[str]:
-    macro = [(lead.episode.key, lead.macro is not None and lead.macro <= -sc.MACRO_LEAD)
-             for lead in found if lead.episode.kind == "recession"]  # fmt: skip
-    stress = [(lead.episode.key, lead.stress is not None and lead.stress <= sc.STRESS_LAG)
-              for lead in found]  # fmt: skip
+    macro: list[Graded] = [
+        (lead.episode.key, lead.macro_unknown if lead.macro_unknown is not None
+         else lead.macro is not None and lead.macro <= -sc.MACRO_LEAD)
+        for lead in found if lead.episode.kind == "recession"
+    ]  # fmt: skip
+    stress: list[Graded] = [
+        (lead.episode.key, lead.stress_unknown if lead.stress_unknown is not None
+         else lead.stress is not None and lead.stress <= sc.STRESS_LAG)
+        for lead in found
+    ]  # fmt: skip
     lines = [
         "(d) Acceptance (plan section 4)",
-        _grade(f"macro_risk >= {sc.HIGH:g} at least {sc.MACRO_LEAD} sessions before each "
-               "recession bear's peak", macro),
-        _grade(f"market_stress >= {sc.HIGH:g} within {sc.STRESS_LAG} sessions of each peak",
-               stress),
+        *_grade(f"macro_risk >= {sc.HIGH:g} at least {sc.MACRO_LEAD} sessions before each "
+                "recession bear's peak", macro),
+        *_grade(f"market_stress >= {sc.HIGH:g} within {sc.STRESS_LAG} sessions of each peak",
+                stress),
     ]  # fmt: skip
     name = f"fewer than one false CRISIS per {sc.CRISIS_YEARS:g} years"
     if alarms is None or alarms.years <= 0:

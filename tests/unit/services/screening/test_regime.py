@@ -17,8 +17,8 @@ from tests.helpers.stored_frames import T0, stamped
 from tests.unit.services.screening import test_screening_service as legacy
 from tests.unit.services.screening.test_rule_screens import DAY, configs, seeded
 
-LABEL = "market.regime@v1.label"
-REGIME = "rollups/market/regime@v1"
+LABEL = "market.regime@v2.label"
+REGIME = "rollups/market/regime@v2"
 ON = {"enabled": True, "pause_in": ["STRESS", "CRISIS"]}
 
 
@@ -48,9 +48,9 @@ def test_the_session_market_values_are_read_for_exactly_that_session() -> None:
     reader, writer = seeded()
     assert session_market(reader, [LABEL], DAY) == {LABEL: None}  # nothing stored: unknown
     store_label(writer, "CAUTION")
-    assert session_market(reader, [LABEL, "market.regime@v1.market_stress"], DAY) == {
+    assert session_market(reader, [LABEL, "market.regime@v2.market_stress"], DAY) == {
         LABEL: "CAUTION",
-        "market.regime@v1.market_stress": 70.0,
+        "market.regime@v2.market_stress": 70.0,
     }
     assert session_market(reader, [], DAY) == {}
 

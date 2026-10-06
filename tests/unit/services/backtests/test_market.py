@@ -22,8 +22,8 @@ from tests.unit.services.backtests.test_backtests import LOADED, START, T0, back
 
 __all__ = ["backend"]  # the golden store fixture, shared with test_backtests
 
-LABEL = "market.regime@v1.label"
-REGIME = "rollups/market/regime@v1"
+LABEL = "market.regime@v2.label"
+REGIME = "rollups/market/regime@v2"
 
 
 def write_labels(writer: StoreWriter, labels: dict[date, str | None]) -> None:

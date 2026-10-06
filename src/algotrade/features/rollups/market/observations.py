@@ -8,9 +8,11 @@ value revised after the session is never seen), dated within the input's lookbac
 series' latest. ``as_series`` turns those rows into one series per id. A null value (FRED's
 ".", a holiday) is no observation.
 
-Every window is complete or null (UNKNOWN), never shorter: a window whose history does not
-reach back to its start (within ``tolerance`` calendar days, for holidays and weekly dates)
-gives null.
+Every window of days or sessions is complete or null (UNKNOWN), never shorter: a window whose
+history does not reach back to its start (within ``tolerance`` calendar days, for holidays and
+weekly dates) gives null. A monthly window is the observations dated in its calendar months and
+tolerates gaps (a month never published, as October 2025's unemployment rate in the
+government shutdown): ``trailing_mean`` needs a minimum of its months present, else null.
 """
 
 from collections.abc import Mapping
@@ -79,12 +81,20 @@ def since(s: Series | None, start: date) -> Series | None:
     return window if len(window) else None
 
 
-def last_months(s: Series | None, n: int) -> Series | None:
-    """The last ``n`` monthly observations, when they are ``n`` consecutive months (``None``
-    otherwise)."""
-    if s is None or len(s) < n:
-        return None
-    window = s.iloc[-n:]
-    index = pd.DatetimeIndex(window.index)
-    months = index.year * 12 + index.month
-    return window if int(months[-1] - months[0]) == n - 1 else None
+type Months = dict[int, float]  # month number (year * 12 + month - 1) -> its observation
+
+
+def by_month(s: Series | None) -> Months:
+    """A monthly series' observations by month number (the last one of a month); empty when
+    there are none."""
+    if s is None or s.empty:
+        return {}
+    index = pd.DatetimeIndex(s.index)
+    return dict(zip((index.year * 12 + index.month - 1).tolist(), s.to_numpy(float), strict=True))
+
+
+def trailing_mean(months: Months, last: int, n: int, minimum: int) -> float:
+    """The mean of the observations dated in the ``n`` calendar months ending with month
+    ``last``, when at least ``minimum`` of them are present (NaN otherwise)."""
+    present = [months[m] for m in range(last - n + 1, last + 1) if m in months]
+    return float(np.mean(present)) if len(present) >= minimum else np.nan

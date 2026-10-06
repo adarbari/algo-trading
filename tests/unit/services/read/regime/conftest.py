@@ -1,4 +1,4 @@
-"""A small regime store: the ``regime@v1`` and ``regime_indicators@v1`` market groups (declared
+"""A small regime store: the ``regime@v2`` and ``regime_indicators@v1`` market groups (declared
 here, as the RG3 groups will), written for 28 and 29 Sep (CALM), none for 30 Sep and STRESS on
 1 Oct (D1), and four cards: ``curve`` and ``hy`` (slow; ``hy``'s column is in no group),
 ``trend`` and ``vix`` (fast; ``vix`` has a value column but no verdict column)."""
@@ -28,7 +28,7 @@ def _never(*_: Any) -> pd.DataFrame:  # pragma: no cover - the rows are written,
 
 REGIME = FeatureGroup(
     "regime",
-    1,
+    2,
     "test regime group",
     (Input("bars/1d"),),
     features(

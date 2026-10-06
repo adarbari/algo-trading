@@ -1,4 +1,4 @@
-"""``market_macro@v2``: the slow macro readings of the regime model, one ``MKT:US`` row per
+"""``market_macro@v3``: the slow macro readings of the regime model, one ``MKT:US`` row per
 session (ADR 0047, ADR 0048; docs/market-regime-plan.md sections 3A and 3E).
 
 Inputs: ``macro/series`` (the series of ``SERIES``, by id, point in time by vintage: each
@@ -17,13 +17,21 @@ year earlier. Rates, spreads and changes are decimals (FRED's percents / 100: a 
                               sessions
     sahm_gap                  3-month mean unemployment minus its lowest 3-month mean of the
                               previous 12 months (the Sahm rule, from UNRATE's vintages)
+
+The unemployment windows are calendar months ending with the latest observation known by the
+session, and tolerate gaps (``Params``, ``config/site/rollups.toml ["market_macro@v3"]``): a
+12-month mean or low needs ``min_months_12`` of its 12 months present, a 3-month mean
+``min_months_3`` of 3; else null.
     ebp, ebp_recession_prob   the Fed's excess bond premium (Gilchrist-Zakrajsek) and its
                               12-month recession probability (published monthly file)
     ofr_fsi, epu              the OFR Financial Stress Index and the daily Economic Policy
                               Uncertainty index (published daily files)
 
 v2 (RG3b) added ``ebp``, ``ebp_recession_prob``, ``ofr_fsi`` and ``epu`` (new stored columns are
-a new version, ADR 0023); v1 is superseded.
+a new version, ADR 0023); v1 is superseded. v3 let the unemployment windows tolerate a missing
+month (v2 needed 12 / 15 consecutive months, so October 2025, never published in the shutdown,
+left ``unrate_vs_12m_avg`` and ``sahm_gap`` null until 2027); v2 is superseded, and like
+``regime@v1`` not in ``features.registry.SUPERSEDED`` (that map handles instrument groups only).
 
 Every column is null (UNKNOWN) when a series it reads has no observation known by the session
 (no FRED key, or before the series starts) or its window is not complete; with no macro data at
@@ -46,14 +54,15 @@ from algotrade.features.rollups.market.observations import (
     HISTORY_SESSIONS,
     Series,
     as_series,
+    by_month,
     change_12m,
-    last_months,
     latest,
     since,
+    trailing_mean,
 )
 
 NAME = "market_macro"
-VERSION = 2
+VERSION = 3
 MACRO = "macro/series"
 TREASURY = "rates/treasury"
 type Transform = Literal["level", "yoy", "diff"]
@@ -106,6 +115,29 @@ CURVE_SESSIONS = 252  # the inversion count
 CLAIMS_DAYS = 364  # the 52-week low of the 4-week average of claims
 TENORS = {"curve_10y3m": ("10Y", "3M", "T10Y3M"), "curve_10y2y": ("10Y", "2Y", "T10Y2Y")}
 SOURCES = ("treasury", "fred")
+
+
+@dataclass(frozen=True)
+class Params:
+    """How many months a monthly window needs present (a month never published, as October
+    2025's unemployment rate, is a gap, not a reason to read nothing for a year)."""
+
+    min_months_12: int = 10  # of a 12-month mean or low
+    min_months_3: int = 2  # of a 3-month mean
+
+    def __post_init__(self) -> None:
+        if not 1 <= self.min_months_12 <= 12 or not 1 <= self.min_months_3 <= 3:
+            raise ValueError(
+                f"min_months_12 must be in 1..12 and min_months_3 in 1..3, got "
+                f"{self.min_months_12} and {self.min_months_3}"
+            )
+
+
+D = Params()
+_GAP = (
+    "October 2025, never published in the government shutdown, is such a gap: the window "
+    "reads the months present"
+)
 
 
 def _none(*keys: str) -> str:
@@ -167,12 +199,17 @@ FEATURES = (
        ("BAMLC0A0CM",), valid_range=(0, 0.1)),
     _f("unrate", "decimal", "Unemployment rate (0.041 = 4.1%)", ("UNRATE",),
        valid_range=(0, 0.3)),
-    _f("unrate_vs_12m_avg", "decimal", "Unemployment rate minus its mean over the last 12 "
-       "months (above 0: rising, the unemployment trend signal)", ("UNRATE",),
-       "fewer than 12 consecutive monthly UNRATE observations known", valid_range=(-0.2, 0.2)),
+    _f("unrate_vs_12m_avg", "decimal", "Unemployment rate minus its mean over the 12 calendar "
+       "months ending with its latest observation (above 0: rising, the unemployment trend "
+       f"signal); a missing month is skipped ({_GAP})", ("UNRATE",),
+       f"fewer than {D.min_months_12} of those 12 months have an UNRATE observation known",
+       valid_range=(-0.2, 0.2)),
     _f("sahm_gap", "decimal", "Sahm rule gap: 3-month mean unemployment minus the lowest "
-       "3-month mean of the previous 12 months (0.005 = the rule's 0.5 point trigger)",
-       ("UNRATE",), "fewer than 15 consecutive monthly UNRATE observations known",
+       "3-month mean of the previous 12 months (0.005 = the rule's 0.5 point trigger); a "
+       f"3-month mean needs {D.min_months_3} of its months, the low {D.min_months_12} of the "
+       f"12 means ({_GAP})", ("UNRATE",),
+       f"the latest 3 months have fewer than {D.min_months_3} UNRATE observations known, or "
+       f"fewer than {D.min_months_12} of the previous 12 months have a 3-month mean",
        valid_range=(-0.05, 0.2)),
     _f("claims_4w_vs_52w_low", "ratio", "4-week average of initial jobless claims / its "
        "lowest of the last 52 weeks (1.15: 15% above the low)", ("IC4WSA",),
@@ -255,15 +292,19 @@ def _credit(s: Series | None, session: date) -> tuple[float, float]:
     return now - then, now - low
 
 
-def _unemployment(s: Series | None) -> tuple[float, float]:
-    """(latest minus the 12-month mean, the Sahm gap), in percent points."""
-    year = last_months(s, 12)
-    trend = np.nan if year is None else float(year.iloc[-1] - year.mean())
-    months = last_months(s, 15)
-    if months is None:
-        return trend, np.nan
-    ma3 = months.rolling(3).mean().to_numpy()
-    return trend, float(ma3[-1] - np.min(ma3[2:-1]))
+def _unemployment(s: Series | None, p: "Params") -> tuple[float, float]:
+    """(latest minus the 12-month mean, the Sahm gap), in percent points, over the calendar
+    months ending with the latest observation (gaps tolerated down to ``p``'s minimums)."""
+    months = by_month(s)
+    if not months:
+        return np.nan, np.nan
+    last = max(months)
+    trend = months[last] - trailing_mean(months, last, 12, p.min_months_12)
+    now = trailing_mean(months, last, 3, p.min_months_3)
+    lows = [trailing_mean(months, m, 3, p.min_months_3) for m in range(last - 12, last)]
+    known = [x for x in lows if not np.isnan(x)]
+    low = min(known) if len(known) >= p.min_months_12 else np.nan
+    return trend, now - low
 
 
 def _claims(s: Series | None) -> float:
@@ -316,7 +357,7 @@ def _changes(series: Mapping[str, Series]) -> dict[str, float]:
 
 
 def macro_row(
-    series: Mapping[str, Series], curve: pd.DataFrame | None, session: date
+    series: Mapping[str, Series], curve: pd.DataFrame | None, session: date, p: "Params"
 ) -> dict[str, object]:
     """Every column for the session from the known ``series`` (by id) and the curve rows."""
     row: dict[str, object] = {**_levels(series), **_changes(series)}
@@ -330,15 +371,15 @@ def macro_row(
     chg, off_low = _credit(None if hy is None else hy / PERCENT, session)
     row["hy_oas_chg_126d"], row["hy_oas_vs_126d_low"] = chg, off_low
     unrate = series.get(ID["UNRATE"])
-    trend, sahm = _unemployment(None if unrate is None else unrate / PERCENT)
+    trend, sahm = _unemployment(None if unrate is None else unrate / PERCENT, p)
     row["unrate_vs_12m_avg"], row["sahm_gap"] = trend, sahm
     row["claims_4w_vs_52w_low"] = _claims(series.get(ID["IC4WSA"]))
     return row
 
 
-def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
+def compute(inputs: Inputs, session: date, params: Params) -> pd.DataFrame:
     series = as_series(inputs[MACRO])
-    row = {"instrument_id": market_id("US"), **macro_row(series, inputs[TREASURY], session)}
+    row = {"instrument_id": market_id("US"), **macro_row(series, inputs[TREASURY], session, params)}
     return pd.DataFrame([row], columns=["instrument_id", *COLUMNS])
 
 
@@ -355,5 +396,6 @@ GROUP = FeatureGroup(
     ),
     FEATURES,
     compute,
+    params=D,
     entity="market",
 )

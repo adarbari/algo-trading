@@ -48,7 +48,7 @@ def store(
 
 def test_defaults_are_off_and_fail_closed() -> None:
     d = RegimeSettings.parse(None, "x [regime]")
-    assert not d.enabled and d.label == REGIME_LABEL == "market.regime@v1.label"
+    assert not d.enabled and d.label == REGIME_LABEL == "market.regime@v2.label"
     assert dict(d.multipliers) == dict(DEFAULT_MULTIPLIERS)
     assert d.unknown_multiplier == 0.0 and d.pause_in == frozenset()
     assert d.pauses_for("anything") == frozenset()

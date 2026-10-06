@@ -294,13 +294,13 @@ range; every feature is listed in the generated **[feature catalogue](features.m
   session's universe stocks above their averages and in a bear, new highs minus lows, the Zweig
   thrust, 90% down days; null below `min_coverage`) and `market_cross_asset@v1` (turbulence and
   the absorption ratio of an ETF basket, leadership ratios), all from `bars/1d`;
-  `market_macro@v2` (the curve from the session's own `rates/treasury` curve else FRED, credit
+  `market_macro@v3` (the curve from the session's own `rates/treasury` curve else FRED, credit
   spreads, labour, financial conditions, lending, policy, inflation, activity, the excess bond
   premium, the OFR stress index, policy uncertainty, VIX / VIX3M: each the latest observation of `macro/series` known by the session, by vintage, with the
   registry's `yoy` / `diff` transform applied here; null without FRED data, the row still
   written); `regime_indicators@v1` (per regime card: the value, its on / off verdict and
-  whether it changed within 5 sessions); and `regime@v1` (`macro_risk`, `market_stress`,
-  `fragility`, the label with a stateless 5-session hold, coverage and missing counts: no
+  whether it changed within 5 sessions); and `regime@v2` (`macro_risk`, `market_stress` on the
+  covered-weight scale, their unnormalised `_raw`, `fragility`, the label with a stateless 5-session hold, coverage and missing counts: no
   data is UNKNOWN, never CALM). The groups' thresholds and weights are their
   `config/site/rollups.toml` sections; the plan's context signals (VIX band, drawdown band,
   death cross, ...) and the bear-state probit (`bear_prob_6m`, `bear_prob_source`: its
