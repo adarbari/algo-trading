@@ -217,7 +217,7 @@ owner = [
     "apps/ingestion/algotrade_ingestion/tasks/framework/run.py",
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#the-ingest-loop-is-written-once"
-detect = [{ call = "with_ids" }, { call = "equity_id" }, { string_prefix = "EQ:" }, { string_prefix = "MKT:" }]
+detect = [{ call = "with_ids" }, { call = "equity_id" }, { string_prefix = "EQ:" }, { string_prefix = "MKT:" }, { string_prefix = "IDX:" }, { string_prefix = "MACRO:" }]
 
 [[responsibility]]
 id = "ingestion-step-dispatch"
@@ -398,6 +398,14 @@ allowed = [
 ]
 section = "docs/adr/0035-etf-holdings.md#decision"
 detect = [{ string = "holdings/etf" }]
+
+[[responsibility]]
+id = "macro-series-reads"
+description = "Read macro series and index levels (macro/series, ADR 0048) point in time by vintage: each observation's latest vintage on or before a session (data.macro.series) and the pit = lag vintage rule (data.macro.vintages); consumers and feature groups read the table only through data.macro and data.feature_inputs"
+owner = ["src/algotrade/data/macro/*"]
+allowed = ["src/algotrade/storage/tables/schemas.py"]  # declares the table
+section = "docs/adr/0048-macro-series-with-vintages.md#decision"
+detect = [{ string = "macro/series" }]
 
 [[responsibility]]
 id = "live-option-quotes"

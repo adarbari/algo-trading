@@ -44,6 +44,11 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
 - ``volatility/ibkr_iv30``
                        ``volatility.ibkr_iv30``: IBKR's vols for the session plus ``lookback``
                        earlier sessions; ``None`` when the session has no rows (no IBKR run)
+- ``macro/series``     ``macro.series.stored_vintages``: every vintage of the group's series
+                       (``Input.ids``; all when empty) with ``vintage_date`` on or before the
+                       session (point in time by vintage, ADR 0048), sorted by
+                       ``vintage_date`` (the group keeps the latest vintage per observation);
+                       ``None`` when there is none
 - ``rollups/instrument/<name>@v<N>``, ``rollups/market/<name>@v<N>``
                        another group's stored output (``rollups.rollup_rows``) for the session
                        plus ``lookback`` earlier sessions; ``None`` when the session has no
@@ -64,6 +69,8 @@ from algotrade.core.model.fields import group_of_table
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.data.chains import chain_status, option_quotes, underlying_quotes
 from algotrade.data.events import events_by_event_date, stored_events
+from algotrade.data.macro.series import TABLE as MACRO_SERIES
+from algotrade.data.macro.series import stored_vintages
 from algotrade.data.prices import SessionBars, session_bars
 from algotrade.data.rates import TABLE as TREASURY
 from algotrade.data.rates import curve_as_rows
@@ -80,6 +87,8 @@ class Loaded(Protocol):
 
 
 type Loader = Callable[[StoreReader, Sequence[date], int], Loaded]
+# A loader that reads only some instruments (``Input.ids``; all when empty).
+type IdLoader = Callable[[StoreReader, Sequence[date], int, Sequence[str]], Loaded]
 # Frames computed in this run, by group table and session (``None``: computed, no rows).
 type Produced = Mapping[str, Mapping[date, pd.DataFrame | None]]
 
@@ -149,6 +158,14 @@ def _event_snapshots(table: str) -> Loader:
 def _share_facts(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
     frame = share_facts(reader)
     return _Snapshots(frame, _days(frame["filed"]) if len(frame) else np.array([], "datetime64[D]"))
+
+
+def _macro_series(
+    reader: StoreReader, sessions: Sequence[date], lookback: int, ids: Sequence[str]
+) -> Loaded:
+    frame = stored_vintages(reader, ids)
+    days = _days(frame["vintage_date"]) if len(frame) else np.array([], "datetime64[D]")
+    return _Snapshots(frame, days)
 
 
 @dataclass(frozen=True)
@@ -249,6 +266,9 @@ INPUTS: Mapping[str, Loader] = {
 }
 
 
+ID_INPUTS: Mapping[str, IdLoader] = {MACRO_SERIES: _macro_series}
+
+
 def is_group_table(table: str) -> bool:
     """A stored feature group's table (``rollups/instrument/<name>@v<N>`` or, a market-entity
     group, ``rollups/market/<name>@v<N>``: ADR 0047)."""
@@ -257,7 +277,7 @@ def is_group_table(table: str) -> bool:
 
 def has_input(table: str) -> bool:
     """Whether ``table`` can be a feature input (an ``INPUTS`` table or any group table)."""
-    return table in INPUTS or is_group_table(table)
+    return table in INPUTS or table in ID_INPUTS or is_group_table(table)
 
 
 def load_input(
@@ -266,8 +286,14 @@ def load_input(
     sessions: Sequence[date],
     lookback: int,
     produced: Produced | None = None,
+    ids: Sequence[str] = (),
 ) -> Loaded:
-    """``table`` for ``sessions`` (ascending) and ``lookback`` earlier sessions, read once."""
+    """``table`` for ``sessions`` (ascending) and ``lookback`` earlier sessions, read once.
+    ``ids``: only these instruments, for a table that reads by id (``ID_INPUTS``)."""
+    if table in ID_INPUTS:
+        return ID_INPUTS[table](reader, sessions, lookback, ids)
+    if ids:
+        raise ValueError(f"{table!r} is read whole: ids are only for {sorted(ID_INPUTS)}")
     if is_group_table(table):
         return _group_rows(reader, table, sessions, lookback, produced or {})
     if table not in INPUTS:

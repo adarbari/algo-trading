@@ -203,6 +203,12 @@ name = "holdings/etf"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/etf_holdings.py"
 
 [[table]]
+name = "macro/series"
+owner = "src/algotrade/data/macro/vintages.py"
+target_owner = "apps/ingestion/algotrade_ingestion/tasks/macro/series.py"
+note = "ADR 0048; the macro task (RG2c) writes it and becomes the owner"
+
+[[table]]
 name = "live/option_quotes"
 owner = "src/algotrade/services/live/recorder.py"
 note = "the API's one write (ADR 0028): live IBKR quotes it served; personal-use licence"

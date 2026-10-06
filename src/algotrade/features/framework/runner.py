@@ -101,7 +101,7 @@ def _compute_chunk(
 ) -> Iterator[SessionResult]:
     lookbacks = {i.table: i.sessions_back(params) for i in rollup.inputs}
     loaded = {
-        i.table: load_input(reader, i.table, sessions, lookbacks[i.table], produced)
+        i.table: load_input(reader, i.table, sessions, lookbacks[i.table], produced, i.ids)
         for i in rollup.inputs
     }
     for session in sessions:

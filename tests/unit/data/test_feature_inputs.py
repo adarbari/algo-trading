@@ -1,8 +1,8 @@
 """Feature inputs asked of ``algotrade.data`` by table name: each table's point-in-time read
 (bars, earnings snapshots, chain partitions, events by event date, the Treasury curve, share
 facts, the reference's security types, IBKR vols, the universe snapshot, the symbol -> id
-map) and other groups' stored rows (instrument and market groups), with this run's rows
-winning."""
+map, macro series by vintage and id) and other groups' stored rows (instrument and market
+groups), with this run's rows winning."""
 
 from datetime import date, timedelta
 
@@ -11,6 +11,7 @@ import pytest
 
 from algotrade.core.model.errors import MissingDataError
 from algotrade.data import feature_inputs as inputs
+from algotrade.data.macro.series import TABLE as MACRO_SERIES
 from algotrade.data.shares import TABLE as SHARES
 from tests.helpers.rollup_store import (
     END,
@@ -188,3 +189,27 @@ def test_bars_windows_allow_the_start_of_history_and_one_names_gap() -> None:
     window = inputs.load_input(reader, "bars/1d", [days[3]], 20).at(days[3], 20)
     assert window is not None  # 20 sessions back is before the first stored one: not a gap
     assert sorted(window["session_date"].unique()) == days  # B's missing bar is not a gap
+
+
+def test_macro_series_are_seen_from_their_vintage_and_read_by_id() -> None:
+    writer, reader = store()
+    assert inputs.load_input(reader, MACRO_SERIES, [END], 0).at(END, 0) is None
+    early, late = END - timedelta(days=30), END + timedelta(days=5)
+    rows = [
+        {"instrument_id": iid, "series": iid[6:], "obs_date": early, "vintage_date": v,
+         "value": x, "vintage_kind": "alfred"}
+        for iid, v, x in (("MACRO:A", early, 1.0), ("MACRO:A", late, 1.5), ("MACRO:B", early, 9.0))
+    ]  # fmt: skip
+    writer.write_table(MACRO_SERIES, late, "r1", stamped(rows, late, "r1"))  # stored after all
+    loaded = inputs.load_input(reader, MACRO_SERIES, [END], 0, ids=("MACRO:A",))
+    seen = loaded.at(END, 0)
+    assert seen is not None and list(seen["value"]) == [1.0]  # the revision is not out yet
+    assert "session_date" not in seen.columns
+    later = loaded.at(late, 0)
+    assert later is not None and list(later["vintage_date"]) == [early, late]
+    assert loaded.at(early - timedelta(days=1), 0) is None
+    every = inputs.load_input(reader, MACRO_SERIES, [END], 0).at(END, 0)
+    assert every is not None and set(every["instrument_id"]) == {"MACRO:A", "MACRO:B"}
+    assert inputs.has_input(MACRO_SERIES)
+    with pytest.raises(ValueError, match="read whole"):
+        inputs.load_input(reader, SHARES, [END], 0, ids=("EQ:A",))

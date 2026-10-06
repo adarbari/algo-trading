@@ -32,8 +32,10 @@ observation cheats. ALFRED gives every vintage of every observation (`realtime_s
    parsers (e.g. `shiller_xls`) in `vendors/published/parsers.py`.
 5. **Point in time.** With `pit = "lag"` (unrevised market series, and observations before
    ALFRED's first vintage) `vintage_date = obs_date + release_lag`, flagged `lagged`. The reader
-   `data/macro.py` `series_as_of(reader, ids, session, lookback)` returns the latest vintage per
-   (id, `obs_date`) with `vintage_date <= session`; a feature input reuses `_Snapshots` sorted on
+   `data/macro/series.py` `series_as_of(reader, ids, session, lookback)` returns the latest
+   vintage per (id, `obs_date`) with `vintage_date <= session`, always including each series'
+   latest known observation. Values are end-of-night like `bars/1d`: `vintage_date <= session`
+   means known by the session's nightly run, never at its close. A feature input reuses `_Snapshots` sorted on
    `vintage_date`; `Input.ids` lets a group load only its series; `Feature.inputs` accepts
    `series:<KEY>`, checked against the registry by a fitness test.
 6. **Nightly.** Task `macro` (`apps/ingestion/.../tasks/macro/series.py`), a non-critical step

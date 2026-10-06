@@ -211,6 +211,18 @@ counts from its `filed` date, whichever partition stored it, so a backfill serve
 financial facts only ever add rows to a store that already has share counts: the first
 `algotrade-ingest shares --force` after they shipped stores them and leaves the rest alone.
 
+**`macro/series`** (ADR 0048; increments merged across runs, one row per series, observation date
+and vintage) holds economic series (`MACRO:<KEY>`) and index levels (`IDX:<KEY>`: index levels
+are series, never bars) declared in `config/site/macro.toml` (`config/site/macro.py`):
+`series` (the vendor's code), `obs_date`, `vintage_date`, `value` (null where FRED prints "."),
+`vintage_kind` (`alfred`: ALFRED's `realtime_start`; `lagged`: `obs_date` + the series'
+`release_lag_days`, for unrevised series and observations before ALFRED's first vintage,
+`data.macro.vintages`). `vintage_date` is the point-in-time date, not `knowledge_ts` (which
+stays the storage stamp): reads (`data.macro.series.series_as_of`) union every partition and
+give each observation's latest vintage on or before the session, so a backfill serves history
+without lookahead; feature groups read it as `Input("macro/series", ids=...)` and name a series
+in `Feature.inputs` as `series:<KEY>`.
+
 Selections read the company columns as `instrument.<column>` (`instrument.sector`,
 `instrument.industry`, `instrument.sic`, `instrument.sic_division`, `instrument.website`,
 `instrument.state_of_incorporation`, `instrument.fiscal_year_end`) from the latest snapshot on

@@ -11,6 +11,8 @@ the domain rules on top:
 - ``rates``      the Treasury curve a date sees (risk-free rates for option pricing)
 - ``rollups``    stored rollup rows over a range of sessions (a rollup reading another)
 - ``shares``     share counts from SEC company facts, point in time by filing date
+- ``macro``      macro series and index levels (``macro/series``), point in time by vintage
+                 (ADR 0048): ``macro.series``, and the ``pit = "lag"`` rule (``macro.vintages``)
 - ``volatility`` IBKR's implied and historical vol per underlying and session (ADR 0028;
                  the IBKR contracts snapshot is a ``reference`` read)
 - ``feature_inputs``  what a feature group reads, by table name (``load_input``): each
