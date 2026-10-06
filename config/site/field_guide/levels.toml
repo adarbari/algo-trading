@@ -1,0 +1,307 @@
+# L3 site setting: the field guide (ADR 0041, amended 2026-10-06), one <theme>.toml per theme
+# plus situations.toml; loaded together by config/site/settings.py load_field_guide. Every
+# [[field]] says how to read one catalogue field, which criterion means what, and when the
+# reading lies; a [[situation]] is one state of the world that fools several thresholds at once.
+# The keys are documented in momentum.toml. Edit by PR; `make features-doc` renders the page.
+
+# Price levels (price_stats@v2, momentum@v1, swing_levels@v1): averages, highs, lows and swing
+# points in dollars per share. A level is compared with the close, not thresholded; the
+# derived fields (pct_vs_sma_*, pct_from_high_52w, dist_to_support, breakout_20d) carry the
+# screening thresholds and this page says what the levels mean.
+
+[[field]]
+name = "rollup.price_stats@v2.sma_20"
+theme = "price levels"
+reads = "The mean close of the last 20 sessions, in dollars: the one-month average, the short-term trend line a pullback returns to. The close above it is a short-term uptrend; feature.pct_vs_sma_20 is the distance as a fraction and feature.pullback_to_sma20 the dip-in-an-uptrend entry (within one ATR of it)."
+caveats = [
+  "An average, so it lags: after a gap the 20-day average takes weeks to catch up and 'above the average' says the gap happened, not that a trend exists.",
+  "Null after any missing bar in the last 20 sessions.",
+]
+sources = ["Brock, Lakonishok and LeBaron (1992) for moving-average rules in general"]
+[[field.use]]
+for = "has a one-month average"
+op = "not_null"
+mode = "hard"
+note = "threshold the distance instead: feature.pct_vs_sma_20"
+
+[[field]]
+name = "rollup.price_stats@v2.sma_50"
+theme = "price levels"
+reads = "The mean close of the last 50 sessions, in dollars: the intermediate trend line, the best single rule in Brock, Lakonishok and LeBaron's long Dow test. Above it is an intermediate uptrend; with the 200-day average it defines feature.trend_state (close above 50 above 200: UPTREND). feature.pct_vs_sma_50 is the distance."
+caveats = [
+  "Lags by about a quarter of its length: a trend change shows in the close weeks before it shows in the average.",
+  "Null after any missing bar in the last 50 sessions or a shorter history.",
+]
+sources = ["Brock, Lakonishok and LeBaron (1992): https://ideas.repec.org/a/bla/jfinan/v47y1992i5p1731-64.html"]
+[[field.use]]
+for = "has a 50-day average"
+op = "not_null"
+mode = "hard"
+note = "threshold the distance instead: feature.pct_vs_sma_50"
+
+[[field]]
+name = "rollup.price_stats@v2.sma_200"
+theme = "price levels"
+reads = "The mean close of the last 200 sessions, in dollars: the long-term trend line, the daily version of Faber's 10-month average. Above it is the classic bull-market condition for the name; the 50-day crossing above it is the 'golden cross', below the 'death cross'. feature.pct_vs_sma_200 is the distance."
+caveats = [
+  "Needs 200 sessions of history: null for listings under ten months old and after any gap, so a hard criterion on it excludes every recent listing (the 'recent listing' situation).",
+  "The crossover signals lag by months and whipsaw in ranges; the evidence is for indices and portfolios more than single names.",
+]
+sources = ["Faber (2007); Brock, Lakonishok and LeBaron (1992)"]
+[[field.use]]
+for = "has a 200-day average (ten months of history)"
+op = "not_null"
+mode = "hard"
+note = "threshold the distance instead: feature.pct_vs_sma_200"
+
+[[field]]
+name = "rollup.price_stats@v2.high_52w"
+theme = "price levels"
+reads = "The highest daily high of the last 252 sessions, split-adjusted, in dollars: the 52-week high investors anchor on (George and Hwang). A level to show next to the close; the distance to it is feature.pct_from_high_52w and the near-the-high band feature.near_52w."
+caveats = [
+  "Split-adjusted but not dividend-adjusted: a large special dividend leaves a high the price cannot regain without the payout.",
+  "Null under 240 bars in the last 252 sessions; feature.pct_from_high_avail uses the high since listing for younger names.",
+]
+sources = ["George and Hwang (2004)"]
+[[field.use]]
+for = "has a 52-week high"
+op = "not_null"
+mode = "hard"
+note = "threshold the distance instead: feature.pct_from_high_52w"
+
+[[field]]
+name = "rollup.price_stats@v2.low_52w"
+theme = "price levels"
+reads = "The lowest daily low of the last 252 sessions, split-adjusted, in dollars: the 52-week low. The distance above it is feature.pct_from_low_52w; LOW in feature.near_52w is within 10% of it."
+caveats = [
+  "A low set on one panic day (a halt, a flash move) can sit far below any price the name has traded at since; feature.pct_from_low_52w then reads 'far from the low' for a name that is at its usual bottom.",
+  "Null under 240 bars in the last 252 sessions.",
+]
+sources = ["George and Hwang (2004)"]
+[[field.use]]
+for = "has a 52-week low"
+op = "not_null"
+mode = "hard"
+note = "threshold the distance instead: feature.pct_from_low_52w"
+
+[[field]]
+name = "rollup.price_stats@v2.history_days"
+theme = "price levels"
+reads = "How many of the last 252 sessions have a bar, the session included: 252 is a full year, 240 is the floor for the 52-week fields, under 200 means the 200-day average is null, under about 60 is a listing a few months old. The one-number form of 'how much history does this name have'."
+caveats = [
+  "A low count is either a young listing (instrument.listed_on) or a name that trades rarely (rollup.price_history@v1.bar_status); the two need different treatment.",
+]
+sources = ["Site convention (the window floors of price_stats@v2)"]
+[[field.use]]
+for = "a full year of history"
+op = "gte"
+value = 240
+mode = "hard"
+[[field.use]]
+for = "enough history for the long averages"
+op = "gte"
+value = 200
+mode = "soft"
+tolerance = 20
+
+[[field]]
+name = "rollup.momentum@v1.atr_14"
+theme = "price levels"
+reads = "Wilder's average true range over 14 sessions, in dollars: the typical daily range including gaps. The unit of swing-trading distances: a stop 2 ATRs below entry (the Turtle rule), a target 3 ATRs above, a pullback 'within 1 ATR' of the average. feature.atr_pct is the same number as a share of price, which is what a screen compares across names."
+caveats = [
+  "Dollars are not comparable across names: $2 is 1% on a $200 stock and 10% on a $20 one. Threshold feature.atr_pct, not this.",
+  "One gap day lifts it for two weeks; a takeover pins it near zero (the 'pending takeover' situation).",
+]
+sources = ["Wilder (1978); the Turtle rules (ATR-sized stops)"]
+[[field.use]]
+for = "has a range (15 consecutive bars)"
+op = "not_null"
+mode = "hard"
+note = "threshold feature.atr_pct instead"
+
+[[field]]
+name = "rollup.momentum@v1.high_20d"
+theme = "price levels"
+reads = "The highest daily high of the last 20 sessions, the session included, in dollars: the top of the month's channel. With rollup.momentum@v1.low_20d it gives feature.range_20d_pct (the channel's height). The close at it is a one-month high."
+caveats = [
+  "Includes today, so a close at the high reads as 'at the channel top' by definition; the breakout test uses rollup.momentum@v1.prior_high_20d, which excludes today.",
+]
+sources = ["Donchian channels (the Turtle rules)"]
+[[field.use]]
+for = "has a 20-day channel"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.momentum@v1.low_20d"
+theme = "price levels"
+reads = "The lowest daily low of the last 20 sessions, the session included, in dollars: the bottom of the month's channel, the Turtle rules' exit level for a long (a close below the 10- or 20-day low). The close at it is a one-month low."
+caveats = [
+  "Includes today: a close at the low is at the channel bottom by definition.",
+]
+sources = ["Donchian channels (the Turtle rules)"]
+[[field.use]]
+for = "has a 20-day channel"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.momentum@v1.high_50d"
+theme = "price levels"
+reads = "The highest daily high of the last 50 sessions, the session included, in dollars: the top of the quarter's channel, the longer Turtle entry level (System 2 used 55 days). A close at it is a quarterly high."
+caveats = [
+  "Includes today; compare the close with yesterday's channel for a breakout test (only the 20-day version stores the prior high).",
+]
+sources = ["Donchian channels (the Turtle rules)"]
+[[field.use]]
+for = "has a 50-day channel"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.momentum@v1.low_50d"
+theme = "price levels"
+reads = "The lowest daily low of the last 50 sessions, the session included, in dollars: the bottom of the quarter's channel. A close at it is a quarterly low."
+caveats = [
+  "Includes today.",
+]
+sources = ["Donchian channels (the Turtle rules)"]
+[[field.use]]
+for = "has a 50-day channel"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.momentum@v1.prior_high_20d"
+theme = "price levels"
+reads = "The highest daily high of the 20 sessions before today, today excluded, in dollars: the level a breakout close has to clear. feature.breakout_20d is the close above it with volume at 1.5 times normal; this field is the level itself, to show next to the close."
+caveats = [
+  "A level set by one spike high (a halt, a news candle) is easy to clear on a quiet day: the volume condition of feature.breakout_20d is there for that reason.",
+  "Null after a gap among those 20 sessions.",
+]
+sources = ["Donchian channels (the Turtle rules); Raschke and Connors on failed breakouts"]
+[[field.use]]
+for = "has a breakout level"
+op = "not_null"
+mode = "hard"
+note = "the breakout itself is feature.breakout_20d"
+
+[[field]]
+name = "rollup.swing_levels@v1.swing_high"
+theme = "price levels"
+reads = "Resistance: the high of the most recent confirmed swing high above the close, in dollars. A swing high is a bar whose high is strictly above the five highs before it and at least the five after, so it is confirmed five sessions later. It is where sellers last showed up above the current price; feature.dist_to_resistance is the distance as a fraction and feature.dist_to_resistance_atr in ATRs."
+caveats = [
+  "Null at a one-year high (nothing above the close): a 'near resistance' criterion then rejects the names breaking out, which is often what you want, and a hard 'not_null' drops them.",
+  "The most recent swing high above the close is not always the strongest: an older, higher one can matter more; rollup.swing_levels@v1.swing_high_date says when it formed.",
+  "Confirmed five sessions late: a swing high from the last week is not yet a level.",
+]
+sources = ["docs/data/swing.md (pivot width 5); practitioner swing-point conventions"]
+[[field.use]]
+for = "has resistance above"
+op = "not_null"
+mode = "hard"
+note = "threshold feature.dist_to_resistance instead"
+
+[[field]]
+name = "rollup.swing_levels@v1.swing_high_date"
+theme = "price levels"
+reads = "The session of the swing high that is the current resistance. A level from last month is fresher than one from eleven months ago: recent levels have more participants anchored to them. A date to show with the level."
+caveats = [
+  "Null when there is no confirmed swing high above the close.",
+]
+sources = ["docs/data/swing.md"]
+[[field.use]]
+for = "has a dated resistance"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.swing_levels@v1.swing_low"
+theme = "price levels"
+reads = "Support: the low of the most recent confirmed swing low below the close, in dollars (a bar whose low is strictly below the five lows before it and at most the five after, confirmed five sessions later). Where buyers last showed up below the current price; the usual place for a stop just under it. feature.dist_to_support is the distance as a fraction and feature.dist_to_support_atr in ATRs."
+caveats = [
+  "Null at a one-year low (nothing below the close): the name just broke every support, which a screen should read as what it is.",
+  "Confirmed five sessions late; a level more than a few ATRs below is not support for a swing trade.",
+]
+sources = ["docs/data/swing.md; the Turtle rules for ATR-scaled stops"]
+[[field.use]]
+for = "has support below"
+op = "not_null"
+mode = "hard"
+note = "threshold feature.dist_to_support instead"
+
+[[field]]
+name = "rollup.swing_levels@v1.swing_low_date"
+theme = "price levels"
+reads = "The session of the swing low that is the current support. A recent low is a level the market has just defended; an old one is a memory. A date to show with the level."
+caveats = [
+  "Null when there is no confirmed swing low below the close.",
+]
+sources = ["docs/data/swing.md"]
+[[field.use]]
+for = "has a dated support"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "feature.pct_from_high_avail"
+theme = "price levels"
+reads = "The close against the highest high of the history available, minus 1 (at or below 0): the 52-week high for a name with a year of bars, the high since listing for a younger one (rollup.price_history@v1.range_sessions says how many sessions that is). The version of feature.pct_from_high_52w that does not go null on recent listings."
+caveats = [
+  "For a young listing the 'high' can be the first day's print (IPO pops): 20% below it after three months is normal, not a discount. Check rollup.price_history@v1.range_sessions before reading the distance like a 52-week one.",
+  "Null for a listing under 20 sessions old or a name trading too rarely.",
+]
+sources = ["George and Hwang (2004) for the 52-week version; site convention (ADR 0046) for the available-history fallback"]
+[[field.use]]
+for = "near the high of its history"
+op = "gte"
+value = -0.10
+mode = "soft"
+tolerance = 0.05
+note = "for names with a year of bars prefer feature.pct_from_high_52w"
+
+[[field]]
+name = "feature.dist_to_resistance_atr"
+theme = "price levels"
+reads = "The distance to resistance in ATRs: how many typical daily ranges sit between the close and the last swing high above it. Under 1 the level is inside today's noise (at resistance); 2 to 4 is a swing trade's room; above 6 the level is out of play. The ATR scaling makes it comparable across calm and volatile names, which feature.dist_to_resistance (a fraction of price) is not."
+caveats = [
+  "Null at a one-year high (no resistance above) and when the ATR is 0: a hard 'room to run' criterion rejects the names at new highs.",
+  "A tiny ATR (a pinned takeover target) makes any distance read as many ATRs; require feature.atr_pct gte 0.005.",
+]
+sources = ["The Turtle rules (ATR-scaled distances); docs/data/swing.md"]
+[[field.use]]
+for = "room to run (in ATRs)"
+op = "gte"
+value = 3
+mode = "soft"
+tolerance = 1
+note = "soft, so a name at a new high (null) is listed rather than rejected"
+[[field.use]]
+for = "at resistance"
+op = "lte"
+value = 1
+mode = "soft"
+tolerance = 0.5
+
+[[field]]
+name = "feature.dist_to_support_atr"
+theme = "price levels"
+reads = "The distance to support in ATRs: how many typical daily ranges sit between the close and the last swing low below it. Under 1 the close is at support (a stop just below it is tight); 2 to 3 is the usual working distance for a swing entry; above 5 a stop at support is a wide one."
+caveats = [
+  "Null at a one-year low (no support below) and when the ATR is 0.",
+  "Support in a downtrend breaks: pair with feature.trend_state eq UPTREND.",
+]
+sources = ["The Turtle rules (a 2 ATR stop); docs/data/swing.md"]
+[[field.use]]
+for = "near support (a tight stop)"
+op = "lte"
+value = 1
+mode = "soft"
+tolerance = 0.5
+note = "with feature.trend_state eq UPTREND"
+[[field.use]]
+for = "a stop at support within reach"
+op = "lte"
+value = 3
+mode = "soft"
+tolerance = 1

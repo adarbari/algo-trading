@@ -210,3 +210,53 @@ Sources: docs/screeners/vrp-scanner.md; https://www.thetaedge.ai/blog/assess-liq
 - Delta is ours (ADR 0021), from the stored chain: on a name whose price moved after the close the band has moved too; confirm on a live quote.
 
 Sources: docs/screeners/vrp-scanner.md (owner decision 2026-10-04: strike choice scored)
+
+### `feature.option_chain_known`
+
+**How to read it.** True when the session's chain run says what the name's options are: its fetch succeeded, or it did not list the name at all (no options). False when the fetch failed for the name (STALE_DATA, FETCH_ERROR, NOT_ATTEMPTED). It separates 'no options' (known, true with a tier of D) from 'we do not know today'.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| the options are known today | `eq true` | soft | 0, LIQUIDITY_RISK | - |
+
+**When the reading lies**
+
+- Null when the chains step did not run for the session at all; the option fields are then null for every name, and a hard option criterion empties the screen. A soft criterion lists the names instead.
+
+Sources: ADR 0043 (the chains step's acceptance); config/site/features/liquidity.toml
+
+### `feature.liquidity_high`
+
+**How to read it.** True when every HIGH threshold holds: $100M a day of stock volume, a close of at least $10, option tier A on both sides, 50,000 of chain open interest and 5,000 of chain volume. The flag behind feature.liquidity_class HIGH: a name that absorbs a large position in stock and options alike.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| the most liquid names | `eq true` | hard | - | or feature.liquidity_class eq HIGH |
+
+**When the reading lies**
+
+- Null (not false) when a threshold cannot be checked because an input is unknown, usually the options on a day the chain fetch failed; feature.liquidity_class says UNKNOWN then.
+- Stock-only screens do not need the option conditions: use rollup.price_stats@v2.adv_usd_20d.
+
+Sources: config/site/features/liquidity.toml (the HIGH params)
+
+### `feature.liquidity_medium`
+
+**How to read it.** True when every MEDIUM threshold holds: $10M a day, a close of at least $5, option tier A or B, 5,000 of chain open interest. The flag behind feature.liquidity_class MEDIUM: tradable for a retail account in both stock and options.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| tradable in stock and options | `eq true` | hard | - | or feature.liquidity_class in [HIGH, MEDIUM] |
+
+**When the reading lies**
+
+- A name that is HIGH is MEDIUM too (the thresholds nest); 'MEDIUM but not HIGH' needs both flags.
+- Null when an input is unknown.
+
+Sources: config/site/features/liquidity.toml (the MEDIUM params)

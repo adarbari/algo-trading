@@ -135,8 +135,11 @@ def test_the_shipped_guide_is_complete() -> None:
         "events",
         "fundamentals",
         "instrument",
+        "levels",
         "liquidity",
         "momentum",
+        "options-chain",
+        "options-wing",
         "situations",
         "volatility",
     ]

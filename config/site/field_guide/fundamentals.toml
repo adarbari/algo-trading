@@ -122,3 +122,92 @@ value = 0.08
 mode = "soft"
 tolerance = 0.01
 note = "with feature.trend_state ne DOWNTREND"
+
+[[field]]
+name = "rollup.financials@v1.eps_diluted_ttm"
+theme = "fundamentals"
+reads = "Diluted earnings per share over the trailing twelve months, summed from the quarters and split-adjusted to the session, in dollars; negative for a loss. The numerator's denominator in feature.pe_ratio, which is null for a loss, so this is the field that can say 'unprofitable': under 0 is a loss-maker, which a growth screen may want and a value screen must know about."
+caveats = [
+  "The TTM lags: it ends at the last filed quarter, up to four months old (rollup.financials@v1.ttm_as_of); rollup.financials@v1.eps_stale flags a figure more than 480 days old.",
+  "One-offs (a tax gain, a write-down, an asset sale) swing a year's EPS; nothing here separates them from operations.",
+  "Null for funds, foreign filers and companies without four consecutive quarters or a fiscal year on file (rollup.financials@v1.financials_status).",
+]
+sources = ["SEC EDGAR company facts (docs/data/vendors.md)"]
+[[field.use]]
+for = "profitable over the last year"
+op = "gt"
+value = 0
+mode = "hard"
+note = "the gate feature.pe_ratio applies implicitly; make it explicit when it matters"
+[[field.use]]
+for = "loss-making (speculative growth, turnarounds)"
+op = "lte"
+value = 0
+mode = "hard"
+
+[[field]]
+name = "rollup.financials@v1.net_income_ttm"
+theme = "fundamentals"
+reads = "Net income over the trailing twelve months, in dollars; negative for a loss. The company-level profit behind EPS: against rollup.financials@v1.revenue_ttm it gives the net margin (10% is healthy for most industries, 20% and above is software or a franchise, under 0 is a loss), and against feature.market_cap the earnings yield."
+caveats = [
+  "Lags like every TTM figure, and includes one-offs.",
+  "Null for funds, foreign filers and incomplete filings; a hard criterion drops every ETF and ADR without US filings.",
+]
+sources = ["SEC EDGAR company facts"]
+[[field.use]]
+for = "profitable"
+op = "gt"
+value = 0
+mode = "hard"
+[[field.use]]
+for = "a large, established earner"
+op = "gte"
+value = 1000000000
+mode = "soft"
+tolerance = { relative = 0.3 }
+
+[[field]]
+name = "rollup.financials@v1.revenue_ttm"
+theme = "fundamentals"
+reads = "Revenue over the trailing twelve months, in dollars: the last four discrete quarters, else the latest fiscal year (rollup.financials@v1.ttm_basis says which). Size of the business in sales terms: under $100M is early-stage, $1B is a mid-sized company, above $50B a giant. The denominator of feature.revenue_growth_yoy and the base of the net margin."
+caveats = [
+  "Which revenue concept a company reports varies (Revenues, RevenueFromContractWithCustomer, SalesRevenueNet); banks and insurers report revenue differently from industrials, so cross-sector comparisons are rough.",
+  "Fiscal-year basis (ttm_basis) lags a quarter-based TTM by up to a year.",
+  "Null for funds, foreign filers and incomplete filings.",
+]
+sources = ["SEC EDGAR company facts (docs/data/vendors.md)"]
+[[field.use]]
+for = "an established business"
+op = "gte"
+value = 1000000000
+mode = "soft"
+tolerance = { relative = 0.3 }
+[[field.use]]
+for = "a small or early-stage business"
+op = "lt"
+value = 100000000
+mode = "soft"
+tolerance = { relative = 0.3 }
+
+[[field]]
+name = "rollup.dividends@v2.div_count_ttm"
+theme = "fundamentals"
+reads = "How many ex-dividend dates fell in the last 365 days: 4 is a quarterly payer, 12 monthly, 1 or 2 annual or semi-annual, 0 a known non-payer. Above the usual cadence (5 for a quarterly payer) means a special dividend inflated feature.div_yield for the year."
+caveats = [
+  "Null for a non-payer with too little history to call it one (under 240 bars); 0 only with a full year of bars.",
+  "Special distributions are excluded from div_ttm by default but still counted here when stored; a count of 5 with an ordinary yield is the usual sign of one.",
+]
+sources = ["Site convention (features/rollups/corporate/dividends.py)"]
+[[field.use]]
+for = "a regular quarterly payer"
+op = "gte"
+value = 4
+mode = "soft"
+tolerance = 1
+note = "pair with feature.div_yield gte 0.02"
+[[field.use]]
+for = "no special-dividend distortion"
+op = "lte"
+value = 4
+mode = "soft"
+tolerance = 1

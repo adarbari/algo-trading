@@ -228,3 +228,51 @@ value = 0
 mode = "score"
 tolerance = 0.20
 note = "full points inside the band, none at 0.20 away"
+
+[[field]]
+name = "feature.option_chain_known"
+theme = "liquidity"
+reads = "True when the session's chain run says what the name's options are: its fetch succeeded, or it did not list the name at all (no options). False when the fetch failed for the name (STALE_DATA, FETCH_ERROR, NOT_ATTEMPTED). It separates 'no options' (known, true with a tier of D) from 'we do not know today'."
+caveats = [
+  "Null when the chains step did not run for the session at all; the option fields are then null for every name, and a hard option criterion empties the screen. A soft criterion lists the names instead.",
+]
+sources = ["ADR 0043 (the chains step's acceptance); config/site/features/liquidity.toml"]
+[[field.use]]
+for = "the options are known today"
+op = "eq"
+value = true
+mode = "soft"
+tolerance = 0
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "feature.liquidity_high"
+theme = "liquidity"
+reads = "True when every HIGH threshold holds: $100M a day of stock volume, a close of at least $10, option tier A on both sides, 50,000 of chain open interest and 5,000 of chain volume. The flag behind feature.liquidity_class HIGH: a name that absorbs a large position in stock and options alike."
+caveats = [
+  "Null (not false) when a threshold cannot be checked because an input is unknown, usually the options on a day the chain fetch failed; feature.liquidity_class says UNKNOWN then.",
+  "Stock-only screens do not need the option conditions: use rollup.price_stats@v2.adv_usd_20d.",
+]
+sources = ["config/site/features/liquidity.toml (the HIGH params)"]
+[[field.use]]
+for = "the most liquid names"
+op = "eq"
+value = true
+mode = "hard"
+note = "or feature.liquidity_class eq HIGH"
+
+[[field]]
+name = "feature.liquidity_medium"
+theme = "liquidity"
+reads = "True when every MEDIUM threshold holds: $10M a day, a close of at least $5, option tier A or B, 5,000 of chain open interest. The flag behind feature.liquidity_class MEDIUM: tradable for a retail account in both stock and options."
+caveats = [
+  "A name that is HIGH is MEDIUM too (the thresholds nest); 'MEDIUM but not HIGH' needs both flags.",
+  "Null when an input is unknown.",
+]
+sources = ["config/site/features/liquidity.toml (the MEDIUM params)"]
+[[field.use]]
+for = "tradable in stock and options"
+op = "eq"
+value = true
+mode = "hard"
+note = "or feature.liquidity_class in [HIGH, MEDIUM]"
