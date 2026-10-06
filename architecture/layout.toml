@@ -129,7 +129,7 @@ contracts = [
 
 [[dir]]
 path = "src/algotrade/quant"
-purpose = "pure numerics (numpy only): option pricing and Greeks, implied vol, realised vol, rate conventions"
+purpose = "pure numerics (numpy only): option pricing and Greeks, implied vol, realised vol, rate conventions, cross-asset stress, bull / bear dating, the probit model"
 contracts = ["Layout: quant is pure numeric code (numpy only: no pandas, pyarrow, storage, data, config or services)"]
 
 [[dir]]
@@ -254,7 +254,7 @@ contracts = [
 
 [[dir]]
 path = "src/algotrade/services/evaluation"
-purpose = "use case: evaluate every strategy on every golden dataset against the baseline"
+purpose = "use case: evaluate every strategy on every golden dataset against the baseline; the regime episode scorecard (dating, leads, false alarms, acceptance, probit fit) over the stored history"
 
 [[dir]]
 path = "src/algotrade/services/preview"

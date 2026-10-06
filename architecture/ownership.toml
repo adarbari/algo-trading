@@ -96,6 +96,13 @@ owner = ["src/algotrade/quant/turning_points.py"]
 section = "docs/market-regime-plan.md#e-what-the-research-literature-adds"
 detect = [{ call_regex = "(^|\\.)(find_peaks|argrelextrema|argrelmax|argrelmin)$" }]
 
+[[responsibility]]
+id = "quant-probit"
+description = "The probit model: maximum-likelihood fit by Newton-Raphson with step halving (coefficients, convergence, log-likelihood) and prediction Phi(X b); the bear-state probit's maths"
+owner = ["src/algotrade/quant/probit.py"]
+section = "docs/market-regime-plan.md#e-what-the-research-literature-adds"
+detect = [{ import = "statsmodels" }, { call_regex = "(^|\\.)(Probit|probit)$" }]
+
 # --------------------------------------------------------------------------- rollups
 
 [[responsibility]]
@@ -629,6 +636,16 @@ owner = [
 ]
 section = "docs/adr/0019-ownership-and-boundaries.md#r5-everything-runs-through-the-job-runner"
 detect = [{ call = "run_screener" }]
+
+[[responsibility]]
+id = "regime-scorecard"
+description = "The regime episode scorecard: bear markets dated from stored index levels against the reference episodes, each score's lead on every episode peak, false alarms per decade, the plan's acceptance as PASS / FAIL, and the bear-state probit fitted on stored history; deterministic text (algotrade-backtest regime-scorecard, make evaluate)"
+owner = [
+    "src/algotrade/services/evaluation/regime_scorecard.py",
+    "src/algotrade/services/evaluation/regime_report.py",
+]
+section = "docs/market-regime-plan.md#4-the-regime-model-we-would-ship"
+detect = [{ call = "fit_probit" }, { call = "false_alarms" }]
 
 # --------------------------------------------------------------------------- api (ADR 0024)
 

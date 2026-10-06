@@ -11,8 +11,8 @@ Point in time is the VINTAGE date, not the partition or ``knowledge_ts``: a 2008
 session knew it: the latest vintage with ``vintage_date`` on or before the session, never a
 later revision. Values are end-of-night like ``bars/1d``: ``vintage_date <= session`` means
 known by the session's nightly run, so a fill at the session's close must not use them. Feature
-groups read the same rows through ``data.feature_inputs`` (every
-vintage known by the session, sorted by ``vintage_date``) and pick the latest themselves.
+groups read the same rows through ``data.feature_inputs``, which applies the same rule
+(``known_window``) per session.
 """
 
 from collections.abc import Sequence
@@ -72,10 +72,19 @@ def series_as_of(
     ``obs_date``), sorted by both, so ``frame.pivot(index="obs_date", columns="instrument_id",
     values="value")`` gives one column per series. ``as_of`` pins what the store held
     (``knowledge_ts``), as for every table."""
+    known = known_window(stored_vintages(reader, ids, as_of), session, lookback)
+    return known.reindex(columns=COLUMNS).reset_index(drop=True)
+
+
+def known_window(vintages: pd.DataFrame, session: date, lookback: int) -> pd.DataFrame:
+    """``series_as_of``'s rule over rows already read (``stored_vintages``' shape): the latest
+    vintage a ``session`` knew of each observation dated from ``lookback`` exchange sessions
+    before the session on, plus each series' latest known observation however old; sorted by
+    id and observation. Pure: the feature input ``macro/series`` applies it per session."""
     if lookback < 0:
         raise ValueError(f"lookback must be >= 0, got {lookback}")
     first = sessions_ending(session, lookback + 1)[0]
-    known = latest_vintages(stored_vintages(reader, ids, as_of), session)
+    known = vintages[vintages["vintage_date"] <= session]
     newest = known.groupby("instrument_id")["obs_date"].transform("max")
     window = known[(known["obs_date"] >= first) | (known["obs_date"] == newest)]
-    return window.reindex(columns=COLUMNS).reset_index(drop=True)
+    return latest_vintages(window, session)

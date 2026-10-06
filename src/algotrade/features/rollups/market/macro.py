@@ -1,9 +1,10 @@
-"""``market_macro@v1``: the slow macro readings of the regime model, one ``MKT:US`` row per
+"""``market_macro@v2``: the slow macro readings of the regime model, one ``MKT:US`` row per
 session (ADR 0047, ADR 0048; docs/market-regime-plan.md sections 3A and 3E).
 
-Inputs: ``macro/series`` (the series of ``SERIES``, by id, point in time by vintage: each value
-is the latest observation known by the session, however old: the ``macro`` task's staleness
-check guards freshness) and ``rates/treasury`` (the session's own Treasury curve). The
+Inputs: ``macro/series`` (the series of ``SERIES``, by id, point in time by vintage: each
+observation as the session knew it, ``HISTORY_SESSIONS`` back, and each value the latest
+observation known by the session, however old: the ``macro`` task's staleness check guards
+freshness) and ``rates/treasury`` (the session's own Treasury curve). The
 registry's ``transform`` (``config/site/macro.toml``) is applied here, not at ingestion: ``yoy``
 is the latest observation over the one a year earlier - 1, ``diff`` the latest minus the one a
 year earlier. Rates, spreads and changes are decimals (FRED's percents / 100: a 5% spread is
@@ -16,6 +17,13 @@ year earlier. Rates, spreads and changes are decimals (FRED's percents / 100: a 
                               sessions
     sahm_gap                  3-month mean unemployment minus its lowest 3-month mean of the
                               previous 12 months (the Sahm rule, from UNRATE's vintages)
+    ebp, ebp_recession_prob   the Fed's excess bond premium (Gilchrist-Zakrajsek) and its
+                              12-month recession probability (published monthly file)
+    ofr_fsi, epu              the OFR Financial Stress Index and the daily Economic Policy
+                              Uncertainty index (published daily files)
+
+v2 (RG3b) added ``ebp``, ``ebp_recession_prob``, ``ofr_fsi`` and ``epu`` (new stored columns are
+a new version, ADR 0023); v1 is superseded.
 
 Every column is null (UNKNOWN) when a series it reads has no observation known by the session
 (no FRED key, or before the series starts) or its window is not complete; with no macro data at
@@ -35,16 +43,17 @@ from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature, Licence
 from algotrade.features.rollups.market.observations import (
+    HISTORY_SESSIONS,
     Series,
+    as_series,
     change_12m,
-    known_series,
     last_months,
     latest,
     since,
 )
 
 NAME = "market_macro"
-VERSION = 1
+VERSION = 2
 MACRO = "macro/series"
 TREASURY = "rates/treasury"
 type Transform = Literal["level", "yoy", "diff"]
@@ -83,6 +92,10 @@ SERIES: dict[str, SeriesUse] = {
     "RECPROUSM156N": SeriesUse(),
     "GDPNOW": SeriesUse(),
     "TOTBKCR": SeriesUse("yoy"),
+    "EBP": SeriesUse(),
+    "EBP_RECESSION_PROB": SeriesUse(),
+    "OFR_FSI": SeriesUse(),
+    "EPU_DAILY": SeriesUse(),
     "VIX": SeriesUse(index=True),
     "VIX3M": SeriesUse(index=True),
 }
@@ -192,6 +205,17 @@ FEATURES = (
        ("GDPNOW",), valid_range=(-0.6, 0.6)),
     _f("bank_credit_yoy", "decimal", f"Bank credit / {_YEAR} - 1 (credit expansion, Baron "
        "and Xiong)", ("TOTBKCR",), valid_range=(-0.5, 0.5)),
+    _f("ebp", "decimal", "Excess bond premium (Gilchrist and Zakrajsek, the Fed's monthly "
+       "update): the part of corporate bond spreads not explained by expected default (0.005 "
+       "= 50 bp; above 0: credit tighter than default risk explains)", ("EBP",),
+       valid_range=(-0.05, 0.1)),
+    _f("ebp_recession_prob", "decimal", "The Fed's estimate, from the excess bond premium, of "
+       "the probability of a recession within 12 months (0.3 = 30%)", ("EBP_RECESSION_PROB",),
+       valid_range=(0, 1)),
+    _f("ofr_fsi", "ratio", "OFR Financial Stress Index (0 = average stress since 2000; above "
+       "0: more stress than average)", ("OFR_FSI",), valid_range=(-10, 50)),
+    _f("epu", "ratio", "Daily US Economic Policy Uncertainty index (Baker, Bloom and Davis; "
+       "about 100 on an average day of 1985-2009)", ("EPU_DAILY",), valid_range=(0, 2000)),
     _f("vix", "pct_points", "Cboe VIX close (20 = 20% implied vol)", ("VIX",),
        valid_range=(0, 150)),
     _f("vix3m", "pct_points", "Cboe 3-month VIX close", ("VIX3M",), valid_range=(0, 150)),
@@ -266,6 +290,10 @@ def _levels(series: Mapping[str, Series]) -> dict[str, float]:
         "cfnai_ma3": latest(series, ID["CFNAIMA3"]),
         "recession_prob_smoothed": pct("RECPROUSM156N"),
         "gdpnow": pct("GDPNOW"),
+        "ebp": pct("EBP"),
+        "ebp_recession_prob": latest(series, ID["EBP_RECESSION_PROB"]),
+        "ofr_fsi": latest(series, ID["OFR_FSI"]),
+        "epu": latest(series, ID["EPU_DAILY"]),
         "vix": vix,
         "vix3m": vix3m,
         "vix_term_ratio": vix / vix3m if vix3m else np.nan,
@@ -309,7 +337,7 @@ def macro_row(
 
 
 def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
-    series = known_series(inputs[MACRO], session)
+    series = as_series(inputs[MACRO])
     row = {"instrument_id": market_id("US"), **macro_row(series, inputs[TREASURY], session)}
     return pd.DataFrame([row], columns=["instrument_id", *COLUMNS])
 
@@ -318,10 +346,11 @@ GROUP = FeatureGroup(
     NAME,
     VERSION,
     "Slow macro readings of the regime model: the yield curve, credit spreads, labour, "
-    "financial conditions, lending, policy, inflation, activity and the VIX term structure, "
-    "each the latest observation known by the session",
+    "financial conditions, lending, policy, inflation, activity, the excess bond premium, "
+    "financial stress, policy uncertainty and the VIX term structure, each the latest "
+    "observation known by the session",
     (
-        Input(MACRO, required=False, ids=tuple(ID.values())),
+        Input(MACRO, lookback=HISTORY_SESSIONS, required=False, ids=tuple(ID.values())),
         Input(TREASURY, required=False),
     ),
     FEATURES,

@@ -1,6 +1,7 @@
-"""``regime@v1``: the scores' arithmetic by hand, the coverage rule (no macro data is UNKNOWN,
-never CALM), the stateless 5-session hold (a one-day STRESS blip holds for 5 sessions), and a
-backfill equal to the nightly, deterministic run after run."""
+"""``regime@v1``: the scores' arithmetic by hand (credit from high yield, else the EBP), the
+coverage rule (no macro data is UNKNOWN, never CALM), the stateless 5-session hold (a one-day
+STRESS blip holds for 5 sessions), and a backfill equal to the nightly, deterministic run after
+run."""
 
 from collections.abc import Mapping
 from datetime import date
@@ -54,6 +55,14 @@ def test_unknown_signals_add_nothing_and_count_as_missing() -> None:
     assert (m.value, m.coverage, m.missing) == (20.0, 0.55, 7)
     assert raw_label(half, P) == "CALM"  # 55% of the weight known: enough for a label
     assert score({}, P, "fragility").coverage == 0.0
+
+
+def test_credit_is_the_high_yield_verdict_else_the_excess_bond_premium() -> None:
+    no_hy = {k: v for k, v in CALM.items() if k != "hy_oas_on"}
+    assert score(no_hy, P, "macro").missing == 1  # neither known: the credit signal is unknown
+    assert score({**no_hy, "ebp": 0.006}, P, "macro").value == 20.0  # before 1997: EBP
+    assert score({**no_hy, "ebp": 0.004}, P, "macro") == score(CALM, P, "macro")
+    assert score({**CALM, "ebp": 0.03}, P, "macro").value == 0.0  # high yield known: it decides
 
 
 def test_weights_must_sum_to_100() -> None:

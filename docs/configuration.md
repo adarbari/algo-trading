@@ -298,7 +298,8 @@ A formula over existing features is a TOML entry, not code (ADR 0023 step 3). Ea
 version (`price_stats.hv30` is `price_stats@v2`'s), a bare name is another expression
 feature or one of the feature's `params`. Operators, lowest precedence first: `or`, `and`,
 `not`, comparisons `< <= > >= == !=` (one per term), `+ -`, `* /`, unary `-`. Functions:
-`if(cond, a, b)`, `abs`, `sqrt`, `log` (natural), `min(a, b, ...)`, `max(a, b, ...)` (numbers
+`if(cond, a, b)`, `abs`, `sqrt`, `log` (natural), `ncdf` (the standard normal CDF, for a
+probit: `ncdf(b0 + b1 * x)`), `min(a, b, ...)`, `max(a, b, ...)` (numbers
 or strings), `clip(x, lo, hi)`, `coalesce(a, b, ...)`, `is_null(x)`, `one_of(x, "A", "B")`,
 `exists(group)`. Types are checked at load: arithmetic takes numbers, `and` / `or` / `not` and
 `if` conditions take bools, `==` compares like with like (never `null`: use `is_null`), and a

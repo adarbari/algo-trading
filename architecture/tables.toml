@@ -187,8 +187,9 @@ name = "rollups/market/market_cross_asset@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
 
 [[table]]
-name = "rollups/market/market_macro@v1"
+name = "rollups/market/market_macro@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
+note = "v1 (RG3a) was never materialised; v2 added ebp, ebp_recession_prob, ofr_fsi and epu"
 
 [[table]]
 name = "rollups/market/regime_indicators@v1"

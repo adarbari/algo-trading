@@ -93,6 +93,17 @@ def test_evaluate_matches_committed_baseline(cli: Cli, tmp_path: Path) -> None:
     assert "regime overlay: no market feature rows in the store" in proc.stdout
 
 
+def test_regime_scorecard_says_no_data_on_a_store_without_macro_rows(
+    cli: Cli, tmp_path: Path
+) -> None:
+    report = tmp_path / "regime.txt"
+    proc = cli("regime-scorecard", "--report", str(report))
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert proc.stdout.count("no data: run the macro backfill") == 5  # (a) (b) (c) (d) (f)
+    assert "algotrade-ingest run macro --since 1970-01-01" in proc.stdout
+    assert report.read_text() == proc.stdout == cli("regime-scorecard").stdout  # deterministic
+
+
 def test_backtest_outputs_json(cli: Cli) -> None:
     proc = cli("backtest", "--strategy", "sma_crossover", "--dataset", "bull_trend",
                "--param", "fast=10", "--param", "slow=50")  # fmt: skip

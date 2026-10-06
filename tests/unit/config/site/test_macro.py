@@ -57,6 +57,11 @@ def test_the_shipped_registry() -> None:
     }
     assert min(revised_late.values()) >= 125  # a final value before ALFRED's first vintage
     assert all(s.terms for s in macro.series)
+    files = {"EBP", "EBP_RECESSION_PROB", "OFR_FSI", "EPU_DAILY"}  # re-estimated in place
+    assert {s.key for s in macro.series if s.revised} == files
+    assert all(macro.by_key(k).pit == "lag" and macro.by_key(k).is_revised for k in files)
+    assert macro.by_key("UNRATE").is_revised and not macro.by_key("T10Y3M").is_revised
+    assert macro.by_key("EBP").release_lag_days == 45  # the Fed posts irregularly
     assert load_macro(MemoryConfigStore({})).series == ()
 
 

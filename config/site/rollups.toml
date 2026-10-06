@@ -105,6 +105,7 @@ sloos_above = 0.20           # more than 20% of banks tightening C&I standards
 permits_at_most = -0.20      # permits down 20% or more on the year
 fed_hikes_above = 0.02       # fed funds up more than 200 bp on the year
 cpi_above = 0.04             # CPI inflation above 4%
+ebp_above = 0.005            # credit when the high-yield spread is unknown (before 1997): EBP above 50 bp
 w_trend = 20.0               # market_stress: the card verdicts spx_trend_200d, vix_term,
 w_vol_term = 20.0            # breadth_200d and the thresholds below
 w_drawdown = 10.0
