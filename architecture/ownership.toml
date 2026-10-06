@@ -909,7 +909,7 @@ enforced_by = ["eslint no-restricted-globals / no-restricted-syntax / no-restric
 id = "web-session"
 description = "The browser's Supabase session: password sign-in and sign-out, the access token sent as the bearer on every request, a 401 ending the session (ADR 0040)"
 owner = ["apps/web/src/shared/api/auth.ts"]
-section = "docs/adr/0040-identity-and-roles.md"
+section = "docs/adr/0040-identity-and-roles.md#decision"
 enforced_by = ["eslint no-restricted-imports: @supabase/supabase-js only in src/shared/api (apps/web/lint-rules/restrictions.js)"]
 
 [[web_responsibility]]
