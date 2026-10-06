@@ -1,4 +1,4 @@
-# Expression features over price_stats (L3, reviewed via PR; ADR 0023 step 3). Each [name] is
+# Expression features over price_stats and price_history (L3, reviewed via PR; ADR 0023 step 3). Each [name] is
 # one feature: a formula over stored features (group.column), other expression features (by
 # name) and its own params. Computed on read unless materialise = true. The language and the
 # keys: docs/configuration.md "Expression features". Changing a formula: bump its version.
@@ -9,6 +9,15 @@ dtype = "float"
 unit = "decimal"
 description = "Close / 52-week high - 1 (at or below 0)"
 null_meaning = "price_stats high_52w is null (fewer than 240 bars in the last 252 sessions), or no price_stats row"
+valid_range = [-1, 0]
+version = 1
+
+[pct_from_high_avail]
+expr = "price_stats.close / price_history.high_avail - 1"
+dtype = "float"
+unit = "decimal"
+description = "Close / the high over the history available - 1 (at or below 0): the 52-week high, or the high since listing for a younger listing (price_history range_sessions says how many sessions)"
+null_meaning = "no trade on the session (no price_stats row), or price_history high_avail is null (a listing under 20 sessions old, or a name trading too rarely for the window)"
 valid_range = [-1, 0]
 version = 1
 
