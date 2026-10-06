@@ -3,11 +3,12 @@
 from dataclasses import replace
 
 from algotrade.features.catalogue import _cell, render, valid_values
+from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.registry import FEATURES, GROUPS, catalogue_columns, feature
 from algotrade.features.site import site_features
 from algotrade.storage.configs.files import FileConfigStore
 from tests.conftest import REPO_ROOT
-from tests.helpers.rollup_store import features
+from tests.helpers.rollup_store import MARKET_COUNTS, features
 
 
 def test_lookup_by_key_or_selection_field() -> None:
@@ -44,3 +45,16 @@ def test_render_lists_every_group_feature_expression_and_superseded_group() -> N
     assert "`rollups/instrument/div_yield@v1` |" in text and "(within = 0.1)" in text
     assert "| `liquidity_class@v1` | `price_stats@v2` + expression features; `chain_oi`" in text
     assert "`rule_hash` retired" in text
+
+
+def test_market_groups_get_their_own_section_only_when_there_are_any() -> None:
+    site = site_features(FileConfigStore(REPO_ROOT / "config"))
+    assert "## Market features" not in render(site)
+    code = {**site.code, MARKET_COUNTS.key: MARKET_COUNTS}
+    with_market = FeatureSet(code, site.expressions, site.superseded)
+    text = render(with_market)
+    market = text.index("## Market features")
+    assert text.index("## `price_stats@v2`") < market < text.index("## Expression features")
+    assert "\n### `market_counts@v1`" in text and "\n## `market_counts@v1`" not in text
+    assert "Stored as `rollups/market/market_counts@v1`" in text
+    assert "`market.<group>@v<N>.<column>`" in text

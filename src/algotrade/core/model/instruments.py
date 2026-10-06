@@ -4,6 +4,8 @@
   else the symbol id ``EQ:<SYMBOL>``. A FIGI id never changes, whatever the ticker does.
 - Options: ``OPT:<OCC symbol>`` (``OPT:SPY261231C00586000``).
 - Reference rates: ``RATE:<curve>-<tenor>`` (``RATE:UST-3M``, a Treasury par yield tenor).
+- Markets: ``MKT:<market>`` (``MKT:US``), the one row per session of a market-entity feature
+  group (``rollups/market/<name>@v<N>``; ADR 0047). Not tradable; only ``market_id`` builds it.
 
 Every stored row is keyed by these ids, never by a raw ticker. Code that has a vendor ticker
 resolves it through ``data.resolver.SymbolResolver``; only ``equity_id`` builds ``EQ:`` ids.
@@ -21,6 +23,7 @@ class AssetClass(StrEnum):
     OPTION = "OPT"
     FUTURE = "FUT"
     RATE = "RATE"  # a reference interest rate (one tenor of a yield curve), not tradable
+    MARKET = "MKT"  # a whole market (the row of a market-entity feature group), not tradable
 
 
 def instrument_id(asset_class: AssetClass, symbol: str) -> str:
@@ -34,6 +37,12 @@ def equity_id(symbol: str, figi: str | None = None) -> str:
     """The id rule for equities and ETFs: FIGI-based when a composite FIGI is known."""
     has_figi = figi is not None and bool(str(figi).strip())
     return instrument_id(AssetClass.EQUITY, str(figi) if has_figi else symbol)
+
+
+def market_id(market: str) -> str:
+    """The id of a whole market's row in a market-entity feature group: ``market_id("US")``
+    is ``MKT:US`` (ADR 0047). The one place the ``MKT:`` prefix is built."""
+    return instrument_id(AssetClass.MARKET, market)
 
 
 def is_figi_id(instrument: str, figi: str | None) -> bool:

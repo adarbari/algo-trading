@@ -99,5 +99,7 @@ def feature(name: str) -> Feature | None:
 
 
 def catalogue_columns() -> dict[str, Mapping[str, str]]:
-    """``{"price_stats@v2": {"hv30": "float32", ...}}``: the selectable group fields."""
-    return {key: g.columns for key, g in GROUPS.items()}
+    """``{"price_stats@v2": {"hv30": "float32", ...}}``: the instrument groups' selectable
+    fields (a market-entity group is read as ``market.<group>@v<N>.<column>``, never selected
+    per instrument: ADR 0047)."""
+    return {key: g.columns for key, g in GROUPS.items() if g.entity == "instrument"}

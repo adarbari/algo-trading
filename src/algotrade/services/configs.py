@@ -31,7 +31,11 @@ def field_catalog(store: ConfigStore | None = None, user: str | None = None) -> 
 
 
 def catalog_of(fs: FeatureSet) -> FieldCatalog:
-    expressions = {n: e.feature.dtype for n, e in fs.expressions.items()}
+    """``fs``'s per-instrument fields (market-entity features are not selectable per
+    instrument: ADR 0047)."""
+    expressions = {
+        n: e.feature.dtype for n, e in fs.expressions.items() if e.feature.entity == "instrument"
+    }
     return FieldCatalog.build(catalogue_columns(), expressions, fs.moved_field)
 
 

@@ -255,6 +255,22 @@ range; every feature is listed in the generated **[feature catalogue](features.m
   exactly as the nightly run would have. Nightly runs it for every session it ingests, after
   earnings, bars, corporate actions, rates and chains. `--only` computes just the named
   rollups; their dependencies are read from the store.
+- **Market-entity groups** (ADR 0047). A group declared with `entity = "market"` describes the
+  whole market, not an instrument: breadth, trend, stress. It is stored as
+  `rollups/market/<name>@v<N>` with **one row per session**, `instrument_id = MKT:US`
+  (`core.model.instruments.market_id`, the only place that id is built; the column is the
+  storage key, as `RATE:UST-3M` is for rates), the point-in-time columns unchanged, and is
+  read as `market.<name>@v<N>.<column>`, never selected per instrument. Its compute has the
+  same signature and reads ordinary multi-instrument frames (all of `bars/1d`, other groups'
+  tables), plus `universe` (the session's universe snapshot, `None` before the first one: a
+  later list would count today's survivors) and `instruments/symbol_ids` (symbol -> id from the
+  reference snapshot, to find SPY without building an id). `symbol_ids` is a lookup only, never
+  a population (it may come from a later snapshot); `universe` is the population. The runner
+  fails the group unless it returns exactly that one row. An instrument group never reads a
+  market group (broadcasting needs its own ADR), and a market group's `applies_to` is `any`.
+  An expression feature takes the entity of what it reads; one
+  that reads two entities is a definition error. `compute_rollups(..., entity="market")`
+  computes them after the instrument groups; the catalogue lists them under "Market features".
 
 Per-column meanings, units, ranges and null meanings: [features.md](features.md). Floats of
 the v2 groups are stored as 32-bit (`float32`). Columns computed from other columns are

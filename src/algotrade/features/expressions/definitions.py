@@ -1,6 +1,9 @@
 """Expression features from their site definitions: parsed, parameters bound, names resolved,
 the dependency graph checked and every formula type checked against the catalogue. Each
-takes the most restrictive licence of the features it reads (``Feature.licence``).
+takes the most restrictive licence of the features it reads (``Feature.licence``), and the
+entity of what it reads (``Feature.entity``: a formula over market groups is a market feature,
+ADR 0047); a formula that reads more than one entity is an error (broadcasting a market value
+to every instrument would need its own ADR).
 
 ``build_expressions(definitions, groups)`` returns each ``Expression`` by name in dependency
 order (an expression after the expressions it reads). A formula names stored features as
@@ -38,7 +41,13 @@ from algotrade.features.expressions.nodes import (
 )
 from algotrade.features.expressions.parser import parse_formula
 from algotrade.features.framework.declaration import FeatureGroup
-from algotrade.features.framework.feature import Feature, Licence, feature_problems, strictest
+from algotrade.features.framework.feature import (
+    Entity,
+    Feature,
+    Licence,
+    feature_problems,
+    strictest,
+)
 
 _NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 
@@ -170,11 +179,28 @@ def _order(uses: Mapping[str, tuple[str, ...]], where: Mapping[str, str]) -> lis
     return done
 
 
-def _feature(d: FeatureDefinition, inputs: tuple[str, ...], licence: Licence = "open") -> Feature:
+def _entity(where: str, read: Mapping[str, Entity]) -> Entity:
+    """The one entity of everything a formula reads (``read``: name -> its entity);
+    ``instrument`` when it reads nothing. ``ExpressionError`` when it reads two."""
+    found = sorted(set(read.values()))
+    if len(found) > 1:
+        names = ", ".join(f"{n} ({e})" for n, e in sorted(read.items()))
+        raise ExpressionError(
+            where, None, f"reads features of more than one entity ({' and '.join(found)}): {names}"
+        )
+    return found[0] if found else "instrument"
+
+
+def _feature(
+    d: FeatureDefinition,
+    inputs: tuple[str, ...],
+    licence: Licence = "open",
+    entity: Entity = "instrument",
+) -> Feature:
     f = Feature(
         d.name, d.dtype, d.unit, d.description, d.null_meaning, d.kind,  # type: ignore[arg-type]
         valid_range=d.valid_range, categories=d.categories, inputs=inputs, version=d.version,
-        licence=licence,
+        licence=licence, entity=entity,
     )  # fmt: skip
     problems = feature_problems(f)
     if d.kind == "label" and not d.categories:
@@ -232,9 +258,22 @@ def build_expressions(
         )
         licences = [by_name[r.partition(".")[0]].feature(r.partition(".")[2]).licence
                     for r in stored] + [out[u].feature.licence for u in uses[name]]  # fmt: skip
-        feature = _feature(d, inputs, strictest(licences))
+        entity = _entity(d.where, _read_entities(by_name, [*stored, *exists], uses[name], out))
+        feature = _feature(d, inputs, strictest(licences), entity)
         out[name] = Expression(feature, d, node, result, stored, uses[name], tuple(exists))
     return {n: e for n, e in out.items() if n in defs}
+
+
+def _read_entities(
+    groups: Mapping[str, FeatureGroup],
+    stored: Sequence[str],
+    uses: Sequence[str],
+    expressions: Mapping[str, Expression],
+) -> dict[str, Entity]:
+    """Each name a formula reads -> its entity: stored ``group.column`` and ``exists(group)``
+    names by their group, expression features by their own."""
+    read = {s: groups[s.partition(".")[0]].entity for s in stored if s.partition(".")[0] in groups}
+    return read | {u: expressions[u].feature.entity for u in uses if u in expressions}
 
 
 def formula_type(
@@ -249,7 +288,11 @@ def formula_type(
     by_name = {g.name: g for g in groups.values()}
     declared = {n: feature_type(e.feature.dtype, e.feature.categories) for n, e in base.items()}
     node = parse_formula(expr, where)
-    return check_formula(node, _Scope(where, by_name, declared), where)
+    result = check_formula(node, _Scope(where, by_name, declared), where)
+    refs, exists = _names(node)
+    stored = [r.name for r in refs if "." in r.name]
+    _entity(where, _read_entities(by_name, [*stored, *exists], [r.name for r in refs], base))
+    return result
 
 
 def _fits(d: FeatureDefinition, result: Type) -> None:

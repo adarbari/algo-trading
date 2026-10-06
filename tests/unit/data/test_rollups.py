@@ -1,6 +1,6 @@
-"""Stored rollup rows: one instrument's latest row, a range for some instruments, and the
-read path of expression features (only the columns asked for, a column a partition lacks as
-null, nothing when nothing is stored)."""
+"""Stored rollup rows: one instrument's latest row, a range for some instruments, the read
+path of expression features (only the columns asked for, a column a partition lacks as null,
+nothing when nothing is stored) and one session's group fields of a market's row."""
 
 from datetime import date
 
@@ -8,7 +8,7 @@ import pytest
 
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data.prices import adjusted_bars
-from algotrade.data.rollups import feature_rows, rollup_row, rollup_rows
+from algotrade.data.rollups import feature_rows, group_view, rollup_row, rollup_rows
 from tests.helpers.rollup_store import store, write_rows
 from tests.helpers.stored_frames import stamped
 
@@ -48,3 +48,17 @@ def test_feature_rows_read_only_the_columns_asked_for() -> None:
         "session_date", "instrument_id",
     ]  # fmt: skip
     assert feature_rows(reader, "rollups/instrument/none@v1", {"a"}, D1, D2) is None
+
+
+def test_group_view_reads_exactly_the_sessions_partition_for_the_ids() -> None:
+    writer, reader = store()
+    market = "rollups/market/breadth@v1"
+    write_rows(writer, market, D1, [{"instrument_id": "MKT:US", "share": 0.4, "n": 10}])
+    fields = ["market.breadth@v1.share", "market.other@v1.x"]
+    frame, missing = group_view(reader, D1, fields, ["MKT:US"])
+    assert frame.to_dict("list") == {"instrument_id": ["MKT:US"], "market.breadth@v1.share": [0.4]}
+    assert missing == ("rollups/market/other@v1",)
+    later, gone = group_view(reader, D2, fields[:1], ["MKT:US"])  # never the older partition
+    assert list(later.columns) == ["instrument_id"] and gone == (market,)
+    with pytest.raises(ValueError, match="not a feature group field"):
+        group_view(reader, D1, ["instrument.symbol"], ["MKT:US"])

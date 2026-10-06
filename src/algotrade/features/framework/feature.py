@@ -8,8 +8,12 @@ metadata is declared next to the compute that produces it (``features/rollups/<g
 and drives the generated feature catalogue (``docs/data/features.md``), the stored column
 type and, later, UI and email labels (ADR 0023).
 
-- ``entity``      what one row describes: ``instrument`` today (``market``, ``contract``,
-                  ``sector`` are reserved for when a feature needs that grain)
+- ``entity``      what one row describes: ``instrument`` (one row per instrument) or
+                  ``market`` (one ``MKT:US`` row per session: breadth, trend, regime; stored
+                  in ``rollups/market/``, selectable as ``market.<group>@v<N>.<column>``;
+                  ADR 0047). A group's value is inherited by its features; an expression
+                  feature's is that of what it reads (mixing entities is an error).
+                  ``contract`` and ``sector`` are reserved for when a feature needs that grain
 - ``kind``        how it is computed: ``window`` (one entity's history up to the session:
                   bars, events, filings, earlier sessions), ``chain`` (one session's option
                   chain), ``expression`` (arithmetic / logic over other features of the same
@@ -56,9 +60,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
 
-from algotrade.core.model.fields import FIELD_TYPES, NUMERIC_TYPES, ROLLUP_TABLE_PREFIX
+from algotrade.core.model.fields import FIELD_TYPES, NUMERIC_TYPES, group_field, rollup_table
 
-type Entity = Literal["instrument"]
+type Entity = Literal["instrument", "market"]
 type Kind = Literal["window", "chain", "expression", "cross_section", "label"]
 type Range = tuple[float | None, float | None]
 type Licence = Literal["open", "personal"]
@@ -67,7 +71,7 @@ type AppliesTo = Literal["any", "optionable", "operating_company"]
 # stored table of the feature declaring it (an EXPLAINED status covers a missing row there only).
 type StatusRule = tuple[str, frozenset[str], frozenset[str], str]
 
-ENTITIES = frozenset({"instrument"})
+ENTITIES = frozenset({"instrument", "market"})
 KINDS = frozenset({"window", "chain", "expression", "cross_section", "label"})
 LICENCES = ("open", "personal")  # least to most restrictive
 APPLIES_TO = ("any", "optionable", "operating_company")
@@ -150,19 +154,22 @@ class Feature:
     def status_table(self) -> str:
         """The stored table holding ``null_status`` (``""``: none)."""
         group, _ = self.status_column
-        return f"{ROLLUP_TABLE_PREFIX}{group}" if group else ""
+        return rollup_table(self.entity, group) if group else ""
 
     @property
     def status_field(self) -> str:
         """The selection field of ``null_status`` (``""``: none): a sibling column of this
         group, or ``<group>.<column>@v<N>`` of another."""
         group, column = self.status_column
-        return f"rollup.{group}.{column}" if group else ""
+        return group_field(self.entity, group, column) if group else ""
 
     @property
     def field(self) -> str:
-        """The selection field: ``rollup.<group>@v<N>.<column>`` or ``feature.<name>``."""
-        return f"rollup.{self.group}.{self.name}" if self.group else f"feature.{self.name}"
+        """The selection field: ``rollup.<group>@v<N>.<column>`` (``market.`` for a market
+        group) or ``feature.<name>``."""
+        if not self.group:
+            return f"feature.{self.name}"
+        return group_field(self.entity, self.group, self.name)
 
 
 def is_feature_ref(ref: str) -> bool:

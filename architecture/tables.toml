@@ -166,6 +166,11 @@ name = "rollups/instrument/nearest_expiry@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
+name = "rollups/market/*"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "market-entity feature groups (ADR 0047): one MKT:US row per session, compute_rollups(entity='market')"
+
+[[table]]
 name = "rollups/daily/*"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "none produced yet (phase 6); rollups are computed only by the rollups task"

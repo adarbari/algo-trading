@@ -5,7 +5,9 @@ browser never guesses a format from a feature's name).
 
 The catalogue is the caller's: the site's fields plus their own expression features
 (``ctx.features``, read once per request; ADR 0023 step 4). Instrument facts first, then
-feature groups in registry order, then expression features."""
+feature groups in registry order, then expression features. A market's catalogue
+(``entity="market"``, ADR 0047) is its groups' ``market.<group>@v<N>.<column>`` fields and
+the expression features over them."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -15,11 +17,11 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.fields import (
     COMPANY_TABLE,
     FEATURE_FIELD_PREFIX,
+    GROUP_FIELD_HEADS,
     field_source,
     is_feature_field,
 )
 from algotrade.features.expressions.feature_set import FeatureSet
-from algotrade.features.registry import GROUPS, feature
 from algotrade.services.configs import catalog_of
 from algotrade.services.read.context import Stores
 
@@ -93,8 +95,8 @@ class UnknownFeatureError(ConfigurationError):
     """A name that is not in the caller's catalogue (GraphQL ``UNKNOWN_FEATURE``)."""
 
 
-def _group_info(name: str, dtype: str) -> FeatureInfo:
-    found = feature(name)
+def _group_info(fs: FeatureSet, name: str, dtype: str) -> FeatureInfo:
+    found = fs.feature(name)
     if found is None:  # pragma: no cover - every catalogue field of a group is declared
         raise UnknownFeatureError(f"no feature metadata for {name!r}")
     unit = found.unit or None
@@ -109,7 +111,7 @@ def _group_info(name: str, dtype: str) -> FeatureInfo:
         version=found.version,
         group=found.group,
         key=found.key,
-        inputs=tuple(found.inputs) or tuple(i.table for i in GROUPS[found.group].inputs),
+        inputs=tuple(found.inputs) or tuple(i.table for i in fs.code[found.group].inputs),
         unit=unit,
         range=found.valid_range,
         categories=tuple(found.categories),
@@ -151,17 +153,21 @@ def _instrument_info(name: str, dtype: str) -> FeatureInfo:
 
 
 def _info(fs: FeatureSet, name: str, dtype: str) -> FeatureInfo:
-    if name.startswith("rollup."):
-        return _group_info(name, dtype)
+    if name.partition(".")[0] in GROUP_FIELD_HEADS.values():
+        return _group_info(fs, name, dtype)
     if is_feature_field(name):
         return _expression_info(fs, name, dtype)
     return _instrument_info(name, dtype)
 
 
-def feature_infos(fs: FeatureSet, names: Sequence[str] | None = None) -> dict[str, FeatureInfo]:
+def feature_infos(
+    fs: FeatureSet, names: Sequence[str] | None = None, entity: str = "instrument"
+) -> dict[str, FeatureInfo]:
     """The catalogue entries of ``names`` in ``fs`` (None: every field, in catalogue order;
-    see the module docstring). ``UnknownFeatureError`` naming the first name ``fs`` does not
-    have (and where it moved, for a field of a superseded group)."""
+    see the module docstring) for one ``entity``. ``UnknownFeatureError`` naming the first
+    name ``fs`` does not have (and where it moved, for a field of a superseded group)."""
+    if entity != "instrument":
+        return _entity_infos(fs, names, entity)
     catalogue = catalog_of(fs)
     out: dict[str, FeatureInfo] = {}
     for name in catalogue.fields if names is None else names:
@@ -172,6 +178,16 @@ def feature_infos(fs: FeatureSet, names: Sequence[str] | None = None) -> dict[st
                 raise UnknownFeatureError(str(error)) from error
         out[name] = _info(fs, name, catalogue.fields[name])
     return out
+
+
+def _entity_infos(
+    fs: FeatureSet, names: Sequence[str] | None, entity: str
+) -> dict[str, FeatureInfo]:
+    fields = fs.field_types(entity)
+    unknown = [n for n in names or () if n not in fields]
+    if unknown:
+        raise UnknownFeatureError(f"unknown {entity} feature {unknown[0]!r}")
+    return {n: _info(fs, n, fields[n]) for n in (fields if names is None else names)}
 
 
 def load_catalogue(ctx: Stores) -> tuple[FeatureInfo, ...]:

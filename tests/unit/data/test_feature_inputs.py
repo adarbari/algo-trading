@@ -1,7 +1,8 @@
 """Feature inputs asked of ``algotrade.data`` by table name: each table's point-in-time read
 (bars, earnings snapshots, chain partitions, events by event date, the Treasury curve, share
-facts, the reference's security types, IBKR vols) and other groups' stored rows, with this
-run's rows winning."""
+facts, the reference's security types, IBKR vols, the universe snapshot, the symbol -> id
+map) and other groups' stored rows (instrument and market groups), with this run's rows
+winning."""
 
 from datetime import date, timedelta
 
@@ -20,7 +21,7 @@ from tests.helpers.rollup_store import (
     write_dividends,
     write_split,
 )
-from tests.helpers.stored_frames import stamped
+from tests.helpers.stored_frames import stamped, universe_rows, write_reference
 
 
 def test_loaders() -> None:
@@ -53,6 +54,39 @@ def test_rollup_input_reads_store_and_this_runs_rows_win() -> None:
     assert loaded.at(days[4], 2) is None  # computed here with no rows: no stale stored rows
     assert inputs.load_input(reader, "rollups/instrument/none@v1", [END], 0).at(END, 0) is None
     assert inputs.has_input(table) and not inputs.has_input("bars/7m")
+    assert inputs.has_input("rollups/market/breadth@v1") and inputs.is_group_table(table)
+    assert not inputs.is_group_table("rollups/market/")
+
+
+def test_universe_is_the_snapshot_the_session_sees_and_none_before_the_first() -> None:
+    writer, reader = store()
+    days = write_bars(writer, {"EQ:A": series(4)})
+    universe = inputs.load_input(reader, "universe", days, 0)
+    assert universe.at(days[0], 0) is None  # nothing stored
+    writer.write_table("universe", days[1], "u1", stamped(universe_rows(["A", "B"]), days[1], "u1"))
+    writer.write_table("universe", days[3], "u3", stamped(universe_rows(["A"]), days[3], "u3"))
+    universe = inputs.load_input(reader, "universe", days, 0)
+    assert universe.at(days[0], 0) is None  # only later lists: survivorship, so none
+    seen = universe.at(days[2], 0)
+    assert seen is not None and sorted(seen["instrument_id"]) == ["EQ:A", "EQ:B"]
+    latest = universe.at(days[3], 0)
+    assert latest is not None and list(latest["instrument_id"]) == ["EQ:A"]
+
+
+def test_symbol_ids_resolve_through_the_reference_the_session_sees() -> None:
+    writer, reader = store()
+    days = write_bars(writer, {"EQ:A": series(3)})
+    ids = inputs.load_input(reader, "instruments/symbol_ids", days, 0)
+    assert ids.at(days[0], 0) is None  # no reference stored
+    write_reference(writer, days[1], {"SPY": "EQ:BBG000BDTBL9", "A": "EQ:A"})
+    ids = inputs.load_input(reader, "instruments/symbol_ids", days, 0)
+    early, on = ids.at(days[0], 0), ids.at(days[1], 0)
+    assert on is not None and on.to_dict("list") == {
+        "symbol": ["A", "SPY"],
+        "instrument_id": ["EQ:A", "EQ:BBG000BDTBL9"],
+        "pre_snapshot": [False, False],
+    }
+    assert early is not None and list(early["pre_snapshot"]) == [True, True]
 
 
 def test_event_inputs_are_by_event_date_and_never_later() -> None:
