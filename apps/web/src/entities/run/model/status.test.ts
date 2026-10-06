@@ -14,12 +14,15 @@ describe('status tones', () => {
     expect(statusTone('SUCCEEDED')).toBe('positive');
     expect(statusTone('WAIVED')).toBe('warning');
     expect(statusTone('NOT_RUN')).toBe('negative');
+    expect(statusTone('WAITING')).toBe('info');
+    expect(segmentTone('WAITING')).toBe('info');
     expect(segmentTone('NO_CHAIN')).toBe('muted');
     expect(segmentTone('OK')).toBe('positive');
   });
 
   it('explains the common item codes', () => {
     expect(statusHint('STALE_DATA: chain is for 2026-10-01')).toMatch(/UNKNOWN/);
+    expect(statusHint('WAITING')).toMatch(/not published/);
     expect(statusHint('SOMETHING_ELSE')).toBeUndefined();
   });
 });

@@ -1,8 +1,9 @@
 """What earlier nightly attempts of a session already did (ADR 0039: resume, expiry).
 
-A FAILED session is retried (the hourly watchdog, or the next night) from where it stopped:
+A FAILED or WAITING session (ADR 0043: its source has not published it yet) is retried (the
+hourly watchdog, or the next night) from where it stopped:
 a step that SUCCEEDED or was WAIVED in an earlier attempt is not run again; its stored result
-is reused. A step that ran and FAILED is remembered, so a latest-only step
+is reused. A step that ran and FAILED or was WAITING is remembered, so a latest-only step
 (a source that serves only the current snapshot) whose session is no longer the latest FAILS
 as expired instead of being SKIPPED: the session stays FAILED until it is waived by hand.
 """
@@ -21,7 +22,7 @@ DONE = (StepStatus.SUCCEEDED, StepStatus.WAIVED)
 @dataclass(frozen=True)
 class Attempts:
     done: dict[str, dict[str, Any]] = field(default_factory=dict)  # step -> stored result
-    tried: frozenset[str] = frozenset()  # steps an earlier attempt ran and saw FAIL
+    tried: frozenset[str] = frozenset()  # steps an earlier attempt ran and saw FAIL or WAIT
 
 
 def _current(steps: dict[str, Any]) -> bool:
@@ -33,8 +34,8 @@ def _current(steps: dict[str, Any]) -> bool:
 
 def earlier_attempts(reader: StoreReader, session: date) -> Attempts:
     """The session's earlier ``nightly`` attempts, oldest first: the steps done (with the run
-    id that did them) and the steps that FAILED. A step held back (NOT_RUN) was never tried,
-    so a latest-only one (screens behind failed bars) is SKIPPED later, not expired."""
+    id that did them) and the steps that FAILED or WAITED. A step held back (NOT_RUN) was never
+    tried, so a latest-only one (screens behind failed bars) is SKIPPED later, not expired."""
     done: dict[str, dict[str, Any]] = {}
     tried: set[str] = set()
     for record in sorted(reader.runs(NIGHTLY_RUN, session), key=lambda r: r.started_at):
@@ -45,6 +46,6 @@ def earlier_attempts(reader: StoreReader, session: date) -> Attempts:
             status = parse_status(str(step.get("status")))
             if status in DONE:
                 done[name] = {**step, "status": status.value, "run_id": record.run_id}
-            elif status is StepStatus.FAILED:  # ran and failed; NOT_RUN was never tried
+            elif status in (StepStatus.FAILED, StepStatus.WAITING):  # NOT_RUN was never tried
                 tried.add(name)
     return Attempts(done, frozenset(tried - set(done)))

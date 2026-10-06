@@ -23,7 +23,11 @@ PURGE_STEP = "purge-raw"
 SLACK = timedelta(minutes=1)  # clock jitter between a task's record and the nightly's
 # A nightly record's status as the summary shows it (ADR 0039: a session that SUCCEEDED is
 # stored COMPLETE; PARTIAL only in records written before it, shown as stored).
-SHOWN_STATUS = {RunStatus.COMPLETE: "SUCCEEDED", RunStatus.FAILED: "FAILED"}
+SHOWN_STATUS = {
+    RunStatus.COMPLETE: "SUCCEEDED",
+    RunStatus.WAITING: "WAITING",
+    RunStatus.FAILED: "FAILED",
+}
 
 
 def job_name(step: str) -> str | None:

@@ -12,7 +12,8 @@ Every ingestion task runs inside one ``IngestRun``, which owns:
   ``stage_sessions`` / ``publish_sessions`` when an item's rows span many sessions);
 - the run status, decided in one place: any failed item or explicit ``partial`` -> PARTIAL;
   an exception escaping the ``with`` block -> FAILED, saved, then re-raised; an explicit
-  ``failed`` (a workflow whose every step failed) -> FAILED; else COMPLETE;
+  ``failed`` (a workflow whose every step failed) -> FAILED; an explicit ``waiting`` -> WAITING;
+  else COMPLETE;
 - atomic publication (ADR 0022): every table write is pending until the run finishes; a
   COMPLETE or PARTIAL run commits all of them at once (``knowledge_ts`` stays the write
   time; reads pinned at ``as_of`` see the run from its commit time), a FAILED run drops
@@ -135,6 +136,7 @@ class IngestRun:
         self._resolved = False
         self._partial: list[str] = []
         self._failed: list[str] = []
+        self._waiting: list[str] = []
         self._resolvers: dict[date | None, SymbolResolver] = {}
         self._pacing: dict[str, PacingStats] = {}
         resumed = self._resume() if resume else None
@@ -185,6 +187,8 @@ class IngestRun:
         partial -> PARTIAL; else COMPLETE."""
         if self._failed:
             return RunStatus.FAILED
+        if self._waiting:
+            return RunStatus.WAITING
         return RunStatus.PARTIAL if self.failures() or self._partial else RunStatus.COMPLETE
 
     def _finish(self, status: RunStatus) -> None:
@@ -195,6 +199,8 @@ class IngestRun:
             self.stats["partial"] = self._partial
         if self._failed:
             self.stats["failed_because"] = self._failed
+        if self._waiting:
+            self.stats["waiting_because"] = self._waiting
         self._pacing_stats()
         self.record.stats = self.stats
         try:
@@ -254,6 +260,11 @@ class IngestRun:
         """Mark the whole run FAILED without raising (e.g. a workflow none of whose steps
         succeeded); the record is still saved on exit."""
         self._failed.append(reason)
+
+    def waiting(self, reason: str) -> None:
+        """Mark the run WAITING (a workflow whose source has not published the session yet,
+        ADR 0043): not done, not failed; it publishes nothing and a later run retries it."""
+        self._waiting.append(reason)
 
     # ------------------------------------------------------------------ items
 
@@ -408,7 +419,11 @@ def recover_unpublished(writer: StoreWriter, now: datetime) -> dict[str, list[st
     dropped = []
     for run_id in writer.pending_runs():
         record = writer.load_run(run_id)
-        if record is not None and record.status in (RunStatus.RUNNING, RunStatus.FAILED):
+        if record is not None and record.status in (
+            RunStatus.RUNNING,
+            RunStatus.FAILED,
+            RunStatus.WAITING,
+        ):
             writer.abort_run(run_id)
             dropped.append(run_id)
     return {"completed": completed, "dropped": dropped}

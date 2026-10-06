@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 
 import pytest
 
@@ -9,6 +9,7 @@ from algotrade.core.time.calendar import (
     holidays,
     is_session,
     last_closed_session,
+    local_deadline,
     next_session,
     nth_weekday,
     previous_session,
@@ -177,3 +178,8 @@ def test_sessions_ending_and_sessions_to() -> None:
 def test_special_closures_are_not_sessions() -> None:
     assert not is_session(date(2025, 1, 9)) and not is_session(date(2018, 12, 5))
     assert is_session(date(2025, 1, 8)) and is_session(date(2025, 1, 10))
+
+
+def test_local_deadline_follows_daylight_saving_in_los_angeles() -> None:
+    assert local_deadline(date(2026, 10, 5), time(23, 0)) == datetime(2026, 10, 6, 6, tzinfo=UTC)
+    assert local_deadline(date(2026, 12, 1), time(23, 0)) == datetime(2026, 12, 2, 7, tzinfo=UTC)
