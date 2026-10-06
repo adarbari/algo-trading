@@ -307,7 +307,7 @@
           "key": "spx_trend_200d",
           "pace": "fast",
           "plainName": "Is the market below its long-term trend?",
-          "technicalName": "SPY close vs its 200-day moving average",
+          "technicalName": "S&P 500 close (SPY, else the index level) vs its 200-day moving average",
           "oneLiner": "Whether the S&P 500 (SPY) closes below its average price of the last 200 trading days.",
           "whyItMatters": "Big falls rarely happen with the market above its long-term trend. Simple trend rules miss the first part of a fall but have stepped aside for most of the worst bear markets.",
           "whatOnMeans": "On when SPY closes below its 200-day average; a 50-day average falling below the 200-day (a 'death cross') confirms it.",
