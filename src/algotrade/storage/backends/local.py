@@ -25,6 +25,7 @@ only when its run commits, in every partition at once (``local_index.py``).
 """
 
 import gzip
+import os
 import shutil
 from collections.abc import Sequence
 from datetime import date, datetime
@@ -44,6 +45,7 @@ from algotrade.storage.backends.arrow import (
 )
 from algotrade.storage.backends.local_index import (
     INDEX,
+    TXN,
     Commits,
     atomic_write,
     default_file,
@@ -71,6 +73,32 @@ from algotrade.storage.tables.schemas import require_retention
 
 def _parquet_bytes(frame: pd.DataFrame) -> bytes:
     return frame.to_parquet(index=False, engine="pyarrow", compression="zstd")
+
+
+def _stored_tables(root: Path) -> list[str]:
+    """Table paths (relative, posix) with an indexed partition, found by walking directories
+    only: a directory is a table when one of its ``date=*`` children holds an index, which
+    ends its scan (so the cost is the number of table directories, not of partitions or
+    files; was ``root.glob("**/date=*/_runs.json")``: 20 s on 54,000 partitions). A directory
+    with no indexed partition is searched below, apart from ``_txn`` at the root."""
+    found: list[str] = []
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        below: list[str] = []
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                if not entry.is_dir():
+                    continue
+                if entry.name.startswith("date="):
+                    if (Path(entry.path) / INDEX).exists():
+                        found.append(directory.relative_to(root).as_posix())
+                        below = []
+                        break
+                elif not (directory == root and entry.name == TXN):
+                    below.append(entry.path)
+        pending.extend(Path(p) for p in below)
+    return found
 
 
 class LocalTables:
@@ -226,8 +254,7 @@ class LocalTables:
     def names(self, own_run: str | None = None) -> list[str]:
         found = {t for t, _ in self._own_partitions(own_run)}
         if self.root.exists():
-            found |= {p.parent.parent.relative_to(self.root).as_posix()
-                      for p in self.root.glob(f"**/date=*/{INDEX}")}  # fmt: skip
+            found |= set(_stored_tables(self.root))
         return sorted(found)
 
     @staticmethod
