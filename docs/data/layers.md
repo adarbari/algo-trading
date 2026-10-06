@@ -279,12 +279,20 @@ range; every feature is listed in the generated **[feature catalogue](features.m
   tables), plus `universe` (the session's universe snapshot, `None` before the first one: a
   later list would count today's survivors) and `instruments/symbol_ids` (symbol -> id from the
   reference snapshot, to find SPY without building an id). `symbol_ids` is a lookup only, never
-  a population (it may come from a later snapshot); `universe` is the population. The runner
+  a population (it may come from a later snapshot); `universe` is the population. A group that
+  reads a few tickers declares `Input("bars/1d", symbols=(...))` and loads only the bars of the
+  ids they resolve to in each session's reference snapshot (the union over the chunk), not every
+  instrument's. The runner
   fails the group unless it returns exactly that one row. An instrument group never reads a
   market group (broadcasting needs its own ADR), and a market group's `applies_to` is `any`.
   An expression feature takes the entity of what it reads; one
   that reads two entities is a definition error. `compute_rollups(..., entity="market")`
   computes them after the instrument groups; the catalogue lists them under "Market features".
+  The groups (`features/rollups/market/`): `market_trend@v1` (SPY / QQQ vs their 200-day
+  average, death cross, drawdown, realised vol, returns), `market_breadth@v1` (the shares of the
+  session's universe stocks above their averages and in a bear, new highs minus lows, the Zweig
+  thrust, 90% down days; null below `min_coverage`) and `market_cross_asset@v1` (turbulence and
+  the absorption ratio of an ETF basket, leadership ratios), all from `bars/1d`.
 
 Per-column meanings, units, ranges and null meanings: [features.md](features.md). Floats of
 the v2 groups are stored as 32-bit (`float32`). Columns computed from other columns are

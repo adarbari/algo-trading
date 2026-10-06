@@ -10,7 +10,13 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        return), the session plus ``lookback`` earlier sessions; ``None`` when
                        the session has no bars stored; ``MissingDataError`` when a session in
                        the window (on or after the first stored one) has no bars: a rollup
-                       never computes over a gap (ADR 0039)
+                       never computes over a gap (ADR 0039). With ``symbols`` (``Input.symbols``)
+                       only the ids those tickers resolve to in the reference snapshot each
+                       session of the chunk sees (``reference.ids_for_symbols``, the union: a
+                       superset of each session's), so a market group reading a few tickers
+                       does not load every instrument (ADR 0047); ``None`` only when the session
+                       has no bars stored, as for a whole read (an empty frame when none of the
+                       tickers resolves or has bars)
 - ``events/earnings``  ``events.stored_events``: every calendar snapshot stored on or before
                        the session (what was known then); ``None`` when there is none
 - ``chains/*``         ``chains``: the session's own partition, read per session (chains are
@@ -74,7 +80,13 @@ from algotrade.data.macro.series import stored_vintages
 from algotrade.data.prices import SessionBars, session_bars
 from algotrade.data.rates import TABLE as TREASURY
 from algotrade.data.rates import curve_as_rows
-from algotrade.data.reference import UNIVERSE_TABLE, instruments, load_universe, symbol_ids
+from algotrade.data.reference import (
+    UNIVERSE_TABLE,
+    ids_for_symbols,
+    instruments,
+    load_universe,
+    symbol_ids,
+)
 from algotrade.data.rollups import rollup_rows
 from algotrade.data.shares import TABLE as SHARES
 from algotrade.data.shares import share_facts
@@ -106,12 +118,18 @@ def _days(values: pd.Series) -> np.ndarray:
 class _Bars:
     bars: SessionBars | None
     stored: frozenset[date] = frozenset()  # every session with a bars partition
+    # Narrowed to some instruments (``symbols``): the session has input when it has a bars
+    # partition, even if those instruments have no bar on it (as for a whole-store read).
+    narrowed: bool = False
 
     def at(self, session: date, lookback: int) -> pd.DataFrame | None:
         if self.bars is None:
             return None
         window = self.bars.window(sessions_before(session, lookback), session)
-        if window.empty or window["session_date"].iloc[-1] != session:
+        if self.narrowed:
+            if session not in self.stored:
+                return None
+        elif window.empty or window["session_date"].iloc[-1] != session:
             return None
         first = min(self.stored)
         missing = [
@@ -127,12 +145,26 @@ class _Bars:
         return window
 
 
-def _bars(reader: StoreReader, sessions: Sequence[date], lookback: int) -> Loaded:
+BARS = "bars/1d"
+
+
+def _bars(
+    reader: StoreReader,
+    sessions: Sequence[date],
+    lookback: int,
+    instruments: Sequence[str] | None = None,
+) -> Loaded:
+    first = sessions_before(sessions[0], lookback)
+    stored = frozenset(reader.dates(BARS))
+    narrowed = instruments is not None
+    empty = _Bars(SessionBars.empty(), stored, narrowed) if narrowed and stored else _Bars(None)
+    if narrowed and not instruments:
+        return empty  # never a read filtered on no ids (a typed empty filter fails in Parquet)
     try:
-        loaded = session_bars(reader, sessions_before(sessions[0], lookback), sessions[-1])
+        loaded = session_bars(reader, first, sessions[-1], instruments)
     except MissingDataError:
-        return _Bars(None)
-    return _Bars(loaded, frozenset(reader.dates("bars/1d")))
+        return empty
+    return _Bars(loaded, stored, narrowed)
 
 
 @dataclass(frozen=True)
@@ -250,7 +282,7 @@ def _group_rows(
 
 
 INPUTS: Mapping[str, Loader] = {
-    "bars/1d": _bars,
+    BARS: _bars,
     "events/earnings": _event_snapshots("events/earnings"),
     "chains/status": _partition(chain_status),
     "chains/option_quotes": _partition(option_quotes),
@@ -287,9 +319,15 @@ def load_input(
     lookback: int,
     produced: Produced | None = None,
     ids: Sequence[str] = (),
+    symbols: Sequence[str] = (),
 ) -> Loaded:
     """``table`` for ``sessions`` (ascending) and ``lookback`` earlier sessions, read once.
-    ``ids``: only these instruments, for a table that reads by id (``ID_INPUTS``)."""
+    ``ids``: only these instruments, for a table that reads by id (``ID_INPUTS``);
+    ``symbols``: only the ids these tickers resolve to (``bars/1d`` only)."""
+    if symbols:
+        if table != BARS or ids:
+            raise ValueError(f"{table!r}: symbols are only for {BARS!r}, and never with ids")
+        return _bars(reader, sessions, lookback, ids_for_symbols(reader, sessions, symbols))
     if table in ID_INPUTS:
         return ID_INPUTS[table](reader, sessions, lookback, ids)
     if ids:

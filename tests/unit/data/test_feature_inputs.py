@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 
 from algotrade.core.model.errors import MissingDataError
+from algotrade.core.time.calendar import next_session
 from algotrade.data import feature_inputs as inputs
 from algotrade.data.macro.series import TABLE as MACRO_SERIES
 from algotrade.data.shares import TABLE as SHARES
@@ -213,3 +214,32 @@ def test_macro_series_are_seen_from_their_vintage_and_read_by_id() -> None:
     assert inputs.has_input(MACRO_SERIES)
     with pytest.raises(ValueError, match="read whole"):
         inputs.load_input(reader, SHARES, [END], 0, ids=("EQ:A",))
+
+
+def test_bars_by_symbol_read_only_the_ids_the_reference_resolves_each_session() -> None:
+    """``symbols`` narrows ``bars/1d`` to the ids the tickers resolve to in the snapshot each
+    session of the chunk sees (the union): a ticker whose id changes inside the chunk keeps
+    both ids' bars; other instruments are not read."""
+    writer, reader = store()
+    days = write_bars(writer, {"EQ:OLD": series(4), "EQ:NEW": series(4, 2), "EQ:X": series(4, 3)})
+    write_reference(writer, days[0], {"SPY": "EQ:OLD", "X": "EQ:X"})
+    write_reference(writer, days[2], {"SPY": "EQ:NEW", "X": "EQ:X"}, run_id="ref2")
+    loaded = inputs.load_input(reader, "bars/1d", days, 1, symbols=("SPY", "QQQ"))
+    for day in (days[1], days[3]):
+        frame = loaded.at(day, 1)
+        assert frame is not None and set(frame["instrument_id"]) == {"EQ:OLD", "EQ:NEW"}
+    early = inputs.load_input(reader, "bars/1d", days[:2], 1, symbols=("SPY",))
+    assert set(early.at(days[1], 1)["instrument_id"]) == {"EQ:OLD"}  # type: ignore[index]
+    unlisted = inputs.load_input(reader, "bars/1d", days, 0, symbols=("QQQ",)).at(days[3], 0)
+    assert unlisted is not None and unlisted.empty  # bars are stored: input, none of QQQ's
+    assert loaded.at(next_session(days[3]), 0) is None  # no bars stored for the session
+    with pytest.raises(ValueError, match="symbols are only for"):
+        inputs.load_input(reader, "events/split", days, 0, symbols=("SPY",))
+
+
+def test_bars_by_symbol_without_a_reference_are_empty_and_without_bars_none() -> None:
+    writer, reader = store()
+    assert inputs.load_input(reader, "bars/1d", [END], 0, symbols=("A",)).at(END, 0) is None
+    days = write_bars(writer, {"EQ:A": series(3)})
+    frame = inputs.load_input(reader, "bars/1d", days, 0, symbols=("A",)).at(days[-1], 0)
+    assert frame is not None and frame.empty and "close" in frame.columns

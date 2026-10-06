@@ -13,12 +13,12 @@ from algotrade_ingestion.tasks.derived.market_rollups import compute_market_roll
 from algotrade_ingestion.tasks.derived.rollups import SITE, compute_rollups
 from algotrade_ingestion.tasks.framework.registry import TASKS, run_task
 from tests.helpers.ingest_fakes import task_ctx
-from tests.helpers.rollup_store import MARKET_COUNTS, market_store
+from tests.helpers.rollup_store import MARKET_COUNTS, market_store, only_market_counts
 
 
 @pytest.fixture(autouse=True)
 def with_market(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setitem(site_features(SITE).groups, MARKET_COUNTS.key, MARKET_COUNTS)
+    only_market_counts(monkeypatch, site_features(SITE))
 
 
 def test_three_sessions_write_one_market_row_each() -> None:

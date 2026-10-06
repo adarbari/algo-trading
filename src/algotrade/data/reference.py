@@ -208,6 +208,27 @@ def symbol_ids(reader: StoreReader, on: date) -> pd.DataFrame | None:
     return frame.assign(pre_snapshot=found.snapshot > on)
 
 
+def ids_for_symbols(
+    reader: StoreReader, sessions: Sequence[date], symbols: Sequence[str]
+) -> list[str]:
+    """The ids ``symbols`` resolve to in the reference snapshot each of ``sessions`` sees, as
+    ``symbol_ids`` resolves them (each snapshot read once), as one sorted union: a superset of
+    any one session's ids, to narrow a read (``Input.symbols``, ADR 0047). Empty when no
+    reference is stored or none of the symbols is listed."""
+    found: set[str] = set()
+    seen: set[date] = set()
+    for day in sessions:
+        snap = snapshot(reader, REFERENCE_TABLE, day)
+        if snap is None:
+            return []
+        if snap.snapshot_date in seen:
+            continue
+        seen.add(snap.snapshot_date)
+        ids = resolver(reader, day).ids
+        found |= {ids[s] for s in symbols if s in ids}
+    return sorted(found)
+
+
 @dataclass(frozen=True)
 class InstrumentView:
     """L1 for one date: reference facts + rollups, one row per instrument (ADR 0016).

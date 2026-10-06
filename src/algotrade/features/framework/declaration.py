@@ -35,6 +35,7 @@ type Compute = Callable[[Inputs, date, Any], pd.DataFrame]
 type Lookback = int | Callable[[Any], int]
 
 _NAME = re.compile(r"^[a-z][a-z0-9_]*$")
+SYMBOL_TABLES = frozenset({"bars/1d"})  # the inputs ``Input.symbols`` may narrow
 RESERVED = frozenset({"instrument_id", "session_date", "knowledge_ts", "source", "run_id"})
 
 
@@ -44,12 +45,15 @@ class Input:
     function of the params). ``required``: without data for the session the group has
     nothing to compute (the runner reports NO_INPUT instead of calling ``compute``).
     ``ids``: only these instruments of a table read by id (``macro/series``: the group's
-    series, ``MACRO:<KEY>`` / ``IDX:<KEY>``); empty: all of them."""
+    series, ``MACRO:<KEY>`` / ``IDX:<KEY>``); empty: all of them. ``symbols``: only the
+    instruments these tickers resolve to through the reference (``bars/1d`` only, never with
+    ``ids``): a market group that reads a few tickers loads only theirs (ADR 0047)."""
 
     table: str
     lookback: Lookback = 0
     required: bool = True
     ids: tuple[str, ...] = ()
+    symbols: tuple[str, ...] = ()
 
     def sessions_back(self, params: Any) -> int:
         n = self.lookback(params) if callable(self.lookback) else self.lookback
@@ -154,7 +158,16 @@ def declaration_problems(group: FeatureGroup) -> list[str]:
             problems.append(f"{f.name}: entity must be the group's ({group.entity})")
     if group.params is not None and not is_dataclass(group.params):
         problems.append("params must be a dataclass instance (or None)")
-    return problems + _entity_problems(group)
+    return problems + _symbol_problems(group) + _entity_problems(group)
+
+
+def _symbol_problems(group: FeatureGroup) -> list[str]:
+    """``Input.symbols`` narrows only ``SYMBOL_TABLES``, and never together with ``ids``."""
+    return [
+        f"{i.table}: symbols are only for {sorted(SYMBOL_TABLES)}, never with ids"
+        for i in group.inputs
+        if i.symbols and (i.table not in SYMBOL_TABLES or i.ids)
+    ]
 
 
 def _entity_problems(group: FeatureGroup) -> list[str]:
