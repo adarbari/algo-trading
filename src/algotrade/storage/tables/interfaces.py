@@ -143,6 +143,10 @@ class StagingStore(Protocol):
 
     def collect(self, run_id: str, table: str) -> pd.DataFrame | None: ...
 
+    def exists(self, run_id: str) -> bool:
+        """Whether the run still has scratch (dropped on commit, or purged by retention)."""
+        ...
+
     def clear(self, run_id: str) -> None:
         """Drop one run's scratch (no-op when it has none)."""
         ...

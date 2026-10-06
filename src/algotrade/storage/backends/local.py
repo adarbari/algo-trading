@@ -332,6 +332,9 @@ class LocalStaging:
         parts = [p for p in parts if not p.empty]
         return pd.concat(parts, ignore_index=True) if parts else None
 
+    def exists(self, run_id: str) -> bool:
+        return (self.root / safe(run_id)).is_dir()
+
     def clear(self, run_id: str) -> None:
         shutil.rmtree(self.root / safe(run_id), ignore_errors=True)
 

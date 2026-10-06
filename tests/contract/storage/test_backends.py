@@ -93,14 +93,17 @@ def test_raw_purge_per_source(backend: Backend) -> None:
 
 
 def test_staging_store(backend: Backend) -> None:
+    assert not backend.staging.exists("r1")
+    backend.staging.put("r1", "chains/x", "E", pd.DataFrame({"v": []}))
+    assert backend.staging.exists("r1")  # an empty frame is still staged
     backend.staging.put("r1", "chains/x", "B", pd.DataFrame({"v": [2]}))
     backend.staging.put("r1", "chains/x", "A", pd.DataFrame({"v": [1]}))
-    backend.staging.put("r1", "chains/x", "E", pd.DataFrame({"v": []}))
     assert backend.staging.keys("r1", "chains/x") == ["A", "B", "E"]
     collected = backend.staging.collect("r1", "chains/x")
     assert collected is not None
     assert list(collected["v"]) == [1, 2]
     backend.staging.clear("r1")
+    assert not backend.staging.exists("r1")
     assert backend.staging.keys("r1", "chains/x") == []
     assert backend.staging.collect("r1", "chains/x") is None
     backend.staging.clear("r1")  # nothing left: a no-op

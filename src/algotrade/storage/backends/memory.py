@@ -260,6 +260,9 @@ class MemoryStaging:
         parts = [f for _, f in sorted(self._data.get((run_id, table), {}).items()) if not f.empty]
         return pd.concat(parts, ignore_index=True) if parts else None
 
+    def exists(self, run_id: str) -> bool:
+        return any(k[0] == run_id for k in self._data)
+
     def clear(self, run_id: str) -> None:
         for k in [k for k in self._data if k[0] == run_id]:
             del self._data[k]

@@ -19,7 +19,7 @@ There are four areas, and only the backend (`storage/backends/`) knows these pat
 | Tables | `tables/<table>/date=<session>/run=<run_id>.parquet` | Parquet, zstd, rows sorted by `instrument_id`, written atomically | forever (point-in-time history) |
 | Table index | `tables/<table>/date=<session>/_runs.json` | JSON `{run_id: knowledge_ts}` so readers pick the run known at `as_of` | forever |
 | Raw | `raw/source=<s>/dataset=<d>/date=<session>/run=<run_id>/<key>.json.gz` | the vendor's bytes exactly as received, gzipped (the name says `.json.gz` even for text and xlsx payloads) | per source: its section's `raw_retention_days` (`sec_edgar`: 7), else the global `raw_retention_days` (90) |
-| Staging | `staging/<run_id>/<table>/<key>.parquet` | per-ticker Parquet pieces of the chain job | dropped when the run finishes with nothing left to retry (COMPLETE, or PARTIAL without FETCH_ERROR items); otherwise kept for a resume and purged after `staging_retention_days` (14) |
+| Staging | `staging/<run_id>/<table>/<key>.parquet` | per-ticker Parquet pieces of the chain job | dropped when the run finishes with nothing left to retry (COMPLETE, or PARTIAL without FETCH_ERROR or STALE_DATA items); otherwise kept for a resume and purged after `staging_retention_days` (14) |
 | Run records | `runs/<run_id>.json` | JSON: job, status, per-item statuses, stats | forever (the audit trail every row's `run_id` points to) |
 
 Equity and ETF ids are `EQ:<composite FIGI>` when known, else `EQ:<symbol>` (ADR 0018).
