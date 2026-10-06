@@ -37,7 +37,15 @@ provider (OAuth, SSO) is more than it needs and would add a network dependency t
    a refused workspace redirects to the default; a 401 shows the login page (a design-system
    `LoginForm` component first, then the page). Ops fields and the ADMIN workspace require
    `admin`; the server enforces it, the guard only hides.
-5. **Not now:** OAuth / SSO, API tokens for scripts (the CLIs keep `ALGOTRADE_USER` on the
+5. **Local login is replaceable by design (owner, 2026-10-05).** Exactly one module resolves
+   the caller from a request (`apps/api/.../auth/resolver.py`, behind an `Authenticator`
+   protocol: request in, user id out or 401); REST deps and the GraphQL context call it and
+   nothing else inspects cookies or headers. Roles always come from the registry, never from
+   the authenticator. Moving to a hosted provider (Supabase Auth or another JWT issuer, when
+   the API is hosted in phase 6) is a second `Authenticator` that verifies the provider's token
+   and maps its subject to a registry id, plus the web's sign-in call, plus an amendment here;
+   the registry, the services and the guard do not change.
+6. **Not now:** OAuth / SSO, API tokens for scripts (the CLIs keep `ALGOTRADE_USER` on the
    machine that holds the data), per-user data visibility (IB-B stays its own item).
 
 ## Consequences
