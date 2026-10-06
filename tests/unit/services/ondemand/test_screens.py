@@ -7,6 +7,7 @@ from datetime import timedelta
 import pytest
 
 from algotrade.config.user import SITE_USER, UserContext
+from algotrade.core.model.errors import PermissionDeniedError
 from algotrade.services.ondemand.screens import READY, OnDemandScreens, RunRequest
 from algotrade.services.read.context import NotFoundError
 from algotrade.storage.backends.memory import MemoryBackend
@@ -16,11 +17,12 @@ from tests.helpers.ondemand_store import DAY, SCREEN, SNAPSHOT, seeded_backend, 
 
 
 def wait(runner: OnDemandScreens, request: RunRequest, timeout: float = 10.0) -> RunRequest:
-    """Poll the job until it is no longer queued or running."""
+    """Poll the job (as an admin: ownership has its own test) until it is no longer queued or
+    running."""
     deadline = time.monotonic() + timeout
     assert request.job_id is not None
     while time.monotonic() < deadline:
-        found = runner.status(request.config_id, request.job_id)
+        found = runner.status(request.config_id, request.job_id, SITE, admin=True)
         if found.state not in ("queued", "running"):
             return found
         time.sleep(0.02)
@@ -80,10 +82,32 @@ def test_only_a_screener_can_be_run_and_a_job_belongs_to_its_screener(
         runner.request("nope", SITE, DAY)
     started = runner.request("big_liquid", SITE, DAY)
     with pytest.raises(NotFoundError):
-        runner.status("sma_trend", started.job_id or "")
+        runner.status("sma_trend", started.job_id or "", SITE)
     with pytest.raises(NotFoundError):
-        runner.status("big_liquid", "job-screen-unknown")
+        runner.status("big_liquid", "job-screen-unknown", SITE)
     wait(runner, started)
+
+
+def test_a_job_is_read_by_its_owner_or_an_admin_only() -> None:
+    """A screen of one's own is that user's job; a site preset's run is the site's, shared."""
+    mine = {**SCREEN, "id": "mine"}
+    ondemand = OnDemandScreens(
+        seeded_backend(), site_configs({("alice", "strategies", "mine"): mine})
+    )
+    alice, bob = UserContext("alice"), UserContext("bob")
+    try:
+        own = ondemand.request("mine", alice, DAY)
+        shared = ondemand.request("big_liquid", alice, DAY)
+        wait(ondemand, own)
+        wait(ondemand, shared)
+        assert ondemand.status("mine", own.job_id or "", alice).state == "complete"
+        with pytest.raises(PermissionDeniedError):
+            ondemand.status("mine", own.job_id or "", bob)
+        assert ondemand.status("mine", own.job_id or "", bob, admin=True).state == "complete"
+        # The preset's job is the site's: whoever may request the preset may poll it.
+        assert ondemand.status("big_liquid", shared.job_id or "", bob).state == "complete"
+    finally:
+        ondemand.close()
 
 
 def test_a_run_does_not_wait_for_an_ingestion_run() -> None:
@@ -115,7 +139,7 @@ def test_a_job_left_running_by_a_stopped_process_is_run_again() -> None:
     first._runs.save_run(job)
     second = OnDemandScreens(store, site_configs())
     try:
-        assert second.status("big_liquid", stuck.job_id or "").state == "failed"
+        assert second.status("big_liquid", stuck.job_id or "", SITE).state == "failed"
     finally:
         second.close()
 

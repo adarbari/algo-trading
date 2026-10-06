@@ -4,7 +4,8 @@ context for the latest session, opened as GraphQL opens it), the live quotes (AD
 the config writer (ADR 0029: user configs only, through ``services.authoring``), the
 on-request screen runner (ADR 0033), the caller (``Caller``: the registry user the app's
 authenticator resolves, once per request, ADR 0040), the text model behind screener drafts
-(ADR 0041), the user a write is for, and the query parameters several routes share
+(ADR 0041), the user a write is for (the caller, or for an admin the user named in the ``X-Act-For``
+header; never a query parameter), and the query parameters several routes share
 (comma-separated lists).
 
 Settings come from the environment through ``algotrade.config.env`` (the one reader):
@@ -19,21 +20,22 @@ from pathlib import Path
 from typing import Annotated, cast
 from urllib.parse import urlparse
 
-from fastapi import Depends, HTTPException, Query, Request
+from fastapi import Depends, Header, HTTPException, Request
 
 from algotrade.config.env import (
     api_debug,
     auth_mode,
     config_dir,
+    cors_origins,
     data_url,
     supabase_jwt_secret,
     supabase_url,
     user_id,
 )
-from algotrade.config.site.users import Role, UserRecord
+from algotrade.config.site.users import Role, UserRecord, UsersSettings
 from algotrade.config.user import DEFAULT_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
-from algotrade.services.authoring.scope import ConfigWriter, open_writer
+from algotrade.services.authoring.scope import ConfigWriter, author, open_writer
 from algotrade.services.drafting.model import TextModel
 from algotrade.services.live.quotes import LiveQuotes
 from algotrade.services.ondemand.screens import OnDemandScreens
@@ -100,7 +102,15 @@ class ApiSettings:
     def from_env(cls) -> "ApiSettings":
         auth = AuthConfig.of(auth_mode(), supabase_url(), supabase_jwt_secret())
         user = user_id(DEFAULT_USER)
-        return cls(data_url(), str(config_dir()), user, live=True, debug=api_debug(), auth=auth)
+        return cls(
+            data_url(),
+            str(config_dir()),
+            user,
+            cors_origins=cors_origins(DEV_ORIGINS),
+            live=True,
+            debug=api_debug(),
+            auth=auth,
+        )
 
     def open(self) -> ReadStore:
         return open_store(self.data_url, self.config_dir, UserContext(self.user))
@@ -175,16 +185,29 @@ def get_writer(request: Request) -> ConfigWriter:
 Writer = Annotated[ConfigWriter, Depends(get_writer)]
 
 
+ACT_FOR = "X-Act-For"  # the header an admin names another user in (writes; ADR 0040)
+
+
+def get_users(request: Request) -> UsersSettings:
+    """The site registry ``create_app`` loaded (who is declared, with which role)."""
+    return cast(UsersSettings, request.app.state.users)
+
+
 def write_user(
     caller: Caller,
-    user: Annotated[
+    users: Annotated[UsersSettings, Depends(get_users)],
+    act_for: Annotated[
         str | None,
-        Query(description="whose configs (default: the caller's; another user's: admins only)"),
+        Header(
+            alias=ACT_FOR,
+            description="whose configs (default: the caller's; another user's: admins only)",
+        ),
     ] = None,
 ) -> str:
-    """``?user=`` when the caller may act for them (``acting_for``; the id is validated by
-    ``services.authoring``), else the caller."""
-    return acting_for(caller, user)
+    """The user a write is for: the caller, or the user ``X-Act-For`` names when the caller
+    is an admin (``acting_for``); ``services.authoring`` refuses an id the registry does not
+    declare (400)."""
+    return author(acting_for(caller, act_for), lambda uid: users.get(uid) is not None).user_id
 
 
 User = Annotated[str, Depends(write_user)]
