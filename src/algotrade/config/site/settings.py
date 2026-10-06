@@ -960,6 +960,13 @@ def load_rollups(
     return rollup_params(site_document(configs.load, "rollups"), declared)
 
 
+def load_rollup(configs: SiteDocuments, key: str, defaults: Any) -> Any:
+    """One rollup's params (``rollups.toml`` section ``key`` over ``defaults``), that section
+    only: a reader of one group's thresholds (the read model) need not know the others."""
+    doc = site_document(configs.load, "rollups") or {}
+    return rollup_params({key: doc[key]} if key in doc else {}, {key: defaults})[key]
+
+
 def load_features(configs: SiteDocuments) -> tuple[FeatureDefinition, ...]:
     """The site's expression features (``config/site/features/*.toml``; none without files)."""
     names = configs.names("site", "features")

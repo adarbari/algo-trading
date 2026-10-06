@@ -46,6 +46,58 @@ export const Bands: Story = {
   ),
 };
 
+/**
+ * One threshold, higher is risk: a spread against its trigger. Safe side neutral, risky side warning;
+ * the value on each side, and exactly at the threshold (which counts as reached).
+ */
+export const Threshold: Story = {
+  render: ({ caption: _caption, ...rest }) => (
+    <Stack gap={3}>
+      {[0.3, 0.5, 0.73].map((value) => (
+        <ScoreMeter
+          key={value}
+          {...rest}
+          label={`Unemployment rise, ${String(value)} pts`}
+          value={value}
+          min={0}
+          max={1}
+          unit="pts"
+          format={{ kind: 'number', digits: 2 }}
+          baseTone="neutral"
+          baseLabel="safe side"
+          thresholds={[{ at: 0.5, label: 'risky side', tone: 'warning' }]}
+        />
+      ))}
+    </Stack>
+  ),
+};
+
+/** Lower is risk (a cushion): the scale is turned, so risk is always at the right end. */
+export const LowerIsRisk: Story = {
+  args: {
+    label: 'Credit cushion',
+    direction: 'lower-is-risk',
+    value: 120,
+    min: 0,
+    max: 600,
+    unit: 'bp',
+    baseTone: 'positive',
+    baseLabel: 'ample',
+    thresholds: [{ at: 200, label: 'thin', tone: 'negative' }],
+    caption: 'Below the 200 bp floor.',
+  },
+};
+
+/** A value off the scale: the marker pins to the nearer end and the text says so. */
+export const OffScale: Story = {
+  render: ({ caption: _caption, ...rest }) => (
+    <Stack gap={3}>
+      <ScoreMeter {...rest} label="Above range" value={118} />
+      <ScoreMeter {...rest} label="Below range" value={-4} />
+    </Stack>
+  ),
+};
+
 /** No thresholds: a plain meter in the base tone, on a 0-10 scale. */
 export const Plain: Story = {
   args: { value: 7.5, min: 0, max: 10, thresholds: [], baseTone: 'accent', caption: 'Out of 10.' },

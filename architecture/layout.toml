@@ -93,6 +93,11 @@ purpose = "L3 site settings: config/site/*.toml into frozen, validated dataclass
 contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
 
 [[dir]]
+path = "src/algotrade/config/site/events"
+purpose = "L3 event-sensitivity settings: the names in the event-study scope (config/site/events/scope.toml, ADR 0050), typed and validated (split from config/site, at its module cap)"
+contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
+
+[[dir]]
 path = "src/algotrade/config/site/regime"
 purpose = "L3 regime settings: the plain-language indicator cards and the reference crash episodes (config/site/regime/*.toml, ADR 0047), typed and validated (split from config/site, at its module cap)"
 contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
@@ -690,6 +695,10 @@ purpose = "L3 field guide, one <theme>.toml per theme plus situations.toml: how 
 [[config_dir]]
 path = "config/site/features"
 purpose = "L3 expression features, one <theme>.toml per theme (loaded by config/site/settings.py load_features; ADR 0023 step 3)"
+
+[[config_dir]]
+path = "config/site/events"
+purpose = "event-sensitivity track settings: the scope list of names the event study runs for (ADR 0050)"
 
 [[config_dir]]
 path = "config/site/regime"
