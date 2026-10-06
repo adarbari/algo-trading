@@ -304,3 +304,18 @@ def test_no_bar_on_the_session_reads_no_trade_and_the_since_listing_high(
     assert avail[FROM_HIGH][1] is None  # the 52-week value is still served
     gone = values(ctx, "EQ:GONE", CLOSE)
     assert gone[CLOSE] == (None, UnknownCode.NO_ROW)  # no status: the gap stays a gap
+
+
+def test_a_next_report_not_in_the_calendar_reads_not_announced(reader: StoreReader) -> None:
+    writer = StoreWriter(reader._backend)
+    write_rows(writer, "rollups/instrument/earnings@v1", D1, [
+        {"instrument_id": "EQ:AAA", "next_earnings_date": None, "last_earnings_date": D0},
+    ])  # fmt: skip
+    write_rows(writer, "rollups/instrument/earnings_schedule@v1", D1, [
+        {"instrument_id": "EQ:AAA", "next_status": "NOT_ANNOUNCED"},
+    ])  # fmt: skip
+    ctx = open_context(reader, MemoryConfigStore({}), UserContext("local"))
+    [nxt] = load_feature_values(ctx, ["EQ:AAA"], [NEXT])["EQ:AAA"]
+    assert nxt.unknown is not None and nxt.unknown.reason is NullReason.NOT_ANNOUNCED
+    assert nxt.unknown.detail.endswith("the next report date is not announced")
+    assert values(ctx, "EQ:ETFX", NEXT)[NEXT] == (None, UnknownCode.NOT_APPLICABLE)  # still n/a

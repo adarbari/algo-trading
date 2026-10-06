@@ -94,6 +94,7 @@ export const SITE_FEATURES = [
   'rollup.earnings@v1.days_to_earnings',
   'rollup.earnings@v1.date_confirmed',
   'rollup.earnings@v1.last_earnings_date',
+  'rollup.earnings_schedule@v1.next_status',
   'rollup.iv30@v1.iv30',
   'rollup.iv30@v1.iv30_cboe',
   'rollup.iv30@v1.iv30_status',
