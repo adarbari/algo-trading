@@ -32,8 +32,13 @@ not own, and a hosted identity provider stops being over-engineering.
    access token as `Authorization: Bearer` on every REST and GraphQL request. The API verifies
    the token offline: the project's JWKS (`SUPABASE_URL`, fetched once at startup, cached,
    refreshed on an unknown `kid`) or the legacy `SUPABASE_JWT_SECRET` (HS256), never a call per
-   request. The token's email maps to a registry user (`users.toml` gains `email`); a valid
-   token with no registry match is 403, no token is 401. No `/auth/*` REST endpoints and no
+   request. The token's email maps to a registry user; a valid
+   token with no registry match is 403, no token is 401. The email is personal data and the
+   repo is public, so it is not in `users.toml`: each user's lives in their git-ignored
+   `config/users/<id>/identity.toml` (`email = "..."`, amended 2026-10-05 in ID2). Because an
+   email alone identifies a user, the Supabase project must have sign-ups off (users are
+   invited), email confirmation on and anonymous sign-ins off; `identity.toml` may also pin
+   `subject` (the Supabase user id), and then a token whose `sub` differs is 403. No `/auth/*` REST endpoints and no
    password material in the repo. Dev shortcut: `ALGOTRADE_AUTH=off` serves `ALGOTRADE_USER`
    without a token, and the API refuses to start that way when bound to a non-loopback address.
 4. **The web learns who is calling from one field.** `Query.viewer { id name role workspaces }`

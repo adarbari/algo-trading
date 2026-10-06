@@ -58,7 +58,7 @@ RATES = "rates/treasury"
 DIVIDENDS = "rollups/instrument/div_yield@v1"  # the materialised expression feature
 # Expiry-level failures, most informative last: an underlying reports the worst it reached.
 FAILURES = ("NO_QUOTES", "WIDE_SPREADS", "ILLIQUID", "IV_FAILED")
-# Statuses where the chain is too thin to price (ADR 0041): the read says ILLIQUID for a null
+# Statuses where the chain is too thin to price (ADR 0042): the read says ILLIQUID for a null
 # ``iv30`` with one of these; the other statuses (NO_CHAIN, NO_SPOT, IV_FAILED...) stay NULL.
 ILLIQUID_STATUSES = frozenset({"NO_QUOTES", "WIDE_SPREADS", "ILLIQUID"})
 

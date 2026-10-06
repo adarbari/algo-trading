@@ -182,6 +182,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/screeners/{screener_id}/draft-from-text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Draft From Text */
+        post: operations["draft_from_text_screeners__screener_id__draft_from_text_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/screeners/{screener_id}/finalise": {
         parameters: {
             query?: never;
@@ -286,7 +303,7 @@ export interface components {
             sample: number;
             /**
              * User
-             * @description whose catalogue (default the API's)
+             * @description whose catalogue (default: the caller's; another user's: admins only)
              */
             user?: string | null;
         };
@@ -338,6 +355,30 @@ export interface components {
             document: {
                 [key: string]: unknown;
             };
+        };
+        /** DraftFromTextBody */
+        DraftFromTextBody: {
+            /**
+             * Document
+             * @description the Builder's current document (its criteria are kept unless changed)
+             */
+            document?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Text
+             * @description the screen in plain English
+             */
+            text: string;
+        };
+        /** DroppedCriterion */
+        DroppedCriterion: {
+            /** Field */
+            field: string;
+            /** Id */
+            id: string;
+            /** Reason */
+            reason: string;
         };
         /** ExpressionCheck */
         ExpressionCheck: {
@@ -588,7 +629,7 @@ export interface components {
             };
             /**
              * User
-             * @description whose catalogue and presets (default the API's)
+             * @description whose catalogue and presets (default: the caller's; another: admins only)
              */
             user?: string | null;
         };
@@ -804,6 +845,28 @@ export interface components {
             name: string;
             /** Theme */
             theme: string;
+        };
+        /** ScreenDraft */
+        ScreenDraft: {
+            /**
+             * Document
+             * @description the draft for the Builder (never saved here)
+             */
+            document: {
+                [key: string]: unknown;
+            };
+            /**
+             * Dropped
+             * @description proposed criteria the draft does not keep
+             */
+            dropped: components["schemas"]["DroppedCriterion"][];
+            /**
+             * Notes
+             * @description what the model could not map or assumed
+             */
+            notes: string[];
+            /** Screener Id */
+            screener_id: string;
         };
         /** ScreenPreview */
         ScreenPreview: {
@@ -1046,7 +1109,7 @@ export interface operations {
     save_user_feature_features_user_post: {
         parameters: {
             query?: {
-                /** @description whose configs (a label until auth; default the API's) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;
@@ -1122,7 +1185,7 @@ export interface operations {
     save_ideas_priority_preferences_ideas_put: {
         parameters: {
             query?: {
-                /** @description whose configs (a label until auth; default the API's) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;
@@ -1160,7 +1223,7 @@ export interface operations {
             query?: {
                 /** @description a named view (default: the table's default view) */
                 name?: string | null;
-                /** @description whose configs (a label until auth; default the API's) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;
@@ -1200,7 +1263,7 @@ export interface operations {
             query: {
                 /** @description the named view to remove */
                 name: string;
-                /** @description whose configs (a label until auth; default the API's) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;
@@ -1234,7 +1297,7 @@ export interface operations {
     delete_screener_screeners__screener_id__delete: {
         parameters: {
             query?: {
-                /** @description whose configs (a label until auth; default the API's) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;
@@ -1266,7 +1329,7 @@ export interface operations {
     copy_screeners__screener_id__copy_post: {
         parameters: {
             query?: {
-                /** @description whose configs (a label until auth; default the API's) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;
@@ -1304,7 +1367,7 @@ export interface operations {
     save_draft_screeners__screener_id__draft_put: {
         parameters: {
             query?: {
-                /** @description whose configs (a label until auth; default the API's) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;
@@ -1342,7 +1405,7 @@ export interface operations {
     discard_draft_screeners__screener_id__draft_delete: {
         parameters: {
             query?: {
-                /** @description whose configs (a label until auth; default the API's) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;
@@ -1371,10 +1434,45 @@ export interface operations {
             };
         };
     };
+    draft_from_text_screeners__screener_id__draft_from_text_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screener_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftFromTextBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenDraft"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     finalise_screeners__screener_id__finalise_post: {
         parameters: {
             query?: {
-                /** @description whose configs (a label until auth; default the API's) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;
@@ -1408,7 +1506,7 @@ export interface operations {
     rebase_screeners__screener_id__rebase_post: {
         parameters: {
             query?: {
-                /** @description whose configs (a label until auth; default the API's) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;
@@ -1477,7 +1575,7 @@ export interface operations {
             query?: {
                 /** @description default: the latest session with data */
                 date?: string | null;
-                /** @description default: the API's user (a label until auth) */
+                /** @description whose configs (default: the caller's; another user's: admins only) */
                 user?: string | null;
             };
             header?: never;

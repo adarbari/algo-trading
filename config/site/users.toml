@@ -3,7 +3,8 @@
 #   role  "admin" (TRADER and ADMIN workspaces, ops reads, waivers) or "trader" (TRADER only)
 #   name  display name (optional)
 # Without this file the install is single-user: `local` and `site` as admins. How a user logs
-# in is the API's concern (ADR 0040): no credentials live here.
+# in is the API's concern (ADR 0040): no credentials and no emails live here (a user's sign-in
+# email is in their git-ignored config/users/<id>/identity.toml).
 
 [[user]]
 id = "local"
@@ -14,3 +15,8 @@ name = "Local user"
 id = "site"
 role = "admin"
 name = "Scheduled site screens"
+
+[[user]]
+id = "smoke"
+role = "admin"
+name = "Real-app smoke test (apps/web playwright.real.config.ts, ALGOTRADE_AUTH=off)"

@@ -106,7 +106,7 @@ def test_a_missing_hard_value_rejects_and_a_missing_soft_one_only_costs_points()
 
 
 def test_a_not_applicable_or_illiquid_value_never_passes_a_filter() -> None:
-    """ADR 0041: the screener sees the stored null of an n/a or Illiquid value (the read says
+    """ADR 0042: the screener sees the stored null of an n/a or Illiquid value (the read says
     why; the filter does not care), so it never passes a hard criterion on it (ADR 0015)."""
     rows = {"EQ:OK": GOOD, "EQ:NA": {**GOOD, "px": None}, "EQ:THIN": {**GOOD, "px": float("nan")}}
     got = {r.instrument_id: r for r in evaluate_screen(spec(), FeatureView(DAY, rows)).rows}

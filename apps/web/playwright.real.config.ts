@@ -45,6 +45,7 @@ export default defineConfig({
         ALGOTRADE_DATA_URL: s.url,
         ALGOTRADE_CONFIG_DIR: resolve(root, 'config'),
         ALGOTRADE_USER: 'smoke',
+        ALGOTRADE_AUTH: 'off', // no Supabase here: the API serves the smoke user on loopback
         ALGOTRADE_IBKR_PORT: '1', // no broker here: live quotes must degrade, not hang
       },
     },

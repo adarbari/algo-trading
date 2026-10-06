@@ -25,7 +25,7 @@
                 "type": "null"
               }
             ],
-            "description": "whose catalogue (default the API's)",
+            "description": "whose catalogue (default: the caller's; another user's: admins only)",
             "title": "User"
           }
         },
@@ -143,6 +143,58 @@
           "document"
         ],
         "title": "DraftBody",
+        "type": "object"
+      },
+      "DraftFromTextBody": {
+        "properties": {
+          "document": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "the Builder's current document (its criteria are kept unless changed)",
+            "title": "Document"
+          },
+          "text": {
+            "description": "the screen in plain English",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "DraftFromTextBody",
+        "type": "object"
+      },
+      "DroppedCriterion": {
+        "properties": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "field",
+          "reason"
+        ],
+        "title": "DroppedCriterion",
         "type": "object"
       },
       "ExpressionCheck": {
@@ -743,7 +795,7 @@
                 "type": "null"
               }
             ],
-            "description": "whose catalogue and presets (default the API's)",
+            "description": "whose catalogue and presets (default: the caller's; another: admins only)",
             "title": "User"
           }
         },
@@ -1183,6 +1235,44 @@
           "inputs"
         ],
         "title": "SavedFeature",
+        "type": "object"
+      },
+      "ScreenDraft": {
+        "properties": {
+          "document": {
+            "additionalProperties": true,
+            "description": "the draft for the Builder (never saved here)",
+            "title": "Document",
+            "type": "object"
+          },
+          "dropped": {
+            "description": "proposed criteria the draft does not keep",
+            "items": {
+              "$ref": "#/components/schemas/DroppedCriterion"
+            },
+            "title": "Dropped",
+            "type": "array"
+          },
+          "notes": {
+            "description": "what the model could not map or assumed",
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "screener_id": {
+            "title": "Screener Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "screener_id",
+          "document",
+          "dropped",
+          "notes"
+        ],
+        "title": "ScreenDraft",
         "type": "object"
       },
       "ScreenPreview": {
@@ -1707,7 +1797,7 @@
         "operationId": "save_user_feature_features_user_post",
         "parameters": [
           {
-            "description": "whose configs (a label until auth; default the API's)",
+            "description": "whose configs (default: the caller's; another user's: admins only)",
             "in": "query",
             "name": "user",
             "required": false,
@@ -1720,7 +1810,7 @@
                   "type": "null"
                 }
               ],
-              "description": "whose configs (a label until auth; default the API's)",
+              "description": "whose configs (default: the caller's; another user's: admins only)",
               "title": "User"
             }
           }
@@ -1808,7 +1898,7 @@
         "operationId": "save_ideas_priority_preferences_ideas_put",
         "parameters": [
           {
-            "description": "whose configs (a label until auth; default the API's)",
+            "description": "whose configs (default: the caller's; another user's: admins only)",
             "in": "query",
             "name": "user",
             "required": false,
@@ -1821,7 +1911,7 @@
                   "type": "null"
                 }
               ],
-              "description": "whose configs (a label until auth; default the API's)",
+              "description": "whose configs (default: the caller's; another user's: admins only)",
               "title": "User"
             }
           }
@@ -1889,7 +1979,7 @@
             }
           },
           {
-            "description": "whose configs (a label until auth; default the API's)",
+            "description": "whose configs (default: the caller's; another user's: admins only)",
             "in": "query",
             "name": "user",
             "required": false,
@@ -1902,7 +1992,7 @@
                   "type": "null"
                 }
               ],
-              "description": "whose configs (a label until auth; default the API's)",
+              "description": "whose configs (default: the caller's; another user's: admins only)",
               "title": "User"
             }
           }
@@ -1965,7 +2055,7 @@
             }
           },
           {
-            "description": "whose configs (a label until auth; default the API's)",
+            "description": "whose configs (default: the caller's; another user's: admins only)",
             "in": "query",
             "name": "user",
             "required": false,
@@ -1978,7 +2068,7 @@
                   "type": "null"
                 }
               ],
-              "description": "whose configs (a label until auth; default the API's)",
+              "description": "whose configs (default: the caller's; another user's: admins only)",
               "title": "User"
             }
           }
@@ -2077,7 +2167,7 @@
             }
           },
           {
-            "description": "whose configs (a label until auth; default the API's)",
+            "description": "whose configs (default: the caller's; another user's: admins only)",
             "in": "query",
             "name": "user",
             "required": false,
@@ -2090,7 +2180,7 @@
                   "type": "null"
                 }
               ],
-              "description": "whose configs (a label until auth; default the API's)",
+              "description": "whose configs (default: the caller's; another user's: admins only)",
               "title": "User"
             }
           }
@@ -2130,7 +2220,7 @@
             }
           },
           {
-            "description": "whose configs (a label until auth; default the API's)",
+            "description": "whose configs (default: the caller's; another user's: admins only)",
             "in": "query",
             "name": "user",
             "required": false,
@@ -2143,7 +2233,7 @@
                   "type": "null"
                 }
               ],
-              "description": "whose configs (a label until auth; default the API's)",
+              "description": "whose configs (default: the caller's; another user's: admins only)",
               "title": "User"
             }
           }
@@ -2200,7 +2290,7 @@
             }
           },
           {
-            "description": "whose configs (a label until auth; default the API's)",
+            "description": "whose configs (default: the caller's; another user's: admins only)",
             "in": "query",
             "name": "user",
             "required": false,
@@ -2213,7 +2303,7 @@
                   "type": "null"
                 }
               ],
-              "description": "whose configs (a label until auth; default the API's)",
+              "description": "whose configs (default: the caller's; another user's: admins only)",
               "title": "User"
             }
           }
@@ -2251,7 +2341,7 @@
             }
           },
           {
-            "description": "whose configs (a label until auth; default the API's)",
+            "description": "whose configs (default: the caller's; another user's: admins only)",
             "in": "query",
             "name": "user",
             "required": false,
@@ -2264,7 +2354,7 @@
                   "type": "null"
                 }
               ],
-              "description": "whose configs (a label until auth; default the API's)",
+              "description": "whose configs (default: the caller's; another user's: admins only)",
               "title": "User"
             }
           }
@@ -2307,6 +2397,58 @@
         ]
       }
     },
+    "/screeners/{screener_id}/draft-from-text": {
+      "post": {
+        "operationId": "draft_from_text_screeners__screener_id__draft_from_text_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "screener_id",
+            "required": true,
+            "schema": {
+              "title": "Screener Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftFromTextBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenDraft"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Draft From Text",
+        "tags": [
+          "screeners"
+        ]
+      }
+    },
     "/screeners/{screener_id}/finalise": {
       "post": {
         "operationId": "finalise_screeners__screener_id__finalise_post",
@@ -2321,7 +2463,7 @@
             }
           },
           {
-            "description": "whose configs (a label until auth; default the API's)",
+            "description": "whose configs (default: the caller's; another user's: admins only)",
             "in": "query",
             "name": "user",
             "required": false,
@@ -2334,7 +2476,7 @@
                   "type": "null"
                 }
               ],
-              "description": "whose configs (a label until auth; default the API's)",
+              "description": "whose configs (default: the caller's; another user's: admins only)",
               "title": "User"
             }
           }
@@ -2381,7 +2523,7 @@
             }
           },
           {
-            "description": "whose configs (a label until auth; default the API's)",
+            "description": "whose configs (default: the caller's; another user's: admins only)",
             "in": "query",
             "name": "user",
             "required": false,
@@ -2394,7 +2536,7 @@
                   "type": "null"
                 }
               ],
-              "description": "whose configs (a label until auth; default the API's)",
+              "description": "whose configs (default: the caller's; another user's: admins only)",
               "title": "User"
             }
           }
@@ -2460,7 +2602,7 @@
             }
           },
           {
-            "description": "default: the API's user (a label until auth)",
+            "description": "whose configs (default: the caller's; another user's: admins only)",
             "in": "query",
             "name": "user",
             "required": false,
@@ -2473,7 +2615,7 @@
                   "type": "null"
                 }
               ],
-              "description": "default: the API's user (a label until auth)",
+              "description": "whose configs (default: the caller's; another user's: admins only)",
               "title": "User"
             }
           }

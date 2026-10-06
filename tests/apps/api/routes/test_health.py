@@ -6,7 +6,7 @@ from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade_api import __version__
 from algotrade_api.deps import ApiSettings
 from algotrade_api.main import create_app
-from tests.helpers.api_store import store_over
+from tests.helpers.api_store import as_user, store_over
 
 
 def test_health_reports_store_latest_session_and_versions(client: TestClient) -> None:
@@ -21,5 +21,9 @@ def test_health_reports_store_latest_session_and_versions(client: TestClient) ->
 
 def test_an_empty_store_has_no_session_and_reports_its_kind() -> None:
     store = store_over(MemoryBackend(), MemoryConfigStore({}), UserContext("local"), "file://x")
-    body = TestClient(create_app(ApiSettings("memory://", "config"), store)).get("/health").json()
+    body = (
+        TestClient(create_app(ApiSettings("memory://", "config"), store, authenticator=as_user()))
+        .get("/health")
+        .json()
+    )
     assert (body["storage"], body["latest_session"], body["tables"]) == ("file", None, [])

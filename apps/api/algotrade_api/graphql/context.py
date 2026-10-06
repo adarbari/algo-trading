@@ -1,7 +1,9 @@
 """The context of one GraphQL request (ADR 0037): ``RequestContext.read(date)`` is the
 ``ReadContext`` for the session ``date`` resolves to (``services.read.context.open_context``,
-through the opener ``create_app`` gives the router), opened once per date per request and
-carrying that request's dataloaders (``loaders.Loaders``).
+through the opener ``create_app`` gives the router), opened once per date per request, as the
+request's caller, and carrying that request's dataloaders (``loaders.Loaders``).
+``RequestContext.viewer`` is the caller: the registry user ``deps.get_caller`` resolved for
+this request (ADR 0040; the same resolution the route's guard made, cached by FastAPI).
 
 A top-level field takes the session as its ``date`` argument and hands the ``ReadContext`` to
 the objects it returns; fields of one operation that pass the same ``date`` share one
@@ -14,21 +16,29 @@ from datetime import date
 
 from strawberry.fastapi import BaseContext
 
+from algotrade.config.site.users import UserRecord
+from algotrade.config.user import UserContext
 from algotrade.services.read.context import NotFoundError, ReadContext, Stores
+from algotrade_api.deps import Caller
 from algotrade_api.graphql.loaders import Loaders
 
-# Opens the read context for a requested session (None: the latest): ``open_context`` over
-# the app's store, configs, user and result cache.
-Opener = Callable[[date | None], ReadContext]
-# Opens the session-free context (configs, run records, the catalogue): ``open_stores``.
-StoresOpener = Callable[[], Stores]
+# Opens the read context for a user and a requested session (None: the latest):
+# ``open_context`` over the app's store, configs and result cache.
+Opener = Callable[[UserContext, date | None], ReadContext]
+# Opens a user's session-free context (configs, run records, the catalogue): ``open_stores``.
+StoresOpener = Callable[[UserContext], Stores]
 
 
 class RequestContext(BaseContext):
-    """What a resolver reads through (``info.context``) during one request."""
+    """What a resolver reads through (``info.context``) during one request: every read is
+    for ``viewer``, the request's caller."""
 
-    def __init__(self, opener: Opener, stores: StoresOpener | None = None) -> None:
+    def __init__(
+        self, opener: Opener, viewer: UserRecord, stores: StoresOpener | None = None
+    ) -> None:
         super().__init__()
+        self.viewer = viewer
+        self._user = UserContext(viewer.user_id)
         self._open = opener
         self._open_stores = stores
         self._contexts: dict[date | None, ReadContext | None] = {}
@@ -39,7 +49,7 @@ class RequestContext(BaseContext):
         dataloaders; ``None`` when the store holds nothing to resolve a session from."""
         if requested not in self._contexts:
             try:
-                ctx = self._open(requested)
+                ctx = self._open(self._user, requested)
             except NotFoundError:
                 self._contexts[requested] = None
             else:
@@ -53,16 +63,17 @@ class RequestContext(BaseContext):
         if self._open_stores is None:
             return self.read(None)
         if self._stores is None:
-            self._stores = self._open_stores()
+            self._stores = self._open_stores(self._user)
         return self._stores
 
 
 def context_getter(
     opener: Opener, stores: StoresOpener | None = None
-) -> Callable[[], RequestContext]:
-    """The router's ``context_getter``: a fresh ``RequestContext`` per request."""
+) -> Callable[[UserRecord], RequestContext]:
+    """The router's ``context_getter``: a fresh ``RequestContext`` per request, for the caller
+    (a FastAPI dependency: Strawberry resolves it, sharing the request's one resolution)."""
 
-    def get_context() -> RequestContext:
-        return RequestContext(opener, stores)
+    def get_context(caller: Caller) -> RequestContext:
+        return RequestContext(opener, caller, stores)
 
     return get_context

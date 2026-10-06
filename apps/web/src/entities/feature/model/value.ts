@@ -62,7 +62,7 @@ export function isUnknown(value: ServedValue | undefined): boolean {
 }
 
 /**
- * What a cell with no value says (ADR 0041): "n/a" where the feature does not apply to the
+ * What a cell with no value says (ADR 0042): "n/a" where the feature does not apply to the
  * instrument, "Illiquid" where the options are too thin to price, else "Unknown". The one place
  * the label is chosen; the server decides the code.
  */

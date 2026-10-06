@@ -60,7 +60,7 @@ function describe(info: ColumnInfo): string {
 /**
  * One catalogue feature: headed by its short label (personal-licence features marked `(P)`),
  * formatted by the server's `info.format`; a cell the session has no value for reads
- * "Unknown" (or "n/a" / "Illiquid", ADR 0041) with the reason.
+ * "Unknown" (or "n/a" / "Illiquid", ADR 0042) with the reason.
  */
 export function featureColumn(info: ColumnInfo): DataTableColumn<TableRow> {
   const format = valueFormat(info);

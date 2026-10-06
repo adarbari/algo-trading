@@ -9,13 +9,16 @@ import tomllib
 from algotrade_api.deps import ApiSettings
 from algotrade_api.main import create_app
 from tests.conftest import REPO_ROOT
+from tests.helpers.api_store import as_user
 
 REST_ALLOWLIST = "architecture/rest_allowlist.toml"
 
 
 def _served_get_routes() -> set[str]:
     """Every GET path the API serves, from its OpenAPI document (the app as served)."""
-    paths = create_app(ApiSettings("memory://", "config")).openapi()["paths"]
+    paths = create_app(ApiSettings("memory://", "config"), authenticator=as_user()).openapi()[
+        "paths"
+    ]
     return {path for path, ops in paths.items() if "get" in ops}
 
 

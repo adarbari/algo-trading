@@ -13,7 +13,7 @@ from algotrade_api.deps import ApiSettings
 from algotrade_api.graphql.schema import sdl
 from algotrade_api.main import create_app
 from tests.apps.api.graphql.conftest import FACTS, Graph
-from tests.helpers.api_store import END, PREVIOUS, store_over
+from tests.helpers.api_store import END, PREVIOUS, as_user, store_over
 
 REPO = Path(__file__).resolve().parents[4]
 CLOSE = "rollup.price_stats@v2.close"
@@ -75,7 +75,9 @@ def test_no_such_instrument_is_null_not_an_error(graph: Graph) -> None:
 
 def test_an_empty_store_answers_nulls() -> None:
     store = store_over(MemoryBackend(), MemoryConfigStore({}), UserContext("local"))
-    client = TestClient(create_app(ApiSettings("memory://", "config"), store))
+    client = TestClient(
+        create_app(ApiSettings("memory://", "config"), store, authenticator=as_user())
+    )
     body = client.post("/graphql", json={"query": FACTS, "variables": {"key": "A", "names": []}})
     assert body.json() == {"data": {"session": None, "instrument": None}}
 
@@ -83,7 +85,9 @@ def test_an_empty_store_answers_nulls() -> None:
 def test_get_is_off_and_graphiql_only_in_debug(client: TestClient) -> None:
     assert client.get("/graphql").status_code == 404
     store = store_over(MemoryBackend(), MemoryConfigStore({}), UserContext("local"))
-    debug = TestClient(create_app(ApiSettings("memory://", "config", debug=True), store))
+    debug = TestClient(
+        create_app(ApiSettings("memory://", "config", debug=True), store, authenticator=as_user())
+    )
     page = debug.get("/graphql", headers={"accept": "text/html"})
     assert page.status_code == 200 and "graphiql" in page.text.lower()
     query = debug.get("/graphql", params={"query": "{ session { date } }"})

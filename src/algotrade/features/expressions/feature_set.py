@@ -73,7 +73,7 @@ class FeatureSet:
 
     def _check_statuses(self) -> None:
         """A ``null_status`` naming another group's column (``<group>.<col>@vN``) must name a
-        declared one (ADR 0041)."""
+        declared one (ADR 0042)."""
         for f in self.features.values():
             if "@" not in f.null_status:
                 continue
@@ -130,7 +130,7 @@ class FeatureSet:
     def applicability(
         self, name: str
     ) -> tuple[frozenset[str], tuple[tuple[str, frozenset[str]], ...]]:
-        """What a value's absence may be put down to (ADR 0041), inherited by an expression
+        """What a value's absence may be put down to (ADR 0042), inherited by an expression
         from everything it reads like its licence: -> (the non-``any`` ``applies_to`` values
         of the stored features it reads, each ``null_status`` field with its ``illiquid_statuses``).
         ``name``: a selection field (``rollup.<group>.<col>``, ``feature.<name>``)."""

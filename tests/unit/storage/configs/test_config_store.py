@@ -119,3 +119,11 @@ def test_screen_documents_are_read_through_every_store(tmp_path: Path) -> None:
     assert (overlay.drafts("alice"), overlay.versions("alice", "mine")) == (["mine"], [1])
     assert overlay.draft("alice", "mine") == files.draft("alice", "mine")
     assert overlay.version("alice", "mine", 1) == files.version("alice", "mine", 1)
+
+
+def test_a_users_identity_is_one_file_in_their_folder(root: Path) -> None:
+    (root / "users" / "alice" / "identity.toml").write_text('email = "alice@example.com"\n')
+    store = FileConfigStore(root)
+    assert store.load("alice", "identity", "identity") == {"email": "alice@example.com"}
+    assert store.load("bob", "identity", "identity") is None
+    assert store.load(SITE_USER, "identity", "identity") is None  # a user's, never the site's

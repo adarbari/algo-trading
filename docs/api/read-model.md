@@ -177,6 +177,7 @@ Owner folder `src/algotrade/services/read/` (ownership `domain-read-model`). Eve
 | TableView | (`user`, `scope`, `name?`) | `columns, sort, decisions, names`; `scope` `screener:<id>` (PR 8: `views.<scope>`) | `preferences.toml` | `read/screens/views.py` | `explore/screens/view.py` (deleted) |
 | Backtest, BacktestDetail | `runId` | `configId, user, status, start, end, startedAt, finishedAt, metrics`; detail: `configHash, selection, data, rebalances, equity[], fills[]` | run records; the run's own `results/backtest_{equity,fills}` partition as of the run (`context.run_partition`) | `read/ops/backtests.py` (PR 9) | `explore/backtests.py` (deleted) |
 | Config | (`scope`, `configId`) | `kind, impl, selection, hash, error` | configs | `read/ops/configs.py` (PR 9) | `explore/configs.py` (deleted) |
+| Viewer | `id` (the caller) | `name, role, workspaces` (never the email) | `config/site/users.toml` + `config/users/<id>/identity.toml` (the registry, in memory) | `read/users/viewer.py` (ID2, ADR 0040; `load_viewer(user)`: no store read) | the open `canEnter` |
 | ScreenListing, ScreenDetail, ScreenVersion | (`user`, `screenerId`) | `status, latest, hasDraft, presetId`; `draft, draftError, versions, preset{presetId, pinned, current, rebaseAvailable}, hash, layers, resolved, error, working`; `version, document` | the user's drafts and versions (`ConfigStore`) | `read/screens/documents.py` (PR 9) | `services/authoring/screens.{screen_detail,list_screens,screen_versions}` |
 | NightlyRun, RunDetail, RunItem | `runId` | `runId, session, status, startedAt, finishedAt, durationS, steps[{name, status, durationS, reason, error, counts}], problems`; `job, itemsTotal, itemsByStatus, failures[{reason, count, examples, statuses}], stats`; `key, code, status` | run records (session-free: `Stores`) | `read/ops/runs.py` (PR 10a) | `explore/runs.py` (deleted) |
 | QualityReport, Verification | `session` | `runId, status, finishedAt, checks[{name, status, detail}], unknown` (`NOT_RUN`: no `data_quality` run for the session); `runIds, instruments, counts, byCheck, failing, unknown` (`NO_PARTITION`) | the session's `data_quality` run records; `verification/ibkr` exact session | `read/ops/quality.py` (PR 10a) | `explore/{runs,ingestion}.py` (deleted; both were "latest on or before") |
@@ -201,11 +202,11 @@ vocabulary. `FeatureValue.value is None` always comes with `unknown` set.
 | `LICENCE` | a `personal`-licence feature and the caller is not its owner (ADR 0028) |
 | `NOT_RUN` | a screener (or the nightly data-quality check) has no run for the session |
 | `PRE_SNAPSHOT` | identity came from a later snapshot (survivorship) |
-| `NOT_APPLICABLE` | the feature is not defined for this instrument (not optionable; an ETF has no earnings); shown "n/a" (ADR 0041) |
-| `ILLIQUID` | an option feature null because the chain is too thin to price (`iv30_status` NO_QUOTES / WIDE_SPREADS / ILLIQUID); shown "Illiquid" (ADR 0041) |
+| `NOT_APPLICABLE` | the feature is not defined for this instrument (not optionable; an ETF has no earnings); shown "n/a" (ADR 0042) |
+| `ILLIQUID` | an option feature null because the chain is too thin to price (`iv30_status` NO_QUOTES / WIDE_SPREADS / ILLIQUID); shown "Illiquid" (ADR 0042) |
 
 `features(names)` returns `NO_PARTITION`, `NO_ROW`, `NULL`, `NOT_APPLICABLE` and `ILLIQUID`
-(precedence: no partition, a present value, not applicable, illiquid, no row, null; ADR 0041). A name the caller's
+(precedence: no partition, a present value, not applicable, illiquid, no row, null; ADR 0042). A name the caller's
 catalogue lacks is a request error (`UNKNOWN_FEATURE`, naming it) when the client asked for it;
 `NOT_IN_CATALOGUE` is for names the server reads on its own (a saved view's columns, PR 8).
 `LICENCE` waits for a second user (ADR 0028: personal values are hidden from other users once

@@ -1,0 +1,16 @@
+# L3 site setting: the text model behind "Describe it" in the screener Builder (ADR 0041).
+# Off by default. The key never goes here: set ALGOTRADE_LLM_API_KEY in .env (a local Ollama
+# server needs none). What leaves the machine is the typed sentence and the field catalogue.
+#
+# Any OpenAI-compatible endpoint works; `base_url` is the root that has /chat/completions:
+#   Ollama (local, free):   base_url = "http://localhost:11434/v1",                  model = "llama3.1"
+#   Gemini (free tier):     base_url = "https://generativelanguage.googleapis.com/v1beta/openai", model = "gemini-2.5-flash"
+#   Groq (free tier):       base_url = "https://api.groq.com/openai/v1",             model = "llama-3.3-70b-versatile"
+#   OpenRouter (:free):     base_url = "https://openrouter.ai/api/v1",               model = "<id>:free"
+#   Anthropic:              base_url = "https://api.anthropic.com/v1",               model = "claude-haiku-4-5"
+
+enabled = false
+base_url = "http://localhost:11434/v1"
+model = "llama3.1"
+timeout_s = 60                   # one request may take this long before "drafting unavailable"
+answer_limit = 2000              # the longest answer asked for, in tokens (a draft is a few hundred)

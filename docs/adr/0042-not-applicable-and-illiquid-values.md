@@ -1,4 +1,4 @@
-# ADR 0041: Not applicable and illiquid values
+# ADR 0042: Not applicable and illiquid values
 
 **Status:** accepted (2026-10-05; owner decision). Amends [0023](0023-feature-store.md) (the
 `Feature` / `FeatureGroup` declaration gains two fields) and

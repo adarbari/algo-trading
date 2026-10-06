@@ -7,6 +7,7 @@ carries ``extensions.code`` (``errors.py``). ``sdl()`` is the committed snapshot
 
 import strawberry
 from fastapi import Request
+from fastapi.routing import APIWebSocketRoute
 from strawberry.fastapi import GraphQLRouter
 from strawberry.http import GraphQLHTTPResponse
 from strawberry.schema.config import StrawberryConfig
@@ -47,7 +48,7 @@ def graphql_router(
     """``POST /graphql`` over the read contexts ``opener`` opens (one per requested session,
     per request) and the session-free one ``stores`` opens (configs, run records); the
     GraphiQL IDE at ``GET /graphql`` only when ``debug``."""
-    return _Router(
+    router = _Router(
         schema,
         path=PATH,
         graphql_ide="graphiql" if debug else None,
@@ -55,3 +56,7 @@ def graphql_router(
         context_getter=context_getter(opener, stores),
         tags=["graphql"],
     )
+    # No subscriptions: drop Strawberry's WebSocket route, which the caller guard (an HTTP
+    # dependency, ADR 0040) cannot see; /graphql is served over HTTP POST only.
+    router.routes = [r for r in router.routes if not isinstance(r, APIWebSocketRoute)]
+    return router

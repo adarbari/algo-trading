@@ -33,11 +33,11 @@ type and, later, UI and email labels (ADR 0023).
 - ``applies_to``  which instruments the feature is defined for: ``any``, ``optionable``
                   (option-chain features: a non-optionable instrument has none) or ``not_etf``
                   (earnings: an ETF has none). A group's value is inherited by its features.
-                  Where it does not apply the read says NOT_APPLICABLE, not UNKNOWN (ADR 0041)
+                  Where it does not apply the read says NOT_APPLICABLE, not UNKNOWN (ADR 0042)
 - ``null_status`` the status column saying why this one is null: a sibling column of the same
                   group (``iv30_status``) or another group's (``iv30.iv30_status@v1``, for a
                   feature derived from it); when its value is an illiquid status the read
-                  says ILLIQUID (ADR 0041)
+                  says ILLIQUID (ADR 0042)
 - ``illiquid_statuses``  which ``null_status`` values mean the chain is too thin (the others
                   stay NULL); declared with ``null_status``, each needs the other
 - ``version``     the feature's definition version: a group feature's is its group's (a

@@ -56,3 +56,19 @@ def test_the_api_has_its_own_ibkr_client_id(monkeypatch: pytest.MonkeyPatch) -> 
 def test_api_debug(monkeypatch: pytest.MonkeyPatch, value: str, debug: bool) -> None:
     monkeypatch.setenv(env.API_DEBUG, value)
     assert env.api_debug() is debug
+
+
+def test_auth_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in (env.AUTH, env.SUPABASE_URL, env.SUPABASE_JWT_SECRET):
+        monkeypatch.delenv(name, raising=False)
+    assert (env.auth_mode(), env.supabase_url(), env.supabase_jwt_secret()) == (
+        "supabase",
+        None,
+        None,
+    )
+    monkeypatch.setenv(env.AUTH, " OFF ")
+    monkeypatch.setenv(env.SUPABASE_URL, "https://ref.supabase.co/")
+    monkeypatch.setenv(env.SUPABASE_JWT_SECRET, "s3cret")
+    assert env.auth_mode() == "off"
+    assert env.supabase_url() == "https://ref.supabase.co"
+    assert env.supabase_jwt_secret() == "s3cret"

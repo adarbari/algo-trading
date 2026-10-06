@@ -15,7 +15,7 @@ says what null means), ``NOT_APPLICABLE`` (the feature is not defined for this k
 instrument: option features of a non-optionable one, earnings of an ETF; from the session's
 reference snapshot) and ``ILLIQUID`` (an option feature null because the chain is too thin: its
 status column says so). A present value wins over both; they win over NO_ROW and NULL, so a
-non-optionable instrument with no option rows is n/a, not a gap (ADR 0041). ``LICENCE``
+non-optionable instrument with no option rows is n/a, not a gap (ADR 0042). ``LICENCE``
 waits for a second user (ADR 0028: personal-licence values are hidden from users other than
 the owner once there are any). A name outside the caller's catalogue is an error
 (``UnknownFeatureError``), not a value."""
@@ -152,7 +152,7 @@ def _absence(
     iid: str,
     reasons: Reasons,
 ) -> Unknown:
-    """Why a null value is null (ADR 0041 precedence): not applicable, illiquid, no row in a
+    """Why a null value is null (ADR 0042 precedence): not applicable, illiquid, no row in a
     table it reads, else a stored null."""
     day = ctx.session.date
     why = _not_applicable(reasons[0], row, ctx, iid)

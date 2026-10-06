@@ -40,7 +40,7 @@ SOURCES = {"ours": "iv30", "cboe": "iv30_cboe"}
 
 _IV = "iv30.iv30@v1"
 _THIN = tuple(sorted(ILLIQUID_STATUSES))
-_STATUS = "iv30.iv30_status@v1"  # why iv30@v1 has no IV (ADR 0041: a thin chain reads ILLIQUID)
+_STATUS = "iv30.iv30_status@v1"  # why iv30@v1 has no IV (ADR 0042: a thin chain reads ILLIQUID)
 _UNKNOWN = "rank_status is UNKNOWN (fewer than 60 sessions with an IV), or there is no IV today"
 
 FEATURES = (

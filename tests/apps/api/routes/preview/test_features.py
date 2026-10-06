@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from algotrade_api.deps import ApiSettings
 from algotrade_api.main import create_app
+from tests.helpers.api_store import as_user
 
 
 def test_a_formula_is_typed_and_sampled(client: TestClient) -> None:
@@ -27,7 +28,7 @@ def test_a_label_formula_reports_its_categories(client: TestClient) -> None:
 
 
 def test_an_empty_store_checks_without_sampling() -> None:
-    app = create_app(ApiSettings("memory://", "config"))
+    app = create_app(ApiSettings("memory://", "config"), authenticator=as_user())
     got = TestClient(app).post("/features/check", json={"expr": "price_stats.close > 10"})
     assert got.status_code == 200, got.text
     assert (got.json()["session"], got.json()["sample"]) == (None, [])

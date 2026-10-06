@@ -222,7 +222,12 @@ A read-only HTTP API over everything above, the web app's only backend
 ```
 
 It reads the store at `ALGOTRADE_DATA_URL` and the configs at `ALGOTRADE_CONFIG_DIR` (both from
-`.env`) as the user `ALGOTRADE_USER` (default `local`), and never writes. After changing a
+`.env`). Every request except `GET /health` carries a Supabase access token
+(`Authorization: Bearer`, ADR 0040): the API verifies it with `SUPABASE_URL`'s keys (or
+`SUPABASE_JWT_SECRET`) and serves the registry user whose `config/users/<id>/identity.toml`
+email matches (401 without a valid token, 403 for an unknown email). Until the Supabase project
+exists set `ALGOTRADE_AUTH=off` in `.env`: the API then serves `ALGOTRADE_USER` (default `local`)
+without a token, and refuses to start on a non-loopback `--host`. After changing a
 route or schema run `.venv/bin/python scripts/export_openapi.py` and commit
 `apps/api/openapi.json` (CI fails when it is stale); the web client is generated from it.
 

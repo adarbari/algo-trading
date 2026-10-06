@@ -12,7 +12,10 @@ from algotrade_api.schemas.health import Schema
 
 class PreviewBody(BaseModel):
     spec: dict[str, Any] = Field(description="the draft rule screen (as the Builder holds it)")
-    user: str | None = Field(None, description="whose catalogue and presets (default the API's)")
+    user: str | None = Field(
+        None,
+        description="whose catalogue and presets (default: the caller's; another: admins only)",
+    )
     limit: int = Field(
         50,
         ge=0,
