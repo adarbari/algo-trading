@@ -456,6 +456,7 @@ modules = [
     "algotrade_sources.vendors.published",
     "algotrade_sources.vendors.sec",
     "algotrade_sources.vendors.ssga",
+    "algotrade_sources.vendors.tiingo",
     "algotrade_sources.vendors.treasury",
 ]
 

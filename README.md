@@ -212,6 +212,21 @@ The nightly step continues the backfill on its own, `[ibkr] iv_backfill_per_nigh
 names a night (~17 min), so new names fill in without a command; the email's `ibkr-iv` line
 shows coverage, names still pending and the estimated hours left.
 
+The `bars-history` task (Tiingo daily bars from 2018 for the event-study names, ADR 0050) makes one
+request per name, 72 s apart on the free tier (50 requests an hour: the ~140 scoped names take about
+3 hours), so run it detached. It needs a free Tiingo key (`ALGOTRADE_TIINGO_API_KEY` in `.env`), is
+resumable (a name already fetched for the window is skipped; an interrupted run resumes when started
+again with the same `--until`; `--limit N` fetches N names a run) and never replaces a Massive row.
+Its run record reports unknown scope symbols, `overlap_rows` and `split_mismatches` (Tiingo's
+`splitFactor` against `events/split`):
+
+```bash
+mkdir -p var/logs
+nohup sh -c '.venv/bin/algotrade-ingest run bars-history --since 2018-01-01 --until <last session> \
+  > var/logs/bars-history.log 2>&1; echo "exit=$? $(date -u +%FT%TZ)" > var/logs/bars-history.status' >/dev/null 2>&1 &
+cat var/logs/bars-history.status   # appears when the run ends; tail var/logs/bars-history.log meanwhile
+```
+
 The `macro` task (economic series and index levels with their vintages, ADR 0048) refetches
 each series whole, so its first run is the history: run it detached, the published files first
 when there is no FRED key (the FRED series are skipped and counted until `ALGOTRADE_FRED_API_KEY`
