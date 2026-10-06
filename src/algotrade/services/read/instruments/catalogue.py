@@ -1,7 +1,9 @@
 """The feature catalogue a caller reads values by (ADR 0038): one ``FeatureInfo`` per field
 (``instrument.<column>``, ``rollup.<group>@v<N>.<column>``, ``feature.<name>``) with its
 metadata and the display ``format`` derived here, on the server, from its unit and dtype (the
-browser never guesses a format from a feature's name).
+browser never guesses a format from a feature's name), and, on the catalogue read, the site
+field guide's entry for it (``guide``: how to read it, the criterion per intent, caveats; ADR
+0041 amended) so the Builder explains a field with the same words the drafting model gets.
 
 The catalogue is the caller's: the site's fields plus their own expression features
 (``ctx.features``, read once per request; ADR 0023 step 4). Instrument facts first, then
@@ -9,10 +11,19 @@ feature groups in registry order, then expression features. A market's catalogue
 (``entity="market"``, ADR 0047) is its groups' ``market.<group>@v<N>.<column>`` fields and
 the expression features over them."""
 
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
 from enum import StrEnum
+from typing import Any
 
+from algotrade.config.site.field_guide import (
+    FieldGuideEntry,
+    FieldGuideSettings,
+)
+from algotrade.config.site.field_guide import (
+    GuideUse as GuideUseEntry,
+)
+from algotrade.config.site.settings import load_field_guide
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.core.model.fields import (
     COMPANY_TABLE,
@@ -65,12 +76,52 @@ def format_of(dtype: str, unit: str | None) -> FeatureFormat:
 
 
 @dataclass(frozen=True)
+class GuideUse:
+    """One intent a trader has for a field and the criterion that expresses it, as a rule
+    screen takes it: ``op``, ``value`` (in the field's unit), ``mode``, ``tolerance`` (a number
+    in the unit, or ``{"relative": r}``), ``on_miss`` (soft only), ``note`` on combining it."""
+
+    intent: str
+    op: str
+    value: Any
+    mode: str
+    tolerance: float | dict[str, float] | None
+    on_miss: str | None
+    note: str
+
+    @classmethod
+    def from_entry(cls, u: GuideUseEntry) -> "GuideUse":
+        tolerance = dict(u.tolerance) if isinstance(u.tolerance, Mapping) else u.tolerance
+        return cls(u.intent, u.op, u.value, u.mode, tolerance, u.on_miss or None, u.note)
+
+
+@dataclass(frozen=True)
+class FieldGuide:
+    """The site field guide's entry for a field (``docs/data/field-guide.md``): how to read
+    it, the criterion per intent, when the reading lies (each caveat names the field that
+    exposes it), the sources."""
+
+    theme: str
+    reads: str
+    uses: tuple[GuideUse, ...]
+    caveats: tuple[str, ...]
+    sources: tuple[str, ...]
+
+    @classmethod
+    def from_entry(cls, e: FieldGuideEntry) -> "FieldGuide":
+        return cls(
+            e.theme, e.reads, tuple(GuideUse.from_entry(u) for u in e.uses), e.caveats, e.sources
+        )
+
+
+@dataclass(frozen=True)
 class FeatureInfo:
     """One catalogue field: what it is, how it is computed and stored, how to show it.
     ``source``: the table it is read from (``expression``: computed on read); ``key``: the
     feature key ``<group>.<column>@v<N>``; ``range``: plausible ``(min, max)`` (values outside
     are kept); ``scope``: ``site`` or ``user`` (one of the caller's own expression features,
-    declared by ``owner``); ``licence``: ``open`` or ``personal`` (ADR 0028)."""
+    declared by ``owner``); ``licence``: ``open`` or ``personal`` (ADR 0028); ``guide``: the
+    site field guide's entry (None: no entry, or a read that did not attach the guide)."""
 
     name: str
     kind: str
@@ -89,6 +140,7 @@ class FeatureInfo:
     scope: str = "site"
     owner: str | None = None
     licence: str = "open"
+    guide: FieldGuide | None = None
 
 
 class UnknownFeatureError(ConfigurationError):
@@ -161,11 +213,15 @@ def _info(fs: FeatureSet, name: str, dtype: str) -> FeatureInfo:
 
 
 def feature_infos(
-    fs: FeatureSet, names: Sequence[str] | None = None, entity: str = "instrument"
+    fs: FeatureSet,
+    names: Sequence[str] | None = None,
+    entity: str = "instrument",
+    guide: FieldGuideSettings | None = None,
 ) -> dict[str, FeatureInfo]:
     """The catalogue entries of ``names`` in ``fs`` (None: every field, in catalogue order;
-    see the module docstring) for one ``entity``. ``UnknownFeatureError`` naming the first
-    name ``fs`` does not have (and where it moved, for a field of a superseded group)."""
+    see the module docstring) for one ``entity``, each with ``guide``'s entry when a guide is
+    given. ``UnknownFeatureError`` naming the first name ``fs`` does not have (and where it
+    moved, for a field of a superseded group)."""
     if entity != "instrument":
         return _entity_infos(fs, names, entity)
     catalogue = catalog_of(fs)
@@ -176,7 +232,9 @@ def feature_infos(
                 catalogue.check_field(name, "features")
             except ConfigurationError as error:
                 raise UnknownFeatureError(str(error)) from error
-        out[name] = _info(fs, name, catalogue.fields[name])
+        info = _info(fs, name, catalogue.fields[name])
+        entry = guide.entry(name) if guide is not None else None
+        out[name] = replace(info, guide=FieldGuide.from_entry(entry)) if entry is not None else info
     return out
 
 
@@ -191,5 +249,6 @@ def _entity_infos(
 
 
 def load_catalogue(ctx: Stores) -> tuple[FeatureInfo, ...]:
-    """The caller's catalogue (``ctx.features``), in catalogue order."""
-    return tuple(feature_infos(ctx.features).values())
+    """The caller's catalogue (``ctx.features``), in catalogue order, with the site field
+    guide's entries (``ctx.configs``)."""
+    return tuple(feature_infos(ctx.features, guide=load_field_guide(ctx.configs)).values())

@@ -24,6 +24,23 @@ const CATALOGUE = [
     scope: 'site',
     licence: 'open',
     categories: [],
+    guide: {
+      theme: 'volatility',
+      reads: 'Our 30-day ATM implied volatility as a fraction.',
+      uses: [
+        {
+          intent: 'high IV',
+          op: 'gte',
+          value: 0.4,
+          mode: 'soft',
+          tolerance: 0.05,
+          onMiss: null,
+          note: '',
+        },
+      ],
+      caveats: ['A report inside 30 days inflates it.'],
+      sources: [],
+    },
   },
   {
     name: 'instrument.sector',
@@ -147,6 +164,22 @@ describe('CriterionRow', () => {
     expect(
       await screen.findByRole('img', { name: /rollup\.iv30@v1\.iv30 across 100 instruments/ }),
     ).toBeInTheDocument();
+  });
+
+  it('applies a guided intent to the row', async () => {
+    const { onChange } = setup();
+    await userEvent.click(screen.getByRole('button', { name: 'How to read it' }));
+    expect(screen.getByText(/Our 30-day ATM implied volatility/)).toBeInTheDocument();
+    expect(screen.getByText('≥ 40.0%')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Use: high IV' }));
+    expect(onChange).toHaveBeenCalledWith({
+      ...CRITERION,
+      op: 'gte',
+      value: 0.4,
+      mode: 'soft',
+      tolerance: 0.05,
+      on_miss: undefined,
+    });
   });
 
   it('is read-only for a preset not yet copied', () => {

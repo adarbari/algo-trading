@@ -55,8 +55,10 @@ operator, value, mode and tolerance as this grammar takes them), and the caveats
 number is right and the conclusion wrong (a pending takeover pins RSI high with no trend
 behind it; an earnings gap inflates realised volatility for a month), plus the situations that
 fool several thresholds at once. The model takes thresholds from it and adds the check a
-caveat names. The same file is rendered to [field-guide.md](../data/field-guide.md)
-(`make features-doc`) for people building a screen by hand.
+caveat names. The same files are rendered to [field-guide.md](../data/field-guide.md)
+(`make features-doc`) and shown in the Builder under each criterion ("How to read it": the
+reading, each intent with a Use button that sets the row to its criterion, the caveats), so a
+person building a screen by hand and the model read the same words.
 
 ## Example
 

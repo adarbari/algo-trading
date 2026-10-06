@@ -12,7 +12,8 @@ from tests.apps.api.graphql.conftest import Graph
 from tests.helpers.api_store import END, PREVIOUS
 
 CATALOGUE = """{ catalogue { name kind source dtype format version group key inputs unit
-  categories scope owner licence nullMeaning } }"""
+  categories scope owner licence nullMeaning
+  guide { theme reads caveats sources uses { intent op value mode tolerance onMiss note } } } }"""
 DISTRIBUTION = """query D($name: FeatureName!, $date: Date) {
   distribution(name: $name, date: $date) {
     name session count nulls info { dtype format }
@@ -119,3 +120,16 @@ def test_a_feature_not_stored_for_the_session_is_unknown_not_an_older_partition(
 def test_a_name_outside_the_catalogue_is_unknown_feature(graph: Graph) -> None:
     body = graph(DISTRIBUTION, {"name": "rollup.nope@v1.x"})
     assert body["errors"][0]["extensions"]["code"] == "UNKNOWN_FEATURE"
+
+
+def test_the_catalogue_carries_the_field_guide(graph: Graph) -> None:
+    body = graph(CATALOGUE)
+    assert "errors" not in body
+    catalogue = {f["name"]: f for f in body["data"]["catalogue"]}
+    guide = catalogue["rollup.momentum@v1.rsi_14"]["guide"]
+    assert guide["theme"] == "momentum and trend" and guide["reads"] and guide["caveats"]
+    first = guide["uses"][0]
+    assert (first["op"], first["value"], first["mode"], first["tolerance"]) == ("lt", 30, "soft", 5)
+    liquid = catalogue["rollup.price_stats@v2.adv_usd_20d"]["guide"]["uses"][0]
+    assert liquid["tolerance"] == {"relative": 0.2} and liquid["onMiss"] == "LIQUIDITY_RISK"
+    assert catalogue["instrument.symbol"]["guide"] is None

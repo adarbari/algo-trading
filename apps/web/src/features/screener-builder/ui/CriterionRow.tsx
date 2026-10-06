@@ -1,7 +1,9 @@
 /**
  * One criterion: mode (Hard / Soft / Score), the feature, the operator, the threshold, remove.
  * Under it: what the feature is (description, unit, licence), the tolerance of a soft or score
- * criterion, and the field's distribution with the threshold marked (opened on demand).
+ * criterion, the field guide (how to read it, each intent with a "Use" button that sets the row
+ * to it, the caveats; opened on demand) and the field's distribution with the threshold marked
+ * (opened on demand).
  */
 import {
   Box,
@@ -18,9 +20,11 @@ import { useState } from 'react';
 import { featureMarks, unitLabel, type CatalogueFeature } from '@/entities/feature';
 import { MODES, type Criterion, type CriterionMode } from '@/entities/screen';
 
+import { applyGuideUse } from '../model/guide';
 import { allowsTolerance, coerceValue, fieldKind, opFor, operatorsFor } from '../model/threshold';
 
 import { FeaturePicker } from './FeaturePicker';
+import { FieldGuideHelp } from './FieldGuideHelp';
 import { ThresholdDistribution } from './ThresholdDistribution';
 import { ThresholdInput } from './ThresholdInput';
 import { ToleranceFields } from './ToleranceFields';
@@ -170,6 +174,16 @@ export function CriterionRow({
         <Text size="sm" tone="negative" as="p">
           {error}
         </Text>
+      )}
+      {feature?.guide && (
+        <FieldGuideHelp
+          guide={feature.guide}
+          feature={feature}
+          onApply={(use) => {
+            onChange(applyGuideUse(criterion, use));
+          }}
+          disabled={disabled}
+        />
       )}
       {feature && kind === 'number' && (
         <Disclosure

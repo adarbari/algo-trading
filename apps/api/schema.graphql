@@ -171,7 +171,9 @@ enum FeatureFormat {
   TEXT
 }
 
-"""One catalogue field: what it is and how to show it"""
+"""
+One catalogue field: what it is and how to show it; `guide` is the site field guide's entry (on the catalogue read; null for a field without one)
+"""
 type FeatureInfo {
   name: String!
   kind: String!
@@ -190,6 +192,7 @@ type FeatureInfo {
   scope: String!
   owner: String
   licence: String!
+  guide: FieldGuide
 }
 
 """
@@ -235,6 +238,17 @@ type FeatureValue {
   info: FeatureInfo!
 }
 
+"""
+The site field guide's entry for a field (docs/data/field-guide.md): how to read it, the criterion per intent, when the reading lies (each caveat names the field that exposes it), and the sources
+"""
+type FieldGuide {
+  theme: String!
+  reads: String!
+  uses: [GuideUse!]!
+  caveats: [String!]!
+  sources: [String!]!
+}
+
 """One simulated fill"""
 type Fill {
   ts: String!
@@ -244,6 +258,19 @@ type Fill {
   price: Float
   commission: Float
   multiplier: Float
+}
+
+"""
+One intent a trader has for a field and the criterion that expresses it, as a rule screen takes it: `op`, `value` (in the field's unit), `mode`, `tolerance` (a number in the unit, or `{relative}` as a share of the threshold), `onMiss` for soft; `note` says how to combine it
+"""
+type GuideUse {
+  intent: String!
+  op: String!
+  value: JSON
+  mode: String!
+  tolerance: JSON
+  onMiss: String
+  note: String!
 }
 
 """

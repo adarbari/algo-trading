@@ -1,5 +1,6 @@
 /**
- * Entity: the feature catalogue (definitions, units, formats), feature distributions, how a
+ * Entity: the feature catalogue (definitions, units, formats, the site field guide's entry per
+ * field: how to read it, the criterion per intent, caveats), feature distributions, how a
  * served feature value reads (format from the server, UNKNOWN reasons), the feature table
  * (instruments x catalogue columns, one page per request) and the column factories every
  * table is built from (ADR 0038).
@@ -50,6 +51,7 @@ export {
   unitLabel,
   type CatalogueFeature,
 } from './model/catalogue';
+export { guideTolerance, guideValues, type FieldGuide, type GuideUse } from './model/guide';
 export {
   codeReason,
   isUnknown,
