@@ -151,7 +151,7 @@ branches from `main`. `architect` review after RG1a, RG1d, RG2a, RG3 and RG4. Re
 | RG1b | The `market-rollups` task and its non-critical step before the screens | next |
 | RG1c | Market groups `trend` and `breadth` | next |
 | RG1d | `cross_asset` group: turbulence and absorption ratio (`eigvalsh`) in `quant/covariance.py` | next |
-| RG1e | Market reads and `Query.regime` (label UNKNOWN until RG3) | next |
+| RG1e | Market reads and `Query.regime` (label UNKNOWN until RG3) | **done** |
 | RG1f | Design-system pieces: `ScoreMeter`, `IndicatorRow`, `Chart.bands` | next |
 | RG1g | `entities/regime` (`useRegime`, `useRegimeBands`, `RegimeChip`, `toChartBands`), the top-bar chip, the page header and cards | next |
 | RG1h | Per-instrument episode features `episode_behaviour@v1` (`features/rollups/price/episodes.py`) | next |

@@ -47,9 +47,11 @@ class FeatureSeries:
     points: tuple[SeriesPoint, ...]
 
 
-def _groups(ctx: ReadContext, names: Sequence[str]) -> dict[str, list[tuple[str, str]]]:
+def _groups(
+    ctx: ReadContext, names: Sequence[str], entity: str
+) -> dict[str, list[tuple[str, str]]]:
     """Rollup table (or ``EXPRESSIONS``) -> [(catalogue name, column)]."""
-    infos = feature_infos(ctx.features, names)  # UnknownFeatureError for a name not there
+    infos = feature_infos(ctx.features, names, entity)  # UnknownFeatureError for a name not there
     groups: dict[str, list[tuple[str, str]]] = {}
     for name, info in infos.items():
         if is_feature_field(name):
@@ -79,17 +81,19 @@ def load_series(
     names: Sequence[str],
     start: date,
     end: date | None = None,
+    entity: str = "instrument",
 ) -> dict[str, FeatureSeries]:
     """``names`` (catalogue fields, in the order asked; repeats dropped) of each instrument
     for every stored session of ``start..end`` (``end``: the session's date): one read per
-    table for them all."""
+    table for them all. ``entity``: whose catalogue and ids (``market``: ``market_id("US")``,
+    ADR 0047)."""
     wanted = tuple(dict.fromkeys(names))
     last = end if end is not None else ctx.session.date
     if last > ctx.session.date:  # a window past the session would show what it did not know
         raise ConfigurationError(f"end {last} is after the session {ctx.session.date}")
     ids = list(dict.fromkeys(instrument_ids))
     by_day: dict[tuple[str, date], dict[str, Any]] = {}
-    for table, fields in _groups(ctx, wanted).items():
+    for table, fields in _groups(ctx, wanted, entity).items():
         frame = _frame(ctx, table, [c for _, c in fields], ids, start, last)
         if frame is None or frame.empty:
             continue

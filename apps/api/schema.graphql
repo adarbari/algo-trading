@@ -304,6 +304,25 @@ type Ideas {
   items: [Idea!]!
 }
 
+"""What an indicator did before one episode, in one line"""
+type IndicatorBefore {
+  episode: String!
+  line: String!
+}
+
+"""One reading-list entry of an indicator card"""
+type IndicatorLink {
+  title: String!
+  url: String!
+}
+
+"""An indicator's own verdict: ON, OFF or UNKNOWN"""
+enum IndicatorStatus {
+  ON
+  OFF
+  UNKNOWN
+}
+
 """
 One dataset on one session: `status` COMPLETE, PARTIAL, MISSING or CARRIED; `present` rows stored, `expected` rows expected and `basis` what that is; `runIds` the stored runs the rows came from
 """
@@ -367,6 +386,38 @@ type Instrument {
 The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
 """
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
+
+"""
+A market (`marketId` `MKT:US`) for the session. Per-session values (breadth, trend, the regime's inputs) are market catalogue features: `features(names)`
+"""
+type Market {
+  session: Date!
+  marketId: String!
+
+  """
+  The values of `names` (market catalogue fields: `market.<group>@v<N>.<column>`, or a `feature.<name>` over them; in the order asked) for the session; a name outside the market's catalogue is an UNKNOWN_FEATURE error
+  """
+  features(names: [String!]!): [FeatureValue!]!
+}
+
+"""
+The market regime for the session, as market weather (`plainLabel`: Clear, Clouds building, Storm, Severe storm). `label` is UNKNOWN exactly when `unknownReason` says why (the regime is not computed for the session); `headline` is the sentence under the weather
+"""
+type MarketRegime {
+  session: Date!
+  label: RegimeLabel!
+  plainLabel: String!
+  headline: String!
+  scores: RegimeScores!
+  indicators: [RegimeIndicator!]!
+  sizing: RegimeSizing!
+  unknownReason: Unknown
+
+  """
+  The regime label of every exchange session of `start..end` (`end` on or before the session's date), consecutive equal labels merged into bands, oldest first; a session with no stored label is an UNKNOWN band
+  """
+  bands(start: Date!, end: Date!): [RegimeBand!]!
+}
 
 """
 One session's nightly run: `status` queued, running, complete, partial or failed; `steps` in workflow order; `problems` why it is partial or failed
@@ -550,6 +601,26 @@ type Query {
   ): Ideas
 
   """
+  The US market for the session: the market-entity features by catalogue name (ADR 0047). Null: nothing stored
+  """
+  market(
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): Market
+
+  """
+  The market regime for the session as weather (Clear, Clouds building, Storm, Severe storm), with its scores, indicator cards and sizing rule; UNKNOWN with its reason when not computed for the session (ADR 0047). Null: nothing stored
+  """
+  regime(
+    """
+    the session to read (default: the latest with bars); every value below is for exactly this date
+    """
+    date: Date = null
+  ): MarketRegime
+
+  """
   Every rule screen the user sees (their own config, else the site preset), by id; each with its run for the session
   """
   screeners(
@@ -688,6 +759,70 @@ type Query {
     """
     date: Date = null
   ): ReviewList
+}
+
+"""
+Consecutive sessions `start..end` (the first and last of the run) with the same regime label; UNKNOWN where none is stored
+"""
+type RegimeBand {
+  start: Date!
+  end: Date!
+  label: RegimeLabel!
+}
+
+"""
+One indicator card with its value for the session: the plain-language text first, the technical name and `value` behind it. `value` is null exactly when `unknown` says why (format it with `format`); `status` is the indicator's own verdict and `changed` whether it differs from 5 sessions earlier (null: not stored). `pace`: slow (macro) or fast (market)
+"""
+type RegimeIndicator {
+  key: String!
+  pace: String!
+  plainName: String!
+  technicalName: String!
+  oneLiner: String!
+  whyItMatters: String!
+  whatOnMeans: String!
+  before: [IndicatorBefore!]!
+  leadTime: String!
+  falseAlarms: String!
+  links: [IndicatorLink!]!
+  feature: String!
+  value: JSON
+  unknown: Unknown
+  format: FeatureFormat
+  status: IndicatorStatus!
+  changed: Boolean
+}
+
+"""The regime; UNKNOWN when it is not stored"""
+enum RegimeLabel {
+  CALM
+  CAUTION
+  STRESS
+  CRISIS
+  UNKNOWN
+}
+
+"""A 0-100 score; `value` is null exactly when `unknown` says why"""
+type RegimeScore {
+  value: Float
+  unknown: Unknown
+}
+
+"""
+`macroRisk` (slow, weekly), `marketStress` (fast, daily) and `fragility` (context only: it never changes the label)
+"""
+type RegimeScores {
+  macroRisk: RegimeScore!
+  marketStress: RegimeScore!
+  fragility: RegimeScore!
+}
+
+"""
+The site's sizing rule in force: new positions are sized at `multiplier` of the normal size while the regime is `label` (null: the regime is UNKNOWN)
+"""
+type RegimeSizing {
+  label: RegimeLabel!
+  multiplier: Float
 }
 
 """One of the screen's display columns for the instrument"""
