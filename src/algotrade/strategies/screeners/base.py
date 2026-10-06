@@ -18,6 +18,9 @@ class Decision(StrEnum):
     REJECT = "REJECT"
     UNKNOWN = "UNKNOWN"  # data missing or stale: fail closed, never counted as processed
     SKIPPED = "SKIPPED"  # a rule screen's gating criterion has no data (ADR 0029): not processed
+    # A pick held back by the regime gate (ADR 0049), with its reason. Processed: the row was
+    # decided on its data, so it never lowers coverage (a Storm run is not PARTIAL).
+    PAUSED = "PAUSED"
 
     @property
     def processed(self) -> bool:

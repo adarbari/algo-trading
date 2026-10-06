@@ -1,5 +1,6 @@
 """Rule-screen rows as the ``results/rule_screen`` and ``results/rule_screen_values`` frames
-(ADR 0029), stamped with the run's point-in-time columns and the config's identity."""
+(ADR 0029), stamped with the run's point-in-time columns and the config's identity; the
+screen rows also carry the session's ``regime`` and ``size_multiplier`` (ADR 0049)."""
 
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -26,6 +27,8 @@ class Stamp:
     config_id: str
     config_hash: str
     config_version: int | None
+    regime: str | None = None  # the session's regime label (ADR 0049; None: gate off / unknown)
+    size_multiplier: float = 1.0  # the regime's size for this screener (1.0 with the gate off)
 
     def apply(self, frame: pd.DataFrame) -> pd.DataFrame:
         frame["user_id"], frame["config_id"] = self.user_id, self.config_id
@@ -67,6 +70,8 @@ def screen_frame(result: RuleScreenResult, stamp: Stamp) -> pd.DataFrame:
             "failed": _ids(row, "FAIL"),
             "near_missed": _ids(row, "NEAR"),
             "missing": _ids(row, "MISSING"),
+            "regime": stamp.regime,
+            "size_multiplier": stamp.size_multiplier,
         }
         for row in result.rows
     ]

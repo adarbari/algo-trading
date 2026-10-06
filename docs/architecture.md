@@ -40,7 +40,7 @@ versus planned. Detail lives in companion docs:
 
  SHARED LIBRARY (src/algotrade/), layered top to bottom:
    services/    use cases: backtests/ · screening/ (+ exports) · jobs/ · evaluation/ · configs, selection
-   engines/     backtest/ · screening/ · selection/
+   engines/     backtest/ · screening/ · selection/ · overlays/
    strategies/  trading/ (backtests) · screeners/. Pure: MarketView / FeatureView in, decisions out.
    features/    framework/ · rollups/ · expressions/ · registry · site  analytics/   metrics, reports
    storage/     tables/ (schemas, readers / writers) · backends/ · configs/ (config store) · runs, locks
@@ -352,7 +352,7 @@ apps/ingestion · apps/backtest · apps/api (algotrade_api)   never import each 
      services/           use cases: jobs, configs, selection, screening, backtests, evaluation;
                          read/ (the read model the API serves), preview/ (Builder dry runs)
         │
-     engines/            backtest/ · screening/ · selection/   (independent of each other)
+     engines/            backtest/ · screening/ · selection/   (independent of each other); overlays/
         │
  strategies/ (trading · screeners) · features/ · analytics/
         │
@@ -381,7 +381,7 @@ Extra contracts:
 | `strategies/` → `screeners/` | Screener contract, shared `Decision` categories, `short_premium_liquidity`. | core, quant |
 | `features/` | The feature store (ADR 0023): `framework/` (`Feature`: one typed, documented column with kind, unit, null meaning, range; `FeatureGroup`: inputs + lookback, params from `rollups.toml`, its features; the dependency graph and the per-session runner, point in time, chunked backfills), `rollups/` (the groups: `FEATURES` + a pure compute; only core, quant, numpy, pandas), `registry.py` (`GROUPS`, `FEATURES`, `feature(name)`, `SUPERSEDED`), `expressions/` (the typed expression language: lexer, parser, type checker, vectorised evaluator, never Python `eval`; expression features from `config/site/features/*.toml` resolved into a `FeatureSet` with the code groups and the groups that materialise expressions), `site.py` (the site's `FeatureSet`; the selection catalogue and the `rollups` task are built from it), `catalogue.py` (renders `docs/data/features.md`). A group's `entity` is `instrument` (default) or `market` (ADR 0047: one `MKT:US` row per session in `rollups/market/<name>@vN`; an expression never mixes entities). Inputs are asked of `data.feature_inputs` by table name; expression features are computed on read (`services/features.py`) unless materialised. | data (`data.feature_inputs` only), config.site, quant, core |
 | `analytics/` | Metrics and report formatting from equity curves + fills. | core |
-| `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener and audits coverage. `selection/`: three-valued evaluation with a per-rule audit; `schedule.py`, the rebalance sessions and the audit of each change. `backtest/universe.py`: the tradable set per bar (fixed, or from a rebalance schedule; exits on removal). | strategies, config, analytics, core |
+| `engines/` | `backtest/`: the bar loop, risk limits, sizing, simulated broker, costs, portfolio. `screening/`: runs a screener, applies the regime gate (`PAUSED`, ADR 0049) and audits coverage. `overlays/`: run overlays applied to a strategy's weights from the session's market features (ADR 0049). `selection/`: three-valued evaluation with a per-rule audit; `schedule.py`, the rebalance sessions and the audit of each change. `backtest/universe.py`: the tradable set per bar (fixed, or from a rebalance schedule; exits on removal). | strategies, config, analytics, core |
 | `services/` | Use cases: `backtests/`, `screening/` (run + `exports`), `jobs/`, `evaluation/`; shared by several: `configs`, `selection`, golden `datasets`, `views` (FeatureView builder), `features` (expression features on read: only the stored columns they need). | everything below except `storage.tables.writers` and `storage.tables.readers` (through `data/`) |
 | `libs/sources` (`algotrade_sources`, ADR 0027) | Vendor sources as a shared package: `framework/` (protocols, HTTP with retries, pacing, the source registry), `vendors/<vendor>/`, `fixtures/` (synthetic/golden). Vendor SDKs (`ib_async`, `openpyxl`) are declared here. Used by ingestion (batch); the API uses it for live, read-only quotes (ADR 0028); backtests and the library never import it. | core, quant, `config.env` only (import-linter) |
 | `apps/ingestion` | Depends on `algotrade-sources`; `tasks/` (`framework/`: `IngestRun` in `run.py` and the task registry; one module per dataset in `reference/`, `market/`, `derived/`, `maintenance/`); nightly workflow (`workflows/nightly/`: ordered, isolated registry tasks, catch-up, screens as jobs, notification); `cli/` (`algotrade-ingest`); `ops/` (schedule). | library |
@@ -470,9 +470,23 @@ task registry); `[[shared]]` names the reasoned exceptions (the ingestion id rul
 open of bar t   : SimulatedBroker fills orders queued at t-1 (slippage, commission, buying power)
                   -> Portfolio.apply_fill (value = qty × price × multiplier)
 close of bar t  : Portfolio marked to market -> equity[t]
-                  Strategy.on_bar(MarketView(data, cursor=t)) -> target weights | None
-                  apply_limits -> targets_to_orders -> Broker.submit
+                  Strategy.on_bar(MarketView(data, cursor=t, market)) -> target weights | None
+                  overlays (MarketFeatures.at(t)) -> apply_limits -> targets_to_orders -> Broker.submit
 ```
+
+**Run overlays** (ADR 0049, `engines/overlays/`): a market-wide rule that resizes every
+strategy's targets is an `Overlay` the engine applies after `on_bar` and before
+`apply_limits`, never code inside a strategy (strategies see only `core` and `quant`). The
+first is `ScaleByLabel`, the regime overlay: each weight times the multiplier of session t's
+`market.regime@v1.label` (config `[regime]`), 0 in a paused label, `unknown_multiplier` (0)
+when the label is unknown (fail closed). Market values come in as `MarketFeatures`
+(`core/views/market_features.py`), one column per feature name on the bars' timeline, built by
+`services/backtests/market.py` from the market feature store; strategies read them through
+`MarketView.market_feature(name)` at the same cursor. Session t's values size the orders that
+fill at t+1's open, so no overlay sees the future. A strategy that returns `None` is resized
+when the overlay's output changes; the run record counts the bars per overlay reason. The
+screening engine's counterpart is the regime gate (`engines/screening/gate.py`): a screener's
+QUALIFIED / WATCH rows become `PAUSED` in the labels it pauses in, or when the label is unknown.
 
 ---
 

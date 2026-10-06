@@ -23,6 +23,7 @@ from algotrade.config.site.settings import (
     site_defaults,
 )
 from algotrade.config.strategy.catalog import FieldCatalog
+from algotrade.config.strategy.regime import RegimeSettings
 from algotrade.config.strategy.schema import (
     EVERY_INSTRUMENT,
     RULES_IMPL,
@@ -121,6 +122,11 @@ class ResolvedConfig:
     def backtest(self) -> BacktestSettings:
         """The resolved ``[backtest]`` settings, typed (validated by ``resolve``)."""
         return BacktestSettings.parse(self.settings.get("backtest"), f"{self.config.id} [backtest]")
+
+    @property
+    def regime(self) -> RegimeSettings:
+        """The resolved ``[regime]`` settings (ADR 0049), typed (validated by ``resolve``)."""
+        return RegimeSettings.parse(self.settings.get("regime"), f"{self.config.id} [regime]")
 
     @property
     def screen_spec(self) -> ScreenSpec:
@@ -273,7 +279,8 @@ def resolve(
     defaults = deep_merge(BUILTIN_DEFAULTS, site_defaults(load))
     settings = deep_merge(defaults, config.settings)
     resolved = ResolvedConfig(config, selection, settings, user, tuple(layers))
-    _ = resolved.screening, resolved.backtest  # typed: a bad value fails here, with its path
+    # typed: a bad value fails here, with its path
+    _ = resolved.screening, resolved.backtest, resolved.regime
     return ResolvedConfig(
         config, selection, settings, user, tuple(layers), fingerprint(resolved.canonical())
     )

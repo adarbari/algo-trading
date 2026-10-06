@@ -70,8 +70,9 @@ built-in defaults  <  L3 site (defaults.toml + preset)  <  L4 user config  <  ru
   preset with `selection_overrides` (AND-ed with the preset's rules, so later preset fixes
   still apply) or **replaces** it with its own `selection`. A user can never widen coverage:
   covering a new instrument is a site change.
-- **Settings.** `[screening]` and `[backtest]` come from defaults, overridden by the config,
-  and are typed at resolve time (`ResolvedConfig.screening`, `.backtest`; see
+- **Settings.** `[screening]`, `[backtest]` and `[regime]` come from defaults, overridden by
+  the config, and are typed at resolve time (`ResolvedConfig.screening`, `.backtest`,
+  `.regime`, [below](#regime); see
   [site settings](#site-settings-typed-one-loader)): an unknown key or a bad value fails
   with its path, e.g. `sma_trend [backtest.costs]: unknown keys ['fee']`.
 - **Hash.** SHA-256 of everything that affects results (impl, params, selection, exports,
@@ -210,6 +211,45 @@ Rules (`engines/selection/schedule.py`, `services/backtests/rebalance.py`,
 - **Hash.** Both keys are part of the config hash when set; a config that does not set them
   keeps its previous hash (they are not written into the defaults).
 
+## Regime
+
+`[regime]` (ADR 0049; typed `RegimeSettings` in `config/strategy/regime.py`) sizes backtests
+and gates screeners by the session's market regime. It layers like `[screening]` and
+`[backtest]`: built-in < `config/site/defaults.toml` < the site preset < the user's config
+(`config/users/<id>/strategies/<id>.toml` or `screeners/`) < run overrides, tables merging, so
+the config hash records it.
+
+```toml
+[regime]
+enabled = false                    # off until the site, a user or a run turns it on
+label = "market.regime@v1.label"   # a market feature field: CALM, CAUTION, STRESS, CRISIS
+unknown_multiplier = 0.0           # size when the label is null or unknown (fail closed)
+pause_in = []                      # labels in which a screener's picks are PAUSED
+[regime.multipliers]               # size per label, each in [0, 1]
+CALM = 1.0
+CAUTION = 0.75
+STRESS = 0.5
+CRISIS = 0.25
+[regime.screeners.vrp_scanner]     # per screener (config id): replaces pause_in
+pause_in = ["STRESS", "CRISIS"]
+```
+
+- **Backtests.** Enabled, the run reads the label for every session of its bars (a session
+  with no row is unknown; no row in the whole range is a `MissingDataError`) and the engine's
+  `ScaleByLabel` overlay multiplies the strategy's weights by the session's multiplier (0 in a
+  `pause_in` label, `unknown_multiplier` when unknown) before the risk limits; the run record's
+  `overlay_reasons` counts the bars per reason.
+- **Screeners.** Enabled, a QUALIFIED / WATCH row is `PAUSED` when the session's label is in
+  the screener's `pause_in` (its `[regime.screeners.<id>]` table, else the top-level list), and
+  in every screener when the label is unknown; result rows carry `regime` and
+  `size_multiplier` ([screeners](screeners/README.md#contract-all-screeners)).
+- **Validation.** Unknown keys, a multiplier outside [0, 1], a label outside the four, or a
+  `label` that is not a `market.<group>@v<N>.<column>` field fail at resolve with the path,
+  e.g. `vrp_scanner [regime] pause_in: unknown labels ['STORM']`.
+- **Evaluation.** `make evaluate` also runs every strategy on every golden dataset without and
+  with the site's overlay (whether or not it is enabled) and prints max drawdown, Sharpe and
+  exposure for both, or `regime overlay: no market feature rows in the store`.
+
 ## Site settings (typed, one loader)
 
 Every `config/site/*.toml` is loaded and validated by `src/algotrade/config/site/settings.py`
@@ -217,7 +257,7 @@ alone (ADR 0019 `site-settings`); apps receive frozen dataclasses, never dicts:
 
 | File | Type | Holds |
 |---|---|---|
-| `defaults.toml` | `ScreeningSettings`, `BacktestSettings` (`CostSettings`, `LimitSettings`) | run defaults, layered per config |
+| `defaults.toml` | `ScreeningSettings`, `BacktestSettings` (`CostSettings`, `LimitSettings`), `RegimeSettings` ([regime](#regime)) | run defaults, layered per config |
 | `sources.toml` | `SourcesSettings` (`VendorSettings` per section) | per-vendor `enabled` and pacing (`min_interval_s`, `max_interval_s`, `start_interval_s`; see [Vendor pacing](#vendor-pacing)), chain workers and `[cboe] priority_symbols`, earnings days, corporate-actions window, SEC refresh days (`[sec_edgar] refresh_days` company details, `facts_refresh_days` share counts; spread over the window by CIK), ETF holdings (`[etf_holdings] refresh_days` 7: each fund once per window on its slot day, N-PORT funds at most every 90 days; `per_night` 200: funds the nightly reads a night from one list across issuers, 0 no cap (the CLI is uncapped); `keep_top` 100: holdings stored per fund, 0 all; `fallback_scope` `liquid` (default) / `optionable` / `all` / `off`: which funds SEC N-PORT is read for (`liquid`: the optionable ones plus those with `fallback_min_adv_usd` 5,000,000 of 20-session dollar volume); `[spy_holdings]`, the older name of `[ssga]`, still switches State Street off; `[ssga]`, `[ishares]` and `[proshares]` hold the issuers' `enabled`, pacing and `raw_retention_days` 14; `[ssga] etf_files` false turns off only the SPDR fund files; `[etf_holdings]` takes only `enabled` and its own keys, no pacing or retention); `[sec_edgar] fund_quarters` (6: prospectus data sets read for ETF descriptions, ADR 0034), `[massive] descriptions_per_night` (100: stocks the nightly asks Massive for; 0 turns the nightly requests off, hand runs still work) and `descriptions_refresh_days` (365); `[http]` retry cap, circuit breaker, limiter directory and adaptive-pacing rules; raw and staging retention, `live_retention_days` (7: `live/option_quotes` partitions older than this are purged by `purge-raw`) (a vendor section's `raw_retention_days` overrides the global raw window for every raw source in that section: `[sec_edgar]` keeps 7 days; see [storage.md](data/storage.md#retention)); `[quality]` thresholds of the nightly steps' acceptance checks (ADR 0039: outside them the step FAILS and holds back what needs it): `max_bar_count_drop` (0.10), `max_bar_unresolved` (0.01: share of the session's bars whose ticker the resolver did not know), `max_universe_change` (0.05), `max_name_over_vendor` (0.02: share of ACTIVE reference rows typed by the name over a generic vendor type) and `max_type_disagreement` (0.10: share whose vendor type our name rules contradict), the `reference_classification` check (ADR 0045); `macro.toml [macro] run_budget_s` (900: the `macro` task stops fetching after that many seconds and records the rest as skipped, so a FRED outage cannot hold the nightly up); `max_macro_stale_share` (0.20: the `macro_fresh` check FAILs above that share of the enabled macro series with no observation newer than cadence + `release_lag_days` + 2 days (3 for a daily series), ADR 0048; the `macro_vintages` check FAILs when a series holds fewer vintages than an earlier run recorded); option chains: `max_chain_fetch_failures` = share of optionable names whose fetch failed (`FETCH_ERROR`, including an open circuit, or `NOT_ATTEMPTED`) above which `chains_fetch` FAILs, default 0.02; `max_chain_stale_share` = share of the "rest" tier's `STALE_DATA` chains above which `chains_stale_rest` FAILs, default 0.20, and `max_chain_stale_share_core` the same for the "core" tier (S&P 500, `[cboe] priority_symbols`, HIGH liquidity; `chains/status.tier`, recorded at fetch time) with `chains_stale_core`, default 0.02; the details list the OK / STALE_DATA / NO_CHAIN / NO_STANDARD_SERIES counts. `min_chain_coverage` was replaced by these two and is now rejected); `[quality.coverage.<group>.<column>]` (ADR 0043: `core_min`, `rest_min`, `max_drop`, `level`, `core_level`, `covered_by` `value` / `row` / `recent`; `recent` takes `max_age_days`, 100, and `or_value`) grade per tier the share of the names a feature applies to that have a value: the `coverage_<feature>` checks of the `rollups` step; `earnings.last_earnings_date` (`recent`) flags overdue earnings, core companies whose last report is over 100 days old with no next date |
 | `sources.toml [ibkr]` | `IbkrSettings` (`SourcesSettings.ibkr`) | IB Gateway for the read-only `verify`, `ibkr-contracts` and `ibkr-iv` tasks (ADR 0026, 0028): `enabled` (off by default: a missing section is disabled too), `min_interval_s` (every message, 0.02 = 50/s), `historical_min_interval_s` (>= 0, default 10: the shared `ibkr_historical` limiter, one historical request per 10 s = 60 per 10 minutes. IBKR documents that 60-per-10-minutes rule only for bars of 30 s or less; daily bars, which every IBKR task asks for, are soft throttled. The default stays 10; the owner may trial 5, then 3, watching the `ibkr_historical` pacing stats, request timeouts and error 162 (pacing violation): an unanswered request is retried and then left pending, never recorded as `NO_DATA`), `market_data_type` (1 live, 3 delayed), `connect_timeout_s`, `request_timeout_s`, `stream_wait_s` (IB dividends tick; the IV ticks too), `raw_retention_days` (30); the IBKR enrichment (ADR 0028, tasks `ibkr-contracts`, `ibkr-iv`): `contracts_refresh_days` (30: each conid again once a month, on a slot day by key), `contracts_batch` (25 per `qualifyContracts`), `iv_batch` (50 IV streams open together), `iv_history_days` (730: the history a nightly backfill fetches), `iv_backfill_per_night` (100 underlyings without history the nightly backfills, one IV request each; 0 off); `[quality] max_verify_failures` (0.10): the `verification` check FAILs above that share of failing graded checks and WARNs on any |
 | `verification.toml` | `VerificationSettings` | the live verification vs IBKR: `[sample]` `core_symbols` (always verified), `rotating` (more per session, by a hash of the session), `option_symbols` + `options_per_symbol` (option quotes compared with our chain), `bar_sessions` (IBKR daily bars per name); `[tolerances]` `close_rel`, `range_rel`, `hv_rel`, `high_52w_rel`, `extreme_rel` (52-week low, the dividend-gap rule), `yield_abs`, `iv_abs`, `spread_band` (option mids, in half-spreads), `max_missing_sessions`, `warn_multiple` (over tolerance by at most this factor: WARN; beyond: FAIL). Defaults are the reconciliation suite's tolerances (testing.md) |

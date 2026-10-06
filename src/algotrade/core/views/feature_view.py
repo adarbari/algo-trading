@@ -2,7 +2,8 @@
 
 Like ``MarketView`` for prices, this is the only window a screener has onto data. It is
 built by the services layer from stores read with ``as_of``, so a screener cannot see
-anything that was not known at that time.
+anything that was not known at that time. ``market`` holds the session's market-wide values
+(``market.<group>@v<N>.<column>``, ADR 0047) for the names the run asks for (ADR 0049).
 """
 
 from collections.abc import Iterator, Mapping
@@ -13,15 +14,26 @@ type FeatureValue = float | int | str | bool | None
 
 
 class FeatureView:
-    __slots__ = ("_as_of", "_rows")
+    __slots__ = ("_as_of", "_market", "_rows")
 
-    def __init__(self, as_of: date, rows: Mapping[str, Mapping[str, FeatureValue]]) -> None:
+    def __init__(
+        self,
+        as_of: date,
+        rows: Mapping[str, Mapping[str, FeatureValue]],
+        market: Mapping[str, FeatureValue] | None = None,
+    ) -> None:
         self._as_of = as_of
         self._rows = MappingProxyType({k: MappingProxyType(dict(v)) for k, v in rows.items()})
+        self._market = MappingProxyType(dict(market or {}))
 
     @property
     def as_of(self) -> date:
         return self._as_of
+
+    @property
+    def market(self) -> Mapping[str, FeatureValue]:
+        """The session's market values by name (``None``: the session has none)."""
+        return self._market
 
     @property
     def instruments(self) -> tuple[str, ...]:

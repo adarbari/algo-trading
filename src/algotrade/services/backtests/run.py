@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 
 from algotrade.config.site.settings import BacktestSettings
+from algotrade.config.strategy.regime import RegimeSettings
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
@@ -17,8 +18,11 @@ from algotrade.engines.backtest.engine import run_backtest
 from algotrade.engines.backtest.limits import RiskLimits
 from algotrade.engines.backtest.result import BacktestResult
 from algotrade.engines.backtest.universe import Schedule
+from algotrade.engines.overlays.overlay import Overlay
+from algotrade.engines.overlays.scale import ScaleByLabel
 from algotrade.engines.selection.evaluate import SelectionResult
 from algotrade.engines.selection.schedule import Rebalance, turnover
+from algotrade.services.backtests.market import load_market_features
 from algotrade.services.backtests.rebalance import load_rebalanced
 from algotrade.services.features import config_features
 from algotrade.services.selection import select
@@ -54,6 +58,15 @@ def backtest_settings(bt: BacktestSettings) -> BacktestConfig:
         lot_size=bt.lot_size,
         cash_buffer=bt.cash_buffer,
         periods_per_year=bt.periods_per_year,
+    )
+
+
+def regime_overlays(regime: RegimeSettings) -> tuple[Overlay, ...]:
+    """The run overlays ``[regime]`` asks for (ADR 0049): none while it is off."""
+    if not regime.enabled:
+        return ()
+    return (
+        ScaleByLabel(regime.label, regime.multipliers, regime.pause_in, regime.unknown_multiplier),
     )
 
 
@@ -158,6 +171,10 @@ def run_configured_backtest(
     With a ``writer``, the equity curve and fills are saved as ``results/backtest_equity`` and
     ``results/backtest_fills`` (partitioned by ``end``), and a run record stores the metrics,
     the selection audit, the config hash and the exact data runs read.
+
+    With ``[regime]`` enabled the regime overlay scales the strategy's weights from each
+    session's label (``services.backtests.market``; ADR 0049) and the run record counts the
+    bars per overlay reason (``overlay_reasons``).
     """
     if config.config.kind != "strategy":
         raise ConfigurationError(f"{config.config.id} is a {config.config.kind}, not a strategy")
@@ -181,7 +198,14 @@ def run_configured_backtest(
         _check_selected(config, selected, start)
         data, schedule = rebalanced.prices, rebalanced.schedule
     strategy = create_strategy(config.config.impl, **dict(config.config.params))
-    result = run_backtest(data.series, strategy, backtest_settings(bt), data.terms, schedule)
+    overlays = regime_overlays(config.regime)
+    market = None
+    if overlays:  # the regime label for every session of the run (ADR 0049)
+        timeline = next(iter(data.series.values())).timestamps
+        market = load_market_features(reader, [config.regime.label], timeline, as_of=now)
+    result = run_backtest(
+        data.series, strategy, backtest_settings(bt), data.terms, schedule, overlays, market
+    )
     outcome = BacktestOutcome(
         config,
         selected,
@@ -212,5 +236,7 @@ def run_configured_backtest(
         "metrics": result.metrics.as_dict(),
         **outcome.data_stats(),
     }
+    if overlays:  # bars each overlay reason applied on (ADR 0049)
+        stats["overlay_reasons"] = dict(result.overlay_reasons)
     writer.save_run(record.finish(now, stats=stats))
     return replace(outcome, run_id=run_id)

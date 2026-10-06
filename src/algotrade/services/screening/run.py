@@ -2,10 +2,15 @@
 
 A rule screen (``impl = "rules"``, ADR 0029) reads its spec's fields, is evaluated once by
 ``strategies.screeners.rules`` and writes ``results/rule_screen`` + ``rule_screen_values``
-atomically; its run summary goes into the run record (``stats["summary"]``)."""
+atomically; its run summary goes into the run record (``stats["summary"]``).
+
+With ``[regime]`` enabled (ADR 0049) the session's regime label is read (``services.screening
+.regime``) and the screening engine's gate PAUSES the picks of a screener that pauses in it
+(or of every screener when the label is unknown: fail closed); every result row carries the
+session's ``regime`` and ``size_multiplier``, and the run record the gate's summary."""
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
 
 import pandas as pd
@@ -15,10 +20,12 @@ from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data import StoreReader
 from algotrade.data.reference import Universe, load_universe
+from algotrade.engines.screening.gate import RegimeGate, gate_rule_result
 from algotrade.engines.screening.runner import RunCoverage, ScreenRun, audit_rows, run_screen
 from algotrade.engines.selection.evaluate import SelectionResult
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.services.features import config_features
+from algotrade.services.screening.regime import market_names, regime_gate, session_market
 from algotrade.services.screening.rule_results import Stamp, rule_frames
 from algotrade.services.selection import fields_view, select
 from algotrade.services.views import feature_view
@@ -79,14 +86,16 @@ def screen_rules(
     session_date: date,
     selected: SelectionResult,
     features: FeatureSet,
+    gate: RegimeGate | None = None,
 ) -> tuple[ScreenRun, RuleScreenResult, tuple[str, ...]]:
     """A rule screen over the selected instruments: the spec's fields read for the session
-    (missing values stay missing: a HARD criterion rejects the row), evaluated once, then audited.
-    Also returns the tables that had no rows for the session."""
+    (missing values stay missing: a HARD criterion rejects the row), evaluated once, through
+    the regime ``gate``, then audited. Also returns the tables that had no rows for the
+    session."""
     screener = RuleScreener(config.screen_spec)
     ids = list(selected.instruments)
     view, source = fields_view(reader, screener.spec.fields(), session_date, ids, features=features)
-    result = screener.evaluate(view)
+    result = gate_rule_result(screener.evaluate(view), gate)
     return rule_run(result, ids, config.screening), result, source.missing
 
 
@@ -135,6 +144,7 @@ def _write(
             stamp.config_id,
             stamp.config_hash,
         )
+        frame["regime"], frame["size_multiplier"] = stamp.regime, stamp.size_multiplier
         writer.write_result(config.config.impl, stamp.session_date, stamp.run_id, frame)
         return
     with writer.publishing(stamp.run_id, stamp.knowledge_ts):  # both tables or neither
@@ -161,12 +171,19 @@ def run_screener(
     selected = select(reader, config.selection, session_date, features=features)
     rules: RuleScreenResult | None = None
     missing_tables: tuple[str, ...] = ()
+    market = session_market(reader, market_names(config), session_date)
+    gate = regime_gate(config, market)
     if config.config.impl == RULES:
-        run, rules, missing_tables = screen_rules(reader, config, session_date, selected, features)
+        run, rules, missing_tables = screen_rules(
+            reader, config, session_date, selected, features, gate
+        )
     else:
         screener = create_screener(config.config.impl, params=config.config.params)
-        view = feature_view(reader, screener.requires, session_date, selected.instruments)
-        run = run_screen(screener, view, list(selected.instruments), screening.min_coverage)
+        view = feature_view(
+            reader, screener.requires, session_date, selected.instruments, market=market
+        )
+        ids = list(selected.instruments)
+        run = run_screen(screener, view, ids, screening.min_coverage, gate)
     run = settle_coverage(run, selected, universe, session_date, screening, missing_tables)
     user = config.user.user_id
     record = start_run(run_job_name(config.config.id, user), session_date, now)
@@ -188,11 +205,19 @@ def run_screener(
         # The universe came from a snapshot after the session: results carry survivorship bias.
         "universe_pre_snapshot": universe.pre_snapshot,
     }
+    if gate is not None:  # ADR 0049: the label, the size and whether picks were held back
+        audit["regime"] = {
+            "label": gate.regime,
+            "size_multiplier": gate.size_multiplier,
+            "paused_reason": gate.reason,
+        }
     if rules is not None:  # the run summary (ADR 0029): passed, decisions, narrow misses
         audit["summary"] = rules.summary.as_dict()
         audit["missing_tables"] = list(missing_tables)
     version = rules.spec.version if rules else None
     stamp = Stamp(session_date, run_id, now, user, config.config.id, config.hash, version)
+    if gate is not None:
+        stamp = replace(stamp, regime=gate.regime, size_multiplier=gate.size_multiplier)
     _write(writer, config, run, rules, stamp)
     complete = run.coverage is RunCoverage.COMPLETE
     writer.save_run(record.finish(now, complete=complete, stats=audit))

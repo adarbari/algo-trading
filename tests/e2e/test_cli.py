@@ -89,6 +89,8 @@ def test_evaluate_matches_committed_baseline(cli: Cli, tmp_path: Path) -> None:
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "all results match baseline" in proc.stdout
     assert report.read_text().startswith("# Strategy scorecard")
+    # ADR 0049: the golden store has no regime rows yet; the comparison says so, never fails
+    assert "regime overlay: no market feature rows in the store" in proc.stdout
 
 
 def test_backtest_outputs_json(cli: Cli) -> None:

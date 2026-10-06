@@ -159,7 +159,7 @@ branches from `main`. `architect` review after RG1a, RG1d, RG2a, RG3 and RG4. Re
 | RG2b | FRED / ALFRED and published-file adapters against recorded payloads | next |
 | RG2c | The `macro` task, step and `check_macro`; then a detached backfill | next |
 | RG3 | The macro group; regime expression features (with an `ncdf` built-in for the probit); the regime group; Pagan-Sossounov dating in `quant/turning_points.py`; the episode scorecard in `services/evaluation` | next |
-| RG4 | Overlays (`engines/overlays/`), `Decision.PAUSED`, `[regime]` config, with-versus-without evaluation | next |
+| RG4 | Overlays (`engines/overlays/`), `Decision.PAUSED`, `[regime]` config, with-versus-without evaluation | in review (architect review pending) |
 | RG5 | The embeddings (Ideas strip and paused section, results header, Explore and Backtests bands) and the full Regime page | next |
 | RG6 | On-demand explanation: the text-model seam (ADR 0041 amended), `services/explaining`, `POST /regime/explain`, its cache | next |
 
