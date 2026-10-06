@@ -64,3 +64,27 @@ input loads only the ids those tickers resolve to in the reference snapshot each
 chunk sees (`reference.ids_for_symbols`, the union), instead of every instrument's bars, and the
 group still picks each session's ids through `instruments/symbol_ids`. The prefilter is a
 superset of every session's ids, so point in time and ADR 0018 (no built ids) are unchanged.
+
+## Amendment (2026-10-06, RG1h review)
+A group whose history lies years behind the session (the per-episode drawdowns of
+`episode_behaviour@v1`) declares `Input("bars/1d", windows=((first, last), ...), required=False)`
+beside its trailing `bars/1d`. A trailing lookback to 2020 would load every instrument's every
+column for 1,650 sessions. The window input (`Input.key` = `bars/1d#windows`) instead holds only
+the closes of each fixed window up to the session (`prices.window_closes`: sixty sessions read
+at a time and kept compact, the instruments with a bar in the chunk, splits inside a window
+applied and later ones not, so a ratio taken inside a window does not depend on how far the
+read went). Rows are sorted by day, so the rows a session may see are a prefix, and a session of
+a window with no stored bars (on or after the first stored one) is a gap that fails the read
+(ADR 0039). `windows` takes no lookback, `ids` or `symbols`, and is never required. Point in
+time and ADR 0018 are unchanged.
+
+## Amendment (2026-10-06, RG3a review): licences of the regime's verdicts, scores and label
+ADR 0028 marks values derived from a personal-use source `personal` so that the licensed data
+itself is never shown to other users; it does not mean every conclusion we draw from it is
+hidden. So a raw third-party value keeps its licence (`market_macro@v1.hy_oas`, `vix`,
+`vix_term_ratio` and the card values `regime_indicators@v1.hy_oas` / `vix_term` are personal),
+while a verdict, score or label we compute is our own aggregate and is `open`: every
+`<key>_on` and `<key>_changed` of `regime_indicators@v1` and every column of `regime@v1`.
+Otherwise the regime, which reads the high-yield spread and the VIX, would be hidden from every
+non-owner user (the traders being onboarded). An expression feature still takes the most
+restrictive licence of what it reads (`vix_band` is personal).

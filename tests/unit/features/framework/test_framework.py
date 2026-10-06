@@ -31,6 +31,8 @@ from tests.helpers.rollup_store import (
 )
 from tests.helpers.stored_frames import universe_rows, write_reference
 
+D1, D2 = date(2020, 2, 12), date(2021, 10, 1)
+
 SPY = "EQ:BBG000BDTBL9"
 
 
@@ -87,6 +89,10 @@ def _rollup(**changes: Any) -> FeatureGroup:
         ({"version": 0}, "version"),
         ({"inputs": ()}, "at least one input"),
         ({"inputs": (Input("bars/1d"), Input("bars/1d"))}, "twice"),
+        ({"inputs": (Input("bars/1d", windows=((D1, D2),)),) * 2}, "twice"),
+        ({"inputs": (Input("bars/1d", windows=((D1, D2),)),)}, "not required"),
+        ({"inputs": (Input("bars/1d", 3, False, windows=((D1, D2),)),)}, "no lookback"),
+        ({"inputs": (Input("bars/1d", required=False, windows=((D2, D1),)),)}, "ends before"),
         ({"features": ()}, "at least one feature"),
         ({"features": features({"a": "decimal"})}, "dtype must be"),
         ({"features": features({"run_id": "str"})}, "reserved"),
@@ -111,6 +117,13 @@ def _rollup(**changes: Any) -> FeatureGroup:
 def test_declaration_is_validated(changes: dict[str, Any], problem: str) -> None:
     with pytest.raises(ValueError, match=problem):
         _rollup(**changes)
+
+
+def test_a_window_input_is_its_own_key_beside_the_trailing_one() -> None:
+    windows = Input("bars/1d", required=False, windows=((D1, D2),))
+    assert (Input("bars/1d").key, windows.key) == ("bars/1d", "bars/1d#windows")
+    group = _rollup(inputs=(Input("bars/1d"), windows))
+    assert [i.key for i in group.inputs] == ["bars/1d", "bars/1d#windows"]
 
 
 def test_key_table_and_lookback() -> None:
@@ -217,6 +230,20 @@ def test_a_market_group_returns_its_one_row() -> None:
     assert (row["instrument_id"], row["names"], row["with_bars"]) == ("MKT:US", 2, 1)
     assert row["spy_close"] == pytest.approx(series(5, seed=2)[1])
     assert first.frame["spy_close"].iloc[0] == pytest.approx(series(5, seed=2)[0])
+
+
+def test_a_market_group_writes_its_row_with_no_optional_input_but_an_instrument_group_not() -> None:
+    _, reader = store()
+
+    def nulls(frames: Inputs, session: date, params: None) -> pd.DataFrame:
+        assert all(f is None for f in frames.values())
+        return pd.DataFrame({"instrument_id": ["MKT:US"], "a": [None]})
+
+    optional = (Input("bars/1d", required=False),)
+    market = compute_one(reader, _rollup(inputs=optional, compute=nulls, entity="market"), END)
+    assert market.frame is not None and market.frame["a"].isna().all()
+    alone = compute_one(reader, _rollup(inputs=optional, compute=nulls), END)
+    assert alone.frame is None and alone.no_input == f"no input for {END}"
 
 
 @pytest.mark.parametrize(

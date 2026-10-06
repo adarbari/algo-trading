@@ -158,6 +158,10 @@ name = "rollups/instrument/anchored_vwap@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
+name = "rollups/instrument/episode_behaviour@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
 name = "rollups/instrument/oi_walls@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
@@ -180,6 +184,18 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
 
 [[table]]
 name = "rollups/market/market_cross_asset@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
+
+[[table]]
+name = "rollups/market/market_macro@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
+
+[[table]]
+name = "rollups/market/regime_indicators@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
+
+[[table]]
+name = "rollups/market/regime@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
 
 [[table]]

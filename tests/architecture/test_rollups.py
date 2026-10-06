@@ -131,6 +131,9 @@ def test_a_market_group_is_never_selected_per_instrument(key: str) -> None:
 def test_expression_features_are_in_the_catalogue_and_stale_fields_say_where_they_went() -> None:
     catalog = field_catalog()
     for name, e in SITE.expressions.items():
+        if e.feature.entity == "market":  # read as the market's, never per instrument (ADR 0047)
+            assert f"feature.{name}" not in catalog.fields
+            continue
         assert catalog.fields[f"feature.{name}"] == e.feature.dtype
     with pytest.raises(ConfigurationError, match=re.escape("use 'feature.pct_from_high_52w'")):
         catalog.check_field("rollup.price_stats@v1.pct_from_high_52w", "sel")

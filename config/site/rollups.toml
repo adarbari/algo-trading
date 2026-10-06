@@ -70,3 +70,53 @@ prefer_monthly = true    # standard monthlies in the window first (where OI conc
 
 ["market_breadth@v1"]      # the universe's breadth (ADR 0047)
 min_coverage = 0.9         # share of member stocks with a bar on the session, else every breadth column is null
+
+["regime_indicators@v1"]     # the regime cards' verdicts (ADR 0047; docs/market-regime-plan.md 3-4)
+changed_sessions = 5         # <card>_changed compares the verdict with this many sessions earlier
+curve_min_inverted_days = 21 # curve: 10y - 3m below 0 now and on this many of the last 252 sessions
+hy_oas_above = 0.05          # high-yield spread above 5% ...
+hy_oas_off_low = 0.015       # ... or 150 bp or more above its 126-session low
+unrate_trend_above = 0.0     # unemployment above its 12-month mean
+sahm_at_least = 0.005        # Sahm gap of 0.5 points or more
+nfci_above = 0.0             # financial conditions tighter than average
+spx_trend_below = 0.0        # SPY below its 200-day mean
+vix_term_above = 1.0         # VIX above VIX3M (backwardation)
+breadth_below = 0.40         # fewer than 40% of the universe above their 200-day mean
+
+["regime@v1"]                # the regime scores and label (plan section 4; starting values, tuned
+                             # on the episode scorecard in RG3b). Each score's w_* sum to 100.
+hold_sessions = 5            # label: the most severe raw label of this many sessions (hysteresis)
+changed_sessions = 5         # label_changed compares the label with this many sessions earlier
+min_coverage = 0.5           # a score with less than this share of its weight known gives no label
+macro_high = 50.0            # macro_risk at or above: macro high (CAUTION, or CRISIS with stress)
+market_high = 50.0           # market_stress at or above: market high (STRESS, or CRISIS)
+w_curve = 20.0               # macro_risk: the card verdicts curve_10y3m, hy_oas, unrate_trend,
+w_credit = 20.0              # sahm, nfci, and the thresholds below; labour (20) is split
+w_unrate_trend = 7.0         # unemployment trend 7, Sahm 7, claims 6
+w_sahm = 7.0
+w_claims = 6.0
+w_nfci = 15.0
+w_sloos = 10.0
+w_permits = 5.0
+w_fed = 5.0                  # Fed hikes and inflation (10), split 5 / 5
+w_inflation = 5.0
+claims_at_least = 1.15       # 4-week claims 15% or more above their 52-week low
+sloos_above = 0.20           # more than 20% of banks tightening C&I standards
+permits_at_most = -0.20      # permits down 20% or more on the year
+fed_hikes_above = 0.02       # fed funds up more than 200 bp on the year
+cpi_above = 0.04             # CPI inflation above 4%
+w_trend = 20.0               # market_stress: the card verdicts spx_trend_200d, vix_term,
+w_vol_term = 20.0            # breadth_200d and the thresholds below
+w_drawdown = 10.0
+w_breadth = 20.0
+w_leadership = 8.0           # leadership (XLY/XLP and IWM/SPY both falling over 63 sessions) and
+w_credit_etf = 7.0           # credit ETFs (HYG/LQD falling): 15
+w_turbulence = 8.0           # turbulence and absorption: 15
+w_absorption = 7.0
+drawdown_at_most = -0.10     # SPY 10% or more below its 52-week closing high
+turbulence_at_least = 2.0    # turbulence / basket size (about 1 on an ordinary day)
+absorption_shift_at_least = 1.0  # the absorption ratio up a standard deviation
+w_credit_boom = 50.0         # fragility (context only): bank credit growth and SPY's run-up
+w_runup = 50.0
+credit_boom_above = 0.10     # bank credit up more than 10% on the year
+runup_above = 0.30           # SPY up more than 30% on the year

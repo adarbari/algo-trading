@@ -314,8 +314,13 @@ RANGE_GRAIN_FIELDS = {
 
 def test_no_typed_feature_fields() -> None:
     """Identity (``symbol``, ``name``, ``exchange``, ...) is typed by rule (ADR 0038); a field
-    named like a rollup column or an expression feature is a per-instrument value."""
-    catalogue = {f.name for f in FEATURES.values()} | set(site_features().expressions)
+    named like a rollup column or an expression feature is a per-instrument value. Market-entity
+    features (ADR 0047: ``regime@v1.label``, ``macro_risk``, ...) are not: the regime read
+    object maps them by catalogue name into its typed fields (``services/read/regime/``)."""
+    expressions = site_features().expressions
+    catalogue = {f.name for f in FEATURES.values() if f.entity == "instrument"} | {
+        n for n, e in expressions.items() if e.feature.entity == "instrument"
+    }
     named = {
         f"{cls.__name__}.{field.python_name}"
         for cls in graphql_objects()
