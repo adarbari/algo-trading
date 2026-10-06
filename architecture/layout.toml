@@ -880,6 +880,10 @@ path = "config/site/features"
 purpose = "L3 expression features, one <theme>.toml per theme (loaded by config/site/settings.py load_features; ADR 0023 step 3)"
 
 [[config_dir]]
+path = "config/site/regime"
+purpose = "regime track reference data: the crash episodes and the plain-language indicator cards (ADR 0047)"
+
+[[config_dir]]
 path = "config/site/presets"
 purpose = "site presets by kind (no files of its own)"
 

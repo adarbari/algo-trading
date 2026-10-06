@@ -1,6 +1,6 @@
 # ADR 0023: Feature store: per-feature definitions, feature groups, inputs through `data/`
 
-**Status:** accepted (2026-10-03); steps 1-4 implemented. Extends [0007](0007-point-in-time-data.md)
+**Status:** accepted (2026-10-03); steps 1-4 implemented; amended by [0047](0047-market-entity-features-and-non-tradable-ids.md) (`FeatureGroup.entity`: market groups in `rollups/market/<name>@vN`). Extends [0007](0007-point-in-time-data.md)
 (features are `name@version`, precomputed nightly) and [0016](0016-four-data-layers.md) (rollups
 are L1 / L2 data). Code: `src/algotrade/features/` (`framework/feature.py`, `framework/declaration.py`,
 `registry.py`, `catalogue.py`, `rollups/*`, `expressions/*`, `site.py`),

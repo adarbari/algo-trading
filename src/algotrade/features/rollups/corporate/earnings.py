@@ -21,6 +21,7 @@ One row per instrument with a next or a last date; others have no row (UNKNOWN).
 
 from datetime import date
 from functools import cache
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -36,22 +37,28 @@ TIMES = {"pre_market": "pre", "after_hours": "post"}
 
 _REPORT = f"{EVENTS}.ts"
 _NO_NEXT = "no report date on or after the session in the calendars stored by then"
+# A row with no next date reads "Not announced" (ADR 0046), from earnings_schedule@v1.
+_NOT_ANNOUNCED: dict[str, Any] = {
+    "null_status": "earnings_schedule.next_status@v1",
+    "explained_statuses": ("NOT_ANNOUNCED",),
+}
 
 FEATURES = (
     Feature(
         "next_earnings_date", "date", "date",
         "The first report date on or after the session, as known on the session",
-        f"{_NO_NEXT} (the row exists for a last date)", inputs=(_REPORT,),
+        f"{_NO_NEXT} (the row exists for a last date)", inputs=(_REPORT,), **_NOT_ANNOUNCED,
     ),
     Feature(
         "earnings_time", "str", "category",
         "When the next report is due: pre (before the open), post (after the close), unknown",
         _NO_NEXT, "label", categories=("pre", "post", "unknown"), inputs=(f"{EVENTS}.time",),
+        **_NOT_ANNOUNCED,
     ),
     Feature(
         "days_to_earnings", "int", "sessions",
         "Exchange sessions after the session up to the next report date (0: reports today)",
-        _NO_NEXT, valid_range=(0, None), inputs=(_REPORT,),
+        _NO_NEXT, valid_range=(0, None), inputs=(_REPORT,), **_NOT_ANNOUNCED,
     ),
     Feature(
         "date_confirmed", "bool", "flag", "Whether the source confirmed the next report date",
