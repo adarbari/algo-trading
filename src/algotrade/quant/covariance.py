@@ -4,7 +4,8 @@ Each function takes a panel of returns (sessions x assets, oldest first on axis 
 per asset) and a ``window`` of observations, and returns one value per session. Every value
 uses only rows up to that session (point in time: no later data is used), NaN until the
 window is full. NaN marks a missing return: a window (or a session row) that contains one
-gives NaN, never a shorter window or a smaller basket. Rows in a window have equal weight.
+gives NaN, never a shorter window or a smaller basket. Rows in a window have equal weight
+(the absorption ratio takes an optional exponential ``half_life``).
 
     turbulence         Kritzman and Li (2010), "Skulls, Financial Turbulence, and Risk
                        Management", FAJ 66(5): the squared Mahalanobis distance of the
@@ -14,16 +15,24 @@ gives NaN, never a shorter window or a smaller basket. Rows in a window have equ
     absorption_ratio   Kritzman, Li, Page and Rigobon (2011), "Principal Components as a
                        Measure of Systemic Risk", JPM 37(4): the share of total variance
                        explained by the first n eigenvectors of the covariance of the
-                       ``window`` rows ENDING at the session (n defaults to N / 5, as there)
+                       ``window`` rows ENDING at the session. The paper takes about a fifth
+                       of the assets' eigenvectors (n defaults to ``max(1, N // 5)`` here) of
+                       a 500-day window with exponential weights, half-life 250 days; here
+                       the weights are equal unless ``half_life`` is given, and the window
+                       is the caller's (``window=500, half_life=250`` is the paper's)
     absorption_shift   the same paper's standardised shift,
                        (mean AR over ``short`` - mean AR over ``long``) / stdev AR over ``long``
 
 Singular covariances (fewer rows than assets, a constant or duplicated asset) are handled
 with a pseudo-inverse built from ``numpy.linalg.eigh``: eigenvalues at or below
-``max eigenvalue * N * machine epsilon`` (numpy's rank tolerance) are dropped, so a
-direction with no variance in the window adds nothing to turbulence (a zero covariance gives
-0.0). Eigen decompositions are the symmetric LAPACK routines only (``eigh`` / ``eigvalsh``):
-no SVD, no randomness, so the same panel gives the same bits on one machine. Column order
+``max eigenvalue * N * machine epsilon`` (numpy's rank tolerance) are dropped. A session
+that moves along a direction the window never moved in (a forward-filled constant asset that
+then moves, or N >= window) has no defined distance: its turbulence is NaN, never a quiet
+0.0 (missing data must not pass as calm). A move inside the window's span is measured
+against the kept eigenvalues; no move at all from a zero covariance is 0.0.
+
+Eigen decompositions are the symmetric LAPACK routines only (``eigh`` / ``eigvalsh``): no
+SVD, no randomness, so the same panel gives the same bits on one machine. Column order
 changes results only at rounding level; callers sort the assets (by instrument id) for
 bit-reproducibility. Use a window several times the number of assets: close to it the
 covariance is ill-conditioned and turbulence is dominated by its smallest eigenvalues.
@@ -47,11 +56,20 @@ def _check_window(window: int, minimum: int) -> None:
         raise ValueError(f"window must be >= {minimum}, got {window}")
 
 
+_SPAN_TOLERANCE = 1e-8  # a residual outside the window's span above this share is a real move
+
+
 def _quadratic_form(cov: Array, x: Array) -> float:
-    """x' cov^+ x, with cov^+ the eigen pseudo-inverse of the symmetric ``cov``."""
+    """x' cov^+ x, with cov^+ the eigen pseudo-inverse of the symmetric ``cov``; NaN when
+    ``x`` has a component outside the span of the kept eigenvectors."""
     values, vectors = np.linalg.eigh(cov)
-    keep = values > values.max(initial=0.0) * cov.shape[0] * np.finfo(np.float64).eps
-    projections = vectors[:, keep].T @ x
+    top = values.max(initial=0.0)
+    keep = values > top * cov.shape[0] * np.finfo(np.float64).eps
+    basis = vectors[:, keep]
+    projections = basis.T @ x
+    scale = max(float(np.linalg.norm(x)), float(np.sqrt(max(top, 0.0))))
+    if np.linalg.norm(x - basis @ projections) > _SPAN_TOLERANCE * scale:
+        return float("nan")
     return float(np.sum(projections**2 / values[keep]))
 
 
@@ -74,12 +92,19 @@ def turbulence(returns: npt.ArrayLike, window: int) -> Array:
     return out
 
 
-def absorption_ratio(returns: npt.ArrayLike, window: int, components: int | None = None) -> Array:
+def absorption_ratio(
+    returns: npt.ArrayLike,
+    window: int,
+    components: int | None = None,
+    half_life: float | None = None,
+) -> Array:
     """Share of the window's total variance absorbed by its first ``components`` eigenvectors.
 
     ``out[t]`` uses rows ``t - window + 1 .. t`` (the window ending at the session), so
-    ``out[: window - 1]`` is NaN. ``components`` defaults to ``max(1, N // 5)``. A window
-    with no variance at all gives NaN (0 / 0).
+    ``out[: window - 1]`` is NaN. ``components`` defaults to ``max(1, N // 5)``. With
+    ``half_life`` the covariance weights row ``t - k`` by ``0.5 ** (k / half_life)``
+    (reliability weights, ``numpy.cov`` ``aweights``); without it all rows weigh the same.
+    A window with no variance at all gives NaN (0 / 0).
     """
     _check_window(window, 2)
     panel = _panel(returns)
@@ -87,12 +112,15 @@ def absorption_ratio(returns: npt.ArrayLike, window: int, components: int | None
     n = max(1, n_assets // 5) if components is None else components
     if not 1 <= n <= n_assets:
         raise ValueError(f"components must be in 1..{n_assets}, got {n}")
+    if half_life is not None and not half_life > 0:
+        raise ValueError(f"half_life must be > 0, got {half_life}")
+    weights = None if half_life is None else 0.5 ** (np.arange(window - 1, -1, -1) / half_life)
     out = np.full(panel.shape[0], np.nan)
     for t in range(window - 1, panel.shape[0]):
         rows = panel[t - window + 1 : t + 1]
         if np.isnan(rows).any():
             continue
-        cov = np.cov(rows, rowvar=False, ddof=1).reshape(n_assets, n_assets)
+        cov = np.cov(rows, rowvar=False, ddof=1, aweights=weights).reshape(n_assets, n_assets)
         values = np.clip(np.linalg.eigvalsh(cov), 0.0, None)  # ascending; drop rounding < 0
         total = values.sum()
         if total > 0.0:

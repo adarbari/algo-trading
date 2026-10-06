@@ -35,25 +35,22 @@ def test_pagan_sossounov_dates_two_25pct_falls() -> None:
 
 def test_lunde_timmermann_dates_two_25pct_falls() -> None:
     phases = tp.lunde_timmermann(TWO_FALLS)
-    # The first rise of 20% confirms the trough at the start; the last rise stays open.
-    assert kinds(phases) == [(0, 20, "bull"), (20, 30, "bear"), (30, 54, "bull"), (54, 66, "bear")]
-    assert phases[1].change == pytest.approx(-0.25, rel=1e-12)
+    # The trough at the start is not a turn (censored); the last rise stays open.
+    assert kinds(phases) == [(20, 30, "bear"), (30, 54, "bull"), (54, 66, "bear")]
+    assert phases[0].change == pytest.approx(-0.25, rel=1e-12)
 
 
 def test_lunde_timmermann_thresholds() -> None:
     # A 15% fall is not a bear at 20% but is at 10%.
     levels = path(100, (130, 10), (110.5, 5), (160, 10), (100, 10))
-    assert kinds(tp.lunde_timmermann(levels)) == [(0, 25, "bull")]
-    assert kinds(tp.lunde_timmermann(levels, down=0.10)) == [
-        (0, 10, "bull"),
-        (10, 15, "bear"),
-        (15, 25, "bull"),
-    ]
+    assert kinds(tp.lunde_timmermann(levels)) == []  # only the censored start and one peak
+    assert kinds(tp.lunde_timmermann(levels, down=0.10)) == [(10, 15, "bear"), (15, 25, "bull")]
 
 
 def test_lunde_timmermann_starting_with_a_fall() -> None:
-    levels = path(100, (70, 5), (90, 5), (60, 5))
-    assert kinds(tp.lunde_timmermann(levels)) == [(0, 5, "bear"), (5, 10, "bull")]
+    # A flat start: the running high never moves off index 0, which is censored.
+    levels = np.concatenate([[100.0, 100.0], path(100, (70, 5), (90, 5), (60, 5))])
+    assert kinds(tp.lunde_timmermann(levels)) == [(7, 12, "bull")]
 
 
 def test_short_small_phases_are_removed() -> None:
@@ -73,6 +70,16 @@ def test_short_cycles_are_removed_keeping_the_higher_peak() -> None:
     # Peaks at 20 (130) and 30 (140) are 10 apart: the trough between and the lower peak go.
     levels = path(100, (130, 20), (100, 5), (140, 5), (100, 5), (180, 20))
     assert kinds(tp.pagan_sossounov(levels, window=2)) == [(30, 35, "bear")]
+
+
+def test_short_cycle_keeps_the_most_extreme_turns() -> None:
+    # P 200@20, T 160@40, P 170@50, T 140@57, P 190@62: the cycle 50 -> 62 is short; the
+    # lower peak (170@50) goes with the higher of its troughs (160@40), so the bear runs to
+    # the 140 low (-30%), not to 160.
+    levels = path(100, (200, 20), (160, 20), (170, 10), (140, 7), (190, 5), (150, 10))
+    phases = tp.pagan_sossounov(levels, window=3)
+    assert kinds(phases) == [(20, 57, "bear"), (57, 62, "bull")]
+    assert phases[0].change == pytest.approx(-0.30, rel=1e-12)
 
 
 def test_short_inner_phase_merges_its_neighbours() -> None:

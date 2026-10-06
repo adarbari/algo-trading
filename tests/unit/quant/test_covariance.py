@@ -39,17 +39,33 @@ def test_turbulence_uses_only_the_window_before_the_session() -> None:
 
 def test_turbulence_singular_covariance_uses_the_pseudo_inverse() -> None:
     # Asset 2 is twice asset 1: one direction (1, 2) with variance 4/3 * 5; along it,
-    # (1, 2) is one stdev-of-asset-1 move: 1 / (4/3) = 0.75. Orthogonal moves count 0.
+    # (1, 2) is one stdev-of-asset-1 move: 1 / (4/3) = 0.75. A move off that line has no
+    # defined distance: NaN, not 0.
     history = np.array([[1.0, 2.0], [-1.0, -2.0], [1.0, 2.0], [-1.0, -2.0]])
     along = cv.turbulence(np.vstack([history, [[1.0, 2.0]]]), window=4)
     across = cv.turbulence(np.vstack([history, [[2.0, -1.0]]]), window=4)
     assert along[4] == pytest.approx(0.75, rel=1e-9)
-    assert across[4] == pytest.approx(0.0, abs=1e-9)
+    assert np.isnan(across[4])
 
 
-def test_turbulence_of_a_constant_window_is_zero() -> None:
-    out = cv.turbulence(np.vstack([np.ones((4, 2)), [[3.0, 3.0]]]), window=4)
-    assert out[4] == 0.0
+def test_turbulence_of_a_forward_filled_asset_that_moves_is_nan() -> None:
+    # Asset 2 is forward-filled (zero returns) through the window, then moves 10%.
+    history = np.column_stack([HISTORY[:, 0], np.zeros(4)])
+    moved = cv.turbulence(np.vstack([history, [[1.0, 0.10]]]), window=4)
+    still = cv.turbulence(np.vstack([history, [[1.0, 0.0]]]), window=4)
+    assert np.isnan(moved[4])
+    assert still[4] == pytest.approx(0.75, rel=1e-9)  # 1 / var(asset 1) = 1 / (4/3)
+
+
+def test_turbulence_with_more_assets_than_window_rows_is_nan() -> None:
+    panel = np.random.default_rng(3).normal(size=(6, 5))  # 4 rows span at most 3 directions
+    assert np.isnan(cv.turbulence(panel, window=4)[4:]).all()
+
+
+def test_turbulence_of_a_constant_window() -> None:
+    history = np.ones((4, 2))
+    assert cv.turbulence(np.vstack([history, [[1.0, 1.0]]]), window=4)[4] == 0.0
+    assert np.isnan(cv.turbulence(np.vstack([history, [[3.0, 3.0]]]), window=4)[4])
 
 
 def test_turbulence_nan_in_the_window_or_the_session() -> None:
@@ -84,6 +100,22 @@ def test_absorption_by_hand_on_two_assets() -> None:
     # Covariance [[4/3, 2/3], [2/3, 2/3]]: eigenvalues 1 +/- sqrt(5)/3, trace 2.
     out = cv.absorption_ratio(HISTORY, window=4)
     assert out[3] == pytest.approx((1 + 5**0.5 / 3) / 2, rel=1e-12)
+
+
+def test_absorption_with_exponential_weights() -> None:
+    panel = np.random.default_rng(11).normal(size=(30, 4))
+    panel[20:, 1] += 2 * panel[20:, 0]  # the last rows are more correlated
+    out = cv.absorption_ratio(panel, window=20, components=1, half_life=5)
+    rows = panel[10:30]
+    weights = 0.5 ** (np.arange(19, -1, -1) / 5)
+    mean = weights @ rows / weights.sum()
+    cov = (rows - mean).T @ ((rows - mean) * weights[:, None])  # the scale cancels in a share
+    values = np.linalg.eigvalsh(cov)
+    assert out[-1] == pytest.approx(values[-1] / values.sum(), rel=1e-10)
+    equal = cv.absorption_ratio(panel, window=20, components=1)
+    assert out[-1] > equal[-1]  # recent rows, more correlated, weigh more
+    flat = cv.absorption_ratio(panel, window=20, components=1, half_life=1e12)
+    np.testing.assert_allclose(flat, equal, rtol=1e-9)
 
 
 def test_absorption_nan_window_and_zero_variance() -> None:
@@ -121,6 +153,7 @@ def test_absorption_shift_nan_and_constant_windows() -> None:
         (lambda: cv.absorption_ratio(np.ones((5, 0)), 3), "2-d"),
         (lambda: cv.absorption_ratio(np.ones((5, 2)), 3, components=3), "components"),
         (lambda: cv.absorption_ratio(np.ones((5, 2)), 3, components=0), "components"),
+        (lambda: cv.absorption_ratio(np.ones((5, 2)), 3, half_life=0), "half_life"),
         (lambda: cv.absorption_shift(np.ones((5, 2))), "1-d"),
         (lambda: cv.absorption_shift(np.ones(5), short=5, long=4), "short"),
         (lambda: cv.absorption_shift(np.ones(5), short=0, long=4), "short"),

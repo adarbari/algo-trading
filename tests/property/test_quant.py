@@ -153,5 +153,8 @@ def test_dated_phases_alternate_and_respect_the_rules(seed: int) -> None:
     for phases in (tp.pagan_sossounov(levels), tp.lunde_timmermann(levels)):
         for before, after in pairwise(phases):
             assert before.end == after.start and before.kind != after.kind
-    for phase in tp.pagan_sossounov(levels):
+    dated = tp.pagan_sossounov(levels)
+    for phase in dated:
         assert phase.end - phase.start >= 4 or abs(phase.change) > 0.20
+    for before, after in pairwise(dated):
+        assert after.end - before.start >= 16  # every cycle (peak to peak, trough to trough)

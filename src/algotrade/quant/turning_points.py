@@ -34,7 +34,8 @@ type Array = npt.NDArray[np.float64]
 
 @dataclass(frozen=True, slots=True)
 class Phase:
-    """One bull or bear phase between two turning points (array indices, inclusive)."""
+    """One bull or bear phase between two turning points (array indices, inclusive at both
+    ends: adjacent phases share the turn index, ``phases[i].end == phases[i + 1].start``)."""
 
     start: int
     end: int
@@ -103,13 +104,21 @@ def _censor_ends(lv: Array, turns: list[_Turn]) -> list[_Turn]:
 
 
 def _fix_short_cycle(lv: Array, turns: list[_Turn], min_cycle: int) -> list[_Turn] | None:
-    """Remove the first cycle (peak to peak or trough to trough) shorter than ``min_cycle``:
-    the turn between and the less extreme end. None when every cycle is long enough."""
+    """Remove the first cycle (peak to peak or trough to trough) shorter than ``min_cycle``.
+
+    The less extreme end goes, with the less extreme of the two opposite turns beside it
+    (the turn between and the end's outer neighbour; the turn between on a tie or when there
+    is no neighbour), so the most extreme turns survive. None when every cycle is long enough.
+    """
     for k in range(len(turns) - 2):
-        first, last = turns[k], turns[k + 2]
+        first, middle, last = turns[k], turns[k + 1], turns[k + 2]
         if last.at - first.at < min_cycle:
-            loser = first if _beats(lv, last, first) else last
-            return [t for t in turns if t not in (turns[k + 1], loser)]
+            if _beats(lv, last, first):
+                loser, outer = first, turns[k - 1] if k > 0 else None
+            else:
+                loser, outer = last, turns[k + 3] if k + 3 < len(turns) else None
+            partner = outer if outer is not None and _beats(lv, middle, outer) else middle
+            return [t for t in turns if t not in (loser, partner)]
     return None
 
 
@@ -197,7 +206,10 @@ def lunde_timmermann(levels: npt.ArrayLike, *, up: float = 0.20, down: float = 0
     phase starts at the running high once a level is at least ``down`` below it, and ends at
     the lowest level since then once a level is at least ``up`` above that low; a bull phase
     the other way round. Only phases between two confirmed turns are returned (the last,
-    still open phase is not).
+    still open phase is not). A first turn at the first observation is dropped: the series
+    may start mid-phase, so it is not a turn (the counterpart of Pagan-Sossounov's end
+    censoring; ties go to the earlier observation, so a running extreme that never moved off
+    the start sits at index 0).
     """
     lv = _levels(levels)
     if up <= 0 or not 0 < down < 1:
@@ -218,4 +230,6 @@ def lunde_timmermann(levels: npt.ArrayLike, *, up: float = 0.20, down: float = 0
         elif looking_for_trough and level >= lv[low] * (1 + up):
             turns.append(_Turn(low, False))
             high = t
+    if turns and turns[0].at == 0:
+        turns = turns[1:]
     return _phases(lv, turns)
