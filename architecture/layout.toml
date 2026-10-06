@@ -329,6 +329,11 @@ contracts = [
 ]
 
 [[dir]]
+path = "apps/api/algotrade_api/auth"
+purpose = "who is calling (ADR 0040): the Authenticator protocol, Supabase token verification (JWKS key cache, claims, email -> registry user) and the loopback-only ALGOTRADE_AUTH=off mode; the one reader of the Authorization header"
+contracts = ["API: routes reach the library only through services.read, services.preview, services.authoring, config and core (ADR 0024, ADR 0037)"]
+
+[[dir]]
 path = "apps/api/algotrade_api/routes"
 purpose = "one FastAPI router per area (REST: writes, job polling, health, live quotes, preview POSTs): parse parameters, call one library function, map it to a schema"
 

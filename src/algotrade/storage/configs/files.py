@@ -8,6 +8,8 @@ site/presets/selections/<id>.toml          L3 shared selections
 users/<user>/strategies/<id>.toml          L4 (git-ignored locally)
 users/<user>/selections/<id>.toml
 users/<user>/features/<theme>.toml         L4 expression features (always virtual)
+users/<user>/preferences.toml              L4 the user's page preferences (ADR 0029)
+users/<user>/identity.toml                 L4 the user's sign-in email (ADR 0040; never committed)
 site/presets/screeners/<id>/v<N>.toml      L3 rule-screen preset versions: immutable (hash
                                            lock: architecture/preset_versions.toml); latest = max N
 users/<user>/screeners/<id>/v<N>.toml      L4 finalised rule screen: immutable; latest = max N
@@ -29,6 +31,7 @@ from algotrade.storage.configs.store import KINDS, split_version
 
 SITE = "site"
 SCREENERS = "screeners"
+USER_FILES = ("preferences", "identity")  # one document per user, never the site's
 DRAFT = "draft.toml"
 _ID_NAME = re.compile(r"[a-z0-9_-]{1,64}")  # core.model.ids: other names are not screens
 _VERSION_FILE = re.compile(r"v([1-9][0-9]{0,8})\.toml")
@@ -72,8 +75,8 @@ class FileConfigStore:
                 return self.root / SITE / "features" / f"{validate_id(kind, name)}.toml"
             return self.root / SITE / "presets" / kind / f"{validate_id(kind, name)}.toml"
         user = validate_id("user", scope)
-        if kind == "preferences":  # one file per user: users/<id>/preferences.toml
-            return self.root / "users" / user / "preferences.toml"
+        if kind in USER_FILES:  # one file per user: users/<id>/<kind>.toml
+            return self.root / "users" / user / f"{kind}.toml"
         return self.root / "users" / user / kind / f"{validate_id(kind, name)}.toml"
 
     def screen_dir(self, scope: str, name: str) -> Path:
@@ -124,7 +127,7 @@ class FileConfigStore:
         return read_toml(self.screen_dir(scope, name) / version_file(version)) or {}
 
     def load(self, scope: str, kind: str, name: str) -> Mapping[str, Any] | None:
-        if kind == "preferences" and scope == SITE:  # a user's, never the site's
+        if kind in USER_FILES and scope == SITE:  # a user's, never the site's
             return None
         if kind in ("defaults", "settings") and scope != SITE:
             return None

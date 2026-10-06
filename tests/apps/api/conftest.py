@@ -1,11 +1,18 @@
-"""The API over the golden ``api_golden`` store (tests/conftest.py)."""
+"""The API over the golden ``api_golden`` store (tests/conftest.py), and a test Supabase
+project (``tokens``: an ES256 key pair published as a JWKS, the legacy HS256 secret, a token
+minter and a JWKS fetch that counts its calls; no network)."""
 
-from collections.abc import Callable
-from dataclasses import replace
+import time
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field, replace
 from pathlib import Path
+from typing import Any
 
+import jwt
 import pytest
+from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi.testclient import TestClient
+from jwt.algorithms import ECAlgorithm
 
 from algotrade.config.user import UserContext
 from algotrade.storage.configs.files import FileConfigStore
@@ -50,3 +57,72 @@ def user_client(
         return TestClient(create_app(ApiSettings("memory://", str(root), user), store))
 
     return client_for
+
+
+SUPABASE_URL = "https://test-project.supabase.co"
+ISSUER = f"{SUPABASE_URL}/auth/v1"
+KID = "k1"
+
+
+@dataclass
+class Fetch:
+    """An injected JWKS fetch: serves ``document`` (or raises ``failure``) and counts calls."""
+
+    document: Mapping[str, Any]
+    failure: Exception | None = None
+    calls: int = 0
+
+    def __call__(self) -> Mapping[str, Any]:
+        self.calls += 1
+        if self.failure is not None:
+            raise self.failure
+        return self.document
+
+
+@dataclass
+class Tokens:
+    """A test Supabase project: an ES256 key published under ``KID`` and an HS256 secret."""
+
+    private: ec.EllipticCurvePrivateKey = field(
+        default_factory=lambda: ec.generate_private_key(ec.SECP256R1())
+    )
+    secret: str = "test-hs256-secret-of-at-least-32-bytes"
+
+    def jwk(self, kid: str = KID, alg: str = "ES256") -> dict[str, Any]:
+        public = ECAlgorithm.to_jwk(self.private.public_key(), as_dict=True)
+        return {**public, "kid": kid, "alg": alg, "use": "sig"}
+
+    def jwks(self, *kids: str) -> dict[str, Any]:
+        return {"keys": [self.jwk(k) for k in kids or (KID,)]}
+
+    def fetch(self, *kids: str) -> Fetch:
+        return Fetch(self.jwks(*kids))
+
+    def claims(self, **changes: Any) -> dict[str, Any]:
+        """A signed-in user's claims; a change to ``None`` drops the claim."""
+        now = int(time.time())
+        base = {
+            "iss": ISSUER,
+            "aud": "authenticated",
+            "sub": "7b1c1d2e-0000-4000-8000-000000000001",
+            "role": "authenticated",
+            "email": "ana@example.com",
+            "iat": now,
+            "exp": now + 3600,
+            "is_anonymous": False,
+        }
+        merged = {**base, **changes}
+        return {k: v for k, v in merged.items() if v is not None}
+
+    def mint(
+        self, alg: str = "ES256", kid: str | None = KID, key: Any = None, **claims: Any
+    ) -> str:
+        if key is None:
+            key = self.secret if alg == "HS256" else self.private
+        headers = {"kid": kid} if kid is not None else None
+        return jwt.encode(self.claims(**claims), key, algorithm=alg, headers=headers)
+
+
+@pytest.fixture(scope="session")
+def tokens() -> Tokens:
+    return Tokens()

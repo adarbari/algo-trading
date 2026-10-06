@@ -15,6 +15,12 @@ CONFIG_DIR = "ALGOTRADE_CONFIG_DIR"
 DEFAULT_CONFIG_DIR = "config"
 USER = "ALGOTRADE_USER"
 API_DEBUG = "ALGOTRADE_API_DEBUG"  # "1": the API serves the GraphiQL IDE (local development)
+# Who may call the API (ADR 0040): "supabase" (default) verifies a Supabase access token per
+# request; "off" serves ALGOTRADE_USER without one, and only on a loopback address.
+AUTH = "ALGOTRADE_AUTH"
+DEFAULT_AUTH = "supabase"
+SUPABASE_URL = "SUPABASE_URL"  # the project URL: https://<ref>.supabase.co (its JWKS, its iss)
+SUPABASE_JWT_SECRET = "SUPABASE_JWT_SECRET"  # the legacy HS256 secret; unset: JWKS keys only
 # The nightly summary email (workflows/nightly/notify.py): personal data stays out of the repo.
 NOTIFY_EMAIL_TO = "ALGOTRADE_NOTIFY_EMAIL_TO"  # comma-separated recipients
 NOTIFY_EMAIL_FROM = "ALGOTRADE_NOTIFY_EMAIL_FROM"  # default: the first recipient
@@ -37,11 +43,14 @@ __all__ = [
     "REQUIRED_KEYS",
     "api_credential",
     "api_debug",
+    "auth_mode",
     "config_dir",
     "credential",
     "data_url",
     "dotenv_keys",
     "load_dotenv",
+    "supabase_jwt_secret",
+    "supabase_url",
     "user_id",
 ]
 
@@ -100,6 +109,22 @@ def config_dir(explicit: str | Path | None = None) -> Path:
 def api_debug() -> bool:
     """``$ALGOTRADE_API_DEBUG`` is ``1`` / ``true``: the API serves its development tools."""
     return (credential(API_DEBUG) or "").strip().lower() in ("1", "true")
+
+
+def auth_mode() -> str:
+    """``$ALGOTRADE_AUTH`` lowercased (the API checks the value), else ``supabase``."""
+    return (credential(AUTH) or DEFAULT_AUTH).strip().lower()
+
+
+def supabase_url() -> str | None:
+    """``$SUPABASE_URL`` without a trailing slash; ``None`` when unset."""
+    url = credential(SUPABASE_URL)
+    return url.strip().rstrip("/") if url else None
+
+
+def supabase_jwt_secret() -> str | None:
+    """``$SUPABASE_JWT_SECRET`` (the legacy HS256 signing secret); ``None`` when unset."""
+    return credential(SUPABASE_JWT_SECRET)
 
 
 def user_id(fallback: str) -> str:

@@ -378,12 +378,25 @@ call `load_dotenv()` once (a local `.env`, never overriding what is already set)
 | `ALGOTRADE_DATA_URL` | `data_url()`, passed to `storage.factory.open_backend(url)`; `--data-url` wins | `file://./var/data` |
 | `ALGOTRADE_CONFIG_DIR` | `config_dir()`, passed to `open_config_store(dir)`; `--config-dir` wins | `./config` |
 | `ALGOTRADE_USER` | `user_id()`, the default `--user` | `local` (`site` for site screens) |
+| `ALGOTRADE_AUTH` | `auth_mode()`: how the API resolves its caller (ADR 0040): `supabase` verifies a Supabase access token on every request (401 without a valid one, 403 when its email maps to no registry user); `off` serves `ALGOTRADE_USER` without a token and the API refuses to start that way on a non-loopback `--host` | `supabase` |
+| `SUPABASE_URL` | `supabase_url()`: the Supabase project (`https://<ref>.supabase.co`); the API fetches its JWKS once at startup (refetched on an unknown `kid`) and checks the token's issuer against it | unset with `ALGOTRADE_AUTH=supabase`: the API refuses to start |
+| `SUPABASE_JWT_SECRET` | `supabase_jwt_secret()`: the project's legacy HS256 signing secret, for projects not yet on asymmetric keys | unset: only JWKS-signed (ES256 / RS256) tokens are accepted |
 | `ALGOTRADE_MASSIVE_API_KEY`, `ALGOTRADE_SEC_CONTACT` | `credential()`, handed to the source registry | unset: the source is skipped with the reason |
 | `ALGOTRADE_IBKR_HOST`, `ALGOTRADE_IBKR_PORT`, `ALGOTRADE_IBKR_CLIENT_ID` | `credential()`, handed to the source registry for the IB Gateway session (`verify`, read-only); port 4001 live gateway, 4002 paper | unset: the `ibkr` source is skipped with the reason |
 | `ALGOTRADE_IBKR_API_CLIENT_ID` | `api_credential()`: the client id of the API's live option quotes (ADR 0028) | `ALGOTRADE_IBKR_CLIENT_ID` + 1 |
 | `ALGOTRADE_NOTIFY_EMAIL_TO`, `ALGOTRADE_NOTIFY_EMAIL_FROM`, `ALGOTRADE_SMTP_USER`, `ALGOTRADE_SMTP_PASSWORD` | `credential()`, read by the nightly email notifier (`workflows/nightly/notify.py`) when `[notify.email] enabled`; recipients comma-separated, FROM defaults to the first recipient; Gmail needs an app password | unset with email enabled: a `notify` WARN "email not configured", the nightly carries on |
 
 ## Users
+
+The users are declared in `config/site/users.toml` (id, role, name; ADR 0040). The email a
+Supabase sign-in maps to is personal data, so it is not in that public file: each user's lives
+in their git-ignored `config/users/<id>/identity.toml`:
+
+```toml
+email = "alice@example.com"   # the address the user signs in with (case ignored, unique)
+```
+
+A user without the file cannot sign in to the API (403); `site` never has one. The CLIs ignore it.
 
 Phase 0 identity is a **label for namespacing, not authentication**: `--user` on both CLIs,
 defaulting to `$ALGOTRADE_USER`, else `local` (`site` for runs scheduled from site presets). Market data and rollups are

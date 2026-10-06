@@ -5,12 +5,13 @@ ADMIN workspace and the ops reads; ``trader`` the TRADER workspace). Their confi
 ``config/users/<id>/`` (ADR 0015): the registry only says who exists and what they may do. A
 missing file is the single-user install: ``local`` as ``admin`` and ``site`` for scheduled
 site screens, so nothing changes until a second user is declared. How a user proves who they
-are (login) is the API's concern (ADR 0040); ``settings.load_users`` reads the file, this
-module does no I/O.
+are (login) is the API's concern (ADR 0040); the email a sign-in maps to is not in the public
+site file but in the user's own git-ignored ``config/users/<id>/identity.toml`` (``email``),
+attached by ``with_emails``. ``settings.load_users`` reads the files, this module does no I/O.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Any
 
@@ -20,6 +21,8 @@ from algotrade.core.model.errors import ConfigurationError
 
 WHERE = "users.toml"
 USER_KEYS = ("id", "role", "name")
+IDENTITY = "identity"  # config/users/<id>/identity.toml: the user's sign-in email
+IDENTITY_KEYS = ("email",)
 
 
 class Role(StrEnum):
@@ -39,9 +42,12 @@ class UserRecord:
     user_id: str
     role: Role
     name: str = ""
+    email: str | None = None  # lowercased; from identity.toml (never committed: ADR 0040)
 
     def __post_init__(self) -> None:
         validate_id("user", self.user_id)
+        if self.email is not None and self.user_id == SITE_USER:
+            raise ConfigurationError(f"user '{SITE_USER}' runs scheduled screens: no email")
 
 
 DEFAULT_USERS: tuple[UserRecord, ...] = (
@@ -62,10 +68,22 @@ class UsersSettings:
             seen.add(user.user_id)
         if not any(u.role is Role.ADMIN for u in self.users):
             raise ConfigurationError(f"{WHERE}: at least one user must have role = 'admin'")
+        emails = [u.email for u in self.users if u.email is not None]
+        if len(emails) != len(set(emails)):
+            raise ConfigurationError(f"{IDENTITY}.toml: two users have the same email")
 
     def get(self, user_id: str) -> UserRecord | None:
         """The declared user, or ``None`` for an unknown id (callers refuse it)."""
         return next((u for u in self.users if u.user_id == user_id), None)
+
+    def by_email(self, email: str) -> UserRecord | None:
+        """The user whose identity email is ``email`` (case ignored), or ``None``."""
+        wanted = email.strip().lower()
+        return next((u for u in self.users if u.email is not None and u.email == wanted), None)
+
+    def with_emails(self, emails: Mapping[str, str | None]) -> "UsersSettings":
+        """These users with the emails ``emails`` maps their ids to (``identity_email``)."""
+        return UsersSettings(tuple(replace(u, email=emails.get(u.user_id)) for u in self.users))
 
     def role_of(self, user_id: str) -> Role:
         user = self.get(user_id)
@@ -105,3 +123,19 @@ def _user(doc: Mapping[str, Any], index: int) -> UserRecord:
     if name is not None and not isinstance(name, str):
         raise ConfigurationError(f"{where} name: expected a string")
     return UserRecord(user_id, Role(role), name or "")
+
+
+def identity_email(doc: Mapping[str, Any] | None, user_id: str) -> str | None:
+    """The sign-in email in ``user_id``'s ``identity.toml`` (lowercased), ``None`` without
+    the file or the key. The message never repeats the value (personal data)."""
+    if doc is None:
+        return None
+    where = f"users/{user_id}/{IDENTITY}.toml"
+    table = Table(doc, where)
+    table.only(IDENTITY_KEYS)
+    email = table.raw("email")
+    if email is None:
+        return None
+    if not isinstance(email, str) or "@" not in email.strip():
+        raise ConfigurationError(f"{where} email: expected an email address")
+    return email.strip().lower()

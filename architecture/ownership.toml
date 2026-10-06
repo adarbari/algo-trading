@@ -544,6 +544,13 @@ section = "docs/adr/0024-api.md#http-layer"
 detect = [{ import = "fastapi" }, { import = "starlette" }, { import = "uvicorn" }]
 
 [[responsibility]]
+id = "api-authentication"
+description = "Resolve the caller of an API request (ADR 0040): the Authenticator seam, Supabase access tokens verified offline (JWKS cached by kid and refreshed on an unknown kid, or the legacy HS256 secret; iss, aud, exp), the token's email mapped to a registry user (401 no or bad token, 403 no registry user), and ALGOTRADE_AUTH=off on loopback only; REST deps and the GraphQL context call it, nothing else reads the Authorization header or decodes a token"
+owner = ["apps/api/algotrade_api/auth/*"]
+section = "docs/adr/0040-identity-and-roles.md#decision"
+detect = [{ import = "jwt" }, { string = "authorization" }, { call = "get_unverified_header" }]
+
+[[responsibility]]
 id = "run-item-summary"
 description = "Summarise a run record's per-item statuses: status codes, which are fine, failed items grouped by a normalised reason (the nightly report and the API share it)"
 owner = ["src/algotrade/services/run_items.py"]
