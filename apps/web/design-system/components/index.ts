@@ -10,6 +10,8 @@ export { Button, type ButtonProps, type ButtonVariant } from './Button';
 export {
   Chart,
   CHART_RANGES,
+  type ChartBand,
+  type ChartBandTone,
   type ChartEvent,
   type ChartEventKind,
   type ChartPoint,
@@ -52,6 +54,12 @@ export {
 } from './HeatGrid';
 export { Icon, ICON_NAMES, type IconName, type IconProps, type IconTone } from './Icon';
 export { IconButton, type IconButtonProps } from './IconButton';
+export {
+  IndicatorRow,
+  type IndicatorChange,
+  type IndicatorRowProps,
+  type IndicatorStatus,
+} from './IndicatorRow';
 export { Input, type InputProps } from './Input';
 export { Kbd, type KbdProps } from './Kbd';
 export { LoginForm, type LoginCredentials, type LoginFormProps } from './LoginForm';
@@ -66,6 +74,7 @@ export {
   type PopoverProps,
   type PopoverTriggerProps,
 } from './Popover';
+export { ScoreMeter, type ScoreMeterProps, type ScoreThreshold } from './ScoreMeter';
 export { SearchInput, type SearchInputProps } from './SearchInput';
 export {
   SegmentedControl,

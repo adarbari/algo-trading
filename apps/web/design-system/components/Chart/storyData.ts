@@ -3,7 +3,7 @@
  * from 30 Sep 2024 to 2 Oct 2026, ending on fixed closes, with sample events and volume. Not
  * market data.
  */
-import type { ChartEvent, ChartPoint, ChartSeries } from './chartData';
+import type { ChartBand, ChartEvent, ChartPoint, ChartSeries } from './chartData';
 
 /** Seeded PRNG (mulberry32): the same numbers on every run, so screenshots are stable. */
 function random(seed: number): () => number {
@@ -82,3 +82,24 @@ export const aaplVolume: ChartPoint[] = (() => {
   const next = random(5);
   return DAYS.map((time) => ({ time, value: Math.round(38e6 + next() * 52e6) }));
 })();
+
+export const cautionBand: ChartBand = {
+  start: '2026-01-12',
+  end: '2026-02-20',
+  tone: 'warning',
+  label: 'Caution',
+};
+/** Starts on a Saturday: its first session is the Monday after. */
+export const stressBand: ChartBand = {
+  start: '2026-02-21',
+  end: '2026-03-27',
+  tone: 'negative',
+  label: 'Stress',
+};
+
+/** Sample shaded periods (two cautions and a stress) over the last year. Not market data. */
+export const sampleBands: ChartBand[] = [
+  cautionBand,
+  stressBand,
+  { start: '2026-08-03', end: '2026-09-04', tone: 'warning', label: 'Caution' },
+];

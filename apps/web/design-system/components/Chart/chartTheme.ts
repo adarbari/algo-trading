@@ -24,6 +24,14 @@ export function readTheme(element: Element): EngineTheme {
     track: read('--color-track'),
     fontFamily: read('--font-sans'),
     fontSize: Number.isFinite(fontSize) ? fontSize : 11.5,
+    bands: {
+      positive: read('--color-positive-bg'),
+      warning: read('--color-warning-bg'),
+      negative: read('--color-negative-bg'),
+      neutral: read('--color-neutral-bg'),
+      info: read('--color-info-bg'),
+      accent: read('--color-accent-soft'),
+    },
     series: Object.fromEntries(SERIES.map((s) => [s, read(`--color-${s}`)])) as Record<
       Series,
       string

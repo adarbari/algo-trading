@@ -1,0 +1,93 @@
+/* IndicatorRow: a ruled row; the header (status, names, description) left, the reading right. */
+.root {
+  min-width: 0;
+  border-block-end: var(--border-width-thin) solid var(--color-border-soft);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+}
+
+.flat {
+  display: flex;
+  gap: var(--space-1-5);
+  align-items: center;
+  min-height: var(--density-row-height);
+  padding-block: var(--space-2);
+
+  /* Lines up with an expandable row's text: the chevron's width and gap. */
+  padding-inline-start: calc(var(--size-icon-sm) + var(--space-1-5));
+}
+
+.head {
+  display: flex;
+  flex: 1;
+  gap: var(--space-2);
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.status {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  min-width: var(--space-10);
+  min-height: var(--line-height-base);
+}
+
+.dot {
+  width: var(--space-2);
+  height: var(--space-2);
+  margin-inline: var(--space-1);
+  border-radius: var(--radius-lg);
+  background: var(--tone-fill);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
+  align-items: baseline;
+}
+
+.reading {
+  display: inline-flex;
+  flex: none;
+  gap: var(--space-1-5);
+  align-items: center;
+  justify-content: flex-end;
+  min-width: var(--space-10);
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.value {
+  font-weight: var(--font-weight-semibold);
+}
+
+.value[data-missing] {
+  color: var(--color-muted);
+}
+
+.unit {
+  color: var(--color-muted);
+  font-weight: var(--font-weight-regular);
+}
+
+.changed {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.changed[data-change='new'] {
+  color: var(--color-accent-strong);
+}

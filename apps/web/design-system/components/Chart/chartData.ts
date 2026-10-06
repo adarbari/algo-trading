@@ -5,6 +5,7 @@
  */
 import { formatValue, type ValueFormat } from '../../format';
 import { SERIES, type Series } from '../../tokens';
+import type { StatusTone } from '../StatusBadge';
 
 /** The time windows a caller offers (usually through a SegmentedControl). */
 export type ChartRange = '3M' | '1Y' | '2Y' | 'All';
@@ -35,6 +36,20 @@ export interface ChartEvent {
   kind: ChartEventKind;
   /** Short detail for the tooltip and table ("$0.26", "4-for-1", "after close"). */
   detail?: string;
+}
+
+/** The tones a shaded band takes: the StatusBadge tones (`accent` is the one accent hue). */
+export type ChartBandTone = StatusTone;
+
+export interface ChartBand {
+  /** First day of the span, ISO. A non-trading day shades from the next day with data. */
+  start: string;
+  /** Last day of the span, ISO (inclusive). */
+  end: string;
+  /** Tint of the span. */
+  tone: ChartBandTone;
+  /** What the span is ("Stress"): its name for assistive technology, the key and the table. */
+  label: string;
 }
 
 /** Marker key: a shape and a letter per kind, so colour is never the only key. */
@@ -89,6 +104,7 @@ export interface PreparedSeries extends ChartSeries {
 export interface PreparedChart {
   series: PreparedSeries[];
   events: ChartEvent[];
+  bands: ChartBand[];
   volume: ChartPoint[];
   start: string | null;
   end: string | null;
@@ -101,6 +117,7 @@ export function prepare(
     range: ChartRange;
     rebase: boolean;
     events?: readonly ChartEvent[];
+    bands?: readonly ChartBand[];
     volume?: readonly ChartPoint[];
   },
 ): PreparedChart {
@@ -115,13 +132,47 @@ export function prepare(
     };
   });
   const times = prepared.flatMap((s) => s.points.map((p) => p.time)).sort();
+  const first = times[0] ?? null;
+  const end = times.at(-1) ?? null;
   return {
     series: prepared.filter((s) => s.points.length > 0),
     events: inWindow(options.events ?? [], start).filter((e) => last === null || e.time <= last),
+    bands: clampBands(options.bands ?? [], first, end),
     volume: inWindow(options.volume ?? [], start),
-    start: times[0] ?? null,
-    end: times.at(-1) ?? null,
+    start: first,
+    end,
   };
+}
+
+/** The bands that overlap the window, cut to its first and last day, oldest first. */
+export function clampBands(
+  bands: readonly ChartBand[],
+  first: string | null,
+  last: string | null,
+): ChartBand[] {
+  if (first === null || last === null) return [];
+  return bands
+    .filter((b) => b.start <= b.end && b.end >= first && b.start <= last)
+    .map((b) => ({
+      ...b,
+      start: b.start < first ? first : b.start,
+      end: b.end > last ? last : b.end,
+    }))
+    .sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
+}
+
+/**
+ * The first and last day WITH DATA a band covers (a band over a weekend or a holiday shades the
+ * sessions inside it), or undefined when it holds no session.
+ */
+export function bandSpan(
+  band: ChartBand,
+  points: readonly ChartPoint[],
+): { from: string; to: string } | undefined {
+  const inside = points.filter((p) => p.time >= band.start && p.time <= band.end);
+  const from = inside[0]?.time;
+  const to = inside.at(-1)?.time;
+  return from === undefined || to === undefined ? undefined : { from, to };
 }
 
 /** The text alternative: what is drawn, over which dates, and how each series moved. */
@@ -155,6 +206,11 @@ export function describeChart(
       .map(([kind, n]) => `${String(n)} ${EVENT_KINDS[kind].label.toLowerCase()}`);
     parts.push(`events: ${counts.join(', ')}`);
   }
+  if (chart.bands.length > 0) {
+    parts.push(
+      `${String(chart.bands.length)} shaded ${chart.bands.length === 1 ? 'period' : 'periods'}`,
+    );
+  }
   return `${parts.join('; ')}.`;
 }
 
@@ -164,6 +220,8 @@ export interface ChartTableRow {
   values: Record<string, number | undefined>;
   volume: number | undefined;
   events: string;
+  /** Labels of the bands covering the day, joined. */
+  shaded: string;
 }
 
 /** Newest first, every day any series has a value. */
@@ -172,7 +230,7 @@ export function tableRows(chart: PreparedChart): ChartTableRow[] {
   const row = (time: string) => {
     let found = byTime.get(time);
     if (!found) {
-      found = { time, values: {}, volume: undefined, events: '' };
+      found = { time, values: {}, volume: undefined, events: '', shaded: '' };
       byTime.set(time, found);
     }
     return found;
@@ -185,6 +243,12 @@ export function tableRows(chart: PreparedChart): ChartTableRow[] {
     const r = row(e.time);
     const text = [EVENT_KINDS[e.kind].label, e.detail].filter(Boolean).join(' ');
     r.events = r.events ? `${r.events}; ${text}` : text;
+  }
+  for (const r of byTime.values()) {
+    r.shaded = chart.bands
+      .filter((b) => r.time >= b.start && r.time <= b.end)
+      .map((b) => b.label)
+      .join('; ');
   }
   return [...byTime.values()].sort((a, b) => (a.time < b.time ? 1 : -1));
 }

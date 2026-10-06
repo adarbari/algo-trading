@@ -4,9 +4,25 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { expectNoA11yViolations } from '../../testing';
 import { Chart } from './Chart';
-import { describeChart, prepare, rangeStart, rebased, tableRows } from './chartData';
+import {
+  bandSpan,
+  clampBands,
+  describeChart,
+  prepare,
+  rangeStart,
+  rebased,
+  tableRows,
+} from './chartData';
 import type { CrosshairInfo, EngineInput } from './engine';
-import { aapl, aaplEvents, aaplVolume, msft } from './storyData';
+import {
+  aapl,
+  aaplEvents,
+  aaplVolume,
+  cautionBand,
+  msft,
+  sampleBands,
+  stressBand,
+} from './storyData';
 
 // jsdom has no canvas: the engine (the only lightweight-charts module) is replaced by a spy.
 const engine = vi.hoisted(() => ({
@@ -58,6 +74,58 @@ describe('chart data', () => {
     const rows = tableRows(chart);
     expect(rows[0]?.time).toBe('2026-10-02');
     expect(rows.find((r) => r.time === '2026-08-10')?.events).toBe('Ex-dividend $0.27');
+  });
+});
+
+describe('chart bands', () => {
+  it('cuts bands to the window and drops those outside it', () => {
+    const outside = {
+      start: '2020-03-01',
+      end: '2020-04-01',
+      tone: 'negative',
+      label: 'Old',
+    } as const;
+    const straddling = {
+      start: '2025-06-01',
+      end: '2025-11-03',
+      tone: 'warning',
+      label: 'Edge',
+    } as const;
+    expect(
+      clampBands([outside, straddling, stressBand, cautionBand], '2025-10-02', '2026-10-02').map(
+        (b) => [b.label, b.start, b.end],
+      ),
+    ).toEqual([
+      ['Edge', '2025-10-02', '2025-11-03'],
+      ['Caution', '2026-01-12', '2026-02-20'],
+      ['Stress', '2026-02-21', '2026-03-27'],
+    ]);
+    expect(clampBands([stressBand], null, null)).toEqual([]);
+    expect(
+      clampBands(
+        [{ ...stressBand, start: '2026-03-27', end: '2026-02-21' }],
+        '2025-10-02',
+        '2026-10-02',
+      ),
+    ).toEqual([]);
+  });
+
+  it('shades the sessions inside a band, so a weekend edge starts on the next session', () => {
+    // 21 Feb 2026 is a Saturday: the band's first session is Monday the 23rd.
+    expect(bandSpan(stressBand, aapl.points)).toEqual({ from: '2026-02-23', to: '2026-03-27' });
+    expect(
+      bandSpan({ ...stressBand, start: '2026-02-21', end: '2026-02-22' }, aapl.points),
+    ).toBeUndefined();
+  });
+
+  it('lists a band per row in the table by label', () => {
+    const chart = prepare([aapl], { range: '1Y', rebase: false, bands: sampleBands });
+    const rows = tableRows(chart);
+    expect(rows.find((r) => r.time === '2026-03-02')?.shaded).toBe('Stress');
+    expect(rows.find((r) => r.time === '2026-06-01')?.shaded).toBe('');
+    expect(describeChart('AAPL', chart, { rebase: false, format: { kind: 'currency' } })).toContain(
+      '3 shaded periods',
+    );
   });
 });
 
@@ -161,9 +229,56 @@ describe('Chart', () => {
     expect(engine.draw).not.toHaveBeenCalled();
   });
 
+  it('passes bands to the engine and names them in a key and a list for screen readers', async () => {
+    render(<Chart label="AAPL" series={[aapl]} range="1Y" bands={sampleBands} />);
+    await waitFor(() => {
+      expect(engine.draw).toHaveBeenCalled();
+    });
+    expect(lastInput().bands).toHaveLength(3);
+    const key = screen.getByRole('list', { name: 'Shaded periods' });
+    expect(
+      within(key)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual(['Caution', 'Stress']);
+    const list = screen.getByRole('list', { name: 'AAPL: shaded periods' });
+    expect(within(list).getAllByRole('listitem')[1]).toHaveTextContent(
+      'Stress: 21 Feb 2026 to 27 Mar 2026',
+    );
+  });
+
+  it('can hide the bands from the key but keeps the list for screen readers', () => {
+    render(<Chart label="AAPL" series={[aapl]} bands={sampleBands} bandKey={false} />);
+    expect(screen.queryByRole('list', { name: 'Shaded periods' })).toBeNull();
+    expect(screen.getByRole('list', { name: 'AAPL: shaded periods' })).toBeInTheDocument();
+  });
+
+  it('adds a Shaded column to the table when there are bands', async () => {
+    render(<Chart label="AAPL" series={[aapl]} range="1Y" bands={sampleBands} />);
+    await userEvent.click(screen.getByRole('button', { name: 'View as table' }));
+    expect(screen.getByRole('columnheader', { name: /Shaded/ })).toBeInTheDocument();
+  });
+
+  it('is unchanged without bands: no key, no list, no engine bands', async () => {
+    render(<Chart label="AAPL" series={[aapl]} range="1Y" />);
+    await waitFor(() => {
+      expect(engine.draw).toHaveBeenCalled();
+    });
+    expect(lastInput().bands).toEqual([]);
+    expect(screen.queryByRole('list', { name: 'Shaded periods' })).toBeNull();
+    expect(screen.queryByRole('list', { name: 'AAPL: shaded periods' })).toBeNull();
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(
-      <Chart label="AAPL" series={[aapl, msft]} range="3M" rebase events={aaplEvents} />,
+      <Chart
+        label="AAPL"
+        series={[aapl, msft]}
+        range="1Y"
+        rebase
+        events={aaplEvents}
+        bands={sampleBands}
+      />,
     );
     await expectNoA11yViolations(container);
   });
