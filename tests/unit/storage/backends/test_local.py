@@ -2,9 +2,13 @@
 ``pq.read_table`` did (same columns, types, metadata and row order), a whole range read too,
 and an empty instrument list still raises (the contract suite covers everything else).
 
-The ``perf`` test is the budget of Market.history's read (13,500 one-row partitions, two
-columns), serial, cold, on an idle machine (``make perf``): the ceiling is the time measured
-when it landed; the target is under 5 s (docs/roadmap.md)."""
+Table listing (``names``) walks directories only and equals the recursive glob it replaced,
+on nested table paths and with stray directories.
+
+The ``perf`` tests are the budget of Market.history's read (13,500 one-row partitions, two
+columns) and of the table listing (50,000 partitions), serial, cold, on an idle machine
+(``make perf``): the first ceiling is the time measured when it landed (target under 5 s,
+docs/roadmap.md); the listing's is 0.2 s."""
 
 import shutil
 import time
@@ -115,3 +119,55 @@ def test_a_13500_partition_two_column_read_is_within_budget(tmp_path: Path) -> N
     elapsed = time.perf_counter() - start
     assert out is not None and len(out) == n  # the restating r2 (one row) is the latest
     assert elapsed < BUDGET_S, f"{elapsed:.2f} s for {n} partitions (budget {BUDGET_S} s)"
+
+
+def _index_files(tables: Path, layout: dict[str, int]) -> None:
+    """Indexed partitions (a bare ``_runs.json``: all the listing looks at) per table path."""
+    for table, n in layout.items():
+        for day in _days(n):
+            partition = tables / table / f"date={day.isoformat()}"
+            partition.mkdir(parents=True)
+            (partition / local.INDEX).write_text("{}")
+
+
+def test_table_names_equal_the_recursive_glob_on_nested_tables_and_stray_directories(
+    tmp_path: Path,
+) -> None:
+    tables = tmp_path / "data" / "tables"
+    _index_files(
+        tables,
+        {"bars/1d": 3, "rollups/market/regime@v2": 2, "macro/series": 1, "reference": 4},
+    )
+    (tables / "stray" / "empty").mkdir(parents=True)  # a directory with no partition
+    (tables / "stray" / "notes.txt").write_text("x")
+    (tables / "unindexed" / "date=2020-01-01").mkdir(parents=True)  # a day with no index
+    (tables / "bars" / "1d" / f"date={START.isoformat()}" / "file.parquet").write_text("x")
+    (tables / "_txn" / "commits").mkdir(parents=True)
+    (tables / "_txn" / "commits" / "r1.json").write_text("{}")
+    old = sorted(
+        {
+            p.parent.parent.relative_to(tables).as_posix()
+            for p in tables.glob(f"**/date=*/{local.INDEX}")
+        }
+    )
+    names = LocalBackend(tmp_path / "data").tables.names()
+    assert names == old == ["bars/1d", "macro/series", "reference", "rollups/market/regime@v2"]
+
+
+def test_table_names_of_an_empty_store_are_empty(tmp_path: Path) -> None:
+    assert LocalBackend(tmp_path / "data").tables.names() == []
+
+
+@pytest.mark.perf
+def test_listing_tables_of_50000_partitions_is_within_budget(tmp_path: Path) -> None:
+    tables = tmp_path / "data" / "tables"
+    _index_files(
+        tables,
+        {"bars/1d": 20_000, "rollups/market/regime@v2": 20_000, "macro/series": 10_000},
+    )
+    backend = LocalBackend(tmp_path / "data")
+    start = time.perf_counter()
+    names = backend.tables.names()
+    elapsed = time.perf_counter() - start
+    assert names == ["bars/1d", "macro/series", "rollups/market/regime@v2"]
+    assert elapsed < 0.2, f"{elapsed:.3f} s for 50,000 partitions (budget 0.2 s)"
