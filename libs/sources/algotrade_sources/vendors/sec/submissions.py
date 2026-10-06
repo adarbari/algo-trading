@@ -25,7 +25,6 @@ received; with pages they are saved one document after another (one per line), w
 instrument id belong to the task.
 """
 
-import json
 import re
 from dataclasses import dataclass
 from datetime import date
@@ -40,6 +39,7 @@ from algotrade_sources.framework.base import (
     TransientFetchError,
 )
 from algotrade_sources.framework.http import Http
+from algotrade_sources.framework.pages import json_documents
 
 SOURCE = "sec_edgar"
 DATASET = "filings"
@@ -88,22 +88,7 @@ def filings_request(request: FetchRequest) -> FilingsRequest:
 
 def parse_documents(payload: bytes) -> list[dict[str, Any]]:
     """The JSON documents in ``payload`` (the company's, then one per older page)."""
-    text, decoder, pos, documents = payload.decode("utf-8-sig"), json.JSONDecoder(), 0, []
-    while True:
-        while pos < len(text) and text[pos].isspace():
-            pos += 1
-        if pos >= len(text):
-            break
-        try:
-            document, pos = decoder.raw_decode(text, pos)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"SEC answer is not JSON: {exc}") from exc
-        if not isinstance(document, dict):
-            raise ValueError("SEC answer is not a JSON object")
-        documents.append(document)
-    if not documents:
-        raise ValueError("SEC answer is empty")
-    return documents
+    return json_documents(payload, "SEC")
 
 
 def _recent(document: dict[str, Any]) -> dict[str, Any]:
