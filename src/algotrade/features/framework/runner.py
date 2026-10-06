@@ -58,11 +58,14 @@ def rollup_params(configs: SiteDocuments | None, rollups: Sequence[FeatureGroup]
 def _check_point_in_time(
     rollup: FeatureGroup, table: str, frame: pd.DataFrame, session: date
 ) -> None:
-    """Loaders return frames sorted by ``session_date``: the last row is the latest."""
-    if "session_date" in frame.columns and len(frame):
-        latest = frame["session_date"].iloc[-1]
-        if latest > session:
-            raise AssertionError(f"{rollup.key}: {table} rows from {latest} reached {session}")
+    """Loaders return frames sorted by ``session_date`` (``day`` for a window input): the last
+    row is the latest."""
+    for column in ("session_date", "day"):
+        if column in frame.columns and len(frame):
+            latest = frame[column].iloc[-1]
+            later = latest > pd.Timestamp(session) if column == "day" else latest > session
+            if later:
+                raise AssertionError(f"{rollup.key}: {table} rows from {latest} reached {session}")
 
 
 def _check_entity_rows(rollup: FeatureGroup, frame: pd.DataFrame, session: date) -> None:
@@ -99,10 +102,10 @@ def _compute_chunk(
     params: Any,
     produced: Produced | None,
 ) -> Iterator[SessionResult]:
-    lookbacks = {i.table: i.sessions_back(params) for i in rollup.inputs}
+    lookbacks = {i.key: i.sessions_back(params) for i in rollup.inputs}
     loaded = {
-        i.table: load_input(
-            reader, i.table, sessions, lookbacks[i.table], produced, i.ids, i.symbols
+        i.key: load_input(
+            reader, i.table, sessions, lookbacks[i.key], produced, i.ids, i.symbols, i.windows
         )
         for i in rollup.inputs
     }
@@ -110,12 +113,12 @@ def _compute_chunk(
         frames: dict[str, pd.DataFrame | None] = {}
         missing = []
         for spec in rollup.inputs:
-            frame = loaded[spec.table].at(session, lookbacks[spec.table])
+            frame = loaded[spec.key].at(session, lookbacks[spec.key])
             if frame is None and spec.required:
                 missing.append(spec.table)
             if frame is not None:
-                _check_point_in_time(rollup, spec.table, frame, session)
-            frames[spec.table] = frame
+                _check_point_in_time(rollup, spec.key, frame, session)
+            frames[spec.key] = frame
         if missing:
             yield SessionResult(session, None, f"no {', '.join(missing)} for {session}")
             continue
