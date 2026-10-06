@@ -431,11 +431,13 @@ name = "Layout: vendors never import each other (one folder per vendor)"
 type = "independence"
 modules = [
     "algotrade_sources.vendors.cboe",
+    "algotrade_sources.vendors.fred",
     "algotrade_sources.vendors.ibkr",
     "algotrade_sources.vendors.ishares",
     "algotrade_sources.vendors.massive",
     "algotrade_sources.vendors.nasdaq",
     "algotrade_sources.vendors.proshares",
+    "algotrade_sources.vendors.published",
     "algotrade_sources.vendors.sec",
     "algotrade_sources.vendors.ssga",
     "algotrade_sources.vendors.treasury",

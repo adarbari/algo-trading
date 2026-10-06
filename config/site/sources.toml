@@ -122,6 +122,15 @@ enabled = true
 min_interval_s = 1.0             # official site, no published limit; stay polite
 lookback_days = 10               # nightly window: the last N calendar days (catches late publications)
 
+[fred]                           # FRED / ALFRED economic series with every vintage (ADR 0048); key in .env
+enabled = true                   # ALGOTRADE_FRED_API_KEY (free: fredaccount.stlouisfed.org); no key: the source is skipped
+min_interval_s = 0.5             # FRED allows 120 requests a minute
+base_url = "https://api.stlouisfed.org/fred"
+
+[published]                      # published series files (Stooq, Fed EBP, OFR FSI, Shiller): one request per file
+enabled = true
+min_interval_s = 1.0             # a few static files a day; no published limit, stay polite
+
 [ibkr]                           # IB Gateway, READ-ONLY market data: `verify`, `ibkr-contracts`, `ibkr-iv`
 enabled = true                   # owner runs IB Gateway with "Read-Only API" ticked (verified 2026-10-03)
                                  # (README "Live verification"); host, port and client id come from

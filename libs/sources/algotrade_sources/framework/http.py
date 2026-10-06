@@ -12,6 +12,7 @@ import random
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -67,6 +68,18 @@ def urllib_transport(
             header = exc.headers.get("Retry-After") if exc.headers else None
             retry = float(header) if header and header.isdigit() else None
             raise HttpError(exc.code, retry, _error_body(exc)) from exc
+
+    return get
+
+
+def with_query_param(transport: Transport, name: str, value: str) -> Transport:
+    """``transport`` that adds ``name=value`` to every URL it fetches, for the vendor whose key
+    can only travel as a query parameter (FRED ``api_key``). The source and the retry loop see
+    the URL without it, so the key never reaches a log line, an error message or a raw path."""
+    pair = urllib.parse.urlencode({name: value})
+
+    def get(url: str) -> bytes:
+        return transport(f"{url}{'&' if '?' in url else '?'}{pair}")
 
     return get
 

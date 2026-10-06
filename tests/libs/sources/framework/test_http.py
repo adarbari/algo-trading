@@ -20,6 +20,7 @@ from algotrade_sources.framework.http import (
     get_with_retry,
     json_post_transport,
     urllib_transport,
+    with_query_param,
 )
 from algotrade_sources.framework.limiter import Limiter, Pacing
 from algotrade_sources.vendors.cboe.option_chains import (
@@ -272,3 +273,25 @@ def test_giving_up_keeps_the_last_http_status_and_status_probes_once() -> None:
     http = http_for(transport)
     assert (http.status("fine"), http.status("blocked")) == (200, 403)
     assert seen == ["fine", "blocked"]  # one attempt each, never retried
+
+
+def test_a_query_param_transport_adds_the_key_after_the_url_is_logged() -> None:
+    seen: list[str] = []
+
+    def transport(url: str) -> bytes:
+        seen.append(url)
+        raise HttpError(500)
+
+    wrapped = with_query_param(transport, "api_key", "s3cret&=")
+    with pytest.raises(HttpError):
+        wrapped("https://x.example/a?b=1")
+    with pytest.raises(HttpError):
+        wrapped("https://x.example/a")
+    assert seen == [
+        "https://x.example/a?b=1&api_key=s3cret%26%3D",
+        "https://x.example/a?api_key=s3cret%26%3D",
+    ]
+    http = Http(wrapped, RetryPolicy(tries=1), sleep=lambda s: None)
+    with pytest.raises(GaveUpError) as caught:
+        http.get("https://x.example/a")
+    assert "s3cret" not in str(caught.value)  # the retry loop never saw the key

@@ -6,6 +6,7 @@ sharing a key read one section, and no vendor module paces itself (``time.sleep`
 
 import ast
 import tomllib
+from collections.abc import Callable
 from dataclasses import replace
 from functools import partial
 from pathlib import Path
@@ -25,13 +26,24 @@ from algotrade_sources.framework.registry import (
     raw_sections,
     raw_source,
 )
+from algotrade_sources.framework.series import SeriesRequest
 from tests.conftest import REPO_ROOT
+from tests.helpers.payloads import fred as fred_payloads
 
 SITE_SOURCES = tomllib.loads((REPO_ROOT / "config" / "site" / "sources.toml").read_text())
 SOURCES_DIR = REPO_ROOT / "libs" / "sources" / "algotrade_sources"
 # The two modules that may wait: the limiter (pacing) and http.py (retry backoff).
 MAY_SLEEP = {"limiter.py", "http.py"}
-ENV = {"ALGOTRADE_MASSIVE_API_KEY": "key", "ALGOTRADE_SEC_CONTACT": "ops@example.org"}
+ENV = {
+    "ALGOTRADE_MASSIVE_API_KEY": "key",
+    "ALGOTRADE_SEC_CONTACT": "ops@example.org",
+    "ALGOTRADE_FRED_API_KEY": "fred-key",
+}
+
+
+def keep_http(kept: dict[str, Http], name: str, http: Http, **options: object) -> Http:
+    """A ``build`` that keeps the ``Http`` the registry made, for the test to inspect."""
+    return kept.setdefault(name, http)
 
 
 def settings(doc: dict[str, object] | None = None) -> SourcesSettings:
@@ -61,12 +73,42 @@ def test_disabled_sections_and_missing_credentials_are_skipped_with_a_reason(
         build_sources(settings(), ENV.get, ["nope"], tmp_path)
 
 
+def test_fred_needs_its_key_and_sends_it_only_as_a_query_parameter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    missing = build_sources(settings(), lambda name: None, ["fred", "published"], tmp_path)
+    assert missing.skipped["fred"].startswith("ALGOTRADE_FRED_API_KEY is not set")
+    assert "published" in missing.sources  # published files need no key
+
+    seen: list[str] = []
+
+    def answer(url: str) -> bytes:
+        seen.append(url)
+        return fred_payloads.payload()
+
+    def fake_transport(headers: dict[str, str] | None = None) -> Callable[[str], bytes]:
+        assert "s3cret" not in str(headers)  # not a header: FRED takes it as a parameter
+        return answer
+
+    monkeypatch.setattr(registry, "urllib_transport", fake_transport)
+    doc = {**SITE_SOURCES, "fred": {**SITE_SOURCES["fred"], "base_url": "https://fred.example/v1"}}
+    built = build_sources(
+        settings(doc), {"ALGOTRADE_FRED_API_KEY": "s3cret"}.get, ["fred"], tmp_path
+    )
+    source = built.sources["fred"]
+    request = SeriesRequest("GDP_REAL", code="GDPC1")
+    source.fetch(request)
+    assert len(seen) == 1 and seen[0].endswith("&api_key=s3cret")
+    assert seen[0].startswith("https://fred.example/v1/series/observations?")  # [fred] base_url
+    assert "api_key" not in source.url(request)  # type: ignore[attr-defined]
+
+
 def test_one_limiter_and_breaker_per_key_with_configured_or_default_pace(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     http: dict[str, Http] = {}
     for name, spec in SOURCES.items():
-        keep = partial(http.setdefault, name)
+        keep = partial(keep_http, http, name)
         monkeypatch.setitem(registry.SOURCES, name, replace(spec, build=keep))  # type: ignore[arg-type]
     doc = {"massive": {"min_interval_s": 1.0}, "http": {"breaker_failures": 4}}
     build_sources(settings(doc), ENV.get, limits_dir=tmp_path)
@@ -86,7 +128,7 @@ def test_a_sources_toml_from_before_the_ssga_section_still_builds_and_paces_poli
     files still build, on one limiter with the default 1 s pace."""
     http: dict[str, Http] = {}
     for name in ("spy_holdings", "ssga_holdings"):
-        keep = partial(http.setdefault, name)
+        keep = partial(keep_http, http, name)
         monkeypatch.setitem(registry.SOURCES, name, replace(SOURCES[name], build=keep))  # type: ignore[arg-type]
     old = {k: v for k, v in SITE_SOURCES.items() if k != "ssga"}
     old["spy_holdings"] = {"enabled": True, "min_interval_s": 0.0}

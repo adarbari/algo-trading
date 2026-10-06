@@ -8,7 +8,7 @@ swapping a vendor never touches storage, features, strategies or the UI.
 
 **Pacing is shared.** Each source is declared once in `sources/framework/registry.py` with its
 `config/site/sources.toml` section and a limiter key (`cboe`, `nasdaqtrader`, `ssga`,
-`nasdaq`, `ishares`, `proshares`, `massive`, `sec`, `treasury`, `ibkr`, `ibkr_historical`). One limiter per key (`sources/framework/limiter.py`)
+`nasdaq`, `ishares`, `proshares`, `massive`, `sec`, `treasury`, `fred`, `published`, `ibkr`, `ibkr_historical`). One limiter per key (`sources/framework/limiter.py`)
 spaces requests across every worker thread **and every process** on the machine (a lock file
 per key under `[http] limits_dir`, default `var/run/limits/`), so a backfill and the nightly
 run never exceed a vendor's limit together. The pace is **adaptive** between the section's
@@ -182,6 +182,57 @@ nightly re-checks the last `[treasury] lookback_days` (10) and writes only curve
 yet stored. Paced by `[treasury] min_interval_s` (1 s; no published limit). The curve is
 published after the close, and the bond market keeps its own holidays (Columbus Day,
 Veterans Day), so a session can lack its own curve: `data.rates.curve` uses the latest one.
+
+## FRED and ALFRED (implemented adapter, ADR 0048)
+
+`https://api.stlouisfed.org/fred/series/observations` (St. Louis Fed; free, **key required**:
+`ALGOTRADE_FRED_API_KEY`, from a free account at fredaccount.stlouisfed.org). We ask for the
+full real-time period (`realtime_start=1776-07-04`, `realtime_end=9999-12-31`,
+`file_type=json`), so ALFRED returns **one row per observation and per value it has had**:
+`realtime_start` is the day that value became known, our `vintage_date`. FRED writes a missing
+observation as `"."`; it is stored as a null value. One request returns up to 100,000 rows
+(`limit` / `offset`; the adapter pages until `count`); a revised monthly or quarterly series
+is a few thousand rows, a daily market series (`DGS10`, `T10Y3M`) one row per day.
+`sources/vendors/fred/observations.py` returns the one normalised series shape
+(`sources/framework/series.py`: `series`, `obs_date`, `vintage_date`, `value`, `code`).
+
+- **The key is a query parameter** (FRED has no header form): the registry's transport appends
+  `api_key` to every URL (`SourceSpec.query_param`), so the URL the adapter builds, the retry
+  loop's messages and the raw-store path (keyed by series, not URL) never hold it.
+- **Pacing:** `[fred] min_interval_s = 0.5` (FRED allows 120 requests a minute);
+  `[fred] base_url` is the API root. An unknown series id answers 400 `series does not exist`
+  and reads as "nothing there"; any other 400 (a bad key) is an error.
+- **Cadence:** nightly, with the `macro` task (RG2c): FRED series change at their release
+  dates (daily to monthly; claims weekly), and a refetch returns the whole history so a new
+  vintage of an old observation is picked up.
+- **Terms:** FRED's own series are free to use, key and attribution; **licence `open`**. Series
+  FRED republishes from third parties carry their own terms: the ICE BofA credit spreads
+  (`BAML*`) are **licence `personal`** (FRED limits their history and forbids redistribution),
+  the same word ADR 0028 uses for IBKR.
+
+## Published series files (implemented adapter, ADR 0048)
+
+Series with no FRED or ALFRED feed are read from the publisher's own file by one data-driven
+adapter (`sources/vendors/published/csv_series.py`): the registry entry
+(`config/site/macro.toml`) names the `url`, the `parser`, the `date_column` and the
+`value_column`, so one more CSV is a config entry, not code. A published file has no vintages:
+`vintage_date` is null and the registry's release lag (the `lagged` rule) is applied downstream.
+Paced by `[published] min_interval_s` (1 s); one request per file, refetched by the series'
+`cadence`.
+
+| File | Format | Used as | Terms |
+|---|---|---|---|
+| Fed Excess Bond Premium, `ebp_csv.csv` (Federal Reserve Board) | `csv`: `date,gz_spread,ebp,est_prob`, monthly, `value_column = "ebp"` | credit risk premium | public Fed Notes data: `open` |
+| OFR Financial Stress Index (financialresearch.gov) | `csv`: `Date,OFR FSI,Credit,Equity valuation,...`, daily | market stress | OFR public data: `open` |
+| Stooq daily history (`stooq.com/q/d/l/?s=<symbol>&i=d`) | `csv`: `Date,Open,High,Low,Close,Volume`, `value_column = "Close"` | index levels (S&P 500, VIX) | free for personal use, no redistribution: **`personal`** |
+| Shiller `ie_data.xls` (Yale) | `shiller_xls`: a legacy `.xls` workbook | CAPE, long-run earnings | academic data, credit the author: `open` |
+
+The fixtures in `tests/helpers/payloads/` are written from these documented formats, not
+recorded: CI never calls the network. **Follow-up:** `shiller_xls` raises
+`NotImplementedError` because reading `.xls` needs `xlrd`, which is not a dependency
+(`openpyxl` reads only `.xlsx`); adding it is its own PR. Stooq has begun asking some clients
+for a download key; if it does for ours, the Stooq entries move to a keyed variant or another
+index source, and the macro step fails for that series only (ADR 0048).
 
 ## ETF holdings (implemented, ADR 0035)
 

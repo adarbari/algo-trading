@@ -40,10 +40,12 @@ from algotrade_sources.framework.http import (
     json_post_transport,
     pause,
     urllib_transport,
+    with_query_param,
 )
 from algotrade_sources.framework.limiter import Limiter, Pacing
 from algotrade_sources.llm.chat import ChatCompletions
 from algotrade_sources.vendors.cboe.option_chains import CboeOptionsSource, missing_chain
+from algotrade_sources.vendors.fred.observations import FredObservations, missing_series
 from algotrade_sources.vendors.ibkr.gateway import GatewayConfig, IbkrMarketData
 from algotrade_sources.vendors.ibkr.market_data import IbkrSource
 from algotrade_sources.vendors.ishares.etf_holdings import IsharesHoldings, no_file
@@ -54,6 +56,7 @@ from algotrade_sources.vendors.massive.tickers import MassiveTickers
 from algotrade_sources.vendors.nasdaq.earnings import NasdaqEarningsSource
 from algotrade_sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
 from algotrade_sources.vendors.proshares.etf_holdings import ProsharesHoldings
+from algotrade_sources.vendors.published.csv_series import PublishedSeries
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts
 from algotrade_sources.vendors.sec.edgar import SecSubmissions, SecTickerMap, user_agent
 from algotrade_sources.vendors.sec.fund_objectives import (
@@ -69,6 +72,7 @@ from algotrade_sources.vendors.treasury.par_yields import TreasuryParYields
 type Env = Callable[[str], str | None]  # variable name -> value (``env.credential``)
 MASSIVE_KEY = "ALGOTRADE_MASSIVE_API_KEY"
 SEC_CONTACT = "ALGOTRADE_SEC_CONTACT"
+FRED_KEY = "ALGOTRADE_FRED_API_KEY"
 
 
 class VendorConfig(Protocol):
@@ -114,6 +118,9 @@ class RegistrySettings(Protocol):
     def http_max_retry_s(self) -> float: ...
 
     @property
+    def fred_base_url(self) -> str: ...
+
+    @property
     def http_breaker_failures(self) -> int: ...
 
     @property
@@ -144,12 +151,20 @@ def _no_headers(_: str | None) -> dict[str, str]:
     return {}
 
 
+def _no_options(_: RegistrySettings) -> dict[str, Any]:
+    return {}
+
+
+def _fred_options(settings: RegistrySettings) -> dict[str, Any]:
+    return {"base_url": settings.fred_base_url}
+
+
 @dataclass(frozen=True)
 class SourceSpec:
     name: str
     section: str  # config/site/sources.toml section: enabled, min_interval_s
     limiter: str  # one shared limiter (and circuit breaker) per key
-    build: Callable[[Http], Source]
+    build: Callable[..., Source]  # (Http, **options(settings))
     min_interval_s: float = 0.0  # default floor when the section does not set min_interval_s
     env_var: str | None = None  # required credential or contact
     env_hint: str = "add it to .env"
@@ -157,6 +172,10 @@ class SourceSpec:
     tries: int = 7
     not_found: Callable[[HttpError], bool] | None = None  # vendor's "no such object" errors
     switch: str | None = None  # a further on/off key of the section that must not be false
+    # A vendor that takes its key only as a query parameter (FRED ``api_key``): the transport
+    # appends it to every URL, so sources, retry messages and raw paths never hold it.
+    query_param: str | None = None
+    options: Callable[[RegistrySettings], dict[str, Any]] = _no_options  # keyword args of build
 
 
 def _bearer(key: str | None) -> dict[str, str]:
@@ -212,6 +231,20 @@ SOURCES: dict[str, SourceSpec] = {
         _sec("sec_fund_objectives", SecFundObjectives),
         _sec("sec_fund_series", SecFundSeries),
         SourceSpec("treasury", "treasury", "treasury", TreasuryParYields, 1.0),
+        SourceSpec(
+            "fred",
+            "fred",
+            "fred",
+            FredObservations,
+            0.5,  # FRED allows 120 requests a minute
+            FRED_KEY,
+            "create a free FRED account (fredaccount.stlouisfed.org) and add the key to .env",
+            tries=4,
+            not_found=missing_series,
+            query_param="api_key",
+            options=_fred_options,
+        ),
+        SourceSpec("published", "published", "published", PublishedSeries, 1.0),
     )
 }
 
@@ -388,8 +421,11 @@ def build_sources(
             limiter(key, pacing(spec, settings))
             breakers[key] = CircuitBreaker(key, settings.http_breaker_failures)
         secret = env(spec.env_var) if spec.env_var else None
+        transport = urllib_transport(headers=spec.headers(secret))
+        if spec.query_param and secret:
+            transport = with_query_param(transport, spec.query_param, secret)
         http = Http(
-            urllib_transport(headers=spec.headers(secret)),
+            transport,
             RetryPolicy(
                 tries=spec.tries,
                 max_total_s=settings.http_max_retry_s,
@@ -398,7 +434,7 @@ def build_sources(
             limiters[key],
             breakers[key],
         )
-        built.sources[name] = spec.build(http)
+        built.sources[name] = spec.build(http, **spec.options(settings))
     return built
 
 
