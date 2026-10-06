@@ -59,8 +59,14 @@ test('filters by decision', async ({ page }) => {
 
 test('shows the stored display values and the watch-outs', async ({ page }) => {
   await page.goto('/ideas');
-  const headers = await grid(page).getByRole('columnheader').allTextContents();
-  expect(headers.join(' | ')).toMatch(/IV30.*HV30.*IV \/ HV.*Put strike.*Put ROC/);
+  // A retrying assertion: a one-shot read of the headers can run before the grid mounts.
+  await expect(grid(page).getByRole('columnheader')).toContainText([
+    'IV30',
+    'HV30',
+    'IV / HV',
+    'Put strike',
+    'Put ROC',
+  ]);
   const aapl = grid(page).getByRole('row', { name: /AAPL/ });
   await expect(aapl).toContainText('31.0%');
   await expect(aapl).toContainText('1.49');
