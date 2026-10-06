@@ -48,7 +48,7 @@ export interface FactGroup {
   items: KeyValueItem[];
 }
 
-interface FactSpec {
+export interface FactSpec {
   id: string;
   label: string;
   name: SiteFeature;
@@ -220,7 +220,7 @@ export function profileOf(instrument: FactsInstrument, values: Values): Profile 
 const UNKNOWN = 'Unknown';
 
 /** A row with its stable id (a headline stat uses the same id). */
-type Fact = KeyValueItem & { id: string };
+export type Fact = KeyValueItem & { id: string };
 
 function formatOf(spec: FactSpec, value: ServedValue): ValueFormat {
   const format = valueFormat(value.info);
@@ -229,7 +229,7 @@ function formatOf(spec: FactSpec, value: ServedValue): ValueFormat {
 
 /** A fact's row: its value, "Unknown" with the reason when the session has no partition for
  * it, nothing when it does not apply to the instrument. */
-function factItem(values: Values, spec: FactSpec): Fact | null {
+export function factItem(values: Values, spec: FactSpec): Fact | null {
   const value = values.get(spec.name);
   if (!value) return null;
   if (isUnknown(value)) {

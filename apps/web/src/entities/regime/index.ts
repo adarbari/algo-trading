@@ -4,6 +4,7 @@
  * window as bands, the chip and headline views, and the mapping of bands to chart props.
  */
 export { REGIME_BANDS_OPERATION, REGIME_OPERATION, useRegime, useRegimeBands } from './api/hooks';
+export { episodeName, EPISODES, type Episode } from './model/episodes';
 export { regimeFixture, unknownRegimeFixture } from './model/fixtures';
 export {
   changedIndicators,

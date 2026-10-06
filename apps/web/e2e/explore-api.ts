@@ -233,7 +233,7 @@ function graphqlAnswer(operation: Operation): Json | null {
   const instrumentId = VALUES.instrumentId;
   switch (name) {
     case 'InstrumentFacts':
-      return fixture('facts-aapl.json');
+      return withEpisodeFeatures(fixture('facts-aapl.json'));
     case 'InstrumentEvents':
       return fixture('gql-events-aapl.json');
     case 'InstrumentScreenerHits':
@@ -297,6 +297,37 @@ function answer(url: URL, body: string | null): Json | Json[] | null {
   const path = url.pathname.replace(/^\/api/, '');
   if (path === '/graphql') return graphqlAnswer(JSON.parse(body ?? '{}') as Operation);
   return null;
+}
+
+/**
+ * The recorded facts predate `episode_behaviour@v1`: the "In rough markets" values are
+ * synthetic (a beta, two episodes with a drawdown, one with none stored).
+ */
+function withEpisodeFeatures(facts: Json): Json {
+  const value = (
+    name: string,
+    v: unknown,
+    format: string,
+    unit: string,
+    unknown: Json | null = null,
+  ) => ({
+    name: `rollup.episode_behaviour@v1.${name}`,
+    value: v,
+    unknown,
+    info: { format, unit, dtype: 'float', nullMeaning: 'not enough bars for the episode' },
+  });
+  const data = facts['data'] as { instrument: { features: unknown[] } };
+  data.instrument.features.push(
+    value('beta_252d', 1.18, 'NUMBER', 'ratio'),
+    value('dd_tariffs_2025', -0.24, 'PERCENT', 'decimal'),
+    value('recovery_sessions_tariffs_2025', 41, 'NUMBER', 'sessions'),
+    value('dd_hikes_2022', -0.31, 'PERCENT', 'decimal'),
+    value('dd_covid_2020', null, 'PERCENT', 'decimal', {
+      code: 'NO_PARTITION',
+      detail: 'rollups/instrument/episode_behaviour@v1',
+    }),
+  );
+  return facts;
 }
 
 /** Answers the Explore API from fixtures; anything else is a 404 with a detail. */

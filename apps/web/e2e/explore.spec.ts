@@ -86,6 +86,7 @@ test('one ticker opens on its overview', async ({ page }) => {
   await expect(page.getByRole('region', { name: 'AAPL headline numbers' })).toContainText(
     'Market cap',
   );
+  await expect(page.getByLabel('In rough markets')).toContainText('Tariff shock, spring 2025');
   await page.getByRole('tab', { name: 'Compare' }).click();
   await expect(page).toHaveURL(/tab=compare/);
   await expectAccessible(page);

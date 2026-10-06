@@ -159,8 +159,8 @@ branches from `main`. `architect` review after RG1a, RG1d, RG2a, RG3 and RG4. Re
 | RG2b | FRED / ALFRED and published-file adapters against recorded payloads | next |
 | RG2c | The `macro` task, step and `check_macro`; then a detached backfill | next |
 | RG3 | The macro group; regime expression features (with an `ncdf` built-in for the probit); the regime group; Pagan-Sossounov dating in `quant/turning_points.py`; the episode scorecard in `services/evaluation` | **done** (RG3a: the macro, indicator and regime groups; RG3b: EBP / OFR FSI / EPU, the probit, the scorecard: `make regime-scorecard` after the macro backfill; open: the Pagan-Sossounov published-table check) |
-| RG4 | Overlays (`engines/overlays/`), `Decision.PAUSED`, `[regime]` config, with-versus-without evaluation | in review (architect review pending) |
-| RG5 | The embeddings (Ideas strip and paused section, results header, Explore and Backtests bands) and the full Regime page; before `[regime]` is turned on, the read model's picked count must exclude `PAUSED` (`services/read/screens/runs.py` `NOT_PICKED`) | next |
+| RG4 | Overlays (`engines/overlays/`), `Decision.PAUSED`, `[regime]` config, with-versus-without evaluation | **done** (PR 217) |
+| RG5 | The embeddings (Ideas strip and paused section, results header, Explore and Backtests bands) and the full Regime page; before `[regime]` is turned on, the read model's picked count must exclude `PAUSED` (`services/read/screens/runs.py` `NOT_PICKED`) | next (RG5a: Explore's "In rough markets" done; Backtests is still a placeholder page, so its bands and by-regime split wait for the page) |
 | RG6 | On-demand explanation: the text-model seam (ADR 0041 amended), `services/explaining`, `POST /regime/explain`, its cache | **done** |
 
 ## Swing levels and momentum (SW): support, resistance and momentum from daily bars
