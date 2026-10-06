@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-141 stored features in 18 groups, in dependency order; 38 expression features.
+173 stored features in 21 groups, in dependency order; 38 expression features.
 
 ## `option_liquidity@v1`
 
@@ -288,6 +288,63 @@ IV30 rank and percentile over 252 sessions (provisional after 60). Stored as `ro
 | `iv_percentile_252d` | window | float32 | decimal | open | 0 .. 1 | IV percentile: the share of the window's earlier IVs strictly below today's | rank_status is UNKNOWN (fewer than 60 sessions with an IV), or there is no IV today; or no earlier IV | `iv30.iv30@v1` |
 | `history_days` | window | int | sessions | open | >= 0 | Sessions of the 252-session window with an IV, today included (gaps are not filled) | never | `iv30.iv30@v1` |
 | `rank_status` | label | str | category | open | UNKNOWN, PROVISIONAL, FULL | UNKNOWN below 60 sessions with an IV (no rank), PROVISIONAL below 252, FULL from 252 | never | `iv30.iv30@v1` |
+
+## Market features
+
+Market-entity groups (ADR 0047): one row per session for the whole market (`instrument_id` `MKT:US`), stored as `rollups/market/<group>@v<N>` and read as `market.<group>@v<N>.<column>`, never selected per instrument.
+
+### `market_trend@v1`
+
+Index trend of SPY and QQQ: distance from the 200-day average, death cross, drawdown from the 52-week closing high, realised vol and returns. Stored as `rollups/market/market_trend@v1`; reads `bars/1d`, `instruments/symbol_ids` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `spx_close_vs_sma200` | window | float32 | decimal | open | >= -1 | SPY close / its mean close over the last 200 sessions - 1 (below 0: under the 200-day average) | SPY is not in the reference snapshot, or has no bar on a session among the last 200 (a short history or a gap) | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `spx_sma50_vs_sma200` | window | float32 | decimal | open | >= -1 | SPY 50-session mean close / 200-session mean close - 1 (below 0: a death cross) | SPY is not in the reference snapshot, or has no bar on a session among the last 200 (a short history or a gap) | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `spx_drawdown_252d` | window | float32 | decimal | open | -1 .. 0 | SPY close / its highest close over the last 252 sessions - 1 (0 at a new high, -0.2 a bear market's threshold) | SPY is not in the reference snapshot, or has no bar on a session among the last 252 (a short history or a gap) | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `spx_realised_vol_20d` | window | float32 | decimal | open | 0 .. 5 | SPY close-to-close realised volatility: sample stdev of the last 20 log returns x sqrt(252) | SPY is not in the reference snapshot, or has no bar on a session among the last 21 (a short history or a gap) | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `spx_ret_21d` | window | float32 | decimal | open | >= -1 | SPY close / close 21 sessions earlier - 1 (price return, no dividends) | SPY is not in the reference snapshot, or has no bar on a session among the last 22 (a short history or a gap) | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `spx_ret_252d` | window | float32 | decimal | open | >= -1 | SPY close / close 252 sessions earlier - 1 (price return, no dividends) | SPY is not in the reference snapshot, or has no bar on a session among the last 253 (a short history or a gap) | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `ndx_close_vs_sma200` | window | float32 | decimal | open | >= -1 | QQQ close / its mean close over the last 200 sessions - 1 (below 0: under the 200-day average) | QQQ is not in the reference snapshot, or has no bar on a session among the last 200 (a short history or a gap) | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `ndx_sma50_vs_sma200` | window | float32 | decimal | open | >= -1 | QQQ 50-session mean close / 200-session mean close - 1 (below 0: a death cross) | QQQ is not in the reference snapshot, or has no bar on a session among the last 200 (a short history or a gap) | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `ndx_drawdown_252d` | window | float32 | decimal | open | -1 .. 0 | QQQ close / its highest close over the last 252 sessions - 1 (0 at a new high, -0.2 a bear market's threshold) | QQQ is not in the reference snapshot, or has no bar on a session among the last 252 (a short history or a gap) | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `ndx_realised_vol_20d` | window | float32 | decimal | open | 0 .. 5 | QQQ close-to-close realised volatility: sample stdev of the last 20 log returns x sqrt(252) | QQQ is not in the reference snapshot, or has no bar on a session among the last 21 (a short history or a gap) | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `ndx_ret_21d` | window | float32 | decimal | open | >= -1 | QQQ close / close 21 sessions earlier - 1 (price return, no dividends) | QQQ is not in the reference snapshot, or has no bar on a session among the last 22 (a short history or a gap) | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `ndx_ret_252d` | window | float32 | decimal | open | >= -1 | QQQ close / close 252 sessions earlier - 1 (price return, no dividends) | QQQ is not in the reference snapshot, or has no bar on a session among the last 253 (a short history or a gap) | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+
+### `market_breadth@v1`
+
+Breadth of the session's universe (stocks): shares above the 200- and 50-day averages and in a bear market, new highs minus lows, the Zweig thrust and 90% down days. Stored as `rollups/market/market_breadth@v1`; reads `bars/1d`, `universe` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `breadth_status` | label | str | category | open | OK, LOW_COVERAGE, NO_UNIVERSE | Whether the breadth columns are computed: OK, LOW_COVERAGE (coverage below min_coverage: every breadth column null) or NO_UNIVERSE (no universe snapshot on or before the session: everything null) | never | `universe.instrument_id`, `bars/1d.close` |
+| `universe_members` | cross_section | int | count | open | >= 0 | Stocks (common stocks and ADRs) in the universe snapshot the session sees | no universe snapshot on or before the session (NO_UNIVERSE) | `universe.instrument_id` |
+| `universe_coverage` | cross_section | float32 | decimal | open | 0 .. 1 | Share of members with a bar on every one of the last 200 sessions | no universe snapshot on or before the session (NO_UNIVERSE), or it lists no stocks | `universe.instrument_id`, `bars/1d.close` |
+| `pct_above_sma200` | cross_section | float32 | decimal | open | 0 .. 1 | Share of members whose close is above their mean close over the last 200 sessions (over members with a bar on each of those sessions) | no universe snapshot on or before the session (breadth_status NO_UNIVERSE), or coverage below min_coverage (LOW_COVERAGE) | `universe.instrument_id`, `bars/1d.close` |
+| `pct_above_sma50` | cross_section | float32 | decimal | open | 0 .. 1 | Share of members whose close is above their mean close over the last 50 sessions (over members with a bar on each of those sessions) | no universe snapshot on or before the session (breadth_status NO_UNIVERSE), or coverage below min_coverage (LOW_COVERAGE) | `universe.instrument_id`, `bars/1d.close` |
+| `pct_in_bear` | cross_section | float32 | decimal | open | 0 .. 1 | Share of members whose close is more than 20% below their highest close of the last 252 sessions (over members with 240+ of those bars) | no universe snapshot on or before the session (breadth_status NO_UNIVERSE), or coverage below min_coverage (LOW_COVERAGE) | `universe.instrument_id`, `bars/1d.close` |
+| `new_highs_minus_lows_pct` | cross_section | float32 | decimal | open | -1 .. 1 | (Members closing at their highest close of the last 252 sessions - members closing at their lowest) / members with 240+ of those bars | no universe snapshot on or before the session (breadth_status NO_UNIVERSE), or coverage below min_coverage (LOW_COVERAGE) | `universe.instrument_id`, `bars/1d.close` |
+| `zweig_thrust` | cross_section | bool | flag | open |  | Zweig breadth thrust: the 10-session mean of the advancing share (advancers / (advancers + decliners)) is above 0.615 and was below 0.4 on one of the 10 sessions before | no universe snapshot on or before the session (breadth_status NO_UNIVERSE), or coverage below min_coverage (LOW_COVERAGE); or a session among the last 20 had no member advance or decline | `universe.instrument_id`, `bars/1d.close` |
+| `pct_90_down_days_20d` | cross_section | float32 | decimal | open | 0 .. 1 | Share of the last 20 sessions on which decliners held 90% or more of the dollar volume (close x volume) of advancers and decliners | no universe snapshot on or before the session (breadth_status NO_UNIVERSE), or coverage below min_coverage (LOW_COVERAGE); or a session among the last 20 had no member dollar volume up or down | `universe.instrument_id`, `bars/1d.close`, `bars/1d.volume` |
+
+### `market_cross_asset@v1`
+
+Cross-asset stress over an ETF basket (turbulence, absorption ratio and its shift) and the leadership ratios' 63-session relative returns. Stored as `rollups/market/market_cross_asset@v1`; reads `bars/1d`, `instruments/symbol_ids` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `basket_size` | window | int | count | open | 0 .. 14 | Basket ETFs (SPY, QQQ, IWM, TLT, IEF, HYG, LQD, GLD, USO, XLY, XLP, XLU, XLK, XLF) in the reference with a bar on each of the last 61 sessions: the columns of turbulence and absorption | never | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `turbulence_60d` | window | float32 | ratio | open | >= 0 | Kritzman-Li turbulence: squared Mahalanobis distance of the session's basket log returns from the mean and covariance of the 60 sessions before it (about basket_size on an ordinary day) | fewer than 5 basket tickers with a bar on each of the last 61 sessions, or a direction the window never moved in | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `absorption_ratio_500d` | window | float32 | decimal | open | 0 .. 1 | Share of the variance of the last 500 sessions' basket log returns absorbed by the first fifth of the eigenvectors (exponential weights, half-life 250 sessions) | fewer than 5 basket tickers with a bar on each of the last 61 sessions, or a basket ETF misses a bar among the last 501 sessions | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `absorption_shift` | window | float32 | ratio | open |  | Standardised shift of the absorption ratio: (its mean over 15 sessions - its mean over 252) / its stdev over 252 | fewer than 5 basket tickers with a bar on each of the last 61 sessions, or a basket ETF misses a bar among the last 752 sessions, or the ratio did not move over 252 sessions | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `rsp_vs_spy` | window | float32 | decimal | open | >= -1 | RSP / SPY relative return over 63 sessions: (close RSP / close SPY) / the same ratio 63 sessions earlier - 1 | RSP or SPY is not in the reference, or has no bar on the session or 63 sessions earlier | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `iwm_vs_spy` | window | float32 | decimal | open | >= -1 | IWM / SPY relative return over 63 sessions: (close IWM / close SPY) / the same ratio 63 sessions earlier - 1 | IWM or SPY is not in the reference, or has no bar on the session or 63 sessions earlier | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `xly_vs_xlp` | window | float32 | decimal | open | >= -1 | XLY / XLP relative return over 63 sessions: (close XLY / close XLP) / the same ratio 63 sessions earlier - 1 | XLY or XLP is not in the reference, or has no bar on the session or 63 sessions earlier | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `hyg_vs_lqd` | window | float32 | decimal | open | >= -1 | HYG / LQD relative return over 63 sessions: (close HYG / close LQD) / the same ratio 63 sessions earlier - 1 | HYG or LQD is not in the reference, or has no bar on the session or 63 sessions earlier | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `hyg_vs_ief` | window | float32 | decimal | open | >= -1 | HYG / IEF relative return over 63 sessions: (close HYG / close IEF) / the same ratio 63 sessions earlier - 1 | HYG or IEF is not in the reference, or has no bar on the session or 63 sessions earlier | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `cper_vs_gld` | window | float32 | decimal | open | >= -1 | CPER / GLD relative return over 63 sessions: (close CPER / close GLD) / the same ratio 63 sessions earlier - 1 | CPER or GLD is not in the reference, or has no bar on the session or 63 sessions earlier | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
+| `xlu_vs_spy` | window | float32 | decimal | open | >= -1 | XLU / SPY relative return over 63 sessions: (close XLU / close SPY) / the same ratio 63 sessions earlier - 1 | XLU or SPY is not in the reference, or has no bar on the session or 63 sessions earlier | `bars/1d.close`, `instruments/symbol_ids.instrument_id` |
 
 ## Expression features
 

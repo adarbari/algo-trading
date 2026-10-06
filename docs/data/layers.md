@@ -283,6 +283,11 @@ range; every feature is listed in the generated **[feature catalogue](features.m
   An expression feature takes the entity of what it reads; one
   that reads two entities is a definition error. `compute_rollups(..., entity="market")`
   computes them after the instrument groups; the catalogue lists them under "Market features".
+  The groups (`features/rollups/market/`): `market_trend@v1` (SPY / QQQ vs their 200-day
+  average, death cross, drawdown, realised vol, returns), `market_breadth@v1` (the shares of the
+  session's universe stocks above their averages and in a bear, new highs minus lows, the Zweig
+  thrust, 90% down days; null below `min_coverage`) and `market_cross_asset@v1` (turbulence and
+  the absorption ratio of an ETF basket, leadership ratios), all from `bars/1d`.
 
 Per-column meanings, units, ranges and null meanings: [features.md](features.md). Floats of
 the v2 groups are stored as 32-bit (`float32`). Columns computed from other columns are

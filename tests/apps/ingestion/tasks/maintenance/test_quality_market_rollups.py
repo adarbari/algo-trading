@@ -10,12 +10,19 @@ from algotrade_ingestion.tasks.derived.market_rollups import compute_market_roll
 from algotrade_ingestion.tasks.derived.rollups import SITE
 from algotrade_ingestion.tasks.maintenance.quality import check_market_rollups
 from tests.helpers.ingest_fakes import task_ctx
-from tests.helpers.rollup_store import MARKET_COUNTS, market_store, store
+from tests.helpers.rollup_store import (
+    MARKET_COUNTS,
+    market_store,
+    only_market_counts,
+    store,
+    without_market_groups,
+)
 
 SETTINGS = SourcesSettings()
 
 
-def test_no_market_group_declared_passes() -> None:
+def test_no_market_group_declared_passes(monkeypatch: pytest.MonkeyPatch) -> None:
+    without_market_groups(monkeypatch, site_features(SITE), default_features())
     _, reader = store()
     [check] = check_market_rollups(reader, market_store()[2][-1], SETTINGS)
     assert check.status == "PASS" and "0 market groups" in check.detail
@@ -25,8 +32,7 @@ def test_a_row_per_group_for_the_session_passes_and_a_missing_one_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # the task reads the site through its own store, the check through the default one
-    for features in (site_features(SITE), default_features()):
-        monkeypatch.setitem(features.groups, MARKET_COUNTS.key, MARKET_COUNTS)
+    only_market_counts(monkeypatch, site_features(SITE), default_features())
     writer, reader, days = market_store()
     [before] = check_market_rollups(reader, days[-1], SETTINGS)
     assert before.status == "FAIL"

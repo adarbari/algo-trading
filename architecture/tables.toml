@@ -171,6 +171,18 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
 note = "market-entity feature groups (ADR 0047): one MKT:US row per session, the market-rollups task (compute_rollups(entity='market')); each group's own table is declared here when the group is added"
 
 [[table]]
+name = "rollups/market/market_trend@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
+
+[[table]]
+name = "rollups/market/market_breadth@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
+
+[[table]]
+name = "rollups/market/market_cross_asset@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/market_rollups.py"
+
+[[table]]
 name = "rollups/daily/*"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 note = "none produced yet (phase 6); rollups are computed only by the rollups task"

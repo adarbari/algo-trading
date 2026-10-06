@@ -2,14 +2,15 @@
 materialise expression features, ``features.site``): every declared group
 
 - is a valid declaration with typed columns, defined in a kind folder of
-  ``features/rollups/`` (``price``, ``options``, ``corporate``);
+  ``features/rollups/`` (``price``, ``options``, ``corporate``, ``market``);
 - has a ``config/site/rollups.toml`` section exactly when it takes parameters, and the file
   loads through the one settings loader;
 - reads only inputs ``algotrade.data.feature_inputs`` knows how to read, and the
   rollups it reads are registered, acyclic and computed before it (registry order);
 - has exactly one producer, its entity's task (``rollups`` for instrument groups,
   ``market-rollups`` for market groups), in ``architecture/tables.toml``;
-- is reachable from the selection catalogue as ``rollup.<name>@v<N>.<column>``.
+- is reachable from the selection catalogue as ``rollup.<name>@v<N>.<column>`` (an instrument
+  group) or read only as ``market.<name>@v<N>.<column>`` (a market group).
 """
 
 import re
@@ -96,8 +97,8 @@ def test_every_entity_has_a_producer() -> None:
 def test_one_producer_per_entity(group: FeatureGroup) -> None:
     """A group of either entity is produced by exactly one task: its entity's."""
     task, module = PRODUCER[group.entity]
-    owners = [t["owner"] for t in TABLES if _covers(t["name"], group.table)]
-    assert owners == [module]
+    owners = {t["owner"] for t in TABLES if _covers(t["name"], group.table)}
+    assert owners == {module}  # its own entry and the family's (rollups/market/*) agree
     others = [n for n, t in TASKS.items() if group.table in t.tables]
     assert others in ([], [task])  # a declared table is registered on that task only
 
@@ -112,11 +113,19 @@ def _covers(declared: str, table: str) -> bool:
     return declared == table or (declared.endswith("*") and table.startswith(declared[:-1]))
 
 
-@pytest.mark.parametrize("key", sorted(GROUPS))
+@pytest.mark.parametrize("key", sorted(k for k, g in GROUPS.items() if g.entity == "instrument"))
 def test_reachable_from_the_catalogue(key: str) -> None:
     fields = field_catalog().fields
     for column, kind in GROUPS[key].columns.items():
         assert fields[f"rollup.{key}.{column}"] == kind
+
+
+@pytest.mark.parametrize("key", sorted(k for k, g in GROUPS.items() if g.entity == "market"))
+def test_a_market_group_is_never_selected_per_instrument(key: str) -> None:
+    """A market group is read as ``market.<key>.<column>`` (ADR 0047), never ``rollup.``."""
+    fields = field_catalog().fields
+    assert not [f for f in fields if f.startswith(f"rollup.{key}.")]
+    assert all(f.field.startswith(f"market.{key}.") for f in GROUPS[key].features)
 
 
 def test_expression_features_are_in_the_catalogue_and_stale_fields_say_where_they_went() -> None:
