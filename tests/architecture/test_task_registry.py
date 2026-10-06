@@ -4,7 +4,9 @@
   module produces (``owner`` or ``also_written_by``), and every producing task module is in
   the registry;
 - every task is reachable from the CLI, by its own command and as ``run <task>``;
-- every source a task names is declared in the source registry.
+- every source a task names is declared in the source registry;
+- every task that writes an ``events/*`` table sets ``known_from`` on its rows (ADR 0050
+  decision 3), or the table is listed in ``STORES_ON_LEARNING`` with the reason.
 """
 
 import tomllib
@@ -21,6 +23,19 @@ from tests.conftest import REPO_ROOT
 
 TABLES = tomllib.loads((REPO_ROOT / "architecture" / "tables.toml").read_text())["table"]
 TASKS_DIR = "apps/ingestion/algotrade_ingestion/tasks/"
+# Event tables whose rows are known from the session that stored them (``known_from`` null:
+# ``data.events`` reads ``session_date``), with the reason. A new events/* writer sets
+# ``known_from`` (``schemas.KNOWN_FROM``) or is listed here.
+STORES_ON_LEARNING = {
+    "events/split": "corporate actions (the Massive window around the session, or a --from/--to "
+    "backfill): not in ADR 0050 decision 3's tables, so known from the session that stored it",
+    "events/dividend": "corporate actions, as events/split; its declaration_date is a candidate "
+    "known_from not adopted by ADR 0050",
+    "events/reference_change": "the diff of two reference snapshots: learned on the session that "
+    "built the newer one",
+    "events/index_change": "the diff of two reference snapshots (S&P 500 membership): learned on "
+    "the session that built the newer one",
+}
 
 
 def _module_path(module: object) -> str:
@@ -99,3 +114,21 @@ def test_every_nightly_step_has_a_status_in_the_result() -> None:
     for step in [*steps.values(), *summary["steps"].values()]:
         assert step["status"] in ("SUCCEEDED", "FAILED", "NOT_RUN", "SKIPPED", "WAIVED")
         assert "duration_s" in step and isinstance(step["critical"], bool)
+
+
+@pytest.mark.parametrize("name", sorted(TASKS))
+def test_every_event_writer_sets_known_from(name: str) -> None:
+    spec = TASKS[name]
+    events = [t for t in spec.tables if t.startswith("events/") and t not in STORES_ON_LEARNING]
+    if not events:
+        return
+    source = Path(str(spec.module.__file__)).read_text()
+    assert "KNOWN_FROM" in source, (
+        f"{name} writes {events} without known_from (ADR 0050 decision 3): set it on every "
+        "row (schemas.KNOWN_FROM), or list the table in STORES_ON_LEARNING with the reason"
+    )
+
+
+def test_stores_on_learning_lists_only_stored_event_tables() -> None:
+    written = {t for spec in TASKS.values() for t in spec.tables if t.startswith("events/")}
+    assert set(STORES_ON_LEARNING) <= written, sorted(set(STORES_ON_LEARNING) - written)

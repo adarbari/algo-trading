@@ -1,10 +1,16 @@
 from datetime import UTC, date, datetime
 
+import pytest
+
 from algotrade.data import StoreReader
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
-from algotrade_ingestion.tasks.market.earnings import ingest_earnings, report_days
+from algotrade_ingestion.tasks.market.earnings import (
+    backfill_earnings,
+    ingest_earnings,
+    report_days,
+)
 from algotrade_sources.framework.base import FetchRequest
 from algotrade_sources.framework.http import HttpError, RetryPolicy
 from algotrade_sources.vendors.nasdaq.earnings import NasdaqEarningsSource, parse_calendar
@@ -85,3 +91,60 @@ def test_quiet_window_is_complete_with_no_rows() -> None:
         task_ctx(StoreWriter(backend), StoreReader(backend), CLOCK), source, DAY, days=2
     )
     assert (record.status, record.stats["rows"]) == (RunStatus.COMPLETE, 0)
+
+
+def test_each_row_is_known_from_the_earlier_of_the_session_and_its_report_date() -> None:
+    def transport(url: str) -> bytes:
+        return calendar([("AAPL", "time-after-hours")], reported=url.endswith("2026-09-30"))
+
+    backend = MemoryBackend()
+    source = NasdaqEarningsSource(http_for(transport, RetryPolicy(tries=1)))
+    ctx = task_ctx(StoreWriter(backend), StoreReader(backend), CLOCK)
+    ingest_earnings(ctx, source, DAY, date(2026, 9, 30), days=6)
+    events = StoreReader(backend).table("events/earnings", DAY)
+    assert events is not None
+    known = dict(zip(events["earnings_date"], events["known_from"], strict=True))
+    assert known == {
+        date(2026, 9, 30): date(2026, 9, 30),  # last week's result: knowable on its date
+        date(2026, 10, 1): date(2026, 10, 1),
+        date(2026, 10, 2): DAY,
+        date(2026, 10, 5): DAY,  # a forward row: known on the session that stored it
+    }
+
+
+def test_backfill_is_known_from_each_report_date_and_resumes() -> None:
+    asked: list[str] = []
+    broken = {"2026-09-29"}
+
+    def transport(url: str) -> bytes:
+        day = url.rsplit("=", 1)[1]
+        asked.append(day)
+        if day in broken:
+            raise HttpError(500)
+        return calendar([("AAPL", "time-pre-market")], reported=True)
+
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    write_reference(writer, DAY, {"AAPL": "EQ:BBG000B9XRY4"})
+    source = NasdaqEarningsSource(http_for(transport, RetryPolicy(tries=1)))
+    ctx = task_ctx(writer, StoreReader(backend), CLOCK)
+    first = backfill_earnings(ctx, source, DAY, date(2026, 9, 28), date(2026, 10, 1))
+    assert first.status is RunStatus.PARTIAL and first.stats["fetched"] == 4
+    assert first.stats["dates_failed"][0].startswith("2026-09-29")
+    broken.clear()
+    asked.clear()
+    resumed = backfill_earnings(ctx, source, DAY, date(2026, 9, 28), date(2026, 10, 1))
+    assert (resumed.run_id, resumed.status, asked) == (
+        first.run_id,
+        RunStatus.COMPLETE,
+        ["2026-09-29"],
+    )
+    events = StoreReader(backend).table("events/earnings", DAY)  # the run session's partition
+    assert events is not None
+    assert list(events["known_from"]) == list(events["earnings_date"])  # each its report date
+    assert len(events) == 4 and set(events["instrument_id"]) == {"EQ:BBG000B9XRY4"}
+    later = backfill_earnings(ctx, source, date(2026, 10, 5), date(2026, 9, 28), date(2026, 10, 2))
+    assert asked[1:] == ["2026-10-02"]  # a later run skips the days fetched before
+    assert later.stats["already_done"] == 4
+    with pytest.raises(ValueError, match="after"):
+        backfill_earnings(ctx, source, DAY, date(2026, 10, 1), date(2026, 9, 1))

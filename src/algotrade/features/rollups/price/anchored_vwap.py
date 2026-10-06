@@ -1,7 +1,7 @@
 """``anchored_vwap@v1``: the volume-weighted average price since the last earnings report
 (``docs/data/swing.md``).
 
-Inputs: every ``events/earnings`` calendar snapshot stored on or before the session, read as
+Inputs: every ``events/earnings`` row known on or before the session (ADR 0050), read as
 ``earnings@v1`` reads them (``corporate.earnings.valid_events``: the latest snapshot covering a
 date is its authority, moved or cancelled dates are dropped; only report dates from the
 session before the window on, the only ones that can anchor), and ``bars/1d`` split-adjusted AS

@@ -17,7 +17,13 @@ import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 from algotrade.core.model.errors import DataValidationError
-from algotrade.storage.tables.schemas import COMMON, SCHEMA_VERSION, TableSpec, spec_for
+from algotrade.storage.tables.schemas import (
+    COMMON,
+    KNOWN_FROM,
+    SCHEMA_VERSION,
+    TableSpec,
+    spec_for,
+)
 
 ARROW_TYPES: dict[str, pa.DataType] = {
     "string": pa.large_string(),
@@ -98,8 +104,9 @@ def concat(table: str, parts: list[pa.Table]) -> pa.Table:
 
 
 def keep_columns(columns: Iterable[str]) -> set[str]:
-    """A column-pruned read keeps these as well: the row key and the point-in-time columns."""
-    return {*columns, *COMMON, "instrument_id", "ts", "change"}
+    """A column-pruned read keeps these as well: the row key and the point-in-time columns
+    (with an event row's ``known_from``, ADR 0050)."""
+    return {*columns, *COMMON, KNOWN_FROM, "instrument_id", "ts", "change"}
 
 
 def parquet_bytes(data: pa.Table) -> bytes:

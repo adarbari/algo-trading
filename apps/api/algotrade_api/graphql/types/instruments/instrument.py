@@ -67,7 +67,9 @@ class Instrument:
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Stored events (earnings, dividends, splits, reference changes) with "
-        "their event date in `start..end` (null: unbounded), oldest first"
+        "their event date in `start..end` (null: unbounded), oldest first, among the rows "
+        "known on or before the session (`known_from`, else the session that stored the row; "
+        "ADR 0050)"
     )
     async def events(
         self, info: Info, start: dt.date | None = None, end: dt.date | None = None

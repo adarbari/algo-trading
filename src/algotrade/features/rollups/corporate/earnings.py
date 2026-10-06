@@ -1,12 +1,14 @@
 """``earnings@v1``: the next and last earnings dates as known on the session.
 
-Input: every ``events/earnings`` calendar snapshot stored on or before the session (the
-earnings task stores, on each session, the calendar for the days ahead). Knowledge is as
-stored: a snapshot says "on session S we knew these companies would report on these dates",
-and dates move, so for each report date X the authority is the LATEST snapshot on or before
-the session whose date range covers X (from its own session, or its earliest row if
-earlier, to its latest row). A row an earlier snapshot listed for X but that
-snapshot omits was moved or cancelled, and is ignored.
+Input: every ``events/earnings`` row known on or before the session (``data.events``' one
+read rule, ADR 0050: its ``known_from``, else the session that stored it). The earnings task
+stores, on each session, the calendar for the days ahead (known from that session) and the
+past reports (known from their report dates, so a later backfill is seen by the sessions
+after each report). Knowledge is as stored: a snapshot (the rows of one stored session) says
+"by session S we knew these companies would report on these dates", and dates move, so for
+each report date X the authority is the LATEST snapshot among the known rows whose date range
+covers X (from its own session, or its earliest row if earlier, to its latest row). A row an
+earlier snapshot listed for X but that snapshot omits was moved or cancelled, and is ignored.
 
     next_earnings_date  the first valid report date on or after the session
     earnings_time       pre / post (after the close) / unknown, for that date

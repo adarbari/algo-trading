@@ -237,10 +237,10 @@ Rules by **table grain** (the only place grain decides anything):
 |---|---|---|
 | session | `rollups/instrument/*`, `chains/*`, `results/*`, `bars/1d` (the day's bar), `verification/*`, `live/*` | **exactly the date**; absent: `Unknown(NO_PARTITION)` |
 | snapshot | `instruments/reference`, `instruments/company`, `universe`, `instruments/id_map`, `instruments/ibkr_contracts` | `data.reference.snapshot` (ADR 0007's one rule: latest on or before, else earliest with `pre_snapshot`); **disclosed** as `Session.referenceSnapshot` / `preSnapshot` |
-| event | `events/*` | by event date (ADR 0007), never by partition |
+| event | `events/*` | by event date (ADR 0007), among the rows known on or before the date: `known_from` (null: the row's `session_date`; ADR 0050 decision 3), the latest version of each event |
 | issuer-dated | `holdings/etf` | latest `as_of` on or before the date with `filed <= date`; `Holdings.asOf` disclosed |
 | incremental | `instruments/description` | the latest stored row per instrument (text, not a fact) |
-| range | bars, feature series | `[start, end]` given explicitly; never "latest" |
+| range | bars, feature series | `[start, end]` given explicitly, `end` not after the date (`prices` / `series` refuse it); never "latest" |
 
 `session.grain_of(table)` is this table in code (range is a read shape, not a table grain, so
 it has no entry); `partition` refuses a table of another grain or with no declared grain
@@ -590,8 +590,3 @@ after the object graph because they need the columnar type and the factories.
   `EtfHoldings`), PR 7 `Table` (the Explore table's `FeatureTable`, sorted on an expression
   feature), `CompareTable` and `ComparePrices`, PR 8 `ScreenerResults` (a run sorted on an
   expression feature with catalogue columns).
-- **Events are not knowledge-dated** (PR 6): `Instrument.events` reads each event's latest
-  stored version by event date, so a read pinned to a past session can show an event or a
-  revision stored after it. Bounding it by `knowledge_ts` / stored partition is open; until
-  then the web reads events only for the latest session. `prices` / `series` refuse an `end`
-  after the session.

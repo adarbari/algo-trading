@@ -490,6 +490,11 @@ KNOWN: dict[str, TableSpec] = {
 # nightly -7..+30-day windows into the same session), so they merge; rollups, catalogues and
 # results are full snapshots per run. Bars and chains (fixed, above) are snapshots too: a
 # re-fetched session replaces the earlier fetch.
+# Event rows may say when the fact became knowable (ADR 0050 decision 3): ``known_from``, the
+# session it was knowable on (a backfilled report: its report date). Null: the session that
+# stored it (``session_date``). Declared (typed) on every ``events/*`` table; ``data.events``
+# applies it.
+KNOWN_FROM = "known_from"
 OPEN_PREFIXES = {
     "rollups/daily/": "rollup",
     "rollups/instrument/": "rollup",
@@ -517,9 +522,11 @@ def spec_for(table: str) -> TableSpec:
         if table.startswith(prefix) and len(table) > len(prefix):
             required = ("instrument_id", "ts") if grain == "event" else ("instrument_id",)
             keys = ("instrument_id string!", "ts timestamp_utc!")[: len(required)]
-            runs = "merge" if grain == "event" else "snapshot"
+            event = grain == "event"
+            typed = (*keys, f"{KNOWN_FROM} date") if event else keys
+            runs = "merge" if event else "snapshot"
             return TableSpec(
-                table, grain, required, open_ended=True, columns=_columns(*keys), runs=runs
+                table, grain, required, open_ended=True, columns=_columns(*typed), runs=runs
             )
     raise DataValidationError(
         table, ["unknown table; add a TableSpec to storage/tables/schemas.py"]

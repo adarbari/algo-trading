@@ -5,7 +5,7 @@
     algotrade-ingest universe-build [--date YYYY-MM-DD] [--review-out leveraged_candidates.csv]
                                     [--figi-review-out var/figi_review.csv] [--accept-sp500]
     algotrade-ingest company-details [--date D] [--force] [--limit N]   (SEC EDGAR)
-    algotrade-ingest earnings [--date D] [--start D] [--days 60]
+    algotrade-ingest earnings [--date D] [--start D] [--days 60] | [--from D --to D] (backfill)
     algotrade-ingest bars [--date D | --from D --to D] [--force]   (needs a Massive API key)
     algotrade-ingest corporate-actions [--date D] [--from D --to D]
     algotrade-ingest chains   [--date YYYY-MM-DD] [--workers N] [--symbols SPY,AAPL]

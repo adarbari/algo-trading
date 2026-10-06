@@ -62,3 +62,17 @@ def test_tables_declare_how_their_runs_combine() -> None:
     assert table_key(spec_for("events/x"), ["instrument_id", "ts"]) == ["instrument_id", "ts"]
     with pytest.raises(ValueError, match="run mode"):
         TableSpec("t", "event", ("instrument_id",), runs="append")
+
+
+def test_known_from_is_declared_on_every_event_table_only() -> None:
+    from algotrade.storage.tables.schemas import KNOWN_FROM  # noqa: PLC0415
+
+    for table in ("events/earnings", "events/split", "events/macro_release"):
+        column = spec_for(table).column(KNOWN_FROM)
+        assert column is not None and column.type == "date" and column.nullable, table
+    for table in ("bars/1d", "rollups/instrument/x@v1", "instruments/reference"):
+        assert spec_for(table).column(KNOWN_FROM) is None, table
+    row = {"instrument_id": "EQ:A", "ts": datetime(2019, 5, 1, tzinfo=UTC)}
+    validate_frame(
+        "events/earnings", stamped([{**row, KNOWN_FROM: date(2019, 5, 1)}], date(2026, 10, 2), "r")
+    )

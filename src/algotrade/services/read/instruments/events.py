@@ -2,12 +2,13 @@
 dividends, splits, reference changes) with their event date in an explicit window.
 
 Event grain (ADR 0007, docs/api/read-model.md "Session resolution"): an event is read by its
-event date (``data.events.read_events``: the UTC date of ``ts``, the latest stored version of
-each event), never by the partition it was stored in, so the session does not pick them; the
-caller names the window (``start`` / ``end``, None: all time). Known gap (docs/api/read-
-model.md "Risks"): the rows are the latest stored version of each event, so a read pinned to a
-past session can show an event or revision stored after it. The rows are what the events list
-shows; the earnings dates a page reads as facts are catalogue features
+event date (``data.events.read_events``: the UTC date of ``ts``), never by the partition it
+was stored in; the caller names the window (``start`` / ``end``, None: all time). The session
+bounds what was known (ADR 0050 decision 3, ADR 0036 point 4): only rows known on or before
+it are read (``known_from``, else the session that stored the row), and each event shows its
+latest version among them, so a past session never shows an event or revision learned after
+it, and a report backfilled later shows from its report date on. The rows are what the
+events list shows; the earnings dates a page reads as facts are catalogue features
 (``rollup.earnings@v1.*``), never derived from these rows."""
 
 from collections.abc import Sequence
@@ -49,13 +50,16 @@ def event_tables(ctx: ReadContext) -> tuple[str, ...]:
 def load_events(
     ctx: ReadContext, instrument_ids: Sequence[str], start: date | None, end: date | None
 ) -> dict[str, tuple[Event, ...]]:
-    """Every stored event of each of ``instrument_ids`` with its event date in
-    ``start..end`` (None: unbounded), from every ``events/*`` table, sorted by date and table:
-    one read per table for them all. An instrument with none has an empty tuple."""
+    """Every event of each of ``instrument_ids`` with its event date in ``start..end``
+    (None: unbounded) known on or before the session, from every ``events/*`` table, sorted
+    by date and table: one read per table for them all. An instrument with none has an empty
+    tuple."""
     first, last = start or ALL_TIME[0], end or ALL_TIME[1]
     found: dict[str, list[Event]] = {iid: [] for iid in instrument_ids}
     for table in event_tables(ctx):
-        frame = read_events(ctx.reader, table, first, last, list(instrument_ids)).frame
+        frame = read_events(
+            ctx.reader, table, first, last, list(instrument_ids), through=ctx.session.date
+        ).frame
         for row in frame.to_dict("records"):
             ts = pd.Timestamp(row["ts"])
             ts = ts.tz_localize("UTC") if ts.tzinfo is None else ts.tz_convert("UTC")
