@@ -459,3 +459,26 @@ value = 0.03
 mode = "soft"
 tolerance = 0.01
 note = "with feature.trend_state eq UPTREND; support in a downtrend breaks"
+
+[[field]]
+name = "feature.dist_52w"
+theme = "momentum and trend"
+reads = "The distance to the nearer 52-week extreme as a fraction of it: 0 at the high or the low, 0.10 when the close is 10% from whichever is closer. It is the one-number form of 'near a 52-week extreme' (the VRP scanner's gate); feature.near_52w says which side (HIGH, LOW, BOTH)."
+caveats = [
+  "It does not say which extreme: a name 5% under its high and one 5% above its low both read 0.05, and they are opposite setups. Read feature.near_52w, or feature.pct_from_high_52w and feature.pct_from_low_52w, before acting on it.",
+  "A pinned takeover target sits at its high with a distance near 0 for months (the 'pending takeover' situation).",
+  "Null under 240 bars in the last 252 sessions (recent listings).",
+]
+sources = ["George and Hwang (2004) for the high; the VRP scanner's spec (docs/screeners/vrp-scanner.md) for the 10% gate"]
+[[field.use]]
+for = "within 10% of a 52-week extreme (the VRP gate)"
+op = "lte"
+value = 0.10
+mode = "hard"
+note = "read feature.near_52w for the side"
+[[field.use]]
+for = "near an extreme, listing near misses"
+op = "lte"
+value = 0.10
+mode = "soft"
+tolerance = 0.05

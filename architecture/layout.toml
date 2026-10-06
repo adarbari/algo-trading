@@ -744,6 +744,10 @@ path = "docs/data"
 purpose = "data specs: layers, storage, instruments, vendors, nightly footprint, feature catalogue and field guide (both generated), options positioning, swing levels"
 
 [[docs_dir]]
+path = "docs/data/field-guide"
+purpose = "the field guide, one generated page per theme (make features-doc from config/site/field_guide/; the index is docs/data/field-guide.md)"
+
+[[docs_dir]]
 path = "docs/screeners"
 purpose = "one page per screener, and the screener index"
 

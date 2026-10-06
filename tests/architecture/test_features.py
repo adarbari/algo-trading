@@ -14,20 +14,27 @@
 - the generated catalogue (``docs/data/features.md``) is up to date;
 - the site field guide (``config/site/field_guide/*.toml``, ADR 0041) names only catalogue fields,
   in its entries, its situations and its prose, with values that fit each field's type,
-  categories and range, and its generated page (``docs/data/field-guide.md``) is up to date;
+  categories and range, and its generated pages (``docs/data/field-guide.md`` and one per theme
+  under ``docs/data/field-guide/``) are up to date;
 - inputs come only through ``algotrade.data.feature_inputs``: no module under ``features/``
   imports storage or a domain reader, and the framework has no loaders of its own.
 """
 
 import ast
 import re
+import tomllib
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
 from algotrade.config.site.field_guide import GuideUse
-from algotrade.config.site.settings import MacroSettings, load_field_guide, load_macro
+from algotrade.config.site.settings import (
+    MacroSettings,
+    load_field_guide,
+    load_macro,
+    load_phrasebook,
+)
 from algotrade.data import StoreReader
 from algotrade.data.macro.series import TABLE as MACRO_SERIES
 from algotrade.features.catalogue import PATH, render
@@ -42,8 +49,8 @@ from algotrade.features.framework.feature import (
 )
 from algotrade.features.framework.graph import dependencies
 from algotrade.features.framework.runner import compute_in_memory
-from algotrade.features.guide import PATH as GUIDE_PATH
-from algotrade.features.guide import render as render_guide
+from algotrade.features.guide import DIR as GUIDE_DIR
+from algotrade.features.guide import pages as guide_pages
 from algotrade.features.registry import GROUPS, feature
 from algotrade.features.site import site_features
 from algotrade.services.read.instruments.catalogue import feature_infos
@@ -292,6 +299,10 @@ def test_field_guide_values_fit_their_fields() -> None:
                 assert use.op == "eq" and isinstance(use.value, bool), (
                     f"{where}: a flag takes eq true/false"
                 )
+            elif info.dtype == "str":
+                assert use.op in CATEGORY_OPS, f"{where}: {use.op} on a string"
+                chosen = use.value if isinstance(use.value, list) else [use.value]
+                assert all(isinstance(v, str) for v in chosen), f"{where}: strings only"
             else:
                 assert use.op in NUMERIC_OPS, f"{where}: {use.op} on a number"
                 _check_numeric(e.name, use, lo, hi)
@@ -300,8 +311,16 @@ def test_field_guide_values_fit_their_fields() -> None:
 
 
 def test_field_guide_page_is_up_to_date() -> None:
-    committed = (REPO_ROOT / GUIDE_PATH).read_text()
-    assert committed == render_guide(GUIDE), f"{GUIDE_PATH} is out of date: run `make features-doc`"
+    pages = guide_pages(GUIDE)
+    for rel, text in pages.items():
+        path = REPO_ROOT / rel
+        assert path.exists() and path.read_text() == text, (
+            f"{rel} is out of date: run `make features-doc`"
+        )
+    extra = {str(p.relative_to(REPO_ROOT)) for p in (REPO_ROOT / GUIDE_DIR).glob("*.md")} - set(
+        pages
+    )
+    assert not extra, f"theme pages no longer rendered: {sorted(extra)} (run `make features-doc`)"
 
 
 def test_series_inputs_are_checked_against_the_macro_registry() -> None:
@@ -337,4 +356,37 @@ def test_series_inputs_are_checked_against_the_macro_registry() -> None:
     typo = group(("MACRO:T10Y3N",), feature("slope", "series:T10Y3M"))
     assert series_input_problems(typo, MACRO)[0] == (
         "toy@v1: macro/series ids ['MACRO:T10Y3N'] are not in macro.toml"
+    )
+
+
+def _screened_fields() -> dict[str, str]:
+    """Every field a site preset screener's criteria, tie-break or flags name -> where."""
+    found: dict[str, str] = {}
+    presets = REPO_ROOT / "config" / "site" / "presets" / "screeners"
+    for path in sorted(presets.glob("*/v*.toml")):
+        doc = tomllib.loads(path.read_text())
+        where = f"{path.parent.name}/{path.name}"
+        for c in (doc.get("criteria") or {}).values():
+            if isinstance(c, dict) and "field" in c:
+                found.setdefault(c["field"], where)
+        rank = doc.get("rank") or {}
+        if isinstance(rank, dict) and rank.get("tie_break"):
+            found.setdefault(rank["tie_break"], f"{where} rank.tie_break")
+        for flag in (doc.get("flags") or {}).values():
+            for c in (flag.get("any") or []) if isinstance(flag, dict) else []:
+                if isinstance(c, dict) and "field" in c:
+                    found.setdefault(c["field"], f"{where} flags")
+    return found
+
+
+def test_screened_and_phrased_fields_have_a_guide_entry() -> None:
+    """A field a trader's words map to, or a site preset screens on, is one a person sets a
+    threshold for: it has a guide entry (how to read it, the criterion per intent, caveats)."""
+    guided = {e.name for e in GUIDE.fields}
+    store = FileConfigStore(REPO_ROOT / "config")
+    phrased = {f: "phrasebook" for p in load_phrasebook(store).phrases for f in p.fields}
+    missing = {f: w for f, w in {**_screened_fields(), **phrased}.items() if f not in guided}
+    assert not missing, (
+        "fields screened or phrased without a field guide entry (add a [[field]] to "
+        f"config/site/field_guide/<theme>.toml, then `make features-doc`): {missing}"
     )

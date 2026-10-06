@@ -117,3 +117,114 @@ value = 1000
 mode = "soft"
 tolerance = { relative = 0.3 }
 on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.option_liquidity@v1.put_spread_pct"
+theme = "liquidity"
+reads = "The bid-ask spread of the short put at the target expiry as a share of its mid, on the stored after-close quote: 0.10 means a $0.20 spread on a $2.00 option, the round-trip cost of being wrong by nothing. Under 0.10 is tight, 0.10 to 0.20 is tradable with limit orders, above 0.30 the spread eats the premium."
+caveats = [
+  "Stored after the close, when market makers widen quotes: a wide reading can be a quiet print, a tight one can be stale. Judge a trade on a live quote (the chain's live read) and keep this one as a score, as the VRP scanner does.",
+  "The strike is the group's own short strike, not necessarily the one you would trade; rollup.put_wing@v1.best_put_spread_pct is the spread at the best put.",
+  "Null without a two-sided quote at the target expiry (rollup.option_liquidity@v1.liq_status says why).",
+]
+sources = ["Spread as a share of the premium: https://www.thetaedge.ai/blog/assess-liquidity-trading-options"]
+[[field.use]]
+for = "a tradable spread (scored)"
+op = "lt"
+value = 0.15
+mode = "score"
+tolerance = 0.15
+note = "full points under 15% of mid, none at 30%"
+[[field.use]]
+for = "tight spreads"
+op = "lte"
+value = 0.10
+mode = "soft"
+tolerance = 0.05
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.option_liquidity@v1.put_zone_oi"
+theme = "liquidity"
+reads = "Open interest of the target expiry's puts with a delta between 0.15 and 0.40: the standing depth where a short put would be sold. Hundreds is thin, a few thousand is tradable, tens of thousands is deep. A chain can carry a large total (feature.option_chain_oi) with nothing in this zone."
+caveats = [
+  "Open interest is yesterday's standing book, not today's activity; pair with rollup.put_wing@v1.best_put_volume for whether anyone trades it.",
+  "Null without a target expiry or a standard series (rollup.option_liquidity@v1.liq_status).",
+]
+sources = ["https://www.tastylive.com/concepts-strategies/options-liquidity"]
+[[field.use]]
+for = "depth where a put would be sold"
+op = "gte"
+value = 2000
+mode = "soft"
+tolerance = { relative = 0.5 }
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.put_wing@v1.best_put_oi"
+theme = "liquidity"
+reads = "Open interest of the best put: the put at the target expiry nearest the 8 to 15 delta band (rollup.put_wing@v1.best_put_strike and best_put_delta name it). Above 1,000 contracts is the VRP scanner's full-score level; under 100 the exit depends on one market maker."
+caveats = [
+  "A single strike's open interest moves with one institutional position; a round 5,000 at one strike with 50 at its neighbours is one trade, not a liquid wing. Check rollup.put_wing@v1.wing_oi for the band's total.",
+  "Null when no put at the target expiry has our delta in 0.05 to 0.35 (rollup.put_wing@v1.wing_status NO_STRIKE).",
+]
+sources = ["docs/screeners/vrp-scanner.md (owner decision 2026-10-04: liquidity scored, not gated)"]
+[[field.use]]
+for = "a put with standing depth (scored)"
+op = "gt"
+value = 1000
+mode = "score"
+tolerance = { relative = 1.0 }
+note = "full points above 1,000 contracts, none at 0"
+
+[[field]]
+name = "rollup.put_wing@v1.best_put_volume"
+theme = "liquidity"
+reads = "Contracts of the best put traded on the session. Volume is today's activity where open interest is the standing book; a few hundred is active for a single strike, above 1,000 is the VRP scanner's full-score level, 0 on a quiet day is common even on liquid names."
+caveats = [
+  "One day's volume is noisy: an expiry Friday or an earnings week multiplies it, a holiday week halves it. Read it with rollup.put_wing@v1.best_put_oi, which does not reset each day.",
+  "Null without a best put (rollup.put_wing@v1.wing_status).",
+]
+sources = ["https://www.tastylive.com/concepts-strategies/options-liquidity"]
+[[field.use]]
+for = "a put that trades (scored)"
+op = "gt"
+value = 1000
+mode = "score"
+tolerance = { relative = 1.0 }
+note = "full points above 1,000 contracts, none at 0"
+
+[[field]]
+name = "rollup.put_wing@v1.best_put_spread_pct"
+theme = "liquidity"
+reads = "The best put's bid-ask spread as a share of its mid on the stored after-close quote: 0.15 means the spread is 15% of the premium. Under 0.15 is the VRP scanner's full-score level, 0.30 and above scores nothing; the trade itself is judged on a live quote."
+caveats = [
+  "After-close quotes are wide by nature; the live spread during the session is what a fill costs. Score it, never gate on it (owner decision 2026-10-04).",
+  "A cheap far-out-of-the-money put has a wide spread in percent of a tiny mid even when the dollar spread is a nickel; read rollup.put_wing@v1.best_put_mid with it.",
+  "Null without a best put (rollup.put_wing@v1.wing_status).",
+]
+sources = ["docs/screeners/vrp-scanner.md; https://www.thetaedge.ai/blog/assess-liquidity-trading-options"]
+[[field.use]]
+for = "a fillable spread (scored)"
+op = "lt"
+value = 0.15
+mode = "score"
+tolerance = 0.15
+note = "full points under 15% of mid, none at 30%"
+
+[[field]]
+name = "rollup.put_wing@v1.delta_band_distance"
+theme = "liquidity"
+reads = "How far the best put's delta is from the 8 to 15 delta band: 0 inside it, else the distance to the nearer edge (a 20 delta put reads 0.05, a 5 delta put 0.03). The VRP scanner scores it rather than gating: a 20 delta put still scores, a 25 delta one less, and nothing is filtered on delta."
+caveats = [
+  "The best put is chosen among our 0.05 to 0.35 delta puts, so the field never exceeds 0.20; a name whose only puts are nearer the money has no best put at all (null, rollup.put_wing@v1.wing_status NO_STRIKE).",
+  "Delta is ours (ADR 0021), from the stored chain: on a name whose price moved after the close the band has moved too; confirm on a live quote.",
+]
+sources = ["docs/screeners/vrp-scanner.md (owner decision 2026-10-04: strike choice scored)"]
+[[field.use]]
+for = "a put in the 8 to 15 delta band (scored)"
+op = "lte"
+value = 0
+mode = "score"
+tolerance = 0.20
+note = "full points inside the band, none at 0.20 away"

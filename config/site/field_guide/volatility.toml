@@ -215,3 +215,88 @@ op = "lte"
 value = 0.9
 mode = "soft"
 tolerance = 0.1
+
+[[field]]
+name = "feature.vrp_iv30"
+theme = "volatility"
+reads = "The VRP scanner's IV30: the lower of IBKR's and Cboe's 30-day implied volatility when both exist (feature.vrp_iv30_source says which), as a fraction. Taking the lower one makes the premium conservative: a name passes only when both feeds agree it is high. 0.50 is the scanner's gate (the owner may lower it to 0.40); 0.30 is an ordinary large cap, 0.80 and above is a biotech or a meme name."
+caveats = [
+  "A report inside 30 days inflates it; the earnings move is the premium. Check rollup.earnings@v1.days_to_earnings.",
+  "High IV with no report ahead is usually a known binary event the catalogue does not store (an FDA date, a court ruling): EVENT_RISK, not free premium.",
+  "Null when neither feed has an IV30 for the session (no chain, a failed fetch): a hard gate rejects the name that day.",
+]
+sources = ["docs/screeners/vrp-scanner.md (the owner's 50% gate); the IV behaviour around earnings: https://optionalpha.com/learn/iv-crush"]
+[[field.use]]
+for = "high implied volatility (the VRP gate)"
+op = "gte"
+value = 0.50
+mode = "hard"
+note = "0.40 for a looser screen"
+[[field.use]]
+for = "elevated, listing near misses"
+op = "gte"
+value = 0.40
+mode = "soft"
+tolerance = 0.05
+
+[[field]]
+name = "feature.vrp_iv_hv_spread"
+theme = "volatility"
+reads = "The VRP scanner's volatility premium: vrp_iv30 minus HV30, in volatility points as a fraction. 0.10 means options price ten points more movement than the stock delivered over the last 30 sessions. The average premium across markets is 3 to 4 points (Carr and Wu), so 0.10 is a rich one; the scanner gates on it and ranks by it."
+caveats = [
+  "The caveats of feature.iv_hv_spread apply: a report ahead inflates it, a report inside the HV window hides it, a quiet month widens it. Check rollup.earnings@v1.days_to_earnings and rollup.price_moves@v1.one_day_move.",
+  "A spread of 0.10 on a 0.08 HV is a pinned or halted name, not a premium; require feature.vrp_iv_hv_ratio and rollup.price_stats@v2.hv30 gte 0.10 with it.",
+]
+sources = ["Carr and Wu (2009), Variance risk premiums; docs/screeners/vrp-scanner.md"]
+[[field.use]]
+for = "a rich premium (the VRP gate)"
+op = "gte"
+value = 0.10
+mode = "hard"
+note = "with feature.vrp_iv_hv_ratio gte 1.25; rank by the spread descending"
+[[field.use]]
+for = "a premium worth a look"
+op = "gte"
+value = 0.05
+mode = "soft"
+tolerance = 0.02
+
+[[field]]
+name = "feature.vrp_iv_hv_ratio"
+theme = "volatility"
+reads = "vrp_iv30 over HV30 with no floor on HV30: 1.25 means options price 25% more movement than the last 30 sessions delivered. The scanner requires both the spread and the ratio, because each alone is fooled: a spread is small on a low-volatility name even when the ratio is large, and a ratio explodes when HV30 is tiny."
+caveats = [
+  "No HV30 floor by design (owner, 2026-10-03): a pinned takeover target with HV 0.03 shows a ratio of 3 or more and tops the list. Pair with rollup.price_stats@v2.hv30 gte 0.10 or feature.atr_pct gte 0.01.",
+  "A report inside the HV window compresses it; a report ahead inflates it. Check rollup.earnings@v1.days_to_earnings and last_earnings_date.",
+  "Null when HV30 is 0 or either input is missing.",
+]
+sources = ["Carr and Wu (2009); docs/screeners/vrp-scanner.md"]
+[[field.use]]
+for = "a rich premium (the VRP gate)"
+op = "gte"
+value = 1.25
+mode = "hard"
+note = "with feature.vrp_iv_hv_spread gte 0.10"
+[[field.use]]
+for = "a premium worth a look"
+op = "gte"
+value = 1.1
+mode = "soft"
+tolerance = 0.1
+
+[[field]]
+name = "rollup.ibkr_iv@v1.iv_rank_252d_ibkr"
+theme = "volatility"
+reads = "IV rank on IBKR's own implied-volatility history, 0 to 1: where today's IV sits between the year's low and high. The same reading as feature.iv_rank, which prefers this one where IBKR has it; use this field only when the screen must say 'IBKR's rank', as the VRP scanner does (it scores it, so a name IBKR has no history for loses points rather than the screen)."
+caveats = [
+  "Null for the names IBKR has no history for (under 60 sessions of its IV, rollup.ibkr_iv@v1.rank_status_ibkr says): a hard criterion silently excludes them. Prefer feature.iv_rank for a gate; score this one.",
+  "Every caveat of feature.iv_rank applies: one spike squashes the year, a report ahead lifts it, a takeover collapses it. feature.iv_percentile is the robust cross-check.",
+]
+sources = ["https://flashalpha.com/articles/iv-rank-vs-iv-percentile-difference-which-matters; ADR 0028 (IBKR-derived, personal licence)"]
+[[field.use]]
+for = "IV high for the name (scored, IBKR's history)"
+op = "gte"
+value = 0.5
+mode = "score"
+tolerance = 0.5
+note = "full points at 0.5 and above, none at 0; a missing rank scores nothing"
