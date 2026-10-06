@@ -1,0 +1,532 @@
+# L3 site setting: the field guide (ADR 0041, amended 2026-10-06), one <theme>.toml per theme
+# plus situations.toml; loaded together by config/site/settings.py load_field_guide. Every
+# [[field]] says how to read one catalogue field, which criterion means what, and when the
+# reading lies; a [[situation]] is one state of the world that fools several thresholds at once.
+# The keys are documented in momentum.toml. Edit by PR; `make features-doc` renders the page.
+
+# The option chain at the target expiry (option_liquidity@v1): the standard monthly nearest 35
+# days within 21..60, the short strike each side (tightest relative spread with 0.20..0.40
+# delta), its quote, open interest and the tier it earns. Tiers (TierRule): A: spread <= 5% of
+# mid and <= $0.03, zone OI >= 2,000, chain OI >= 20,000, bid >= $0.25; B: 10% / $0.05 / 500 /
+# 5,000 / $0.15; C: 20% / $0.10 / 100 / 1,000 / $0.05; else D. The stored quote is after the
+# close: judge a trade on a live one.
+
+[[field]]
+name = "rollup.option_liquidity@v1.liq_status"
+theme = "option chain and short strikes"
+reads = "Why the chain columns have values or not: OK (a target expiry and a standard series), NO_STANDARD_SERIES (only non-standard contracts, e.g. after a split), NO_TARGET_EXPIRY (no expiry 14 days out or more), or the fetch's own failure (NO_CHAIN: no options listed; STALE_DATA: the feed's snapshot was old; FETCH_ERROR; NOT_ATTEMPTED). Only OK rows carry strikes, quotes and tiers."
+caveats = [
+  "STALE_DATA and FETCH_ERROR are about the session's pull, not the name: the same name is usually OK the next session. A hard gate on OK drops it for a day; feature.option_chain_known separates 'no options' from 'the run failed'.",
+  "NO_CHAIN is the durable 'no options' answer; instrument.optionable says whether options are listed at all.",
+]
+sources = ["Site convention (features/rollups/options/option_liquidity.py)"]
+[[field.use]]
+for = "a usable chain this session"
+op = "eq"
+value = "OK"
+mode = "hard"
+note = "soft when a day's failed fetch should list the name rather than drop it"
+
+[[field]]
+name = "rollup.option_liquidity@v1.chain_oi"
+theme = "option chain and short strikes"
+reads = "Open interest summed over every standard-series contract of the name: the standing depth of the whole chain. Under 5,000 is a thin chain, 20,000 is the tier A floor, hundreds of thousands is an index-like name. feature.option_chain_oi is the same number with 0 for a name the run did not list."
+caveats = [
+  "A chain total says nothing about the strike and expiry you want: open interest piles up in a few monthlies and round strikes. Read rollup.option_liquidity@v1.put_zone_oi or rollup.put_wing@v1.wing_oi for the band you trade.",
+  "LEAPS inflate the total for large caps; a name can carry 100,000 contracts a year out and 500 in the front month.",
+  "Null when the fetch failed or there is no standard series.",
+]
+sources = ["https://www.tastylive.com/concepts-strategies/options-liquidity"]
+[[field.use]]
+for = "a chain with depth"
+op = "gte"
+value = 20000
+mode = "soft"
+tolerance = { relative = 0.5 }
+on_miss = "LIQUIDITY_RISK"
+note = "5000 for 'some options' (the MEDIUM class), 50000 for the HIGH class"
+
+[[field]]
+name = "rollup.option_liquidity@v1.chain_volume"
+theme = "option chain and short strikes"
+reads = "Contracts traded on the session over every standard-series contract: the day's activity, where open interest is the standing book. Hundreds is quiet, a few thousand is active, tens of thousands is heavy; 5,000 is the HIGH liquidity class's floor."
+caveats = [
+  "One day's volume: an expiry Friday, an earnings week or one block trade multiplies it. Read it with rollup.option_liquidity@v1.chain_oi, which does not reset each day.",
+  "Volume much larger than open interest (several times) on a quiet name is one trade opening and closing, or an index event, not a liquid chain.",
+]
+sources = ["https://www.tastylive.com/concepts-strategies/options-liquidity"]
+[[field.use]]
+for = "options that trade every day"
+op = "gte"
+value = 1000
+mode = "soft"
+tolerance = { relative = 0.5 }
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.option_liquidity@v1.expiries_within_60d"
+theme = "option chain and short strikes"
+reads = "How many expiries are listed in the next 60 calendar days: 2 means monthlies only, 8 to 10 means weeklies, more means a name with daily or several weekly series. More expiries means finer control of days to expiry and usually a more active chain; fewer means the target expiry can be a long way from 35 days."
+caveats = [
+  "Weeklies exist on liquid names, but the count alone is not liquidity: a thin name can list weeklies nobody trades. Pair with rollup.option_liquidity@v1.chain_oi.",
+  "Right after a monthly expiry the count drops by one until the next series lists; a threshold on it wobbles month to month.",
+]
+sources = ["Site convention"]
+[[field.use]]
+for = "weeklies listed"
+op = "gte"
+value = 6
+mode = "soft"
+tolerance = 2
+
+[[field]]
+name = "rollup.option_liquidity@v1.target_expiry"
+theme = "option chain and short strikes"
+reads = "The expiry the short-strike columns describe: the standard monthly nearest 35 days within 21 to 60 days out, else any expiry in that window, else any at least 14 days out. It is a date to show, not a threshold; rollup.option_liquidity@v1.target_dte is the number of days."
+caveats = [
+  "Null when no expiry is 14 days out or more (liq_status NO_TARGET_EXPIRY): a name whose options stop listing, or a chain fetched without far expiries.",
+  "It is not the nearest expiry (rollup.nearest_expiry@v1.expiry_date) nor the put wing's 45-day target (rollup.put_wing@v1.target_expiry); three groups, three expiries.",
+]
+sources = ["Site convention (features/rollups/options/option_liquidity.py)"]
+[[field.use]]
+for = "has a target expiry"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.option_liquidity@v1.target_dte"
+theme = "option chain and short strikes"
+reads = "Calendar days from the session to the target expiry, usually 21 to 60 and near 35 (the standard monthly). Days to expiry set how fast premium decays and how much a move hurts: 30 to 45 days is the premium-selling convention (theta is fast, gamma still moderate); under 14 days the position is mostly gamma."
+caveats = [
+  "A reading outside 21 to 60 means the fallback picked a far or near expiry because the window had none; the tier columns then describe an expiry you may not want.",
+  "Earnings before the target expiry is EVENT_RISK: compare with rollup.earnings@v1.days_to_earnings (sessions, not calendar days).",
+]
+sources = ["tastylive on 45 days to expiry for premium selling; site convention"]
+[[field.use]]
+for = "a 30 to 45 day short option"
+op = "between"
+value = [28, 50]
+mode = "soft"
+tolerance = 7
+
+[[field]]
+name = "rollup.option_liquidity@v1.short_put_ok"
+theme = "option chain and short strikes"
+reads = "True when the short put's tier is A or B: a put that can be sold at the target expiry with a tight enough spread, enough open interest around it and a bid worth collecting. The one-flag form of rollup.option_liquidity@v1.put_tier for a short-put or cash-secured-put screen."
+caveats = [
+  "Judged on the stored after-close quote; a B at the close can be an A or a C live. Confirm on the live chain before trading.",
+  "Null when there is no target expiry or the fetch failed, which a hard criterion rejects; feature.option_tier eq D is the durable 'no usable options'.",
+]
+sources = ["Site convention (TierRule thresholds)"]
+[[field.use]]
+for = "a sellable put"
+op = "eq"
+value = true
+mode = "hard"
+note = "or feature.option_tier in [A, B] for both sides at once"
+
+[[field]]
+name = "rollup.option_liquidity@v1.short_call_ok"
+theme = "option chain and short strikes"
+reads = "True when the short call's tier is A or B: a call that can be sold at the target expiry (a covered call, the short leg of a spread). The one-flag form of rollup.option_liquidity@v1.call_tier."
+caveats = [
+  "A name can be OK on the call side and D on the put side (a chain where only calls trade: a meme name after a run); feature.option_tier takes the worse side.",
+  "Null without a target expiry or after a failed fetch.",
+]
+sources = ["Site convention (TierRule thresholds)"]
+[[field.use]]
+for = "a sellable call (covered calls)"
+op = "eq"
+value = true
+mode = "hard"
+
+[[field]]
+name = "rollup.option_liquidity@v1.underlying_price"
+theme = "option chain and short strikes"
+reads = "The underlying's price captured with the chain snapshot: the price the strikes, deltas and spreads were quoted against. Usually within a few cents of rollup.price_stats@v2.close; a gap between the two means the snapshot was taken at another time than the close."
+caveats = [
+  "When it differs from the close by more than the day's range, the chain is from another time (rollup.option_liquidity@v1.chain_asof): deltas and 'at the money' are off by that move.",
+  "Null when no underlying quote came with the chain.",
+]
+sources = ["Site convention"]
+[[field.use]]
+for = "a chain quoted against a price"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.option_liquidity@v1.iv30"
+theme = "option chain and short strikes"
+reads = "The feed's own 30-day implied volatility, in percentage points: 25.3 is 25.3% a year. The same quantity as rollup.iv30@v1.iv30_cboe (which is a fraction, 0.253); it is kept here as the chain snapshot's number. Compare with the name's history (feature.iv_rank) and realised movement (feature.iv_hv_spread) rather than against one level."
+caveats = [
+  "Percentage points, not a fraction: 'IV over 40%' is gte 40 here and gte 0.40 on rollup.iv_history@v2.iv30. Mixing the two is the commonest threshold error on this field.",
+  "The feed's method is not ours (ADR 0021): on thin chains the two disagree by several points; feature.vrp_iv30 takes the lower of IBKR's and Cboe's for that reason.",
+  "Every earnings and event caveat of rollup.iv_history@v2.iv30 applies.",
+]
+sources = ["Cboe's IV30 definition; ADR 0021 for ours"]
+[[field.use]]
+for = "high implied volatility (the feed's)"
+op = "gte"
+value = 40
+mode = "soft"
+tolerance = 5
+note = "prefer feature.iv_rank gte 0.5, relative to the name's own year"
+
+[[field]]
+name = "rollup.option_liquidity@v1.stock_volume"
+theme = "option chain and short strikes"
+reads = "The underlying's share volume as the chain feed reported it on the session. Shares, not dollars: a $2 stock trading 10M shares is $20M a day. The screening measure of liquidity is rollup.price_stats@v2.adv_usd_20d (dollars, averaged); this one is a single day's count from the chain feed."
+caveats = [
+  "One day's volume, and from the options feed's quote rather than the bars: it can lag or lead the bar's volume by a session. Use adv_usd_20d for a gate.",
+  "Null when no underlying quote came with the chain.",
+]
+sources = ["Site convention"]
+[[field.use]]
+for = "traded today"
+op = "gte"
+value = 500000
+mode = "soft"
+tolerance = { relative = 0.5 }
+on_miss = "LIQUIDITY_RISK"
+note = "shares; prefer rollup.price_stats@v2.adv_usd_20d in dollars"
+
+[[field]]
+name = "rollup.option_liquidity@v1.chain_asof"
+theme = "option chain and short strikes"
+reads = "The date the feed's chain snapshot was taken. It should be the session itself; an earlier date means the feed served a stale chain (liq_status STALE_DATA), and every quote, delta and open-interest column describes that earlier day."
+caveats = [
+  "A stale chain after a big move puts every strike in the wrong place relative to spot; the chains step retries STALE_DATA names, so the next session is usually current.",
+  "Null when no underlying quote came with the chain.",
+]
+sources = ["Site convention (ADR 0043: the chains step's acceptance checks)"]
+[[field.use]]
+for = "a chain snapshot exists"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.option_liquidity@v1.put_tier"
+theme = "option chain and short strikes"
+reads = "The short put's liquidity tier at the target expiry: A (spread at most 5% of mid and $0.03, 2,000 open interest in the 0.15 to 0.40 delta zone, 20,000 in the chain, a bid of at least $0.25), B (10% / $0.05 / 500 / 5,000 / $0.15), C (20% / $0.10 / 100 / 1,000 / $0.05), else D: not tradable. A and B fill at a fair price with a limit order; C costs real slippage; D has no market."
+caveats = [
+  "Graded on the stored after-close quote, when spreads are widest; a B at the close is often an A live, and a C is sometimes a B. Score it or confirm live rather than rejecting on C.",
+  "The short strike is the group's pick (the tightest spread between 0.20 and 0.40 delta), not the 8 to 15 delta put the VRP scanner sells; that one's spread is rollup.put_wing@v1.best_put_spread_pct.",
+  "D also when there is no two-sided put at all; feature.option_tier takes the worse of put and call.",
+]
+sources = ["Site TierRule thresholds (features/rollups/options/option_liquidity.py); spread as a share of mid: https://www.thetaedge.ai/blog/assess-liquidity-trading-options"]
+[[field.use]]
+for = "a sellable put"
+op = "in"
+value = ["A", "B"]
+mode = "hard"
+[[field.use]]
+for = "tight put markets only"
+op = "eq"
+value = "A"
+mode = "soft"
+tolerance = 0
+on_miss = "LIQUIDITY_RISK"
+note = "a near miss here is B"
+
+[[field]]
+name = "rollup.option_liquidity@v1.put_strike"
+theme = "option chain and short strikes"
+reads = "The short put strike the tier describes: the put between 0.20 and 0.40 delta with the tightest relative spread (ties: higher open interest), else the two-sided quote nearest 0.30 delta. A level in dollars: compare it with the close (how far out of the money) or with support (rollup.swing_levels@v1.swing_low) rather than thresholding it."
+caveats = [
+  "It is the liquidity-chosen strike, not a trade recommendation; the VRP scanner's candidate is rollup.put_wing@v1.best_put_strike (8 to 15 delta).",
+  "Null without a two-sided put with a delta at the target expiry.",
+]
+sources = ["Site convention"]
+[[field.use]]
+for = "has a short put strike"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.option_liquidity@v1.put_delta"
+theme = "option chain and short strikes"
+reads = "The short put strike's delta as the feed quotes it, negative: -0.30 means the put gains about 30 cents per dollar the stock falls and has roughly a 30% chance of expiring in the money. Puts between -0.20 and -0.40 are the 'short strike zone' this group picks from; -0.08 to -0.15 is the VRP scanner's far wing (rollup.put_wing@v1.best_put_delta, ours)."
+caveats = [
+  "The feed's delta, three places, from its own volatility; ours (ADR 0021) can differ by a few hundredths on thin quotes.",
+  "A delta near -0.40 with a tier A means the liquid strike is close to the money: a short put there is a stock position with extra steps.",
+]
+sources = ["Black-Scholes delta as a rough probability of finishing in the money (Hull, Options, Futures and Other Derivatives)"]
+[[field.use]]
+for = "a short put in the 20 to 40 delta zone"
+op = "between"
+value = [-0.40, -0.20]
+mode = "soft"
+tolerance = 0.05
+
+[[field]]
+name = "rollup.option_liquidity@v1.put_bid"
+theme = "option chain and short strikes"
+reads = "The short put's bid in dollars per share: what a seller collects at the market. Tier A requires at least $0.25, B $0.15, C $0.05; under that the premium does not pay for the spread and the commission. Multiply by 100 for the contract."
+caveats = [
+  "After-close bids are often pulled or widened; a $0.00 bid at the close can be $0.20 live. Confirm live.",
+  "Premium per share says nothing about return on capital: a $0.50 bid on a $200 strike is 0.25%; rollup.put_wing@v1.best_put_roc is the ratio.",
+]
+sources = ["Site TierRule bid floors"]
+[[field.use]]
+for = "a premium worth collecting"
+op = "gte"
+value = 0.25
+mode = "soft"
+tolerance = 0.10
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.option_liquidity@v1.put_ask"
+theme = "option chain and short strikes"
+reads = "The short put's ask in dollars per share: what a buyer pays at the market. With the bid it gives the spread (rollup.option_liquidity@v1.put_spread_abs) and the mid; on its own it is a level, not a threshold."
+caveats = [
+  "An ask far above the bid on a thin strike is a placeholder quote, not a price; the relative spread (rollup.option_liquidity@v1.put_spread_pct) is the number to judge.",
+]
+sources = ["Site convention"]
+[[field.use]]
+for = "a two-sided quote"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.option_liquidity@v1.put_spread_abs"
+theme = "option chain and short strikes"
+reads = "Ask minus bid at the short put strike, in dollars per share: $0.05 is a penny-increment market, $0.03 or less is tier A, $0.10 is the tier C limit. The dollar spread is the cost of crossing it once; the relative spread (rollup.option_liquidity@v1.put_spread_pct) says how big that is against the premium."
+caveats = [
+  "Nickel-increment names cannot show less than $0.05: a $0.05 spread is tight there and loose on a penny-increment name.",
+  "After-close quotes are wider than live ones; judge the trade live.",
+]
+sources = ["Site TierRule spread limits"]
+[[field.use]]
+for = "a tight dollar spread"
+op = "lte"
+value = 0.05
+mode = "soft"
+tolerance = 0.05
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.option_liquidity@v1.put_strike_oi"
+theme = "option chain and short strikes"
+reads = "Open interest at the short put strike alone: the standing contracts at exactly the strike the tier describes. Hundreds is thin, a few thousand is tradable; the tier's own floors are on the zone (rollup.option_liquidity@v1.put_zone_oi) and the chain, not this one strike."
+caveats = [
+  "One strike's open interest is lumpy: round strikes and monthlies hold most of it, and one institutional position makes a strike look liquid on its own. Read the zone total with it.",
+]
+sources = ["https://www.tastylive.com/concepts-strategies/options-liquidity"]
+[[field.use]]
+for = "standing interest at the strike"
+op = "gte"
+value = 500
+mode = "soft"
+tolerance = { relative = 0.5 }
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.option_liquidity@v1.put_zone_vol"
+theme = "option chain and short strikes"
+reads = "Contracts traded on the session across the target expiry's puts with 0.15 to 0.40 delta: whether the short-put zone trades, where rollup.option_liquidity@v1.put_zone_oi says whether it holds positions. A few hundred is active for one expiry's zone."
+caveats = [
+  "Daily and noisy: an expiry Friday or an earnings week multiplies it, a holiday week halves it. Open interest is the steadier measure.",
+  "Null without a target expiry or after a failed fetch.",
+]
+sources = ["https://www.tastylive.com/concepts-strategies/options-liquidity"]
+[[field.use]]
+for = "the put zone trades"
+op = "gte"
+value = 200
+mode = "soft"
+tolerance = { relative = 0.5 }
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.option_liquidity@v1.put_missing_delta"
+theme = "option chain and short strikes"
+reads = "How many puts at the target expiry came without a delta from the feed (counted, not dropped). A handful is normal (far wings with no bid); many means the feed's Greeks were missing for the expiry and the delta-based columns (zone totals, the short strike) rest on fewer contracts."
+caveats = [
+  "A high count with a low rollup.option_liquidity@v1.put_zone_oi can be a feed problem, not an empty zone; the next session usually fills in.",
+]
+sources = ["Site convention"]
+[[field.use]]
+for = "the feed priced the expiry"
+op = "lte"
+value = 5
+mode = "soft"
+tolerance = 5
+
+[[field]]
+name = "rollup.option_liquidity@v1.call_tier"
+theme = "option chain and short strikes"
+reads = "The short call's liquidity tier at the target expiry, graded like the put's: A (spread at most 5% of mid and $0.03, 2,000 zone open interest, 20,000 chain open interest, a bid of at least $0.25), B (10% / $0.05 / 500 / 5,000 / $0.15), C (20% / $0.10 / 100 / 1,000 / $0.05), else D. The gate for covered calls and call spreads."
+caveats = [
+  "After-close grading, as for the put tier: confirm live, score rather than gate on C.",
+  "feature.option_tier is the worse of the two sides; a call-only screen reads this one.",
+]
+sources = ["Site TierRule thresholds"]
+[[field.use]]
+for = "a sellable call (covered calls)"
+op = "in"
+value = ["A", "B"]
+mode = "hard"
+
+[[field]]
+name = "rollup.option_liquidity@v1.call_strike"
+theme = "option chain and short strikes"
+reads = "The short call strike the tier describes: the call between 0.20 and 0.40 delta with the tightest relative spread (ties: higher open interest), else the two-sided quote nearest 0.30 delta. A level: compare with the close (how far out of the money) and with resistance (rollup.swing_levels@v1.swing_high, rollup.oi_walls@v1.call_wall) rather than thresholding it."
+caveats = [
+  "Null without a two-sided call with a delta at the target expiry.",
+]
+sources = ["Site convention"]
+[[field.use]]
+for = "has a short call strike"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.option_liquidity@v1.call_delta"
+theme = "option chain and short strikes"
+reads = "The short call strike's delta as the feed quotes it, positive: 0.30 means the call gains about 30 cents per dollar the stock rises and has roughly a 30% chance of expiring in the money. 0.20 to 0.40 is the zone this group picks from; a covered call at 0.30 delta is the common compromise between premium and upside kept."
+caveats = [
+  "The feed's delta; ours can differ by a few hundredths on thin quotes.",
+  "Near 0.40 the liquid strike is close to the money: a covered call there caps most of the upside.",
+]
+sources = ["Hull, Options, Futures and Other Derivatives (delta as a rough probability)"]
+[[field.use]]
+for = "a short call in the 20 to 40 delta zone"
+op = "between"
+value = [0.20, 0.40]
+mode = "soft"
+tolerance = 0.05
+
+[[field]]
+name = "rollup.option_liquidity@v1.call_bid"
+theme = "option chain and short strikes"
+reads = "The short call's bid in dollars per share: what a covered-call seller collects at the market. Tier A requires at least $0.25, B $0.15, C $0.05."
+caveats = [
+  "After-close bids are pulled or widened; confirm live.",
+  "Premium per share, not a yield: against a $200 stock $0.50 is 0.25% for the period.",
+]
+sources = ["Site TierRule bid floors"]
+[[field.use]]
+for = "a premium worth collecting"
+op = "gte"
+value = 0.25
+mode = "soft"
+tolerance = 0.10
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.option_liquidity@v1.call_ask"
+theme = "option chain and short strikes"
+reads = "The short call's ask in dollars per share; with the bid it gives the spread and the mid. A level, not a threshold."
+caveats = [
+  "A placeholder ask far above the bid marks a thin strike; judge rollup.option_liquidity@v1.call_spread_pct instead.",
+]
+sources = ["Site convention"]
+[[field.use]]
+for = "a two-sided quote"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.option_liquidity@v1.call_spread_abs"
+theme = "option chain and short strikes"
+reads = "Ask minus bid at the short call strike, in dollars per share: $0.03 or less is tier A, $0.05 tier B, $0.10 the tier C limit."
+caveats = [
+  "Nickel-increment names cannot show less than $0.05; after-close quotes are wider than live ones.",
+]
+sources = ["Site TierRule spread limits"]
+[[field.use]]
+for = "a tight dollar spread"
+op = "lte"
+value = 0.05
+mode = "soft"
+tolerance = 0.05
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.option_liquidity@v1.call_spread_pct"
+theme = "option chain and short strikes"
+reads = "The short call's bid-ask spread as a share of its mid on the stored after-close quote: 0.10 means a $0.20 spread on a $2.00 option. Under 0.05 is tier A, 0.10 tier B, 0.20 tier C; above 0.30 the spread eats the premium."
+caveats = [
+  "After the close market makers widen quotes: a wide reading can be a quiet print. Score it, confirm live.",
+  "Null without a two-sided call quote at the target expiry.",
+]
+sources = ["https://www.thetaedge.ai/blog/assess-liquidity-trading-options"]
+[[field.use]]
+for = "a tradable call spread (scored)"
+op = "lt"
+value = 0.15
+mode = "score"
+tolerance = 0.15
+note = "full points under 15% of mid, none at 30%"
+[[field.use]]
+for = "tight call spreads"
+op = "lte"
+value = 0.10
+mode = "soft"
+tolerance = 0.05
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.option_liquidity@v1.call_strike_oi"
+theme = "option chain and short strikes"
+reads = "Open interest at the short call strike alone. Hundreds is thin, a few thousand is tradable; read with the zone total (rollup.option_liquidity@v1.call_zone_oi), since one strike's interest is lumpy."
+caveats = [
+  "Round strikes and monthlies hold most of a chain's interest; a single large position makes one strike look liquid on its own.",
+]
+sources = ["https://www.tastylive.com/concepts-strategies/options-liquidity"]
+[[field.use]]
+for = "standing interest at the strike"
+op = "gte"
+value = 500
+mode = "soft"
+tolerance = { relative = 0.5 }
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.option_liquidity@v1.call_zone_oi"
+theme = "option chain and short strikes"
+reads = "Open interest of the target expiry's calls with 0.15 to 0.40 delta: the standing depth where a covered call or a short call spread is sold. 2,000 is the tier A floor, 500 tier B, 100 tier C."
+caveats = [
+  "Standing positions, not today's activity: pair with rollup.option_liquidity@v1.call_zone_vol.",
+  "Null without a target expiry or after a failed fetch.",
+]
+sources = ["Site TierRule zone floors"]
+[[field.use]]
+for = "depth where a call would be sold"
+op = "gte"
+value = 2000
+mode = "soft"
+tolerance = { relative = 0.5 }
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.option_liquidity@v1.call_zone_vol"
+theme = "option chain and short strikes"
+reads = "Contracts traded on the session across the target expiry's calls with 0.15 to 0.40 delta: whether the short-call zone trades. A few hundred is active for one expiry's zone."
+caveats = [
+  "Daily and noisy (expiry Fridays, earnings weeks); open interest is the steadier measure.",
+]
+sources = ["https://www.tastylive.com/concepts-strategies/options-liquidity"]
+[[field.use]]
+for = "the call zone trades"
+op = "gte"
+value = 200
+mode = "soft"
+tolerance = { relative = 0.5 }
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.option_liquidity@v1.call_missing_delta"
+theme = "option chain and short strikes"
+reads = "How many calls at the target expiry came without a delta from the feed. A handful is normal (far wings); many means the delta-based call columns rest on fewer contracts."
+caveats = [
+  "A high count with a low rollup.option_liquidity@v1.call_zone_oi can be a feed gap rather than an empty zone.",
+]
+sources = ["Site convention"]
+[[field.use]]
+for = "the feed priced the expiry"
+op = "lte"
+value = 5
+mode = "soft"
+tolerance = 5

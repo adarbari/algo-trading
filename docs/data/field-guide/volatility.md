@@ -228,3 +228,40 @@ Sources: Carr and Wu (2009); docs/screeners/vrp-scanner.md
 - Every caveat of feature.iv_rank applies: one spike squashes the year, a report ahead lifts it, a takeover collapses it. feature.iv_percentile is the robust cross-check.
 
 Sources: https://flashalpha.com/articles/iv-rank-vs-iv-percentile-difference-which-matters; ADR 0028 (IBKR-derived, personal licence)
+
+### `rollup.price_stats@v2.hv30`
+
+**How to read it.** Realised (historical) volatility over 30 sessions, annualised, as a fraction: 0.25 is 25% a year. The denominator of the IV-over-HV premium (feature.iv_hv_spread, feature.iv_hv_ratio, the VRP scanner's versions): what the stock actually did against what its options price. A large-cap index runs 0.12 to 0.20, a typical single stock 0.25 to 0.40, a biotech or a meme name above 0.60.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| the premium's denominator is real | `gte 0.1` | hard | - | the floor the VRP ratio lacks by design; add it to any IV/HV screen |
+| a volatile name (realised, a month and a half) | `gte 0.4` | soft | 0.05 | - |
+
+**When the reading lies**
+
+- Close-to-close, so one gap dominates it for 30 sessions: an earnings day of 15% alone puts hv30 near 0.45 (the 'earnings gap inside the window' situation); rollup.price_stats@v2.hv20_yz is the gap-robust alternative.
+- Under 0.10 on a stock is a pinned takeover or a halted name, not calm; a tiny HV makes feature.iv_hv_ratio explode.
+- Null after any missing bar in the last 31 sessions.
+
+Sources: Carr and Wu (2009) on the realised side of the premium; Yang and Zhang (2000)
+
+### `rollup.price_stats@v2.hv20_yz`
+
+**How to read it.** Yang-Zhang realised volatility over 20 sessions, annualised, as a fraction. It uses the open, high, low and close, weighing the overnight gap and the intraday range separately, so it is several times more efficient than close-to-close and does not let one gap day own the window. The better estimate for comparing realised volatility across names; the close-to-close hv20 and hv30 are what the stored IV/HV features use.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a calm name (gap-robust) | `lte 0.25` | soft | 0.05 | with rollup.price_stats@v2.hv20_yz gte 0.08 so pinned names are out |
+| a volatile name (gap-robust) | `gte 0.4` | soft | 0.05 | - |
+
+**When the reading lies**
+
+- Still a 20-session window: a shock inside it raises the estimate, just less violently than close-to-close.
+- Bad intraday highs and lows (a bad print) distort a range estimator more than a close estimator; a reading far from rollup.price_stats@v2.hv20 is worth a look at the bars.
+
+Sources: Yang and Zhang (2000); https://flashalpha.com/articles/yang-zhang-vs-close-to-close-realized-volatility

@@ -83,3 +83,77 @@ Sources: Organic versus reported revenue growth, as defined in issuers' filings 
 - Null for a non-payer with too little history to say so; 0 for a known non-payer. A hard 'gte 0.03' drops both, which is usually intended.
 
 Sources: Yield traps and payout ratios (yields above 10% and payouts above 100% precede cuts): https://www.livewiremarkets.com/wires/how-to-avoid-dividend-traps and https://indexes.morningstar.com/insights/perspective/bltdb6d3e043f097825/not-all-dividend-stocks-are-safe-heres-how-to-avoid-dividend-traps
+
+### `rollup.financials@v1.eps_diluted_ttm`
+
+**How to read it.** Diluted earnings per share over the trailing twelve months, summed from the quarters and split-adjusted to the session, in dollars; negative for a loss. The numerator's denominator in feature.pe_ratio, which is null for a loss, so this is the field that can say 'unprofitable': under 0 is a loss-maker, which a growth screen may want and a value screen must know about.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| profitable over the last year | `gt 0` | hard | - | the gate feature.pe_ratio applies implicitly; make it explicit when it matters |
+| loss-making (speculative growth, turnarounds) | `lte 0` | hard | - | - |
+
+**When the reading lies**
+
+- The TTM lags: it ends at the last filed quarter, up to four months old (rollup.financials@v1.ttm_as_of); rollup.financials@v1.eps_stale flags a figure more than 480 days old.
+- One-offs (a tax gain, a write-down, an asset sale) swing a year's EPS; nothing here separates them from operations.
+- Null for funds, foreign filers and companies without four consecutive quarters or a fiscal year on file (rollup.financials@v1.financials_status).
+
+Sources: SEC EDGAR company facts (docs/data/vendors.md)
+
+### `rollup.financials@v1.net_income_ttm`
+
+**How to read it.** Net income over the trailing twelve months, in dollars; negative for a loss. The company-level profit behind EPS: against rollup.financials@v1.revenue_ttm it gives the net margin (10% is healthy for most industries, 20% and above is software or a franchise, under 0 is a loss), and against feature.market_cap the earnings yield.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| profitable | `gt 0` | hard | - | - |
+| a large, established earner | `gte 1000000000` | soft | 0.3 x the threshold | - |
+
+**When the reading lies**
+
+- Lags like every TTM figure, and includes one-offs.
+- Null for funds, foreign filers and incomplete filings; a hard criterion drops every ETF and ADR without US filings.
+
+Sources: SEC EDGAR company facts
+
+### `rollup.financials@v1.revenue_ttm`
+
+**How to read it.** Revenue over the trailing twelve months, in dollars: the last four discrete quarters, else the latest fiscal year (rollup.financials@v1.ttm_basis says which). Size of the business in sales terms: under $100M is early-stage, $1B is a mid-sized company, above $50B a giant. The denominator of feature.revenue_growth_yoy and the base of the net margin.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| an established business | `gte 1000000000` | soft | 0.3 x the threshold | - |
+| a small or early-stage business | `lt 100000000` | soft | 0.3 x the threshold | - |
+
+**When the reading lies**
+
+- Which revenue concept a company reports varies (Revenues, RevenueFromContractWithCustomer, SalesRevenueNet); banks and insurers report revenue differently from industrials, so cross-sector comparisons are rough.
+- Fiscal-year basis (ttm_basis) lags a quarter-based TTM by up to a year.
+- Null for funds, foreign filers and incomplete filings.
+
+Sources: SEC EDGAR company facts (docs/data/vendors.md)
+
+### `rollup.dividends@v2.div_count_ttm`
+
+**How to read it.** How many ex-dividend dates fell in the last 365 days: 4 is a quarterly payer, 12 monthly, 1 or 2 annual or semi-annual, 0 a known non-payer. Above the usual cadence (5 for a quarterly payer) means a special dividend inflated feature.div_yield for the year.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a regular quarterly payer | `gte 4` | soft | 1 | pair with feature.div_yield gte 0.02 |
+| no special-dividend distortion | `lte 4` | soft | 1 | - |
+
+**When the reading lies**
+
+- Null for a non-payer with too little history to call it one (under 240 bars); 0 only with a full year of bars.
+- Special distributions are excluded from div_ttm by default but still counted here when stored; a count of 5 with an ordinary yield is the usual sign of one.
+
+Sources: Site convention (features/rollups/corporate/dividends.py)

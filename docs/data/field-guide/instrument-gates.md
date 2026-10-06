@@ -86,3 +86,73 @@ Sources: StockCharts, Why technical analysis does not work for leveraged ETFs: h
 - Exclude from stock and trend screens with the leveraged flag; screen them deliberately or not at all (the 'leveraged or inverse fund' situation).
 
 Sources: StockCharts, Why technical analysis does not work for leveraged ETFs: https://articles.stockcharts.com/article/articles-finalbar-2024-06-why-technical-analysis-does-no-911/
+
+### `instrument.in_sp500`
+
+**How to read it.** Whether the name is an S&P 500 constituent in the reference snapshot. Membership is a liquidity and quality filter in one flag (the index requires profitability and float), and index flows make members trade differently: additions get bid, deletions sold, and every member moves with the ETF rebalances.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| S&P 500 members only | `eq true` | hard | - | - |
+
+**When the reading lies**
+
+- Membership changes quarterly and on corporate events; a name added last week has the flag and none of the history as a member.
+- Not a size cut-off: the smallest members are around $10B and some $50B companies are not in (foreign domiciles, dual-class rules). feature.market_cap is the size.
+- Null when the reference does not know; false for every ETF.
+
+Sources: S&P Dow Jones Indices, S&P 500 eligibility criteria
+
+### `instrument.sector`
+
+**How to read it.** The company's sector as derived from its SEC industry code (SIC): the broad group (energy, financials, health care, technology and so on). A screen uses it to compare like with like, because every valuation and volatility threshold is sector-dependent: a P/E of 12 is rich for a bank and cheap for software, an IV of 0.40 is calm for a biotech.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| one sector | `eq "Technology"` | hard | - | the values are the catalogue's sector labels; use in [..] for several |
+
+**When the reading lies**
+
+- SIC-derived, so the labels follow the SEC's old industry codes rather than GICS: a platform company can sit under 'services', a conglomerate under its original business. instrument.industry is the finer SIC description.
+- Null for funds (no SIC) and companies without a filing; a hard sector criterion drops every ETF.
+
+Sources: SEC SIC codes (docs/data/instruments.md); sector-relative valuation as a practitioner convention
+
+### `instrument.industry`
+
+**How to read it.** The company's industry as the SEC's SIC description gives it (a few hundred labels: 'pharmaceutical preparations', 'semiconductors and related devices', 'state commercial banks'). Finer than instrument.sector: the peer group a company is valued and traded against.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| one industry | `in ["Pharmaceutical Preparations"]` | hard | - | the values are the catalogue's industry labels, spelled exactly |
+
+**When the reading lies**
+
+- SIC descriptions are decades old and self-reported at registration: many technology companies are 'services-prepackaged software' and a company that changed business keeps its original code.
+- Null for funds and companies without a filing.
+
+Sources: SEC SIC codes (docs/data/instruments.md)
+
+### `instrument.is_etf`
+
+**How to read it.** True for an exchange-traded fund (and the trusts and notes the reference classes with them). A fund has no earnings, revenue or market cap here, its on-screen volume understates its liquidity (creation and redemption), and its 'sector' is null; the company fields do not apply and a company screen should exclude it.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| funds only | `eq true` | hard | - | - |
+| no funds (a company screen) | `eq false` | hard | - | - |
+
+**When the reading lies**
+
+- Includes leveraged and inverse funds; instrument.is_leveraged and instrument.is_inverse single those out.
+- instrument.security_type in [ETF] is the same gate in the three-way form; this flag is the one-bit version.
+
+Sources: Site convention (docs/data/instruments.md)

@@ -300,3 +300,382 @@ value = 0.5
 mode = "score"
 tolerance = 0.5
 note = "full points at 0.5 and above, none at 0; a missing rank scores nothing"
+
+# ------------------------------------------------------------------- realised volatility
+
+[[field]]
+name = "rollup.price_stats@v2.hv30"
+theme = "volatility"
+reads = "Realised (historical) volatility over 30 sessions, annualised, as a fraction: 0.25 is 25% a year. The denominator of the IV-over-HV premium (feature.iv_hv_spread, feature.iv_hv_ratio, the VRP scanner's versions): what the stock actually did against what its options price. A large-cap index runs 0.12 to 0.20, a typical single stock 0.25 to 0.40, a biotech or a meme name above 0.60."
+caveats = [
+  "Close-to-close, so one gap dominates it for 30 sessions: an earnings day of 15% alone puts hv30 near 0.45 (the 'earnings gap inside the window' situation); rollup.price_stats@v2.hv20_yz is the gap-robust alternative.",
+  "Under 0.10 on a stock is a pinned takeover or a halted name, not calm; a tiny HV makes feature.iv_hv_ratio explode.",
+  "Null after any missing bar in the last 31 sessions.",
+]
+sources = ["Carr and Wu (2009) on the realised side of the premium; Yang and Zhang (2000)"]
+[[field.use]]
+for = "the premium's denominator is real"
+op = "gte"
+value = 0.10
+mode = "hard"
+note = "the floor the VRP ratio lacks by design; add it to any IV/HV screen"
+[[field.use]]
+for = "a volatile name (realised, a month and a half)"
+op = "gte"
+value = 0.40
+mode = "soft"
+tolerance = 0.05
+
+[[field]]
+name = "rollup.price_stats@v2.hv20_yz"
+theme = "volatility"
+reads = "Yang-Zhang realised volatility over 20 sessions, annualised, as a fraction. It uses the open, high, low and close, weighing the overnight gap and the intraday range separately, so it is several times more efficient than close-to-close and does not let one gap day own the window. The better estimate for comparing realised volatility across names; the close-to-close hv20 and hv30 are what the stored IV/HV features use."
+caveats = [
+  "Still a 20-session window: a shock inside it raises the estimate, just less violently than close-to-close.",
+  "Bad intraday highs and lows (a bad print) distort a range estimator more than a close estimator; a reading far from rollup.price_stats@v2.hv20 is worth a look at the bars.",
+]
+sources = ["Yang and Zhang (2000); https://flashalpha.com/articles/yang-zhang-vs-close-to-close-realized-volatility"]
+[[field.use]]
+for = "a calm name (gap-robust)"
+op = "lte"
+value = 0.25
+mode = "soft"
+tolerance = 0.05
+note = "with rollup.price_stats@v2.hv20_yz gte 0.08 so pinned names are out"
+[[field.use]]
+for = "a volatile name (gap-robust)"
+op = "gte"
+value = 0.40
+mode = "soft"
+tolerance = 0.05
+
+# ---------------------------------------------------------- implied volatility: the inputs
+
+[[field]]
+name = "rollup.iv30@v1.iv30"
+theme = "implied volatility"
+reads = "Our 30-calendar-day at-the-money implied volatility as a fraction (ADR 0021): the forward ATM vols of the two expiries around 30 days, each from the two strikes around the forward with calls and puts averaged, interpolated in total variance. The number rollup.iv_history@v2.iv30 stores and feature.iv_rank ranks. 0.20 is a calm large cap, 0.30 to 0.50 an ordinary single stock, above 0.80 a biotech, a meme or an event."
+caveats = [
+  "A report inside 30 days inflates it: the earnings move is priced in and drops out after the report (20% to 60% of it in a session). Check rollup.earnings@v1.days_to_earnings.",
+  "Built from after-close quotes that pass the quality filters; on a thin chain few quotes survive (rollup.iv30@v1.n_quotes_used) and one wide quote moves the number. SINGLE_EXPIRY (rollup.iv30@v1.iv30_status) means one expiry only, flat vol.",
+  "The feed's IV30 (rollup.iv30@v1.iv30_cboe) and IBKR's (rollup.ibkr_iv@v1.iv30_ibkr) use other methods; they differ by a few points on liquid names and by more on thin ones, which is why feature.vrp_iv30 takes the lower.",
+]
+sources = ["ADR 0021 (our IV30); https://optionalpha.com/learn/iv-crush for the earnings behaviour"]
+[[field.use]]
+for = "high implied volatility (ours, absolute)"
+op = "gte"
+value = 0.40
+mode = "soft"
+tolerance = 0.05
+note = "prefer feature.iv_rank gte 0.5 (relative to the name's own year)"
+[[field.use]]
+for = "low implied volatility (ours, absolute)"
+op = "lte"
+value = 0.25
+mode = "soft"
+tolerance = 0.05
+note = "with feature.atr_pct gte 0.005"
+
+[[field]]
+name = "rollup.iv30@v1.iv30_cboe"
+theme = "implied volatility"
+reads = "The feed's (Cboe's) 30-day implied volatility as a fraction: 0.253 is 25.3%. The same quantity as our rollup.iv30@v1.iv30 by another method; the two agree within a few points on a liquid name. rollup.option_liquidity@v1.iv30 is the same feed number in percentage points."
+caveats = [
+  "A fraction here, percentage points in the chain group: 'IV over 40%' is gte 0.40 on this field.",
+  "Null when the feed gives no IV30 (no underlying quote, a thin chain); ours may still have one, and vice versa.",
+]
+sources = ["Cboe's IV30 definition"]
+[[field.use]]
+for = "high implied volatility (the feed's)"
+op = "gte"
+value = 0.40
+mode = "soft"
+tolerance = 0.05
+note = "prefer feature.iv_rank"
+
+[[field]]
+name = "rollup.iv30@v1.iv30_status"
+theme = "implied volatility"
+reads = "Why our IV30 has a value or not: OK (two expiries), SINGLE_EXPIRY (one usable expiry, flat vol, still a value), or the first failing step: NO_SPOT, NO_CHAIN, NO_EXPIRY (none 7 to 90 days out), NO_QUOTES, WIDE_SPREADS (every ATM quote wider than 35% of mid), ILLIQUID (no quote met the open-interest or volume floor), IV_FAILED (the inversion did not converge)."
+caveats = [
+  "WIDE_SPREADS and ILLIQUID are facts about the name's options, not the run: an IV that is null for that reason is a name whose options are not worth pricing. NO_CHAIN and NO_SPOT can be the day's fetch.",
+  "SINGLE_EXPIRY values are less reliable near 30 days when the one expiry is far from it.",
+]
+sources = ["ADR 0021; features/rollups/options/iv30.py"]
+[[field.use]]
+for = "an IV30 from two expiries"
+op = "eq"
+value = "OK"
+mode = "soft"
+tolerance = 0
+note = "the near miss is SINGLE_EXPIRY"
+
+[[field]]
+name = "rollup.iv30@v1.near_expiry"
+theme = "implied volatility"
+reads = "The expiry at or before 30 days out that our IV30 interpolates from (standard monthlies first, 7 to 90 days). A date to show; with rollup.iv30@v1.far_expiry it says how far the two bracketing expiries are from 30 days, which is how much interpolation the number carries."
+caveats = [
+  "Null when no expiry sits in 7 to 90 days at or before the target: the IV30 is then SINGLE_EXPIRY from the far one, or null.",
+]
+sources = ["ADR 0021"]
+[[field.use]]
+for = "a near expiry was selected"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.iv30@v1.far_expiry"
+theme = "implied volatility"
+reads = "The expiry at or after 30 days out that our IV30 interpolates from. With the near expiry it brackets the 30-day target; the closer the two are to 30 days, the less the interpolation matters."
+caveats = [
+  "Null when no expiry sits in 7 to 90 days at or after the target.",
+]
+sources = ["ADR 0021"]
+[[field.use]]
+for = "a far expiry was selected"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.iv30@v1.atm_strike_near"
+theme = "implied volatility"
+reads = "The listed strike nearest the forward price in the near expiry (the far one without a near): the strike our ATM vol is read around. A level to show; its distance from rollup.iv30@v1.spot says how coarse the strike ladder is at the money, which matters for how exact 'at the money' is."
+caveats = [
+  "On a high-priced stock with $5 strikes the nearest strike can be 2% from the forward; the two-strike interpolation handles it, but the quoted vols are not exactly ATM.",
+]
+sources = ["ADR 0021"]
+[[field.use]]
+for = "an ATM strike was found"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.iv30@v1.spot"
+theme = "implied volatility"
+reads = "The underlying's price captured with the chain, in dollars: the S our IV30 is priced against. It should be within the day's range of rollup.price_stats@v2.close; a gap between them means the chain was snapped at another time and the ATM strike is off by that move."
+caveats = [
+  "Null when no positive underlying price came with the chain (iv30_status NO_SPOT).",
+]
+sources = ["ADR 0021"]
+[[field.use]]
+for = "a spot price with the chain"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.iv30@v1.rate"
+theme = "implied volatility"
+reads = "The continuous risk-free rate at 30 days from the Treasury curve the session sees, as a fraction: 0.045 is 4.5%. An input of the forward and the inversion, the same for every name on the session; it moves the IV30 by a fraction of a point and is stored so the number can be reproduced."
+caveats = [
+  "Not a screening field: every name has the same value on a session.",
+]
+sources = ["ADR 0021 (the Treasury curve as the rate input)"]
+[[field.use]]
+for = "the curve was available"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.iv30@v1.div_yield"
+theme = "implied volatility"
+reads = "The dividend yield used as the continuous q in the forward, read from the materialised div_yield feature: 0.03 is 3%. A name priced with q = 0 (null here) has its forward slightly too high, and its IV30 off by a fraction of a point. The screening version of the yield is feature.div_yield."
+caveats = [
+  "Null means 'priced with no dividend', which is right for a non-payer and slightly wrong for a payer with too little history to be known as one.",
+]
+sources = ["ADR 0021"]
+[[field.use]]
+for = "priced with a known yield"
+op = "not_null"
+mode = "soft"
+tolerance = 0
+
+[[field]]
+name = "rollup.iv30@v1.n_quotes_used"
+theme = "implied volatility"
+reads = "How many option quotes' implied vols were averaged into our IV30, across both expiries: 8 is the full set (two strikes, call and put, two expiries), 4 is one expiry (SINGLE_EXPIRY) or one side, 1 or 2 is a number resting on a quote or two. The confidence of rollup.iv30@v1.iv30 in one count."
+caveats = [
+  "Few quotes means a wide or thin chain: the IV30 is then a noisy number and the IV-over-HV premium built on it noisier still. Require 4 or more for a premium-selling screen.",
+]
+sources = ["ADR 0021"]
+[[field.use]]
+for = "an IV30 built on enough quotes"
+op = "gte"
+value = 4
+mode = "soft"
+tolerance = 2
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.ibkr_iv@v1.iv30_ibkr"
+theme = "implied volatility"
+reads = "IBKR's 30-day implied volatility of the underlying's options for the session, as a fraction (IB's daily implied-volatility bar, or the streamed value after the close). A third method next to ours and Cboe's; on liquid names the three agree within a few points. feature.vrp_iv30 takes the lower of IBKR's and Cboe's so a premium screen is conservative. Personal licence (ADR 0028)."
+caveats = [
+  "The earnings and event caveats of every IV apply (rollup.earnings@v1.days_to_earnings).",
+  "Null for names IBKR has no IV for (no listed options, no quotes) and for sessions outside the nightly snapshot's coverage; the history backfill covers IV, not HV.",
+]
+sources = ["ADR 0028 (IBKR-derived features); IB's option implied-volatility bars"]
+[[field.use]]
+for = "high implied volatility (IBKR's)"
+op = "gte"
+value = 0.40
+mode = "soft"
+tolerance = 0.05
+note = "prefer feature.vrp_iv30 (the lower of the two feeds) for a premium gate"
+
+[[field]]
+name = "rollup.ibkr_iv@v1.hv30_ibkr"
+theme = "implied volatility"
+reads = "IBKR's 30-day historical (realised) volatility for the session, as a fraction: IB's own estimate of what the stock did, next to our close-to-close rollup.price_stats@v2.hv30. The two agree closely on ordinary names; a gap between them is usually a split or a bad print on one side."
+caveats = [
+  "Only from the nightly snapshot: null on sessions the backfill filled (it fetches IV only). Our hv30 is the one every stored IV/HV feature uses.",
+]
+sources = ["ADR 0028"]
+[[field.use]]
+for = "a realised-volatility cross-check exists"
+op = "not_null"
+mode = "soft"
+tolerance = 0
+
+[[field]]
+name = "rollup.ibkr_iv@v1.iv_percentile_252d_ibkr"
+theme = "implied volatility"
+reads = "The share of the last 252 sessions whose IBKR IV was below today's, 0 to 1: 0.9 means IV was lower on 90% of days this year. The robust companion of rollup.ibkr_iv@v1.iv_rank_252d_ibkr (counts days instead of measuring the span, so one spike cannot squash it); feature.iv_percentile prefers this one where IBKR has it."
+caveats = [
+  "Null under 60 sessions of IBKR IV (rollup.ibkr_iv@v1.rank_status_ibkr UNKNOWN); PROVISIONAL below 252 sessions compares against a shorter year.",
+  "A report in the next ten sessions lifts it like every IV measure.",
+]
+sources = ["https://flashalpha.com/articles/iv-rank-vs-iv-percentile-difference-which-matters; ADR 0028"]
+[[field.use]]
+for = "IV high for the name (robust, IBKR's history)"
+op = "gte"
+value = 0.7
+mode = "soft"
+tolerance = 0.1
+
+[[field]]
+name = "rollup.ibkr_iv@v1.history_days_ibkr"
+theme = "implied volatility"
+reads = "Sessions of the 252-session window with an IBKR IV, today included: 252 is a full year, 60 is the floor for a rank, under 60 means no rank yet. Says how much of the year the IBKR-based rank and percentile are computed over."
+caveats = [
+  "Gaps are not filled: a name IBKR dropped and re-added has a low count with a long listing history.",
+]
+sources = ["ADR 0028"]
+[[field.use]]
+for = "a full year of IBKR IV"
+op = "gte"
+value = 252
+mode = "soft"
+tolerance = 30
+[[field.use]]
+for = "enough history for a rank"
+op = "gte"
+value = 60
+mode = "hard"
+
+[[field]]
+name = "rollup.ibkr_iv@v1.rank_status_ibkr"
+theme = "implied volatility"
+reads = "How complete IBKR's IV history is for the rank: UNKNOWN below 60 sessions (no rank), PROVISIONAL below 252 (a rank over a partial year), FULL from 252. A PROVISIONAL rank over three months compares today against a short, possibly calm, window."
+caveats = [
+  "A PROVISIONAL rank of 1.0 after a quiet quarter is a modest IV; read the level (rollup.ibkr_iv@v1.iv30_ibkr) with it.",
+]
+sources = ["ADR 0028"]
+[[field.use]]
+for = "a rank over a full year"
+op = "eq"
+value = "FULL"
+mode = "soft"
+tolerance = 0
+note = "the near miss is PROVISIONAL"
+
+[[field]]
+name = "rollup.iv_history@v2.iv_rank_252d"
+theme = "implied volatility"
+reads = "IV rank on our own IV30 history, 0 to 1: where today's IV30 sits between the year's low and high. feature.iv_rank prefers IBKR's rank and falls back to this one (feature.iv_rank_source says which); use this field only when the screen must say 'our history'."
+caveats = [
+  "Every caveat of feature.iv_rank: one spike squashes the year, a report ahead lifts it, a takeover collapses it; rollup.iv_history@v2.iv_percentile_252d is the robust cross-check.",
+  "Null under 60 sessions of our IV (rollup.iv_history@v2.rank_status UNKNOWN), when there is no IV today, or when every IV in the window is equal.",
+]
+sources = ["https://flashalpha.com/articles/iv-rank-vs-iv-percentile-difference-which-matters"]
+[[field.use]]
+for = "IV high for the name (our history)"
+op = "gte"
+value = 0.5
+mode = "soft"
+tolerance = 0.1
+note = "prefer feature.iv_rank, which takes IBKR's where it exists"
+
+[[field]]
+name = "rollup.iv_history@v2.iv_percentile_252d"
+theme = "implied volatility"
+reads = "The share of the last 252 sessions whose IV30 (ours) was below today's, 0 to 1. The robust companion of rollup.iv_history@v2.iv_rank_252d; feature.iv_percentile prefers IBKR's and falls back to this."
+caveats = [
+  "A percentile near 1 after a long calm stretch can be a modest IV; read the level too.",
+  "Null under 60 sessions of IV or without an earlier IV.",
+]
+sources = ["https://flashalpha.com/articles/iv-rank-vs-iv-percentile-difference-which-matters"]
+[[field.use]]
+for = "IV high for the name (robust, our history)"
+op = "gte"
+value = 0.7
+mode = "soft"
+tolerance = 0.1
+
+[[field]]
+name = "rollup.iv_history@v2.history_days"
+theme = "implied volatility"
+reads = "Sessions of the 252-session window with our IV30, today included: 252 is a full year, 60 the floor for a rank. Our history starts when the chain store starts (2026-10-02), so counts are short for every name until a year has passed; IBKR's history (rollup.ibkr_iv@v1.history_days_ibkr) is the longer one."
+caveats = [
+  "Gaps are not filled: a session whose chain failed is a missing day in the window.",
+]
+sources = ["Site convention (docs/roadmap.md: the IBKR IV history backfill)"]
+[[field.use]]
+for = "enough history for a rank"
+op = "gte"
+value = 60
+mode = "hard"
+
+[[field]]
+name = "rollup.iv_history@v2.rank_status"
+theme = "implied volatility"
+reads = "How complete our IV history is for the rank: UNKNOWN below 60 sessions (no rank), PROVISIONAL below 252, FULL from 252."
+caveats = [
+  "PROVISIONAL over a short, calm window makes an ordinary IV rank near 1; read rollup.iv_history@v2.iv30 with it.",
+]
+sources = ["Site convention"]
+[[field.use]]
+for = "a rank over a full year"
+op = "eq"
+value = "FULL"
+mode = "soft"
+tolerance = 0
+note = "the near miss is PROVISIONAL"
+
+[[field]]
+name = "feature.iv_rank_source"
+theme = "implied volatility"
+reads = "Where feature.iv_rank and feature.iv_percentile came from: ibkr (IBKR's IV history, the longer one, personal licence) or ours (iv_history, from Cboe chains, from 2026-10-02). A label to show next to the rank; a screen restricted to one source pins it here."
+caveats = [
+  "Null when neither source has a rank; the two sources' ranks are not interchangeable on the same name (different methods, different windows), so a screen that mixes them compares slightly different things.",
+]
+sources = ["ADR 0028"]
+[[field.use]]
+for = "IBKR's rank only"
+op = "eq"
+value = "ibkr"
+mode = "hard"
+
+[[field]]
+name = "feature.vrp_iv30_source"
+theme = "implied volatility"
+reads = "Where feature.vrp_iv30 came from: ibkr or cboe, the lower of the two when both exist (ibkr on a tie). A label to show with the VRP gate's IV30; when it says cboe, IBKR's number was the higher (or missing), and the premium screen used the conservative one."
+caveats = [
+  "Null when neither feed has an IV30 for the session.",
+]
+sources = ["docs/screeners/vrp-scanner.md (the lower-of-two rule)"]
+[[field.use]]
+for = "both feeds agreed closely enough to use IBKR's"
+op = "eq"
+value = "ibkr"
+mode = "soft"
+tolerance = 0

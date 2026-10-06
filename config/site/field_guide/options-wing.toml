@@ -1,0 +1,347 @@
+# L3 site setting: the field guide (ADR 0041, amended 2026-10-06), one <theme>.toml per theme
+# plus situations.toml; loaded together by config/site/settings.py load_field_guide. Every
+# [[field]] says how to read one catalogue field, which criterion means what, and when the
+# reading lies; a [[situation]] is one state of the world that fools several thresholds at once.
+# The keys are documented in momentum.toml. Edit by PR; `make features-doc` renders the page.
+
+# The put wing (put_wing@v1): the short put to sell at the 30..60 day expiry nearest 45 days,
+# aiming for 8..15 delta (ours, ADR 0021); the open-interest walls (oi_walls@v1); the nearest
+# listed expiry (nearest_expiry@v1).
+
+[[field]]
+name = "rollup.put_wing@v1.wing_status"
+theme = "put wing, walls and expiries"
+reads = "Whether the best put was found: OK (its delta is inside 0.08 to 0.15), OUTSIDE_BAND (a best put exists between 0.05 and 0.35 delta but outside the band; rollup.put_wing@v1.delta_band_distance says how far), or the first failing step: NO_SPOT, NO_CHAIN (no puts), NO_EXPIRY (none 30 to 60 days out), NO_STRIKE (no put with our delta in 0.05 to 0.35)."
+caveats = [
+  "OUTSIDE_BAND is not a failure: the VRP scanner scores the distance rather than rejecting (owner, 2026-10-04). A hard 'eq OK' is stricter than the preset.",
+  "NO_STRIKE on a liquid name usually means a high-priced stock whose strike ladder skips the band, or every far put lacked a two-sided quote (rollup.put_wing@v1.n_unpriced).",
+]
+sources = ["docs/screeners/vrp-scanner.md (owner decisions 2026-10-04)"]
+[[field.use]]
+for = "a best put in the 8 to 15 delta band"
+op = "eq"
+value = "OK"
+mode = "soft"
+tolerance = 0
+note = "the near miss is OUTSIDE_BAND; score rollup.put_wing@v1.delta_band_distance instead of gating"
+
+[[field]]
+name = "rollup.put_wing@v1.target_expiry"
+theme = "put wing, walls and expiries"
+reads = "The expiry of the best put: the one nearest 45 calendar days among those 30 to 60 days out, standard monthlies first (open interest concentrates there; a weekly nearer 45 days is usually thin). A date to show with the strike; rollup.put_wing@v1.target_dte is the days."
+caveats = [
+  "Null when no expiry sits 30 to 60 days out (a name with monthlies only can have a gap right after an expiry).",
+  "Different from rollup.option_liquidity@v1.target_expiry (near 35 days) and rollup.nearest_expiry@v1.expiry_date (the front one).",
+]
+sources = ["docs/screeners/vrp-scanner.md"]
+[[field.use]]
+for = "has a wing expiry"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.put_wing@v1.target_dte"
+theme = "put wing, walls and expiries"
+reads = "Calendar days to the best put's expiry, 30 to 60 by construction and near 45: the premium-selling sweet spot where time decay is fast and gamma still moderate. Nearer 30 the position decays faster but a move hurts more; nearer 60 it is slower and calmer."
+caveats = [
+  "The VRP scanner holds to expiry, so a report before it is the risk to check: feature.earnings_before_expiry is for the nearest expiry, not this one; compare rollup.earnings@v1.days_to_earnings (sessions) with this (calendar days, roughly 1.4 sessions per 2 days).",
+]
+sources = ["tastylive on 45 days to expiry; docs/screeners/vrp-scanner.md"]
+[[field.use]]
+for = "around 45 days to expiry"
+op = "between"
+value = [35, 55]
+mode = "soft"
+tolerance = 5
+
+[[field]]
+name = "rollup.put_wing@v1.n_unpriced"
+theme = "put wing, walls and expiries"
+reads = "Puts at the target expiry that have no delta of ours (no two-sided quote, or the implied-volatility inversion failed): they can never be the best put. A few far wings are normal; a large share of the expiry means the chain was quoted one-sided after the close and the wing columns rest on few strikes."
+caveats = [
+  "Compare with rollup.put_wing@v1.n_strikes: many unpriced and few band strikes says 'quote problem', not 'no market'.",
+]
+sources = ["Site convention (features/rollups/options/put_wing.py)"]
+[[field.use]]
+for = "the expiry's puts were priced"
+op = "lte"
+value = 10
+mode = "soft"
+tolerance = 10
+
+[[field]]
+name = "rollup.put_wing@v1.n_strikes"
+theme = "put wing, walls and expiries"
+reads = "How many strikes at the target expiry have a put with our delta inside 0.08 to 0.15: the choice available in the band. 0 means no put in the band (the best put is outside it), 1 or 2 is normal for a strike ladder in $5 steps, 4 or more is a finely struck, usually liquid, name."
+caveats = [
+  "0 with wing_status OUTSIDE_BAND is a ladder gap, common on high-priced stocks; the best put is then the nearest outside the band and its distance is scored.",
+]
+sources = ["Site convention"]
+[[field.use]]
+for = "a strike inside the band"
+op = "gte"
+value = 1
+mode = "soft"
+tolerance = 1
+
+[[field]]
+name = "rollup.put_wing@v1.wing_oi"
+theme = "put wing, walls and expiries"
+reads = "Open interest summed over the puts inside the 8 to 15 delta band at the target expiry: the standing depth of the wing a short put is sold into. Under 500 is thin, a few thousand is tradable, tens of thousands is a popular wing. 0 when no put is in the band."
+caveats = [
+  "A single strike can hold all of it (one institutional hedge); rollup.put_wing@v1.best_put_oi is the chosen strike alone, and the two together say whether the depth is spread across the band.",
+  "Standing positions, not today's activity: rollup.put_wing@v1.wing_volume is the day's trades.",
+]
+sources = ["https://www.tastylive.com/concepts-strategies/options-liquidity"]
+[[field.use]]
+for = "a wing with depth"
+op = "gte"
+value = 2000
+mode = "soft"
+tolerance = { relative = 0.5 }
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.put_wing@v1.wing_volume"
+theme = "put wing, walls and expiries"
+reads = "Contracts traded on the session across the puts in the 8 to 15 delta band at the target expiry: whether the wing trades today. A few hundred is active for one expiry's wing; 0 on a quiet day is common even on liquid names."
+caveats = [
+  "Daily and noisy; read with rollup.put_wing@v1.wing_oi.",
+]
+sources = ["https://www.tastylive.com/concepts-strategies/options-liquidity"]
+[[field.use]]
+for = "the wing trades"
+op = "gte"
+value = 200
+mode = "soft"
+tolerance = { relative = 0.5 }
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.put_wing@v1.wing_spread_pct"
+theme = "put wing, walls and expiries"
+reads = "The median bid-ask spread as a share of mid across the puts in the 8 to 15 delta band, on the stored after-close quotes. Far wings quote wide in percent because their mids are small: 0.15 is good for a wing, 0.30 is usual on a mid-cap, above 0.50 the band is not really made."
+caveats = [
+  "A $0.05 spread on a $0.20 put is 25%: a wide percentage can be a nickel. Read rollup.put_wing@v1.best_put_mid with it.",
+  "After-close quotes; judge live. Null when no put is in the band.",
+]
+sources = ["https://www.thetaedge.ai/blog/assess-liquidity-trading-options"]
+[[field.use]]
+for = "a wing that is made (scored)"
+op = "lt"
+value = 0.20
+mode = "score"
+tolerance = 0.20
+note = "full points under 20% of mid, none at 40%"
+
+[[field]]
+name = "rollup.put_wing@v1.best_put_strike"
+theme = "put wing, walls and expiries"
+reads = "The strike of the best put: among puts with our delta between 0.05 and 0.35, the one nearest the 8 to 15 delta band, then the highest cash-secured return on capital, then the higher open interest, then the lower strike. With the expiry it identifies the contract to quote live; it is a level, shown next to the close and support (rollup.swing_levels@v1.swing_low, rollup.oi_walls@v1.put_wall)."
+caveats = [
+  "A strike above the put wall or above swing support is a wing that sits inside the zone where the stock has recently stopped falling; a strike below both has those levels as a cushion.",
+  "Null with wing_status NO_STRIKE or no target expiry.",
+]
+sources = ["docs/screeners/vrp-scanner.md"]
+[[field.use]]
+for = "has a candidate put"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.put_wing@v1.best_put_delta"
+theme = "put wing, walls and expiries"
+reads = "Our delta of the best put, negative, between -0.35 and -0.05: -0.10 is a put with roughly a 10% chance of finishing in the money, the VRP scanner's 8 to 15 delta target (-0.08 to -0.15). Nearer -0.05 the premium is tiny; nearer -0.35 the put is a stock position in waiting."
+caveats = [
+  "Ours (ADR 0021), from the stored mid with the Treasury curve and the dividend yield; the feed's delta can differ by a few hundredths. rollup.put_wing@v1.delta_band_distance is the band check in one number.",
+  "A delta computed on an after-close quote on a name that moved after the close is already stale by that move; confirm live.",
+]
+sources = ["docs/screeners/vrp-scanner.md; Hull on delta as a rough probability"]
+[[field.use]]
+for = "in the 8 to 15 delta band"
+op = "between"
+value = [-0.15, -0.08]
+mode = "soft"
+tolerance = 0.05
+note = "or score rollup.put_wing@v1.delta_band_distance lte 0 with tolerance 0.20, as the preset does"
+
+[[field]]
+name = "rollup.put_wing@v1.best_put_iv"
+theme = "put wing, walls and expiries"
+reads = "The implied volatility of the best put from its mid, as a fraction: 0.45 is 45% a year. A far put's IV is above the at-the-money IV (the skew: puts are bid for protection), so it reads higher than rollup.iv_history@v2.iv30 by 5 to 15 points on an ordinary stock. The premium the VRP scanner collects is this number against realised movement."
+caveats = [
+  "Skew is sector- and regime-dependent: a wing IV 20 points over the ATM IV says protection is expensive (a crowded or feared name), not that the stock will move that much.",
+  "A report before expiry inflates it like every IV; check rollup.earnings@v1.days_to_earnings.",
+]
+sources = ["Carr and Wu (2009); practitioner notes on put skew"]
+[[field.use]]
+for = "a rich wing (sell premium)"
+op = "gte"
+value = 0.40
+mode = "soft"
+tolerance = 0.05
+
+[[field]]
+name = "rollup.put_wing@v1.best_put_mid"
+theme = "put wing, walls and expiries"
+reads = "The best put's mid price, (bid + ask) / 2, in dollars per share: the premium a seller can expect near the middle of the market; times 100 per contract. Under $0.20 the spread is most of it; $0.50 to $2.00 is the usual wing premium on a $50 to $200 stock."
+caveats = [
+  "The mid of an after-close quote; the live mid can be far from it. The return on capital (rollup.put_wing@v1.best_put_roc) is the comparable number across prices.",
+]
+sources = ["docs/screeners/vrp-scanner.md"]
+[[field.use]]
+for = "a premium worth the spread"
+op = "gte"
+value = 0.30
+mode = "soft"
+tolerance = 0.10
+on_miss = "LIQUIDITY_RISK"
+
+[[field]]
+name = "rollup.put_wing@v1.best_put_roc"
+theme = "put wing, walls and expiries"
+reads = "The best put's cash-secured return on capital: premium over the strike (mid / strike), as a fraction for the expiry's term. 0.01 is 1% for about 45 days (roughly 8% a year); 0.02 is rich and usually means a high-volatility name; under 0.005 the trade does not pay for its risk."
+caveats = [
+  "A high ROC is a high IV: it is the compensation for the name's risk, not free money. Pair with feature.vrp_iv_hv_ratio so the IV is high against what the stock actually does.",
+  "Per term, not annualised: compare only across similar rollup.put_wing@v1.target_dte.",
+]
+sources = ["docs/screeners/vrp-scanner.md (the put wing's ROC ordering)"]
+[[field.use]]
+for = "a worthwhile return on capital"
+op = "gte"
+value = 0.01
+mode = "soft"
+tolerance = 0.003
+[[field.use]]
+for = "rank by return on capital"
+op = "gte"
+value = 0.015
+mode = "score"
+tolerance = 0.01
+
+[[field]]
+name = "rollup.oi_walls@v1.wall_status"
+theme = "put wing, walls and expiries"
+reads = "Whether the open-interest walls were found: OK (a call wall at or above spot and a put wall at or below), PARTIAL (one side only), NO_OI (no open interest on either side within 60 days), or the first failing step (NO_SPOT, NO_CHAIN, NO_EXPIRY: nothing listed 1 to 60 days out)."
+caveats = [
+  "PARTIAL is common on a name at a 52-week extreme: at a high there is little call interest above spot, at a low little put interest below.",
+]
+sources = ["docs/data/swing.md (oi_walls@v1)"]
+[[field.use]]
+for = "both walls known"
+op = "eq"
+value = "OK"
+mode = "soft"
+tolerance = 0
+note = "the near miss is PARTIAL"
+
+[[field]]
+name = "rollup.oi_walls@v1.call_wall"
+theme = "put wing, walls and expiries"
+reads = "The strike at or above spot with the most call open interest, summed over expiries 1 to 60 days out: where upside positioning is concentrated. Dealer hedging around a heavy call strike tends to lean against the price as it approaches, so the call wall reads as soft resistance and a common pinning level into expiry. Compare it with the close: a wall 3% above is near, 15% above is out of play."
+caveats = [
+  "Open interest does not say who holds it: a strike where customers face customers produces no hedging flow. Treat the wall as an estimate of a level, not a barrier (docs/data/positioning.md).",
+  "Round strikes attract interest regardless of positioning; a wall exactly at a round number is partly a ladder artefact.",
+  "After a large move the wall can sit well above or below spot until positions roll; rollup.oi_walls@v1.call_wall_oi says how much interest backs it.",
+]
+sources = ["SpotGamma, call wall and put wall explained: https://spotgamma.com/call-wall-put-wall-explained/; docs/data/positioning.md"]
+[[field.use]]
+for = "has a call wall"
+op = "not_null"
+mode = "hard"
+note = "read it against the close and feature.dist_to_resistance"
+
+[[field]]
+name = "rollup.oi_walls@v1.call_wall_oi"
+theme = "put wing, walls and expiries"
+reads = "Call open interest at the call wall, summed over expiries 1 to 60 days out: how much positioning backs the level. A few thousand contracts is a modest wall on a mid-cap; tens of thousands is a level the market watches; against the chain total (feature.option_chain_oi) it says how concentrated the upside positioning is."
+caveats = [
+  "A large number with a chain total not much larger is one expiry's interest: the wall vanishes at that expiry.",
+]
+sources = ["https://spotgamma.com/call-wall-put-wall-explained/"]
+[[field.use]]
+for = "a wall with weight"
+op = "gte"
+value = 5000
+mode = "soft"
+tolerance = { relative = 0.5 }
+
+[[field]]
+name = "rollup.oi_walls@v1.put_wall"
+theme = "put wing, walls and expiries"
+reads = "The strike at or below spot with the most put open interest, summed over expiries 1 to 60 days out: where downside protection is concentrated. Hedging around a heavy put strike tends to cushion the price as it approaches, so the put wall reads as soft support. Compare it with the close and with swing support (rollup.swing_levels@v1.swing_low); a short put struck below the wall has it as a cushion."
+caveats = [
+  "An estimate of a level, not a barrier: nothing here says whose gamma it is (docs/data/positioning.md).",
+  "Round strikes and monthlies attract interest by themselves; a wall at a round number is partly a ladder artefact.",
+]
+sources = ["https://spotgamma.com/call-wall-put-wall-explained/; docs/data/positioning.md"]
+[[field.use]]
+for = "has a put wall"
+op = "not_null"
+mode = "hard"
+note = "read it against the close and feature.dist_to_support"
+
+[[field]]
+name = "rollup.oi_walls@v1.put_wall_oi"
+theme = "put wing, walls and expiries"
+reads = "Put open interest at the put wall, summed over expiries 1 to 60 days out: how much protection sits at the level. Tens of thousands is a watched level on a large cap; against feature.option_chain_oi it says how concentrated the downside positioning is."
+caveats = [
+  "Concentrated in one expiry, it disappears at that expiry; a rolled hedge moves the wall overnight.",
+]
+sources = ["https://spotgamma.com/call-wall-put-wall-explained/"]
+[[field.use]]
+for = "a wall with weight"
+op = "gte"
+value = 5000
+mode = "soft"
+tolerance = { relative = 0.5 }
+
+[[field]]
+name = "rollup.nearest_expiry@v1.expiry_date"
+theme = "put wing, walls and expiries"
+reads = "The nearest listed option expiry on or after the session, from the session's own stored chain (an expiry on the session counts: a 0-DTE trades until the close). The Ideas page's expiry column; a date to show, with rollup.nearest_expiry@v1.dte for the days."
+caveats = [
+  "Null when every stored expiry is before the session (a stale chain): the session's chain run says why (rollup.option_liquidity@v1.liq_status).",
+  "The nearest expiry is rarely the one to trade: the short-strike groups use expiries near 35 and 45 days.",
+]
+sources = ["Site convention (features/rollups/options/nearest_expiry.py)"]
+[[field.use]]
+for = "has a listed expiry"
+op = "not_null"
+mode = "hard"
+
+[[field]]
+name = "rollup.nearest_expiry@v1.dte"
+theme = "put wing, walls and expiries"
+reads = "Calendar days to the nearest listed expiry: 0 expires today, 1 to 7 is a weekly, up to about 30 a monthly-only name. For an event play the front expiry is the one that prices the event; for everything else the number says how finely the name's expiries are spaced."
+caveats = [
+  "A front expiry with earnings before it (feature.earnings_before_expiry) carries the event; a short option there is an earnings trade whether or not it was meant as one.",
+]
+sources = ["Site convention"]
+[[field.use]]
+for = "a weekly expiry available"
+op = "lte"
+value = 7
+mode = "soft"
+tolerance = 3
+[[field.use]]
+for = "no expiry inside a week (avoid 0-DTE pinning days)"
+op = "gt"
+value = 7
+mode = "soft"
+tolerance = 3
+
+[[field]]
+name = "rollup.nearest_expiry@v1.sessions_to_expiry"
+theme = "put wing, walls and expiries"
+reads = "Exchange sessions after the session up to the nearest expiry (0: expires today), the same count as rollup.earnings@v1.days_to_earnings uses, so the two compare directly: earnings sessions below expiry sessions means the report lands before the front expiry (feature.earnings_before_expiry)."
+caveats = [
+  "Sessions, not calendar days: a holiday week makes 5 calendar days 3 sessions.",
+]
+sources = ["Site convention"]
+[[field.use]]
+for = "a front expiry at least a week out"
+op = "gte"
+value = 5
+mode = "soft"
+tolerance = 2
