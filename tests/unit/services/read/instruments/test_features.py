@@ -1,7 +1,7 @@
 """Feature values by catalogue name for exactly the session: a value, or UNKNOWN with the
 reason (NO_PARTITION, NO_ROW, NULL), never an older partition's value."""
 
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -17,6 +17,7 @@ from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.rollup_store import write_rows
 from tests.unit.services.read.instruments.conftest import D0, D1, context, store_with
 
+D2 = D1 + timedelta(days=1)
 CLOSE = "rollup.price_stats@v2.close"
 HV20 = "rollup.price_stats@v2.hv20"
 NEXT = "rollup.earnings@v1.next_earnings_date"
@@ -134,7 +135,7 @@ def test_an_etf_has_no_earnings_but_a_stock_with_none_is_unknown(reader: StoreRe
     earlier = open_context(reader, MemoryConfigStore({}), UserContext("local"), D0)
     assert values(earlier, "EQ:ETFX", NEXT)[NEXT] == (None, UnknownCode.NOT_APPLICABLE)
     [etf] = load_feature_values(earlier, ["EQ:ETFX"], [NEXT])["EQ:ETFX"]
-    assert etf.unknown is not None and "is an ETF" in etf.unknown.detail
+    assert etf.unknown is not None and "ETF" in etf.unknown.detail
     assert values(earlier, "EQ:AAA", NEXT)[NEXT] == (D1.isoformat(), None)  # a value always wins
 
 
@@ -171,3 +172,44 @@ def test_a_null_optionable_is_not_not_applicable() -> None:
 def test_a_null_rank_with_an_ok_status_is_null_not_illiquid() -> None:
     ctx = context(_chain_rows("OK"))
     assert values(ctx, "EQ:AAA", IV_RANK)[IV_RANK] == (None, UnknownCode.NULL)
+
+
+def _kinds(writer: StoreWriter) -> None:
+    """A D1 reference snapshot with a preferred, a SPAC (SIC 6770, company snapshot on D1) and
+    a stock with no company row (null sic), beside AAA."""
+    base = {"asset_class": "EQ", "exchange": "NYSE", "multiplier": 1.0, "status": "ACTIVE",
+            "is_etf": False, "optionable": True}  # fmt: skip
+    kinds = {"AAA": "COMMON_STOCK", "PREF": "PREFERRED", "SPAC": "COMMON_STOCK",
+             "NOSIC": "COMMON_STOCK"}  # fmt: skip
+    rows = [{"instrument_id": f"EQ:{s}", "symbol": s, "name": s, "security_type": t, **base}
+            for s, t in kinds.items()]  # fmt: skip
+    write_rows(writer, "instruments/reference", D1, rows)
+    company = [
+        {"instrument_id": f"EQ:{s}", "symbol": s, "cik": "1", "name": s, "sic": sic,
+         "sector": None, "fetched_on": D1}
+        for s, sic in (("AAA", "3571"), ("SPAC", "6770"))
+    ]  # fmt: skip
+    write_rows(writer, "instruments/company", D1, company)
+    earnings = {"instrument_id": "EQ:AAA", "next_earnings_date": D1, "days_to_earnings": 0}
+    write_rows(writer, "rollups/instrument/earnings@v1", D1, [earnings])
+
+
+def test_earnings_apply_only_to_operating_companies() -> None:
+    ctx = context(store_with(_kinds))
+    assert values(ctx, "EQ:AAA", NEXT)[NEXT] == (D1.isoformat(), None)
+    assert values(ctx, "EQ:PREF", NEXT)[NEXT] == (None, UnknownCode.NOT_APPLICABLE)
+    assert values(ctx, "EQ:SPAC", NEXT)[NEXT] == (None, UnknownCode.NOT_APPLICABLE)
+    [spac] = load_feature_values(ctx, ["EQ:SPAC"], [NEXT])["EQ:SPAC"]
+    assert spac.unknown is not None and "blank-check" in spac.unknown.detail
+    assert values(ctx, "EQ:NOSIC", NEXT)[NEXT] == (None, UnknownCode.NO_ROW)  # never a false n/a
+
+
+def test_a_company_snapshot_after_the_session_does_not_make_a_spac() -> None:
+    def later(writer: StoreWriter) -> None:
+        _kinds(writer)
+        company = {"instrument_id": "EQ:NOSIC", "symbol": "NOSIC", "cik": "2", "name": "NOSIC",
+                   "sic": "6770", "sector": None, "fetched_on": D2}  # fmt: skip
+        write_rows(writer, "instruments/company", D2, [company])
+
+    ctx = context(store_with(later), D1)
+    assert values(ctx, "EQ:NOSIC", NEXT)[NEXT] == (None, UnknownCode.NO_ROW)

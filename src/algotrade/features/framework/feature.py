@@ -31,8 +31,10 @@ type and, later, UI and email labels (ADR 0023).
                   shown to the owner only once there are other users; ADR 0028). An
                   expression feature takes the most restrictive licence of its inputs
 - ``applies_to``  which instruments the feature is defined for: ``any``, ``optionable``
-                  (option-chain features: a non-optionable instrument has none) or ``not_etf``
-                  (earnings: an ETF has none). A group's value is inherited by its features.
+                  (option-chain features: a non-optionable instrument has none) or
+                  ``operating_company`` (earnings: only a common stock or ADR that is not a
+                  blank-check company, SEC SIC 6770; ADR 0045). A group's value is inherited by its
+                  features.
                   Where it does not apply the read says NOT_APPLICABLE, not UNKNOWN (ADR 0042)
 - ``null_status`` the status column saying why this one is null: a sibling column of the same
                   group (``iv30_status``) or another group's (``iv30.iv30_status@v1``, for a
@@ -56,12 +58,12 @@ type Entity = Literal["instrument"]
 type Kind = Literal["window", "chain", "expression", "cross_section", "label"]
 type Range = tuple[float | None, float | None]
 type Licence = Literal["open", "personal"]
-type AppliesTo = Literal["any", "optionable", "not_etf"]
+type AppliesTo = Literal["any", "optionable", "operating_company"]
 
 ENTITIES = frozenset({"instrument"})
 KINDS = frozenset({"window", "chain", "expression", "cross_section", "label"})
 LICENCES = ("open", "personal")  # least to most restrictive
-APPLIES_TO = ("any", "optionable", "not_etf")
+APPLIES_TO = ("any", "optionable", "operating_company")
 UNITS = frozenset(
     {
         "decimal",  # a fraction: 0.25 is 25% (returns, vols, yields, rates, relative spreads)
@@ -179,15 +181,28 @@ def _absence_problems(f: Feature) -> list[str]:
     return problems
 
 
-def not_applicable(applies: Iterable[str], optionable: bool | None, is_etf: bool) -> str:
+OPERATING_TYPES = frozenset({"COMMON_STOCK", "ADR"})  # security types that can report earnings
+BLANK_CHECK_SIC = "6770"  # SEC SIC code of a blank-check company (SPAC): no operations
+
+
+def not_applicable(
+    applies: Iterable[str],
+    optionable: bool | None,
+    security_type: str | None,
+    sic: str | None = None,
+) -> str:
     """The ``applies_to`` value that rules a feature out for an instrument with these
-    reference facts, or ``""`` when it applies (ADR 0042; a null ``optionable`` is not "no").
+    reference and company facts, or ``""`` when it applies (ADR 0042, ADR 0045). A null fact
+    never rules out: a null ``optionable``, ``security_type`` or ``sic`` is unknown, not "no".
     The one decision: the read layer (NOT_APPLICABLE) and the nightly coverage check share it."""
     wanted = set(applies)
     if "optionable" in wanted and optionable is False:
         return "optionable"
-    if "not_etf" in wanted and is_etf:
-        return "not_etf"
+    if "operating_company" in wanted:
+        if security_type and security_type not in OPERATING_TYPES:
+            return "operating_company"
+        if (sic or "").strip() == BLANK_CHECK_SIC:
+            return "operating_company"
     return ""
 
 

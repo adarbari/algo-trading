@@ -265,9 +265,15 @@ Interface shape (illustrative):
 
 ```python
 class BarStore(Protocol):
-    def read(self, instruments: Sequence[str], interval: str, start: date, end: date,
-             as_of: datetime | None = None) -> BarFrame: ...
-    def write(self, bars: BarFrame, run: IngestRun) -> None: ...   # writers only
+    def read(
+        self,
+        instruments: Sequence[str],
+        interval: str,
+        start: date,
+        end: date,
+        as_of: datetime | None = None,
+    ) -> BarFrame: ...
+    def write(self, bars: BarFrame, run: IngestRun) -> None: ...  # writers only
 ```
 
 **Contract tests:** `tests/contract/storage/` holds one shared test suite that every

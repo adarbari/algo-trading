@@ -101,10 +101,10 @@ def test_applicability_is_inherited_from_the_group_and_status_fields_resolve() -
     assert other.status_field == "rollup.iv30@v1.iv30_status" and feature_problems(other) == []
     assert _feature().status_field == "" and _feature().applies_to == "any"
     own = FeatureGroup(
-        "demo2", 1, "", (Input("bars/1d"),), (_feature(applies_to="not_etf"),),
+        "demo2", 1, "", (Input("bars/1d"),), (_feature(applies_to="operating_company"),),
         lambda *_: None, applies_to="optionable",
     )  # fmt: skip
-    assert own.feature("hv30").applies_to == "not_etf"  # a feature's own value wins
+    assert own.feature("hv30").applies_to == "operating_company"  # a feature's own value wins
     with pytest.raises(ValueError, match="not a column of the group"):
         FeatureGroup(
             "d3",
@@ -133,7 +133,17 @@ def test_a_cross_group_null_status_must_name_a_declared_column() -> None:
 
 
 def test_not_applicable_is_decided_from_the_reference_facts() -> None:
-    assert not_applicable(["optionable"], optionable=False, is_etf=False) == "optionable"
-    assert not_applicable(["optionable"], optionable=None, is_etf=False) == ""  # null is not "no"
-    assert not_applicable(["not_etf"], optionable=True, is_etf=True) == "not_etf"
-    assert not_applicable([], optionable=False, is_etf=True) == ""  # applies to any
+    assert not_applicable(["optionable"], False, "COMMON_STOCK") == "optionable"
+    assert not_applicable(["optionable"], None, "COMMON_STOCK") == ""  # null is not "no"
+    assert not_applicable([], False, "ETF") == ""  # applies to any
+
+
+def test_operating_company_rules_out_non_operating_types_and_blank_checks() -> None:
+    op = ["operating_company"]
+    assert not_applicable(op, True, "ETF") == "operating_company"
+    assert not_applicable(op, True, "PREFERRED") == "operating_company"
+    assert not_applicable(op, True, "COMMON_STOCK", "6770") == "operating_company"
+    assert not_applicable(op, True, "COMMON_STOCK", "3571") == ""
+    assert not_applicable(op, True, "ADR") == ""
+    assert not_applicable(op, True, "COMMON_STOCK", None) == ""  # null sic: never a false n/a
+    assert not_applicable(op, True, None, None) == ""  # null type: unknown, not n/a

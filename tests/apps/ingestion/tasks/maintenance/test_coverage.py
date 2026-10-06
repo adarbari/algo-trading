@@ -235,3 +235,14 @@ def test_overdue_grades_only_names_with_a_row() -> None:
     put(writer, EARNINGS, D, {"C1": {"last_earnings_date": None, "next_earnings_date": None}})
     check = only(check_coverage(reader, D, rules(OVERDUE)), "earnings.last_earnings_date")
     assert cell(check, "core")["missing"] == ["C1"]  # a row with neither date is overdue too
+
+
+def test_a_blank_check_company_is_not_expected_to_have_earnings() -> None:
+    writer, reader = store()
+    company = [{"instrument_id": "EQ:R2", "symbol": "R2", "cik": "1", "name": "R2 Acquisition",
+                "sic": "6770", "sector": None, "fetched_on": D}]  # fmt: skip
+    writer.write_table("instruments/company", D, "c", stamped(company, D, "c"))
+    put(writer, EARNINGS, D, {s: {"next_earnings_date": None} for s in ("C1", "C2", "R1")})
+    rule = CoverageRule("earnings.next_earnings_date", 1.0, 0.5, covered_by="row")
+    check = only(check_coverage(reader, D, rules(rule)), "earnings.next_earnings_date")
+    assert cell(check, "rest")["missing"] == ["N1"]  # R2 is a SPAC: out of the denominator
