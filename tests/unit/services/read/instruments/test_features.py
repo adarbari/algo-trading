@@ -280,3 +280,27 @@ def test_cell_codes_carry_the_reason_of_explained_cells() -> None:
     unknown, reasons = cell_codes(cells, ["A", "B", "C"])
     assert unknown == ((UnknownCode.EXPLAINED, None), (UnknownCode.NULL, UnknownCode.NULL), ())
     assert reasons == ((NullReason.NEW_LISTING, None), (None, None), ())
+
+
+HISTORY = "rollups/instrument/price_history@v1"
+
+
+def test_no_bar_on_the_session_reads_no_trade_and_the_since_listing_high(
+    reader: StoreReader,
+) -> None:
+    writer = StoreWriter(reader._backend)
+    write_rows(writer, HISTORY, D1, [
+        {"instrument_id": "EQ:ETFX", "bar_status": "NO_TRADE", "range_status": "FULL",
+         "high_avail": 60.0},
+        {"instrument_id": "EQ:AAA", "bar_status": "TRADED", "range_status": "NEW_LISTING",
+         "high_avail": None},
+    ])  # fmt: skip
+    ctx = open_context(reader, MemoryConfigStore({}), UserContext("local"))
+    [close] = load_feature_values(ctx, ["EQ:ETFX"], [CLOSE])["EQ:ETFX"]  # no price_stats row
+    assert close.unknown is not None and close.unknown.reason is NullReason.NO_TRADE
+    assert close.unknown.detail.startswith("bar_status is NO_TRADE for EQ:ETFX on 2026-10-01")
+    avail = values(ctx, "EQ:AAA", "feature.pct_from_high_avail", FROM_HIGH)
+    assert avail["feature.pct_from_high_avail"] == (None, UnknownCode.EXPLAINED)  # NEW_LISTING
+    assert avail[FROM_HIGH][1] is None  # the 52-week value is still served
+    gone = values(ctx, "EQ:GONE", CLOSE)
+    assert gone[CLOSE] == (None, UnknownCode.NO_ROW)  # no status: the gap stays a gap

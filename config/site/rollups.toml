@@ -21,6 +21,12 @@ year_sessions = 252      # the 52-week window, in exchange sessions
 min_year_sessions = 240  # bars needed in that window for high_52w / low_52w (else null)
 periods_per_year = 252   # realised-vol annualisation
 
+["price_history@v1"]       # no trade on the session, and the high / low since listing (ADR 0046)
+year_sessions = 252        # the window (price_stats@v2's 52 weeks)
+full_bars = 240            # bars in the window for FULL (price_stats@v2's min_year_sessions)
+listing_quiet = 60         # sessions with no bar before the first bar that make it a listing
+min_listing_sessions = 20  # sessions since listing for a range (else NEW_LISTING)
+
 ["dividends@v2"]
 min_history_days = 240   # bars among the last 252 sessions before "no dividend" means 0 (else null)
 include_special = false  # count distributions typed "special" in the trailing 12 months

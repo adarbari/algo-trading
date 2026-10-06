@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-134 stored features in 16 groups, in dependency order; 37 expression features.
+140 stored features in 17 groups, in dependency order; 38 expression features.
 
 ## `option_liquidity@v1`
 
@@ -69,7 +69,7 @@ Close, moving averages, returns, 52-week range, realised vol and dollar volume. 
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
-| `close` | window | float32 | usd_per_share | open | >= 0 | The session's close, split-adjusted as of the session | never: a row exists only for an instrument with a bar on the session | `bars/1d.close` |
+| `close` | window | float32 | usd_per_share | open | >= 0 | The session's close, split-adjusted as of the session | no bar on the session (no row): price_history bar_status says NO_TRADE when the instrument has an earlier bar in the last 252 sessions | `bars/1d.close` |
 | `sma_20` | window | float32 | usd_per_share | open | >= 0 | Mean close over the last 20 sessions | a session among the last 20 has no bar (a gap), or the history is shorter | `bars/1d.close` |
 | `sma_50` | window | float32 | usd_per_share | open | >= 0 | Mean close over the last 50 sessions | a session among the last 50 has no bar (a gap), or the history is shorter | `bars/1d.close` |
 | `sma_200` | window | float32 | usd_per_share | open | >= 0 | Mean close over the last 200 sessions | a session among the last 200 has no bar (a gap), or the history is shorter | `bars/1d.close` |
@@ -82,6 +82,19 @@ Close, moving averages, returns, 52-week range, realised vol and dollar volume. 
 | `hv20_yz` | window | float32 | decimal | open | 0 .. 5 | Yang-Zhang realised volatility over 20 sessions, annualised (252) | a session among the last 21 has no bar (a gap), or the history is shorter | `bars/1d.open`, `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
 | `adv_usd_20d` | window | float32 | usd | open | >= 0 | Mean daily dollar volume (close x volume) over 20 sessions | a session among the last 20 has no bar (a gap), or the history is shorter | `bars/1d.close`, `bars/1d.volume` |
 | `history_days` | window | int | sessions | open | >= 1 | Sessions with a bar among the last year_sessions (252), the session included | never | `bars/1d.close` |
+
+## `price_history@v1`
+
+Whether the instrument traded on the session, and its high / low over the history it has. Stored as `rollups/instrument/price_history@v1`; reads `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `bar_status` | label | str | category | open | TRADED, NO_TRADE | TRADED: a bar on the session; NO_TRADE: none, though the instrument has a bar among the last year_sessions (252) sessions | never | `bars/1d.close` |
+| `last_bar_session` | window | date | date | open |  | The session of the latest bar on or before the session | never | `bars/1d.close` |
+| `range_sessions` | window | int | sessions | open | >= 1 | Sessions the range covers: from the first bar among the last year_sessions (252) sessions to the session, both included | never | `bars/1d.close` |
+| `range_status` | label | str | category | open | FULL, SINCE_LISTING, NEW_LISTING, FEW_BARS | How much history the range covers: FULL (at least full_bars, 240, bars in the window), SINCE_LISTING (listed inside the window, at least min_listing_sessions, 20, sessions ago), NEW_LISTING (listed more recently), FEW_BARS (an older listing that trades too rarely) | never | `bars/1d.close` |
+| `high_avail` | window | float32 | usd_per_share | open | >= 0 | Highest daily high over the history available: the last year_sessions (252) sessions, or since listing; split-adjusted (not dividend-adjusted) | range_status is NEW_LISTING (fewer than min_listing_sessions sessions since listing) or FEW_BARS (an older listing with fewer than full_bars bars in the window) | `bars/1d.high` |
+| `low_avail` | window | float32 | usd_per_share | open | >= 0 | Lowest daily low over the history available: the last year_sessions (252) sessions, or since listing; split-adjusted (not dividend-adjusted) | range_status is NEW_LISTING (fewer than min_listing_sessions sessions since listing) or FEW_BARS (an older listing with fewer than full_bars bars in the window) | `bars/1d.low` |
 
 ## `earnings@v1`
 
@@ -304,6 +317,7 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Formula | Stored |
 |---|---|---|---|---|---|---|---|---|---|
 | `pct_from_high_52w` | expression | float | decimal | open | -1 .. 0 | Close / 52-week high - 1 (at or below 0) | price_stats high_52w is null (fewer than 240 bars in the last 252 sessions), or no price_stats row | `price_stats.close / price_stats.high_52w - 1` | virtual |
+| `pct_from_high_avail` | expression | float | decimal | open | -1 .. 0 | Close / the high over the history available - 1 (at or below 0): the 52-week high, or the high since listing for a younger listing (price_history range_sessions says how many sessions) | no trade on the session (no price_stats row), or price_history high_avail is null (a listing under 20 sessions old, or a name trading too rarely for the window) | `price_stats.close / price_history.high_avail - 1` | virtual |
 | `pct_from_low_52w` | expression | float | decimal | open | >= 0 | Close / 52-week low - 1 (at or above 0) | price_stats low_52w is null (fewer than 240 bars in the last 252 sessions), or no price_stats row | `price_stats.close / price_stats.low_52w - 1` | virtual |
 | `near_52w` | label | str | category | open | HIGH, LOW, BOTH, NONE | Where the close sits in its 52-week range: HIGH within 10% (params.within) of the high, LOW within 10% of the low, BOTH (a narrow range), else NONE | the 52-week high or low is unknown (pct_from_high_52w or pct_from_low_52w is null) | `if(pct_from_high_52w >= -within and pct_from_low_52w <= within, "BOTH", if(pct_from_high_52w >= -within, "HIGH", if(pct_from_low_52w <= within, "LOW", "NONE")))` (within = 0.1) | virtual |
 | `dist_52w` | expression | float | decimal | open | >= 0 | Distance to the nearer 52-week extreme: the smaller of (high - close) / high and (close - low) / low (0 at an extreme) | the 52-week high or low is unknown (pct_from_high_52w or pct_from_low_52w is null) | `min(-pct_from_high_52w, pct_from_low_52w)` | virtual |
