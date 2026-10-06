@@ -44,6 +44,6 @@ def regime_gate(config: ResolvedConfig, market: dict[str, FeatureValue]) -> Regi
         screener=config.config.id,
         label=market.get(regime.label),
         multipliers=regime.multipliers,
-        pause_in=regime.pauses_for(config.config.id),
+        pause_in=config.gate_pauses,
         unknown_multiplier=regime.unknown_multiplier,
     )

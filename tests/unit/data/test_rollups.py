@@ -1,6 +1,6 @@
 """Stored rollup rows: one instrument's latest row, a range for some instruments, the read
 path of expression features (only the columns asked for, a column a partition lacks as null,
-nothing when nothing is stored) and one session's group fields of a market's row."""
+nothing when nothing is stored) and a market's row's group fields for one session or a range."""
 
 from datetime import date
 
@@ -8,7 +8,7 @@ import pytest
 
 from algotrade.core.model.errors import ConfigurationError
 from algotrade.data.prices import adjusted_bars
-from algotrade.data.rollups import feature_rows, group_view, rollup_row, rollup_rows
+from algotrade.data.rollups import feature_rows, group_rows, group_view, rollup_row, rollup_rows
 from tests.helpers.rollup_store import store, write_rows
 from tests.helpers.stored_frames import stamped
 
@@ -62,3 +62,26 @@ def test_group_view_reads_exactly_the_sessions_partition_for_the_ids() -> None:
     assert list(later.columns) == ["instrument_id"] and gone == (market,)
     with pytest.raises(ValueError, match="not a feature group field"):
         group_view(reader, D1, ["instrument.symbol"], ["MKT:US"])
+
+
+def test_group_rows_reads_every_stored_session_of_the_range() -> None:
+    writer, reader = store()
+    breadth, trend = "rollups/market/breadth@v1", "rollups/market/trend@v1"
+    write_rows(writer, breadth, D1, [{"instrument_id": "MKT:US", "share": 0.4}])
+    write_rows(writer, breadth, D2, [{"instrument_id": "MKT:US", "share": None}])
+    write_rows(writer, trend, D2, [{"instrument_id": "MKT:US", "slope": 1.5}])
+    fields = ["market.breadth@v1.share", "market.trend@v1.slope", "market.other@v1.x"]
+    frame, missing = group_rows(reader, D1, D2, fields, ["MKT:US"])
+    assert list(frame["session_date"]) == [D1, D2]  # no row for a session: absent, not null
+    assert frame["market.breadth@v1.share"].iloc[0] == 0.4
+    assert frame["market.breadth@v1.share"].isna().iloc[1]  # a stored null stays null
+    assert (
+        frame["market.trend@v1.slope"].isna().iloc[0]
+        and frame["market.trend@v1.slope"].iloc[1] == 1.5
+    )
+    assert missing == ("rollups/market/other@v1",)
+    empty, gone = group_rows(reader, D1, D2, fields[2:], ["MKT:US"])
+    assert empty.empty and list(empty.columns) == ["session_date", "instrument_id"]
+    assert gone == ("rollups/market/other@v1",)
+    with pytest.raises(ValueError, match="not a feature group field"):
+        group_rows(reader, D1, D2, ["instrument.symbol"], ["MKT:US"])

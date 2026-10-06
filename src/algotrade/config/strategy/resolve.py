@@ -110,6 +110,7 @@ class ResolvedConfig:
     layers: tuple[str, ...] = ()
     hash: str = field(default="")
     features: tuple[FeatureDefinition, ...] = ()  # referenced user features, dependency order
+    preset: str | None = None  # the site preset it is or extends (None: a user-only config)
 
     @property
     def screening(self) -> ScreeningSettings:
@@ -122,6 +123,12 @@ class ResolvedConfig:
     def backtest(self) -> BacktestSettings:
         """The resolved ``[backtest]`` settings, typed (validated by ``resolve``)."""
         return BacktestSettings.parse(self.settings.get("backtest"), f"{self.config.id} [backtest]")
+
+    @property
+    def gate_pauses(self) -> frozenset[str]:
+        """The labels this screener's picks pause in (ADR 0049): its own id's
+        ``[regime.screeners.<id>]``, else the preset's it extends, else ``[regime] pause_in``."""
+        return self.regime.pauses_for(self.config.id, self.preset)
 
     @property
     def regime(self) -> RegimeSettings:
@@ -207,7 +214,7 @@ def _pinned_preset(
 
 def _strategy_document(
     config_id: str, user: UserContext, load: DocumentLoader
-) -> tuple[dict[str, Any], list[str]]:
+) -> tuple[dict[str, Any], list[str], str | None]:
     own = config_document(load, user.user_id, config_id) if user.user_id != SITE_USER else None
     user_kind, user_doc = own if own else ("strategies", None)
     where = f"{user.user_id}/{user_kind}/{config_id}"
@@ -230,7 +237,7 @@ def _strategy_document(
         merged = deep_merge(merged, {k: v for k, v in user_doc.items() if k != "extends"})
         merged["id"] = config_id
         layers.append(where)
-    return merged, layers
+    return merged, layers, base_id if site_doc else None
 
 
 def _selection(
@@ -256,7 +263,7 @@ def resolve(
     load = _checked(load)
     if overrides:
         reject_secrets(overrides, "run-overrides")
-    document, layers = _strategy_document(config_id, user, load)
+    document, layers, preset = _strategy_document(config_id, user, load)
     if overrides:
         document = deep_merge(document, overrides)
         layers.append("run-overrides")
@@ -278,9 +285,7 @@ def resolve(
             check_screen_spec(spec, catalog, config_id)
     defaults = deep_merge(BUILTIN_DEFAULTS, site_defaults(load))
     settings = deep_merge(defaults, config.settings)
-    resolved = ResolvedConfig(config, selection, settings, user, tuple(layers))
+    resolved = ResolvedConfig(config, selection, settings, user, tuple(layers), preset=preset)
     # typed: a bad value fails here, with its path
     _ = resolved.screening, resolved.backtest, resolved.regime
-    return ResolvedConfig(
-        config, selection, settings, user, tuple(layers), fingerprint(resolved.canonical())
-    )
+    return replace(resolved, hash=fingerprint(resolved.canonical()))

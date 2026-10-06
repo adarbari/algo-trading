@@ -6,8 +6,9 @@ atomically; its run summary goes into the run record (``stats["summary"]``).
 
 With ``[regime]`` enabled (ADR 0049) the session's regime label is read (``services.screening
 .regime``) and the screening engine's gate PAUSES the picks of a screener that pauses in it
-(or of every screener when the label is unknown: fail closed); every result row carries the
-session's ``regime`` and ``size_multiplier``, and the run record the gate's summary."""
+(or of every gated screener, one with a ``pause_in``, when the label is unknown: fail
+closed); every result row carries the session's ``regime`` and ``size_multiplier``, and the
+run record the gate's summary."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass, replace

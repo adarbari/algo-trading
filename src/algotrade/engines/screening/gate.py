@@ -4,10 +4,11 @@ The screening engine applies it to a screener's rows, never the screener itself:
 ``[regime]`` is enabled, a QUALIFIED or WATCH row becomes ``Decision.PAUSED`` with the reason
 first (``regime=STRESS: vrp_scanner pauses in STRESS``) when the session's label is one the
 screener pauses in, and with ``regime unknown`` when the label is unknown (null, or not a
-known label): fail closed, never read as CALM. Other decisions are left as they are. PAUSED is
-processed, so coverage is unchanged. Every row of the run carries the session's ``regime`` and
-its ``size_multiplier``: the label's multiplier, 0 in a label the screener pauses in, and
-``unknown_multiplier`` when the label is unknown.
+known label) and the screener is gated (its ``pause_in`` is not empty): fail closed, never
+read as CALM. A screener that pauses in no label is never paused. Other decisions are left as
+they are. PAUSED is processed, so coverage is unchanged. Every row of the run carries the
+session's ``regime`` and its ``size_multiplier``: the label's multiplier, 0 in a label the
+screener pauses in, and ``unknown_multiplier`` when the label is unknown.
 """
 
 from collections.abc import Mapping, Sequence
@@ -44,7 +45,7 @@ class RegimeGate:
     def reason(self) -> str | None:
         """Why the gate pauses this run's picks (``None``: it lets them through)."""
         if not self.known:
-            return UNKNOWN
+            return UNKNOWN if self.pause_in else None
         if self.label in self.pause_in:
             return f"regime={self.label}: {self.screener} pauses in {self.label}"
         return None

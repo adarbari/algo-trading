@@ -26,7 +26,9 @@ SITE_REGIME = {
 
 
 def store(
-    user: dict[str, Any] | None = None, site: dict[str, Any] | None = None
+    user: dict[str, Any] | None = None,
+    site: dict[str, Any] | None = None,
+    extra: dict[tuple[str, str, str], Any] | None = None,
 ) -> MemoryConfigStore:
     docs: dict[tuple[str, str, str], Any] = {
         ("site", "defaults", "defaults"): {"regime": SITE_REGIME},
@@ -40,6 +42,7 @@ def store(
     }
     if user is not None:
         docs[("u1", "strategies", "vrp_scanner")] = user
+    docs.update(extra or {})
     return MemoryConfigStore(docs)
 
 
@@ -99,3 +102,22 @@ def test_the_committed_site_defaults_pause_the_vrp_scanner_in_storms() -> None:
     assert dict(regime.multipliers) == dict(DEFAULT_MULTIPLIERS)
     assert regime.pauses_for("vrp_scanner") == {"STRESS", "CRISIS"}
     assert regime.pauses_for("short_premium_liquidity") == frozenset()
+
+
+MY_VRP = ("u1", "strategies", "my_vrp")
+
+
+def test_a_users_copy_keeps_the_presets_pause() -> None:
+    """A user's ``my_vrp`` extending ``vrp_scanner`` pauses where the preset does, unless
+    ``[regime.screeners.my_vrp]`` says otherwise."""
+    copy = {"id": "my_vrp", "extends": "vrp_scanner"}
+    mine = resolve("my_vrp", UserContext("u1"), store(extra={MY_VRP: copy}).load)
+    assert mine.preset == "vrp_scanner" and mine.config.id == "my_vrp"
+    assert mine.gate_pauses == {"STRESS", "CRISIS"}
+    own = {**copy, "regime": {"screeners": {"my_vrp": {"pause_in": ["CRISIS"]}}}}
+    assert resolve("my_vrp", UserContext("u1"), store(extra={MY_VRP: own}).load).gate_pauses == {
+        "CRISIS"
+    }
+    site = resolve("vrp_scanner", UserContext(SITE_USER), store().load)
+    assert site.preset == "vrp_scanner" and site.gate_pauses == {"STRESS", "CRISIS"}
+    assert RegimeSettings(pause_in=frozenset({"STRESS"})).pauses_for("x", "y") == {"STRESS"}

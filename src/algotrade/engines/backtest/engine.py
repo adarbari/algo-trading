@@ -87,16 +87,22 @@ class _Overlays:
         self._decided: TargetWeights | None = None  # the strategy's latest targets
         self._sent: dict[str, float] | None = None  # the latest overlaid weights sent on
 
-    def step(self, targets: TargetWeights | None, t: int) -> TargetWeights | None:
-        """The weights to trade towards at bar ``t`` (``None``: no change)."""
+    def step(
+        self, targets: TargetWeights | None, t: int, view: Mapping[str, object]
+    ) -> TargetWeights | None:
+        """The weights to trade towards at bar ``t`` (``None``: no change). Only instruments
+        in ``view`` (the tradable set at ``t``) are kept: one that left a rebalanced set is
+        never bought back from the strategy's older targets."""
         if not self.overlays or self.market is None:
             return targets
         self._decided = self._decided if targets is None else targets
         if self._decided is None:
             return None
-        weights, why = overlaid(self._decided, self.overlays, self.market.at(t))
+        tradable = {i: w for i, w in self._decided.items() if i in view}
+        weights, why = overlaid(tradable, self.overlays, self.market.at(t))
         self.reasons.update(why)
-        if targets is None and weights == self._sent:
+        sent = {i: w for i, w in (self._sent or {}).items() if i in view}
+        if targets is None and weights == sent:
             return None
         self._sent = weights
         return weights
@@ -160,7 +166,7 @@ def run_backtest(
         view = universe.view(t)
         if not view:
             continue
-        targets = overlay.step(strategy.on_bar(MarketView(view, t, market)), t)
+        targets = overlay.step(strategy.on_bar(MarketView(view, t, market)), t, view)
         if targets is None:
             continue
         limited = apply_limits(targets, config.limits)

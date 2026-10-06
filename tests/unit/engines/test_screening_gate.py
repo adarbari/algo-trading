@@ -55,8 +55,8 @@ def test_a_paused_regime_pauses_only_the_picks_and_keeps_coverage() -> None:
 
 
 @pytest.mark.parametrize("label", [None, "STORM", 2.0])
-def test_an_unknown_regime_pauses_every_pick(label: object) -> None:
-    g = gate(label, frozenset())
+def test_an_unknown_regime_pauses_every_pick_of_a_gated_screener(label: object) -> None:
+    g = gate(label, frozenset({"CRISIS"}))
     assert g.reason == UNKNOWN and g.size_multiplier == 0.0
     rows = gate_rows(Fixed().screen(FeatureView(DAY, {"EQ:A": {}, "EQ:C": {}})), g)
     assert [(r.decision, r.reasons[0]) for r in rows] == [
@@ -85,3 +85,11 @@ def test_a_regime_the_screener_does_not_pause_in_lets_rows_through() -> None:
     assert run(gate("CAUTION")).rows == run(None).rows
     assert run(gate("STRESS", frozenset())).counts() == run(None).counts()
     assert run(gate("STRESS")).rows == run(gate("STRESS")).rows  # deterministic
+
+
+def test_an_unknown_regime_leaves_an_ungated_screener_alone() -> None:
+    """A screener that pauses in no label is never paused, even when the label is unknown;
+    its size is still the unknown multiplier."""
+    g = gate(None, frozenset())
+    assert g.reason is None and g.size_multiplier == 0.0 and g.regime is None
+    assert run(g).rows == run(None).rows

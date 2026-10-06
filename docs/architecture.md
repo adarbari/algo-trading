@@ -486,7 +486,8 @@ when the label is unknown (fail closed). Market values come in as `MarketFeature
 fill at t+1's open, so no overlay sees the future. A strategy that returns `None` is resized
 when the overlay's output changes; the run record counts the bars per overlay reason. The
 screening engine's counterpart is the regime gate (`engines/screening/gate.py`): a screener's
-QUALIFIED / WATCH rows become `PAUSED` in the labels it pauses in, or when the label is unknown.
+QUALIFIED / WATCH rows become `PAUSED` in the labels it pauses in, or, if it pauses in any,
+when the label is unknown.
 
 ---
 

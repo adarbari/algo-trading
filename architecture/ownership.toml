@@ -161,9 +161,6 @@ detect = [
 id = "virtual-feature-reads"
 description = "Read expression features on read (selections, FeatureView, series): load only the stored columns their formulas need (data.rollups.feature_rows, column-pruned) and evaluate them through the FeatureSet"
 owner = ["src/algotrade/services/features.py", "src/algotrade/data/rollups.py"]
-allowed = [
-    "src/algotrade/services/backtests/market.py",  # a backtest's stored market feature columns over its sessions (ADR 0049): a column-pruned read of stored values, no formula
-]
 section = "docs/adr/0023-feature-store.md#step-3-expression-features-virtual-by-default"
 detect = [{ call = "feature_rows" }]
 
@@ -610,7 +607,7 @@ detect = [{ call = "evaluate_screen" }, { call = "evaluate_criterion" }, { call 
 
 [[responsibility]]
 id = "run-overlays"
-description = "Run overlays and the regime gate (ADR 0049): the Overlay protocol and ScaleByLabel (engines/overlays), applied by the backtest engine after on_bar and before the risk limits; MarketFeatures on the bar timeline (session t's values at bar t, no lookahead) and the market features a run reads (services/backtests/market.py, services/screening/regime.py); the typed [regime] settings (config/strategy/regime.py); the screening engine's gate that PAUSES a screener's picks in the regimes it pauses in, and every pick when the label is unknown (fail closed)"
+description = "Run overlays and the regime gate (ADR 0049): the Overlay protocol and ScaleByLabel (engines/overlays), applied by the backtest engine after on_bar and before the risk limits; MarketFeatures on the bar timeline (session t's values at bar t, no lookahead) and the market features a run reads (services/backtests/market.py, services/screening/regime.py); the typed [regime] settings (config/strategy/regime.py); the screening engine's gate that PAUSES a screener's picks in the regimes it pauses in, and every pick of a gated screener (a non-empty pause_in) when the label is unknown (fail closed)"
 owner = [
     "src/algotrade/engines/overlays/*",
     "src/algotrade/engines/screening/gate.py",

@@ -6,7 +6,8 @@ range of sessions, one session, or one instrument's latest row.
 read model's range reads (feature series); ``rollup_on`` one session's rows for a consumer
 comparing them (the live verification); ``group_view`` the fields of feature groups for one
 session of some entities that are not instruments (a market group's ``MKT:US`` row, ADR 0047;
-instruments go through ``reference.instrument_view``). ``feature_rows``: for the read path of
+instruments go through ``reference.instrument_view``), and ``group_rows`` the same over a range
+of sessions (a backtest's market features, ADR 0049). ``feature_rows``: for the read path of
 expression features (``services.features``), only the columns a formula needs. Each partition is one
 session's rows from the latest run that wrote it (or the run current at ``as_of``). The stamp
 columns (``knowledge_ts``, ``source``, ``run_id``) are dropped; ``session_date`` is kept as a
@@ -108,6 +109,17 @@ def rollup_on(
     return frame.drop(columns=[c for c in STAMPS if c in frame.columns]).reset_index(drop=True)
 
 
+def _by_table(fields: Sequence[str]) -> dict[str, list[tuple[str, str]]]:
+    """``{table: [(field, column)]}`` of feature group fields; any other field fails."""
+    wanted: dict[str, list[tuple[str, str]]] = {}
+    for name in fields:
+        table, column = field_source(name)
+        if group_of_table(table) is None:
+            raise ValueError(f"{name}: not a feature group field")
+        wanted.setdefault(table, []).append((name, column))
+    return wanted
+
+
 def group_view(
     reader: StoreReader,
     session: date,
@@ -118,18 +130,43 @@ def group_view(
     """``instrument_id`` (each of ``ids``) and each of ``fields`` (feature group fields only,
     ``market.<group>@v<N>.<column>``) from exactly ``session``'s partition -> (the frame, the
     tables with no partition for it, whose fields are absent)."""
-    wanted: dict[str, list[tuple[str, str]]] = {}
-    for name in fields:
-        table, column = field_source(name)
-        if group_of_table(table) is None:
-            raise ValueError(f"{name}: not a feature group field")
-        wanted.setdefault(table, []).append((name, column))
     out = pd.DataFrame({"instrument_id": [str(i) for i in ids]})
     missing = []
-    for table, columns in wanted.items():
+    for table, columns in _by_table(fields).items():
         frame = reader.table(table, session, as_of, list(ids))
         if frame is None:
             missing.append(table)
             continue
         out = join_fields(out, frame, columns)
     return out, tuple(sorted(missing))
+
+
+def group_rows(
+    reader: StoreReader,
+    start: date,
+    end: date,
+    fields: Sequence[str],
+    ids: Sequence[str],
+    as_of: datetime | None = None,
+) -> tuple[pd.DataFrame, tuple[str, ...]]:
+    """``group_view`` over ``start <= session_date <= end``: ``session_date``, ``instrument_id``
+    and each of ``fields`` for every stored row of ``ids`` (one row per stored session and id;
+    a session with no row is absent, a stored null stays null), sorted by session and id ->
+    (the frame, the tables with no row in the range, whose fields are absent)."""
+    keys = ["session_date", "instrument_id"]
+    out: pd.DataFrame | None = None
+    missing = []
+    for table, columns in _by_table(fields).items():
+        wanted = sorted({c for _, c in columns})
+        frame = _rows(reader.table_range(table, start, end, as_of, list(ids), wanted))
+        if frame is None:
+            missing.append(table)
+            continue
+        picked = frame[keys].astype({"instrument_id": str})
+        for name, column in columns:
+            if column in frame.columns:
+                picked[name] = frame[column].to_numpy()
+        out = picked if out is None else out.merge(picked, on=keys, how="outer")
+    if out is None:
+        return pd.DataFrame(columns=keys), tuple(sorted(missing))
+    return out.sort_values(keys, kind="stable").reset_index(drop=True), tuple(sorted(missing))

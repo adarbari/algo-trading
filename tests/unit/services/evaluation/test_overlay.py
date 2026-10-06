@@ -27,9 +27,10 @@ def test_without_market_rows_the_report_says_so(backend: MemoryBackend) -> None:
 
 @pytest.fixture(scope="module")
 def stormy(backend: MemoryBackend) -> StoreReader:
-    """bull_trend's first 60 sessions labelled (a storm in 20..39); later ones unknown."""
-    days = [d.item() for d in business_days("2020-01-01", 60).astype("datetime64[D]")]
-    labels: dict[date, str | None] = dict.fromkeys(days, "CALM")
+    """Every bull_trend session labelled: a storm in 20..39, CALM to 59, then stored nulls."""
+    days = [d.item() for d in business_days("2020-01-01", 756).astype("datetime64[D]")]
+    labels: dict[date, str | None] = dict.fromkeys(days, None)
+    labels.update(dict.fromkeys(days[:60], "CALM"))
     labels.update(dict.fromkeys(days[20:40], "STRESS"))
     write_labels(StoreWriter(backend), labels)
     return StoreReader(backend)

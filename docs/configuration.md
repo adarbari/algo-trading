@@ -240,9 +240,10 @@ pause_in = ["STRESS", "CRISIS"]
   `pause_in` label, `unknown_multiplier` when unknown) before the risk limits; the run record's
   `overlay_reasons` counts the bars per reason.
 - **Screeners.** Enabled, a QUALIFIED / WATCH row is `PAUSED` when the session's label is in
-  the screener's `pause_in` (its `[regime.screeners.<id>]` table, else the top-level list), and
-  in every screener when the label is unknown; result rows carry `regime` and
-  `size_multiplier` ([screeners](screeners/README.md#contract-all-screeners)).
+  the screener's `pause_in` (its `[regime.screeners.<id>]` table, else that of the site preset it
+  extends, so a user's copy of the VRP scanner keeps its pause, else the top-level list), and
+  in every gated screener (a non-empty `pause_in`) when the label is unknown; result rows
+  carry `regime` and `size_multiplier` ([screeners](screeners/README.md#contract-all-screeners)).
 - **Validation.** Unknown keys, a multiplier outside [0, 1], a label outside the four, or a
   `label` that is not a `market.<group>@v<N>.<column>` field fail at resolve with the path,
   e.g. `vrp_scanner [regime] pause_in: unknown labels ['STORM']`.

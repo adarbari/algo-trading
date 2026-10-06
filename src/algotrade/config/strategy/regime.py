@@ -68,9 +68,14 @@ class RegimeSettings:
     pause_in: frozenset[str] = frozenset()
     screeners: Mapping[str, frozenset[str]] = field(default_factory=dict)  # id -> pause_in
 
-    def pauses_for(self, screener: str) -> frozenset[str]:
-        """The labels in which ``screener`` (a config id) pauses its picks."""
-        return self.screeners.get(screener, self.pause_in)
+    def pauses_for(self, screener: str, preset: str | None = None) -> frozenset[str]:
+        """The labels in which ``screener`` (a config id) pauses its picks: its own
+        ``[regime.screeners.<id>]``, else that of the ``preset`` it extends (a user's copy of
+        the VRP scanner keeps its pause), else ``pause_in``."""
+        for key in (screener, preset):
+            if key is not None and key in self.screeners:
+                return self.screeners[key]
+        return self.pause_in
 
     @classmethod
     def parse(cls, doc: Mapping[str, Any] | None, where: str) -> "RegimeSettings":

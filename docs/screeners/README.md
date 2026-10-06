@@ -16,8 +16,9 @@
 - `PAUSED` (ADR 0049) is a pick (`QUALIFIED` or `WATCH`) held back by the regime gate, never
   by the screener itself: with `[regime] enabled`, the screening engine pauses a screener's
   picks when the session's `market.regime@v1.label` is one of its `pause_in` labels (reason
-  `regime=STRESS: vrp_scanner pauses in STRESS`), and every screener's picks when the label is
-  unknown (reason `regime unknown`: fail closed, never read as CALM). A paused row keeps its
+  `regime=STRESS: vrp_scanner pauses in STRESS`), and all its picks when the label is
+  unknown and it pauses in any label (reason `regime unknown`: fail closed, never read as
+  CALM); a screener with an empty `pause_in` is never paused. A paused row keeps its
   score, rank and other reasons and counts as processed, so a Storm run is not `PARTIAL`;
   `SKIPPED` still means "no data". Every result row carries the session's `regime` (null with
   the gate off or the label unknown) and `size_multiplier` (the label's multiplier; 0 when

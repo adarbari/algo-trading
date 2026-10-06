@@ -7,7 +7,7 @@ from datetime import date
 import pytest
 
 from algotrade.config.user import UserContext
-from algotrade.core.model.errors import ConfigurationError, MissingDataError
+from algotrade.core.model.errors import MissingDataError
 from algotrade.core.time.clock import business_days
 from algotrade.data import StoreReader
 from algotrade.services.backtests.market import MARKET, load_market_features
@@ -32,24 +32,36 @@ def write_labels(writer: StoreWriter, labels: dict[date, str | None]) -> None:
         writer.write_table(REGIME, day, "m1", stamped([row], day, "m1", LOADED))
 
 
+TIMELINE = business_days("2024-01-01", 5)  # Mon 1 .. Fri 5 January
+DAYS = [d.item() for d in TIMELINE.astype("datetime64[D]")]
+
+
 def test_values_sit_on_the_bar_timeline_without_lookahead() -> None:
     b = MemoryBackend()
-    timeline = business_days("2024-01-01", 5)  # Mon 1 .. Fri 5 January
-    days = [d.item() for d in timeline.astype("datetime64[D]")]
-    write_labels(StoreWriter(b), {days[0]: "CALM", days[1]: "STRESS", days[3]: None})
-    market = load_market_features(StoreReader(b), [LABEL], timeline)
-    assert [market.at(t)[LABEL] for t in range(5)] == ["CALM", "STRESS", None, None, None]
-    assert market.timestamps is timeline
+    labels = ["CALM", "STRESS", None, "CRISIS", None]  # None: a stored null label
+    write_labels(StoreWriter(b), dict(zip(DAYS, labels, strict=True)))
+    market = load_market_features(StoreReader(b), [LABEL], TIMELINE)
+    assert [market.at(t)[LABEL] for t in range(5)] == labels
+    assert market.timestamps is TIMELINE
+
+
+def test_a_session_with_no_stored_row_is_missing_data() -> None:
+    """ADR 0008: only a stored null is unknown; a session with no row is an error naming it."""
+    b = MemoryBackend()
+    write_labels(StoreWriter(b), {d: "CALM" for d in DAYS if d != DAYS[2]})
+    with pytest.raises(MissingDataError, match=r"no MKT:US row for 1 session\(s\): 2024-01-03"):
+        load_market_features(StoreReader(b), [LABEL], TIMELINE)
 
 
 def test_nothing_stored_is_missing_data_and_other_fields_are_refused() -> None:
     reader = StoreReader(MemoryBackend())
-    timeline = business_days("2024-01-01", 3)
     with pytest.raises(MissingDataError, match="market-rollups"):
-        load_market_features(reader, [LABEL], timeline)
-    with pytest.raises(ConfigurationError, match="not a market feature field"):
-        load_market_features(reader, ["rollup.iv30@v1.iv30"], timeline)
-    assert load_market_features(reader, [LABEL], timeline[:0]).names == (LABEL,)
+        load_market_features(reader, [LABEL], TIMELINE)
+    with pytest.raises(MissingDataError, match="iv30"):  # an instrument group: no MKT:US rows
+        load_market_features(reader, ["rollup.iv30@v1.iv30"], TIMELINE)
+    with pytest.raises(ValueError, match="not a feature group field"):
+        load_market_features(reader, ["instrument.symbol"], TIMELINE)
+    assert load_market_features(reader, [LABEL], TIMELINE[:0]).names == (LABEL,)
 
 
 def test_a_configured_backtest_applies_the_regime_overlay(backend: MemoryBackend) -> None:
