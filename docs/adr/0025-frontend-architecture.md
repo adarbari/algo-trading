@@ -50,7 +50,7 @@ apps/web/
 ```
 A slice (`pages/*`, `widgets/*`, `features/*`, `entities/*`, `shared/*`) exposes its public API
 in `index.ts`; inner folders are segments named for their kind (`ui`, `model`, `api`, `lib`,
-`config`). Every folder is declared as a `[[web_dir]]` in `architecture/layout.toml`.
+`config`). Every folder is declared as a `[[web_dir]]` in `architecture/web_layout.toml`.
 
 ### Workspaces and routes
 Two workspaces, switched in a **horizontal top bar** (not a sidebar):

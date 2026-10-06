@@ -100,7 +100,7 @@ jobs:
       - name: Unit + architecture + property + integration + e2e (coverage gate 90%, one worker per CPU)
         if: needs.changes.outputs.python == 'true'
         run: make test
-      # A web-only change still answers to the layout rules (architecture/layout.toml [[web_dir]]).
+      # A web-only change still answers to the layout rules (architecture/web_layout.toml [[web_dir]]).
       - name: Architecture only (the change is web-only)
         if: needs.changes.outputs.python != 'true'
         run: .venv/bin/python -m pytest -q -n auto tests/architecture

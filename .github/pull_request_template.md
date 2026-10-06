@@ -20,7 +20,7 @@
 - [ ] Tests mirror the source folders; no grab-bag module names (`utils`, `helpers`, `common`, ...)
 
 ## Web UI (ADR 0025; skip if `apps/web` is untouched)
-- [ ] Placed per `docs/ui/architecture.md` ("Where does it go?"); new folders declared as `[[web_dir]]` in `architecture/layout.toml`
+- [ ] Placed per `docs/ui/architecture.md` ("Where does it go?"); new folders declared as `[[web_dir]]` in `architecture/web_layout.toml`
 - [ ] Layers import only downward; other slices only via `index.ts`; no sibling-slice imports
 - [ ] No HTML elements, `className` / `style`, CSS, colours or px outside `design-system/`; only `src/shared/api` talks HTTP
 - [ ] New / changed design-system component: stories (Default, Loading, Empty, Error, Dense), test with axe, screenshots updated (`npm run visual:update`) and reviewed; `COMPONENTS.md` regenerated

@@ -12,7 +12,7 @@ No new HTML: pages, widgets, features and entities only compose `@algotrade/ui`.
    Screeners, Explore, Backtests; ADMIN: Ingestion, Screener runs, Users & configs). A new
    section is a new entry there plus a route in its workspace group
    (`src/app/routes/trader/` or `src/app/routes/admin/`). Each folder kind is declared in
-   `architecture/layout.toml` (`[[web_dir]]`); a new kind of folder is declared first.
+   `architecture/web_layout.toml` (`[[web_dir]]`); a new kind of folder is declared first.
 1. **Data first: the entity's GraphQL operation** (ADR 0037; `.claude/skills/add-graphql-field`).
    Page reads are GraphQL: the operation in the entity's `api/`, fragments from other entities
    through their `index.ts`, per-instrument values as `features(names: [feature('<name>')])`

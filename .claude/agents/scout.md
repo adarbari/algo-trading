@@ -17,7 +17,7 @@ Rules:
   `apps/api/openapi.json`, `datasets/golden/**`, `tests/fixtures/**`, `**/__screenshots__/**`.
   Grep `docs/data/features.md` instead of reading it.
 - Ownership questions: grep `architecture/ownership.toml` for the responsibility and quote
-  the entry. Folder questions: grep `architecture/layout.toml`.
+  the entry. Folder questions: grep `architecture/layout.toml` (web folders: `architecture/web_layout.toml`).
 
 Answer format (keep it under 30 lines):
 

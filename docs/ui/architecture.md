@@ -30,7 +30,7 @@ system; everything else composes it in layers that import only downward.
 | Lint rule, generator, check | `apps/web/lint-rules/`, `apps/web/scripts/` |
 
 Nothing fits? Add a folder for the new kind, declare it as a `[[web_dir]]` in
-`architecture/layout.toml` with a purpose, and never park code in a neighbour.
+`architecture/web_layout.toml` with a purpose, and never park code in a neighbour.
 
 ## Layers
 
@@ -95,7 +95,7 @@ Every message names its rule (`[ADR 0025 rule n]`), this page and the skill with
 | 7 | No grab-bag module names (`utils.ts`, `helpers.ts`, ...) | `test_layout_web.py` (`[banned_module_names]`) |
 | 8 | Accessible: keyboard and labels for interactive components | `eslint-plugin-jsx-a11y` (strict); axe in unit, visual and e2e tests |
 
-Every folder under `apps/web` is declared in `architecture/layout.toml` (`[[web_dir]]`, with
+Every folder under `apps/web` is declared in `architecture/web_layout.toml` (`[[web_dir]]`, with
 `kind` = layer / slice / segment / component / screenshots); an undeclared folder fails
 `tests/architecture/test_layout_web.py`. Owners of web responsibilities (styling, tokens, HTTP,
 data access, routing, workspace access, env) are `[[web_responsibility]]` entries in
