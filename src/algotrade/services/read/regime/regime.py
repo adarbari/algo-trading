@@ -6,18 +6,17 @@ session (``fields.py``; never an older partition). A label not stored for the se
 "Not computed yet" rather than guess a weather. The headline is templated here from the
 indicators' counts, so the browser derives nothing (ADR 0038).
 
-Sizing: the site's multiplier per label (the plan's 1 / 0.75 / 0.5 / 0.25), from a ``[regime]``
-``multipliers`` table of ``config/site/defaults.toml`` when it has one, else the constants
-below. An UNKNOWN regime has no multiplier (the overlay fails closed, ADR 0049)."""
+Sizing: the site's multiplier per label, the typed ``[regime] multipliers`` of
+``config/site/defaults.toml`` (``config.strategy.regime.site_regime``; the plan's 1 / 0.75 /
+0.5 / 0.25 where it sets none). The per-user layer comes with RG5's read of the caller's
+config. An UNKNOWN regime has no multiplier (the overlay fails closed, ADR 0049)."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
 from enum import StrEnum
-from typing import Any
 
-from algotrade.config.site.settings import site_defaults
-from algotrade.core.model.errors import ConfigurationError
+from algotrade.config.strategy.regime import site_regime
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.regime.fields import (
     FRAGILITY,
@@ -52,15 +51,7 @@ PLAIN_LABELS = {
     RegimeLabel.CRISIS: "Severe storm",
     RegimeLabel.UNKNOWN: "Not computed yet",
 }
-# TODO(RG4, ADR 0049): the multipliers become `[regime]` of config/site/defaults.toml typed in
-# config/strategy/regime.py, layered per user; this read then takes them from there.
-DEFAULT_MULTIPLIERS = {
-    RegimeLabel.CALM: 1.0,
-    RegimeLabel.CAUTION: 0.75,
-    RegimeLabel.STRESS: 0.5,
-    RegimeLabel.CRISIS: 0.25,
-}
-KNOWN = tuple(DEFAULT_MULTIPLIERS)
+KNOWN = (RegimeLabel.CALM, RegimeLabel.CAUTION, RegimeLabel.STRESS, RegimeLabel.CRISIS)
 NOT_COMPUTED = "Not computed yet"
 
 
@@ -123,18 +114,10 @@ def _score(reading: Reading) -> RegimeScore:
 
 
 def _multipliers(ctx: ReadContext) -> Mapping[RegimeLabel, float]:
-    """The site's multipliers: ``[regime] multipliers`` of ``defaults.toml`` when present."""
-    table: Any = (site_defaults(ctx.configs.load).get("regime") or {}).get("multipliers")
-    if table is None:
-        return DEFAULT_MULTIPLIERS
-    bad = [
-        k.value
-        for k in KNOWN
-        if isinstance(table.get(k.value), bool) or not isinstance(table.get(k.value), int | float)
-    ]
-    if bad:
-        raise ConfigurationError(f"defaults.toml [regime] multipliers: expected numbers for {bad}")
-    return {k: float(table[k.value]) for k in KNOWN}
+    """The site's multipliers: ``[regime] multipliers`` of ``defaults.toml``, typed and
+    validated by ``RegimeSettings`` (its defaults where the file sets none)."""
+    regime = site_regime(ctx.configs.load)
+    return {k: regime.multipliers[k.value] for k in KNOWN}
 
 
 def _count(items: list[RegimeIndicator], pace: str) -> tuple[int, int]:

@@ -91,15 +91,17 @@ class _Overlays:
         self, targets: TargetWeights | None, t: int, view: Mapping[str, object]
     ) -> TargetWeights | None:
         """The weights to trade towards at bar ``t`` (``None``: no change). Only instruments
-        in ``view`` (the tradable set at ``t``) are kept: one that left a rebalanced set is
-        never bought back from the strategy's older targets."""
+        in ``view`` (the tradable set at ``t``) are kept, for good: one that left a rebalanced
+        set is never bought back from the strategy's older targets, even when it re-enters."""
         if not self.overlays or self.market is None:
             return targets
         self._decided = self._decided if targets is None else targets
         if self._decided is None:
             return None
-        tradable = {i: w for i, w in self._decided.items() if i in view}
-        weights, why = overlaid(tradable, self.overlays, self.market.at(t))
+        # Written back: an instrument that left the set stays out of the held targets, so it is
+        # never bought back when it re-enters (only the strategy's new targets can buy it).
+        self._decided = {i: w for i, w in self._decided.items() if i in view}
+        weights, why = overlaid(self._decided, self.overlays, self.market.at(t))
         self.reasons.update(why)
         sent = {i: w for i, w in (self._sent or {}).items() if i in view}
         if targets is None and weights == sent:
