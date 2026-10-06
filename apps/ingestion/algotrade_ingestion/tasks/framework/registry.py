@@ -585,7 +585,9 @@ TASKS: dict[str, Task] = {
                 SESSION,
                 FROM,
                 TO,
-                Param("only", ("--only",), str, "comma-separated market rollups, e.g. trend@v1"),
+                Param(
+                    "only", ("--only",), str, "comma-separated market rollups, e.g. market_trend@v2"
+                ),
             ),
         ),
         Task(

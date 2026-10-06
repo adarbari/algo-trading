@@ -2,7 +2,7 @@
 0047; the contract of ``services/read/regime/fields.py`` and ``config/site/regime/cards.toml``).
 
 For each card ``CARDS`` key: ``<key>`` its value (a column of ``market_macro@v1``,
-``market_trend@v1`` or ``market_breadth@v1`` for the session), ``<key>_on`` its verdict from the
+``market_trend@v2`` or ``market_breadth@v1`` for the session), ``<key>_on`` its verdict from the
 thresholds of ``Params`` (``config/site/rollups.toml ["regime_indicators@v1"]``), and
 ``<key>_changed`` whether that verdict differs from the one ``changed_sessions`` sessions
 earlier. The earlier verdict is recomputed from the inputs stored for that session, never read
@@ -14,7 +14,8 @@ The expression language has no look-back across sessions, so the verdicts live h
 ``config/site/features/regime.toml``.
 
 Licence (ADR 0047, on ADR 0028): a ``<key>`` value keeps its source's licence (the high-yield
-spread and the VIX ratio are personal-use values); a verdict is our own aggregate and is open.
+spread, the VIX ratio and the S&P 500 trend, which can come from the index level, are
+personal-use values); a verdict is our own aggregate and is open.
 """
 
 from collections.abc import Callable, Mapping
@@ -47,7 +48,7 @@ class Params:
     unrate_trend_above: float = 0.0  # unemployment above its 12-month mean
     sahm_at_least: float = 0.005  # the Sahm rule's 0.5 point
     nfci_above: float = 0.0  # financial conditions tighter than average
-    spx_trend_below: float = 0.0  # SPY below its 200-day mean
+    spx_trend_below: float = 0.0  # the S&P 500 below its 200-day mean
     vix_term_above: float = 1.0  # VIX above VIX3M (backwardation)
     breadth_below: float = 0.40  # fewer than 40% of the universe above their 200-day mean
 
@@ -123,7 +124,7 @@ CARDS = (
          lambda v, p: compare(number(v, "sahm_gap"), ">=", p.sahm_at_least)),
     Card("nfci", M, "nfci", "NFCI above 0 (tighter than average)",
          lambda v, p: compare(number(v, "nfci"), ">", p.nfci_above)),
-    Card("spx_trend_200d", T, "spx_close_vs_sma200", "SPY below its 200-day mean",
+    Card("spx_trend_200d", T, "spx_close_vs_sma200", "the S&P 500 below its 200-day mean",
          lambda v, p: compare(number(v, "spx_close_vs_sma200"), "<", p.spx_trend_below)),
     Card("vix_term", M, "vix_term_ratio", f"VIX / VIX3M above {D.vix_term_above:g}",
          lambda v, p: compare(number(v, "vix_term_ratio"), ">", p.vix_term_above)),
