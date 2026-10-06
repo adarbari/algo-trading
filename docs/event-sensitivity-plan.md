@@ -290,18 +290,33 @@ forecast); intraday; any trade recommendation or order; news ingestion in v1.
 
 | Need | Have | Gap and the way to close it |
 |---|---|---|
-| Daily bars from 2018 for the scoped names | `bars/1d` 2024-10-03 to 2026-10-05 (about 500 sessions) | a backfill for about 1-2k names: Stooq daily files (already a published source; one file per symbol, back to the 1990s; split-adjusted, so stored under their own `source` and a split day is a market-structure event, never unscheduled) |
-| Earnings dates with pre / post time from 2018 | `events/earnings` from 2026-10-02 only (upcoming calendars) | **backfill**: the Nasdaq calendar by past date (the task already takes a past window; how far back Nasdaq serves is unverified), with SEC 8-K Item 2.02 filings (EDGAR, free, the exact date and acceptance time of every results release, back decades) as the authoritative source; both land in `events/earnings` with `known_from` = the report date (ADR 0050 decision 3; one confirmed report per quarter; folds in the deferred "Events point in time" item) |
+| Daily bars from 2018 for the scoped names | `bars/1d` 2024-10-03 to 2026-10-05 (about 500 sessions) | a backfill for the scope list, its references and the tier A / B names: **Tiingo** daily prices (the default, owner decision in EV1d; one request per symbol from 2018-01-01; unadjusted `open/high/low/close/volume` stored with `source = "tiingo"`, corporate actions applied at read time as for Massive (ADR 0016), its `splitFactor` checked against `events/split`; free tier 500 symbols a month, 50 requests an hour, 1,000 a day, the $10 a month Power tier lifts the symbol cap; licence `personal`). Stooq, the first choice, now answers its daily CSV with a JavaScript browser-verification page: unusable |
+| Earnings dates with pre / post time from 2018 | `events/earnings` from 2026-10-02 only (upcoming calendars) | **backfill**: the Nasdaq calendar by past date (`algotrade-ingest earnings --from --to`, one request a session; Nasdaq serves 2018 dates, verified below), with SEC 8-K Item 2.02 filings (EDGAR, free, the exact date and acceptance time of every results release, back decades) as the authoritative source; both land in `events/earnings` with `known_from` = the report date (ADR 0050 decision 3; one confirmed report per quarter; folds in the deferred "Events point in time" item) |
 | Ex-dividend, splits, index changes | `events/dividend`, `events/split`, `events/index_change` | none |
 | Peer map | SEC `sic` / `industry` / `sector` on company details; ETF holdings table (pending the owner's run); bars for correlation | a peer **selection** is new (4.3) |
 | Leveraged fund -> reference link | `is_leveraged`, `is_inverse`, `leverage`; the holdings table names the swap / stock | a catalogue feature `fund_reference@v1.reference_instrument_id` (ADR 0038) with a name-rule fallback resolved through `SymbolResolver` |
-| Macro release calendar, past and future | FRED adapter (observations only); `macro/series` | a new `fred/releases/dates` fetch into a new `events/macro_release` table (release id, name, date, time); FOMC dates from a site TOML, 8 a year |
+| Macro release calendar, past and future | FRED adapter (observations only); `macro/series` | a new `fred/releases/dates` fetch into a new `events/macro_release` table (release id, name, date, time); the FOMC dates from FRED too (release 101, verified below), ISM by its rule |
 | Listed expiries per name | `chains/status`, `nearest_expiry@v1` (chains stored from 2026-10-02) | none for the ladder; weekly listing is read from the chain |
 | IV around earnings | `ibkr_iv@v1`, about 500 sessions | none (the crush statistic covers two years, not 2018) |
 | The scope list, editable | nothing | a site-level config written by the API: the API writes only user configs today (ADR 0029), so an admin-owned site list is an ADR amendment with the same `services/authoring` seam |
 | 8-K filings with item codes | SEC EDGAR source (company details, facts) | a filing-index reader (daily index or per-CIK submissions JSON, free) into `events/filing` |
 | Headlines | the Massive vendor (bars, descriptions) | its news endpoint, capped per night to the names with a big move; the text model classifies (`config/site/llm.toml` on) |
 | Dossiers (factors, reviewed attributions, dated occurrences) | nothing | the deep-dive skill writes TOML; `dossier-import` writes `instruments/factors`, `events/factor_occurrence`, `events/attribution` |
+
+Verified against the live sources on 2026-10-06 (probes, not tests):
+
+- **Nasdaq** `api/calendar/earnings?date=D` serves 2018 dates (234 rows on 2018-10-25), so the
+  earnings backfill reaches 2018 from one source.
+- **SEC** `data.sec.gov/submissions/CIK##########.json` lists every filing with `form`,
+  `filingDate`, `acceptanceDateTime` (UTC) and `items` ("2.02,9.01"); the recent block holds
+  about 1,000 filings and `filings.files` names the older pages (Micron: back to 1994).
+- **FRED** `fred/release/dates?release_id=N&include_release_dates_with_no_data=true` returns the
+  scheduled future dates (CPI, id 10: 2026-10-14, 2026-11-10, 2026-12-10). Release ids: 9
+  Advance Monthly Sales for Retail and Food Services, 10 Consumer Price Index, 46 Producer
+  Price Index, 50 Employment Situation, 53 Gross Domestic Product, 54 Personal Income and
+  Outlays (PCE), 101 FOMC Press Release (so the FOMC dates need no site file). ISM is not on
+  FRED: its dates follow a rule (manufacturing the first business day of the month, services
+  the third).
 
 ## 8. Decisions
 
@@ -346,7 +361,7 @@ Assumptions to confirm (I proceed on them unless told otherwise):
 - **Sources** (`add-data-source`): a FRED release-calendar fetch in the existing FRED vendor;
   the Nasdaq calendar's past-date mode; an 8-K filing-index reader in the SEC source (Item
   2.02 doubles as the earnings-date fallback); Massive's news endpoint in the Massive vendor;
-  Stooq per-symbol daily files in the published source.
+  Tiingo daily prices (a new vendor, EV1d; Stooq is unusable, section 7).
 - **Text model**: a second use of the `TextModel` seam (ADR 0041), `services/attributing`:
   headlines in, a cause class with confidence and the quoted evidence out; off when the LLM
   is off.
@@ -378,7 +393,7 @@ Assumptions to confirm (I proceed on them unless told otherwise):
 ## 10. Sequence (each line one or two PRs; model per CLAUDE.md: Opus where marked, Sonnet otherwise)
 
 1. **ADR + data** (Opus, `architect` review): macro release calendar source and table;
-   earnings-date backfill (past-date mode and the 8-K Item 2.02 fallback); Stooq bar backfill
+   earnings-date backfill (past-date mode and the 8-K Item 2.02 fallback); Tiingo bar backfill
    for the scoped names; the leveraged-fund reference link; the scope list config and its
    import of the owner's list. Owner actions: the backfills (detached; hours).
 2. **`event_reaction@v1`** (Opus for the definitions and point-in-time rule, Sonnet for the
