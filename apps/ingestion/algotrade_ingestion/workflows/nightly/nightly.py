@@ -142,16 +142,18 @@ NIGHTLY: tuple[Step, ...] = (
     # Its acceptance is the coverage of the key features by tier (ADR 0043): a FAIL-level breach
     # (core-tier prices) fails the step and holds the screens back; the rest are warnings.
     Step("rollups", needs=MARKET_DATA, accept=(check_coverage,), task_complete=True),
-    # The market-entity rollups (ADR 0047: regime and breadth, one MKT:US row per group), after
-    # the instrument rollups they read. Optional: a failure here never holds back the screens.
+    # Economic series and index levels with their vintages (ADR 0048), before the market
+    # rollups whose macro and regime groups read them. Latest session only (the sources serve
+    # their current state); optional, and its run budget ([macro] run_budget_s) bounds a FRED
+    # outage, so it never holds up the screens.
+    Step("macro", critical=False, latest_only=True, accept_with=(check_macro,)),
+    # The market-entity rollups (ADR 0047: breadth, macro, the regime, one MKT:US row per group),
+    # after the instrument rollups they read. Optional: a failure here never holds back the
+    # screens. Not `needs=("macro",)`: a FAILED (or skipped, no FRED key) macro step would hold
+    # the regime back (ADR 0039), while its groups read whatever macro/series holds, each value
+    # point in time by vintage, and say UNKNOWN for what is missing.
     Step("market-rollups", needs=("rollups",), critical=False, accept=(check_market_rollups,)),
     Step(SCREENS, needs=("chains", "rollups"), requires=universe_exists, latest_only=True),
-    # Economic series and index levels with their vintages (ADR 0048): after the screens, which
-    # nothing here reads until RG3. Its time budget bounds a FRED outage, but until then it must
-    # not sit on the critical path at all; RG3 moves it back before `market-rollups`, when the
-    # regime group needs it. Latest session only (the sources serve their current state); its
-    # failure only warns.
-    Step("macro", critical=False, latest_only=True, accept_with=(check_macro,)),
     # Company and ETF descriptions (ADR 0034): after the screens, so the Massive requests
     # (capped per night, ~21 min) do not delay them. Optional.
     Step("descriptions", latest_only=True, critical=False),

@@ -71,8 +71,8 @@ def test_nothing_computed_yet_is_an_unknown_regime_not_an_error() -> None:
     assert (found.label, found.plain_label) == (RegimeLabel.UNKNOWN, "Not computed yet")
     assert found.headline == "Not computed yet"
     assert found.unknown_reason is not None
-    assert found.unknown_reason.code is UnknownCode.NOT_IN_CATALOGUE
-    assert "market.regime@v1.label" in found.unknown_reason.detail
+    # the site catalogue has the RG3 groups: nothing stored for the session is NO_PARTITION
+    assert found.unknown_reason.code is UnknownCode.NO_PARTITION
     scores = (found.scores.macro_risk, found.scores.market_stress, found.scores.fragility)
     assert all(s.value is None and s.unknown is not None for s in scores)
     assert (found.sizing.label, found.sizing.multiplier) == (RegimeLabel.UNKNOWN, None)
