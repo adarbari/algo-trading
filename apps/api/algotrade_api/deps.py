@@ -193,9 +193,19 @@ def get_users(request: Request) -> UsersSettings:
     return cast(UsersSettings, request.app.state.users)
 
 
+Users = Annotated[UsersSettings, Depends(get_users)]
+
+
+def acting_user(caller: UserRecord, users: UsersSettings, requested: str | None) -> str:
+    """The user a request is for: the caller, or the user ``requested`` names when the caller
+    is an admin (``acting_for``); ``services.authoring`` refuses an id the registry does not
+    declare (400, and ``site``). The one resolution of whose configs, for writes and previews."""
+    return author(acting_for(caller, requested), lambda uid: users.get(uid) is not None).user_id
+
+
 def write_user(
     caller: Caller,
-    users: Annotated[UsersSettings, Depends(get_users)],
+    users: Users,
     act_for: Annotated[
         str | None,
         Header(
@@ -204,10 +214,8 @@ def write_user(
         ),
     ] = None,
 ) -> str:
-    """The user a write is for: the caller, or the user ``X-Act-For`` names when the caller
-    is an admin (``acting_for``); ``services.authoring`` refuses an id the registry does not
-    declare (400)."""
-    return author(acting_for(caller, act_for), lambda uid: users.get(uid) is not None).user_id
+    """The user a write is for: the caller, or the user ``X-Act-For`` names (an admin only)."""
+    return acting_user(caller, users, act_for)
 
 
 User = Annotated[str, Depends(write_user)]

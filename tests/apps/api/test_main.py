@@ -210,6 +210,11 @@ def test_a_trader_cannot_act_for_another_user(signed: TestClient, tokens: Tokens
 
     assert status("bob@example.com") == 403  # a trader naming someone else
     assert status("ana@example.com") == 200 and status("alice@example.com") == 200
+    # The registry decides who exists: an admin previewing as an undeclared id or the site.
+    for ghost in ("mallory", "site"):
+        body = {"expr": "hv20_pct / 100", "user": ghost}
+        refused = signed.post("/features/check", json=body, headers=_as(tokens, "ana@example.com"))
+        assert refused.status_code == 400
 
 
 class Refuse:

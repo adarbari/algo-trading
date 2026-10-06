@@ -1,6 +1,7 @@
-"""Admin-only fields (ADR 0040): every field of the Admin area (the ops types of runs, quality,
-ingestion and review) is refused to a trader with ``FORBIDDEN`` and answers an admin. The
-fields are found in the schema, so a new Admin field without ``AdminOnly`` fails here."""
+"""Admin-only fields (ADR 0040): every field of the Admin area (the types under ``types/ops``
+but the trader ones: runs, quality, ingestion and review) is refused to a trader with
+``FORBIDDEN`` and answers an admin. The fields are found in the schema, so a new Admin field
+without ``AdminOnly`` fails here."""
 
 from collections.abc import Callable
 from typing import Any
@@ -17,13 +18,10 @@ from algotrade_api.main import create_app
 from tests.apps.api.graphql.conftest import Graph
 from tests.helpers.api_store import as_user
 
-# The modules whose types are ops data: a Query field returning one is an Admin field.
-ADMIN_TYPE_MODULES = (
-    "algotrade_api.graphql.types.ops.run",
-    "algotrade_api.graphql.types.ops.quality",
-    "algotrade_api.graphql.types.ops.ingestion",
-    "algotrade_api.graphql.types.ops.review",
-)
+# Every module under types/ops/ is ops data (an Admin type) except these trader ones: the
+# strategy configs and saved backtests the Backtests page reads.
+OPS = "algotrade_api.graphql.types.ops."
+TRADER_OPS = (OPS + "backtest", OPS + "config")
 # The arguments each Admin field needs, for a call that selects only ``__typename``.
 CALLS = {
     "nightly_runs": "nightlyRuns(limit: 1)",
@@ -42,15 +40,43 @@ def _query_fields() -> list[Any]:
     return list(Query.__strawberry_definition__.fields)
 
 
-def _returns(field: Any) -> str:
+def _target(field: Any) -> Any:
+    """The object type ``field`` returns (lists and optionals unwrapped), else ``None``."""
     kind = field.type
     while hasattr(kind, "of_type"):
         kind = kind.of_type
-    definition = getattr(kind, "__strawberry_definition__", None)
-    return str(definition.origin.__module__) if definition is not None else ""
+    return getattr(kind, "__strawberry_definition__", None)
 
 
-ADMIN_FIELDS = sorted(f.python_name for f in _query_fields() if _returns(f) in ADMIN_TYPE_MODULES)
+def _is_admin(definition: Any) -> bool:
+    module = str(definition.origin.__module__)
+    return module.startswith(OPS) and module not in TRADER_OPS
+
+
+ADMIN_FIELDS = sorted(
+    f.python_name for f in _query_fields() if (d := _target(f)) is not None and _is_admin(d)
+)
+
+
+def test_no_ops_type_is_reachable_without_going_through_an_admin_field() -> None:
+    """Walk the graph from ``Query`` through the fields that are not ``AdminOnly``: an Admin
+    type found there (a nested field returning one) would be readable by a trader."""
+    seen: set[str] = set()
+    pending = [
+        f for f in _query_fields() if not any(isinstance(e, AdminOnly) for e in f.extensions)
+    ]
+    leaked: list[str] = []
+    while pending:
+        field = pending.pop()
+        target = _target(field)
+        if target is None:
+            continue
+        if _is_admin(target):
+            leaked.append(f"{field.python_name} -> {target.name}")
+        elif target.name not in seen:
+            seen.add(target.name)
+            pending.extend(target.fields)
+    assert leaked == []
 
 
 def test_the_admin_fields_are_the_ops_reads() -> None:
