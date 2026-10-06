@@ -44,7 +44,7 @@ def test_a_valid_feature_has_no_problems() -> None:
         ({"dtype": "decimal"}, "dtype must be"),
         ({"unit": "percent"}, "unit"),
         ({"kind": "magic"}, "kind"),
-        ({"entity": "market"}, "entity"),
+        ({"entity": "sector"}, "entity 'sector' must be one of"),
         ({"description": " "}, "describe it"),
         ({"null_meaning": ""}, "when it is null"),
         ({"dtype": "str", "unit": "category", "valid_range": (0, 1)}, "numeric dtype"),

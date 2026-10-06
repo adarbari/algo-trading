@@ -1,6 +1,9 @@
 """Feature values by catalogue name (ADR 0038): ``FeatureValue`` for (instrument, name,
 session), each with its ``FeatureInfo`` and, when the value is not known for the session, an
-``Unknown`` saying why (ADR 0036).
+``Unknown`` saying why (ADR 0036). The same read serves other entities: ``entity="market"``
+reads a market's ``MKT:US`` row of the market-entity groups (ADR 0047;
+``services.read.market.features``), from exactly the session's partitions too, with the same
+UNKNOWN / EXPLAINED rules.
 
 Values come from ``services.features.field_view``, the same read a selection evaluates (so a
 page and a screener agree): rollups and the inputs of expression features for exactly
@@ -29,13 +32,16 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any, cast
 
+import pandas as pd
+
 from algotrade.core.model.fields import (
     COMPANY_TABLE,
     FEATURE_FIELD_PREFIX,
     REFERENCE_TABLE,
-    ROLLUP_TABLE_PREFIX,
     field_source,
+    group_of_table,
     is_feature_field,
+    table_field,
 )
 from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.features.expressions.feature_set import FeatureSet
@@ -46,7 +52,7 @@ from algotrade.features.framework.feature import (
     StatusRule,
     not_applicable,
 )
-from algotrade.services.features import field_view
+from algotrade.services.features import entity_field_view, field_view
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
 from algotrade.services.read.session import Grain, grain_of
@@ -97,8 +103,8 @@ def _reason_fields(reasons: Reasons) -> list[str]:
 
 
 def _marker(table: str) -> str:
-    """The field reading ``table``'s ``instrument_id`` (rollup tables only)."""
-    return f"rollup.{table.removeprefix(ROLLUP_TABLE_PREFIX)}.{_ROW}"
+    """The field reading ``table``'s ``instrument_id`` (feature group tables only)."""
+    return table_field(table, _ROW)
 
 
 def _absent(tables: Sequence[str], day: date) -> str:
@@ -229,7 +235,7 @@ def _absence(
     rowless = [
         t
         for t in tables
-        if t.startswith(ROLLUP_TABLE_PREFIX) and to_scalar(row.get(_marker(t))) is None
+        if group_of_table(t) is not None and to_scalar(row.get(_marker(t))) is None
     ]
     explained = _explained(reasons[1], row, rowless, iid, day)
     if explained is not None:
@@ -256,45 +262,68 @@ def cell_codes(
     )
 
 
+def _rows(
+    ctx: ReadContext,
+    entity: str,
+    ids: Sequence[str] | None,
+    wanted: Sequence[str],
+    tables: Mapping[str, tuple[str, ...]],
+    reasons: Mapping[str, Reasons],
+) -> tuple[dict[str, Mapping[str, Any]], tuple[str, ...]]:
+    """-> (each entity's row of ``wanted`` plus the row markers and the fields the reasons
+    read, by id; the tables with no partition for the session)."""
+    groups = sorted({t for ts in tables.values() for t in ts if group_of_table(t) is not None})
+    fields = [
+        *wanted,
+        *(_marker(t) for t in groups),
+        *dict.fromkeys(f for r in reasons.values() for f in _reason_fields(r)),
+    ]
+    day = ctx.session.date
+    if entity != "instrument":
+        if ids is None:
+            raise ValueError(f"a {entity} read names its ids")
+        frame, missing = entity_field_view(ctx.reader, day, fields, ids, features=ctx.features)
+        return _by_id(frame), missing
+    view = field_view(ctx.reader, day, fields, ids, features=ctx.features)
+    rows, missing = _by_id(view.frame), view.missing
+    # A company snapshot taken after the session is not known on it (no lookahead).
+    if view.company_pre_snapshot:
+        missing = (*missing, COMPANY_TABLE)
+        # its sic is not known either: never a false n/a
+        rows = {i: {**row, _SIC: None} for i, row in rows.items()}
+    return rows, missing
+
+
+def _by_id(frame: pd.DataFrame) -> dict[str, Mapping[str, Any]]:
+    return {str(r["instrument_id"]): cast(dict[str, Any], r) for r in frame.to_dict("records")}
+
+
 def load_feature_values(
-    ctx: ReadContext, instrument_ids: Sequence[str] | None, names: Sequence[str]
+    ctx: ReadContext,
+    instrument_ids: Sequence[str] | None,
+    names: Sequence[str],
+    entity: str = "instrument",
 ) -> dict[str, tuple[FeatureValue, ...]]:
     """``names`` (catalogue fields, in the order asked; repeats dropped) for each instrument
     of ``instrument_ids`` (None: every instrument of the session's reference snapshot, the
     population a distribution is over), for ``ctx.session``: one read for them all.
-    ``UnknownFeatureError`` when a name is not in the caller's catalogue."""
+    ``entity``: whose catalogue and rows (``market``: ``instrument_ids`` are market ids,
+    ``market_id("US")``; ADR 0047). ``UnknownFeatureError`` when a name is not in the
+    caller's catalogue of that entity."""
     wanted = list(dict.fromkeys(names))
-    infos = feature_infos(ctx.features, wanted)
+    infos = feature_infos(ctx.features, wanted, entity)
     tables = {n: _tables(ctx.features, n) for n in wanted}
     reasons = {
         n: ctx.features.applicability(n) if not n.startswith("instrument.") else (frozenset(), ())
         for n in wanted
     }
-    if ctx.session.reference_snapshot is None:  # nothing stored to say who anything is
-        rows: dict[str, Mapping[str, Any]] = {}
-        missing: tuple[str, ...] = (REFERENCE_TABLE,)
+    rows: Mapping[str, Mapping[str, Any]]
+    missing: tuple[str, ...]
+    if entity == "instrument" and ctx.session.reference_snapshot is None:
+        rows, missing = {}, (REFERENCE_TABLE,)  # nothing stored to say who anything is
         tables = dict.fromkeys(wanted, (REFERENCE_TABLE,))
     else:
-        rollups = sorted(
-            {t for ts in tables.values() for t in ts if t.startswith(ROLLUP_TABLE_PREFIX)}
-        )
-        fields = [
-            *wanted,
-            *(_marker(t) for t in rollups),
-            *dict.fromkeys(f for r in reasons.values() for f in _reason_fields(r)),
-        ]
-        view = field_view(
-            ctx.reader, ctx.session.date, fields, instrument_ids, features=ctx.features
-        )
-        rows = {
-            str(r["instrument_id"]): cast(dict[str, Any], r) for r in view.frame.to_dict("records")
-        }
-        # A company snapshot taken after the session is not known on it (no lookahead).
-        missing = view.missing
-        if view.company_pre_snapshot:
-            missing = (*missing, COMPANY_TABLE)
-            # its sic is not known either: never a false n/a
-            rows = {i: {**row, _SIC: None} for i, row in rows.items()}
+        rows, missing = _rows(ctx, entity, instrument_ids, wanted, tables, reasons)
     if instrument_ids is None:
         instrument_ids = list(rows)
     return {

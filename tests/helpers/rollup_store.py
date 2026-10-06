@@ -1,4 +1,5 @@
-"""Builders for rollup tests: a memory store with daily bars, splits and earnings snapshots."""
+"""Builders for rollup tests: a memory store with daily bars, splits and earnings snapshots,
+and a toy market-entity group (``MARKET_COUNTS``, ADR 0047)."""
 
 from collections.abc import Mapping, Sequence
 from datetime import date
@@ -6,8 +7,10 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
+from algotrade.core.model.instruments import market_id
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.data import StoreReader
+from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs
 from algotrade.features.framework.feature import Feature
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.tables.writers import StoreWriter
@@ -202,3 +205,39 @@ def write_rows(
 def features(columns: Mapping[str, str]) -> tuple[Feature, ...]:
     """Placeholder feature declarations for test groups: ``{"col": "float"}``."""
     return tuple(Feature(c, t, "text", f"test {c}", "test") for c, t in columns.items())
+
+
+def _market_counts(frames: Inputs, session: date, params: None) -> pd.DataFrame:
+    """The market's one row: how many names the session's universe holds and how many of them
+    have a bar on the session (null before the first universe snapshot), and SPY's close
+    (found through the symbol -> id map, never a built id)."""
+    universe, bars, ids = frames["universe"], frames["bars/1d"], frames["instruments/symbol_ids"]
+    assert bars is not None
+    today = bars[bars["session_date"] == session]
+    names = covered = None
+    if universe is not None:
+        names = len(universe)
+        covered = int(today["instrument_id"].isin(universe["instrument_id"]).sum())
+    spy = None
+    if ids is not None:
+        closes = today.loc[
+            today["instrument_id"].isin(ids.loc[ids["symbol"] == "SPY", "instrument_id"]), "close"
+        ]
+        spy = float(closes.iloc[0]) if len(closes) else None
+    row = {"instrument_id": market_id("US"), "names": names, "with_bars": covered, "spy_close": spy}
+    return pd.DataFrame([row])
+
+
+MARKET_COUNTS = FeatureGroup(
+    "market_counts",
+    1,
+    "test market group",
+    (
+        Input("bars/1d"),
+        Input("universe", required=False),
+        Input("instruments/symbol_ids", required=False),
+    ),
+    features({"names": "int", "with_bars": "int", "spy_close": "float"}),
+    _market_counts,
+    entity="market",
+)

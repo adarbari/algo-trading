@@ -463,6 +463,7 @@ KNOWN: dict[str, TableSpec] = {
 OPEN_PREFIXES = {
     "rollups/daily/": "rollup",
     "rollups/instrument/": "rollup",
+    "rollups/market/": "rollup",  # market-entity feature groups: one MKT:<market> row (ADR 0047)
     "events/": "event",
     "results/": "results",
     "catalog/": "catalog",

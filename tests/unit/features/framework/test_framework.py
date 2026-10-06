@@ -1,5 +1,6 @@
 """The group framework: declaration validation, column typing, and the runner
-(point in time per session; a backfill equals per-session compute, across chunks)."""
+(point in time per session; a backfill equals per-session compute, across chunks; a
+market-entity group returns exactly its one ``MKT:US`` row)."""
 
 from dataclasses import dataclass, replace
 from datetime import date
@@ -19,7 +20,18 @@ from algotrade.features.framework.runner import (
 )
 from algotrade.features.registry import GROUPS
 from algotrade.storage.configs.files import MemoryConfigStore
-from tests.helpers.rollup_store import END, features, series, store, write_bars
+from tests.helpers.rollup_store import (
+    END,
+    MARKET_COUNTS,
+    features,
+    series,
+    store,
+    write_bars,
+    write_rows,
+)
+from tests.helpers.stored_frames import universe_rows, write_reference
+
+SPY = "EQ:BBG000BDTBL9"
 
 
 @dataclass(frozen=True)
@@ -81,6 +93,17 @@ def _rollup(**changes: Any) -> FeatureGroup:
         ({"features": features({"a": "float"}) * 2}, "twice"),
         ({"features": (replace(features({"a": "float"})[0], version=2),)}, "group's"),
         ({"params": {"a": 1}}, "dataclass"),
+        ({"entity": "sector"}, "entity 'sector' must be one of"),
+        ({"features": (replace(features({"a": "float"})[0], entity="market"),)}, "the group's"),
+        ({"inputs": (Input("rollups/market/breadth@v1"),)}, "broadcasting market values"),
+        ({"entity": "market", "applies_to": "optionable"}, "applies to the whole market"),
+        (
+            {
+                "entity": "market",
+                "features": (replace(features({"a": "float"})[0], applies_to="optionable"),),
+            },
+            r"not \['optionable'\]",
+        ),
     ],
 )
 def test_declaration_is_validated(changes: dict[str, Any], problem: str) -> None:
@@ -90,6 +113,9 @@ def test_declaration_is_validated(changes: dict[str, Any], problem: str) -> None
 
 def test_key_table_and_lookback() -> None:
     assert (COUNTING.key, COUNTING.table) == ("seen@v1", "rollups/instrument/seen@v1")
+    assert MARKET_COUNTS.table == "rollups/market/market_counts@v1"
+    assert {f.entity for f in MARKET_COUNTS.features} == {"market"}
+    assert MARKET_COUNTS.feature("names").field == "market.market_counts@v1.names"
     assert COUNTING.inputs[0].sessions_back(Window(5)) == 4
     with pytest.raises(ValueError, match="lookback"):
         Input("bars/1d", lookback=-1).sessions_back(None)
@@ -174,6 +200,36 @@ def test_point_in_time_guard() -> None:
     future = pd.DataFrame({"session_date": [END, date(2026, 10, 5)]})
     with pytest.raises(AssertionError, match="reached"):
         runner._check_point_in_time(COUNTING, "bars/1d", future, END)
+
+
+def test_a_market_group_returns_its_one_row() -> None:
+    writer, reader = store()
+    days = write_bars(writer, {"EQ:A": series(5), SPY: series(5, seed=2)})
+    write_rows(writer, "universe", days[1], universe_rows(["A", "B"]))
+    write_reference(writer, days[1], {"A": "EQ:A", "SPY": SPY})  # SPY by its FIGI id
+    first, second = list(compute_sessions(reader, MARKET_COUNTS, days[:2]))
+    assert first.frame is not None and second.frame is not None
+    # before the first universe snapshot: unknown, never today's survivors counted
+    assert first.frame["names"].isna().all() and first.frame["with_bars"].isna().all()
+    row = second.frame.iloc[0]
+    assert (row["instrument_id"], row["names"], row["with_bars"]) == ("MKT:US", 2, 1)
+    assert row["spy_close"] == pytest.approx(series(5, seed=2)[1])
+    assert first.frame["spy_close"].iloc[0] == pytest.approx(series(5, seed=2)[0])
+
+
+@pytest.mark.parametrize(
+    "ids", [["MKT:US", "MKT:US"], ["EQ:A"], []], ids=["two rows", "an instrument", "none"]
+)
+def test_a_market_group_with_other_rows_fails_loudly(ids: list[str]) -> None:
+    writer, reader = store()
+    write_bars(writer, {"EQ:A": series(3)})
+
+    def wrong(frames: Inputs, session: date, params: None) -> pd.DataFrame:
+        return pd.DataFrame({"instrument_id": ids, "a": [1.0] * len(ids)})
+
+    group = _rollup(compute=wrong, entity="market")
+    with pytest.raises(DataValidationError, match="returns one MKT:US row"):
+        compute_one(reader, group, END)
 
 
 def test_params_and_selection() -> None:

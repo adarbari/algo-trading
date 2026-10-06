@@ -1,6 +1,7 @@
 """The feature set: lookups, the read plan (only the stored columns needed; a materialised
 expression read from its table), joining group rows with ``exists``, evaluation over a
-range, materialised groups in the dependency order, and fields of superseded groups."""
+range, materialised groups in the dependency order (a market-entity one in rollups/market/),
+and fields of superseded groups."""
 
 from dataclasses import replace
 from datetime import date
@@ -15,7 +16,7 @@ from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.expressions.frame import join
 from algotrade.features.framework.runner import compute_one
 from algotrade.features.registry import GROUPS, SUPERSEDED
-from tests.helpers.rollup_store import store, write_rows
+from tests.helpers.rollup_store import MARKET_COUNTS, store, write_rows
 
 D1, D2 = date(2026, 10, 1), date(2026, 10, 2)
 PS = "rollups/instrument/price_stats@v2"
@@ -124,3 +125,22 @@ def test_fields_of_superseded_groups(fs: FeatureSet) -> None:
     assert fs.moved_field("rollup.price_stats@v1.nope") == ""
     assert fs.moved_field("rollup.price_stats@v2.hv30") is None
     assert fs.moved_field("instrument.symbol") is None
+
+
+def test_a_market_expression_is_a_market_feature_and_stored_as_one() -> None:
+    groups = {**GROUPS, MARKET_COUNTS.key: MARKET_COUNTS}
+    share = define("share", "market_counts.with_bars / market_counts.names", materialise=True)
+    fs = FeatureSet.build(groups, [*DEFS, share])
+    assert fs.table("share") == "rollups/market/share@v1"
+    group = fs.groups["share@v1"]
+    assert group.entity == "market" and group.table == "rollups/market/share@v1"
+    assert list(fs.groups).index("market_counts@v1") < list(fs.groups).index("share@v1")
+    market = fs.field_types("market")
+    assert market["feature.share"] == "float" and "market.market_counts@v1.names" in market
+    assert "feature.ret" not in market and "feature.share" not in fs.field_types("instrument")
+    writer, reader = store()
+    write_rows(writer, MARKET_COUNTS.table, D2,
+               [{"instrument_id": "MKT:US", "names": 4, "with_bars": 3}])  # fmt: skip
+    result = compute_one(reader, group, D2)
+    assert result.frame is not None
+    assert result.frame.to_dict("list") == {"instrument_id": ["MKT:US"], "share": [0.75]}

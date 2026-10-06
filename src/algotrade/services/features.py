@@ -4,9 +4,10 @@
 need (``FeatureSet.stored_columns``: through ``data.rollups.feature_rows``, column-pruned) and
 evaluates the expressions in dependency order (``FeatureSet.evaluate``); a materialised one
 is read from its table. The same path serves a session (selections, ``FeatureView``,
-``field_view``: an ``InstrumentView`` of any catalogue fields) and a series over a date
-range. ``site_features()`` is the site's ``FeatureSet``, from the config store given
-(default: ``$ALGOTRADE_CONFIG_DIR`` or ./config); ``catalogue(store, user)`` is a user's
+``field_view``: an ``InstrumentView`` of any catalogue fields; ``entity_field_view`` the
+same for a market's row, ADR 0047) and a series over a date range. ``site_features()`` is
+the site's ``FeatureSet``, from the config store given (default: ``$ALGOTRADE_CONFIG_DIR``
+or ./config); ``catalogue(store, user)`` is a user's
 (site + ``config/users/<user>/features``, ADR 0023 step 4) and ``config_features(resolved)``
 the one a resolved config's selection is evaluated with (site + the user features it names).
 """
@@ -24,7 +25,7 @@ from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.core.model.fields import FEATURE_FIELD_PREFIX, is_feature_field
 from algotrade.data import StoreReader
 from algotrade.data.reference import InstrumentView, instrument_view
-from algotrade.data.rollups import feature_rows
+from algotrade.data.rollups import feature_rows, group_view
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.site import site_features as build_site_features
 from algotrade.features.site import user_features, with_user_features
@@ -124,19 +125,53 @@ def field_view(
     """``data.reference.instrument_view`` for any catalogue fields: stored ones as read,
     ``feature.<name>`` ones computed for the session, for ``ids`` only when given (tables they
     need that have no partition for the session are added to ``missing``)."""
-    expressions = [f.removeprefix(FEATURE_FIELD_PREFIX) for f in fields if is_feature_field(f)]
     stored = [f for f in fields if not is_feature_field(f)]
     view = instrument_view(reader, session, stored, ids, as_of)
+    frame, missing = _with_expressions(
+        reader, session, fields, view.frame, view.missing, ids, as_of, features
+    )
+    return replace(view, frame=frame, missing=missing)
+
+
+def entity_field_view(
+    reader: StoreReader,
+    session: date,
+    fields: Sequence[str],
+    ids: Sequence[str],
+    as_of: datetime | None = None,
+    features: FeatureSet | None = None,
+) -> tuple[pd.DataFrame, tuple[str, ...]]:
+    """``field_view`` for entities that are not instruments (a market's ``MKT:US`` row, ADR
+    0045): one row per id of ``ids``, group fields (``market.<group>@v<N>.<column>``) from
+    exactly ``session``'s partition, ``feature.<name>`` ones computed -> (the frame, the tables
+    with no partition for the session)."""
+    stored = [f for f in fields if not is_feature_field(f)]
+    frame, missing = group_view(reader, session, stored, ids, as_of)
+    return _with_expressions(reader, session, fields, frame, missing, ids, as_of, features)
+
+
+def _with_expressions(
+    reader: StoreReader,
+    session: date,
+    fields: Sequence[str],
+    frame: pd.DataFrame,
+    missing: tuple[str, ...],
+    ids: Sequence[str] | None,
+    as_of: datetime | None,
+    features: FeatureSet | None,
+) -> tuple[pd.DataFrame, tuple[str, ...]]:
+    """``frame`` plus the ``feature.<name>`` fields of ``fields``, computed for ``session``."""
+    expressions = [f.removeprefix(FEATURE_FIELD_PREFIX) for f in fields if is_feature_field(f)]
     if not expressions:
-        return view
+        return frame, missing
     computed = read_expressions(
         reader, expressions, session, as_of=as_of, instruments=ids, features=features
     )
     extra = computed.frame.drop(columns="session_date").rename(
         columns={n: f"{FEATURE_FIELD_PREFIX}{n}" for n in expressions}
     )
-    frame = view.frame.merge(extra, on="instrument_id", how="left")
-    return replace(view, frame=frame, missing=tuple(sorted({*view.missing, *computed.missing})))
+    joined = frame.merge(extra, on="instrument_id", how="left")
+    return joined, tuple(sorted({*missing, *computed.missing}))
 
 
 def _stored(
