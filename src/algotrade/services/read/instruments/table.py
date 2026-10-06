@@ -27,10 +27,11 @@ from algotrade.core.model.errors import MissingDataError
 from algotrade.core.model.fields import COMPANY_TABLE, field_source, is_feature_field
 from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.data.reference import load_universe
+from algotrade.features.framework.feature import NullReason
 from algotrade.services.features import field_view
 from algotrade.services.read.context import NotFoundError, ReadContext, catalogue_key
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
-from algotrade.services.read.instruments.features import load_feature_values
+from algotrade.services.read.instruments.features import cell_codes, load_feature_values
 from algotrade.services.read.instruments.identity import Instrument, load_instruments, resolve_id
 from algotrade.services.read.session import Session
 from algotrade.services.read.values import UnknownCode
@@ -83,6 +84,7 @@ class FeatureTable:
     instruments: tuple[Instrument, ...]
     rows: tuple[tuple[Scalar, ...], ...]
     unknown: tuple[tuple[UnknownCode | None, ...], ...]
+    reasons: tuple[tuple[NullReason | None, ...], ...]  # the NullReason of each EXPLAINED cell
     sort: str | None
     total: int
     page: int
@@ -264,6 +266,7 @@ def load_table(
     identity = load_instruments(ctx, shown)
     shown = [i for i in shown if i in identity]  # the snapshot just read has each of them
     cells = load_feature_values(ctx, shown, wanted) if wanted and shown else {}
+    codes = cell_codes(cells, shown)
     return FeatureTable(
         session=ctx.session,
         universe_snapshot=population.snapshot,
@@ -271,10 +274,8 @@ def load_table(
         columns=tuple(infos[n] for n in wanted),
         instruments=tuple(identity[i] for i in shown),
         rows=tuple(tuple(v.value for v in cells.get(i, ())) for i in shown),
-        unknown=tuple(
-            tuple(v.unknown.code if v.unknown is not None else None for v in cells.get(i, ()))
-            for i in shown
-        ),
+        unknown=codes[0],
+        reasons=codes[1],
         sort=order,
         total=len(ordered),
         page=page,

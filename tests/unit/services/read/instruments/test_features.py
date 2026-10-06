@@ -8,9 +8,18 @@ import pytest
 from algotrade.config.user import UserContext
 from algotrade.data import StoreReader
 from algotrade.services.read.context import ReadContext, open_context
-from algotrade.services.read.instruments.catalogue import FeatureFormat, UnknownFeatureError
-from algotrade.services.read.instruments.features import load_feature_values
-from algotrade.services.read.values import UnknownCode
+from algotrade.services.read.instruments.catalogue import (
+    FeatureFormat,
+    UnknownFeatureError,
+    feature_infos,
+)
+from algotrade.services.read.instruments.features import (
+    FeatureValue,
+    _absence,
+    cell_codes,
+    load_feature_values,
+)
+from algotrade.services.read.values import NullReason, Unknown, UnknownCode
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.tables.writers import StoreWriter
@@ -213,3 +222,61 @@ def test_a_company_snapshot_after_the_session_does_not_make_a_spac() -> None:
 
     ctx = context(store_with(later), D1)
     assert values(ctx, "EQ:NOSIC", NEXT)[NEXT] == (None, UnknownCode.NO_ROW)
+
+
+PRICE_STATS = "rollups/instrument/price_stats@v2"
+BAR_STATUS = "rollup.price_history@v1.bar_status"  # a status field (ADR 0046)
+STATS_ROW = "rollup.price_stats@v2.instrument_id"
+
+
+def _why(row: dict[str, object], applies: frozenset[str] = frozenset(), *rules: object) -> Unknown:
+    """``_absence`` of the close of EQ:AAA on D1 with ``row`` and these status rules."""
+    ctx = context(_chain_rows("OK"))
+    info = feature_infos(ctx.features, [CLOSE])[CLOSE]
+    return _absence(info, (PRICE_STATS,), row, ctx, "EQ:AAA", (applies, tuple(rules)))  # type: ignore[arg-type]
+
+
+NO_TRADE = (BAR_STATUS, frozenset(), frozenset({"NO_TRADE"}), PRICE_STATS)
+
+
+def test_an_explained_status_names_its_reason() -> None:
+    why = _why({BAR_STATUS: "NO_TRADE"}, frozenset(), NO_TRADE)  # no price_stats row either
+    assert (why.code, why.reason) == (UnknownCode.EXPLAINED, NullReason.NO_TRADE)
+    assert why.detail == "bar_status is NO_TRADE for EQ:AAA on 2026-10-01: no bar on the session"
+
+
+def test_a_status_that_explains_nothing_leaves_the_gap() -> None:
+    traded = _why({BAR_STATUS: "TRADED"}, frozenset(), NO_TRADE)
+    assert (traded.code, traded.reason) == (UnknownCode.NO_ROW, None)  # a real gap stays one
+    unstatused = _why({BAR_STATUS: None, STATS_ROW: "EQ:AAA"}, frozenset(), NO_TRADE)
+    assert unstatused.code is UnknownCode.NULL
+
+
+def test_an_explained_input_never_hides_a_gap_in_another_input() -> None:
+    elsewhere = (BAR_STATUS, frozenset(), frozenset({"NOT_ANNOUNCED"}), "rollups/x/earnings@v2")
+    gap = _why({BAR_STATUS: "NOT_ANNOUNCED"}, frozenset(), elsewhere)  # no price_stats row
+    assert (gap.code, gap.reason) == (UnknownCode.NO_ROW, None)
+    covered = _why({BAR_STATUS: "NOT_ANNOUNCED", STATS_ROW: "EQ:AAA"}, frozenset(), elsewhere)
+    assert covered.reason is NullReason.NOT_ANNOUNCED  # every input has its row: explained
+
+
+def test_absence_precedence_not_applicable_then_illiquid_then_explained() -> None:
+    thin = ("rollup.iv30@v1.iv30_status", frozenset({"WIDE_SPREADS"}), frozenset(), IV_STATUS)
+    row = {BAR_STATUS: "NO_TRADE", thin[0]: "WIDE_SPREADS", "instrument.optionable": False}
+    assert _why(row, frozenset(), NO_TRADE, thin).code is UnknownCode.ILLIQUID
+    assert _why(row, frozenset({"optionable"}), NO_TRADE, thin).code is UnknownCode.NOT_APPLICABLE
+    first = (BAR_STATUS, frozenset(), frozenset({"NO_TRADE", "FEW_BARS"}), PRICE_STATS)
+    assert _why(row, frozenset(), first).reason is NullReason.NO_TRADE
+
+
+def test_cell_codes_carry_the_reason_of_explained_cells() -> None:
+    ctx = context(_chain_rows("OK"))
+    info = feature_infos(ctx.features, [CLOSE])[CLOSE]
+    explained = Unknown(UnknownCode.EXPLAINED, "x", NullReason.NEW_LISTING)
+    cells = {
+        "A": (FeatureValue(CLOSE, None, explained, info), FeatureValue(CLOSE, 1.0, None, info)),
+        "B": (FeatureValue(CLOSE, None, Unknown(UnknownCode.NULL, "y"), info),) * 2,
+    }
+    unknown, reasons = cell_codes(cells, ["A", "B", "C"])
+    assert unknown == ((UnknownCode.EXPLAINED, None), (UnknownCode.NULL, UnknownCode.NULL), ())
+    assert reasons == ((NullReason.NEW_LISTING, None), (None, None), ())

@@ -14,9 +14,12 @@ or in any input of the expression), ``NULL`` (stored or computed null; ``Feature
 says what null means), ``NOT_APPLICABLE`` (the feature is not defined for this kind of
 instrument: option features of a non-optionable one, earnings of an ETF, preferred or
 blank-check company; from the session's reference snapshot and its company snapshot's SIC) and
-``ILLIQUID`` (an option feature null because the chain is too thin: its status column says so).
-A present value wins over both; they win over NO_ROW and NULL, so a
-non-optionable instrument with no option rows is n/a, not a gap (ADR 0042). ``LICENCE``
+``ILLIQUID`` (an option feature null because the chain is too thin: its status column says so)
+and ``EXPLAINED`` (the null is itself the fact, a ``NullReason`` its status column holds: no
+trade on the session, next earnings not announced, a new listing; ADR 0046).
+A present value wins over all three; they win over NO_ROW and NULL, in that order, so a
+non-optionable instrument with no option rows is n/a, not a gap (ADR 0042), and a stock with
+no bar on the session but a ``NO_TRADE`` status is "no trade", not a gap. ``LICENCE``
 waits for a second user (ADR 0028: personal-licence values are hidden from users other than
 the owner once there are any). A name outside the caller's catalogue is an error
 (``UnknownFeatureError``), not a value."""
@@ -36,7 +39,13 @@ from algotrade.core.model.fields import (
 )
 from algotrade.core.views.feature_view import FeatureValue as Scalar
 from algotrade.features.expressions.feature_set import FeatureSet
-from algotrade.features.framework.feature import BLANK_CHECK_SIC, OPERATING_TYPES, not_applicable
+from algotrade.features.framework.feature import (
+    BLANK_CHECK_SIC,
+    OPERATING_TYPES,
+    NullReason,
+    StatusRule,
+    not_applicable,
+)
 from algotrade.services.features import field_view
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
@@ -49,7 +58,14 @@ _ROW = "instrument_id"
 _OPTIONABLE = "instrument.optionable"
 _SECURITY_TYPE = "instrument.security_type"
 _SIC = "instrument.sic"  # company snapshot on or before the session (ADR 0045)
-type Reasons = tuple[frozenset[str], tuple[tuple[str, frozenset[str]], ...]]  # applicability
+type Reasons = tuple[frozenset[str], tuple[StatusRule, ...]]  # FeatureSet.applicability
+# What an EXPLAINED value's detail adds after "<status> is <reason> for <id> on <day>".
+_EXPLAINED = {
+    NullReason.NO_TRADE: "no bar on the session",
+    NullReason.NOT_ANNOUNCED: "the next report date is not announced",
+    NullReason.NEW_LISTING: "too few sessions since listing",
+    NullReason.FEW_BARS: "too few bars in the window",
+}
 
 
 @dataclass(frozen=True)
@@ -71,12 +87,12 @@ def _tables(fs: FeatureSet, name: str) -> tuple[str, ...]:
 
 
 def _reason_fields(reasons: Reasons) -> list[str]:
-    """The extra fields a value's NOT_APPLICABLE / ILLIQUID decision reads."""
+    """The extra fields a value's NOT_APPLICABLE / ILLIQUID / EXPLAINED decision reads."""
     applies, statuses = reasons
     return [
         *([_OPTIONABLE] if "optionable" in applies else []),
         *([_SECURITY_TYPE, _SIC] if "operating_company" in applies else []),
-        *(field for field, _ in statuses),
+        *(field for field, _, _, _ in statuses),
     ]
 
 
@@ -128,12 +144,10 @@ def _not_applicable(
     return ""
 
 
-def _illiquid(
-    statuses: Sequence[tuple[str, frozenset[str]]], row: Mapping[str, Any], iid: str, day: date
-) -> str:
+def _illiquid(statuses: Sequence[StatusRule], row: Mapping[str, Any], iid: str, day: date) -> str:
     """Why an option feature is null for want of a tradeable chain (the status column), or
     ``""``."""
-    for field, thin in statuses:
+    for field, thin, _, _ in statuses:
         status = to_scalar(row.get(field))
         if status in thin:
             return (
@@ -141,6 +155,34 @@ def _illiquid(
                 "no near-the-money quote within the spread limit"
             )
     return ""
+
+
+def _explained(
+    statuses: Sequence[StatusRule],
+    row: Mapping[str, Any],
+    rowless: Sequence[str],
+    iid: str,
+    day: date,
+) -> Unknown | None:
+    """The ``NullReason`` a status column gives for the null (the first that does), or
+    ``None``. Only when the explaining statuses cover every table with no row for the
+    instrument: an expression's explained input never hides a real gap in another input
+    (``close / days_to_earnings`` with no ``price_stats`` row stays NO_ROW whatever the
+    earnings status says)."""
+    found = [
+        (field, str(status), table)
+        for field, _, explained, table in statuses
+        if (status := to_scalar(row.get(field))) in explained
+    ]
+    if not found or not set(rowless) <= {table for _, _, table in found}:
+        return None
+    field, status, _ = found[0]
+    reason = NullReason(status)
+    detail = (
+        f"{field.rpartition('.')[2]} is {status} for {iid} on {day.isoformat()}: "
+        f"{_EXPLAINED[reason]}"
+    )
+    return Unknown(UnknownCode.EXPLAINED, detail, reason)
 
 
 def _value(
@@ -175,8 +217,8 @@ def _absence(
     iid: str,
     reasons: Reasons,
 ) -> Unknown:
-    """Why a null value is null (ADR 0042 precedence): not applicable, illiquid, no row in a
-    table it reads, else a stored null."""
+    """Why a null value is null (ADR 0042 and 0046 precedence): not applicable, illiquid,
+    explained, no row in a table it reads, else a stored null."""
     day = ctx.session.date
     why = _not_applicable(reasons[0], row, ctx, iid)
     if why:
@@ -189,10 +231,29 @@ def _absence(
         for t in tables
         if t.startswith(ROLLUP_TABLE_PREFIX) and to_scalar(row.get(_marker(t))) is None
     ]
+    explained = _explained(reasons[1], row, rowless, iid, day)
+    if explained is not None:
+        return explained
     if rowless:
         detail = f"{' / '.join(rowless)} has no row for {iid} on {day.isoformat()}"
         return Unknown(UnknownCode.NO_ROW, detail)
     return Unknown(UnknownCode.NULL, f"{info.name} is null for {iid} on {day.isoformat()}")
+
+
+def cell_codes(
+    cells: Mapping[str, Sequence[FeatureValue]], ids: Sequence[str]
+) -> tuple[tuple[tuple[UnknownCode | None, ...], ...], tuple[tuple[NullReason | None, ...], ...]]:
+    """A table's ``unknown`` and ``reasons`` matrices for ``ids`` (rows) from their
+    ``load_feature_values`` cells: the code of each UNKNOWN cell, and its ``NullReason`` when
+    the code is EXPLAINED (else None)."""
+
+    def row(iid: str) -> tuple[Unknown | None, ...]:
+        return tuple(v.unknown for v in cells.get(iid, ()))
+
+    return (
+        tuple(tuple(u.code if u else None for u in row(i)) for i in ids),
+        tuple(tuple(u.reason if u else None for u in row(i)) for i in ids),
+    )
 
 
 def load_feature_values(

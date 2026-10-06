@@ -7,6 +7,8 @@
   expression feature a group reads is materialised and computed before it;
 - every expression feature is documented like a stored one, and golden output of both
   (materialised and virtual) has the declared types, ranges and categories;
+- a null explained by a status column (ADRs 0042, 0046) names statuses that are ``NullReason``
+  values and that the status column declares as categories;
 - the generated catalogue (``docs/data/features.md``) is up to date;
 - inputs come only through ``algotrade.data.feature_inputs``: no module under ``features/``
   imports storage or a domain reader, and the framework has no loaders of its own.
@@ -20,7 +22,7 @@ import pytest
 
 from algotrade.data import StoreReader
 from algotrade.features.catalogue import PATH, render
-from algotrade.features.framework.feature import in_range, is_feature_ref
+from algotrade.features.framework.feature import NullReason, in_range, is_feature_ref
 from algotrade.features.framework.graph import dependencies
 from algotrade.features.framework.runner import compute_in_memory
 from algotrade.features.registry import GROUPS, feature
@@ -111,6 +113,20 @@ def test_labels_and_units() -> None:
             assert f.unit == "flag", f.key
         if f.unit in ("decimal", "usd", "usd_per_share", "shares", "count", "sessions"):
             assert f.valid_range is not None, f"{f.key}: give a numeric feature a range"
+
+
+def test_explained_and_illiquid_statuses_are_values_of_their_status_column() -> None:
+    reasons = {r.value for r in NullReason}
+    for f in FEATURES.values():
+        if not f.null_status:
+            continue
+        status = SITE.feature(f.status_field)
+        assert status is not None and status.categories, (
+            f"{f.key}: {f.status_field} has no categories"
+        )
+        assert set(f.explained_statuses) <= reasons, f"{f.key}: explained statuses not NullReason"
+        named = {*f.explained_statuses, *f.illiquid_statuses}
+        assert named <= set(status.categories), f"{f.key}: {named - set(status.categories)}"
 
 
 def test_catalogue_is_up_to_date() -> None:

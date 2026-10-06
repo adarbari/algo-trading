@@ -105,7 +105,8 @@ class ChangeCount:
 @strawberry.type(
     description="One page of a run's rows matching the filters, in the sort order (`total`: "
     "every page). `rows[i][j]` is the catalogue column `columns[j]` for `results[i]`, null "
-    "exactly when `unknown[i][j]` says why. `missing`: tables the search and sort read with "
+    "exactly when `unknown[i][j]` says why (`reasons[i][j]`: its NullReason when EXPLAINED). "
+    "`missing`: tables the search and sort read with "
     "nothing for the session"
 )
 class ScreenResultPage:
@@ -118,6 +119,7 @@ class ScreenResultPage:
     results: list[ScreenResult]
     rows: list[list[JSON | None]]
     unknown: list[list[values.UnknownCode | None]]
+    reasons: list[list[values.NullReason | None]]
     missing: list[str]
 
     @classmethod
@@ -132,5 +134,6 @@ class ScreenResultPage:
             results=[ScreenResult.of(r, ctx) for r in d.results],
             rows=[[JSON(v) for v in row] for row in d.rows],
             unknown=[list(row) for row in d.unknown],
+            reasons=[list(row) for row in d.reasons],
             missing=list(d.missing),
         )

@@ -41,7 +41,7 @@ from algotrade.features.expressions.frame import join
 from algotrade.features.expressions.functions import Type
 from algotrade.features.framework.columns import conform
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, Superseded
-from algotrade.features.framework.feature import Feature
+from algotrade.features.framework.feature import Feature, StatusRule
 from algotrade.features.framework.graph import dependency_order
 
 
@@ -127,21 +127,27 @@ class FeatureSet:
         e = self.expressions[name]
         return f"{ROLLUP_TABLE_PREFIX}{e.name}@v{e.feature.version}"
 
-    def applicability(
-        self, name: str
-    ) -> tuple[frozenset[str], tuple[tuple[str, frozenset[str]], ...]]:
-        """What a value's absence may be put down to (ADR 0042), inherited by an expression
-        from everything it reads like its licence: -> (the non-``any`` ``applies_to`` values
-        of the stored features it reads, each ``null_status`` field with its ``illiquid_statuses``).
+    def applicability(self, name: str) -> tuple[frozenset[str], tuple[StatusRule, ...]]:
+        """What a value's absence may be put down to (ADRs 0042, 0046), inherited by an
+        expression from everything it reads like its licence: -> (the non-``any``
+        ``applies_to`` values of the stored features it reads, each ``null_status`` field with
+        its ``illiquid_statuses``, ``explained_statuses`` and the declaring feature's table).
         ``name``: a selection field (``rollup.<group>.<col>``, ``feature.<name>``)."""
         applies: set[str] = set()
-        statuses: list[tuple[str, frozenset[str]]] = []
+        statuses: list[StatusRule] = []
 
         def add(feature: Feature) -> None:
             if feature.applies_to != "any":
                 applies.add(feature.applies_to)
             if feature.null_status:
-                statuses.append((feature.status_field, frozenset(feature.illiquid_statuses)))
+                statuses.append(
+                    (
+                        feature.status_field,
+                        frozenset(feature.illiquid_statuses),
+                        frozenset(feature.explained_statuses),
+                        f"{ROLLUP_TABLE_PREFIX}{feature.group}",
+                    )
+                )
 
         def visit(expression: str) -> None:
             e = self.expressions[expression]
