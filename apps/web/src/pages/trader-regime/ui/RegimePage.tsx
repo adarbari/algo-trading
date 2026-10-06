@@ -1,13 +1,14 @@
 /**
  * Trader > Regime: the market as weather. The header (the weather word, its sentence, the
- * three scores, what changed this week), the slow and fast warning signs behind it, and the
- * reading list the cards cite.
+ * three scores, what changed this week), the slow and fast warning signs behind it, beside
+ * the caller's sizing rules (read-only) and the reading list the cards cite.
  */
 import { Grid, Heading, Stack, Text } from '@algotrade/ui';
 
 import { ReadingList } from '@/widgets/reading-list';
 import { RegimeHeader } from '@/widgets/regime-header';
 import { RegimeIndicators } from '@/widgets/regime-indicators';
+import { RegimeSizing } from '@/widgets/regime-sizing';
 
 export function RegimePage() {
   return (
@@ -22,7 +23,10 @@ export function RegimePage() {
       <RegimeHeader />
       <Grid columns="main-aside" gap={4} collapse="lg" align="start">
         <RegimeIndicators />
-        <ReadingList />
+        <Stack gap={3}>
+          <RegimeSizing />
+          <ReadingList />
+        </Stack>
       </Grid>
     </Stack>
   );

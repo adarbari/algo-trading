@@ -9,6 +9,7 @@ serves (``runs.py``); a config that does not resolve is left out."""
 
 from dataclasses import dataclass
 
+from algotrade.config.strategy.regime import REGIME_LABELS
 from algotrade.config.strategy.resolve import ResolvedConfig
 from algotrade.config.strategy.schema import RULES_IMPL
 from algotrade.config.user import SITE_USER, UserContext
@@ -44,7 +45,9 @@ class Screener:
     """A rule screen as the user sees it. ``scope``: where its config lives (``site`` or the
     user's id); ``owner``: whose runs are its (the user's id, or ``site``); ``name``: the
     config's display name, else its id; ``version``: the config's current version;
-    ``criteria`` and ``display_columns``: the current config's, in spec order."""
+    ``criteria`` and ``display_columns``: the current config's, in spec order;
+    ``regime_enabled`` / ``pause_in``: its resolved ``[regime]`` gate (ADR 0049): whether it is
+    on for this screener and the labels, calmest first, in which its picks are PAUSED."""
 
     id: str
     owner: str
@@ -54,11 +57,14 @@ class Screener:
     hash: str
     criteria: tuple[ScreenCriterion, ...]
     display_columns: tuple[ScreenColumn, ...]
+    regime_enabled: bool = False
+    pause_in: tuple[str, ...] = ()
 
 
 def _screener(config: ResolvedConfig) -> Screener:
     owner = config.user.user_id
     spec = config.screen_spec
+    regime = config.regime
     return Screener(
         id=config.config.id,
         owner=owner,
@@ -68,6 +74,8 @@ def _screener(config: ResolvedConfig) -> Screener:
         hash=config.hash,
         criteria=tuple(ScreenCriterion(c.id, c.field, c.mode.value) for c in spec.criteria),
         display_columns=tuple(ScreenColumn(n, f) for n, f in spec.columns),
+        regime_enabled=regime.enabled,
+        pause_in=tuple(label for label in REGIME_LABELS if label in config.gate_pauses),
     )
 
 

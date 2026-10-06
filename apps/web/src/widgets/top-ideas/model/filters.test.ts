@@ -26,6 +26,8 @@ const idea = (symbol: string, decision: string, days: number | null): Idea => ({
   rank: 1,
   picks: [pick(decision)],
   best: pick(decision),
+  regime: null,
+  sizeMultiplier: null,
   facts: { [IDEA_FACTS.sessionsToEarnings]: sessions(days) },
   metrics: {},
   watchOut: [],

@@ -5,8 +5,9 @@ from algotrade.data import StoreReader
 from algotrade.services.read.context import ReadContext, open_context
 from algotrade.services.read.screens.ideas import Ideas, load_ideas, screener_priority
 from algotrade.services.read.values import UnknownCode
+from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
-from tests.unit.services.read.screens.conftest import CONFIGS, D1, context
+from tests.unit.services.read.screens.conftest import CONFIGS, D1, context, write_gated
 
 PRIORITY = {("me", "preferences", "preferences"): {"ideas": {"priority": ["beta", "nope"]}}}
 
@@ -61,3 +62,44 @@ def test_a_session_nothing_ran_for(reader: StoreReader) -> None:
 def test_priority_is_read_from_the_users_preferences(reader: StoreReader) -> None:
     assert screener_priority(context(reader, PRIORITY)) == ("beta", "nope")
     assert screener_priority(context(reader)) == ()
+
+
+def test_paused_picks_are_no_ideas_but_are_listed_apart_with_their_reason(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    write_gated(backend)
+    ideas = load_ideas(context(reader), 10)
+    assert "EQ:BBB" in _ids(ideas)  # beta still picks it
+    assert [i.instrument_id for i in ideas.items if i.picks[0].config_id == "alpha"] == ["EQ:AAA"]
+    assert ideas.paused_total == 2
+    assert [(p.instrument_id, p.result.config_id) for p in ideas.paused] == [
+        ("EQ:BBB", "alpha"), ("EQ:DDD", "alpha")
+    ]  # fmt: skip
+    first = ideas.paused[0]
+    assert first.result.decision == "PAUSED" and first.result.reasons == "regime=STRESS: alpha"
+    assert first.instrument is not None and first.instrument.symbol == "BBB"
+    alpha = next(s for s in ideas.screeners if s.screener.id == "alpha")
+    assert alpha.picked == 1 and alpha.run is not None and alpha.run.paused == 2
+    assert [r.instrument_id for r in alpha.top] == ["EQ:AAA"]  # a paused row is no top pick
+
+
+def test_the_paused_section_is_capped_by_the_limit_but_counts_every_row(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    write_gated(backend)
+    ideas = load_ideas(context(reader), 1)
+    assert ideas.paused_total == 2 and len(ideas.paused) == 1
+
+
+def test_an_idea_carries_its_best_picks_regime_and_size(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    write_gated(backend)
+    by_id = {i.instrument_id: i for i in load_ideas(context(reader), 10).items}
+    assert (by_id["EQ:AAA"].regime, by_id["EQ:AAA"].size_multiplier) == ("STRESS", 0.5)
+    assert (by_id["EQ:BBB"].regime, by_id["EQ:BBB"].size_multiplier) == (None, None)  # beta's
+
+
+def test_no_paused_rows_is_an_empty_section(ctx: ReadContext) -> None:
+    ideas = load_ideas(ctx, 10)
+    assert (ideas.paused_total, ideas.paused) == (0, ())

@@ -6,10 +6,13 @@ session (``fields.py``; never an older partition). A label not stored for the se
 "Not computed yet" rather than guess a weather. The headline is templated here from the
 indicators' counts, so the browser derives nothing (ADR 0038).
 
-Sizing: the site's multiplier per label, the typed ``[regime] multipliers`` of
+Sizing: the multiplier per label, the typed ``[regime] multipliers`` of
 ``config/site/defaults.toml`` (``config.strategy.regime.site_regime``; the plan's 1 / 0.75 /
-0.5 / 0.25 where it sets none). The per-user layer comes with RG5's read of the caller's
-config. An UNKNOWN regime has no multiplier (the overlay fails closed, ADR 0049)."""
+0.5 / 0.25 where it sets none), the ``unknown_multiplier`` and, for the caller's screeners as
+the config layers resolve them (ADR 0015: a user's copy of a preset, their own ``[regime]``),
+the labels each pauses in. The multipliers are the site's: a user layer that sets its own
+multipliers changes that screener's runs, not this summary. An UNKNOWN regime has no
+multiplier (the overlay fails closed, ADR 0049)."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -31,6 +34,7 @@ from algotrade.services.read.regime.indicators import (
     RegimeIndicator,
     load_indicators,
 )
+from algotrade.services.read.screens.screeners import load_screeners
 from algotrade.services.read.values import Unknown, UnknownCode, to_scalar
 
 
@@ -74,12 +78,38 @@ class RegimeScores:
 
 
 @dataclass(frozen=True)
+class LabelSize:
+    """New positions are sized at ``multiplier`` of the normal size in ``label``."""
+
+    label: RegimeLabel
+    multiplier: float
+
+
+@dataclass(frozen=True)
+class ScreenerGate:
+    """One of the caller's screeners and the labels its picks are PAUSED in (``enabled``:
+    its ``[regime]`` gate is on; with it off nothing is paused), calmest first."""
+
+    screener_id: str
+    name: str
+    enabled: bool
+    pause_in: tuple[RegimeLabel, ...]
+
+
+@dataclass(frozen=True)
 class RegimeSizing:
-    """The site's sizing rule in force: new positions are sized at ``multiplier`` of the
-    normal size while the regime is ``label`` (``None``: the regime is UNKNOWN)."""
+    """The sizing rule in force for the caller: new positions are sized at ``multiplier`` of
+    the normal size while the regime is ``label`` (``None``: the regime is UNKNOWN);
+    ``enabled``: the gate is on (site-wide or for one of the caller's screeners; off, sizes
+    are 100% and nothing pauses); ``multipliers`` per label, ``unknown_multiplier`` for a
+    label not stored, and ``screeners`` with the labels each pauses in."""
 
     label: RegimeLabel
     multiplier: float | None
+    enabled: bool
+    multipliers: tuple[LabelSize, ...]
+    unknown_multiplier: float
+    screeners: tuple[ScreenerGate, ...]
 
 
 @dataclass(frozen=True)
@@ -113,11 +143,24 @@ def _score(reading: Reading) -> RegimeScore:
     return RegimeScore(None if value is None else float(value), reading.unknown)
 
 
-def _multipliers(ctx: ReadContext) -> Mapping[RegimeLabel, float]:
-    """The site's multipliers: ``[regime] multipliers`` of ``defaults.toml``, typed and
-    validated by ``RegimeSettings`` (its defaults where the file sets none)."""
+def _sizing(ctx: ReadContext, label: RegimeLabel) -> RegimeSizing:
+    """The caller's sizing rule: ``[regime]`` of ``defaults.toml``, typed and validated by
+    ``RegimeSettings`` (its defaults where the file sets none), and each screener's resolved
+    pauses."""
     regime = site_regime(ctx.configs.load)
-    return {k: regime.multipliers[k.value] for k in KNOWN}
+    sizes: Mapping[RegimeLabel, float] = {k: regime.multipliers[k.value] for k in KNOWN}
+    gates = tuple(
+        ScreenerGate(s.id, s.name, s.regime_enabled, tuple(RegimeLabel(p) for p in s.pause_in))
+        for s in load_screeners(ctx)
+    )
+    return RegimeSizing(
+        label=label,
+        multiplier=sizes.get(label),
+        enabled=regime.enabled or any(g.enabled for g in gates),
+        multipliers=tuple(LabelSize(k, sizes[k]) for k in KNOWN),
+        unknown_multiplier=regime.unknown_multiplier,
+        screeners=gates,
+    )
 
 
 def _count(items: list[RegimeIndicator], pace: str) -> tuple[int, int]:
@@ -155,7 +198,6 @@ def load_regime(ctx: ReadContext) -> MarketRegime:
     read = read_fields(ctx, [LABEL, MACRO_RISK, MARKET_STRESS, FRAGILITY])
     label, reason = _label(read[LABEL])
     indicators = load_indicators(ctx)
-    multiplier = _multipliers(ctx).get(label)
     return MarketRegime(
         session=ctx.session.date,
         label=label,
@@ -165,6 +207,6 @@ def load_regime(ctx: ReadContext) -> MarketRegime:
             _score(read[MACRO_RISK]), _score(read[MARKET_STRESS]), _score(read[FRAGILITY])
         ),
         indicators=indicators,
-        sizing=RegimeSizing(label, multiplier),
+        sizing=_sizing(ctx, label),
         unknown_reason=reason,
     )

@@ -11,6 +11,7 @@ export {
   type IdeaPick,
   type IdeasData,
   type IdeasResponse,
+  type PausedIdea,
   type ScreenerSummary,
   type WatchOut,
 } from './model/idea';

@@ -17,6 +17,7 @@ type ServedIdeas = NonNullable<IdeasResponse['ideas']>;
 type ServedItem = ServedIdeas['items'][number];
 type ServedPick = ServedItem['picks'][number];
 type ServedScreener = ServedIdeas['screeners'][number];
+type ServedPaused = ServedIdeas['paused'][number];
 
 /** A stored display value: a screener's column (`hv30`, `put_roc`, ...) or a criterion value. */
 export type IdeaMetric = number | string;
@@ -51,6 +52,9 @@ export interface Idea {
   picks: IdeaPick[];
   /** The pick with the best decision (ties: the higher-priority screener). */
   best: IdeaPick;
+  /** The regime label and size its best-priority pick was stamped with (null: not stamped). */
+  regime: string | null;
+  sizeMultiplier: number | null;
   /** The served facts (`IDEA_FEATURES`) by catalogue name: a value, or why it is UNKNOWN. */
   facts: Readonly<Record<string, ServedValue>>;
   /**
@@ -61,6 +65,19 @@ export interface Idea {
   metrics: Record<string, IdeaMetric>;
   /** Flags, liquidity risk and earnings before expiry, each once. */
   watchOut: WatchOut[];
+}
+
+/** A pick the regime gate held back: not an idea, listed apart with its reason. */
+export interface PausedIdea {
+  instrumentId: string;
+  /** Null when the session's reference snapshot does not have the instrument. */
+  symbol: string | null;
+  screenerId: string;
+  screenerName: string;
+  score: number | null;
+  /** Why it is paused (the label and the rule), as the run stored it. */
+  reason: string;
+  regime: string | null;
 }
 
 export interface ScreenerSummary {
@@ -83,6 +100,9 @@ export interface IdeasData {
   session: string | null;
   total: number;
   ideas: Idea[];
+  /** How many picks the gate paused over every run, and the first of them (never hidden). */
+  pausedTotal: number;
+  paused: PausedIdea[];
   /** The user's screeners, highest priority first (priority list, then the rest by id). */
   screeners: ScreenerSummary[];
 }
@@ -171,6 +191,8 @@ function toIdea(item: ServedItem, names: ReadonlyMap<string, string>): Idea | nu
     rank: item.rank,
     picks,
     best,
+    regime: item.regime ?? null,
+    sizeMultiplier: item.sizeMultiplier ?? null,
     facts,
     metrics: toMetrics(strongest),
     watchOut: [],
@@ -193,7 +215,26 @@ function toScreener(entry: ServedScreener): ScreenerSummary {
   };
 }
 
-export const NO_IDEAS: IdeasData = { session: null, total: 0, ideas: [], screeners: [] };
+export const NO_IDEAS: IdeasData = {
+  session: null,
+  total: 0,
+  ideas: [],
+  pausedTotal: 0,
+  paused: [],
+  screeners: [],
+};
+
+function toPaused(entry: ServedPaused, names: ReadonlyMap<string, string>): PausedIdea {
+  return {
+    instrumentId: entry.instrumentId,
+    symbol: entry.instrument?.symbol ?? null,
+    screenerId: entry.result.configId,
+    screenerName: names.get(entry.result.configId) ?? entry.result.configId,
+    score: entry.result.score ?? null,
+    reason: entry.result.reasons,
+    regime: entry.result.regime ?? null,
+  };
+}
 
 export function toIdeasData(response: IdeasResponse): IdeasData {
   const found = response.ideas;
@@ -205,6 +246,8 @@ export function toIdeasData(response: IdeasResponse): IdeasData {
     ideas: found.items
       .map((item) => toIdea(item, names))
       .filter((idea): idea is Idea => idea !== null),
+    pausedTotal: found.pausedTotal,
+    paused: found.paused.map((entry) => toPaused(entry, names)),
     screeners: found.screeners.map(toScreener),
   };
 }

@@ -35,7 +35,9 @@ class DecisionCount:
 @strawberry.type(
     description="A screener's run for the session: whose, which version ran, its run record's "
     "status and `audit` (coverage, the selection's audit), and every decision with its count "
-    "over the whole run (`picked`: the tickers it picked)"
+    "over the whole run (`picked`: the tickers it picked, `paused`: the picks the regime gate "
+    "held back, never counted as picked; `regime`: the label the run stamped, null when the "
+    "gate was off or the label unknown)"
 )
 class ScreenerRun:
     run_id: str
@@ -47,6 +49,8 @@ class ScreenerRun:
     config_version: int | None
     decisions: list[DecisionCount]
     picked: int
+    paused: int
+    regime: str | None
     audit: JSON
     run: strawberry.Private[runs.ScreenerRun]
     ctx: strawberry.Private[ReadContext]
@@ -63,6 +67,8 @@ class ScreenerRun:
             config_version=d.config_version,
             decisions=[DecisionCount.of(c) for c in d.decisions],
             picked=d.picked,
+            paused=d.paused,
+            regime=d.regime,
             audit=JSON(dict(d.audit)),
             run=d,
             ctx=ctx,

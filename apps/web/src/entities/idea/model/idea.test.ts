@@ -32,13 +32,15 @@ const item = (
 ): Item => ({
   rank,
   instrumentId: `id-${String(rank)}`,
+  regime: rank === 1 ? 'STRESS' : null,
+  sizeMultiplier: rank === 1 ? 0.5 : null,
   instrument: symbol === null ? null : { symbol, features: facts },
   picks,
 });
 
 const screener = (id: string, name: string, notRun = false): Served['screeners'][number] => ({
   screener: { id, name, owner: 'abhinav', version: 3 },
-  run: notRun ? null : { runId: `run-${id}`, configVersion: 2 },
+  run: notRun ? null : { runId: `run-${id}`, configVersion: 2, paused: id === 'vrp' ? 1 : 0 },
   notRun: notRun
     ? { code: 'NOT_RUN', detail: `${id} has no run for 2026-10-02`, reason: null }
     : null,
@@ -51,6 +53,19 @@ const response: IdeasResponse = {
     session: '2026-10-02',
     priority: ['vrp', 'liq'],
     total: 3,
+    pausedTotal: 1,
+    paused: [
+      {
+        instrumentId: 'id-9',
+        instrument: { symbol: 'XOM' },
+        result: {
+          configId: 'vrp',
+          score: 70,
+          reasons: 'regime=STRESS: vrp pauses in STRESS',
+          regime: 'STRESS',
+        },
+      },
+    ],
     screeners: [
       screener('vrp', 'VRP scanner'),
       screener('liq', 'liq'),
@@ -104,6 +119,28 @@ describe('toIdeasData', () => {
       version: 3,
       top: [],
     });
+  });
+
+  it("carries each idea's regime stamp, as stored (null: not stamped)", () => {
+    expect(data.ideas.map((i) => [i.regime, i.sizeMultiplier])).toEqual([
+      ['STRESS', 0.5],
+      [null, null],
+    ]);
+  });
+
+  it('lists the paused picks apart, with the screener name and the stored reason', () => {
+    expect(data.pausedTotal).toBe(1);
+    expect(data.paused).toEqual([
+      {
+        instrumentId: 'id-9',
+        symbol: 'XOM',
+        screenerId: 'vrp',
+        screenerName: 'VRP scanner',
+        score: 70,
+        reason: 'regime=STRESS: vrp pauses in STRESS',
+        regime: 'STRESS',
+      },
+    ]);
   });
 
   it('reads nothing stored as no ideas', () => {

@@ -13,7 +13,8 @@ REGIME = """query R($date: Date) {
     session label plainLabel headline unknownReason { code detail }
     scores { macroRisk { value unknown { code } } marketStress { value unknown { code } }
              fragility { value unknown { code } } }
-    sizing { label multiplier }
+    sizing { label multiplier enabled unknownMultiplier multipliers { label multiplier }
+             screeners { screenerId name enabled pauseIn } }
     indicators { key pace plainName technicalName oneLiner whyItMatters whatOnMeans
       before { episode line } leadTime falseAlarms links { title url } feature
       value unknown { code } format status changed }
@@ -38,7 +39,14 @@ def test_the_regime_is_unknown_until_it_is_computed(graph: Graph) -> None:
     assert (regime["session"], regime["label"]) == (END.isoformat(), "UNKNOWN")
     assert (regime["plainLabel"], regime["headline"]) == ("Not computed yet", "Not computed yet")
     assert regime["unknownReason"]["code"] == "NO_PARTITION"  # the groups exist, no rows yet
-    assert regime["sizing"] == {"label": "UNKNOWN", "multiplier": None}
+    sizing = regime["sizing"]
+    assert (sizing["label"], sizing["multiplier"], sizing["enabled"]) == ("UNKNOWN", None, False)
+    assert sizing["unknownMultiplier"] == 0.0  # fail closed
+    assert [(m["label"], m["multiplier"]) for m in sizing["multipliers"]] == [
+        ("CALM", 1.0), ("CAUTION", 0.75), ("STRESS", 0.5), ("CRISIS", 0.25)
+    ]  # fmt: skip
+    vrp = next(g for g in sizing["screeners"] if g["screenerId"] == "vrp_scanner")
+    assert vrp["pauseIn"] == ["STRESS", "CRISIS"] and not vrp["enabled"]  # the preset's, gate off
     assert regime["scores"]["fragility"] == {
         "value": None, "unknown": {"code": "NO_PARTITION"},
     }  # fmt: skip

@@ -51,6 +51,18 @@ const RegimeQuery = graphql(`
       sizing {
         label
         multiplier
+        enabled
+        unknownMultiplier
+        multipliers {
+          label
+          multiplier
+        }
+        screeners {
+          screenerId
+          name
+          enabled
+          pauseIn
+        }
       }
       indicators {
         key

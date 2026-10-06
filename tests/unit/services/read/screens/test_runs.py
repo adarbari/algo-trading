@@ -12,8 +12,9 @@ from algotrade.services.read.screens.runs import (
     run_rows,
 )
 from algotrade.services.read.values import Unknown, UnknownCode
+from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
-from tests.unit.services.read.screens.conftest import D0, D1, T
+from tests.unit.services.read.screens.conftest import D0, D1, T, write_gated
 
 
 def _on(reader: StoreReader, day: date) -> ReadContext:
@@ -62,9 +63,24 @@ def test_an_earlier_session_reads_its_own_runs(reader: StoreReader) -> None:
     assert older.run is not None and older.run.session == D0
 
 
-def test_picked_is_every_decision_but_reject_skipped_unknown() -> None:
+def test_picked_is_every_decision_but_reject_skipped_unknown_paused() -> None:
     assert all(is_picked(d) for d in ("QUALIFIED", "WATCH", "EVENT_RISK", "LIQUIDITY_RISK"))
-    assert not any(is_picked(d) for d in ("REJECT", "SKIPPED", "UNKNOWN"))
+    assert not any(is_picked(d) for d in ("REJECT", "SKIPPED", "UNKNOWN", "PAUSED"))
+
+
+def test_paused_rows_are_counted_apart_and_never_picked(
+    backend: MemoryBackend, reader: StoreReader
+) -> None:
+    write_gated(backend)
+    run = latest_run(_on(reader, D1), "site", "alpha").run
+    assert run is not None and run.run_id == "r2"
+    assert (run.picked, run.paused, run.regime) == (1, 2, "STRESS")  # only AAA is picked
+    assert DecisionCount("PAUSED", 2) in run.decisions  # the whole run, as stored
+
+
+def test_a_run_without_the_stamp_has_no_regime_and_nothing_paused(ctx: ReadContext) -> None:
+    run = latest_run(ctx, "site", "alpha").run
+    assert run is not None and (run.regime, run.paused) == (None, 0)
 
 
 def test_a_run_carries_its_record_stats(ctx: ReadContext) -> None:

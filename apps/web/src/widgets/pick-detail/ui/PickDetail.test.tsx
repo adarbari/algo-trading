@@ -100,4 +100,18 @@ describe('PickDetail', () => {
     setup({ compared: true });
     expect(screen.getByRole('button', { name: 'Remove from compare' })).toBeInTheDocument();
   });
+
+  it('says a paused pick was held back by the regime gate, with the stored rule', () => {
+    setup({
+      row: {
+        ...ROW,
+        decision: 'PAUSED',
+        reasons: 'regime=STRESS: vrp_scanner pauses in STRESS',
+        flags: [],
+      },
+    });
+    expect(screen.getByText('Paused')).toHaveAttribute('data-tone', 'warning');
+    expect(screen.getByText(/The regime gate held this pick back/)).toBeVisible();
+    expect(screen.getByText('regime=STRESS: vrp_scanner pauses in STRESS')).toBeVisible();
+  });
 });

@@ -37,12 +37,18 @@ class IdeaScreener:
         )
 
 
-@strawberry.type(description="A ticker some screener picked: its picks, best screener first")
+@strawberry.type(
+    description="A ticker some screener picked: its picks, best screener first. `regime` and "
+    "`sizeMultiplier`: the session's label and the size of its best pick, as the run stamped "
+    "them (null: gate off, regime unknown, or a run before the stamp)"
+)
 class Idea:
     rank: int
     instrument_id: str
     instrument: Instrument | None
     picks: list[ScreenResult]
+    regime: str | None
+    size_multiplier: float | None
 
     @classmethod
     def of(cls, d: ideas.Idea, ctx: ReadContext) -> Self:
@@ -51,12 +57,33 @@ class Idea:
             instrument_id=d.instrument_id,
             instrument=Instrument.of(d.instrument, ctx) if d.instrument is not None else None,
             picks=[ScreenResult.of(p, ctx) for p in d.picks],
+            regime=d.regime,
+            size_multiplier=d.size_multiplier,
+        )
+
+
+@strawberry.type(
+    description="A ticker one screener picked and the regime gate held back: that screener's "
+    "PAUSED row, whose `reasons` say why"
+)
+class PausedIdea:
+    instrument_id: str
+    instrument: Instrument | None
+    result: ScreenResult
+
+    @classmethod
+    def of(cls, d: ideas.PausedIdea, ctx: ReadContext) -> Self:
+        return cls(
+            instrument_id=d.instrument_id,
+            instrument=Instrument.of(d.instrument, ctx) if d.instrument is not None else None,
+            result=ScreenResult.of(d.result, ctx),
         )
 
 
 @strawberry.type(
     description="The ideas for the session: `screeners` in the user's priority order (then the "
-    "rest by id), `items` the first `limit` of `total` picked tickers"
+    "rest by id), `items` the first `limit` of `total` picked tickers, `paused` the first `limit` "
+    "of `pausedTotal` picks the regime gate held back (never counted in `total`)"
 )
 class Ideas:
     session: dt.date
@@ -64,6 +91,8 @@ class Ideas:
     screeners: list[IdeaScreener]
     total: int
     items: list[Idea]
+    paused_total: int
+    paused: list[PausedIdea]
 
     @classmethod
     def of(cls, d: ideas.Ideas, ctx: ReadContext) -> Self:
@@ -73,4 +102,6 @@ class Ideas:
             screeners=[IdeaScreener.of(s, ctx) for s in d.screeners],
             total=d.total,
             items=[Idea.of(i, ctx) for i in d.items],
+            paused_total=d.paused_total,
+            paused=[PausedIdea.of(p, ctx) for p in d.paused],
         )

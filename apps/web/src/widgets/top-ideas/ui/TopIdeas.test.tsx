@@ -51,10 +51,17 @@ const item = (
   symbol: string,
   picks: ReturnType<typeof pick>[],
   features: ReturnType<typeof facts>,
-): Item => ({ rank, instrumentId: `id-${symbol}`, instrument: { symbol, features }, picks });
+): Item => ({
+  rank,
+  instrumentId: `id-${symbol}`,
+  regime: null,
+  sizeMultiplier: null,
+  instrument: { symbol, features },
+  picks,
+});
 const screener = (id: string, name: string) => ({
   screener: { id, name, owner: 'abhinav', version: 1 },
-  run: { runId: `run-${id}`, configVersion: 1 },
+  run: { runId: `run-${id}`, configVersion: 1, paused: 0 },
   notRun: null,
   picked: 3,
   top: [],
@@ -65,6 +72,8 @@ const response: IdeasResponse = {
     session: '2026-10-02',
     priority: ['vrp', 'liq'],
     total: 4,
+    pausedTotal: 0,
+    paused: [],
     screeners: [screener('vrp', 'VRP scanner'), screener('liq', 'Liquidity')],
     items: [
       item(
@@ -163,6 +172,30 @@ describe('TopIdeas', () => {
     expect(within(aapl).getByText('31.0%')).toBeInTheDocument();
     expect(within(aapl).getByText('1.49')).toBeInTheDocument();
     expect(within(aapl).getByText('1.9%')).toBeInTheDocument();
+  });
+
+  it('shows the regime size of an idea, only when some run stamped one', () => {
+    const none = setup();
+    const before = within(none.grid())
+      .getAllByRole('columnheader')
+      .map((h) => h.textContent);
+    expect(before.some((h) => h.startsWith('Size'))).toBe(false);
+    none.unmount();
+    const stamped = {
+      ...data,
+      ideas: data.ideas.map((idea) =>
+        idea.symbol === 'AAPL' ? { ...idea, regime: 'STRESS', sizeMultiplier: 0.5 } : idea,
+      ),
+    };
+    hooks.useIdeas.mockReturnValue(fakeQuery<IdeasData>(stamped));
+    const { grid } = setup();
+    const headers = within(grid())
+      .getAllByRole('columnheader')
+      .map((h) => h.textContent);
+    expect(headers.some((h) => h.startsWith('Size'))).toBe(true);
+    expect(
+      within(within(grid()).getByRole('row', { name: /AAPL/ })).getByText('50%'),
+    ).toBeVisible();
   });
 
   it('shows the watch-outs as chips', () => {

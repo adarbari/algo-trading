@@ -82,7 +82,10 @@ class ScreenResult:
     snapshot (None: not in it); ``criteria`` in the order stored; ``change``: ``new`` (picked
     now, not by the previous run) or ``dropped`` (the reverse), None when the same or not
     compared (no previous run, or a read that does not compare: Ideas);
-    ``previous_decision``: the previous run's (None: not in it, or not compared)."""
+    ``previous_decision``: the previous run's (None: not in it, or not compared).
+    ``regime`` / ``size_multiplier``: the session's regime label and the size the gate applied,
+    as the run stamped them (None: gate off, regime unknown, or a run before the stamp);
+    a ``PAUSED`` row says why first in ``reasons`` (ADR 0049)."""
 
     run_id: str
     config_id: str
@@ -98,6 +101,8 @@ class ScreenResult:
     columns: tuple[ResultColumn, ...]
     change: str | None = None
     previous_decision: str | None = None
+    regime: str | None = None
+    size_multiplier: float | None = None
 
 
 @dataclass(frozen=True)
@@ -225,6 +230,8 @@ def _result(
         columns=columns,
         change=change[0],
         previous_decision=change[1],
+        regime=None if (label := to_scalar(row.get("regime"))) is None else str(label),
+        size_multiplier=_float(row.get("size_multiplier")),
     )
 
 

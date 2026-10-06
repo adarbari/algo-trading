@@ -18,6 +18,8 @@ const data: IdeasData = {
   session: '2026-10-02',
   total: 2,
   ideas: [],
+  pausedTotal: 0,
+  paused: [],
   screeners: [
     {
       id: 'vrp-scanner',

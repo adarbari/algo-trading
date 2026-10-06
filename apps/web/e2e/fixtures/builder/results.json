@@ -48,6 +48,10 @@
           "count": 1
         },
         {
+          "decision": "PAUSED",
+          "count": 1
+        },
+        {
           "decision": "REJECT",
           "count": 4198
         }
@@ -64,14 +68,14 @@
       ],
       "results": {
         "sort": "rank",
-        "total": 5,
+        "total": 6,
         "page": 1,
         "size": 100,
         "missing": [],
         "columns": [],
-        "rows": [[], [], [], [], []],
-        "unknown": [[], [], [], [], []],
-        "reasons": [[], [], [], [], []],
+        "rows": [[], [], [], [], [], []],
+        "unknown": [[], [], [], [], [], []],
+        "reasons": [[], [], [], [], [], []],
         "results": [
           {
             "instrumentId": "EQ:AAPL",
@@ -292,9 +296,55 @@
                 "value": 0.21
               }
             ]
+          },
+          {
+            "instrumentId": "EQ:XOM",
+            "rank": 6,
+            "decision": "PAUSED",
+            "score": 71,
+            "reasons": "regime=CAUTION: vrp_scanner pauses in CAUTION",
+            "flags": [],
+            "change": null,
+            "previousDecision": null,
+            "instrument": {
+              "instrumentId": "EQ:XOM",
+              "symbol": "XOM",
+              "name": "Exxon Mobil"
+            },
+            "criteria": [
+              {
+                "id": "security_type",
+                "field": "instrument.security_type",
+                "mode": "hard",
+                "outcome": "PASS",
+                "value": "COMMON_STOCK"
+              },
+              {
+                "id": "iv30",
+                "field": "rollup.iv30@v1.iv30",
+                "mode": "hard",
+                "outcome": "PASS",
+                "value": 0.61
+              },
+              {
+                "id": "iv_hv_ratio",
+                "field": "feature.iv_hv_ratio",
+                "mode": "hard",
+                "outcome": "PASS",
+                "value": 1.22
+              }
+            ],
+            "columns": [
+              {
+                "name": "spread",
+                "value": 0.04
+              }
+            ]
           }
         ]
-      }
+      },
+      "regime": "CAUTION",
+      "paused": 1
     }
   }
 }

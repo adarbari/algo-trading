@@ -84,9 +84,12 @@ function served(total = 2) {
         runId: 'r1',
         session: '2026-10-02',
         previousSession: '2026-10-01',
+        regime: 'STRESS',
+        paused: 1,
         decisions: [
           { decision: 'QUALIFIED', count: 1 },
           { decision: 'WATCH', count: 1 },
+          { decision: 'PAUSED', count: 1 },
           { decision: 'REJECT', count: 4000 },
         ],
         changes: [
@@ -171,7 +174,7 @@ describe('ScreenerResults', () => {
     expect(asked()).toEqual([
       'vrp',
       {
-        decisions: ['QUALIFIED', 'WATCH', 'LIQUIDITY_RISK', 'EVENT_RISK'],
+        decisions: ['QUALIFIED', 'WATCH', 'LIQUIDITY_RISK', 'EVENT_RISK', 'PAUSED'],
         change: undefined,
         q: '',
         columns: [CLOSE],
@@ -199,15 +202,40 @@ describe('ScreenerResults', () => {
     expect(aapl).toHaveTextContent('$71.50');
     expect(aapl).toHaveTextContent('New');
     expect(screen.getByRole('row', { name: /KO/ })).toHaveTextContent('Unknown');
-    expect(screen.getByText('2 shown · 4,002 in the run')).toBeInTheDocument();
+    expect(screen.getByText('2 shown · 4,003 in the run')).toBeInTheDocument();
     await expectNoA11yViolations(container);
+  });
+
+  it('shows the regime the run stamped in the header, and says so when it stamped none', () => {
+    const { unmount } = setup();
+    expect(screen.getByText('Regime: Storm')).toBeVisible();
+    unmount();
+    const none = served();
+    hooks.useScreenerResults.mockReturnValue(
+      fakeQuery({
+        ...none,
+        screener: { ...none.screener, latestRun: { ...none.screener.latestRun, regime: null } },
+      }),
+    );
+    setup();
+    expect(screen.getByText('Regime: not recorded for this run')).toBeVisible();
+  });
+
+  it("has a chip for the paused picks, selected by default, with the run's count", async () => {
+    setup();
+    const chip = screen.getByRole('button', { name: 'Paused 1' });
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(chip);
+    expect(hooks.change).toHaveBeenCalledWith({
+      decisions: ['QUALIFIED', 'WATCH', 'LIQUIDITY_RISK', 'EVENT_RISK'],
+    });
   });
 
   it('saves a decision chip and the sort into the view; New filters by the change', async () => {
     setup();
     await userEvent.click(screen.getByRole('button', { name: 'Reject 4,000' }));
     expect(hooks.change).toHaveBeenCalledWith({
-      decisions: ['QUALIFIED', 'WATCH', 'LIQUIDITY_RISK', 'EVENT_RISK', 'REJECT'],
+      decisions: ['QUALIFIED', 'WATCH', 'LIQUIDITY_RISK', 'EVENT_RISK', 'PAUSED', 'REJECT'],
     });
     await userEvent.click(screen.getByRole('button', { name: 'New 1' }));
     expect(asked()[1]).toMatchObject({ change: 'new' });

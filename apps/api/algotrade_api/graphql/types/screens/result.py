@@ -54,7 +54,9 @@ class ResultColumn:
     description="One instrument's row of a screener's run; `instrument` is null when the "
     "session's reference snapshot does not have it. `change`: `new` (picked now, not by the "
     "previous run) or `dropped` (the reverse); null when the same or not compared (Ideas); "
-    "`previousDecision`: the previous run's"
+    "`previousDecision`: the previous run's. `regime` / `sizeMultiplier`: the session's regime "
+    "label and the size the gate applied, as the run stamped them (null: gate off, regime "
+    "unknown, or a run before the stamp); a PAUSED row says why first in `reasons`"
 )
 class ScreenResult:
     run_id: str
@@ -71,6 +73,8 @@ class ScreenResult:
     columns: list[ResultColumn]
     change: str | None
     previous_decision: str | None
+    regime: str | None
+    size_multiplier: float | None
 
     @classmethod
     def of(cls, d: stored.ScreenResult, ctx: ReadContext) -> Self:
@@ -89,6 +93,8 @@ class ScreenResult:
             columns=[ResultColumn.of(c) for c in d.columns],
             change=d.change,
             previous_decision=d.previous_decision,
+            regime=d.regime,
+            size_multiplier=d.size_multiplier,
         )
 
 

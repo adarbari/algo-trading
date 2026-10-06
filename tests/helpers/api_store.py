@@ -201,6 +201,10 @@ def _screen(writer: StoreWriter) -> None:
     writer.save_run(run.finish(NOW, stats={"coverage": "COMPLETE", "config_hash": "h"}))
 
 
+REASONS = {"WATCH": "iv rank 40 < 50", "PAUSED": "regime=CAUTION: vrp_scanner pauses in CAUTION"}
+GATE_STAMP = {"regime": "CAUTION", "size_multiplier": 0.75}  # the gate's stamp on a run (ADR 0049)
+
+
 def _ideas(writer: StoreWriter) -> None:
     """Two rule screens over AAA / BBB / CCC (+ earnings context for AAA), for ``/ideas``."""
     common = {"user_id": SITE_USER, "config_hash": "h", "config_version": 1}
@@ -208,7 +212,7 @@ def _ideas(writer: StoreWriter) -> None:
         "vrp_scanner": [
             ("AAA", "QUALIFIED", 80.0, 1),
             ("BBB", "WATCH", 90.0, 2),
-            ("CCC", "REJECT", 0.0, 3),
+            ("CCC", "PAUSED", 0.0, 3),
         ],
         "premium": [("AAA", "QUALIFIED", 100.0, 1), ("CCC", "SKIPPED", None, 2)],
     }
@@ -217,8 +221,9 @@ def _ideas(writer: StoreWriter) -> None:
         frame = [
             {"instrument_id": f"EQ:{s}", "decision": d, "score": sc, "rank": rank,
              "tie_break": None,
-             "reasons": "iv rank 40 < 50" if d == "WATCH" else "", "config_id": config, **common,
-             "flags": "leveraged_inverse" if (s, config) == ("AAA", "vrp_scanner") else ""}
+             "reasons": REASONS.get(d, ""), "config_id": config, **common,
+             "flags": "leveraged_inverse" if (s, config) == ("AAA", "vrp_scanner") else "",
+             **(GATE_STAMP if config == "vrp_scanner" else {})}
             for s, d, sc, rank in rows
         ]  # fmt: skip
         writer.write_result("rule_screen", END, run.run_id, stamped(frame, END, run.run_id))

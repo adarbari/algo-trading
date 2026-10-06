@@ -25,6 +25,20 @@ vi.mock('@/widgets/regime-strip', async () => {
     ),
   };
 });
+vi.mock('@/widgets/paused-ideas', async () => {
+  const { Button } = await import('@algotrade/ui');
+  return {
+    PausedIdeas: (props: { onOpen: (s: string) => void }) => (
+      <Button
+        onClick={() => {
+          props.onOpen('XOM');
+        }}
+      >
+        paused
+      </Button>
+    ),
+  };
+});
 vi.mock('@/widgets/ideas-heading', async () => {
   const { Heading } = await import('@algotrade/ui');
   return { IdeasHeading: () => <Heading level={1}>Ideas for Fri 2 Oct</Heading> };
@@ -88,6 +102,8 @@ describe('IdeasPage', () => {
     expect(onCompare).toHaveBeenCalledWith({ sel: 'AAPL,MSFT', focus: 'AAPL' });
     await user.click(screen.getByRole('button', { name: 'open' }));
     expect(onOpen).toHaveBeenCalledWith('KO');
+    await user.click(screen.getByRole('button', { name: 'paused' }));
+    expect(onOpen).toHaveBeenLastCalledWith('XOM');
     await user.click(screen.getByRole('button', { name: 'screeners' }));
     expect(onScreeners).toHaveBeenCalledOnce();
     await expectNoA11yViolations(container);

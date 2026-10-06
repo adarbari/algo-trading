@@ -13,11 +13,14 @@ export function decisionLabel(decision: string): string {
 
 export type DecisionTone = 'positive' | 'accent' | 'warning' | 'neutral';
 
-/** QUALIFIED positive, WATCH accent, EVENT_RISK warning; the rest (SKIPPED, REJECT) neutral. */
+/**
+ * QUALIFIED positive, WATCH accent, EVENT_RISK and PAUSED (held back by the regime gate)
+ * warning; the rest (SKIPPED, REJECT) neutral.
+ */
 export function decisionTone(decision: string): DecisionTone {
   if (decision === 'QUALIFIED') return 'positive';
   if (decision === 'WATCH') return 'accent';
-  if (decision === 'EVENT_RISK') return 'warning';
+  if (decision === 'EVENT_RISK' || decision === 'PAUSED') return 'warning';
   return 'neutral';
 }
 

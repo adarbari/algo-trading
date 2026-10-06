@@ -41,6 +41,8 @@ const idea = (facts: ServedValue[]): Idea => ({
   rank: 1,
   picks: [pick],
   best: pick,
+  regime: null,
+  sizeMultiplier: null,
   facts: Object.fromEntries(facts.map((f) => [f.name, f])),
   metrics: {},
   watchOut: [],

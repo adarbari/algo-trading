@@ -9,6 +9,7 @@ from typing import Any
 
 import pandas as pd
 
+from algotrade.config.user import UserContext
 from algotrade.core.model.instruments import market_id
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.framework.declaration import FeatureGroup, Input
@@ -82,16 +83,21 @@ def with_regime(
     ctx: ReadContext,
     cards: list[dict[str, Any]] | None = None,
     defaults: dict[str, Any] | None = None,
+    docs: dict[tuple[str, str, str], dict[str, Any]] | None = None,
+    user: str | None = None,
 ) -> ReadContext:
-    """``ctx`` whose catalogue has the two market groups and whose configs have ``cards`` and,
-    when given, a ``defaults.toml`` document."""
+    """``ctx`` whose catalogue has the two market groups and whose configs have ``cards``,
+    when given a ``defaults.toml`` document, and ``docs`` (``(scope, kind, name)``: document,
+    the screeners the caller sees); ``user``: whose context it is."""
     site = ctx.features
     code = {**site.code, REGIME.key: REGIME, INDICATORS.key: INDICATORS}
     documents = {("site", "regime", "cards"): {"card": CARDS if cards is None else cards}}
     if defaults is not None:
         documents[("site", "defaults", "defaults")] = defaults
+    documents.update(docs or {})
     return replace(
         ctx,
+        user=ctx.user if user is None else UserContext(user),
         features=FeatureSet(code, site.expressions, site.superseded),
         configs=MemoryConfigStore(documents),
     )

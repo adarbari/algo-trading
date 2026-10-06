@@ -30,17 +30,30 @@ describe('RegimeStrip', () => {
     const onOpen = vi.fn();
     const { container } = render(<RegimeStrip onOpen={onOpen} />);
     expect(screen.getByText('1 of 3 warning signs is on. The fast signs are quiet.')).toBeVisible();
-    expect(screen.getByText('New positions sized at 75% (clouds building)')).toBeVisible();
+    expect(
+      screen.getByText(
+        'New positions sized at 75% in Clouds building; Momentum pauses in Severe storm; VRP scanner pauses in Storm and Severe storm',
+      ),
+    ).toBeVisible();
     await userEvent.setup().click(screen.getByRole('button', { name: 'regime chip' }));
     expect(onOpen).toHaveBeenCalledOnce();
     await expectNoA11yViolations(container);
   });
 
-  it('says 100% and that the regime is not computed while it is UNKNOWN', () => {
+  it('says the unknown size and that the regime is not computed while it is UNKNOWN', () => {
     hooks.useRegime.mockReturnValue(fakeQuery<Regime | null>(unknownRegimeFixture()));
     render(<RegimeStrip onOpen={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'regime chip' })).toBeVisible();
-    expect(screen.getByText('New positions sized at 100% (regime not computed)')).toBeVisible();
+    expect(screen.getByText(/New positions sized at 0% \(regime not computed\)/)).toBeVisible();
+  });
+
+  it('says the gate is off, and names no pause, while it is', () => {
+    const regime = regimeFixture();
+    hooks.useRegime.mockReturnValue(
+      fakeQuery<Regime | null>({ ...regime, sizing: { ...regime.sizing, enabled: false } }),
+    );
+    render(<RegimeStrip onOpen={vi.fn()} />);
+    expect(screen.getByText('New positions at full size (the regime gate is off)')).toBeVisible();
   });
 
   it('says so when nothing is stored, while loading and when the read failed', () => {

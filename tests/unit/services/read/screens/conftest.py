@@ -138,3 +138,21 @@ def context(reader: StoreReader, docs: Docs | None = None, user: str = "me") -> 
 def ctx(reader: StoreReader) -> ReadContext:
     """``me``'s read context for the latest session, D1."""
     return context(reader)
+
+
+def write_gated(backend: MemoryBackend) -> None:
+    """A later ``alpha`` run (``r2``, supersedes ``r1``) of the gate in STORM (ADR 0049): AAA
+    QUALIFIED, BBB and DDD PAUSED with the reason first, CCC REJECT; each row stamps the label
+    and the size 0.5."""
+    why = "regime=STRESS: alpha"
+    gated = [("AAA", "QUALIFIED", 50.0, ""), ("BBB", "PAUSED", 70.0, why),
+             ("CCC", "REJECT", 0.0, ""), ("DDD", "PAUSED", 40.0, why)]  # fmt: skip
+    frame = [
+        {"instrument_id": f"EQ:{s}", "user_id": "site", "config_id": "alpha",
+         "config_version": 1, "config_hash": "h", "decision": d, "score": sc, "rank": n,
+         "tie_break": None, "flags": "", "reasons": why, "failed": "", "near_missed": "",
+         "missing": "", "regime": "STRESS", "size_multiplier": 0.5}
+        for n, (s, d, sc, why) in enumerate(gated, start=1)
+    ]  # fmt: skip
+    knowledge = T + timedelta(hours=2)
+    StoreWriter(backend).write_result("rule_screen", D1, "r2", stamped(frame, D1, "r2", knowledge))

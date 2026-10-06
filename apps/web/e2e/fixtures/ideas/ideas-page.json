@@ -14,7 +14,8 @@
           },
           "run": {
             "runId": "screen-vrp-scanner-abhinav-2026-10-02",
-            "configVersion": 3
+            "configVersion": 3,
+            "paused": 1
           },
           "notRun": null,
           "picked": 16,
@@ -51,7 +52,8 @@
           },
           "run": {
             "runId": "screen-short-premium-liquidity-abhinav-2026-10-02",
-            "configVersion": 3
+            "configVersion": 3,
+            "paused": 0
           },
           "notRun": null,
           "picked": 12,
@@ -88,7 +90,8 @@
           },
           "run": {
             "runId": "screen-post-earnings-iv-crush-abhinav-2026-10-02",
-            "configVersion": 3
+            "configVersion": 3,
+            "paused": 0
           },
           "notRun": null,
           "picked": 4,
@@ -222,7 +225,9 @@
               "criteria": [],
               "columns": []
             }
-          ]
+          ],
+          "regime": "STRESS",
+          "sizeMultiplier": 0.5
         },
         {
           "rank": 2,
@@ -317,7 +322,9 @@
                 }
               ]
             }
-          ]
+          ],
+          "regime": null,
+          "sizeMultiplier": null
         },
         {
           "rank": 3,
@@ -421,7 +428,9 @@
               "criteria": [],
               "columns": []
             }
-          ]
+          ],
+          "regime": null,
+          "sizeMultiplier": null
         },
         {
           "rank": 4,
@@ -510,7 +519,9 @@
               "criteria": [],
               "columns": []
             }
-          ]
+          ],
+          "regime": null,
+          "sizeMultiplier": null
         },
         {
           "rank": 5,
@@ -599,7 +610,9 @@
               "criteria": [],
               "columns": []
             }
-          ]
+          ],
+          "regime": null,
+          "sizeMultiplier": null
         },
         {
           "rank": 6,
@@ -700,7 +713,24 @@
               "criteria": [],
               "columns": []
             }
-          ]
+          ],
+          "regime": null,
+          "sizeMultiplier": null
+        }
+      ],
+      "pausedTotal": 1,
+      "paused": [
+        {
+          "instrumentId": "EQ:XOM",
+          "instrument": {
+            "symbol": "XOM"
+          },
+          "result": {
+            "configId": "vrp-scanner",
+            "score": 71.0,
+            "reasons": "regime=STRESS: vrp-scanner pauses in STRESS",
+            "regime": "STRESS"
+          }
         }
       ]
     }

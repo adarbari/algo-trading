@@ -33,7 +33,35 @@
       },
       "sizing": {
         "label": "UNKNOWN",
-        "multiplier": null
+        "multiplier": null,
+        "enabled": false,
+        "unknownMultiplier": 0.0,
+        "multipliers": [
+          {
+            "label": "CALM",
+            "multiplier": 1.0
+          },
+          {
+            "label": "CAUTION",
+            "multiplier": 0.75
+          },
+          {
+            "label": "STRESS",
+            "multiplier": 0.5
+          },
+          {
+            "label": "CRISIS",
+            "multiplier": 0.25
+          }
+        ],
+        "screeners": [
+          {
+            "screenerId": "vrp_scanner",
+            "name": "VRP scanner",
+            "enabled": false,
+            "pauseIn": ["STRESS", "CRISIS"]
+          }
+        ]
       },
       "indicators": [
         {

@@ -16,7 +16,28 @@ export function regimeFixture(overrides: Partial<Regime> = {}): Regime {
       marketStress: { value: 18, unknown: NO_UNKNOWN },
       fragility: { value: 40, unknown: NO_UNKNOWN },
     },
-    sizing: { label: 'CAUTION', multiplier: 0.75 },
+    sizing: {
+      label: 'CAUTION',
+      multiplier: 0.75,
+      enabled: true,
+      multipliers: [
+        { label: 'CALM', multiplier: 1 },
+        { label: 'CAUTION', multiplier: 0.75 },
+        { label: 'STRESS', multiplier: 0.5 },
+        { label: 'CRISIS', multiplier: 0.25 },
+      ],
+      unknownMultiplier: 0,
+      screeners: [
+        { screenerId: 'momentum', name: 'Momentum', enabled: true, pauseIn: ['CRISIS'] },
+        {
+          screenerId: 'vrp_scanner',
+          name: 'VRP scanner',
+          enabled: true,
+          pauseIn: ['STRESS', 'CRISIS'],
+        },
+        { screenerId: 'quiet', name: 'Quiet', enabled: true, pauseIn: [] },
+      ],
+    },
     unknownReason: NO_UNKNOWN,
     indicators: [
       {
@@ -97,7 +118,7 @@ export function unknownRegimeFixture(): Regime {
       },
       fragility: { value: null, unknown: { code: 'NOT_IN_CATALOGUE', detail: 'regime not built' } },
     },
-    sizing: { label: 'UNKNOWN', multiplier: null },
+    sizing: { ...known.sizing, label: 'UNKNOWN', multiplier: null },
     unknownReason: { code: 'NOT_IN_CATALOGUE', detail: 'The regime is not in the catalogue yet.' },
     indicators: known.indicators.map((i) => ({
       ...i,

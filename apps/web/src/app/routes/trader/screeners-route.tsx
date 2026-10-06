@@ -64,6 +64,7 @@ function EditScreener() {
       onOpenTicker={(symbol) =>
         void navigate({ to: '/explore', search: { sel: symbol, focus: symbol } })
       }
+      onOpenRegime={() => void navigate({ to: '/regime' })}
     />
   );
 }

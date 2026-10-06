@@ -30,7 +30,7 @@ const SCREENERS = [screener('vrp', 3), screener('liq', 5)];
 
 const served = (id: string) => ({
   screener: { id, name: id, owner: 'abhinav', version: 1 },
-  run: { runId: `run-${id}`, configVersion: 1 },
+  run: { runId: `run-${id}`, configVersion: 1, paused: 0 },
   notRun: null,
   picked: 1,
   top: [],
@@ -40,6 +40,8 @@ const cached: IdeasResponse = {
     session: '2026-10-02',
     priority: ['vrp', 'liq'],
     total: 0,
+    pausedTotal: 0,
+    paused: [],
     screeners: [served('vrp'), served('liq')],
     items: [],
   },

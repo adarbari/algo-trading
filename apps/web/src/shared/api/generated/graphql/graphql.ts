@@ -118,7 +118,7 @@ export type IdeasPageQueryVariables = Exact<{
 }>;
 
 
-export type IdeasPageQuery = { ideas: { session: string, priority: Array<string>, total: number, screeners: Array<{ picked: number, screener: { id: string, name: string, owner: string, version: number | null }, run: { runId: string, configVersion: number | null } | null, notRun: { code: UnknownCode, detail: string, reason: NullReason | null } | null, top: Array<{ instrumentId: string, score: number | null, instrument: { symbol: string } | null }> }>, items: Array<{ rank: number, instrumentId: string, instrument: { symbol: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, detail: string } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null, picks: Array<{ configId: string, decision: string, score: number | null, reasons: string, flags: Array<string>, criteria: Array<{ id: string, value: unknown }>, columns: Array<{ name: string, value: unknown }> }> }> } | null };
+export type IdeasPageQuery = { ideas: { session: string, priority: Array<string>, total: number, pausedTotal: number, paused: Array<{ instrumentId: string, instrument: { symbol: string } | null, result: { configId: string, score: number | null, reasons: string, regime: string | null } }>, screeners: Array<{ picked: number, screener: { id: string, name: string, owner: string, version: number | null }, run: { runId: string, configVersion: number | null, paused: number } | null, notRun: { code: UnknownCode, detail: string, reason: NullReason | null } | null, top: Array<{ instrumentId: string, score: number | null, instrument: { symbol: string } | null }> }>, items: Array<{ rank: number, instrumentId: string, regime: string | null, sizeMultiplier: number | null, instrument: { symbol: string, features: Array<{ name: string, value: unknown, unknown: { code: UnknownCode, detail: string } | null, info: { format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string } }> } | null, picks: Array<{ configId: string, decision: string, score: number | null, reasons: string, flags: Array<string>, criteria: Array<{ id: string, value: unknown }>, columns: Array<{ name: string, value: unknown }> }> }> } | null };
 
 export type IngestionCompletenessQueryVariables = Exact<{
   sessions: number;
@@ -180,7 +180,7 @@ export type InstrumentHistoryQuery = { instrument: { instrumentId: string, serie
 export type RegimeQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type RegimeQuery = { regime: { session: string, label: RegimeLabel, headline: string, unknownReason: { code: UnknownCode, detail: string } | null, scores: { macroRisk: { value: number | null, unknown: { code: UnknownCode, detail: string } | null }, marketStress: { value: number | null, unknown: { code: UnknownCode, detail: string } | null }, fragility: { value: number | null, unknown: { code: UnknownCode, detail: string } | null } }, sizing: { label: RegimeLabel, multiplier: number | null }, indicators: Array<{ key: string, pace: string, plainName: string, technicalName: string, oneLiner: string, whyItMatters: string, whatOnMeans: string, leadTime: string, falseAlarms: string, value: unknown, format: FeatureFormat | null, status: IndicatorStatus, changed: boolean | null, before: Array<{ episode: string, line: string }>, links: Array<{ title: string, url: string }>, unknown: { code: UnknownCode, detail: string } | null }> } | null };
+export type RegimeQuery = { regime: { session: string, label: RegimeLabel, headline: string, unknownReason: { code: UnknownCode, detail: string } | null, scores: { macroRisk: { value: number | null, unknown: { code: UnknownCode, detail: string } | null }, marketStress: { value: number | null, unknown: { code: UnknownCode, detail: string } | null }, fragility: { value: number | null, unknown: { code: UnknownCode, detail: string } | null } }, sizing: { label: RegimeLabel, multiplier: number | null, enabled: boolean, unknownMultiplier: number, multipliers: Array<{ label: RegimeLabel, multiplier: number }>, screeners: Array<{ screenerId: string, name: string, enabled: boolean, pauseIn: Array<RegimeLabel> }> }, indicators: Array<{ key: string, pace: string, plainName: string, technicalName: string, oneLiner: string, whyItMatters: string, whatOnMeans: string, leadTime: string, falseAlarms: string, value: unknown, format: FeatureFormat | null, status: IndicatorStatus, changed: boolean | null, before: Array<{ episode: string, line: string }>, links: Array<{ title: string, url: string }>, unknown: { code: UnknownCode, detail: string } | null }> } | null };
 
 export type RegimeBandsQueryVariables = Exact<{
   start: string;
@@ -269,7 +269,7 @@ export type ScreenerResultsQueryVariables = Exact<{
 }>;
 
 
-export type ScreenerResultsQuery = { session: { date: string, missing: Array<string> } | null, screener: { id: string, name: string, criteria: Array<{ id: string, field: string, mode: string }>, displayColumns: Array<{ name: string, field: string }>, notRun: { code: UnknownCode, detail: string } | null, latestRun: { runId: string, session: string, previousSession: string | null, decisions: Array<{ decision: string, count: number }>, changes: Array<{ change: string, count: number }>, results: { sort: string, total: number, page: number, size: number, missing: Array<string>, rows: Array<Array<unknown>>, unknown: Array<Array<UnknownCode | null>>, reasons: Array<Array<NullReason | null>>, columns: Array<{ name: string, description: string, format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string, licence: string, scope: string }>, results: Array<{ instrumentId: string, rank: number, decision: string, score: number | null, reasons: string, flags: Array<string>, change: string | null, previousDecision: string | null, instrument: { instrumentId: string, symbol: string, name: string } | null, criteria: Array<{ id: string, field: string, mode: string, outcome: string, value: unknown, distance: number | null }>, columns: Array<{ name: string, value: unknown }> }> } } | null } | null };
+export type ScreenerResultsQuery = { session: { date: string, missing: Array<string> } | null, screener: { id: string, name: string, criteria: Array<{ id: string, field: string, mode: string }>, displayColumns: Array<{ name: string, field: string }>, notRun: { code: UnknownCode, detail: string } | null, latestRun: { runId: string, session: string, previousSession: string | null, regime: string | null, paused: number, decisions: Array<{ decision: string, count: number }>, changes: Array<{ change: string, count: number }>, results: { sort: string, total: number, page: number, size: number, missing: Array<string>, rows: Array<Array<unknown>>, unknown: Array<Array<UnknownCode | null>>, reasons: Array<Array<NullReason | null>>, columns: Array<{ name: string, description: string, format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string, licence: string, scope: string }>, results: Array<{ instrumentId: string, rank: number, decision: string, score: number | null, reasons: string, flags: Array<string>, change: string | null, previousDecision: string | null, instrument: { instrumentId: string, symbol: string, name: string } | null, criteria: Array<{ id: string, field: string, mode: string, outcome: string, value: unknown, distance: number | null }>, columns: Array<{ name: string, value: unknown }> }> } } | null } | null };
 
 export type VerificationQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -507,6 +507,19 @@ export const IdeasPageDocument = new TypedDocumentString(`
     session
     priority
     total
+    pausedTotal
+    paused {
+      instrumentId
+      instrument {
+        symbol
+      }
+      result {
+        configId
+        score
+        reasons
+        regime
+      }
+    }
     screeners {
       screener {
         id
@@ -517,6 +530,7 @@ export const IdeasPageDocument = new TypedDocumentString(`
       run {
         runId
         configVersion
+        paused
       }
       notRun {
         code
@@ -535,6 +549,8 @@ export const IdeasPageDocument = new TypedDocumentString(`
     items {
       rank
       instrumentId
+      regime
+      sizeMultiplier
       instrument {
         symbol
         features(names: $names) {
@@ -770,6 +786,18 @@ export const RegimeDocument = new TypedDocumentString(`
     sizing {
       label
       multiplier
+      enabled
+      unknownMultiplier
+      multipliers {
+        label
+        multiplier
+      }
+      screeners {
+        screenerId
+        name
+        enabled
+        pauseIn
+      }
     }
     indicators {
       key
@@ -1006,6 +1034,8 @@ export const ScreenerResultsDocument = new TypedDocumentString(`
       runId
       session
       previousSession
+      regime
+      paused
       decisions {
         decision
         count
