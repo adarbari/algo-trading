@@ -17,11 +17,12 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
-from algotrade.config.site.settings import load_universe
+from algotrade.config.site.settings import load_macro, load_universe
 from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.derived import market_rollups, rollups
 from algotrade_ingestion.tasks.framework.run import TaskContext
+from algotrade_ingestion.tasks.macro import series as macro_series
 from algotrade_ingestion.tasks.maintenance import (
     golden,
     migrate_ids,
@@ -256,12 +257,19 @@ def _only(p: Params) -> list[str]:
     return [k.strip() for k in str(p.get("only") or "").split(",") if k.strip()]
 
 
+def _macro(ctx: TaskContext, p: Params) -> RunRecord:
+    assert ctx.configs is not None
+    return macro_series.ingest_macro(
+        ctx, load_macro(ctx.configs), session_of(p), _symbols(p, "only"), p.get("since")
+    )
+
+
 def _verify(ctx: TaskContext, p: Params) -> RunRecord:
     return verify.verify(ctx, session_of(p), _symbols(p))
 
 
-def _symbols(p: Params) -> list[str]:
-    return [s.strip() for s in str(p.get("symbols") or "").split(",") if s.strip()]
+def _symbols(p: Params, name: str = "symbols") -> list[str]:
+    return [s.strip() for s in str(p.get(name) or "").split(",") if s.strip()]
 
 
 DESCRIPTION_SOURCES = (
@@ -531,6 +539,25 @@ TASKS: dict[str, Task] = {
                 SESSION,
                 Param("workers", ("--workers",), int, "parallel requests (default: sources.toml)"),
                 Param("symbols", ("--symbols",), str, "comma-separated subset of the universe"),
+            ),
+        ),
+        Task(
+            "macro",
+            "economic series and index levels (FRED / ALFRED, published files) with vintages",
+            macro_series,
+            (macro_series.TABLE,),
+            _macro,
+            optional_sources=("fred", "published"),
+            settings="macro.toml + sources.toml [fred] [published] [quality]",
+            params=(
+                SESSION,
+                Param("only", ("--only",), str, "comma-separated series keys, e.g. UNRATE"),
+                Param(
+                    "since",
+                    ("--since",),
+                    date.fromisoformat,
+                    "first observation date (a backfill; default: all history)",
+                ),
             ),
         ),
         Task(

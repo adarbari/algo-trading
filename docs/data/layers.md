@@ -221,7 +221,9 @@ are series, never bars) declared in `config/site/macro.toml` (`config/site/macro
 stays the storage stamp): reads (`data.macro.series.series_as_of`) union every partition and
 give each observation's latest vintage on or before the session, so a backfill serves history
 without lookahead; feature groups read it as `Input("macro/series", ids=...)` and name a series
-in `Feature.inputs` as `series:<KEY>`.
+in `Feature.inputs` as `series:<KEY>`. The `macro` task (`tasks/macro/series.py`) writes it: it
+stores only the vintages the table lacks, and a changed `lagged` value is a new vintage dated the
+run's session, never an overwrite.
 
 Selections read the company columns as `instrument.<column>` (`instrument.sector`,
 `instrument.industry`, `instrument.sic`, `instrument.sic_division`, `instrument.website`,

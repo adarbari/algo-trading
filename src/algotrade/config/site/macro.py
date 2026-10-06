@@ -24,6 +24,12 @@ WHERE = "macro.toml"
 SOURCES = ("fred", "published")
 KINDS = ("macro", "index")
 CADENCES = ("daily", "weekly", "monthly", "quarterly")
+CADENCE_DAYS = {"daily": 1, "weekly": 7, "monthly": 31, "quarterly": 92}  # a release's period
+# A series may run this long past its cadence plus its release lag. A daily series gets a day
+# more: a Monday holiday leaves a lag-0 close 4 days old on Tuesday.
+STALE_MARGIN_DAYS = 2
+DAILY_MARGIN_DAYS = 3
+RUN_BUDGET_S = 900  # [macro] run_budget_s: the macro task stops fetching series after this long
 PITS = ("alfred", "lag")
 TRANSFORMS = ("level", "yoy", "diff")
 LICENCES = ("open", "personal")  # as a feature's licence (ADR 0028)
@@ -78,12 +84,26 @@ class MacroSeries:
     def vendor_code(self) -> str:
         return self.code or self.key
 
+    @property
+    def cadence_days(self) -> int:
+        return CADENCE_DAYS[self.cadence]
+
+    @property
+    def stale_after_days(self) -> int:
+        """How old the newest observation may be, in calendar days, before the series counts as
+        stale: its cadence + ``release_lag_days`` + 2 days (3 for a daily series, ADR 0048)."""
+        margin = DAILY_MARGIN_DAYS if self.cadence == "daily" else STALE_MARGIN_DAYS
+        return self.cadence_days + self.release_lag_days + margin
+
 
 @dataclass(frozen=True)
 class MacroSettings:
-    """``macro.toml``: the series in file order (none without the file)."""
+    """``macro.toml``: the series in file order (none without the file); ``run_budget_s``
+    (``[macro]``): seconds a run of the ``macro`` task may keep fetching series before it stops
+    and records the rest as skipped (a FRED outage must not hold the nightly up)."""
 
     series: tuple[MacroSeries, ...] = ()
+    run_budget_s: int = RUN_BUDGET_S
 
     @property
     def keys(self) -> frozenset[str]:
@@ -99,7 +119,8 @@ class MacroSettings:
     def from_document(cls, doc: Mapping[str, Any] | None) -> "MacroSettings":
         reject_secrets(doc or {}, WHERE)
         root = Table(doc, WHERE)
-        root.only(("series",))
+        root.only(("macro", "series"))
+        budget = root.table("macro", ("run_budget_s",)).integer("run_budget_s", RUN_BUDGET_S, 1)
         raw = root.raw("series") or []
         if not isinstance(raw, list) or not all(isinstance(e, Mapping) for e in raw):
             raise ConfigurationError(f"{WHERE} series: expected a list of tables ([[series]])")
@@ -107,7 +128,7 @@ class MacroSettings:
         repeated = sorted(k for k, n in Counter(s.key for s in series).items() if n > 1)
         if repeated:
             raise ConfigurationError(f"{WHERE}: keys declared more than once: {repeated}")
-        return cls(series)
+        return cls(series, budget)
 
 
 def _required(t: Table, key: str, choices: tuple[str, ...] | None = None) -> str:

@@ -204,9 +204,8 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/market/etf_holdings.py"
 
 [[table]]
 name = "macro/series"
-owner = "src/algotrade/data/macro/vintages.py"
-target_owner = "apps/ingestion/algotrade_ingestion/tasks/macro/series.py"
-note = "ADR 0048; the macro task (RG2c) writes it and becomes the owner"
+owner = "apps/ingestion/algotrade_ingestion/tasks/macro/series.py"
+note = "ADR 0048: FRED / ALFRED and published series with their vintages; read through data/macro"
 
 [[table]]
 name = "live/option_quotes"

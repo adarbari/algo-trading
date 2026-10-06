@@ -14,14 +14,16 @@ from typing import Any
 
 import pandas as pd
 
-from algotrade.config.site.settings import SourcesSettings
+from algotrade.config.site.macro import MacroSeries, MacroSettings
+from algotrade.config.site.settings import SourcesSettings, load_macro
 from algotrade.core.model.instruments import market_id
 from algotrade.data import StoreReader
 from algotrade.data.chains import chain_status
+from algotrade.data.macro.series import latest_vintages, stored_vintages
 from algotrade.data.reference import snapshot
 from algotrade.services.features import site_features
 from algotrade.storage.runs import RunRecord
-from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
+from algotrade_ingestion.tasks.framework.run import PUBLISHED, IngestRun, TaskContext
 from algotrade_ingestion.tasks.reference.classify import security_type
 
 TASK = "data_quality"
@@ -280,6 +282,103 @@ def check_verification(reader: StoreReader, session: date, s: SourcesSettings) -
             f"(max {s.max_verify_failures:.0%}); {breakdown}{worst}",
         )
     ]
+
+
+MACRO_TASK = "macro"  # the macro task's run-record job name (tasks/macro/series.py)
+EXAMPLES_MACRO = 6  # stale or shrunken series named in a detail
+
+
+def check_macro(ctx: TaskContext, session: date) -> list[Check]:
+    """The ``macro`` step's acceptance over the series of the registry the task ran with
+    (``ctx.configs``, ``macro.toml``); nothing without a config store."""
+    if ctx.configs is None:
+        return []
+    return macro_checks(ctx.reader, session, ctx.settings, load_macro(ctx.configs))
+
+
+def macro_checks(
+    reader: StoreReader, session: date, s: SourcesSettings, macro: MacroSettings
+) -> list[Check]:
+    """FAIL when over ``max_macro_stale_share`` of the fetchable series have no observation
+    newer than ``stale_after_days`` (WARN on any fewer), and when a series holds fewer
+    vintages than an earlier ``macro`` run recorded (a stored vintage is never removed: ADR
+    0048). Fetchable: its source is enabled in ``sources.toml`` and the latest macro run did
+    not skip it (no credential); the skipped ones are named in the detail, and when every
+    enabled series was skipped the check WARNs instead of failing."""
+    enabled = [x for x in macro.series if s.vendor(x.source).enabled]
+    if not enabled:
+        return []
+    runs = reader.runs(MACRO_TASK)
+    named = {x.key for x in enabled}
+    skipped = {k: v for k, v in _skipped_series(runs).items() if k in named}
+    fetchable = [x for x in enabled if x.key not in skipped]
+    stored = stored_vintages(reader, [x.instrument_id for x in enabled])
+    return [
+        _macro_fresh(stored, session, s.max_macro_stale_share, fetchable, skipped),
+        _macro_vintages(stored, runs, enabled),
+    ]
+
+
+def _skipped_series(runs: list[RunRecord]) -> dict[str, str]:
+    """Series key -> why, for what the latest finished ``macro`` run skipped."""
+    done = [r for r in runs if r.status in PUBLISHED]
+    if not done:
+        return {}
+    latest = max(done, key=lambda r: (r.started_at, r.run_id))
+    return {str(k): str(v) for k, v in dict(latest.stats.get("skipped_series") or {}).items()}
+
+
+def _macro_fresh(
+    stored: pd.DataFrame,
+    session: date,
+    max_share: float,
+    enabled: list[MacroSeries],
+    skipped: dict[str, str],
+) -> Check:
+    note = ""
+    if skipped:
+        keys = ", ".join(list(skipped)[:EXAMPLES_MACRO]) + (
+            " ..." if len(skipped) > EXAMPLES_MACRO else ""
+        )
+        note = f"; {len(skipped)} skipped, not graded ({keys}: {next(iter(skipped.values()))})"
+    if not enabled:
+        return Check("macro_fresh", "WARN", f"no macro series was fetchable{note}")
+    known = latest_vintages(stored, session)
+    newest = known[known["value"].notna()].groupby("instrument_id")["obs_date"].max()
+    stale = [
+        x.key
+        for x in enabled
+        if x.instrument_id not in newest.index
+        or (session - newest[x.instrument_id]).days > x.stale_after_days
+    ]
+    share = len(stale) / len(enabled)
+    named = ", ".join(stale[:EXAMPLES_MACRO]) + (" ..." if len(stale) > EXAMPLES_MACRO else "")
+    detail = f"{len(stale)} of {len(enabled)} series stale ({share:.0%}, max {max_share:.0%})"
+    return Check(
+        "macro_fresh",
+        "FAIL" if share > max_share else "WARN" if stale else "PASS",
+        (f"{detail}: {named}" if stale else detail) + note,
+    )
+
+
+def _macro_vintages(
+    stored: pd.DataFrame, runs: list[RunRecord], enabled: list[MacroSeries]
+) -> Check:
+    held = stored.groupby("instrument_id").size()
+    recorded: dict[str, int] = {}
+    for run in runs:
+        if run.status in PUBLISHED:
+            for key, n in dict(run.stats.get("vintages") or {}).items():
+                recorded[key] = max(recorded.get(key, 0), int(n))
+    now = {x.key: int(held.get(x.instrument_id, 0)) for x in enabled}
+    shrunk = [k for k, n in recorded.items() if k in now and now[k] < n]
+    if not shrunk:
+        return Check(
+            "macro_vintages", "PASS", f"{int(held.sum())} vintages of {len(held)} series, none lost"
+        )
+    listed = ", ".join(f"{k} ({now[k]} < {recorded[k]})" for k in shrunk[:EXAMPLES_MACRO])
+    detail = f"{len(shrunk)} series hold fewer vintages than a macro run recorded: {listed}"
+    return Check("macro_vintages", "FAIL", detail)
 
 
 def check_market_rollups(reader: StoreReader, session: date, s: SourcesSettings) -> list[Check]:

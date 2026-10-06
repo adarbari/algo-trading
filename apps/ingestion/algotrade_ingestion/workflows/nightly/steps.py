@@ -60,6 +60,8 @@ class Status(StrEnum):
 type Precondition = Callable[[TaskContext, date], str | None]
 # An acceptance check over what the step wrote (``tasks/maintenance/quality.py``).
 type Acceptance = Callable[[StoreReader, date, SourcesSettings], list[Check]]
+# A check that also needs the run's config store (a site registry), e.g. ``check_macro``.
+type ConfiguredAcceptance = Callable[[TaskContext, date], list[Check]]
 
 
 @dataclass(frozen=True)
@@ -72,6 +74,7 @@ class Step:
     requires: Precondition | None = None  # data that must exist for the session
     latest_only: bool = False  # current-snapshot sources: only the latest closed session
     accept: tuple[Acceptance, ...] = ()  # acceptance checks run after the task
+    accept_with: tuple[ConfiguredAcceptance, ...] = ()  # the same, given the task context
     task_complete: bool = False  # the task must finish COMPLETE (a PARTIAL item fails it)
     params: Mapping[str, Any] = field(default_factory=dict, compare=False)  # extra task params
 
@@ -166,6 +169,7 @@ def from_record(
     if step is None or ctx is None or session is None:
         return Outcome(StepStatus.SUCCEEDED, record.stats)
     checks = [c for fn in step.accept for c in fn(ctx.reader, session, ctx.settings)]
+    checks += [c for fn in step.accept_with for c in fn(ctx, session)]
     outcome = judge(checks, record.stats, wait)
     outcome.observed = observe(step.name, checks)
     return outcome

@@ -15,6 +15,10 @@
 # licence, terms    "personal" for data licensed for personal use only: third-party series on FRED
 #                   (ICE BofA, Moody's, Nasdaq, Cboe) and Stooq (ADR 0028)
 
+[macro]
+run_budget_s = 900            # the macro task stops fetching series after this many seconds and
+                              # records the rest as skipped (a FRED outage must not hold the nightly up)
+
 # --- Recession risk: the curve, credit, policy and oil (daily market series: unrevised)
 
 [[series]]

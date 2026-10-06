@@ -423,6 +423,14 @@ section = "docs/adr/0048-macro-series-with-vintages.md#decision"
 detect = [{ string = "macro/series" }]
 
 [[responsibility]]
+id = "macro-ingestion"
+description = "Store the registry's economic series and index levels in macro/series (ADR 0048): fetch each enabled series whole through the FRED / published sources, give every value its vintage (ALFRED's realtime_start, or the lagged rule: a changed lagged value is a new vintage dated the run's session) and write only the rows the table lacks; a series whose source is off or has no credential is skipped and counted, never an error"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/macro/*"]
+allowed = ["apps/ingestion/algotrade_ingestion/tasks/framework/registry.py"]  # declares the task's tables
+section = "docs/adr/0048-macro-series-with-vintages.md#decision"
+detect = [{ call = "lagged_vintages" }]
+
+[[responsibility]]
 id = "live-option-quotes"
 description = "The API's live option quotes, read-only (ADR 0028): IBKR quotes for an underlying's expiry through the facade on the API's own client id and session thread, a 60 s cache, the stored delayed chain + a status as the fallback, and the API's one write: the answers recorded in the background to live/option_quotes (only through LiveWriter, atomic per run); read back through data.chains"
 owner = [
