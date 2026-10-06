@@ -25,7 +25,7 @@ the text is ``regime_report``.
 - (d) **Acceptance** (plan section 4): macro high at least ``MACRO_LEAD`` sessions before each
   recession bear's peak; stress high within ``STRESS_LAG`` sessions of each peak; fewer than one
   false CRISIS per ``CRISIS_YEARS`` years. An episode without stored regime rows is not graded.
-- (f) **Probit fit.** The bear-state probit (``market_bear_probit@v1``) fitted on the stored
+- (f) **Probit fit.** The bear-state probit (``bear_prob_6m``) fitted on the stored
   history: month-end sessions with ``curve_10y3m``, ``cpi_yoy`` and ``hy_oas`` known, ``y`` = the
   S&P 500 in a Pagan-Sossounov bear ``HORIZON`` index sessions later; the coefficients, the
   in-sample hit rate (p >= 0.5 against y) and the lines to paste into ``rollups.toml``.
@@ -48,7 +48,7 @@ from algotrade.core.time.calendar import next_session, sessions_ending, sessions
 from algotrade.data import StoreReader
 from algotrade.data.macro.series import known_window, latest_vintages, stored_vintages
 from algotrade.features.framework.declaration import FeatureGroup
-from algotrade.features.rollups.market import macro, probit, regime
+from algotrade.features.rollups.market import macro, regime
 from algotrade.quant.probit import ProbitFit, fit, predict
 from algotrade.quant.turning_points import Phase, lunde_timmermann, pagan_sossounov
 from algotrade.services.read.context import ConfigStore, NotFoundError, ReadContext, open_context
@@ -70,7 +70,8 @@ MACRO_LEAD = 63  # macro high at least this many sessions (3 months) before a re
 STRESS_LAG = 15  # stress high no later than this many sessions after each peak
 CRISIS_YEARS = 3.0  # fewer than one false CRISIS alarm per this many years
 SESSIONS_PER_YEAR = 252
-HORIZON = probit.HORIZON_SESSIONS
+HORIZON = 126  # sessions: bear_prob_6m's six months (config/site/features/regime.toml)
+REGRESSORS = ("curve_10y3m", "cpi_yoy", "hy_oas")  # market_macro columns, coefficient order
 MIN_PROBIT_MONTHS = 24
 ALARMS = ("STRESS", "CRISIS")
 REGIME_COLUMNS = ("label", "raw_label", "macro_risk", "market_stress")
@@ -138,6 +139,7 @@ class ProbitResult:
     months: int
     hit_rate: float
     base_rate: float
+    through: date  # the last month-end session of the sample: values up to it are in-sample
 
 
 def _market_rows(
@@ -186,7 +188,7 @@ def load_history(reader: StoreReader, configs: ConfigStore, user: UserContext) -
     return History(
         levels,
         _market_rows(ctx, regime.GROUP, REGIME_COLUMNS),
-        _market_rows(ctx, macro.GROUP, probit.REGRESSORS),
+        _market_rows(ctx, macro.GROUP, REGRESSORS),
         vintages,
     )
 
@@ -284,8 +286,9 @@ def _lagged(vintages: pd.DataFrame, session: date, revised: Collection[str]) -> 
     if vintages.empty:
         return ()
     known = known_window(vintages, session, 0)
-    lagged = known[(known["vintage_kind"] == "lagged") & known["series"].isin(list(revised))]
-    return tuple(sorted(set(lagged["series"].astype(str))))
+    ids = known["instrument_id"].astype(str)
+    lagged = known[(known["vintage_kind"] == "lagged") & ids.isin(list(revised))]
+    return tuple(sorted(set(lagged["instrument_id"].astype(str))))
 
 
 def covers(rows: pd.DataFrame | None, e: Episode) -> bool:
@@ -376,16 +379,17 @@ def bear_states(levels: pd.Series) -> tuple[list[date], np.ndarray, int]:
     return days, state, (phases[-1].end if phases else -1)
 
 
-def probit_sample(history: History) -> tuple[np.ndarray, np.ndarray] | None:
-    """(X with a constant, y) over month-end sessions, or ``None`` with no history."""
+def probit_sample(history: History) -> tuple[np.ndarray, np.ndarray, date] | None:
+    """(X with a constant, y, the last sample session) over month-end sessions, or ``None``
+    with no history."""
     spx, rows = history.levels.get("SPX"), history.macro
     if spx is None or rows is None:
         return None
     days, state, last = bear_states(spx)
-    rows = rows.dropna(subset=list(probit.REGRESSORS))
+    rows = rows.dropna(subset=list(REGRESSORS))
     month = pd.to_datetime(rows["session_date"]).dt.to_period("M")
     ends = rows.groupby(month, sort=True).tail(1)
-    xs, ys = [], []
+    xs, ys, used = [], [], []
     positions = np.array(days, dtype="datetime64[D]")
     for _, r in ends.iterrows():
         day = np.datetime64(r["session_date"], "D")
@@ -393,11 +397,12 @@ def probit_sample(history: History) -> tuple[np.ndarray, np.ndarray] | None:
         ahead = at + HORIZON
         if at < 0 or ahead > last:
             continue
-        xs.append([1.0, *(float(r[c]) for c in probit.REGRESSORS)])
+        xs.append([1.0, *(float(r[c]) for c in REGRESSORS)])
         ys.append(state[ahead])
+        used.append(r["session_date"])
     if not xs:
         return None
-    return np.array(xs), np.array(ys)
+    return np.array(xs), np.array(ys), max(used)
 
 
 def fit_probit(history: History) -> ProbitResult | None:
@@ -405,9 +410,9 @@ def fit_probit(history: History) -> ProbitResult | None:
     sample = probit_sample(history)
     if sample is None:
         return None
-    x, y = sample
+    x, y, through = sample
     if len(y) < MIN_PROBIT_MONTHS or y.min() == y.max():
         return None
     result = fit(x, y, max_iter=100, tol=1e-9)
     hits = (predict(x, result.coef) >= 0.5) == (y == 1)
-    return ProbitResult(result, len(y), float(hits.mean()), float(y.mean()))
+    return ProbitResult(result, len(y), float(hits.mean()), float(y.mean()), through)

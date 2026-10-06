@@ -36,7 +36,6 @@ from algotrade.features.rollups.market import (
     cross_asset,
     indicators,
     macro,
-    probit,
     regime,
     trend,
 )
@@ -88,7 +87,6 @@ GROUPS: dict[str, FeatureGroup] = {
             macro.GROUP,
             indicators.GROUP,
             regime.GROUP,
-            probit.GROUP,
         ),
         # iv30@v1 and put_wing@v1 read the materialised div_yield@v1 (FeatureSet orders it)
         stored_ok=True,

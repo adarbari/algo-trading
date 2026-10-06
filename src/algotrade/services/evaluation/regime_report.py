@@ -1,11 +1,11 @@
 """The regime episode scorecard as deterministic text (``regime_scorecard`` computes it).
 
 Sections (a) dating agreement, (b) leads per episode, (c) false alarms per decade, (d) the
-plan's acceptance as PASS / FAIL lines, (f) the bear-state probit fit with the lines to paste
-into ``config/site/rollups.toml``. A section with nothing stored to read prints
-``regime_scorecard.NO_DATA`` and the backfill command instead (e): the report never fails for
-want of data. Numbers are rounded the same way every run, rows sorted, so two runs over the
-same store print the same text.
+plan's acceptance as PASS / FAIL lines, (f) the bear-state probit fit with the params to paste
+into ``config/site/features/regime.toml`` (or "not converged: do not paste"). A section with
+nothing stored to read prints ``regime_scorecard.NO_DATA`` and the backfill command instead
+(e): the report never fails for want of data. Numbers are rounded the same way every run, rows
+sorted, so two runs over the same store print the same text.
 """
 
 from collections.abc import Collection, Sequence
@@ -134,25 +134,29 @@ def probit_section(result: sc.ProbitResult | None) -> list[str]:
     if result is None:
         too_few = f"or fewer than {sc.MIN_PROBIT_MONTHS} months with both states"
         return [*head, f"  {sc.NO_DATA} ({too_few}): {sc.BACKFILL}"]
+    summary = (
+        f"  months {result.months} through {result.through}, bear share "
+        f"{result.base_rate:.3f}, converged {str(result.fit.converged).lower()}, "
+        f"log-likelihood {result.fit.loglik:.3f}, in-sample hit rate {result.hit_rate:.3f}"
+    )
+    if not result.fit.converged:
+        return [*head, summary, "  not converged: do not paste"]
     b = [f"{c:.4f}" for c in result.fit.coef]
     return [
         *head,
-        f"  months {result.months}, bear share {result.base_rate:.3f}, converged "
-        f"{str(result.fit.converged).lower()}, log-likelihood {result.fit.loglik:.3f}, "
-        f"in-sample hit rate {result.hit_rate:.3f}",
-        "  paste into config/site/rollups.toml:",
-        '  ["market_bear_probit@v1"]',
-        f"  b0 = {b[0]}",
-        f"  b_curve = {b[1]}",
-        f"  b_cpi = {b[2]}",
-        f"  b_hy = {b[3]}",
-        f"  fitted = {str(result.fit.converged).lower()}",
+        summary,
+        "  paste into config/site/features/regime.toml, bump both versions (a new fit is a new",
+        f"  definition) and note that sessions up to {result.through} are in-sample:",
+        f"  [bear_prob_6m] params = {{ b0 = {b[0]}, b_curve = {b[1]}, b_cpi = {b[2]}, "
+        f"b_hy = {b[3]} }}",
+        f'  [bear_prob_source] params = {{ fitted = 1, fitted_through = "{result.through}" }}',
     ]
 
 
 def render(history: History, episodes: Sequence[Episode], revised: Collection[str]) -> str:
-    """The whole scorecard. ``revised``: the registry keys with ALFRED vintages (``pit =
-    "alfred"``), whose ``lagged`` values in an episode are reported."""
+    """The whole scorecard. ``revised``: the instrument ids of the revised series (ALFRED
+    vintages, or ``revised = true`` in the registry), whose ``lagged`` values in an episode
+    are reported."""
     found = sc.leads(history, episodes, revised)
     alarms = sc.false_alarms(history, episodes)
     sections = (

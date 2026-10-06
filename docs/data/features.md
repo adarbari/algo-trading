@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-250 stored features in 26 groups, in dependency order; 46 expression features.
+248 stored features in 25 groups, in dependency order; 48 expression features.
 
 ## `option_liquidity@v1`
 
@@ -432,15 +432,6 @@ The regime cards' readings: each indicator's value, its on / off verdict from th
 | `breadth_200d_on` | window | bool | flag | open |  | The breadth_200d card is on: fewer than 40% of the universe above their 200-day mean | a value the rule needs is null (market_breadth.pct_above_sma200@v1) | `market_breadth.pct_above_sma200@v1` |
 | `breadth_200d_changed` | window | bool | flag | open |  | The breadth_200d verdict differs from 5 sessions earlier (recomputed from that session's inputs) | the verdict now or then is null | `market_breadth.pct_above_sma200@v1` |
 
-### `market_bear_probit@v1`
-
-The bear-state probit (Chen 2009, Nyberg 2013): the probability of a bear market six months on from the term spread, inflation and the high-yield spread, a second opinion beside the regime's macro risk. Stored as `rollups/market/market_bear_probit@v1`; reads `rollups/market/market_macro@v2` (optional).
-
-| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
-|---|---|---|---|---|---|---|---|---|
-| `bear_prob_6m` | window | float32 | decimal | personal | 0 .. 1 | Bear-state probit: the probability that the S&P 500 is in a bear market 126 sessions on, ncdf(b0 + b_curve x curve_10y3m + b_cpi x cpi_yoy + b_hy x hy_oas) with the site's coefficients (defaults -1, -40, 15, 10: literature-order, not fitted) | curve_10y3m, cpi_yoy or hy_oas is null for the session (hy_oas starts in 1997) | `market_macro.curve_10y3m@v2`, `market_macro.cpi_yoy@v2`, `market_macro.hy_oas@v2` |
-| `bear_prob_source` | label | str | category | open | fitted, literature | Where bear_prob_6m's coefficients come from: fitted (the episode scorecard's fit on stored history) or literature (literature-order defaults) | curve_10y3m, cpi_yoy or hy_oas is null for the session (hy_oas starts in 1997) | `market_macro.curve_10y3m@v2`, `market_macro.cpi_yoy@v2`, `market_macro.hy_oas@v2` |
-
 ### `regime@v1`
 
 The market regime: macro risk and market stress scores (weighted counts of signals on), the fragility context score and the label with its 5-session hold. Stored as `rollups/market/regime@v1`; reads `rollups/market/regime_indicators@v1` (optional), `rollups/market/market_macro@v2` (optional), `rollups/market/market_trend@v1` (optional), `rollups/market/market_cross_asset@v1` (optional).
@@ -514,6 +505,8 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | `cfnai_recession` | expression | bool | flag | open |  | The Chicago Fed National Activity Index's 3-month mean is below -0.7 (params.below): the economy is likely in recession | no CFNAIMA3 observation known by the session (no FRED key) | `market_macro.cfnai_ma3 < below` (below = -0.7) | virtual |
 | `oil_shock` | expression | bool | flag | open |  | WTI crude is up more than 50% on the year (params.above): an oil shock | market_macro.wti_chg_12m is null (no DCOILWTICO observation a year before the latest) | `market_macro.wti_chg_12m > above` (above = 0.5) | virtual |
 | `recession_prob_high` | expression | bool | flag | open |  | The Chauvet-Piger smoothed recession probability is above 20% (params.above): a reference, not a driver | no RECPROUSM156N observation known by the session (no FRED key) | `market_macro.recession_prob_smoothed > above` (above = 0.2) | virtual |
+| `bear_prob_6m` | expression | float | decimal | personal | 0 .. 1 | Bear-state probit: the probability that the S&P 500 is in a bear market 126 sessions (six months) on, ncdf(b0 + b_curve x curve_10y3m + b_cpi x cpi_yoy + b_hy x hy_oas); bear_prob_source says whether the coefficients were fitted and through when (sessions up to fitted_through are in-sample) | market_macro.curve_10y3m, cpi_yoy or hy_oas is null for the session (hy_oas starts in 1997) | `ncdf(b0 + b_curve * market_macro.curve_10y3m + b_cpi * market_macro.cpi_yoy + b_hy * market_macro.hy_oas)` (b0 = -1.0, b_curve = -40.0, b_cpi = 15.0, b_hy = 10.0) | virtual |
+| `bear_prob_source` | label | str | category | personal | fitted, literature | Where bear_prob_6m's coefficients come from: fitted (the episode scorecard's fit on the stored history through params.fitted_through; sessions up to it are in-sample) or literature (literature-order values, not fitted) | bear_prob_6m is null | `if(is_null(bear_prob_6m), null, if(fitted == 1 and fitted_through != "", "fitted", "literature"))` (fitted = 0, fitted_through = '') | virtual |
 
 ### `swing.toml`
 

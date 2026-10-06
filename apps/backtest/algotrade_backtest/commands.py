@@ -196,7 +196,7 @@ def cmd_regime_scorecard(args: argparse.Namespace) -> int:
     """The regime episode scorecard over the store (docs/market-regime-plan.md section 4):
     deterministic text, "no data" sections (exit 0) until the macro backfill has run."""
     configs = open_config_store(config_dir(args.config_dir))
-    revised = [s.key for s in load_macro(configs).series if s.pit == "alfred"]
+    revised = [s.instrument_id for s in load_macro(configs).series if s.is_revised]
     history = load_history(reader_for(args), configs, _user(args))
     text = render(history, load_episodes(configs).episodes, revised)
     print(text, end="")

@@ -18,8 +18,9 @@ from algotrade.core.time.calendar import sessions_between, sessions_ending
 from algotrade.data import StoreReader
 from algotrade.data.macro.series import TABLE as MACRO_SERIES
 from algotrade.features.rollups.market import macro, regime
+from algotrade.quant.probit import ProbitFit
 from algotrade.services.evaluation import regime_scorecard as sc
-from algotrade.services.evaluation.regime_report import render
+from algotrade.services.evaluation.regime_report import probit_section, render
 from algotrade.storage.configs.files import FileConfigStore
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.rollup_store import store, write_rows
@@ -135,9 +136,9 @@ def test_both_rules_date_the_engineered_bears_on_both_indices(reader: StoreReade
 
 
 def test_leads_paths_and_lagged_vintages(reader: StoreReader) -> None:
-    a, b = sc.leads(read_history(reader), EPISODES, revised={"UNRATE"})
+    a, b = sc.leads(read_history(reader), EPISODES, revised={macro_id("UNRATE")})
     assert a.macro == -len(sessions_between(MACRO_ON, A_PEAK)) + 1 == -104
-    assert a.stress == 5 and a.lagged == ("UNRATE",)  # UNRATE's 2000 value: no ALFRED vintage
+    assert a.stress == 5 and a.lagged == (macro_id("UNRATE"),)  # its 2000 value: lagged
     assert b.macro is None and b.stress == 21 and b.lagged == ()
     crisis = len(sessions_between(A_PEAK, A_TROUGH)) - 5
     assert a.path == f"CAUTION {63 + 5} > CRISIS {crisis}"  # 63 before the peak, 5 after
@@ -148,14 +149,14 @@ def test_false_alarms_and_acceptance(reader: StoreReader) -> None:
     alarms = sc.false_alarms(history, EPISODES)
     assert alarms is not None and alarms.by_decade == {2000: (7, 2, 1)}
     assert alarms.years == pytest.approx(len(SESSIONS) / 252)
-    text = render(history, EPISODES, {"UNRATE"})
+    text = render(history, EPISODES, {macro_id("UNRATE")})
     macro_line = "PASS     macro_risk >= 50 at least 63 sessions before each recession bear's peak"
     stress_line = "FAIL     market_stress >= 50 within 15 sessions of each peak: 1 of 2"
     assert f"{macro_line}: 1 of 1" in text
     assert f"{stress_line} (failed: b_shock)" in text
     assert "PASS     fewer than one false CRISIS per 3 years: 1 over" in text
     assert "no data" not in text
-    assert text == render(read_history(reader), EPISODES, {"UNRATE"})  # deterministic
+    assert text == render(read_history(reader), EPISODES, {macro_id("UNRATE")})  # deterministic
 
 
 def test_the_probit_is_fitted_on_month_end_rows(reader: StoreReader) -> None:
@@ -164,7 +165,8 @@ def test_the_probit_is_fitted_on_month_end_rows(reader: StoreReader) -> None:
     assert result.fit.coef[1] < 0  # an inverted curve raises the bear probability
     assert result.hit_rate > 0.7 and 0 < result.base_rate < 0.5
     text = render(read_history(reader), EPISODES, ())
-    assert '["market_bear_probit@v1"]' in text and "fitted = true" in text
+    assert f'fitted = 1, fitted_through = "{result.through}"' in text and "do not paste" not in text
+    assert result.through in macro_rows() and sc.offset(result.through, B_TROUGH) >= sc.HORIZON
 
 
 def test_without_data_every_section_says_so() -> None:
@@ -173,3 +175,12 @@ def test_without_data_every_section_says_so() -> None:
     assert text.count(sc.NO_DATA) == 5 and sc.BACKFILL in text
     assert sc.offset(date(2004, 6, 1), date(2004, 5, 28)) == -1
     assert sessions_ending(date(2004, 6, 1), 2)[0] == date(2004, 5, 28)
+
+
+def test_a_fit_that_did_not_converge_is_never_offered_for_pasting() -> None:
+    stuck = sc.ProbitResult(
+        ProbitFit(np.array([0.0, 50.0, 0.0, 0.0]), False, -0.01), 30, 1.0, 0.5, date(2004, 2, 27)
+    )
+    lines = probit_section(stuck)
+    assert lines[-1] == "  not converged: do not paste"
+    assert not any("params =" in line for line in lines)

@@ -14,6 +14,9 @@
 # transform         how the macro group reads it: level, yoy (year-over-year change) or diff
 # licence, terms    "personal" for data licensed for personal use only: third-party series on FRED
 #                   (ICE BofA, Moody's, Nasdaq, Cboe) and Stooq (ADR 0028)
+# revised           true for a pit = "lag" file whose history is re-estimated in place (EBP, OFR
+#                   FSI, EPU): its values are revised although they have no vintages, so the
+#                   regime scorecard reports episodes that relied on them (ALFRED series are)
 
 [macro]
 run_budget_s = 900            # the macro task stops fetching series after this many seconds and
@@ -347,9 +350,10 @@ key = "EBP"                   # excess bond premium (Gilchrist-Zakrajsek), perce
 source = "published"
 kind = "macro"
 cadence = "monthly"
-release_lag_days = 36         # obs dated the 1st; the Fed posts it on the 4th business day of
-pit = "lag"                   # the next month: a month (31) plus 5 days
+release_lag_days = 45         # obs dated the 1st; the Fed posts it irregularly, from the 4th
+pit = "lag"                   # business day of the next month: a month and two weeks
 transform = "level"
+revised = true
 terms = "Federal Reserve Board FEDS Notes data (https://www.federalreserve.gov/econres/notes/feds-notes/updating-the-recession-risk-and-the-excess-bond-premium-20161006.html): public Fed data, cite Gilchrist and Zakrajsek (2012) and Favara et al. (2016)"
 url = "https://www.federalreserve.gov/econres/notes/feds-notes/ebp_csv.csv"
 date_column = "date"          # m/d/yyyy, the first of the month
@@ -361,9 +365,10 @@ key = "EBP_RECESSION_PROB"    # the Fed's 12-month recession probability from th
 source = "published"
 kind = "macro"
 cadence = "monthly"
-release_lag_days = 36
+release_lag_days = 45
 pit = "lag"
 transform = "level"
+revised = true
 terms = "Federal Reserve Board FEDS Notes data (https://www.federalreserve.gov/econres/notes/feds-notes/updating-the-recession-risk-and-the-excess-bond-premium-20161006.html): public Fed data, cite Gilchrist and Zakrajsek (2012) and Favara et al. (2016)"
 url = "https://www.federalreserve.gov/econres/notes/feds-notes/ebp_csv.csv"
 date_column = "date"
@@ -378,6 +383,7 @@ cadence = "daily"
 release_lag_days = 5          # posted on business days a day or more after the close (a
 pit = "lag"                   # Thursday value appeared on the Monday): conservative
 transform = "level"
+revised = true
 terms = "Office of Financial Research (https://www.financialresearch.gov/financial-stress-index/): US government work, informational only, no warranty; cite \"OFR Financial Stress Index\""
 url = "https://www.financialresearch.gov/financial-stress-index/data/fsi.csv"
 date_column = "Date"
@@ -392,6 +398,7 @@ cadence = "daily"
 release_lag_days = 2          # posted the next day; newspaper counts can be revised
 pit = "lag"
 transform = "level"
+revised = true
 terms = "Baker, Bloom and Davis (https://www.policyuncertainty.com): Creative Commons Attribution 4.0, cite Baker, Bloom and Davis (2016)"
 url = "https://www.policyuncertainty.com/media/All_Daily_Policy_Data.csv"
 date_column = "date"          # built from the file's day, month and year columns

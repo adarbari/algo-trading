@@ -88,3 +88,38 @@ unit = "flag"
 description = "The Chauvet-Piger smoothed recession probability is above 20% (params.above): a reference, not a driver"
 null_meaning = "no RECPROUSM156N observation known by the session (no FRED key)"
 version = 1
+
+# The bear-state probit (plan section 3E: Chen 2009, Nyberg 2013), a second opinion beside
+# regime.macro_risk that never sets the label. The coefficients are literature-order values
+# (Chen's signs: a falling term spread and rising inflation and credit spreads raise the risk),
+# NOT fitted on our data. `make regime-scorecard` fits them on the stored history and prints
+# the params to paste here. A pasted fit is a new definition: bump both versions and set
+# bear_prob_source's fitted = 1 and fitted_through (the last month-end the fit saw: values up
+# to it are in-sample, so a backtest over them sees the fit's hindsight).
+
+[bear_prob_6m]
+expr = '''
+ncdf(b0 + b_curve * market_macro.curve_10y3m + b_cpi * market_macro.cpi_yoy
+     + b_hy * market_macro.hy_oas)
+'''
+params = { b0 = -1.0, b_curve = -40.0, b_cpi = 15.0, b_hy = 10.0 }  # inputs are decimals
+dtype = "float"
+unit = "decimal"
+valid_range = [0, 1]
+description = "Bear-state probit: the probability that the S&P 500 is in a bear market 126 sessions (six months) on, ncdf(b0 + b_curve x curve_10y3m + b_cpi x cpi_yoy + b_hy x hy_oas); bear_prob_source says whether the coefficients were fitted and through when (sessions up to fitted_through are in-sample)"
+null_meaning = "market_macro.curve_10y3m, cpi_yoy or hy_oas is null for the session (hy_oas starts in 1997)"
+version = 1
+
+[bear_prob_source]
+kind = "label"
+expr = '''
+if(is_null(bear_prob_6m), null,
+   if(fitted == 1 and fitted_through != "", "fitted", "literature"))
+'''
+params = { fitted = 0, fitted_through = "" }  # a pasted fit: fitted = 1, fitted_through = "YYYY-MM-DD"
+dtype = "str"
+unit = "category"
+categories = ["fitted", "literature"]
+description = "Where bear_prob_6m's coefficients come from: fitted (the episode scorecard's fit on the stored history through params.fitted_through; sessions up to it are in-sample) or literature (literature-order values, not fitted)"
+null_meaning = "bear_prob_6m is null"
+version = 1

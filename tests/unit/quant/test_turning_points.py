@@ -174,7 +174,7 @@ def _months_apart(a: str, b: str) -> int:
     return abs((ya - yb) * 12 + ma - mb)
 
 
-def test_pagan_sossounov_monthly_dating_of_the_sp500_1970_2013() -> None:
+def test_pagan_sossounov_monthly_dating_of_the_sp500_against_episode_months() -> None:
     """The paper's monthly rules (8, 4, 16 months, 20%) on Shiller's monthly averages.
 
     Pagan and Sossounov's own table (US data to 1997) is not reproduced here: the expected

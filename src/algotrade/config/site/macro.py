@@ -45,6 +45,7 @@ KEYS = (
     "transform",
     "licence",
     "terms",
+    "revised",
     *FILE_KEYS,
 )
 _KEY = re.compile(r"^[A-Z0-9][A-Z0-9_]*$")
@@ -74,6 +75,13 @@ class MacroSeries:
     date_column: str = ""
     value_column: str = ""
     parser: str = ""
+    revised: bool = False
+
+    @property
+    def is_revised(self) -> bool:
+        """Its history is revised after publication: ALFRED vintages, or ``revised = true`` (a
+        published file re-estimated in place, stored through the lagged rule: EBP, OFR FSI)."""
+        return self.pit == "alfred" or self.revised
 
     @property
     def instrument_id(self) -> str:
@@ -160,6 +168,7 @@ def _series(doc: Mapping[str, Any], index: int) -> MacroSeries:
         date_column=t.text("date_column", ""),
         value_column=t.text("value_column", ""),
         parser=t.text("parser", "csv" if source == "published" else ""),
+        revised=t.boolean("revised", False),
     )
     _check_source(s, where)
     return s
