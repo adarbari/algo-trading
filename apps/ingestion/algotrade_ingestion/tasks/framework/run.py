@@ -155,12 +155,15 @@ class IngestRun:
         return self.record.items
 
     def _resume(self) -> RunRecord | None:
-        """The last unfinished run of this task for the session, minus its retryable items."""
+        """The last unfinished run of this task for the session, minus its retryable items; none
+        when its staging is gone (a fresh run then refetches everything)."""
         runs = self.writer.runs_for(self.task, self.session)
         unfinished = [r for r in runs if r.status is not RunStatus.COMPLETE]
         if not unfinished:
             return None
         record = unfinished[-1]
+        if not self.writer.staging.exists(record.run_id):
+            return None  # scratch gone: publishing would drop its finished items' rows
         record.items = {k: v for k, v in record.items.items() if status_label(v) not in RETRYABLE}
         record.status, record.finished_at = RunStatus.RUNNING, None
         return record

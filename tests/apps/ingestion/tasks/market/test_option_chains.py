@@ -164,14 +164,32 @@ def test_rerun_refetches_stale_and_keeps_ok_rows(backend: MemoryBackend | LocalB
     assert writer.staging.keys(second.run_id, OPTIONS) == []  # nothing stale left: dropped
 
 
-def test_rerun_with_nothing_stale_fetches_nothing(backend: MemoryBackend | LocalBackend) -> None:
+def test_resume_without_staging_starts_fresh_and_never_shrinks_partition(
+    backend: MemoryBackend | LocalBackend,
+) -> None:
     writer = StoreWriter(backend)
-    names = universe("A", "GONE")  # PARTIAL (50% NO_CHAIN), but nothing stale or failed
+    old = DAY - timedelta(days=1)
+    names = universe("A", "OLD")
+    first = run(writer, FakeFeed({"A": fx.payload("A"), "OLD": fx.payload("OLD", session=old)}),
+                names, retry_pause_s=0)  # fmt: skip
+    writer.staging.clear(first.run_id)  # dropped on commit / purged by retention
+    feed = FakeFeed({"A": fx.payload("A"), "OLD": fx.payload("OLD")})
+    run(writer, feed, names, retry_pause_s=0)
+    assert sorted(feed.calls) == ["A", "OLD"]  # a fresh run refetches all
+    options = StoreReader(backend).table(OPTIONS, DAY)
+    assert options is not None and set(options["underlying_id"]) == {"EQ:A", "EQ:OLD"}
+
+
+def test_rerun_with_nothing_retryable_starts_fresh_and_keeps_every_row(
+    backend: MemoryBackend | LocalBackend,
+) -> None:
+    writer = StoreWriter(backend)
+    names = universe("A", "GONE")  # PARTIAL (50% NO_CHAIN): staging dropped, nothing retryable
     first = run(writer, FakeFeed({"A": fx.payload("A")}), names, retry_pause_s=0)
     assert first.status is RunStatus.PARTIAL
     feed = FakeFeed({"A": fx.payload("A")})
-    second = run(writer, feed, names, retry_pause_s=0)
-    assert second.run_id == first.run_id and feed.calls == []
+    run(writer, feed, names, retry_pause_s=0)
+    assert sorted(feed.calls) == ["A", "GONE"]  # no scratch to resume from: a full fetch
     options = StoreReader(backend).table(OPTIONS, DAY)
     assert options is not None and set(options["underlying_id"]) == {"EQ:A"}
 
