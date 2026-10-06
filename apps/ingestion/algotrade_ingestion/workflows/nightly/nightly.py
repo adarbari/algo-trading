@@ -16,7 +16,9 @@ is waived by hand (``algotrade-ingest nightly --date D --waive STEP --reason ...
 A step whose source has not published the latest session yet is WAITING, not FAILED, until its
 deadline (``[schedule] data_deadline``, ADR 0043; ``waits``): the session is WAITING, holds
 later sessions back like a failed one, is not done (the next hourly run resumes it) and sends
-no alert. A catch-up session (not the latest) is past its deadline: FAILED as before.
+no alert. A catch-up session (not the latest) is past its deadline: FAILED as before. A step with
+``[steps.<name>] settle_minutes`` WAITS without fetching until the close plus that long, and
+every attempt for the latest session records when its source's data arrived (``arrival``).
 
 ``purge-raw`` ends the run whatever failed before; then ``notify.report`` writes the summary
 file and sends the notifications. Each session gets a ``nightly`` run record (COMPLETE when
@@ -30,7 +32,7 @@ from pathlib import Path
 from typing import Any
 
 from algotrade.config.site.settings import NightlySettings, SourcesSettings, load_nightly
-from algotrade.core.time.calendar import last_closed_session, local_deadline
+from algotrade.core.time.calendar import close_time, last_closed_session, local_deadline
 from algotrade.data.reference import snapshot
 from algotrade.services.jobs import JobContext
 from algotrade_ingestion.tasks.framework.registry import TASKS, run_task, task
@@ -64,6 +66,7 @@ from algotrade_ingestion.workflows.nightly.steps import (
     run_isolated,
     unsatisfied,
 )
+from algotrade_ingestion.workflows.nightly.timing import minutes_after_close
 
 SCREENS = "screens"  # not an ingestion task: one `screen` job per screener
 PURGE = "purge-raw"
@@ -222,6 +225,13 @@ def waits(
     return latest and ctx.clock() < deadline
 
 
+def settle_until(step: Step, session: date, settings: NightlySettings) -> datetime | None:
+    """The instant before which ``step`` does not fetch (close + ``[steps.<name>]
+    settle_minutes``), ``None`` when it has no settle time."""
+    minutes = settings.settle_for(step.name)
+    return close_time(session) + timedelta(minutes=minutes) if minutes else None
+
+
 def run_step(
     step: Step,
     ctx: TaskContext,
@@ -229,11 +239,18 @@ def run_step(
     params: Mapping[str, Any],
     screens: ScreenStep | None,
     wait: bool = False,
+    settle_until: datetime | None = None,
+    observe: bool = False,
 ) -> StepResult:
     """One step, isolated: its precondition, the registry task (or the screen jobs), then
-    its acceptance checks (``wait``: a pending failure is WAITING, not FAILED)."""
+    its acceptance checks (``wait``: a pending failure is WAITING, not FAILED;
+    ``settle_until``: WAITING without fetching before then; ``observe``: the latest session,
+    so the attempt records when the data arrived)."""
+    started = ctx.clock()
 
     def body() -> Outcome:
+        if settle_until is not None and started < settle_until:
+            return Outcome(StepStatus.WAITING, reason=f"settling until {settle_until:%H:%M} UTC")
         if step.requires is not None and (why := step.requires(ctx, session)):
             return Outcome(StepStatus.NOT_RUN, reason=why)
         if step.name == SCREENS:
@@ -243,7 +260,11 @@ def run_step(
         record = run_task(step.name, ctx, {**params, **step.params, "session": session})
         return from_record(record, step, ctx, session, wait)
 
-    return run_isolated(step.name, body, ctx.clock, step.critical)
+    result = run_isolated(step.name, body, ctx.clock, step.critical)
+    if observe and result.observed is not None:
+        minutes = minutes_after_close(started, close_time(session))
+        result.arrival = {"minutes_after_close": minutes, **result.observed}
+    return result
 
 
 def run_session(
@@ -267,7 +288,14 @@ def run_session(
             held = _not_run(step, ctx, latest, done, before, waive or {})
             wait = waits(step, ctx, session, latest, settings)
             done[step.name] = held or run_step(
-                step, ctx, session, {"workers": workers}, screens, wait
+                step,
+                ctx,
+                session,
+                {"workers": workers},
+                screens,
+                wait,
+                settle_until(step, session, settings) if wait else None,
+                latest,
             )
             run.record_item(step.name, _item(done[step.name]))
         status = overall(done.values())

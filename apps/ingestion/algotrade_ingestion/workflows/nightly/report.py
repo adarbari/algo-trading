@@ -19,6 +19,7 @@ from typing import Any
 from algotrade.services.run_items import failed_items, normalise, status_code
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.workflows.nightly.timing import (
+    ArrivalStat,
     PacingLine,
     StepTiming,
     step_timings,
@@ -131,6 +132,7 @@ class Report:
     rollups: tuple[tuple[str, str, int, int], ...]  # session, rollup, rows, no_input sessions
     hints: tuple[str, ...] = field(default=())
     timings: tuple[StepTiming, ...] = ()  # run timing per step (timing.py)
+    arrivals: tuple[ArrivalStat, ...] = ()  # when each source-fed step's data first appeared
     pacing: tuple[PacingLine, ...] = ()  # vendor limiters per step (requests, 429s, waits)
     max_duration_s: float | None = None  # [alerts] max_duration_minutes
     catch_up_held: tuple[str, ...] = ()  # sessions held back behind a failed one
@@ -385,6 +387,7 @@ def build_report(
     max_examples: int = 5,
     history: Sequence[Mapping[str, float]] = (),
     max_duration_s: float | None = None,
+    arrivals: Sequence[ArrivalStat] = (),
 ) -> Report:
     """The report for one nightly run. ``records``: (session, step) -> that step's task run
     record (``""`` session for the steps after every session); ``labels``: id -> ticker;
@@ -442,4 +445,6 @@ def build_report(
         for (session, name), record in records.items()
         for line in vendor_pacing(session, name, record.stats.get("pacing"))
     )
-    return replace(report, hints=hints(report), timings=timings, pacing=pacing)
+    return replace(
+        report, hints=hints(report), timings=timings, pacing=pacing, arrivals=tuple(arrivals)
+    )

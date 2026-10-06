@@ -43,9 +43,14 @@ class NightlySettings:
     # [schedule] / [steps.<name>]: Los Angeles wall-clock time on the session's date
     data_deadline: time = time(23, 0)
     step_deadlines: Mapping[str, time] = field(default_factory=dict)
+    # [steps.<name>] settle_minutes: wait this long after the close before fetching (0: no wait)
+    step_settle_minutes: Mapping[str, int] = field(default_factory=dict)
 
     def deadline_for(self, step: str) -> time:
         return self.step_deadlines.get(step, self.data_deadline)
+
+    def settle_for(self, step: str) -> int:
+        return self.step_settle_minutes.get(step, 0)
 
     @classmethod
     def from_document(
@@ -57,7 +62,7 @@ class NightlySettings:
         schedule = root.table("schedule", ["data_deadline"])
         declared = root.raw("steps") or {}
         steps_table = root.table("steps", list(declared))
-        steps = {n: steps_table.table(n, ["deadline"]) for n in declared}
+        steps = {n: steps_table.table(n, ["deadline", "settle_minutes"]) for n in declared}
         sessions = root.table("sessions", ["settle_minutes", "max_catch_up"])
         alerts = root.table("alerts", ["max_duration_minutes"])
         notify = root.table("notify", ["enabled", "desktop", "summary_path", "email"])
@@ -78,5 +83,10 @@ class NightlySettings:
                 n: clock_time(t, "deadline", d.data_deadline)
                 for n, t in steps.items()
                 if "deadline" in t.names()
+            },
+            step_settle_minutes={
+                n: t.integer("settle_minutes", 0, 0)
+                for n, t in steps.items()
+                if "settle_minutes" in t.names()
             },
         )

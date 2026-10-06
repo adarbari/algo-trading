@@ -29,6 +29,7 @@ class Check:
     status: str  # PASS | WARN | FAIL
     detail: str
     pending: bool = False  # a FAIL that only means "the source has not published it yet" (ADR 0043)
+    value: float | None = None  # the measured number behind it (a stale share), for arrival records
 
 
 def _rows(reader: StoreReader, table: str, day: date | None) -> int | None:
@@ -193,6 +194,7 @@ def _stale_check(
         "FAIL" if share > limit else "PASS",
         f"{count} of {total} {tier} chains stale ({share:.1%}, max {limit:.0%}){names}; {detail}",
         pending=True,  # Cboe has not rolled to the session yet (ADR 0043)
+        value=share,
     )
 
 

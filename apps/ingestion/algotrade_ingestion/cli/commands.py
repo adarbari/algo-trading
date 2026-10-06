@@ -31,7 +31,8 @@ from algotrade_ingestion.tasks.framework.registry import TASKS, Task, run_task, 
 from algotrade_ingestion.tasks.framework.run import TaskContext, run_summary
 from algotrade_ingestion.workflows.nightly import notify
 from algotrade_ingestion.workflows.nightly.nightly import FINALLY, NIGHTLY, nightly_job
-from algotrade_ingestion.workflows.nightly.records import stored_summary
+from algotrade_ingestion.workflows.nightly.records import arrivals, stored_summary
+from algotrade_ingestion.workflows.nightly.timing import arrival_line
 from algotrade_sources.framework.base import Source
 from algotrade_sources.framework.registry import (
     RAW_SECTIONS,
@@ -192,4 +193,17 @@ def nightly_report(args: argparse.Namespace, reader: StoreReader, session: date)
             print(f"warning: {warning}", file=sys.stderr)
             return 1
         print("email sent", file=sys.stderr)
+    return 0
+
+
+def arrivals_command(args: argparse.Namespace, reader: StoreReader, session: date) -> int:
+    """``arrivals``: when each source-fed step's data first appeared after the close, over the
+    last ``--sessions`` sessions (p50 / p90 minutes), from the stored nightly attempts
+    (``session`` is unused: the window is the latest sessions)."""
+    stats = arrivals(reader, args.sessions)
+    if not stats:
+        print("no arrival records yet (each nightly attempt for the latest session adds one)")
+        return 0
+    for stat in stats:
+        print(f"{stat.step:<8} {arrival_line(stat)}")
     return 0

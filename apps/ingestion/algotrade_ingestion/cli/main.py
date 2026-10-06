@@ -21,6 +21,8 @@
                               step that cannot succeed, e.g. chains past their day: ADR 0039)
     algotrade-ingest report   [--date D] [--out report.html] [--send] [--max-examples N]
                               (the nightly summary email for a past session; read-only)
+    algotrade-ingest arrivals [--sessions N]
+                              (when bars / chains first appeared after the close: p50 / p90 minutes)
     algotrade-ingest purge-raw [--keep-days 90] [--staging-keep-days 14]
     algotrade-ingest migrate-ids [--dry-run]   (symbol ids -> FIGI ids, append-only)
     algotrade-ingest golden build|verify|load [--golden-dir datasets/golden]
@@ -63,6 +65,7 @@ from algotrade.services.jobs import RunLockedError, exclusive_run
 from algotrade.storage.factory import open_backend
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.cli.commands import (
+    arrivals_command,
     config_store,
     golden,
     nightly_report,
@@ -83,6 +86,7 @@ from algotrade_ingestion.tasks.framework.registry import TASKS, Task
 from algotrade_ingestion.tasks.framework.run import recover_unpublished
 from algotrade_ingestion.workflows.nightly.nightly import NIGHTLY
 from algotrade_ingestion.workflows.nightly.sessions import last_done
+from algotrade_ingestion.workflows.nightly.timing import DEFAULT_SESSIONS
 
 # Task commands kept under their own names (``algotrade-ingest bars ...``); every registry
 # task is also ``algotrade-ingest run <task>``. ``golden load`` runs the ``golden-load`` task.
@@ -101,7 +105,7 @@ def add_wait(parser: argparse.ArgumentParser) -> None:
 
 def writes(args: argparse.Namespace) -> bool:
     """Whether the command writes to the store (and so takes the run lock)."""
-    if args.command in ("schedule", "report"):
+    if args.command in ("schedule", "report", "arrivals"):
         return False
     return not (args.command == "golden" and args.action in ("build", "verify"))
 
@@ -200,6 +204,8 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
     r.add_argument("--out", type=Path, help="also write the HTML version to this file")
     r.add_argument("--send", action="store_true", help="email it ([notify.email] + .env)")
     r.add_argument("--max-examples", type=int, help="examples per failure group")
+    a = sub.add_parser("arrivals", help="when each source's data first appeared after the close")
+    a.add_argument("--sessions", type=int, default=DEFAULT_SESSIONS, help="last N sessions")
     g = sub.add_parser(
         "golden", help="golden test datasets: build CSVs, verify, load into the store"
     )
@@ -270,8 +276,9 @@ def _dispatch(args: argparse.Namespace, reader: StoreReader, writer: StoreWriter
     session = explicit or default_session(args, datetime.now(UTC))
     if args.command == "golden":
         return golden(args, reader, writer)
-    if args.command == "report":
-        return nightly_report(args, reader, session)
+    if args.command in ("report", "arrivals"):
+        read_only = {"report": nightly_report, "arrivals": arrivals_command}
+        return read_only[args.command](args, reader, session)
     if getattr(args, "task", None):
         return run_task_command(args, reader, writer, args.task, task_params(args, session))
     if args.command == "screen":
