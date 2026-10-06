@@ -241,6 +241,20 @@ nohup sh -c '.venv/bin/algotrade-ingest run macro --since 1970-01-01 \
 cat var/logs/macro.status   # appears when the run ends; the run record lists every series' status
 ```
 
+The earnings history (`events/earnings` from 2018, ADR 0050) is one Nasdaq calendar request per
+exchange session (about 2,200 since 2018 at the vendor's pace, about 20 minutes). Each row is
+stored with `known_from` = its report date, so past sessions see the reports from their dates
+on. A rerun the same day continues an interrupted or partial run (only its failed days are
+asked again); a run on a later day fetches the whole window again. The run record lists every
+day's status and `pre_snapshot_rows` (rows resolved through the earliest reference snapshot):
+
+```bash
+mkdir -p var/logs
+nohup sh -c '.venv/bin/algotrade-ingest earnings --from 2018-01-02 --to <last session> \
+  > var/logs/earnings-history.log 2>&1; echo "exit=$? $(date -u +%FT%TZ)" > var/logs/earnings-history.status' >/dev/null 2>&1 &
+cat var/logs/earnings-history.status   # appears when the run ends
+```
+
 The nightly's `macro` step is optional (a failure warns, `check_macro` grades staleness and lost
 vintages), runs after the screens (until the regime group needs it) within a time budget
 (`macro.toml [macro] run_budget_s`) and refetches a published file by its cadence, at most weekly.

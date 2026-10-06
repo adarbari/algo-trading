@@ -369,6 +369,26 @@ ETF_HOLDINGS = _fixed(
 # ``instruments/shares`` keeps ``filed``. ``value`` is null where FRED prints ".". The
 # partition is the run's session; runs are increments, so they merge on the key; readers union
 # every partition and keep the vintages on or before their session (``data.macro.series``).
+# Event rows say when the fact became knowable (ADR 0050 decision 3): ``known_from``, the
+# session it was knowable on (a backfilled report: its report date); ``data.events`` applies
+# it. Every event table with a spec of its own REQUIRES it, non-null (``EARNINGS_EVENTS``; a
+# new event table declares it the same way). The generic event grain keeps it optional (null:
+# the session that stored it) for the facts of record (``data.events.FACTS_OF_RECORD``:
+# splits, dividends, reference and index changes).
+KNOWN_FROM = "known_from"
+# A calendar row copied forward over a day the fetch failed: the session of the snapshot that
+# fetched it (null on fetched rows), so a failed fetch never cancels knowledge (ADR 0050).
+CARRIED_FROM = "carried_from"
+EARNINGS_EVENTS = TableSpec(
+    "events/earnings",
+    "event",
+    ("instrument_id", "ts", KNOWN_FROM),
+    open_ended=True,
+    columns=_columns(
+        "instrument_id string!", "ts timestamp_utc!", f"{KNOWN_FROM} date!", f"{CARRIED_FROM} date"
+    ),
+    runs="merge",
+)
 MACRO_SERIES = _fixed(
     "macro/series",
     "reference",
@@ -483,6 +503,7 @@ KNOWN: dict[str, TableSpec] = {
         LIVE_OPTION_QUOTES,
         ETF_HOLDINGS,
         MACRO_SERIES,
+        EARNINGS_EVENTS,
     )
 }
 # Open-ended tables: the producing rollup, event source, catalogue or screener defines the
@@ -517,9 +538,11 @@ def spec_for(table: str) -> TableSpec:
         if table.startswith(prefix) and len(table) > len(prefix):
             required = ("instrument_id", "ts") if grain == "event" else ("instrument_id",)
             keys = ("instrument_id string!", "ts timestamp_utc!")[: len(required)]
-            runs = "merge" if grain == "event" else "snapshot"
+            event = grain == "event"
+            typed = (*keys, f"{KNOWN_FROM} date") if event else keys
+            runs = "merge" if event else "snapshot"
             return TableSpec(
-                table, grain, required, open_ended=True, columns=_columns(*keys), runs=runs
+                table, grain, required, open_ended=True, columns=_columns(*typed), runs=runs
             )
     raise DataValidationError(
         table, ["unknown table; add a TableSpec to storage/tables/schemas.py"]

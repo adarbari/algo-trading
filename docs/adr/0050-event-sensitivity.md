@@ -37,17 +37,23 @@ not answered: a fact of record stored years after it happened.
    instrument's events**, scaled by `leverage`. The link is a catalogue feature
    (`fund_reference@v1.reference_instrument_id`, ADR 0038) computed from the holdings table,
    with a name rule resolved through `SymbolResolver` as the fallback. The group's `applies_to` is `leveraged_fund` (ADR 0042 amended): every other instrument reads NOT_APPLICABLE. One owner, `services/events`, resolves the scope as of a session (the tier A / B names, the list, the funds' references, each with its reason; unresolved symbols returned). Scoped names get bars
-   and earnings dates from 2018-01-01 (Stooq split-adjusted daily files stored under their own
-   `source`; the Nasdaq calendar by past date, SEC 8-K Item 2.02 as the authoritative source
+   and earnings dates from 2018-01-01 (Tiingo daily files, unadjusted columns, licence
+   `personal`, stored under their own `source`; Stooq sits behind a JavaScript check since
+   2026-10; the Nasdaq calendar by past date, SEC 8-K Item 2.02 as the authoritative source
    of the report date and time).
 3. **Point in time: one `known_from` date per event row** (the pattern of ADR 0048, which
    separated `vintage_date` from the storage stamp). Every event row (`events/earnings`,
    `events/macro_release`, `events/filing`, `events/attribution`, `events/factor_occurrence`,
    `instruments/factors`) carries `known_from`: the session on which the fact was knowable.
-   A row the nightly stores from a calendar gets its snapshot session; a backfilled past
-   event gets its event date (an 8-K its acceptance date); a model attribution the session it
-   ran; a dossier row the session of its import. `knowledge_ts` stays the storage stamp
-   (stamping overwrites it; nothing is keyed on it). **The one read rule**: as of session S the
+   A row gets the earlier of its snapshot session and its event date (a lookback row reported
+   last week was knowable on its report date); a backfilled past event gets its event date
+   (an 8-K its acceptance date); a model attribution the session it ran; a dossier row the
+   session of its import. `knowledge_ts` stays the storage stamp (stamping overwrites it;
+   nothing is keyed on it). Splits, dividends, reference and index changes are facts of
+   record applied to bars at read time (ADR 0016): they are read by event date without a
+   knowledge bound and carry no `known_from`. A calendar day the nightly failed to fetch
+   carries the previous snapshot's forecasts forward (`carried_from`), so a failed fetch never
+   cancels knowledge. **The one read rule**: as of session S the
    data layer serves rows with `known_from <= S`, and a **statistic** as of S uses only events
    whose inputs are complete on or before S (the reaction session for a move, the reaction
    session plus 5 for `revert_rate`, plus 1 for `iv_crush`), with every lookback window
@@ -116,7 +122,9 @@ UNKNOWN until 2027).
 - The owner has recurring work: run the backfills once, the deep dive weekly or monthly, and
   review each dossier diff; a name unreviewed for 90 days is flagged on the Admin screen.
 - A new vendor use (Massive news), a new SEC reader (8-K index) and a new FRED endpoint
-  (release dates), each on a source already in `libs/sources`; no new vendor.
+  (release dates), each on a source already in `libs/sources`, and one new vendor: Tiingo
+  daily files for the bar history (unadjusted columns, licence `personal`; Stooq sits behind
+  a JavaScript check since 2026-10).
 - The scope file is edited by PR until EV8 gives Admin a write for it (amending ADRs 0005 and
   0029 then: an admin writes one site file through the API).
 - Reviewed 2026-10-06 by `architect`: the original two-rule design was replaced by this

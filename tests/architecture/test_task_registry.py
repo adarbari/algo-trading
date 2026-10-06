@@ -4,7 +4,9 @@
   module produces (``owner`` or ``also_written_by``), and every producing task module is in
   the registry;
 - every task is reachable from the CLI, by its own command and as ``run <task>``;
-- every source a task names is declared in the source registry.
+- every source a task names is declared in the source registry;
+- every ``events/*`` table's spec requires a non-null ``known_from`` (ADR 0050 decision 3), or
+  the table is a fact of record (``data.events.FACTS_OF_RECORD``) listed with its reason.
 """
 
 import tomllib
@@ -13,6 +15,8 @@ from pathlib import Path
 
 import pytest
 
+from algotrade.data.events import FACTS_OF_RECORD
+from algotrade.storage.tables.schemas import KNOWN_FROM, spec_for
 from algotrade_ingestion.cli import main as cli
 from algotrade_ingestion.tasks.framework.registry import TASKS
 from algotrade_ingestion.workflows.nightly.nightly import FINALLY, NIGHTLY, SCREENS
@@ -21,6 +25,16 @@ from tests.conftest import REPO_ROOT
 
 TABLES = tomllib.loads((REPO_ROOT / "architecture" / "tables.toml").read_text())["table"]
 TASKS_DIR = "apps/ingestion/algotrade_ingestion/tasks/"
+# The event tables read without a knowledge bound and stored without ``known_from``, with the
+# reason (``data.events.FACTS_OF_RECORD``). Every other event table requires ``known_from``.
+FACTS_OF_RECORD_REASONS = {
+    "events/split": "applied to bars at read time (ADR 0016): read by event date, unbounded",
+    "events/dividend": "applied to bars at read time (ADR 0016), as events/split",
+    "events/reference_change": "the diff of two reference snapshots: a fact of record of the "
+    "listing, read by event date",
+    "events/index_change": "the diff of two reference snapshots (S&P 500 membership), as "
+    "events/reference_change",
+}
 
 
 def _module_path(module: object) -> str:
@@ -99,3 +113,24 @@ def test_every_nightly_step_has_a_status_in_the_result() -> None:
     for step in [*steps.values(), *summary["steps"].values()]:
         assert step["status"] in ("SUCCEEDED", "FAILED", "NOT_RUN", "SKIPPED", "WAIVED")
         assert "duration_s" in step and isinstance(step["critical"], bool)
+
+
+EVENT_TABLES = sorted(t["name"] for t in TABLES if t["name"].startswith("events/"))
+
+
+@pytest.mark.parametrize("table", EVENT_TABLES)
+def test_every_event_table_requires_known_from_or_is_a_fact_of_record(table: str) -> None:
+    spec = spec_for(table)
+    if table in FACTS_OF_RECORD:
+        assert table in FACTS_OF_RECORD_REASONS, f"{table}: give the reason it is unbounded"
+        return
+    column = spec.column(KNOWN_FROM)
+    assert KNOWN_FROM in spec.required and column is not None and not column.nullable, (
+        f"{table} must require a non-null known_from (ADR 0050 decision 3): declare its "
+        "TableSpec in storage/tables/schemas.py like EARNINGS_EVENTS"
+    )
+
+
+def test_the_facts_of_record_are_the_listed_stored_tables() -> None:
+    assert set(FACTS_OF_RECORD) == set(FACTS_OF_RECORD_REASONS)
+    assert set(FACTS_OF_RECORD) <= set(EVENT_TABLES)

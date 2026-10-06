@@ -99,7 +99,13 @@ def seed(
         {"instrument_id": f"EQ:S{i}", "status": s} for i, s in enumerate(chains)
     ]
     w.write_table("chains/status", D2, "c", stamped(status, D2, "c"))
-    earnings = [{"instrument_id": "EQ:S1", "ts": pd.Timestamp(D2 + timedelta(5), tz="UTC")}]
+    earnings = [
+        {
+            "instrument_id": "EQ:S1",
+            "ts": pd.Timestamp(D2 + timedelta(5), tz="UTC"),
+            "known_from": D2,
+        }
+    ]
     w.write_table("events/earnings", D2, "e", stamped(earnings, D2, "e"))
     return StoreReader(backend)
 

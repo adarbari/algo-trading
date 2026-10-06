@@ -197,7 +197,9 @@ def test_reading_only_reports_that_can_anchor_changes_nothing(
             write_earnings(writer, days[k], [(i, d, t) for (i, d), t in listed.items()])
     picks = days[-130::2]  # every other session of the last 130
     after = [r.frame for r in compute_sessions(reader, av.GROUP, picks)]
-    monkeypatch.setattr(av, "valid_events", lambda stored, since=None: valid_events(stored))
+    monkeypatch.setattr(
+        av, "valid_events", lambda stored, session, since=None: valid_events(stored, session)
+    )
     before = [r.frame for r in compute_sessions(reader, av.GROUP, picks)]
     assert sum(f is not None and f["avwap_earnings"].notna().any() for f in after) > 40
     for a, b in zip(after, before, strict=True):
