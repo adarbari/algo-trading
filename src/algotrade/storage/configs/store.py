@@ -13,6 +13,7 @@ KINDS = (
     "selections",
     "settings",
     "features",
+    "field_guide",
     "screeners",
     "preferences",
     "identity",
@@ -24,8 +25,10 @@ class ConfigStore(Protocol):
         """``scope`` is "site" or a user id; ``kind`` one of ``KINDS``. ``settings`` are site-only
         documents read by ingestion (``universe``, ``sources``, ``rollups``, ...); ``features``
         are expression-feature files (``site/features/<theme>.toml``, or a user's
-        ``users/<id>/features/<theme>.toml``). ``preferences`` and ``identity`` are one file
-        per user (``users/<id>/<kind>.toml``; identity holds the sign-in email, ADR 0040), never
+        ``users/<id>/features/<theme>.toml``); ``field_guide`` the site's field guide files
+        (``site/field_guide/<theme>.toml``, site-only). ``preferences`` and ``identity`` are
+        one file per user (``users/<id>/<kind>.toml``; identity holds the sign-in email, ADR
+        0040), never
         the site's. ``screeners`` are versioned rule screens:
         ``name`` loads the latest version, ``name@N`` exactly version N; drafts are never
         loaded here."""

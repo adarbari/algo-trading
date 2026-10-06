@@ -98,13 +98,14 @@ detect = [{ call = "compute_sessions" }, { call = "compute_one" }, { call = "Fea
 
 [[responsibility]]
 id = "feature-metadata"
-description = "Feature definitions and their catalogue: each stored column is a Feature (kind, dtype, unit, description, null meaning, range, categories, inputs) declared in its group, each expression feature one built from its site definition; the registry and the FeatureSet index them and catalogue.py renders docs/data/features.md (ADR 0023)"
+description = "Feature definitions and their catalogue: each stored column is a Feature (kind, dtype, unit, description, null meaning, range, categories, inputs) declared in its group, each expression feature one built from its site definition; the registry and the FeatureSet index them and catalogue.py renders docs/data/features.md (ADR 0023); guide.py renders docs/data/field-guide.md from the site field guide (ADR 0041)"
 owner = [
     "src/algotrade/features/framework/feature.py",
     "src/algotrade/features/rollups/*",
     "src/algotrade/features/expressions/definitions.py",
     "src/algotrade/features/registry.py",
     "src/algotrade/features/catalogue.py",
+    "src/algotrade/features/guide.py",  # renders docs/data/field-guide.md from the site field guide (ADR 0041)
 ]
 section = "docs/adr/0023-feature-store.md#decision"
 detect = [{ call = "Feature" }, { string = "docs/data/features.md" }]
@@ -465,11 +466,12 @@ detect = [{ import = "fcntl" }, { call = "flock" }]
 
 [[responsibility]]
 id = "site-settings"
-description = "Load and type L3 site settings (config/site/*.toml: sources, universe + overrides, nightly, defaults, users with roles per ADR 0040): one loader, frozen dataclasses; the store only reads files"
+description = "Load and type L3 site settings (config/site/*.toml: sources, universe + overrides, nightly, defaults, users with roles per ADR 0040, the field guide per ADR 0041): one loader, frozen dataclasses; the store only reads files"
 owner = [
     "src/algotrade/config/site/settings.py",
     "src/algotrade/config/site/users.py",
     "src/algotrade/config/site/nightly.py",
+    "src/algotrade/config/site/field_guide.py",
     "src/algotrade/storage/configs/store.py",
     "src/algotrade/storage/configs/files.py",
 ]
@@ -691,7 +693,7 @@ detect = [{ call = "load_ideas" }]
 
 [[responsibility]]
 id = "screen-drafting"
-description = "A rule screen drafted from a sentence (ADR 0041): the TextModel protocol, the prompt over the caller's catalogue (name, type, unit, description, category values; no market data, results or credentials), strict parsing of the model's JSON, invented fields and rejected criteria dropped with a reason, the rest validated with resolve_rule_draft; the one OpenAI-compatible adapter (built by the source registry, the key only in a header) and the API's wiring of it from llm.toml; a draft the Builder loads, never a write, never a run"
+description = "A rule screen drafted from a sentence (ADR 0041): the TextModel protocol, the prompt over the caller's catalogue (name, type, unit, description, category values), the phrasebook and the field guide (config/site/field_guide/*.toml: how to read a field, the criterion per intent, caveats, situations; no market data, results or credentials), strict parsing of the model's JSON, invented fields and rejected criteria dropped with a reason, the rest validated with resolve_rule_draft; the one OpenAI-compatible adapter (built by the source registry, the key only in a header) and the API's wiring of it from llm.toml; a draft the Builder loads, never a write, never a run"
 owner = [
     "src/algotrade/services/drafting/*",
     "libs/sources/algotrade_sources/llm/*",

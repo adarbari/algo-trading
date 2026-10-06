@@ -265,7 +265,7 @@ function nextEarnings(values: Values): Fact {
     return {
       id: 'next',
       label: 'Next earnings',
-      value: unknownLabel(next?.unknown?.code),
+      value: unknownLabel(next?.unknown?.code, next?.unknown?.reason),
       hint: unknownReason(next),
     };
   }
@@ -314,7 +314,7 @@ export function earningsGroup(values: Values, events: readonly InstrumentEvent[]
     items.push({
       id: 'last',
       label: 'Last earnings',
-      value: unknownLabel(last?.unknown?.code),
+      value: unknownLabel(last?.unknown?.code, last?.unknown?.reason),
       hint: unknownReason(last),
     });
     return { id: 'earnings', title: 'Earnings', items };

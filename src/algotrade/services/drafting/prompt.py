@@ -2,14 +2,23 @@
 (``docs/screeners/rules.md``), two worked examples, the caller's field catalogue in catalogue
 order (name, type, unit, description, the values of a category), the site phrasebook (trader
 vocabulary -> fields, ``config/site/phrasebook.toml``; a phrase keeps only the fields this
-catalogue has) and the sentence. Rendered with no timestamps or ids, so the same catalogue and
-phrasebook give the same bytes (a provider's prompt cache hits and a recorded test stays
-valid). The prompt carries no market data, results or credentials."""
+catalogue has), the site field guide (``config/site/field_guide/*.toml``: how to read a field,
+the usual criterion per intent, the caveats, and the situations that fool several thresholds;
+only entries over this catalogue's fields, sources left out) and the sentence. Rendered with no
+timestamps or ids, so the same catalogue, phrasebook and guide give the same bytes (a provider's
+prompt cache hits and a recorded test stays valid). The prompt carries no market data, results
+or credentials."""
 
 import json
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from algotrade.config.site.field_guide import (
+    FieldGuideEntry,
+    FieldGuideSettings,
+    GuideUse,
+    Situation,
+)
 from algotrade.config.site.llm import Phrase
 from algotrade.services.read.instruments.catalogue import FeatureInfo
 
@@ -49,6 +58,10 @@ Rules:
 - The phrasebook after the catalogue says which fields a trader's words mean and how to
   use them (the gate, a confirmation, a score; typical thresholds). Follow it; prefer its
   thresholds to your own; say in "notes" when you had to choose one.
+- The field guide after the phrasebook says how to read a field, the usual criterion for
+  each intent (op, value, mode, tolerance) and when the reading lies. Take thresholds from
+  it, never from memory. When a caveat or a situation names a field to check, add that
+  criterion (soft or score, so it lists rather than rejects) and say why in "notes".
 
 Answer shape:
 {"criteria": [ ... ], "tie_break": {"field": "...", "descending": true} or null,
@@ -227,10 +240,53 @@ def phrase_line(phrase: Phrase, catalogue: set[str]) -> str | None:
     return f"{' / '.join(phrase.say)} | {', '.join(fields)} | {hint or '-'}"
 
 
-def system_prompt(catalogue: Iterable[FeatureInfo], phrasebook: Iterable[Phrase] = ()) -> str:
+def _value(value: Any) -> str:
+    return json.dumps(value)
+
+
+def use_text(use: GuideUse) -> str:
+    """One intent as the model should write it: ``intent: op value mode [tolerance] [on_miss]
+    (note)``."""
+    parts = [use.op]
+    if use.op not in ("is_null", "not_null"):
+        parts.append(_value(use.value))
+    parts.append(use.mode)
+    if use.tolerance is not None:
+        parts.append(f"tolerance {_value(use.tolerance)}")
+    if use.on_miss:
+        parts.append(f"on_miss {use.on_miss}")
+    text = f"{use.intent}: {' '.join(parts)}"
+    return f"{text} ({use.note})" if use.note else text
+
+
+def guide_line(entry: FieldGuideEntry, catalogue: set[str]) -> str | None:
+    """One field guide entry: ``name | reads | use: ...; ... | caveats: ... ``; None when the
+    field is not in this catalogue. Sources stay out of the prompt."""
+    if entry.name not in catalogue:
+        return None
+    parts = [entry.name, entry.reads]
+    parts.append("use: " + "; ".join(use_text(u) for u in entry.uses) if entry.uses else "use: -")
+    parts.append("caveats: " + " ".join(entry.caveats) if entry.caveats else "caveats: -")
+    return " | ".join(parts)
+
+
+def situation_line(situation: Situation, catalogue: set[str]) -> str | None:
+    """One situation with the affected fields this catalogue has (None: it has none)."""
+    affects = [f for f in situation.affects if f in catalogue]
+    if not affects:
+        return None
+    return f"{situation.name} | {situation.signs} | affects: {', '.join(affects)} | {situation.do}"
+
+
+def system_prompt(
+    catalogue: Iterable[FeatureInfo],
+    phrasebook: Iterable[Phrase] = (),
+    guide: FieldGuideSettings | None = None,
+) -> str:
     """The task with its examples, the catalogue (in the order given: the caller's catalogue
-    order) and the phrasebook (file order; entries with none of this catalogue's fields left
-    out)."""
+    order), the phrasebook (file order; entries with none of this catalogue's fields left
+    out) and the field guide (file order; entries and situations over this catalogue's fields
+    only)."""
     infos = list(catalogue)
     names = {info.name for info in infos}
     lines = "\n".join(catalogue_line(info) for info in infos)
@@ -242,6 +298,19 @@ def system_prompt(catalogue: Iterable[FeatureInfo], phrasebook: Iterable[Phrase]
     if phrases:
         out += "\nPhrasebook (what the trader says | fields | how to use them):\n"
         out += "\n".join(phrases) + "\n"
+    if guide is not None:
+        entries = [line for e in guide.fields if (line := guide_line(e, names)) is not None]
+        if entries:
+            out += "\nField guide (field | how to read it | the criterion per intent | caveats):\n"
+            out += "\n".join(entries) + "\n"
+        situations = [
+            line for s in guide.situations if (line := situation_line(s, names)) is not None
+        ]
+        if situations:
+            out += (
+                "\nSituations that fool a threshold (situation | signs | affects | what to do):\n"
+            )
+            out += "\n".join(situations) + "\n"
     return out
 
 

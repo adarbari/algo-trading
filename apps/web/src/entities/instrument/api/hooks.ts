@@ -83,6 +83,7 @@ const InstrumentFeatureValues = graphql(`
         unknown {
           code
           detail
+          reason
         }
         info {
           format

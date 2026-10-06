@@ -7,10 +7,10 @@
  * flags and why); how many pages a query has, and the missing tables' short names.
  */
 import {
+  catalogueColumn,
   changeColumn,
   criterionColumn,
   decisionColumn,
-  featureColumn,
   flagsColumn,
   rankColumn,
   reasonsColumn,
@@ -24,8 +24,13 @@ import {
 } from '@/entities/feature';
 import { isShownCriterion } from '@/entities/screen';
 
-export function tablePlan(columns: readonly ColumnInfo[]): ColumnPlan {
-  return [tickerColumn(), ...columns.map(featureColumn)];
+/** The ticker, then a column for each served column that was asked for (`shown`: a companion the server sent for a factory is not a column). */
+export function tablePlan(columns: readonly ColumnInfo[], shown?: readonly string[]): ColumnPlan {
+  const asked = shown ? new Set(shown) : null;
+  return [
+    tickerColumn(),
+    ...columns.filter((c) => !asked || asked.has(c.name)).map(catalogueColumn),
+  ];
 }
 
 export interface ResultsPlanInput {
@@ -63,7 +68,7 @@ export function resultsPlan({
     ...displayColumns
       .filter((c) => !judged.has(c.field))
       .map((c) => screenColumn(c, catalogue.get(c.field))),
-    ...added.map(featureColumn),
+    ...added.map(catalogueColumn),
     ...(changes ? [changeColumn()] : []),
     flagsColumn(),
     reasonsColumn(),

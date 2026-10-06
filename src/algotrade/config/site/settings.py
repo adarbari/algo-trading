@@ -6,6 +6,7 @@ ADR 0019 ``site-settings``. Each file becomes a frozen dataclass that apps recei
     verification.toml -> VerificationSettings (live verification vs IBKR)
     llm.toml       -> LlmSettings       (the text model behind screener drafts, ADR 0041)
     phrasebook.toml -> PhrasebookSettings (trader vocabulary -> catalogue fields, ADR 0041)
+    field_guide/*.toml -> FieldGuideSettings (how to read a field, thresholds, caveats, ADR 0041)
     universe.toml  -> UniverseSettings  (+ overrides/leveraged_etfs.csv, overrides/figi.csv)
     nightly.toml   -> NightlySettings
     users.toml     -> UsersSettings     (config/site/users.py: the user registry, ADR 0040)
@@ -29,6 +30,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
 from algotrade.config.site.coverage import DEFAULT_COVERAGE, CoverageRule, load_coverage
+from algotrade.config.site.field_guide import FieldGuideSettings
 from algotrade.config.site.fields import Table, reject_secrets
 from algotrade.config.site.holdings import KEYS as ETF_KEYS
 from algotrade.config.site.holdings import (
@@ -925,6 +927,15 @@ def load_llm(configs: SiteDocuments) -> LlmSettings:
 def load_phrasebook(configs: SiteDocuments) -> PhrasebookSettings:
     """``phrasebook.toml`` (ADR 0041); missing: no phrases."""
     return PhrasebookSettings.from_document(site_document(configs.load, "phrasebook"))
+
+
+def load_field_guide(configs: SiteDocuments) -> FieldGuideSettings:
+    """``config/site/field_guide/*.toml`` (ADR 0041, amended): how to read each field, in
+    file-name order; none without files."""
+    names = configs.names("site", "field_guide")
+    return FieldGuideSettings.from_documents(
+        {n: configs.load("site", "field_guide", n) for n in names}
+    )
 
 
 def load_rollups(
