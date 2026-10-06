@@ -16,7 +16,7 @@ know is returned in ``unresolved``, never dropped silently and never fetched und
 id. A name found by several reasons appears once with all of them.
 """
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import date
 
@@ -25,7 +25,7 @@ from algotrade.core.model.fields import rollup_table
 from algotrade.data import StoreReader
 from algotrade.data.reference import resolver
 from algotrade.data.resolver import SymbolResolver
-from algotrade.data.rollups import latest_rollup
+from algotrade.data.rollups import rollup_as_of
 
 TIER, LIST, REQUESTED, REFERENCE = "tier", "list", "requested", "reference"
 REASONS = (TIER, LIST, REQUESTED, REFERENCE)
@@ -67,7 +67,7 @@ class ScopedInstruments:
 
 def _tier_ids(reader: StoreReader, session: date) -> tuple[date | None, list[str]]:
     """The short-put names of the newest ``option_liquidity@v1`` on or before ``session``."""
-    found = latest_rollup(reader, LIQUIDITY, session)
+    found = rollup_as_of(reader, LIQUIDITY, session)
     if found is None or "short_put_ok" not in found[1].columns:
         return (found[0] if found else None), []
     day, rows = found
@@ -81,7 +81,7 @@ def _fund_references(
     """The stock each of ``funds`` tracks (``fund_reference@v1``; funds without one omitted)."""
     if not funds:
         return None, {}
-    found = latest_rollup(reader, FUND_REFERENCE, session, funds)
+    found = rollup_as_of(reader, FUND_REFERENCE, session, funds)
     if found is None or "reference_instrument_id" not in found[1].columns:
         return (found[0] if found else None), {}
     day, rows = found
@@ -90,10 +90,15 @@ def _fund_references(
     return day, {str(fund): str(stock) for fund, stock in pairs}
 
 
-def _symbols(listed: Sequence[str], requested: Sequence[str]) -> dict[str, str]:
-    """Upper-cased symbols in order, each with its reason (the list's wins a repeat)."""
+def _symbols(
+    listed: Sequence[str], requested: Sequence[str], wanted: Collection[str]
+) -> dict[str, str]:
+    """Upper-cased symbols in order, each with its reason (the list's wins a repeat), of the
+    ``wanted`` reasons only."""
     out: dict[str, str] = {}
     for reason, symbols in ((LIST, listed), (REQUESTED, requested)):
+        if reason not in wanted:
+            continue
         for symbol in (s.strip().upper() for s in symbols):
             if symbol and symbol not in out:
                 out[symbol] = reason
@@ -105,10 +110,19 @@ def scoped_instruments(
     configs: Documents | None,
     session: date,
     requested: Sequence[str] = (),
+    reasons: Collection[str] = REASONS,
 ) -> ScopedInstruments:
     """The names in scope for ``session`` (``configs``: the config store holding the site list;
-    ``None``: no list), with each one's reasons and the symbols that did not resolve."""
-    listed = load_event_scope(configs).symbols if configs is not None else ()
+    ``None``: no list), with each one's reasons and the symbols that did not resolve.
+    ``reasons`` asks for a subset of ``REASONS`` (default all: the event study's scope): a task
+    with a request budget leaves ``tier`` out. ``reference`` adds the stocks tracked by the
+    funds among the names the other reasons found. Everything is read as of ``session``: the
+    reference snapshot, the tiers and the fund links each from their newest partition on or
+    before it, never a later one."""
+    unknown = sorted(set(reasons) - set(REASONS))
+    if unknown:
+        raise ValueError(f"unknown scope reasons {unknown}: expected a subset of {list(REASONS)}")
+    listed = load_event_scope(configs).symbols if configs is not None and LIST in reasons else ()
     found: dict[str, list[str]] = {}  # instrument id -> reasons, in order of first appearance
 
     def add(instrument_id: str, reason: str) -> None:
@@ -118,15 +132,17 @@ def scoped_instruments(
 
     resolved: SymbolResolver = resolver(reader, session)
     unresolved = []
-    for symbol, reason in _symbols(listed, requested).items():
+    for symbol, reason in _symbols(listed, requested, reasons).items():
         if resolved.knows(symbol):
             add(resolved.id_for(symbol), reason)
         else:
             unresolved.append(symbol)
-    tier_session, tier_ids = _tier_ids(reader, session)
+    tier_session, tier_ids = _tier_ids(reader, session) if TIER in reasons else (None, [])
     for instrument_id in sorted(tier_ids, key=lambda i: (resolved.symbols.get(i, i), i)):
         add(instrument_id, TIER)
-    link_session, links = _fund_references(reader, session, list(found))
+    link_session, links = (
+        _fund_references(reader, session, list(found)) if REFERENCE in reasons else (None, {})
+    )
     for stock in dict.fromkeys(links[f] for f in found if f in links):
         add(stock, REFERENCE)
     names = tuple(

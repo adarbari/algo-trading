@@ -1,19 +1,21 @@
 """Unadjusted daily bars from Tiingo back to 2018 for the event-study names (ADR 0050).
 
 ``algotrade-ingest run bars-history`` fetches ONE request per name of the event-study scope
-(``services.events.scope.scoped_instruments``: the tier A / B short-put names, the site list
-``config/site/events/scope.toml`` and the stocks the scoped leveraged funds track, plus
-``--symbols``) for ``--since`` (default 2018-01-01) to ``--until`` (default: the last session)
-and stores the rows in ``bars/1d`` with ``source = "tiingo"``, one partition per session. Prices
-are stored unadjusted, as Massive's are (ADR 0016). The free tier allows 50 requests an hour, so
-the source paces one every 72 s and ~140 names take ~3 hours: run it detached (README "Long
-runs"); ``stats["pending"]`` and ``eta_h`` say how many are left.
+(``services.events.scope.scoped_instruments``): by default the site list
+``config/site/events/scope.toml``, the stocks the scoped leveraged funds track and ``--symbols``;
+with ``--include-tiers`` also the tier A / B short-put names. Tiingo's free tier allows 500
+unique symbols a month and 50 requests an hour, so the tier names (hundreds) need its Power tier.
+The task stores the rows in ``bars/1d`` with ``source = "tiingo"``, one partition per session,
+for ``--since`` (default 2018-01-01) to ``--until`` (default: the last session). Prices are
+stored unadjusted, as Massive's are (ADR 0016). The source paces one request every 72 s, so ~140
+names take ~3 hours: run it detached (README "Long runs"); ``stats["pending"]`` and ``eta_h``
+say how many are left.
 
 - **Scope** is resolved once, by the owner, as of ``--until``'s session (ADR 0018): ids come
   from that session's reference snapshot. A symbol it does not know is NEVER fetched under a
   made-up id: it is an item ``sym:<SYMBOL>`` (``UNKNOWN``) and listed in
-  ``stats["unknown_symbols"]``; ``stats["by_reason"]`` counts the names per reason (tier, list,
-  requested, reference).
+  ``stats["unknown_symbols"]``; ``stats["by_reason"]`` counts the names per reason (list, requested,
+  reference, and tier with ``--include-tiers``).
 - **Resumable**, like ``ibkr-iv``: a name an earlier finished run fetched for the whole window
   (item ``hist:<id>``, ``OK: <since>..<until>`` or ``NO_DATA: ...``) is skipped (``--force``
   fetches it again); an interrupted run resumes from its staging when started again with the
@@ -44,7 +46,14 @@ from functools import partial
 import pandas as pd
 
 from algotrade.data.events import read_events
-from algotrade.services.events.scope import ScopedInstruments, scoped_instruments
+from algotrade.services.events.scope import (
+    LIST,
+    REFERENCE,
+    REQUESTED,
+    TIER,
+    ScopedInstruments,
+    scoped_instruments,
+)
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.framework.run import (
     FETCH_ERROR,
@@ -60,6 +69,7 @@ TASK = "bars_history"
 BARS = "bars/1d"
 SPLITS = "events/split"
 DEFAULT_SINCE = date(2018, 1, 1)
+DEFAULT_REASONS = (LIST, REQUESTED, REFERENCE)  # the tier names need Tiingo's Power tier
 DONE = ("OK", "NO_DATA")  # item statuses that need no refetch
 UNKNOWN = "UNKNOWN"
 SPLIT_MISMATCH = "SPLIT_MISMATCH"
@@ -236,14 +246,22 @@ def ingest_bars_history(
     until: date,
     force: bool = False,
     limit: int | None = None,
+    include_tiers: bool = False,
 ) -> RunRecord:
-    """Daily bars of the event-study scope plus ``requested`` symbols from ``since`` to ``until``
-    (``limit``: fetch at most that many names this run; ``force``: also the names an earlier run
-    fetched for the window)."""
+    """Daily bars of the scope list, its funds' references and ``requested`` symbols (plus the
+    tier A / B names with ``include_tiers``) from ``since`` to ``until`` (``limit``: fetch at
+    most that many names this run; ``force``: also the names an earlier run fetched for the
+    window)."""
     if until < since:
         raise ValueError(f"--until {until} is before --since {since}")
     with IngestRun(ctx, TASK, until, resume=True) as run:
-        scope = scoped_instruments(run.reader, ctx.configs, until, requested)
+        scope = scoped_instruments(
+            run.reader,
+            ctx.configs,
+            until,
+            requested,
+            DEFAULT_REASONS + ((TIER,) if include_tiers else ()),
+        )
         names, unknown = names_of(scope), scope.unresolved
         for symbol in unknown:
             run.record_item(

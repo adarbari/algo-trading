@@ -4,6 +4,8 @@ are reported."""
 
 from datetime import date
 
+import pytest
+
 from algotrade.data import StoreReader
 from algotrade.services.events.scope import (
     FUND_REFERENCE,
@@ -94,3 +96,16 @@ def test_an_empty_store_resolves_nothing() -> None:
     found = scoped_instruments(reader, MemoryConfigStore(LIST), D3)
     assert found.names == () and found.reference_snapshot is None
     assert found.unresolved == ("TSLL", "AAA", "NOPE")
+
+
+def test_a_subset_of_reasons_leaves_the_rest_out() -> None:
+    reader, configs = world(tiers={D2: {"BBB": True}}, links={D2: {"TSLL": "TSLA"}})
+    no_tiers = scoped_instruments(reader, configs, D3, reasons=("list", "reference"))
+    assert reasons(no_tiers) == {"TSLL": ("list",), "AAA": ("list",), "TSLA": ("reference",)}
+    assert no_tiers.tier_session is None  # not even read
+    only_tiers = scoped_instruments(reader, configs, D3, ["x"], reasons=("tier",))
+    assert reasons(only_tiers) == {"BBB": ("tier",)} and only_tiers.unresolved == ()
+    listed = scoped_instruments(reader, configs, D3, ["AAA", "ZZZ"], reasons=("requested",))
+    assert reasons(listed) == {"AAA": ("requested",), "ZZZ": ("requested",)}  # the list is out
+    with pytest.raises(ValueError, match="unknown scope reasons"):
+        scoped_instruments(reader, configs, D3, reasons=("tiers",))

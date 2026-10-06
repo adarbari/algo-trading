@@ -217,8 +217,8 @@ def _bars(ctx: TaskContext, p: Params) -> RunRecord:
 
 def _bars_history(ctx: TaskContext, p: Params) -> RunRecord:
     assert ctx.configs is not None  # the scope list is read from the site configs
-    # The scope (tier names, the list, fund references) is resolved by the task through
-    # ``services.events``; --symbols only adds to it.
+    # The scope (the list, fund references, with --include-tiers the tier names) is resolved by
+    # the task through ``services.events``; --symbols only adds to it.
     since = p.get("since") or bars_history.DEFAULT_SINCE
     return bars_history.ingest_bars_history(
         ctx,
@@ -228,6 +228,7 @@ def _bars_history(ctx: TaskContext, p: Params) -> RunRecord:
         p.get("until") or session_of(p),
         bool(p.get("force")),
         p.get("limit"),
+        bool(p.get("include_tiers")),
     )
 
 
@@ -526,8 +527,8 @@ TASKS: dict[str, Task] = {
         ),
         Task(
             "bars-history",
-            "unadjusted daily bars from Tiingo since 2018 for the event-study names "
-            "(resumable backfill: 50 requests an hour on the free tier)",
+            "unadjusted daily bars from Tiingo since 2018 for the scope list and its funds' "
+            "references (resumable backfill: 50 requests an hour on the free tier)",
             bars_history,
             ("bars/1d",),
             _bars_history,
@@ -540,6 +541,12 @@ TASKS: dict[str, Task] = {
                 Param("symbols", ("--symbols",), str, "tickers on top of the scope list"),
                 Param("limit", ("--limit",), int, "fetch at most N names this run"),
                 Param("force", ("--force",), None, "also names already fetched for the window"),
+                Param(
+                    "include_tiers",
+                    ("--include-tiers",),
+                    None,
+                    "also the tier A / B short-put names (hundreds: needs Tiingo's Power tier)",
+                ),
             ),
         ),
         Task(
