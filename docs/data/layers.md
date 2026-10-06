@@ -239,7 +239,8 @@ range; every feature is listed in the generated **[feature catalogue](features.m
 (`make features-doc`).
 
 - **Declaration** (`features/framework/declaration.py`, `FeatureGroup`): name, version, inputs
-  (each a table plus a lookback in exchange sessions, required or optional), params (a frozen
+  (each a table plus a lookback in exchange sessions, required or optional; or only some of its
+  instruments, `ids` / `symbols`, or fixed date `windows` for a history years back, ADR 0047), params (a frozen
   dataclass of defaults, or none), its `FEATURES` (`features/framework/feature.py`: one
   `Feature` per output column, in stored order), and a pure
   `compute(inputs, session, params) -> frame`. Groups live in
@@ -317,6 +318,7 @@ readable until `algotrade-ingest retire-features --group <name>@v1` deletes them
 | `option_liquidity@v1` | `liq_status`, put/call tiers, target expiry + DTE, short strike, spreads, zone OI / volume, chain OI / volume, `underlying_price`, `iv30`, `stock_volume`, `chain_asof` (date) | the session's `chains/status` (required), `chains/option_quotes`, `chains/underlying_quotes` | built |
 | `price_stats@v2` | `close`, `sma_20/50/200`, `ret_20d/60d`, `high_52w`, `low_52w`, `hv20`, `hv30` (close-to-close), `hv20_yz` (Yang-Zhang), `adv_usd_20d`, `history_days` | `bars/1d` split-adjusted as of the session (not total return), 252 sessions back | built |
 | `price_history@v1` | `bar_status` (TRADED / NO_TRADE), `last_bar_session`, `range_sessions`, `range_status` (FULL / SINCE_LISTING / NEW_LISTING / FEW_BARS / NO_HISTORY), `high_avail`, `low_avail` | `bars/1d` split-adjusted as of the session, 252 + 60 sessions back; params in `config/site/rollups.toml` | built |
+| `episode_behaviour@v1` | `beta_252d`, `corr_252d` (log returns on SPY's), `dd_<episode>` and `recovery_sessions_<episode>` for `covid_2020`, `hikes_2022`, `tariffs_2025` (ADR 0047) | `bars/1d` split-adjusted, 252 sessions back; `instruments/symbol_ids` (SPY's id); `bars/1d#windows`: each episode's own closes from 5 sessions before its peak to 400 after its trough (`Input.windows`) | built |
 | `earnings@v1` | `next_earnings_date`, `earnings_time` (pre / post / unknown), `days_to_earnings` (sessions), `date_confirmed` (null: the source does not say), `last_earnings_date` | every `events/earnings` snapshot stored on or before the session | built |
 | `earnings_schedule@v1` | `next_status` (SCHEDULED / NOT_ANNOUNCED): the status of `earnings@v1`'s next-report features (ADR 0046) | `events/earnings`, through `earnings@v1`'s compute (same rows) | built |
 | `dividends@v2` | `div_ttm`, `div_count_ttm`, `last_ex_date` | `events/dividend`, `events/split` (by event date), `price_stats@v2` | built |
@@ -404,6 +406,15 @@ basis). `hv20` / `hv30` are close-to-close: the sample stdev of the last 20 / 30
 x sqrt(252); IBKR's own historical volatility uses another estimator and differs. Both are
 checked against recorded IBKR data by the reconciliation suite (`docs/testing.md`).
 The windows named in the columns are part of the definition (changing one is a new version).
+
+**`episode_behaviour@v1` rules (ADR 0047).** The episode dates are code constants checked against
+`config/site/regime/episodes.toml`; a column is null before the episode's trough (`known_from`), and
+for an instrument with under 80% of the sessions from peak to trough on file. The drawdown is
+the worst close-to-close fall from the instrument's own running high (it starts 5 sessions
+before the peak); recovery counts the sessions from the trough until a close regains the
+pre-episode high, and is null until it does (or beyond 400 sessions). Each episode reads only its
+own window of closes (`Input.windows`, one split adjustment per window), never the years in
+between; the nightly recomputes the settled columns, as a group has no cadence of its own.
 
 **`dividends@v2` rules.** `div_ttm` sums cash dividends with ex-date in (session - 365 days,
 session], each divided by the ratio of every split after its ex-date up to the session, so it

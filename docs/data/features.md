@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-236 stored features in 24 groups, in dependency order; 46 expression features.
+244 stored features in 25 groups, in dependency order; 46 expression features.
 
 ## `option_liquidity@v1`
 
@@ -172,6 +172,21 @@ VWAP anchored to the last earnings report (from the reaction session through the
 |---|---|---|---|---|---|---|---|---|
 | `avwap_earnings` | window | float32 | usd_per_share | open | >= 0 | Volume-weighted average of the typical price (high + low + close) / 3 from the last earnings anchor session through the session (the anchor: the report date, or the next session for a report after the close) | no report known on the session anchors on or before it within the last 126 sessions (no earlier report stored, or the last one is older); or fewer than 2 sessions from the anchor through the session, a session in that range without a bar, or no volume in it | `events/earnings.ts`, `events/earnings.time`, `bars/1d.high`, `bars/1d.low`, `bars/1d.close`, `bars/1d.volume` |
 | `avwap_anchor_date` | window | date | date | open |  | The session avwap_earnings is anchored on: the last report date (pre-market or unknown time) or the session after it (after the close) | no report known on the session anchors on or before it within the last 126 sessions (no earlier report stored, or the last one is older) | `events/earnings.ts`, `events/earnings.time` |
+
+## `episode_behaviour@v1`
+
+Beta and correlation against SPY, and each reference episode's drawdown and recovery. Stored as `rollups/instrument/episode_behaviour@v1`; reads `bars/1d`, `instruments/symbol_ids` (optional), `bars/1d#windows` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `beta_252d` | window | float32 | ratio | open | -10 .. 10 | OLS beta of the daily log returns on SPY's over the trailing 252 sessions | SPY is not in the reference or has no bars, or fewer than 200 of the last 252 sessions have a return for both (a gap, a young listing) | `bars/1d.close`, `instruments/symbol_ids.symbol` |
+| `corr_252d` | window | float32 | ratio | open | -1 .. 1 | Correlation of the daily log returns with SPY's over the trailing 252 sessions | SPY is not in the reference or has no bars, or fewer than 200 of the last 252 sessions have a return for both (a gap, a young listing) | `bars/1d.close`, `instruments/symbol_ids.symbol` |
+| `dd_covid_2020` | window | float32 | decimal | open | -1 .. 0 | The worst close-to-close fall from the instrument's own high in the covid_2020 episode (2020-02-19 to 2020-03-23), negative | the session is before the covid_2020 trough (2020-03-23: the earliest it is known), the instrument has fewer than 80% of the sessions from the peak (2020-02-19) to the trough on file, or the stored bars do not reach the episode | `bars/1d.close` |
+| `dd_hikes_2022` | window | float32 | decimal | open | -1 .. 0 | The worst close-to-close fall from the instrument's own high in the hikes_2022 episode (2022-01-03 to 2022-10-12), negative | the session is before the hikes_2022 trough (2022-10-12: the earliest it is known), the instrument has fewer than 80% of the sessions from the peak (2022-01-03) to the trough on file, or the stored bars do not reach the episode | `bars/1d.close` |
+| `dd_tariffs_2025` | window | float32 | decimal | open | -1 .. 0 | The worst close-to-close fall from the instrument's own high in the tariffs_2025 episode (2025-02-19 to 2025-04-08), negative | the session is before the tariffs_2025 trough (2025-04-08: the earliest it is known), the instrument has fewer than 80% of the sessions from the peak (2025-02-19) to the trough on file, or the stored bars do not reach the episode | `bars/1d.close` |
+| `recovery_sessions_covid_2020` | window | int | sessions | open | >= 0 | Sessions from the 2020-03-23 trough until the close first regained the pre-episode high (covid_2020) | the close has not yet regained the pre-episode high, or not within 400 sessions of the trough (not recovered: not a failure to compute), or the session is before the covid_2020 trough (2020-03-23: the earliest it is known), the instrument has fewer than 80% of the sessions from the peak (2020-02-19) to the trough on file, or the stored bars do not reach the episode | `bars/1d.close` |
+| `recovery_sessions_hikes_2022` | window | int | sessions | open | >= 0 | Sessions from the 2022-10-12 trough until the close first regained the pre-episode high (hikes_2022) | the close has not yet regained the pre-episode high, or not within 400 sessions of the trough (not recovered: not a failure to compute), or the session is before the hikes_2022 trough (2022-10-12: the earliest it is known), the instrument has fewer than 80% of the sessions from the peak (2022-01-03) to the trough on file, or the stored bars do not reach the episode | `bars/1d.close` |
+| `recovery_sessions_tariffs_2025` | window | int | sessions | open | >= 0 | Sessions from the 2025-04-08 trough until the close first regained the pre-episode high (tariffs_2025) | the close has not yet regained the pre-episode high, or not within 400 sessions of the trough (not recovered: not a failure to compute), or the session is before the tariffs_2025 trough (2025-04-08: the earliest it is known), the instrument has fewer than 80% of the sessions from the peak (2025-02-19) to the trough on file, or the stored bars do not reach the episode | `bars/1d.close` |
 
 ## `oi_walls@v1`
 

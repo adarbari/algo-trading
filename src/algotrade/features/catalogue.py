@@ -68,7 +68,7 @@ def _row(f: Feature, *extra: str) -> str:
 
 
 def _group(g: FeatureGroup, level: str = "##") -> list[str]:
-    inputs = ", ".join(f"`{i.table}`" + ("" if i.required else " (optional)") for i in g.inputs)
+    inputs = ", ".join(f"`{i.key}`" + ("" if i.required else " (optional)") for i in g.inputs)
     lines = [
         f"{level} `{g.key}`",
         "",

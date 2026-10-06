@@ -16,13 +16,16 @@ lookback window split-adjusted as of that session (never by a later split).
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
+from typing import Any
 
 import numpy as np
 import pandas as pd
+from pandas.api.types import union_categoricals
 
 from algotrade.core.model.errors import ConfigurationError, MissingDataError
 from algotrade.core.model.fields import REFERENCE_TABLE
 from algotrade.core.model.instruments import Instrument
+from algotrade.core.time.calendar import sessions_between
 from algotrade.core.views.series import FIELDS, PriceSeries, align
 from algotrade.data.events import read_events
 from algotrade.data.reference import REFERENCE_HINT, Snapshot, instrument_terms, read_snapshot
@@ -36,13 +39,15 @@ def bars(
     end: date,
     instruments: Sequence[str] | None = None,
     as_of: datetime | None = None,
+    columns: Sequence[str] | None = None,
 ) -> pd.DataFrame:
-    """Bars for ``start <= session_date <= end``, sorted by (instrument_id, ts).
+    """Bars for ``start <= session_date <= end``, sorted by (instrument_id, ts). ``columns``:
+    only these (and the key and point-in-time columns) are read: a long window of one price.
 
     Raises ``MissingDataError`` when nothing is stored; backtests never fetch (ADR 0008).
     """
     table = f"bars/{interval}"
-    frame = reader.table_range(table, start, end, as_of, instruments)
+    frame = reader.table_range(table, start, end, as_of, instruments, columns)
     if frame is None:
         hint = f"run the ingestion job that loads {table} for {start}..{end}"
         raise MissingDataError(table, f"no bars between {start} and {end}", hint)
@@ -111,8 +116,10 @@ def adjust_bars(
                 previous_close = close[before][-1]  # unadjusted basis, as the cash amount is
                 if previous_close > amount:
                     price_factor[before] *= 1 - amount / previous_close
-    out[_PRICES] = out[_PRICES].to_numpy() * price_factor[:, None]
-    out["volume"] = out["volume"].to_numpy() * volume_factor
+    prices = [c for c in _PRICES if c in out.columns]  # a column-pruned read has fewer
+    out[prices] = out[prices].to_numpy() * price_factor[:, None]
+    if "volume" in out.columns:
+        out["volume"] = out["volume"].to_numpy() * volume_factor
     return out
 
 
@@ -222,8 +229,10 @@ class SessionBars:
             rows = self._rows[str(iid)]
             factor[rows[(rows >= lo) & (rows < hi)] - lo] *= ratio
         out = out.copy()
-        out[_PRICES] = out[_PRICES].to_numpy() * factor[:, None]
-        out["volume"] = out["volume"].to_numpy() / factor
+        prices = [c for c in _PRICES if c in out.columns]
+        out[prices] = out[prices].to_numpy() * factor[:, None]
+        if "volume" in out.columns:
+            out["volume"] = out["volume"].to_numpy() / factor
         return out
 
 
@@ -233,14 +242,17 @@ def session_bars(
     end: date,
     instruments: Sequence[str] | None = None,
     as_of: datetime | None = None,
+    columns: Sequence[str] | None = None,
 ) -> SessionBars:
     """Daily bars for ``start..end`` (split events in the range applied) as ``SessionBars``.
+    ``columns``: only those of ``open high low close volume`` are read and kept.
 
     Raises ``MissingDataError`` when no bars are stored in the range."""
-    frame = bars(reader, "1d", start, end, instruments, as_of)
+    frame = bars(reader, "1d", start, end, instruments, as_of, columns)
     splits = read_events(reader, "events/split", start, end, instruments, as_of).frame
     no_dividends = pd.DataFrame(columns=["instrument_id", "ts", "cash_amount"])
-    frame = adjust_bars(frame, splits, no_dividends, "splits")[_WINDOW_COLUMNS]
+    frame = adjust_bars(frame, splits, no_dividends, "splits")
+    frame = frame[[c for c in _WINDOW_COLUMNS if c in frame.columns]]
     frame = frame.sort_values(["session_date", "instrument_id"], kind="stable")
     frame = frame.reset_index(drop=True)
     table = pd.DataFrame(
@@ -257,3 +269,82 @@ def session_bars(
         days,
         _rows_of(frame["instrument_id"].astype(str), list(table["instrument_id"])),
     )
+
+
+# ------------------------------------------------------------------ fixed windows of closes
+type DateWindow = tuple[date, date]
+WINDOW_PIECE = 60  # sessions read at a time: bounds the raw (uncompacted) frame in memory
+
+
+def window_closes(
+    reader: StoreReader,
+    windows: Sequence[DateWindow],
+    through: date,
+    instruments: Sequence[str] | None = None,
+) -> pd.DataFrame:
+    """Closes of fixed ``(first, last)`` windows up to ``through``: columns ``window`` (the index
+    into ``windows``, int8), ``day`` (datetime64[ns]), ``instrument_id`` (categorical) and
+    ``close`` (float64), sorted by ``day`` so that the rows on or before a session are a prefix.
+
+    Each window is read from ``first`` to the earlier of ``last`` and ``through``, only the close
+    column, ``WINDOW_PIECE`` sessions at a time, each piece kept compact (a categorical id and
+    two numbers per row) before the next is read: years of every instrument are a few hundred
+    MB, not the GB of the full bars. Splits with an ex-date inside the window are applied to
+    every piece (the later ones are not): all prices of one instrument in a window then share
+    one adjustment, so the ratios a caller takes (drawdown, recovery) do not depend on how far
+    the read went. A window with no stored bars (before the history we hold) has no rows.
+    ``instruments``: only these (dropped after each piece is read: the rest never stays in memory).
+    """
+    days_of: list[np.ndarray] = []  # per piece: day, window, close and the id categorical
+    windows_of: list[np.ndarray] = []
+    closes_of: list[np.ndarray] = []
+    ids_of: list[Any] = []
+    no_dividends = pd.DataFrame(columns=["instrument_id", "ts", "cash_amount"])
+    for index, (first, last) in enumerate(windows):
+        end = min(last, through)
+        if end < first:
+            continue
+        splits = read_events(reader, "events/split", first, end, instruments).frame
+        days = sessions_between(first, end)
+        for i in range(0, len(days), WINDOW_PIECE):
+            piece = days[i : i + WINDOW_PIECE]
+            try:
+                frame = bars(reader, "1d", piece[0], piece[-1], None, None, ("close",))
+            except MissingDataError:
+                continue
+            frame = adjust_bars(frame, splits, no_dividends, "splits")
+            ids = pd.Categorical(frame["instrument_id"].astype(str))
+            wanted = np.ones(len(ids), dtype=bool)
+            if instruments is not None:  # on the categories (a few thousand), not on every row
+                wanted = ids.categories.isin(list(instruments))[ids.codes]
+            days_of.append(
+                pd.to_datetime(frame["session_date"]).to_numpy(dtype="datetime64[ns]")[wanted]
+            )
+            windows_of.append(np.full(int(wanted.sum()), index, dtype=np.int8))
+            closes_of.append(frame["close"].to_numpy(dtype=np.float64)[wanted])
+            ids_of.append(ids[wanted].remove_unused_categories())
+    if not days_of:
+        return pd.DataFrame(
+            {
+                "window": np.array([], dtype=np.int8),
+                "day": np.array([], dtype="datetime64[ns]"),
+                "instrument_id": pd.Categorical([]),
+                "close": np.array([], dtype=np.float64),
+            }
+        )
+    day = np.concatenate(days_of)
+    days_of.clear()
+    # The rows on or before a session must be a prefix. Windows in date order, as given, already
+    # are; otherwise (overlapping or unordered windows) pay for a stable sort.
+    order = None if bool(np.all(day[1:] >= day[:-1])) else np.argsort(day, kind="stable")
+    day = day if order is None else day[order]
+    ids_all = union_categoricals(ids_of)  # one category set, codes kept
+    ids_of.clear()
+    window = np.concatenate(windows_of)
+    windows_of.clear()
+    close = np.concatenate(closes_of)  # a column at a time: the pieces are freed as used
+    closes_of.clear()
+    if order is not None:
+        ids_all, window, close = ids_all[order], window[order], close[order]
+    columns = {"window": window, "day": day, "instrument_id": ids_all, "close": close}
+    return pd.DataFrame(columns, copy=False)
