@@ -99,7 +99,7 @@ Every folder under `apps/web` is declared in `architecture/layout.toml` (`[[web_
 `kind` = layer / slice / segment / component / screenshots); an undeclared folder fails
 `tests/architecture/test_layout_web.py`. Owners of web responsibilities (styling, tokens, HTTP,
 data access, routing, workspace access, env) are `[[web_responsibility]]` entries in
-`architecture/ownership.toml`.
+`architecture/web_ownership.toml`.
 
 ## Commands (in `apps/web`, Node 24 + npm)
 
