@@ -214,6 +214,32 @@ def test_web_build_is_checked_only_when_set(tmp_path: Path) -> None:
     assert found.level == "ok"
 
 
+def test_a_wrong_llm_toml_is_a_warning_with_the_message(tmp_path: Path) -> None:
+    ok = doctor.check_llm(probes(tmp_path, {}, main=lambda: tmp_path))
+    assert ok.level == "ok"
+    bad = doctor.check_llm(
+        probes(
+            tmp_path,
+            {},
+            main=lambda: tmp_path,
+            llm_error=lambda main: "llm.toml: unknown keys ['request_']",
+        )
+    )
+    assert bad.level == doctor.WARN and "unknown keys" in bad.detail and "llm.toml" in bad.fix
+
+
+def test_llm_error_reads_the_main_checkouts_file(tmp_path: Path) -> None:
+    assert doctor.llm_error(tmp_path) is None  # no file: drafting is simply off
+    site = tmp_path / "config" / "site"
+    site.mkdir(parents=True)
+    (site / "llm.toml").write_text('enabled = false\n[request]\nreasoning_effort = "low"\n')
+    assert doctor.llm_error(tmp_path) is None
+    (site / "llm.toml").write_text("[request]\nmodel = 'x'\n")
+    assert "the adapter sets" in (doctor.llm_error(tmp_path) or "")
+    (site / "llm.toml").write_text("enabled = \n")
+    assert "llm.toml" in (doctor.llm_error(tmp_path) or "")
+
+
 def _agent(agents: Path, label: str, repo: Path, program: str) -> None:
     agents.mkdir(exist_ok=True)
     plist = {"Label": label, "ProgramArguments": [program], "WorkingDirectory": str(repo)}

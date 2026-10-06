@@ -41,8 +41,7 @@ class ChatCompletions:
 
     def request(self, system: str, user: str) -> dict[str, Any]:
         """The body sent (stable key order: a provider's prompt cache sees the same bytes)."""
-        return {
-            **self.extra,
+        body: dict[str, Any] = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": system},
@@ -52,6 +51,8 @@ class ChatCompletions:
             "max_tokens": self.max_tokens,
             "response_format": {"type": "json_object"},
         }
+        # The configured extras follow the standard keys and never replace them.
+        return body | {k: v for k, v in self.extra.items() if k not in body}
 
     def complete(self, system: str, user: str) -> str:
         body = json.dumps(self.request(system, user), separators=(",", ":")).encode()

@@ -6,6 +6,7 @@ hint on thresholds, listed in the prompt after the catalogue)."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -27,8 +28,8 @@ class LlmSettings:
     model that thinks first, Gemini 3.x, spends thinking tokens from the same budget: ~2,000);
     ``retries`` how many times a busy provider (429, 5xx) or a dropped connection is retried
     before "drafting unavailable" (0: never); ``request`` extra fields sent with every request
-    as given (``[request] reasoning_effort = "low"`` tells Gemini to think briefly), never the
-    ones the adapter sets."""
+    as given (``[request] reasoning_effort = "low"`` tells Gemini to think briefly): strings,
+    numbers and booleans only, never the ones the adapter sets; read-only."""
 
     enabled: bool = False
     base_url: str = "http://localhost:11434/v1"  # Ollama's default: nothing leaves the machine
@@ -36,7 +37,7 @@ class LlmSettings:
     timeout_s: float = 60.0
     answer_limit: int = 8000
     retries: int = 2
-    request: Mapping[str, Any] = field(default_factory=dict)
+    request: Mapping[str, str | float | bool] = field(default_factory=lambda: MappingProxyType({}))
 
     @classmethod
     def from_document(cls, doc: Mapping[str, Any] | None) -> "LlmSettings":
@@ -56,16 +57,21 @@ class LlmSettings:
         )
 
 
-def _request(t: Table) -> dict[str, Any]:
+def _request(t: Table) -> Mapping[str, str | float | bool]:
     raw = t.raw("request")
     if raw is None:
-        return {}
+        return MappingProxyType({})
     if not isinstance(raw, Mapping):
         raise ConfigurationError(f"{t.where} request: expected a table ([request])")
     reserved = sorted(set(raw) & set(RESERVED_REQUEST_KEYS))
     if reserved:
         raise ConfigurationError(f"{t.where} [request]: the adapter sets {reserved}; remove them")
-    return dict(raw)
+    for key, value in raw.items():
+        if not isinstance(value, str | int | float | bool):
+            raise ConfigurationError(
+                f"{t.where} [request] {key}: expected a string, number or boolean, got {value!r}"
+            )
+    return MappingProxyType(dict(raw))
 
 
 def _endpoint(url: str, where: str) -> str:

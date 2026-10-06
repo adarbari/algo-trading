@@ -18,7 +18,9 @@ answer_limit = 8000              # tokens for the answer AND the model's thinkin
 retries = 2                      # a busy provider (429, 5xx: Gemini's "high demand") or a dropped
                                  # connection is retried this many times, pausing 3 s then 6 s
 
-# Extra fields sent with every request as given (the adapter's own keys are refused): for
-# Gemini 3.x, a short think leaves the answer budget for the draft and answers faster.
+# [request]: extra fields sent with every request as given (strings, numbers and booleans only;
+# `model`, `messages`, `temperature`, `max_tokens` and `response_format` are refused: the
+# adapter sets them). Gemini 3.x thinks before it answers: `reasoning_effort = "low"` keeps that
+# short, which leaves the answer budget for the draft and answers faster.
 # [request]
 # reasoning_effort = "low"
