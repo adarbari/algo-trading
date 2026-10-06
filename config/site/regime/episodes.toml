@@ -1,5 +1,5 @@
 # The twelve S&P 500 drawdowns of 19% or more (closing basis) since 1970: the regime track's
-# reference episodes (docs/market-regime-plan.md section 2; ADR 0046).
+# reference episodes (docs/market-regime-plan.md section 2; ADR 0047).
 #
 # Dates are re-derived by the Pagan-Sossounov dating in RG3 (quant/turning_points.py) from
 # index history; these are the reference values that dating is checked against.

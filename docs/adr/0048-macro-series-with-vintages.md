@@ -1,10 +1,10 @@
-# ADR 0047: Macro series with vintages
+# ADR 0048: Macro series with vintages
 
 **Status:** accepted (2026-10-06; architect design for the market regime track,
 [market-regime-plan.md](../market-regime-plan.md)). Extends [0007](0007-point-in-time-data.md)
 (a vintage is not the storage stamp), [0012](0012-data-vendors.md) (free sources first) and
 [0039](0039-ingestion-workflows-dependencies-and-acceptance.md) (a non-critical step). Index
-levels stored here are named under [0046](0046-market-entity-features-and-non-tradable-ids.md).
+levels stored here are named under [0047](0047-market-entity-features-and-non-tradable-ids.md).
 
 ## Context
 Recession-risk signals (yield curve history, credit spreads, claims, unemployment, NFCI, lending

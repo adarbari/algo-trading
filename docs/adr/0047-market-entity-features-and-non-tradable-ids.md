@@ -1,9 +1,9 @@
-# ADR 0046: Market-entity features and non-tradable id namespaces
+# ADR 0047: Market-entity features and non-tradable id namespaces
 
 **Status:** accepted (2026-10-06; architect design for the market regime track,
 [market-regime-plan.md](../market-regime-plan.md)). Amends [0009](0009-generic-instrument-model.md)
 (non-tradable id namespaces) and [0023](0023-feature-store.md) (`FeatureGroup.entity`, market
-groups). Indices are stored as series under [0047](0047-macro-series-with-vintages.md).
+groups). Indices are stored as series under [0048](0048-macro-series-with-vintages.md).
 
 ## Context
 Every stored feature is keyed by `instrument_id`. The regime track needs facts about the whole
@@ -39,7 +39,7 @@ site / user, so the new axis cannot be called `scope`.
 6. **Index levels are series, not bars.** `bars/1d` uses snapshot runs (a separate index run
    would replace the session's equity bars on read) and the `bars` task skips stored dates (1970-
    2024 partitions would block equity backfills), so index levels live in `macro/series` (ADR
-   0047, `kind = "index"`); index trend comes from the market `trend` group through `quant`.
+   0048, `kind = "index"`); index trend comes from the market `trend` group through `quant`.
 7. **Nightly.** `compute_rollups(..., entity=...)` and a registered task `market-rollups`,
    `Step("market-rollups", needs=("rollups",), critical=False)` before the screens: a bug in a
    market group never holds back the screens (ADR 0039).

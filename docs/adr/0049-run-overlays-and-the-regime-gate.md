@@ -1,10 +1,10 @@
-# ADR 0048: Run overlays and the regime gate
+# ADR 0049: Run overlays and the regime gate
 
 **Status:** accepted (2026-10-06; architect design for the market regime track,
 [market-regime-plan.md](../market-regime-plan.md)). Extends [0008](0008-backtests-read-only-from-stores.md)
 (a missing market value is an error), [0015](0015-configs-selections-users.md) (the `[regime]`
 config layers and is hashed) and [0029](0029-rule-screener.md) (a new screener decision). Reads
-market features from [0046](0046-market-entity-features-and-non-tradable-ids.md).
+market features from [0047](0047-market-entity-features-and-non-tradable-ids.md).
 
 ## Context
 The regime track stores a label (`regime@v1`: CALM, CAUTION, STRESS, CRISIS) per session. Its use

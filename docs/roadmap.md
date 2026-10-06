@@ -8,7 +8,7 @@ The pickup list a fresh session reads first. A PR that opens or closes an item u
 - Nothing long-running. IBKR IV history backfill finished 2026-10-05 05:30 (all 4,200 names: 4,197 OK, 3 genuine NO_DATA; `ibkr_iv@v1` rollups over 502 sessions, rank FULL for 4,789 of 5,415 names on 2026-10-02).
 
 **Next**
-- **Market regime (RG, ADRs 0046-0048):** RG0 done (ADRs, reference config); next RG1a and RG2a in parallel ([RG section](#market-regime-rg-recession-risk-and-market-stress-as-features-a-regime-gate-for-sizing-adrs-0046-0048); plan [market-regime-plan.md](market-regime-plan.md)).
+- **Market regime (RG, ADRs 0047-0049):** RG0 done (ADRs, reference config); next RG1a and RG2a in parallel ([RG section](#market-regime-rg-recession-risk-and-market-stress-as-features-a-regime-gate-for-sizing-adrs-0047-0049); plan [market-regime-plan.md](market-regime-plan.md)).
 - **Workflows (WF, ADR 0039):** WF1-WF3 done; next WF3b, then WF4 ([WF section](#workflows-wf-dependencies-succeed-or-fail-cadence-adr-0039)). **Owner action first:** Massive returned 403 for the 2026-10-05 bars and that nightly finished PARTIAL, so nothing retries it: once Massive serves the day run `algotrade-ingest bars --date 2026-10-05 --wait`, then `rollups --date 2026-10-05 --wait`, then the 2026-10-05 screens (until then lookback rollups from 2026-10-06 compute over the gap).
 - ETF holdings (ADR 0035, accepted): after merge run `algotrade-ingest etf-holdings` once (reads the ~1,140 covered funds, plus the non-optionable N-PORT funds with a 20-session dollar volume of $5M or more, up to ~900 (`fallback_scope = "liquid"`, `fallback_min_adv_usd`): about 1.5 hours per 1,140, extrapolated from the sample, mostly SEC header lookups; or let the nightly fill it, 200 funds a night, 6 weekday nights), ProShares funds (173, the VIX funds UVXY / SVXY / VIXY and the leveraged and inverse ones) are read from their daily file by the same run (weights are shares of gross exposure, ADR 0035), then the Overview tab renders `<HoldingsPanel symbol onSelectSymbol>` (`widgets/holdings-panel`) for ETFs.
 - ETF descriptions for funds with no SEC prospectus objective: SPY, DIA, GLD, SLV, USO, IBIT, SOXL and the like (unit trusts, commodity and crypto trusts, some leveraged funds); 246 of the 1,464 ETFs trading $5M or more a day have none (2026-10-05). The SEC series match closes 83 of them; the rest need issuer pages (iShares and State Street page text for IBIT, SLV, SPY, DIA; ProShares and Direxion 497K or pages for SOXL, TSLL, UVXY) and an ADR.
@@ -136,9 +136,9 @@ catalogue of every feature is [data/features.md](data/features.md).
 | FS5 | Features by name for group features: unique group-independent names, copies become references | next |
 | FS6 | `cross_section` features (ranks, z-scores within the universe or a sector) | later |
 | FS7 | Feature quality: null rates and `valid_range` checks in nightly (out-of-range values reported, never clipped) | later |
-| FS8 | New grains (`market`, `contract`, `sector`) when a feature needs one; market: RG track (ADR 0046) | later |
+| FS8 | New grains (`market`, `contract`, `sector`) when a feature needs one; market: RG track (ADR 0047) | later |
 
-## Market regime (RG): recession risk and market stress as features, a regime gate for sizing (ADRs 0046-0048)
+## Market regime (RG): recession risk and market stress as features, a regime gate for sizing (ADRs 0047-0049)
 
 Plan: [market-regime-plan.md](market-regime-plan.md). Phases 1 and 2 run in parallel; every PR
 branches from `main`. `architect` review after RG1a, RG1d, RG2a, RG3 and RG4. Reference data:
@@ -146,7 +146,7 @@ branches from `main`. `architect` review after RG1a, RG1d, RG2a, RG3 and RG4. Re
 
 | # | Delivers | Status |
 |---|---|---|
-| RG0 | ADRs 0046-0048, this track, `config/site/regime/{episodes,cards}.toml`, the plan doc | **done** |
+| RG0 | ADRs 0047-0049, this track, `config/site/regime/{episodes,cards}.toml`, the plan doc | **done** |
 | RG1a | `FeatureGroup.entity`, the `rollups/market/` table family, `MKT` / `IDX` / `MACRO` ids, `field_source`, inputs `universe` and `instruments/symbol_ids`, catalogue "Market features", the expression entity check (a toy market group: backfilled rows equal nightly rows) | next |
 | RG1b | The `market-rollups` task and its non-critical step before the screens | next |
 | RG1c | Market groups `trend` and `breadth` | next |

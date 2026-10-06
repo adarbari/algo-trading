@@ -1,5 +1,5 @@
 # Plain-language cards for the regime indicators (docs/market-regime-plan.md sections 3 and 5.5;
-# ADR 0046). Reviewed by PR like any site preset; written for someone who does not follow
+# ADR 0047). Reviewed by PR like any site preset; written for someone who does not follow
 # markets. The page shows plain_name and one_liner first, the rest behind "learn more".
 # - key: the indicator's stable key (the feature it describes is named when it exists).
 # - before: what the indicator did before the 2008, 2020 and 2022 falls, one line each.

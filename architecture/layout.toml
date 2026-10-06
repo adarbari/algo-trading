@@ -881,7 +881,7 @@ purpose = "L3 expression features, one <theme>.toml per theme (loaded by config/
 
 [[config_dir]]
 path = "config/site/regime"
-purpose = "regime track reference data: the crash episodes and the plain-language indicator cards (ADR 0046)"
+purpose = "regime track reference data: the crash episodes and the plain-language indicator cards (ADR 0047)"
 
 [[config_dir]]
 path = "config/site/presets"
