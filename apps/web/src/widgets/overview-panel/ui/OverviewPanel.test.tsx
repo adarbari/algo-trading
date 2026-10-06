@@ -6,13 +6,29 @@ import { expectNoA11yViolations, fakeQuery } from '@/shared/lib/testing';
 
 import { OverviewPanel } from './OverviewPanel';
 
-const hooks = vi.hoisted(() => ({ useInstrumentFacts: vi.fn(), useInstrumentEvents: vi.fn() }));
+const hooks = vi.hoisted(() => ({
+  useInstrumentFacts: vi.fn(),
+  useInstrumentEvents: vi.fn(),
+  useRegimeEpisodes: vi.fn(),
+}));
 
 vi.mock('@/entities/instrument', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useInstrumentFacts: hooks.useInstrumentFacts,
   useInstrumentEvents: hooks.useInstrumentEvents,
 }));
+
+vi.mock('@/entities/regime', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useRegimeEpisodes: hooks.useRegimeEpisodes,
+}));
+
+const episode = (key: string, name: string) => ({ key, name });
+const EPISODES = [
+  episode('covid_2020', 'Covid crash, early 2020'),
+  episode('hikes_2022', 'Rate-hike bear market, 2022'),
+  episode('tariffs_2025', 'Tariff shock, spring 2025'),
+];
 
 const info = (format: string, unit: string | null = null) => ({
   format,
@@ -73,6 +89,7 @@ const stock = {
 };
 
 beforeEach(() => {
+  hooks.useRegimeEpisodes.mockReturnValue(fakeQuery({ episodes: EPISODES, recessions: [] }));
   hooks.useInstrumentFacts.mockReturnValue(fakeQuery({ session, instrument: stock }));
   hooks.useInstrumentEvents.mockReturnValue(
     fakeQuery([
@@ -132,6 +149,16 @@ describe('OverviewPanel', () => {
       'KO',
       expect.arrayContaining(['rollup.episode_behaviour@v1.beta_252d']),
     );
+  });
+
+  it('waits for the episode names, and spaces the key of an episode the API does not name', () => {
+    hooks.useRegimeEpisodes.mockReturnValue(fakeQuery(undefined, { isPending: true }));
+    const { unmount } = render(<OverviewPanel symbol="KO" />);
+    expect(screen.queryByText('In rough markets')).not.toBeInTheDocument();
+    unmount();
+    hooks.useRegimeEpisodes.mockReturnValue(fakeQuery({ episodes: [], recessions: [] }));
+    render(<OverviewPanel symbol="KO" />);
+    expect(screen.getByLabelText('In rough markets')).toHaveTextContent('tariffs 2025');
   });
 
   it('reads Unknown with the reason for an episode the session has no partition for', () => {

@@ -10,6 +10,7 @@ from anyio import to_thread
 from strawberry.types import Info
 
 from algotrade.services.read.context import ReadContext
+from algotrade.services.read.regime import episodes as episodes_read
 from algotrade.services.read.regime import history, regime
 from algotrade_api.graphql.types.instruments.feature import Unknown
 from algotrade_api.graphql.types.market.indicator import RegimeIndicator
@@ -131,6 +132,72 @@ class RegimeBand:
 
 
 @strawberry.type(
+    description="One reference market drawdown, with its plain `name`. `recovered`: the "
+    "session the S&P 500 regained its peak, null while the session did not know it yet; "
+    "`recession` / `nberStart` / `nberEnd`: the NBER recession months (first days) it "
+    "overlapped, shown only once NBER had announced them (`kind` reads `shock` until the "
+    "peak is announced; `nberEnd` is null until the trough is). Listed from `knownFrom` "
+    "(its trough)"
+)
+class Episode:
+    key: str
+    name: str
+    kind: str
+    peak: dt.date
+    trough: dt.date
+    recovered: dt.date | None
+    spx_drawdown: float
+    nasdaq_drawdown: float
+    recession: bool
+    nber_start: dt.date | None
+    nber_end: dt.date | None
+    cause: str
+    notes: str
+    known_from: dt.date
+
+    @classmethod
+    def of(cls, d: episodes_read.Episode) -> Self:
+        return cls(
+            key=d.key,
+            name=d.name,
+            kind=d.kind,
+            peak=d.peak,
+            trough=d.trough,
+            recovered=d.recovered,
+            spx_drawdown=d.spx_drawdown,
+            nasdaq_drawdown=d.nasdaq_drawdown,
+            recession=d.recession,
+            nber_start=d.nber_start,
+            nber_end=d.nber_end,
+            cause=d.cause,
+            notes=d.notes,
+            known_from=d.known_from,
+        )
+
+
+@strawberry.type(
+    description="One NBER recession as the session knew it: `start` / `end` are the first "
+    "days of its peak and trough months; `end` is null while the committee had not yet "
+    "dated its end, and the announcement dates are null where none was published or it is "
+    "not past"
+)
+class Recession:
+    start: dt.date
+    end: dt.date | None
+    announced_start: dt.date | None
+    announced_end: dt.date | None
+
+    @classmethod
+    def of(cls, d: episodes_read.Recession) -> Self:
+        return cls(
+            start=d.start,
+            end=d.end,
+            announced_start=d.announced_start,
+            announced_end=d.announced_end,
+        )
+
+
+@strawberry.type(
     description="The market regime for the session, as market weather (`plainLabel`: Clear, "
     "Clouds building, Storm, Severe storm). `label` is UNKNOWN exactly when `unknownReason` "
     "says why (the regime is not computed for the session); `headline` is the sentence under "
@@ -170,3 +237,17 @@ class MarketRegime:
         # Off the event loop: one range read of the label table.
         found = await to_thread.run_sync(history.load_regime_bands, self.ctx, start, end)
         return [RegimeBand.of(b) for b in found]
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The reference drawdowns the session knows (those whose trough has come), "
+        "oldest first"
+    )
+    def episodes(self, info: Info) -> list[Episode]:
+        return [Episode.of(e) for e in episodes_read.load_regime_episodes(self.ctx).episodes]
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The NBER recessions since 1969 the session knows (listed from the day "
+        "the committee dated the peak), oldest first"
+    )
+    def recessions(self, info: Info) -> list[Recession]:
+        return [Recession.of(r) for r in episodes_read.load_regime_episodes(self.ctx).recessions]

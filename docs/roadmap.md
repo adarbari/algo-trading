@@ -162,6 +162,7 @@ branches from `main`. `architect` review after RG1a, RG1d, RG2a, RG3 and RG4. Re
 | RG4 | Overlays (`engines/overlays/`), `Decision.PAUSED`, `[regime]` config, with-versus-without evaluation | **done** (PR 217) |
 | RG5 | The embeddings (Ideas strip and paused section, results header, Explore and Backtests bands) and the full Regime page | **done** except the Backtests page items (its bands, the by-regime split and the with / without toggle: wait for the Backtests page mockup). RG5a: Explore's "In rough markets"; RG5b: `Idea.regime` / `sizeMultiplier`, `Ideas.paused`, `ScreenerRun.paused` / `regime` (`NOT_PICKED` excludes `PAUSED`), `MarketRegime.sizing` per caller, the Size column, "Paused by regime (n)", the results header chip, the Builder gate line; the Admin Users & configs block is the read-only `regime-sizing` widget on the Regime page until that Admin page exists |
 | RG6 | On-demand explanation: the text-model seam (ADR 0041 amended), `services/explaining`, `POST /regime/explain`, its cache | **done** |
+| RG7 follow-up | Storage read path: `ParquetFile` + arrow filter and a bounded executor in `LocalBackend.at`, target under 5 s cold for a 13,500-partition `Market.history` read (about 12 s today on a quiet machine; the 25 s `COLD_CEILING` in `tests/unit/services/read/market/test_performance.py` is a temporary guard, tighten it to 5 s when this lands); needs an `architect` review (the pinned read of one commit sequence) | open |
 
 ## Event sensitivity (EV): what moves a name, and what is coming (ADR 0050)
 
