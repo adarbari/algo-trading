@@ -160,7 +160,7 @@ branches from `main`. `architect` review after RG1a, RG1d, RG2a, RG3 and RG4. Re
 | RG2c | The `macro` task, step and `check_macro`; then a detached backfill | next |
 | RG3 | The macro group; regime expression features (with an `ncdf` built-in for the probit); the regime group; Pagan-Sossounov dating in `quant/turning_points.py`; the episode scorecard in `services/evaluation` | next (RG3a done: `market_macro`, `regime_indicators`, `regime` groups and `regime.toml`; RG3b: probit, dating, scorecard) |
 | RG4 | Overlays (`engines/overlays/`), `Decision.PAUSED`, `[regime]` config, with-versus-without evaluation | next |
-| RG5 | The embeddings (Ideas strip and paused section, results header, Explore and Backtests bands) and the full Regime page | next |
+| RG5 | The embeddings (Ideas strip and paused section, results header, Explore and Backtests bands) and the full Regime page | next (RG5a: Explore's "In rough markets" done; Backtests is still a placeholder page, so its bands and by-regime split wait for the page) |
 | RG6 | On-demand explanation: the text-model seam (ADR 0041 amended), `services/explaining`, `POST /regime/explain`, its cache | **done** |
 
 ## Swing levels and momentum (SW): support, resistance and momentum from daily bars
