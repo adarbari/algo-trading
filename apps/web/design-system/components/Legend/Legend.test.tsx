@@ -21,6 +21,16 @@ describe('Legend', () => {
     expect(items[0]).toHaveTextContent('OK3,624');
   });
 
+  it('draws a hatch swatch as hidden diagonal lines in the tone', () => {
+    const { container } = render(
+      <Legend swatch="hatch" items={[{ label: 'Recession', tone: 'negative' }]} />,
+    );
+    const swatch = container.querySelector('[data-swatch="hatch"]');
+    expect(swatch).toHaveAttribute('data-tone', 'negative');
+    expect(swatch?.querySelector('svg path')).not.toBeNull();
+    expect(screen.getByText('Recession')).toBeInTheDocument();
+  });
+
   it('marks swatches decorative and exposes tone and shape as data attributes', () => {
     const { container } = render(
       <Legend swatch="cell" items={[{ label: 'failed', tone: 'negative' }]} />,

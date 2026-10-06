@@ -14,15 +14,18 @@ export interface ExternalLinkProps {
   href: string;
   /** What the page is ("Chicago Fed NFCI"): the visible text. */
   children: string;
-  /** Smaller text for a dense list (`sm`) or the body size (default). */
-  size?: 'sm' | 'base';
+  /** Smaller text for a dense list (`sm`), the body size (default) or the surrounding text's (`inherit`, inside a sentence). */
+  size?: 'sm' | 'base' | 'inherit';
+  /** Hover text about the page ("Chicago Fed, weekly"). */
+  title?: string;
 }
 
-export function ExternalLink({ href, children, size = 'base' }: ExternalLinkProps) {
+export function ExternalLink({ href, children, size = 'base', title }: ExternalLinkProps) {
   return (
     <a
       className={styles.link}
       data-size={size}
+      title={title}
       href={href}
       target="_blank"
       rel="noopener noreferrer"

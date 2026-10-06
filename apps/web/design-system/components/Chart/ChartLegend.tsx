@@ -2,10 +2,16 @@
  * The chart's key: one line swatch per series (Legend) and, when events are drawn, one marker
  * glyph per event kind with its letter and name, the same shapes the canvas draws (circle,
  * square, arrow), so neither series nor events rely on colour alone; and, with `bandKey`, one
- * tinted cell per distinct shaded band (tone and label).
+ * tinted cell per distinct shaded band (hatched ones with a hatch swatch), and one per distinct
+ * lane segment label (tone and label).
  */
 import { Legend } from '../Legend';
-import { EVENT_KINDS, type ChartEventKind, type PreparedChart } from './chartData';
+import {
+  EVENT_KINDS,
+  type ChartBandTone,
+  type ChartEventKind,
+  type PreparedChart,
+} from './chartData';
 import styles from './Chart.module.css';
 
 function Glyph({ kind }: { kind: ChartEventKind }) {
@@ -22,8 +28,16 @@ export function ChartLegend({ chart, bandKey }: { chart: PreparedChart; bandKey:
   const kinds = (Object.keys(EVENT_KINDS) as ChartEventKind[]).filter((kind) =>
     chart.events.some((e) => e.kind === kind),
   );
-  const bands = chart.bands.filter(
-    (b, i) => chart.bands.findIndex((o) => o.label === b.label && o.tone === b.tone) === i,
+  const distinct = <T extends { tone: ChartBandTone; label: string }>(items: readonly T[]) =>
+    items.filter((b, i) => items.findIndex((o) => o.label === b.label && o.tone === b.tone) === i);
+  const bands = distinct(chart.bands.filter((b) => b.pattern !== 'hatch'));
+  const hatched = distinct(chart.bands.filter((b) => b.pattern === 'hatch'));
+  const states = distinct(
+    chart.lanes.flatMap((lane) =>
+      lane.segments.flatMap((g) =>
+        g.label === undefined ? [] : [{ tone: g.tone, label: g.label }],
+      ),
+    ),
   );
   return (
     <div className={styles.legend}>
@@ -39,6 +53,22 @@ export function ChartLegend({ chart, bandKey }: { chart: PreparedChart; bandKey:
           size="xs"
           label="Shaded periods"
           items={bands.map((b) => ({ id: `${b.tone}-${b.label}`, label: b.label, tone: b.tone }))}
+        />
+      )}
+      {bandKey && hatched.length > 0 && (
+        <Legend
+          swatch="hatch"
+          size="xs"
+          label="Hatched periods"
+          items={hatched.map((b) => ({ id: `${b.tone}-${b.label}`, label: b.label, tone: b.tone }))}
+        />
+      )}
+      {bandKey && states.length > 0 && (
+        <Legend
+          swatch="cell"
+          size="xs"
+          label="Lane states"
+          items={states.map((b) => ({ id: `${b.tone}-${b.label}`, label: b.label, tone: b.tone }))}
         />
       )}
       {kinds.length > 0 && (
