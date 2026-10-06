@@ -234,8 +234,30 @@ id = "instrument-tiers"
 description = "Which underlyings are core (S&P 500, [cboe] priority_symbols, latest liquidity_class HIGH) and which are rest: the one tier rule, recorded in chains/status.tier at fetch time and graded by the chain acceptance check (ADR 0043)"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/market/tiers.py"]
 section = "docs/adr/0019-ownership-and-boundaries.md#guardrails"
-allowed = ["apps/ingestion/algotrade_ingestion/tasks/market/option_chains.py"]  # the chain run loads the tiers it records and orders by
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/market/option_chains.py",  # the chain run loads the tiers it records and orders by
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/coverage.py",  # grades coverage per tier
+]
 detect = [{ call = "Tiers" }, { call = "load_tiers" }]
+
+[[responsibility]]
+id = "feature-applicability"
+description = "Whether a feature applies to an instrument (Feature.applies_to over the reference snapshot's optionable / ETF facts): the one decision behind the read layer's NOT_APPLICABLE and the nightly coverage check (ADR 0042)"
+owner = ["src/algotrade/features/framework/feature.py"]
+allowed = [
+    "src/algotrade/services/read/instruments/features.py",  # NOT_APPLICABLE on a read
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/coverage.py",  # which names a feature is expected for
+]
+section = "docs/adr/0042-not-applicable-and-illiquid-values.md#decision"
+detect = [{ call = "not_applicable" }]
+
+[[responsibility]]
+id = "coverage-acceptance"
+description = "Per key feature and tier, the share of the instruments it applies to (Feature.applies_to) that have a value for the session, graded against [quality.coverage.*] (minimum per tier, day-over-day drop, WARN or FAIL): the acceptance check of the rollups step and a quality check (ADR 0043)"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/maintenance/coverage.py"]
+allowed = ["apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py"]  # run_quality runs it with the other checks
+section = "docs/adr/0043-waiting-on-publication-tiered-and-coverage-acceptance.md#later-prs-under-this-adr-not-in-this-change"
+detect = [{ call = "check_coverage" }]
 
 [[responsibility]]
 id = "ingestion-report"

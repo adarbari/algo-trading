@@ -13,6 +13,7 @@ from algotrade.features.framework.feature import (
     feature_problems,
     in_range,
     is_feature_ref,
+    not_applicable,
     strictest,
 )
 from tests.helpers.rollup_store import features
@@ -129,3 +130,10 @@ def test_a_cross_group_null_status_must_name_a_declared_column() -> None:
     for bad in ("iv30.nope@v1", "ghost.iv30_status@v1", "iv30.iv30_status@v2"):
         with pytest.raises(ConfigurationError, match="not a declared feature column"):
             FeatureSet({"demo@v1": group(bad), "iv30@v1": other}, {}, {})
+
+
+def test_not_applicable_is_decided_from_the_reference_facts() -> None:
+    assert not_applicable(["optionable"], optionable=False, is_etf=False) == "optionable"
+    assert not_applicable(["optionable"], optionable=None, is_etf=False) == ""  # null is not "no"
+    assert not_applicable(["not_etf"], optionable=True, is_etf=True) == "not_etf"
+    assert not_applicable([], optionable=False, is_etf=True) == ""  # applies to any

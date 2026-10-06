@@ -203,7 +203,7 @@ def observe(step: str, checks: Sequence[Any]) -> dict[str, Any] | None:
     if not seen:
         return None
     out: dict[str, Any] = {"published": all(c.status == "PASS" for c in seen)}
-    shares = [c.value for c in seen if getattr(c, "value", None) is not None]
+    shares = [c.data["share"] for c in seen if "share" in c.data]
     if shares:
         out["stale_share"] = round(max(shares), 4)
     return out

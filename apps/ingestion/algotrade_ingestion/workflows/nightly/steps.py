@@ -85,7 +85,9 @@ class StepResult:
     result: Any = None
     reason: str | None = None  # why it FAILED acceptance, was NOT_RUN, SKIPPED or WAIVED
     error: str | None = None  # the exception when it raised
-    checks: list[dict[str, str]] = field(default_factory=list)  # checks that did not PASS
+    checks: list[dict[str, Any]] = field(
+        default_factory=list
+    )  # checks that did not PASS, and those carrying data
     held_by_wait: bool = False  # NOT_RUN only because a need is WAITING (transitively)
     observed: dict[str, Any] | None = None  # what the attempt saw of the source (timing.observe)
     arrival: dict[str, Any] | None = None  # ``observed`` + minutes_after_close, latest session
@@ -115,7 +117,7 @@ class Outcome:
     status: StepStatus
     result: Any = field(default=None)
     reason: str | None = None
-    checks: list[dict[str, str]] = field(default_factory=list)
+    checks: list[dict[str, Any]] = field(default_factory=list)
     observed: dict[str, Any] | None = None
 
 
@@ -125,9 +127,14 @@ def judge(checks: Iterable[Check], result: Any = None, wait: bool = False) -> Ou
     checks = list(checks)
     failed = [c for c in checks if c.status == "FAIL"]
     shown = [
-        {"name": c.name, "status": c.status, "detail": c.detail}
+        {
+            "name": c.name,
+            "status": c.status,
+            "detail": c.detail,
+            **({"data": c.data} if c.data else {}),
+        }
         for c in checks
-        if c.status != "PASS"
+        if c.status != "PASS" or c.data  # a check with figures is kept even when it passes
     ]
     if failed:
         reason = "; ".join(f"{c.name}: {c.detail}" for c in failed)

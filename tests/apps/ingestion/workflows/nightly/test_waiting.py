@@ -239,7 +239,12 @@ def test_a_waiting_run_that_also_finished_sessions_is_still_reported(tmp_path: P
 
 
 def test_an_attempt_records_when_the_source_data_arrived(fake: Callable[..., Calls]) -> None:  # noqa: F811
-    fake(checks={"bars": [NOT_YET], "chains": [Check("chains_stale_core", "PASS", "", value=0.05)]})
+    fake(
+        checks={
+            "bars": [NOT_YET],
+            "chains": [Check("chains_stale_core", "PASS", "", data={"share": 0.05})],
+        }
+    )
     writer = store()
     summary = run_nightly(_ctx(writer, AFTER_CLOSE), Plan([D]))  # type: ignore[arg-type]
     steps = steps_of(summary)

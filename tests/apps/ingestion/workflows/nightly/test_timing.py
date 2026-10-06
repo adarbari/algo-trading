@@ -110,8 +110,8 @@ def test_observe_reads_publication_checks() -> None:
     assert observe("bars", [fresh, Check("bars_count", "PASS", "")]) == {"published": False}
     assert observe("bars", [Check("bars_fresh", "PASS", "")]) == {"published": True}
     stale = [
-        Check("chains_stale_core", "PASS", "", value=0.02),
-        Check("chains_stale_rest", "FAIL", "", pending=True, value=0.53),
+        Check("chains_stale_core", "PASS", "", data={"share": 0.02}),
+        Check("chains_stale_rest", "FAIL", "", pending=True, data={"share": 0.53}),
     ]
     assert observe("chains", stale) == {"published": False, "stale_share": 0.53}
     assert observe("chains", [Check("chains_fetch", "PASS", "")]) is None

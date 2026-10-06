@@ -37,6 +37,7 @@ from algotrade.data.reference import snapshot
 from algotrade.services.jobs import JobContext
 from algotrade_ingestion.tasks.framework.registry import TASKS, run_task, task
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext, utc_now
+from algotrade_ingestion.tasks.maintenance.coverage import check_coverage
 from algotrade_ingestion.tasks.maintenance.quality import (
     check_bars,
     check_bars_resolved,
@@ -130,7 +131,9 @@ NIGHTLY: tuple[Step, ...] = (
     ),
     # Every session (catch-up too), after the market data it reads. A rollup that raises
     # (a gap in a lookback window included) fails the step.
-    Step("rollups", needs=MARKET_DATA, task_complete=True),
+    # Its acceptance is the coverage of the key features by tier (ADR 0043): a FAIL-level breach
+    # (core-tier prices) fails the step and holds the screens back; the rest are warnings.
+    Step("rollups", needs=MARKET_DATA, accept=(check_coverage,), task_complete=True),
     Step(SCREENS, needs=("chains", "rollups"), requires=universe_exists, latest_only=True),
     # Company and ETF descriptions (ADR 0034): after the screens, so the Massive requests
     # (capped per night, ~21 min) do not delay them. Optional.
