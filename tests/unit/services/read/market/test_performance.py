@@ -38,8 +38,8 @@ pytestmark = pytest.mark.slow
 SESSIONS = 13_500
 COLD_TARGET, COLD_CEILING, WARM = 5.0, 25.0, 0.5  # seconds (wall)
 DAY = date(2026, 10, 2)
-TABLE = "rollups/market/regime@v2"
-NAMES = ["market.regime@v2.macro_risk", "market.regime@v2.market_stress"]
+TABLE = "rollups/market/regime@v3"
+NAMES = ["market.regime@v3.macro_risk", "market.regime@v3.market_stress"]
 
 
 def _store(root: Path, n: int) -> ReadContext:

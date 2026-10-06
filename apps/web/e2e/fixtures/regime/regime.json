@@ -6,36 +6,36 @@
       "headline": "Not computed yet",
       "unknownReason": {
         "code": "NO_PARTITION",
-        "detail": "rollups/market/regime@v2 has no partition for 2022-11-23"
+        "detail": "rollups/market/regime@v3 has no partition for 2022-11-23"
       },
       "scores": {
         "macroRisk": {
           "value": null,
           "unknown": {
             "code": "NO_PARTITION",
-            "detail": "rollups/market/regime@v2 has no partition for 2022-11-23"
+            "detail": "rollups/market/regime@v3 has no partition for 2022-11-23"
           },
-          "feature": "market.regime@v2.macro_risk",
-          "coverageFeature": "market.regime@v2.macro_coverage",
+          "feature": "market.regime@v3.macro_risk",
+          "coverageFeature": "market.regime@v3.macro_coverage",
           "threshold": 50.0
         },
         "marketStress": {
           "value": null,
           "unknown": {
             "code": "NO_PARTITION",
-            "detail": "rollups/market/regime@v2 has no partition for 2022-11-23"
+            "detail": "rollups/market/regime@v3 has no partition for 2022-11-23"
           },
-          "feature": "market.regime@v2.market_stress",
-          "coverageFeature": "market.regime@v2.market_coverage",
+          "feature": "market.regime@v3.market_stress",
+          "coverageFeature": "market.regime@v3.market_coverage",
           "threshold": 50.0
         },
         "fragility": {
           "value": null,
           "unknown": {
             "code": "NO_PARTITION",
-            "detail": "rollups/market/regime@v2 has no partition for 2022-11-23"
+            "detail": "rollups/market/regime@v3 has no partition for 2022-11-23"
           },
-          "feature": "market.regime@v2.fragility",
+          "feature": "market.regime@v3.fragility",
           "coverageFeature": null,
           "threshold": null
         }

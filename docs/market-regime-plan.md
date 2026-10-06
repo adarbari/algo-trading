@@ -164,23 +164,29 @@ episodes at monthly resolution.
 Two scores and one label, all stored as **features** so they are documented, versioned and
 point-in-time like everything else (ADR 0023).
 
-- `macro_risk_score@v1` (0-100, weekly): a weighted count of section A and E signals on,
-  weights set on the six recession bears and penalised on 2022-24. Starting weights: curve 20,
-  credit (HY spread or EBP) 20, labour (unemployment trend, Sahm, claims) 20, financial
-  conditions (NFCI) 15, lending standards 10, permits 5, Fed change and inflation 10. The
-  bear-state probit from section E is shown beside it as a second opinion.
+- `macro_risk` (0-100, `regime@v3`): the higher of two tiers, each a weighted count of section
+  A and E signals on its own covered-weight scale (`macro_early`, `macro_confirming`), so either
+  tier alone makes macro risk high. **Early** (35): curve 20 (10y - 3m inverted on at least 21
+  of the last 252 sessions: a month of inversion within the year), permits 5, Fed change 5,
+  inflation 5; the curve alone is 57% of the tier. **Confirming** (65): credit (the HY card,
+  else EBP) 20, labour (unemployment trend 7, Sahm 7, claims 6) 20, NFCI 15, lending standards
+  10. The weights are the plan's starting weights, unchanged; the tiers and the curve's memory
+  (one new parameter, `curve_inverted_days`, the card's own month) were set on the measured
+  leads below (2026-10-06, the owner's 1971-2026 store), not fitted per episode. The bear-state
+  probit from section E is shown beside it as a second opinion.
 - `market_stress_score@v1` (0-100, daily): section B signals plus turbulence and absorption;
   trend 20, vol term structure 20, drawdown 10, breadth 20, leadership and credit ETFs 15,
   turbulence and absorption 15.
 - `fragility_score@v1` (0-100, monthly, context only): valuation (CAPE), credit expansion,
   sector run-ups, margin debt. It never changes the regime label; it changes the text ("a
   fall from here would likely be deep") and the deep-dive links.
-- `regime@v2`: `CALM` (both low), `CAUTION` (macro high, market calm: late cycle), `STRESS`
+- `regime@v3`: `CALM` (both low), `CAUTION` (macro high, market calm: late cycle), `STRESS`
   (market high, macro low: a shock), `CRISIS` (both high). Hysteresis: a regime is left only
   after 5 sessions below its threshold, to cut whipsaw. Both scores are on the covered-weight
   scale (`100 * weight on / weight known`, null when less than half the weight is known), so a
   signal not computable yet (turbulence before three years of bars) neither adds nor dilutes;
-  the unnormalised score stays as `macro_risk_raw` / `market_stress_raw` (`regime@v2`).
+  the unnormalised score stays as `macro_risk_raw` / `market_stress_raw` (`regime@v2`); v3
+  added the two macro tiers (`macro_risk` is their maximum).
 - `regime_size_multiplier@v1`: site default 1.0 / 0.75 / 0.5 / 0.25, user-overridable
   (ADR 0015 layering), plus per-idea-kind rules: short-volatility ideas (the VRP scanner)
   are off in `STRESS` and `CRISIS`; momentum longs halve in `CAUTION`; defined-risk
@@ -191,6 +197,42 @@ twelve episodes with vintage data and reports, per episode, when each score cros
 threshold relative to the peak, and the number of false alarms per decade. Acceptance: the
 macro score is above 50 at least 3 months before each recession bear's peak; the stress score
 is above 50 within 15 sessions of each peak; fewer than one false `CRISIS` per 3 years.
+
+**Measured leads (2026-10-06, `make regime-scorecard` section g).** Each macro signal, per
+recession bear: the first session it was on in the 504 sessions (24 months) before the peak,
+from the peak / the sessions it was on before the peak; "after +N": first on after the peak;
+n/a: not stored that early. Hit: on in the 12 months before a recession bear's peak; alarms:
+runs on outside every episode window (24 months before a recession bear, 3 months before a
+shock, to 6 months after the trough), per year known there. Pre-ALFRED values (EBP, Fed funds,
+claims, NFCI, permits) are today's revised figures, so the early leads are optimistic; the HY
+spread is stored only from 2023 (FRED's three-year window), so credit is the EBP before that.
+
+| signal | tier | 1973 | 1980 | 1990 | 2000 | 2007 | 2020 | hit | alarms / yr | on outside |
+|---|---|---|---|---|---|---|---|---|---|---|
+| curve (21 of 252 inverted) | early | n/a | n/a | -269/270 | after +93 | -297/298 | -172/173 | 3 of 4 | 0.12 | 10% |
+| permits down 20% | early | after +174 | -236/125 | -312/40 | never | -288/289 | never | 3 of 6 | 0.14 | 3% |
+| Fed funds up 200 bp | early | after +15 | -504/379 | -365/125 | never | -504/79 | never | 2 of 6 | 0.18 | 8% |
+| CPI above 4% | early | after +69 | -504/505 | -478/479 | never | -498/108 | never | 2 of 6 | 0.21 | 20% |
+| credit (HY card, else EBP) | confirming | after +380 | after +117 | -294/170 | after +36 | after +67 | never | 1 of 5 | 0.18 | 4% |
+| unemployment trend | confirming | -504/207 | -310/288 | -194/145 | -372/44 | -46/47 | -282/43 | 5 of 6 | 0.60 | 25% |
+| Sahm | confirming | -504/226 | -145/146 | never | after +323 | after +142 | never | 1 of 6 | 0.28 | 18% |
+| claims 15% off the low | confirming | -504/54 | -412/350 | -263/184 | after +106 | -504/29 | -32/5 | 4 of 6 | 0.46 | 11% |
+| NFCI above 0 | confirming | after +18 | -504/505 | -504/333 | -369/20 | -28/19 | never | 3 of 6 | 0.25 | 5% |
+| SLOOS above 20% | confirming | n/a | n/a | -41/42 | -341/61 | after +89 | never | 1 of 4 | 0.25 | 8% |
+
+Why two tiers: the v2 single score crossed 50 only once the confirming signals moved, after
+the peak (0 of 6 recession bears 63 sessions early), and the curve card ("inverted now")
+switched off at the un-inversion that came months before the 1990, 2007 and 2020 peaks. With
+the early tier able to carry the score and the curve remembering a year, macro risk is high
+from 1980 -223, 1990 -269, 2007 -297 and 2020 -172 sessions (4 of 6). 1973 (no curve stored,
+nothing early on before the peak) and 2000 (the curve inverted after the peak, the Fed up only
+175 bp) are out of reach of the stored data. Credit expansion (bank credit up 10%) stays a
+fragility signal: hit 1 of 4, on 14% of the sessions outside the windows. The cost is the
+curve's known false positive: macro high from April 2023 to November 2024 and October 2025 to
+August 2026 (the 2022-24 inversion and 2025's shallow one), which makes two of the four
+2020s stress alarms CRISIS (0.67 per 3 years, under the acceptance line). The stress score is
+unchanged: no single threshold change caught both 2018 (+16) and 2022 (+17) without adding
+alarms (the PR's evidence).
 
 ## 5. Where it goes in the platform
 

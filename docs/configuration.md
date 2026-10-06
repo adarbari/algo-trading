@@ -223,7 +223,7 @@ the config hash records it.
 ```toml
 [regime]
 enabled = false                    # off until the site, a user or a run turns it on
-label = "market.regime@v2.label"   # a market feature field: CALM, CAUTION, STRESS, CRISIS
+label = "market.regime@v3.label"   # a market feature field: CALM, CAUTION, STRESS, CRISIS
 unknown_multiplier = 0.0           # size when the label is null or unknown (fail closed)
 pause_in = []                      # labels in which a screener's picks are PAUSED
 [regime.multipliers]               # size per label, each in [0, 1]

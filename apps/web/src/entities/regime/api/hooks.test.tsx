@@ -109,7 +109,7 @@ describe('useRegimeEpisodes', () => {
 
 describe('useMarketHistory', () => {
   const history = {
-    name: 'market.regime@v2.macro_risk',
+    name: 'market.regime@v3.macro_risk',
     bucketSessions: 5,
     points: [
       { session: '2020-01-02', value: 41 },
@@ -121,7 +121,7 @@ describe('useMarketHistory', () => {
   it('asks the MarketHistory operation with the names, window and point budget', async () => {
     GQL.mockResolvedValue({ market: { history: [history] } });
     const { result } = renderHook(
-      () => useMarketHistory(['market.regime@v2.macro_risk'], '1971-01-01', '2026-10-02', 600),
+      () => useMarketHistory(['market.regime@v3.macro_risk'], '1971-01-01', '2026-10-02', 600),
       { wrapper },
     );
     await waitFor(() => {
@@ -129,7 +129,7 @@ describe('useMarketHistory', () => {
     });
     expect(String(GQL.mock.calls[0]?.[0])).toContain('query MarketHistory');
     expect(GQL.mock.calls[0]?.[1]).toEqual({
-      names: ['market.regime@v2.macro_risk'],
+      names: ['market.regime@v3.macro_risk'],
       start: '1971-01-01',
       end: '2026-10-02',
       points: 600,

@@ -2,7 +2,8 @@
 
 Sections (a) dating agreement, (b) leads per episode, (c) false alarms per decade, (d) the
 plan's acceptance as PASS / FAIL lines, (f) the bear-state probit fit with the params to paste
-into ``config/site/features/regime.toml`` (or "not converged: do not paste"). A section with
+into ``config/site/features/regime.toml`` (or "not converged: do not paste"), (g) each macro
+signal's own leads, hit rate and false alarms. A section with
 nothing stored to read prints ``regime_scorecard.NO_DATA`` and the backfill command instead
 (e): the report never fails for want of data. Numbers are rounded the same way every run, rows
 sorted, so two runs over the same store print the same text.
@@ -170,6 +171,43 @@ def probit_section(result: sc.ProbitResult | None) -> list[str]:
     ]
 
 
+def _lead_cell(cell: tuple[int | None, int] | None) -> str:
+    """``-269/79``: first on 269 sessions before the peak, on 79 of them; ``after +93``."""
+    if cell is None:
+        return "n/a"
+    first, on = cell
+    if first is None:
+        return "never"
+    return f"{first:+d}/{on}" if first <= 0 else f"after {first:+d}"
+
+
+def signal_section(found: Sequence[sc.SignalLead], episodes: Sequence[Episode]) -> list[str]:
+    head = [
+        f"(g) Per-indicator leads: each macro signal (its tier), per episode the first session "
+        f"it was on in the {sc.SEARCH_BEFORE} sessions before the peak, from the peak / the "
+        "sessions it was on before the peak (after +N: first on after the peak, to the "
+        "trough; n/a: unknown throughout)"
+    ]
+    if not found:
+        return head + _no_data()
+    lines = list(head)
+    for kind in ("recession", "shock"):
+        keys = [e.key for e in episodes if e.kind == kind and e.key in found[0].episodes]
+        rows = [[f.signal, f.tier, *(_lead_cell(f.episodes[k]) for k in keys)]
+                for f in found]  # fmt: skip
+        lines += _table(["signal", "tier", *keys], rows) if keys else []
+    lines.append(
+        f"    hit: on in the {sc.HIT_BEFORE} sessions before a recession bear's peak; alarms: "
+        f"runs on outside every window ({sc.SEARCH_BEFORE} sessions before a recession bear's "
+        f"peak, {sc.WINDOW_BEFORE} before a shock's, to {sc.WINDOW_AFTER} after the trough; "
+        f"back on within {sc.MERGE_GAP} sessions is the same run), per year known there"
+    )
+    rows = [[f.signal, f.tier, f"{f.hits} of {f.graded}", str(f.alarms), f"{f.years:.1f}",
+             f"{f.alarms / f.years:.2f}" if f.years else "-", f"{f.share:.0%}"]
+            for f in found]  # fmt: skip
+    return lines + _table(["signal", "tier", "hit", "alarms", "years", "per year", "on"], rows)
+
+
 def render(history: History, episodes: Sequence[Episode], revised: Collection[str]) -> str:
     """The whole scorecard. ``revised``: the instrument ids of the revised series (ALFRED
     vintages, or ``revised = true`` in the registry), whose ``lagged`` values in an episode
@@ -182,6 +220,7 @@ def render(history: History, episodes: Sequence[Episode], revised: Collection[st
         alarms_section(alarms),
         acceptance_section(found, alarms),
         probit_section(sc.fit_probit(history)),
+        signal_section(sc.signal_leads(history, episodes), episodes),
     )
     lines = [TITLE, "=" * len(TITLE)]
     for section in sections:

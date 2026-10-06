@@ -1,7 +1,7 @@
 """Scale target weights by a market label (ADR 0049): ``ScaleByLabel``.
 
 The regime overlay: every weight is multiplied by the multiplier of the session's label
-(``market.regime@v2.label``: CALM 1.0, CAUTION 0.75, STRESS 0.5, CRISIS 0.25 by default). A
+(``market.regime@v3.label``: CALM 1.0, CAUTION 0.75, STRESS 0.5, CRISIS 0.25 by default). A
 label in ``pause_in`` scales to 0. An unknown label (null, or a value with no multiplier) fails
 closed: ``unknown_multiplier`` (0.0 by default), never the CALM multiplier. A name the session's
 values do not carry at all is a ``MissingDataError`` (ADR 0008): the run did not load it.

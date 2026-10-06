@@ -53,26 +53,26 @@ const history = (name: string, extra: Partial<SeriesHistory>): SeriesHistory => 
   ...extra,
 });
 const HISTORIES = [
-  history('market.regime@v2.macro_risk', {
+  history('market.regime@v3.macro_risk', {
     points: [
       { session: '2008-09-05', value: 40 },
       { session: '2008-10-03', value: 71 },
     ],
   }),
-  history('market.regime@v2.market_stress', {
+  history('market.regime@v3.market_stress', {
     points: [
       { session: '2008-09-05', value: null },
       { session: '2008-10-03', value: 88 },
     ],
   }),
-  history('market.regime@v2.label', {
+  history('market.regime@v3.label', {
     bucketSessions: 1,
     segments: [
       { start: '2008-09-05', end: '2008-09-30', value: 'CAUTION' },
       { start: '2008-10-01', end: '2008-10-03', value: 'CRISIS' },
     ],
   }),
-  history('market.regime@v2.market_coverage', {
+  history('market.regime@v3.market_coverage', {
     points: [
       { session: '2008-09-05', value: 0.4 },
       { session: '2008-10-03', value: 1 },
@@ -108,10 +108,10 @@ describe('RegimeCycles', () => {
     render(<RegimeCycles />);
     expect(hooks.useMarketHistory).toHaveBeenCalledWith(
       [
-        'market.regime@v2.macro_risk',
-        'market.regime@v2.market_stress',
-        'market.regime@v2.label',
-        'market.regime@v2.market_coverage',
+        'market.regime@v3.macro_risk',
+        'market.regime@v3.market_stress',
+        'market.regime@v3.label',
+        'market.regime@v3.market_coverage',
       ],
       '1971-01-01',
       '2026-10-02',

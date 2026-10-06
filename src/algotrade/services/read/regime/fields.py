@@ -3,8 +3,9 @@ read of them: each name is a ``market.<group>@v<N>.<column>`` field of the marke
 row for exactly ``ctx.session``, or ``Unknown(NOT_IN_CATALOGUE)`` while its group does not exist
 yet (the regime is UNKNOWN until RG3 writes it, never an error and never an older partition).
 
-``market.regime@v2``: ``label`` (CALM, CAUTION, STRESS, CRISIS), and the scores ``macro_risk``,
-``market_stress`` and ``fragility`` (0 to 100). ``market.regime_indicators@v1``: per card
+``market.regime@v3``: ``label`` (CALM, CAUTION, STRESS, CRISIS), and the scores ``macro_risk``
+(with its tiers ``macro_early`` and ``macro_confirming``), ``market_stress`` and ``fragility``
+(0 to 100). ``market.regime_indicators@v1``: per card
 (``config/site/regime/cards.toml``) its value column ``<key>``, and the bool columns
 ``<key>_on`` (the indicator's own on / off verdict) and ``<key>_changed`` (the verdict differs
 from 5 sessions earlier), named by the suffixes below from the card's ``feature``."""
@@ -18,9 +19,11 @@ from algotrade.services.read.instruments.catalogue import FeatureFormat
 from algotrade.services.read.market.features import load_market_feature_values
 from algotrade.services.read.values import Unknown, UnknownCode
 
-REGIME = "market.regime@v2"
+REGIME = "market.regime@v3"
 LABEL = f"{REGIME}.label"
 MACRO_RISK = f"{REGIME}.macro_risk"
+MACRO_EARLY = f"{REGIME}.macro_early"  # the macro score's early tier (macro_risk: the higher)
+MACRO_CONFIRMING = f"{REGIME}.macro_confirming"  # ... and its confirming tier
 MARKET_STRESS = f"{REGIME}.market_stress"
 FRAGILITY = f"{REGIME}.fragility"
 MACRO_COVERAGE = f"{REGIME}.macro_coverage"  # the share of macro_risk's weight known

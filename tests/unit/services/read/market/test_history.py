@@ -24,8 +24,8 @@ from tests.unit.services.read.regime.conftest import (
     write_regime,
 )
 
-RISK = "market.regime@v2.macro_risk"
-LABEL = "market.regime@v2.label"
+RISK = "market.regime@v3.macro_risk"
+LABEL = "market.regime@v3.label"
 CURVE_ON = "market.regime_indicators@v1.curve_on"
 
 
@@ -135,7 +135,7 @@ def test_every_window_slices_one_cached_read_until_something_is_published(
     whole = load_market_history(ctx, [RISK], SEP28, D1)
     recent = load_market_history(ctx, [RISK], SEP30, D1)  # another window, same session
     narrow = load_market_history(ctx, [RISK, LABEL], SEP29, SEP29)
-    assert reads == [("rollups/market/regime@v2", date.min, D1)]  # one read: the whole range
+    assert reads == [("rollups/market/regime@v3", date.min, D1)]  # one read: the whole range
     assert [p.session for p in whole[0].points] == [SEP28, SEP29, SEP30, D1]
     assert [p.session for p in recent[0].points] == [SEP30, D1]
     assert narrow[0].points == (Point(SEP29, 10.0),)
