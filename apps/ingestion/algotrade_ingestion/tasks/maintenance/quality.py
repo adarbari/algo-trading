@@ -161,14 +161,15 @@ def check_reference_classification(
     over = int(active["security_type_source"].eq("name_over_vendor").sum())
     disagree = int((from_vendor & active["security_type"].ne(named)).sum()) + over
     total = len(active)
-    worst = max(over, disagree) / total
     return [
         Check(
             "reference_classification",
-            "FAIL" if worst > s.max_type_disagreement else "PASS",
+            "FAIL"
+            if disagree / total > s.max_type_disagreement or over / total > s.max_name_over_vendor
+            else "PASS",
             f"{disagree} of {total} ACTIVE rows ({disagree / total:.1%}) typed differently by "
             f"the vendor and the name rules, {over} ({over / total:.1%}) decided by the name "
-            f"(max {s.max_type_disagreement:.0%})",
+            f"(max {s.max_type_disagreement:.0%} and {s.max_name_over_vendor:.0%})",
             data={"disagreements": disagree, "name_over_vendor": over, "active": total},
         )
     ]

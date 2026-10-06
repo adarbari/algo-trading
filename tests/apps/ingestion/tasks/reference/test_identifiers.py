@@ -108,6 +108,15 @@ def test_operating_companies_adrs_and_spacs_keep_their_type() -> None:
     )
 
 
+def test_banks_named_preferred_and_common_ordinary_shares_are_not_preferred() -> None:
+    assert type_after_precedence("Preferred Bank - Common Stock", "CS") == (
+        "COMMON_STOCK",
+        "vendor",
+    )
+    bns = "Bank of Nova Scotia Pfd 3 Ordinary Shares"
+    assert type_after_precedence(bns, "CS") == ("COMMON_STOCK", "vendor")
+
+
 def test_a_specific_vendor_type_beats_the_name_rules() -> None:
     assert type_after_precedence("Acme Income Fund Preferred", "FUND") == ("CEF", "vendor")
 

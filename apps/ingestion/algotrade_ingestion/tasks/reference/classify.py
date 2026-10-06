@@ -14,7 +14,11 @@ from algotrade.config.site.settings import UniverseSettings
 
 _RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("ETN", re.compile(r"\bETNs?\b|exchange[- ]traded notes?", re.I)),
-    ("PREFERRED", re.compile(r"preferred|\bpfd\b", re.I)),
+    # not a name that ends "Common Stock" / "Ordinary Shares" ("Preferred Bank - Common Stock")
+    (
+        "PREFERRED",
+        re.compile(r"^(?!.*(?:common stock|ordinary shares)\s*$).*(?:preferred|\bpfd\b)", re.I),
+    ),
     # Units first: SPAC unit names mention the warrants and rights they contain.
     ("UNIT", re.compile(r"\bunits?, each consisting\b|\bunits? \(each", re.I)),
     ("WARRANT", re.compile(r"\bwarrants?\b", re.I)),

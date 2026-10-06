@@ -67,3 +67,9 @@ def test_no_reference_snapshot_fails() -> None:
         StoreReader(MemoryBackend()), D, SourcesSettings.from_document({})
     )
     assert result.status == "FAIL"
+
+
+def test_too_many_rows_typed_by_the_name_fail_on_their_own_limit() -> None:
+    rows = [OPERATING] * 96 + [PREFERRED] * 4  # 4% > 2%, but only 4% disagree (< 10%)
+    assert check(rows)[0] == "FAIL"
+    assert check(rows, max_name_over_vendor=0.05)[0] == "PASS"

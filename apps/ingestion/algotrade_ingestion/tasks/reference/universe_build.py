@@ -157,7 +157,7 @@ def apply_identifiers(
     vendor = merged["vendor_security_type"]
     named = merged["security_type"]
     disagree = int((vendor.notna() & vendor.ne(named)).sum())
-    # A generic vendor type (Massive CS / OS / LT: ~400 preferreds and notes are typed "CS")
+    # A generic vendor type (Massive CS / OS / LT: ~90 preferreds and notes are typed "CS")
     # yields to a more specific name-rule result; a specific vendor type still wins (ADR 0045).
     yields = vendor.isin(GENERIC_VENDOR_TYPES) & named.ne(vendor) & named.ne("ADR")
     source = vendor.notna().map({True: "vendor", False: "name_rule"})
