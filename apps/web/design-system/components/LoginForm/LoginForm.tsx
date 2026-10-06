@@ -6,7 +6,7 @@
  * and described by it). Enter submits from either field, and the browser checks that the
  * email is filled and shaped like one.
  */
-import { useId, useState, type FormEvent } from 'react';
+import { useId, useState, type SyntheticEvent } from 'react';
 
 import { Heading } from '../../primitives/Heading';
 import { Stack } from '../../primitives/Stack';
@@ -52,7 +52,7 @@ export function LoginForm({
   const [email, setEmail] = useState(defaultEmail);
   const [password, setPassword] = useState('');
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (pending) return;
     onSubmit({ email: email.trim(), password });
