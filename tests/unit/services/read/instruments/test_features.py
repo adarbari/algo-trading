@@ -15,7 +15,7 @@ from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade.storage.tables.writers import StoreWriter
 from tests.helpers.rollup_store import write_rows
-from tests.unit.services.read.instruments.conftest import D0, D1
+from tests.unit.services.read.instruments.conftest import D0, D1, context, store_with
 
 CLOSE = "rollup.price_stats@v2.close"
 HV20 = "rollup.price_stats@v2.hv20"
@@ -102,3 +102,72 @@ def test_an_expression_names_the_inputs_without_a_row(reader: StoreReader) -> No
     [value] = load_feature_values(ctx, ["EQ:AAA"], ["feature.iv_hv_ratio"])["EQ:AAA"]
     assert value.unknown is not None and value.unknown.code is UnknownCode.NO_ROW
     assert value.unknown.detail.startswith("rollups/instrument/iv_history@v2 has no row")
+
+
+IV30 = "rollup.iv30@v1.iv30"
+IV_HISTORY = "rollups/instrument/iv_history@v2"
+IV_STATUS = "rollups/instrument/iv30@v1"
+
+
+def _chain_rows(status: str, history: float | None = None) -> StoreReader:
+    """AAA has an iv30 row on D1 with ``status`` (iv30 null unless OK) and an iv_history row."""
+
+    def write(writer: StoreWriter) -> None:
+        iv = 0.3 if status == "OK" else None
+        write_rows(writer, IV_STATUS, D1, [{"instrument_id": "EQ:AAA", "iv30": iv,
+                                            "iv30_status": status}])  # fmt: skip
+        write_rows(writer, IV_HISTORY, D1, [{"instrument_id": "EQ:AAA", "iv30": iv}])
+
+    return store_with(write)
+
+
+def test_a_non_optionable_instrument_is_not_applicable_not_unknown() -> None:
+    ctx = context(_chain_rows("WIDE_SPREADS"))
+    [etf] = load_feature_values(ctx, ["EQ:ETFX"], [IV30])["EQ:ETFX"]  # no row in iv30@v1
+    assert etf.unknown is not None and etf.unknown.code is UnknownCode.NOT_APPLICABLE
+    assert "EQ:ETFX is not optionable (reference snapshot 2026-09-30)" in etf.unknown.detail
+    aaa = values(ctx, "EQ:AAA", FROM_HIGH)
+    assert aaa[FROM_HIGH][1] is None  # a feature that applies to every instrument is unaffected
+
+
+def test_an_etf_has_no_earnings_but_a_stock_with_none_is_unknown(reader: StoreReader) -> None:
+    earlier = open_context(reader, MemoryConfigStore({}), UserContext("local"), D0)
+    assert values(earlier, "EQ:ETFX", NEXT)[NEXT] == (None, UnknownCode.NOT_APPLICABLE)
+    [etf] = load_feature_values(earlier, ["EQ:ETFX"], [NEXT])["EQ:ETFX"]
+    assert etf.unknown is not None and "is an ETF" in etf.unknown.detail
+    assert values(earlier, "EQ:AAA", NEXT)[NEXT] == (D1.isoformat(), None)  # a value always wins
+
+
+def test_a_thin_chain_is_illiquid_and_inherited_by_expressions() -> None:
+    ctx = context(_chain_rows("WIDE_SPREADS"))
+    [value] = load_feature_values(ctx, ["EQ:AAA"], [IV30])["EQ:AAA"]
+    assert value.unknown is not None and value.unknown.code is UnknownCode.ILLIQUID
+    assert value.unknown.detail.startswith("iv30_status is WIDE_SPREADS for EQ:AAA on 2026-10-01")
+    got = values(ctx, "EQ:AAA", "feature.iv_hv_ratio")
+    assert got["feature.iv_hv_ratio"] == (None, UnknownCode.ILLIQUID)
+
+
+def test_a_real_gap_stays_unknown() -> None:
+    ctx = context(_chain_rows("NO_CHAIN"))  # no chain at all: not "too thin"
+    assert values(ctx, "EQ:AAA", IV30)[IV30] == (None, UnknownCode.NULL)
+    ok = context(_chain_rows("OK"))
+    assert values(ok, "EQ:AAA", IV30)[IV30][0] == pytest.approx(0.3)  # a value always wins
+
+
+def test_not_applicable_wins_over_illiquid_for_an_expression() -> None:
+    ctx = context(_chain_rows("WIDE_SPREADS"))
+    got = values(ctx, "EQ:ETFX", "feature.iv_hv_ratio")
+    assert got["feature.iv_hv_ratio"][1] is not UnknownCode.ILLIQUID
+
+
+IV_RANK = "rollup.iv_history@v2.iv_rank_252d"
+
+
+def test_a_null_optionable_is_not_not_applicable() -> None:
+    ctx = context(_chain_rows("OK"))  # EQ:NOOPT: optionable unknown, no iv30 row
+    assert values(ctx, "EQ:NOOPT", IV30)[IV30] == (None, UnknownCode.NO_ROW)
+
+
+def test_a_null_rank_with_an_ok_status_is_null_not_illiquid() -> None:
+    ctx = context(_chain_rows("OK"))
+    assert values(ctx, "EQ:AAA", IV_RANK)[IV_RANK] == (None, UnknownCode.NULL)

@@ -90,4 +90,5 @@ GROUP = FeatureGroup(
     (Input(OPTIONS),),
     FEATURES,
     compute,
+    applies_to="optionable",
 )

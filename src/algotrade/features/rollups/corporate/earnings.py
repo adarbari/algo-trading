@@ -144,4 +144,5 @@ GROUP = FeatureGroup(
     (Input(EVENTS),),
     FEATURES,
     compute,
+    applies_to="not_etf",
 )

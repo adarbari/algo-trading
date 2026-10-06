@@ -116,6 +116,37 @@ describe('column factories', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('say n/a and Illiquid, not Unknown, where the server says the value cannot exist', () => {
+    const etf: TableRow = {
+      symbol: 'SPY',
+      instrumentId: 'EQ:S',
+      name: 'SPDR S&P 500',
+      cells: {
+        [EARN.name]: { value: null, unknown: 'NOT_APPLICABLE' },
+        [IV.name]: { value: null, unknown: 'ILLIQUID' },
+      },
+    };
+    render(
+      <DataTable
+        columns={[tickerColumn(), featureColumn(EARN), featureColumn(IV)]}
+        rows={[etf]}
+        getRowId={(r) => r.symbol}
+        label="Thin"
+        rowLines={2}
+      />,
+    );
+    const grid = screen.getByRole('grid', { name: 'Thin' });
+    expect(within(grid).getByText('n/a')).toHaveAttribute(
+      'title',
+      expect.stringMatching(/does not apply/),
+    );
+    expect(within(grid).getByText('Illiquid')).toHaveAttribute(
+      'title',
+      expect.stringMatching(/too thin/),
+    );
+    expect(within(grid).queryByText('Unknown')).not.toBeInTheDocument();
+  });
+
   it('mark personal-licence features and describe a column from its catalogue entry', () => {
     const column = featureColumn(IV);
     expect(column.header).toBe('Iv30 (P)');

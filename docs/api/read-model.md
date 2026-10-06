@@ -202,8 +202,11 @@ vocabulary. `FeatureValue.value is None` always comes with `unknown` set.
 | `LICENCE` | a `personal`-licence feature and the caller is not its owner (ADR 0028) |
 | `NOT_RUN` | a screener (or the nightly data-quality check) has no run for the session |
 | `PRE_SNAPSHOT` | identity came from a later snapshot (survivorship) |
+| `NOT_APPLICABLE` | the feature is not defined for this instrument (not optionable; an ETF has no earnings); shown "n/a" (ADR 0042) |
+| `ILLIQUID` | an option feature null because the chain is too thin to price (`iv30_status` NO_QUOTES / WIDE_SPREADS / ILLIQUID); shown "Illiquid" (ADR 0042) |
 
-In PR 4 `features(names)` returns `NO_PARTITION`, `NO_ROW` and `NULL`. A name the caller's
+`features(names)` returns `NO_PARTITION`, `NO_ROW`, `NULL`, `NOT_APPLICABLE` and `ILLIQUID`
+(precedence: no partition, a present value, not applicable, illiquid, no row, null; ADR 0042). A name the caller's
 catalogue lacks is a request error (`UNKNOWN_FEATURE`, naming it) when the client asked for it;
 `NOT_IN_CATALOGUE` is for names the server reads on its own (a saved view's columns, PR 8).
 `LICENCE` waits for a second user (ADR 0028: personal values are hidden from other users once
