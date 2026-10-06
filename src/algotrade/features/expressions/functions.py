@@ -15,7 +15,8 @@ by zero, ``log`` of a value <= 0, ``sqrt`` of a negative and any non-finite resu
 
 Built-ins (``FUNCTIONS``): ``if(cond, a, b)``, ``abs(x)``, ``min(a, b, ...)``,
 ``max(a, b, ...)`` (numbers or strings; null if any is null), ``log(x)`` (natural),
-``sqrt(x)``, ``clip(x, lo, hi)``, ``coalesce(a, b, ...)`` (the first non-null),
+``sqrt(x)``, ``ncdf(x)`` (the standard normal CDF, for a probit: ``ncdf(b0 + b1 * x)``),
+``clip(x, lo, hi)``, ``coalesce(a, b, ...)`` (the first non-null),
 ``is_null(x)`` (never null), ``one_of(x, "A", "B", ...)`` (x equals one of the literals) and
 ``exists(group)`` (the instrument has a row in that group for the session: false when the
 group has rows for the session but not this instrument, null when it has none at all).
@@ -27,6 +28,8 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
+
+from algotrade.quant.black_scholes import norm_cdf
 
 KINDS = ("num", "bool", "str", "date")
 _NULLS = {"num": np.nan, "bool": np.nan, "str": None, "date": np.datetime64("NaT", "ns")}
@@ -236,6 +239,7 @@ FUNCTIONS: dict[str, Function] = {
         Function("abs", 1, _numeric(np.abs, lambda x: ~np.isnan(x))),
         Function("sqrt", 1, _numeric(np.sqrt, lambda x: x >= 0)),
         Function("log", 1, _numeric(np.log, lambda x: x > 0)),
+        Function("ncdf", 1, _numeric(norm_cdf, lambda x: ~np.isnan(x))),
         Function("min", 2, _extreme(np.minimum), variadic=True),
         Function("max", 2, _extreme(np.maximum), variadic=True),
         Function("clip", 3, _clip),

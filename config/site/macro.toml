@@ -338,6 +338,66 @@ pit = "alfred"
 transform = "level"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/)"
 
+# --- Published files (RG3b; docs/market-regime-plan.md 3E and 3F). Fetched whole by the
+# `published` adapter; revised history arrives as a new `lagged` vintage dated the run's session
+# (the RG2c rule for a changed lagged value), never as an overwrite.
+
+[[series]]
+key = "EBP"                   # excess bond premium (Gilchrist-Zakrajsek), percentage points, 1973-
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 36         # obs dated the 1st; the Fed posts it on the 4th business day of
+pit = "lag"                   # the next month: a month (31) plus 5 days
+transform = "level"
+terms = "Federal Reserve Board FEDS Notes data (https://www.federalreserve.gov/econres/notes/feds-notes/updating-the-recession-risk-and-the-excess-bond-premium-20161006.html): public Fed data, cite Gilchrist and Zakrajsek (2012) and Favara et al. (2016)"
+url = "https://www.federalreserve.gov/econres/notes/feds-notes/ebp_csv.csv"
+date_column = "date"          # m/d/yyyy, the first of the month
+value_column = "ebp"
+parser = "csv"
+
+[[series]]
+key = "EBP_RECESSION_PROB"    # the Fed's 12-month recession probability from the EBP (0-1)
+source = "published"
+kind = "macro"
+cadence = "monthly"
+release_lag_days = 36
+pit = "lag"
+transform = "level"
+terms = "Federal Reserve Board FEDS Notes data (https://www.federalreserve.gov/econres/notes/feds-notes/updating-the-recession-risk-and-the-excess-bond-premium-20161006.html): public Fed data, cite Gilchrist and Zakrajsek (2012) and Favara et al. (2016)"
+url = "https://www.federalreserve.gov/econres/notes/feds-notes/ebp_csv.csv"
+date_column = "date"
+value_column = "est_prob"
+parser = "csv"
+
+[[series]]
+key = "OFR_FSI"               # OFR Financial Stress Index, daily, 2000- (re-estimated: revised)
+source = "published"
+kind = "macro"
+cadence = "daily"
+release_lag_days = 5          # posted on business days a day or more after the close (a
+pit = "lag"                   # Thursday value appeared on the Monday): conservative
+transform = "level"
+terms = "Office of Financial Research (https://www.financialresearch.gov/financial-stress-index/): US government work, informational only, no warranty; cite \"OFR Financial Stress Index\""
+url = "https://www.financialresearch.gov/financial-stress-index/data/fsi.csv"
+date_column = "Date"
+value_column = "OFR FSI"
+parser = "csv"
+
+[[series]]
+key = "EPU_DAILY"             # daily US Economic Policy Uncertainty index, 1985-
+source = "published"
+kind = "macro"
+cadence = "daily"
+release_lag_days = 2          # posted the next day; newspaper counts can be revised
+pit = "lag"
+transform = "level"
+terms = "Baker, Bloom and Davis (https://www.policyuncertainty.com): Creative Commons Attribution 4.0, cite Baker, Bloom and Davis (2016)"
+url = "https://www.policyuncertainty.com/media/All_Daily_Policy_Data.csv"
+date_column = "date"          # built from the file's day, month and year columns
+value_column = "daily_policy_index"
+parser = "epu_daily"
+
 # --- Index levels (ADR 0047: index levels are series, never bars; the close is public on its day)
 
 [[series]]

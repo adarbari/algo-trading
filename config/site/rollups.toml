@@ -105,6 +105,7 @@ sloos_above = 0.20           # more than 20% of banks tightening C&I standards
 permits_at_most = -0.20      # permits down 20% or more on the year
 fed_hikes_above = 0.02       # fed funds up more than 200 bp on the year
 cpi_above = 0.04             # CPI inflation above 4%
+ebp_above = 0.005            # credit when the high-yield spread is unknown (before 1997): EBP above 50 bp
 w_trend = 20.0               # market_stress: the card verdicts spx_trend_200d, vix_term,
 w_vol_term = 20.0            # breadth_200d and the thresholds below
 w_drawdown = 10.0
@@ -120,3 +121,14 @@ w_credit_boom = 50.0         # fragility (context only): bank credit growth and 
 w_runup = 50.0
 credit_boom_above = 0.10     # bank credit up more than 10% on the year
 runup_above = 0.30           # SPY up more than 30% on the year
+
+["market_bear_probit@v1"]    # the bear-state probit (plan section 3E): ncdf(b0 + b_curve x curve_10y3m
+                             # + b_cpi x cpi_yoy + b_hy x hy_oas), inputs in decimals. Literature-order
+                             # values (Chen 2009's signs), NOT fitted on our data: once the macro
+                             # backfill exists, paste the fit `make regime-scorecard` prints and set
+                             # fitted = true.
+b0 = -1.0
+b_curve = -40.0
+b_cpi = 15.0
+b_hy = 10.0
+fitted = false

@@ -74,5 +74,7 @@ def test_no_session_sees_a_later_vintage(
     if loaded is None:
         assert not expected
     else:
-        assert max(loaded["vintage_date"]) <= session
-        assert len(loaded) == sum(1 for k in by_key if k[2] <= session)
+        assert max(loaded["vintage_date"]) <= session  # the feature input is the same read
+        same = series_as_of(reader, None, session, 0)
+        cols = ["instrument_id", "obs_date", "vintage_date", "value"]
+        assert loaded.reset_index(drop=True)[cols].equals(same[cols])

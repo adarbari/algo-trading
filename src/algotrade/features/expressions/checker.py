@@ -10,7 +10,7 @@ Rules: ``+ - * /`` and unary ``-`` take numbers; ``< <= > >=`` numbers, strings 
 the same type; ``== !=`` any two values of the same type (never ``null``: use ``is_null``);
 ``and or not`` take bools; ``if`` takes a bool and two branches of one type (``null`` fits
 any); ``min`` / ``max`` numbers or strings; ``coalesce`` values of one type; ``abs log sqrt
-clip`` numbers; ``one_of(x, literals...)`` literals of x's type; ``exists`` a group name.
+ncdf clip`` numbers; ``one_of(x, literals...)`` literals of x's type; ``exists`` a group name.
 """
 
 from collections.abc import Sequence
@@ -153,7 +153,7 @@ class _Checker:
         self.check(node.args[0])
         return BOOL
 
-    def numeric(self, node: Call) -> Type:  # abs, sqrt, log, clip
+    def numeric(self, node: Call) -> Type:  # abs, sqrt, log, ncdf, clip
         for arg in node.args:
             self.want(arg, "num", node.func)
         return NUM

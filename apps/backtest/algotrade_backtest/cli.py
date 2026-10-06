@@ -6,6 +6,7 @@ algotrade-backtest [--user U] backtest --config sma_trend --start 2020-01-01 --e
 algotrade-backtest [--user U] config validate|show sma_trend
 algotrade-backtest [--user U] config validate-features   (the user's expression features)
 algotrade-backtest evaluate [--update-baseline] [--report scorecard.md]
+algotrade-backtest regime-scorecard [--report regime-scorecard.txt]   (the regime episodes)
 """
 
 import argparse
@@ -16,7 +17,13 @@ from pathlib import Path
 
 from algotrade.config.env import load_dotenv
 from algotrade.core.model.errors import AlgoTradeError
-from algotrade_backtest.commands import cmd_backtest, cmd_config, cmd_datasets, cmd_evaluate
+from algotrade_backtest.commands import (
+    cmd_backtest,
+    cmd_config,
+    cmd_datasets,
+    cmd_evaluate,
+    cmd_regime_scorecard,
+)
 
 DEFAULT_BASELINE = Path("benchmarks/baseline.json")
 
@@ -55,6 +62,11 @@ def build_parser() -> argparse.ArgumentParser:
     ev.add_argument("--baseline", type=Path, default=DEFAULT_BASELINE)
     ev.add_argument("--update-baseline", action="store_true")
     ev.add_argument("--report", type=Path, help="write a Markdown scorecard here")
+
+    rg = sub.add_parser(
+        "regime-scorecard", help="the regime model against the reference crash episodes"
+    )
+    rg.add_argument("--report", type=Path, help="also write the text here")
     return parser
 
 
@@ -65,6 +77,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "datasets": cmd_datasets,
         "backtest": cmd_backtest,
         "evaluate": cmd_evaluate,
+        "regime-scorecard": cmd_regime_scorecard,
         "config": cmd_config,
     }
     try:

@@ -7,7 +7,10 @@ plain format needs no code, only a registry entry:
 - ``csv``: a comma-separated file with a header row. Stooq daily
   (``Date,Open,High,Low,Close,Volume``, ``value_column = "Close"``), the Fed's EBP
   (``ebp_csv.csv``: ``date,gz_spread,ebp,est_prob``, monthly) and the OFR financial stress
-  index (daily CSV, one column per index) all read this way;
+  index (``fsi.csv``: ``Date,OFR FSI,Credit,...``, daily) all read this way;
+- ``epu_daily``: the daily Economic Policy Uncertainty CSV (``All_Daily_Policy_Data.csv``:
+  ``day,month,year,daily_policy_index``): the date is in three columns, so this parser adds a
+  ``date`` column (ISO ``YYYY-MM-DD``; a row whose parts do not form a date gets none);
 - ``shiller_xls``: Shiller's ``ie_data.xls`` (a legacy Excel workbook with a multi-row header).
   Reading ``.xls`` needs ``xlrd``, which is not a dependency (``openpyxl``, the one workbook
   reader we ship, reads only ``.xlsx``), so it raises ``NotImplementedError`` until that
@@ -36,6 +39,23 @@ def parse_csv(payload: bytes) -> pd.DataFrame:
     return frame
 
 
+EPU_PARTS = ("year", "month", "day")
+
+
+def parse_epu_daily(payload: bytes) -> pd.DataFrame:
+    """The daily EPU CSV with a ``date`` column built from ``year``, ``month`` and ``day``."""
+    frame = parse_csv(payload)
+    if frame.empty and not len(frame.columns):
+        return frame
+    missing = [c for c in EPU_PARTS if c not in frame.columns]
+    if missing:
+        raise ValueError(f"not the daily EPU file: no column {missing}")
+    parts = frame[list(EPU_PARTS)].apply(pd.to_numeric, errors="coerce")
+    dates = pd.to_datetime(parts, errors="coerce")
+    frame["date"] = dates.dt.strftime("%Y-%m-%d").where(dates.notna(), None)
+    return frame
+
+
 def parse_shiller_xls(payload: bytes) -> pd.DataFrame:
     """Shiller's ``ie_data.xls``: not readable until ``xlrd`` is a dependency."""
     raise NotImplementedError(
@@ -44,4 +64,8 @@ def parse_shiller_xls(payload: bytes) -> pd.DataFrame:
     )
 
 
-PARSERS: dict[str, Parser] = {"csv": parse_csv, "shiller_xls": parse_shiller_xls}
+PARSERS: dict[str, Parser] = {
+    "csv": parse_csv,
+    "epu_daily": parse_epu_daily,
+    "shiller_xls": parse_shiller_xls,
+}

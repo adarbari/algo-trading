@@ -207,14 +207,32 @@ def test_macro_series_are_seen_from_their_vintage_and_read_by_id() -> None:
     seen = loaded.at(END, 0)
     assert seen is not None and list(seen["value"]) == [1.0]  # the revision is not out yet
     assert "session_date" not in seen.columns
-    later = loaded.at(late, 0)
-    assert later is not None and list(later["vintage_date"]) == [early, late]
+    later = loaded.at(late, 0)  # only the latest vintage of each observation
+    assert later is not None and list(later["value"]) == [1.5]
+    assert list(later["vintage_date"]) == [late]
     assert loaded.at(early - timedelta(days=1), 0) is None
     every = inputs.load_input(reader, MACRO_SERIES, [END], 0).at(END, 0)
     assert every is not None and set(every["instrument_id"]) == {"MACRO:A", "MACRO:B"}
     assert inputs.has_input(MACRO_SERIES)
     with pytest.raises(ValueError, match="read whole"):
         inputs.load_input(reader, SHARES, [END], 0, ids=("EQ:A",))
+
+
+def test_macro_series_keep_the_lookback_window_and_each_series_latest() -> None:
+    writer, reader = store()
+    old, recent = END - timedelta(days=400), END - timedelta(days=3)
+    rows = [
+        {"instrument_id": iid, "series": iid[6:], "obs_date": d, "vintage_date": d,
+         "value": x, "vintage_kind": "lagged"}
+        for iid, d, x in (("MACRO:A", old, 1.0), ("MACRO:A", recent, 2.0), ("MACRO:B", old, 7.0))
+    ]  # fmt: skip
+    writer.write_table(MACRO_SERIES, END, "r1", stamped(rows, END, "r1"))
+    seen = inputs.load_input(reader, MACRO_SERIES, [END], 20).at(END, 20)
+    assert seen is not None  # A's old value is outside 20 sessions; B's only one is its latest
+    assert list(zip(seen["instrument_id"], seen["value"], strict=True)) == [
+        ("MACRO:A", 2.0),
+        ("MACRO:B", 7.0),
+    ]
 
 
 def test_bar_windows_are_the_closes_of_each_window_up_to_the_session() -> None:

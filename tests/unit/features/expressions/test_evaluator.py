@@ -51,6 +51,8 @@ def run(text: str) -> list[object]:
         ("abs(g.x)", [1.0, 2.0, None, 4.0, 1.0]),
         ("sqrt(g.x)", [1.0, np.sqrt(2), None, 2.0, None]),
         ("log(g.y)", [None, 0.0, 0.0, np.log(2), np.log(3)]),
+        ("ncdf(g.y - 1)", [0.15865525393145707, 0.5, 0.5, 0.8413447460685429, 0.9772498680518208]),
+        ("ncdf(g.x * 100)", [1.0, 1.0, None, 1.0, 0.0]),  # the tails are exact, never null
         ("min(g.x, g.y)", [0.0, 1.0, None, 2.0, -1.0]),
         ("max(g.x, g.y, 3)", [3.0, 3.0, None, 4.0, 3.0]),
         ("clip(g.x, 0, 3)", [1.0, 2.0, None, 3.0, 0.0]),

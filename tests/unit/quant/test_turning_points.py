@@ -1,9 +1,12 @@
-"""Bull and bear dating: synthetic level paths with known turns, each rule, drawdowns, errors."""
+"""Bull and bear dating: synthetic level paths with known turns, each rule, drawdowns, errors;
+and the paper's monthly rules on the recorded S&P 500 monthly series (Shiller, 1970-2013)."""
 
 from collections.abc import Callable
+from pathlib import Path
 
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
 import pytest
 
 from algotrade.quant import turning_points as tp
@@ -151,3 +154,60 @@ def test_drawdowns_by_hand() -> None:
 def test_input_errors(call: Callable[[], object]) -> None:
     with pytest.raises(ValueError):
         call()
+
+
+SHILLER = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "sp500_monthly_shiller.csv"
+# Closing-basis peak and trough months of config/site/regime/episodes.toml.
+EPISODE_MONTHS = {
+    "1973": ("1973-01", "1974-10"),
+    "1980": ("1980-11", "1982-08"),
+    "1987": ("1987-08", "1987-12"),
+    "2000": ("2000-03", "2002-10"),
+    "2007": ("2007-10", "2009-03"),
+    "2011": ("2011-04", "2011-10"),
+}
+
+
+def _months_apart(a: str, b: str) -> int:
+    ya, ma = map(int, a.split("-"))
+    yb, mb = map(int, b.split("-"))
+    return abs((ya - yb) * 12 + ma - mb)
+
+
+def test_pagan_sossounov_monthly_dating_of_the_sp500_1970_2013() -> None:
+    """The paper's monthly rules (8, 4, 16 months, 20%) on Shiller's monthly averages.
+
+    Pagan and Sossounov's own table (US data to 1997) is not reproduced here: the expected
+    turns are the episodes' closing-basis months, met within one month wherever the monthly
+    average tracks the daily close. Where it cannot, the divergence is pinned and explained:
+    the 2000 average peaked in August (the daily close in March, on a flat top), and the
+    averaged lows of 1974 and 2002-03 came after the daily lows; the brief 1990 fall (3 months,
+    -15% on averages) is too short and too small for the rules, as the paper's minimum phase
+    intends."""
+    frame = pd.read_csv(SHILLER, comment="#")
+    months = list(frame["month"])
+    bears = [
+        (months[p.start], months[p.end], round(p.change, 3))
+        for p in tp.pagan_sossounov(frame["sp500"].to_numpy(float))
+        if p.kind == "bear"
+    ]
+    assert bears == [
+        ("1971-04", "1971-11", -0.099),
+        ("1973-01", "1974-12", -0.434),
+        ("1976-09", "1978-03", -0.158),
+        ("1978-08", "1980-04", -0.009),
+        ("1980-11", "1982-07", -0.194),
+        ("1983-10", "1984-07", -0.099),
+        ("1987-08", "1987-12", -0.268),
+        ("2000-08", "2003-02", -0.437),
+        ("2007-10", "2009-03", -0.508),
+        ("2011-05", "2011-09", -0.123),
+    ]
+    dated = {peak[:4]: (peak, trough) for peak, trough, _ in bears}
+    within = {"1973": (True, False), "2000": (False, False)}  # (peak, trough) within a month
+    for key, (peak, trough) in EPISODE_MONTHS.items():
+        got_peak, got_trough = dated[key]
+        expect = within.get(key, (True, True))
+        near = (_months_apart(got_peak, peak) <= 1, _months_apart(got_trough, trough) <= 1)
+        assert near == expect, key
+    assert not any(peak.startswith("1990") for peak, _, _ in bears)

@@ -1,4 +1,4 @@
-"""``market_macro@v1`` over a ``macro/series`` store written through the storage layer:
+"""``market_macro@v2`` over a ``macro/series`` store written through the storage layer:
 hand-computed levels, transforms and windows, vintages respected (a value with a later vintage
 is not seen), the curve from the session's own Treasury curve else FRED, one null-safe row with
 no macro data, and a backfill equal to the nightly."""
@@ -103,14 +103,19 @@ def test_levels_and_transforms_by_hand() -> None:
         + monthly("NFCI", [0.25])
         + monthly("DRTSCILM", [22.5])
         + monthly("RECPROUSM156N", [31.0])
-        + monthly("CFNAIMA3", [-0.8]),
+        + monthly("CFNAIMA3", [-0.8])
+        + monthly("EBP", [0.4, 1.25], last="2026-08-01")  # percentage points
+        + monthly("EBP_RECESSION_PROB", [0.62])  # a fraction already
+        + daily("OFR_FSI", [3.5, -1.25])
+        + daily("EPU_DAILY", [180.0]),
     )
     got = row(reader)
     expected = {
         "hy_oas": 0.0525, "ig_oas": 0.011, "vix": 30.0, "vix3m": 25.0, "vix_term_ratio": 1.2,
         "real_10y": 0.018, "payrolls_yoy": 0.03, "cpi_yoy": 0.03, "fedfunds_chg_12m": 0.025,
         "nfci": 0.25, "sloos_ci_tightening": 0.225, "recession_prob_smoothed": 0.31,
-        "cfnai_ma3": -0.8,
+        "cfnai_ma3": -0.8, "ebp": 0.0125, "ebp_recession_prob": 0.62, "ofr_fsi": -1.25,
+        "epu": 180.0,
     }  # fmt: skip
     for column, value in expected.items():
         assert got[column] == pytest.approx(value, rel=F32), column
