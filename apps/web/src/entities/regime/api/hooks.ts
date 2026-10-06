@@ -9,11 +9,12 @@ import { useQuery } from '@tanstack/react-query';
 
 import { gql, graphql, queryKeys } from '@/shared/api';
 
-import type { Regime, RegimeBand } from '../model/regime';
+import type { Recession, Regime, RegimeBand, RegimeEpisode } from '../model/regime';
 
 /** The GraphQL operations' names: their cached responses share these key prefixes. */
 export const REGIME_OPERATION = 'Regime';
 export const REGIME_BANDS_OPERATION = 'RegimeBands';
+export const REGIME_EPISODES_OPERATION = 'RegimeEpisodes';
 
 const RegimeQuery = graphql(`
   query Regime {
@@ -107,6 +108,35 @@ const RegimeBandsQuery = graphql(`
   }
 `);
 
+const RegimeEpisodesQuery = graphql(`
+  query RegimeEpisodes {
+    regime {
+      episodes {
+        key
+        name
+        kind
+        peak
+        trough
+        recovered
+        spxDrawdown
+        nasdaqDrawdown
+        recession
+        nberStart
+        nberEnd
+        cause
+        notes
+        knownFrom
+      }
+      recessions {
+        start
+        end
+        announcedStart
+        announcedEnd
+      }
+    }
+  }
+`);
+
 /** The session's regime (null: nothing stored for the session; UNKNOWN is a label, not null). */
 export function useRegime() {
   return useQuery({
@@ -127,5 +157,21 @@ export function useRegimeBands(start: string, end: string | undefined) {
     queryFn: () => gql(RegimeBandsQuery, variables),
     enabled: end !== undefined,
     select: (data): readonly RegimeBand[] => data.regime?.bands ?? [],
+  });
+}
+
+/**
+ * The reference drawdowns and NBER recessions the session knows (`config/site/regime/
+ * episodes.toml`, oldest first; a recovery or a recession's end only once it has come). Empty
+ * when nothing is stored for the session.
+ */
+export function useRegimeEpisodes() {
+  return useQuery({
+    queryKey: queryKeys.gql(REGIME_EPISODES_OPERATION, {}),
+    queryFn: () => gql(RegimeEpisodesQuery, {}),
+    select: (data): { episodes: readonly RegimeEpisode[]; recessions: readonly Recession[] } => ({
+      episodes: data.regime?.episodes ?? [],
+      recessions: data.regime?.recessions ?? [],
+    }),
   });
 }

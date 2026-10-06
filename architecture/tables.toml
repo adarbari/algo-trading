@@ -155,6 +155,10 @@ name = "rollups/instrument/momentum@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
+name = "rollups/instrument/volume@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
 name = "rollups/instrument/swing_levels@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 

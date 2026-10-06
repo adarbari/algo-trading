@@ -190,6 +190,11 @@ export type RegimeBandsQueryVariables = Exact<{
 
 export type RegimeBandsQuery = { regime: { bands: Array<{ start: string, end: string, label: RegimeLabel }> } | null };
 
+export type RegimeEpisodesQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type RegimeEpisodesQuery = { regime: { episodes: Array<{ key: string, name: string, kind: string, peak: string, trough: string, recovered: string | null, spxDrawdown: number, nasdaqDrawdown: number, recession: boolean, nberStart: string | null, nberEnd: string | null, cause: string, notes: string, knownFrom: string }>, recessions: Array<{ start: string, end: string | null, announcedStart: string | null, announcedEnd: string | null }> } | null };
+
 export type FigiReviewQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -855,6 +860,34 @@ export const RegimeBandsDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<RegimeBandsQuery, RegimeBandsQueryVariables>;
+export const RegimeEpisodesDocument = new TypedDocumentString(`
+    query RegimeEpisodes {
+  regime {
+    episodes {
+      key
+      name
+      kind
+      peak
+      trough
+      recovered
+      spxDrawdown
+      nasdaqDrawdown
+      recession
+      nberStart
+      nberEnd
+      cause
+      notes
+      knownFrom
+    }
+    recessions {
+      start
+      end
+      announcedStart
+      announcedEnd
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<RegimeEpisodesQuery, RegimeEpisodesQueryVariables>;
 export const FigiReviewDocument = new TypedDocumentString(`
     query FigiReview {
   figiReview {

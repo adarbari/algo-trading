@@ -335,7 +335,7 @@ detect = [{ call = "MinInterval" }, { attr = "time.sleep" }]
 
 [[responsibility]]
 id = "economic-series-sources"
-description = "Fetch and normalise economic series into one shape (SERIES_COLUMNS): FRED / ALFRED observations with every vintage, and published dated files (Stooq, Fed EBP, OFR FSI, Shiller) through named parsers; the registry builds them, the macro task stores them (ADR 0048)"
+description = "Fetch and normalise economic series into one shape (SERIES_COLUMNS): FRED / ALFRED observations with every vintage, FRED release dates (the calendar of a release, ADR 0050), and published dated files (Stooq, Fed EBP, OFR FSI, Shiller) through named parsers; the registry builds them, the macro task stores them (ADR 0048)"
 owner = [
     "libs/sources/algotrade_sources/vendors/fred/*",
     "libs/sources/algotrade_sources/vendors/published/*",
@@ -724,7 +724,7 @@ detect = [
 
 [[responsibility]]
 id = "domain-read-model"
-description = "Domain read objects and their loaders (ADR 0037): every read a page shows is a frozen dataclass built by one load_<object>(ctx, ...) in services/read/<area>/, for ctx.session only; per-instrument values by catalogue name (ADR 0038), never a table path. the market regime (ADR 0047: MarketRegime with its indicator cards and label bands, services/read/regime/) and the market entity (services/read/market/), read from the market-entity feature groups by catalogue name. A fact a page needs is stored, not computed on read: chain_expiries (the nearest expiry, stored as rollup.nearest_expiry@v1 since read-model PR 3) is called only by data/ and the producing feature group (read-model PR 5 deleted its last read-time caller, explore ideas/ranking.py)"
+description = "Domain read objects and their loaders (ADR 0037): every read a page shows is a frozen dataclass built by one load_<object>(ctx, ...) in services/read/<area>/, for ctx.session only; per-instrument values by catalogue name (ADR 0038), never a table path. the market regime (ADR 0047: MarketRegime with its indicator cards, label bands, reference episodes and NBER recessions, services/read/regime/) and the market entity (services/read/market/: its values by catalogue name and the bucketed history of its stored fields), read from the market-entity feature groups by catalogue name. A fact a page needs is stored, not computed on read: chain_expiries (the nearest expiry, stored as rollup.nearest_expiry@v1 since read-model PR 3) is called only by data/ and the producing feature group (read-model PR 5 deleted its last read-time caller, explore ideas/ranking.py)"
 owner = ["src/algotrade/services/read/*"]
 allowed = [
     "src/algotrade/data/*",  # the generic table reads (R1)

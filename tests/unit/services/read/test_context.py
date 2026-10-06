@@ -197,6 +197,13 @@ def test_result_cache_is_a_small_lru() -> None:
     assert (cache.get("a"), cache.get("b"), cache.get("c")) == (1, None, 3)
 
 
+def test_result_cache_holds_32_entries_by_default() -> None:
+    cache = ResultCache()
+    for i in range(33):
+        cache.put(i, i)
+    assert cache.get(0) is None and cache.get(1) == 1 and cache.get(32) == 32
+
+
 def test_open_read_stores_opens_the_store_and_the_configs(tmp_path: Path) -> None:
     reader, configs = open_read_stores("memory://", tmp_path)
     assert reader.table_names() == []

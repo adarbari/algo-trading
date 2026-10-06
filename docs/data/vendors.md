@@ -31,6 +31,7 @@ circuit opens: the rest of the run's items for that vendor fail at once with
 | S&P 500 membership | SPY daily holdings file (State Street) | — | Membership changes become events |
 | ETF holdings (top holdings and weights per fund) | **Issuer daily files**: State Street SPDR workbooks, iShares CSVs, the ProShares daily CSV; **SEC N-PORT** for the funds they do not cover (ADR 0035) | Vanguard / Invesco / ARK sites (no usable public file, see below) | Accepted (ADR 0035) |
 | Company details (name, SIC, sector, state, fiscal year end) | SEC EDGAR submissions (free; contact email in the user agent) | Massive ticker details | Implemented, phase 1.7 |
+| 8-K filings (event dates, with acceptance time) | SEC EDGAR submissions: `filings.recent` plus the older pages in `filings.files` (free; same contact and pacing; `sources/vendors/sec/submissions.py`, `sec_filings`) | none | Adapter implemented (ADR 0050); ingestion task later |
 | Company description (stocks, ADRs) | Massive ticker overview (`/v3/reference/tickers/{ticker}`; one request per ticker; free tier) | none free | Implemented (ADR 0034): capped per night |
 | Fund description (ETFs) | SEC prospectus investment objective (Risk/Return Summary data sets + `company_tickers_mf.json`; official, free) | issuer fund pages (per-site terms, not used) | Implemented (ADR 0034): the objective sentence, ~74% of ETFs |
 | Shares outstanding (market cap) | SEC EDGAR company facts (XBRL; free; same contact and pacing) | Massive ticker details (`share_class_shares_outstanding`) | Implemented, phase 2b.4 |
@@ -237,6 +238,12 @@ is a few thousand rows, a daily market series (`DGS10`, `T10Y3M`) one row per da
   FRED republishes from third parties carry their own terms: the ICE BofA credit spreads
   (`BAML*`) are **licence `personal`** (FRED limits their history and forbids redistribution),
   the same word ADR 0028 uses for IBKR.
+- **Release dates** (`sources/vendors/fred/releases.py`, `fred_release_dates`, ADR 0050): the
+  same key and limiter. `release/dates?release_id=N&include_release_dates_with_no_data=true`
+  lists a release's past dates and the scheduled future ones (CPI, id 10: 2026-10-14,
+  2026-11-10, 2026-12-10 as of 2026-10-06); an unknown release id answers 200 with an empty
+  list. Recorded: `tests/fixtures/sources/fred/release_dates_10_cpi.json`. The adapter only
+  fetches and normalises (`release_id`, `release_date`); the calendar task comes later.
 
 ## Published series files (implemented adapter, ADR 0048)
 

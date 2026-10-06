@@ -1,8 +1,11 @@
 /**
- * Playwright route mock for the market regime: the `Regime` and `RegimeBands` GraphQL
- * operations (POST /api/graphql) answer from fixtures recorded from the real API on the golden
- * store (e2e/fixtures/regime/): the regime is UNKNOWN (`NOT_IN_CATALOGUE`, the RG3 groups do not
- * exist yet) with its eight indicator cards, and the band history is one UNKNOWN band. Any other
+ * Playwright route mock for the market regime: the `Regime`, `RegimeBands` and `RegimeEpisodes`
+ * GraphQL operations (POST /api/graphql). `Regime` and `RegimeBands` answer from fixtures
+ * recorded from the real API on the golden store (e2e/fixtures/regime/): the regime is UNKNOWN
+ * (`NOT_IN_CATALOGUE`, the RG3 groups do not exist yet) with its eight indicator cards, and the
+ * band history is one UNKNOWN band. `RegimeEpisodes` answers with the episodes and recessions
+ * the real loader serves over `episodes.toml` for a 2026 session (`regime-episodes.json`; the
+ * golden session of 2022 would not know the 2025 episode). Any other
  * operation falls through to the other areas' mocks. `mockRegimeComputed` serves the same
  * regime as a computed CAUTION one (the RG3 groups are not stored yet) and `mockExplain` the
  * `POST /regime/explain` of an API with a text model (the empty probe answers 400, the
@@ -20,11 +23,13 @@ const fixture = (name: string): unknown =>
 
 const REGIME = fixture('regime');
 const BANDS = fixture('regime-bands');
+const EPISODES = fixture('regime-episodes');
 
 export async function mockRegimeApi(page: Page): Promise<void> {
   await page.route('**/api/graphql', async (route: Route) => {
     const query = (route.request().postDataJSON() as { query?: string } | null)?.query ?? '';
     if (/query\s+RegimeBands\b/.test(query)) await route.fulfill({ json: BANDS });
+    else if (/query\s+RegimeEpisodes\b/.test(query)) await route.fulfill({ json: EPISODES });
     else if (/query\s+Regime\b/.test(query)) await route.fulfill({ json: REGIME });
     else await route.fallback();
   });

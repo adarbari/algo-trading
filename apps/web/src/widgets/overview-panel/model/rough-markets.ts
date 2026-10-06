@@ -1,21 +1,25 @@
 /**
  * "In rough markets": how the focused instrument behaved against the market and in the
  * market's reference episodes, from the stored `episode_behaviour@v1` features (read by name,
- * ADR 0038): beta to SPY, then the drawdown in each episode with its plain name and, when the
- * close has regained the pre-episode high, the sessions it took. Values and their UNKNOWN
+ * ADR 0038): beta to SPY, then the drawdown in each episode with its plain name (from the
+ * API's episodes: `Query.regime.episodes`) and, when the close has regained the pre-episode
+ * high, the sessions it took. Values and their UNKNOWN
  * reasons read as every other fact does (`factItem`); a name with no value for an episode
  * (listed later, not enough bars) leaves the line out, and the group is empty when none has one.
  */
 import type { KeyValueItem } from '@algotrade/ui';
 
-import { episodeName, EPISODES } from '@/entities/regime';
+import { episodeName, type RegimeEpisode } from '@/entities/regime';
 import { feature, type SiteFeature } from '@/shared/api';
 
 import { factItem, type FactGroup, type Values } from './overview';
 
 const BETA = feature('rollup.episode_behaviour@v1.beta_252d');
 
-/** The drawdown and recovery features of each episode (the names are checked literals). */
+/**
+ * The drawdown and recovery features of each episode the nightly stores (the names are checked
+ * literals: a new episode is a new column and version, not a config line), newest first.
+ */
 const EPISODE_FEATURES: Readonly<Record<string, { drawdown: SiteFeature; recovery: SiteFeature }>> =
   {
     tariffs_2025: {
@@ -35,10 +39,7 @@ const EPISODE_FEATURES: Readonly<Record<string, { drawdown: SiteFeature; recover
 /** Every feature the line asks for (added to the Overview's one request). */
 export const ROUGH_MARKET_FEATURES: readonly SiteFeature[] = [
   BETA,
-  ...EPISODES.flatMap((episode) => {
-    const names = EPISODE_FEATURES[episode.key];
-    return names ? [names.drawdown, names.recovery] : [];
-  }),
+  ...Object.values(EPISODE_FEATURES).flatMap((names) => [names.drawdown, names.recovery]),
 ];
 
 const sessions = (n: unknown): string | null =>
@@ -46,16 +47,15 @@ const sessions = (n: unknown): string | null =>
     ? `Back at its pre-episode high ${n} session${n === 1 ? '' : 's'} after the low`
     : null;
 
-export function roughMarketsGroup(values: Values): FactGroup {
+/** `episodes`: the episodes the API knows for the session (names); a key it lacks reads spaced. */
+export function roughMarketsGroup(values: Values, episodes: readonly RegimeEpisode[]): FactGroup {
   const items: KeyValueItem[] = [];
   const beta = factItem(values, { id: 'beta', label: 'Beta to SPY (1 year)', name: BETA });
   if (beta) items.push(beta);
-  for (const episode of EPISODES) {
-    const names = EPISODE_FEATURES[episode.key];
-    if (!names) continue;
+  for (const [key, names] of Object.entries(EPISODE_FEATURES)) {
     const drawdown = factItem(values, {
-      id: episode.key,
-      label: episodeName(episode.key),
+      id: key,
+      label: episodeName(episodes, key),
       name: names.drawdown,
       signed: true,
     });

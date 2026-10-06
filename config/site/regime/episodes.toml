@@ -9,14 +9,22 @@
 # - recession: an NBER recession overlaps the episode; nber_start / nber_end are the NBER
 #   peak and trough months, written as the first day of the month.
 # - kind: "recession" (a recession bear) or "shock" (a shock or re-rating, no recession).
+# - name: the plain name a page shows ("Tariff shock, spring 2025").
+# - recovered: the first session the S&P 500 closed at or above its pre-episode peak (the
+#   closing-basis recovery of the peak). Omit the key while it has not happened. Reviewed by
+#   hand against index history (2018, 2020, 2022 and 2025 re-derived from the stored IDX:SPX
+#   levels, which start in 2016; the earlier eight are the plan's reviewed dates, not
+#   re-derived here). A page shows it only on a session on or after it.
 # - known_from: the trough date, the earliest session a feature about the episode may be
 #   non-null (no feature may know an episode's depth before it ended).
 # - notes: the warnings that were visible before or during the fall.
 
 [[episode]]
 key = "oil_1973"
+name = "Oil shock and Nifty-Fifty bust, 1973-74"
 peak = 1973-01-11
 trough = 1974-10-03
+recovered = 1980-07-17
 spx_drawdown = -0.48
 nasdaq_drawdown = -0.60
 recession = true
@@ -29,8 +37,10 @@ notes = "A hiking Fed and stretched valuations before the embargo; Nasdaq depth 
 
 [[episode]]
 key = "volcker_1980"
+name = "Volcker rate shock, 1980-82"
 peak = 1980-11-28
 trough = 1982-08-12
+recovered = 1982-11-03
 spx_drawdown = -0.27
 nasdaq_drawdown = -0.25
 recession = true
@@ -43,8 +53,10 @@ notes = "Policy rates near 20% and an inverted curve; the first dip (Jan - Jul 1
 
 [[episode]]
 key = "crash_1987"
+name = "Black Monday crash, 1987"
 peak = 1987-08-25
 trough = 1987-12-04
+recovered = 1989-07-26
 spx_drawdown = -0.34
 nasdaq_drawdown = -0.36
 recession = false
@@ -55,8 +67,10 @@ notes = "No recession warning; stretched valuations and a Fed hiking into a high
 
 [[episode]]
 key = "gulf_1990"
+name = "Gulf War oil shock, 1990"
 peak = 1990-07-16
 trough = 1990-10-11
+recovered = 1991-02-13
 spx_drawdown = -0.20
 nasdaq_drawdown = -0.33
 recession = true
@@ -69,8 +83,10 @@ notes = "Tightening bank lending standards and the S&L credit crunch before the 
 
 [[episode]]
 key = "ltcm_1998"
+name = "Russia default and LTCM, 1998"
 peak = 1998-07-17
 trough = 1998-10-08
+recovered = 1998-11-23
 spx_drawdown = -0.19
 nasdaq_drawdown = -0.30
 recession = false
@@ -81,8 +97,10 @@ notes = "No recession signal; a brief curve inversion (a false alarm) and credit
 
 [[episode]]
 key = "dotcom_2000"
+name = "Dot-com bust, 2000-02"
 peak = 2000-03-24
 trough = 2002-10-09
+recovered = 2007-05-30
 spx_drawdown = -0.49
 nasdaq_drawdown = -0.78
 recession = true
@@ -95,8 +113,10 @@ notes = "Extreme valuation, a hiking Fed, an inverted curve and breadth that bro
 
 [[episode]]
 key = "gfc_2007"
+name = "Global financial crisis, 2007-09"
 peak = 2007-10-09
 trough = 2009-03-09
+recovered = 2013-03-28
 spx_drawdown = -0.57
 nasdaq_drawdown = -0.56
 recession = true
@@ -109,8 +129,10 @@ notes = "An inverted curve in 2006-07, permits down over 20% a year, tighter len
 
 [[episode]]
 key = "downgrade_2011"
+name = "US downgrade and euro crisis, 2011"
 peak = 2011-04-29
 trough = 2011-10-03
+recovered = 2012-02-24
 spx_drawdown = -0.19
 nasdaq_drawdown = -0.19
 recession = false
@@ -121,8 +143,10 @@ notes = "No recession signal; VIX term structure inverted and credit spreads wid
 
 [[episode]]
 key = "qt_2018"
+name = "Fed tightening scare, late 2018"
 peak = 2018-09-20
 trough = 2018-12-24
+recovered = 2019-04-23
 spx_drawdown = -0.20
 nasdaq_drawdown = -0.24
 recession = false
@@ -133,8 +157,10 @@ notes = "A Fed tightening into a high market and narrowing breadth; VIX backward
 
 [[episode]]
 key = "covid_2020"
+name = "Covid crash, early 2020"
 peak = 2020-02-19
 trough = 2020-03-23
+recovered = 2020-08-18
 spx_drawdown = -0.34
 nasdaq_drawdown = -0.30
 recession = true
@@ -147,8 +173,10 @@ notes = "The curve had inverted in 2019 and manufacturing was weak for five mont
 
 [[episode]]
 key = "hikes_2022"
+name = "Rate-hike bear market, 2022"
 peak = 2022-01-03
 trough = 2022-10-12
+recovered = 2024-01-19
 spx_drawdown = -0.25
 nasdaq_drawdown = -0.36
 recession = false
@@ -159,8 +187,10 @@ notes = "Inflation, a fast-hiking Fed and narrow breadth in late 2021; two negat
 
 [[episode]]
 key = "tariffs_2025"
+name = "Tariff shock, spring 2025"
 peak = 2025-02-19
 trough = 2025-04-08
+recovered = 2025-06-27
 spx_drawdown = -0.19
 nasdaq_drawdown = -0.24
 recession = false
@@ -168,3 +198,57 @@ kind = "shock"
 cause = "The April 2 'Liberation Day' tariffs; the 90-day pause on April 9 began the recovery, with a new high by June 27."
 known_from = 2025-04-08
 notes = "VIX closed at 45 with its term structure inverted and HY spreads gapping; -21% intraday; the Nasdaq fell from Dec 2024."
+
+# The NBER recessions since 1969 (the Business Cycle Dating Committee's chronology), for the
+# regime page's recession bands (ADR 0047). Point in time: the committee dates a turning point
+# months after it, so a page shows a recession only from `announced_start` (or `start` when
+# that is null) and its end only from `announced_end` (or `end` when null).
+# - start / end: the first day of the NBER peak month and of the trough month.
+# - announced_start / announced_end: the day the committee announced that peak / trough
+#   (nber.org, "Business Cycle Dating Committee Announcements"; 1980-1983 and 1991-2021
+#   read there). Null (omitted) for 1969-70 and 1973-75: NBER's page lists no announcement
+#   before June 1980, so we do not guess one; the page then shows them from `start` / `end`.
+
+[[recession]]
+start = 1969-12-01
+end = 1970-11-01
+
+[[recession]]
+start = 1973-11-01
+end = 1975-03-01
+
+[[recession]]
+start = 1980-01-01
+end = 1980-07-01
+announced_start = 1980-06-03
+announced_end = 1981-07-08
+
+[[recession]]
+start = 1981-07-01
+end = 1982-11-01
+announced_start = 1982-01-06
+announced_end = 1983-07-08
+
+[[recession]]
+start = 1990-07-01
+end = 1991-03-01
+announced_start = 1991-04-25
+announced_end = 1992-12-22
+
+[[recession]]
+start = 2001-03-01
+end = 2001-11-01
+announced_start = 2001-11-26
+announced_end = 2003-07-17
+
+[[recession]]
+start = 2007-12-01
+end = 2009-06-01
+announced_start = 2008-12-01
+announced_end = 2010-09-20
+
+[[recession]]
+start = 2020-02-01
+end = 2020-04-01
+announced_start = 2020-06-08
+announced_end = 2021-07-19
