@@ -7,14 +7,17 @@ Behaviour carried over from the original liquidity_screen.py and made stricter:
   ``feature.option_chain_oi`` (expression features), then the rest alphabetically;
 - every ticker gets a status (OK, NO_CHAIN, NO_STANDARD_SERIES, STALE_DATA, FETCH_ERROR);
   none is dropped;
-- the task is resumable: a re-run for the same session reuses finished tickers;
+- the task is resumable: a re-run for the same session reuses finished tickers (OK, NO_CHAIN,
+  NO_STANDARD_SERIES) and refetches the STALE_DATA and FETCH_ERROR ones (``RETRYABLE``), so a
+  retry after Cboe's delayed feed rolls over refreshes them and keeps the earlier OK rows;
 - failures get a second, gentler pass with one worker, after a cool-down the source's shared
   limiter applies to every process (``Throttled``);
 - raw responses are saved before parsing (``IngestRun.fetch``), so normalisation can be
   replayed.
 
 Per-ticker results are staged, then published as one partition per table and session. The
-staging is kept while FETCH_ERROR items remain (a re-run resumes from it), else dropped.
+staging is kept while FETCH_ERROR or STALE_DATA items remain (a re-run resumes from it and
+republishes the merged results), else dropped.
 """
 
 from collections.abc import Sequence
@@ -222,4 +225,4 @@ def ingest_option_chains(
         run.stats.update(universe=len(universe), statuses=counts, order_tiers=tiers)
         if no_chain_share > MAX_NO_CHAIN_SHARE:
             run.partial(f"{no_chain_share:.0%} of optionable names returned no chain")
-    return run.record  # staging: dropped by IngestRun unless FETCH_ERROR items remain
+    return run.record  # staging: dropped by IngestRun unless retryable items remain

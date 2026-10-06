@@ -52,7 +52,9 @@ REFERENCE = "instruments/reference"
 FETCH_ERROR = "FETCH_ERROR"
 # Item statuses that make a run PARTIAL. ``RETRYABLE`` items are refetched on resume.
 FAILURES = (FETCH_ERROR, "STALE_DATA", "FAILED")
-RETRYABLE = (FETCH_ERROR,)
+# STALE_DATA is retryable too: the vendor may serve the session later (a delayed feed rolling
+# thin names over), so a re-run refetches it and the staging of the finished items survives.
+RETRYABLE = (FETCH_ERROR, "STALE_DATA")
 # Run statuses whose table writes are published (ADR 0022); FAILED publishes nothing.
 PUBLISHED = (RunStatus.COMPLETE, RunStatus.PARTIAL)
 

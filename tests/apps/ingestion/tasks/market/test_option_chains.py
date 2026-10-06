@@ -133,11 +133,47 @@ def test_finished_chain_runs_drop_their_staging(backend: MemoryBackend | LocalBa
     assert done.status is RunStatus.COMPLETE
     assert writer.staging.keys(done.run_id, OPTIONS) == []
     assert StoreReader(backend).table(OPTIONS, DAY) is not None
-    # PARTIAL with nothing a resume would refetch (no FETCH_ERROR): dropped too
-    stale = {"A": fx.payload("A"), "OLD": fx.payload("OLD", session=DAY - timedelta(days=1))}
-    partial = run(writer, FakeFeed(stale), universe("A", "OLD"), retry_pause_s=0)
-    assert partial.status is RunStatus.PARTIAL
-    assert writer.staging.keys(partial.run_id, OPTIONS) == []
+    # PARTIAL with nothing a resume would refetch (only NO_CHAIN misses): dropped too
+    gone = run(writer, FakeFeed({"A": fx.payload("A")}), universe("A", "GONE"), retry_pause_s=0)
+    assert gone.status is RunStatus.PARTIAL  # 50% NO_CHAIN is suspicious
+    assert writer.staging.keys(gone.run_id, OPTIONS) == []
+
+
+def test_rerun_refetches_stale_and_keeps_ok_rows(backend: MemoryBackend | LocalBackend) -> None:
+    writer = StoreWriter(backend)
+    old = DAY - timedelta(days=1)
+    names = universe("A", "OLD", "BARE")
+    bare = fx.payload("BARE", options=[fx.contract("BARE1", fx.EXPIRIES[0], "C", 100)])
+    stale = fx.payload("OLD", session=old)
+    first_feed = FakeFeed({"A": fx.payload("A"), "OLD": stale, "BARE": bare})
+    first = run(writer, first_feed, names, retry_pause_s=0)
+    assert first.status is RunStatus.PARTIAL
+    assert first.items["EQ:OLD"].startswith("STALE_DATA")
+    assert writer.staging.keys(first.run_id, OPTIONS) == ["A"]  # stale left: kept
+    # the feed rolled over
+    feed = FakeFeed({"A": fx.payload("A"), "OLD": fx.payload("OLD"), "BARE": bare})
+    second = run(writer, feed, names, retry_pause_s=0)
+    assert second.run_id == first.run_id
+    assert second.status is RunStatus.COMPLETE
+    assert second.items == {"EQ:A": "OK", "EQ:OLD": "OK", "EQ:BARE": "NO_STANDARD_SERIES"}
+    assert feed.calls == ["OLD"]  # OK and NO_STANDARD_SERIES results are kept, not refetched
+    options = StoreReader(backend).table(OPTIONS, DAY)
+    assert options is not None and set(options["underlying_id"]) == {"EQ:A", "EQ:OLD"}
+    status = StoreReader(backend).table(STATUS, DAY)
+    assert status is not None and set(status["status"]) == {"OK", "NO_STANDARD_SERIES"}
+    assert writer.staging.keys(second.run_id, OPTIONS) == []  # nothing stale left: dropped
+
+
+def test_rerun_with_nothing_stale_fetches_nothing(backend: MemoryBackend | LocalBackend) -> None:
+    writer = StoreWriter(backend)
+    names = universe("A", "GONE")  # PARTIAL (50% NO_CHAIN), but nothing stale or failed
+    first = run(writer, FakeFeed({"A": fx.payload("A")}), names, retry_pause_s=0)
+    assert first.status is RunStatus.PARTIAL
+    feed = FakeFeed({"A": fx.payload("A")})
+    second = run(writer, feed, names, retry_pause_s=0)
+    assert second.run_id == first.run_id and feed.calls == []
+    options = StoreReader(backend).table(OPTIONS, DAY)
+    assert options is not None and set(options["underlying_id"]) == {"EQ:A"}
 
 
 def test_mass_no_chain_is_suspicious() -> None:
