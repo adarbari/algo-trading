@@ -1,18 +1,21 @@
 """The exchange calendar (NYSE): which days are sessions, and when each one closes.
 
 The one place that knows weekends, holidays and early closes (ADR 0019, ``session-calendar``).
-Pure Python. Rules (NYSE, current since 2022):
+Pure Python. Rules (NYSE), valid for sessions from 1971 (the Monday-holiday rules of that
+year; earlier years are not modelled: Washington's Birthday was February 22, and 1968 had
+Wednesday paperwork-crisis closures and a state-wide election-day closure):
 
 - full-day holidays: New Year's Day (Sunday -> Monday; Saturday -> not observed, the year-end
-  session stays open), Martin Luther King Jr. Day (3rd Monday of January), Washington's
-  Birthday (3rd Monday of February), Good Friday, Memorial Day (last Monday of May),
-  Juneteenth (from 2022), Independence Day, Labor Day (1st Monday of September), Thanksgiving
-  (4th Thursday of November) and Christmas; fixed-date holidays move Saturday -> Friday and
-  Sunday -> Monday;
-- special closures (``SPECIAL_CLOSURES``): days the exchange closed outside the rules, e.g.
-  national days of mourning;
+  session stays open), Martin Luther King Jr. Day (3rd Monday of January, from 1998: the NYSE
+  stayed open on it before), Washington's Birthday (3rd Monday of February), Good Friday,
+  Memorial Day (last Monday of May), Juneteenth (from 2022), Independence Day, Labor Day
+  (1st Monday of September), Thanksgiving (4th Thursday of November) and Christmas;
+  fixed-date holidays move Saturday -> Friday and Sunday -> Monday;
+- special closures (``SPECIAL_CLOSURES``): days the exchange closed outside the rules since
+  1971: presidential election days to 1980, days of mourning, a blackout, hurricanes and
+  September 11;
 - early closes (13:00 New York): July 3 and December 24 when they are sessions, and the day
-  after Thanksgiving.
+  after Thanksgiving (the close times are the current ones; no earlier era is modelled).
 
 ``last_closed_session(now)`` is the session a nightly run may ingest as end of day: the most
 recent one whose close (plus a settle margin) has passed in New York time. A run started
@@ -28,10 +31,32 @@ REGULAR_CLOSE = time(16, 0)
 EARLY_CLOSE = time(13, 0)
 DEFAULT_SETTLE = timedelta(minutes=30)
 _MONDAY, _THURSDAY, _FRIDAY, _SATURDAY = 0, 3, 4, 5
-# Full-day closures outside the rules (NYSE): national days of mourning.
+_MLK_FROM_YEAR = 1998  # first NYSE closure for Martin Luther King Jr. Day: 1998-01-19
+# Full-day closures outside the rules since 1971 (NYSE; cross-checked with the list in
+# exchange_calendars' XNYS calendar and the NYSE's "Market Closings" history).
 SPECIAL_CLOSURES: dict[date, str] = {
+    date(1972, 11, 7): "presidential election day (closed through 1980)",
+    date(1972, 12, 28): "national day of mourning, President Harry S. Truman",
+    date(1973, 1, 25): "national day of mourning, President Lyndon B. Johnson",
+    date(1976, 11, 2): "presidential election day (closed through 1980)",
+    date(1977, 7, 14): "New York City blackout",
+    date(1980, 11, 4): "presidential election day (closed through 1980)",
+    date(1985, 9, 27): "Hurricane Gloria",
+    date(1994, 4, 27): "national day of mourning, President Richard Nixon",
+    date(2001, 9, 11): "September 11 attacks",
+    date(2001, 9, 12): "September 11 attacks",
+    date(2001, 9, 13): "September 11 attacks",
+    date(2001, 9, 14): "September 11 attacks",
+    date(2004, 6, 11): "national day of mourning, President Ronald Reagan",
+    date(2007, 1, 2): "national day of mourning, President Gerald Ford",
+    date(2012, 10, 29): "Hurricane Sandy",
+    date(2012, 10, 30): "Hurricane Sandy",
     date(2018, 12, 5): "national day of mourning, President George H. W. Bush",
     date(2025, 1, 9): "national day of mourning, President Jimmy Carter",
+}
+_SPECIAL_BY_YEAR: dict[int, frozenset[date]] = {
+    year: frozenset(d for d in SPECIAL_CLOSURES if d.year == year)
+    for year in {d.year for d in SPECIAL_CLOSURES}
 }
 
 
@@ -78,7 +103,6 @@ def _observed(day: date) -> date:
 def holidays(year: int) -> frozenset[date]:
     """Full-day exchange holidays in ``year``."""
     days = {
-        nth_weekday(year, 1, _MONDAY, 3),
         nth_weekday(year, 2, _MONDAY, 3),
         easter(year) - timedelta(2),
         nth_weekday(year, 5, _MONDAY, -1),
@@ -90,9 +114,11 @@ def holidays(year: int) -> frozenset[date]:
     new_year = date(year, 1, 1)
     if new_year.weekday() != _SATURDAY:  # a Saturday New Year's Day is not observed
         days.add(_observed(new_year))
+    if year >= _MLK_FROM_YEAR:
+        days.add(nth_weekday(year, 1, _MONDAY, 3))
     if year >= 2022:
         days.add(_observed(date(year, 6, 19)))
-    days.update(d for d in SPECIAL_CLOSURES if d.year == year)
+    days.update(_SPECIAL_BY_YEAR.get(year, ()))
     return frozenset(days)
 
 
