@@ -3,6 +3,14 @@
 #
 #   scripts/worktree.sh [--dry-run] <branch> [base]    new worktree off origin/<base|main>
 #   scripts/worktree.sh [--dry-run] --remove <branch>  remove it (refuses if dirty / unpushed)
+#   scripts/worktree.sh [--dry-run] --prune-merged     remove the worktrees of merged PRs
+#
+# --prune-merged covers ../algo-trading-*, ../algo-wt-* and <main>/.claude/worktrees/*. It
+# removes a worktree only when it is clean, not locked, not the current one, its branch has no
+# open PR and a merged PR (`gh`) whose last commit is the worktree's HEAD (or an ancestor of
+# it), then deletes the local branch (`git branch -D`: a squash-merged branch is never an
+# ancestor of main, which is why --remove refuses it). It prints "removed" / "kept <reason>"
+# per worktree (dry-run: "would remove"), never touches the main checkout, and needs `gh`.
 #
 # The worktree is ../algo-trading-<branch-slug> (slash -> dash) next to the main checkout.
 # Create: symlinks .venv to the main checkout's (so pre-commit hooks work; never --no-verify
@@ -15,20 +23,23 @@
 # Then: `source <wt>/worktree.env`.
 set -euo pipefail
 
-dry=0 remove=0 args=()
+dry=0 remove=0 prune=0 args=()
 for a in "$@"; do
   case "$a" in
     --dry-run) dry=1 ;;
     --remove) remove=1 ;;
-    -h | --help) sed -n '2,15p' "$0"; exit 0 ;;
+    --prune-merged) prune=1 ;;
+    -h | --help) sed -n '2,22p' "$0"; exit 0 ;;
     *) args+=("$a") ;;
   esac
 done
-if [ "${#args[@]}" -lt 1 ] || [ "${#args[@]}" -gt 2 ]; then
-  echo "usage: scripts/worktree.sh [--dry-run] [--remove] <branch> [base]" >&2
+if [ "$prune" = 1 ]; then
+  [ "${#args[@]}" = 0 ] && [ "$remove" = 0 ] || { echo "--prune-merged takes no branch" >&2; exit 2; }
+elif [ "${#args[@]}" -lt 1 ] || [ "${#args[@]}" -gt 2 ]; then
+  echo "usage: scripts/worktree.sh [--dry-run] [--remove] <branch> [base] | --prune-merged" >&2
   exit 2
 fi
-branch=${args[0]}
+branch=${args[0]:-}
 base=${args[1]:-main}
 
 main=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)
@@ -38,6 +49,72 @@ wt="$(dirname "$main")/algo-trading-$slug"
 run() {
   if [ "$dry" = 1 ]; then echo "[dry-run] $*"; else "$@"; fi
 }
+
+# Why the worktree at $1 (branch $2, HEAD $3) must stay, or empty when its PR is merged.
+keep_reason() {
+  local path=$1 br=$2 head=$3 oid
+  [ -n "$br" ] || { echo "detached HEAD"; return; }
+  [ -n "$(git -C "$path" status --porcelain --ignore-submodules)" ] && { echo "uncommitted changes"; return; }
+  grep -Fxq "$br" "$tmp/open" && { echo "open PR"; return; }
+  awk -F'\t' -v b="$br" '$1 == b { f = 1 } END { exit !f }' "$tmp/merged" || { echo "no merged PR"; return; }
+  while read -r b oid; do
+    [ "$b" = "$br" ] || continue
+    [ "$oid" = "$head" ] && return
+    git cat-file -e "$oid^{commit}" 2>/dev/null && git merge-base --is-ancestor "$head" "$oid" && return
+  done <"$tmp/merged"
+  echo "commits after the merged PR"
+}
+
+prune_merged() {
+  command -v gh >/dev/null || { echo "gh not on PATH" >&2; exit 1; }
+  tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+  gh pr list --state merged --limit 2000 --json headRefName,headRefOid \
+    --jq '.[] | [.headRefName, .headRefOid] | @tsv' >"$tmp/merged"
+  gh pr list --state open --limit 500 --json headRefName --jq '.[].headRefName' >"$tmp/open"
+  local mainp cur path br head why removed=0 kept=0
+  mainp=$(cd "$main" && pwd -P)
+  cur=$(git rev-parse --show-toplevel 2>/dev/null || true)
+  git worktree list --porcelain >"$tmp/list"
+  path="" br="" head="" locked=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      "worktree "*) path=${line#worktree } br="" head="" locked=0 ;;
+      "HEAD "*) head=${line#HEAD } ;;
+      "branch "*) br=${line#branch refs/heads/} ;;
+      locked*) locked=1 ;;
+      "") ;;
+    esac
+    # a record ends at the blank line after it; handle it there
+    [ -z "$line" ] || continue
+    [ -n "$path" ] && [ "$path" != "$mainp" ] || { path=""; continue; }
+    case "$path" in
+      "$(dirname "$mainp")"/algo-trading-* | "$(dirname "$mainp")"/algo-wt-* | "$mainp"/.claude/worktrees/*) ;;
+      *) path=""; continue ;;
+    esac
+    if [ "$path" = "$cur" ]; then why="the current worktree"
+    elif [ "$locked" = 1 ]; then why="locked"
+    else why=$(keep_reason "$path" "$br" "$head"); fi
+    if [ -n "$why" ]; then
+      echo "kept $path ($br): $why"; kept=$((kept + 1))
+    else
+      if [ "$dry" = 1 ]; then echo "would remove $path ($br)"; else
+        [ -L "$path/.venv" ] && rm "$path/.venv"
+        [ -L "$path/apps/web/node_modules" ] && rm "$path/apps/web/node_modules"
+        rm -f "$path/worktree.env"
+        if git -C "$mainp" worktree remove "$path" && git -C "$mainp" branch -D "$br" >/dev/null; then
+          echo "removed $path ($br)"
+        else
+          echo "kept $path ($br): git refused to remove it"; kept=$((kept + 1)); continue
+        fi
+      fi
+      removed=$((removed + 1))
+    fi
+    path=""
+  done <"$tmp/list"
+  echo "$([ "$dry" = 1 ] && echo "would remove" || echo removed) $removed worktree(s), kept $kept"
+}
+
+if [ "$prune" = 1 ]; then prune_merged; exit 0; fi
 
 if [ "$remove" = 1 ]; then
   [ -d "$wt" ] || { echo "no worktree at $wt" >&2; exit 1; }

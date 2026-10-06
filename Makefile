@@ -14,7 +14,7 @@ WORKERS ?= auto
 WEB_WORKERS ?=
 BASE ?= origin/main
 
-doctor:          ## is this machine ready? (uv, Node 24, Docker, gh, venv, web deps, .env keys, store); prints the fix for each failure
+doctor:          ## is this machine ready? (uv, Node 24, Docker, gh, venv, web deps, disk, merged-PR worktrees, .env keys, store); prints the fix for each failure
 	@$(if $(wildcard $(PY)),$(PY),python3) scripts/doctor.py
 
 status:          ## PRs + CI, running ingest jobs, last nightly, store latest session, dev servers (~15 lines, read-only)

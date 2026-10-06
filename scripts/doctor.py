@@ -22,6 +22,8 @@ REPO = Path(__file__).resolve().parents[1]
 CI_PYTHON = "3.12"
 NODE_MAJOR = "24"
 OK, FAIL, WARN, INFO = "ok", "FAIL", "warn", "info"
+LOW_DISK_GB = 10  # below this a full disk stops every agent and the nightly (2026-10-06)
+MAX_MERGED_WORKTREES = 10  # leftover worktrees of merged PRs, each with its own node_modules
 
 
 def _run(cmd: list[str], cwd: Path | None = None) -> tuple[int, str]:
@@ -61,6 +63,7 @@ class Probes:
     web_dist: Callable[[], Path | None] = field(default=lambda: None)  # ALGOTRADE_WEB_DIST
     llm_error: Callable[[Path], str | None] = field(default=lambda main: None)  # llm.toml's error
     launch_agents: Path = Path.home() / "Library" / "LaunchAgents"
+    free_bytes: Callable[[Path], int] = lambda path: shutil.disk_usage(path).free
 
 
 @dataclass(frozen=True)
@@ -335,6 +338,36 @@ def check_agents(p: Probes) -> list[Result]:
     return out
 
 
+def check_disk(p: Probes) -> Result:
+    free = p.free_bytes(p.main()) / 1e9
+    if free >= LOW_DISK_GB:
+        return Result(OK, "disk", f"{free:.0f} GB free")
+    return Result(
+        WARN,
+        "disk",
+        f"{free:.1f} GB free, under {LOW_DISK_GB} GB (a full disk stops agents and the nightly)",
+        f"{p.repo}/scripts/worktree.sh --prune-merged  # then rm -rf the caches it did not cover",
+    )
+
+
+def check_worktrees(p: Probes) -> Result:
+    """Leftover worktrees of merged PRs (same detection as ``worktree.sh --prune-merged``)."""
+    script = p.repo / "scripts" / "worktree.sh"
+    rc, out = p.run(["bash", str(script), "--prune-merged", "--dry-run"], cwd=p.main())
+    if rc != 0:
+        return Result(INFO, "worktrees", "merged-PR worktree check skipped (needs gh)")
+    merged = [x for x in out.splitlines() if x.startswith("would remove /")]
+    if len(merged) <= MAX_MERGED_WORKTREES:
+        return Result(OK, "worktrees", f"{len(merged)} of merged PRs (each holds ~440 MB)")
+    return Result(
+        WARN,
+        "worktrees",
+        f"{len(merged)} worktrees of merged PRs, over {MAX_MERGED_WORKTREES}"
+        " (each holds its own node_modules, ~440 MB)",
+        f"{script} --prune-merged",
+    )
+
+
 def run_checks(p: Probes) -> list[Result]:
     return [
         check_uv(p),
@@ -344,6 +377,8 @@ def run_checks(p: Probes) -> list[Result]:
         *check_venv(p),
         check_venv_paths(p),
         check_node_modules(p),
+        check_disk(p),
+        check_worktrees(p),
         check_env(p),
         check_ibkr(p),
         check_store(p),
