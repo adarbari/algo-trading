@@ -253,6 +253,24 @@ def test_rollup_params_typed_from_the_declared_defaults() -> None:
     assert load_rollups(store, declared)["r@v1"].n == 7
 
 
+def test_one_rollups_params_read_from_its_own_section_only() -> None:
+    from dataclasses import dataclass  # noqa: PLC0415
+
+    from algotrade.config.site.settings import load_rollup  # noqa: PLC0415
+
+    @dataclass(frozen=True)
+    class Params:
+        n: int = 5
+
+    other = {"other@v1": {"anything": 1}}  # another rollup's section: not this reader's concern
+    store = MemoryConfigStore({("site", "settings", "rollups"): {"r@v1": {"n": 3}, **other}})
+    assert load_rollup(store, "r@v1", Params()) == Params(3)
+    assert load_rollup(store, "absent@v1", Params()) == Params()  # no section: the defaults
+    bad = MemoryConfigStore({("site", "settings", "rollups"): {"r@v1": {"m": 3}}})
+    with pytest.raises(ConfigurationError, match=r"unknown keys \['m'\]"):
+        load_rollup(bad, "r@v1", Params())
+
+
 def test_site_rollups_toml_loads_for_every_registered_rollup() -> None:
     from algotrade.config.site.settings import rollup_params  # noqa: PLC0415
     from algotrade.features.registry import GROUPS  # noqa: PLC0415

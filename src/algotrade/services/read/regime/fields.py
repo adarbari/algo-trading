@@ -23,6 +23,8 @@ LABEL = f"{REGIME}.label"
 MACRO_RISK = f"{REGIME}.macro_risk"
 MARKET_STRESS = f"{REGIME}.market_stress"
 FRAGILITY = f"{REGIME}.fragility"
+MACRO_COVERAGE = f"{REGIME}.macro_coverage"  # the share of macro_risk's weight known
+MARKET_COVERAGE = f"{REGIME}.market_coverage"  # the share of market_stress's weight known
 ON = "_on"  # <card feature> + ON: the indicator's verdict (bool)
 CHANGED = "_changed"  # <card feature> + CHANGED: the verdict changed within 5 sessions (bool)
 
