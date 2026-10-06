@@ -1,5 +1,5 @@
 """Fitness tests for the web app's directory layout (ADR 0025, ``[[web_dir]]`` in
-``architecture/layout.toml``).
+``architecture/web_layout.toml``).
 
 - every directory under ``apps/web`` (build output and ``node_modules`` skipped) is declared;
 - at most ``max_modules`` modules per directory (``index.ts``, tests, stories and ``.d.ts``
@@ -25,12 +25,14 @@ import pytest
 
 from tests.conftest import REPO_ROOT
 
-LAYOUT_FILE = "architecture/layout.toml"
+LAYOUT_FILE = "architecture/layout.toml"  # shared settings: max_modules, banned_module_names
+WEB_LAYOUT_FILE = "architecture/web_layout.toml"  # the [web] settings and every [[web_dir]]
 LAYOUT: dict[str, Any] = tomllib.loads((REPO_ROOT / LAYOUT_FILE).read_text())
-WEB: dict[str, Any] = LAYOUT["web"]
-DIRS: list[dict[str, Any]] = LAYOUT["web_dir"]
+WEB_LAYOUT: dict[str, Any] = tomllib.loads((REPO_ROOT / WEB_LAYOUT_FILE).read_text())
+WEB: dict[str, Any] = WEB_LAYOUT["web"]
+DIRS: list[dict[str, Any]] = WEB_LAYOUT["web_dir"]
 GUIDE = "docs/ui/architecture.md (where it goes) and .claude/skills/add-web-page"
-HINT = f"declare it as a [[web_dir]] in {LAYOUT_FILE} with a purpose; see {GUIDE}"
+HINT = f"declare it as a [[web_dir]] in {WEB_LAYOUT_FILE} with a purpose; see {GUIDE}"
 KINDS = (None, "layer", "slice", "segment", "component", "screenshots")
 CODE_SUFFIXES = (".ts", ".tsx", ".js")
 NOT_MODULES = ("index.ts", "*.test.*", "*.spec.*", "*.stories.*", "*.d.ts")
@@ -105,7 +107,7 @@ def test_web_declarations_are_well_formed_and_not_stale() -> None:
         # A glob (a slot such as features/*) may match nothing yet; an exact path must exist.
         if "*" not in decl["path"]:
             assert (REPO_ROOT / decl["path"]).is_dir(), (
-                f"[[web_dir]] {decl['path']} does not exist: remove it from {LAYOUT_FILE}"
+                f"[[web_dir]] {decl['path']} does not exist: remove it from {WEB_LAYOUT_FILE}"
             )
 
 

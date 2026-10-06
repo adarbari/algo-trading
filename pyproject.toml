@@ -280,7 +280,7 @@ allow_indirect_imports = true
 # ---- ADR 0024, ADR 0037: the API is a thin HTTP layer; page reads are GraphQL over services.read.
 
 [[tool.importlinter.contracts]]
-name = "API: routes reach the library only through services.read, services.preview, services.drafting, services.authoring, config and core (ADR 0024, ADR 0037, ADR 0041)"
+name = "API: routes reach the library only through services.read, services.preview, services.drafting, services.explaining, services.authoring, config and core (ADR 0024, ADR 0037, ADR 0041)"
 type = "forbidden"
 source_modules = ["algotrade_api"]
 forbidden_modules = [
@@ -305,6 +305,22 @@ allow_indirect_imports = true  # services.read and services.preview read the sto
 name = "Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"
 type = "forbidden"
 source_modules = ["algotrade.services.drafting"]
+forbidden_modules = [
+    "algotrade.storage.tables.writers",
+    "algotrade.storage.tables.result_writer",
+    "algotrade.storage.configs.writer",
+    "algotrade.services.jobs",
+    "algotrade.services.authoring",
+    "algotrade.services.ondemand",
+    "algotrade.services.screening",
+    "algotrade_sources",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Explaining reads the regime and writes only its cache: no writers, no jobs, no vendors (ADR 0041)"
+type = "forbidden"
+source_modules = ["algotrade.services.explaining"]
 forbidden_modules = [
     "algotrade.storage.tables.writers",
     "algotrade.storage.tables.result_writer",
@@ -606,9 +622,9 @@ source_modules = ["algotrade.config.site"]
 forbidden_modules = ["algotrade.config.strategy"]
 
 [[tool.importlinter.contracts]]
-name = "Layout: use-case packages are independent (backtests, screening, authoring, drafting)"
+name = "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining)"
 type = "independence"
-modules = ["algotrade.services.backtests", "algotrade.services.screening", "algotrade.services.authoring", "algotrade.services.drafting"]
+modules = ["algotrade.services.backtests", "algotrade.services.screening", "algotrade.services.authoring", "algotrade.services.drafting", "algotrade.services.explaining"]
 
 # ---- ADR 0029: user configs are written only through services.authoring (the API calls it).
 [[tool.importlinter.contracts]]

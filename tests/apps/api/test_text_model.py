@@ -1,5 +1,5 @@
 """The API's text model (ADR 0041): ``llm.toml`` builds it, and a file that does not load turns
-drafting off with the file's message instead of stopping the app."""
+the text model off with the file's message instead of stopping the app."""
 
 import logging
 from dataclasses import replace
@@ -10,8 +10,8 @@ from fastapi.testclient import TestClient
 
 from algotrade.storage.configs.files import MemoryConfigStore
 from algotrade_api.deps import ApiSettings, ReadStore
-from algotrade_api.drafting import OFF, open_drafting
 from algotrade_api.main import create_app
+from algotrade_api.text_model import OFF, open_text_model
 from algotrade_sources.llm.chat import ChatCompletions
 from tests.helpers.api_store import as_user
 
@@ -23,24 +23,25 @@ def configs(llm: dict[str, Any] | None) -> MemoryConfigStore:
 def test_a_missing_or_disabled_file_is_off_without_a_complaint(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    assert open_drafting(configs(None)) == (None, OFF)
-    assert open_drafting(configs({"enabled": False})) == (None, OFF)
+    assert open_text_model(configs(None)) == (None, OFF)
+    assert open_text_model(configs({"enabled": False})) == (None, OFF)
     assert not caplog.records
 
 
 def test_an_enabled_file_builds_the_model_with_its_request_fields() -> None:
-    model, _ = open_drafting(
+    model, _ = open_text_model(
         configs({"enabled": True, "model": "gemini", "request": {"reasoning_effort": "low"}})
     )
     assert isinstance(model, ChatCompletions) and model.model == "gemini"
+    assert model.name == "gemini"
     assert dict(model.extra) == {"reasoning_effort": "low"}
 
 
-def test_a_file_that_does_not_load_is_logged_and_turns_drafting_off(
+def test_a_file_that_does_not_load_is_logged_and_turns_the_text_model_off(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     with caplog.at_level(logging.ERROR):
-        model, reason = open_drafting(configs({"enabled": True, "reasoning_effort": "low"}))
+        model, reason = open_text_model(configs({"enabled": True, "reasoning_effort": "low"}))
     assert model is None
     assert "llm.toml" in reason and "reasoning_effort" in reason
     assert [r.levelname for r in caplog.records] == ["ERROR"]

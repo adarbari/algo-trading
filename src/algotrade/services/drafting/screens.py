@@ -16,10 +16,10 @@ from algotrade.config.site.settings import load_field_guide, load_phrasebook
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
 from algotrade.core.model.predicates import NO_VALUE_OPS, OPS
 from algotrade.services.configs import resolve_rule_draft
-from algotrade.services.drafting.model import TextModel
 from algotrade.services.drafting.prompt import system_prompt, user_prompt
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import feature_infos
+from algotrade.services.text_model.model import TextModel
 
 MODES = ("hard", "soft", "score")
 MISSES = ("WATCH", "LIQUIDITY_RISK", "EVENT_RISK")

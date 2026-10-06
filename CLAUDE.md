@@ -17,7 +17,7 @@ Read in this order, **by section and only when the task needs it** (grep, then r
 ## Settled decisions (one line each; the ADR has the detail)
 
 - **Four apps, one repo** (`apps/{ingestion,backtest,api,web}`): they never import each other; they share `src/algotrade/` and talk through storage (HTTP for web to api). (ADR 0004)
-- **Writes**: ingestion writes market and feature data. The API writes only user configs (ADR 0029), its live-quote log (ADR 0028) and the results of a screener run on request (ADR 0033). (ADR 0005)
+- **Writes**: ingestion writes market and feature data. The API writes only user configs (ADR 0029), its live-quote log (ADR 0028) and the results of a screener run on request (ADR 0033) and a derived cache of regime explanations (ADR 0041). (ADR 0005)
 - **Vendor sources are a shared package** `libs/sources/algotrade_sources/` (vendor SDKs live there): ingestion uses it for batch pulls, the API for live quotes; backtests and the library never import it. (ADR 0027)
 - **Storage by grain** behind `Protocol` interfaces, Parquet locally; no code outside `storage/backends/` builds a path. (ADR 0006)
 - **Point-in-time**: rows carry `ts`, `session_date`, `knowledge_ts`, `source`, `run_id`; features are `name@version`, precomputed nightly. (ADR 0007)
@@ -35,7 +35,7 @@ Read in this order, **by section and only when the task needs it** (grep, then r
 - **Reads serve one session**: every read resolves the session once (`services/read/session.py`) and reads session-grain tables for exactly that date; a fact not stored for it is UNKNOWN with a reason (`services/read/values.py`), never an older partition; a screener with no run for it is NOT_RUN. Snapshot tables (reference, company, universe) follow ADR 0007's one rule and say which snapshot they used. (ADR 0036)
 - **One read model, one graph**: page data is a domain read object in `src/algotrade/services/read/` (one loader per object) served by GraphQL (`apps/api/algotrade_api/graphql/`, snapshot `apps/api/schema.graphql`). REST only for writes, job polling, health, live quotes, preview POSTs and files (`architecture/rest_allowlist.toml`, shrink-only). New page read: `.claude/skills/add-graphql-field`; new object: `.claude/skills/add-domain-object`; status and plan: `docs/api/read-model.md`. (ADR 0037)
 - **Per-instrument stored values are catalogue features**: read by name through `features(names)`, never a typed field (REST legacy reads included: `features` dict; test `test_no_typed_catalogue_fields_in_api_schemas`); a fact a page needs that is not stored is a feature first (`add-feature`). The browser derives nothing from raw rows (`architecture/web_forbidden_derivations.toml`); tables are `widgets/feature-table` with the column factories in `entities/feature`. (ADR 0038)
-- **Natural-language screener drafts**: a sentence becomes a draft rule screen through one `TextModel` protocol (`services/drafting`) and the one OpenAI-compatible adapter in `algotrade_sources/llm` (provider by `config/site/llm.toml` `base_url`; key only from `ALGOTRADE_LLM_API_KEY`; off by default); the prompt is the sentence, the catalogue, the phrasebook and the field guide (`config/site/field_guide/*.toml`: how to read each field, the criterion per intent, the caveats; rendered to `docs/data/field-guide.md` by `make features-doc`); invented fields are dropped with a reason, the rest validated as finalise; a draft the Builder loads, never a write or a run. (ADR 0041)
+- **Natural-language screener drafts**: a sentence becomes a draft rule screen through one `TextModel` protocol (`services/text_model`, also behind the on-demand regime explanation in `services/explaining`) and the one OpenAI-compatible adapter in `algotrade_sources/llm` (provider by `config/site/llm.toml` `base_url`; key only from `ALGOTRADE_LLM_API_KEY`; off by default); the prompt is the sentence, the catalogue, the phrasebook and the field guide (`config/site/field_guide/*.toml`: how to read each field, the criterion per intent, the caveats; rendered to `docs/data/field-guide.md` by `make features-doc`); invented fields are dropped with a reason, the rest validated as finalise; a draft the Builder loads, never a write or a run. (ADR 0041)
 - **Ingestion workflows** by cadence: `market-daily` (gates screens), weekly `reference`, `enrichment`. A step declares `needs` and runs only when they SUCCEEDED; it SUCCEEDS or FAILS by its acceptance checks (thresholds in `sources.toml [quality]`), never PARTIAL; a failed critical step holds back the workflow and every later session until it succeeds or is waived by hand (`--waive`). (ADR 0039)
 
 ## Ownership (ADR 0019; enforced by `make ownership`, `make dupes`, `make arch`)
@@ -65,7 +65,7 @@ source (`tests/unit/<path>` = `src/algotrade/<path>`, `tests/libs/sources/<path>
 `apps/ingestion/algotrade_ingestion/<path>`); shared test builders live in `tests/helpers/`
 (vendor payloads in `tests/helpers/payloads/`), recorded data in `tests/fixtures/`.
 
-**Where does this go?** `grep -n purpose architecture/layout.toml` (every folder, with its
+**Where does this go?** `grep -n purpose architecture/*layout.toml` (every folder, with its
 purpose). The non-obvious cases:
 
 | Kind of code | Folder |
@@ -100,7 +100,7 @@ Screeners, Explore, Backtests) and ADMIN (Ingestion, Screener runs, Users & conf
 gating goes only in `src/app/workspaces/guard.ts`. Order (ADR 0011): tokens (FINAL, approved
 mockups 2026-10-03) -> primitives -> components -> screens; screens lay out and set text only
 with the primitives (Box, Surface, Stack, Grid, Text, Heading, Mono, Divider, VisuallyHidden).
-Every folder is a `[[web_dir]]` in `architecture/layout.toml`. Lint messages name the rule and
+Every folder is a `[[web_dir]]` in `architecture/web_layout.toml`. Lint messages name the rule and
 the skill with the fix.
 
 

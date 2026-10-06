@@ -125,6 +125,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/regime/explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Explain */
+        post: operations["explain_regime_explain_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/screeners/{screener_id}": {
         parameters: {
             query?: never;
@@ -310,6 +327,13 @@ export interface components {
              */
             user?: string | null;
         };
+        /** Citation */
+        Citation: {
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
+        };
         /** CopyBody */
         CopyBody: {
             /**
@@ -382,6 +406,19 @@ export interface components {
             id: string;
             /** Reason */
             reason: string;
+        };
+        /** ExplainBody */
+        ExplainBody: {
+            /**
+             * Card
+             * @description a regime card's key
+             */
+            card?: string | null;
+            /**
+             * Question
+             * @description only "what is happening?"
+             */
+            question?: string | null;
         };
         /** ExpressionCheck */
         ExpressionCheck: {
@@ -808,6 +845,34 @@ export interface components {
             passed: number;
             /** Rows */
             rows: number;
+        };
+        /** RegimeExplanation */
+        RegimeExplanation: {
+            /**
+             * Cached
+             * @description read from the cache, not asked of the model
+             */
+            cached: boolean;
+            /**
+             * Checked
+             * @description every number in the text is one of the facts
+             */
+            checked: boolean;
+            /**
+             * Citations
+             * @description allowed links the explanation used
+             */
+            citations: components["schemas"]["Citation"][];
+            /**
+             * Note
+             * @description why the text is withheld, when it is
+             */
+            note: string | null;
+            /**
+             * Text
+             * @description plain-text explanation; empty when checked is false
+             */
+            text: string;
         };
         /** RunRequest */
         RunRequest: {
@@ -1286,6 +1351,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ViewNames"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    explain_regime_explain_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExplainBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegimeExplanation"];
                 };
             };
             /** @description Validation Error */

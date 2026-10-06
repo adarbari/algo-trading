@@ -38,7 +38,8 @@ from algotrade.config.site.users import Role, UserRecord, UsersSettings
 from algotrade.config.user import DEFAULT_USER, UserContext
 from algotrade.core.model.errors import ConfigurationError, ModelUnavailableError
 from algotrade.services.authoring.scope import ConfigWriter, author, open_writer
-from algotrade.services.drafting.model import TextModel
+from algotrade.services.explaining.cache import TextCache
+from algotrade.services.explaining.limits import RateLimiter
 from algotrade.services.live.quotes import LiveQuotes
 from algotrade.services.ondemand.screens import OnDemandScreens
 from algotrade.services.read.context import (
@@ -52,6 +53,7 @@ from algotrade.services.read.context import (
     open_read_stores,
     open_stores,
 )
+from algotrade.services.text_model.model import TextModel
 from algotrade_api.auth.mode import AuthConfig
 from algotrade_api.auth.protocol import Authenticator, ForbiddenError, UnauthenticatedError
 
@@ -245,16 +247,30 @@ def get_ondemand(request: Request) -> OnDemandScreens:
 OnDemand = Annotated[OnDemandScreens, Depends(get_ondemand)]
 
 
-def get_drafter(request: Request) -> TextModel:
+def get_text_model(request: Request) -> TextModel:
     """The text model behind screener drafts ``create_app`` set up (ADR 0041); off (no
     ``llm.toml`` enabling it, tests, the OpenAPI export): 503 with the reason."""
-    model = cast(TextModel | None, request.app.state.drafter)
+    model = cast(TextModel | None, request.app.state.text_model)
     if model is None:
-        raise ModelUnavailableError(cast(str, request.app.state.drafter_off))
+        raise ModelUnavailableError(cast(str, request.app.state.text_model_off))
     return model
 
 
-Drafter = Annotated[TextModel, Depends(get_drafter)]
+TextModelDep = Annotated[TextModel, Depends(get_text_model)]
+
+
+def get_explain_cache(request: Request) -> TextCache:
+    """The cache of regime explanations ``create_app`` opened beside the store."""
+    return cast(TextCache, request.app.state.explain_cache)
+
+
+def get_explain_limiter(request: Request) -> RateLimiter:
+    """The per-user rate limit on regime explanations ``create_app`` set up."""
+    return cast(RateLimiter, request.app.state.explain_limiter)
+
+
+ExplainCache = Annotated[TextCache, Depends(get_explain_cache)]
+ExplainLimiter = Annotated[RateLimiter, Depends(get_explain_limiter)]
 
 
 def name_list(value: str | None) -> list[str]:

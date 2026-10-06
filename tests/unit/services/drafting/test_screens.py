@@ -38,6 +38,8 @@ OI = f"{LIQ}.chain_oi"
 class Canned:
     """A ``TextModel`` with one answer; keeps what it was asked."""
 
+    name = "canned"
+
     def __init__(self, answer: Any) -> None:
         self.answer = answer if isinstance(answer, str) else json.dumps(answer)
         self.asked: list[tuple[str, str]] = []
@@ -48,6 +50,8 @@ class Canned:
 
 
 class Down:
+    name = "down"
+
     def complete(self, system: str, user: str) -> str:
         raise ModelUnavailableError("llama at http://localhost:11434/v1: timed out")
 

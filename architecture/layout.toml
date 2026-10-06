@@ -22,7 +22,7 @@
 #     declared source directory that exists; every other test directory is a `[[test_dir]]`;
 #   - config/ and docs/ folders are declared (`[[config_dir]]`, `[[docs_dir]]`) and hold at
 #     most `max_files` files each (`kind = "log"`: an append-only numbered log, not capped);
-#   - every apps/web folder is a `[[web_dir]]` (ADR 0025; rules in the web section below,
+#   - every apps/web folder is a `[[web_dir]]` in architecture/web_layout.toml (ADR 0025;
 #     enforced by tests/architecture/test_layout_web.py).
 #
 #   path     a directory relative to the repo root; `*` matches one path segment
@@ -237,18 +237,18 @@ purpose = "use cases (the backend's interface for apps); shared helpers: configs
 [[dir]]
 path = "src/algotrade/services/backtests"
 purpose = "use case: run a configured backtest, record its run and results"
-contracts = ["Layout: use-case packages are independent (backtests, screening, authoring, drafting)"]
+contracts = ["Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining)"]
 
 [[dir]]
 path = "src/algotrade/services/screening"
 purpose = "use case: run a screener over the universe, record the run, export its rows"
-contracts = ["Layout: use-case packages are independent (backtests, screening, authoring, drafting)"]
+contracts = ["Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining)"]
 
 [[dir]]
 path = "src/algotrade/services/authoring"
 purpose = "use case: author L4 user configs (ADR 0029): rule-screen drafts, immutable versions, preset copy / rebase, schedule switch, user features; the only config writer the API calls"
 contracts = [
-    "Layout: use-case packages are independent (backtests, screening, authoring, drafting)",
+    "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining)",
     "Config writes go only through services.authoring (ADR 0029)",
 ]
 
@@ -263,8 +263,20 @@ contracts = ["Preview is read-only: no writers, no jobs (ADR 0029)"]
 
 [[dir]]
 path = "src/algotrade/services/drafting"
-purpose = "use case: a rule screen drafted from a sentence (ADR 0041): the TextModel protocol the API injects, the prompt over the caller's catalogue, strict parsing of the answer, invented fields dropped with a reason, the rest validated as finalise does; never a write, never a run"
+purpose = "use case: a rule screen drafted from a sentence (ADR 0041): the prompt over the caller's catalogue, strict parsing of the answer, invented fields dropped with a reason, the rest validated as finalise does; never a write, never a run"
 contracts = ["Drafting is read-only: no writers, no jobs, no vendors (ADR 0041)"]
+
+[[dir]]
+path = "src/algotrade/services/text_model"
+purpose = "the text-model seam (ADR 0041, amended 2026-10-06): the TextModel protocol the API injects and both callers (screener drafts, regime explanations) are asked through; no vendor, no storage"
+
+[[dir]]
+path = "src/algotrade/services/explaining"
+purpose = "use case: the market regime explained in plain words on request (ADR 0041, amended): the prompt of facts and allowed links, the answer cleaned and number-checked, the TextCache protocol and key, the per-user rate limit; the only write is the explanation cache"
+contracts = [
+    "Explaining reads the regime and writes only its cache: no writers, no jobs, no vendors (ADR 0041)",
+    "Layout: use-case packages are independent (backtests, screening, authoring, drafting, explaining)",
+]
 
 [[dir]]
 path = "src/algotrade/services/read"
@@ -364,16 +376,16 @@ purpose = "the golden synthetic fixture source (generators, catalogue, CSV files
 
 [[dir]]
 path = "apps/api/algotrade_api"
-purpose = "the API app: app factory (main), dependencies (deps), the live-quotes feed over IB Gateway (live, ADR 0028), the text model behind screener drafts (drafting, ADR 0041), the built web app on the API's origin (web, ADR 0044), the ASGI app and the algotrade-api CLI"
+purpose = "the API app: app factory (main), dependencies (deps), the live-quotes feed over IB Gateway (live, ADR 0028), the text model behind screener drafts and regime explanations (text_model, ADR 0041), the built web app on the API's origin (web, ADR 0044), the ASGI app and the algotrade-api CLI"
 contracts = [
-    "API: routes reach the library only through services.read, services.preview, services.drafting, services.authoring, config and core (ADR 0024, ADR 0037, ADR 0041)",
+    "API: routes reach the library only through services.read, services.preview, services.drafting, services.explaining, services.authoring, config and core (ADR 0024, ADR 0037, ADR 0041)",
     "Apps never import each other (ADR 0004)",
 ]
 
 [[dir]]
 path = "apps/api/algotrade_api/auth"
 purpose = "who is calling (ADR 0040): the Authenticator protocol, Supabase token verification (JWKS key cache, claims, email -> registry user) and the loopback-only ALGOTRADE_AUTH=off mode; the one reader of the Authorization header"
-contracts = ["API: routes reach the library only through services.read, services.preview, services.drafting, services.authoring, config and core (ADR 0024, ADR 0037, ADR 0041)"]
+contracts = ["API: routes reach the library only through services.read, services.preview, services.drafting, services.explaining, services.authoring, config and core (ADR 0024, ADR 0037, ADR 0041)"]
 
 [[dir]]
 path = "apps/api/algotrade_api/ops"
@@ -401,12 +413,20 @@ path = "apps/api/algotrade_api/routes/drafting"
 purpose = "the drafting route (ADR 0041): a sentence to a draft rule screen through the app's text model; a POST body, never a write; calls the one services.drafting use case"
 
 [[dir]]
+path = "apps/api/algotrade_api/routes/regime"
+purpose = "the regime route (ADR 0041, amended): the market regime in plain words through the app's text model; a POST body whose only write is the explanation cache; calls the one services.explaining use case"
+
+[[dir]]
 path = "apps/api/algotrade_api/schemas"
 purpose = "pydantic response models per area: the public contract (OpenAPI -> the web client)"
 
 [[dir]]
 path = "apps/api/algotrade_api/schemas/drafting"
 purpose = "request body and response of the drafting route (ADR 0041)"
+
+[[dir]]
+path = "apps/api/algotrade_api/schemas/regime"
+purpose = "request body and response of the regime explanation route (ADR 0041, amended)"
 
 [[dir]]
 path = "apps/api/algotrade_api/schemas/preview"
@@ -542,257 +562,7 @@ reason = "the one core / rest tier rule (ADR 0043): the chain fetch order, the c
 module = "apps/ingestion/algotrade_ingestion/tasks/maintenance/coverage.py"
 reason = "the coverage check is the rollups step's acceptance check (ADR 0043): the workflow declares which check accepts which step and runs it right after the step"
 
-# --------------------------------------------------------------------------- web app (apps/web)
-# ADR 0025 (frontend architecture). Every directory under apps/web (build output and
-# node_modules skipped) is a declared [[web_dir]]; enforced by
-# tests/architecture/test_layout_web.py. Modules are .ts/.tsx/.js files other than index.ts,
-# tests (*.test.*, *.spec.*), stories (*.stories.*) and declarations (*.d.ts); at most
-# `max_modules` per folder, and `[banned_module_names]` applies to their names. CSS only where
-# `styles = true` (the design system). Import rules between these folders: ESLint
-# (apps/web/lint-rules/), see docs/ui/architecture.md.
-#
-#   kind  "layer"       holds only slice folders (+ README.md): no modules of its own
-#         "slice"       one page / widget / feature / entity: must have a public index.ts
-#         "segment"     a slice's inner folder, named for its kind (`names`)
-#         "component"   one design-system component: <Name>.tsx, .module.css, .stories.tsx,
-#                       .test.tsx, index.ts, __screenshots__/ (details: npm run ds:check)
-#         "screenshots" committed screenshot baselines (.png only)
-
-[web]
-root = "apps/web"
-doc = "docs/adr/0025-frontend-architecture.md"
-skipped = ["node_modules", "dist", "storybook-static", "playwright-report", "test-results"]
-segment_names = ["ui", "model", "api", "lib", "config"]
-
-[[web_dir]]
-path = "apps/web"
-purpose = "the web app root: package, lockfile, Vite / TypeScript / ESLint / Stylelint / Playwright configs, index.html"
-
-[[web_dir]]
-path = "apps/web/.storybook"
-purpose = "Storybook config: the design-system catalogue (main) and the theme/density decorator (preview)"
-
-[[web_dir]]
-path = "apps/web/lint-rules"
-purpose = "ESLint rule sets by concern: base (TS, React, a11y), layers (rules 1-2), restrictions (rules 3-4)"
-
-[[web_dir]]
-path = "apps/web/scripts"
-purpose = "generators (tokens.css, COMPONENTS.md, API schema), the design-system completeness check, the node_modules guard (predev), the Playwright Docker runner"
-
-[[web_dir]]
-path = "apps/web/e2e"
-purpose = "Playwright end-to-end tests against the production build"
-
-[[web_dir]]
-path = "apps/web/e2e/fixtures"
-purpose = "API responses recorded from the real API for end-to-end route mocks, one folder per page"
-
-[[web_dir]]
-path = "apps/web/e2e/fixtures/*"
-purpose = "one page's recorded API responses (JSON), served by its e2e route mock"
-
-[[web_dir]]
-path = "apps/web/real"
-purpose = "Playwright real-app smoke: the Vite dev server against the real API on an empty and the golden store, every route, no mocks"
-
-[[web_dir]]
-path = "apps/web/visual"
-purpose = "Playwright screenshot + axe suite over every design-system story, light and dark"
-
-[[web_dir]]
-path = "apps/web/design-system"
-purpose = "package @algotrade/ui: the ONLY place styling and raw HTML elements live; index.ts is its public API"
-styles = true
-
-[[web_dir]]
-path = "apps/web/design-system/tokens"
-purpose = "typed design tokens (FINAL, approved mockups 2026-10-03), the contrast check and the generated tokens.css (npm run tokens)"
-styles = true
-
-[[web_dir]]
-path = "apps/web/design-system/theme"
-purpose = "UiProvider (fonts, tokens, theme, density, up/down palette) and the one global base.css"
-styles = true
-
-[[web_dir]]
-path = "apps/web/design-system/testing"
-purpose = "test support for design-system tests (axe assertion); never exported"
-
-[[web_dir]]
-path = "apps/web/design-system/format"
-purpose = "value formatters shared by the data components (number, percent, compact currency, date, signed delta with up/down tone); exported from @algotrade/ui"
-
-[[web_dir]]
-path = "apps/web/design-system/files"
-purpose = "browser file helpers (save text the app built as a download); exported from @algotrade/ui"
-
-[[web_dir]]
-path = "apps/web/design-system/foundations"
-purpose = "Storybook foundation pages (Foundations/Tokens: colours with contrast, type, space, radius, density)"
-styles = true
-
-[[web_dir]]
-path = "apps/web/design-system/foundations/__screenshots__"
-purpose = "the foundation pages' screenshot baselines, one per story and theme"
-kind = "screenshots"
-
-[[web_dir]]
-path = "apps/web/design-system/primitives"
-purpose = "layout and typography primitives, one folder each (index.ts re-exports them)"
-kind = "layer"
-
-[[web_dir]]
-path = "apps/web/design-system/primitives/*"
-purpose = "one primitive (Box, Surface, Stack, Grid, Text, Heading, Mono, Divider, VisuallyHidden); Text is the template every component copies"
-kind = "component"
-styles = true
-
-[[web_dir]]
-path = "apps/web/design-system/primitives/*/__screenshots__"
-purpose = "the primitive's screenshot baselines, one per story and theme (Linux, npm run visual:update)"
-kind = "screenshots"
-
-[[web_dir]]
-path = "apps/web/design-system/components"
-purpose = "design-system components, one folder each (built on the primitives; design system PR 2 onwards)"
-kind = "layer"
-
-[[web_dir]]
-path = "apps/web/design-system/components/*"
-purpose = "one generic component (Button, DataTable, ...), named for what it is, not the screen"
-kind = "component"
-styles = true
-
-[[web_dir]]
-path = "apps/web/design-system/components/*/__screenshots__"
-purpose = "the component's screenshot baselines, one per story and theme"
-kind = "screenshots"
-
-[[web_dir]]
-path = "apps/web/src"
-purpose = "the app, by layer: app -> pages -> widgets -> features -> entities -> shared (no files of its own)"
-kind = "layer"
-
-[[web_dir]]
-path = "apps/web/src/app"
-purpose = "the shell: entry, App (providers around the router); composition only"
-
-[[web_dir]]
-path = "apps/web/src/app/providers"
-purpose = "app-wide providers: UiProvider, ToastProvider, the TanStack Query client"
-
-[[web_dir]]
-path = "apps/web/src/app/router"
-purpose = "the router instance (only src/app imports the router library)"
-
-[[web_dir]]
-path = "apps/web/src/app/routes"
-purpose = "the route tree: root, the section-route builder, one route group per workspace"
-
-[[web_dir]]
-path = "apps/web/src/app/routes/*"
-purpose = "one workspace's route group (trader, admin): its layout route, guard and section routes"
-
-[[web_dir]]
-path = "apps/web/src/app/layouts"
-purpose = "layout routes: the workspace layout (horizontal top bar above the page)"
-
-[[web_dir]]
-path = "apps/web/src/app/workspaces"
-purpose = "the workspaces (TRADER, ADMIN) and their sections; the workspace guard (the role-gating seam)"
-
-[[web_dir]]
-path = "apps/web/src/pages"
-purpose = "one folder per page (route); no modules of its own"
-kind = "layer"
-
-[[web_dir]]
-path = "apps/web/src/pages/*"
-purpose = "one page: composes widgets and features with primitives; no logic, no styling"
-kind = "slice"
-
-[[web_dir]]
-path = "apps/web/src/pages/*/*"
-purpose = "a page's segment (ui, model, ...)"
-kind = "segment"
-
-[[web_dir]]
-path = "apps/web/src/widgets"
-purpose = "page sections composed of features and entities; no modules of its own"
-kind = "layer"
-
-[[web_dir]]
-path = "apps/web/src/widgets/*"
-purpose = "one widget (e.g. NightlyRunPanel)"
-kind = "slice"
-
-[[web_dir]]
-path = "apps/web/src/widgets/*/*"
-purpose = "a widget's segment (ui, model, ...)"
-kind = "segment"
-
-[[web_dir]]
-path = "apps/web/src/features"
-purpose = "user actions and flows with their state; no modules of its own"
-kind = "layer"
-
-[[web_dir]]
-path = "apps/web/src/features/*"
-purpose = "one feature (e.g. screener-builder, chain-filter)"
-kind = "slice"
-
-[[web_dir]]
-path = "apps/web/src/features/*/*"
-purpose = "a feature's segment (ui, model, api, ...)"
-kind = "segment"
-
-[[web_dir]]
-path = "apps/web/src/entities"
-purpose = "domain models with read hooks and view components; no modules of its own"
-kind = "layer"
-
-[[web_dir]]
-path = "apps/web/src/entities/*"
-purpose = "one entity (e.g. instrument, feature, screen, run)"
-kind = "slice"
-
-[[web_dir]]
-path = "apps/web/src/entities/*/*"
-purpose = "an entity's segment (ui, model, api, ...)"
-kind = "segment"
-
-[[web_dir]]
-path = "apps/web/src/shared"
-purpose = "the bottom app layer, by segment: api, lib, config (no files of its own)"
-kind = "layer"
-
-[[web_dir]]
-path = "apps/web/src/shared/api"
-purpose = "the ONLY code that talks HTTP: typed client + fetch wrapper, query keys"
-kind = "slice"
-
-[[web_dir]]
-path = "apps/web/src/shared/api/generated"
-purpose = "generated API types: schema.ts from apps/api/openapi.json (npm run api:generate), catalogue.ts from the site catalogue (scripts/export_catalogue.py)"
-
-[[web_dir]]
-path = "apps/web/src/shared/api/generated/graphql"
-purpose = "the GraphQL client preset output: typed documents and the graphql() tag, from apps/api/schema.graphql (codegen.ts, npm run api:generate)"
-
-[[web_dir]]
-path = "apps/web/src/shared/lib"
-purpose = "pure helpers, one folder per kind of value (format/, ...); never utils.ts"
-kind = "slice"
-
-[[web_dir]]
-path = "apps/web/src/shared/lib/*"
-purpose = "one kind of pure helper (format: numbers, percentages)"
-
-[[web_dir]]
-path = "apps/web/src/shared/config"
-purpose = "build-time configuration (Vite env); the one place app code reads env"
-kind = "slice"
+# The web app's folders (the [web] settings and every [[web_dir]], ADR 0025) are in architecture/web_layout.toml.
 
 # --------------------------------------------------------------------------- tests (tests/)
 # Test modules mirror their source: a directory under `tests` is the source directory at the

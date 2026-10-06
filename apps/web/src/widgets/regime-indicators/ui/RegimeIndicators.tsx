@@ -21,7 +21,7 @@ import { IndicatorDetail } from './IndicatorDetail';
 const isScalar = (value: unknown): value is string | number | boolean =>
   typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
 
-function Row({ indicator }: { indicator: RegimeIndicator }) {
+function Row({ indicator, explainable }: { indicator: RegimeIndicator; explainable: boolean }) {
   const known = indicator.unknown === null && isScalar(indicator.value);
   const shown = known ? shownValue(indicator.value) : null;
   const change = indicatorChange(indicator);
@@ -36,7 +36,7 @@ function Row({ indicator }: { indicator: RegimeIndicator }) {
       format={valueFormat({ format: indicator.format ?? 'TEXT' })}
       {...(change ? { changed: change.change, changedLabel: change.label } : {})}
     >
-      <IndicatorDetail indicator={indicator} />
+      <IndicatorDetail indicator={indicator} explainable={explainable} />
     </IndicatorRow>
   );
 }
@@ -64,7 +64,7 @@ function PaceList({
       <Stack as="ul" gap={0}>
         {indicators.map((indicator) => (
           <Stack as="li" key={indicator.key}>
-            <Row indicator={indicator} />
+            <Row indicator={indicator} explainable={regime.label !== 'UNKNOWN'} />
           </Stack>
         ))}
       </Stack>

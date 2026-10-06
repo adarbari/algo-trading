@@ -15,7 +15,7 @@ Read first: `docs/ui/architecture.md` (ADR 0025: layers, rules), `docs/ui/design
    - app code composing components: `src/{pages,widgets,features,entities}/<slice>/`, by layer.
    Layer rules: `app -> pages -> widgets -> features -> entities -> shared -> @algotrade/ui`;
    no imports between slices of one layer; other slices only through their `index.ts`. If no
-   folder fits, declare a new one as a `[[web_dir]]` in `architecture/layout.toml`; never park
+   folder fits, declare a new one as a `[[web_dir]]` in `architecture/web_layout.toml`; never park
    code in a neighbour. At most 10 modules per folder (`make layout` warns at 8).
 1. **Check the inventory:** read `apps/web/design-system/COMPONENTS.md`. Can an existing
    component, or a composition or configuration of components, do the job? Then use it
