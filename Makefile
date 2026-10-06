@@ -6,7 +6,7 @@ GOLDEN_URL ?= file://datasets/golden/store
 
 
 .PHONY: changed install no-shared-venv doctor status lock-check lint format typecheck arch layout ownership ownership-update dupes dupes-update rest-allowlist rest-allowlist-update filelen unit property integration e2e test \
-        evaluate baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-real web-visual
+        evaluate baseline datasets-verify datasets-build golden-store check nightly features-doc web-install web-check web-real web-visual web-build
 
 UV ?= uv
 WORKERS ?= auto
@@ -137,6 +137,13 @@ web-real: $(WEB)/node_modules/.package-lock.json golden-store  ## real-app smoke
 
 web-visual:      ## screenshots + axe over every story, in the CI Linux image (needs Docker)
 	cd $(WEB) && $(NPM) run visual:docker
+
+# The build the API serves on its own origin (ADR 0043, docs/hosting.md): API calls go to the
+# same origin's root (VITE_API_BASE_URL empty), Supabase keys from apps/web/.env.local. It goes
+# to var/web, not dist/ (which `make check` rebuilds for the dev setup). Redo after a web change.
+WEB_DIST ?= var/web
+web-build: $(WEB)/node_modules/.package-lock.json  ## the production web build the API serves (ALGOTRADE_WEB_DIST=var/web); redo after a web change
+	cd $(WEB) && VITE_API_BASE_URL= $(NPM) run build -- --outDir $(abspath $(WEB_DIST)) --emptyOutDir
 
 check: lock-check lint typecheck arch layout ownership dupes rest-allowlist filelen datasets-verify test evaluate web-check web-real
 

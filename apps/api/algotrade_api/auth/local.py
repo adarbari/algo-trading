@@ -2,8 +2,9 @@
 user without a token, and only on a loopback address. The CLI refuses to start that way on
 another ``--host`` (``require_loopback``), and every request is checked again against the
 address the server accepted it on, so a misconfigured bind still answers 401. A request a
-proxy forwarded (``Forwarded`` / ``X-Forwarded-For``: a tunnel or reverse proxy on this
-machine makes remote callers look local) is 401 too."""
+proxy forwarded (``Forwarded`` / ``X-Forwarded-For``, or Tailscale Funnel's
+``Tailscale-Funnel-Request``: a tunnel or reverse proxy on this machine makes remote callers
+look local, ADR 0043) is 401 too."""
 
 import ipaddress
 
@@ -14,7 +15,9 @@ from algotrade.core.model.errors import ConfigurationError
 from algotrade_api.auth.protocol import UnauthenticatedError
 
 LOCALHOST = "localhost"
-FORWARDED = ("forwarded", "x-forwarded-for")  # set by a proxy in front of the app
+# Set by a proxy in front of the app; Tailscale Serve / Funnel set X-Forwarded-For, and Funnel
+# also Tailscale-Funnel-Request (ADR 0043).
+FORWARDED = ("forwarded", "x-forwarded-for", "tailscale-funnel-request")
 
 
 def is_loopback(host: str) -> bool:

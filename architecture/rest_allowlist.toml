@@ -19,7 +19,7 @@
 #   keep       true: stays REST by design (health, job polling, live quotes); false: retires
 #   retire_in  the read-model PR that moves it to GraphQL and removes this entry
 
-max_get_routes = 3
+max_get_routes = 4
 
 # ---------------------------------------------------------------------------- stays REST
 
@@ -41,3 +41,9 @@ path = "/chains/{underlying_id}/live"
 keep = true
 reason = "live quotes (ADR 0028): latency-bound, records to live/*, bypasses the session model on purpose"
 
+
+[[route]]
+method = "GET"
+path = "/{path}"
+keep = true
+reason = "files (ADR 0043, amending 0037): the built web app on the API's origin when ALGOTRADE_WEB_DIST is set; a build file, else index.html; public, no data; mounted last so API routes keep precedence"

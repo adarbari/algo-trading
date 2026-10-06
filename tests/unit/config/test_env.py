@@ -84,3 +84,12 @@ def test_cors_origins_come_from_the_environment_else_the_default(
     assert env.cors_origins(default) == ("https://app.example.com", "https://b.example.com")
     monkeypatch.setenv(env.CORS_ORIGINS, " , ")
     assert env.cors_origins(default) == default
+
+
+def test_web_dist_comes_from_the_environment_else_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(env.WEB_DIST, raising=False)
+    assert env.web_dist() is None
+    monkeypatch.setenv(env.WEB_DIST, "  ")
+    assert env.web_dist() is None
+    monkeypatch.setenv(env.WEB_DIST, " apps/web/dist ")
+    assert env.web_dist() == Path("apps/web/dist")

@@ -201,3 +201,37 @@ def test_main_checkout_comes_from_the_git_common_dir(tmp_path: Path) -> None:
     subprocess.run(["git", "init", "-q", str(main)], check=True)
     assert doctor._main_checkout(main) == main.resolve()
     assert doctor._main_checkout(tmp_path / "nowhere") == tmp_path / "nowhere"
+
+
+def test_web_build_is_checked_only_when_set(tmp_path: Path) -> None:
+    unset = doctor.check_web_dist(probes(tmp_path, {}))
+    assert unset.level == doctor.INFO
+    missing = doctor.check_web_dist(probes(tmp_path, {}, web_dist=lambda: Path("var/web")))
+    assert missing.level == doctor.FAIL and "make web-build" in missing.fix
+    (tmp_path / "var" / "web").mkdir(parents=True)
+    (tmp_path / "var" / "web" / "index.html").write_text("<!doctype html>")
+    found = doctor.check_web_dist(probes(tmp_path, {}, web_dist=lambda: Path("var/web")))
+    assert found.level == "ok"
+
+
+def _agent(agents: Path, label: str, repo: Path, program: str) -> None:
+    agents.mkdir(exist_ok=True)
+    plist = {"Label": label, "ProgramArguments": [program], "WorkingDirectory": str(repo)}
+    (agents / f"{label}.plist").write_bytes(doctor.plistlib.dumps(plist))
+
+
+def test_installed_agents_must_run_the_main_checkout(tmp_path: Path) -> None:
+    main, agents = tmp_path / "main", tmp_path / "LaunchAgents"
+    (main / ".venv" / "bin").mkdir(parents=True)
+    (main / ".venv" / "bin" / "algotrade-api").write_text("#!/bin/sh\n")
+    p = probes(tmp_path, {}, main=lambda: main, launch_agents=agents)
+    assert [r.level for r in doctor.check_agents(p)] == [doctor.INFO, doctor.INFO]
+    _agent(agents, "com.algotrade.api", main, str(main / ".venv" / "bin" / "algotrade-api"))
+    api = doctor.check_agents(p)[1]
+    assert (api.name, api.level) == ("com.algotrade.api", "ok")
+    worktree = main / ".claude" / "worktrees" / "wt"
+    _agent(agents, "com.algotrade.api", worktree, str(worktree / ".venv" / "bin" / "algotrade-api"))
+    bad = doctor.check_agents(p)[1]
+    assert bad.level == doctor.FAIL and "algotrade-api schedule" in bad.fix
+    (agents / "com.algotrade.nightly.plist").write_bytes(b"not a plist")
+    assert doctor.check_agents(p)[0].level == doctor.FAIL

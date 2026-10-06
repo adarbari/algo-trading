@@ -4,7 +4,8 @@ bad token -> 401, a caller the registry refuses -> 403), CORS for the configured
 (outermost, so a 401 still carries it), the live quotes (closed when the app stops), and error
 handlers that map library errors to HTTP (not found -> 404, bad configuration or parameters
 -> 400, another user's job -> 403, a write that clashes with what exists -> 409, the drafting
-model off or not answering -> 503)."""
+model off or not answering -> 503), and, when ``settings.web_dist`` is set, the built web app
+on the same origin (``web``, ADR 0043: mounted last, so every API route keeps precedence)."""
 
 import json
 from collections.abc import AsyncIterator, Callable
@@ -47,6 +48,7 @@ from algotrade_api.drafting import open_drafting
 from algotrade_api.graphql.schema import graphql_router
 from algotrade_api.live import no_live, open_live
 from algotrade_api.routes import PUBLIC_ROUTERS, ROUTERS
+from algotrade_api.web import web_router
 
 TITLE = "algotrade API"
 
@@ -144,6 +146,8 @@ def create_app(
     cache = ResultCache(READ_CACHE_SIZE)
     reads, stores = _reads(app.state.store, cache), _stores(app.state.store, cache)
     app.include_router(graphql_router(reads, settings.debug, stores), dependencies=caller)
+    if settings.web_dist is not None:  # last: its catch-all GET must not shadow an API route
+        app.include_router(web_router(settings.web_dist))
     return app
 
 
