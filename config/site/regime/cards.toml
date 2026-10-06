@@ -185,7 +185,7 @@ links = [
 
 [[card]]
 key = "spx_trend_200d"
-technical_name = "SPY close vs its 200-day moving average"
+technical_name = "S&P 500 close (SPY, else the index level) vs its 200-day moving average"
 pace = "fast"
 feature = "market.regime_indicators@v1.spx_trend_200d"
 plain_name = "Is the market below its long-term trend?"

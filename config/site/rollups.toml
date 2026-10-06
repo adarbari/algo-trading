@@ -84,7 +84,7 @@ hy_oas_off_low = 0.015       # ... or 150 bp or more above its 126-session low
 unrate_trend_above = 0.0     # unemployment above its 12-month mean
 sahm_at_least = 0.005        # Sahm gap of 0.5 points or more
 nfci_above = 0.0             # financial conditions tighter than average
-spx_trend_below = 0.0        # SPY below its 200-day mean
+spx_trend_below = 0.0        # the S&P 500 below its 200-day mean
 vix_term_above = 1.0         # VIX above VIX3M (backwardation)
 breadth_below = 0.40         # fewer than 40% of the universe above their 200-day mean
 

@@ -95,7 +95,7 @@ def test_the_contract_columns_of_the_read_model() -> None:
     assert indicators.GROUP.key == "regime_indicators@v1" and indicators.GROUP.entity == "market"
     # raw licensed values stay personal; our verdicts are open (ADR 0047 on ADR 0028)
     personal = {f.name for f in indicators.FEATURES if f.licence == "personal"}
-    assert personal == {"hy_oas", "vix_term"}
+    assert personal == {"hy_oas", "vix_term", "spx_trend_200d"}  # S&P 500 levels: market_trend@v2
 
 
 # Each verdict input around its threshold (stored float32 values: some exactly on it), with

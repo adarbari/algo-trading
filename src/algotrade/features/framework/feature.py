@@ -82,6 +82,7 @@ UNITS = frozenset(
         "ratio",  # a plain quotient (iv / hv), or a dimensionless sensitivity (delta)
         "usd",  # US dollars (dollar volume, market cap)
         "usd_per_share",  # a price per share or per option contract unit
+        "index_points",  # an index level in its own points (the S&P 500 at 5,700)
         "shares",  # a share count
         "count",  # how many of something (contracts, ex-dates, quotes)
         "sessions",  # exchange sessions (core.time.calendar)
