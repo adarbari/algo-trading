@@ -10,7 +10,7 @@ export default defineConfig({
   projects: [
     // Desktop: every spec but the phone one.
     { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: /phone\.spec\.ts/ },
-    // A phone (touch, mobile viewport; Chromium, the one browser CI installs): e2e/phone.spec.ts only (ADR 0025 rule 9).
+    // A phone (touch, mobile viewport; Chromium, the one browser CI installs): e2e/phone.spec.ts only (ADR 0025 rule 10).
     {
       name: 'phone',
       use: { ...devices['iPhone 13'], defaultBrowserType: 'chromium' },

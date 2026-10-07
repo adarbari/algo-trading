@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { expectNoA11yViolations } from '../../testing';
+import * as responsive from '../../responsive';
 import { MasterDetail, type MasterDetailProps } from './MasterDetail';
 
 function Example({ onClose, ...props }: Partial<MasterDetailProps> & { onClose?: () => void }) {
@@ -91,5 +92,36 @@ describe('MasterDetail', () => {
       rerender(<MasterDetail {...props} detailKey="MSFT" detailTitle="MSFT" />);
     });
     expect(screen.getByRole('dialog', { name: 'MSFT' })).toBeInTheDocument();
+  });
+
+  it('keeps the master mounted and does not pop the sheet when the width turns narrow', async () => {
+    let narrow = false;
+    const ref = { current: null };
+    const spy = vi
+      .spyOn(responsive, 'useNarrow')
+      .mockImplementation(() => [ref, narrow] as ReturnType<typeof responsive.useNarrow>);
+    try {
+      const props = {
+        master: <input aria-label="Filter" defaultValue="" />,
+        detail: <p>Detail</p>,
+        detailTitle: 'KO',
+        onDetailClose: vi.fn(),
+      };
+      const { rerender } = render(<MasterDetail {...props} detailKey="KO" />);
+      await userEvent.type(screen.getByRole('textbox', { name: 'Filter' }), 'abc');
+      narrow = true;
+      act(() => {
+        rerender(<MasterDetail {...props} detailKey="KO" />);
+      });
+      // The same input instance (its typed value survives) and no modal over it.
+      expect(screen.getByRole('textbox', { name: 'Filter' })).toHaveValue('abc');
+      expect(screen.queryByRole('dialog')).toBeNull();
+      act(() => {
+        rerender(<MasterDetail {...props} detailKey="MSFT" detailTitle="MSFT" />);
+      });
+      expect(screen.getByRole('dialog', { name: 'MSFT' })).toBeInTheDocument();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

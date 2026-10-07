@@ -82,3 +82,9 @@ description = "Build-time configuration (Vite env, VITE_*)"
 owner = ["apps/web/src/shared/config/*"]
 section = "docs/adr/0025-frontend-architecture.md#layers-and-folders"
 enforced_by = ["review (import.meta.env is read only in shared/config)"]
+
+[[web_responsibility]]
+id = "web-container-width"
+description = "Measuring a component's own width against a breakpoint token when its tree (not only its CSS) changes on a phone (useNarrow; ADR 0052)"
+owner = ["apps/web/design-system/responsive/*"]
+section = "docs/adr/0052-one-ui-for-phones-and-desktops.md"

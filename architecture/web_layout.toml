@@ -36,7 +36,7 @@ purpose = "Storybook config: the design-system catalogue (main) and the theme/de
 
 [[web_dir]]
 path = "apps/web/lint-rules"
-purpose = "ESLint rule sets by concern: base (TS, React, a11y), layers (rules 1-2), restrictions (rules 3-4), responsive (rule 9: a multi-column Grid collapses), columns and views (read model WEB 4, 7), guide (messages), and the responsive rule's test"
+purpose = "ESLint rule sets by concern: base (TS, React, a11y), layers (rules 1-2), restrictions (rules 3-4), responsive (rule 10: a multi-column Grid collapses), columns and views (read model WEB 4, 7), guide (messages), and the responsive rule's test"
 
 [[web_dir]]
 path = "apps/web/scripts"

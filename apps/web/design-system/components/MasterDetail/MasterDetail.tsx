@@ -7,7 +7,7 @@
  * sheet calls `onDetailClose`; the caller clears its key there, so choosing the same item again
  * reopens it.
  */
-import { useState, type ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 
 import { Grid } from '../../primitives/Grid';
 import { Stack } from '../../primitives/Stack';
@@ -59,41 +59,54 @@ export function MasterDetail({
     setShownKey(detailKey);
     setDismissed(null);
   }
+  // Crossing from wide to narrow (a window resized, a phone measured after the viewport guess
+  // was wrong) must not pop a modal over a detail the user was already reading: the current
+  // key counts as dismissed; the next choice opens the sheet.
+  const [wasNarrow, setWasNarrow] = useState(narrow);
+  if (wasNarrow !== narrow) {
+    setWasNarrow(narrow);
+    if (narrow) setDismissed(detailKey);
+  }
   const open = narrow && detailKey !== null && dismissed !== detailKey;
+  // One Grid at both widths, its children keyed, so the master keeps its instance (scroll,
+  // active row, open pickers) when the width crosses the breakpoint.
+  const children = narrow
+    ? [
+        summary === undefined ? null : <Fragment key="summary">{summary}</Fragment>,
+        <Fragment key="master">{master}</Fragment>,
+      ]
+    : [
+        <Fragment key="master">{master}</Fragment>,
+        summary === undefined ? (
+          <Fragment key="detail">{detail}</Fragment>
+        ) : (
+          <Stack key="detail" gap={3}>
+            {summary}
+            {detail}
+          </Stack>
+        ),
+      ];
   return (
     <div ref={ref} className={styles.root} data-layout={narrow ? 'narrow' : 'wide'}>
+      <Grid columns={narrow ? 1 : columns} gap={gap} align="start">
+        {children}
+      </Grid>
       {narrow ? (
-        <Stack gap={gap}>
-          {summary}
-          {master}
-          <Drawer
-            open={open}
-            onOpenChange={(next) => {
-              if (next) return;
-              setDismissed(detailKey);
-              onDetailClose();
-            }}
-            title={detailTitle}
-            description={detailDescription}
-            side="end"
-            size="lg"
-          >
-            {detail}
-          </Drawer>
-        </Stack>
-      ) : (
-        <Grid columns={columns} gap={gap} align="start">
-          {master}
-          {summary === undefined ? (
-            detail
-          ) : (
-            <Stack gap={3}>
-              {summary}
-              {detail}
-            </Stack>
-          )}
-        </Grid>
-      )}
+        <Drawer
+          open={open}
+          onOpenChange={(next) => {
+            if (next) return;
+            setDismissed(detailKey);
+            onDetailClose();
+          }}
+          title={detailTitle}
+          description={detailDescription}
+          side="end"
+          size="lg"
+        >
+          {detail}
+        </Drawer>
+      ) : null}
     </div>
   );
 }

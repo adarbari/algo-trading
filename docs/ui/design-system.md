@@ -336,7 +336,7 @@ With PR 4 the catalogue covers every v1 screen (Ideas, Screener builder, Explore
 | `COMPONENTS.md` and `tokens.css` are up to date | regenerated in CI (`npm run generated:check`); fails on diff |
 | Screenshot changes are reviewed; contrast holds in light and dark | Playwright visual suite over every story (screenshot diff + axe), Linux image |
 | 1000-line file limit also covers `.ts` / `.tsx` / `.css` | `scripts/check_file_length.py` |
-| Phones: a multi-column `Grid` outside the design system passes `collapse`; a responsive component has a `Narrow` story; every section route and the master-detail / link flows work at iPhone width | ESLint `[ADR 0025 rule 9]`, `npm run ds:check`, the e2e `phone` project (`e2e/phone.spec.ts`) |
+| Phones: a multi-column `Grid` outside the design system passes `collapse`; a responsive component has a `Narrow` story; every section route and the master-detail / link flows work at iPhone width | ESLint `[ADR 0025 rule 10]`, `npm run ds:check`, the e2e `phone` project (`e2e/phone.spec.ts`) |
 
 ## Before any screen is built
 

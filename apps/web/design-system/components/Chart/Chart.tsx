@@ -310,7 +310,7 @@ export function Chart({
         <ChartLegend chart={chart} bandKey={bandKey} />
         <div className={styles.tools}>
           {toolbar}
-          {view === 'chart' && (
+          {showCanvas && (
             <div className={styles.zoom} role="group" aria-label="Zoom">
               <IconButton
                 icon="zoom-in"
