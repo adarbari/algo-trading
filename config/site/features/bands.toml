@@ -1,5 +1,5 @@
-# Bands, channels, z-scores and stretches (the TA track; definitions and worked examples in
-# docs/data/technical.md). Formulas over bands@v1, price_stats@v2 and momentum@v1, computed
+# Bands, channels, z-scores, stretches, the EMA stack and the regression trend score (the TA track; definitions in
+# docs/data/technical.md). Formulas over bands@v2, price_stats@v2 and momentum@v1, computed
 # on read. The language and the keys: docs/configuration.md "Expression features". Changing a
 # formula or a param: bump its version.
 
@@ -148,4 +148,22 @@ unit = "category"
 categories = ["BULL", "BEAR", "MIXED"]
 description = "EMA alignment: BULL when EMA20 > EMA50 > EMA200, BEAR when EMA20 < EMA50 < EMA200, else MIXED (an equality is MIXED); trend_state is the same test on the close and the SMAs"
 null_meaning = "an EMA is null (fewer than 200 consecutive bars ending on the session)"
+version = 1
+
+[pct_vs_sma_150]
+expr = "price_stats.close / bands.sma_150 - 1"
+dtype = "float"
+unit = "decimal"
+description = "Close / 150-session (30-week) moving average - 1: Minervini's template wants it above 0 with sma_150 above sma_200"
+null_meaning = "sma_150 is null (a gap among the last 150 sessions, or a shorter history), or no price_stats row"
+valid_range = [-1, inf]
+version = 1
+
+[clenow_momentum_90d]
+expr = "trend_stats.reg_slope_90d_ann * trend_stats.trend_r2_90d"
+dtype = "float"
+unit = "decimal"
+description = "Clenow's momentum score: the annualised regression slope over 90 sessions x its R-squared, rewarding trends that are both fast and smooth (0.30 is a smooth 30%-a-year pace; a volatile name with the same slope scores lower)"
+null_meaning = "trend_r2_90d or reg_slope_90d_ann is null (a gap among the last 90 sessions, a shorter history, or a close that never moved)"
+valid_range = [-1, inf]
 version = 1

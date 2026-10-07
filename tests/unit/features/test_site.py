@@ -580,7 +580,7 @@ def test_the_bear_state_probit_and_its_source(fs: FeatureSet) -> None:
     }
 
 
-BANDS = "rollups/instrument/bands@v1"
+BANDS = "rollups/instrument/bands@v2"
 
 
 def test_bands_channels_zscores_and_stretches(fs: FeatureSet) -> None:
@@ -638,7 +638,7 @@ def test_bands_channels_zscores_and_stretches(fs: FeatureSet) -> None:
     assert nob["donchian_pos_20d"] == pytest.approx(0.5)
 
 
-TREND = "rollups/instrument/trend_stats@v1"
+TREND = "rollups/instrument/trend_stats@v2"
 PUT_WING = "rollups/instrument/put_wing@v1"
 
 

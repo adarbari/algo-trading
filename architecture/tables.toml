@@ -169,11 +169,11 @@ name = "rollups/instrument/volume@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
-name = "rollups/instrument/bands@v1"
+name = "rollups/instrument/bands@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
-name = "rollups/instrument/trend_stats@v1"
+name = "rollups/instrument/trend_stats@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
