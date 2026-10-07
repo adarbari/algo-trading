@@ -249,6 +249,7 @@ say = ["implied move bigger than realised", "options pricing more than the stock
 fields = ["feature.implied_move_vs_hv", "rollup.implied_move@v1.move_basis"]
 hint = "implied_move_vs_hv gte 1.2 (the straddle prices 20% more than HV20 would), soft with tolerance 0.2; add move_basis eq TERM when the report should not be what is priced; null without HV20 or a priced move"
 
+[[phrase]]
 say = ["dividend before the call expires", "ex-dividend during the covered call", "collect the dividend with a covered call"]
 fields = ["feature.ex_div_before_call_expiry", "rollup.call_wing@v1.best_call_delta"]
 hint = "ex_div_before_call_expiry eq true to collect it (with best_call_delta lte 0.3 so the call is not assigned first), eq false to avoid the assignment question; null means no date is known yet, not none"
