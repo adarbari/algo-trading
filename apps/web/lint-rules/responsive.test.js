@@ -40,7 +40,7 @@ describe('algotrade/grid-collapses', () => {
     expect(lint(`${UI}const x = ${jsx};`)).toEqual([]);
   });
 
-  it('ignores a Grid that is not the design system\'s', () => {
+  it("ignores a Grid that is not the design system's", () => {
     expect(lint("import { Grid } from 'other';\nconst x = <Grid columns={2} />;")).toEqual([]);
   });
 
