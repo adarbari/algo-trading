@@ -20,8 +20,11 @@ builds it from the registry, so adapters hold no per-series knowledge. ``Release
 the release-dates source (FRED ``release/dates``, ADR 0050) for one release, bounded in real
 time; its answer is ``parsed[RELEASE_FRAME]`` (``vendors/fred/releases.py``). ``FilingsRequest``
 asks the SEC filings source for one company's 8-Ks (ADR 0050); its answer is
-``parsed[FILINGS_FRAME]`` with ``FILING_COLUMNS`` (``vendors/sec/submissions.py``). Both live
-here so a task builds its requests without importing a vendor module.
+``parsed[FILINGS_FRAME]`` with ``FILING_COLUMNS`` (``vendors/sec/submissions.py``).
+``DailyIndexRequest`` asks the SEC daily form index for one filing day: which CIKs filed an
+8-K that day, ``parsed[DAILY_INDEX_FRAME]`` with ``DAILY_INDEX_COLUMNS``
+(``vendors/sec/daily_index.py``). They live here so a task builds its requests without
+importing a vendor module.
 """
 
 from dataclasses import dataclass
@@ -35,6 +38,8 @@ SERIES_FRAME = "series"  # key of ``Normalized.parsed`` holding the normalised f
 SERIES_COLUMNS = ("series", "obs_date", "vintage_date", "value", "code")
 RELEASE_FRAME = "release_dates"  # key of ``Normalized.parsed`` holding a release's dates (ADR 0050)
 FILINGS_FRAME = "filings"  # key of ``Normalized.parsed`` holding a company's 8-K rows (ADR 0050)
+DAILY_INDEX_FRAME = "daily_index"  # key of ``Normalized.parsed`` holding a day's 8-K filers
+DAILY_INDEX_COLUMNS = ("cik", "form", "accession", "filing_date")
 FILING_COLUMNS = (
     "cik",
     "form",
@@ -80,6 +85,15 @@ class FilingsRequest(FetchRequest):
     wanted (``None``: the recent block only)."""
 
     since: date | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class DailyIndexRequest(FetchRequest):
+    """One filing day of the SEC daily form index (``key`` is the day, ISO); ``day`` is the
+    date SEC filed under (a filing accepted after 17:30 New York time is dated the next business
+    day)."""
+
+    day: date
 
 
 def series_request(request: FetchRequest) -> SeriesRequest:

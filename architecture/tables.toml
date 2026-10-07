@@ -91,7 +91,7 @@ note = "ADR 0050: the macro release calendar (FRED release dates, ISM by rule), 
 [[table]]
 name = "events/filing"
 owner = "apps/ingestion/algotrade_ingestion/tasks/events/filings.py"
-note = "ADR 0050: SEC 8-K and 8-K/A filings of the scoped companies by acceptance time; known_from = the acceptance's session (New York)"
+note = "ADR 0050: SEC 8-K and 8-K/A filings of every operating company in the universe by acceptance time; known_from = the acceptance's session (New York)"
 
 [[table]]
 name = "events/reference_change"

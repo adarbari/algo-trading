@@ -63,6 +63,7 @@ from algotrade_sources.vendors.nasdaq.symbol_directory import NasdaqTraderSource
 from algotrade_sources.vendors.proshares.etf_holdings import ProsharesHoldings
 from algotrade_sources.vendors.published.csv_series import PublishedSeries
 from algotrade_sources.vendors.sec.company_facts import SecCompanyFacts
+from algotrade_sources.vendors.sec.daily_index import SecDailyIndex, missing_index
 from algotrade_sources.vendors.sec.edgar import SecSubmissions, SecTickerMap, user_agent
 from algotrade_sources.vendors.sec.fund_objectives import (
     SecFundObjectives,
@@ -208,9 +209,15 @@ def _massive(name: str, build: Callable[[Http], Source]) -> SourceSpec:
     return SourceSpec(name, "massive", "massive", build, 12.5, MASSIVE_KEY, hint, _bearer)
 
 
-def _sec(name: str, build: Callable[[Http], Source]) -> SourceSpec:
+def _sec(
+    name: str,
+    build: Callable[[Http], Source],
+    not_found: Callable[[HttpError], bool] | None = None,
+) -> SourceSpec:
     hint = "SEC EDGAR requires a contact email; add it to .env"
-    return SourceSpec(name, "sec_edgar", "sec", build, 0.2, SEC_CONTACT, hint, _sec_agent, 4)
+    return SourceSpec(
+        name, "sec_edgar", "sec", build, 0.2, SEC_CONTACT, hint, _sec_agent, 4, not_found
+    )
 
 
 SOURCES: dict[str, SourceSpec] = {
@@ -239,6 +246,7 @@ SOURCES: dict[str, SourceSpec] = {
         _sec("sec_tickers", SecTickerMap),
         _sec("sec_submissions", SecSubmissions),
         _sec("sec_filings", SecFilings),
+        _sec("sec_daily_index", SecDailyIndex, not_found=missing_index),
         _sec("sec_company_facts", SecCompanyFacts),
         _sec("sec_nport_holdings", NportHoldings),
         _sec("sec_fund_tickers", SecFundTickerMap),
