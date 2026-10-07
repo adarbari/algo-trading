@@ -11,7 +11,6 @@ const widgets = vi.hoisted(() => ({
   options: vi.fn(),
   overview: vi.fn(),
   hits: vi.fn(),
-  guide: vi.fn(),
 }));
 
 vi.mock('@/widgets/feature-table', async () => {
@@ -20,15 +19,6 @@ vi.mock('@/widgets/feature-table', async () => {
     FeatureTable: (props: Record<string, unknown>) => {
       (props['label'] === 'Tickers' ? widgets.table : widgets.side)(props);
       return <Text>{String(props['label'])}</Text>;
-    },
-  };
-});
-vi.mock('@/widgets/field-guide', async () => {
-  const { Text } = await import('@algotrade/ui');
-  return {
-    FieldGuide: (props: Record<string, unknown>) => {
-      widgets.guide(props);
-      return <Text>field guide</Text>;
     },
   };
 });
@@ -75,7 +65,6 @@ describe('ExplorePage', () => {
       <ExplorePage
         search={{ sel: 'AAPL,MSFT', sort: '-feature.market_cap', lev: true }}
         onSearchChange={vi.fn()}
-        onOpenBuilder={vi.fn()}
       />,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Explore' })).toBeInTheDocument();
@@ -104,13 +93,7 @@ describe('ExplorePage', () => {
   it('opens one ticker on its overview and goes back to the default in the URL', async () => {
     const user = userEvent.setup();
     const onSearchChange = vi.fn();
-    render(
-      <ExplorePage
-        search={{ sel: 'AAPL' }}
-        onSearchChange={onSearchChange}
-        onOpenBuilder={vi.fn()}
-      />,
-    );
+    render(<ExplorePage search={{ sel: 'AAPL' }} onSearchChange={onSearchChange} />);
     expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
     expect(widgets.overview).toHaveBeenLastCalledWith(
       expect.objectContaining({ symbol: 'AAPL', fund: expect.anything() as unknown }),
@@ -123,11 +106,7 @@ describe('ExplorePage', () => {
     const user = userEvent.setup();
     const onSearchChange = vi.fn();
     render(
-      <ExplorePage
-        search={{ sel: 'AAPL', tab: 'options' }}
-        onSearchChange={onSearchChange}
-        onOpenBuilder={vi.fn()}
-      />,
+      <ExplorePage search={{ sel: 'AAPL', tab: 'options' }} onSearchChange={onSearchChange} />,
     );
     await user.click(screen.getByRole('tab', { name: 'Overview' }));
     expect(onSearchChange).toHaveBeenLastCalledWith({ tab: undefined });
@@ -137,11 +116,7 @@ describe('ExplorePage', () => {
     const user = userEvent.setup();
     const onSearchChange = vi.fn();
     render(
-      <ExplorePage
-        search={{ sel: 'AAPL,MSFT', focus: 'MSFT' }}
-        onSearchChange={onSearchChange}
-        onOpenBuilder={vi.fn()}
-      />,
+      <ExplorePage search={{ sel: 'AAPL,MSFT', focus: 'MSFT' }} onSearchChange={onSearchChange} />,
     );
     await user.click(screen.getByRole('tab', { name: 'Options' }));
     expect(onSearchChange).toHaveBeenLastCalledWith({ tab: 'options' });
@@ -166,101 +141,26 @@ describe('ExplorePage', () => {
 
   it('shows the focused ticker in the detail tabs, and its screener hits', () => {
     const { rerender } = render(
-      <ExplorePage
-        search={{ tab: 'options', focus: 'NVDA' }}
-        onSearchChange={vi.fn()}
-        onOpenBuilder={vi.fn()}
-      />,
+      <ExplorePage search={{ tab: 'options', focus: 'NVDA' }} onSearchChange={vi.fn()} />,
     );
     expect(widgets.options).toHaveBeenLastCalledWith(
       expect.objectContaining({ symbol: 'NVDA', view: 'simple', right: 'P', allStrikes: false }),
     );
-    rerender(
-      <ExplorePage search={{ tab: 'chart' }} onSearchChange={vi.fn()} onOpenBuilder={vi.fn()} />,
-    );
+    rerender(<ExplorePage search={{ tab: 'chart' }} onSearchChange={vi.fn()} />);
     expect(screen.getByText('No ticker chosen')).toBeInTheDocument();
-    rerender(
-      <ExplorePage search={{ tab: 'hits' }} onSearchChange={vi.fn()} onOpenBuilder={vi.fn()} />,
-    );
+    rerender(<ExplorePage search={{ tab: 'hits' }} onSearchChange={vi.fn()} />);
     expect(screen.getByText('No ticker chosen')).toBeInTheDocument();
-    rerender(
-      <ExplorePage
-        search={{ tab: 'hits', focus: 'NVDA' }}
-        onSearchChange={vi.fn()}
-        onOpenBuilder={vi.fn()}
-      />,
-    );
+    rerender(<ExplorePage search={{ tab: 'hits', focus: 'NVDA' }} onSearchChange={vi.fn()} />);
     expect(widgets.hits).toHaveBeenLastCalledWith({ symbol: 'NVDA' });
   });
 
-  it('opens the field guide as the last tab, over the whole page without the ticker table', async () => {
+  it('keeps the Field guide as the last tab; choosing it only sets the tab (the route redirects)', async () => {
     const user = userEvent.setup();
     const onSearchChange = vi.fn();
-    const { rerender } = render(
-      <ExplorePage
-        search={{ sel: 'AAPL' }}
-        onSearchChange={onSearchChange}
-        onOpenBuilder={vi.fn()}
-      />,
-    );
+    render(<ExplorePage search={{ sel: 'AAPL' }} onSearchChange={onSearchChange} />);
     const tabs = screen.getAllByRole('tab').map((t) => t.textContent);
     expect(tabs.at(-1)).toBe('Field guide');
     await user.click(screen.getByRole('tab', { name: 'Field guide' }));
     expect(onSearchChange).toHaveBeenLastCalledWith({ tab: 'guide' });
-
-    widgets.table.mockClear();
-    rerender(
-      <ExplorePage
-        search={{
-          sel: 'AAPL',
-          tab: 'guide',
-          theme: 'Volatility',
-          field: 'feature.x',
-          symbol: 'KO',
-        }}
-        onSearchChange={onSearchChange}
-        onOpenBuilder={vi.fn()}
-      />,
-    );
-    expect(screen.getByRole('tab', { name: 'Field guide' })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
-    expect(screen.getByText('field guide')).toBeInTheDocument();
-    expect(widgets.table).not.toHaveBeenCalled();
-    expect(widgets.guide).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        theme: 'Volatility',
-        field: 'feature.x',
-        symbol: 'KO',
-        defaultSymbol: 'AAPL',
-      }),
-    );
-  });
-
-  it('writes the field guide choices back as search params and opens the Builder', () => {
-    const onSearchChange = vi.fn();
-    const onOpenBuilder = vi.fn();
-    render(
-      <ExplorePage
-        search={{ tab: 'guide' }}
-        onSearchChange={onSearchChange}
-        onOpenBuilder={onOpenBuilder}
-      />,
-    );
-    const guide = widgets.guide.mock.lastCall?.[0] as {
-      onThemeChange: (t: string) => void;
-      onFieldChange: (c: { theme: string; field: string }) => void;
-      onSymbolChange: (s: string) => void;
-      onAddToScreen: () => void;
-    };
-    guide.onThemeChange('Volume');
-    expect(onSearchChange).toHaveBeenLastCalledWith({ theme: 'Volume', field: undefined });
-    guide.onFieldChange({ theme: 'Volatility', field: 'feature.x' });
-    expect(onSearchChange).toHaveBeenLastCalledWith({ theme: 'Volatility', field: 'feature.x' });
-    guide.onSymbolChange('KO');
-    expect(onSearchChange).toHaveBeenLastCalledWith({ symbol: 'KO' });
-    guide.onAddToScreen();
-    expect(onOpenBuilder).toHaveBeenCalledOnce();
   });
 });

@@ -25,3 +25,14 @@
   margin-inline-start: auto;
   color: var(--color-muted);
 }
+
+/* The utility slot takes the push to the far side; `end` then follows it directly. */
+.utility {
+  display: flex;
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+.utility + .end {
+  margin-inline-start: 0;
+}

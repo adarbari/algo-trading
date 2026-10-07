@@ -772,7 +772,7 @@ detect = [{ string_prefix = "rollups/instrument/" }, { string_prefix = "rollups/
 id = "guide-read"
 description = "The Guide's read objects: the index of every entry kind and the field page with what the server derives for it (related fields from the guide entry's text and the formula's inputs, the site playbooks that use the field with each rule as text, the situations that fool it), ADR 0051; session-free, over the site configs and the caller's catalogue"
 owner = ["src/algotrade/services/read/guide/*"]
-section = "docs/api/read-model.md#the-domain-objects"
+section = "docs/ui/guide.md#5-the-rule-and-its-checks"
 detect = [{ call = "load_guide_sections" }, { call = "site_playbooks" }, { call = "rule_text" }]
 
 [[responsibility]]
