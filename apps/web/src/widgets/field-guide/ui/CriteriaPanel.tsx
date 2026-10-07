@@ -25,9 +25,7 @@ export function CriteriaPanel({ uses, onAddToScreen }: CriteriaPanelProps) {
           <Surface key={use.intent} tone="row" radius="lg" padding={3}>
             <Stack gap={2}>
               <Text weight="medium">{use.intent}</Text>
-              <Mono size="sm">
-                {ruleText(use)}
-              </Mono>
+              <Mono size="sm">{ruleText(use)}</Mono>
               <Text size="sm" tone="muted">
                 {use.note}
               </Text>
