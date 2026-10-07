@@ -28,3 +28,11 @@ unit = "flag"
 description = "Whether the next known ex-dividend date (dividend_schedule.next_ex_date) falls on or before the nearest listed option expiry (nearest_expiry.expiry_date): a short option expiring then carries the dividend"
 null_meaning = "no ex-dividend date after the session is known (dividend_schedule NOT_ANNOUNCED), or no stored chain with an expiry on or after the session"
 version = 1
+
+[ex_div_before_call_expiry]
+expr = "dividend_schedule.next_ex_date <= call_wing.target_expiry"
+dtype = "bool"
+unit = "flag"
+description = "Whether the next known ex-dividend date falls on or before the covered-call wing's target expiry (call_wing.target_expiry): the early-assignment risk of the short call, and the dividend the shares collect if it is not assigned"
+null_meaning = "no ex-dividend date after the session is known (dividend_schedule NOT_ANNOUNCED), or no call target expiry (call_wing NO_SPOT, NO_CHAIN or NO_EXPIRY)"
+version = 1
