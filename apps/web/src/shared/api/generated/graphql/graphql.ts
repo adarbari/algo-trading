@@ -124,6 +124,18 @@ export type FeatureTableQueryVariables = Exact<{
 
 export type FeatureTableQuery = { table: { universeSnapshot: string | null, preSnapshot: boolean, sort: string | null, total: number, page: number, size: number, missing: Array<string>, rows: Array<Array<unknown>>, unknown: Array<Array<UnknownCode | null>>, reasons: Array<Array<NullReason | null>>, session: { date: string, missing: Array<string> }, columns: Array<{ name: string, description: string, format: FeatureFormat, unit: string | null, dtype: string, nullMeaning: string, licence: string, scope: string }>, instruments: Array<{ instrumentId: string, symbol: string, name: string }> } | null };
 
+export type GuideIndexQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GuideIndexQuery = { guideIndex: { sections: Array<{ id: string, title: string, purpose: string, entries: number }>, themeGroups: Array<{ id: string, title: string, themes: Array<{ theme: string, fields: number }> }>, intents: Array<{ intent: string, fields: number }> } | null };
+
+export type GuideFieldQueryVariables = Exact<{
+  name: string;
+}>;
+
+
+export type GuideFieldQuery = { guideField: { related: Array<string>, playbooks: Array<{ id: string, name: string, family: string | null, rules: Array<string>, column: boolean, rank: boolean, flag: boolean }>, situations: Array<{ name: string, signs: string, do: string, affects: Array<string> }> } | null };
+
 export type EtfHoldingsQueryVariables = Exact<{
   key: string;
   top: number;
@@ -650,6 +662,52 @@ export const FeatureTableDocument = new TypedDocumentString(`
   }
 }
     `) as unknown as TypedDocumentString<FeatureTableQuery, FeatureTableQueryVariables>;
+export const GuideIndexDocument = new TypedDocumentString(`
+    query GuideIndex {
+  guideIndex {
+    sections {
+      id
+      title
+      purpose
+      entries
+    }
+    themeGroups {
+      id
+      title
+      themes {
+        theme
+        fields
+      }
+    }
+    intents {
+      intent
+      fields
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<GuideIndexQuery, GuideIndexQueryVariables>;
+export const GuideFieldDocument = new TypedDocumentString(`
+    query GuideField($name: FeatureName!) {
+  guideField(name: $name) {
+    related
+    playbooks {
+      id
+      name
+      family
+      rules
+      column
+      rank
+      flag
+    }
+    situations {
+      name
+      signs
+      do
+      affects
+    }
+  }
+}
+    `) as unknown as TypedDocumentString<GuideFieldQuery, GuideFieldQueryVariables>;
 export const EtfHoldingsDocument = new TypedDocumentString(`
     query EtfHoldings($key: String!, $top: Int!) {
   instrument(key: $key) {

@@ -51,6 +51,7 @@ export {
   type DistributionMarker,
   type DistributionProps,
 } from './Distribution';
+export { DocLayout, DocSection, type DocLayoutProps, type DocSectionProps } from './DocLayout';
 export { Drawer, type DrawerProps } from './Drawer';
 export { EmptyState, type EmptyStateProps } from './EmptyState';
 export {
@@ -96,6 +97,7 @@ export {
 } from './IndicatorRow';
 export { Input, type InputProps } from './Input';
 export { Kbd, type KbdProps } from './Kbd';
+export { NavList, type NavListItem, type NavListProps } from './NavList';
 export { LoginForm, type LoginCredentials, type LoginFormProps } from './LoginForm';
 export { KeyValue, type KeyValueItem, type KeyValueProps } from './KeyValue';
 export { Legend, type DataTone, type LegendItem, type LegendProps } from './Legend';
@@ -150,6 +152,15 @@ export {
   type ToastProviderProps,
   type ToastTone,
 } from './Toast';
+export {
+  LinkProvider,
+  TextLink,
+  useRenderLink,
+  type LinkProviderProps,
+  type LinkRenderProps,
+  type LinkRenderer,
+  type TextLinkProps,
+} from './TextLink';
 export { Tooltip, type TooltipProps, type TooltipTriggerProps } from './Tooltip';
 export { TopBar, type TopBarProps } from './TopBar';
 export { WorkspaceSwitch, type WorkspaceSwitchProps } from './WorkspaceSwitch';

@@ -11,10 +11,12 @@
 import {
   AppShell,
   Button,
+  LinkProvider,
   Mono,
   NavTabs,
   Stack,
   Text,
+  TextLink,
   TopBar,
   WorkspaceSwitch,
 } from '@algotrade/ui';
@@ -25,6 +27,9 @@ import { RegimeChip } from '@/entities/regime';
 import { useSession, useSignOut, useViewer } from '@/entities/viewer';
 
 import { canEnter, WORKSPACES, type Workspace, type WorkspaceId } from '../workspaces';
+
+import { renderRouterLink } from './router-link';
+import { useGuideShortcut } from './use-guide-shortcut';
 
 /** The section a path belongs to (`/screeners/new` is in `/screeners`), else the path itself. */
 const activeSection = (workspace: Workspace, pathname: string): string =>
@@ -37,6 +42,7 @@ export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
   const viewer = useViewer().data;
   const { session } = useSession();
   const signOut = useSignOut();
+  useGuideShortcut();
   useEffect(() => {
     if (viewer === null) void navigate({ to: '/login', search: {} });
   }, [viewer, navigate]);
@@ -49,38 +55,50 @@ export function WorkspaceLayout({ workspace }: { workspace: Workspace }) {
     if (home) void navigate({ to: home });
   };
   return (
-    <AppShell
-      topBar={
-        <TopBar
-          brand={<Mono weight="medium">algotrade</Mono>}
-          workspace={
-            <WorkspaceSwitch workspaces={options} value={workspace.id} onValueChange={enter} />
-          }
-          end={
-            viewer && (
-              <Stack direction="row" gap={2} align="center">
-                <RegimeChip onOpen={() => void navigate({ to: '/regime' })} />
-                <Text size="sm">{viewer.name}</Text>
-                {session && (
-                  <Button variant="ghost" size="sm" onClick={() => void signOut()}>
-                    Sign out
-                  </Button>
-                )}
-              </Stack>
-            )
-          }
-          nav={
-            <NavTabs
-              aria-label={`${workspace.label} sections`}
-              items={workspace.sections.map((s) => ({ href: s.path, label: s.label }))}
-              activeHref={activeSection(workspace, pathname)}
-              renderLink={({ href, ...link }) => <Link to={href} {...link} />}
-            />
-          }
-        />
-      }
-    >
-      <Outlet />
-    </AppShell>
+    <LinkProvider render={renderRouterLink}>
+      <AppShell
+        topBar={
+          <TopBar
+            brand={<Mono weight="medium">algotrade</Mono>}
+            workspace={
+              <WorkspaceSwitch workspaces={options} value={workspace.id} onValueChange={enter} />
+            }
+            utility={
+              <TextLink
+                href="/guide"
+                icon="book"
+                keys={['?']}
+                current={pathname === '/guide' || pathname.startsWith('/guide/')}
+              >
+                Guide
+              </TextLink>
+            }
+            end={
+              viewer && (
+                <Stack direction="row" gap={2} align="center">
+                  <RegimeChip onOpen={() => void navigate({ to: '/regime' })} />
+                  <Text size="sm">{viewer.name}</Text>
+                  {session && (
+                    <Button variant="ghost" size="sm" onClick={() => void signOut()}>
+                      Sign out
+                    </Button>
+                  )}
+                </Stack>
+              )
+            }
+            nav={
+              <NavTabs
+                aria-label={`${workspace.label} sections`}
+                items={workspace.sections.map((s) => ({ href: s.path, label: s.label }))}
+                activeHref={activeSection(workspace, pathname)}
+                renderLink={({ href, ...link }) => <Link to={href} {...link} />}
+              />
+            }
+          />
+        }
+      >
+        <Outlet />
+      </AppShell>
+    </LinkProvider>
   );
 }
