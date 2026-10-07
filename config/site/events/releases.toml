@@ -11,6 +11,11 @@
 #               month, core/time/calendar.py). There is no hand-kept dates file: FOMC comes from FRED.
 # release_id    the FRED release id (source = "fred"; ids from fred/releases, verified 2026-10-06)
 # nth_business_day   1 = the first session of the month, 3 = the third (source = "rule")
+# exceptions    optional, rule releases only: a month ("YYYY-MM") -> the date ISM actually published,
+#               where it differs from the rule (ISM sometimes shifts a release around a holiday).
+#               Empty on purpose: ISM's dates cannot be read without an ismworld.org sign-in, so none
+#               is guessed. To fill it, read the year's schedule on ismworld.org (Reports > ISM PMI
+#               Reports) and add e.g. `exceptions = { "2025-01" = 2025-01-03 }` to the release.
 # time_et       the release time, "HH:MM" in America/New_York; the row's ts is that moment in UTC
 # terms         where the dates come from and how they may be used
 
@@ -61,6 +66,8 @@ source = "fred"
 release_id = 9
 time_et = "08:30"
 terms = "FRED terms of use (https://fred.stlouisfed.org/legal/); release 9, Census"
+
+# ISM is not on FRED: the two ISM releases follow a rule (an approximation, see `exceptions`).
 
 [[release]]
 key = "ISM_MFG"

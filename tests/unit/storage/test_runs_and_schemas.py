@@ -96,6 +96,8 @@ def test_macro_release_rows_declare_known_from_and_a_known_status() -> None:
         "time_et": "08:30", "status": "scheduled",
     }  # fmt: skip
     validate_frame("events/macro_release", stamped([row], date(2026, 10, 6), "r"))
+    moved = stamped([{**row, "status": "moved"}], date(2026, 10, 6), "r")
+    validate_frame("events/macro_release", moved)  # a date FRED no longer lists
     with pytest.raises(DataValidationError, match="status must be one of"):
         frame = stamped([{**row, "status": "cancelled"}], date(2026, 10, 6), "r")
         validate_frame("events/macro_release", frame)

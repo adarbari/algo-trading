@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from algotrade.config.env import user_id
-from algotrade.config.site.settings import FeatureDefinition
+from algotrade.config.site.features.definitions import FeatureDefinition
 from algotrade.config.strategy.catalog import FieldCatalog
 from algotrade.config.strategy.resolve import CONFIG_KINDS, ResolvedConfig, resolve
 from algotrade.config.strategy.schema import RULES_IMPL, Selection

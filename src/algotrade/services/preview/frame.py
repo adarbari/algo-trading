@@ -10,7 +10,7 @@ from dataclasses import dataclass, field, replace
 from datetime import date
 from functools import cached_property
 
-from algotrade.config.site.settings import FeatureDefinition
+from algotrade.config.site.features.definitions import FeatureDefinition
 from algotrade.config.strategy.schema import Selection
 from algotrade.core.views.feature_view import FeatureView
 from algotrade.data import StoreReader
