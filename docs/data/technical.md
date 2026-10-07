@@ -67,7 +67,7 @@ left out with the field that covers it. Screener presets come last (section "Pre
 | | sector momentum, sector relative strength | `relative_strength@v1`: `sector_etf`, `sector_ret_63d`, `sector_rank_63d`, `rs_sector_63d`; `feature.sector_leader` |
 | Options | IV, IV rank, IV percentile, IV / HV, IV - HV spread | `iv30`, `iv_rank`, `iv_percentile`, `iv_hv_ratio`, `iv_hv_spread`, the `vrp_*` set |
 | | OI, option volume, spread, delta, DTE | `option_liquidity`, `put_wing`, `oi_walls`, `nearest_expiry` |
-| | skew, expected move | `skew@v1`, `implied_move@v1` (planned, positioning.md) |
+| | skew, skew rank, expected move, term structure | `skew.skew`, `feature.skew_rr25`, `skew_history.skew_rank_252d`, `implied_move.implied_move`, `feature.term_ratio_30_90`, `feature.term_ratio_next_30` (positioning.md; built) |
 | | strike distance from support, / ATR | `feature.put_support_cushion` ((best put strike... see swing.toml: (swing_low - best_put_strike) / close) and `feature.put_support_cushion_atr` (/ atr_14) |
 | | covered call: strike above the close, above resistance, premium yield | `call_wing` (`best_call_strike`, `best_call_yield`), `feature.call_otm_pct`, `feature.cc_yield_annualised`, `feature.call_strike_above_resistance`, `feature.cc_resistance_cushion_atr` |
 | | ex-dividend before expiry (early assignment, a dividend a put misses) | `dividend_schedule.next_ex_date`, `feature.ex_div_before_expiry` (the put / call wing's target expiry), `feature.ex_div_before_nearest_expiry` |
@@ -127,7 +127,7 @@ folder per kind of thing; `architecture/layout.toml`):
 | `volume_profile@v1` | `activity/` | `profile_status`, `poc_252d`, `value_area_high`, `value_area_low`, `hvn_above`, `hvn_below`, `lvn_above`, `lvn_below`, `volume_near_close_share` | built |
 | `anchored_vwap@v2` | `price/` | v1 + `avwap_swing_low`, `avwap_swing_high` | built |
 | `relative_strength@v1` | `relative/` | `rs_spy_63d`, `rs_spy_252d`, `rs_line_high_252d`, `rs_spy_trend_20d`, `ret_5d_pctile`, `mom_pctile_63d`, `mom_pctile_252d`, `sector_etf`, `sector_ret_63d`, `rs_sector_63d`, `sector_rank_63d` | built |
-| `chain_flow@v1`, `flow_history@v1`, `skew@v1`, `skew_history@v1`, `implied_move@v1`, `iv_term@v1` | `positioning/` | [positioning.md](positioning.md) | planned |
+| `chain_flow@v1`, `flow_history@v1`, `skew@v1`, `skew_history@v1`, `implied_move@v1`, `iv_term@v1` | `positioning/` | [positioning.md](positioning.md) | built |
 | `call_wing@v1` | `options/` | the covered-call mirror of `put_wing@v1` (shared search in `wing_search`): `wing_status`, `target_expiry`, `target_dte`, `n_unpriced`, `n_strikes`, `wing_oi`, `wing_volume`, `wing_spread_pct`, `delta_band_distance`, `best_call_strike`, `_delta`, `_iv`, `_mid`, `_oi`, `_volume`, `_spread_pct`, `_yield` | built |
 | `dividend_schedule@v1` | `corporate/` | `dividend_status`, `next_ex_date`, `next_div_amount`, `days_to_ex_date`, `next_pay_date` | built |
 | `financials@v2` | `corporate/` | v1 + `eps_diluted_ttm_year_ago`, `revenue_qtr`, `revenue_qtr_year_ago`, `eps_diluted_qtr`, `eps_diluted_qtr_year_ago`, `qtr_as_of` | built |

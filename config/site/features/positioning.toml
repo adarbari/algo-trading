@@ -77,3 +77,30 @@ description = "The short put's cash-secured return annualised, simple (no compou
 null_meaning = "no best put (put_wing NO_STRIKE or worse), or no target expiry"
 valid_range = [0, inf]
 version = 1
+
+[skew_rr25]
+expr = "skew.iv_25p - skew.iv_25c"
+dtype = "float"
+unit = "decimal"
+description = "The raw 25-delta risk reversal at 30 days: put vol minus call vol (iv_25p - iv_25c), 0.06 is six vol points; positive: puts richer than calls. skew divides it by the ATM vol, which makes names of different vol level comparable; this keeps the vol points a collar or a put spread is priced in"
+null_meaning = "skew_status is neither OK nor SINGLE_EXPIRY (no spot, no chain, no expiry, no ATM vol or 25-delta wing)"
+valid_range = [-5, 5]
+version = 1
+
+[term_ratio_30_90]
+expr = "iv30.iv30 / iv_term.iv_90d"
+dtype = "float"
+unit = "ratio"
+description = "The front of the vol term structure over the back: our 30-day ATM vol over the 90-day one (iv30 / iv_90d). Above 1 is backwardation (the front richer than the back: an event or stress is priced near), below 1 contango (the normal shape: more uncertainty the further out)"
+null_meaning = "iv30 or iv_90d is null (no spot, no chain, or no usable ATM vol at 30 or 90 days; a single usable expiry is not a 90-day vol)"
+valid_range = [0, inf]
+version = 1
+
+[term_ratio_next_30]
+expr = "iv_term.iv_next / iv30.iv30"
+dtype = "float"
+unit = "ratio"
+description = "The front-expiry premium: the ATM vol at the next expiry over the 30-day vol (iv_next / iv30). Above 1.2 an event (earnings, a ruling) is priced into the nearest expiry; read skew.ne_dte for how short that expiry is, since a few days out is noisy"
+null_meaning = "iv_next or iv30 is null (no spot, no chain, or no usable ATM vol at the next expiry or at 30 days)"
+valid_range = [0, inf]
+version = 1

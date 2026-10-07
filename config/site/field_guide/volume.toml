@@ -508,10 +508,10 @@ mode = "soft"
 tolerance = 0.02
 note = "with feature.in_value_area eq true; a mean-reversion zone"
 
-# The session's bar shape and the named candles (candle@v1, and the inside_day_breakout and
-# strong_close expressions in config/site/features/swing.toml): what the day's open, high, low
-# and close say on their own. A single candle means little without where it formed. Filed under
-# "volume" because the momentum and price-level pages are at their 1000-line cap.
+# ---------------------------------------------------------------------------------------------
+# Skew, skew rank and the implied-vol term structure (skew@v1, skew_history@v1, iv_term@v1;
+# docs/data/positioning.md OP3 and the term group; ADR 0031). Theme "implied volatility", filed
+# here because volatility.toml, where that theme's other fields live, is at its line cap.
 
 [[field]]
 name = "rollup.candle@v1.body_share"

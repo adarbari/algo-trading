@@ -1,6 +1,6 @@
 # ADR 0031: Options positioning features are daily chain-derived estimates
 
-**Status:** accepted in part (2026-10-06, owner request): OP2 and OP4 built; OP3 next; OP1 (GEX / DEX) stays parked on the P1 dealer-sign decision. (Proposed 2026-10-04, parked while the SW track went first.) The owner's 2026-10-06 request for the options-strategy parameters settles the "Proposed" items of
+**Status:** accepted in part (2026-10-06, owner request): OP2, OP3 and OP4 built (OP3: `skew@v1`, `skew_history@v1`, plus the `iv_term@v1` term group); OP1 (GEX / DEX) stays parked on the P1 dealer-sign decision. (Proposed 2026-10-04, parked while the SW track went first.) The owner's 2026-10-06 request for the options-strategy parameters settles the "Proposed" items of
 [docs/data/positioning.md](../data/positioning.md) that OP2 and OP4 implement; the others stay
 proposed until their group is built. Extends [0014](0014-cboe-options-source.md)
 (we compute Greeks ourselves), [0021](0021-option-pricing-conventions.md) (pricing

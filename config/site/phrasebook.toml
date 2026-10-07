@@ -310,6 +310,36 @@ fields = ["feature.ex_div_before_call_expiry", "rollup.call_wing@v1.best_call_de
 hint = "ex_div_before_call_expiry eq true to collect it (with best_call_delta lte 0.3 so the call is not assigned first), eq false to avoid the assignment question; null means no date is known yet, not none"
 
 [[phrase]]
+say = ["put skew", "puts expensive", "puts are rich", "downside skew", "steep skew"]
+fields = ["rollup.skew@v1.skew", "feature.skew_rr25", "rollup.skew@v1.skew_status", "rollup.skew_history@v1.skew_rank_252d"]
+hint = "skew is (put vol - call vol) / ATM vol at 30 days: gte 0.25 for rich puts (about 0.10 to 0.20 is ordinary), soft with tolerance 0.05; skew_rr25 is the raw vol-point difference; require skew_status eq OK; a rank gate (skew_rank_252d gte 0.8) is null for every name until about the end of 2026, so say so rather than silently emptying the list"
+
+[[phrase]]
+say = ["calls expensive", "calls are rich", "call skew", "upside skew", "call-rich"]
+fields = ["rollup.skew@v1.skew", "feature.skew_rr25", "rollup.skew@v1.skew_status"]
+hint = "skew lte -0.05 (calls richer than puts, rare; usually a takeover or a squeeze), soft with tolerance 0.05; require skew_status eq OK"
+
+[[phrase]]
+say = ["skew rank", "skew percentile", "skew stretched", "skew at a high for the year"]
+fields = ["rollup.skew_history@v1.skew_rank_252d", "rollup.skew_history@v1.skew_percentile_252d", "rollup.skew_history@v1.skew_rank_status", "rollup.skew_history@v1.history_days"]
+hint = "skew_rank_252d gte 0.8 for a stretched put premium (0 to 1), confirm with skew_percentile_252d; gate history_days gte 60; chains are stored from 2026-10-02 only, so every rank is null until about the end of 2026 and PROVISIONAL until about October 2027: say this instead of returning an empty list"
+
+[[phrase]]
+say = ["backwardation", "term structure inverted", "inverted term structure", "front vol rich", "front richer than the back"]
+fields = ["feature.term_ratio_30_90", "rollup.iv_term@v1.iv_term_status", "rollup.iv_term@v1.iv_90d"]
+hint = "term_ratio_30_90 gte 1.1 (the 30-day vol over the 90-day one; an event or stress is priced near), soft with tolerance 0.05; add rollup.earnings@v1.days_to_earnings gt 30 to rule out a report; require iv_term_status eq OK"
+
+[[phrase]]
+say = ["contango", "steep contango", "normal term structure", "front vol cheap"]
+fields = ["feature.term_ratio_30_90", "rollup.iv_term@v1.iv_term_status"]
+hint = "term_ratio_30_90 lte 0.9 for steep contango (the front cheap against the back; calendars buy the front), soft with tolerance 0.05; any value below 1 is contango, the normal shape; require iv_term_status eq OK"
+
+[[phrase]]
+say = ["event priced in the front", "event in the front expiry", "front expiry premium", "event priced into the nearest expiry"]
+fields = ["feature.term_ratio_next_30", "rollup.skew@v1.ne_dte", "rollup.iv_term@v1.iv_next"]
+hint = "term_ratio_next_30 gte 1.3 (the next expiry's vol over the 30-day vol; 1.2 is a hint), soft with tolerance 0.1; gate ne_dte gte 7 so a pinned weekly is not read as an event"
+
+[[phrase]]
 say = ["hammer at support", "hammer candle at support", "hammer off support", "hammer"]
 fields = ["rollup.candle@v1.candle", "feature.dist_to_support"]
 hint = "candle eq HAMMER; 'at support' adds dist_to_support lte 0.02 (within 2% of the swing support), soft with tolerance 0.01; a hammer alone is a shape in any place, so without 'support' or 'after a decline' say the location is not asked; null on a no-range bar or a missing previous bar drops the name"

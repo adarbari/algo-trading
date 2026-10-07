@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-406 stored features in 41 groups, in dependency order; 117 expression features.
+420 stored features in 44 groups, in dependency order; 120 expression features.
 
 ## `option_liquidity@v1`
 
@@ -548,6 +548,30 @@ The covered call at the expiry nearest 45 days: the one nearest 15-30 delta (our
 | `best_call_spread_pct` | chain | float32 | decimal | open | 0 .. 2 | The best call's (ask - bid) / mid on the stored quote (judge the trade on a live one) | no call at the target expiry with our \|delta\| in 0.05..0.50 (NO_STRIKE), or no target expiry (wing_status NO_SPOT, NO_CHAIN or NO_EXPIRY) | `chains/option_quotes.bid`, `chains/option_quotes.ask` |
 | `best_call_yield` | chain | float32 | decimal | open | 0 .. 1 | The best call's premium yield for the period: mid / the underlying's price (the covered call's income per dollar of stock held) | no call at the target expiry with our \|delta\| in 0.05..0.50 (NO_STRIKE), or no target expiry (wing_status NO_SPOT, NO_CHAIN or NO_EXPIRY) | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
 
+## `skew@v1`
+
+The 25-delta skew at 30 days: (put vol - call vol) / ATM vol from our own delta at each contract's IV, with the three vols and the same skew at the next expiry. Stored as `rollups/instrument/skew@v1`; reads `chains/option_quotes`, `rates/treasury`, `chains/underlying_quotes` (optional), `rollups/instrument/div_yield@v1` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `skew_status` | label | str | category | open | OK, SINGLE_EXPIRY, NO_SPOT, NO_CHAIN, NO_EXPIRY, NO_ATM, NO_WING | OK, SINGLE_EXPIRY (one usable expiry, its vols unchanged), or the first failing step: NO_SPOT, NO_CHAIN, NO_EXPIRY (none 7..90 days out), NO_ATM (no ATM vol), NO_WING (25 delta not bracketed on a side) | never | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.close`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `skew` | chain | float32 | ratio | open | -1 .. 2 | Normalised 25-delta skew at 30 days: (iv_25p - iv_25c) / iv_atm; positive: puts richer than calls, 0.2 is a put vol 20% of ATM above the call vol | skew_status is neither OK nor SINGLE_EXPIRY (the status says why) | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.close`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `iv_25p` | chain | float32 | decimal | open | 0 .. 5 | The put vol at our delta -0.25 (linear in delta between the two smile quotes bracketing it), interpolated in total variance to 30 days | skew_status is neither OK nor SINGLE_EXPIRY (the status says why) | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.close`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `iv_25c` | chain | float32 | decimal | open | 0 .. 5 | The call vol at our delta +0.25 (linear in delta between the two smile quotes bracketing it), interpolated in total variance to 30 days | skew_status is neither OK nor SINGLE_EXPIRY (the status says why) | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.close`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `iv_atm` | chain | float32 | decimal | open | 0 .. 5 | The at-the-money vol: the mean of the call vol at delta +0.50 and the put vol at -0.50, interpolated in total variance to 30 days | skew_status is neither OK nor SINGLE_EXPIRY (the status says why) | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.close`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `ne_skew` | chain | float32 | ratio | open | -1 .. 2 | The same skew at the next expiry (the first listed with dte >= 1, weeklies included), no interpolation; very short expiries have noisy vols, read ne_dte | no chain or spot, no expiry with dte >= 1, or the next expiry has no ATM vol or no bracketing 25-delta put and call among its smile quotes | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.right`, `chains/underlying_quotes.close`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `ne_dte` | chain | int | days | open | >= 1 | Calendar days from the session to the next expiry (the first listed with dte >= 1) | no option chain, or no listed expiry with dte >= 1 | `chains/option_quotes.expiry` |
+
+## `iv_term@v1`
+
+The at-the-money vol at the next expiry and at a constant 90 days (iv30's method), the two points the term ratios compare with iv30. Stored as `rollups/instrument/iv_term@v1`; reads `chains/option_quotes`, `rates/treasury`, `chains/underlying_quotes` (optional), `rollups/instrument/div_yield@v1` (optional).
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `iv_term_status` | label | str | category | open | OK, NO_SPOT, NO_CHAIN, NO_NEXT, NO_90D | OK, or the first failing step: NO_SPOT, NO_CHAIN, NO_NEXT (no ATM vol at the next expiry), NO_90D (no bracketing pair of expiries 30..180 days out with ATM vols); the side that exists keeps its value | never | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.open_interest`, `chains/underlying_quotes.close`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `iv_next` | chain | float32 | decimal | open | 0 .. 5 | The at-the-money vol at the next expiry (the first listed with dte >= 1, weeklies included): iv30's forward ATM method on that one expiry, no interpolation; a very short expiry is noisy and carries any event in it | iv_term_status is NO_SPOT, NO_CHAIN or NO_NEXT (the status says why) | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.open_interest`, `chains/underlying_quotes.close`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+| `iv_90d` | chain | float32 | decimal | open | 0 .. 5 | Our constant 90-day at-the-money vol: iv30's method with the two expiries around 90 days among 30..180 (standard monthlies first), interpolated in total variance | iv_term_status is NO_SPOT, NO_CHAIN or NO_90D, or NO_NEXT with no bracketing pair (a single usable expiry is not a 90-day vol) | `chains/option_quotes.bid`, `chains/option_quotes.ask`, `chains/option_quotes.strike`, `chains/option_quotes.expiry`, `chains/option_quotes.open_interest`, `chains/underlying_quotes.close`, `chains/underlying_quotes.price`, `rates/treasury.rate_cont`, `div_yield@v1` |
+
 ## `iv_history@v2`
 
 IV30 rank and percentile over 252 sessions (provisional after 60). Stored as `rollups/instrument/iv_history@v2`; reads `rollups/instrument/iv30@v1`.
@@ -559,6 +583,17 @@ IV30 rank and percentile over 252 sessions (provisional after 60). Stored as `ro
 | `iv_percentile_252d` | window | float32 | decimal | open | 0 .. 1 | IV percentile: the share of the window's earlier IVs strictly below today's | rank_status is UNKNOWN (fewer than 60 sessions with an IV), or there is no IV today; or no earlier IV | `iv30.iv30@v1` |
 | `history_days` | window | int | sessions | open | >= 0 | Sessions of the 252-session window with an IV, today included (gaps are not filled) | never | `iv30.iv30@v1` |
 | `rank_status` | label | str | category | open | UNKNOWN, PROVISIONAL, FULL | UNKNOWN below 60 sessions with an IV (no rank), PROVISIONAL below 252, FULL from 252 | never | `iv30.iv30@v1` |
+
+## `skew_history@v1`
+
+Skew rank and percentile over 252 sessions (provisional after 60). Stored as `rollups/instrument/skew_history@v1`; reads `rollups/instrument/skew@v1`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `skew_rank_252d` | window | float32 | decimal | open | 0 .. 1 | Skew rank: (skew - min) / (max - min) over the last 252 sessions' skews, today included (1 is the most put-rich skew of the year, 0 the least) | skew_rank_status is UNKNOWN (fewer than 60 sessions with a skew; chains are stored nightly from 2026-10-02 only, so every name reads null until about the end of 2026), or there is no skew today (skew_status says why); or every skew in the window is equal | `skew.skew@v1` |
+| `skew_percentile_252d` | window | float32 | decimal | open | 0 .. 1 | Skew percentile: the share of the window's earlier skews strictly below today's | skew_rank_status is UNKNOWN (fewer than 60 sessions with a skew; chains are stored nightly from 2026-10-02 only, so every name reads null until about the end of 2026), or there is no skew today (skew_status says why); or no earlier skew | `skew.skew@v1` |
+| `history_days` | window | int | sessions | open | 0 .. 252 | Sessions of the 252-session window with a skew, today included (gaps are not filled) | never | `skew.skew@v1` |
+| `skew_rank_status` | label | str | category | open | UNKNOWN, PROVISIONAL, FULL | UNKNOWN below 60 sessions with a skew (no rank), PROVISIONAL below 252, FULL from 252 | never | `skew.skew@v1` |
 
 ## Market features
 
@@ -795,6 +830,9 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | `put_otm_pct` | expression | float | decimal | open | -1 .. 1 | How far below the close the best short put's strike is: (close - strike) / close, 0.08 means the strike sits 8% under the price (negative: the strike is above the close) | no best put (put_wing NO_STRIKE or worse), or no price_stats row | `(price_stats.close - put_wing.best_put_strike) / price_stats.close` | virtual |
 | `put_breakeven` | expression | float | usd_per_share | open | >= 0 | The short put's break-even at expiry: the best put's strike minus the premium it collects (its mid), per share; the stock must stay above it for the trade to win | no best put (put_wing NO_STRIKE or worse) | `put_wing.best_put_strike - put_wing.best_put_mid` | virtual |
 | `put_roc_annualised` | expression | float | decimal | open | >= 0 | The short put's cash-secured return annualised, simple (no compounding): best_put_roc x 365 / target_dte, 0.3 is 30% a year if the put expires worthless and is sold again at the same terms | no best put (put_wing NO_STRIKE or worse), or no target expiry | `put_wing.best_put_roc * 365 / put_wing.target_dte` | virtual |
+| `skew_rr25` | expression | float | decimal | open | -5 .. 5 | The raw 25-delta risk reversal at 30 days: put vol minus call vol (iv_25p - iv_25c), 0.06 is six vol points; positive: puts richer than calls. skew divides it by the ATM vol, which makes names of different vol level comparable; this keeps the vol points a collar or a put spread is priced in | skew_status is neither OK nor SINGLE_EXPIRY (no spot, no chain, no expiry, no ATM vol or 25-delta wing) | `skew.iv_25p - skew.iv_25c` | virtual |
+| `term_ratio_30_90` | expression | float | ratio | open | >= 0 | The front of the vol term structure over the back: our 30-day ATM vol over the 90-day one (iv30 / iv_90d). Above 1 is backwardation (the front richer than the back: an event or stress is priced near), below 1 contango (the normal shape: more uncertainty the further out) | iv30 or iv_90d is null (no spot, no chain, or no usable ATM vol at 30 or 90 days; a single usable expiry is not a 90-day vol) | `iv30.iv30 / iv_term.iv_90d` | virtual |
+| `term_ratio_next_30` | expression | float | ratio | open | >= 0 | The front-expiry premium: the ATM vol at the next expiry over the 30-day vol (iv_next / iv30). Above 1.2 an event (earnings, a ruling) is priced into the nearest expiry; read skew.ne_dte for how short that expiry is, since a few days out is noisy | iv_next or iv30 is null (no spot, no chain, or no usable ATM vol at the next expiry or at 30 days) | `iv_term.iv_next / iv30.iv30` | virtual |
 
 ### `price.toml`
 
