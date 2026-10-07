@@ -39,6 +39,7 @@ import pandas as pd
 from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
+from algotrade.features.rollups.price.momentum import channel_features
 from algotrade.features.rollups.price.price_stats import Matrix, Panel, panel, traded_rows
 from algotrade.quant.rolling import rolling_max, rolling_mean, rolling_min, trailing_run
 
@@ -93,22 +94,7 @@ FEATURES = (
         "deviation)",
         inputs=(CLOSE,),
     ),
-    *(
-        f
-        for n in CHANNELS
-        for f in (
-            Feature(
-                f"high_{n}d", "float32", "usd_per_share",
-                f"Highest daily high over the last {n} sessions, the session included",
-                _gap(n), valid_range=(0, None), inputs=(HIGH,),
-            ),
-            Feature(
-                f"low_{n}d", "float32", "usd_per_share",
-                f"Lowest daily low over the last {n} sessions, the session included",
-                _gap(n), valid_range=(0, None), inputs=(LOW,),
-            ),
-        )
-    ),
+    *channel_features(CHANNELS, HIGH, LOW),
     *(
         Feature(
             f"prior_{side}_{n}d", "float32", "usd_per_share",
