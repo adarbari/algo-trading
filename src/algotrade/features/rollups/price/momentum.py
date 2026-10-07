@@ -58,6 +58,27 @@ def _gap(n: int) -> str:
     return f"a session among the last {n} has no bar (a gap), or the history is shorter"
 
 
+def channel_features(windows: tuple[int, ...], high: str, low: str) -> tuple[Feature, ...]:
+    """The highest-high / lowest-low features over each of ``windows`` sessions (the session
+    included), reading the ``high`` / ``low`` bar fields; shared with ``trend_stats``."""
+    return tuple(
+        f
+        for n in windows
+        for f in (
+            Feature(
+                f"high_{n}d", "float32", "usd_per_share",
+                f"Highest daily high over the last {n} sessions, the session included",
+                _gap(n), valid_range=(0, None), inputs=(high,),
+            ),
+            Feature(
+                f"low_{n}d", "float32", "usd_per_share",
+                f"Lowest daily low over the last {n} sessions, the session included",
+                _gap(n), valid_range=(0, None), inputs=(low,),
+            ),
+        )
+    )  # fmt: skip
+
+
 FEATURES = (
     Feature(
         f"atr_{PERIOD}", "float32", "usd_per_share",
@@ -86,22 +107,7 @@ FEATURES = (
         f"{_gap(VOLUME_WINDOW + 1)}; or those {VOLUME_WINDOW} sessions had no volume at all",
         valid_range=(0, None), inputs=(VOLUME,),
     ),
-    *(
-        f
-        for n in CHANNELS
-        for f in (
-            Feature(
-                f"high_{n}d", "float32", "usd_per_share",
-                f"Highest daily high over the last {n} sessions, the session included",
-                _gap(n), valid_range=(0, None), inputs=(HIGH,),
-            ),
-            Feature(
-                f"low_{n}d", "float32", "usd_per_share",
-                f"Lowest daily low over the last {n} sessions, the session included",
-                _gap(n), valid_range=(0, None), inputs=(LOW,),
-            ),
-        )
-    ),
+    *channel_features(CHANNELS, HIGH, LOW),
     Feature(
         f"prior_high_{CHANNELS[0]}d", "float32", "usd_per_share",
         f"Highest daily high over the {CHANNELS[0]} sessions before the session (the session "

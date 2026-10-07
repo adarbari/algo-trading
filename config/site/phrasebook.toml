@@ -133,3 +133,33 @@ hint = "volume_bias eq ACCUMULATION (DISTRIBUTION for the sellers); or up_volume
 say = ["volume climax", "capitulation volume", "climactic volume", "unusual volume", "volume spike"]
 fields = ["feature.volume_climax", "rollup.volume@v1.volume_z_20d", "rollup.momentum@v1.rel_volume"]
 hint = "volume_climax eq true (3 standard deviations above the 20 sessions before); 'unusual volume' alone is volume_z_20d gte 2 soft or rel_volume gte 3; most climaxes are earnings: check rollup.earnings@v1.last_earnings_date"
+
+[[phrase]]
+say = ["squeeze", "coiling", "volatility contraction", "tight bands", "narrow range", "building a base"]
+fields = ["feature.bb_squeeze", "rollup.bands@v1.bb_width_pctile_252d", "rollup.trend_stats@v1.tight_range_sessions"]
+hint = "gate: bb_squeeze eq true, or bb_width_pctile_252d lte 0.10 (narrower than 90% of the year); tight_range_sessions gte 10 for a base at least two weeks old; do not add a momentum gate, a squeeze is a pre-move state"
+
+[[phrase]]
+say = ["stretched", "extended", "far above its average", "overextended", "parabolic"]
+fields = ["feature.stretch_sma20_atr", "feature.price_z_20d", "feature.bb_pct_b"]
+hint = "stretch_sma20_atr gte 3 (three ATRs above the 20-session mean), or price_z_20d gte 2 (on the upper band), or bb_pct_b gt 1; negative values for 'stretched below'"
+
+[[phrase]]
+say = ["at the lower band", "below the band", "washed out", "mean reversion long"]
+fields = ["feature.bb_pct_b", "feature.price_z_20d", "feature.trend_state"]
+hint = "bb_pct_b lte 0 (at or under the lower Bollinger band) or price_z_20d lte -2; pair with trend_state eq UPTREND or feature.pct_vs_sma_200 gt 0 so it is a dip, not a downtrend"
+
+[[phrase]]
+say = ["12-month momentum", "one-year momentum", "long-term momentum", "momentum factor"]
+fields = ["rollup.trend_stats@v1.mom_12_1", "rollup.trend_stats@v1.ret_252d"]
+hint = "mom_12_1 gt 0 as the gate (the last month skipped, the factor definition); ret_252d for the plain one-year return"
+
+[[phrase]]
+say = ["winning streak", "up days in a row", "consecutive up days", "down days in a row", "losing streak"]
+fields = ["rollup.trend_stats@v1.close_streak"]
+hint = "close_streak gte 5 for five up closes in a row, lte -5 for five down; a long streak is a short-term reversal setup more than a trend signal"
+
+[[phrase]]
+say = ["big move today", "unusual move", "outsized day", "shock day"]
+fields = ["rollup.trend_stats@v1.ret_z_20d", "rollup.volume@v1.volume_z_20d"]
+hint = "ret_z_20d gte 3 for an up shock, lte -3 for a down one (three times the normal daily move); confirm with volume_z_20d gte 2"

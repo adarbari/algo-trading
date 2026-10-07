@@ -108,6 +108,8 @@ Selectable rollup fields today ([data/layers.md](data/layers.md#rollups-as-built
 | `momentum@v1` | `atr_14`, `rsi_14`, `ret_5d`, `rel_volume`, `high_20d`, `low_20d`, `high_50d`, `low_50d`, `prior_high_20d` (float32) |
 | `volume@v1` | `session_volume`, `dollar_volume`, `adv_shares_20d`, `volume_ratio_5d_20d`, `volume_z_20d`, `up_volume_share_20d`, `cmf_20d` (float32) |
 | `swing_levels@v1` | `swing_high`, `swing_low` (float32); `swing_high_date`, `swing_low_date` (date) |
+| `bands@v1` | `ema_10`, `ema_20`, `ema_50`, `ema_200`, `ema20_slope_5d`, `ema50_slope_10d`, `sma200_slope_20d`, `close_std_20`, `bb_width_pctile_252d` (float32); `band_walk` (int, signed) |
+| `trend_stats@v1` | `ret_1d`, `ret_3d`, `ret_10d`, `ret_120d`, `ret_252d`, `mom_12_1`, `mom_accel_5d`, `ret_z_20d`, `high_100d`, `low_100d`, `high_200d`, `low_200d`, `prior_high_50d`, `prior_low_20d`, `prior_low_50d`, `close_range_pos` (float32); `sessions_since_high_20d`, `close_streak`, `sma20_streak`, `tight_range_sessions` (int) |
 | `anchored_vwap@v1` | `avwap_earnings` (float32); `avwap_anchor_date` (date) |
 | `oi_walls@v1` | `wall_status` (str); `call_wall`, `put_wall` (float32); `call_wall_oi`, `put_wall_oi` (int) |
 | `nearest_expiry@v1` | `expiry_date` (date); `dte`, `sessions_to_expiry` (int) |
@@ -279,7 +281,7 @@ negative interval) and invalid leverage-marker regexes. Every key must also driv
 
 A formula over existing features is a TOML entry, not code (ADR 0023 step 3). Each
 `config/site/features/<theme>.toml` (one per theme: `price`, `volatility`, `fundamentals`,
-`liquidity`, `vrp`, `swing`) holds one `[name]` per feature:
+`liquidity`, `vrp`, `swing`, `bands`) holds one `[name]` per feature:
 
 | Key | Meaning |
 |---|---|

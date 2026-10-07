@@ -321,3 +321,257 @@ Sources: The Turtle rules (ATR-scaled distances); docs/data/swing.md
 - Support in a downtrend breaks: pair with feature.trend_state eq UPTREND.
 
 Sources: The Turtle rules (a 2 ATR stop); docs/data/swing.md
+
+### `rollup.bands@v1.ema_20`
+
+**How to read it.** The 20-session exponential moving average of the close, in dollars per share: the midline of the Keltner channel and the fastest of the common averages (it weights the latest close 2 / 21, so it turns a few sessions before rollup.price_stats@v2.sma_20). Compare with the close: above it the short-term trend is up, below it down; the gap between the two in percent or ATRs is what to threshold (feature.pct_vs_sma_20 and feature.stretch_sma20_atr do that for the SMA, which sits within a fraction of a percent of the EMA on all but the fastest moves).
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a 20-session EMA | `not_null` | hard | - | threshold the distance instead: feature.kc_position or feature.pct_vs_sma_20 |
+
+**When the reading lies**
+
+- The EMA is seeded with the mean of the first 20 bars of the consecutive run ending today; after a gap in the bars the run restarts, so a name that just resumed trading has an EMA over few bars. Check rollup.price_history@v1.bar_status and rollup.price_stats@v2.history_days.
+- Null with fewer than 20 consecutive bars ending on the session (a gap among the last 20, or a new listing).
+
+Sources: Moving average (exponential), Wikipedia: https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average; Keltner channel, Wikipedia: https://en.wikipedia.org/wiki/Keltner_channel
+
+### `feature.bb_upper`
+
+**How to read it.** The upper Bollinger band: the 20-session mean close plus two standard deviations of those closes, in dollars per share. Price touches it on about 5% of sessions in a random walk; in a trend it rides along it (the band walk, rollup.bands@v1.band_walk). Compare with the close through feature.bb_pct_b (1 is on the band, above 1 is outside it) rather than the level itself.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has Bollinger bands | `not_null` | hard | - | threshold the position instead: feature.bb_pct_b |
+
+**When the reading lies**
+
+- A band is a statement about the last 20 closes, not resistance: in a strong uptrend the close lives on or above the upper band for weeks. Pair a 'too far above' reading with feature.trend_state and rollup.momentum@v1.rsi_14 before reading it as a top.
+- After a one-day shock (earnings, a takeover) both bands jump apart for 20 sessions and the price sits 'inside' them; the squeeze that follows is the shock leaving the window, not a new base. Check rollup.price_moves@v1.one_day_move.
+- Null after a gap in the last 20 sessions or a shorter history.
+
+Sources: Bollinger (2001), Bollinger on Bollinger Bands: the 20 / 2 defaults; Bollinger Bands, Wikipedia: https://en.wikipedia.org/wiki/Bollinger_Bands
+
+### `feature.bb_lower`
+
+**How to read it.** The lower Bollinger band: the 20-session mean close minus two standard deviations of those closes, in dollars per share. A close at or under it (feature.bb_pct_b at or below 0) is a two-sigma dip against the last month; in an uptrend that is the classic mean-reversion entry, in a downtrend it is where the price lives.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has Bollinger bands | `not_null` | hard | - | threshold the position instead: feature.bb_pct_b |
+
+**When the reading lies**
+
+- A close below the band in a downtrend keeps falling: a dip is a dip only with feature.trend_state UPTREND or feature.pct_vs_sma_200 above 0.
+- The band widens after a shock and narrows as the shock leaves the window, so a touch 20 sessions after an earnings gap means less than one in a quiet month. Check rollup.earnings@v1.last_earnings_date.
+- Null after a gap in the last 20 sessions or a shorter history.
+
+Sources: Bollinger (2001), Bollinger on Bollinger Bands; Mean reversion with bands (Connors and Alvarez, Short Term Trading Strategies That Work)
+
+### `feature.kc_upper`
+
+**How to read it.** The upper Keltner channel: the 20-session EMA plus two Wilder ATR(14), in dollars per share. Unlike a Bollinger band it is built from the daily range, so it moves with how much the name trades each day rather than with the dispersion of closes; price closes above it on a strong day, and a Bollinger band inside it is the squeeze (feature.bb_squeeze). Compare with the close through feature.kc_position.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a Keltner channel | `not_null` | hard | - | threshold the position instead: feature.kc_position |
+
+**When the reading lies**
+
+- The channel uses ATR(14) where the classic uses ATR(10); the width is the same within a few percent on most names and the reading is unchanged. For the exact TTM construction see the sources.
+- A takeover pins the price with an ATR near zero, so the channel collapses onto the EMA and every close is 'outside' it. Check feature.atr_pct and the 'pending takeover' situation.
+- Null with fewer than 20 consecutive bars ending on the session.
+
+Sources: Keltner channel, Wikipedia: https://en.wikipedia.org/wiki/Keltner_channel; Carter (2005), Mastering the Trade: the TTM squeeze (Bollinger 20/2 inside Keltner 20/1.5 ATR)
+
+### `feature.kc_lower`
+
+**How to read it.** The lower Keltner channel: the 20-session EMA minus two Wilder ATR(14), in dollars per share. A close below it is a strong down day against the name's own daily range; a Bollinger band inside it is part of the squeeze. Compare with the close through feature.kc_position.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a Keltner channel | `not_null` | hard | - | threshold the position instead: feature.kc_position |
+
+**When the reading lies**
+
+- A gap down on news puts the close far below the channel for one day and the ATR catches up over the next two weeks; the channel widens after the move, not before. Check rollup.price_moves@v1.one_day_move.
+- Null with fewer than 20 consecutive bars ending on the session.
+
+Sources: Keltner channel, Wikipedia: https://en.wikipedia.org/wiki/Keltner_channel
+
+### `rollup.bands@v1.ema_10`
+
+**How to read it.** The 10-session exponential moving average of the close, in dollars per share: the fastest trend line in the catalogue, about two trading weeks, which day traders and short-term swing systems use as the trailing reference. The close above it is a short-term uptrend in force; a close below it after a run is the first warning. Threshold the distance, not the level.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a 10-session EMA | `not_null` | hard | - | compare with rollup.price_stats@v2.close in a rule; threshold feature.pct_vs_ema_20 for distance |
+
+**When the reading lies**
+
+- It hugs the price: a 10-day average crosses the close every few sessions in a range, so a cross alone is noise. Pair with rollup.bands@v1.ema_20 or feature.ema_stack for the direction.
+- Null with fewer than 10 consecutive bars ending on the session.
+
+Sources: Moving average (exponential), Wikipedia: https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average
+
+### `rollup.bands@v1.ema_50`
+
+**How to read it.** The 50-session exponential moving average of the close, in dollars per share: the intermediate trend line (about a quarter). Above it with the 20-session EMA above it too is the alignment the pullback and continuation screens require (feature.ema_stack BULL); a pullback that holds it is the classic swing entry. feature.pct_vs_ema_50 is the distance.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a 50-session EMA | `not_null` | hard | - | threshold feature.pct_vs_ema_50 or use feature.ema_stack for alignment |
+
+**When the reading lies**
+
+- It is seeded with the mean of the first 50 bars of the run ending today, so after a gap in the bars it restarts; a name that resumed trading recently has a young average. Check rollup.price_stats@v2.history_days.
+- Null with fewer than 50 consecutive bars ending on the session.
+
+Sources: Brock, Lakonishok and LeBaron (1992): https://ideas.repec.org/a/bla/jfinan/v47y1992i5p1731-64.html
+
+### `rollup.bands@v1.ema_200`
+
+**How to read it.** The 200-session exponential moving average of the close, in dollars per share: the long-term trend line (about ten months). The close above it is the bull-market condition most trend-following systems gate on (Faber's rule uses the 10-month SMA, within a percent of this). feature.pct_vs_ema_200 is the distance, feature.ema_stack the alignment with the 20 and the 50.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a 200-session EMA (ten months of history) | `not_null` | hard | - | threshold feature.pct_vs_ema_200 or feature.pct_vs_sma_200 |
+
+**When the reading lies**
+
+- Seeded with the mean of the run's first 200 bars over at most the last 400 sessions, so on a name with under 400 bars the seed still carries weight and the EMA sits close to the SMA; rollup.price_stats@v2.sma_200 is the comparison.
+- Null with fewer than 200 consecutive bars ending on the session (a listing under ten months old, or any gap in that span).
+
+Sources: Faber (2007), A Quantitative Approach to Tactical Asset Allocation: https://papers.ssrn.com/sol3/papers.cfm?abstract_id=962461
+
+### `rollup.trend_stats@v1.high_100d`
+
+**How to read it.** The highest daily high of the last 100 sessions (about five months), in dollars per share, today's high included. With the 20 and 50-session highs it dates the current advance: the close at all three is a fresh leg, at the 20 but not the 100 a rally inside a longer range. Compare with the close as a share: rollup.price_stats@v2.close / high_100d - 1.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a 100-session channel | `not_null` | hard | - | compare with rollup.price_stats@v2.close in a rule |
+
+**When the reading lies**
+
+- A single spike high (an earnings gap that reversed) sets the level for 100 sessions; feature.dist_to_resistance uses the confirmed swing pivot instead.
+- Null after a gap in the last 100 sessions or a shorter history.
+
+Sources: Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian
+
+### `rollup.trend_stats@v1.low_100d`
+
+**How to read it.** The lowest daily low of the last 100 sessions, in dollars per share, today's low included: the floor of the five-month range. The close at it is a five-month low; the distance above it (close / low_100d - 1) is how much of the range the name has recovered.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a 100-session channel | `not_null` | hard | - | compare with rollup.price_stats@v2.close in a rule |
+
+**When the reading lies**
+
+- One capitulation wick sets the level for 100 sessions; rollup.swing_levels@v1.swing_low is the confirmed support instead.
+- Null after a gap in the last 100 sessions or a shorter history.
+
+Sources: Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian
+
+### `rollup.trend_stats@v1.high_200d`
+
+**How to read it.** The highest daily high of the last 200 sessions, in dollars per share, today's high included: close to the 52-week high (rollup.price_stats@v2.high_52w covers 252 sessions and needs 240 bars), so use it on names too young or gappy for the 52-week figure.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a 200-session channel | `not_null` | hard | - | prefer feature.pct_from_high_52w for the 52-week distance |
+
+**When the reading lies**
+
+- Null after a gap in the last 200 sessions or a shorter history; the 52-week high tolerates 12 missing bars, this does not.
+
+Sources: Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian
+
+### `rollup.trend_stats@v1.low_200d`
+
+**How to read it.** The lowest daily low of the last 200 sessions, in dollars per share, today's low included: the ten-month floor, close to rollup.price_stats@v2.low_52w.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a 200-session channel | `not_null` | hard | - | prefer feature.pct_from_low_52w for the 52-week distance |
+
+**When the reading lies**
+
+- Null after a gap in the last 200 sessions or a shorter history.
+
+Sources: Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian
+
+### `rollup.trend_stats@v1.prior_high_50d`
+
+**How to read it.** The highest daily high of the 50 sessions before today (today excluded), in dollars per share: the level a 50-session breakout close has to clear. feature.breakout_50d is the rule (close above it on 1.5x volume); rollup.momentum@v1.prior_high_20d is the 20-session version.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a 50-session breakout level | `not_null` | hard | - | the rule is feature.breakout_50d |
+
+**When the reading lies**
+
+- It excludes today on purpose: today's high is always at or above today's close, so a channel that included it could never be broken by the close.
+- Null after a gap in the 50 sessions before today or a shorter history.
+
+Sources: Faith (2007), Way of the Turtle: the 55-day breakout (System 2)
+
+### `rollup.trend_stats@v1.prior_low_20d`
+
+**How to read it.** The lowest daily low of the 20 sessions before today (today excluded), in dollars per share: the level a 20-session breakdown close has to break. feature.breakdown_20d is the rule (close below it on 1.5x volume); for a long it is the stop most swing systems place just under.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a 20-session breakdown level | `not_null` | hard | - | the rule is feature.breakdown_20d; the distance above it is rollup.price_stats@v2.close / prior_low_20d - 1 |
+
+**When the reading lies**
+
+- Null after a gap in the 20 sessions before today or a shorter history.
+
+Sources: Faith (2007), Way of the Turtle: the 20-day channel exit
+
+### `rollup.trend_stats@v1.prior_low_50d`
+
+**How to read it.** The lowest daily low of the 50 sessions before today (today excluded), in dollars per share: the intermediate breakdown level, and the stop a position-trade places under.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a 50-session breakdown level | `not_null` | hard | - | compare with rollup.price_stats@v2.close in a rule |
+
+**When the reading lies**
+
+- Null after a gap in the 50 sessions before today or a shorter history.
+
+Sources: Faith (2007), Way of the Turtle

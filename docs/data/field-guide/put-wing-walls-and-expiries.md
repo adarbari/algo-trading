@@ -351,3 +351,40 @@ Sources: Site convention
 - Sessions, not calendar days: a holiday week makes 5 calendar days 3 sessions.
 
 Sources: Site convention
+
+### `feature.put_support_cushion`
+
+**How to read it.** The short put's cushion: (support - the best put's strike) / close, where support is the most recent confirmed swing low below the close. 0.05 means the strike sits 5% of the price below support: the stock has to break support and fall another 5% before the put is in the money. Positive is what a put seller wants; 0 puts the strike on support; negative means the strike is above support, so a test of support alone puts the option in the money. feature.put_support_cushion_atr is the same room in ATRs.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| strike below support (put selling) | `gte 0.03` | soft | 0.02 | with feature.dist_to_support between 0.02 and 0.10 so support is near but holding; feature.put_support_cushion_atr gte 1 is the ATR-scaled version |
+
+**When the reading lies**
+
+- Support is the most recent swing low, not the strongest one: a minor pivot a week old reads as support while the real floor is lower. Check rollup.swing_levels@v1.swing_low_date and feature.dist_to_support.
+- The best put is the 8-15 delta strike nearest 45 days; a wider cushion usually means a lower delta and less premium. Read with rollup.put_wing@v1.best_put_delta and rollup.put_wing@v1.best_put_roc.
+- An earnings date before the expiry makes the cushion a different question (the gap, not the chart). Check feature.earnings_before_expiry.
+- Null when there is no confirmed swing low below the close (the name is at a one-year low), no best put, or no price_stats row.
+
+Sources: Cash-secured puts below support (McMillan, Options as a Strategic Investment: strike selection)
+
+### `feature.put_support_cushion_atr`
+
+**How to read it.** The short put's cushion in Wilder ATR(14): (support - the best put's strike) / atr_14, how many average days' range the stock has to fall below support before the put is in the money. 1 is one day's range of room, 2 to 3 is comfortable, 0 puts the strike on support, negative above it. The ATR scale makes it comparable across names and the natural companion to rollup.put_wing@v1.best_put_delta (a low delta at a small cushion means the market prices the support as weak).
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| at least one ATR of room below support | `gte 1.0` | soft | 0.5 | with rollup.put_wing@v1.wing_status eq OK and feature.earnings_before_expiry eq false |
+
+**When the reading lies**
+
+- A pending takeover shrinks the ATR towards zero, so the cushion reads huge on a name that cannot move; see the 'pending takeover' situation.
+- The cushion is measured today; a wider ATR after a shock shrinks it without the strike or support moving. Check rollup.price_moves@v1.one_day_move.
+- Null when there is no confirmed swing low below the close, no best put, or atr_14 is unknown or 0.
+
+Sources: Cash-secured puts below support (McMillan, Options as a Strategic Investment)

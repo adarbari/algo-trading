@@ -141,6 +141,7 @@ def test_the_shipped_guide_is_complete() -> None:
         "options-chain",
         "options-wing",
         "situations",
+        "trend",
         "volatility",
         "volume",
     ]

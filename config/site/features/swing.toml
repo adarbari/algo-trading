@@ -92,3 +92,105 @@ unit = "flag"
 description = "A pullback in an uptrend: trend_state UPTREND and the close within 1 ATR (params.atr_multiple) of SMA20, above or below it (edges included)"
 null_meaning = "neither condition is false and one is unknown (trend_state, sma_20 or atr_14 null)"
 version = 1
+
+# Distances to the channels, the pullback in ATRs, the 52-week position, breakout and
+# breakdown rules over trend_stats@v1, and the short put's cushion above support (TA track,
+# docs/data/technical.md).
+
+[dist_to_high_20d]
+expr = "price_stats.close / momentum.high_20d - 1"
+dtype = "float"
+unit = "decimal"
+description = "Close / the 20-session high - 1 (at or below 0): the pullback from the channel high, -0.05 is 5% below it"
+null_meaning = "high_20d is null (a gap among the last 20 sessions, or a shorter history)"
+valid_range = [-1, 0]
+version = 1
+
+[dist_to_high_50d]
+expr = "price_stats.close / momentum.high_50d - 1"
+dtype = "float"
+unit = "decimal"
+description = "Close / the 50-session high - 1 (at or below 0)"
+null_meaning = "high_50d is null (a gap among the last 50 sessions, or a shorter history)"
+valid_range = [-1, 0]
+version = 1
+
+[dist_to_low_20d]
+expr = "price_stats.close / momentum.low_20d - 1"
+dtype = "float"
+unit = "decimal"
+description = "Close / the 20-session low - 1 (at or above 0): how far the close sits above the channel low"
+null_meaning = "low_20d is null (a gap among the last 20 sessions, or a shorter history)"
+valid_range = [0, inf]
+version = 1
+
+[dist_to_low_50d]
+expr = "price_stats.close / momentum.low_50d - 1"
+dtype = "float"
+unit = "decimal"
+description = "Close / the 50-session low - 1 (at or above 0)"
+null_meaning = "low_50d is null (a gap among the last 50 sessions, or a shorter history)"
+valid_range = [0, inf]
+version = 1
+
+[pullback_atr_20d]
+expr = "(momentum.high_20d - price_stats.close) / momentum.atr_14"
+dtype = "float"
+unit = "ratio"
+description = "The pullback from the 20-session high in ATRs: (high_20d - close) / atr_14, 1.5 is a dip of one and a half average days' range"
+null_meaning = "high_20d or atr_14 is null (a gap among the last 20 sessions, fewer than 15 consecutive bars), or atr_14 is 0"
+valid_range = [0, inf]
+version = 1
+
+[pct_52w_range]
+expr = "(price_stats.close - price_stats.low_52w) / (price_stats.high_52w - price_stats.low_52w)"
+dtype = "float"
+unit = "ratio"
+description = "Where the close sits in its 52-week range: 0 at the low, 1 at the high (the 52-week percentile of the price)"
+null_meaning = "the 52-week high or low is null (fewer than 240 bars in the last 252 sessions), or they coincide"
+valid_range = [0, 1]
+version = 1
+
+[breakout_magnitude_20d]
+expr = "price_stats.close / momentum.prior_high_20d - 1"
+dtype = "float"
+unit = "decimal"
+description = "Close / the highest high of the 20 sessions before today - 1: above 0 the close cleared the level (0.02 is a 2% breakout), below 0 how far under it the close sits"
+null_meaning = "prior_high_20d is null (a gap among the 20 sessions before, or a shorter history)"
+valid_range = [-1, inf]
+version = 1
+
+[breakout_50d]
+expr = "price_stats.close > trend_stats.prior_high_50d and momentum.rel_volume > min_rel_volume"
+dtype = "bool"
+unit = "flag"
+description = "A 50-session breakout on volume: close above the highest high of the 50 sessions before today (prior_high_50d) and rel_volume above 1.5 (params.min_rel_volume)"
+null_meaning = "neither condition is false and one is unknown (prior_high_50d or rel_volume null)"
+params = { min_rel_volume = 1.5 }
+version = 1
+
+[breakdown_20d]
+expr = "price_stats.close < trend_stats.prior_low_20d and momentum.rel_volume > min_rel_volume"
+dtype = "bool"
+unit = "flag"
+description = "A 20-session breakdown on volume: close below the lowest low of the 20 sessions before today (prior_low_20d) and rel_volume above 1.5 (params.min_rel_volume)"
+null_meaning = "neither condition is false and one is unknown (prior_low_20d or rel_volume null)"
+params = { min_rel_volume = 1.5 }
+version = 1
+
+[put_support_cushion]
+expr = "(swing_levels.swing_low - put_wing.best_put_strike) / price_stats.close"
+dtype = "float"
+unit = "decimal"
+description = "The short put's cushion: (support - the best put's strike) / close, 0.05 means the strike sits 5% of the price below the most recent swing low (negative: the strike is above support)"
+null_meaning = "no confirmed swing low below the close, no best put (put_wing NO_STRIKE or worse), or no price_stats row"
+valid_range = [-1, 1]
+version = 1
+
+[put_support_cushion_atr]
+expr = "(swing_levels.swing_low - put_wing.best_put_strike) / momentum.atr_14"
+dtype = "float"
+unit = "ratio"
+description = "The short put's cushion in ATRs: (support - the best put's strike) / atr_14, how many average days' range of technical room sit between support and the strike"
+null_meaning = "no confirmed swing low below the close, no best put, atr_14 null (fewer than 15 consecutive bars) or 0"
+version = 1

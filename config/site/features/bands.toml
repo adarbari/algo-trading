@@ -1,0 +1,151 @@
+# Bands, channels, z-scores and stretches (the TA track; definitions and worked examples in
+# docs/data/technical.md). Formulas over bands@v1, price_stats@v2 and momentum@v1, computed
+# on read. The language and the keys: docs/configuration.md "Expression features". Changing a
+# formula or a param: bump its version.
+
+[bb_upper]
+expr = "price_stats.sma_20 + k * bands.close_std_20"
+dtype = "float"
+unit = "usd_per_share"
+description = "Upper Bollinger band: the 20-session mean close + 2 (params.k) standard deviations of those closes"
+null_meaning = "sma_20 or close_std_20 is null (a gap among the last 20 sessions, or a shorter history)"
+valid_range = [0, inf]
+params = { k = 2.0 }
+version = 1
+
+[bb_lower]
+expr = "price_stats.sma_20 - k * bands.close_std_20"
+dtype = "float"
+unit = "usd_per_share"
+description = "Lower Bollinger band: the 20-session mean close - 2 (params.k) standard deviations of those closes"
+null_meaning = "sma_20 or close_std_20 is null (a gap among the last 20 sessions, or a shorter history)"
+valid_range = [0, inf]
+params = { k = 2.0 }
+version = 1
+
+[bb_width]
+expr = "(bb_upper - bb_lower) / price_stats.sma_20"
+dtype = "float"
+unit = "decimal"
+description = "Bollinger bandwidth: (upper - lower) / the 20-session mean, 0.10 is bands 10% of the price apart; its rank against the year is bands.bb_width_pctile_252d"
+null_meaning = "the bands are null (a gap among the last 20 sessions, or a shorter history)"
+valid_range = [0, inf]
+version = 1
+
+[bb_pct_b]
+expr = "(price_stats.close - bb_lower) / (bb_upper - bb_lower)"
+dtype = "float"
+unit = "ratio"
+description = "%B: where the close sits between the Bollinger bands, 0 at the lower band, 1 at the upper, below 0 or above 1 outside them"
+null_meaning = "the bands are null (a gap among the last 20 sessions, or a shorter history), or the bands coincide (20 equal closes)"
+version = 1
+
+[kc_upper]
+expr = "bands.ema_20 + m * momentum.atr_14"
+dtype = "float"
+unit = "usd_per_share"
+description = "Upper Keltner channel: the 20-session EMA + 2 (params.m) Wilder ATR(14)"
+null_meaning = "ema_20 or atr_14 is null (fewer than 20 consecutive bars ending on the session)"
+valid_range = [0, inf]
+params = { m = 2.0 }
+version = 1
+
+[kc_lower]
+expr = "bands.ema_20 - m * momentum.atr_14"
+dtype = "float"
+unit = "usd_per_share"
+description = "Lower Keltner channel: the 20-session EMA - 2 (params.m) Wilder ATR(14)"
+null_meaning = "ema_20 or atr_14 is null (fewer than 20 consecutive bars ending on the session)"
+valid_range = [0, inf]
+params = { m = 2.0 }
+version = 1
+
+[kc_position]
+expr = "(price_stats.close - kc_lower) / (kc_upper - kc_lower)"
+dtype = "float"
+unit = "ratio"
+description = "Where the close sits in the Keltner channel, 0 at the lower line, 1 at the upper, outside 0..1 beyond them"
+null_meaning = "the channel is null (fewer than 20 consecutive bars ending on the session), or atr_14 is 0"
+version = 1
+
+[bb_squeeze]
+expr = "bb_upper <= kc_upper and bb_lower >= kc_lower"
+dtype = "bool"
+unit = "flag"
+description = "The TTM squeeze: both Bollinger bands inside the Keltner channel (volatility compressed below its usual range; a breakout often follows the release)"
+null_meaning = "neither condition is false and one is unknown (the bands or the channel null)"
+version = 1
+
+[price_z_20d]
+expr = "(price_stats.close - price_stats.sma_20) / bands.close_std_20"
+dtype = "float"
+unit = "ratio"
+description = "Price z-score: (close - the 20-session mean) / the standard deviation of those closes; +2 sits on the upper Bollinger band, -2 on the lower"
+null_meaning = "sma_20 or close_std_20 is null (a gap among the last 20 sessions, or a shorter history), or the closes never moved (zero deviation)"
+version = 1
+
+[stretch_sma20_atr]
+expr = "(price_stats.close - price_stats.sma_20) / momentum.atr_14"
+dtype = "float"
+unit = "ratio"
+description = "Stretch from the 20-session mean in ATRs: (close - sma_20) / atr_14, +3 is three average daily ranges above it"
+null_meaning = "sma_20 or atr_14 is null (a gap among the last 20 sessions, or fewer than 15 consecutive bars), or atr_14 is 0"
+version = 1
+
+[stretch_sma50_atr]
+expr = "(price_stats.close - price_stats.sma_50) / momentum.atr_14"
+dtype = "float"
+unit = "ratio"
+description = "Stretch from the 50-session mean in ATRs: (close - sma_50) / atr_14"
+null_meaning = "sma_50 or atr_14 is null (a gap among the last 50 sessions, or fewer than 15 consecutive bars), or atr_14 is 0"
+version = 1
+
+[donchian_pos_20d]
+expr = "(price_stats.close - momentum.low_20d) / (momentum.high_20d - momentum.low_20d)"
+dtype = "float"
+unit = "ratio"
+description = "Where the close sits in the 20-session high-low channel: 0 at the channel low, 1 at the high (a close at a 20-session high)"
+null_meaning = "high_20d or low_20d is null (a gap among the last 20 sessions, or a shorter history), or the channel has no width"
+valid_range = [0, 1]
+version = 1
+
+[pct_vs_ema_20]
+expr = "price_stats.close / bands.ema_20 - 1"
+dtype = "float"
+unit = "decimal"
+description = "Close / 20-session EMA - 1: 0.03 is 3% above the fast average"
+null_meaning = "ema_20 is null (fewer than 20 consecutive bars), or no price_stats row"
+valid_range = [-1, inf]
+version = 1
+
+[pct_vs_ema_50]
+expr = "price_stats.close / bands.ema_50 - 1"
+dtype = "float"
+unit = "decimal"
+description = "Close / 50-session EMA - 1"
+null_meaning = "ema_50 is null (fewer than 50 consecutive bars), or no price_stats row"
+valid_range = [-1, inf]
+version = 1
+
+[pct_vs_ema_200]
+expr = "price_stats.close / bands.ema_200 - 1"
+dtype = "float"
+unit = "decimal"
+description = "Close / 200-session EMA - 1"
+null_meaning = "ema_200 is null (fewer than 200 consecutive bars), or no price_stats row"
+valid_range = [-1, inf]
+version = 1
+
+[ema_stack]
+kind = "label"
+expr = '''
+if(is_null(bands.ema_20) or is_null(bands.ema_50) or is_null(bands.ema_200), null,
+   if(bands.ema_20 > bands.ema_50 and bands.ema_50 > bands.ema_200, "BULL",
+      if(bands.ema_20 < bands.ema_50 and bands.ema_50 < bands.ema_200, "BEAR", "MIXED")))
+'''
+dtype = "str"
+unit = "category"
+categories = ["BULL", "BEAR", "MIXED"]
+description = "EMA alignment: BULL when EMA20 > EMA50 > EMA200, BEAR when EMA20 < EMA50 < EMA200, else MIXED (an equality is MIXED); trend_state is the same test on the close and the SMAs"
+null_meaning = "an EMA is null (fewer than 200 consecutive bars ending on the session)"
+version = 1
