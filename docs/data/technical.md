@@ -31,7 +31,7 @@ left out with the field that covers it. Screener presets come last (section "Pre
 | Area | Requested | Where |
 |---|---|---|
 | Trend | SMA 20 / 50 / 200 | `price_stats` `sma_20/50/200` |
-| | EMA 10 / 20 / 50 / 200 | `bands` `ema_10/20/50/200` (EMA 5 and SMA 5 / 10 / 100 left out: one short and one long average each is enough to state alignment; SMA 10 is `ema_10`'s twin) |
+| | EMA 10 / 20 / 50 / 200, SMA 150 | `bands` `ema_10/20/50/200`, `sma_150` (the 30-week average Minervini and Weinstein threshold; EMA 5 and SMA 5 / 10 / 100 left out: one short and one long average each is enough to state alignment; SMA 10 is `ema_10`'s twin) |
 | | slopes | `bands` `ema20_slope_5d`, `ema50_slope_10d`, `sma200_slope_20d` |
 | | EMA alignment | `feature.ema_stack` (BULL / BEAR / MIXED over EMA 20 / 50 / 200; `trend_state` is the SMA version) |
 | | distance from moving averages | `feature.pct_vs_sma_20/50/200`, `feature.pct_vs_ema_20/50/200`, `feature.stretch_sma20_atr`, `feature.stretch_sma50_atr` |
@@ -87,8 +87,8 @@ folder per kind of thing; `architecture/layout.toml`):
 
 | Group | Folder | Columns | Status |
 |---|---|---|---|
-| `bands@v1` | `price/` | `ema_10/20/50/200`, `ema20_slope_5d`, `ema50_slope_10d`, `sma200_slope_20d`, `close_std_20`, `bb_width_pctile_252d`, `band_walk` | built |
-| `trend_stats@v1` | `price/` | `ret_1d/3d/10d/120d/252d`, `mom_12_1`, `mom_accel_5d`, `ret_z_20d`, `high_100d`, `low_100d`, `high_200d`, `low_200d`, `prior_high_50d`, `prior_low_20d`, `prior_low_50d`, `sessions_since_high_20d`, `close_range_pos`, `close_streak`, `sma20_streak`, `tight_range_sessions` | built |
+| `bands@v1` | `price/` | `ema_10/20/50/200`, `sma_150`, `ema20_slope_5d`, `ema50_slope_10d`, `sma200_slope_20d`, `close_std_20`, `bb_width_pctile_252d`, `band_walk` | built |
+| `trend_stats@v1` | `price/` | `ret_1d/3d/10d/120d/252d`, `mom_12_1`, `mom_accel_5d`, `ret_z_20d`, `high_100d`, `low_100d`, `high_200d`, `low_200d`, `prior_high_50d`, `prior_low_20d`, `prior_low_50d`, `sessions_since_high_20d`, `close_range_pos`, `trend_r2_90d`, `reg_slope_90d_ann`, `close_streak`, `sma20_streak`, `tight_range_sessions` | built |
 | `swing_levels@v1` | `levels/` (moved from `price/`) | unchanged | planned |
 | `pivot_strength@v1` | `levels/` | `resistance_touches`, `support_touches`, `resistance_age`, `support_age`, `pivot_structure` | planned |
 | `retest@v1` | `levels/` | `breakout_date`, `breakout_level`, `sessions_since_breakout`, `retest_state` | planned |
@@ -125,6 +125,7 @@ Inputs: `bars/1d`, the session plus 399 earlier sessions (the EMA run, and 252 b
 | Column | Definition | Null when |
 |---|---|---|
 | `close_std_20` | sample standard deviation (ddof 1) of the last 20 closes, the session included | a gap among the last 20 sessions, or a shorter history |
+| `sma_150` | mean close over the last 150 sessions (the 30-week average) | a gap among them |
 | `ema_10`, `ema_20`, `ema_50`, `ema_200` | exponential moving average of the close, alpha 2 / (n + 1), seeded with the mean of the first n closes of the consecutive run of bars ending on the session (at most the last 400 sessions; every charting package seeds the same way and uses all its history, so the 200 differs from theirs by the seed's remaining weight, (199/201)^k after k more bars) | fewer than n consecutive bars ending on the session |
 | `ema20_slope_5d`, `ema50_slope_10d`, `sma200_slope_20d` | the average today / the average h sessions earlier - 1 | the average is unknown on either session |
 | `bb_width_pctile_252d` | share of the 252 sessions before the session whose Bollinger bandwidth (4 x close_std_20 / sma_20) was strictly below the session's: 0.05 is a squeeze (narrower than 95% of the year), 0.95 an expansion | the session's bandwidth is unknown, or fewer than 240 of the 252 sessions before have one |
@@ -154,6 +155,7 @@ Inputs: `bars/1d`, the session plus 252 earlier sessions. Param `tight_range_pct
 | `prior_high_50d`, `prior_low_20d`, `prior_low_50d` | the extreme over the n sessions before the session (the session excluded): the level a breakout or breakdown close must clear | a gap among those n sessions |
 | `sessions_since_high_20d` | sessions since the highest high of the last 20 (the latest of equal highs; 0: today) | a gap among the last 20 sessions |
 | `close_range_pos` | (close - low) / (high - low) of the session's bar | the bar has no range |
+| `trend_r2_90d`, `reg_slope_90d_ann` | the R-squared and the annualised slope (exp(slope x 252) - 1) of the least-squares line through the log close over the last 90 sessions (Clenow); `clenow_momentum_90d` is their product | a gap among the last 90 sessions; r2 also when the close never moved |
 | `mom_12_1` | close 21 sessions earlier / close 252 sessions earlier - 1: the 12-month return with the last month skipped (Jegadeesh-Titman) | a gap among the last 253 sessions, or a shorter history |
 | `ret_z_20d` | the session's one-session return / the sample standard deviation of the 20 one-session returns before it | a gap among the last 22 sessions, a shorter history, or those 20 returns were all equal |
 | `close_streak` | signed consecutive sessions, ending on the session, with the close above the previous close (positive) or below it (negative); 0 when unchanged | no bar on the previous session |

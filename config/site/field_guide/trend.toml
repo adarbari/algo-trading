@@ -449,7 +449,7 @@ note = "a filter against buying a run that is already slowing"
 
 [[field]]
 name = "rollup.trend_stats@v1.sessions_since_high_20d"
-theme = "momentum and trend"
+theme = "price levels"
 reads = "How many sessions ago the highest high of the last 20 sessions was set: 0 means today's high is the channel high (no pullback), 3 to 7 a one-week pullback, 15 to 19 a dip that has lasted nearly the whole window (the high is about to leave it). It is the pullback's duration; feature.pullback_atr_20d is its depth."
 caveats = [
   "When the high leaves the window the count resets to a younger high and the pullback 'shortens' with no price change; read it with feature.dist_to_high_20d.",
@@ -571,7 +571,7 @@ note = "with feature.breakdown_20d for the trigger"
 
 [[field]]
 name = "feature.dist_to_high_20d"
-theme = "momentum and trend"
+theme = "price levels"
 reads = "Close over the 20-session high minus one, at or below 0: the pullback from the channel high as a fraction, -0.05 is 5% below it, 0 is a close at the high. The breakout screens want it near 0; the pullback screens want a modest negative value (-0.03 to -0.08 on a large cap) with the trend intact. feature.pullback_atr_20d is the same depth in ATRs."
 caveats = [
   "One intraday spike sets the high for 20 sessions, so a name quietly rising can read 5% 'below its high' for weeks; check rollup.trend_stats@v1.sessions_since_high_20d.",
@@ -595,7 +595,7 @@ note = "with feature.ema_stack eq BULL; use feature.pullback_atr_20d to scale by
 
 [[field]]
 name = "feature.dist_to_high_50d"
-theme = "momentum and trend"
+theme = "price levels"
 reads = "Close over the 50-session high minus one, at or below 0: how far the close sits under the quarterly high. 'Within X% of the 50-day high' is the breakout screens' second condition (near 0 means the 20-session breakout is also at a quarterly high, not a bounce inside a longer decline)."
 caveats = [
   "Null when high_50d is unknown (a gap among the last 50 sessions).",
@@ -611,7 +611,7 @@ note = "with feature.breakout_20d for a breakout that is also a quarterly high"
 
 [[field]]
 name = "feature.dist_to_low_20d"
-theme = "momentum and trend"
+theme = "price levels"
 reads = "Close over the 20-session low minus one, at or above 0: how far the close has lifted off the channel low, 0.10 is 10% above it. Near 0 is a close at a 20-session low (a breakdown or a capitulation); a bounce that lifts 1 to 2 ATRs off the low is the reversal screens' trigger."
 caveats = [
   "Null when low_20d is unknown (a gap among the last 20 sessions).",
@@ -627,7 +627,7 @@ note = "with feature.trend_state eq UPTREND for a dip; alone it lists breakdowns
 
 [[field]]
 name = "feature.dist_to_low_50d"
-theme = "momentum and trend"
+theme = "price levels"
 reads = "Close over the 50-session low minus one, at or above 0: how far the close sits above the quarterly low. Near 0 is a quarterly low; 0.20 and more means the name has recovered a fifth off its low."
 caveats = [
   "Null when low_50d is unknown (a gap among the last 50 sessions).",
@@ -643,7 +643,7 @@ note = "a filter for trend screens against names still at their lows"
 
 [[field]]
 name = "feature.pullback_atr_20d"
-theme = "momentum and trend"
+theme = "price levels"
 reads = "The pullback from the 20-session high measured in Wilder ATR(14): 1.5 means the close sits one and a half average days' range under the channel high. 0 is at the high; up to about 1.5 is the shallow pullback the swing screens buy; 3 and more is a correction, not a pullback. Scaled by volatility, so the same threshold works on a utility and a biotech."
 caveats = [
   "A gap down puts the close many ATRs under the high in a day; the ATR then widens and the number shrinks without a rally. Check rollup.price_moves@v1.one_day_move.",
@@ -660,7 +660,7 @@ note = "with feature.ema_stack eq BULL and rollup.trend_stats@v1.sessions_since_
 
 [[field]]
 name = "feature.pct_52w_range"
-theme = "momentum and trend"
+theme = "price levels"
 reads = "Where the close sits in its 52-week range, 0 at the low, 1 at the high: the 52-week percentile of the price. Above 0.8 the name trades in the top fifth of its year (George and Hwang's nearness-to-high effect, where momentum lives); below 0.2 in the bottom fifth. feature.near_52w is the labelled version (HIGH / LOW within 10%)."
 caveats = [
   "The range is set by two days a year ago as much as by today: a spike high makes the whole year read 'low in the range'. Check feature.dist_52w for the distance to the nearer extreme.",
@@ -677,7 +677,7 @@ note = "a momentum score; feature.pct_from_high_52w gte -0.10 is the 'within 10%
 
 [[field]]
 name = "feature.breakout_magnitude_20d"
-theme = "momentum and trend"
+theme = "price levels"
 reads = "How far the close sits above (positive) or below (negative) the highest high of the 20 sessions before today, as a fraction: 0.02 is a 2% breakout, -0.01 a close 1% under the level. A breakout of 1 to 3% that closed strong (rollup.trend_stats@v1.close_range_pos) on volume is the textbook entry; 8% and more in one day is a gap that may already be extended (feature.stretch_sma20_atr)."
 caveats = [
   "A positive value with low volume (rollup.momentum@v1.rel_volume under 1.25) is the breakout that fails most; feature.breakout_20d requires the volume.",
@@ -701,7 +701,7 @@ note = "with rollup.momentum@v1.prior_high_20d gt rollup.price_stats@v2.close ye
 
 [[field]]
 name = "feature.breakout_50d"
-theme = "momentum and trend"
+theme = "price levels"
 reads = "True when the close is above the highest high of the previous 50 sessions on at least 1.5 times average volume: the quarterly breakout, the Turtles' slower system (55 days) and the level where a 20-session breakout becomes a trend rather than a range swing. Fewer and better signals than feature.breakout_20d."
 caveats = [
   "A takeover announcement or an earnings gap is a 50-session breakout on volume with no follow-through to come; check rollup.price_moves@v1.one_day_move and rollup.earnings@v1.last_earnings_date.",
@@ -717,7 +717,7 @@ note = "with feature.stretch_sma20_atr lte 3 so the breakout is not already a cl
 
 [[field]]
 name = "feature.breakdown_20d"
-theme = "momentum and trend"
+theme = "price levels"
 reads = "True when the close is below the lowest low of the previous 20 sessions on at least 1.5 times average volume: the mirror of feature.breakout_20d, the short-setup trigger and, for a long, the stop that just got hit. In an uptrend it marks the end of the leg; in a downtrend it is the next leg down."
 caveats = [
   "A capitulation day is a breakdown on volume and often the low; pair with rollup.trend_stats@v1.close_range_pos (a close near the day's high after a breakdown is a reversal, not a breakdown).",
@@ -731,3 +731,71 @@ op = "eq"
 value = true
 mode = "hard"
 note = "with feature.ema_stack eq BEAR for a trend short; with feature.trend_state eq UPTREND it is a stop-out list"
+
+[[field]]
+name = "feature.pct_vs_sma_150"
+theme = "momentum and trend"
+reads = "Close over the 150-session (30-week) average minus one: 0.08 is 8% above it. Above 0 is the first line of Minervini's trend template (close above the 150 and 200-day averages, the 150 above the 200, the 50 above both) and Weinstein's stage-2 condition; well above it (0.25 and more) the name is extended from its seven-month base."
+caveats = [
+  "Null when sma_150 is unknown (a gap among the last 150 sessions, or a listing under seven months old).",
+]
+sources = ["Minervini (2013), Trade Like a Stock Market Wizard: the trend template"]
+[[field.use]]
+for = "above the 30-week average (trend template)"
+op = "gt"
+value = 0.0
+mode = "hard"
+note = "with feature.pct_vs_sma_200 gt 0 and feature.ema_stack eq BULL for the rest of the template"
+
+[[field]]
+name = "rollup.trend_stats@v1.trend_r2_90d"
+theme = "momentum and trend"
+reads = "How well a straight line fits the log price over the last 90 sessions, 0 to 1: the R-squared of the regression of log close on time. Above 0.8 the trend has been smooth (few deep pullbacks: the kind a trend follower can hold); 0.4 to 0.8 a trend with noise; below 0.3 no trend worth the name, whatever the return. It says nothing about direction: read it with rollup.trend_stats@v1.reg_slope_90d_ann (the pace) or feature.clenow_momentum_90d (both at once)."
+caveats = [
+  "One gap (an earnings jump) in the window breaks the line: a name up 30% in a day and flat otherwise has a low R-squared and a high slope. Check rollup.price_moves@v1.one_day_move.",
+  "A smooth decline fits a line as well as a smooth rise; the sign is in the slope.",
+  "Null after a gap in the last 90 sessions, a shorter history, or a close that never moved.",
+]
+sources = ["Clenow (2015), Stocks on the Move: the exponential regression slope x R-squared ranking"]
+[[field.use]]
+for = "a smooth trend"
+op = "gte"
+value = 0.7
+mode = "soft"
+tolerance = 0.1
+note = "with rollup.trend_stats@v1.reg_slope_90d_ann gt 0 for a smooth uptrend"
+
+[[field]]
+name = "rollup.trend_stats@v1.reg_slope_90d_ann"
+theme = "momentum and trend"
+reads = "The pace of the last 90 sessions' trend as a yearly rate: the slope of the regression line through the log close, annualised, so 0.40 means the trend, continued for a year, would return 40%. It is the return the trend implies, not the return made (a single jump adds little to the slope); Clenow ranks names by this times rollup.trend_stats@v1.trend_r2_90d (feature.clenow_momentum_90d). Above about 0.3 is a strong trend in an ordinary year, above 1.0 a parabolic one."
+caveats = [
+  "A slope with a low R-squared is a line through noise: gate on rollup.trend_stats@v1.trend_r2_90d gte 0.5 before reading the pace.",
+  "It describes the last 90 sessions and turns slowly; a name that broke down two weeks ago still shows a positive slope. Check rollup.trend_stats@v1.ret_10d.",
+  "Null after a gap in the last 90 sessions or a shorter history.",
+]
+sources = ["Clenow (2015), Stocks on the Move"]
+[[field.use]]
+for = "a strong trend pace"
+op = "gte"
+value = 0.3
+mode = "soft"
+tolerance = 0.1
+note = "with rollup.trend_stats@v1.trend_r2_90d gte 0.6; the combined score is feature.clenow_momentum_90d"
+
+[[field]]
+name = "feature.clenow_momentum_90d"
+theme = "momentum and trend"
+reads = "Clenow's momentum score: the annualised regression slope over 90 sessions times its R-squared, so a smooth 40%-a-year trend scores about 0.36 while a jerky one with the same slope scores half that. Rank the universe by it and buy the top decile (Clenow's rule, with the 100-day average and a 15% gap filter); above about 0.25 is a candidate in an ordinary year, negative is a downtrend."
+caveats = [
+  "A one-day gap inside the window lowers the R-squared more than it raises the slope, so gap-driven names rank low; that is the intended filter, but check rollup.price_moves@v1.one_day_move when a strong name is missing.",
+  "Null when either input is unknown (a gap among the last 90 sessions, or a flat close).",
+]
+sources = ["Clenow (2015), Stocks on the Move: the ranking formula and the 90-day window"]
+[[field.use]]
+for = "momentum ranking (smooth and fast)"
+op = "gte"
+value = 0.25
+mode = "score"
+tolerance = 0.1
+note = "the gate is feature.pct_vs_sma_200 gt 0 (or sma_100 in Clenow's book) and market.market_trend@v2.spx_close_vs_sma200 gt 0"

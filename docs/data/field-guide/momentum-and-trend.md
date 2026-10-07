@@ -694,24 +694,6 @@ Sources: Momentum (finance), Wikipedia: https://en.wikipedia.org/wiki/Momentum_(
 
 Sources: Momentum acceleration (second-order momentum): Chen and Yu (2014), Investor attention and momentum; Kaufman, Trading Systems and Methods (rate-of-change of momentum)
 
-### `rollup.trend_stats@v1.sessions_since_high_20d`
-
-**How to read it.** How many sessions ago the highest high of the last 20 sessions was set: 0 means today's high is the channel high (no pullback), 3 to 7 a one-week pullback, 15 to 19 a dip that has lasted nearly the whole window (the high is about to leave it). It is the pullback's duration; feature.pullback_atr_20d is its depth.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| a short pullback (under two weeks) | `between [2, 10]` | soft | 2 | with feature.pullback_atr_20d lte 1.5 and feature.ema_stack eq BULL |
-| at a fresh 20-session high today | `eq 0` | hard | - | the breakout day; feature.breakout_20d adds the volume condition |
-
-**When the reading lies**
-
-- When the high leaves the window the count resets to a younger high and the pullback 'shortens' with no price change; read it with feature.dist_to_high_20d.
-- Null after a gap in the last 20 sessions or a shorter history.
-
-Sources: Pullback trading (Raschke and Connors, Street Smarts: the holy grail setup)
-
 ### `rollup.trend_stats@v1.close_range_pos`
 
 **How to read it.** Where today's close sits in today's high-low range, 0 at the low of the day, 1 at the high. Above 0.7 the session closed strong (buyers held into the close), below 0.3 it closed weak; around 0.5 the day was indecisive. A breakout that closes above 0.7 on volume is a far better candidate than one that spiked intraday and closed in the lower half (a shooting star).
@@ -798,156 +780,71 @@ Sources: Faber (2007), A Quantitative Approach to Tactical Asset Allocation
 
 Sources: Moving average ribbons and alignment (Guppy, Trend Trading)
 
-### `feature.dist_to_high_20d`
+### `feature.pct_vs_sma_150`
 
-**How to read it.** Close over the 20-session high minus one, at or below 0: the pullback from the channel high as a fraction, -0.05 is 5% below it, 0 is a close at the high. The breakout screens want it near 0; the pullback screens want a modest negative value (-0.03 to -0.08 on a large cap) with the trend intact. feature.pullback_atr_20d is the same depth in ATRs.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| within a few percent of the 20-session high | `gte -0.03` | soft | 0.02 | feature.breakout_magnitude_20d gt 0 is the actual breakout; feature.dist_to_high_50d gte -0.03 for the 50-session version |
-| a shallow pullback | `between [-0.08, -0.02]` | soft | 0.02 | with feature.ema_stack eq BULL; use feature.pullback_atr_20d to scale by volatility |
-
-**When the reading lies**
-
-- One intraday spike sets the high for 20 sessions, so a name quietly rising can read 5% 'below its high' for weeks; check rollup.trend_stats@v1.sessions_since_high_20d.
-- Null when high_20d is unknown (a gap among the last 20 sessions).
-
-Sources: Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian
-
-### `feature.dist_to_high_50d`
-
-**How to read it.** Close over the 50-session high minus one, at or below 0: how far the close sits under the quarterly high. 'Within X% of the 50-day high' is the breakout screens' second condition (near 0 means the 20-session breakout is also at a quarterly high, not a bounce inside a longer decline).
+**How to read it.** Close over the 150-session (30-week) average minus one: 0.08 is 8% above it. Above 0 is the first line of Minervini's trend template (close above the 150 and 200-day averages, the 150 above the 200, the 50 above both) and Weinstein's stage-2 condition; well above it (0.25 and more) the name is extended from its seven-month base.
 
 **The criterion per intent**
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| within a few percent of the 50-session high | `gte -0.05` | soft | 0.02 | with feature.breakout_20d for a breakout that is also a quarterly high |
+| above the 30-week average (trend template) | `gt 0.0` | hard | - | with feature.pct_vs_sma_200 gt 0 and feature.ema_stack eq BULL for the rest of the template |
 
 **When the reading lies**
 
-- Null when high_50d is unknown (a gap among the last 50 sessions).
+- Null when sma_150 is unknown (a gap among the last 150 sessions, or a listing under seven months old).
 
-Sources: Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian
+Sources: Minervini (2013), Trade Like a Stock Market Wizard: the trend template
 
-### `feature.dist_to_low_20d`
+### `rollup.trend_stats@v1.trend_r2_90d`
 
-**How to read it.** Close over the 20-session low minus one, at or above 0: how far the close has lifted off the channel low, 0.10 is 10% above it. Near 0 is a close at a 20-session low (a breakdown or a capitulation); a bounce that lifts 1 to 2 ATRs off the low is the reversal screens' trigger.
+**How to read it.** How well a straight line fits the log price over the last 90 sessions, 0 to 1: the R-squared of the regression of log close on time. Above 0.8 the trend has been smooth (few deep pullbacks: the kind a trend follower can hold); 0.4 to 0.8 a trend with noise; below 0.3 no trend worth the name, whatever the return. It says nothing about direction: read it with rollup.trend_stats@v1.reg_slope_90d_ann (the pace) or feature.clenow_momentum_90d (both at once).
 
 **The criterion per intent**
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| at or near a 20-session low | `lte 0.02` | soft | 0.01 | with feature.trend_state eq UPTREND for a dip; alone it lists breakdowns |
+| a smooth trend | `gte 0.7` | soft | 0.1 | with rollup.trend_stats@v1.reg_slope_90d_ann gt 0 for a smooth uptrend |
 
 **When the reading lies**
 
-- Null when low_20d is unknown (a gap among the last 20 sessions).
+- One gap (an earnings jump) in the window breaks the line: a name up 30% in a day and flat otherwise has a low R-squared and a high slope. Check rollup.price_moves@v1.one_day_move.
+- A smooth decline fits a line as well as a smooth rise; the sign is in the slope.
+- Null after a gap in the last 90 sessions, a shorter history, or a close that never moved.
 
-Sources: Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian
+Sources: Clenow (2015), Stocks on the Move: the exponential regression slope x R-squared ranking
 
-### `feature.dist_to_low_50d`
+### `rollup.trend_stats@v1.reg_slope_90d_ann`
 
-**How to read it.** Close over the 50-session low minus one, at or above 0: how far the close sits above the quarterly low. Near 0 is a quarterly low; 0.20 and more means the name has recovered a fifth off its low.
+**How to read it.** The pace of the last 90 sessions' trend as a yearly rate: the slope of the regression line through the log close, annualised, so 0.40 means the trend, continued for a year, would return 40%. It is the return the trend implies, not the return made (a single jump adds little to the slope); Clenow ranks names by this times rollup.trend_stats@v1.trend_r2_90d (feature.clenow_momentum_90d). Above about 0.3 is a strong trend in an ordinary year, above 1.0 a parabolic one.
 
 **The criterion per intent**
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| well off its quarterly low | `gte 0.1` | soft | 0.05 | a filter for trend screens against names still at their lows |
+| a strong trend pace | `gte 0.3` | soft | 0.1 | with rollup.trend_stats@v1.trend_r2_90d gte 0.6; the combined score is feature.clenow_momentum_90d |
 
 **When the reading lies**
 
-- Null when low_50d is unknown (a gap among the last 50 sessions).
+- A slope with a low R-squared is a line through noise: gate on rollup.trend_stats@v1.trend_r2_90d gte 0.5 before reading the pace.
+- It describes the last 90 sessions and turns slowly; a name that broke down two weeks ago still shows a positive slope. Check rollup.trend_stats@v1.ret_10d.
+- Null after a gap in the last 90 sessions or a shorter history.
 
-Sources: Donchian channels: https://en.wikipedia.org/wiki/Richard_Donchian
+Sources: Clenow (2015), Stocks on the Move
 
-### `feature.pullback_atr_20d`
+### `feature.clenow_momentum_90d`
 
-**How to read it.** The pullback from the 20-session high measured in Wilder ATR(14): 1.5 means the close sits one and a half average days' range under the channel high. 0 is at the high; up to about 1.5 is the shallow pullback the swing screens buy; 3 and more is a correction, not a pullback. Scaled by volatility, so the same threshold works on a utility and a biotech.
+**How to read it.** Clenow's momentum score: the annualised regression slope over 90 sessions times its R-squared, so a smooth 40%-a-year trend scores about 0.36 while a jerky one with the same slope scores half that. Rank the universe by it and buy the top decile (Clenow's rule, with the 100-day average and a 15% gap filter); above about 0.25 is a candidate in an ordinary year, negative is a downtrend.
 
 **The criterion per intent**
 
 | Intent | Criterion | Mode | Near-miss band | How to combine it |
 |---|---|---|---|---|
-| a shallow pullback (swing entry) | `lte 1.5` | soft | 0.5 | with feature.ema_stack eq BULL and rollup.trend_stats@v1.sessions_since_high_20d between 2 and 10 |
+| momentum ranking (smooth and fast) | `gte 0.25` | score | 0.1 | the gate is feature.pct_vs_sma_200 gt 0 (or sma_100 in Clenow's book) and market.market_trend@v2.spx_close_vs_sma200 gt 0 |
 
 **When the reading lies**
 
-- A gap down puts the close many ATRs under the high in a day; the ATR then widens and the number shrinks without a rally. Check rollup.price_moves@v1.one_day_move.
-- Null when high_20d or atr_14 is unknown, or the ATR is 0.
+- A one-day gap inside the window lowers the R-squared more than it raises the slope, so gap-driven names rank low; that is the intended filter, but check rollup.price_moves@v1.one_day_move when a strong name is missing.
+- Null when either input is unknown (a gap among the last 90 sessions, or a flat close).
 
-Sources: Raschke and Connors (1995), Street Smarts: ATR-scaled pullbacks
-
-### `feature.pct_52w_range`
-
-**How to read it.** Where the close sits in its 52-week range, 0 at the low, 1 at the high: the 52-week percentile of the price. Above 0.8 the name trades in the top fifth of its year (George and Hwang's nearness-to-high effect, where momentum lives); below 0.2 in the bottom fifth. feature.near_52w is the labelled version (HIGH / LOW within 10%).
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| in the top of its yearly range | `gte 0.8` | soft | 0.1 | a momentum score; feature.pct_from_high_52w gte -0.10 is the 'within 10% of the high' gate |
-
-**When the reading lies**
-
-- The range is set by two days a year ago as much as by today: a spike high makes the whole year read 'low in the range'. Check feature.dist_52w for the distance to the nearer extreme.
-- Null when the 52-week high or low is unknown (fewer than 240 bars in the last 252 sessions) or they coincide.
-
-Sources: George and Hwang (2004), The 52-Week High and Momentum Investing
-
-### `feature.breakout_magnitude_20d`
-
-**How to read it.** How far the close sits above (positive) or below (negative) the highest high of the 20 sessions before today, as a fraction: 0.02 is a 2% breakout, -0.01 a close 1% under the level. A breakout of 1 to 3% that closed strong (rollup.trend_stats@v1.close_range_pos) on volume is the textbook entry; 8% and more in one day is a gap that may already be extended (feature.stretch_sma20_atr).
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| a fresh breakout (not extended) | `between [0.0, 0.05]` | soft | 0.02 | with rollup.momentum@v1.rel_volume gte 1.25 and rollup.trend_stats@v1.close_range_pos gte 0.7 |
-| a failed breakout (back under the level) | `lt 0.0` | hard | - | with rollup.momentum@v1.prior_high_20d gt rollup.price_stats@v2.close yesterday: use rollup.trend_stats@v1.ret_1d lt 0 and feature.dist_to_high_20d gte -0.03 |
-
-**When the reading lies**
-
-- A positive value with low volume (rollup.momentum@v1.rel_volume under 1.25) is the breakout that fails most; feature.breakout_20d requires the volume.
-- The level excludes today; it can be yesterday's spike, so a 'breakout' can be a return to where the name was two days ago. Check feature.dist_to_high_50d.
-- Null when prior_high_20d is unknown (a gap among the 20 sessions before today).
-
-Sources: O'Neil (2009), How to Make Money in Stocks: buying within 5% of the pivot
-
-### `feature.breakout_50d`
-
-**How to read it.** True when the close is above the highest high of the previous 50 sessions on at least 1.5 times average volume: the quarterly breakout, the Turtles' slower system (55 days) and the level where a 20-session breakout becomes a trend rather than a range swing. Fewer and better signals than feature.breakout_20d.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| a quarterly breakout on volume | `eq true` | hard | - | with feature.stretch_sma20_atr lte 3 so the breakout is not already a climax |
-
-**When the reading lies**
-
-- A takeover announcement or an earnings gap is a 50-session breakout on volume with no follow-through to come; check rollup.price_moves@v1.one_day_move and rollup.earnings@v1.last_earnings_date.
-- Null when the prior high or the volume ratio is unknown and the known side does not already say false.
-
-Sources: Faith (2007), Way of the Turtle: System 2 (55-day breakout)
-
-### `feature.breakdown_20d`
-
-**How to read it.** True when the close is below the lowest low of the previous 20 sessions on at least 1.5 times average volume: the mirror of feature.breakout_20d, the short-setup trigger and, for a long, the stop that just got hit. In an uptrend it marks the end of the leg; in a downtrend it is the next leg down.
-
-**The criterion per intent**
-
-| Intent | Criterion | Mode | Near-miss band | How to combine it |
-|---|---|---|---|---|
-| a breakdown on volume (short setup) | `eq true` | hard | - | with feature.ema_stack eq BEAR for a trend short; with feature.trend_state eq UPTREND it is a stop-out list |
-
-**When the reading lies**
-
-- A capitulation day is a breakdown on volume and often the low; pair with rollup.trend_stats@v1.close_range_pos (a close near the day's high after a breakdown is a reversal, not a breakdown).
-- An ex-dividend day or an index event can print a volume breakdown on a flat chart; check rollup.dividends@v2.last_ex_date and rollup.trend_stats@v1.ret_1d.
-- Null when the prior low or the volume ratio is unknown and the known side does not already say false.
-
-Sources: Faith (2007), Way of the Turtle: the 20-day channel exit
+Sources: Clenow (2015), Stocks on the Move: the ranking formula and the 90-day window

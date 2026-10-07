@@ -53,8 +53,11 @@ Z_WINDOW = 20  # one-session returns the return z-score is measured against
 CHANNELS = (100, 200)
 PRIOR = (("high", 50), ("low", 20), ("low", 50))  # the extremes over the sessions before
 MEAN_WINDOW = 20  # sma20_streak's mean, tight_range_sessions' range, the pullback's age
+REG_WINDOW = 90  # the regression of log close on time (Clenow's momentum)
+PERIODS_PER_YEAR = 252
 LOOKBACK = LONG  # earlier sessions read: a return over 252 sessions needs the close before
 ZERO_STD = 1e-9  # a return stdev under this is rounding noise over equal returns: unknown z
+ZERO_VAR = 1e-16  # a log-close variance under this is rounding noise over equal closes: no fit
 CLOSE, HIGH, LOW = (f"{BARS}.{c}" for c in ("close", "high", "low"))
 
 
@@ -119,6 +122,20 @@ FEATURES = (
         "low), 1 at the high of the day, 0 at the low; above 0.7 the session closed strong",
         "never null for a traded session, except a bar whose high equals its low (no range)",
         valid_range=(0, 1), inputs=(HIGH, LOW, CLOSE),
+    ),
+    Feature(
+        f"trend_r2_{REG_WINDOW}d", "float32", "ratio",
+        f"R-squared of the least-squares line through the log close over the last {REG_WINDOW} "
+        "sessions: how much of the price path a straight trend explains, 1 a perfectly smooth "
+        "trend, 0 no trend at all (Clenow's trend quality)",
+        f"{_gap(REG_WINDOW)}; or the close never moved over the window",
+        valid_range=(0, 1), inputs=(CLOSE,),
+    ),
+    Feature(
+        f"reg_slope_{REG_WINDOW}d_ann", "float32", "decimal",
+        f"The slope of that line, annualised: exp(slope x {PERIODS_PER_YEAR}) - 1, the yearly "
+        "return the last {REG_WINDOW} sessions' trend implies (0.40 is a trend pace of 40% a year)",
+        _gap(REG_WINDOW), valid_range=(-1, None), inputs=(CLOSE,),
     ),
     Feature(
         "close_streak", "int", "sessions",
@@ -203,6 +220,25 @@ def levels(px: Panel) -> dict[str, Matrix]:
     return out
 
 
+def regression(close: Matrix) -> tuple[Matrix, Matrix]:
+    """For the last row: ``(r2, annualised slope)`` of the least-squares line through the log
+    close over the last ``REG_WINDOW`` rows (NaN on a gap; r2 NaN when the close never moved)."""
+    y = np.log(close[-REG_WINDOW:])
+    x = np.arange(REG_WINDOW, dtype=float)
+    x = x - x.mean()
+    y_mean = y.mean(axis=0)
+    cov = (x[:, None] * (y - y_mean)).sum(axis=0)
+    var_x = (x**2).sum()
+    var_y = ((y - y_mean) ** 2).sum(axis=0)
+    slope = cov / var_x
+    with np.errstate(divide="ignore", invalid="ignore"):
+        r2 = np.where(var_y > ZERO_VAR, cov**2 / (var_x * var_y), np.nan)
+    complete = ~np.isnan(y).any(axis=0)
+    return np.where(complete, r2, np.nan), np.where(
+        complete, np.expm1(slope * PERIODS_PER_YEAR), np.nan
+    )
+
+
 def signed_run(diff: Matrix, known: np.ndarray) -> Matrix:
     """The signed trailing run of ``diff``'s sign: rows above 0 count up, below 0 down."""
     up = trailing_run(diff > 0, known)
@@ -226,10 +262,13 @@ def compute(inputs: Inputs, session: date, p: TrendStatsParams) -> pd.DataFrame:
     bars = inputs[BARS]
     assert bars is not None  # required input
     px = panel(bars, sessions_ending(session, LOOKBACK + 1))
+    r2, slope = regression(px.close)
     values = {
         **returns(px.close),
         f"ret_z_{Z_WINDOW}d": return_z(px.close),
         **levels(px),
+        f"trend_r2_{REG_WINDOW}d": r2,
+        f"reg_slope_{REG_WINDOW}d_ann": slope,
         **streaks(px, p),
     }
     return traded_rows(px, values, COLUMNS)
@@ -240,7 +279,8 @@ GROUP = FeatureGroup(
     VERSION,
     "Short and long returns, the 12-1 momentum and its acceleration, the return z-score, the "
     "100 / 200-session channels, the prior 20 / 50-session extremes, the pullback's age, the "
-    "close's place in the day's range and the close, SMA20 and tight-range streaks",
+    f"close's place in the day's range, the {REG_WINDOW}-session regression trend quality and "
+    "pace, and the close, SMA20 and tight-range streaks",
     (Input(BARS, lookback=LOOKBACK),),
     FEATURES,
     compute,

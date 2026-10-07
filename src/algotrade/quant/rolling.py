@@ -9,6 +9,8 @@ contains a NaN (a missing session; never a shorter window).
     rolling_max, rolling_min    highest and lowest of the last ``window`` rows
     trailing_run                how many consecutive rows, ending at the last one, satisfy a
                                 condition (0 when the last does not; stops at an unknown row)
+    trailing_percentile         the share of the ``window`` rows before the last one, among
+                                those known, strictly below the last row's value
 """
 
 import numpy as np
@@ -88,3 +90,19 @@ def exponential_path(values: Array, period: int, alpha: float | None = None) -> 
         avg = np.where(k > period, avg + weight * (row - avg), avg)
         out[i] = np.where(k >= period, avg, np.nan)
     return out
+
+
+def trailing_percentile(values: Array, window: int, min_known: int) -> Array:
+    """Per column: the share of the ``window`` rows before the last one with a known value
+    strictly below the last row's (a percentile against the column's own recent history);
+    NaN when the last row is NaN or fewer than ``min_known`` of those rows are known."""
+    _check_window(window, 1)
+    if min_known < 1 or min_known > window:
+        raise ValueError(f"min_known must be 1..{window}, got {min_known}")
+    earlier = values[-window - 1 : -1]
+    known = ~np.isnan(earlier)
+    below = (known & (earlier < values[-1])).sum(axis=0)
+    count = known.sum(axis=0)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        share = np.where(count >= min_known, below / count, np.nan)
+    return np.asarray(np.where(np.isnan(values[-1]), np.nan, share))

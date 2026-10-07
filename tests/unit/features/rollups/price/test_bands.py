@@ -137,3 +137,12 @@ def test_registered_with_the_declared_lookback() -> None:
     assert GROUPS["bands@v1"].table == "rollups/instrument/bands@v1"
     assert bd.GROUP.inputs[0].sessions_back(None) == bd.LOOKBACK == 399
     assert len(sessions_ending(END, bd.LOOKBACK + 1)) == 400
+
+
+def test_sma_150_by_hand() -> None:
+    writer, reader = store()
+    c = series(200, seed=9)
+    write_bars(writer, {"EQ:A": c, "EQ:SHORT": c[-149:]})
+    out = rows(compute_one(reader, bd.GROUP, END).frame)
+    assert out["EQ:A"]["sma_150"] == pytest.approx(c[-150:].mean(), rel=F32)
+    assert pd.isna(out["EQ:SHORT"]["sma_150"])

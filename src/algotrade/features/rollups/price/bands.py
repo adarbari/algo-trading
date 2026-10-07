@@ -32,7 +32,13 @@ from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
 from algotrade.features.rollups.price.price_stats import Matrix, Panel, panel, traded_rows
-from algotrade.quant.rolling import exponential_path, rolling_mean, rolling_var, trailing_run
+from algotrade.quant.rolling import (
+    exponential_path,
+    rolling_mean,
+    rolling_var,
+    trailing_percentile,
+    trailing_run,
+)
 
 NAME = "bands"
 VERSION = 1
@@ -40,6 +46,9 @@ BARS = "bars/1d"
 WINDOW = 20  # closes in a band
 MULTIPLIER = 2.0  # standard deviations each side (Bollinger's default)
 EMA_WINDOWS = (10, 20, 50, 200)
+SMA_EXTRA = (
+    150  # the 30-week average (Minervini's template, Weinstein's stages): not in price_stats
+)
 SLOPES = (("ema", 20, 5), ("ema", 50, 10), ("sma", 200, 20))  # (average, window, horizon)
 PCTILE_WINDOW = 252  # sessions before the session the bandwidth is ranked against
 MIN_PCTILE = 240  # ... of which this many need a bandwidth
@@ -78,6 +87,13 @@ FEATURES = (
             _run(n), valid_range=(0, None), inputs=(CLOSE,),
         )
         for n in EMA_WINDOWS
+    ),
+    Feature(
+        f"sma_{SMA_EXTRA}", "float32", "usd_per_share",
+        f"Mean close over the last {SMA_EXTRA} sessions (the 30-week average of Minervini's "
+        "trend template and Weinstein's stage analysis; price_stats has the 20 / 50 / 200)",
+        f"a session among the last {SMA_EXTRA} has no bar (a gap), or the history is shorter",
+        valid_range=(0, None), inputs=(CLOSE,),
     ),
     *(_slope(kind, n, h) for kind, n, h in SLOPES),
     Feature(
@@ -121,13 +137,7 @@ def width_percentile(sma: Matrix, std: Matrix) -> Matrix:
     bandwidth strictly below the last row's; NaN below ``MIN_PCTILE`` known rows."""
     with np.errstate(divide="ignore", invalid="ignore"):
         width = np.where(sma > 0, 2 * MULTIPLIER * std / sma, np.nan)
-    earlier = width[-PCTILE_WINDOW - 1 : -1]
-    known = ~np.isnan(earlier)
-    below = (known & (earlier < width[-1])).sum(axis=0)
-    count = known.sum(axis=0)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        share = np.where(count >= MIN_PCTILE, below / count, np.nan)
-    return np.where(np.isnan(width[-1]), np.nan, share)
+    return trailing_percentile(width, PCTILE_WINDOW, MIN_PCTILE)
 
 
 def band_walk(close: Matrix, upper: Matrix, lower: Matrix) -> Matrix:
@@ -148,6 +158,7 @@ def stats(px: Panel) -> dict[str, Matrix]:
     sma, std, upper, lower = band_edges(px.close)
     emas = {n: exponential_path(px.close, n) for n in EMA_WINDOWS}
     out: dict[str, Matrix] = {f"ema_{n}": path[-1] for n, path in emas.items()}
+    out[f"sma_{SMA_EXTRA}"] = rolling_mean(px.close, SMA_EXTRA)[-1]
     for kind, n, h in SLOPES:
         path = emas[n] if kind == "ema" else rolling_mean(px.close, n)
         out[f"{kind}{n}_slope_{h}d"] = slope(path, h)
@@ -167,7 +178,8 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
 GROUP = FeatureGroup(
     NAME,
     VERSION,
-    f"The EMA stack ({', '.join(str(n) for n in EMA_WINDOWS)}) with slopes, the {WINDOW}-close "
+    f"The EMA stack ({', '.join(str(n) for n in EMA_WINDOWS)}) with slopes, the "
+    f"{SMA_EXTRA}-session SMA, the {WINDOW}-close "
     f"standard deviation, the bandwidth percentile over {PCTILE_WINDOW} sessions (the squeeze) "
     "and the band walk",
     (Input(BARS, lookback=LOOKBACK),),
