@@ -50,11 +50,6 @@ added_on = 2026-10-06
 note = "2x AVGO (Defiance)"
 
 [[name]]
-symbol = "BRKD"
-added_on = 2026-10-06
-note = "-2x BRK.B"
-
-[[name]]
 symbol = "BRKU"
 added_on = 2026-10-06
 note = "2x BRK.B"
@@ -63,11 +58,6 @@ note = "2x BRK.B"
 symbol = "GGLL"
 added_on = 2026-10-06
 note = "2x GOOGL"
-
-[[name]]
-symbol = "MCDL"
-added_on = 2026-10-06
-note = "2x MCD (unverified)"
 
 [[name]]
 symbol = "METU"

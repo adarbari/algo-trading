@@ -7,7 +7,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from algotrade.config.site.settings import SourcesSettings
 from algotrade.data import StoreReader
+from algotrade.services.events.fill import IV_HISTORY, PRICE_STATS
 from algotrade.services.events.scope import LIQUIDITY
 from algotrade.storage.backends.local import LocalBackend
 from algotrade.storage.backends.memory import MemoryBackend
@@ -277,3 +279,104 @@ def test_split_findings_only_compare_the_span_of_the_fetched_bars() -> None:
     assert split_findings(tiingo, stored, date(2019, 1, 1), date(2020, 1, 6)) == [
         "2019-06-03: tiingo none vs events/split 3"
     ]
+
+
+FILL_IDS = {s: f"EQ:{s}" for s in ("AAA", "BBB", "CCC", "DDD", "EEE")}
+
+
+def fill_world() -> tuple[StoreWriter, Vendor]:
+    """Five names; optionable CCC (iv 80) and EEE (iv 50), then BBB (adv 9e6), AAA, DDD."""
+    writer = StoreWriter(MemoryBackend())
+    write_reference(writer, date(2020, 1, 1), FILL_IDS)
+    day = date(2020, 1, 2)
+    tables = {
+        LIQUIDITY: [{"instrument_id": "EQ:CCC"}, {"instrument_id": "EQ:EEE"}],
+        IV_HISTORY: [{"instrument_id": "EQ:EEE", "iv30": 50.0},
+                     {"instrument_id": "EQ:CCC", "iv30": 80.0}],
+        PRICE_STATS: [{"instrument_id": "EQ:AAA", "adv_usd_20d": 5e6},
+                      {"instrument_id": "EQ:BBB", "adv_usd_20d": 9e6}],
+    }  # fmt: skip
+    for table, found in tables.items():
+        writer.write_table(table, day, "t", stamped(found, day, "t"))
+    return writer, Vendor({s: payloads.prices(rows(10)) for s in FILL_IDS})
+
+
+def fill_run(
+    writer: StoreWriter,
+    vendor: Vendor,
+    fill: int,
+    now: datetime,
+    budget: int = 450,
+) -> RunRecord:
+    """A ``--fill`` run at ``now`` with the month's symbol budget ``budget``."""
+    ctx = task_ctx(
+        writer,
+        clock=lambda: now + timedelta(seconds=next(TICKS)),  # run ids never repeat
+        settings=SourcesSettings(tiingo_monthly_symbol_budget=budget),
+    )
+    source = TiingoDailyPrices(http_for(vendor, RetryPolicy(tries=1)))
+    return ingest_bars_history(ctx, source, (), SINCE, UNTIL, fill=fill)
+
+
+JAN, FEB = datetime(2020, 1, 10, 9, tzinfo=UTC), datetime(2020, 2, 2, 9, tzinfo=UTC)
+
+
+def test_fill_takes_the_most_useful_names_without_history_and_skips_stored_ones() -> None:
+    writer, vendor = fill_world()
+    first = fill_run(writer, vendor, 2, JAN)
+    assert vendor.asked == ["CCC", "EEE"]  # optionable, IV30 descending
+    assert first.stats["filled"] == 2 and first.stats["by_reason"] == {"requested": 2}
+    second = fill_run(writer, vendor, 2, JAN)
+    assert vendor.asked == ["CCC", "EEE", "BBB", "AAA"]  # CCC / EEE have history: next two
+    assert second.stats["filled"] == 2 and second.stats["skipped_done"] == 0
+    third = fill_run(writer, vendor, 5, JAN)
+    assert vendor.asked[-1] == "DDD" and third.stats["filled"] == 1
+    assert fill_run(writer, vendor, 5, JAN).stats["filled"] == 0  # the universe is covered
+
+
+def test_the_monthly_budget_counts_every_run_of_the_month_and_resets_in_the_next() -> None:
+    writer, vendor = fill_world()
+    first = fill_run(writer, vendor, 2, JAN, budget=3)
+    assert first.stats["month_budget"] == 3 and first.stats["month_used"] == 2
+    second = fill_run(writer, vendor, 5, JAN, budget=3)  # asks for 5, 1 of the 3 is left
+    assert vendor.asked == ["CCC", "EEE", "BBB"]
+    assert (second.stats["fetched"], second.stats["filled"]) == (1, 1)
+    assert (second.stats["month_used"], second.stats["month_remaining"]) == (3, 0)
+    capped = fill_run(writer, vendor, 5, JAN, budget=3)
+    assert capped.stats["fetched"] == 0 and capped.stats["month_remaining"] == 0
+    assert vendor.asked == ["CCC", "EEE", "BBB"]  # nothing asked of Tiingo
+    february = fill_run(writer, vendor, 5, FEB, budget=3)  # a new month: the budget is whole
+    assert vendor.asked == ["CCC", "EEE", "BBB", "AAA", "DDD"]
+    assert (february.stats["month_used"], february.stats["month_remaining"]) == (2, 1)
+
+
+def spent(
+    writer: StoreWriter, started: datetime, finished: datetime | None, status: RunStatus, n: int
+) -> None:
+    """An earlier run of the task, with ``n`` ``hist:`` items (one of them a FETCH_ERROR)."""
+    record = RunRecord(f"bars_history-x{n}-{started:%Y%m%dT%H%M}", "bars_history", UNTIL, started)
+    record.status, record.finished_at = status, finished
+    record.items = {f"hist:EQ:OLD{i}": "OK: w" for i in range(n - 1)} | {
+        f"hist:EQ:ERR{n}": "FETCH_ERROR: HTTP 500"
+    }
+    writer._backend.runs.save(record)  # type: ignore[attr-defined]
+
+
+def test_a_failed_run_this_month_has_spent_its_requests() -> None:
+    """A run that crashed after its fetches (FAILED, FETCH_ERROR items included) counts."""
+    writer, vendor = fill_world()
+    spent(writer, JAN - timedelta(days=3), None, RunStatus.FAILED, 3)
+    record = fill_run(writer, vendor, 5, JAN, budget=5)
+    assert record.stats["fetched"] == 2 and vendor.asked == ["CCC", "EEE"]
+    assert (record.stats["month_used"], record.stats["month_remaining"]) == (5, 0)
+
+
+def test_a_run_spanning_a_month_end_counts_in_both_months() -> None:
+    writer, vendor = fill_world()
+    start, end = datetime(2020, 1, 31, 20, tzinfo=UTC), datetime(2020, 2, 1, 5, tzinfo=UTC)
+    spent(writer, start, end, RunStatus.COMPLETE, 3)
+    spent(writer, start, None, RunStatus.RUNNING, 1)  # crashed mid-run: still open: counts too
+    in_feb = fill_run(writer, vendor, 5, FEB, budget=5)
+    assert in_feb.stats["fetched"] == 1  # 3 + 1 of the 5 spent
+    in_mar = fill_run(writer, vendor, 5, datetime(2020, 3, 5, tzinfo=UTC), budget=5)
+    assert in_mar.stats["month_used"] == in_mar.stats["fetched"] + 1  # only the open run spills

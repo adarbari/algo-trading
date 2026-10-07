@@ -6,6 +6,7 @@ site/features/<theme>.toml                 L3 expression features (kind ``featur
 site/field_guide/<theme>.toml              L3 field guide (kind ``field_guide``, ADR 0041)
 site/regime/{cards,episodes}.toml          L3 regime cards, crash episodes (kind ``regime``)
 site/events/{scope,releases}.toml          L3 event scope, macro releases (kind ``events``)
+site/guide/sections.toml                   L3 Guide order, groups (kind ``guide``, ADR 0051)
 site/presets/strategies/<id>.toml          L3 shared strategy / screener configs
 site/presets/selections/<id>.toml          L3 shared selections
 users/<user>/strategies/<id>.toml          L4 (git-ignored locally)
@@ -35,7 +36,8 @@ from algotrade.storage.configs.store import KINDS, split_version
 SITE = "site"
 SCREENERS = "screeners"
 USER_FILES = ("preferences", "identity")  # one document per user, never the site's
-SITE_FOLDERS = ("features", "field_guide", "regime", "events")  # site/<kind>/<name>.toml
+SITE_FOLDERS = ("features", "field_guide", "regime", "events", "guide")  # site/<kind>/<name>.toml
+SITE_ONLY = ("defaults", "settings", "field_guide", "regime", "events", "guide")  # never a user's
 DRAFT = "draft.toml"
 _ID_NAME = re.compile(r"[a-z0-9_-]{1,64}")  # core.model.ids: other names are not screens
 _VERSION_FILE = re.compile(r"v([1-9][0-9]{0,8})\.toml")
@@ -133,7 +135,7 @@ class FileConfigStore:
     def load(self, scope: str, kind: str, name: str) -> Mapping[str, Any] | None:
         if kind in USER_FILES and scope == SITE:  # a user's, never the site's
             return None
-        if kind in ("defaults", "settings", "field_guide", "regime", "events") and scope != SITE:
+        if kind in SITE_ONLY and scope != SITE:
             return None
         if kind == SCREENERS:
             return self._screen(scope, name)

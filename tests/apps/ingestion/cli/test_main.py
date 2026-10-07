@@ -357,6 +357,11 @@ def test_quality_and_schedule_commands(
     assert written["optional_wake"]["command"] == "sudo pmset repeat wakeorpoweron MTWRF 14:55:00"
     agent = plistlib.loads((env / "agent.plist").read_bytes())
     assert agent["StartCalendarInterval"][0]["Minute"] == 15 and agent["StartInterval"] == 3600
+    monthly = plistlib.loads(
+        (env / "var" / "com.algotrade.bars-history-monthly.plist").read_bytes()
+    )
+    assert monthly["ProgramArguments"][1:] == ["bars-history", "--fill", "450", "--wait"]
+    assert written["monthly_install"][-1].endswith("com.algotrade.bars-history-monthly.plist")
     code, written = call(
         capsys, "schedule", "--watchdog-minutes", "0", "--out", str(env / "agent.plist")
     )
@@ -415,7 +420,12 @@ def test_a_second_writing_run_exits_3_unless_it_waits(
     with exclusive_run(other):
         assert cli.main(["purge-raw", "--date", DAY]) == cli.LOCKED_EXIT
         assert "pass --wait" in capsys.readouterr().err
-        code, _ = call(capsys, "schedule", "--out", str(env / "agent.plist"))
+        code, _ = call(
+            capsys,
+            "schedule",
+            "--out", str(env / "agent.plist"),
+            "--monthly-out", str(env / "monthly.plist"),
+        )  # fmt: skip
         assert code == 0  # writes no store data: no lock needed
         codes: list[int] = []
         waiter = threading.Thread(

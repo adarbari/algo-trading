@@ -549,13 +549,14 @@ detect = [{ import = "fcntl" }, { call = "flock" }]
 
 [[responsibility]]
 id = "site-settings"
-description = "Load and type L3 site settings (config/site/*.toml: sources, universe + overrides, nightly, defaults, users with roles per ADR 0040, the field guide per ADR 0041, the regime cards and episodes per ADR 0047, the event-sensitivity scope list per ADR 0050): one loader, frozen dataclasses; the store only reads files"
+description = "Load and type L3 site settings (config/site/*.toml: sources, universe + overrides, nightly, defaults, users with roles per ADR 0040, the field guide per ADR 0041, the regime cards and episodes per ADR 0047, the event-sensitivity scope list per ADR 0050, the Guide's sections, theme groups and playbook families per ADR 0051): one loader, frozen dataclasses; the store only reads files"
 owner = [
     "src/algotrade/config/site/settings.py",
     "src/algotrade/config/site/users.py",
     "src/algotrade/config/site/nightly.py",
     "src/algotrade/config/site/field_guide.py",
     "src/algotrade/config/site/regime/*",
+    "src/algotrade/config/site/guide/*",
     "src/algotrade/config/site/events/*",
     "src/algotrade/config/site/features/*",
     "src/algotrade/storage/configs/store.py",
@@ -768,6 +769,13 @@ section = "docs/api/read-model.md#the-domain-objects"
 detect = [{ string_prefix = "rollups/instrument/" }, { string_prefix = "rollups/market/" }, { call = "chain_expiries" }]
 
 [[responsibility]]
+id = "guide-read"
+description = "The Guide's read objects: the index of every entry kind and the field page with what the server derives for it (related fields from the guide entry's text and the formula's inputs, the site playbooks that use the field with each rule as text, the situations that fool it), ADR 0051; session-free, over the site configs and the caller's catalogue"
+owner = ["src/algotrade/services/read/guide/*"]
+section = "docs/api/read-model.md#the-domain-objects"
+detect = [{ call = "load_guide_sections" }, { call = "site_playbooks" }, { call = "rule_text" }]
+
+[[responsibility]]
 id = "scalar-coercion"
 description = "Turn a stored scalar (numpy, pandas, NaN, NaT, dates) into a JSON-safe value, one way for reads and runs (ADR 0037): services/read/values.py to_scalar; services/views.py imports it back as to_value for runs. Callers of the one coercion are allowed; re-implementations are not: a private _float / _text / _num helper is one (read-model PR 8), except where it parses a vendor payload, formats text or does arithmetic rather than coerce a stored value for display (the allowed entries below say which)"
 owner = ["src/algotrade/services/read/values.py"]
@@ -853,6 +861,16 @@ allowed = [
 ]
 section = "docs/adr/0050-event-sensitivity.md#decision"
 detect = [{ call = "load_event_scope" }, { string = "fund_reference@v1" }, { string = "short_put_ok" }]
+
+[[responsibility]]
+id = "history-fill-order"
+description = "The order a budgeted history backfill takes names as of a session (ADR 0050, services/events/fill.py): every ticker of the session's reference snapshot, optionable names first (an option_liquidity@v1 row), then iv_history@v2.iv30 descending, then price_stats@v2.adv_usd_20d descending, each read through rollup_as_of; tasks call fill_order and never rank the universe themselves"
+owner = ["src/algotrade/services/events/fill.py"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/market/bars_history.py",  # the one caller: takes the first N names without history (--fill)
+]
+section = "docs/adr/0050-event-sensitivity.md#decision"
+detect = [{ call = "fill_order" }]
 
 [[responsibility]]
 id = "screen-preview"
