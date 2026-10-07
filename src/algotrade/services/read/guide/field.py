@@ -9,24 +9,23 @@ it (ADR 0038: never the browser):
   ``feature.atr_pct``);
 - ``playbooks``: the site presets that name the field in a criterion (with each such rule as
   text), a display column or the rank tie-break, in Guide order;
-- ``situations``: the field guide's situations whose ``affects`` names the field.
+- ``situations``: the field guide's situations whose ``affects`` names the field;
+- ``reads_linked``, ``caveats_linked`` and each situation's ``signs_linked`` / ``do_linked``:
+  the same prose split at the catalogue names it mentions (``prose.py``).
 
 A name outside the caller's catalogue is ``UnknownFeatureError`` (GraphQL
 ``UNKNOWN_FEATURE``), as for the catalogue and distribution reads."""
 
-import re
-from collections.abc import Iterable
+from collections.abc import Container
 from dataclasses import dataclass
 
+from algotrade.config.site.field_guide import Situation
 from algotrade.config.site.settings import load_field_guide
 from algotrade.services.configs import catalog_of
 from algotrade.services.read.context import Stores
 from algotrade.services.read.guide.playbooks import SitePlaybook, rule_text, site_playbooks
+from algotrade.services.read.guide.prose import LinkedProse, link_prose, mentions
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
-
-# A token a catalogue name could be: letters, digits, ``_``, ``@`` and dots (``feature.x``,
-# ``rollup.g@v1.c``); a trailing dot is the sentence's, not the name's.
-_TOKEN = re.compile(r"[A-Za-z0-9_@.]+")
 
 
 @dataclass(frozen=True)
@@ -53,6 +52,21 @@ class GuideSituation:
     signs: str
     do: str
     affects: tuple[str, ...]
+    slug: str
+    signs_linked: LinkedProse
+    do_linked: LinkedProse
+
+    @classmethod
+    def of(cls, s: Situation, names: Container[str]) -> "GuideSituation":
+        return cls(
+            s.name,
+            s.signs,
+            s.do,
+            s.affects,
+            s.slug,
+            link_prose(s.signs, names),
+            link_prose(s.do, names),
+        )
 
 
 @dataclass(frozen=True)
@@ -61,6 +75,8 @@ class GuideField:
     related: tuple[str, ...]
     playbooks: tuple[GuidePlaybookUse, ...]
     situations: tuple[GuideSituation, ...]
+    reads_linked: LinkedProse | None  # None: the field has no guide entry
+    caveats_linked: tuple[LinkedProse, ...]
 
 
 def load_guide_field(ctx: Stores, name: str) -> GuideField:
@@ -68,36 +84,30 @@ def load_guide_field(ctx: Stores, name: str) -> GuideField:
     caller's catalogue."""
     guide = load_field_guide(ctx.configs)
     info = feature_infos(ctx.features, [name], guide=guide)[name]
-    situations = tuple(
-        GuideSituation(s.name, s.signs, s.do, s.affects)
-        for s in guide.situations
-        if name in s.affects
-    )
+    fields = catalog_of(ctx.features).fields
+    situations = tuple(GuideSituation.of(s, fields) for s in guide.situations if name in s.affects)
     found = (_use(p, name) for p in site_playbooks(ctx))
+    entry = info.guide
     return GuideField(
         info=info,
-        related=_related(ctx, info),
+        related=_related(ctx, info, fields),
         playbooks=tuple(p for p in found if p is not None),
         situations=situations,
+        reads_linked=link_prose(entry.reads, fields) if entry is not None else None,
+        caveats_linked=tuple(link_prose(c, fields) for c in entry.caveats) if entry else (),
     )
 
 
-def _related(ctx: Stores, info: FeatureInfo) -> tuple[str, ...]:
-    fields = catalog_of(ctx.features).fields
+def _related(ctx: Stores, info: FeatureInfo, fields: Container[str]) -> tuple[str, ...]:
     texts = (
         [info.guide.reads, *info.guide.caveats, *(u.note for u in info.guide.uses)]
         if info.guide is not None
         else []
     )
     inputs = (ctx.features.feature(ref) for ref in info.inputs)
-    named = [*_mentions(texts), *(f.field for f in inputs if f is not None)]
+    named = [*mentions(texts, fields), *(f.field for f in inputs if f is not None)]
     out = dict.fromkeys(n for n in named if n in fields and n != info.name)
     return tuple(out)
-
-
-def _mentions(texts: Iterable[str]) -> list[str]:
-    """Every name-shaped token of ``texts`` in order (the caller keeps catalogue names)."""
-    return [t.rstrip(".") for text in texts for t in _TOKEN.findall(text) if "." in t]
 
 
 def _use(playbook: SitePlaybook, name: str) -> GuidePlaybookUse | None:

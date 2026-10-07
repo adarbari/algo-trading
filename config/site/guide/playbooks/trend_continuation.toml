@@ -1,0 +1,40 @@
+# L3 site setting: the Guide's playbook for the site preset trend_continuation (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "trend_continuation"
+summary = "Finds the shares already in a well-established uptrend that are also beating the market: the leaders of the current trend. It is a list of names going up in an orderly way, not a prediction that they keep going."
+hit = "The three moving averages are stacked in uptrend order (the 20-session EMA above the 50 above the 200), the share is up over the last 20 and the last 60 sessions, it has outperformed SPY over the last quarter, today's close sits above the 20-session EMA, and this week's daily range is at least 80% of the month's (the range is not drying up)."
+not_checked = "It does not say how far a name has already run: a hit can be extended or just leaving a dip, so pair it with pullback or breakout for the entry. It does not check earnings dates or news."
+before_acting = [
+  "A quarter's lead over the market can be one day's jump (a takeover bid, an earnings gap): compare rollup.price_moves@v1.one_day_move with rollup.price_stats@v2.ret_20d and rollup.price_stats@v2.ret_60d; when one day is most of the return, it is an event, not a trend.",
+  "Outperforming SPY may be the sector, not the share: read rollup.relative_strength@v1.rs_sector_63d alongside rollup.relative_strength@v1.rs_spy_63d.",
+  "A BULL stack lags: feature.ema_stack stays BULL for weeks after a top. Check rollup.bands@v2.ema20_slope_5d and rollup.relative_strength@v1.rs_spy_trend_20d for whether the lead is still growing.",
+  "A pinned takeover target is UPTREND on every field and will not move again: feature.atr_pct near 0 after one large day is the signature.",
+]
+sources = [
+  "O'Neil, How to Make Money in Stocks (relative price strength, buy leaders not laggards)",
+  "Minervini, Trade Like a Stock Market Wizard (the Trend Template: stacked averages above a rising 200-day)",
+  "Guppy, Trend Trading (moving average alignment)",
+]
+related = [
+  { id = "pullback", reason = "the same leaders at a dip" },
+  { id = "breakout", reason = "the same leaders clearing a level" },
+  { id = "exhaustion", reason = "when a leader's run overheats" },
+]
+
+[asks]
+security_type = "A common stock, ADR or ETF"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+ema_stack = "Averages stacked in uptrend order"
+ret_20d = "Up over the last 20 sessions"
+ret_60d = "Up over the last 60 sessions"
+rs_spy = "Ahead of SPY over the quarter"
+above_ema20 = "Closed above its 20-session EMA"
+atr_ok = "Daily range not drying up"

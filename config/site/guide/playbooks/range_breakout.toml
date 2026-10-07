@@ -1,0 +1,39 @@
+# L3 site setting: the Guide's playbook for the site preset range_breakout (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "range_breakout"
+summary = "Finds shares that have gone quiet, with the tightest trading range they have had in a year, sitting just under a resistance level while volume and momentum start to stir. These are coiled names likely to make a larger move soon; the screen catches them before the move, not after."
+hit = "The daily range this week is at most 85% of the month's, the Bollinger bandwidth is tighter than on at least 85% of the last year's sessions (a squeeze), the last swing high above is within 1 ATR of the close, today's volume is at least 1.2 times the 20-session average, this week's return beat last week's, and the week itself was up."
+not_checked = "It does not know which way the squeeze resolves: the resistance condition leans upward but nothing confirms it, and a squeeze can break down. Once the level is cleared the breakout playbook takes over."
+before_acting = [
+  "Twenty sessions after a shock day the bands snap shut as it leaves the window, and rollup.bands@v2.bb_width_pctile_252d can print a squeeze on a name that just had its biggest day of the year. A genuine squeeze has a flat chart behind it: check rollup.price_moves@v1.one_day_move and rollup.trend_stats@v2.tight_range_sessions.",
+  "A pending takeover pins the price, so the bands stay the tightest in the year and a tiny ATR makes any distance read as 'at resistance'. Check feature.atr_pct (the field guide asks for at least 0.005).",
+  "Volume is several times normal across the whole market on quarterly expiry Fridays and index rebalance days; a rollup.momentum@v1.rel_volume of 1.2 on such a session carries no information.",
+  "Names at a one-year high have no resistance above and so never appear here (feature.dist_to_resistance_atr is null); that is by design, not a gap in the data.",
+]
+sources = [
+  "Bollinger, Bollinger on Bollinger Bands (The Squeeze: bandwidth at a six-month low)",
+  "Minervini, Trade Like a Stock Market Wizard (volatility contraction before a breakout)",
+  "Kaufman, Trading Systems and Methods (range contraction and expansion)",
+]
+related = [
+  { id = "breakout", reason = "the same name once it clears" },
+  { id = "trend_continuation", reason = "whether a trend sits behind the squeeze" },
+]
+
+[asks]
+security_type = "A common stock, ADR or ETF"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+atr_contracting = "Daily range shrinking"
+bb_width_low = "Bands tighter than on 85% of the year"
+near_resistance = "Within 1 ATR under resistance"
+rel_volume = "Volume at least 1.2 times normal"
+momentum_turning = "This week beat last week"
+ret_5d = "Up over the week"

@@ -1,0 +1,43 @@
+# L3 site setting: the Guide's playbook for the site preset breakout (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "breakout"
+summary = "Finds shares that closed today above their highest price of the last month, with the volume, momentum and widening range that a real breakout carries, and did so near a three-month high rather than inside a longer decline. It is the list of names breaking out today."
+hit = "The close is above the highest high of the 20 sessions before today and within 3% of the 50-session high (a new high passes); the week and the month are both up and this week's return beat last week's; volume is more than 1.25 times the 20-session average; this week's daily range is at least 1.1 times the month's; the close sits in the top 30% of the day's range; and the close is no more than 3 ATR above its 20-session average (3 to 4 ATR is flagged WATCH as extended)."
+not_checked = "It does not check whether the break holds (failed_breakout finds the ones that did not), earnings or news behind the move, gaps, or the market's regime."
+before_acting = [
+  "A feature.breakout_magnitude_20d of 8% or more in one day is a gap, not a breakout, and may already be extended: read feature.stretch_sma20_atr and rollup.price_moves@v1.one_day_move with it.",
+  "The level excludes today, so it may be yesterday's spike and the 'breakout' a return to where the share was two days ago; feature.dist_to_high_50d near 0 is the reassurance.",
+  "Earnings days run 3 to 10 times normal volume, and expiry Fridays and index changes lift volume market-wide with no news; check rollup.earnings@v1.last_earnings_date before reading rollup.momentum@v1.rel_volume as conviction. After earnings a large move tends to continue; on no news it more often gives some back.",
+  "One gap day lifts ATR(5) for a week, so a feature.atr_ratio_5_20 'expansion' that is one day old is the gap itself; rollup.trend_stats@v2.ret_z_20d says how unusual today was.",
+]
+sources = [
+  "O'Neil, How to Make Money in Stocks (buying within 5% of the pivot, on volume, with a strong close)",
+  "Faith, Way of the Turtle (the 20-day Donchian breakout entry)",
+  "Minervini, Trade Like a Stock Market Wizard (breakouts from a volatility contraction)",
+]
+related = [
+  { id = "range_breakout", reason = "the squeeze before this break" },
+  { id = "failed_breakout", reason = "the same break after it fails" },
+  { id = "trend_continuation", reason = "the trend the break belongs to" },
+]
+
+[asks]
+security_type = "A common stock, ADR or ETF"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+breakout_20d = "Closed above the 20-session high"
+near_high_50d = "Within 3% of the 50-session high"
+ret_5d = "Up over the week"
+ret_20d = "Up over the last 20 sessions"
+mom_accel = "This week beat last week"
+rel_volume = "Volume above 1.25 times normal"
+atr_expanding = "Daily range widening"
+close_location = "Closed in the top 30% of the day's range"
+not_extended = "Not stretched far above its 20-session average"

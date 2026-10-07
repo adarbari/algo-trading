@@ -7,6 +7,7 @@ site/field_guide/<theme>.toml              L3 field guide (kind ``field_guide``,
 site/regime/{cards,episodes}.toml          L3 regime cards, crash episodes (kind ``regime``)
 site/events/{scope,releases}.toml          L3 event scope, macro releases (kind ``events``)
 site/guide/sections.toml                   L3 Guide order, groups (kind ``guide``, ADR 0051)
+site/guide/playbooks/<id>.toml             L3 Guide playbook prose (kind ``guide_playbooks``)
 site/presets/strategies/<id>.toml          L3 shared strategy / screener configs
 site/presets/selections/<id>.toml          L3 shared selections
 users/<user>/strategies/<id>.toml          L4 (git-ignored locally)
@@ -36,8 +37,18 @@ from algotrade.storage.configs.store import KINDS, split_version
 SITE = "site"
 SCREENERS = "screeners"
 USER_FILES = ("preferences", "identity")  # one document per user, never the site's
-SITE_FOLDERS = ("features", "field_guide", "regime", "events", "guide")  # site/<kind>/<name>.toml
-SITE_ONLY = ("defaults", "settings", "field_guide", "regime", "events", "guide")  # never a user's
+# site/<folder>/<name>.toml by kind (the folder is the kind's name unless given)
+SITE_FOLDERS = {
+    "features": "features",
+    "field_guide": "field_guide",
+    "regime": "regime",
+    "events": "events",
+    "guide": "guide",
+    "guide_playbooks": "guide/playbooks",
+}
+SITE_ONLY = (  # never a user's
+    "defaults", "settings", "field_guide", "regime", "events", "guide", "guide_playbooks",
+)  # fmt: skip
 DRAFT = "draft.toml"
 _ID_NAME = re.compile(r"[a-z0-9_-]{1,64}")  # core.model.ids: other names are not screens
 _VERSION_FILE = re.compile(r"v([1-9][0-9]{0,8})\.toml")
@@ -78,7 +89,7 @@ class FileConfigStore:
             if kind == "settings":
                 return self.root / SITE / f"{validate_id(kind, name)}.toml"
             if kind in SITE_FOLDERS:
-                return self.root / SITE / kind / f"{validate_id(kind, name)}.toml"
+                return self.root / SITE / SITE_FOLDERS[kind] / f"{validate_id(kind, name)}.toml"
             return self.root / SITE / "presets" / kind / f"{validate_id(kind, name)}.toml"
         user = validate_id("user", scope)
         if kind in USER_FILES:  # one file per user: users/<id>/<kind>.toml

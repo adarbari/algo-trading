@@ -118,9 +118,15 @@ Header (preset id and version, the plain summary as the hero), **See today's hit
 in Builder** with the last run; "What a hit looks like" beside "What it does not check"; the
 criteria table (what it asks in words, the field linked, the rule, what a miss does; the base
 gates as one line); "Before you act on a hit" (the caveats of its fields, each attributed) and
-the situations; related playbooks. The prose (summary, what a hit looks like, what it does not
-check, family) is a Guide source of its own, `config/site/playbooks/<id>.toml`, because a preset
-version is immutable; a fitness test requires one per site preset.
+the situations; related playbooks. The prose is a Guide source of its own,
+`config/site/guide/playbooks/<id>.toml`, because a preset version is immutable: `summary` (the
+hero), `hit`, `not_checked`, `before_acting` (caveats naming catalogue fields), `related`
+(`{id, reason}`), `sources` and `[asks]` (each criterion of the latest version in a few plain
+words). The family stays in `sections.toml` (one owner). Fitness tests: one file per site
+preset and none more, `asks` names exactly the latest version's criteria, every related id
+exists, every catalogue name in the prose exists. The presets mark the base gates only with a
+TOML comment, so the read (`Query.guidePlaybook`, GD4a) lists the criteria in file order (base
+gates first in every site preset); prose comes split at catalogue names (`GuideProse`).
 
 ### The help drawer
 
@@ -181,7 +187,7 @@ Explain once, in the Guide; show in place through the drawer (ADR 0051).
   playbooks that use a field and the situations that fool it computed server-side
   (`add-graphql-field`); the top-bar link and `/guide`, `/guide/fields`, `/guide/fields/<name>`
   (`add-web-page`); the Explore tab redirect; the drawer on feature-table headers.
-- **GD4**: playbooks (`config/site/playbooks/`, pages, preset links), situations, the Builder
+- **GD4**: playbooks (`config/site/guide/playbooks/`, pages, preset links), situations, the Builder
   and drafter hooks.
 - **GD5**: market regime pages (indicators, episodes) and the Regime page's drawers.
 - **GD6**: Start here, glossary, grouped search behind ⌘K, the remaining migrations, the

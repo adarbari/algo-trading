@@ -365,6 +365,18 @@ type FundReference {
   status: String!
 }
 
+"""
+One criterion of the playbook, in the preset's file order: `name` its id, `asks` in words (null: not written), `rule` as `op value mode tolerance`, `onMiss` what a soft near miss gives (null unless soft)
+"""
+type GuideCriterionRow {
+  name: String!
+  asks: String
+  field: String!
+  rule: String!
+  mode: String!
+  onMiss: String
+}
+
 """A reference market fall: its key and name"""
 type GuideEpisode {
   key: String!
@@ -379,13 +391,15 @@ type GuideFamily {
 }
 
 """
-A field's Guide page: `info` with the field guide's entry; `related` the other catalogue fields its entry names, then its formula's inputs (first mention first); the site playbooks that use it; the situations that fool it
+A field's Guide page: `info` with the field guide's entry; `related` the other catalogue fields its entry names, then its formula's inputs (first mention first); the site playbooks that use it; the situations that fool it; `readsLinked` and `caveatsLinked`, the entry's reads and caveats split at the catalogue names they mention (null / empty without an entry)
 """
 type GuideField {
   info: FeatureInfo!
   related: [String!]!
   playbooks: [GuidePlaybookUse!]!
   situations: [GuideSituation!]!
+  readsLinked: GuideProse
+  caveatsLinked: [GuideProse!]!
 }
 
 """
@@ -422,6 +436,43 @@ type GuidePlaybook {
 }
 
 """
+A site playbook's Guide page: the preset's latest `version`, its family, the prose (null: none written), the criteria in file order (the base gates are not marked apart), the tie-break, related playbooks and the situations that fool its fields
+"""
+type GuidePlaybookDetail {
+  id: String!
+  name: String!
+  family: String
+  familyTitle: String
+  version: Int
+  prose: GuidePlaybookProse
+  criteria: [GuideCriterionRow!]!
+  tieBreak: String
+  tieBreakDescending: Boolean!
+  related: [GuideRelatedPlaybook!]!
+  situations: [GuidePlaybookSituation!]!
+}
+
+"""
+A playbook's prose: the summary (the hero), what a hit looks like, what it does not check, the caveats before acting (each linked) and the sources
+"""
+type GuidePlaybookProse {
+  summary: GuideProse!
+  hit: GuideProse!
+  notChecked: GuideProse!
+  beforeActing: [GuideProse!]!
+  sources: [String!]!
+}
+
+"""
+A situation that fools the playbook: `fields`, the screen's fields it fools
+"""
+type GuidePlaybookSituation {
+  slug: String!
+  name: String!
+  fields: [String!]!
+}
+
+"""
 A site preset that uses the field: `rules`, one per criterion on it as `op value mode tolerance`; `column`: a display column; `rank`: its tie-break; `flag`: a rule of one of its flags
 """
 type GuidePlaybookUse {
@@ -435,6 +486,29 @@ type GuidePlaybookUse {
 }
 
 """
+Guide prose and its `segments` in order (joined, they are `text`): each plain text or a catalogue name in the caller's catalogue, matched exactly as written
+"""
+type GuideProse {
+  text: String!
+  segments: [GuideProseSegment!]!
+}
+
+"""
+A run of Guide prose: `field` is the catalogue name it is (then `text` is that name), null for plain text
+"""
+type GuideProseSegment {
+  text: String!
+  field: String
+}
+
+"""Another playbook worth reading next, and why"""
+type GuideRelatedPlaybook {
+  id: String!
+  name: String!
+  reason: String!
+}
+
+"""
 A Guide section in order: `entries`, how many entries it has (0: none yet)
 """
 type GuideSection {
@@ -445,19 +519,44 @@ type GuideSection {
 }
 
 """
-A situation that fools the field: how it shows, what a screen does about it and every field it fools
+A situation that fools the field: how it shows, what a screen does about it and every field it fools; `slug` its page's key; `signsLinked` / `doLinked` the same text split at the catalogue names it mentions
 """
 type GuideSituation {
   name: String!
   signs: String!
   do: String!
   affects: [String!]!
+  slug: String!
+  signsLinked: GuideProse!
+  doLinked: GuideProse!
 }
 
-"""A situation and the number of fields it fools"""
+"""
+A situation's Guide page: `signs` (how it shows) and `do` (what a screen does about it) linked; `affects`, every field it fools; the site playbooks reading any of them
+"""
+type GuideSituationDetail {
+  slug: String!
+  name: String!
+  signs: GuideProse!
+  do: GuideProse!
+  affects: [String!]!
+  playbooks: [GuideSituationPlaybook!]!
+}
+
+"""A situation, the number of fields it fools and `slug`, its page's key"""
 type GuideSituationEntry {
   name: String!
   fields: Int!
+  slug: String!
+}
+
+"""
+A site playbook reading fields the situation fools: `fields`, those fields
+"""
+type GuideSituationPlaybook {
+  id: String!
+  name: String!
+  fields: [String!]!
 }
 
 """A field-guide theme and the number of fields it guides"""
@@ -1033,6 +1132,16 @@ type Query {
   The Guide page of the catalogue field `name` (ADR 0051): its info and guide entry, related fields, the playbooks that use it and the situations that fool it; a name outside the caller's catalogue is an UNKNOWN_FEATURE error
   """
   guideField(name: FeatureName!): GuideField
+
+  """
+  The Guide page of the site playbook `id` (ADR 0051): its prose, the preset's latest version and criteria, related playbooks and the situations that fool its fields; null: no site rule-screen preset of that id
+  """
+  guidePlaybook(id: String!): GuidePlaybookDetail
+
+  """
+  The Guide page of the situation `slug` (ADR 0051): its signs and what to do, the fields it fools and the site playbooks reading them; null: no such situation
+  """
+  guideSituation(slug: String!): GuideSituationDetail
 
   """
   Every strategy and screener config the user sees: site presets, then their own (`kind`: only `strategy` or `screener`)

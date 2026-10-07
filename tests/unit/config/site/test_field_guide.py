@@ -104,6 +104,17 @@ def test_errors_name_the_entry(doc: dict[str, Any], message: str) -> None:
         FieldGuideSettings.from_document(doc)
 
 
+def test_a_situations_slug_is_its_name_kebab_cased_and_unique() -> None:
+    def situation(name: str) -> dict[str, object]:
+        return {"name": name, "signs": "x", "affects": ["feature.b"], "do": "y"}
+
+    one = FieldGuideSettings.from_document({"situation": [situation("Recent listing, spin-off")]})
+    assert one.situations[0].slug == "recent-listing-spin-off"
+    clash = {"situation": [situation("a null"), situation("A null!")]}
+    with pytest.raises(ConfigurationError, match=r"share a slug: \['a-null'\]"):
+        FieldGuideSettings.from_document(clash)
+
+
 def test_files_load_in_name_order_and_a_field_is_guided_once() -> None:
     store = MemoryConfigStore(
         {

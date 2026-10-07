@@ -25,7 +25,7 @@ microcopy (an empty state, a confirmation, an action hint) is one sentence under
    | field (a catalogue feature) | `config/site/field_guide/<theme>.toml` `[[field]]` | `add-feature` ships it with the feature |
    | situation (fools many fields at once) | `config/site/field_guide/situations.toml` `[[situation]]` | |
    | regime indicator, episode | `config/site/regime/cards.toml`, `episodes.toml` | |
-   | playbook (one per site preset screen) | `config/site/playbooks/<id>.toml` (GD4) | `add-screener` for a site preset |
+   | playbook (one per site preset screen) | `config/site/guide/playbooks/<id>.toml` (`[asks]`: one line per criterion of the latest version) | `add-screener` for a site preset |
    | glossary term, how-to page | the Guide's glossary and how-to sources (GD6) | |
 
    A kind the table does not have yet: stop and add it through `add-responsibility` (an owner,

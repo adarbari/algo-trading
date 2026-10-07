@@ -1,0 +1,45 @@
+# L3 site setting: the Guide's playbook for the site preset pullback (ADR 0051; docs/ui/guide.md
+# "The playbook page"). The prose its page shows beside the preset's latest version (a preset
+# version is immutable, its prose is not); the family is config/site/guide/sections.toml's.
+# Keys: summary (the hero), hit (what a hit looks like), not_checked, before_acting (caveats,
+# naming catalogue fields so the server links them), related (other playbooks), sources, and
+# [asks]: each criterion of the latest preset version in a few plain words. Typed by
+# src/algotrade/config/site/guide/playbooks.py; fitness tests in
+# tests/unit/config/site/guide/test_playbooks.py.
+id = "pullback"
+summary = "Finds shares in a strong uptrend that have dipped back to their one-month average on quiet volume, with a support level close underneath. These are the orderly dips in leaders, where the trend is intact and the risk is well defined."
+hit = "The uptrend is confirmed on every count: the 20 and 60-session returns are positive, the EMAs are stacked BULL, price is above the 50 and 200-day averages (UPTREND), and the share is ahead of SPY over the quarter. The dip is shallow and recent: the close is within half an ATR of its 20-session average (a quarter ATR beyond that is flagged WATCH), no more than 1.5 ATR below the 20-session high, which was set within the last 10 sessions; this week's volume averages less than the month's; a support level sits within 1 ATR below; and this week's momentum has not slipped more than 3 points behind last week's (up to 6 points behind is WATCH)."
+not_checked = "It does not check earnings dates, market breadth, or whether this dip is the start of a larger decline beyond what the trend fields say. It does not confirm that the bounce has started; support_reversal and oversold_reversal look for that."
+before_acting = [
+  "A gap down puts the close many ATRs under the high in one session and then shrinks feature.pullback_atr_20d as the ATR widens, with no rally behind it: check rollup.price_moves@v1.one_day_move.",
+  "Light volume may be the calendar: holiday weeks are quiet across the market, and an earnings day 6 to 20 sessions ago inflates the base of rollup.volume@v1.volume_ratio_5d_20d. Check rollup.earnings@v1.last_earnings_date.",
+  "The count in rollup.trend_stats@v2.sessions_since_high_20d resets to a younger high when the old one leaves the window; read it with feature.dist_to_high_20d.",
+  "feature.trend_state is null under 200 sessions of history, so every listing younger than ten months is silently excluded; check instrument.listed_on when that matters.",
+]
+sources = [
+  "Raschke and Connors, Street Smarts (the Holy Grail pullback to the 20-period average; ATR-scaled stretch)",
+  "Minervini, Trade Like a Stock Market Wizard (buying pullbacks in a confirmed trend)",
+  "O'Neil, How to Make Money in Stocks (volume drying up on a pullback)",
+]
+related = [
+  { id = "trend_continuation", reason = "the leaders this screen waits to dip" },
+  { id = "support_reversal", reason = "the dip after the first up close" },
+  { id = "breakout", reason = "the same trend resolving upward instead" },
+]
+
+[asks]
+security_type = "A common stock, ADR or ETF"
+status = "Still listed and trading"
+price = "Closes above $5"
+adv = "Trades at least $50M a day"
+ret_20d = "Up over the last 20 sessions"
+ret_60d = "Up over the last 60 sessions"
+ema_stack = "Averages stacked in uptrend order"
+near_ema20 = "Back near its 20-session average"
+pullback_depth = "At most 1.5 ATR below the 20-session high"
+pullback_age = "That high set in the last 10 sessions"
+volume_lighter = "Quieter volume this week"
+support_near = "Support within 1 ATR below"
+trend = "In an uptrend"
+momentum_holds = "Momentum not slipping fast"
+rs_spy = "Ahead of SPY over the quarter"
