@@ -253,7 +253,7 @@ Sources: O'Neil (2009), How to Make Money in Stocks: volume building before a br
 
 **When the reading lies**
 
-- Shares outstanding are the company's last filed count (every quarter for a 10-Q filer, once a year for a 20-F filer), so turnover is stale by up to a year after a buyback or an offering; rollup.fundamentals@v2.market_cap_status says STALE when too old.
+- Shares outstanding are the company's last filed count (every quarter for a 10-Q filer, once a year for a 20-F filer), so turnover is stale by up to a year after a buyback or an offering; rollup.fundamentals@v3.market_cap_status says STALE when too old.
 - ETFs and ADRs have no filed share count here, so turnover is null for them; use rollup.price_stats@v2.adv_usd_20d.
 - Null when the 20-session average is unknown or no share count is filed.
 
@@ -465,3 +465,172 @@ Sources: Dalton (2007), Markets in Profile
 - Null unless profile_status is OK.
 
 Sources: Dalton (2007), Markets in Profile
+
+### `rollup.candle@v1.body_share`
+
+**How to read it.** The candle body (open to close) over the day's whole range, 0 to 1. Near 0 (under 0.1) the session closed where it opened: a doji, indecision. Around 0.5 an ordinary day. Above 0.7 a long body with short wicks: one side controlled the session from open to close (a marubozu at 1).
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a decisive session (a long body) | `gte 0.6` | soft | 0.1 | with rollup.trend_stats@v2.close_range_pos gte 0.7 for a strong close; feature.strong_close is that pair |
+| an indecisive session (a doji-like body) | `lte 0.1` | soft | 0.05 | rollup.candle@v1.candle eq DOJI is the same cut with its range check |
+
+**When the reading lies**
+
+- A big body is only meaningful against the name's usual body: rollup.candle@v1.body_vs_avg_20d says whether 0.8 is a large move or a normal one for it.
+- An earnings day or a gap open makes the open far from the prior close, so the body hides most of the move; check rollup.earnings@v1.last_earnings_date and rollup.gaps@v1.gap_open_pct.
+- Null when the bar has no range (high equals low: a halted or untraded session).
+
+Sources: Nison (1991), Japanese Candlestick Charting Techniques: the real body; Bulkowski (2008), Encyclopedia of Candlestick Charts
+
+### `rollup.candle@v1.upper_wick_share`
+
+**How to read it.** The share of the day's range above the body: how much of the session's high was given back by the close, 0 to 1. Under 0.1 the close was at or near the high; above 0.5 half the day's range was sold off from the high (the shape of a shooting star when the body is small and the lower wick short).
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a long upper wick (sold off from the high) | `gte 0.5` | soft | 0.1 | with feature.stretch_sma20_atr gte 2 for a reversal warning after a run |
+
+**When the reading lies**
+
+- One session: a long upper wick after a run (feature.stretch_sma20_atr above 2) is the warning Nison describes; the same wick in a base means little. Read it with where the name is.
+- A wick on a day with an earnings report or a gap open (rollup.earnings@v1.last_earnings_date) reflects the event, not supply at that price.
+- Null when the bar has no range (high equals low).
+
+Sources: Nison (1991), Japanese Candlestick Charting Techniques: the upper shadow; Bulkowski (2008), Encyclopedia of Candlestick Charts
+
+### `rollup.candle@v1.lower_wick_share`
+
+**How to read it.** The share of the day's range below the body: how much of the session's low was bought back by the close, 0 to 1. Under 0.1 the close was at or near the low; above 0.5 half the range was recovered from the low (the shape of a hammer when the body is small and the upper wick short).
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a long lower wick (bought back from the low) | `gte 0.5` | soft | 0.1 | with feature.dist_to_support lte 0.02 for the support reversal shape |
+
+**When the reading lies**
+
+- A long lower wick means little in the middle of a range: it matters at a level where buyers are expected, so pair it with feature.dist_to_support.
+- An earnings day or a gap open (rollup.earnings@v1.last_earnings_date) makes long wicks by nature.
+- Null when the bar has no range (high equals low).
+
+Sources: Nison (1991), Japanese Candlestick Charting Techniques: the lower shadow; Bulkowski (2008), Encyclopedia of Candlestick Charts
+
+### `rollup.candle@v1.body_vs_avg_20d`
+
+**How to read it.** Today's body (open to close) over the mean body of the 20 sessions before it: 1 is a body of the usual size, 2 twice the usual, 0.3 a much smaller one. Above 1.5 the day's move was unusual for this name; under 0.5 the day was quiet.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a larger body than usual | `gte 1.5` | soft | 0.25 | with rollup.candle@v1.body_share gte 0.5 so the body is also most of the range |
+
+**When the reading lies**
+
+- Bodies measure open to close, not the range: a large gap with a small body reads small here. rollup.trend_stats@v2.ret_z_20d is the close-to-close surprise.
+- After a volatile month the base is inflated and a normal day reads small; after a quiet one a normal day reads large.
+- Null when a session among the 20 before has no bar (a gap), the history is shorter, or those bodies were all zero.
+
+Sources: Nison (1991), Japanese Candlestick Charting Techniques: the engulfing pattern's size; Bulkowski (2008), Encyclopedia of Candlestick Charts
+
+### `rollup.candle@v1.bar_relation`
+
+**How to read it.** How the day's high-low range sits against the previous day's. INSIDE: the range lies within the day before's (a pause, compression, the setup before a break). OUTSIDE: it covers the whole previous range (a wider swing, a shake-out or an expansion). UP_GAP: the whole day traded above yesterday's high; DOWN_GAP: the whole day below yesterday's low. OVERLAP: any other partial overlap, the ordinary case.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| an inside day (a pause in the range) | `eq "INSIDE"` | hard | - | the day after is the breakout test; feature.inside_day_breakout is the confirmed form |
+| not a gap day | `in ["INSIDE", "OUTSIDE", "OVERLAP"]` | hard | - | to keep the earnings and news gap days out of a pattern screen |
+
+**When the reading lies**
+
+- Inside days are common and inside days alone are not a signal: the direction comes from the day after (feature.inside_day_breakout) and from the trend (feature.trend_state).
+- An earnings day or a news gap is an UP_GAP or DOWN_GAP by nature: check rollup.earnings@v1.last_earnings_date before reading a gap as a trend change; rollup.gaps@v1.gap_above tracks the gaps that stay open.
+- Compares ranges with the previous session only: a name that traded no session yesterday has no relation (null).
+
+Sources: Nison (1991), Japanese Candlestick Charting Techniques (the harami and the engulfing as inside and outside days); Crabel (1990), Day Trading with Short Term Price Patterns and Opening Range Breakout
+
+### `rollup.candle@v1.prev_bar_relation`
+
+**How to read it.** The bar_relation of the previous session: how yesterday's range sat against the day before's (INSIDE, OUTSIDE, UP_GAP, DOWN_GAP, OVERLAP). It lets a screen ask what yesterday was while reading today: an INSIDE here and a close above yesterday's close today is the inside day breakout.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| yesterday was an inside day | `eq "INSIDE"` | hard | - | with rollup.trend_stats@v2.ret_1d gt 0 for the break up; feature.inside_day_breakout is that pair |
+
+**When the reading lies**
+
+- A label of yesterday, not today: for the shape of today's bar use rollup.candle@v1.bar_relation.
+- Null when the previous session or the one before it has no bar.
+
+Sources: Crabel (1990), Day Trading with Short Term Price Patterns and Opening Range Breakout; Nison (1991), Japanese Candlestick Charting Techniques
+
+### `rollup.candle@v1.candle`
+
+**How to read it.** The named candle of the session: HAMMER (a long lower wick, a small upper wick, a body above a doji: sellers pushed the price down and buyers took it back), SHOOTING_STAR (the mirror: buyers pushed it up and sellers took it back), DOJI (open and close nearly equal: indecision), BULLISH_ENGULFING (a rising body that covers the previous falling body and is at least half an average body), BEARISH_ENGULFING (the mirror), else NONE. The first match wins, in that order: engulfing, hammer, shooting star, doji.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a hammer (at support or after a decline) | `eq "HAMMER"` | hard | - | with feature.dist_to_support lte 0.02, or feature.stretch_sma20_atr lte -2 after a run down |
+| a shooting star (after a run up) | `eq "SHOOTING_STAR"` | hard | - | with feature.stretch_sma20_atr gte 2 |
+| a doji (indecision) | `eq "DOJI"` | hard | - | - |
+| a bullish engulfing day | `eq "BULLISH_ENGULFING"` | hard | - | with rollup.momentum@v1.rel_volume gte 1.25 for the volume to confirm it |
+| a bearish engulfing day | `eq "BEARISH_ENGULFING"` | hard | - | with feature.stretch_sma20_atr gte 2 for a reversal after a run up |
+
+**When the reading lies**
+
+- A single candle means little without its location: a hammer at support (feature.dist_to_support small) or after a run down means something; in the middle of a range it is noise. Bulkowski's tests put the reliability of most candles near a coin flip, a hammer or an engulfing in the right place a little better; use it as a filter on a setup, never as the setup.
+- A shooting star or a bearish engulfing matters after a run up: check feature.stretch_sma20_atr (above 2) before reading it as a top.
+- An earnings day makes gaps and engulfing bars by nature: check rollup.earnings@v1.last_earnings_date and drop the report day from a pattern screen.
+- Null when the bar has no range (high equals low) or the previous session has no bar. An unknown 20-session average body never matches an engulfing candle: the bar then reads on as a hammer, a shooting star, a doji or NONE.
+
+Sources: Nison (1991), Japanese Candlestick Charting Techniques; Bulkowski (2008), Encyclopedia of Candlestick Charts: the reliability and the performance rank of each candle
+
+### `feature.inside_day_breakout`
+
+**How to read it.** True when the session closed above the previous close and the previous session was an inside day (its range within the day before's): the squeeze of the quiet day resolved upward the day after. False for every other session; null when the return or the relation is unknown.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| an inside day broke up | `eq true` | hard | - | with feature.trend_state eq UPTREND and rollup.momentum@v1.rel_volume gte 1.25 |
+
+**When the reading lies**
+
+- Closing above the previous close is a weak test of a breakout: it is not above the inside day's high or the mother bar's high. Gate on rollup.trend_stats@v2.close_range_pos gte 0.7 or feature.breakout_20d to ask for a real break.
+- Direction only: an inside day inside a downtrend is a rest, not a base; gate on feature.trend_state eq UPTREND.
+- An earnings day or a news gap the day after is the event, not the pattern: check rollup.earnings@v1.last_earnings_date.
+- Null when yesterday or the day before has no bar, or the return is unknown.
+
+Sources: Crabel (1990), Day Trading with Short Term Price Patterns and Opening Range Breakout; Bulkowski (2008), Encyclopedia of Candlestick Charts
+
+### `feature.strong_close`
+
+**How to read it.** True when the session closed in the top 30% of its range (rollup.trend_stats@v2.close_range_pos at least 0.7) with a body of at least half the range (rollup.candle@v1.body_share at least 0.5): buyers held into the close and the day was not a doji or a long-wick spike. False otherwise; null for a bar with no range.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| closed strong with conviction | `eq true` | hard | - | with rollup.momentum@v1.rel_volume gte 1.25 on a breakout day |
+
+**When the reading lies**
+
+- One day: a strong close on a quiet day means little. Pair with rollup.momentum@v1.rel_volume gte 1.25 or rollup.candle@v1.body_vs_avg_20d gte 1.
+- The close can be strong because the day opened far below it (a gap up, an earnings day): check rollup.earnings@v1.last_earnings_date and rollup.gaps@v1.gap_open_pct.
+- The 0.7 and 0.5 are fixed; for other cuts use the two fields directly.
+
+Sources: Nison (1991), Japanese Candlestick Charting Techniques; O'Neil (2009), How to Make Money in Stocks: the close in the upper part of the day's range on a breakout

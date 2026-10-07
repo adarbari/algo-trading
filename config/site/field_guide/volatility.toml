@@ -350,6 +350,7 @@ mode = "soft"
 tolerance = 0.05
 
 # ---------------------------------------------------------- implied volatility: the inputs
+# (Skew, skew rank and the term structure fields of this theme are in volume.toml: this file is at its line cap.)
 
 [[field]]
 name = "rollup.iv30@v1.iv30"

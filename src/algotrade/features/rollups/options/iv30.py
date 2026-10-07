@@ -173,7 +173,7 @@ def choose_expiries(
     return (single, None) if days[single] <= p.target_days else (None, single)
 
 
-def _selected(options: pd.DataFrame, session: date, p: Iv30Params) -> pd.DataFrame:
+def selected_expiries(options: pd.DataFrame, session: date, p: Iv30Params) -> pd.DataFrame:
     """``underlying_id``, ``expiry``, ``role`` (near / far) for every chain."""
     pairs = options[["underlying_id", "expiry"]].drop_duplicates()
     monthly = standard_monthly_expiries(pairs["expiry"].unique())
@@ -304,7 +304,7 @@ def _spots(underlyings: pd.DataFrame | None) -> pd.DataFrame:
     )
 
 
-def _yields(dividends: pd.DataFrame | None, session: date) -> pd.Series:
+def div_yields(dividends: pd.DataFrame | None, session: date) -> pd.Series:
     if dividends is None:
         return pd.Series(dtype=float)
     today = dividends[dividends["session_date"] == session]
@@ -350,6 +350,25 @@ def _row(chain: pd.DataFrame | None, session: date, t_target: float) -> dict[str
     }
 
 
+def pricing_inputs(
+    options: pd.DataFrame,
+    chosen: pd.DataFrame,
+    spots: pd.Series,
+    yields: pd.Series,
+    curve: YieldCurve,
+    session: date,
+) -> pd.DataFrame:
+    """The ``options`` rows at the (``underlying_id``, ``expiry``) pairs of ``chosen`` with
+    the columns ``expiry_vols`` reads: ``spot`` and ``q`` (``yields``, 0 when unknown) by
+    underlying id, ``t`` (years), ``r`` (the curve at ``t``) and ``forward``."""
+    quotes = options.merge(chosen[["underlying_id", "expiry"]].drop_duplicates())
+    t = np.array([(e - session).days for e in quotes["expiry"]], dtype=float) / DAYS_PER_YEAR
+    spot = spots.reindex(quotes["underlying_id"]).to_numpy(dtype=float)
+    q = yields.reindex(quotes["underlying_id"]).fillna(0.0).to_numpy(dtype=float)
+    r = curve.rate(t)
+    return quotes.assign(spot=spot, t=t, r=r, q=q, forward=spot * np.exp((r - q) * t))
+
+
 def compute(inputs: Inputs, session: date, p: Iv30Params) -> pd.DataFrame:
     options, curve_rows = inputs[OPTIONS], inputs[RATES]
     assert options is not None and curve_rows is not None  # required inputs
@@ -361,16 +380,11 @@ def compute(inputs: Inputs, session: date, p: Iv30Params) -> pd.DataFrame:
     )
     ids = sorted(set(spots.index) | set(options["underlying_id"]))
     out = spots.reindex(ids)
-    out["div_yield"] = _yields(inputs.get(DIVIDENDS), session).reindex(ids)
+    out["div_yield"] = div_yields(inputs.get(DIVIDENDS), session).reindex(ids)
     out["rate"] = float(curve.rate(t_target))
     priced = options[options["underlying_id"].isin(out.index[out["spot"].notna()])]
-    chosen = _selected(priced, session, p)
-    quotes = priced.merge(chosen[["underlying_id", "expiry"]].drop_duplicates())
-    t = np.array([(e - session).days for e in quotes["expiry"]], dtype=float) / DAYS_PER_YEAR
-    spot = out["spot"].reindex(quotes["underlying_id"]).to_numpy(dtype=float)
-    q = out["div_yield"].reindex(quotes["underlying_id"]).fillna(0.0).to_numpy(dtype=float)
-    r = curve.rate(t)
-    quotes = quotes.assign(spot=spot, t=t, r=r, q=q, forward=spot * np.exp((r - q) * t))
+    chosen = selected_expiries(priced, session, p)
+    quotes = pricing_inputs(priced, chosen, out["spot"], out["div_yield"], curve, session)
     vols = chosen.merge(expiry_vols(quotes, p), on=["underlying_id", "expiry"], how="left")
     vols = vols.fillna({"status": "NO_QUOTES", "n_used": 0})
     chains = dict(tuple(vols.groupby("underlying_id"))) if len(vols) else {}

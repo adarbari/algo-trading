@@ -110,6 +110,41 @@ fields = ["feature.pe_ratio", "feature.revenue_growth_yoy"]
 hint = "pe_ratio lt 15 (trailing); 'growing revenue' is revenue_growth_yoy gt 0.10 (a fraction)"
 
 [[phrase]]
+say = ["cheap on sales", "low price to sales", "low P/S"]
+fields = ["feature.ps_ratio", "feature.net_margin"]
+hint = "ps_ratio lt 2 (market cap over trailing sales), soft with tolerance 0.5; add net_margin gt 0.05 so it is not just a thin margin; '5 to 10' is the growth price, ps_ratio between 5 and 10"
+
+[[phrase]]
+say = ["high margin", "high margins", "fat margins"]
+fields = ["feature.net_margin"]
+hint = "net_margin gte 0.10 (a fraction, 0.10 is 10%) for a healthy business, soft with tolerance 0.03; gte 0.20 for a franchise; margins differ by sector, so pair with an instrument.sector gate"
+
+[[phrase]]
+say = ["safe dividend", "sustainable dividend", "covered dividend"]
+fields = ["feature.payout_ratio", "feature.div_yield"]
+hint = "payout_ratio between 0 and 0.60 (a fraction; never a bare lt 0.6: a negative payout is a payer with negative earnings) and div_yield gte 0.02 so there is a dividend; above 1.0 is unsustainable"
+
+[[phrase]]
+say = ["earnings growth", "growing earnings", "EPS growth"]
+fields = ["feature.eps_growth_qtr_yoy", "feature.eps_growth_yoy"]
+hint = "eps_growth_qtr_yoy gte 0.25 (the latest quarter against a year earlier, a fraction) and eps_growth_yoy gte 0.25 for the year, soft with tolerance 0.05; both are null from a loss, so a turnaround is not matched"
+
+[[phrase]]
+say = ["accelerating earnings", "earnings acceleration", "CAN SLIM earnings"]
+fields = ["feature.eps_growth_qtr_yoy", "feature.eps_growth_yoy", "feature.revenue_growth_qtr_yoy"]
+hint = "eps_growth_qtr_yoy gte 0.25 as the gate, eps_growth_yoy gte 0.25 and revenue_growth_qtr_yoy gte 0.25 as confirmations; accelerating means the quarterly rate is above the yearly one, which the rule grammar cannot compare, so state both thresholds"
+
+[[phrase]]
+say = ["buying back shares", "buybacks", "shrinking share count"]
+fields = ["feature.shares_change_yoy"]
+hint = "shares_change_yoy lte -0.01 (a fraction, -0.03 is a 3% smaller count), soft with tolerance 0.01; 1 to 5% a year is a steady repurchaser"
+
+[[phrase]]
+say = ["diluting", "dilution", "issuing shares"]
+fields = ["feature.shares_change_yoy"]
+hint = "shares_change_yoy gt 0.10 finds dilution above 10% a year; 'no dilution' is shares_change_yoy lte 0.10, soft with tolerance 0.03"
+
+[[phrase]]
 say = ["near support", "near resistance", "room to run"]
 fields = ["feature.dist_to_support", "feature.dist_to_resistance"]
 hint = "near support: dist_to_support lte 0.03 (fraction of price); room to run: dist_to_resistance gte 0.10"
@@ -273,3 +308,73 @@ hint = "implied_move_vs_hv gte 1.2 (the straddle prices 20% more than HV20 would
 say = ["dividend before the call expires", "ex-dividend during the covered call", "collect the dividend with a covered call"]
 fields = ["feature.ex_div_before_call_expiry", "rollup.call_wing@v1.best_call_delta"]
 hint = "ex_div_before_call_expiry eq true to collect it (with best_call_delta lte 0.3 so the call is not assigned first), eq false to avoid the assignment question; null means no date is known yet, not none"
+
+[[phrase]]
+say = ["put skew", "puts expensive", "puts are rich", "downside skew", "steep skew"]
+fields = ["rollup.skew@v1.skew", "feature.skew_rr25", "rollup.skew@v1.skew_status", "rollup.skew_history@v1.skew_rank_252d"]
+hint = "skew is (put vol - call vol) / ATM vol at 30 days: gte 0.25 for rich puts (about 0.10 to 0.20 is ordinary), soft with tolerance 0.05; skew_rr25 is the raw vol-point difference; require skew_status eq OK; a rank gate (skew_rank_252d gte 0.8) is null for every name until about the end of 2026, so say so rather than silently emptying the list"
+
+[[phrase]]
+say = ["calls expensive", "calls are rich", "call skew", "upside skew", "call-rich"]
+fields = ["rollup.skew@v1.skew", "feature.skew_rr25", "rollup.skew@v1.skew_status"]
+hint = "skew lte -0.05 (calls richer than puts, rare; usually a takeover or a squeeze), soft with tolerance 0.05; require skew_status eq OK"
+
+[[phrase]]
+say = ["skew rank", "skew percentile", "skew stretched", "skew at a high for the year"]
+fields = ["rollup.skew_history@v1.skew_rank_252d", "rollup.skew_history@v1.skew_percentile_252d", "rollup.skew_history@v1.skew_rank_status", "rollup.skew_history@v1.history_days"]
+hint = "skew_rank_252d gte 0.8 for a stretched put premium (0 to 1), confirm with skew_percentile_252d; gate history_days gte 60; chains are stored from 2026-10-02 only, so every rank is null until about the end of 2026 and PROVISIONAL until about October 2027: say this instead of returning an empty list"
+
+[[phrase]]
+say = ["backwardation", "term structure inverted", "inverted term structure", "front vol rich", "front richer than the back"]
+fields = ["feature.term_ratio_30_90", "rollup.iv_term@v1.iv_term_status", "rollup.iv_term@v1.iv_90d"]
+hint = "term_ratio_30_90 gte 1.1 (the 30-day vol over the 90-day one; an event or stress is priced near), soft with tolerance 0.05; add rollup.earnings@v1.days_to_earnings gt 30 to rule out a report; require iv_term_status eq OK"
+
+[[phrase]]
+say = ["contango", "steep contango", "normal term structure", "front vol cheap"]
+fields = ["feature.term_ratio_30_90", "rollup.iv_term@v1.iv_term_status"]
+hint = "term_ratio_30_90 lte 0.9 for steep contango (the front cheap against the back; calendars buy the front), soft with tolerance 0.05; any value below 1 is contango, the normal shape; require iv_term_status eq OK"
+
+[[phrase]]
+say = ["event priced in the front", "event in the front expiry", "front expiry premium", "event priced into the nearest expiry"]
+fields = ["feature.term_ratio_next_30", "rollup.skew@v1.ne_dte", "rollup.iv_term@v1.iv_next"]
+hint = "term_ratio_next_30 gte 1.3 (the next expiry's vol over the 30-day vol; 1.2 is a hint), soft with tolerance 0.1; gate ne_dte gte 7 so a pinned weekly is not read as an event"
+
+[[phrase]]
+say = ["hammer at support", "hammer candle at support", "hammer off support", "hammer"]
+fields = ["rollup.candle@v1.candle", "feature.dist_to_support"]
+hint = "candle eq HAMMER; 'at support' adds dist_to_support lte 0.02 (within 2% of the swing support), soft with tolerance 0.01; a hammer alone is a shape in any place, so without 'support' or 'after a decline' say the location is not asked; null on a no-range bar or a missing previous bar drops the name"
+
+[[phrase]]
+say = ["shooting star", "shooting star candle", "rejection at the high", "long upper wick"]
+fields = ["rollup.candle@v1.candle", "rollup.candle@v1.upper_wick_share", "feature.stretch_sma20_atr"]
+hint = "candle eq SHOOTING_STAR; 'after a run' adds stretch_sma20_atr gte 2; for 'a long upper wick' without the named candle use upper_wick_share gte 0.5 (soft, tolerance 0.1)"
+
+[[phrase]]
+say = ["doji", "doji candle", "indecision candle", "indecision day"]
+fields = ["rollup.candle@v1.candle", "rollup.candle@v1.body_share"]
+hint = "candle eq DOJI (a body at most 10% of the range); body_share lte 0.1 is the same cut; it says indecision, not direction: add the location (dist_to_support, stretch_sma20_atr) if the sentence has one"
+
+[[phrase]]
+say = ["bullish engulfing", "bullish engulfing candle", "bullish engulfing day"]
+fields = ["rollup.candle@v1.candle", "rollup.momentum@v1.rel_volume"]
+hint = "candle eq BULLISH_ENGULFING (a rising body covering the previous falling body, at least half the 20-session average body); 'on volume' adds rel_volume gte 1.25; an earnings day is an engulfing bar by nature (rollup.earnings@v1.last_earnings_date)"
+
+[[phrase]]
+say = ["bearish engulfing", "bearish engulfing candle", "bearish engulfing day"]
+fields = ["rollup.candle@v1.candle", "feature.stretch_sma20_atr"]
+hint = "candle eq BEARISH_ENGULFING; 'after a run' adds stretch_sma20_atr gte 2; an earnings day is an engulfing bar by nature (rollup.earnings@v1.last_earnings_date)"
+
+[[phrase]]
+say = ["inside day", "inside bar", "inside candle", "harami day"]
+fields = ["rollup.candle@v1.bar_relation"]
+hint = "bar_relation eq INSIDE (today's high and low within yesterday's range); it is a pause, not a direction: for yesterday's inside day use rollup.candle@v1.prev_bar_relation eq INSIDE"
+
+[[phrase]]
+say = ["inside day breakout", "inside bar breakout", "breakout after an inside day", "inside day breakout up"]
+fields = ["feature.inside_day_breakout", "rollup.trend_stats@v2.close_range_pos"]
+hint = "inside_day_breakout eq true (yesterday was an inside day and today closed above yesterday's close); for a real break add close_range_pos gte 0.7 or feature.breakout_20d; the bool is up only"
+
+[[phrase]]
+say = ["strong close", "closed strong", "closed at the high of the day", "closing near the high"]
+fields = ["feature.strong_close", "rollup.trend_stats@v2.close_range_pos"]
+hint = "strong_close eq true (close in the top 30% of the range and a body of at least half the range); for the close alone close_range_pos gte 0.7 (soft, tolerance 0.1); 'on volume' adds rollup.momentum@v1.rel_volume gte 1.25"

@@ -95,7 +95,7 @@ nightly and stored point-in-time:
 bars/1m ──► rollups/daily/session_stats@v1 ──┐
 bars/1d ─────────────────────────────────────┼─► rollups/instrument/price_stats@v2   (52w hi/lo, MAs, HV, ADV), price_moves@v1, momentum@v1, swing_levels@v1,
                                                    volume@v1, anchored_vwap@v1 (+ events/earnings)
-chains/* ────────────────────────────────────┼─► rollups/instrument/option_liquidity@v1, put_wing@v1, call_wing@v1, oi_walls@v1, nearest_expiry@v1, chain_flow@v1 ─► flow_history@v1, implied_move@v1, iv30@v1 ─► iv_history@v2 ─┐
+chains/* ────────────────────────────────────┼─► rollups/instrument/option_liquidity@v1, put_wing@v1, call_wing@v1, oi_walls@v1, nearest_expiry@v1, chain_flow@v1 ─► flow_history@v1, implied_move@v1, skew@v1 ─► skew_history@v1, iv_term@v1, iv30@v1 ─► iv_history@v2 ─┐
 volatility/ibkr_iv30 ────────────────────────┼─► rollups/instrument/ibkr_iv@v1 ─────────────────────────────────────────────────────────────────────────────────┴─► iv_rank (+ source)
 events/earnings ─────────────────────────────┴─► rollups/instrument/earnings@v1     (next date, days to it)
 ```
@@ -337,12 +337,15 @@ readable until `algotrade-ingest retire-features --group <name>@v1` deletes them
 | `div_yield@v1` | `div_yield` (the materialised expression feature) | `dividends@v2`, `price_stats@v2` | built |
 | `iv30@v1` | `iv30` (ours), `iv30_cboe`, `iv30_status`, `near_expiry`, `far_expiry`, `atm_strike_near`, `spot`, `rate`, `div_yield`, `n_quotes_used` | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `div_yield@v1` | built |
 | `iv_history@v2` | `iv30`, `iv_rank_252d`, `iv_percentile_252d`, `history_days`, `rank_status` (UNKNOWN / PROVISIONAL / FULL) | `iv30@v1` over 252 sessions | built |
-| `fundamentals@v2` | `shares_outstanding`, `shares_as_of`, `shares_filed`, `shares_source` (dei / weighted_basic), `market_cap_status` (OK / NO_SHARES / STALE / NO_PRICE) | `instruments/shares` (filed on or before the session), `price_stats@v2` close, `events/split`; `stale_days` in `config/site/rollups.toml` | built |
-| `financials@v1` | `revenue_ttm`, `revenue_ttm_year_ago`, `net_income_ttm`, `eps_diluted_ttm`, `revenue_fy`, `revenue_fy_end`, `ttm_as_of`, `ttm_filed`, `ttm_basis` (QUARTERS / ANNUAL), `eps_stale`, `is_adr`, `financials_status` (OK / PARTIAL / NO_TTM / NO_FACTS / STALE) | `instruments/shares` financial concepts (filed on or before the session), `price_stats@v2` (which instruments get a row), `events/split`, `instruments/reference` (security type); `stale_days`, `history_days` in `config/site/rollups.toml` | built |
+| `fundamentals@v3` | `shares_outstanding`, `shares_outstanding_year_ago`, `shares_as_of`, `shares_filed`, `shares_source` (dei / weighted_basic), `market_cap_status` (OK / NO_SHARES / STALE / NO_PRICE) | `instruments/shares` (filed on or before the session), `price_stats@v2` close, `events/split`; `stale_days` in `config/site/rollups.toml` | built |
+| `financials@v2` | `revenue_ttm`, `revenue_ttm_year_ago`, `net_income_ttm`, `eps_diluted_ttm`, `eps_diluted_ttm_year_ago`, `revenue_fy`, `revenue_fy_end`, `ttm_as_of`, `ttm_filed`, `ttm_basis` (QUARTERS / ANNUAL), `revenue_qtr`, `revenue_qtr_year_ago`, `eps_diluted_qtr`, `eps_diluted_qtr_year_ago`, `qtr_as_of`, `eps_stale`, `is_adr`, `financials_status` (OK / PARTIAL / NO_TTM / NO_FACTS / STALE) | `instruments/shares` financial concepts (filed on or before the session), `price_stats@v2` (which instruments get a row), `events/split`, `instruments/reference` (security type); `stale_days`, `history_days` in `config/site/rollups.toml` | built |
 | `put_wing@v1` | `wing_status` (OK / OUTSIDE_BAND / NO_SPOT / NO_CHAIN / NO_EXPIRY / NO_STRIKE), `target_expiry` + `target_dte` (nearest 45 days in 30..60, standard monthlies first), `n_unpriced`; band totals of the puts with OUR \|delta\| in 0.08..0.15 (`n_strikes`, `wing_oi`, `wing_volume`, `wing_spread_pct`); the best put among 0.05..0.35 delta, nearest the band then by cash-secured ROC (`delta_band_distance`, `best_put_strike`, `_delta`, `_iv`, `_mid`, `_oi`, `_volume`, `_spread_pct`, `_roc`) | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `div_yield@v1` | built |
 | `chain_flow@v1` | `flow_status` (OK / NO_CHAIN); `call_volume`, `put_volume` (every expiry, 0-DTE included), `call_oi`, `put_oi` (`dte >= 1`), `next_exp_call_volume`, `next_exp_put_volume` (first listed expiry 1+ days out); the unusual-activity columns `unusual_contracts` (volume above OI and at least `min_unusual_volume`), `max_vol_oi_ratio`, `unusual_premium_usd` ([positioning.md](positioning.md)) | the session's `chains/option_quotes` (+ `chains/underlying_quotes`: a quoted name without a chain reads NO_CHAIN); `min_unusual_volume` in `config/site/rollups.toml` | built |
 | `flow_history@v1` | `option_volume_rel_20d` (today's option volume over the mean of the earlier sessions), `pc_volume_ratio_20d`, `flow_history_days`; null until 10 of the last 20 sessions have a chain (stored from 2026-10-02 only) | `chain_flow@v1` over 20 sessions; `window`, `min_sessions` in `config/site/rollups.toml` | built |
 | `implied_move@v1` | `move_status` (OK / NO_SPOT / NO_CHAIN / NO_EXPIRY / NO_QUOTES / WIDE_SPREADS), `implied_move` (the at-the-money straddle over the spot), `straddle_mid`, `move_expiry`, `move_dte`, `move_basis` (EARNINGS: the first expiry covering the next report; TERM: nearest 30 days) ([positioning.md](positioning.md)) | the session's `chains/option_quotes` + `chains/underlying_quotes` (close, else price), `earnings@v1`; `max_dte`, `target_dte`, `max_spread_pct` in `config/site/rollups.toml` | built |
+| `skew@v1` | `skew_status` (OK / SINGLE_EXPIRY / NO_SPOT / NO_CHAIN / NO_EXPIRY / NO_ATM / NO_WING); `skew` ((put vol at delta -0.25 - call vol at +0.25) / ATM vol, at 30 days), `iv_25p`, `iv_25c`, `iv_atm`; `ne_skew`, `ne_dte` (the next expiry, no interpolation) ([positioning.md](positioning.md)) | the session's `chains/option_quotes` (smile quotes only), `rates/treasury`, `chains/underlying_quotes` (close, else price), `div_yield@v1`; `target_days`, `min_days`, `max_days`, `max_spread_pct` in `config/site/rollups.toml` | built |
+| `skew_history@v1` | `skew_rank_252d`, `skew_percentile_252d`, `history_days`, `skew_rank_status` (UNKNOWN below 60 sessions with a skew, PROVISIONAL below 252, FULL); every name UNKNOWN until about the end of 2026 (chains stored from 2026-10-02) | `skew@v1` over 252 sessions; `window`, `min_provisional` in `config/site/rollups.toml` | built |
+| `iv_term@v1` | `iv_term_status` (OK / NO_SPOT / NO_CHAIN / NO_NEXT / NO_90D); `iv_next` (the ATM vol at the next expiry), `iv_90d` (the constant 90-day ATM vol, `iv30`'s method over the expiries 30 to 180 days out) ([positioning.md](positioning.md)) | the same chain inputs as `iv30@v1`; `iv30@v1`'s keys with a 90-day target in `config/site/rollups.toml` | built |
 | `call_wing@v1` | the covered-call mirror of `put_wing@v1`, by the same search: `wing_status`, `target_expiry` + `target_dte`, `n_unpriced`; band totals of the calls with OUR delta in 0.15..0.30 (`n_strikes`, `wing_oi`, `wing_volume`, `wing_spread_pct`); the best call among 0.05..0.50 delta, nearest the band then by premium yield mid / spot, then OI, then the higher strike (`delta_band_distance`, `best_call_strike`, `_delta`, `_iv`, `_mid`, `_oi`, `_volume`, `_spread_pct`, `_yield`) | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `div_yield@v1` | built |
 | `price_moves@v1` | `one_day_move`: the largest \|close-to-close return\| over the last 20 sessions | `bars/1d` split-adjusted as of the session, 20 sessions back | built |
 | `momentum@v1` | `atr_14`, `rsi_14` (Wilder, 150-session warm-up), `ret_5d`, `rel_volume` (vs the 20 sessions before), `high_20d`, `low_20d`, `high_50d`, `low_50d`, `prior_high_20d` ([swing.md](swing.md)) | `bars/1d` split-adjusted as of the session, 149 sessions back | built |
@@ -353,13 +356,14 @@ readable until `algotrade-ingest retire-features --group <name>@v1` deletes them
 | `gaps@v1` | `gap_open_pct` (today's open vs the previous close), `gap_above` / `gap_above_date` (nearest unfilled down gap above the close), `gap_below` / `gap_below_date` (nearest unfilled up gap below it) ([swing.md](swing.md)) | `bars/1d` split-adjusted as of the session, 252 sessions back | built |
 | `bands@v2` | `ema_10/20/50/200`, `sma_150`, `ema20_slope_5d`, `ema50_slope_10d`, `sma200_slope_20d`, `close_std_20`, `bb_width_pctile_252d` (the squeeze: the bandwidth's rank against the year), `band_walk` (signed sessions outside the bands) ([technical.md](technical.md)) | `bars/1d` split-adjusted as of the session, 399 sessions back | built |
 | `trend_stats@v2` | `ret_1d/3d/10d/120d/252d`, `mom_12_1` (12-1 momentum), `mom_accel_5d`, `ret_z_20d`, `high_100d`, `low_100d`, `high_200d`, `low_200d`, `prior_high_50d`, `prior_low_20d`, `prior_low_50d`, `sessions_since_high_20d`, `close_range_pos`, `trend_r2_90d`, `reg_slope_90d_ann`, `close_streak`, `sma20_streak`, `tight_range_sessions` ([technical.md](technical.md)) | `bars/1d` split-adjusted as of the session, 252 sessions back | built |
+| `candle@v1` | `body_share`, `upper_wick_share`, `lower_wick_share`, `body_vs_avg_20d`, `bar_relation`, `prev_bar_relation`, `candle` ([technical.md](technical.md)) | `bars/1d` split-adjusted as of the session, 20 sessions back | built |
 | `vol_stats@v1` | `atr_5`, `atr_20`, `hv10`, `hv60`, `hv20_pctile_252d`, `adv_shares_60d`, `volume_pctile_252d`, `pocket_pivot` ([technical.md](technical.md)) | `bars/1d` split-adjusted as of the session, 272 sessions back | built |
 | `relative_strength@v1` | `rs_spy_63d`, `rs_spy_252d`, `rs_line_high_252d`, `rs_spy_trend_20d` (relative strength against SPY), `ret_5d_pctile`, `mom_pctile_63d`, `mom_pctile_252d` (the return's rank among the universe's stocks), `sector_etf`, `sector_ret_63d`, `rs_sector_63d`, `sector_rank_63d` (the sector ETF and the name against it) ([technical.md](technical.md)) | `bars/1d` split-adjusted as of the session, 252 sessions back; `instruments/symbol_ids` (SPY and the sector ETFs), `universe` (the population of the percentiles), `instruments/company` (sector); `min_members`, `min_sector_etfs` in `config/site/rollups.toml` | built |
 | `anchored_vwap@v2` | `avwap_earnings`, `avwap_anchor_date` (v1), `avwap_swing_low`, `avwap_swing_high` (VWAP from the swing pivots `swing_levels@v1` found) | `events/earnings`, `bars/1d` split-adjusted as of the session, 251 sessions back, `swing_levels@v1` | built |
 | `oi_walls@v1` | `wall_status` (OK / PARTIAL / NO_OI / NO_SPOT / NO_CHAIN / NO_EXPIRY), `call_wall` + `call_wall_oi` (most call OI at or above spot), `put_wall` + `put_wall_oi` (most put OI at or below spot); OI summed across expiries 1..60 days out, ties nearer spot | the session's `chains/option_quotes`, `chains/underlying_quotes` | built |
 | `nearest_expiry@v1` | `expiry_date` (the nearest listed expiry on or after the session; 0-DTE counts), `dte` (calendar days to it), `sessions_to_expiry` (exchange sessions after the session up to it); a row per underlying with a chain, null when every listed expiry is past. `feature.earnings_before_expiry` (`config/site/features/earnings.toml`) compares it with `earnings@v1.next_earnings_date` | the session's `chains/option_quotes` | built |
 
-**`fundamentals@v2` rules.** Among facts FILED on or before the session: the latest cover
+**`fundamentals@v3` rules.** Among facts FILED on or before the session: the latest cover
 count (`dei`; latest filed, then latest period end, so an amendment wins) while the company
 still tags it (its latest `dei` filing is no older than its latest weighted average), else the
 latest filing's weighted average basic. Splits after the count multiply it (after
@@ -369,11 +373,17 @@ null, not an error), `STALE` (period end more than `stale_days`, 400, before the
 the count is still shown) and `NO_PRICE` have a null market cap. Counts are company totals,
 so a class's market cap is the total times its own close (fine for GOOGL / GOOG, wrong for
 classes at very different prices, such as BRK.A / BRK.B). One row per instrument with a
-`price_stats@v2` row or a share count.
+`price_stats@v2` row or a share count. `shares_outstanding_year_ago` is the count of the same
+concept (a cover count against a cover count, a weighted average against a weighted average)
+among the facts filed by the session whose period ended 9 to 15 months before `shares_as_of`,
+the one closest to a year (a later filing of that period, an amendment, wins a tie); split-adjusted
+by the same rule as the current count, so a split in between is not dilution; null when none.
+The expression `shares_change_yoy = shares_outstanding / shares_outstanding_year_ago - 1` is
+negative for buybacks and positive for dilution, null for a stale count.
 
-**`financials@v1` rules.** Among facts FILED on or before the session (a filing counts for
+**`financials@v2` rules.** Among facts FILED on or before the session (a filing counts for
 the session of its filing date, even one made in the evening: the same few-hours look-ahead as
-`fundamentals@v2`), each (concept, tag, period) takes its latest known value (a restatement
+`fundamentals@v3`), each (concept, tag, period) takes its latest known value (a restatement
 counts from its filing date). Per concept a TTM is: (1) `QUARTERS`: the sum of the last four
 consecutive discrete quarters, when the newest quarter ends on or after the newest fiscal year;
 a discrete quarter is a reported three-month fact (the best revenue tag first), else the
@@ -399,7 +409,20 @@ non-USD issuers; every value null, never an error), `NO_TTM` (facts but no TTM c
 ended more than `stale_days`, 480, before the session; values still shown), else `OK`.
 `ttm_as_of`, `ttm_filed` and `ttm_basis` describe that same first TTM (revenue's, normally).
 `eps_stale` says the EPS TTM itself is stale, and `is_adr` that the instrument is an ADR
-(`instruments/reference` security type). The expression feature
+(`instruments/reference` security type). `eps_diluted_ttm_year_ago` is the EPS TTM a year
+earlier (by the same assembly: four quarters ending 340 to 380 days before the EPS TTM, or the
+previous fiscal year). The latest quarter (`revenue_qtr`, `eps_diluted_qtr`) is the newest
+discrete quarter: a 10-Q's three-month figure as filed, or at a 10-K the fourth quarter as the
+annual figure minus the nine months of the same tag (the subtraction above, with its 150-day
+restatement guard; for revenue and net income the same as the annual minus the three quarters);
+null when the annual figure is newer than the newest quarter (a Q4 that cannot be derived),
+when the newest quarter ended more than `stale_days` before the session, or, per concept, when
+that concept's newest quarter is older than the other's (`qtr_as_of` is the one quarter every
+non-null quarter column describes). `revenue_qtr_year_ago` / `eps_diluted_qtr_year_ago` are the
+discrete quarter ending 340 to 380 days before it. The expression features `eps_growth_yoy`
+(EPS TTM against its year-ago, null when the year-ago EPS is 0 or negative or the EPS is stale),
+`revenue_growth_qtr_yoy` and `eps_growth_qtr_yoy` (null when the year-ago quarter is 0 or, for
+EPS, not positive) read them. The expression feature
 `pe_ratio = close / eps_diluted_ttm` is null when `eps_diluted_ttm` is missing or not positive
 (a negative P/E is not shown), when the close is not positive, when `eps_stale`, and for an ADR:
 an ADR's EPS is per ordinary share and the ADR ratio is not stored. Every instrument of a CIK

@@ -18,7 +18,9 @@ def test_config_list(graph: Graph) -> None:
     body = graph(CONFIGS)
     assert "errors" not in body
     configs = {c["configId"]: c for c in body["data"]["configs"]}
-    assert set(configs) == {"short_premium_liquidity", "sma_trend", "vrp_scanner"}
+    ta = {"breakout", "pullback", "support_reversal", "exhaustion", "trend_continuation",
+          "range_breakout", "failed_breakout", "oversold_reversal"}  # fmt: skip
+    assert set(configs) == {"short_premium_liquidity", "sma_trend", "vrp_scanner"} | ta
     assert (configs["sma_trend"]["kind"], configs["sma_trend"]["scope"]) == ("strategy", "site")
     assert configs["sma_trend"]["selection"] == "liquid_optionable"
     assert len(configs["sma_trend"]["hash"]) == 64 and configs["sma_trend"]["error"] is None

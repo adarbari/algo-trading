@@ -24,7 +24,7 @@
       "rollups/instrument/iv30@v1",
       "rollups/instrument/dividends@v2",
       "rollups/instrument/iv_history@v2",
-      "rollups/instrument/fundamentals@v2"
+      "rollups/instrument/fundamentals@v3"
     ],
     "cells": [
       {
@@ -928,7 +928,7 @@
         "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
-        "dataset": "rollups/instrument/fundamentals@v2",
+        "dataset": "rollups/instrument/fundamentals@v3",
         "session": "2026-09-21",
         "status": "COMPLETE",
         "present": 12965,
@@ -937,7 +937,7 @@
         "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
-        "dataset": "rollups/instrument/fundamentals@v2",
+        "dataset": "rollups/instrument/fundamentals@v3",
         "session": "2026-09-22",
         "status": "COMPLETE",
         "present": 12950,
@@ -946,7 +946,7 @@
         "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
-        "dataset": "rollups/instrument/fundamentals@v2",
+        "dataset": "rollups/instrument/fundamentals@v3",
         "session": "2026-09-23",
         "status": "COMPLETE",
         "present": 12959,
@@ -955,7 +955,7 @@
         "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
-        "dataset": "rollups/instrument/fundamentals@v2",
+        "dataset": "rollups/instrument/fundamentals@v3",
         "session": "2026-09-24",
         "status": "COMPLETE",
         "present": 12984,
@@ -964,7 +964,7 @@
         "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
-        "dataset": "rollups/instrument/fundamentals@v2",
+        "dataset": "rollups/instrument/fundamentals@v3",
         "session": "2026-09-25",
         "status": "COMPLETE",
         "present": 12979,
@@ -973,7 +973,7 @@
         "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
-        "dataset": "rollups/instrument/fundamentals@v2",
+        "dataset": "rollups/instrument/fundamentals@v3",
         "session": "2026-09-28",
         "status": "COMPLETE",
         "present": 12945,
@@ -982,7 +982,7 @@
         "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
-        "dataset": "rollups/instrument/fundamentals@v2",
+        "dataset": "rollups/instrument/fundamentals@v3",
         "session": "2026-09-29",
         "status": "COMPLETE",
         "present": 12949,
@@ -991,7 +991,7 @@
         "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
-        "dataset": "rollups/instrument/fundamentals@v2",
+        "dataset": "rollups/instrument/fundamentals@v3",
         "session": "2026-09-30",
         "status": "COMPLETE",
         "present": 12964,
@@ -1000,7 +1000,7 @@
         "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
-        "dataset": "rollups/instrument/fundamentals@v2",
+        "dataset": "rollups/instrument/fundamentals@v3",
         "session": "2026-10-01",
         "status": "COMPLETE",
         "present": 12949,
@@ -1009,7 +1009,7 @@
         "runIds": ["rollups-2026-10-02-20261003T194554Z"]
       },
       {
-        "dataset": "rollups/instrument/fundamentals@v2",
+        "dataset": "rollups/instrument/fundamentals@v3",
         "session": "2026-10-02",
         "status": "COMPLETE",
         "present": 12966,

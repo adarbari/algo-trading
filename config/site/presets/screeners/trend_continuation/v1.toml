@@ -1,0 +1,83 @@
+# Trend continuation: a stacked uptrend that is outperforming the market and whose range is not
+# drying up (owner's screen, 2026-10-06; docs/data/technical.md "Presets"). What it finds: the
+# trend's leaders. What it does not check: how extended each is (pair with pullback or
+# breakout), earnings. The 50-session return is rollup price_stats ret_60d (the nearest stored).
+# Immutable: change it by adding v2.toml (architecture/preset_versions.toml).
+# Run on request or nightly like every site screener (ADR 0033); an identification layer,
+# not a trade signal.
+id = "trend_continuation"
+kind = "screener"
+impl = "rules"
+version = 1
+name = "Trend continuation"
+
+# ------------------------------------------------ who is screened and tradeable (the site base gates;
+# no liquidity_class: it bundles option liquidity, and these are stock-chart screens)
+[criteria.security_type]
+field = "instrument.security_type"
+op = "in"
+value = ["COMMON_STOCK", "ADR", "ETF"]
+
+[criteria.status]
+field = "instrument.status"
+op = "eq"
+value = "ACTIVE"
+
+[criteria.price]
+field = "rollup.price_stats@v2.close"
+op = "gt"
+value = 5
+
+[criteria.adv]
+field = "rollup.price_stats@v2.adv_usd_20d"
+op = "gte"
+value = 50_000_000
+mode = "soft"
+tolerance = { relative = 0.2 }    # $40M-$50M is a near miss
+on_miss = "LIQUIDITY_RISK"
+
+# ------------------------------------------------------------------------ the setup
+[criteria.ema_stack]
+field = "feature.ema_stack"
+op = "eq"
+value = "BULL"
+
+[criteria.ret_20d]
+field = "rollup.price_stats@v2.ret_20d"
+op = "gt"
+value = 0
+
+[criteria.ret_60d]
+field = "rollup.price_stats@v2.ret_60d"
+op = "gt"
+value = 0
+
+[criteria.rs_spy]
+field = "rollup.relative_strength@v1.rs_spy_63d"
+op = "gt"
+value = 0
+
+[criteria.above_ema20]
+field = "feature.pct_vs_ema_20"
+op = "gt"
+value = 0
+
+[criteria.atr_ok]
+field = "feature.atr_ratio_5_20"
+op = "gte"
+value = 0.8
+
+[columns]
+close = "rollup.price_stats@v2.close"
+pct_vs_ema_20 = "feature.pct_vs_ema_20"
+stretch_sma20_atr = "feature.stretch_sma20_atr"
+ret_5d = "rollup.momentum@v1.ret_5d"
+ret_20d = "rollup.price_stats@v2.ret_20d"
+mom_accel_5d = "rollup.trend_stats@v2.mom_accel_5d"
+rel_volume = "rollup.momentum@v1.rel_volume"
+atr_ratio_5_20 = "feature.atr_ratio_5_20"
+rsi_14 = "rollup.momentum@v1.rsi_14"
+rs_spy_63d = "rollup.relative_strength@v1.rs_spy_63d"
+
+[rank]
+tie_break = "rollup.relative_strength@v1.rs_spy_63d"

@@ -67,7 +67,7 @@ left out with the field that covers it. Screener presets come last (section "Pre
 | | sector momentum, sector relative strength | `relative_strength@v1`: `sector_etf`, `sector_ret_63d`, `sector_rank_63d`, `rs_sector_63d`; `feature.sector_leader` |
 | Options | IV, IV rank, IV percentile, IV / HV, IV - HV spread | `iv30`, `iv_rank`, `iv_percentile`, `iv_hv_ratio`, `iv_hv_spread`, the `vrp_*` set |
 | | OI, option volume, spread, delta, DTE | `option_liquidity`, `put_wing`, `oi_walls`, `nearest_expiry` |
-| | skew, expected move | `skew@v1`, `implied_move@v1` (planned, positioning.md) |
+| | skew, skew rank, expected move, term structure | `skew.skew`, `feature.skew_rr25`, `skew_history.skew_rank_252d`, `implied_move.implied_move`, `feature.term_ratio_30_90`, `feature.term_ratio_next_30` (positioning.md; built) |
 | | strike distance from support, / ATR | `feature.put_support_cushion` ((best put strike... see swing.toml: (swing_low - best_put_strike) / close) and `feature.put_support_cushion_atr` (/ atr_14) |
 | | covered call: strike above the close, above resistance, premium yield | `call_wing` (`best_call_strike`, `best_call_yield`), `feature.call_otm_pct`, `feature.cc_yield_annualised`, `feature.call_strike_above_resistance`, `feature.cc_resistance_cushion_atr` |
 | | ex-dividend before expiry (early assignment, a dividend a put misses) | `dividend_schedule.next_ex_date`, `feature.ex_div_before_expiry` (the put / call wing's target expiry), `feature.ex_div_before_nearest_expiry` |
@@ -86,13 +86,13 @@ table: `out/feature-gap-survey.md` in the working tree). What it adds to the tra
 | `sma_150` and `pct_vs_sma_150` (Minervini's template, Weinstein's 30-week average) | `bands@v2` | built (TA track 1b) |
 | `trend_r2_90d`, `reg_slope_90d_ann`, `clenow_momentum_90d` (Clenow's trend quality and pace) | `trend_stats@v2` | built (TA track 1b) |
 | `pocket_pivot` (Morales and Kacher) | `vol_stats@v1` | built |
-| `ps_ratio`, `net_margin`, `payout_ratio` | `fundamentals.toml` expressions over stored facts | planned |
-| quarterly EPS and revenue growth yoy (CAN SLIM C / A) | `financials@v2` | planned |
-| `shares_change_yoy` (buybacks / dilution) | `fundamentals@v3` | planned |
+| `ps_ratio`, `net_margin`, `payout_ratio` | `fundamentals.toml` expressions over stored facts | built |
+| quarterly EPS and revenue growth yoy (CAN SLIM C / A) | `financials@v2` | built |
+| `shares_change_yoy` (buybacks / dilution) | `fundamentals@v3` | built |
 | balance-sheet and cash-flow facts (equity, assets, debt, OCF, capex, gross profit) and `roe`, `roa`, `pb_ratio`, `debt_to_equity`, `fcf_yield`, `gross_profitability` | `balance_sheet@v1` (corporate/; the companyfacts document is already fetched whole) | planned |
 | unusual options activity at chain level (`unusual_contracts`, `max_vol_oi_ratio`, `unusual_premium_usd`) | `chain_flow@v1` (positioning.md) | planned |
 | `iv30_chg_1d`, `iv30_chg_5d` | `iv_history@v3` | planned |
-| bar shape (body and wick shares, inside / outside bar) and the six named candles (hammer, shooting star, doji, bullish / bearish engulfing, inside-day breakout) | `candle@v1`, new folder `patterns/` | planned |
+| bar shape (body and wick shares, inside / outside bar) and the six named candles (hammer, shooting star, doji, bullish / bearish engulfing, inside-day breakout) | `candle@v1`, new folder `patterns/` | built |
 
 Left out as window variants or covered: IBD's RS rating (the percentiles cover it), RSI(2),
 CCI / MFI / stochastics, Hurst and efficiency ratios, the other TA-Lib candles, chart-pattern
@@ -103,11 +103,28 @@ interest and days to cover (FINRA files, free), float and insider / institutiona
 
 ## Presets
 
-Once the inputs above exist, the eight rule screens the owner described (breakout, pullback,
-support reversal, exhaustion, trend continuation, range breakout, failed breakout, oversold
-reversal) are site presets in `config/site/presets/` (`add-screener`), each criterion a
-catalogue field with its guide threshold. They are the last PR of the track; a preset that
-needs a field this table marks planned waits for that field.
+The eight rule screens the owner described (2026-10-06) are site presets
+(`config/site/presets/screeners/<id>/v1.toml`, `add-screener`; rule grammar in
+[rules.md](../screeners/rules.md)), each criterion a catalogue field with the owner's number
+or the field guide's threshold. Each opens with the site base gates (security type, ACTIVE,
+price > $5, ADV >= $50M as a soft `LIQUIDITY_RISK` near miss); `feature.liquidity_class` is
+not used, because it bundles option liquidity (a liquid stock with no options is LOW) and
+these are stock-chart screens. Every criterion is hard unless marked. Where a line has no
+field, it is left out and said so in the preset's header comment.
+
+| Preset | Setup (beyond the base gates) | Left out or approximated |
+|---|---|---|
+| `breakout` | `breakout_magnitude_20d` > 0; `dist_to_high_50d` >= -3%; `ret_5d`, `ret_20d`, `mom_accel_5d` > 0; `rel_volume` > 1.25; `atr_ratio_5_20` >= 1.1; `close_range_pos` > 0.7; `stretch_sma20_atr` <= 3 (soft) | "volume above the 20-session average" (implied by `rel_volume`); the 20 EMA stretch is measured from the SMA20 |
+| `pullback` | `ret_20d`, `ret_60d` > 0; `ema_stack` BULL; `stretch_sma20_atr` in [-0.5, 0.5] (soft); `pullback_atr_20d` <= 1.5; `sessions_since_high_20d` <= 10; `volume_ratio_5d_20d` < 1; `dist_to_support_atr` <= 1; `trend_state` UPTREND; `mom_accel_5d` >= -0.03 (soft); `rs_spy_63d` > 0 | the 50-session return is `ret_60d`; the EMA20 distance is from the SMA20; "volume below the advance" is the 5 / 20-day ratio below 1 |
+| `support_reversal` | `dist_to_support_atr` < 0.5; `support_touches` >= 2; `ret_5d` < 0; `mom_accel_5d` > 0; `ret_1d` > 0; `close_range_pos` > 0.6; `rel_volume` >= 1; `rs_spy_trend_20d` > 0; `put_support_cushion_atr` >= 1 (score, the put seller's cushion) | none |
+| `exhaustion` (reversal) | `ret_5d_pctile` >= 0.9; `stretch_sma20_atr` > 2; `rsi_14` > 70; `rel_volume` > 1.5; `atr_ratio_5_20` > 1.1; `bb_pct_b` >= 0.95; `mom_accel_5d` < 0 | the continuation case is the same screen with `mom_accel_5d` > 0 (copy it in the Builder) |
+| `trend_continuation` | `ema_stack` BULL; `ret_20d`, `ret_60d` > 0; `rs_spy_63d` > 0; `pct_vs_ema_20` > 0; `atr_ratio_5_20` >= 0.8 | the 50-session return is `ret_60d` |
+| `range_breakout` | `atr_ratio_5_20` <= 0.85; `bb_width_pctile_252d` <= 0.15; `dist_to_resistance_atr` <= 1; `rel_volume` >= 1.2; `mom_accel_5d` > 0 and `ret_5d` > 0 | none (nothing confirms the direction of the break) |
+| `failed_breakout` | `breakout_failed` true; `sessions_since_breakout` <= 10 (soft, 5 tolerance); `rel_volume` >= 1.2; `mom_accel_5d` < 0; `dist_to_resistance_atr` <= 1 | "yesterday above the 20-session high, today below" is approximated by `breakout_failed` (any close below the level since the latest breakout of the last 60 sessions) plus the recency gate |
+| `oversold_reversal` | `ret_5d_pctile` <= 0.1; `rsi_14` < 30; `dist_to_support` > 0; `pct_vs_sma_200` > 0 (soft, 5 pts) and `trend_state` != DOWNTREND (score); `mom_accel_5d` > 0; `volume_z_20d` >= 2 (`rel_volume` >= 1.5 scores); `ret_1d` > 0 | the "or" in the volume spike: one field gates, the other scores; `dist_to_support` > 0 also drops names at a one-year low (no swing low below) |
+
+A preset is an identification layer, not a trade signal: none checks earnings, news or the
+market regime.
 
 ## Where the columns live
 
@@ -118,6 +135,7 @@ folder per kind of thing; `architecture/layout.toml`):
 |---|---|---|---|
 | `bands@v2` | `price/` | `ema_10/20/50/200`, `sma_150`, `ema20_slope_5d`, `ema50_slope_10d`, `sma200_slope_20d`, `close_std_20`, `bb_width_pctile_252d`, `band_walk` | built |
 | `trend_stats@v2` | `price/` | `ret_1d/3d/10d/120d/252d`, `mom_12_1`, `mom_accel_5d`, `ret_z_20d`, `high_100d`, `low_100d`, `high_200d`, `low_200d`, `prior_high_50d`, `prior_low_20d`, `prior_low_50d`, `sessions_since_high_20d`, `close_range_pos`, `trend_r2_90d`, `reg_slope_90d_ann`, `close_streak`, `sma20_streak`, `tight_range_sessions` | built |
+| `candle@v1` | `patterns/` | `body_share`, `upper_wick_share`, `lower_wick_share`, `body_vs_avg_20d`, `bar_relation`, `prev_bar_relation`, `candle` | built |
 | `swing_levels@v1` | `levels/` (moved from `price/`) | unchanged | built |
 | `pivot_strength@v1` | `levels/` | `resistance_touches`, `support_touches`, `resistance_age`, `support_age`, `pivot_structure` | built ([swing.md](swing.md)) |
 | `retest@v1` | `levels/` | `breakout_date`, `breakout_level`, `sessions_since_breakout`, `retest_state`, `failed_breakouts_252d` | built ([swing.md](swing.md)) |
@@ -126,9 +144,11 @@ folder per kind of thing; `architecture/layout.toml`):
 | `volume_profile@v1` | `activity/` | `profile_status`, `poc_252d`, `value_area_high`, `value_area_low`, `hvn_above`, `hvn_below`, `lvn_above`, `lvn_below`, `volume_near_close_share` | built |
 | `anchored_vwap@v2` | `price/` | v1 + `avwap_swing_low`, `avwap_swing_high` | built |
 | `relative_strength@v1` | `relative/` | `rs_spy_63d`, `rs_spy_252d`, `rs_line_high_252d`, `rs_spy_trend_20d`, `ret_5d_pctile`, `mom_pctile_63d`, `mom_pctile_252d`, `sector_etf`, `sector_ret_63d`, `rs_sector_63d`, `sector_rank_63d` | built |
-| `chain_flow@v1`, `flow_history@v1`, `skew@v1`, `skew_history@v1`, `implied_move@v1`, `iv_term@v1` | `positioning/` | [positioning.md](positioning.md) | planned |
+| `chain_flow@v1`, `flow_history@v1`, `skew@v1`, `skew_history@v1`, `implied_move@v1`, `iv_term@v1` | `positioning/` | [positioning.md](positioning.md) | built |
 | `call_wing@v1` | `options/` | the covered-call mirror of `put_wing@v1` (shared search in `wing_search`): `wing_status`, `target_expiry`, `target_dte`, `n_unpriced`, `n_strikes`, `wing_oi`, `wing_volume`, `wing_spread_pct`, `delta_band_distance`, `best_call_strike`, `_delta`, `_iv`, `_mid`, `_oi`, `_volume`, `_spread_pct`, `_yield` | built |
 | `dividend_schedule@v1` | `corporate/` | `dividend_status`, `next_ex_date`, `next_div_amount`, `days_to_ex_date`, `next_pay_date` | built |
+| `financials@v2` | `corporate/` | v1 + `eps_diluted_ttm_year_ago`, `revenue_qtr`, `revenue_qtr_year_ago`, `eps_diluted_qtr`, `eps_diluted_qtr_year_ago`, `qtr_as_of` | built |
+| `fundamentals@v3` | `corporate/` | v2 + `shares_outstanding_year_ago` | built |
 
 Formulas over stored columns are expression features (computed on read):
 `config/site/features/bands.toml` (bands, channels, z-scores, stretches),
@@ -204,6 +224,37 @@ Worked examples: 60 closes rising every day give `close_streak` 59 and `sma20_st
 -1% (sample stdev 0.01026) and a +3% session is 2.92; a 2% daily range with one spike high 30
 sessions ago gives `tight_range_sessions` 10 (the spike left the 20-session window 10
 sessions ago).
+
+## `candle@v1` (patterns/)
+
+Inputs: `bars/1d`, the session plus 20 earlier sessions. Params (`config/site/rollups.toml`):
+`doji_body` (0.1: a body at most this share of the range), `hammer_wick` (2.0: the long wick at
+least this many bodies), `small_body` (0.3: the other wick at most this share of the range),
+`engulf_min_body` (0.5: an engulfing body at least this many 20-session average bodies). Every
+column reads the session's open, high, low and close (and the previous bar where said).
+
+| Column | Definition | Null when |
+|---|---|---|
+| `body_share` | \|close - open\| / (high - low), 0 to 1 | the bar has no range |
+| `upper_wick_share`, `lower_wick_share` | (high - max(open, close)) / range and (min(open, close) - low) / range, 0 to 1 | the bar has no range |
+| `body_vs_avg_20d` | \|close - open\| / the mean \|close - open\| of the 20 sessions before; 1 is a usual body | a session among the 20 before has no bar, the history is shorter, or the mean is zero |
+| `bar_relation` | INSIDE (high <= previous high and low >= previous low), OUTSIDE (high > previous high and low < previous low), UP_GAP (low > previous high), DOWN_GAP (high < previous low), else OVERLAP; tested in that order | the previous session has no bar |
+| `prev_bar_relation` | the same label for the previous session against the one before it | the previous session or the one before has no bar |
+| `candle` | the first matching of the order below, else NONE | the bar has no range, or the previous session has no bar |
+
+Precedence of `candle`: (1) BULLISH_ENGULFING: close > open, previous close < previous open,
+open <= previous close, close >= previous open, body >= `engulf_min_body` x the 20-session
+average body; (2) BEARISH_ENGULFING: the mirror; (3) HAMMER: lower wick >= `hammer_wick` x body,
+upper wick share <= `small_body`, body share > `doji_body`; (4) SHOOTING_STAR: the mirror with
+the upper wick; (5) DOJI: body share <= `doji_body`; (6) NONE. An unknown average body never
+matches an engulfing candle (the bar then reads on to the later tests; the label is not null
+for it). The inside-day breakout is not a candle but the expression `inside_day_breakout`
+(`ret_1d > 0` and `prev_bar_relation` INSIDE); `strong_close` is `close_range_pos >= 0.7` and
+`body_share >= 0.5` (both in `config/site/features/swing.toml`).
+
+Worked example: open 100, high 101.2, low 95, close 101 after 20 sessions of body 1: body
+share 1 / 6.2 = 0.16, lower wick 5 (5 bodies, share 0.81), upper wick share 0.03: HAMMER;
+`body_vs_avg_20d` 1.0.
 
 ## `relative_strength@v1` (relative/)
 
@@ -340,6 +391,40 @@ Expression features: `call_otm_pct` = (strike - close) / close; `cc_yield_annual
 yield and the early-assignment risk are separate questions: `ex_div_before_expiry` says a known
 ex-dividend date falls before the target expiry (the dividend can be taken early from a
 short call, an in-the-money one most of all).
+
+## `financials@v2` / `fundamentals@v3` (corporate/)
+
+Built from the SEC facts already stored (`instruments/shares`, point in time by filing date;
+nothing new is fetched). Expressions over stored columns, no code: `ps_ratio` (market cap /
+TTM revenue; null on a missing, zero or stale revenue), `net_margin` (net income / revenue
+TTM), `payout_ratio` (`dividends.div_ttm` / EPS TTM: null when the EPS is 0, missing, stale or
+an ADR; a negative value is a payer with negative earnings, so a safe-dividend rule is
+`between 0 and 0.6`, never a bare `lt 0.6`).
+
+`financials@v2` keeps every v1 column and adds the EPS TTM a year earlier
+(`eps_diluted_ttm_year_ago`, the same assembly as `revenue_ttm_year_ago`: four quarters ending
+340 to 380 days before the EPS TTM, or the previous fiscal year) and the latest quarter. The
+quarter is the newest discrete quarter: a 10-Q's three-month figure as filed, or at a 10-K the
+fourth quarter as the annual figure minus the nine months (one tag; both filed within 150 days
+of each other, so a restated annual figure is not subtracted from an unrestated nine months),
+which is public on the 10-K's filing date. It is null when the annual figure is newer than the
+newest quarter (the Q4 cannot be derived: an older quarter would not be the latest), when the
+quarter ended more than `stale_days` (480) before the session, and for a concept whose newest
+quarter is older than the other's, so `qtr_as_of` is the one quarter every non-null quarter
+column describes. `revenue_qtr_year_ago` / `eps_diluted_qtr_year_ago` are the discrete quarter
+ending 340 to 380 days before it. Growth expressions: `eps_growth_yoy` (CAN SLIM A),
+`revenue_growth_qtr_yoy` and `eps_growth_qtr_yoy` (C). Each is null when the base (the year-ago
+EPS, quarterly or TTM) is 0 or negative: a growth rate from a loss is meaningless, so a
+turnaround is UNKNOWN, never infinite. `revenue_growth_yoy` is unchanged.
+
+`fundamentals@v3` keeps every v2 column and adds `shares_outstanding_year_ago`: among the facts
+filed by the session, the count of the same concept as the current one (a cover count against a
+cover count, a weighted average against a weighted average) whose period ended 9 to 15 months
+before `shares_as_of`, the one closest to a year, split-adjusted to the session's share terms
+(the split lookback covers the window, so a split between the two counts is not read as
+dilution); null when there is none. `shares_change_yoy` is the ratio minus one: negative is
+buybacks (1 to 5% a year is a steady repurchaser), above 0.10 is dilution. Backfill and
+retirement of the v1 / v2 tables: the roadmap's "Backfills pending".
 
 ## `dividend_schedule@v1` (corporate/)
 

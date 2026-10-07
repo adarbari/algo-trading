@@ -52,7 +52,15 @@ from algotrade.features.rollups.options import (
     option_liquidity,
     put_wing,
 )
-from algotrade.features.rollups.positioning import chain_flow, flow_history, implied_move
+from algotrade.features.rollups.patterns import candle
+from algotrade.features.rollups.positioning import (
+    chain_flow,
+    flow_history,
+    implied_move,
+    iv_term,
+    skew,
+    skew_history,
+)
 from algotrade.features.rollups.price import (
     anchored_vwap,
     bands,
@@ -90,6 +98,7 @@ GROUPS: dict[str, FeatureGroup] = {
             volume.GROUP,
             bands.GROUP,
             trend_stats.GROUP,
+            candle.GROUP,
             vol_stats.GROUP,
             volume_profile.GROUP,
             swing_levels.GROUP,
@@ -102,6 +111,9 @@ GROUPS: dict[str, FeatureGroup] = {
             chain_flow.GROUP,
             flow_history.GROUP,
             implied_move.GROUP,
+            skew.GROUP,
+            skew_history.GROUP,
+            iv_term.GROUP,
             nearest_expiry.GROUP,
             trend.GROUP,
             breadth.GROUP,
@@ -124,7 +136,12 @@ _BY_FIELD: dict[str, Feature] = {f.field: f for f in FEATURES.values()}
 SUPERSEDED: dict[str, Superseded] = {
     "price_stats@v1": Superseded("price_stats@v2"),
     "dividends@v1": Superseded("dividends@v2"),
-    "fundamentals@v1": Superseded("fundamentals@v2"),
+    "fundamentals@v1": Superseded("fundamentals@v3"),
+    # v3 adds shares_outstanding_year_ago; every v2 column is unchanged
+    "fundamentals@v2": Superseded("fundamentals@v3"),
+    # v2 adds the year-ago EPS TTM and the latest quarter's revenue and EPS (with the quarter a
+    # year earlier); every v1 column is unchanged
+    "financials@v1": Superseded("financials@v2"),
     "iv_history@v1": Superseded("iv_history@v2"),
     "anchored_vwap@v1": Superseded("anchored_vwap@v2"),
     # v2 adds sma_150 and the regression trend quality (one nightly of v1 rows at most)

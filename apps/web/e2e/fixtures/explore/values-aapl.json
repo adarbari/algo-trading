@@ -1137,8 +1137,8 @@
         "nullMeaning": "never"
       }
     },
-    "rollup.fundamentals@v2.shares_outstanding": {
-      "name": "rollup.fundamentals@v2.shares_outstanding",
+    "rollup.fundamentals@v3.shares_outstanding": {
+      "name": "rollup.fundamentals@v3.shares_outstanding",
       "value": 14594180096.0,
       "unknown": null,
       "info": {
@@ -1148,8 +1148,8 @@
         "nullMeaning": "no share-count fact filed by the session (ETFs, funds, no CIK): NO_SHARES"
       }
     },
-    "rollup.fundamentals@v2.shares_as_of": {
-      "name": "rollup.fundamentals@v2.shares_as_of",
+    "rollup.fundamentals@v3.shares_as_of": {
+      "name": "rollup.fundamentals@v3.shares_as_of",
       "value": "2026-07-17",
       "unknown": null,
       "info": {
@@ -1159,8 +1159,8 @@
         "nullMeaning": "no share-count fact filed by the session (ETFs, funds, no CIK): NO_SHARES"
       }
     },
-    "rollup.fundamentals@v2.shares_filed": {
-      "name": "rollup.fundamentals@v2.shares_filed",
+    "rollup.fundamentals@v3.shares_filed": {
+      "name": "rollup.fundamentals@v3.shares_filed",
       "value": "2026-07-31",
       "unknown": null,
       "info": {
@@ -1170,8 +1170,8 @@
         "nullMeaning": "no share-count fact filed by the session (ETFs, funds, no CIK): NO_SHARES"
       }
     },
-    "rollup.fundamentals@v2.shares_source": {
-      "name": "rollup.fundamentals@v2.shares_source",
+    "rollup.fundamentals@v3.shares_source": {
+      "name": "rollup.fundamentals@v3.shares_source",
       "value": "dei",
       "unknown": null,
       "info": {
@@ -1181,8 +1181,8 @@
         "nullMeaning": "no share-count fact filed by the session (ETFs, funds, no CIK): NO_SHARES"
       }
     },
-    "rollup.fundamentals@v2.market_cap_status": {
-      "name": "rollup.fundamentals@v2.market_cap_status",
+    "rollup.fundamentals@v3.market_cap_status": {
+      "name": "rollup.fundamentals@v3.market_cap_status",
       "value": "OK",
       "unknown": null,
       "info": {
