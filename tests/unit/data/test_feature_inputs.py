@@ -153,6 +153,28 @@ def test_event_inputs_are_by_event_date_and_never_later() -> None:
     assert inputs.load_input(empty, "events/dividend", [END], 5).at(END, 5).empty  # type: ignore[union-attr]
 
 
+def test_declared_dividends_are_read_by_knowledge_date_with_their_stored_session() -> None:
+    """``events/dividend_declared``: the same table as ``events/dividend`` read by the
+    partition that stored each row, so a declared future ex-date is there from that session
+    and not before, and the stored session says which listing a row came from."""
+    writer, reader = store()
+    first, second = END - timedelta(days=5), END - timedelta(days=2)
+    write_dividends(writer, [("EQ:A", END + timedelta(days=9), 0.5, "recurring")], first)
+    write_dividends(writer, [("EQ:A", END + timedelta(days=9), 0.55, "recurring")], second)
+    loaded = inputs.load_input(reader, "events/dividend_declared", [END], 0)
+    assert loaded.at(first - timedelta(days=1), 0) is None  # nothing stored yet
+    rows = loaded.at(first, 0)
+    assert rows is not None and list(rows["cash_amount"]) == [0.5]
+    both = loaded.at(END, 0)
+    assert both is not None and list(both["session_date"]) == [first, second]  # not merged
+    assert list(both["cash_amount"]) == [0.5, 0.55]
+    by_event = inputs.load_input(reader, "events/dividend", [END], 30).at(END, 30)
+    assert by_event is not None and by_event.empty  # the by-event-date read never shows it
+    assert inputs.has_input("events/dividend_declared")
+    _, empty = store()
+    assert inputs.load_input(empty, "events/dividend_declared", [END], 0).at(END, 0) is None
+
+
 def test_rates_input_is_the_curve_the_session_sees() -> None:
     writer, reader = store()
     loaded = inputs.load_input(reader, "rates/treasury", [END], 0)

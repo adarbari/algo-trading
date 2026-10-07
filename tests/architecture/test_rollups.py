@@ -26,7 +26,7 @@ from algotrade.data.feature_inputs import has_input
 from algotrade.features.framework.declaration import FeatureGroup, declaration_problems
 from algotrade.features.framework.feature import ENTITIES
 from algotrade.features.framework.graph import dependencies, dependency_order
-from algotrade.features.registry import GROUPS
+from algotrade.features.registry import GROUPS, SUPERSEDED
 from algotrade.features.site import site_features
 from algotrade.services.configs import field_catalog
 from algotrade.storage.configs.files import FileConfigStore
@@ -158,3 +158,16 @@ def test_nightly_computes_rollups_after_the_data_they_read() -> None:
     for upstream in ("earnings", "bars", "corporate-actions", "chains"):
         assert names.index(upstream) < names.index("rollups")
     assert names.index("rollups") < names.index("screens")
+
+
+def test_superseded_groups_are_retired_and_point_at_a_registered_successor() -> None:
+    """A superseded key is no longer registered, and ``by`` is a registered later version of the
+    same group (a rename that pointed a group at itself was shipped once: #249)."""
+    for old, superseded in SUPERSEDED.items():
+        assert old not in GROUPS, old
+        assert superseded.by in GROUPS, (old, superseded.by)
+        assert superseded.by != old, old
+        old_name, old_version = old.split("@v")
+        new_name, new_version = superseded.by.split("@v")
+        assert new_name == old_name or old == "liquidity_class@v1", old  # moved into price_stats
+        assert int(new_version) > int(old_version) or old == "liquidity_class@v1", old

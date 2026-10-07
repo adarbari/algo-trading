@@ -34,3 +34,21 @@ categories = ["ACCUMULATION", "DISTRIBUTION", "NEUTRAL"]
 description = "ACCUMULATION when 60% (params.accumulation_at) or more of the last 20 sessions' volume traded on up days, DISTRIBUTION at 40% (params.distribution_at) or less, else NEUTRAL"
 null_meaning = "up_volume_share_20d is null (a gap among the last 21 sessions, a shorter history, or no volume at all over the 20)"
 version = 1
+
+[volume_trend_20_60]
+expr = "volume.adv_shares_20d / vol_stats.adv_shares_60d"
+dtype = "float"
+unit = "ratio"
+description = "The 20-session average volume / the 60-session average: above 1 activity is building over the quarter, below 1 fading; 1.3 is a clear pick-up"
+null_meaning = "adv_shares_20d or adv_shares_60d is null (a gap among the last 60 sessions, or a shorter history), or the 60-session average is 0"
+valid_range = [0, inf]
+version = 1
+
+[turnover_20d]
+expr = "volume.adv_shares_20d / fundamentals.shares_outstanding"
+dtype = "float"
+unit = "decimal"
+description = "Daily turnover: the 20-session average share volume / shares outstanding, 0.01 means 1% of the company changes hands a day (about a 100-session holding period)"
+null_meaning = "adv_shares_20d is null (a gap among the last 20 sessions), or shares_outstanding is null (no share count filed, or STALE: fundamentals market_cap_status)"
+valid_range = [0, inf]
+version = 1

@@ -1,4 +1,5 @@
-# Expression features over the earnings calendar (L3, reviewed via PR; ADR 0023 step 3). Each
+# Expression features over scheduled events against expiries: the earnings calendar and the
+# ex-dividend schedule against the option expiries (L3, reviewed via PR; ADR 0023 step 3). Each
 # [name] is one feature: a formula over stored features (group.column), other expression
 # features (by name) and its own params. Computed on read unless materialise = true. The
 # language and the keys: docs/configuration.md "Expression features". Changing a formula:
@@ -10,4 +11,20 @@ dtype = "bool"
 unit = "flag"
 description = "Whether the next earnings report (earnings.next_earnings_date) falls on or before the nearest listed option expiry (nearest_expiry.expiry_date): a short option held to that expiry carries the report"
 null_meaning = "the next report date or the nearest expiry is unknown (no report date on or after the session in the stored calendars, or no stored chain with an expiry on or after the session)"
+version = 1
+
+[ex_div_before_expiry]
+expr = "dividend_schedule.next_ex_date <= put_wing.target_expiry"
+dtype = "bool"
+unit = "flag"
+description = "Whether the next known ex-dividend date (dividend_schedule.next_ex_date) falls on or before the target expiry (put_wing.target_expiry, the 30-60 day expiry the put and call wings use): a short call held to it risks early assignment, and a short put misses the dividend"
+null_meaning = "no ex-dividend date after the session is known (dividend_schedule NOT_ANNOUNCED: the source lists a date only about 30 days ahead, so null is 'none known yet', not 'none'), or no target expiry (put_wing NO_SPOT, NO_CHAIN or NO_EXPIRY)"
+version = 1
+
+[ex_div_before_nearest_expiry]
+expr = "dividend_schedule.next_ex_date <= nearest_expiry.expiry_date"
+dtype = "bool"
+unit = "flag"
+description = "Whether the next known ex-dividend date (dividend_schedule.next_ex_date) falls on or before the nearest listed option expiry (nearest_expiry.expiry_date): a short option expiring then carries the dividend"
+null_meaning = "no ex-dividend date after the session is known (dividend_schedule NOT_ANNOUNCED), or no stored chain with an expiry on or after the session"
 version = 1

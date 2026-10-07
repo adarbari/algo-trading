@@ -18,7 +18,10 @@ ingestion task sees one shape (``parsed["series"]`` of ``Normalized``, ``SERIES_
 ``SeriesRequest`` is a ``FetchRequest`` plus what the registry knows about the series; the task
 builds it from the registry, so adapters hold no per-series knowledge. ``ReleaseRequest`` asks
 the release-dates source (FRED ``release/dates``, ADR 0050) for one release, bounded in real
-time; its answer is ``parsed[RELEASE_FRAME]`` (``vendors/fred/releases.py``).
+time; its answer is ``parsed[RELEASE_FRAME]`` (``vendors/fred/releases.py``). ``FilingsRequest``
+asks the SEC filings source for one company's 8-Ks (ADR 0050); its answer is
+``parsed[FILINGS_FRAME]`` with ``FILING_COLUMNS`` (``vendors/sec/submissions.py``). Both live
+here so a task builds its requests without importing a vendor module.
 """
 
 from dataclasses import dataclass
@@ -31,6 +34,17 @@ from algotrade_sources.framework.base import FetchRequest
 SERIES_FRAME = "series"  # key of ``Normalized.parsed`` holding the normalised frame
 SERIES_COLUMNS = ("series", "obs_date", "vintage_date", "value", "code")
 RELEASE_FRAME = "release_dates"  # key of ``Normalized.parsed`` holding a release's dates (ADR 0050)
+FILINGS_FRAME = "filings"  # key of ``Normalized.parsed`` holding a company's 8-K rows (ADR 0050)
+FILING_COLUMNS = (
+    "cik",
+    "form",
+    "accession",
+    "filing_date",
+    "acceptance_ts",
+    "report_date",
+    "items",
+    "primary_document",
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -58,6 +72,14 @@ class ReleaseRequest(FetchRequest):
 
     start: date | None = None
     end: date | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class FilingsRequest(FetchRequest):
+    """One company's filings. ``key`` is the CIK (digits); ``since``: the earliest filing date
+    wanted (``None``: the recent block only)."""
+
+    since: date | None = None
 
 
 def series_request(request: FetchRequest) -> SeriesRequest:

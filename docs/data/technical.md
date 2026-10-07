@@ -31,7 +31,7 @@ left out with the field that covers it. Screener presets come last (section "Pre
 | Area | Requested | Where |
 |---|---|---|
 | Trend | SMA 20 / 50 / 200 | `price_stats` `sma_20/50/200` |
-| | EMA 10 / 20 / 50 / 200 | `bands` `ema_10/20/50/200` (EMA 5 and SMA 5 / 10 / 100 left out: one short and one long average each is enough to state alignment; SMA 10 is `ema_10`'s twin) |
+| | EMA 10 / 20 / 50 / 200, SMA 150 | `bands` `ema_10/20/50/200`, `sma_150` (the 30-week average Minervini and Weinstein threshold; EMA 5 and SMA 5 / 10 / 100 left out: one short and one long average each is enough to state alignment; SMA 10 is `ema_10`'s twin) |
 | | slopes | `bands` `ema20_slope_5d`, `ema50_slope_10d`, `sma200_slope_20d` |
 | | EMA alignment | `feature.ema_stack` (BULL / BEAR / MIXED over EMA 20 / 50 / 200; `trend_state` is the SMA version) |
 | | distance from moving averages | `feature.pct_vs_sma_20/50/200`, `feature.pct_vs_ema_20/50/200`, `feature.stretch_sma20_atr`, `feature.stretch_sma50_atr` |
@@ -69,8 +69,37 @@ left out with the field that covers it. Screener presets come last (section "Pre
 | | OI, option volume, spread, delta, DTE | `option_liquidity`, `put_wing`, `oi_walls`, `nearest_expiry` |
 | | skew, expected move | `skew@v1`, `implied_move@v1` (planned, positioning.md) |
 | | strike distance from support, / ATR | `feature.put_support_cushion` ((best put strike... see swing.toml: (swing_low - best_put_strike) / close) and `feature.put_support_cushion_atr` (/ atr_14) |
+| | covered call: strike above the close, above resistance, premium yield | `call_wing` (`best_call_strike`, `best_call_yield`), `feature.call_otm_pct`, `feature.cc_yield_annualised`, `feature.call_strike_above_resistance`, `feature.cc_resistance_cushion_atr` |
+| | ex-dividend before expiry (early assignment, a dividend a put misses) | `dividend_schedule.next_ex_date`, `feature.ex_div_before_expiry` (the put / call wing's target expiry), `feature.ex_div_before_nearest_expiry` |
 | Catalyst / risk | days to earnings | `earnings.days_to_earnings`, `feature.earnings_before_expiry` |
 | | historical, worst and average earnings moves; news / catalyst flags | EV track (`own_sensitivity`: `move_multiple_median`, `down_move_worst_pct`, 8-K item flags); not duplicated here |
+
+## Survey of other systems (2026-10-06)
+
+A survey of the feature sets of TA-Lib, QuantConnect, Qlib, WorldQuant's alphas, Finviz,
+TradingView, thinkorswim, Trade Ideas, TrendSpider, Minervini / IBD, Clenow, Connors and the
+options screeners (Market Chameleon, Barchart, OptionStrat) against this catalogue (the full
+table: `out/feature-gap-survey.md` in the working tree). What it adds to the track, by cost:
+
+| Add | Where | Status |
+|---|---|---|
+| `sma_150` and `pct_vs_sma_150` (Minervini's template, Weinstein's 30-week average) | `bands@v2` | built (TA track 1b) |
+| `trend_r2_90d`, `reg_slope_90d_ann`, `clenow_momentum_90d` (Clenow's trend quality and pace) | `trend_stats@v2` | built (TA track 1b) |
+| `pocket_pivot` (Morales and Kacher) | `vol_stats@v1` | built |
+| `ps_ratio`, `net_margin`, `payout_ratio` | `fundamentals.toml` expressions over stored facts | planned |
+| quarterly EPS and revenue growth yoy (CAN SLIM C / A) | `financials@v2` | planned |
+| `shares_change_yoy` (buybacks / dilution) | `fundamentals@v3` | planned |
+| balance-sheet and cash-flow facts (equity, assets, debt, OCF, capex, gross profit) and `roe`, `roa`, `pb_ratio`, `debt_to_equity`, `fcf_yield`, `gross_profitability` | `balance_sheet@v1` (corporate/; the companyfacts document is already fetched whole) | planned |
+| unusual options activity at chain level (`unusual_contracts`, `max_vol_oi_ratio`, `unusual_premium_usd`) | `chain_flow@v1` (positioning.md) | planned |
+| `iv30_chg_1d`, `iv30_chg_5d` | `iv_history@v3` | planned |
+| bar shape (body and wick shares, inside / outside bar) and the six named candles (hammer, shooting star, doji, bullish / bearish engulfing, inside-day breakout) | `candle@v1`, new folder `patterns/` | planned |
+
+Left out as window variants or covered: IBD's RS rating (the percentiles cover it), RSI(2),
+CCI / MFI / stochastics, Hurst and efficiency ratios, the other TA-Lib candles, chart-pattern
+scans (no deterministic daily-bar definition), per-name drawdown and Ulcer index, Amihud.
+Needing a new data source (a vendor decision, `add-data-source`, not a feature): short
+interest and days to cover (FINRA files, free), float and insider / institutional ownership
+(EDGAR Form 4 / 13F), analyst estimates and surprises (forward P/E, PEG, SUE), dark pool.
 
 ## Presets
 
@@ -87,25 +116,29 @@ folder per kind of thing; `architecture/layout.toml`):
 
 | Group | Folder | Columns | Status |
 |---|---|---|---|
-| `bands@v1` | `price/` | `ema_10/20/50/200`, `ema20_slope_5d`, `ema50_slope_10d`, `sma200_slope_20d`, `close_std_20`, `bb_width_pctile_252d`, `band_walk` | built |
-| `trend_stats@v1` | `price/` | `ret_1d/3d/10d/120d/252d`, `mom_12_1`, `mom_accel_5d`, `ret_z_20d`, `high_100d`, `low_100d`, `high_200d`, `low_200d`, `prior_high_50d`, `prior_low_20d`, `prior_low_50d`, `sessions_since_high_20d`, `close_range_pos`, `close_streak`, `sma20_streak`, `tight_range_sessions` | built |
+| `bands@v2` | `price/` | `ema_10/20/50/200`, `sma_150`, `ema20_slope_5d`, `ema50_slope_10d`, `sma200_slope_20d`, `close_std_20`, `bb_width_pctile_252d`, `band_walk` | built |
+| `trend_stats@v2` | `price/` | `ret_1d/3d/10d/120d/252d`, `mom_12_1`, `mom_accel_5d`, `ret_z_20d`, `high_100d`, `low_100d`, `high_200d`, `low_200d`, `prior_high_50d`, `prior_low_20d`, `prior_low_50d`, `sessions_since_high_20d`, `close_range_pos`, `trend_r2_90d`, `reg_slope_90d_ann`, `close_streak`, `sma20_streak`, `tight_range_sessions` | built |
 | `swing_levels@v1` | `levels/` (moved from `price/`) | unchanged | built |
 | `pivot_strength@v1` | `levels/` | `resistance_touches`, `support_touches`, `resistance_age`, `support_age`, `pivot_structure` | built ([swing.md](swing.md)) |
 | `retest@v1` | `levels/` | `breakout_date`, `breakout_level`, `sessions_since_breakout`, `retest_state`, `failed_breakouts_252d` | built ([swing.md](swing.md)) |
 | `gaps@v1` | `levels/` | `gap_open_pct`, `gap_above`, `gap_above_date`, `gap_below`, `gap_below_date` | built ([swing.md](swing.md)) |
-| `volume_profile@v1` | `levels/` | `poc_252d`, `value_area_high`, `value_area_low`, `hvn_above`, `hvn_below`, `lvn_above`, `lvn_below`, `volume_near_close_share`, `profile_status` | planned |
-| `anchored_vwap@v2` | `price/` | v1 + `avwap_swing_low`, `avwap_swing_high` | planned |
+| `vol_stats@v1` | `activity/` | `atr_5`, `atr_20`, `hv10`, `hv60`, `hv20_pctile_252d`, `adv_shares_60d`, `volume_pctile_252d`, `pocket_pivot` | built |
+| `volume_profile@v1` | `activity/` | `profile_status`, `poc_252d`, `value_area_high`, `value_area_low`, `hvn_above`, `hvn_below`, `lvn_above`, `lvn_below`, `volume_near_close_share` | built |
+| `anchored_vwap@v2` | `price/` | v1 + `avwap_swing_low`, `avwap_swing_high` | built |
 | `relative_strength@v1` | `relative/` | `rs_spy_63d`, `rs_spy_252d`, `rs_line_high_252d`, `rs_spy_trend_20d`, `ret_5d_pctile`, `mom_pctile_63d`, `mom_pctile_252d`, `sector_etf`, `sector_ret_63d`, `rs_sector_63d`, `sector_rank_63d` | built |
 | `chain_flow@v1`, `flow_history@v1`, `skew@v1`, `skew_history@v1`, `implied_move@v1`, `iv_term@v1` | `positioning/` | [positioning.md](positioning.md) | planned |
-| `call_wing@v1` | `options/` | the covered-call mirror of `put_wing@v1` | planned |
-| `dividend_schedule@v1` | `corporate/` | `next_ex_date`, `next_div_amount`, `days_to_ex_date` | planned |
+| `call_wing@v1` | `options/` | the covered-call mirror of `put_wing@v1` (shared search in `wing_search`): `wing_status`, `target_expiry`, `target_dte`, `n_unpriced`, `n_strikes`, `wing_oi`, `wing_volume`, `wing_spread_pct`, `delta_band_distance`, `best_call_strike`, `_delta`, `_iv`, `_mid`, `_oi`, `_volume`, `_spread_pct`, `_yield` | built |
+| `dividend_schedule@v1` | `corporate/` | `dividend_status`, `next_ex_date`, `next_div_amount`, `days_to_ex_date`, `next_pay_date` | built |
 
 Formulas over stored columns are expression features (computed on read):
 `config/site/features/bands.toml` (bands, channels, z-scores, stretches),
 `swing.toml` (level distances, the pullback in ATRs, the 52-week position, the 50-session breakout and
 20-session breakdown, the short put's cushion above support), `price.toml` (`rs_spy_positive`,
 `rs_improving`, `sector_leader`),
-`positioning.toml` (flow ratios, skew, term structure, implied move, wing yields).
+`positioning.toml` (flow ratios, skew, term structure, implied move), `wings.toml` (the covered call's
+strike distance and annualised yield, its strike against resistance; its cushion in ATRs is in
+`swing.toml` beside the put's), `earnings.toml` (scheduled events against expiries: earnings and
+ex-dividend dates).
 
 ## Shared rules
 
@@ -118,7 +151,7 @@ Formulas over stored columns are expression features (computed on read):
 - Point in time (ADR 0007): a row for session S reads bars up to S only; a backfilled row
   equals the row computed on S.
 
-## `bands@v1` (price/)
+## `bands@v2` (price/)
 
 Inputs: `bars/1d`, the session plus 399 earlier sessions (the EMA run, and 252 bandwidths of
 20 closes each).
@@ -126,6 +159,7 @@ Inputs: `bars/1d`, the session plus 399 earlier sessions (the EMA run, and 252 b
 | Column | Definition | Null when |
 |---|---|---|
 | `close_std_20` | sample standard deviation (ddof 1) of the last 20 closes, the session included | a gap among the last 20 sessions, or a shorter history |
+| `sma_150` | mean close over the last 150 sessions (the 30-week average) | a gap among them |
 | `ema_10`, `ema_20`, `ema_50`, `ema_200` | exponential moving average of the close, alpha 2 / (n + 1), seeded with the mean of the first n closes of the consecutive run of bars ending on the session (at most the last 400 sessions; every charting package seeds the same way and uses all its history, so the 200 differs from theirs by the seed's remaining weight, (199/201)^k after k more bars) | fewer than n consecutive bars ending on the session |
 | `ema20_slope_5d`, `ema50_slope_10d`, `sma200_slope_20d` | the average today / the average h sessions earlier - 1 | the average is unknown on either session |
 | `bb_width_pctile_252d` | share of the 252 sessions before the session whose Bollinger bandwidth (4 x close_std_20 / sma_20) was strictly below the session's: 0.05 is a squeeze (narrower than 95% of the year), 0.95 an expansion | the session's bandwidth is unknown, or fewer than 240 of the 252 sessions before have one |
@@ -143,7 +177,7 @@ Worked example: closes 100, 101, ..., 119 (20 bars): sma_20 109.5, close_std_20 
 bb_upper 121.33, bb_lower 97.67, bb_width 0.2161, bb_pct_b (119 - 97.67) / 23.66 = 0.9014,
 price_z_20d 1.606.
 
-## `trend_stats@v1` (price/)
+## `trend_stats@v2` (price/)
 
 Inputs: `bars/1d`, the session plus 252 earlier sessions. Param `tight_range_pct` (0.15).
 
@@ -155,6 +189,7 @@ Inputs: `bars/1d`, the session plus 252 earlier sessions. Param `tight_range_pct
 | `prior_high_50d`, `prior_low_20d`, `prior_low_50d` | the extreme over the n sessions before the session (the session excluded): the level a breakout or breakdown close must clear | a gap among those n sessions |
 | `sessions_since_high_20d` | sessions since the highest high of the last 20 (the latest of equal highs; 0: today) | a gap among the last 20 sessions |
 | `close_range_pos` | (close - low) / (high - low) of the session's bar | the bar has no range |
+| `trend_r2_90d`, `reg_slope_90d_ann` | the R-squared and the annualised slope (exp(slope x 252) - 1) of the least-squares line through the log close over the last 90 sessions (Clenow); `clenow_momentum_90d` is their product | a gap among the last 90 sessions; r2 also when the close never moved |
 | `mom_12_1` | close 21 sessions earlier / close 252 sessions earlier - 1: the 12-month return with the last month skipped (Jegadeesh-Titman) | a gap among the last 253 sessions, or a shorter history |
 | `ret_z_20d` | the session's one-session return / the sample standard deviation of the 20 one-session returns before it | a gap among the last 22 sessions, a shorter history, or those 20 returns were all equal |
 | `close_streak` | signed consecutive sessions, ending on the session, with the close above the previous close (positive) or below it (negative); 0 when unchanged | no bar on the previous session |
@@ -218,9 +253,112 @@ it) and a non-member at +100% reads 5 / 5. If its sector is Technology and XLK i
 XLV is -5%: `sector_etf` XLK, `sector_ret_63d` 0.10, `rs_sector_63d` 0.10 and
 `sector_rank_63d` 1 (XLV is 2).
 
-## Levels (`levels/`), volume at price, options
+## `vol_stats@v1` (activity/)
 
+Inputs: `bars/1d`, the session plus 272 earlier sessions.
+
+| Column | Definition | Null when |
+|---|---|---|
+| `atr_5`, `atr_20` | Wilder ATR over n, as `momentum.atr_14` (seeded with the first n true ranges of the consecutive run ending on the session, at most 150 sessions) | fewer than n + 1 consecutive bars |
+| `hv10`, `hv60` | close-to-close realised vol over n log returns, annualised by 252 (`quant.realized_vol`) | a gap among the last n + 1 sessions |
+| `hv20_pctile_252d` | share of the 252 sessions before the session whose hv20 was strictly below the session's | the session's hv20 unknown, or fewer than 240 of the 252 have one (one gap voids 21 windows) |
+| `adv_shares_60d` | mean share volume over the last 60 sessions | a gap among them |
+| `volume_pctile_252d` | share of the 252 sessions before the session whose volume was strictly below the session's | fewer than 240 known |
+| `pocket_pivot` | the close rose and the volume beat every down-close session's volume among the 10 before (Morales and Kacher); false on a down day or with no down day to beat | a gap among the last 12 sessions |
+
+Expression features: `atr_ratio_5_20` (expansion above 1), `hv_ratio_10_60` (`volatility.toml`);
+`volume_trend_20_60`, `turnover_20d` (adv_shares_20d / shares_outstanding; `volume.toml`).
+
+## `volume_profile@v1` (activity/)
+
+A daily-bar approximation of a volume profile. Inputs: `bars/1d`, the session plus 251 earlier
+sessions; `momentum@v1` (atr_14). Params (`rollups.toml`): `bins` 50, `value_area` 0.70,
+`hvn_factor` 1.5, `lvn_factor` 0.5, `min_bars` 240.
+
+Each bar's volume is spread evenly over the `bins` equal price bins between the window's lowest
+low and highest high that its [low, high] overlaps (a bar with no range goes to its bin). Then:
+`poc_252d` the centre of the fullest bin (ties: nearest the close); the value area grows from
+that bin one neighbour at a time towards the fuller side until it holds `value_area` of the
+volume (`value_area_low` / `value_area_high` are its outer edges); `hvn_above` / `hvn_below` the
+centre of the nearest bin strictly above / below the close's bin with at least `hvn_factor` x
+the mean bin volume, `lvn_*` with at most `lvn_factor` x; `volume_near_close_share` the share
+of volume in bins whose centre is within one atr_14 of the close. `profile_status` is OK,
+FEW_BARS (under `min_bars` bars) or NO_RANGE (one price all year); every value is null unless
+OK. Expression features: `in_value_area`, `dist_to_poc` (`swing.toml`).
+
+Worked example (10 bins over 100..110): one-bin bars of 300 at 102-103, 250 at 103-104, 200 at
+107-108, 20 at 105-106, 20 at 100-101, 10 at 109-110, close 105.5: POC 102.5; value area
+102..106 (300 + 250 = 550 of the 560 needed, then the fuller neighbour, bin 4 with 0, then bin
+5 with 20); HVN above 107.5, below 103.5; LVN above 106.5, below 104.5; within one ATR (1.0)
+of the close 20 / 800 of the volume.
+
+## `anchored_vwap@v2` (price/)
+
+v1's `avwap_earnings` and `avwap_anchor_date` plus `avwap_swing_low` and `avwap_swing_high`:
+the VWAP of the typical price from the session of `swing_levels@v1`'s swing low / high through
+the session (null without that pivot, with fewer than 2 sessions, a gap or no volume in the
+range). The bars read grow to 252 sessions so a pivot anywhere in `swing_levels`' window can
+anchor. v1 is superseded; retire it after the backfill.
+
+## Levels (`levels/`), relative strength, options
+
+Planned; the levels groups are specified in [swing.md](swing.md) by the PR that builds them;
+relative strength and the options groups land with their own sections here.
+`call_wing@v1` and `dividend_schedule@v1` are built (their sections are at the end of this page);
 `pivot_strength@v1`, `retest@v1` and `gaps@v1` are built; their definitions, null rules and
 worked examples are in [swing.md](swing.md) (with `swing_levels@v1`, which they build on). The
 rest is planned; each lands with its own section here (definitions, null rules, a worked
 example) in the PR that builds it.
+
+## `call_wing@v1` (options/)
+
+The covered call to sell at the 30-60 day expiry, the mirror of `put_wing@v1`: one search
+(`options/wing_search.py`) for both rights, so the target expiry (closest to 45 days, standard
+monthlies first), our delta (the mid inverted with `quant.implied_vol`, delta from
+`quant.black_scholes.greeks`, `q` from `div_yield@v1`), the band distance and the statuses are
+the put's. Inputs: the session's chain, the Treasury curve, the underlying quote, `div_yield@v1`.
+
+| Column | Definition | Null when |
+|---|---|---|
+| `wing_status` | OK / OUTSIDE_BAND / NO_SPOT / NO_CHAIN (no call quotes) / NO_EXPIRY (none 30..60 days out) / NO_STRIKE (no call with our delta in 0.05..0.50) | never |
+| `target_expiry`, `target_dte` | the expiry closest to 45 days within 30..60 | NO_SPOT, NO_CHAIN, NO_EXPIRY |
+| `n_unpriced` | calls at it without our delta (no two-sided quote, or the inversion failed) | no target expiry |
+| `n_strikes`, `wing_oi`, `wing_volume`, `wing_spread_pct` | strikes, open interest, volume and median relative spread of the calls with our delta in 0.15..0.30 (edges included); 0 when none (the spread: null) | no target expiry |
+| `delta_band_distance` | the best call's distance from the band: 0 inside, else to the nearer edge | no candidate (NO_STRIKE or no target) |
+| `best_call_strike`, `_delta`, `_iv`, `_mid`, `_oi`, `_volume`, `_spread_pct` | the best call: the candidate with the smallest distance, then the highest `best_call_yield`, then the higher open interest, then the higher strike | as the distance |
+| `best_call_yield` | mid / the underlying's price: the premium per dollar of stock held, for the period (0.012 is 1.2% for 45 days) | as the distance |
+
+Worked example: spot 100, 45 days, vol 40%, rate 4%: the calls with delta 0.15..0.30 are the
+strikes 110..117 (110 is 0.283, 117 is 0.156), the best call is the lowest of them (the highest
+premium): strike 110, mid 2.30, `best_call_yield` 0.023, `delta_band_distance` 0. With only 106
+and 108 listed (both above 0.30 delta) the best call is 108, the nearer to the band, with
+`wing_status` OUTSIDE_BAND and a distance of its delta (0.329) minus 0.30.
+
+Expression features: `call_otm_pct` = (strike - close) / close; `cc_yield_annualised` =
+`best_call_yield` x 365 / `target_dte`; `call_strike_above_resistance` = strike above
+`swing_levels.swing_high`; `cc_resistance_cushion_atr` = (strike - swing high) / `atr_14`. The
+yield and the early-assignment risk are separate questions: `ex_div_before_expiry` says a known
+ex-dividend date falls before the target expiry (the dividend can be taken early from a
+short call, an in-the-money one most of all).
+
+## `dividend_schedule@v1` (corporate/)
+
+The next ex-dividend date known on the session, from the corporate-actions partitions stored by
+it (the rules are under `dividend_schedule@v1` rules in [layers.md](layers.md)).
+
+| Column | Definition | Null when |
+|---|---|---|
+| `dividend_status` | SCHEDULED (an ex-date after the session is known) / NOT_ANNOUNCED | never |
+| `next_ex_date` | the earliest ex-date after the session in the rows stored by it | NOT_ANNOUNCED |
+| `next_div_amount` | its cash amount per share, in the session's share terms (divided by the splits after the partition that stored it) | NOT_ANNOUNCED |
+| `days_to_ex_date` | calendar days to it (>= 1) | NOT_ANNOUNCED |
+| `next_pay_date` | its payment date | NOT_ANNOUNCED, or the source gives none |
+
+Worked example: a run on session S stores `ex 2026-11-06, 0.25` for EQ:A. On S - 1 EQ:A is
+NOT_ANNOUNCED (nothing stored yet); on S and every later session it is SCHEDULED with
+`days_to_ex_date` counting down to 1. If a later run moves the date to 2026-11-13 the next
+sessions read the new date, and a recompute of S still reads the old one. A 2:1 split
+executing after the partition that holds the latest listing divides the amount by 2 (a later
+listing carries the vendor's own number and is used as stored). `ex_div_before_expiry`
+(`config/site/features/earnings.toml`) is null while no date is known: a date beyond the
+30-day window is not listed yet, so null is never "no dividend".

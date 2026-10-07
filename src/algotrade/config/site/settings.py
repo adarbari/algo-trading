@@ -232,6 +232,7 @@ class SourcesSettings:
     max_verify_failures: float = 0.10
     max_macro_stale_share: float = 0.20  # macro series (ADR 0048)
     min_calendar_future_dates: int = 1  # macro-calendar: dates each FRED release must list ahead
+    max_filings_failed: float = 0.05  # filings: share of CIKs whose SEC fetch failed
     coverage: tuple[CoverageRule, ...] = DEFAULT_COVERAGE  # [quality.coverage.<group>.<column>]
     ibkr: IbkrSettings = field(default_factory=IbkrSettings)
     etf: EtfHoldingsSettings = field(default_factory=EtfHoldingsSettings)  # [etf_holdings]
@@ -272,11 +273,9 @@ class SourcesSettings:
                 "max_name_over_vendor",
                 "max_bar_unresolved",
                 "max_chain_fetch_failures",
-                "max_chain_stale_share",
-                "max_chain_stale_share_core",
+                *("max_chain_stale_share", "max_chain_stale_share_core"),
                 "max_verify_failures",
-                "max_macro_stale_share",
-                "min_calendar_future_dates",
+                *("max_macro_stale_share", "min_calendar_future_dates", "max_filings_failed"),
                 "coverage",
             ],
         )
@@ -360,6 +359,7 @@ class SourcesSettings:
             min_calendar_future_dates=quality.integer(
                 "min_calendar_future_dates", d.min_calendar_future_dates, 0
             ),
+            max_filings_failed=quality.fraction("max_filings_failed", d.max_filings_failed),
             coverage=load_coverage(quality, d.coverage),
             ibkr=load_ibkr(_extra(vendors, "ibkr")),
             etf=EtfHoldingsSettings.from_table(_extra(vendors, "etf_holdings")),

@@ -11,12 +11,10 @@ import pytest
 
 from algotrade_sources.framework.base import FetchRequest, TransientFetchError
 from algotrade_sources.framework.http import HttpError, RetryPolicy
+from algotrade_sources.framework.series import FILING_COLUMNS, FILINGS_FRAME, FilingsRequest
 from algotrade_sources.vendors.sec.submissions import (
-    FILING_COLUMNS,
-    FILINGS_FRAME,
     PAGES_URL,
     SUBMISSIONS_URL,
-    FilingsRequest,
     SecFilings,
     older_pages,
     parse_documents,

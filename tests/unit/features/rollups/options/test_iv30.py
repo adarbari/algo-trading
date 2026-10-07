@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 from algotrade.features.framework.runner import compute_in_memory, compute_one
-from algotrade.features.rollups.options import iv30, oi_walls, put_wing
+from algotrade.features.rollups.options import iv30, oi_walls, wing_search
 from algotrade.features.rollups.options.iv30 import GROUP, Iv30Params, choose_expiries
 from algotrade.quant.implied_vol import interpolate_total_variance
 from tests.helpers.rollup_store import END, chain_rows, store, write_chains, write_curve
@@ -176,5 +176,5 @@ def test_spot_prices_are_the_one_spot_reader_of_the_chain_groups() -> None:
     assert spots["EQ:A"] == 12.0 and spots[["EQ:B", "EQ:C", "EQ:D"]].isna().all()
     assert iv30.positive_spots(quotes).to_dict() == {"EQ:A": 12.0}
     assert iv30.spot_prices(None).empty and iv30.positive_spots(quotes.iloc[:0]).empty
-    assert put_wing.positive_spots is iv30.positive_spots
+    assert wing_search.positive_spots is iv30.positive_spots
     assert oi_walls.positive_spots is iv30.positive_spots

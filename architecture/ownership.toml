@@ -455,6 +455,20 @@ section = "docs/adr/0050-event-sensitivity.md#decision"
 detect = [{ call = "lagged_vintages" }, { string = "events/macro_release" }]
 
 [[responsibility]]
+id = "filing-ingestion"
+description = "Store the SEC 8-K and 8-K/A filings of the event-study scope in events/filing (ADR 0050, tasks/events/filings.py): the scoped names' CIKs from the company details as of the session, one SEC request per CIK (plus the older pages when --since precedes the recent block; --since defaults to the CIK's latest stored filing, else 2018-01-01), each row with its acceptance instant, items and known_from (the acceptance's session in New York); and the Item 2.02 results releases as events/earnings rows with source sec_8k (earnings_date the acceptance date in New York, time pre_market / intraday / after_hours by the acceptance clock, reported true, known_from the same date). The per-quarter precedence between those rows and the calendar's belongs to the earnings rollup, not the writer"
+owner = ["apps/ingestion/algotrade_ingestion/tasks/events/*"]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the run (filings_fetched)
+    "src/algotrade/storage/tables/schemas.py",  # declares the table
+    "src/algotrade/features/rollups/corporate/earnings.py",  # the one reader that must tell the 8-K rows apart (v1 reads the calendar rows only; rollups import no storage, so the source name is spelled there)
+    "apps/ingestion/algotrade_ingestion/tasks/market/earnings.py",  # the carry-forward never copies the 8-K rows
+]
+section = "docs/adr/0050-event-sensitivity.md#decision"
+detect = [{ string = "events/filing" }, { string = "sec_8k" }]
+
+[[responsibility]]
 id = "live-option-quotes"
 description = "The API's live option quotes, read-only (ADR 0028): IBKR quotes for an underlying's expiry through the facade on the API's own client id and session thread, a 60 s cache, the stored delayed chain + a status as the fallback, and the API's one write: the answers recorded in the background to live/option_quotes (only through LiveWriter, atomic per run); read back through data.chains"
 owner = [

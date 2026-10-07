@@ -580,7 +580,7 @@ def test_the_bear_state_probit_and_its_source(fs: FeatureSet) -> None:
     }
 
 
-BANDS = "rollups/instrument/bands@v1"
+BANDS = "rollups/instrument/bands@v2"
 
 
 def test_bands_channels_zscores_and_stretches(fs: FeatureSet) -> None:
@@ -638,7 +638,7 @@ def test_bands_channels_zscores_and_stretches(fs: FeatureSet) -> None:
     assert nob["donchian_pos_20d"] == pytest.approx(0.5)
 
 
-TREND = "rollups/instrument/trend_stats@v1"
+TREND = "rollups/instrument/trend_stats@v2"
 PUT_WING = "rollups/instrument/put_wing@v1"
 
 
@@ -724,6 +724,173 @@ def test_ema_distances_alignment_structure_and_put_cushion(fs: FeatureSet) -> No
     assert bull["put_support_cushion_atr"] == pytest.approx(2.5)
     assert bear["put_support_cushion_atr"] == pytest.approx(-2.5)  # strike above support
     assert pd.isna(mix["put_support_cushion"]) and pd.isna(noema["put_support_cushion"])
+
+
+CALL_WING = "rollups/instrument/call_wing@v1"
+DIVIDEND_SCHEDULE = "rollups/instrument/dividend_schedule@v1"
+NEAREST = "rollups/instrument/nearest_expiry@v1"
+
+
+def test_covered_call_expressions_over_the_call_wing_and_resistance(fs: FeatureSet) -> None:
+    ids = ["EQ:OK", "EQ:ITM", "EQ:NOCALL", "EQ:NORES", "EQ:NOATR"]
+    stats = pd.DataFrame({"instrument_id": ids, "session_date": END, "close": [100.0] * 5})
+    wing = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "best_call_strike": [105.0, 98.0, np.nan, 105.0, 105.0],
+            "best_call_yield": [0.01, 0.03, np.nan, 0.01, 0.01],
+            "target_dte": [45, 30, np.nan, 45, 45],
+        }
+    )
+    swing = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "swing_high": [104.0, 104.0, 104.0, np.nan, 104.0],
+        }
+    )
+    mom = pd.DataFrame(
+        {"instrument_id": ids, "session_date": END, "atr_14": [2.0, 2.0, 2.0, 2.0, np.nan]}
+    )
+    frames = {PRICE_STATS: stats, CALL_WING: wing, SWING: swing, MOMENTUM: mom}
+    names = [
+        "call_otm_pct", "cc_yield_annualised", "call_strike_above_resistance",
+        "cc_resistance_cushion_atr",
+    ]  # fmt: skip
+    out = fs.evaluate(frames, names).set_index("instrument_id")
+    ok, itm, nocall, nores, noatr = (out.loc[i] for i in ids)
+    assert ok["call_otm_pct"] == pytest.approx(0.05)
+    assert itm["call_otm_pct"] == pytest.approx(-0.02)  # a strike below the close: ITM
+    assert ok["cc_yield_annualised"] == pytest.approx(0.01 * 365 / 45)
+    assert itm["cc_yield_annualised"] == pytest.approx(0.03 * 365 / 30)
+    assert ok["call_strike_above_resistance"] is True  # 105 > 104
+    assert itm["call_strike_above_resistance"] is False
+    assert ok["cc_resistance_cushion_atr"] == pytest.approx(0.5)  # (105 - 104) / 2
+    assert itm["cc_resistance_cushion_atr"] == pytest.approx(-3.0)  # strike below resistance
+    for unknown in ("call_otm_pct", "cc_yield_annualised", "call_strike_above_resistance"):
+        assert pd.isna(nocall[unknown])  # no best call: UNKNOWN, never false or zero
+    assert pd.isna(nocall["cc_resistance_cushion_atr"])
+    assert pd.isna(nores["call_strike_above_resistance"]) and pd.isna(
+        nores["cc_resistance_cushion_atr"]
+    )
+    assert nores["call_otm_pct"] == pytest.approx(0.05)  # needs no swing high
+    assert pd.isna(noatr["cc_resistance_cushion_atr"])
+    assert noatr["call_strike_above_resistance"] is True  # needs no ATR
+
+
+def test_ex_div_before_expiry_compares_the_next_ex_date_with_the_expiries(fs: FeatureSet) -> None:
+    day = pd.Timestamp(END).date()
+    target, nearest = day + pd.Timedelta(days=45), day + pd.Timedelta(days=7)
+    ids = ["EQ:BEFORE", "EQ:ON", "EQ:AFTER", "EQ:NODIV", "EQ:NOWING", "EQ:NOCHAIN"]
+    schedule = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "next_ex_date": [
+                nearest - pd.Timedelta(days=2),
+                target,
+                target + pd.Timedelta(days=1),
+                None,  # none announced yet (NOT_ANNOUNCED)
+                nearest,
+                nearest,
+            ],
+        }
+    )
+    wing = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "target_expiry": [target, target, target, target, None, target],  # NOWING: no chain
+        }
+    )
+    chains = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "expiry_date": [nearest] * 5 + [None],
+        }
+    )
+    frames = {DIVIDEND_SCHEDULE: schedule, PUT_WING: wing, NEAREST: chains}
+    names = ["ex_div_before_expiry", "ex_div_before_nearest_expiry"]
+    out = fs.evaluate(frames, names).set_index("instrument_id")
+    target_flag, nearest_flag = out["ex_div_before_expiry"], out["ex_div_before_nearest_expiry"]
+    assert bool(target_flag["EQ:BEFORE"]) and bool(target_flag["EQ:ON"])  # on the expiry counts
+    assert not bool(target_flag["EQ:AFTER"])
+    assert bool(nearest_flag["EQ:BEFORE"]) and not bool(nearest_flag["EQ:ON"])
+    assert bool(nearest_flag["EQ:NOWING"])  # the nearest expiry needs no put wing
+    for unknown in ("EQ:NODIV", "EQ:NOWING"):
+        assert pd.isna(target_flag[unknown])  # no ex-date known, or no target expiry
+    for unknown in ("EQ:NODIV", "EQ:NOCHAIN"):
+        assert pd.isna(nearest_flag[unknown])  # either date unknown: UNKNOWN, never false
+
+
+VOL_STATS = "rollups/instrument/vol_stats@v1"
+PROFILE = "rollups/instrument/volume_profile@v1"
+FUNDAMENTALS = "rollups/instrument/fundamentals@v2"
+
+
+def test_volatility_ratios_volume_trend_turnover_and_value_area(fs: FeatureSet) -> None:
+    ids = ["EQ:A", "EQ:OUT", "EQ:NONE"]
+    stats = pd.DataFrame(
+        {"instrument_id": ids, "session_date": END, "close": [105.0, 120.0, 100.0]}
+    )
+    vol = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "atr_5": [3.0, 1.0, np.nan],
+            "atr_20": [2.0, 2.0, 2.0],
+            "hv10": [0.4, 0.2, 0.3],
+            "hv60": [0.2, 0.4, np.nan],
+            "adv_shares_60d": [1e6, 2e6, 0.0],
+        }
+    )
+    volume = pd.DataFrame(
+        {"instrument_id": ids, "session_date": END, "adv_shares_20d": [1.3e6, 1e6, 1e6]}
+    )
+    fund = pd.DataFrame(
+        {"instrument_id": ids, "session_date": END, "shares_outstanding": [1.3e8, np.nan, 1e8]}
+    )
+    profile = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "poc_252d": [100.0, 100.0, np.nan],
+            "value_area_low": [95.0, 95.0, np.nan],
+            "value_area_high": [110.0, 110.0, np.nan],
+        }
+    )
+    frames = {
+        PRICE_STATS: stats,
+        VOL_STATS: vol,
+        VOLUME: volume,
+        FUNDAMENTALS: fund,
+        PROFILE: profile,
+    }
+    names = [
+        "atr_ratio_5_20",
+        "hv_ratio_10_60",
+        "volume_trend_20_60",
+        "turnover_20d",
+        "in_value_area",
+        "dist_to_poc",
+    ]
+    out = fs.evaluate(frames, names).set_index("instrument_id")
+    a, outside, none = (out.loc[i] for i in ids)
+    assert a["atr_ratio_5_20"] == pytest.approx(1.5) and a["hv_ratio_10_60"] == pytest.approx(2.0)
+    assert a["volume_trend_20_60"] == pytest.approx(1.3) and a["turnover_20d"] == pytest.approx(
+        0.01
+    )
+    assert a["in_value_area"] is True and a["dist_to_poc"] == pytest.approx(0.05)
+    assert outside["in_value_area"] is False and outside["dist_to_poc"] == pytest.approx(0.2)
+    assert pd.isna(outside["turnover_20d"])
+    assert pd.isna(none["atr_ratio_5_20"]) and pd.isna(none["hv_ratio_10_60"])
+    assert (
+        pd.isna(none["volume_trend_20_60"])
+        and pd.isna(none["in_value_area"])
+        and pd.isna(none["dist_to_poc"])
+    )
 
 
 RELATIVE_STRENGTH = "rollups/instrument/relative_strength@v1"
