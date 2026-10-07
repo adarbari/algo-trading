@@ -8,7 +8,8 @@
 # source        "fred": the dates come from FRED's release/dates (release_id; scheduled future
 #               dates included, key in .env as for the macro series), one request each;
 #               "rule": computed, no fetch (nth_business_day: the n-th exchange session of the
-#               month, core/time/calendar.py). There is no hand-kept dates file: FOMC comes from FRED.
+#               month, core/time/calendar.py); "dates": an explicit list (`dates`, below), no fetch.
+#               FOMC is a "dates" release: FRED's release 101 lists nearly every calendar day.
 # release_id    the FRED release id (source = "fred"; ids from fred/releases, verified 2026-10-06)
 # nth_business_day   1 = the first session of the month, 3 = the third (source = "rule")
 # exceptions    optional, rule releases only: a month ("YYYY-MM") -> the date ISM actually published,
@@ -16,6 +17,7 @@
 #               Empty on purpose: ISM's dates cannot be read without an ismworld.org sign-in, so none
 #               is guessed. To fill it, read the year's schedule on ismworld.org (Reports > ISM PMI
 #               Reports) and add e.g. `exceptions = { "2025-01" = 2025-01-03 }` to the release.
+# dates         source = "dates" only: the release dates, ascending, unique, real dates
 # time_et       the release time, "HH:MM" in America/New_York; the row's ts is that moment in UTC
 # terms         where the dates come from and how they may be used
 
@@ -85,10 +87,21 @@ nth_business_day = 3
 time_et = "10:00"
 terms = "ISM is not on FRED: the third business day of the month at 10:00 ET, a rule (ISM publishes it on a fixed schedule; no data is stored)"
 
+# FOMC: the scheduled decision days (the last day of each meeting; statement at 14:00 ET), typed
+# from https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm, read 2026-10-07 (lists
+# 2024 to 2027). Unscheduled actions (e.g. the 2025-08-22 notation vote) are not listed. To add
+# the next year: when the Fed publishes it, read that page, append each meeting's second day in
+# order, and update the date read above; the next `macro-calendar` run stores them.
+
 [[release]]
 key = "FOMC"
 name = "FOMC Press Release"
-source = "fred"
-release_id = 101
+source = "dates"
+dates = [
+  2024-01-31, 2024-03-20, 2024-05-01, 2024-06-12, 2024-07-31, 2024-09-18, 2024-11-07, 2024-12-18,
+  2025-01-29, 2025-03-19, 2025-05-07, 2025-06-18, 2025-07-30, 2025-09-17, 2025-10-29, 2025-12-10,
+  2026-01-28, 2026-03-18, 2026-04-29, 2026-06-17, 2026-07-29, 2026-09-16, 2026-10-28, 2026-12-09,
+  2027-01-27, 2027-03-17, 2027-04-28, 2027-06-09, 2027-07-28, 2027-09-15, 2027-10-27, 2027-12-08,
+]
 time_et = "14:00"
-terms = "FRED terms of use (https://fred.stlouisfed.org/legal/); release 101, Federal Reserve"
+terms = "Federal Reserve FOMC calendar (https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm): public, scheduled meeting dates"

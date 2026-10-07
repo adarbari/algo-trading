@@ -3,7 +3,8 @@ event study calendars (CPI, employment, FOMC, ...) and where each one's dates co
 
 Each ``[[release]]`` is a ``key`` (its instrument id is ``MACRO:<key>``), a ``name``, a
 ``source`` (``fred``: the dates of FRED release ``release_id``; ``rule``: the
-``nth_business_day`` of the month, computed with the exchange calendar), the release time of
+``nth_business_day`` of the month, computed with the exchange calendar; ``dates``: an explicit
+sorted list of release dates, FOMC's, typed from the Fed's calendar), the release time of
 day ``time_et`` (New York) and its ``terms``. The loader checks shape and uniqueness; the
 dates, and the UTC instant of ``time_et``, are the ``macro-calendar`` task's.
 """
@@ -21,7 +22,7 @@ from algotrade.core.model.instruments import macro_id
 
 FOLDER = "events"
 NAME = "releases"
-SOURCES = ("fred", "rule")
+SOURCES = ("fred", "rule", "dates")
 KEYS = (
     "key",
     "name",
@@ -29,6 +30,7 @@ KEYS = (
     "release_id",
     "nth_business_day",
     "exceptions",
+    "dates",
     "time_et",
     "terms",
 )
@@ -49,7 +51,8 @@ class MacroRelease:
     """One ``[[release]]``. ``release_id`` is set for ``source = "fred"``, ``nth_business_day``
     for ``source = "rule"``; ``time_et`` is ``"HH:MM"`` in America/New_York. ``exceptions``
     (a rule release only): ``"YYYY-MM"`` -> the date the rule misses that month (the actual
-    release date, in that month)."""
+    release date, in that month). ``dates`` (``source = "dates"``): the release dates, sorted
+    and unique."""
 
     key: str
     name: str
@@ -59,6 +62,7 @@ class MacroRelease:
     release_id: int | None = None
     nth_business_day: int | None = None
     exceptions: Mapping[str, date] = field(default_factory=dict)
+    dates: tuple[date, ...] = ()
 
     @property
     def instrument_id(self) -> str:
@@ -136,25 +140,46 @@ def _release(doc: Mapping[str, Any], file: str, index: int) -> MacroRelease:
         release_id=release_id,
         nth_business_day=nth,
         exceptions=_exceptions(t, source),
+        dates=_dates(t, source),
     )
 
 
 def _source_keys(t: Table, source: str) -> tuple[int | None, int | None]:
-    """``(release_id, nth_business_day)``: the one a source needs, and not the other."""
-    own, other = (
-        ("release_id", "nth_business_day")
-        if source == "fred"
-        else ("nth_business_day", "release_id")
-    )
-    if t.raw(other) is not None:
-        raise ConfigurationError(f"{t.where} {other}: not used by source = {source!r}")
-    _required(t, own)
-    value = t.integer(own, 0, 1)
-    if own == "nth_business_day" and value > MAX_BUSINESS_DAY:
+    """``(release_id, nth_business_day)``: the one a source needs, and not the other (a
+    ``dates`` release needs neither)."""
+    needs = {"fred": "release_id", "rule": "nth_business_day", "dates": ""}[source]
+    for key in ("release_id", "nth_business_day"):
+        if key != needs and t.raw(key) is not None:
+            raise ConfigurationError(f"{t.where} {key}: not used by source = {source!r}")
+    if not needs:
+        return None, None
+    _required(t, needs)
+    value = t.integer(needs, 0, 1)
+    if needs == "nth_business_day" and value > MAX_BUSINESS_DAY:
         raise ConfigurationError(
             f"{t.where} nth_business_day: expected 1 to {MAX_BUSINESS_DAY}, got {value}"
         )
     return (value, None) if source == "fred" else (None, value)
+
+
+def _dates(t: Table, source: str) -> tuple[date, ...]:
+    """``dates``: a non-empty, sorted, unique list of TOML dates, for ``source = "dates"`` only."""
+    raw = t.raw("dates")
+    if source != "dates":
+        if raw is not None:
+            raise ConfigurationError(f"{t.where} dates: not used by source = {source!r}")
+        return ()
+    if not isinstance(raw, list) or not raw:
+        raise ConfigurationError(f"{t.where} dates: required, a non-empty list of dates")
+    for day in raw:
+        if not isinstance(day, date) or isinstance(day, datetime):
+            raise ConfigurationError(f"{t.where} dates: expected dates (YYYY-MM-DD), got {day!r}")
+    if len(set(raw)) != len(raw):
+        repeated = sorted(d for d, n in Counter(raw).items() if n > 1)
+        raise ConfigurationError(f"{t.where} dates: repeated {repeated}")
+    if raw != sorted(raw):
+        raise ConfigurationError(f"{t.where} dates: not sorted ascending")
+    return tuple(raw)
 
 
 def _exceptions(t: Table, source: str) -> dict[str, date]:
