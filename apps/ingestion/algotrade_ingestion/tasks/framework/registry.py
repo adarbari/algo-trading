@@ -17,12 +17,14 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+from algotrade.config.site.events.releases import load_macro_releases
 from algotrade.config.site.events.scope import load_event_scope
 from algotrade.config.site.settings import load_macro, load_universe
 from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.derived import market_rollups, rollups
 from algotrade_ingestion.tasks.framework.run import TaskContext
+from algotrade_ingestion.tasks.macro import calendar as macro_calendar
 from algotrade_ingestion.tasks.macro import series as macro_series
 from algotrade_ingestion.tasks.maintenance import (
     golden,
@@ -199,6 +201,10 @@ def _etf_holdings(ctx: TaskContext, p: Params) -> RunRecord:
 
 def _earnings(ctx: TaskContext, p: Params) -> RunRecord:
     session = session_of(p)
+    source = ctx.sources["nasdaq_earnings"]
+    if p.get("history_from"):
+        end = p.get("history_to") or session
+        return earnings.backfill_earnings(ctx, source, session, p["history_from"], end)
     days = p.get("days") or ctx.settings.earnings_days
     start = p.get("start")
     if start is None:
@@ -206,7 +212,7 @@ def _earnings(ctx: TaskContext, p: Params) -> RunRecord:
         # `last_earnings_date` stays current. An explicit --start is taken as given.
         back = ctx.settings.earnings_lookback_days
         start, days = session - timedelta(days=back), days + back
-    return earnings.ingest_earnings(ctx, ctx.sources["nasdaq_earnings"], session, start, days=days)
+    return earnings.ingest_earnings(ctx, source, session, start, days=days)
 
 
 def _bars(ctx: TaskContext, p: Params) -> RunRecord:
@@ -279,6 +285,13 @@ def _macro(ctx: TaskContext, p: Params) -> RunRecord:
     assert ctx.configs is not None
     return macro_series.ingest_macro(
         ctx, load_macro(ctx.configs), session_of(p), _symbols(p, "only"), p.get("since")
+    )
+
+
+def _macro_calendar(ctx: TaskContext, p: Params) -> RunRecord:
+    assert ctx.configs is not None
+    return macro_calendar.ingest_macro_calendar(
+        ctx, load_macro_releases(ctx.configs), session_of(p), _symbols(p, "only")
     )
 
 
@@ -503,7 +516,8 @@ TASKS: dict[str, Task] = {
         ),
         Task(
             "earnings",
-            "store the Nasdaq earnings calendar as events",
+            "store the Nasdaq earnings calendar as events, or a resumable history backfill "
+            "(--from/--to)",
             earnings,
             ("events/earnings",),
             _earnings,
@@ -513,6 +527,8 @@ TASKS: dict[str, Task] = {
                 SESSION,
                 Param("start", ("--start",), date.fromisoformat, "first date (default: --date)"),
                 Param("days", ("--days",), int, "calendar days (default: sources.toml)"),
+                Param("history_from", ("--from",), date.fromisoformat, "backfill: first day"),
+                Param("history_to", ("--to",), date.fromisoformat, "backfill: last day"),
             ),
         ),
         Task(
@@ -594,6 +610,19 @@ TASKS: dict[str, Task] = {
                     date.fromisoformat,
                     "first observation date (a backfill; default: all history)",
                 ),
+            ),
+        ),
+        Task(
+            "macro-calendar",
+            "the macro release calendar (FRED release dates, ISM by rule): past and scheduled",
+            macro_calendar,
+            (macro_calendar.TABLE,),
+            _macro_calendar,
+            optional_sources=("fred_release_dates",),
+            settings="events/releases.toml + sources.toml [fred] [quality]",
+            params=(
+                SESSION,
+                Param("only", ("--only",), str, "comma-separated release keys, e.g. CPI,FOMC"),
             ),
         ),
         Task(

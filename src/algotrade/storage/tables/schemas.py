@@ -369,6 +369,46 @@ ETF_HOLDINGS = _fixed(
 # ``instruments/shares`` keeps ``filed``. ``value`` is null where FRED prints ".". The
 # partition is the run's session; runs are increments, so they merge on the key; readers union
 # every partition and keep the vintages on or before their session (``data.macro.series``).
+# Event rows say when the fact became knowable (ADR 0050 decision 3): ``known_from``, the
+# session it was knowable on (a backfilled report: its report date); ``data.events`` applies
+# it. Every event table with a spec of its own REQUIRES it, non-null (``EARNINGS_EVENTS``; a
+# new event table declares it the same way). The generic event grain keeps it optional (null:
+# the session that stored it) for the facts of record (``data.events.FACTS_OF_RECORD``:
+# splits, dividends, reference and index changes).
+KNOWN_FROM = "known_from"
+# A calendar row copied forward over a day the fetch failed: the session of the snapshot that
+# fetched it (null on fetched rows), so a failed fetch never cancels knowledge (ADR 0050).
+CARRIED_FROM = "carried_from"
+EARNINGS_EVENTS = TableSpec(
+    "events/earnings",
+    "event",
+    ("instrument_id", "ts", KNOWN_FROM),
+    open_ended=True,
+    columns=_columns(
+        "instrument_id string!", "ts timestamp_utc!", f"{KNOWN_FROM} date!", f"{CARRIED_FROM} date"
+    ),
+    runs="merge",
+)
+# L1: the macro release calendar (ADR 0050), one row per release and date: ``ts`` is the release
+# moment in UTC (the date with ``time_et``, New York), ``instrument_id`` ``MACRO:<release_key>``.
+# ``status`` is ``scheduled`` (the date is after the session that stored the row) or ``released``;
+# ``known_from`` is the first session it was knowable on (the session that fetched the calendar,
+# or the release date for a past row). A rescheduled release is a new key; runs merge on it.
+RELEASE_STATUSES = frozenset({"scheduled", "released"})
+MACRO_RELEASE_EVENTS = _fixed(
+    "events/macro_release",
+    "event",
+    ("instrument_id", "ts", KNOWN_FROM, "release_key", "release_date", "status"),
+    "instrument_id string!",
+    "ts timestamp_utc!",
+    f"{KNOWN_FROM} date!",
+    "release_key string!",
+    "release_name string!",
+    "release_date date!",
+    "time_et string!",
+    "status string!",
+    runs="merge",
+)
 MACRO_SERIES = _fixed(
     "macro/series",
     "reference",
@@ -483,6 +523,8 @@ KNOWN: dict[str, TableSpec] = {
         LIVE_OPTION_QUOTES,
         ETF_HOLDINGS,
         MACRO_SERIES,
+        EARNINGS_EVENTS,
+        MACRO_RELEASE_EVENTS,
     )
 }
 # Open-ended tables: the producing rollup, event source, catalogue or screener defines the
@@ -517,9 +559,11 @@ def spec_for(table: str) -> TableSpec:
         if table.startswith(prefix) and len(table) > len(prefix):
             required = ("instrument_id", "ts") if grain == "event" else ("instrument_id",)
             keys = ("instrument_id string!", "ts timestamp_utc!")[: len(required)]
-            runs = "merge" if grain == "event" else "snapshot"
+            event = grain == "event"
+            typed = (*keys, f"{KNOWN_FROM} date") if event else keys
+            runs = "merge" if event else "snapshot"
             return TableSpec(
-                table, grain, required, open_ended=True, columns=_columns(*keys), runs=runs
+                table, grain, required, open_ended=True, columns=_columns(*typed), runs=runs
             )
     raise DataValidationError(
         table, ["unknown table; add a TableSpec to storage/tables/schemas.py"]
@@ -547,6 +591,8 @@ def validate_frame(table: str, frame: pd.DataFrame) -> None:
             problems.extend(bar_problems(frame))
         if spec is MACRO_SERIES:
             problems.extend(vintage_problems(frame))
+        if spec is MACRO_RELEASE_EVENTS:
+            problems.extend(release_status_problems(frame))
     if problems:
         raise DataValidationError(table, problems)
 
@@ -578,6 +624,12 @@ def vintage_problems(frame: pd.DataFrame) -> list[str]:
     if kinds.isna().any():
         bad.append("null")
     return [f"vintage_kind must be one of {sorted(VINTAGE_KINDS)}, got {bad}"] if bad else []
+
+
+def release_status_problems(frame: pd.DataFrame) -> list[str]:
+    """``events/macro_release`` rows whose ``status`` is not one of ``RELEASE_STATUSES``."""
+    bad = sorted({str(v) for v in frame["status"]} - RELEASE_STATUSES)
+    return [f"status must be one of {sorted(RELEASE_STATUSES)}, got {bad}"] if bad else []
 
 
 def require_retention(table: str) -> int:

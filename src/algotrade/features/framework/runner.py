@@ -60,9 +60,12 @@ def rollup_params(configs: SiteDocuments | None, rollups: Sequence[FeatureGroup]
 def _check_point_in_time(
     rollup: FeatureGroup, table: str, frame: pd.DataFrame, session: date
 ) -> None:
-    """Loaders return frames sorted by ``session_date`` (``day`` for a window input): the last
-    row is the latest."""
-    for column in ("session_date", "day"):
+    """Loaders return frames sorted by the date a row is known on: ``known_from`` for event
+    rows that carry it (a backfilled report stored in a later partition is known from its
+    report date, ADR 0050), else ``session_date`` (``day`` for a window input): the last row is
+    the latest."""
+    known = "known_from" if "known_from" in frame.columns else "session_date"
+    for column in (known, "day"):
         if column in frame.columns and len(frame):
             latest = frame[column].iloc[-1]
             later = latest > pd.Timestamp(session) if column == "day" else latest > session

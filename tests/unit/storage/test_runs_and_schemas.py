@@ -62,3 +62,44 @@ def test_tables_declare_how_their_runs_combine() -> None:
     assert table_key(spec_for("events/x"), ["instrument_id", "ts"]) == ["instrument_id", "ts"]
     with pytest.raises(ValueError, match="run mode"):
         TableSpec("t", "event", ("instrument_id",), runs="append")
+
+
+def test_known_from_is_required_on_earnings_optional_on_facts_of_record() -> None:
+    from algotrade.storage.tables.schemas import KNOWN_FROM  # noqa: PLC0415
+
+    earnings = spec_for("events/earnings")
+    column = earnings.column(KNOWN_FROM)
+    assert KNOWN_FROM in earnings.required and column is not None and not column.nullable
+    assert earnings.grain == "event" and earnings.runs == "merge" and earnings.open_ended
+    for table in ("events/split", "events/dividend"):
+        column = spec_for(table).column(KNOWN_FROM)
+        assert column is not None and column.type == "date" and column.nullable, table
+        assert KNOWN_FROM not in spec_for(table).required
+    for table in ("bars/1d", "rollups/instrument/x@v1", "instruments/reference"):
+        assert spec_for(table).column(KNOWN_FROM) is None, table
+    row = {"instrument_id": "EQ:A", "ts": datetime(2019, 5, 1, tzinfo=UTC)}
+    day = date(2026, 10, 2)
+    validate_frame("events/earnings", stamped([{**row, KNOWN_FROM: date(2019, 5, 1)}], day, "r"))
+    with pytest.raises(DataValidationError, match="missing columns"):
+        validate_frame("events/earnings", stamped([row], day, "r"))
+
+
+def test_macro_release_rows_declare_known_from_and_a_known_status() -> None:
+    spec = spec_for("events/macro_release")
+    assert spec.grain == "event" and spec.runs == "merge" and not spec.open_ended
+    column = spec.column("known_from")
+    assert "known_from" in spec.required and column is not None and not column.nullable
+    ts = datetime(2026, 10, 14, 12, 30, tzinfo=UTC)
+    row = {
+        "instrument_id": "MACRO:CPI", "ts": ts, "known_from": date(2026, 10, 6),
+        "release_key": "CPI", "release_name": "CPI", "release_date": date(2026, 10, 14),
+        "time_et": "08:30", "status": "scheduled",
+    }  # fmt: skip
+    validate_frame("events/macro_release", stamped([row], date(2026, 10, 6), "r"))
+    with pytest.raises(DataValidationError, match="status must be one of"):
+        frame = stamped([{**row, "status": "cancelled"}], date(2026, 10, 6), "r")
+        validate_frame("events/macro_release", frame)
+    with pytest.raises(DataValidationError, match="undeclared columns"):
+        validate_frame(
+            "events/macro_release", stamped([{**row, "extra": 1}], date(2026, 10, 6), "r")
+        )

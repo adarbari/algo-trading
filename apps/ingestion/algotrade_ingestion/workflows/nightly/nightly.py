@@ -44,6 +44,7 @@ from algotrade_ingestion.tasks.maintenance.quality import (
     check_chains,
     check_earnings,
     check_macro,
+    check_macro_calendar,
     check_market_rollups,
     check_reference_classification,
     check_universe,
@@ -95,6 +96,10 @@ NIGHTLY: tuple[Step, ...] = (
     # Reference data (ADR 0039: moves to the weekly `reference` workflow in WF4): optional.
     Step("company-details", latest_only=True, critical=False),
     Step("shares", latest_only=True, critical=False),
+    # The macro release calendar (ADR 0050): seven FRED requests, dates 400 days either side, so
+    # it is a weekly-cadence fact kept current nightly until the `reference` workflow exists
+    # (WF4: it moves there with the two steps above). Optional; FRED off or no key: SKIPPED.
+    Step("macro-calendar", latest_only=True, critical=False, accept_with=(check_macro_calendar,)),
     Step("earnings", accept=(check_earnings,), task_complete=True),
     Step("bars", accept=(check_bars, check_bars_resolved)),
     Step("rates", task_complete=True),

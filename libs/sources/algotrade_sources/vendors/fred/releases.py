@@ -24,30 +24,19 @@ Point-in-time stamping and the release time of day belong to the task, not here.
 """
 
 import urllib.parse
-from dataclasses import dataclass
-from datetime import date
 from typing import NoReturn
 
 import pandas as pd
 
 from algotrade_sources.framework.base import FetchRequest, Normalized, TransientFetchError
 from algotrade_sources.framework.http import Http
+from algotrade_sources.framework.series import RELEASE_FRAME, ReleaseRequest
 from algotrade_sources.vendors.fred.observations import BASE_URL, SOURCE, parse_documents
 
 DATASET = "release_dates"
-RELEASE_FRAME = "release_dates"  # key of ``Normalized.parsed`` holding the normalised frame
 RELEASE_COLUMNS = ("release_id", "release_date")
 PAGE_LIMIT = 10_000  # FRED's maximum ``limit`` for release/dates
 MAX_PAGES = 20  # a release needing more is a bug, not a release
-
-
-@dataclass(frozen=True, kw_only=True)
-class ReleaseRequest(FetchRequest):
-    """One FRED release. ``key`` is the release id (digits, e.g. ``"10"`` for the CPI);
-    ``start`` / ``end`` bound the real-time period (inclusive; ``None``: unbounded)."""
-
-    start: date | None = None
-    end: date | None = None
 
 
 def release_request(request: FetchRequest) -> ReleaseRequest:

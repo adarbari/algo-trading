@@ -1,7 +1,7 @@
 """``anchored_vwap@v1``: the volume-weighted average price since the last earnings report
 (``docs/data/swing.md``).
 
-Inputs: every ``events/earnings`` calendar snapshot stored on or before the session, read as
+Inputs: every ``events/earnings`` row known on or before the session (ADR 0050), read as
 ``earnings@v1`` reads them (``corporate.earnings.valid_events``: the latest snapshot covering a
 date is its authority, moved or cancelled dates are dropped; only report dates from the
 session before the window on, the only ones that can anchor), and ``bars/1d`` split-adjusted AS
@@ -89,7 +89,7 @@ def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
     days = sessions_ending(session, MAX_SESSIONS + 2)  # the window plus the session before it
     px = panel(bars, days[1:])
     # A report before days[0] anchors at row 0 at the latest: too old, never used.
-    reports = valid_events(stored, since=days[0])
+    reports = valid_events(stored, session, since=days[0])
     rows = anchors(reports[reports["report"] <= session], days).reindex(px.ids) - 1
     typical = (px.high + px.low + px.close) / 3
     # sums from each row through the last one (a missing bar counts in ``gaps``)

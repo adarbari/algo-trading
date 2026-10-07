@@ -442,11 +442,15 @@ detect = [{ string = "macro/series" }]
 
 [[responsibility]]
 id = "macro-ingestion"
-description = "Store the registry's economic series and index levels in macro/series (ADR 0048): fetch each enabled series whole through the FRED / published sources, give every value its vintage (ALFRED's realtime_start, or the lagged rule: a changed lagged value is a new vintage dated the run's session) and write only the rows the table lacks; a series whose source is off or has no credential is skipped and counted, never an error"
+description = "Store the registry's economic series and index levels in macro/series (ADR 0048): fetch each enabled series whole through the FRED / published sources, give every value its vintage (ALFRED's realtime_start, or the lagged rule: a changed lagged value is a new vintage dated the run's session) and write only the rows the table lacks; a series whose source is off or has no credential is skipped and counted, never an error. Also the macro release calendar (ADR 0050, calendar.py): one events/macro_release row per release date of the config/site/events/releases.toml registry (FRED release dates, ISM by the exchange calendar), its release moment in UTC, scheduled / released status and known_from, written only when new or newly released"
 owner = ["apps/ingestion/algotrade_ingestion/tasks/macro/*"]
-allowed = ["apps/ingestion/algotrade_ingestion/tasks/framework/registry.py"]  # declares the task's tables
-section = "docs/adr/0048-macro-series-with-vintages.md#decision"
-detect = [{ call = "lagged_vintages" }]
+allowed = [
+    "apps/ingestion/algotrade_ingestion/tasks/framework/registry.py",  # declares the task's tables
+    "apps/ingestion/algotrade_ingestion/tasks/maintenance/quality.py",  # grades the calendar (macro_calendar_future)
+    "src/algotrade/storage/tables/schemas.py",  # declares the table
+]
+section = "docs/adr/0050-event-sensitivity.md#decision"
+detect = [{ call = "lagged_vintages" }, { string = "events/macro_release" }]
 
 [[responsibility]]
 id = "live-option-quotes"

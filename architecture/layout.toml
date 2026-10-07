@@ -94,7 +94,7 @@ contracts = ["Layout: site settings never import strategy configs (resolve layer
 
 [[dir]]
 path = "src/algotrade/config/site/events"
-purpose = "L3 event-sensitivity settings: the names in the event-study scope (config/site/events/scope.toml, ADR 0050), typed and validated (split from config/site, at its module cap)"
+purpose = "L3 event-sensitivity settings: the names in the event-study scope and the macro releases it calendars (config/site/events/{scope,releases}.toml, ADR 0050), typed and validated (split from config/site, at its module cap)"
 contracts = ["Layout: site settings never import strategy configs (resolve layers site defaults in)"]
 
 [[dir]]
@@ -698,7 +698,7 @@ purpose = "L3 expression features, one <theme>.toml per theme (loaded by config/
 
 [[config_dir]]
 path = "config/site/events"
-purpose = "event-sensitivity track settings: the scope list of names the event study runs for (ADR 0050)"
+purpose = "event-sensitivity track settings: the scope list of names the event study runs for and the registry of macro releases it calendars (ADR 0050)"
 
 [[config_dir]]
 path = "config/site/regime"

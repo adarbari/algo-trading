@@ -30,7 +30,7 @@ class ConfigStore(Protocol):
         ``users/<id>/features/<theme>.toml``); ``field_guide`` the site's field guide files
         (``site/field_guide/<theme>.toml``, site-only); ``regime`` the site's regime reference
         files (``site/regime/{cards,episodes}.toml``, ADR 0047, site-only); ``events`` the site's
-        event-sensitivity files (``site/events/scope.toml``, ADR 0050, site-only).
+        event-sensitivity files (``site/events/{scope,releases}.toml``, ADR 0050, site-only).
         ``preferences`` and
         ``identity`` are one file per user (``users/<id>/<kind>.toml``; identity holds the
         sign-in email, ADR 0040), never the site's. ``screeners`` are versioned rule screens:

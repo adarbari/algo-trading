@@ -86,6 +86,35 @@ def test_uncastable_data_and_undeclared_columns_fail(backend: Backend) -> None:
     assert out is not None and list(out["ratio"]) == [2]
 
 
+def test_known_from_is_stored_as_a_date_on_events_and_rejected_on_bars(backend: Backend) -> None:
+    rows = [{"instrument_id": "EQ:A", "ts": T0, "known_from": pd.Timestamp(2019, 5, 1)}]
+    backend.tables.write("events/earnings", D2, "r1", stamped(rows, D2, "r1"))
+    out = backend.tables.read("events/earnings", D2)
+    assert out is not None and out["known_from"].iloc[0] == date(2019, 5, 1)
+    null = [{"instrument_id": "EQ:B", "ts": T0, "known_from": None}]
+    with pytest.raises(DataValidationError, match="known_from: nulls"):
+        backend.tables.write("events/earnings", D2, "r2", stamped(null, D2, "r2"))
+    backend.tables.write("events/split", D2, "r1", stamped(null, D2, "r1"))  # optional there
+    with pytest.raises(DataValidationError, match="undeclared column 'known_from'"):
+        backend.tables.write("bars/1d", D1, "r1", bars(["EQ:A"], D1, known_from=D1))
+
+
+def test_macro_release_rows_round_trip_and_reject_a_null_known_from(backend: Backend) -> None:
+    row = {
+        "instrument_id": "MACRO:CPI", "ts": T0, "known_from": pd.Timestamp(2026, 10, 6),
+        "release_key": "CPI", "release_name": "CPI", "release_date": pd.Timestamp(2026, 10, 14),
+        "time_et": "08:30", "status": "scheduled",
+    }  # fmt: skip
+    backend.tables.write("events/macro_release", D2, "r1", stamped([row], D2, "r1"))
+    out = backend.tables.read("events/macro_release", D2)
+    assert out is not None and out["release_date"].iloc[0] == date(2026, 10, 14)
+    assert out["known_from"].iloc[0] == date(2026, 10, 6)
+    with pytest.raises(DataValidationError, match="known_from: nulls"):
+        backend.tables.write(
+            "events/macro_release", D2, "r2", stamped([{**row, "known_from": None}], D2, "r2")
+        )
+
+
 def test_every_fixed_table_declares_its_required_columns() -> None:
     for name in ("universe", "chains/option_quotes", "instruments/reference", "bars/1d"):
         spec = spec_for(name)

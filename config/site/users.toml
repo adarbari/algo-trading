@@ -20,3 +20,8 @@ name = "Scheduled site screens"
 id = "smoke"
 role = "admin"
 name = "Real-app smoke test (apps/web playwright.real.config.ts, ALGOTRADE_AUTH=off)"
+
+[[user]]
+id = "arvinder"
+role = "trader"
+name = "Arvinder"

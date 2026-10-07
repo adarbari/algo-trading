@@ -27,8 +27,10 @@ seventh clock.
 4. **Other grains keep their one rule, disclosed.** Snapshot tables (reference, company,
    universe, id map, IBKR contracts) use ADR 0007's snapshot rule (latest on or before, else
    earliest flagged `pre_snapshot`) and every response says which snapshot it used
-   (`referenceSnapshot`, `preSnapshot`). Events are read by event date. ETF holdings use the
-   latest issuer `as_of` on or before the date and disclose it. Descriptions are the latest row.
+   (`referenceSnapshot`, `preSnapshot`). Events are read by event date among the rows known on
+   or before the session (`known_from`, ADR 0050); splits, dividends, reference and index
+   changes, facts of record the adjusted bars use, by event date unbounded. ETF holdings use
+   the latest issuer `as_of` on or before the date and disclose it. Descriptions are the latest row.
    Ranges (bars, series) are explicit `[start, end]`, never "latest".
 5. **Writes are out of scope.** An on-request screen run picks the latest session with data to
    run (ADR 0033); it writes results, it is not a read, and may call the latest-session helper.

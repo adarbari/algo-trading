@@ -215,6 +215,12 @@ def test_point_in_time_guard() -> None:
     future = pd.DataFrame({"session_date": [END, date(2026, 10, 5)]})
     with pytest.raises(AssertionError, match="reached"):
         runner._check_point_in_time(COUNTING, "bars/1d", future, END)
+    # An event row stored later but known on time passes; one known later does not (ADR 0050).
+    backfilled = future.assign(known_from=[END, END])
+    runner._check_point_in_time(COUNTING, "events/earnings", backfilled, END)
+    with pytest.raises(AssertionError, match="reached"):
+        late = future.assign(known_from=[END, date(2026, 10, 5)])
+        runner._check_point_in_time(COUNTING, "events/earnings", late, END)
 
 
 def test_a_market_group_returns_its_one_row() -> None:
