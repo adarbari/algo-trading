@@ -27,7 +27,7 @@ export interface DetailTabsProps {
   search: ExploreSearch;
   onSearchChange: (patch: SearchPatch) => void;
   /** Opens one screener's results (the Screener hits tab). */
-  onOpenScreener?: (screenerId: string) => void;
+  onOpenScreener: (screenerId: string) => void;
 }
 
 function FocusedTab({ search, onSearchChange, symbol }: DetailTabsProps & { symbol: string }) {
@@ -155,7 +155,14 @@ export function DetailTabs({ search, onSearchChange, onOpenScreener }: DetailTab
       />
     );
   } else {
-    content = <FocusedTab search={search} onSearchChange={onSearchChange} symbol={focused} />;
+    content = (
+      <FocusedTab
+        search={search}
+        onSearchChange={onSearchChange}
+        onOpenScreener={onOpenScreener}
+        symbol={focused}
+      />
+    );
   }
   return (
     <ExploreTabs tab={tab} selectedCount={selected.length} onSearchChange={onSearchChange}>

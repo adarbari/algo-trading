@@ -27,7 +27,7 @@ export interface ExplorePageProps {
   /** Opens the Screener Builder (the field guide's "Add to a screen"). */
   onOpenBuilder: () => void;
   /** Opens one screener's results (a name in the Screener hits tab). */
-  onOpenScreener?: (screenerId: string) => void;
+  onOpenScreener: (screenerId: string) => void;
 }
 
 export function ExplorePage({

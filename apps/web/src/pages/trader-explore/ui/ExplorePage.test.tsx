@@ -76,6 +76,7 @@ describe('ExplorePage', () => {
         search={{ sel: 'AAPL,MSFT', sort: '-feature.market_cap', lev: true }}
         onSearchChange={vi.fn()}
         onOpenBuilder={vi.fn()}
+        onOpenScreener={vi.fn()}
       />,
     );
     expect(screen.getByRole('heading', { level: 1, name: 'Explore' })).toBeInTheDocument();
@@ -109,6 +110,7 @@ describe('ExplorePage', () => {
         search={{ sel: 'AAPL' }}
         onSearchChange={onSearchChange}
         onOpenBuilder={vi.fn()}
+        onOpenScreener={vi.fn()}
       />,
     );
     expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
@@ -127,6 +129,7 @@ describe('ExplorePage', () => {
         search={{ sel: 'AAPL', tab: 'options' }}
         onSearchChange={onSearchChange}
         onOpenBuilder={vi.fn()}
+        onOpenScreener={vi.fn()}
       />,
     );
     await user.click(screen.getByRole('tab', { name: 'Overview' }));
@@ -141,6 +144,7 @@ describe('ExplorePage', () => {
         search={{ sel: 'AAPL,MSFT', focus: 'MSFT' }}
         onSearchChange={onSearchChange}
         onOpenBuilder={vi.fn()}
+        onOpenScreener={vi.fn()}
       />,
     );
     await user.click(screen.getByRole('tab', { name: 'Options' }));
@@ -170,17 +174,28 @@ describe('ExplorePage', () => {
         search={{ tab: 'options', focus: 'NVDA' }}
         onSearchChange={vi.fn()}
         onOpenBuilder={vi.fn()}
+        onOpenScreener={vi.fn()}
       />,
     );
     expect(widgets.options).toHaveBeenLastCalledWith(
       expect.objectContaining({ symbol: 'NVDA', view: 'simple', right: 'P', allStrikes: false }),
     );
     rerender(
-      <ExplorePage search={{ tab: 'chart' }} onSearchChange={vi.fn()} onOpenBuilder={vi.fn()} />,
+      <ExplorePage
+        search={{ tab: 'chart' }}
+        onSearchChange={vi.fn()}
+        onOpenBuilder={vi.fn()}
+        onOpenScreener={vi.fn()}
+      />,
     );
     expect(screen.getByText('No ticker chosen')).toBeInTheDocument();
     rerender(
-      <ExplorePage search={{ tab: 'hits' }} onSearchChange={vi.fn()} onOpenBuilder={vi.fn()} />,
+      <ExplorePage
+        search={{ tab: 'hits' }}
+        onSearchChange={vi.fn()}
+        onOpenBuilder={vi.fn()}
+        onOpenScreener={vi.fn()}
+      />,
     );
     expect(screen.getByText('No ticker chosen')).toBeInTheDocument();
     rerender(
@@ -188,9 +203,12 @@ describe('ExplorePage', () => {
         search={{ tab: 'hits', focus: 'NVDA' }}
         onSearchChange={vi.fn()}
         onOpenBuilder={vi.fn()}
+        onOpenScreener={vi.fn()}
       />,
     );
-    expect(widgets.hits).toHaveBeenLastCalledWith({ symbol: 'NVDA' });
+    expect(widgets.hits).toHaveBeenLastCalledWith(
+      expect.objectContaining({ symbol: 'NVDA', onOpenScreener: expect.any(Function) as unknown }),
+    );
   });
 
   it('on a phone opens the focused ticker in a sheet and clears the focus on close', async () => {
@@ -202,6 +220,7 @@ describe('ExplorePage', () => {
           search={{ sel: 'AAPL,MSFT' }}
           onSearchChange={onSearchChange}
           onOpenBuilder={vi.fn()}
+          onOpenScreener={vi.fn()}
         />,
       );
       expect(screen.queryByRole('dialog')).toBeNull();
@@ -211,6 +230,7 @@ describe('ExplorePage', () => {
           search={{ sel: 'AAPL,MSFT', focus: 'NVDA', tab: 'hits' }}
           onSearchChange={onSearchChange}
           onOpenBuilder={vi.fn()}
+          onOpenScreener={vi.fn()}
         />,
       );
       const sheet = screen.getByRole('dialog', { name: 'NVDA' });
@@ -230,6 +250,7 @@ describe('ExplorePage', () => {
         search={{ sel: 'AAPL' }}
         onSearchChange={onSearchChange}
         onOpenBuilder={vi.fn()}
+        onOpenScreener={vi.fn()}
       />,
     );
     const tabs = screen.getAllByRole('tab').map((t) => t.textContent);
@@ -249,6 +270,7 @@ describe('ExplorePage', () => {
         }}
         onSearchChange={onSearchChange}
         onOpenBuilder={vi.fn()}
+        onOpenScreener={vi.fn()}
       />,
     );
     expect(screen.getByRole('tab', { name: 'Field guide' })).toHaveAttribute(
@@ -275,6 +297,7 @@ describe('ExplorePage', () => {
         search={{ tab: 'guide' }}
         onSearchChange={onSearchChange}
         onOpenBuilder={onOpenBuilder}
+        onOpenScreener={vi.fn()}
       />,
     );
     const guide = widgets.guide.mock.lastCall?.[0] as {
