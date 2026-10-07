@@ -95,7 +95,7 @@ nightly and stored point-in-time:
 bars/1m ──► rollups/daily/session_stats@v1 ──┐
 bars/1d ─────────────────────────────────────┼─► rollups/instrument/price_stats@v2   (52w hi/lo, MAs, HV, ADV), price_moves@v1, momentum@v1, swing_levels@v1,
                                                    volume@v1, anchored_vwap@v1 (+ events/earnings)
-chains/* ────────────────────────────────────┼─► rollups/instrument/option_liquidity@v1, put_wing@v1, oi_walls@v1, nearest_expiry@v1, iv30@v1 ─► iv_history@v2 ─┐
+chains/* ────────────────────────────────────┼─► rollups/instrument/option_liquidity@v1, put_wing@v1, call_wing@v1, oi_walls@v1, nearest_expiry@v1, iv30@v1 ─► iv_history@v2 ─┐
 volatility/ibkr_iv30 ────────────────────────┼─► rollups/instrument/ibkr_iv@v1 ─────────────────────────────────────────────────────────────────────────────────┴─► iv_rank (+ source)
 events/earnings ─────────────────────────────┴─► rollups/instrument/earnings@v1     (next date, days to it)
 ```
@@ -333,12 +333,14 @@ readable until `algotrade-ingest retire-features --group <name>@v1` deletes them
 | `earnings_schedule@v1` | `next_status` (SCHEDULED / NOT_ANNOUNCED): the status of `earnings@v1`'s next-report features (ADR 0046) | `events/earnings`, through `earnings@v1`'s compute (same rows) | built |
 | `fund_reference@v1` | `reference_instrument_id` (the one stock a leveraged or inverse fund tracks), `reference_kind` (single_stock / index / sector / commodity / none), `reference_source` (holdings / name_rule), `reference_status` (ADR 0050); rows only for those funds, `applies_to = leveraged_fund` | `instruments/reference` (name, flags, security types), `holdings/etf` (the funds' latest holdings), `instruments/symbol_ids` | built |
 | `dividends@v2` | `div_ttm`, `div_count_ttm`, `last_ex_date` | `events/dividend`, `events/split` (by event date), `price_stats@v2` | built |
+| `dividend_schedule@v1` | `dividend_status` (SCHEDULED / NOT_ANNOUNCED: the status of the next-ex-date features), `next_ex_date`, `next_div_amount` (split-adjusted to the session), `days_to_ex_date`, `next_pay_date`: the next ex-dividend date after the session among the dividend rows stored by it (a declared date is known from the session that stored it) | `events/dividend_declared` (`events/dividend` by knowledge date), `events/split` (by event date), `price_stats@v2` | built |
 | `div_yield@v1` | `div_yield` (the materialised expression feature) | `dividends@v2`, `price_stats@v2` | built |
 | `iv30@v1` | `iv30` (ours), `iv30_cboe`, `iv30_status`, `near_expiry`, `far_expiry`, `atm_strike_near`, `spot`, `rate`, `div_yield`, `n_quotes_used` | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `div_yield@v1` | built |
 | `iv_history@v2` | `iv30`, `iv_rank_252d`, `iv_percentile_252d`, `history_days`, `rank_status` (UNKNOWN / PROVISIONAL / FULL) | `iv30@v1` over 252 sessions | built |
 | `fundamentals@v2` | `shares_outstanding`, `shares_as_of`, `shares_filed`, `shares_source` (dei / weighted_basic), `market_cap_status` (OK / NO_SHARES / STALE / NO_PRICE) | `instruments/shares` (filed on or before the session), `price_stats@v2` close, `events/split`; `stale_days` in `config/site/rollups.toml` | built |
 | `financials@v1` | `revenue_ttm`, `revenue_ttm_year_ago`, `net_income_ttm`, `eps_diluted_ttm`, `revenue_fy`, `revenue_fy_end`, `ttm_as_of`, `ttm_filed`, `ttm_basis` (QUARTERS / ANNUAL), `eps_stale`, `is_adr`, `financials_status` (OK / PARTIAL / NO_TTM / NO_FACTS / STALE) | `instruments/shares` financial concepts (filed on or before the session), `price_stats@v2` (which instruments get a row), `events/split`, `instruments/reference` (security type); `stale_days`, `history_days` in `config/site/rollups.toml` | built |
 | `put_wing@v1` | `wing_status` (OK / OUTSIDE_BAND / NO_SPOT / NO_CHAIN / NO_EXPIRY / NO_STRIKE), `target_expiry` + `target_dte` (nearest 45 days in 30..60, standard monthlies first), `n_unpriced`; band totals of the puts with OUR \|delta\| in 0.08..0.15 (`n_strikes`, `wing_oi`, `wing_volume`, `wing_spread_pct`); the best put among 0.05..0.35 delta, nearest the band then by cash-secured ROC (`delta_band_distance`, `best_put_strike`, `_delta`, `_iv`, `_mid`, `_oi`, `_volume`, `_spread_pct`, `_roc`) | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `div_yield@v1` | built |
+| `call_wing@v1` | the covered-call mirror of `put_wing@v1`, by the same search: `wing_status`, `target_expiry` + `target_dte`, `n_unpriced`; band totals of the calls with OUR delta in 0.15..0.30 (`n_strikes`, `wing_oi`, `wing_volume`, `wing_spread_pct`); the best call among 0.05..0.50 delta, nearest the band then by premium yield mid / spot, then OI, then the higher strike (`delta_band_distance`, `best_call_strike`, `_delta`, `_iv`, `_mid`, `_oi`, `_volume`, `_spread_pct`, `_yield`) | the session's `chains/option_quotes` + `chains/underlying_quotes`, `rates/treasury`, `div_yield@v1` | built |
 | `price_moves@v1` | `one_day_move`: the largest \|close-to-close return\| over the last 20 sessions | `bars/1d` split-adjusted as of the session, 20 sessions back | built |
 | `momentum@v1` | `atr_14`, `rsi_14` (Wilder, 150-session warm-up), `ret_5d`, `rel_volume` (vs the 20 sessions before), `high_20d`, `low_20d`, `high_50d`, `low_50d`, `prior_high_20d` ([swing.md](swing.md)) | `bars/1d` split-adjusted as of the session, 149 sessions back | built |
 | `volume@v1` | `session_volume`, `dollar_volume`, `adv_shares_20d`, `volume_ratio_5d_20d` (last 5 vs last 20 sessions), `volume_z_20d` (vs the 20 sessions before), `up_volume_share_20d`, `cmf_20d` (Chaikin money flow) | `bars/1d` split-adjusted as of the session, 20 sessions back | built |
@@ -440,6 +442,16 @@ is in the same share terms as the session's close; the expression feature
 typed `special` are left out by default. No dividend in the window is 0 only with at least
 `min_history_days` (240) bars among the last 252 sessions; otherwise every column is null.
 A future (declared) ex-date never counts.
+
+**`dividend_schedule@v1` rules.** The one place a declared future ex-date counts. It reads
+`events/dividend` by KNOWLEDGE date (`events/dividend_declared`): on session S the rows are those
+stored in partitions on or before S (a dividend declared later is not known), the next ex-date
+is the earliest one after S, and a date the latest listing drops beside another is ignored (moved
+or withdrawn). The corporate-actions window is `-7..+30` days, so a date is listed only from
+about 30 days before it: `NOT_ANNOUNCED` means none known yet, not none this quarter. Every
+distribution type counts (a special dividend is an ex-date too). The amount is divided by the
+splits after the partition that stored it, up to S. Sessions older than the first stored
+partition read `NOT_ANNOUNCED`.
 
 **`iv30@v1` rules.** Our constant-maturity 30-day ATM vol, computed beside Cboe's and used by
 default (ADR 0021, "IV30"): bracketing expiries (standard monthlies first, 7 to 90 days),

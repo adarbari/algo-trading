@@ -127,6 +127,11 @@ name = "rollups/instrument/dividends@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
+name = "rollups/instrument/dividend_schedule@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+note = "the next known ex-dividend date; reads events/dividend by knowledge date (events/dividend_declared)"
+
+[[table]]
 name = "rollups/instrument/fundamentals@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
@@ -154,6 +159,10 @@ note = "derived from IBKR market data: personal-use licence (ADR 0028)"
 
 [[table]]
 name = "rollups/instrument/put_wing@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
+name = "rollups/instrument/call_wing@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]

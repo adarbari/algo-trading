@@ -31,6 +31,11 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        as stored (what was known then); ``None`` when there is none
 - ``chains/*``         ``chains``: the session's own partition, read per session (chains are
                        large; a lookback is not supported)
+- ``events/dividend_declared``
+                       ``events/dividend`` by KNOWLEDGE date (``events.stored_events``): every
+                       row stored in a partition on or before the session, as stored (what was
+                       known then, including a declared future ex-date); ``None`` when there
+                       is none. The same table as ``events/dividend``, a second read of it
 - ``events/dividend``, ``events/split``
                        ``events.events_by_event_date``: events with an event date from
                        ``lookback`` sessions before the session up to the session (never a
@@ -375,6 +380,7 @@ INPUTS: Mapping[str, Loader] = {
     "chains/option_quotes": _partition(option_quotes),
     "chains/underlying_quotes": _partition(underlying_quotes),
     "events/dividend": _events_by_date("events/dividend"),
+    "events/dividend_declared": _event_snapshots("events/dividend"),
     "events/split": _events_by_date("events/split"),
     TREASURY: _partition(curve_as_rows),
     SHARES: _share_facts,

@@ -25,6 +25,7 @@ from algotrade.features.framework.declaration import FeatureGroup, Superseded
 from algotrade.features.framework.feature import Feature
 from algotrade.features.framework.graph import dependency_order
 from algotrade.features.rollups.corporate import (
+    dividend_schedule,
     dividends,
     earnings,
     earnings_schedule,
@@ -41,6 +42,7 @@ from algotrade.features.rollups.market import (
     trend,
 )
 from algotrade.features.rollups.options import (
+    call_wing,
     ibkr_iv,
     iv30,
     iv_history,
@@ -72,12 +74,14 @@ GROUPS: dict[str, FeatureGroup] = {
             earnings.GROUP,
             earnings_schedule.GROUP,
             dividends.GROUP,
+            dividend_schedule.GROUP,
             iv30.GROUP,
             iv_history.GROUP,
             ibkr_iv.GROUP,
             fundamentals.GROUP,
             financials.GROUP,
             put_wing.GROUP,
+            call_wing.GROUP,
             price_moves.GROUP,
             momentum.GROUP,
             volume.GROUP,
@@ -99,7 +103,8 @@ GROUPS: dict[str, FeatureGroup] = {
             regime.GROUP,
             fund_reference.GROUP,
         ),
-        # iv30@v1 and put_wing@v1 read the materialised div_yield@v1 (FeatureSet orders it)
+        # iv30@v1, put_wing@v1 and call_wing@v1 read the materialised div_yield@v1 (FeatureSet
+        # orders it)
         stored_ok=True,
     )
 }

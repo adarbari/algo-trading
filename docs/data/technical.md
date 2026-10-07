@@ -69,6 +69,8 @@ left out with the field that covers it. Screener presets come last (section "Pre
 | | OI, option volume, spread, delta, DTE | `option_liquidity`, `put_wing`, `oi_walls`, `nearest_expiry` |
 | | skew, expected move | `skew@v1`, `implied_move@v1` (planned, positioning.md) |
 | | strike distance from support, / ATR | `feature.put_support_cushion` ((best put strike... see swing.toml: (swing_low - best_put_strike) / close) and `feature.put_support_cushion_atr` (/ atr_14) |
+| | covered call: strike above the close, above resistance, premium yield | `call_wing` (`best_call_strike`, `best_call_yield`), `feature.call_otm_pct`, `feature.cc_yield_annualised`, `feature.call_strike_above_resistance`, `feature.cc_resistance_cushion_atr` |
+| | ex-dividend before expiry (early assignment, a dividend a put misses) | `dividend_schedule.next_ex_date`, `feature.ex_div_before_expiry` (the put / call wing's target expiry), `feature.ex_div_before_nearest_expiry` |
 | Catalyst / risk | days to earnings | `earnings.days_to_earnings`, `feature.earnings_before_expiry` |
 | | historical, worst and average earnings moves; news / catalyst flags | EV track (`own_sensitivity`: `move_multiple_median`, `down_move_worst_pct`, 8-K item flags); not duplicated here |
 
@@ -97,14 +99,17 @@ folder per kind of thing; `architecture/layout.toml`):
 | `anchored_vwap@v2` | `price/` | v1 + `avwap_swing_low`, `avwap_swing_high` | planned |
 | `relative_strength@v1` | `relative/` | `rs_spy_63d`, `rs_spy_252d`, `rs_line_high_252d`, `mom_pctile_63d`, `mom_pctile_252d`, `sector_etf`, `sector_ret_63d`, `rs_sector_63d`, `sector_rank_63d` | planned |
 | `chain_flow@v1`, `flow_history@v1`, `skew@v1`, `skew_history@v1`, `implied_move@v1`, `iv_term@v1` | `positioning/` | [positioning.md](positioning.md) | planned |
-| `call_wing@v1` | `options/` | the covered-call mirror of `put_wing@v1` | planned |
-| `dividend_schedule@v1` | `corporate/` | `next_ex_date`, `next_div_amount`, `days_to_ex_date` | planned |
+| `call_wing@v1` | `options/` | the covered-call mirror of `put_wing@v1` (shared search in `wing_search`): `wing_status`, `target_expiry`, `target_dte`, `n_unpriced`, `n_strikes`, `wing_oi`, `wing_volume`, `wing_spread_pct`, `delta_band_distance`, `best_call_strike`, `_delta`, `_iv`, `_mid`, `_oi`, `_volume`, `_spread_pct`, `_yield` | built |
+| `dividend_schedule@v1` | `corporate/` | `dividend_status`, `next_ex_date`, `next_div_amount`, `days_to_ex_date`, `next_pay_date` | built |
 
 Formulas over stored columns are expression features (computed on read):
 `config/site/features/bands.toml` (bands, channels, z-scores, stretches),
 `swing.toml` (level distances, the pullback in ATRs, the 52-week position, the 50-session breakout and
 20-session breakdown, the short put's cushion above support), `price.toml` (relative strength),
-`positioning.toml` (flow ratios, skew, term structure, implied move, wing yields).
+`positioning.toml` (flow ratios, skew, term structure, implied move), `wings.toml` (the covered call's
+strike distance and annualised yield, its strike against resistance; its cushion in ATRs is in
+`swing.toml` beside the put's), `earnings.toml` (scheduled events against expiries: earnings and
+ex-dividend dates).
 
 ## Shared rules
 
@@ -171,7 +176,61 @@ sessions ago).
 
 ## Levels (`levels/`), volume at price, relative strength, options
 
+`call_wing@v1` and `dividend_schedule@v1` are built (their sections are at the end of this page);
 `pivot_strength@v1`, `retest@v1` and `gaps@v1` are built; their definitions, null rules and
 worked examples are in [swing.md](swing.md) (with `swing_levels@v1`, which they build on). The
 rest is planned; each lands with its own section here (definitions, null rules, a worked
 example) in the PR that builds it.
+
+## `call_wing@v1` (options/)
+
+The covered call to sell at the 30-60 day expiry, the mirror of `put_wing@v1`: one search
+(`options/wing_search.py`) for both rights, so the target expiry (closest to 45 days, standard
+monthlies first), our delta (the mid inverted with `quant.implied_vol`, delta from
+`quant.black_scholes.greeks`, `q` from `div_yield@v1`), the band distance and the statuses are
+the put's. Inputs: the session's chain, the Treasury curve, the underlying quote, `div_yield@v1`.
+
+| Column | Definition | Null when |
+|---|---|---|
+| `wing_status` | OK / OUTSIDE_BAND / NO_SPOT / NO_CHAIN (no call quotes) / NO_EXPIRY (none 30..60 days out) / NO_STRIKE (no call with our delta in 0.05..0.50) | never |
+| `target_expiry`, `target_dte` | the expiry closest to 45 days within 30..60 | NO_SPOT, NO_CHAIN, NO_EXPIRY |
+| `n_unpriced` | calls at it without our delta (no two-sided quote, or the inversion failed) | no target expiry |
+| `n_strikes`, `wing_oi`, `wing_volume`, `wing_spread_pct` | strikes, open interest, volume and median relative spread of the calls with our delta in 0.15..0.30 (edges included); 0 when none (the spread: null) | no target expiry |
+| `delta_band_distance` | the best call's distance from the band: 0 inside, else to the nearer edge | no candidate (NO_STRIKE or no target) |
+| `best_call_strike`, `_delta`, `_iv`, `_mid`, `_oi`, `_volume`, `_spread_pct` | the best call: the candidate with the smallest distance, then the highest `best_call_yield`, then the higher open interest, then the higher strike | as the distance |
+| `best_call_yield` | mid / the underlying's price: the premium per dollar of stock held, for the period (0.012 is 1.2% for 45 days) | as the distance |
+
+Worked example: spot 100, 45 days, vol 40%, rate 4%: the calls with delta 0.15..0.30 are the
+strikes 110..117 (110 is 0.283, 117 is 0.156), the best call is the lowest of them (the highest
+premium): strike 110, mid 2.30, `best_call_yield` 0.023, `delta_band_distance` 0. With only 106
+and 108 listed (both above 0.30 delta) the best call is 108, the nearer to the band, with
+`wing_status` OUTSIDE_BAND and a distance of its delta (0.329) minus 0.30.
+
+Expression features: `call_otm_pct` = (strike - close) / close; `cc_yield_annualised` =
+`best_call_yield` x 365 / `target_dte`; `call_strike_above_resistance` = strike above
+`swing_levels.swing_high`; `cc_resistance_cushion_atr` = (strike - swing high) / `atr_14`. The
+yield and the early-assignment risk are separate questions: `ex_div_before_expiry` says a known
+ex-dividend date falls before the target expiry (the dividend can be taken early from a
+short call, an in-the-money one most of all).
+
+## `dividend_schedule@v1` (corporate/)
+
+The next ex-dividend date known on the session, from the corporate-actions partitions stored by
+it (the rules are under `dividend_schedule@v1` rules in [layers.md](layers.md)).
+
+| Column | Definition | Null when |
+|---|---|---|
+| `dividend_status` | SCHEDULED (an ex-date after the session is known) / NOT_ANNOUNCED | never |
+| `next_ex_date` | the earliest ex-date after the session in the rows stored by it | NOT_ANNOUNCED |
+| `next_div_amount` | its cash amount per share, in the session's share terms (divided by the splits after the partition that stored it) | NOT_ANNOUNCED |
+| `days_to_ex_date` | calendar days to it (>= 1) | NOT_ANNOUNCED |
+| `next_pay_date` | its payment date | NOT_ANNOUNCED, or the source gives none |
+
+Worked example: a run on session S stores `ex 2026-11-06, 0.25` for EQ:A. On S - 1 EQ:A is
+NOT_ANNOUNCED (nothing stored yet); on S and every later session it is SCHEDULED with
+`days_to_ex_date` counting down to 1. If a later run moves the date to 2026-11-13 the next
+sessions read the new date, and a recompute of S still reads the old one. A 2:1 split
+executing after the partition that holds the latest listing divides the amount by 2 (a later
+listing carries the vendor's own number and is used as stored). `ex_div_before_expiry`
+(`config/site/features/earnings.toml`) is null while no date is known: a date beyond the
+30-day window is not listed yet, so null is never "no dividend".

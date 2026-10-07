@@ -1,6 +1,6 @@
 # Swing levels and momentum (the SW track; definitions and worked examples in
-# docs/data/swing.md). Formulas over price_stats@v2, momentum@v1, swing_levels@v1, retest@v1 and
-# gaps@v1, computed on read. The language and the keys: docs/configuration.md "Expression features". Changing a
+# docs/data/swing.md). Formulas over price_stats@v2, momentum@v1, swing_levels@v1, retest@v1,
+# gaps@v1, put_wing@v1 and call_wing@v1, computed on read. The language and the keys: docs/configuration.md "Expression features". Changing a
 # formula or a param: bump its version.
 
 [atr_pct]
@@ -227,4 +227,12 @@ dtype = "float"
 unit = "ratio"
 description = "The short put's cushion in ATRs: (support - the best put's strike) / atr_14, how many average days' range of technical room sit between support and the strike"
 null_meaning = "no confirmed swing low below the close, no best put, atr_14 null (fewer than 15 consecutive bars) or 0"
+version = 1
+
+[cc_resistance_cushion_atr]
+expr = "(call_wing.best_call_strike - swing_levels.swing_high) / momentum.atr_14"
+dtype = "float"
+unit = "ratio"
+description = "The covered call's cushion above resistance in ATRs: (the best call's strike - resistance) / atr_14, how many average days' range sit between the swing high and the strike (negative: the strike is below resistance)"
+null_meaning = "no confirmed swing high above the close, no best call, atr_14 null (fewer than 15 consecutive bars) or 0"
 version = 1
