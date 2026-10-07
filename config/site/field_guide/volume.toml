@@ -514,295 +514,195 @@ note = "with feature.in_value_area eq true; a mean-reversion zone"
 # here because volatility.toml, where that theme's other fields live, is at its line cap.
 
 [[field]]
-name = "rollup.skew@v1.skew_status"
-theme = "implied volatility"
-reads = "Whether the 30-day skew has a value: OK (two expiries around 30 days), SINGLE_EXPIRY (one usable expiry, its vols unchanged, still a value), or the first failing step: NO_SPOT, NO_CHAIN, NO_EXPIRY (none 7 to 90 days out), NO_ATM (no ATM vol from the two-sided, tight quotes) or NO_WING (an ATM vol, but the 25-delta strikes are not bracketed on a side)."
+name = "rollup.candle@v1.body_share"
+theme = "volume"
+reads = "The candle body (open to close) over the day's whole range, 0 to 1. Near 0 (under 0.1) the session closed where it opened: a doji, indecision. Around 0.5 an ordinary day. Above 0.7 a long body with short wicks: one side controlled the session from open to close (a marubozu at 1)."
 caveats = [
-  "NO_ATM and NO_WING are thin chains: skew is computed only from quotes within 35% spread, never guessed, so a name with a sparse chain reads null rather than wrong.",
+  "A big body is only meaningful against the name's usual body: rollup.candle@v1.body_vs_avg_20d says whether 0.8 is a large move or a normal one for it.",
+  "An earnings day or a gap open makes the open far from the prior close, so the body hides most of the move; check rollup.earnings@v1.last_earnings_date and rollup.gaps@v1.gap_open_pct.",
+  "Null when the bar has no range (high equals low: a halted or untraded session).",
 ]
-sources = ["Site convention (features/rollups/positioning/skew.py)"]
+sources = ["Nison (1991), Japanese Candlestick Charting Techniques: the real body", "Bulkowski (2008), Encyclopedia of Candlestick Charts"]
 [[field.use]]
-for = "a priced skew"
-op = "eq"
-value = "OK"
-mode = "soft"
-tolerance = 0
-note = "the near miss is SINGLE_EXPIRY, one expiry's skew rather than the 30-day one"
-
-[[field]]
-name = "rollup.skew@v1.skew"
-theme = "implied volatility"
-reads = "The normalised 25-delta skew at 30 days: (put vol at delta -0.25 minus call vol at +0.25) over the ATM vol. Positive means puts are richer than calls, the normal shape for stocks: about 0.10 to 0.20 is ordinary, above about 0.25 puts are rich (downside protection is expensive: collar and put-spread sellers like it, a put buyer pays up), near 0 flat, negative call-rich (a takeover, a squeeze, a meme name where the upside is what is bid). Dividing by ATM vol makes a 20-vol and an 80-vol name comparable."
-caveats = [
-  "The level of a skew is partly structural: index ETFs sit high, single names lower, and a name's own history matters more than the cross-section; rollup.skew_history@v1.skew_rank_252d says where it is for the name, but is null for the first 60 sessions of stored chains.",
-  "Our delta at each contract's own IV, from after-close mids of tight quotes; one stale wing quote moves it. Read rollup.skew@v1.skew_status and compare rollup.skew@v1.ne_skew, which should agree in sign.",
-  "An earnings report inside 30 days lifts the ATM vol and the wings differently, so the ratio can move with no change in sentiment; check rollup.earnings@v1.days_to_earnings.",
-  "Null when the status is not OK or SINGLE_EXPIRY.",
-]
-sources = [
-  "Risk reversal and skew: https://www.investopedia.com/terms/r/risk-reversal.asp",
-  "Normalising the risk reversal by ATM vol: Sinclair (2013), Volatility Trading",
-]
-[[field.use]]
-for = "puts rich (a steep put skew)"
+for = "a decisive session (a long body)"
 op = "gte"
-value = 0.25
+value = 0.6
 mode = "soft"
-tolerance = 0.05
-note = "with rollup.skew@v1.skew_status eq OK; prefer rollup.skew_history@v1.skew_rank_252d gte 0.8 once a rank exists"
+tolerance = 0.1
+note = "with rollup.trend_stats@v2.close_range_pos gte 0.7 for a strong close; feature.strong_close is that pair"
 [[field.use]]
-for = "call-rich skew (calls priced above puts)"
+for = "an indecisive session (a doji-like body)"
 op = "lte"
-value = -0.05
+value = 0.1
 mode = "soft"
 tolerance = 0.05
-note = "rare; check for a pending takeover or a squeeze (rollup.price_moves@v1.one_day_move)"
+note = "rollup.candle@v1.candle eq DOJI is the same cut with its range check"
 
 [[field]]
-name = "rollup.skew@v1.iv_25p"
-theme = "implied volatility"
-reads = "The put vol at our delta -0.25 interpolated to 30 days, as a fraction: 0.34 is 34%. The price of downside protection one quarter of the way out of the money, in vol terms; compared with rollup.skew@v1.iv_atm it is the put wing's premium."
+name = "rollup.candle@v1.upper_wick_share"
+theme = "volume"
+reads = "The share of the day's range above the body: how much of the session's high was given back by the close, 0 to 1. Under 0.1 the close was at or near the high; above 0.5 half the day's range was sold off from the high (the shape of a shooting star when the body is small and the lower wick short)."
 caveats = [
-  "Linear in delta between the two quotes around -0.25, in total variance across expiries; no extrapolation, so a chain that does not reach a 25-delta put is null (NO_WING), not clipped.",
-  "Null when the skew status is not OK or SINGLE_EXPIRY.",
+  "One session: a long upper wick after a run (feature.stretch_sma20_atr above 2) is the warning Nison describes; the same wick in a base means little. Read it with where the name is.",
+  "A wick on a day with an earnings report or a gap open (rollup.earnings@v1.last_earnings_date) reflects the event, not supply at that price.",
+  "Null when the bar has no range (high equals low).",
 ]
-sources = ["Site convention (docs/data/positioning.md OP3)"]
+sources = ["Nison (1991), Japanese Candlestick Charting Techniques: the upper shadow", "Bulkowski (2008), Encyclopedia of Candlestick Charts"]
 [[field.use]]
-for = "expensive downside puts"
+for = "a long upper wick (sold off from the high)"
 op = "gte"
-value = 0.40
-mode = "soft"
-tolerance = 0.05
-note = "an absolute level; prefer feature.skew_rr25 or rollup.skew@v1.skew for the shape"
-
-[[field]]
-name = "rollup.skew@v1.iv_25c"
-theme = "implied volatility"
-reads = "The call vol at our delta +0.25 interpolated to 30 days, as a fraction. The price of upside, one quarter of the way out of the money; below rollup.skew@v1.iv_25p on a normal stock, above it when calls are bid."
-caveats = [
-  "Same construction and nulls as rollup.skew@v1.iv_25p.",
-]
-sources = ["Site convention (docs/data/positioning.md OP3)"]
-[[field.use]]
-for = "calls bid above the ATM vol"
-op = "gte"
-value = 0.40
-mode = "soft"
-tolerance = 0.05
-note = "with rollup.skew@v1.skew lte 0 for a call-rich skew"
-
-[[field]]
-name = "rollup.skew@v1.iv_atm"
-theme = "implied volatility"
-reads = "The at-the-money vol the skew is measured against: the mean of the call vol at delta +0.50 and the put vol at -0.50, interpolated to 30 days, as a fraction. Close to rollup.iv30@v1.iv30 (another method, the forward-strike average) and within a few points of it on a liquid name."
-caveats = [
-  "Both a +0.50 call and a -0.50 put must bracket, otherwise the status is NO_ATM and the vol is null; prefer rollup.iv30@v1.iv30 for a plain 30-day ATM vol.",
-]
-sources = ["Site convention (docs/data/positioning.md OP3)"]
-[[field.use]]
-for = "a name that is volatile at the money"
-op = "gte"
-value = 0.40
-mode = "soft"
-tolerance = 0.05
-
-[[field]]
-name = "rollup.skew@v1.ne_skew"
-theme = "implied volatility"
-reads = "The same normalised 25-delta skew at the next expiry (the first listed one at least one day out, weeklies included), with no interpolation. The skew of the nearest event or weekly pin rather than of the month; compare it with rollup.skew@v1.skew: a next-expiry skew far above the 30-day one means the near-term downside is what is bid."
-caveats = [
-  "Very short expiries have 25-delta strikes close to the money and noisy vols: read rollup.skew@v1.ne_dte and ignore it under about 7 days.",
-  "Null when the next expiry has no ATM vol or no 25-delta put and call among its tight quotes, whatever the 30-day status is.",
-]
-sources = ["Site convention (docs/data/positioning.md OP3)"]
-[[field.use]]
-for = "near-term puts rich"
-op = "gte"
-value = 0.25
-mode = "soft"
-tolerance = 0.05
-note = "with rollup.skew@v1.ne_dte gte 7 so a pinned weekly is not read as a view"
-
-[[field]]
-name = "rollup.skew@v1.ne_dte"
-theme = "implied volatility"
-reads = "Calendar days from the session to the next expiry, the one rollup.skew@v1.ne_skew reads: 1 to 7 on a name with weeklies, up to a month on a monthly-only chain."
-caveats = [
-  "Weekly and daily expiries make it small on liquid names; a screen on ne_skew should floor it.",
-]
-sources = ["Site convention (docs/data/positioning.md OP3)"]
-[[field.use]]
-for = "a next expiry far enough out to read"
-op = "gte"
-value = 7
-mode = "soft"
-tolerance = 2
-
-[[field]]
-name = "feature.skew_rr25"
-theme = "implied volatility"
-reads = "The raw 25-delta risk reversal at 30 days: put vol minus call vol in vol points as a fraction (0.06 is six points). Positive: puts richer than calls. What a collar or a put spread is quoted in; rollup.skew@v1.skew divides it by the ATM vol to compare names of different vol level."
-caveats = [
-  "A high-vol name has a large raw reversal at an ordinary skew: compare names through rollup.skew@v1.skew, one name over time through either.",
-  "Null when the skew status is not OK or SINGLE_EXPIRY.",
-]
-sources = ["Risk reversal: https://www.investopedia.com/terms/r/risk-reversal.asp"]
-[[field.use]]
-for = "puts at least six vol points over calls"
-op = "gte"
-value = 0.06
-mode = "soft"
-tolerance = 0.01
-note = "with rollup.skew@v1.skew gte 0.2 so a high-vol name is not read as skewed"
-
-[[field]]
-name = "rollup.skew_history@v1.skew_rank_252d"
-theme = "implied volatility"
-reads = "Skew rank, 0 to 1: where today's 30-day skew sits between the year's lowest and highest. Above 0.8 is a stretched put premium for the name (puts are as rich as they have been this year), below 0.2 the flattest. The year the rank needs is built from stored chains, which start on 2026-10-02: every name reads null until it has 60 sessions with a skew (about the end of 2026), and a full year around October 2027."
-caveats = [
-  "One spike sets the year's maximum and squashes later readings, as for IV rank; rollup.skew_history@v1.skew_percentile_252d is the robust cross-check.",
-  "A short window is a short sample: PROVISIONAL (rollup.skew_history@v1.skew_rank_status) means under a year of skews, so a rank near 1 can be an ordinary day.",
-  "Null while skew_rank_status is UNKNOWN, with no skew today, or when every skew in the window is equal.",
-]
-sources = ["https://flashalpha.com/articles/iv-rank-vs-iv-percentile-difference-which-matters (the same rank construction)"]
-[[field.use]]
-for = "a stretched put premium for the name"
-op = "gte"
-value = 0.8
+value = 0.5
 mode = "soft"
 tolerance = 0.1
-note = "with rollup.skew_history@v1.skew_rank_status in PROVISIONAL or FULL"
+note = "with feature.stretch_sma20_atr gte 2 for a reversal warning after a run"
 
 [[field]]
-name = "rollup.skew_history@v1.skew_percentile_252d"
-theme = "implied volatility"
-reads = "The share of the last 252 sessions' skews below today's, 0 to 1. The robust companion of rollup.skew_history@v1.skew_rank_252d: one extreme day does not distort it."
+name = "rollup.candle@v1.lower_wick_share"
+theme = "volume"
+reads = "The share of the day's range below the body: how much of the session's low was bought back by the close, 0 to 1. Under 0.1 the close was at or near the low; above 0.5 half the range was recovered from the low (the shape of a hammer when the body is small and the upper wick short)."
 caveats = [
-  "Null while the rank status is UNKNOWN (fewer than 60 sessions with a skew), with no skew today, or without an earlier skew.",
+  "A long lower wick means little in the middle of a range: it matters at a level where buyers are expected, so pair it with feature.dist_to_support.",
+  "An earnings day or a gap open (rollup.earnings@v1.last_earnings_date) makes long wicks by nature.",
+  "Null when the bar has no range (high equals low).",
 ]
-sources = ["https://flashalpha.com/articles/iv-rank-vs-iv-percentile-difference-which-matters"]
+sources = ["Nison (1991), Japanese Candlestick Charting Techniques: the lower shadow", "Bulkowski (2008), Encyclopedia of Candlestick Charts"]
 [[field.use]]
-for = "puts richer than on most days of the year"
+for = "a long lower wick (bought back from the low)"
 op = "gte"
-value = 0.8
+value = 0.5
 mode = "soft"
 tolerance = 0.1
+note = "with feature.dist_to_support lte 0.02 for the support reversal shape"
 
 [[field]]
-name = "rollup.skew_history@v1.history_days"
-theme = "implied volatility"
-reads = "Sessions of the 252-session window with a 30-day skew, today included: 60 is the floor for a rank, 252 a full year. Chains are stored from 2026-10-02, so counts are short for every name until a year has passed."
+name = "rollup.candle@v1.body_vs_avg_20d"
+theme = "volume"
+reads = "Today's body (open to close) over the mean body of the 20 sessions before it: 1 is a body of the usual size, 2 twice the usual, 0.3 a much smaller one. Above 1.5 the day's move was unusual for this name; under 0.5 the day was quiet."
 caveats = [
-  "A session with no skew (no chain, or a chain with no 25-delta wing) is a gap, not filled.",
+  "Bodies measure open to close, not the range: a large gap with a small body reads small here. rollup.trend_stats@v2.ret_z_20d is the close-to-close surprise.",
+  "After a volatile month the base is inflated and a normal day reads small; after a quiet one a normal day reads large.",
+  "Null when a session among the 20 before has no bar (a gap), the history is shorter, or those bodies were all zero.",
 ]
-sources = ["Site convention (docs/data/positioning.md OP3)"]
+sources = ["Nison (1991), Japanese Candlestick Charting Techniques: the engulfing pattern's size", "Bulkowski (2008), Encyclopedia of Candlestick Charts"]
 [[field.use]]
-for = "enough history for a skew rank"
+for = "a larger body than usual"
 op = "gte"
-value = 60
-mode = "hard"
+value = 1.5
+mode = "soft"
+tolerance = 0.25
+note = "with rollup.candle@v1.body_share gte 0.5 so the body is also most of the range"
 
 [[field]]
-name = "rollup.skew_history@v1.skew_rank_status"
-theme = "implied volatility"
-reads = "How complete the skew history is for the rank: UNKNOWN below 60 sessions with a skew (no rank), PROVISIONAL below 252, FULL from 252. Every name is UNKNOWN until about the end of 2026."
+name = "rollup.candle@v1.bar_relation"
+theme = "volume"
+reads = "How the day's high-low range sits against the previous day's. INSIDE: the range lies within the day before's (a pause, compression, the setup before a break). OUTSIDE: it covers the whole previous range (a wider swing, a shake-out or an expansion). UP_GAP: the whole day traded above yesterday's high; DOWN_GAP: the whole day below yesterday's low. OVERLAP: any other partial overlap, the ordinary case."
 caveats = [
-  "PROVISIONAL over a short window makes an ordinary skew rank near 1; read rollup.skew@v1.skew with it.",
+  "Inside days are common and inside days alone are not a signal: the direction comes from the day after (feature.inside_day_breakout) and from the trend (feature.trend_state).",
+  "An earnings day or a news gap is an UP_GAP or DOWN_GAP by nature: check rollup.earnings@v1.last_earnings_date before reading a gap as a trend change; rollup.gaps@v1.gap_above tracks the gaps that stay open.",
+  "Compares ranges with the previous session only: a name that traded no session yesterday has no relation (null).",
 ]
-sources = ["Site convention (docs/data/positioning.md OP3)"]
+sources = ["Nison (1991), Japanese Candlestick Charting Techniques (the harami and the engulfing as inside and outside days)", "Crabel (1990), Day Trading with Short Term Price Patterns and Opening Range Breakout"]
 [[field.use]]
-for = "a rank over a full year"
+for = "an inside day (a pause in the range)"
 op = "eq"
-value = "FULL"
-mode = "soft"
-tolerance = 0
-note = "the near miss is PROVISIONAL"
-
-[[field]]
-name = "rollup.iv_term@v1.iv_term_status"
-theme = "implied volatility"
-reads = "Whether the term points have values: OK (both), or the first failing step: NO_SPOT, NO_CHAIN, NO_NEXT (no ATM vol at the next expiry) or NO_90D (no pair of expiries 30 to 180 days out around 90 days with ATM vols). The side that exists keeps its value."
-caveats = [
-  "A single listed expiry in the 30 to 180 day window is not a 90-day vol: NO_90D, where rollup.iv30@v1.iv30_status would say SINGLE_EXPIRY.",
-]
-sources = ["Site convention (features/rollups/positioning/iv_term.py)"]
-[[field.use]]
-for = "both term points priced"
-op = "eq"
-value = "OK"
+value = "INSIDE"
 mode = "hard"
+note = "the day after is the breakout test; feature.inside_day_breakout is the confirmed form"
+[[field.use]]
+for = "not a gap day"
+op = "in"
+value = ["INSIDE", "OUTSIDE", "OVERLAP"]
+mode = "hard"
+note = "to keep the earnings and news gap days out of a pattern screen"
 
 [[field]]
-name = "rollup.iv_term@v1.iv_next"
-theme = "implied volatility"
-reads = "The at-the-money vol at the next expiry (the first listed one at least one day out, weeklies included), as a fraction: iv30's method on that single expiry. Above rollup.iv30@v1.iv30 when an event sits in the nearest expiry; feature.term_ratio_next_30 is that comparison."
+name = "rollup.candle@v1.prev_bar_relation"
+theme = "volume"
+reads = "The bar_relation of the previous session: how yesterday's range sat against the day before's (INSIDE, OUTSIDE, UP_GAP, DOWN_GAP, OVERLAP). It lets a screen ask what yesterday was while reading today: an INSIDE here and a close above yesterday's close today is the inside day breakout."
 caveats = [
-  "A few days to expiry make it noisy, and pin risk bids the at-the-money options; read rollup.skew@v1.ne_dte for how many days out it is.",
-  "Null when the status is NO_SPOT, NO_CHAIN or NO_NEXT.",
+  "A label of yesterday, not today: for the shape of today's bar use rollup.candle@v1.bar_relation.",
+  "Null when the previous session or the one before it has no bar.",
 ]
-sources = ["Site convention (docs/data/positioning.md)"]
+sources = ["Crabel (1990), Day Trading with Short Term Price Patterns and Opening Range Breakout", "Nison (1991), Japanese Candlestick Charting Techniques"]
 [[field.use]]
-for = "a high near-term vol"
-op = "gte"
-value = 0.60
-mode = "soft"
-tolerance = 0.1
-note = "with feature.term_ratio_next_30 gte 1.3 to know it is an event, not the name's level"
+for = "yesterday was an inside day"
+op = "eq"
+value = "INSIDE"
+mode = "hard"
+note = "with rollup.trend_stats@v2.ret_1d gt 0 for the break up; feature.inside_day_breakout is that pair"
 
 [[field]]
-name = "rollup.iv_term@v1.iv_90d"
-theme = "implied volatility"
-reads = "Our constant 90-day at-the-money vol as a fraction: the two expiries around 90 days among 30 to 180 days out (standard monthlies first), each priced as in rollup.iv30@v1.iv30, interpolated in total variance. The back of the term structure: the vol the market charges for a quarter."
+name = "rollup.candle@v1.candle"
+theme = "volume"
+reads = "The named candle of the session: HAMMER (a long lower wick, a small upper wick, a body above a doji: sellers pushed the price down and buyers took it back), SHOOTING_STAR (the mirror: buyers pushed it up and sellers took it back), DOJI (open and close nearly equal: indecision), BULLISH_ENGULFING (a rising body that covers the previous falling body and is at least half an average body), BEARISH_ENGULFING (the mirror), else NONE. The first match wins, in that order: engulfing, hammer, shooting star, doji."
 caveats = [
-  "Needs both expiries of the pair with ATM vols: a thin back month makes it null (NO_90D) and the term ratio with it.",
-  "A name's back vol sits near its long-run level; a front vol far above it is stress or an event, far below it is calm.",
+  "A single candle means little without its location: a hammer at support (feature.dist_to_support small) or after a run down means something; in the middle of a range it is noise. Bulkowski's tests put the reliability of most candles near a coin flip, a hammer or an engulfing in the right place a little better; use it as a filter on a setup, never as the setup.",
+  "A shooting star or a bearish engulfing matters after a run up: check feature.stretch_sma20_atr (above 2) before reading it as a top.",
+  "An earnings day makes gaps and engulfing bars by nature: check rollup.earnings@v1.last_earnings_date and drop the report day from a pattern screen.",
+  "Null when the bar has no range (high equals low) or the previous session has no bar. An unknown 20-session average body never matches an engulfing candle: the bar then reads on as a hammer, a shooting star, a doji or NONE.",
 ]
-sources = ["Site convention (docs/data/positioning.md)"]
+sources = ["Nison (1991), Japanese Candlestick Charting Techniques", "Bulkowski (2008), Encyclopedia of Candlestick Charts: the reliability and the performance rank of each candle"]
 [[field.use]]
-for = "a high long-dated vol"
-op = "gte"
-value = 0.40
-mode = "soft"
-tolerance = 0.05
+for = "a hammer (at support or after a decline)"
+op = "eq"
+value = "HAMMER"
+mode = "hard"
+note = "with feature.dist_to_support lte 0.02, or feature.stretch_sma20_atr lte -2 after a run down"
+[[field.use]]
+for = "a shooting star (after a run up)"
+op = "eq"
+value = "SHOOTING_STAR"
+mode = "hard"
+note = "with feature.stretch_sma20_atr gte 2"
+[[field.use]]
+for = "a doji (indecision)"
+op = "eq"
+value = "DOJI"
+mode = "hard"
+[[field.use]]
+for = "a bullish engulfing day"
+op = "eq"
+value = "BULLISH_ENGULFING"
+mode = "hard"
+note = "with rollup.momentum@v1.rel_volume gte 1.25 for the volume to confirm it"
+[[field.use]]
+for = "a bearish engulfing day"
+op = "eq"
+value = "BEARISH_ENGULFING"
+mode = "hard"
+note = "with feature.stretch_sma20_atr gte 2 for a reversal after a run up"
 
 [[field]]
-name = "feature.term_ratio_30_90"
-theme = "implied volatility"
-reads = "The front of the vol term structure over the back: our 30-day ATM vol over the 90-day one. 1 is flat; above 1 is backwardation (the front richer than the back: an event or stress is priced near, calendars sell the front), above about 1.1 a clear one; below 1 is contango, the normal shape, below about 0.9 steep (calendars buy the front cheaply)."
+name = "feature.inside_day_breakout"
+theme = "volume"
+reads = "True when the session closed above the previous close and the previous session was an inside day (its range within the day before's): the squeeze of the quiet day resolved upward the day after. False for every other session; null when the return or the relation is unknown."
 caveats = [
-  "An earnings date inside 30 days (rollup.earnings@v1.days_to_earnings) lifts the 30-day vol and the ratio with it, with no stress in the market; feature.term_ratio_next_30 isolates the front expiry.",
-  "The two vols come from different expiries and spot rules (the 30-day one reads the feed's price, the 90-day one the close), a small error against a 0.1 threshold.",
-  "Null when either vol is null; a single usable expiry is not a 90-day vol.",
+  "Closing above the previous close is a weak test of a breakout: it is not above the inside day's high or the mother bar's high. Gate on rollup.trend_stats@v2.close_range_pos gte 0.7 or feature.breakout_20d to ask for a real break.",
+  "Direction only: an inside day inside a downtrend is a rest, not a base; gate on feature.trend_state eq UPTREND.",
+  "An earnings day or a news gap the day after is the event, not the pattern: check rollup.earnings@v1.last_earnings_date.",
+  "Null when yesterday or the day before has no bar, or the return is unknown.",
 ]
-sources = ["Term structure of implied volatility and calendar spreads: Natenberg, Option Volatility and Pricing"]
+sources = ["Crabel (1990), Day Trading with Short Term Price Patterns and Opening Range Breakout", "Bulkowski (2008), Encyclopedia of Candlestick Charts"]
 [[field.use]]
-for = "backwardation (the front richer than the back)"
-op = "gte"
-value = 1.1
-mode = "soft"
-tolerance = 0.05
-note = "with rollup.earnings@v1.days_to_earnings gt 30 to rule out a report"
-[[field.use]]
-for = "steep contango (the front cheap against the back)"
-op = "lte"
-value = 0.9
-mode = "soft"
-tolerance = 0.05
+for = "an inside day broke up"
+op = "eq"
+value = true
+mode = "hard"
+note = "with feature.trend_state eq UPTREND and rollup.momentum@v1.rel_volume gte 1.25"
 
 [[field]]
-name = "feature.term_ratio_next_30"
-theme = "implied volatility"
-reads = "The front-expiry premium: the ATM vol at the next expiry over the 30-day vol. 1 is no premium; above 1.2 an event (earnings, a ruling) is priced into the nearest expiry, above about 1.3 clearly so. After the event the premium drops out."
+name = "feature.strong_close"
+theme = "volume"
+reads = "True when the session closed in the top 30% of its range (rollup.trend_stats@v2.close_range_pos at least 0.7) with a body of at least half the range (rollup.candle@v1.body_share at least 0.5): buyers held into the close and the day was not a doji or a long-wick spike. False otherwise; null for a bar with no range."
 caveats = [
-  "A next expiry a few days out is noisy and pin-bid: read rollup.skew@v1.ne_dte and floor it near 7 days.",
-  "A name with weeklies has a different next expiry from one with monthlies only, so ratios of the two are not like for like.",
-  "Null when either vol is null.",
+  "One day: a strong close on a quiet day means little. Pair with rollup.momentum@v1.rel_volume gte 1.25 or rollup.candle@v1.body_vs_avg_20d gte 1.",
+  "The close can be strong because the day opened far below it (a gap up, an earnings day): check rollup.earnings@v1.last_earnings_date and rollup.gaps@v1.gap_open_pct.",
+  "The 0.7 and 0.5 are fixed; for other cuts use the two fields directly.",
 ]
-sources = ["Event vol in the front expiry: https://www.tastylive.com/concepts-strategies/implied-volatility-earnings"]
+sources = ["Nison (1991), Japanese Candlestick Charting Techniques", "O'Neil (2009), How to Make Money in Stocks: the close in the upper part of the day's range on a breakout"]
 [[field.use]]
-for = "an event priced into the nearest expiry"
-op = "gte"
-value = 1.3
-mode = "soft"
-tolerance = 0.1
-note = "with rollup.skew@v1.ne_dte gte 7"
+for = "closed strong with conviction"
+op = "eq"
+value = true
+mode = "hard"
+note = "with rollup.momentum@v1.rel_volume gte 1.25 on a breakout day"

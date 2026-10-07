@@ -52,6 +52,7 @@ from algotrade.features.rollups.options import (
     option_liquidity,
     put_wing,
 )
+from algotrade.features.rollups.patterns import candle
 from algotrade.features.rollups.positioning import (
     chain_flow,
     flow_history,
@@ -97,6 +98,7 @@ GROUPS: dict[str, FeatureGroup] = {
             volume.GROUP,
             bands.GROUP,
             trend_stats.GROUP,
+            candle.GROUP,
             vol_stats.GROUP,
             volume_profile.GROUP,
             swing_levels.GROUP,

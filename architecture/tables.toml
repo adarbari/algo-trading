@@ -220,6 +220,10 @@ name = "rollups/instrument/trend_stats@v2"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
 [[table]]
+name = "rollups/instrument/candle@v1"
+owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
+
+[[table]]
 name = "rollups/instrument/vol_stats@v1"
 owner = "apps/ingestion/algotrade_ingestion/tasks/derived/rollups.py"
 
