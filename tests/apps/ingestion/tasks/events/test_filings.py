@@ -1,33 +1,42 @@
-"""The ``filings`` task over the recorded SEC payload and synthetic submissions (ADR 0050): one
-``events/filing`` row per 8-K and instrument with ``known_from`` by the New York session of the
-acceptance time (around 16:00 ET and midnight UTC), the Item 2.02 releases as ``sec_8k``
-``events/earnings`` rows (the three ``time`` labels, ``reported``, a key that never collides
-with the calendar's), the default ``--since`` per CIK, and the item statuses."""
+"""The ``filings`` task over the recorded SEC payloads and synthetic submissions (ADR 0050): the
+universe's operating companies (no funds), one ``events/filing`` row per 8-K and instrument with
+``known_from`` by the New York session of the acceptance time (around 16:00 ET and midnight
+UTC), the Item 2.02 releases as ``sec_8k`` ``events/earnings`` rows (the three ``time`` labels,
+``reported``, a key that never collides with the calendar's), the per-CIK ``--since`` (resumable,
+``--limit``), the nightly from the daily form index (only the CIKs that filed, an unpublished
+day read again, a failing day stopping the walk) and the item statuses."""
 
 import json
+import re
 from datetime import date, datetime, timedelta
 from itertools import count
 from typing import Any
 
 import pandas as pd
+import pytest
 
+from algotrade.core.model.errors import MissingDataError
 from algotrade.data import StoreReader
 from algotrade.data.events import ALL_TIME, read_events
-from algotrade.services.events.scope import ScopedName
 from algotrade.storage.backends.memory import MemoryBackend
 from algotrade.storage.runs import RunStatus
 from algotrade.storage.tables.writers import StoreWriter
 from algotrade_ingestion.tasks.events.filings import (
+    COLUMNS,
     DEFAULT_SINCE,
     EARNINGS,
+    EARNINGS_COLUMNS,
     TABLE,
     TASK,
+    Listed,
     earnings_rows,
     ingest_filings,
     since_by_cik,
+    stored_filings,
 )
 from algotrade_ingestion.tasks.framework.run import IngestRun, TaskContext
 from algotrade_sources.framework.http import HttpError, RetryPolicy
+from algotrade_sources.vendors.sec.daily_index import SecDailyIndex, missing_index
 from algotrade_sources.vendors.sec.submissions import SecFilings
 from tests.conftest import REPO_ROOT
 from tests.helpers.ingest_fakes import FIXED, http_for, task_ctx
@@ -38,8 +47,12 @@ MU_MAIN = (SEC / "submissions_CIK0000723125.json").read_bytes()
 MU_PAGE = (SEC / "submissions_CIK0000723125-submissions-001.json").read_bytes()
 S1, S2 = date(2026, 10, 5), date(2026, 10, 12)
 MU, ALPHA = "0000723125", "0001652044"
-IDS = {s: f"EQ:{s}" for s in ("MU", "GOOGL", "GOOG", "NOCIK", "GONE", "BAD")}
-CIKS = {"MU": "723125", "GOOGL": "1652044", "GOOG": "1652044", "GONE": "999", "BAD": "888"}
+IDS = {s: f"EQ:{s}" for s in ("MU", "GOOGL", "GOOG", "NOCIK", "GONE", "BAD", "SPYX")}
+CIKS = {"MU": "723125", "GOOGL": "1652044", "GOOG": "1652044", "GONE": "999", "BAD": "888",
+        "SPYX": "777"}  # fmt: skip
+TYPES = {"SPYX": "ETF"}  # every other name is a common stock
+INDEX = (SEC / "daily_index_form_20260930_trimmed.idx").read_bytes()
+DENIED = b"<Error><Code>AccessDenied</Code><Message>Access Denied</Message></Error>"
 
 # (accession, acceptance UTC, filing date, items, form, report date)
 ALPHA_FILINGS = [
@@ -80,8 +93,8 @@ def submissions(cik: str, filings: list[tuple[str, str, str, str, str, str]]) ->
 class Feed:
     """SEC answers by CIK; 404 for an unknown one, 500 for ``broken``. A request log."""
 
-    def __init__(self, broken: tuple[str, ...] = ()) -> None:
-        self.bodies = {MU: MU_MAIN, ALPHA: submissions(ALPHA, ALPHA_FILINGS)}
+    def __init__(self, broken: tuple[str, ...] = (), alpha: list[Any] | None = None) -> None:
+        self.bodies = {MU: MU_MAIN, ALPHA: submissions(ALPHA, alpha or ALPHA_FILINGS)}
         self.broken, self.urls = broken, []
         self.page = MU_PAGE
 
@@ -106,6 +119,12 @@ def store() -> StoreWriter:
         for s, i in IDS.items()
     ]  # fmt: skip
     writer.write_table("instruments/reference", day, "ref", stamped(reference, day, "ref"))
+    universe = [
+        {"instrument_id": i, "symbol": s, "security_type": TYPES.get(s, "COMMON_STOCK"),
+         "optionable": True, "status": "ACTIVE", "universe_version": "v1"}
+        for s, i in IDS.items()
+    ]  # fmt: skip
+    writer.write_table("universe", day, "uni", stamped(universe, day, "uni"))
     company = [
         {
             "instrument_id": IDS[s],
@@ -139,6 +158,42 @@ def run(
 ) -> Any:
     source = SecFilings(http_for(feed, RetryPolicy(tries=1)))
     return ingest_filings(context(writer), source, session, symbols, **kw)
+
+
+class IndexFeed:
+    """Daily form indexes by day; S3's 403 AccessDenied for a day not in ``days`` (a weekend, a
+    holiday or not yet published), a 500 for ``broken``. A request log of the days asked."""
+
+    def __init__(self, days: dict[date, bytes], broken: tuple[date, ...] = ()) -> None:
+        self.days, self.broken, self.asked = days, broken, []
+
+    def __call__(self, url: str) -> bytes:
+        found = re.search(r"form\.(\d{4})(\d{2})(\d{2})\.idx", url)
+        assert found, url
+        day = date(*(int(g) for g in found.groups()))
+        self.asked.append(day)
+        if day in self.broken:
+            raise HttpError(500)
+        if day in self.days:
+            return self.days[day]
+        raise HttpError(403, body=DENIED)
+
+
+def index_text(day: date, filers: list[tuple[str, str, str]]) -> bytes:
+    """A form index of ``(form, cik, accession)`` lines in the recorded layout."""
+    header = b"".join(INDEX.splitlines(keepends=True)[:11])
+    lines = [
+        f"{form:<17}{'SOME CO':<62}{cik:<12}{day:%Y%m%d}    edgar/data/{cik}/{accession}.txt\n"
+        for form, cik, accession in filers
+    ]
+    return header + "".join(lines).encode()
+
+
+def nightly(writer: StoreWriter, feed: Feed, index: IndexFeed, session: date, **kw: Any) -> Any:
+    """The task as the nightly runs it: both sources, no ``--since``."""
+    source = SecFilings(http_for(feed, RetryPolicy(tries=1)))
+    daily = SecDailyIndex(http_for(index, RetryPolicy(tries=1, not_found=missing_index)))
+    return ingest_filings(context(writer), source, session, (), index=daily, **kw)
 
 
 def read(writer: StoreWriter, table: str, ids: list[str]) -> pd.DataFrame:
@@ -274,8 +329,8 @@ def test_item_statuses_for_missing_unknown_and_failing_names() -> None:
     writer, feed = store(), Feed(broken=("888",))
     record = run(writer, feed, ("MU", "NOCIK", "GONE", "BAD", "NOPE"))
     assert record.status is RunStatus.PARTIAL
-    assert record.items["sym:NOPE"].startswith("UNKNOWN")  # not in the reference: never fetched
-    assert record.items["cik:NOCIK"].startswith("NO_CIK")
+    assert record.items["sym:NOPE"].startswith("UNKNOWN")  # not in the universe: never fetched
+    assert "cik:NOCIK" not in record.items  # a name without a CIK is counted, not an item
     assert record.items["0000000999"].startswith("NO_DATA")  # SEC 404
     assert record.items["0000723125"].startswith("OK")
     assert record.items["0000000888"].startswith("FETCH_ERROR")
@@ -303,23 +358,25 @@ def test_a_failing_cik_is_counted_and_the_others_are_stored() -> None:
 def test_the_default_since_is_the_latest_stored_acceptance_else_2018() -> None:
     writer = store()
     with IngestRun(context(writer), TASK, S1) as first:
-        ciks = {MU: [ScopedName("EQ:MU", "MU", ())], ALPHA: [ScopedName("EQ:GOOGL", "GOOGL", ())]}
-        assert since_by_cik(first, ciks, None) == {MU: DEFAULT_SINCE, ALPHA: DEFAULT_SINCE}
-        assert since_by_cik(first, ciks, date(2020, 5, 1)) == {
+        ciks = {MU: [Listed("EQ:MU", "MU")], ALPHA: [Listed("EQ:GOOGL", "GOOGL")]}
+        nothing = stored_filings(first)
+        assert since_by_cik(ciks, nothing, None) == {MU: DEFAULT_SINCE, ALPHA: DEFAULT_SINCE}
+        assert since_by_cik(ciks, nothing, date(2020, 5, 1)) == {
             MU: date(2020, 5, 1),
             ALPHA: date(2020, 5, 1),
         }
     run(writer, Feed(), ("MU", "GOOGL"))
     with IngestRun(context(writer), TASK, S2) as second:
-        found = since_by_cik(second, {**ciks, "0000000001": [ScopedName("EQ:X", "X", ())]}, None)
+        both = {**ciks, "0000000001": [Listed("EQ:X", "X")]}
+        found = since_by_cik(both, stored_filings(second), None)
     assert found == {
         MU: date(2026, 9, 30),  # 20:02 UTC: that day in New York
         ALPHA: date(2026, 10, 5),  # the 00:30 UTC acceptance of the 6th is the 5th in New York
         "0000000001": DEFAULT_SINCE,
     }
     with IngestRun(context(writer), TASK, S2) as third:  # a share class newly in scope
-        two = {MU: [ScopedName("EQ:MU", "MU", ()), ScopedName("EQ:MU2", "MU2", ())]}
-        assert since_by_cik(third, two, None) == {MU: DEFAULT_SINCE}
+        two = {MU: [Listed("EQ:MU", "MU"), Listed("EQ:MU2", "MU2")]}
+        assert since_by_cik(two, stored_filings(third), None) == {MU: DEFAULT_SINCE}
 
 
 def test_a_later_run_reads_from_the_latest_stored_filing_and_changes_nothing_stored() -> None:
@@ -348,9 +405,183 @@ def test_an_acceptance_at_midnight_utc_is_written_one_second_later() -> None:
             "report_date": [None, None],
         }
     )
-    rows = earnings_rows(filings, ScopedName("EQ:X", "X", ()))
+    rows = earnings_rows(filings, Listed("EQ:X", "X"))
     assert list(rows["ts"]) == [
         pd.Timestamp("2026-10-06 00:00:01", tz="UTC"),
         pd.Timestamp("2026-10-06 00:00:30", tz="UTC"),
     ]
     assert list(rows["earnings_date"]) == [date(2026, 10, 5), date(2026, 10, 5)]
+
+
+# ----------------------------------------------------------------------------- the universe
+
+
+def test_the_whole_universe_is_covered_without_funds() -> None:
+    writer, feed = store(), Feed()
+    record = run(writer, feed, ())
+    s = record.stats
+    assert (s["names"], s["funds_excluded"], s["with_cik"]) == (6, 1, 5)  # SPYX is an ETF
+    assert s["without_cik"] == ["NOCIK"] and s["mode"] == "per_cik"
+    assert s["ciks"] == 4  # MU, the one Alphabet CIK for two classes, GONE, BAD
+    assert not any("777" in url for url in feed.urls)  # the fund's CIK is never asked
+    stored = set(read(writer, TABLE, list(IDS.values()))["instrument_id"])
+    assert stored == {"EQ:MU", "EQ:GOOGL", "EQ:GOOG"}
+
+
+def test_a_run_without_a_universe_snapshot_fails() -> None:
+    writer = StoreWriter(MemoryBackend())
+    with pytest.raises(MissingDataError):
+        run(writer, Feed(), ())
+    assert StoreReader(writer._backend).runs(TASK)[-1].status is RunStatus.FAILED
+
+
+# ----------------------------------------------------------------------------- the backfill
+
+
+def test_a_backfill_skips_ciks_it_already_reaches_and_asks_never_stored_ones_first() -> None:
+    writer = store()
+    run(writer, Feed(), ("GOOGL",), since=date(2026, 1, 15))  # one Alphabet class, back to 01-15
+    second = Feed()
+    record = run(writer, second, (), since=date(2026, 1, 15))
+    # GOOG was never stored, so the Alphabet CIK is asked again, after the CIKs never stored.
+    assert record.stats["skipped_covered"] == 0
+    assert [u.rsplit("/", 1)[1] for u in second.urls] == [
+        "CIK0000723125.json", "CIK0000000999.json", "CIK0000000888.json", "CIK0001652044.json"
+    ]  # fmt: skip
+    third = Feed()
+    record = run(writer, third, (), since=date(2026, 1, 15))
+    assert record.stats["skipped_covered"] == 1  # both Alphabet classes now reach 01-15
+    # Micron's first stored filing is later than that start: a company listed later is asked
+    # again, after the CIKs never stored.
+    assert [u.rsplit("/", 1)[1] for u in third.urls] == [
+        "CIK0000000999.json", "CIK0000000888.json", "CIK0000723125.json"
+    ]  # fmt: skip
+
+
+def test_the_limit_caps_the_ciks_of_a_run() -> None:
+    writer, feed = store(), Feed()
+    record = run(writer, feed, (), since=DEFAULT_SINCE, limit=2)
+    assert record.stats["ciks"] == len(feed.urls) == 2  # MU, then the Alphabet CIK
+    again = Feed()
+    run(writer, again, (), since=DEFAULT_SINCE, limit=2)
+    # Alphabet's first stored filing (2026-01) does not reach 2018: it is asked again, but the
+    # CIKs never stored come first, so repeated runs make progress through the universe.
+    assert [u.rsplit("/", 1)[1] for u in again.urls] == ["CIK0000000999.json", "CIK0000000888.json"]
+
+
+# ----------------------------------------------------------------------------- the nightly
+
+
+EXTRA = ("A10", "2026-10-07T14:00:00.000Z", "2026-10-07", "7.01", "8-K", "")  # a new 8-K
+LATER = ("A11", "2026-10-08T14:00:00.000Z", "2026-10-08", "2.02", "8-K", "")  # not indexed yet
+
+
+def seeded() -> StoreWriter:
+    """A store whose latest stored filing is Alphabet's of 2026-10-06 (A5, accepted 00:30 UTC)."""
+    writer = store()
+    run(writer, Feed(), ("GOOGL",))
+    return writer
+
+
+def test_the_nightly_asks_only_the_ciks_the_index_shows_and_stops_at_the_last_day() -> None:
+    writer = seeded()
+    feed = Feed(alpha=[*ALPHA_FILINGS, EXTRA, LATER])
+    index = IndexFeed(
+        {
+            date(2026, 10, 7): index_text(
+                date(2026, 10, 7),
+                [("8-K", "1652044", "A10"), ("8-K", "55555", "X1"), ("10-K", "723125", "X2")],
+            )
+        }
+    )
+    record = nightly(writer, feed, index, date(2026, 10, 8))
+    assert record.status is RunStatus.COMPLETE
+    assert index.asked == [date(2026, 10, 6), date(2026, 10, 7), date(2026, 10, 8)]
+    assert [u.rsplit("/", 1)[1] for u in feed.urls] == ["CIK0001652044.json"]  # not MU, not 55555
+    items = record.items
+    assert items["idx:2026-10-06"].startswith("NO_DATA") and "holiday" in items["idx:2026-10-06"]
+    assert items["idx:2026-10-07"] == "OK: 2 CIKs with an 8-K"  # the 10-K line is no filer
+    assert items["idx:2026-10-08"].startswith("NO_DATA: not published yet")
+    assert items["0001652044"].startswith("OK")
+    stored = read(writer, TABLE, ["EQ:GOOGL", "EQ:GOOG"]).set_index("accession")
+    assert "A10" in stored.index and "A11" not in stored.index  # past the last day read: not yet
+    assert set(stored["instrument_id"]) == {"EQ:GOOGL", "EQ:GOOG"}
+    s = record.stats
+    assert (s["mode"], s["days"], s["days_failed"], s["ciks"], s["ciks_failed"]) == (
+        "daily_index", 3, 0, 1, 0,
+    )  # fmt: skip
+    assert (s["since"], s["until"]) == ("2026-10-07", "2026-10-07")
+    assert read(writer, EARNINGS, ["EQ:GOOGL"])["earnings_date"].max() == date(2026, 10, 5)
+
+
+def test_an_unpublished_day_is_read_again_the_next_night() -> None:
+    writer = seeded()
+    feed = Feed(alpha=[*ALPHA_FILINGS, EXTRA, LATER])
+    first = nightly(writer, feed, IndexFeed({}), date(2026, 10, 7))
+    assert first.status is RunStatus.COMPLETE and first.stats["ciks"] == 0
+    assert len(read(writer, TABLE, ["EQ:GOOGL"])) == 9  # nothing new stored, no progress
+    published = {
+        date(2026, 10, 7): index_text(date(2026, 10, 7), [("8-K", "1652044", "A10")]),
+        date(2026, 10, 8): index_text(date(2026, 10, 8), [("8-K/A", "1652044", "A11")]),
+    }
+    again = Feed(alpha=[*ALPHA_FILINGS, EXTRA, LATER])
+    second = nightly(writer, again, IndexFeed(published), date(2026, 10, 9))
+    assert second.stats["until"] == "2026-10-08" and second.status is RunStatus.COMPLETE
+    assert {"A10", "A11"} <= set(read(writer, TABLE, ["EQ:GOOGL"])["accession"])
+
+
+def test_a_day_whose_index_is_over_seven_business_days_missing_is_a_fetch_error() -> None:
+    writer = seeded()
+    index = IndexFeed({})
+    record = nightly(writer, Feed(), index, date(2026, 10, 20))
+    # From 10-06: the 6th to the 8th are more than seven business days before the 20th, the 9th
+    # (seven) and later are not.
+    stale = [k for k, v in record.items.items() if v.startswith("FETCH_ERROR")]
+    assert stale == [f"idx:2026-10-{d:02d}" for d in (6, 7, 8)]
+    assert record.items["idx:2026-10-09"].startswith("NO_DATA: not published yet")
+    assert record.status is RunStatus.PARTIAL and record.stats["days_failed"] == 3
+
+
+def test_a_failing_day_stops_the_walk_so_later_days_are_never_stored_over_it() -> None:
+    writer = seeded()
+    feed = Feed(alpha=[*ALPHA_FILINGS, EXTRA, LATER])
+    index = IndexFeed(
+        {
+            date(2026, 10, 6): index_text(date(2026, 10, 6), [("8-K", "1652044", "A5")]),
+            date(2026, 10, 8): index_text(date(2026, 10, 8), [("8-K", "1652044", "A11")]),
+        },
+        broken=(date(2026, 10, 7),),
+    )
+    record = nightly(writer, feed, index, date(2026, 10, 8))
+    assert record.items["idx:2026-10-07"].startswith("FETCH_ERROR")
+    assert date(2026, 10, 8) not in index.asked and record.status is RunStatus.PARTIAL
+    accessions = set(read(writer, TABLE, ["EQ:GOOGL"])["accession"])
+    assert "A11" not in accessions and "A10" not in accessions  # 10-07 is still to read
+    assert record.stats["until"] == "2026-10-06" and record.stats["days_failed"] == 1
+
+
+def test_an_explicit_since_or_an_empty_store_reads_per_cik_even_with_the_index() -> None:
+    index = IndexFeed({})
+    fresh, feed = store(), Feed()
+    record = nightly(fresh, feed, index, S1, limit=1)  # nothing stored: per CIK, capped
+    assert record.stats["mode"] == "per_cik" and record.stats["ciks"] == 1 and index.asked == []
+    backfill = nightly(seeded(), Feed(), index, S2, since=date(2026, 1, 1))
+    assert backfill.stats["mode"] == "per_cik" and index.asked == []
+
+
+def test_both_paths_store_the_same_rows_for_a_recorded_day() -> None:
+    """Micron's 8-K of 2026-09-30: the per-CIK read and the daily index read agree."""
+    per_cik = store()
+    run(per_cik, Feed(), ("MU",), since=date(2026, 9, 29))
+    old = ("O1", "2026-09-29T13:00:00.000Z", "2026-09-29", "7.01", "8-K", "")  # Alphabet, a day on
+    through_index = store()
+    run(through_index, Feed(alpha=[old]), ("GOOGL",), since=date(2026, 9, 29))
+    index = IndexFeed({date(2026, 9, 30): INDEX})  # the recorded form index of that day
+    record = nightly(through_index, Feed(alpha=[old]), index, S1)
+    assert record.stats["mode"] == "daily_index" and record.stats["ciks"] == 1  # MU only
+    assert record.items["idx:2026-09-30"].startswith("OK")
+    for table, columns in ((TABLE, COLUMNS), (EARNINGS, EARNINGS_COLUMNS)):
+        want = read(per_cik, table, ["EQ:MU"])
+        got = read(through_index, table, ["EQ:MU"])
+        assert len(want) >= 1
+        pd.testing.assert_frame_equal(want[[*columns, "source"]], got[[*columns, "source"]])
