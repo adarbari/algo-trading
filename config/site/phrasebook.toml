@@ -204,6 +204,7 @@ say = ["top decile momentum", "top decile", "momentum leaders", "best performers
 fields = ["rollup.relative_strength@v1.mom_pctile_63d", "rollup.relative_strength@v1.mom_pctile_252d"]
 hint = "mom_pctile_63d gte 0.9 (the top tenth of stocks over a quarter; mom_pctile_252d for a year); a rank, not a size: add feature.pct_vs_sma_200 gt 0"
 
+[[phrase]]
 say = ["covered call", "covered calls", "sell calls against shares", "call to write"]
 fields = ["rollup.call_wing@v1.wing_status", "rollup.call_wing@v1.best_call_yield", "feature.call_otm_pct", "feature.cc_yield_annualised"]
 hint = "the call at the 30 to 60 day expiry nearest 45 days, 15 to 30 delta (ours): wing_status eq OK, soft with tolerance 0 (the near miss is OUTSIDE_BAND); rank by best_call_yield (0.01 is 1% for the term) or cc_yield_annualised gte 0.10; call_otm_pct gte 0.04 for room before the shares are called away; add feature.ex_div_before_expiry eq false when the sentence says early assignment"

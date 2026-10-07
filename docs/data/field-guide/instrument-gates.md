@@ -189,7 +189,7 @@ Sources: O'Neil (1988), How to Make Money in Stocks: relative price strength; Le
 
 **When the reading lies**
 
-- A year back is one start date: a name that fell hard 252 sessions ago and recovered reads a big positive value that says 'bounce', not 'leader'. Check rollup.trend_stats@v1.mom_12_1 (skips the last month) and rollup.relative_strength@v1.rs_spy_63d.
+- A year back is one start date: a name that fell hard 252 sessions ago and recovered reads a big positive value that says 'bounce', not 'leader'. Check rollup.trend_stats@v2.mom_12_1 (skips the last month) and rollup.relative_strength@v1.rs_spy_63d.
 - A recent listing or a gap in the year gives null, never a shorter window: a young name is invisible to a hard criterion on this field.
 - Price return only (no dividends).
 
@@ -281,7 +281,7 @@ Sources: Jegadeesh and Titman (1993), Returns to buying winners and selling lose
 
 **When the reading lies**
 
-- It includes the most recent month, where short-term reversal works against it: a name at 0.95 after a spike this month may pull back. Check rollup.trend_stats@v1.mom_12_1 and rollup.relative_strength@v1.ret_5d_pctile.
+- It includes the most recent month, where short-term reversal works against it: a name at 0.95 after a spike this month may pull back. Check rollup.trend_stats@v2.mom_12_1 and rollup.relative_strength@v1.ret_5d_pctile.
 - A rank over a year favours names that are already extended; add feature.pct_vs_sma_50 lte 0.2 when you do not want to chase.
 - Null with no universe snapshot on or before the session, fewer than 90% of its members with a bar on the session (min_coverage), fewer than 200 members with a known return (min_members), or a gap in the name's own 253 closes (a recent listing).
 

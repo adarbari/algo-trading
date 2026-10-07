@@ -196,7 +196,7 @@ name = "rollup.relative_strength@v1.rs_spy_252d"
 theme = "instrument gates"
 reads = "Relative strength against SPY over a year (252 sessions): (1 + the name's return) / (1 + SPY's return) - 1. The long-run leadership reading: above 0 the name has beaten the market over the year, 0.30 is thirty points ahead. It moves slowly; a quarter that turned (rs_spy_63d) takes months to show here."
 caveats = [
-  "A year back is one start date: a name that fell hard 252 sessions ago and recovered reads a big positive value that says 'bounce', not 'leader'. Check rollup.trend_stats@v1.mom_12_1 (skips the last month) and rollup.relative_strength@v1.rs_spy_63d.",
+  "A year back is one start date: a name that fell hard 252 sessions ago and recovered reads a big positive value that says 'bounce', not 'leader'. Check rollup.trend_stats@v2.mom_12_1 (skips the last month) and rollup.relative_strength@v1.rs_spy_63d.",
   "A recent listing or a gap in the year gives null, never a shorter window: a young name is invisible to a hard criterion on this field.",
   "Price return only (no dividends).",
 ]
@@ -304,7 +304,7 @@ name = "rollup.relative_strength@v1.mom_pctile_252d"
 theme = "instrument gates"
 reads = "Where the 252-session (a year) return ranks among the universe's stocks: the share of universe members whose return is strictly below the name's, among members with a known return. 0.9 is the top decile of the year, 0.5 the median. The classic momentum rank; it includes the last month, which mom_12_1 skips."
 caveats = [
-  "It includes the most recent month, where short-term reversal works against it: a name at 0.95 after a spike this month may pull back. Check rollup.trend_stats@v1.mom_12_1 and rollup.relative_strength@v1.ret_5d_pctile.",
+  "It includes the most recent month, where short-term reversal works against it: a name at 0.95 after a spike this month may pull back. Check rollup.trend_stats@v2.mom_12_1 and rollup.relative_strength@v1.ret_5d_pctile.",
   "A rank over a year favours names that are already extended; add feature.pct_vs_sma_50 lte 0.2 when you do not want to chase.",
   "Null with no universe snapshot on or before the session, fewer than 90% of its members with a bar on the session (min_coverage), fewer than 200 members with a known return (min_members), or a gap in the name's own 253 closes (a recent listing).",
 ]
