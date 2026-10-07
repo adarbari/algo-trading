@@ -92,7 +92,7 @@ table: `out/feature-gap-survey.md` in the working tree). What it adds to the tra
 | balance-sheet and cash-flow facts (equity, assets, debt, OCF, capex, gross profit) and `roe`, `roa`, `pb_ratio`, `debt_to_equity`, `fcf_yield`, `gross_profitability` | `balance_sheet@v1` (corporate/; the companyfacts document is already fetched whole) | planned |
 | unusual options activity at chain level (`unusual_contracts`, `max_vol_oi_ratio`, `unusual_premium_usd`) | `chain_flow@v1` (positioning.md) | planned |
 | `iv30_chg_1d`, `iv30_chg_5d` | `iv_history@v3` | planned |
-| bar shape (body and wick shares, inside / outside bar) and the six named candles (hammer, shooting star, doji, bullish / bearish engulfing, inside-day breakout) | `candle@v1`, new folder `patterns/` | planned |
+| bar shape (body and wick shares, inside / outside bar) and the six named candles (hammer, shooting star, doji, bullish / bearish engulfing, inside-day breakout) | `candle@v1`, new folder `patterns/` | built |
 
 Left out as window variants or covered: IBD's RS rating (the percentiles cover it), RSI(2),
 CCI / MFI / stochastics, Hurst and efficiency ratios, the other TA-Lib candles, chart-pattern
@@ -135,6 +135,7 @@ folder per kind of thing; `architecture/layout.toml`):
 |---|---|---|---|
 | `bands@v2` | `price/` | `ema_10/20/50/200`, `sma_150`, `ema20_slope_5d`, `ema50_slope_10d`, `sma200_slope_20d`, `close_std_20`, `bb_width_pctile_252d`, `band_walk` | built |
 | `trend_stats@v2` | `price/` | `ret_1d/3d/10d/120d/252d`, `mom_12_1`, `mom_accel_5d`, `ret_z_20d`, `high_100d`, `low_100d`, `high_200d`, `low_200d`, `prior_high_50d`, `prior_low_20d`, `prior_low_50d`, `sessions_since_high_20d`, `close_range_pos`, `trend_r2_90d`, `reg_slope_90d_ann`, `close_streak`, `sma20_streak`, `tight_range_sessions` | built |
+| `candle@v1` | `patterns/` | `body_share`, `upper_wick_share`, `lower_wick_share`, `body_vs_avg_20d`, `bar_relation`, `prev_bar_relation`, `candle` | built |
 | `swing_levels@v1` | `levels/` (moved from `price/`) | unchanged | built |
 | `pivot_strength@v1` | `levels/` | `resistance_touches`, `support_touches`, `resistance_age`, `support_age`, `pivot_structure` | built ([swing.md](swing.md)) |
 | `retest@v1` | `levels/` | `breakout_date`, `breakout_level`, `sessions_since_breakout`, `retest_state`, `failed_breakouts_252d` | built ([swing.md](swing.md)) |
@@ -223,6 +224,37 @@ Worked examples: 60 closes rising every day give `close_streak` 59 and `sma20_st
 -1% (sample stdev 0.01026) and a +3% session is 2.92; a 2% daily range with one spike high 30
 sessions ago gives `tight_range_sessions` 10 (the spike left the 20-session window 10
 sessions ago).
+
+## `candle@v1` (patterns/)
+
+Inputs: `bars/1d`, the session plus 20 earlier sessions. Params (`config/site/rollups.toml`):
+`doji_body` (0.1: a body at most this share of the range), `hammer_wick` (2.0: the long wick at
+least this many bodies), `small_body` (0.3: the other wick at most this share of the range),
+`engulf_min_body` (0.5: an engulfing body at least this many 20-session average bodies). Every
+column reads the session's open, high, low and close (and the previous bar where said).
+
+| Column | Definition | Null when |
+|---|---|---|
+| `body_share` | \|close - open\| / (high - low), 0 to 1 | the bar has no range |
+| `upper_wick_share`, `lower_wick_share` | (high - max(open, close)) / range and (min(open, close) - low) / range, 0 to 1 | the bar has no range |
+| `body_vs_avg_20d` | \|close - open\| / the mean \|close - open\| of the 20 sessions before; 1 is a usual body | a session among the 20 before has no bar, the history is shorter, or the mean is zero |
+| `bar_relation` | INSIDE (high <= previous high and low >= previous low), OUTSIDE (high > previous high and low < previous low), UP_GAP (low > previous high), DOWN_GAP (high < previous low), else OVERLAP; tested in that order | the previous session has no bar |
+| `prev_bar_relation` | the same label for the previous session against the one before it | the previous session or the one before has no bar |
+| `candle` | the first matching of the order below, else NONE | the bar has no range, or the previous session has no bar |
+
+Precedence of `candle`: (1) BULLISH_ENGULFING: close > open, previous close < previous open,
+open <= previous close, close >= previous open, body >= `engulf_min_body` x the 20-session
+average body; (2) BEARISH_ENGULFING: the mirror; (3) HAMMER: lower wick >= `hammer_wick` x body,
+upper wick share <= `small_body`, body share > `doji_body`; (4) SHOOTING_STAR: the mirror with
+the upper wick; (5) DOJI: body share <= `doji_body`; (6) NONE. An unknown average body never
+matches an engulfing candle (the bar then reads on to the later tests; the label is not null
+for it). The inside-day breakout is not a candle but the expression `inside_day_breakout`
+(`ret_1d > 0` and `prev_bar_relation` INSIDE); `strong_close` is `close_range_pos >= 0.7` and
+`body_share >= 0.5` (both in `config/site/features/swing.toml`).
+
+Worked example: open 100, high 101.2, low 95, close 101 after 20 sessions of body 1: body
+share 1 / 6.2 = 0.16, lower wick 5 (5 bodies, share 0.81), upper wick share 0.03: HAMMER;
+`body_vs_avg_20d` 1.0.
 
 ## `relative_strength@v1` (relative/)
 

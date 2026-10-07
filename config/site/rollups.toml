@@ -168,6 +168,12 @@ min_sector_etfs = 6      # sector ETFs (of 11) with a known 63-session return a 
 ["trend_stats@v2"]        # streaks and the base length (docs/data/technical.md)
 tight_range_pct = 0.15   # a 20-session high-low range at most this share of the close is tight
 
+["candle@v1"]            # bar shape and the named candles (docs/data/technical.md)
+doji_body = 0.1          # a body at most this share of the range is a doji
+hammer_wick = 2.0        # a hammer / shooting star's long wick is at least this many bodies
+small_body = 0.3         # the other wick at most this share of the range
+engulf_min_body = 0.5    # an engulfing body at least this x the 20-session average body
+
 ["volume_profile@v1"]     # volume at price from daily bars (docs/data/technical.md)
 bins = 50                # price bins between the window's lowest low and highest high
 value_area = 0.70        # share of the volume the value area holds

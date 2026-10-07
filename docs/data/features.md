@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-399 stored features in 40 groups, in dependency order; 115 expression features.
+406 stored features in 41 groups, in dependency order; 117 expression features.
 
 ## `option_liquidity@v1`
 
@@ -213,6 +213,20 @@ Short and long returns, the 12-1 momentum and its acceleration, the return z-sco
 | `close_streak` | window | int | sessions | open | -252 .. 252 | Signed count of consecutive sessions, ending on the session, with the close above the previous close (positive) or below it (negative); 0 when the close is unchanged; the count stops at the first session without a bar before it | no bar on the session before (a gap) | `bars/1d.close` |
 | `sma20_streak` | window | int | sessions | open | -252 .. 252 | Signed count of consecutive sessions, ending on the session, with the close above its 20-session mean (positive) or below it (negative); 0 when equal; the count stops at the first session whose mean is unknown | the session's 20-session mean is unknown (a session among the last 20 has no bar (a gap), or the history is shorter) | `bars/1d.close` |
 | `tight_range_sessions` | window | int | sessions | open | >= 0 | Consecutive sessions, ending on the session, on which the 20-session high-low range / close was at most tight_range_pct (0.15): the length of the base (0: the session itself is not tight) | the session's 20-session range is unknown (a session among the last 20 has no bar (a gap), or the history is shorter) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
+
+## `candle@v1`
+
+The session's bar shape (body and wick shares, the body against its 20-session average), its relation to the previous bar (inside, outside, gaps) and the named candles (hammer, shooting star, doji, bullish and bearish engulfing). Stored as `rollups/instrument/candle@v1`; reads `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `body_share` | window | float32 | ratio | open | 0 .. 1 | The candle body over the session's range: \|close - open\| / (high - low); 0 is a doji, 1 a marubozu (no wicks), 0.5 a body half the day's range | the bar has no range (high equals low) | `bars/1d.open`, `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
+| `upper_wick_share` | window | float32 | ratio | open | 0 .. 1 | The upper shadow over the session's range: (high - max(open, close)) / (high - low); 0.6 means the price gave back most of its day's high | the bar has no range (high equals low) | `bars/1d.open`, `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
+| `lower_wick_share` | window | float32 | ratio | open | 0 .. 1 | The lower shadow over the session's range: (min(open, close) - low) / (high - low); 0.6 means the price was bought back from most of its day's low | the bar has no range (high equals low) | `bars/1d.open`, `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
+| `body_vs_avg_20d` | window | float32 | ratio | open | >= 0 | The session's \|close - open\| over the mean \|close - open\| of the 20 sessions before it: above 1 a bigger body than usual, 2 twice the usual | a session among the 20 before has no bar (a gap), or the history is shorter; or those bodies were all zero (a zero mean) | `bars/1d.open`, `bars/1d.close` |
+| `bar_relation` | label | str | category | open | INSIDE, OUTSIDE, UP_GAP, DOWN_GAP, OVERLAP | The session's high-low range against the previous session's: INSIDE (high at or below the previous high and low at or above the previous low), OUTSIDE (a higher high and a lower low), UP_GAP (the low above the previous high), DOWN_GAP (the high below the previous low), else OVERLAP; tested in that order | the previous session has no bar | `bars/1d.high`, `bars/1d.low` |
+| `prev_bar_relation` | label | str | category | open | INSIDE, OUTSIDE, UP_GAP, DOWN_GAP, OVERLAP | bar_relation of the previous session (its range against the session before it): what the day before was, for a pattern that completes today (an inside day breakout) | the previous session or the one before it has no bar | `bars/1d.high`, `bars/1d.low` |
+| `candle` | label | str | category | open | HAMMER, SHOOTING_STAR, DOJI, BULLISH_ENGULFING, BEARISH_ENGULFING, NONE | The named candle of the session, the first match of BULLISH_ENGULFING (an up body that covers the previous down body, at least engulf_min_body x the 20-session average body), BEARISH_ENGULFING (the mirror), HAMMER (a lower wick of at least hammer_wick bodies, the upper wick at most small_body of the range, a body above doji_body), SHOOTING_STAR (the mirror), DOJI (body at most doji_body of the range), else NONE | the bar has no range (high equals low), or the previous session has no bar; an unknown 20-session average body never matches an engulfing candle (the bar reads on to the other tests, never null for it) | `bars/1d.open`, `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
 
 ## `vol_stats@v1`
 
@@ -844,6 +858,8 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | `cc_resistance_cushion_atr` | expression | float | ratio | open |  | The covered call's cushion above resistance in ATRs: (the best call's strike - resistance) / atr_14, how many average days' range sit between the swing high and the strike (negative: the strike is below resistance) | no confirmed swing high above the close, no best call, atr_14 null (fewer than 15 consecutive bars) or 0 | `(call_wing.best_call_strike - swing_levels.swing_high) / momentum.atr_14` | virtual |
 | `in_value_area` | expression | bool | flag | open |  | The close sits inside the year's value area (the price band that held 70% of the volume): fair value by volume; outside it the price is at an extreme the market has traded little | the value area is null (profile_status not OK) and the known side does not already say false | `price_stats.close >= volume_profile.value_area_low and price_stats.close <= volume_profile.value_area_high` | virtual |
 | `dist_to_poc` | expression | float | decimal | open | >= -1 | Close / the point of control - 1: how far the price sits from the year's most-traded level, 0.05 is 5% above it (the level acts as a magnet and as support when above, resistance when below) | poc_252d is null (profile_status not OK), or no price_stats row | `price_stats.close / volume_profile.poc_252d - 1` | virtual |
+| `inside_day_breakout` | expression | bool | flag | open |  | The session closed above the previous close and the previous session was an inside day (its high-low range within the day before's): the day after the squeeze resolved up | neither condition is false and one is unknown (ret_1d null: a gap in the last 2 sessions; prev_bar_relation null: the previous session or the one before it has no bar), or no trend_stats or candle row | `trend_stats.ret_1d > 0 and candle.prev_bar_relation == "INSIDE"` | virtual |
+| `strong_close` | expression | bool | flag | open |  | The session closed strong with conviction: the close in the top 30% of the day's range (close_range_pos at least 0.7) and a body of at least half the range (body_share at least 0.5), so not a doji or a long-wick spike | neither condition is false and one is unknown (the bar has no range), or no trend_stats or candle row | `trend_stats.close_range_pos >= min_close_pos and candle.body_share >= min_body` (min_close_pos = 0.7, min_body = 0.5) | virtual |
 
 ### `volatility.toml`
 
