@@ -440,6 +440,7 @@ def test_the_committed_feature_files_load() -> None:
         "volatility",
         "volume",
         "vrp",
+        "wings",
     ]
     definitions = load_features(store)
     assert {d.name for d in definitions} >= {"liquidity_class", "div_yield", "near_52w"}

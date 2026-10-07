@@ -16,6 +16,7 @@ from hypothesis import strategies as st
 from algotrade.features.framework.runner import compute_one
 from algotrade.features.registry import GROUPS
 from algotrade.features.rollups.options import put_wing as pw
+from algotrade.features.rollups.options import wing_search as ws
 from algotrade.quant.black_scholes import greeks
 from tests.helpers.rollup_store import END, chain_rows, store, write_chains, write_curve
 
@@ -117,20 +118,20 @@ def test_target_expiry_closest_to_45_ties_to_the_earlier() -> None:
         }
     )
     puts["dte"] = [(e - END).days for e in puts["expiry"]]
-    targets = pw.target_expiries(puts, P).to_dict()
+    targets = ws.target_expiries(puts, P).to_dict()
     assert targets == {"A": E50, "B": END + timedelta(days=40)}  # 40 and 50: the earlier
     edges = puts.assign(dte=[30, 60, 61, 29, 30, 60, 29, 61])
-    assert pw.target_expiries(edges, P).to_dict() == {"A": E25, "B": END + timedelta(days=40)}
+    assert ws.target_expiries(edges, P).to_dict() == {"A": E25, "B": END + timedelta(days=40)}
 
 
 def test_standard_monthly_first_unless_disabled() -> None:
     weekly, monthly = END + timedelta(days=42), date(2026, 11, 20)  # 42 and 49 days out
     puts = pd.DataFrame({"underlying_id": ["A", "A"], "expiry": [weekly, monthly]})
     puts["dte"] = [(e - END).days for e in puts["expiry"]]
-    assert pw.target_expiries(puts, P).to_dict() == {"A": monthly}
-    assert pw.target_expiries(puts, replace(P, prefer_monthly=False)).to_dict() == {"A": weekly}
+    assert ws.target_expiries(puts, P).to_dict() == {"A": monthly}
+    assert ws.target_expiries(puts, replace(P, prefer_monthly=False)).to_dict() == {"A": weekly}
     outside = puts.assign(dte=[42, 61])  # a monthly outside the window never wins
-    assert pw.target_expiries(outside, P).to_dict() == {"A": weekly}
+    assert ws.target_expiries(outside, P).to_dict() == {"A": weekly}
 
 
 def _wing(deltas: list[float], **columns: list[float]) -> pd.DataFrame:
@@ -168,7 +169,7 @@ def _wing(deltas: list[float], **columns: list[float]) -> pd.DataFrame:
 def test_delta_band_and_search_edges_are_included(
     delta: float, status: str, distance: float | None
 ) -> None:
-    row = pw.wing_row(_wing([delta]), P)
+    row = ws.wing_row(_wing([delta]), P, pw.SIDE)
     assert row["wing_status"] == status
     assert row["n_strikes"] == int(status == "OK")
     assert row["n_unpriced"] == int(np.isnan(delta))
@@ -181,12 +182,12 @@ def test_delta_band_and_search_edges_are_included(
 def test_closeness_to_the_band_ranks_before_roc() -> None:
     """20 delta beats 25 delta whatever the ROC; inside the band the highest ROC wins."""
     out_of_band = _wing([-0.25, -0.20], strike=[95.0, 90.0], mid=[3.0, 1.0])
-    assert pw.wing_row(out_of_band, P)["best_put_strike"] == 90.0
-    assert pw.wing_row(out_of_band, P)["delta_band_distance"] == pytest.approx(0.05)
+    assert ws.wing_row(out_of_band, P, pw.SIDE)["best_put_strike"] == 90.0
+    assert ws.wing_row(out_of_band, P, pw.SIDE)["delta_band_distance"] == pytest.approx(0.05)
     inside = _wing([-0.09, -0.14, -0.30], strike=[80.0, 85.0, 95.0], mid=[0.8, 1.7, 9.0])
-    row = pw.wing_row(inside, P)
+    row = ws.wing_row(inside, P, pw.SIDE)
     assert (row["best_put_strike"], row["delta_band_distance"]) == (85.0, 0.0)  # 2% > 1%
-    assert pw.band_distance(pd.Series([0.04, 0.08, 0.2]), P).round(9).tolist() == [
+    assert ws.band_distance(pd.Series([0.04, 0.08, 0.2]), P).round(9).tolist() == [
         0.04,
         0.0,
         0.05,
@@ -195,10 +196,10 @@ def test_closeness_to_the_band_ranks_before_roc() -> None:
 
 def test_best_put_ties_higher_oi_then_lower_strike() -> None:
     tie = _wing([-0.1, -0.1, -0.1], strike=[90.0, 80.0, 70.0], mid=[0.9, 0.8, 0.7], oi=[5, 9, 9])
-    assert pw.wing_row(tie, P)["best_put_strike"] == 70.0  # equal ROC 1%; OI 9 beats 5
-    assert pw.wing_row(tie, P)["best_put_oi"] == 9
+    assert ws.wing_row(tie, P, pw.SIDE)["best_put_strike"] == 70.0  # equal ROC 1%; OI 9 beats 5
+    assert ws.wing_row(tie, P, pw.SIDE)["best_put_oi"] == 9
     nan_oi = _wing([-0.1, -0.1], mid=[1.0, 1.0], oi=[float("nan"), 3.0])
-    assert pw.wing_row(nan_oi, P)["wing_oi"] == 3  # unknown OI counts as none
+    assert ws.wing_row(nan_oi, P, pw.SIDE)["wing_oi"] == 3  # unknown OI counts as none
 
 
 def test_statuses_and_nulls() -> None:
@@ -306,7 +307,7 @@ def test_properties_on_random_chains(
         assert out["best_put_roc"] == pytest.approx(
             out["best_put_mid"] / out["best_put_strike"], rel=1e-6
         )
-        distance = pw.band_distance(pd.Series(size[found]), P).to_numpy()
+        distance = ws.band_distance(pd.Series(size[found]), P).to_numpy()
         assert out["delta_band_distance"] == pytest.approx(distance.min(), abs=1e-5)
         assert (out["wing_status"] == "OK") == (out["delta_band_distance"] == 0)
         if out["wing_status"] == "OK":

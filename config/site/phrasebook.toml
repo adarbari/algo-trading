@@ -185,6 +185,31 @@ fields = ["rollup.trend_stats@v2.ret_z_20d", "rollup.volume@v1.volume_z_20d"]
 hint = "ret_z_20d gte 3 for an up shock, lte -3 for a down one (three times the normal daily move); confirm with volume_z_20d gte 2"
 
 [[phrase]]
+say = ["covered call", "covered calls", "sell calls against shares", "call to write"]
+fields = ["rollup.call_wing@v1.wing_status", "rollup.call_wing@v1.best_call_yield", "feature.call_otm_pct", "feature.cc_yield_annualised"]
+hint = "the call at the 30 to 60 day expiry nearest 45 days, 15 to 30 delta (ours): wing_status eq OK, soft with tolerance 0 (the near miss is OUTSIDE_BAND); rank by best_call_yield (0.01 is 1% for the term) or cc_yield_annualised gte 0.10; call_otm_pct gte 0.04 for room before the shares are called away; add feature.ex_div_before_expiry eq false when the sentence says early assignment"
+
+[[phrase]]
+say = ["call premium yield", "premium yield", "covered call yield", "call income"]
+fields = ["rollup.call_wing@v1.best_call_yield", "feature.cc_yield_annualised"]
+hint = "best_call_yield gte 0.01 (decimal, per term: 0.01 is 1%), soft with tolerance 0.003; cc_yield_annualised gte 0.10 for a yearly rate (0.10 is 10%); a high yield is a high IV, so do not gate on it alone"
+
+[[phrase]]
+say = ["strike above resistance", "call strike above resistance", "above the swing high"]
+fields = ["feature.call_strike_above_resistance", "feature.cc_resistance_cushion_atr"]
+hint = "call_strike_above_resistance eq true, soft with tolerance 0; cc_resistance_cushion_atr gte 1 (average days' range of room above the swing high) as the ATR-scaled version; both are null when no swing high above the close is confirmed"
+
+[[phrase]]
+say = ["ex-dividend before expiry", "ex-dividend date before expiry", "dividend before expiry", "no dividend before expiry"]
+fields = ["feature.ex_div_before_expiry", "feature.ex_div_before_nearest_expiry", "rollup.dividend_schedule@v1.days_to_ex_date"]
+hint = "ex_div_before_expiry eq false for no known ex-dividend date before the 30 to 60 day wing expiry, soft with on_miss EVENT_RISK (it is null while no date is listed; the source lists dates about 30 days ahead); ex_div_before_nearest_expiry for the nearest expiry; days_to_ex_date lte 7 is the early-assignment window"
+
+[[phrase]]
+say = ["early assignment risk", "early assignment", "assigned early"]
+fields = ["feature.ex_div_before_expiry", "feature.ex_div_before_nearest_expiry", "rollup.dividend_schedule@v1.next_div_amount", "rollup.call_wing@v1.best_call_delta"]
+hint = "an in-the-money short call is assigned early just before an ex-dividend date: ex_div_before_nearest_expiry eq false (no known ex-date before the nearest expiry), soft with on_miss EVENT_RISK; best_call_delta lte 0.30 keeps the call out of the money; next_div_amount against the call's mid says whether the dividend exceeds the time value"
+
+[[phrase]]
 say = ["volatility expanding", "range expansion", "ATR expanding", "volatility contracting", "ATR contracting", "quiet for this name"]
 fields = ["feature.atr_ratio_5_20", "feature.hv_ratio_10_60", "rollup.vol_stats@v1.hv20_pctile_252d"]
 hint = "expanding: atr_ratio_5_20 gte 1.2 (or hv_ratio_10_60 gte 1.3); contracting: atr_ratio_5_20 lte 0.8; 'calm for this name' is hv20_pctile_252d lte 0.15 (its own year, not a level)"

@@ -388,3 +388,358 @@ Sources: Cash-secured puts below support (McMillan, Options as a Strategic Inves
 - Null when there is no confirmed swing low below the close, no best put, or atr_14 is unknown or 0.
 
 Sources: Cash-secured puts below support (McMillan, Options as a Strategic Investment)
+
+### `rollup.call_wing@v1.wing_status`
+
+**How to read it.** Whether the best covered call was found: OK (its delta is inside 0.15 to 0.30), OUTSIDE_BAND (a best call exists between 0.05 and 0.50 delta but outside the band; rollup.call_wing@v1.delta_band_distance says how far), or the first failing step: NO_SPOT, NO_CHAIN (no calls), NO_EXPIRY (none 30 to 60 days out), NO_STRIKE (no call with our delta in 0.05 to 0.50).
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a best call in the 15 to 30 delta band | `eq "OK"` | soft | 0 | the near miss is OUTSIDE_BAND; score rollup.call_wing@v1.delta_band_distance instead of gating |
+
+**When the reading lies**
+
+- OUTSIDE_BAND is not a failure: the wing scores the distance rather than rejecting, as the put wing does. A hard 'eq OK' is stricter than a screen that scores rollup.call_wing@v1.delta_band_distance.
+- It is a statement about the chain, not about owning the shares: a covered call needs 100 shares per contract, so a high-priced stock is a large position whatever the wing says. Read rollup.price_stats@v2.close with it.
+- NO_STRIKE on a liquid name usually means every far call lacked a two-sided quote (rollup.call_wing@v1.n_unpriced) or a strike ladder that skips the band.
+
+Sources: Site convention (the covered-call mirror of the put wing); McMillan, Options as a Strategic Investment, on covered writing
+
+### `rollup.call_wing@v1.target_expiry`
+
+**How to read it.** The expiry of the best call: the one nearest 45 calendar days among those 30 to 60 days out, standard monthlies first (open interest concentrates there). The same rule as the put wing, so on one name the two wings share their expiry unless one right has no quotes there. A date to show with the strike; rollup.call_wing@v1.target_dte is the days.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a wing expiry | `not_null` | hard | - | - |
+
+**When the reading lies**
+
+- Null when no expiry sits 30 to 60 days out, or no calls are quoted for the name.
+- A covered call held to this expiry carries every event before it: feature.ex_div_before_expiry for a dividend (early assignment), and rollup.earnings@v1.days_to_earnings for a report.
+
+Sources: Site convention
+
+### `rollup.call_wing@v1.target_dte`
+
+**How to read it.** Calendar days to the best call's expiry, 30 to 60 by construction and near 45: where a short call's time decay is fast and gamma still moderate. Nearer 30 the premium decays faster but each period's yield is smaller; nearer 60 the yield per period is larger and the stock has longer to run through the strike.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| around 45 days to expiry | `between [35, 55]` | soft | 5 | - |
+
+**When the reading lies**
+
+- Compare yields only across similar days: rollup.call_wing@v1.best_call_yield is per term, feature.cc_yield_annualised puts terms on one scale.
+
+Sources: tastylive on 45 days to expiry
+
+### `rollup.call_wing@v1.n_unpriced`
+
+**How to read it.** Calls at the target expiry that have no delta of ours (no two-sided quote, or the implied-volatility inversion failed): they can never be the best call. A few far wings are normal; a large share of the expiry means the chain was quoted one-sided after the close and the wing columns rest on few strikes.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| the expiry's calls were priced | `lte 10` | soft | 10 | - |
+
+**When the reading lies**
+
+- Compare with rollup.call_wing@v1.n_strikes: many unpriced and few band strikes says 'quote problem', not 'no market'.
+- Deep in-the-money calls price on their intrinsic value and can fail the inversion when the bid sits below it; they are not candidates in any case (their delta is above 0.50).
+
+Sources: Site convention (features/rollups/options/wing_search.py)
+
+### `rollup.call_wing@v1.n_strikes`
+
+**How to read it.** How many strikes at the target expiry have a call with our delta inside 0.15 to 0.30: the choice available in the band. 0 means no call in the band (the best call is outside it), 2 to 4 is normal for a strike ladder in $5 steps, 6 or more is a finely struck, usually liquid, name.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a strike inside the band | `gte 1` | soft | 1 | - |
+
+**When the reading lies**
+
+- 0 with wing_status OUTSIDE_BAND is a ladder gap, common on high-priced stocks; the best call is then the nearest outside the band and its distance is scored.
+
+Sources: Site convention
+
+### `rollup.call_wing@v1.wing_oi`
+
+**How to read it.** Open interest summed over the calls inside the 15 to 30 delta band at the target expiry: the standing depth a covered call is sold into. Under 500 is thin, a few thousand is tradable, tens of thousands is a popular wing. 0 when no call is in the band.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a wing with depth | `gte 2000` | soft | 0.5 x the threshold, LIQUIDITY_RISK | - |
+
+**When the reading lies**
+
+- A single strike can hold all of it; rollup.call_wing@v1.best_call_oi is the chosen strike alone.
+- Standing positions, not today's activity: rollup.call_wing@v1.wing_volume is the day's trades. Heavy call open interest also marks where covered-call writers are already short: feature.call_strike_above_resistance and rollup.oi_walls@v1.call_wall say whether the chosen strike sits at the crowd's level.
+
+Sources: https://www.tastylive.com/concepts-strategies/options-liquidity
+
+### `rollup.call_wing@v1.wing_volume`
+
+**How to read it.** Contracts traded on the session across the calls in the 15 to 30 delta band at the target expiry: whether the wing trades today. A few hundred is active for one expiry's wing; 0 on a quiet day is common even on liquid names.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| the wing trades | `gte 200` | soft | 0.5 x the threshold, LIQUIDITY_RISK | - |
+
+**When the reading lies**
+
+- Daily and noisy; read with rollup.call_wing@v1.wing_oi. A spike on a call wing can be one large buyer (a takeover bet or a speculative run), the opposite of a calm covered-call market: check feature.volume_climax.
+
+Sources: https://www.tastylive.com/concepts-strategies/options-liquidity
+
+### `rollup.call_wing@v1.wing_spread_pct`
+
+**How to read it.** The median bid-ask spread as a share of mid across the calls in the 15 to 30 delta band, on the stored after-close quotes. 0.05 is a tight market for a wing, 0.10 to 0.20 is usual on a mid-cap, above 0.30 the band is not really made.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a wing that is made (scored) | `lt 0.15` | score | 0.15 | full points under 15% of mid, none at 30% |
+
+**When the reading lies**
+
+- A $0.05 spread on a $0.30 call is 17%: a wide percentage can be a nickel. Read rollup.call_wing@v1.best_call_mid with it.
+- After-close quotes; judge live. Null when no call is in the band.
+
+Sources: https://www.thetaedge.ai/blog/assess-liquidity-trading-options
+
+### `rollup.call_wing@v1.delta_band_distance`
+
+**How to read it.** How far the best call's delta is from the 0.15 to 0.30 band: 0 inside it, else the distance to the nearer edge (a 0.35 delta call is 0.05 away, a 0.10 delta call is 0.05 away). Up to 0.20 by construction (a 0.50 delta call). A screen can score closeness instead of gating on OK.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| at or near the delta band (scored) | `lte 0` | score | 0.15 | full points inside the band, none at 0.15 away |
+
+**When the reading lies**
+
+- Zero is a delta statement only: a 0.28 delta call can still be a poor trade (a thin quote, an ex-dividend date before expiry). Read rollup.call_wing@v1.wing_spread_pct and feature.ex_div_before_expiry with it.
+- Null with wing_status NO_STRIKE or no target expiry.
+
+Sources: Site convention (the put wing's closeness score, owner 2026-10-04)
+
+### `rollup.call_wing@v1.best_call_strike`
+
+**How to read it.** The strike of the best call: among calls with our delta between 0.05 and 0.50, the one nearest the 15 to 30 delta band, then the highest premium yield, then the higher open interest, then the higher strike. With the expiry it identifies the contract to quote live; it is the price at which the shares are called away, to read next to the close and resistance (rollup.swing_levels@v1.swing_high, rollup.oi_walls@v1.call_wall).
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a candidate call | `not_null` | hard | - | - |
+
+**When the reading lies**
+
+- A strike below the close is an in-the-money call (it can only be picked as a nearest-the-band candidate on an unusual chain): the shares are called away at a loss to the market. feature.call_otm_pct says how far above the close the strike is.
+- Null with wing_status NO_STRIKE or no target expiry.
+
+Sources: McMillan, Options as a Strategic Investment, on covered writing and strike selection
+
+### `rollup.call_wing@v1.best_call_delta`
+
+**How to read it.** Our delta of the best call, positive, between 0.05 and 0.50: 0.25 is a call with roughly a 25% chance of finishing in the money, so a 25% chance the shares are called away at the strike. The covered-call convention is 0.15 to 0.30: nearer 0.15 the premium is small and the stock is rarely called away, nearer 0.30 the premium is larger and assignment is likelier.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| in the 15 to 30 delta band | `between [0.15, 0.3]` | soft | 0.05 | or score rollup.call_wing@v1.delta_band_distance lte 0 with tolerance 0.15 |
+
+**When the reading lies**
+
+- Ours (ADR 0021), from the stored mid with the Treasury curve and the dividend yield; the feed's delta can differ by a few hundredths. rollup.call_wing@v1.delta_band_distance is the band check in one number.
+- Delta is a rough probability only: a stock with a known catalyst before expiry moves outside what the delta implies. Check rollup.earnings@v1.days_to_earnings.
+
+Sources: Hull on delta as a rough probability; McMillan on covered writing
+
+### `rollup.call_wing@v1.best_call_iv`
+
+**How to read it.** The implied volatility of the best call from its mid, as a fraction: 0.35 is 35% a year. Call wings usually sit at or below the at-the-money IV (the skew puts the protection premium on the downside), so a rich call wing is a name where upside is also bid. The premium a covered call collects is this number against what the stock then does.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a rich wing (sell premium) | `gte 0.35` | soft | 0.05 | - |
+
+**When the reading lies**
+
+- A high call IV is often an event (a report, a deal, a squeeze), not a bargain premium: feature.earnings_before_expiry and rollup.price_moves@v1.one_day_move say which.
+- Selling a rich call on a stock that can gap up caps exactly the gain the shares were held for.
+
+Sources: Practitioner notes on call skew and covered writing
+
+### `rollup.call_wing@v1.best_call_mid`
+
+**How to read it.** The best call's mid price, (bid + ask) / 2, in dollars per share: the premium a writer can expect near the middle of the market; times 100 per contract. Under $0.20 the spread is most of it; $0.50 to $3.00 is the usual wing premium on a $50 to $200 stock.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a premium worth the spread | `gte 0.3` | soft | 0.1, LIQUIDITY_RISK | - |
+
+**When the reading lies**
+
+- The mid of an after-close quote; the live mid can be far from it. The premium yield (rollup.call_wing@v1.best_call_yield) is the comparable number across prices.
+
+Sources: Site convention
+
+### `rollup.call_wing@v1.best_call_oi`
+
+**How to read it.** Open interest of the best call's strike at the target expiry: the standing book the covered call is written into. Under 100 is hard to exit, a few hundred is workable, thousands is a liquid strike.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a strike with a book | `gte 100` | soft | 0.5 x the threshold, LIQUIDITY_RISK | - |
+
+**When the reading lies**
+
+- Yesterday's standing book, not today's activity: pair with rollup.call_wing@v1.best_call_volume. rollup.call_wing@v1.wing_oi is the whole band.
+
+Sources: https://www.tastylive.com/concepts-strategies/options-liquidity
+
+### `rollup.call_wing@v1.best_call_volume`
+
+**How to read it.** Contracts traded on the session at the best call's strike and expiry: whether the strike you would write trades today. 0 on a quiet day is common even on liquid names; tens of contracts is active for one strike.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| the strike trades | `gte 10` | soft | 0.5 x the threshold, LIQUIDITY_RISK | - |
+
+**When the reading lies**
+
+- Daily and noisy: judge the strike on a live quote before trading, and read it with rollup.call_wing@v1.best_call_oi.
+
+Sources: Site convention
+
+### `rollup.call_wing@v1.best_call_spread_pct`
+
+**How to read it.** The best call's bid-ask spread as a share of its mid, on the stored after-close quote: 0.05 is a tight market for a wing strike, 0.15 is usual on a mid-cap, above 0.30 the premium is mostly the spread. A seller gives up half of it to cross.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a tight market at the strike (scored) | `lt 0.1` | score | 0.1 | full points under 10% of mid, none at 20% |
+
+**When the reading lies**
+
+- A $0.05 spread on a $0.30 call is 17%: a wide percentage can be a nickel. After-close quote: confirm live.
+
+Sources: https://www.thetaedge.ai/blog/assess-liquidity-trading-options
+
+### `rollup.call_wing@v1.best_call_yield`
+
+**How to read it.** The best call's premium yield: premium over the stock price (mid / spot), as a fraction for the expiry's term. 0.01 is 1% for about 45 days (roughly 8% a year) collected against the shares; 0.02 is rich and usually a high-volatility name; under 0.005 the call pays little for the upside it gives away. feature.cc_yield_annualised puts terms on one scale.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a worthwhile premium for the shares | `gte 0.01` | soft | 0.003 | - |
+| rank by premium yield | `gte 0.015` | score | 0.01 | - |
+
+**When the reading lies**
+
+- It is income, not return: the shares can fall by more than the premium, and assignment caps the gain at the strike. A high yield is a high IV, the compensation for the name's risk.
+- Per term, not annualised, and per dollar of stock held (the put wing's ROC is per dollar of strike): compare only across similar rollup.call_wing@v1.target_dte.
+
+Sources: McMillan, Options as a Strategic Investment, on covered writing returns
+
+### `feature.call_otm_pct`
+
+**How to read it.** How far the best covered call's strike sits above the close: (strike - close) / close. 0.05 is a strike 5% above the price, the level the shares are called away at, so the most the position gains from the stock is that 5% plus the premium. Near 0.02 the upside is capped tight; 0.08 to 0.12 leaves room. Negative is an in-the-money call.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| room to run before the shares are called away | `gte 0.04` | soft | 0.02 | with rollup.call_wing@v1.best_call_yield gte 0.01 so the room is paid for |
+
+**When the reading lies**
+
+- A far strike means a low delta and a small premium: the room is paid for in rollup.call_wing@v1.best_call_yield. Read both.
+- A fixed delta puts the strike further out on a volatile stock than on a calm one, so the same pct is a different bet; feature.cc_resistance_cushion_atr scales it by the stock's range.
+- Null with no best call (NO_STRIKE or worse) or no price_stats row.
+
+Sources: McMillan, Options as a Strategic Investment, on covered writing and strike selection
+
+### `feature.cc_yield_annualised`
+
+**How to read it.** The best covered call's premium yield annualised: best_call_yield x 365 / target_dte. 0.08 is 8% a year of the stock price collected if a call like this is sold every period and expires worthless; 0.15 to 0.25 is rich and usually a high-volatility name; under 0.05 it is not worth the capped upside.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a covered call that pays a worthwhile annual rate | `gte 0.1` | soft | 0.03 | - |
+
+**When the reading lies**
+
+- A premium rate, not a return: assignment caps the gain at the strike and the stock can fall by more than the premium. A high rate on a stock with a report before expiry is the report's premium (feature.earnings_before_expiry).
+- Annualising a 30 to 60 day term assumes the same yield every period; premium varies with the volatility regime. Read rollup.iv_history@v2.iv_rank_252d with it.
+- Null with no best call: no yield or no target_dte.
+
+Sources: Site convention; McMillan, Options as a Strategic Investment
+
+### `feature.call_strike_above_resistance`
+
+**How to read it.** True when the best covered call's strike is above the most recent confirmed swing high: resistance sits between the price and the strike, so the shares are called away only after the stock breaks above where it has recently stopped rising. False means the strike is at or below resistance, inside the zone the stock has recently turned back from: assignment is likelier than the delta alone suggests.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a covered call strike above resistance | `eq true` | soft | 0 | - |
+
+**When the reading lies**
+
+- Resistance is the most recent confirmed swing high above the close, not the strongest level; a minor pivot reads as resistance. Check rollup.swing_levels@v1.swing_high_date and rollup.pivot_strength@v1.resistance_touches.
+- Null when there is no confirmed swing high above the close (the stock is at a one-year high: no overhead supply to measure) or no best call; a hard 'eq true' rejects stocks at highs, soft keeps them listed.
+
+Sources: McMillan, Options as a Strategic Investment; the covered-call strike-above-resistance rule of thumb
+
+### `feature.cc_resistance_cushion_atr`
+
+**How to read it.** The covered call's room above resistance in Wilder ATR(14): (the best call's strike - resistance) / atr_14, how many average days' range sit between the swing high and the strike. 1 is one day's range of room above resistance, 2 to 3 is comfortable, 0 puts the strike on resistance, negative below it. The ATR scale makes it comparable across names and the call-side mirror of feature.put_support_cushion_atr.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| at least one ATR of room above resistance | `gte 1.0` | soft | 0.5 | with rollup.call_wing@v1.wing_status eq OK and feature.ex_div_before_expiry eq false |
+
+**When the reading lies**
+
+- A pending takeover shrinks the ATR towards zero, so the cushion reads huge on a name that cannot move; see the 'pending takeover' situation.
+- Measured today: a wider ATR after a shock shrinks it without the strike or resistance moving. Check rollup.price_moves@v1.one_day_move.
+- Null when there is no confirmed swing high above the close, no best call, or atr_14 is unknown or 0.
+
+Sources: McMillan, Options as a Strategic Investment
