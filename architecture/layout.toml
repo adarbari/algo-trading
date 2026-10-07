@@ -193,8 +193,13 @@ purpose = "feature groups of price-level structure from daily bars (swing pivots
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
+path = "src/algotrade/features/rollups/relative"
+purpose = "feature groups comparing an instrument with the market, its sector and the universe: relative strength, sector membership and momentum, cross-sectional percentiles; one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
 path = "src/algotrade/features/rollups/market"
-purpose = "market-entity feature groups (one MKT:US row per session, ADR 0047): one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus tickers.py, the ticker -> id lookup and close panel they share"
+purpose = "market-entity feature groups (one MKT:US row per session, ADR 0047): one module per group, its documented FEATURES, a pure compute and its GROUP declaration, plus tickers.py, the ticker -> id lookup and close panel they share (the relative-strength groups use it too)"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]

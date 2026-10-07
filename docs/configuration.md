@@ -119,6 +119,7 @@ Selectable rollup fields today ([data/layers.md](data/layers.md#rollups-as-built
 | `bands@v2` | `ema_10`, `ema_20`, `ema_50`, `ema_200`, `sma_150`, `ema20_slope_5d`, `ema50_slope_10d`, `sma200_slope_20d`, `close_std_20`, `bb_width_pctile_252d` (float32); `band_walk` (int, signed) |
 | `trend_stats@v2` | `ret_1d`, `ret_3d`, `ret_10d`, `ret_120d`, `ret_252d`, `mom_12_1`, `mom_accel_5d`, `ret_z_20d`, `high_100d`, `low_100d`, `high_200d`, `low_200d`, `prior_high_50d`, `prior_low_20d`, `prior_low_50d`, `close_range_pos`, `trend_r2_90d`, `reg_slope_90d_ann` (float32); `sessions_since_high_20d`, `close_streak`, `sma20_streak`, `tight_range_sessions` (int) |
 | `vol_stats@v1` | `atr_5`, `atr_20`, `hv10`, `hv60`, `hv20_pctile_252d`, `adv_shares_60d`, `volume_pctile_252d` (float32); `pocket_pivot` (bool) |
+| `relative_strength@v1` | `rs_spy_63d`, `rs_spy_252d`, `rs_spy_trend_20d`, `ret_5d_pctile`, `mom_pctile_63d`, `mom_pctile_252d`, `sector_ret_63d`, `rs_sector_63d` (float32); `rs_line_high_252d` (bool); `sector_etf` (str); `sector_rank_63d` (int) |
 | `anchored_vwap@v2` | `avwap_earnings`, `avwap_swing_low`, `avwap_swing_high` (float32); `avwap_anchor_date` (date) |
 | `oi_walls@v1` | `wall_status` (str); `call_wall`, `put_wall` (float32); `call_wall_oi`, `put_wall_oi` (int) |
 | `nearest_expiry@v1` | `expiry_date` (date); `dte`, `sessions_to_expiry` (int) |
