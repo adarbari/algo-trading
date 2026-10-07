@@ -15,6 +15,12 @@ Note a candidate the moment one of these happens:
   "I'd rather…").
 - A check, CI job or reviewer catches something a written rule would have prevented.
 - You lose real time to setup or environment trouble the next session would repeat.
+- The owner brings an issue to fix (a failed nightly step, a wrong page value, a bad
+  email). The first candidate is always **the missing test**: name the unit, contract or
+  fitness test that would have caught it during implementation, add it with the fix (it
+  fails before, passes after) and put it first in the PR description. Prefer a fitness
+  test over config or a contract test over a workflow to a one-off regression test. A
+  rule is a candidate only when no test can enforce it (CLAUDE.md Code rules, 4).
 
 Each candidate is one line: what happened → the rule that would have prevented it. Keep
 working; do not edit the harness mid-task.
