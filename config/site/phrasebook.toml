@@ -308,3 +308,43 @@ hint = "implied_move_vs_hv gte 1.2 (the straddle prices 20% more than HV20 would
 say = ["dividend before the call expires", "ex-dividend during the covered call", "collect the dividend with a covered call"]
 fields = ["feature.ex_div_before_call_expiry", "rollup.call_wing@v1.best_call_delta"]
 hint = "ex_div_before_call_expiry eq true to collect it (with best_call_delta lte 0.3 so the call is not assigned first), eq false to avoid the assignment question; null means no date is known yet, not none"
+
+[[phrase]]
+say = ["hammer at support", "hammer candle at support", "hammer off support", "hammer"]
+fields = ["rollup.candle@v1.candle", "feature.dist_to_support"]
+hint = "candle eq HAMMER; 'at support' adds dist_to_support lte 0.02 (within 2% of the swing support), soft with tolerance 0.01; a hammer alone is a shape in any place, so without 'support' or 'after a decline' say the location is not asked; null on a no-range bar or a missing previous bar drops the name"
+
+[[phrase]]
+say = ["shooting star", "shooting star candle", "rejection at the high", "long upper wick"]
+fields = ["rollup.candle@v1.candle", "rollup.candle@v1.upper_wick_share", "feature.stretch_sma20_atr"]
+hint = "candle eq SHOOTING_STAR; 'after a run' adds stretch_sma20_atr gte 2; for 'a long upper wick' without the named candle use upper_wick_share gte 0.5 (soft, tolerance 0.1)"
+
+[[phrase]]
+say = ["doji", "doji candle", "indecision candle", "indecision day"]
+fields = ["rollup.candle@v1.candle", "rollup.candle@v1.body_share"]
+hint = "candle eq DOJI (a body at most 10% of the range); body_share lte 0.1 is the same cut; it says indecision, not direction: add the location (dist_to_support, stretch_sma20_atr) if the sentence has one"
+
+[[phrase]]
+say = ["bullish engulfing", "bullish engulfing candle", "bullish engulfing day"]
+fields = ["rollup.candle@v1.candle", "rollup.momentum@v1.rel_volume"]
+hint = "candle eq BULLISH_ENGULFING (a rising body covering the previous falling body, at least half the 20-session average body); 'on volume' adds rel_volume gte 1.25; an earnings day is an engulfing bar by nature (rollup.earnings@v1.last_earnings_date)"
+
+[[phrase]]
+say = ["bearish engulfing", "bearish engulfing candle", "bearish engulfing day"]
+fields = ["rollup.candle@v1.candle", "feature.stretch_sma20_atr"]
+hint = "candle eq BEARISH_ENGULFING; 'after a run' adds stretch_sma20_atr gte 2; an earnings day is an engulfing bar by nature (rollup.earnings@v1.last_earnings_date)"
+
+[[phrase]]
+say = ["inside day", "inside bar", "inside candle", "harami day"]
+fields = ["rollup.candle@v1.bar_relation"]
+hint = "bar_relation eq INSIDE (today's high and low within yesterday's range); it is a pause, not a direction: for yesterday's inside day use rollup.candle@v1.prev_bar_relation eq INSIDE"
+
+[[phrase]]
+say = ["inside day breakout", "inside bar breakout", "breakout after an inside day", "inside day breakout up"]
+fields = ["feature.inside_day_breakout", "rollup.trend_stats@v2.close_range_pos"]
+hint = "inside_day_breakout eq true (yesterday was an inside day and today closed above yesterday's close); for a real break add close_range_pos gte 0.7 or feature.breakout_20d; the bool is up only"
+
+[[phrase]]
+say = ["strong close", "closed strong", "closed at the high of the day", "closing near the high"]
+fields = ["feature.strong_close", "rollup.trend_stats@v2.close_range_pos"]
+hint = "strong_close eq true (close in the top 30% of the range and a body of at least half the range); for the close alone close_range_pos gte 0.7 (soft, tolerance 0.1); 'on volume' adds rollup.momentum@v1.rel_volume gte 1.25"
