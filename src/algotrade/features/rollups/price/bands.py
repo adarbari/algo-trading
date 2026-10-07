@@ -28,11 +28,16 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from algotrade.core.time.calendar import sessions_ending
 from algotrade.features.framework.declaration import FeatureGroup, Input, Inputs, column_types
 from algotrade.features.framework.feature import Feature
-from algotrade.features.rollups.price.price_stats import Matrix, Panel, panel, traded_rows
-from algotrade.quant.rolling import exponential_path, rolling_mean, rolling_var, trailing_run
+from algotrade.features.rollups.price.price_stats import Matrix, Panel, bars_rows
+from algotrade.quant.rolling import (
+    exponential_path,
+    rolling_mean,
+    rolling_var,
+    trailing_percentile,
+    trailing_run,
+)
 
 NAME = "bands"
 VERSION = 1
@@ -121,13 +126,7 @@ def width_percentile(sma: Matrix, std: Matrix) -> Matrix:
     bandwidth strictly below the last row's; NaN below ``MIN_PCTILE`` known rows."""
     with np.errstate(divide="ignore", invalid="ignore"):
         width = np.where(sma > 0, 2 * MULTIPLIER * std / sma, np.nan)
-    earlier = width[-PCTILE_WINDOW - 1 : -1]
-    known = ~np.isnan(earlier)
-    below = (known & (earlier < width[-1])).sum(axis=0)
-    count = known.sum(axis=0)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        share = np.where(count >= MIN_PCTILE, below / count, np.nan)
-    return np.where(np.isnan(width[-1]), np.nan, share)
+    return trailing_percentile(width, PCTILE_WINDOW, MIN_PCTILE)
 
 
 def band_walk(close: Matrix, upper: Matrix, lower: Matrix) -> Matrix:
@@ -158,10 +157,7 @@ def stats(px: Panel) -> dict[str, Matrix]:
 
 
 def compute(inputs: Inputs, session: date, params: None) -> pd.DataFrame:
-    bars = inputs[BARS]
-    assert bars is not None  # required input
-    px = panel(bars, sessions_ending(session, LOOKBACK + 1))
-    return traded_rows(px, stats(px), COLUMNS)
+    return bars_rows(inputs, session, LOOKBACK, stats, COLUMNS)
 
 
 GROUP = FeatureGroup(

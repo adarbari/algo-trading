@@ -173,6 +173,11 @@ purpose = "feature groups (rollups), one folder per kind of input (no modules of
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
 
 [[dir]]
+path = "src/algotrade/features/rollups/activity"
+purpose = "feature groups of volatility and trading activity from daily bars (ATR and realised-vol windows and percentiles, volume averages and rank, volume at price): one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
+contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]
+
+[[dir]]
 path = "src/algotrade/features/rollups/price"
 purpose = "feature groups from daily bars: one module per group, its documented FEATURES, a pure compute and its GROUP declaration"
 contracts = ["Rollup definitions are pure: core, quant, numpy and pandas only (no storage, data, config or services)"]

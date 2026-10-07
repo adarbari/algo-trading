@@ -673,3 +673,71 @@ def test_ema_distances_alignment_structure_and_put_cushion(fs: FeatureSet) -> No
     assert bull["put_support_cushion_atr"] == pytest.approx(2.5)
     assert bear["put_support_cushion_atr"] == pytest.approx(-2.5)  # strike above support
     assert pd.isna(mix["put_support_cushion"]) and pd.isna(noema["put_support_cushion"])
+
+
+VOL_STATS = "rollups/instrument/vol_stats@v1"
+PROFILE = "rollups/instrument/volume_profile@v1"
+FUNDAMENTALS = "rollups/instrument/fundamentals@v2"
+
+
+def test_volatility_ratios_volume_trend_turnover_and_value_area(fs: FeatureSet) -> None:
+    ids = ["EQ:A", "EQ:OUT", "EQ:NONE"]
+    stats = pd.DataFrame(
+        {"instrument_id": ids, "session_date": END, "close": [105.0, 120.0, 100.0]}
+    )
+    vol = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "atr_5": [3.0, 1.0, np.nan],
+            "atr_20": [2.0, 2.0, 2.0],
+            "hv10": [0.4, 0.2, 0.3],
+            "hv60": [0.2, 0.4, np.nan],
+            "adv_shares_60d": [1e6, 2e6, 0.0],
+        }
+    )
+    volume = pd.DataFrame(
+        {"instrument_id": ids, "session_date": END, "adv_shares_20d": [1.3e6, 1e6, 1e6]}
+    )
+    fund = pd.DataFrame(
+        {"instrument_id": ids, "session_date": END, "shares_outstanding": [1.3e8, np.nan, 1e8]}
+    )
+    profile = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "poc_252d": [100.0, 100.0, np.nan],
+            "value_area_low": [95.0, 95.0, np.nan],
+            "value_area_high": [110.0, 110.0, np.nan],
+        }
+    )
+    frames = {
+        PRICE_STATS: stats,
+        VOL_STATS: vol,
+        VOLUME: volume,
+        FUNDAMENTALS: fund,
+        PROFILE: profile,
+    }
+    names = [
+        "atr_ratio_5_20",
+        "hv_ratio_10_60",
+        "volume_trend_20_60",
+        "turnover_20d",
+        "in_value_area",
+        "dist_to_poc",
+    ]
+    out = fs.evaluate(frames, names).set_index("instrument_id")
+    a, outside, none = (out.loc[i] for i in ids)
+    assert a["atr_ratio_5_20"] == pytest.approx(1.5) and a["hv_ratio_10_60"] == pytest.approx(2.0)
+    assert a["volume_trend_20_60"] == pytest.approx(1.3) and a["turnover_20d"] == pytest.approx(
+        0.01
+    )
+    assert a["in_value_area"] is True and a["dist_to_poc"] == pytest.approx(0.05)
+    assert outside["in_value_area"] is False and outside["dist_to_poc"] == pytest.approx(0.2)
+    assert pd.isna(outside["turnover_20d"])
+    assert pd.isna(none["atr_ratio_5_20"]) and pd.isna(none["hv_ratio_10_60"])
+    assert (
+        pd.isna(none["volume_trend_20_60"])
+        and pd.isna(none["in_value_area"])
+        and pd.isna(none["dist_to_poc"])
+    )

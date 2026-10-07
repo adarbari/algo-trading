@@ -53,3 +53,23 @@ categories = ["ibkr", "ours"]
 description = "Where iv_rank and iv_percentile came from: ibkr (IBKR's IV history) or ours (iv_history, from Cboe chains)"
 null_meaning = "iv_rank is null (neither source has a rank)"
 version = 1
+
+# Volatility expansion and contraction over vol_stats@v1 (TA track, docs/data/technical.md).
+
+[atr_ratio_5_20]
+expr = "vol_stats.atr_5 / vol_stats.atr_20"
+dtype = "float"
+unit = "ratio"
+description = "ATR(5) / ATR(20): above 1 the daily range is expanding (this week wider than the month), below 1 contracting; 1.3 is a clear expansion, 0.7 a tight week"
+null_meaning = "atr_5 or atr_20 is null (fewer than 21 consecutive bars), or atr_20 is 0"
+valid_range = [0, inf]
+version = 1
+
+[hv_ratio_10_60]
+expr = "vol_stats.hv10 / vol_stats.hv60"
+dtype = "float"
+unit = "ratio"
+description = "Realised vol over 10 sessions / over 60: above 1 the last two weeks were more volatile than the quarter, below 1 calmer"
+null_meaning = "hv10 or hv60 is null (a gap among the last 61 sessions, or a shorter history), or hv60 is 0"
+valid_range = [0, inf]
+version = 1
