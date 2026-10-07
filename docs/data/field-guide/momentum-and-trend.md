@@ -344,3 +344,242 @@ Sources: Practitioner convention; ATR-scaled stops (Turtle rules)
 - Null under 240 bars in the last 252 sessions (recent listings).
 
 Sources: George and Hwang (2004) for the high; the VRP scanner's spec (docs/screeners/vrp-scanner.md) for the 10% gate
+
+### `rollup.pivot_strength@v1.resistance_touches`
+
+**How to read it.** How many separate times the last 252 sessions tested the current resistance (rollup.swing_levels@v1.swing_high), the pivot bar counted: a bar touches when its high came within half an ATR of the level and it closed at or below it; consecutive bars count once. 1 is the pivot alone; 2 to 3 is a level the market has respected; 4 or more is a heavily tested ceiling, which breaks on strong volume more often than a lone high but is also where many stops and orders sit.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| resistance tested more than once | `gte 2` | soft | 1 | with feature.dist_to_resistance_atr lte 1 for a name pressing against it |
+| a heavily tested ceiling | `gte 4` | score | 2 | - |
+
+**When the reading lies**
+
+- Touches measure attention, not strength: a ceiling tested six times may be about to give way as supply is absorbed. Pair it with rollup.momentum@v1.rel_volume and feature.dist_to_resistance before reading it either way.
+- A tight ATR makes the half-ATR band narrow, so a calm name shows fewer touches than a volatile one at the same chart; rollup.momentum@v1.atr_14 is the unit.
+- Null when there is no resistance (the close is at a one-year high) or atr_14 is unknown; a hard criterion then rejects the name.
+
+Sources: docs/data/swing.md; Edwards and Magee, Technical Analysis of Stock Trends (tests of a level); Bulkowski, Encyclopedia of Chart Patterns (the number of touches in a range)
+
+### `rollup.pivot_strength@v1.support_touches`
+
+**How to read it.** How many separate times the last 252 sessions tested the current support (rollup.swing_levels@v1.swing_low), the pivot bar counted: a bar touches when its low came within half an ATR of the level and it closed at or above it; consecutive bars count once. 1 is the pivot alone; 2 to 3 is a floor that held; each further test is also a chance that the buyers there are exhausted.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| tested support twice | `gte 2` | soft | 1 | with feature.trend_state eq UPTREND and feature.dist_to_support_atr lte 1 |
+
+**When the reading lies**
+
+- A floor that held three times has not been broken yet, which is all it says; a fourth test can fail. Check rollup.pivot_strength@v1.support_age and feature.trend_state (support in a downtrend breaks more than it holds).
+- Needs the close above a swing low: null at a one-year low, and when atr_14 is unknown.
+
+Sources: docs/data/swing.md; Edwards and Magee, Technical Analysis of Stock Trends
+
+### `rollup.pivot_strength@v1.resistance_age`
+
+**How to read it.** Sessions since the swing high that is the current resistance (5 to 246). A level from the last two months is recent supply that many holders still remember; one from ten months ago is mostly forgotten, and a stock that clears it has little overhead memory.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a recent resistance | `lte 60` | soft | 20 | - |
+| an old resistance (little memory) | `gte 120` | soft | 30 | - |
+
+**When the reading lies**
+
+- At least 5 by construction (a pivot is confirmed 5 sessions later); a very recent high is not yet a level.
+- The age of the pivot, not of the last test: rollup.pivot_strength@v1.resistance_touches says whether it was tested since.
+- Null when there is no resistance above the close.
+
+Sources: docs/data/swing.md
+
+### `rollup.pivot_strength@v1.support_age`
+
+**How to read it.** Sessions since the swing low that is the current support (5 to 246). A recent low is a floor the market has just defended; an old one is a memory.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a recently defended support | `lte 60` | soft | 20 | - |
+
+**When the reading lies**
+
+- At least 5 by construction; the age of the pivot, not of its last test (rollup.pivot_strength@v1.support_touches).
+- Null when there is no support below the close.
+
+Sources: docs/data/swing.md
+
+### `rollup.pivot_strength@v1.pivot_structure`
+
+**How to read it.** The shape of the last two swing highs and the last two swing lows over the past year. HH_HL: the later high is above the earlier and the later low above the earlier (higher highs and higher lows: the Dow definition of an uptrend). LH_LL: both lower (a downtrend). MIXED: one up and one down, or an equal pair (a range, an expanding or contracting wedge). Unlike feature.trend_state it reads the pivots, not the averages, so it turns earlier and is blind to the size of the steps.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| higher highs and higher lows | `eq "HH_HL"` | hard | - | with feature.trend_state eq UPTREND to ask for both the pivots and the averages |
+| not in a downtrend structure | `ne "LH_LL"` | soft | 0 | - |
+
+**When the reading lies**
+
+- Only the last two pivots of each kind: one higher low after a long decline reads HH_HL if the last two highs also rose, long before a trend exists. Confirm with feature.trend_state and rollup.price_stats@v2.ret_60d.
+- Pivots are confirmed 5 sessions late, so the newest swing is not in it yet.
+- Null with fewer than two swing highs or two swing lows in the 252 sessions read (a steady trend with no pullbacks has few pivots) or a missing bar around them.
+
+Sources: docs/data/swing.md; Dow theory (higher highs and higher lows) as in Murphy, Technical Analysis of the Financial Markets
+
+### `rollup.retest@v1.sessions_since_breakout`
+
+**How to read it.** Sessions since the latest 20-session breakout of the last 60 (0 is today). A breakout from the last few days is fresh and is where a retest, if there is one, comes next; one from two months ago has either worked or faded.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a fresh breakout | `lte 10` | soft | 5 | with rollup.retest@v1.retest_state ne FAILED |
+
+**When the reading lies**
+
+- A breakout today is never a retest (rollup.retest@v1.retest_state FRESH); look again in a few sessions.
+- Null when there was no breakout in the last 60 sessions.
+
+Sources: docs/data/swing.md
+
+### `rollup.retest@v1.retest_state`
+
+**How to read it.** What the latest 20-session breakout of the last 60 sessions did since. RETESTING: today's low came back to within half an ATR above the breakout level and the close held it (the entry traders wait for). HELD: an earlier session did that and no close since went below the level. FRESH: price has not come back to the level. FAILED: some close since the breakout is below its level. NONE: no breakout in the window. NO_ATR: the ATR is unknown, so the retest tolerance is too.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a breakout that came back and held | `in ["RETESTING", "HELD"]` | hard | - | feature.breakout_retest_held is the HELD half |
+| buying the retest today | `eq "RETESTING"` | hard | - | with feature.trend_state eq UPTREND |
+| a breakout that has not failed | `ne "FAILED"` | soft | 0 | - |
+
+**When the reading lies**
+
+- FAILED includes a single close below the level on any day since the breakout, even if price recovered the next day; rollup.retest@v1.failed_breakouts_252d is how often the name's breakouts failed within 20 sessions.
+- RETESTING is today's bar only: a low in the band with a weak close at or above the level is still RETESTING, so check the close against feature.dist_to_support_atr or the session's range.
+- The breakout is the close above the prior 20-session high, with no volume condition; a thin-volume breakout fails more often (rollup.momentum@v1.rel_volume).
+- NONE and NO_ATR are not failures: a hard 'eq HELD' rejects them, which is usually intended.
+
+Sources: docs/data/swing.md; Bulkowski, Encyclopedia of Chart Patterns (pullbacks and throwbacks to a breakout); Edwards and Magee, Technical Analysis of Stock Trends
+
+### `rollup.retest@v1.failed_breakouts_252d`
+
+**How to read it.** How many of the name's 20-session breakouts in the last 252 sessions fell back below their level within 20 sessions (a run of consecutive breakout days counts once; one younger than 20 sessions counts only if it has already failed). 0 means its breakouts have worked, or it has had none; 2 or more is a name whose breakouts do not stick, which is the pattern a breakout buyer should fade or avoid.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| breakouts that stick | `lte 1` | soft | 1 | - |
+| a record of failed breakouts | `gte 2` | soft | 1 | - |
+
+**When the reading lies**
+
+- 0 mixes two cases: breakouts that held and no breakouts at all. Check rollup.retest@v1.breakout_date, which is null without a recent one.
+- A pending breakout (under 20 sessions old) that has not failed yet counts as 0 today and can turn into 1 tomorrow.
+- Null unless every one of the last 292 sessions has a bar, so a name with a gap or under 14 months of history never passes a hard criterion on it (use soft).
+
+Sources: docs/data/swing.md; Bulkowski, Encyclopedia of Chart Patterns (breakout failure); Raschke and Connors, Street Smarts (failed breakouts)
+
+### `rollup.gaps@v1.gap_open_pct`
+
+**How to read it.** Today's open against the previous close, as a fraction: 0.03 opened 3% above, -0.02 opened 2% below. Overnight news shows here before the day's range does: earnings, a downgrade, a market-wide move. Whether the gap is then held or filled is the day's story, not this number's.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| gapped up at the open | `gte 0.03` | hard | - | with rollup.momentum@v1.rel_volume gte 1.5 to tell news from noise |
+| gapped down at the open | `lte -0.03` | hard | - | - |
+
+**When the reading lies**
+
+- Most large gaps are news (rollup.earnings@v1.last_earnings_date, rollup.earnings@v1.next_earnings_date); a gap on no news and thin volume more often fills.
+- The open is the first print, which can be far from where the day trades; judge the day with the close and rollup.momentum@v1.rel_volume.
+- Null when the previous session has no bar (a halt, a listing day); a hard criterion then rejects the name.
+
+Sources: docs/data/swing.md; Edwards and Magee, Technical Analysis of Stock Trends (gaps)
+
+### `feature.breakout_retest_held`
+
+**How to read it.** True when the latest 20-session breakout came back to within half an ATR of its level on an earlier session and no close since has gone below the level (rollup.retest@v1.retest_state HELD). The breakout has been tested and survived; it does not say price is at the level now (RETESTING is today's retest).
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a breakout that held its retest | `eq true` | hard | - | with feature.trend_state eq UPTREND |
+
+**When the reading lies**
+
+- False covers every other state: not yet retested (FRESH), retesting today, failed and no breakout. Use rollup.retest@v1.retest_state in to include RETESTING.
+- One held retest is a sample of one; combine with feature.trend_state eq UPTREND.
+- Null when the name has no retest row (no bar on the session).
+
+Sources: docs/data/swing.md; Bulkowski, Encyclopedia of Chart Patterns
+
+### `feature.breakout_failed`
+
+**How to read it.** True when the latest 20-session breakout of the last 60 sessions has since closed below its level (rollup.retest@v1.retest_state FAILED): a bull trap. Used to drop names whose breakout did not work, or to look for the reversal.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a failed breakout | `eq true` | hard | - | - |
+| no failed breakout behind it | `eq false` | soft | 0 | - |
+
+**When the reading lies**
+
+- One close below the level is enough, even if price recovered after: check rollup.retest@v1.sessions_since_breakout and feature.dist_to_resistance_atr for whether it is back above.
+- False includes names with no breakout at all; it is not a quality mark.
+- Null when the name has no retest row (no bar on the session).
+
+Sources: docs/data/swing.md; Raschke and Connors, Street Smarts (failed breakouts)
+
+### `feature.dist_to_gap_above`
+
+**How to read it.** How far above the close the nearest unfilled down gap begins, as a fraction of the close: 0.03 is 3% above. Close to 0 the close is just under a gap zone where supply sat when price dropped through; 0.10 or more is out of play for a swing trade. The zone is rollup.gaps@v1.gap_above (its lower edge).
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| an overhead gap close by | `lte 0.05` | soft | 0.02 | a resistance to respect; with feature.dist_to_resistance for the swing high |
+| room before the next overhead gap | `gte 0.08` | soft | 0.03 | soft, so a name with a clean overhead (null) is listed rather than rejected |
+
+**When the reading lies**
+
+- Null when no unfilled down gap lies wholly above the close (all filled, or the close is inside one): that is a clean overhead, not a zero distance.
+- A gap from an earnings reaction (rollup.gaps@v1.gap_above_date near rollup.earnings@v1.last_earnings_date) is a weaker level than one on no news.
+
+Sources: docs/data/swing.md; Murphy, Technical Analysis of the Financial Markets (gaps as resistance)
+
+### `feature.dist_to_gap_below`
+
+**How to read it.** How far below the close the nearest unfilled up gap begins, as a fraction of the close: 0.03 is 3% below. Close to 0 the close is just above a gap zone, where a pullback meets the old gap; the zone is rollup.gaps@v1.gap_below (its upper edge). A gap that far below has not been tested since it formed.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a support gap just under the price | `lte 0.03` | soft | 0.02 | with feature.trend_state eq UPTREND |
+
+**When the reading lies**
+
+- Null when no unfilled up gap lies wholly below the close (all filled, or the close is inside one).
+- A breakaway gap on news may never fill; check rollup.gaps@v1.gap_below_date and rollup.earnings@v1.last_earnings_date.
+
+Sources: docs/data/swing.md; Murphy, Technical Analysis of the Financial Markets (gaps as support)

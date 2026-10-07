@@ -133,3 +133,23 @@ hint = "volume_bias eq ACCUMULATION (DISTRIBUTION for the sellers); or up_volume
 say = ["volume climax", "capitulation volume", "climactic volume", "unusual volume", "volume spike"]
 fields = ["feature.volume_climax", "rollup.volume@v1.volume_z_20d", "rollup.momentum@v1.rel_volume"]
 hint = "volume_climax eq true (3 standard deviations above the 20 sessions before); 'unusual volume' alone is volume_z_20d gte 2 soft or rel_volume gte 3; most climaxes are earnings: check rollup.earnings@v1.last_earnings_date"
+
+[[phrase]]
+say = ["tested support twice", "support held twice", "double bottom support", "multiple tests of support"]
+fields = ["rollup.pivot_strength@v1.support_touches", "feature.dist_to_support_atr", "feature.trend_state"]
+hint = "support_touches gte 2 (soft with tolerance 1); gate with dist_to_support_atr lte 1 so the price is at the level now, and trend_state eq UPTREND; a floor tested many times is not safer, only more watched"
+
+[[phrase]]
+say = ["higher highs and higher lows", "higher highs higher lows", "uptrend structure", "lower highs and lower lows", "downtrend structure"]
+fields = ["rollup.pivot_strength@v1.pivot_structure", "feature.trend_state"]
+hint = "pivot_structure eq HH_HL (LH_LL for lower highs and lower lows); it reads the last two swing highs and lows, so confirm with trend_state eq UPTREND (DOWNTREND) when both the pivots and the averages should agree"
+
+[[phrase]]
+say = ["breakout retest", "retest of the breakout", "pullback to the breakout level", "breakout that held", "broken resistance as support"]
+fields = ["rollup.retest@v1.retest_state", "feature.breakout_retest_held", "feature.breakout_failed"]
+hint = "retest_state in [RETESTING, HELD] for a breakout that came back to its level and held; RETESTING alone is the retest happening today; breakout_retest_held eq true is the HELD half; a failed breakout is breakout_failed eq true, never in this set"
+
+[[phrase]]
+say = ["unfilled gap above", "gap overhead", "open gap above", "unfilled gap below", "gap fill", "gap support"]
+fields = ["feature.dist_to_gap_above", "feature.dist_to_gap_below"]
+hint = "unfilled gap above: dist_to_gap_above lte 0.05 (fraction of price; a down gap still overhead, resistance); unfilled gap below: dist_to_gap_below lte 0.05 (an up gap still unfilled under the price, support); both are null when none, so a hard criterion needs one to exist"

@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-269 stored features in 26 groups, in dependency order; 51 expression features.
+284 stored features in 29 groups, in dependency order; 55 expression features.
 
 ## `option_liquidity@v1`
 
@@ -178,6 +178,18 @@ Resistance and support: the most recent confirmed swing high above and swing low
 | `swing_low` | window | float32 | usd_per_share | open | >= 0 | Support: the low of the most recent swing low below the close (a bar whose low is strictly below the 5 lows before it and at most the 5 after it, confirmed 5 sessions later) | no confirmed swing low below the close dated 5 to 246 sessions before the session (e.g. the close is at a 252-session low), or fewer than 11 bars in a row | `bars/1d.low`, `bars/1d.close` |
 | `swing_low_date` | window | date | date | open |  | The session of that swing low | no confirmed swing low below the close dated 5 to 246 sessions before the session (e.g. the close is at a 252-session low), or fewer than 11 bars in a row | `bars/1d.low`, `bars/1d.close` |
 
+## `gaps@v1`
+
+Today's opening gap and the nearest unfilled down gap above and up gap below the close (over the last 253 sessions). Stored as `rollups/instrument/gaps@v1`; reads `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `gap_open_pct` | window | float32 | decimal | open | >= -1 | Today's open / the previous session's close - 1: the opening gap, up positive | the previous session has no bar | `bars/1d.open`, `bars/1d.close` |
+| `gap_above` | window | float32 | usd_per_share | open | >= 0 | Resistance gap: the lower edge (the high of the gap session, where price rising would enter the zone) of the nearest unfilled down gap above the close (a down gap: high < the previous low; filled when a later high reaches that previous low) | no unfilled down gap above the close among the last 252 sessions (every gap is filled, the close is inside one, or the bars around it are missing) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
+| `gap_above_date` | window | date | date | open |  | The session of that down gap | no unfilled down gap above the close among the last 252 sessions (every gap is filled, the close is inside one, or the bars around it are missing) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
+| `gap_below` | window | float32 | usd_per_share | open | >= 0 | Support gap: the upper edge (the low of the gap session, where price falling would enter the zone) of the nearest unfilled up gap below the close (an up gap: low > the previous high; filled when a later low reaches that previous high) | no unfilled up gap below the close among the last 252 sessions (every gap is filled, the close is inside one, or the bars around it are missing) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
+| `gap_below_date` | window | date | date | open |  | The session of that up gap | no unfilled up gap below the close among the last 252 sessions (every gap is filled, the close is inside one, or the bars around it are missing) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
+
 ## `anchored_vwap@v1`
 
 VWAP anchored to the last earnings report (from the reaction session through the session). Stored as `rollups/instrument/anchored_vwap@v1`; reads `events/earnings`, `bars/1d`.
@@ -264,6 +276,30 @@ Trailing-twelve-month revenue, net income and diluted EPS and the last fiscal ye
 | `eps_stale` | window | bool | flag | open |  | The EPS TTM's own period ended more than stale_days (480) before the session: the value is shown but pe_ratio is null | there is no EPS TTM (see eps_diluted_ttm) | `instruments/shares.period_end` |
 | `is_adr` | window | bool | flag | open |  | The instrument is an ADR: its per-share figures are per ordinary share and the ADR ratio is not stored, so pe_ratio is null | never (false without an instruments/reference snapshot) | `instruments/reference.security_type` |
 | `financials_status` | label | str | category | open | OK, PARTIAL, NO_TTM, NO_FACTS, STALE | OK (all three TTMs); PARTIAL (some); NO_TTM (facts, but no TTM can be formed); NO_FACTS (none filed); STALE (the first TTM present ended more than stale_days, 480, before the session; the values are still shown) | never | `instruments/shares.concept` |
+
+## `pivot_strength@v1`
+
+How often the swing high and low were tested (touches within 0.5 ATR), their age in sessions and whether the pivots step up (HH_HL), down (LH_LL) or mix. Stored as `rollups/instrument/pivot_strength@v1`; reads `bars/1d`, `rollups/instrument/swing_levels@v1`, `rollups/instrument/momentum@v1`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `resistance_touches` | window | int | count | open | 1 .. 252 | Distinct touches of swing_high over the 252 sessions read, the pivot bar included: a bar touches when its high is within touch_atr (0.5) x atr_14 of the level and its close is at or below it; consecutive touching bars count once | swing_high is null (no swing_levels row or no swing high above the close), or atr_14 is null (fewer than 15 consecutive bars) | `bars/1d.high`, `bars/1d.close`, `swing_levels.swing_high@v1`, `momentum.atr_14@v1` |
+| `support_touches` | window | int | count | open | 1 .. 252 | Distinct touches of swing_low over the 252 sessions read, the pivot bar included: a bar touches when its low is within touch_atr (0.5) x atr_14 of the level and its close is at or above it; consecutive touching bars count once | swing_low is null (no swing_levels row or no swing low below the close), or atr_14 is null (fewer than 15 consecutive bars) | `bars/1d.low`, `bars/1d.close`, `swing_levels.swing_low@v1`, `momentum.atr_14@v1` |
+| `resistance_age` | window | int | sessions | open | 5 .. 246 | Exchange sessions from the swing high's date to the session (at least 5: a pivot is confirmed 5 sessions later) | swing_high is null (no swing_levels row or no swing high above the close) | `swing_levels.swing_high_date@v1` |
+| `support_age` | window | int | sessions | open | 5 .. 246 | Exchange sessions from the swing low's date to the session (at least 5: a pivot is confirmed 5 sessions later) | swing_low is null (no swing_levels row or no swing low below the close) | `swing_levels.swing_low_date@v1` |
+| `pivot_structure` | label | str | category | open | HH_HL, LH_LL, MIXED | HH_HL when the last two confirmed swing highs and the last two confirmed swing lows of the window both step up (the later above the earlier), LH_LL when both step down, else MIXED (an equal pair is MIXED); every confirmed pivot counts, not only those beyond the close | fewer than two confirmed swing highs or two swing lows in the 252 sessions read (or a missing bar around them) | `bars/1d.high`, `bars/1d.low` |
+
+## `retest@v1`
+
+The latest 20-session breakout of the last 60 sessions, its level, whether it was retested (within 0.5 ATR) and held or failed, and the failed breakouts of the last year. Stored as `rollups/instrument/retest@v1`; reads `bars/1d`, `rollups/instrument/momentum@v1`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `breakout_date` | window | date | date | open |  | The session of the most recent breakout among the last 60: a close above the highest high of the 20 sessions before it | no breakout session among the last search_sessions (60) sessions (retest_state NONE) | `bars/1d.high`, `bars/1d.close` |
+| `breakout_level` | window | float32 | usd_per_share | open | >= 0 | The highest high of the 20 sessions before that breakout (what its close cleared) | no breakout session among the last search_sessions (60) sessions (retest_state NONE) | `bars/1d.high`, `bars/1d.close` |
+| `sessions_since_breakout` | window | int | sessions | open | 0 .. 291 | Exchange sessions from that breakout to the session (0: the breakout is today) | no breakout session among the last search_sessions (60) sessions (retest_state NONE) | `bars/1d.high`, `bars/1d.close` |
+| `retest_state` | label | str | category | open | FAILED, NONE, RETESTING, HELD, FRESH, NO_ATR | FAILED (a close after the breakout, through the session, is below its level), NONE (no breakout in the last 60 sessions), NO_ATR (atr_14 unknown), RETESTING (the session's low is at or below the level + 0.5 x atr_14 and its close at or above the level), HELD (an earlier session after the breakout had such a low), FRESH (price has not come back to the level); the breakout session itself is never a retest | never | `bars/1d.high`, `bars/1d.low`, `bars/1d.close`, `momentum.atr_14@v1` |
+| `failed_breakouts_252d` | window | int | count | open | 0 .. 252 | Breakouts of the last 252 sessions (the first session of each run of consecutive breakout sessions) whose close fell below their level within the next 20 sessions; one that has not failed and is under 20 sessions old is pending and not counted | a session among the last 292 has no bar (a gap), or the history is shorter | `bars/1d.high`, `bars/1d.close` |
 
 ## `iv30@v1`
 
@@ -549,6 +585,10 @@ Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unle
 | `dist_to_support_atr` | expression | float | ratio | open | >= 0 | Distance to support in ATRs: (close - swing_low) / atr_14 | dist_to_support is null, atr_14 is null (fewer than 15 consecutive bars), or atr_14 is 0 | `(price_stats.close - swing_levels.swing_low) / momentum.atr_14` | virtual |
 | `breakout_20d` | expression | bool | flag | open |  | A 20-session breakout on volume: close above the highest high of the 20 sessions before today (prior_high_20d) and rel_volume above 1.5 (params.min_rel_volume) | neither condition is false and one is unknown (prior_high_20d or rel_volume null: a gap among the last 21 sessions, or a shorter history) | `price_stats.close > momentum.prior_high_20d and momentum.rel_volume > min_rel_volume` (min_rel_volume = 1.5) | virtual |
 | `pullback_to_sma20` | expression | bool | flag | open |  | A pullback in an uptrend: trend_state UPTREND and the close within 1 ATR (params.atr_multiple) of SMA20, above or below it (edges included) | neither condition is false and one is unknown (trend_state, sma_20 or atr_14 null) | `trend_state == "UPTREND" and abs(price_stats.close - price_stats.sma_20) <= atr_multiple * momentum.atr_14` (atr_multiple = 1.0) | virtual |
+| `breakout_retest_held` | expression | bool | flag | open |  | The latest 20-session breakout came back to within 0.5 ATR of its level on an earlier session and has not closed below it since (retest_state HELD); not true while today is the retest (RETESTING) | no retest row (no bar on the session) | `retest.retest_state == "HELD"` | virtual |
+| `breakout_failed` | expression | bool | flag | open |  | The latest 20-session breakout (of the last 60 sessions) has since closed below its level (retest_state FAILED) | no retest row (no bar on the session) | `retest.retest_state == "FAILED"` | virtual |
+| `dist_to_gap_above` | expression | float | decimal | open | >= 0 | How far the nearest unfilled down gap above the close begins: (gap_above - close) / close, 0.03 is 3% above | no unfilled down gap wholly above the close in the last 253 sessions, or no gaps or price_stats row | `(gaps.gap_above - price_stats.close) / price_stats.close` | virtual |
+| `dist_to_gap_below` | expression | float | decimal | open | 0 .. 1 | How far the nearest unfilled up gap below the close begins: (close - gap_below) / close, 0.03 is 3% below | no unfilled up gap wholly below the close in the last 253 sessions, or no gaps or price_stats row | `(price_stats.close - gaps.gap_below) / price_stats.close` | virtual |
 
 ### `volatility.toml`
 

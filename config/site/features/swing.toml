@@ -1,6 +1,6 @@
 # Swing levels and momentum (the SW track; definitions and worked examples in
-# docs/data/swing.md). Formulas over price_stats@v2, momentum@v1 and swing_levels@v1, computed
-# on read. The language and the keys: docs/configuration.md "Expression features". Changing a
+# docs/data/swing.md). Formulas over price_stats@v2, momentum@v1, swing_levels@v1, retest@v1 and
+# gaps@v1, computed on read. The language and the keys: docs/configuration.md "Expression features". Changing a
 # formula or a param: bump its version.
 
 [atr_pct]
@@ -91,4 +91,38 @@ dtype = "bool"
 unit = "flag"
 description = "A pullback in an uptrend: trend_state UPTREND and the close within 1 ATR (params.atr_multiple) of SMA20, above or below it (edges included)"
 null_meaning = "neither condition is false and one is unknown (trend_state, sma_20 or atr_14 null)"
+version = 1
+
+[breakout_retest_held]
+expr = 'retest.retest_state == "HELD"'
+dtype = "bool"
+unit = "flag"
+description = "The latest 20-session breakout came back to within 0.5 ATR of its level on an earlier session and has not closed below it since (retest_state HELD); not true while today is the retest (RETESTING)"
+null_meaning = "no retest row (no bar on the session)"
+version = 1
+
+[breakout_failed]
+expr = 'retest.retest_state == "FAILED"'
+dtype = "bool"
+unit = "flag"
+description = "The latest 20-session breakout (of the last 60 sessions) has since closed below its level (retest_state FAILED)"
+null_meaning = "no retest row (no bar on the session)"
+version = 1
+
+[dist_to_gap_above]
+expr = "(gaps.gap_above - price_stats.close) / price_stats.close"
+dtype = "float"
+unit = "decimal"
+description = "How far the nearest unfilled down gap above the close begins: (gap_above - close) / close, 0.03 is 3% above"
+null_meaning = "no unfilled down gap wholly above the close in the last 253 sessions, or no gaps or price_stats row"
+valid_range = [0, inf]
+version = 1
+
+[dist_to_gap_below]
+expr = "(price_stats.close - gaps.gap_below) / price_stats.close"
+dtype = "float"
+unit = "decimal"
+description = "How far the nearest unfilled up gap below the close begins: (close - gap_below) / close, 0.03 is 3% below"
+null_meaning = "no unfilled up gap wholly below the close in the last 253 sessions, or no gaps or price_stats row"
+valid_range = [0, 1]
 version = 1

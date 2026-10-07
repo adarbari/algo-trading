@@ -321,3 +321,106 @@ Sources: The Turtle rules (ATR-scaled distances); docs/data/swing.md
 - Support in a downtrend breaks: pair with feature.trend_state eq UPTREND.
 
 Sources: The Turtle rules (a 2 ATR stop); docs/data/swing.md
+
+### `rollup.retest@v1.breakout_level`
+
+**How to read it.** The level the latest breakout cleared, in dollars: the highest high of the 20 sessions before the breakout session (the prior_high_20d of that day), within the last 60 sessions. Broken resistance is the textbook place for new support: a pullback that holds near it is the retest. rollup.retest@v1.retest_state says where the close stands against it.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a recent breakout level | `not_null` | hard | - | judge the retest with rollup.retest@v1.retest_state |
+
+**When the reading lies**
+
+- A level set by one spike high (a halt, a news candle) is easy to clear and weak support afterwards; check rollup.retest@v1.sessions_since_breakout and the volume on the day (rollup.momentum@v1.rel_volume).
+- Null when no session of the last 60 closed above its prior 20-session high (retest_state NONE); a hard 'not_null' drops every name that has not broken out lately.
+- The close alone defines the breakout here, with no volume condition (unlike feature.breakout_20d).
+
+Sources: docs/data/swing.md; Edwards and Magee, Technical Analysis of Stock Trends (broken resistance turning into support); Donchian 20-session channel entries
+
+### `rollup.retest@v1.breakout_date`
+
+**How to read it.** The session of the latest 20-session breakout among the last 60 sessions. A date to show with the level: a breakout from last week is fresher than one from two months ago, and rollup.retest@v1.sessions_since_breakout is the same fact as a count.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a dated recent breakout | `not_null` | hard | - | - |
+
+**When the reading lies**
+
+- Null when there was no breakout in the last 60 sessions; an older breakout is not shown.
+- Only the most recent breakout is kept: a name that broke out twice shows the second one.
+
+Sources: docs/data/swing.md
+
+### `rollup.gaps@v1.gap_above`
+
+**How to read it.** Overhead gap: the lower edge, in dollars, of the nearest unfilled down gap that lies wholly above the close. A down gap is a session whose high stayed below the previous session's low, so nothing traded in between; the zone starts at that session's high (where price rising would enter it) and is filled only when a later high reaches the previous low. Gaps are the classic place price tends to come back to and meet supply; feature.dist_to_gap_above is the distance as a fraction.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has an unfilled gap overhead | `not_null` | hard | - | threshold feature.dist_to_gap_above instead |
+
+**When the reading lies**
+
+- A gap is not a wall: price often runs straight through a zone, and a gap from earnings (rollup.earnings@v1.last_earnings_date) is a news reaction, not a technical level.
+- Null when no unfilled down gap lies wholly above the close in the last 253 sessions: all of them filled, or the close sits inside a partly filled zone. A hard 'not_null' drops the names with a clean overhead.
+- Bars are split-adjusted, not dividend-adjusted: a split is never a gap, but a large special dividend can print as one; rollup.gaps@v1.gap_above_date says when it formed.
+
+Sources: docs/data/swing.md; Edwards and Magee, Technical Analysis of Stock Trends (gaps); Murphy, Technical Analysis of the Financial Markets (gaps as support and resistance)
+
+### `rollup.gaps@v1.gap_above_date`
+
+**How to read it.** The session of the down gap behind rollup.gaps@v1.gap_above. A gap from last week is a fresh, fully remembered level; one from eleven months ago is mostly forgotten.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a dated overhead gap | `not_null` | hard | - | - |
+
+**When the reading lies**
+
+- Null when rollup.gaps@v1.gap_above is null.
+
+Sources: docs/data/swing.md
+
+### `rollup.gaps@v1.gap_below`
+
+**How to read it.** Gap support: the upper edge, in dollars, of the nearest unfilled up gap that lies wholly below the close. An up gap is a session whose low stayed above the previous session's high; the zone is entered from above at that session's low and is filled only when a later low reaches the previous high. Price pulling back into the zone is the usual 'gap fill' trade; feature.dist_to_gap_below is the distance as a fraction.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has an unfilled gap below | `not_null` | hard | - | threshold feature.dist_to_gap_below instead |
+
+**When the reading lies**
+
+- Most up gaps eventually fill, but 'eventually' can be a year: an unfilled gap says nothing about when, and a breakaway gap on news may never fill; check rollup.gaps@v1.gap_below_date and rollup.earnings@v1.last_earnings_date.
+- Null when no unfilled up gap lies wholly below the close in the last 253 sessions (all filled, or the close is inside a partly filled zone).
+- Bars are split-adjusted, not dividend-adjusted: a large special dividend can print as a gap.
+
+Sources: docs/data/swing.md; Edwards and Magee, Technical Analysis of Stock Trends (gaps); Murphy, Technical Analysis of the Financial Markets
+
+### `rollup.gaps@v1.gap_below_date`
+
+**How to read it.** The session of the up gap behind rollup.gaps@v1.gap_below. A recent gap is a level the market has just jumped over; an old one is a memory.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| has a dated gap below | `not_null` | hard | - | - |
+
+**When the reading lies**
+
+- Null when rollup.gaps@v1.gap_below is null.
+
+Sources: docs/data/swing.md
