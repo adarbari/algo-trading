@@ -383,8 +383,9 @@ CARRIED_FROM = "carried_from"
 # report date at midnight UTC, ``time`` ``pre_market`` / ``after_hours`` / ``unknown``) and SEC
 # 8-K Item 2.02 results releases (``sec_8k``, ADR 0050: ``ts`` the ACCEPTANCE instant, ``time``
 # also ``intraday`` for an acceptance during the session, ``reported`` true). The merge key is
-# (``instrument_id``, ``ts``): the 8-K row's ``ts`` is never midnight, so a Nasdaq row and an
-# 8-K row of the same day do not collide, and the per-quarter precedence between them belongs
+# (``instrument_id``, ``ts``): the 8-K row's ``ts`` is the acceptance instant (an acceptance at
+# exactly midnight UTC, 20:00 EDT, is written one second later), so a Nasdaq row and an 8-K row
+# of the same day never share a key, and the per-quarter precedence between them belongs
 # to the rollup that reads them (``earnings@v1`` and its ADR 0050 successors), not to a writer.
 EARNINGS_8K_SOURCE = "sec_8k"  # the ``source`` of the 8-K Item 2.02 rows (tasks/events/filings.py)
 EARNINGS_EVENTS = TableSpec(

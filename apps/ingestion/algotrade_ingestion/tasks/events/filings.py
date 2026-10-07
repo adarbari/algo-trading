@@ -19,11 +19,12 @@ session. Share classes of one CIK get a row each.
 - **Earnings**: an ``8-K`` (not an amendment) whose items include 2.02 is also one
   ``events/earnings`` row with ``source = "sec_8k"``: ``earnings_date`` the acceptance date in
   New York; ``time`` ``pre_market`` before 09:30 New York time, ``after_hours`` from 16:00, else
-  ``intraday``; ``reported`` true; ``known_from`` that date; ``fiscal_quarter`` the month of the
-  8-K's ``report_date`` as the calendar writes it ("Sep/2026"), null when SEC gives none (the
-  release date, not the quarter end: SEC's date is the earliest event reported). ``ts`` is the
-  acceptance instant, never midnight, so it cannot collide with the calendar's row of the day
-  (key ``instrument_id`` + ``ts``). The rows are written into the run session's partition like
+  ``intraday``; ``reported`` true; ``known_from`` that date; ``fiscal_quarter`` null (the
+  calendar's label names a quarter end; the 8-K's ``report_date`` is the release date, another
+  thing, so the per-quarter precedence of ADR 0050 is the rollup's to derive). ``ts`` is the
+  acceptance instant (one at exactly midnight UTC is written one second later), so it never
+  shares the calendar row's key (``instrument_id`` + ``ts``). The rows are written into the run
+  session's partition like
   the calendar's; the one report per quarter is chosen by the rollup, not here.
 
 Per CIK, an item of the run: ``OK: <n> 8-K, <m> results`` (none is still ``OK``), ``NO_DATA``
@@ -58,7 +59,6 @@ RESULTS_ITEM = "2.02"
 RESULTS_FORM = "8-K"  # an 8-K/A amends a release, it is no new report
 PRE_MARKET, INTRADAY, AFTER_HOURS = "pre_market", "intraday", "after_hours"
 OPEN_MINUTE, CLOSE_MINUTE = 9 * 60 + 30, 16 * 60  # New York clock, in minutes after midnight
-MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 CHECKPOINT_EVERY = 25
 COLUMNS = [
     "instrument_id",
@@ -146,18 +146,14 @@ def is_results_release(filings: pd.DataFrame) -> pd.Series:
     return (filings["form"] == RESULTS_FORM) & has_item
 
 
-def fiscal_quarter(report_date: pd.Series) -> pd.Series:
-    """The calendar's label ("Sep/2026") of each report date's month, null where missing."""
-    days = pd.to_datetime(report_date)
-    label = [f"{MONTHS[d.month - 1]}/{d.year}" if pd.notna(d) else None for d in days]
-    return pd.Series(label, index=report_date.index, dtype=object)
-
-
 def earnings_rows(filings: pd.DataFrame, name: ScopedName) -> pd.DataFrame:
     """``EARNINGS_COLUMNS`` rows (``source = sec_8k`` is the writer's stamp) of the Item 2.02
     8-Ks in ``filings`` for one name (module doc); one per acceptance instant."""
     results = filings[is_results_release(filings)]
     ts = pd.to_datetime(results["acceptance_ts"], utc=True)
+    # An acceptance at exactly 20:00:00 EDT (19:00 EST) is midnight UTC: the calendar row's key.
+    # One second later keeps the two rows apart (the instant is a key, not a fact anyone reads).
+    ts = ts.where(ts != ts.dt.normalize(), ts + pd.Timedelta(seconds=1))
     day = acceptance_day(ts)
     out = pd.DataFrame(
         {
@@ -166,7 +162,7 @@ def earnings_rows(filings: pd.DataFrame, name: ScopedName) -> pd.DataFrame:
             "symbol": name.symbol,
             "earnings_date": day,
             "time": release_time(ts),
-            "fiscal_quarter": fiscal_quarter(results["report_date"]),
+            "fiscal_quarter": None,  # the calendar's label (a quarter end); an 8-K has none
             "reported": True,
             "known_from": day,
         },
@@ -178,18 +174,23 @@ def earnings_rows(filings: pd.DataFrame, name: ScopedName) -> pd.DataFrame:
 def since_by_cik(
     run: IngestRun, ciks: dict[str, list[ScopedName]], explicit: date | None
 ) -> dict[str, date]:
-    """Where each CIK's read starts: ``explicit`` for all, else the New York date of its latest
-    stored acceptance, else ``DEFAULT_SINCE``."""
+    """Where each CIK's read starts: ``explicit`` for all, else the earliest of its names' starts,
+    a name's start being the New York date of its latest stored acceptance, else
+    ``DEFAULT_SINCE`` (a share class newly in scope gets the CIK's history re-read; the rows
+    already stored are rewritten unchanged)."""
     if explicit is not None:
         return dict.fromkeys(ciks, explicit)
     ids = [n.instrument_id for names in ciks.values() for n in names]
     stored = read_events(run.reader, TABLE, *ALL_TIME, instruments=ids).frame
     latest: dict[str, date] = {}
-    if len(stored) and "cik" in stored.columns:
+    if len(stored):
         ts = pd.to_datetime(stored["ts"], utc=True)
-        newest = ts.groupby(stored["cik"]).max()
-        latest = {str(cik): moment.tz_convert(EXCHANGE_TZ).date() for cik, moment in newest.items()}
-    return {cik: latest.get(cik, DEFAULT_SINCE) for cik in ciks}
+        newest = ts.groupby(stored["instrument_id"]).max()
+        latest = {str(iid): moment.tz_convert(EXCHANGE_TZ).date() for iid, moment in newest.items()}
+    return {
+        cik: min(latest.get(n.instrument_id, DEFAULT_SINCE) for n in names)
+        for cik, names in ciks.items()
+    }
 
 
 def _one_cik(run: IngestRun, source: Source, cik: str, names: list[ScopedName], since: date) -> str:

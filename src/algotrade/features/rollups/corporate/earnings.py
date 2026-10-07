@@ -97,6 +97,13 @@ FEATURES = (
 COLUMNS = column_types(FEATURES)
 
 
+# The ``source`` of the SEC 8-K Item 2.02 results rows the ``filings`` task stores in
+# ``events/earnings`` (``EARNINGS_8K_SOURCE`` in storage.tables.schemas; rollups import no storage).
+# ``earnings@v1`` reads the calendar rows only: the 8-K rows join in a later version with the
+# per-quarter precedence between the two sources (ADR 0050 decision 3), so v1 keeps its values.
+SEC_8K_SOURCE = "sec_8k"
+
+
 def _report_days(stored: pd.DataFrame) -> pd.Series:
     """The report day of each row, naive: ``earnings_date`` where the writer gave one (an 8-K
     accepted after 20:00 New York time has a ``ts`` on the next UTC day; the Nasdaq calendar's
@@ -122,6 +129,8 @@ def valid_events(stored: pd.DataFrame, session: date, since: date | None = None)
     snapshots' ranges still come from all their rows, so the rows kept are exactly those the
     full reading keeps for those dates; only the per-date work is limited to them. The work
     over every stored row is a vectorised group-by of two day columns."""
+    if "source" in stored.columns:  # the 8-K results rows wait for the v2 precedence (above)
+        stored = stored[stored["source"] != SEC_8K_SOURCE]
     report_day = _report_days(stored).to_numpy(dtype="datetime64[D]")
     snap_day = pd.to_datetime(stored["session_date"]).to_numpy(dtype="datetime64[D]")
     n = len(stored)

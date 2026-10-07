@@ -289,3 +289,36 @@ def test_a_failed_day_never_carries_the_8k_results_rows_of_the_previous_snapshot
     assert second.stats["carried_rows"] == 1  # AAPL's forecast only
     stored = StoreReader(backend).table("events/earnings", DAY)
     assert stored is not None and "EQ:MU" not in set(stored["instrument_id"])
+
+
+def test_a_failed_day_carries_from_the_newest_partition_that_has_calendar_rows() -> None:
+    """A partition whose earnings step failed and was waived holds only the ``filings`` task's
+    ``sec_8k`` rows: the carry reads past it to the newest snapshot with calendar rows."""
+    report, failing = date(2026, 10, 6), {"on": False}
+
+    def transport(url: str) -> bytes:
+        if url.endswith(report.isoformat()) and failing["on"]:
+            raise HttpError(500)
+        return calendar([("AAPL", "time-after-hours")])
+
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    write_reference(writer, date(2026, 9, 30), {"AAPL": "EQ:BBG000B9XRY4"})
+    source = NasdaqEarningsSource(http_for(transport, RetryPolicy(tries=1)))
+    ctx = task_ctx(writer, StoreReader(backend), CLOCK)
+    ingest_earnings(ctx, source, date(2026, 9, 30), days=8)  # the calendar rows: Sep 30
+    results = [
+        {"instrument_id": "EQ:MU", "ts": pd.Timestamp("2026-10-01 20:02", tz="UTC"),
+         "time": "after_hours", "reported": True, "known_from": date(2026, 10, 1)}
+    ]  # fmt: skip
+    eight_k = stamped(results, date(2026, 10, 1), "filings-run")
+    eight_k["source"] = "sec_8k"
+    writer.write_table("events/earnings", date(2026, 10, 1), "filings-run", eight_k)  # 8-K only
+    failing["on"] = True
+    second = ingest_earnings(ctx, source, DAY, days=8)
+    assert second.stats["carried_rows"] == 1  # AAPL's forecast, from the Sep 30 snapshot
+    stored = StoreReader(backend).table("events/earnings", DAY)
+    assert stored is not None
+    carried = stored[stored["carried_from"].notna()]
+    assert set(carried["instrument_id"]) == {"EQ:BBG000B9XRY4"}
+    assert list(carried["carried_from"].unique()) == [date(2026, 9, 30)]  # past the 8-K-only day

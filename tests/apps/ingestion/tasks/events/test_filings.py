@@ -22,6 +22,7 @@ from algotrade_ingestion.tasks.events.filings import (
     EARNINGS,
     TABLE,
     TASK,
+    earnings_rows,
     ingest_filings,
     since_by_cik,
 )
@@ -177,8 +178,8 @@ def test_micron_filings_and_results_from_the_recorded_payload() -> None:
     assert list(results["earnings_date"]) == [date(2026, 6, 24), date(2026, 9, 30)]
     assert set(results["source"]) == {"sec_8k"} and results["reported"].all()
     assert list(results["time"]) == ["after_hours", "after_hours"]  # 16:02 New York
-    assert list(results["fiscal_quarter"]) == ["Jun/2026", "Sep/2026"]
-    assert results["ts"].iloc[1] == pd.Timestamp("2026-09-30 20:02:22", tz="UTC")  # never midnight
+    assert results["fiscal_quarter"].isna().all()
+    assert results["ts"].iloc[1] == pd.Timestamp("2026-09-30 20:02:22", tz="UTC")  # the instant
 
 
 def test_a_since_before_the_recent_block_reads_the_older_page() -> None:
@@ -239,11 +240,7 @@ def test_only_original_8ks_with_item_202_become_earnings_rows() -> None:
     assert results["reported"].all() and set(results["source"]) == {"sec_8k"}
     assert set(results["symbol"]) == {"GOOGL"}
     assert (results["known_from"] == results["earnings_date"]).all()
-    assert (
-        results.set_index("ts").loc[pd.Timestamp("2026-10-05 13:29:59", tz="UTC"), "fiscal_quarter"]
-        == "Sep/2026"
-    )
-    assert results["fiscal_quarter"].isna().sum() == 6  # SEC gave no report date
+    assert results["fiscal_quarter"].isna().all()  # the calendar's label is a quarter end, not ours
 
 
 def test_an_8k_row_never_collides_with_the_calendars_row_of_the_day() -> None:
@@ -320,6 +317,9 @@ def test_the_default_since_is_the_latest_stored_acceptance_else_2018() -> None:
         ALPHA: date(2026, 10, 5),  # the 00:30 UTC acceptance of the 6th is the 5th in New York
         "0000000001": DEFAULT_SINCE,
     }
+    with IngestRun(context(writer), TASK, S2) as third:  # a share class newly in scope
+        two = {MU: [ScopedName("EQ:MU", "MU", ()), ScopedName("EQ:MU2", "MU2", ())]}
+        assert since_by_cik(third, two, None) == {MU: DEFAULT_SINCE}
 
 
 def test_a_later_run_reads_from_the_latest_stored_filing_and_changes_nothing_stored() -> None:
@@ -333,3 +333,24 @@ def test_a_later_run_reads_from_the_latest_stored_filing_and_changes_nothing_sto
     assert len(after) == 9 and list(after["accession"]) == list(before["accession"])
     assert list(after["known_from"]) == list(before["known_from"])  # a rewrite moves nothing later
     assert len(read(writer, EARNINGS, ["EQ:GOOGL"])) == 7
+
+
+def test_an_acceptance_at_midnight_utc_is_written_one_second_later() -> None:
+    """20:00:00 EDT is midnight UTC, the calendar row's key: the 8-K row steps off it."""
+    filings = pd.DataFrame(
+        {
+            "form": ["8-K", "8-K"],
+            "items": ["2.02,9.01", "2.02"],
+            "acceptance_ts": [
+                pd.Timestamp("2026-10-06 00:00:00", tz="UTC"),
+                pd.Timestamp("2026-10-06 00:00:30", tz="UTC"),
+            ],
+            "report_date": [None, None],
+        }
+    )
+    rows = earnings_rows(filings, ScopedName("EQ:X", "X", ()))
+    assert list(rows["ts"]) == [
+        pd.Timestamp("2026-10-06 00:00:01", tz="UTC"),
+        pd.Timestamp("2026-10-06 00:00:30", tz="UTC"),
+    ]
+    assert list(rows["earnings_date"]) == [date(2026, 10, 5), date(2026, 10, 5)]

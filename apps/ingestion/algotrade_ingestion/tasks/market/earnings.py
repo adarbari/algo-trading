@@ -70,11 +70,16 @@ class _Previous:
     own ``source`` and are never copied (a copy would be re-stamped as the calendar's)."""
 
     def __init__(self, run: IngestRun) -> None:
-        earlier = [d for d in run.reader.dates(TABLE) if d < run.session]
-        frame = run.reader.table(TABLE, max(earlier)) if earlier else None
-        if frame is not None and "source" in frame.columns:
-            frame = frame[frame["source"] != EARNINGS_8K_SOURCE]
-        self.rows = frame if frame is not None else pd.DataFrame(columns=["instrument_id", "ts"])
+        # The newest earlier partition with calendar rows: one whose earnings step failed and
+        # was waived holds only the 8-K rows, and carrying from it would carry nothing.
+        self.rows = pd.DataFrame(columns=["instrument_id", "ts"])
+        for day in sorted((d for d in run.reader.dates(TABLE) if d < run.session), reverse=True):
+            frame = run.reader.table(TABLE, day)
+            if frame is not None and "source" in frame.columns:
+                frame = frame[frame["source"] != EARNINGS_8K_SOURCE]
+            if frame is not None and len(frame):
+                self.rows = frame
+                break
         self.days = pd.to_datetime(self.rows["ts"], utc=True).dt.date
 
     def carried(
