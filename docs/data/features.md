@@ -306,7 +306,7 @@ Trailing-12-month cash dividends, split-adjusted to the session. Stored as `roll
 
 ## `dividend_schedule@v1`
 
-The next known ex-dividend date, its amount (split-adjusted to the session) and pay date, as known on the session. Stored as `rollups/instrument/dividend_schedule@v1`; reads `rollups/instrument/price_stats@v2`, `events/dividend_declared` (optional), `events/split` (optional).
+The next known ex-dividend date, its amount (split-adjusted to the session) and pay date, as known on the session. Stored as `rollups/instrument/dividend_schedule@v1`; reads `rollups/instrument/price_stats@v2`, `events/dividend_declared`, `events/split` (optional).
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|

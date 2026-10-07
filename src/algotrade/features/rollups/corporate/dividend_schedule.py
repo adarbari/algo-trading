@@ -11,8 +11,10 @@ what it got in that session's partition, so a declared future ex-date is stored 
 first session whose window reached it and is known from then on (a dividend declared later is
 not known earlier: the snapshot rule, ADR 0007). On session S:
 
-- the candidates are the rows stored on or before S whose ex-date (``ts``) is after S, the
-  latest stored version of each (instrument, ex-date);
+- the candidates are the rows stored on or before S whose ex-date (``ts``) is after S and
+  whose declaration date (when the source gives one) is not after S (a corporate-actions run
+  retried later for S stores what the vendor knows by then in S's partition), the latest
+  stored version of each (instrument, ex-date);
 - a row an instrument's latest such partition no longer lists was moved or withdrawn, and is
   ignored (an ex-date listed by an older partition only is never "next"); a date a later fetch
   dropped with nothing replacing it stays until it passes, because an empty fetch stores
@@ -30,9 +32,9 @@ not known earlier: the snapshot rule, ADR 0007). On session S:
     next_pay_date    its payment date; null when the source gives none
 
 A date after the session is only listed from 30 days before it, so NOT_ANNOUNCED is "none in
-the next ~30 days", not "none this quarter": ``days_to_ex_date`` above 30 never occurs. History
-before the first stored partition has no row to read, so backfilled sessions older than the
-store read NOT_ANNOUNCED.
+the next ~30 days", not "none this quarter": ``days_to_ex_date`` above 30 never occurs. A session
+with no dividend row stored by it at all (before the first corporate-actions partition) has no
+row: UNKNOWN, never NOT_ANNOUNCED, which is only for a session whose listings were read.
 """
 
 from datetime import date
@@ -117,6 +119,11 @@ def upcoming(
         stored=pd.to_datetime(declared["session_date"]).dt.date,
     )
     rows = rows[(rows["ex_date"] > session) & (rows["stored"] <= session)]
+    # A run retried later for the same session (ADR 0039) stores what the vendor knows by then
+    # in that session's partition: a dividend declared after the session is not known on it.
+    if "declaration_date" in rows.columns:
+        known = pd.to_datetime(rows["declaration_date"], errors="coerce").dt.date
+        rows = rows[known.isna() | (known <= session)]
     if rows.empty:
         return pd.DataFrame(columns=columns)
     order = ["stored", *(["knowledge_ts"] if "knowledge_ts" in rows.columns else [])]
@@ -157,7 +164,7 @@ GROUP = FeatureGroup(
     "as known on the session",
     (
         Input(PRICE_STATS),
-        Input(DECLARED, required=False),
+        Input(DECLARED),
         Input(SPLITS, lookback=LOOKBACK, required=False),
     ),
     FEATURES,

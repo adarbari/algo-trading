@@ -51,9 +51,13 @@ def _setup(
     return writer, reader, days
 
 
-def _rows(reader: object, session: date = END) -> pd.DataFrame:
+def _frame(reader: object, session: date = END) -> pd.DataFrame | None:
     out = compute_in_memory(reader, [price_stats.GROUP, ds.GROUP], [session])  # type: ignore[arg-type]
-    frame = out[ds.GROUP.key][0].frame
+    return out[ds.GROUP.key][0].frame
+
+
+def _rows(reader: object, session: date = END) -> pd.DataFrame:
+    frame = _frame(reader, session)
     assert frame is not None
     return frame.set_index("instrument_id")
 
@@ -62,9 +66,7 @@ def test_a_declared_future_ex_date_is_known_only_from_the_session_that_stored_it
     writer, reader, days = _setup()
     ex = END + 12 * DAY
     _write(writer, days[-2], [("EQ:A", ex, 0.25)], pay={ex: "2026-11-20"})
-    before = _rows(reader, days[-3])
-    assert before.loc["EQ:A", "dividend_status"] == "NOT_ANNOUNCED"  # not yet fetched
-    assert before.loc["EQ:A", ["next_ex_date", "next_div_amount", "days_to_ex_date"]].isna().all()
+    assert _frame(reader, days[-3]) is None  # nothing stored by then: UNKNOWN, no row
     stored_day = _rows(reader, days[-2]).loc["EQ:A"]
     assert stored_day["dividend_status"] == "SCHEDULED" and stored_day["next_ex_date"] == ex
     out = _rows(reader).loc["EQ:A"]
@@ -156,15 +158,59 @@ def test_pay_date_is_null_when_the_source_has_none_and_specials_count() -> None:
     assert pd.isna(_rows(reader2).loc["EQ:A", "next_pay_date"])
 
 
-def test_one_row_per_price_stats_instrument_and_no_dividends_at_all_is_not_announced() -> None:
+def test_one_row_per_price_stats_instrument_and_listings_without_a_date_are_not_announced() -> None:
     writer, reader, days = _setup(("EQ:A", "EQ:B"))
-    nothing = _rows(reader)
-    assert list(nothing.index) == ["EQ:A", "EQ:B"]
-    assert (nothing["dividend_status"] == "NOT_ANNOUNCED").all()
-    assert nothing.drop(columns="dividend_status").isna().all().all()
-    _write(writer, days[-2], [("EQ:A", END + 4 * DAY, 0.1), ("EQ:NOBAR", END + 4 * DAY, 0.1)])
+    assert _frame(reader) is None  # no dividend partition at all: UNKNOWN, never NOT_ANNOUNCED
+    _write(writer, days[-2], [("EQ:A", END - 4 * DAY, 0.1), ("EQ:NOBAR", END + 4 * DAY, 0.1)])
     out = _rows(reader)
     assert list(out.index) == ["EQ:A", "EQ:B"]  # no price_stats row, no schedule row
+    assert (out["dividend_status"] == "NOT_ANNOUNCED").all()  # listings read, none upcoming
+    assert out.drop(columns="dividend_status").isna().all().all()
+
+
+def test_a_dividend_declared_after_the_session_is_not_known_in_a_rerun_partition() -> None:
+    """A step retried later for the session stores what the vendor knows by then in the
+    session's partition: a declaration dated after the session is not known on it."""
+    writer, reader, _ = _setup()
+    ex = END + 9 * DAY
+    frame = pd.DataFrame(
+        {
+            "instrument_id": ["EQ:A", "EQ:B", "EQ:C"],
+            "symbol": ["A", "B", "C"],
+            "ts": pd.Timestamp(ex, tz="UTC"),
+            "cash_amount": 0.2,
+            "declaration_date": [
+                (END + 2 * DAY).isoformat(),  # declared after the session: unknown on it
+                END.isoformat(),  # declared on it: known
+                None,  # the source gives none: kept
+            ],
+        }
+    )
+    writer.write_table(
+        "events/dividend", END, "rerun", stamped(frame.to_dict("records"), END, "rerun")
+    )
+    out = _rows(reader)
+    assert out["dividend_status"].to_dict() == {
+        "EQ:A": "NOT_ANNOUNCED",
+        "EQ:B": "SCHEDULED",
+        "EQ:C": "SCHEDULED",
+    }
+
+
+def test_a_chunk_of_sessions_equals_each_session_alone() -> None:
+    writer, reader, days = _setup()
+    x1 = END + 9 * DAY
+    _write(writer, days[-5], [("EQ:A", x1, 0.30), ("EQ:B", x1, 0.40)])
+    _write(writer, days[-2], [("EQ:A", x1, 0.32)])
+    sessions = [days[-6], days[-4], days[-1]]
+    chunk = compute_in_memory(reader, [price_stats.GROUP, ds.GROUP], sessions)  # type: ignore[arg-type]
+    for result in chunk[ds.GROUP.key]:
+        alone = _frame(reader, result.session)
+        assert (result.frame is None) == (alone is None)
+        if alone is not None:
+            pd.testing.assert_frame_equal(result.frame, alone)
+    assert chunk[ds.GROUP.key][0].frame is None  # before the first partition
+    assert chunk[ds.GROUP.key][2].frame is not None
 
 
 def test_the_status_explains_the_nulls_and_the_group_is_registered() -> None:

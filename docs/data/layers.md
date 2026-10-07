@@ -450,8 +450,9 @@ is the earliest one after S, and a date the latest listing drops beside another 
 or withdrawn). The corporate-actions window is `-7..+30` days, so a date is listed only from
 about 30 days before it: `NOT_ANNOUNCED` means none known yet, not none this quarter. Every
 distribution type counts (a special dividend is an ex-date too). The amount is divided by the
-splits after the partition that stored it, up to S. Sessions older than the first stored
-partition read `NOT_ANNOUNCED`.
+splits after the partition that stored it, up to S. A dividend whose declaration date is after S is not known on S (a retried run
+stores what the vendor knows by then). A session with no dividend partition stored by it has
+no row (UNKNOWN, as for earnings), never `NOT_ANNOUNCED`.
 
 **`iv30@v1` rules.** Our constant-maturity 30-day ATM vol, computed beside Cboe's and used by
 default (ADR 0021, "IV30"): bracketing expiries (standard monthlies first, 7 to 90 days),
