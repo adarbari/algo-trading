@@ -82,3 +82,24 @@ def test_known_from_is_required_on_earnings_optional_on_facts_of_record() -> Non
     validate_frame("events/earnings", stamped([{**row, KNOWN_FROM: date(2019, 5, 1)}], day, "r"))
     with pytest.raises(DataValidationError, match="missing columns"):
         validate_frame("events/earnings", stamped([row], day, "r"))
+
+
+def test_macro_release_rows_declare_known_from_and_a_known_status() -> None:
+    spec = spec_for("events/macro_release")
+    assert spec.grain == "event" and spec.runs == "merge" and not spec.open_ended
+    column = spec.column("known_from")
+    assert "known_from" in spec.required and column is not None and not column.nullable
+    ts = datetime(2026, 10, 14, 12, 30, tzinfo=UTC)
+    row = {
+        "instrument_id": "MACRO:CPI", "ts": ts, "known_from": date(2026, 10, 6),
+        "release_key": "CPI", "release_name": "CPI", "release_date": date(2026, 10, 14),
+        "time_et": "08:30", "status": "scheduled",
+    }  # fmt: skip
+    validate_frame("events/macro_release", stamped([row], date(2026, 10, 6), "r"))
+    with pytest.raises(DataValidationError, match="status must be one of"):
+        frame = stamped([{**row, "status": "cancelled"}], date(2026, 10, 6), "r")
+        validate_frame("events/macro_release", frame)
+    with pytest.raises(DataValidationError, match="undeclared columns"):
+        validate_frame(
+            "events/macro_release", stamped([{**row, "extra": 1}], date(2026, 10, 6), "r")
+        )

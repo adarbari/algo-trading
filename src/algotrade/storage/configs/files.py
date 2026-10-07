@@ -5,7 +5,7 @@ site/<name>.toml                           L3 site settings (kind ``settings``)
 site/features/<theme>.toml                 L3 expression features (kind ``features``)
 site/field_guide/<theme>.toml              L3 field guide (kind ``field_guide``, ADR 0041)
 site/regime/{cards,episodes}.toml          L3 regime cards, crash episodes (kind ``regime``)
-site/events/scope.toml                     L3 event-sensitivity scope (kind ``events``, ADR 0050)
+site/events/{scope,releases}.toml          L3 event scope, macro releases (kind ``events``)
 site/presets/strategies/<id>.toml          L3 shared strategy / screener configs
 site/presets/selections/<id>.toml          L3 shared selections
 users/<user>/strategies/<id>.toml          L4 (git-ignored locally)

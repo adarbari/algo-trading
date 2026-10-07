@@ -527,3 +527,149 @@ def test_the_bear_state_probit_and_its_source(fs: FeatureSet) -> None:
         "fitted": 0,
         "fitted_through": "",
     }
+
+
+BANDS = "rollups/instrument/bands@v1"
+
+
+def test_bands_channels_zscores_and_stretches(fs: FeatureSet) -> None:
+    ids = ["EQ:MID", "EQ:TOP", "EQ:DIP", "EQ:SQZ", "EQ:FLAT", "EQ:NOBAND"]
+    stats = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "close": [100.0, 112.0, 88.0, 100.0, 100.0, 100.0],
+            "sma_20": [100.0] * 6,
+            "sma_50": [95.0] * 6,
+        }
+    )
+    bands = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "close_std_20": [5.0, 5.0, 5.0, 1.0, 0.0, np.nan],
+            "ema_20": [100.0, 100.0, 100.0, 100.0, 100.0, 100.0],
+        }
+    )
+    mom = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "atr_14": [2.0, 2.0, 2.0, 2.0, 2.0, 2.0],
+            "high_20d": [110.0] * 6,
+            "low_20d": [90.0] * 6,
+        }
+    )
+    frames = {PRICE_STATS: stats, BANDS: bands, MOMENTUM: mom}
+    names = [
+        "bb_upper", "bb_lower", "bb_width", "bb_pct_b", "kc_upper", "kc_lower", "kc_position",
+        "bb_squeeze", "price_z_20d", "stretch_sma20_atr", "stretch_sma50_atr", "donchian_pos_20d",
+    ]  # fmt: skip
+    out = fs.evaluate(frames, names).set_index("instrument_id")
+    mid, top, dip, sqz, flat = (out.loc[i] for i in ids[:5])
+    assert (mid["bb_upper"], mid["bb_lower"]) == (110.0, 90.0)
+    assert mid["bb_width"] == pytest.approx(0.2) and mid["bb_pct_b"] == pytest.approx(0.5)
+    assert (mid["kc_upper"], mid["kc_lower"]) == (104.0, 96.0)
+    assert mid["kc_position"] == pytest.approx(0.5) and mid["bb_squeeze"] is False
+    assert mid["price_z_20d"] == 0.0 and mid["stretch_sma20_atr"] == 0.0
+    assert mid["stretch_sma50_atr"] == pytest.approx(2.5)  # (100 - 95) / 2
+    assert mid["donchian_pos_20d"] == pytest.approx(0.5)
+    assert top["bb_pct_b"] == pytest.approx(1.1) and top["price_z_20d"] == pytest.approx(2.4)
+    assert top["kc_position"] == pytest.approx(2.0) and top["stretch_sma20_atr"] == 6.0
+    assert dip["bb_pct_b"] == pytest.approx(-0.1) and dip["price_z_20d"] == pytest.approx(-2.4)
+    assert sqz["bb_squeeze"] is True  # bands 98..102 inside the channel 96..104
+    assert sqz["bb_width"] == pytest.approx(0.04)
+    assert pd.isna(flat["bb_pct_b"]) and pd.isna(flat["price_z_20d"])  # zero deviation
+    assert flat["bb_squeeze"] is True and flat["bb_width"] == 0.0
+    nob = out.loc["EQ:NOBAND"]
+    assert all(pd.isna(nob[n]) for n in ("bb_upper", "bb_pct_b", "bb_squeeze", "price_z_20d"))
+    assert nob["kc_position"] == pytest.approx(0.5)  # the channel needs no deviation
+    assert nob["donchian_pos_20d"] == pytest.approx(0.5)
+
+
+TREND = "rollups/instrument/trend_stats@v1"
+PUT_WING = "rollups/instrument/put_wing@v1"
+
+
+def test_ema_distances_alignment_structure_and_put_cushion(fs: FeatureSet) -> None:
+    ids = ["EQ:BULL", "EQ:BEAR", "EQ:MIX", "EQ:NOEMA"]
+    stats = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "close": [103.0, 97.0, 100.0, 100.0],
+            "high_52w": [120.0] * 4,
+            "low_52w": [80.0] * 4,
+        }
+    )
+    bands = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "ema_20": [100.0, 100.0, 100.0, np.nan],
+            "ema_50": [95.0, 105.0, 95.0, 95.0],
+            "ema_200": [90.0, 110.0, 96.0, 90.0],
+        }
+    )
+    mom = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "atr_14": [2.0] * 4,
+            "high_20d": [106.0] * 4,
+            "low_20d": [94.0] * 4,
+            "high_50d": [110.0] * 4,
+            "low_50d": [90.0] * 4,
+            "prior_high_20d": [102.0] * 4,
+            "rel_volume": [2.0, 2.0, 1.0, np.nan],
+        }
+    )
+    trend = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "prior_high_50d": [102.0, 102.0, 102.0, 102.0],
+            "prior_low_20d": [98.0] * 4,
+        }
+    )
+    swing = pd.DataFrame(
+        {"instrument_id": ids, "session_date": END, "swing_low": [95.0, 90.0, np.nan, 95.0]}
+    )
+    wing = pd.DataFrame(
+        {"instrument_id": ids, "session_date": END, "best_put_strike": [90.0, 95.0, 90.0, np.nan]}
+    )
+    frames = {
+        PRICE_STATS: stats,
+        BANDS: bands,
+        MOMENTUM: mom,
+        TREND: trend,
+        SWING: swing,
+        PUT_WING: wing,
+    }
+    names = [
+        "pct_vs_ema_20", "pct_vs_ema_50", "pct_vs_ema_200", "ema_stack", "dist_to_high_20d",
+        "dist_to_low_20d", "dist_to_high_50d", "dist_to_low_50d", "pullback_atr_20d",
+        "pct_52w_range", "breakout_magnitude_20d", "breakout_50d", "breakdown_20d",
+        "put_support_cushion", "put_support_cushion_atr",
+    ]  # fmt: skip
+    out = fs.evaluate(frames, names).set_index("instrument_id")
+    bull, bear, mix, noema = (out.loc[i] for i in ids)
+    assert bull["pct_vs_ema_20"] == pytest.approx(0.03) and bull["ema_stack"] == "BULL"
+    assert bear["ema_stack"] == "BEAR" and mix["ema_stack"] == "MIXED"
+    assert pd.isna(noema["ema_stack"]) and pd.isna(noema["pct_vs_ema_20"])
+    assert noema["pct_vs_ema_50"] == pytest.approx(100 / 95 - 1)
+    assert bull["dist_to_high_20d"] == pytest.approx(103 / 106 - 1)
+    assert bull["dist_to_low_20d"] == pytest.approx(103 / 94 - 1)
+    assert bull["dist_to_high_50d"] == pytest.approx(103 / 110 - 1)
+    assert bull["dist_to_low_50d"] == pytest.approx(103 / 90 - 1)
+    assert bull["pullback_atr_20d"] == pytest.approx(1.5)  # (106 - 103) / 2
+    assert bull["pct_52w_range"] == pytest.approx(23 / 40)
+    assert bull["breakout_magnitude_20d"] == pytest.approx(103 / 102 - 1)
+    assert bull["breakout_50d"] is True and bear["breakout_50d"] is False
+    assert mix["breakout_50d"] is False  # 100 < 102 whatever the volume
+    assert noema["breakout_50d"] is False  # 100 < 102: false whatever the unknown volume
+    assert bear["breakdown_20d"] is True and bull["breakdown_20d"] is False
+    assert bull["put_support_cushion"] == pytest.approx(5 / 103)
+    assert bull["put_support_cushion_atr"] == pytest.approx(2.5)
+    assert bear["put_support_cushion_atr"] == pytest.approx(-2.5)  # strike above support
+    assert pd.isna(mix["put_support_cushion"]) and pd.isna(noema["put_support_cushion"])
