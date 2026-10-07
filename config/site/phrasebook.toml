@@ -228,3 +228,8 @@ hint = "turnover_20d gte 0.01 for 1% of the company a day; volume_trend_20_60 gt
 say = ["pocket pivot", "accumulation day", "up day on heavy volume inside the base"]
 fields = ["rollup.vol_stats@v1.pocket_pivot", "rollup.momentum@v1.rel_volume"]
 hint = "pocket_pivot eq true; add feature.pct_vs_ema_20 gt 0 and rollup.trend_stats@v2.tight_range_sessions gte 10 so it is inside a base"
+
+[[phrase]]
+say = ["dividend before the call expires", "ex-dividend during the covered call", "collect the dividend with a covered call"]
+fields = ["feature.ex_div_before_call_expiry", "rollup.call_wing@v1.best_call_delta"]
+hint = "ex_div_before_call_expiry eq true to collect it (with best_call_delta lte 0.3 so the call is not assigned first), eq false to avoid the assignment question; null means no date is known yet, not none"
