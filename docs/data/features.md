@@ -20,7 +20,7 @@ will show it to the owner only once there are other users;
 [ADR 0028](../adr/0028-ibkr-enrichment-source.md)); an expression feature takes the most
 restrictive licence of its inputs.
 
-269 stored features in 26 groups, in dependency order; 51 expression features.
+280 stored features in 28 groups, in dependency order; 63 expression features.
 
 ## `option_liquidity@v1`
 
@@ -166,6 +166,31 @@ Session volume and dollar volume, 20-session average volume, the 5 / 20 volume r
 | `volume_z_20d` | window | float32 | ratio | open |  | (The session's volume - the mean volume of the 20 sessions before it) / the sample standard deviation (ddof 1) of those 20: the volume surprise in standard deviations, on the same base as momentum.rel_volume | a session among the last 21 has no bar (a gap), or the history is shorter; or the 20 sessions before the session all had the same volume (zero standard deviation, all zero included) | `bars/1d.volume` |
 | `up_volume_share_20d` | window | float32 | decimal | open | 0 .. 1 | Volume traded on sessions closing above the previous close / total volume, over the last 20 sessions: 0.5 is balanced, above is accumulation, below distribution; a session closing unchanged counts in the total only | a session among the last 21 has no bar (a gap), or the history is shorter (the first session needs the close before it); or the last 20 sessions had no volume at all | `bars/1d.close`, `bars/1d.volume` |
 | `cmf_20d` | window | float32 | decimal | open | -1 .. 1 | Chaikin money flow over the last 20 sessions: sum(mfm x volume) / sum(volume), mfm = ((close - low) - (high - close)) / (high - low), 0 when high equals low: above 0 closes sat in the upper half of the day's range on volume | a session among the last 20 has no bar (a gap), or the history is shorter; or the last 20 sessions had no volume at all | `bars/1d.close`, `bars/1d.high`, `bars/1d.low`, `bars/1d.volume` |
+
+## `bands@v1`
+
+Bollinger and Keltner inputs: the 20-close standard deviation and EMA, the bandwidth percentile over 252 sessions (the squeeze) and the band walk. Stored as `rollups/instrument/bands@v1`; reads `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `close_std_20` | window | float32 | usd_per_share | open | >= 0 | Sample standard deviation (ddof 1) of the last 20 closes, the session included: the half-width of a one-sigma Bollinger band around sma_20 | a session among the last 20 has no bar (a gap), or the history is shorter | `bars/1d.close` |
+| `ema_20` | window | float32 | usd_per_share | open | >= 0 | Exponential moving average of the close, alpha 2 / 21, over the consecutive bars ending on the session (at most the last 150 sessions), seeded with the mean of the run's first 20 closes: the Keltner channel's midline | fewer than 20 consecutive bars ending on the session (a gap among the last 20 sessions, or a shorter history) | `bars/1d.close` |
+| `bb_width_pctile_252d` | window | float32 | decimal | open | 0 .. 1 | Share of the 252 sessions before the session whose Bollinger bandwidth (2 x 2 x close_std_20 / sma_20) was strictly below the session's: 0.05 is a squeeze (narrower than 95% of the year), 0.95 an expansion | the session's bandwidth is unknown (a session among the last 20 has no bar (a gap), or the history is shorter), or fewer than 240 of the 252 sessions before it have one | `bars/1d.close` |
+| `band_walk` | window | int | sessions | open | -271 .. 271 | Signed count of consecutive sessions, ending on the session, with the close above the upper Bollinger band (sma_20 + 2 x close_std_20; positive) or below the lower band (negative); 0 when the close is inside the bands; the count stops at the first session whose bands are unknown | the session's bands are unknown (a session among the last 20 has no bar (a gap), or the history is shorter) | `bars/1d.close` |
+
+## `trend_stats@v1`
+
+120 / 252-session returns, the 12-1 momentum, the return z-score over 20 sessions and the close, SMA20 and tight-range streaks. Stored as `rollups/instrument/trend_stats@v1`; reads `bars/1d`.
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
+|---|---|---|---|---|---|---|---|---|
+| `ret_120d` | window | float32 | decimal | open | >= -1 | Close / close 120 sessions earlier - 1 | a session among the last 121 has no bar (a gap), or the history is shorter | `bars/1d.close` |
+| `ret_252d` | window | float32 | decimal | open | >= -1 | Close / close 252 sessions earlier - 1 | a session among the last 253 has no bar (a gap), or the history is shorter | `bars/1d.close` |
+| `mom_12_1` | window | float32 | decimal | open | >= -1 | Close 21 sessions earlier / close 252 sessions earlier - 1: the 12-month return with the last month skipped (the Jegadeesh-Titman momentum signal, which leaves out the short-term reversal month) | a session among the last 253 has no bar (a gap), or the history is shorter | `bars/1d.close` |
+| `ret_z_20d` | window | float32 | ratio | open |  | The session's one-session return (close / previous close - 1) / the sample standard deviation (ddof 1) of the 20 one-session returns before it: the day's surprise in standard deviations, on the same base as volume_z_20d | a session among the last 22 has no bar (a gap), or the history is shorter; or those 20 returns were all equal (zero standard deviation) | `bars/1d.close` |
+| `close_streak` | window | int | sessions | open | -252 .. 252 | Signed count of consecutive sessions, ending on the session, with the close above the previous close (positive) or below it (negative); 0 when the close is unchanged; the count stops at the first session without a bar before it | no bar on the session before (a gap) | `bars/1d.close` |
+| `sma20_streak` | window | int | sessions | open | -252 .. 252 | Signed count of consecutive sessions, ending on the session, with the close above its 20-session mean (positive) or below it (negative); 0 when equal; the count stops at the first session whose mean is unknown | the session's 20-session mean is unknown (a session among the last 20 has no bar (a gap), or the history is shorter) | `bars/1d.close` |
+| `tight_range_sessions` | window | int | sessions | open | >= 0 | Consecutive sessions, ending on the session, on which the 20-session high-low range / close was at most tight_range_pct (0.15): the length of the base (0: the session itself is not tight) | the session's 20-session range is unknown (a session among the last 20 has no bar (a gap), or the history is shorter) | `bars/1d.high`, `bars/1d.low`, `bars/1d.close` |
 
 ## `swing_levels@v1`
 
@@ -480,6 +505,23 @@ The market regime: macro risk (the higher of its early and confirming tiers) and
 ## Expression features
 
 Declared in `config/site/features/<theme>.toml`; virtual (computed on read) unless stored (materialised, by the `rollups` task after its inputs).
+
+### `bands.toml`
+
+| Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Formula | Stored |
+|---|---|---|---|---|---|---|---|---|---|
+| `bb_upper` | expression | float | usd_per_share | open | >= 0 | Upper Bollinger band: the 20-session mean close + 2 (params.k) standard deviations of those closes | sma_20 or close_std_20 is null (a gap among the last 20 sessions, or a shorter history) | `price_stats.sma_20 + k * bands.close_std_20` (k = 2.0) | virtual |
+| `bb_lower` | expression | float | usd_per_share | open | >= 0 | Lower Bollinger band: the 20-session mean close - 2 (params.k) standard deviations of those closes | sma_20 or close_std_20 is null (a gap among the last 20 sessions, or a shorter history) | `price_stats.sma_20 - k * bands.close_std_20` (k = 2.0) | virtual |
+| `bb_width` | expression | float | decimal | open | >= 0 | Bollinger bandwidth: (upper - lower) / the 20-session mean, 0.10 is bands 10% of the price apart; its rank against the year is bands.bb_width_pctile_252d | the bands are null (a gap among the last 20 sessions, or a shorter history) | `(bb_upper - bb_lower) / price_stats.sma_20` | virtual |
+| `bb_pct_b` | expression | float | ratio | open |  | %B: where the close sits between the Bollinger bands, 0 at the lower band, 1 at the upper, below 0 or above 1 outside them | the bands are null (a gap among the last 20 sessions, or a shorter history), or the bands coincide (20 equal closes) | `(price_stats.close - bb_lower) / (bb_upper - bb_lower)` | virtual |
+| `kc_upper` | expression | float | usd_per_share | open | >= 0 | Upper Keltner channel: the 20-session EMA + 2 (params.m) Wilder ATR(14) | ema_20 or atr_14 is null (fewer than 20 consecutive bars ending on the session) | `bands.ema_20 + m * momentum.atr_14` (m = 2.0) | virtual |
+| `kc_lower` | expression | float | usd_per_share | open | >= 0 | Lower Keltner channel: the 20-session EMA - 2 (params.m) Wilder ATR(14) | ema_20 or atr_14 is null (fewer than 20 consecutive bars ending on the session) | `bands.ema_20 - m * momentum.atr_14` (m = 2.0) | virtual |
+| `kc_position` | expression | float | ratio | open |  | Where the close sits in the Keltner channel, 0 at the lower line, 1 at the upper, outside 0..1 beyond them | the channel is null (fewer than 20 consecutive bars ending on the session), or atr_14 is 0 | `(price_stats.close - kc_lower) / (kc_upper - kc_lower)` | virtual |
+| `bb_squeeze` | expression | bool | flag | open |  | The TTM squeeze: both Bollinger bands inside the Keltner channel (volatility compressed below its usual range; a breakout often follows the release) | neither condition is false and one is unknown (the bands or the channel null) | `bb_upper <= kc_upper and bb_lower >= kc_lower` | virtual |
+| `price_z_20d` | expression | float | ratio | open |  | Price z-score: (close - the 20-session mean) / the standard deviation of those closes; +2 sits on the upper Bollinger band, -2 on the lower | sma_20 or close_std_20 is null (a gap among the last 20 sessions, or a shorter history), or the closes never moved (zero deviation) | `(price_stats.close - price_stats.sma_20) / bands.close_std_20` | virtual |
+| `stretch_sma20_atr` | expression | float | ratio | open |  | Stretch from the 20-session mean in ATRs: (close - sma_20) / atr_14, +3 is three average daily ranges above it | sma_20 or atr_14 is null (a gap among the last 20 sessions, or fewer than 15 consecutive bars), or atr_14 is 0 | `(price_stats.close - price_stats.sma_20) / momentum.atr_14` | virtual |
+| `stretch_sma50_atr` | expression | float | ratio | open |  | Stretch from the 50-session mean in ATRs: (close - sma_50) / atr_14 | sma_50 or atr_14 is null (a gap among the last 50 sessions, or fewer than 15 consecutive bars), or atr_14 is 0 | `(price_stats.close - price_stats.sma_50) / momentum.atr_14` | virtual |
+| `donchian_pos_20d` | expression | float | ratio | open | 0 .. 1 | Where the close sits in the 20-session high-low channel: 0 at the channel low, 1 at the high (a close at a 20-session high) | high_20d or low_20d is null (a gap among the last 20 sessions, or a shorter history), or the channel has no width | `(price_stats.close - momentum.low_20d) / (momentum.high_20d - momentum.low_20d)` | virtual |
 
 ### `earnings.toml`
 

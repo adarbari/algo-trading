@@ -344,3 +344,228 @@ Sources: Practitioner convention; ATR-scaled stops (Turtle rules)
 - Null under 240 bars in the last 252 sessions (recent listings).
 
 Sources: George and Hwang (2004) for the high; the VRP scanner's spec (docs/screeners/vrp-scanner.md) for the 10% gate
+
+### `feature.bb_pct_b`
+
+**How to read it.** %B: where the close sits between the Bollinger bands, 0 at the lower band, 0.5 at the 20-session mean, 1 at the upper band, below 0 or above 1 outside them. Low to high: under 0 is a two-sigma dip against the last month (the mean-reversion long in an uptrend), 0.2 to 0.8 is inside the normal range, above 1 the close has broken out of the band (strength in a trend, exhaustion after a long run). Bollinger's own rules: buy strength when %B exceeds 1 with volume, buy weakness when it is below 0 with a trend behind it.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a dip to the lower band in an uptrend | `lte 0.0` | soft | 0.1 | with feature.trend_state eq UPTREND as the gate; alone it finds downtrends |
+| breaking out above the upper band | `gte 1.0` | soft | 0.05 | with rollup.momentum@v1.rel_volume gte 1.5 for participation; a score, not a gate, in a trend |
+
+**When the reading lies**
+
+- In a strong trend %B sits above 0.8 for weeks (the band walk, rollup.bands@v1.band_walk): a high %B is not overbought in itself. Pair with rollup.momentum@v1.rsi_14 or feature.stretch_sma20_atr before reading it as stretched.
+- Below 0 in a downtrend is where the price lives, not a dip: gate a mean-reversion long on feature.trend_state eq UPTREND or feature.pct_vs_sma_200 gt 0.
+- The bands widen for 20 sessions after a shock day, so %B reads 'inside' while the price is far from where it was. Check rollup.price_moves@v1.one_day_move.
+- Null when the bands are unknown (a gap among the last 20 sessions) or coincide (20 equal closes).
+
+Sources: Bollinger (2001), Bollinger on Bollinger Bands: %b; Bollinger Bands, Wikipedia: https://en.wikipedia.org/wiki/Bollinger_Bands
+
+### `feature.kc_position`
+
+**How to read it.** Where the close sits in the Keltner channel: 0 at the lower line (EMA minus 2 ATR), 0.5 at the 20-session EMA, 1 at the upper line, outside 0..1 beyond them. Because the channel is built from the daily range, 1 means 'two average days above the EMA': a close above it is a strong move for this name whatever its price. Between 0.3 and 0.7 the name is near its short-term mean.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| pulled back to the channel midline in an uptrend | `between [0.35, 0.65]` | soft | 0.1 | with feature.trend_state eq UPTREND; feature.pullback_to_sma20 is the same idea against the SMA |
+
+**When the reading lies**
+
+- A collapsed ATR (a pending takeover, a halted name) makes the channel a hair wide and every close 'outside'. Check feature.atr_pct; see the 'pending takeover' situation.
+- The channel lags a gap by two weeks (the ATR catches up), so the day after a gap the position is far outside and means 'gapped', not 'trending'. Check rollup.price_moves@v1.one_day_move.
+- Null with fewer than 20 consecutive bars ending on the session, or an ATR of 0.
+
+Sources: Keltner channel, Wikipedia: https://en.wikipedia.org/wiki/Keltner_channel
+
+### `feature.price_z_20d`
+
+**How to read it.** The price z-score: how many standard deviations of the last 20 closes the close sits from their mean. 0 is at the mean, +2 on the upper Bollinger band, -2 on the lower; beyond 2.5 either way is rare (a few sessions a year on a mean-reverting name) and beyond 3 is almost always a one-day shock. It is %B on a different scale (%B 0 is -2, %B 1 is +2); use it when a rule wants sigmas, and feature.stretch_sma20_atr when it wants average daily ranges.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a mean-reversion long | `lte -2.0` | soft | 0.5 | with feature.trend_state eq UPTREND; feature.bb_pct_b lte 0 is the same criterion |
+| stretched above the mean | `gte 2.0` | soft | 0.5 | a filter against chasing; in a strong trend expect many names here |
+
+**When the reading lies**
+
+- A clean trend inflates the deviation (the closes spread out along the move), so a trending name shows a moderate z-score while sitting far from its mean in ATRs. Check feature.stretch_sma20_atr as well.
+- A high z-score in an uptrend is strength more often than a top: pair with rollup.momentum@v1.rsi_14 and feature.pct_vs_sma_50 before fading it.
+- Null when sma_20 or close_std_20 is unknown (a gap among the last 20 sessions) or the closes never moved.
+
+Sources: Standard score, Wikipedia: https://en.wikipedia.org/wiki/Standard_score; Bollinger (2001), Bollinger on Bollinger Bands: bands as +-2 standard deviations
+
+### `feature.stretch_sma20_atr`
+
+**How to read it.** How far the close sits from its 20-session mean, measured in Wilder ATR(14): +1 is one average day's range above it, -1 below. Low to high: within -1 to +1 is at the mean (feature.pullback_to_sma20 is this band in an uptrend), 2 to 3 is extended, beyond 4 is a climax or a gap, the zone where a long is late and a pullback likely. The ATR scale makes it comparable across names: 3 ATR is 3 ATR on a utility and on a biotech.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| not overextended (entry filter) | `lte 2.0` | soft | 0.5 | with feature.trend_state eq UPTREND; feature.pullback_to_sma20 is the within-1-ATR version |
+| a climax run (fade or trim) | `gte 4.0` | soft | 1.0 | a score; confirm with rollup.momentum@v1.rsi_14 gte 75 and feature.volume_climax |
+
+**When the reading lies**
+
+- A gap on news puts the close many ATRs from the mean in one day; the ATR then grows and the stretch shrinks without the price moving. Check rollup.price_moves@v1.one_day_move and rollup.earnings@v1.last_earnings_date.
+- A pending takeover shrinks the ATR towards zero, so the stretch explodes on a flat price. Check feature.atr_pct; see the 'pending takeover' situation.
+- In a strong uptrend 2 to 3 ATR above the mean persists for weeks; fade it only with rollup.momentum@v1.rsi_14 above 75 or feature.bb_pct_b above 1.
+- Null when sma_20 or atr_14 is unknown (a gap among the last 20 sessions, fewer than 15 consecutive bars) or the ATR is 0.
+
+Sources: Wilder (1978), New Concepts in Technical Trading Systems: ATR; Raschke and Connors (1995), Street Smarts: 'stretch' entries measured in ATR
+
+### `feature.stretch_sma50_atr`
+
+**How to read it.** How far the close sits from its 50-session mean, in Wilder ATR(14): the intermediate-term version of feature.stretch_sma20_atr. Within -2 to +2 is near the mean (where a trend-following entry on the 50-day lives), 4 to 6 is a strong run, beyond 8 an extended one that has usually gone a quarter without a rest.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| pulled back to the 50-day in an uptrend | `between [-1.5, 1.5]` | soft | 0.5 | with feature.trend_state eq UPTREND (close above SMA50 above SMA200) |
+
+**When the reading lies**
+
+- A gap moves the stretch many ATRs in a day; the ATR then grows and the stretch shrinks without the price moving. Check rollup.price_moves@v1.one_day_move.
+- A pending takeover shrinks the ATR, so the stretch explodes on a flat price; see the 'pending takeover' situation.
+- Null when sma_50 or atr_14 is unknown (a gap among the last 50 sessions, fewer than 15 consecutive bars) or the ATR is 0.
+
+Sources: Wilder (1978), New Concepts in Technical Trading Systems: ATR
+
+### `feature.donchian_pos_20d`
+
+**How to read it.** Where the close sits in the 20-session high-low channel, 0 at the channel low, 1 at the channel high. 1 means the close is at a 20-session high (today's high included), the Turtle entry; 0 at a 20-session low. Between 0.4 and 0.6 the name is mid-range. Unlike %B it uses highs and lows and has no statistical scale, so it reads the same on every name.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| at a 20-session high (breakout) | `gte 0.95` | soft | 0.05 | with rollup.momentum@v1.rel_volume gte 1.5; feature.breakout_20d is the volume-confirmed flag |
+| at a 20-session low | `lte 0.05` | soft | 0.05 | with feature.trend_state eq UPTREND for a dip; alone it lists breakdowns |
+
+**When the reading lies**
+
+- A single spike high 19 sessions ago keeps the channel top far above the price for one more day, so the position reads low on a name that is quietly rising; feature.range_20d_pct says how wide the channel is.
+- A close at the channel high in a downtrend is a rally to resistance: gate a breakout on feature.trend_state or feature.pct_vs_sma_200, and on volume (feature.breakout_20d).
+- Null when high_20d or low_20d is unknown (a gap among the last 20 sessions) or the channel has no width.
+
+Sources: Donchian channels and the Turtle rules: https://en.wikipedia.org/wiki/Richard_Donchian; Faith (2007), Way of the Turtle: the 20-day breakout entry
+
+### `rollup.bands@v1.band_walk`
+
+**How to read it.** How many consecutive sessions the close has sat outside the Bollinger bands: positive counts closes above the upper band, negative below the lower, 0 inside. A walk of 3 or more up the band is the signature of a strong trend (Bollinger: 'a tag of the upper band is not a sell signal'); a walk down the lower band is a persistent sell-off. Most walks end within a week; 10 and above is a run that usually ends in a climax.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| walking the upper band (strong trend) | `gte 3` | soft | 1 | with rollup.momentum@v1.rel_volume for participation; a score, the gate is feature.trend_state eq UPTREND |
+| a persistent sell-off | `lte -3` | soft | 1 | a capitulation candidate with feature.volume_climax; not a long entry on its own |
+
+**When the reading lies**
+
+- A walk starts with a shock day as often as with a trend: a one-day earnings gap sits outside the band for a session or two while the bands catch up. Check rollup.price_moves@v1.one_day_move and rollup.earnings@v1.last_earnings_date.
+- A thin name with equal closes has bands of zero width, so any tick is outside them. Gate on rollup.price_stats@v2.adv_usd_20d.
+- Null when today's bands are unknown (a gap among the last 20 sessions); the count stops at the first session without bands.
+
+Sources: Bollinger (2001), Bollinger on Bollinger Bands: walking the bands
+
+### `rollup.trend_stats@v1.ret_120d`
+
+**How to read it.** The close over the close 120 sessions (about six months) earlier, minus one: 0.25 is up 25%. The six-month return is the classic intermediate momentum horizon (Jegadeesh and Titman's 6-month formation); above about 0.20 a name is a momentum leader in an ordinary year, below -0.20 a laggard. Compare with the market's six-month return (market.market_trend@v2.spx_ret_252d is the year) before reading it as stock-specific.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| six-month momentum | `gte 0.15` | soft | 0.05 | gate ret_120d gt 0; score the size; pair with rollup.price_stats@v2.ret_20d to avoid names already reversing |
+
+**When the reading lies**
+
+- A single gap (an earnings surprise, a takeover) can be the whole return: check rollup.price_moves@v1.one_day_move and rollup.earnings@v1.last_earnings_date before reading it as a trend.
+- Six months ago may sit just before or after a crash: the same stock reads +40% or -10% depending on the day. Read with rollup.price_stats@v2.ret_60d and rollup.trend_stats@v1.ret_252d.
+- Null after a gap in the last 121 sessions or a shorter history (a listing under six months old).
+
+Sources: Jegadeesh and Titman (1993), Returns to Buying Winners and Selling Losers; Momentum (finance), Wikipedia: https://en.wikipedia.org/wiki/Momentum_(finance)
+
+### `rollup.trend_stats@v1.ret_252d`
+
+**How to read it.** The close over the close 252 sessions (one year) earlier, minus one: the plain one-year return, 0.30 is up 30%. In an average year the S&P 500 returns about 10% with a spread of about 15 points across its members, so above 0.30 is a leader and below -0.20 a laggard. For the momentum factor as the literature defines it, which skips the last month, use rollup.trend_stats@v1.mom_12_1.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| one-year winner | `gte 0.3` | soft | 0.1 | a score; relative strength against the market is rollup.trend_stats@v1.ret_252d minus market.market_trend@v2.spx_ret_252d |
+
+**When the reading lies**
+
+- The last month's reversal is inside this number: a stock up 50% on the year and down 20% this month reads +20%. rollup.trend_stats@v1.mom_12_1 leaves the month out.
+- The year-ago base day moves daily: a crash or a rally one year ago rolling out of the window changes the return with no move today. Check rollup.price_stats@v2.ret_60d for the recent trend.
+- Null after a gap in the last 253 sessions or a shorter history (a listing under a year old; rollup.price_history@v1.range_status says SINCE_LISTING).
+
+Sources: Momentum (finance), Wikipedia: https://en.wikipedia.org/wiki/Momentum_(finance)
+
+### `rollup.trend_stats@v1.mom_12_1`
+
+**How to read it.** The 12-1 momentum: the return from 12 months ago to one month ago (the close 21 sessions back over the close 252 sessions back, minus one), the definition the momentum factor literature uses because the most recent month tends to reverse. 0.20 means the name was up 20% over the eleven months ending a month ago. Positive is the gate; the top decile of the universe (about 0.40 and above in a normal year) is where the factor's return has come from, and the bottom decile is where it has been short.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| momentum factor long | `gte 0.2` | soft | 0.1 | gate mom_12_1 gt 0; score the size; add rollup.price_stats@v2.ret_20d gt -0.10 to avoid the names already breaking |
+
+**When the reading lies**
+
+- It ignores the last month on purpose, so a name that collapsed in the last three weeks still reads as a winner; pair with rollup.price_stats@v2.ret_20d or feature.trend_state to catch the turn.
+- Momentum crashes: after a bear market the losers rally hardest (2009, 2020), and a pure 12-1 screen is on the wrong side for months. Check market.market_trend@v2.spx_drawdown_252d.
+- Null after a gap in the last 253 sessions or a shorter history.
+
+Sources: Jegadeesh and Titman (1993), Returns to Buying Winners and Selling Losers; Carhart (1997), On Persistence in Mutual Fund Performance: the 12-1 momentum factor; Daniel and Moskowitz (2016), Momentum Crashes
+
+### `rollup.trend_stats@v1.close_streak`
+
+**How to read it.** How many consecutive sessions the close has risen (positive) or fallen (negative), ending today; 0 when today's close is unchanged. Streaks of 3 to 5 are common (a coin flip gives five in a row one time in sixteen); 7 and above is rare and, in the short-term mean-reversion literature, a reversal setup rather than a trend: Connors' rules buy after several down closes in an uptrend and sell after several up closes.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| a pullback of several down closes in an uptrend | `lte -3` | soft | 1 | with feature.trend_state eq UPTREND as the gate; the short-term mean-reversion entry |
+| a long run of up closes (not chasing) | `lte 5` | soft | 1 | a filter against buying the sixth up day; use with feature.stretch_sma20_atr |
+
+**When the reading lies**
+
+- A streak says nothing about size: five up closes of 0.1% each is noise. Read it with rollup.price_stats@v2.ret_20d or feature.stretch_sma20_atr for the distance covered.
+- A takeover pins the price, so the streak alternates around zero for months; a halted name has no streak. See the 'pending takeover' situation.
+- Null when the session before has no bar (a gap); the count stops at the first gap.
+
+Sources: Connors and Alvarez (2009), Short Term Trading Strategies That Work: consecutive-close setups
+
+### `rollup.trend_stats@v1.sma20_streak`
+
+**How to read it.** How many consecutive sessions the close has held above (positive) or below (negative) its 20-session mean, ending today. 1 to 3 is a fresh cross, often a whipsaw; 10 and above is a trend that has held for two weeks; 40 and above is a run that has not visited its mean for two months. A negative count of the same size is the mirror in a downtrend. The 20-session mean is the short-term trend line most pullback strategies use, so the streak dates the current leg.
+
+**The criterion per intent**
+
+| Intent | Criterion | Mode | Near-miss band | How to combine it |
+|---|---|---|---|---|
+| an established short-term uptrend | `gte 10` | soft | 3 | with feature.pct_vs_sma_20 gt 0.02 so the trend still has distance; the mirror lte -10 for a downtrend |
+| a fresh cross above the 20-day | `between [1, 3]` | soft | 1 | confirm with rollup.momentum@v1.rel_volume gte 1.3 on the cross; alone it is a whipsaw list |
+
+**When the reading lies**
+
+- A fresh cross (a streak of 1 or 2) reverses as often as not; a gate on the crossing alone is noise. Require 3 or more, or pair with rollup.momentum@v1.rel_volume on the cross day.
+- A long streak above the mean with a shrinking distance (feature.pct_vs_sma_20 near 0) is a trend losing speed, not strength; read both.
+- Null when today's 20-session mean is unknown (a gap among the last 20 sessions); the count stops at the first session without a mean.
+
+Sources: Moving average crossovers, Investopedia: https://www.investopedia.com/terms/c/crossover.asp

@@ -50,12 +50,14 @@ from algotrade.features.rollups.options import (
 )
 from algotrade.features.rollups.price import (
     anchored_vwap,
+    bands,
     episodes,
     momentum,
     price_history,
     price_moves,
     price_stats,
     swing_levels,
+    trend_stats,
     volume,
 )
 
@@ -78,6 +80,8 @@ GROUPS: dict[str, FeatureGroup] = {
             price_moves.GROUP,
             momentum.GROUP,
             volume.GROUP,
+            bands.GROUP,
+            trend_stats.GROUP,
             swing_levels.GROUP,
             anchored_vwap.GROUP,
             episodes.GROUP,

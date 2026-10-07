@@ -113,18 +113,22 @@ FEATURES = (
 COLUMNS = column_types(FEATURES)
 
 
-def wilder(values: Matrix, first: npt.NDArray[np.int64], period: int) -> Matrix:
+def wilder(
+    values: Matrix, first: npt.NDArray[np.int64], period: int, alpha: float | None = None
+) -> Matrix:
     """Per column of a sessions x instruments matrix, Wilder's average at the LAST row of the
     values from row ``first`` on (earlier rows are ignored): the mean of the first ``period``
     values, then ``(avg x (period - 1) + x) / period`` for each later one. NaN for a column
-    with fewer than ``period`` values."""
+    with fewer than ``period`` values. ``alpha`` replaces Wilder's ``1 / period`` smoothing
+    (``2 / (period + 1)`` is the classic EMA; ``bands.ema_20``)."""
+    weight = 1.0 / period if alpha is None else alpha
     total = np.zeros(values.shape[1])
     avg = np.full(values.shape[1], np.nan)
     for i, row in enumerate(values):
         k = i - first + 1  # values seen so far, row i included
         total = np.where((k >= 1) & (k <= period), total + row, total)
         avg = np.where(k == period, total / period, avg)
-        avg = np.where(k > period, (avg * (period - 1) + row) / period, avg)
+        avg = np.where(k > period, avg + weight * (row - avg), avg)
     return np.where(len(values) - first >= period, avg, np.nan)
 
 

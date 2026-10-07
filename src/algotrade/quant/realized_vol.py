@@ -22,7 +22,8 @@ import math
 
 import numpy as np
 import numpy.typing as npt
-from numpy.lib.stride_tricks import sliding_window_view
+
+from algotrade.quant.rolling import rolling_mean, rolling_var
 
 type Array = npt.NDArray[np.float64]
 
@@ -47,18 +48,17 @@ def _check_window(window: int, minimum: int) -> None:
 def _rolling_mean(values: Array, window: int, offset: int) -> Array:
     """Mean over each window of ``values``, placed so that ``out[i]`` covers data up to
     session ``i`` (``offset``: how many sessions ``values`` lags the price arrays by)."""
-    out = np.full((values.shape[0] + offset, *values.shape[1:]), np.nan)
-    if values.shape[0] >= window:
-        out[offset + window - 1 :] = sliding_window_view(values, window, axis=0).mean(axis=-1)
-    return out
+    return _aligned(rolling_mean(values, window), offset)
 
 
 def _rolling_var(values: Array, window: int, offset: int) -> Array:
     """Sample variance (ddof=1) over each window, aligned like ``_rolling_mean``."""
-    out = np.full((values.shape[0] + offset, *values.shape[1:]), np.nan)
-    if values.shape[0] >= window:
-        windows = sliding_window_view(values, window, axis=0)
-        out[offset + window - 1 :] = windows.var(axis=-1, ddof=1)
+    return _aligned(rolling_var(values, window), offset)
+
+
+def _aligned(rolled: Array, offset: int) -> Array:
+    out = np.full((rolled.shape[0] + offset, *rolled.shape[1:]), np.nan)
+    out[offset:] = rolled
     return out
 
 

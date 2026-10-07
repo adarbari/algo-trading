@@ -69,11 +69,18 @@ section = "docs/adr/0021-option-pricing-conventions.md#implied-volatility"
 detect = [{ import = "scipy.optimize" }, { call_regex = "(^|\\.)(brentq|newton|bisect|fsolve)$" }]
 
 [[responsibility]]
+id = "rolling-statistics"
+description = "Rolling statistics over sessions x instruments arrays, point in time (row i describes the window ending at session i; NaN until full and on any gap, never a shorter window): rolling mean, sample variance, max and min, and the trailing run of a condition; the realised-vol estimators and the feature groups build on them"
+owner = ["src/algotrade/quant/rolling.py"]
+section = "docs/data/technical.md#shared-rules"
+detect = [{ call = "sliding_window_view" }]
+
+[[responsibility]]
 id = "realized-vol"
-description = "Realised volatility estimators over rolling windows (close-to-close, Parkinson, Garman-Klass, Yang-Zhang), annualised"
+description = "Realised volatility estimators over rolling windows (close-to-close, Parkinson, Garman-Klass, Yang-Zhang), annualised, over quant.rolling's windows"
 owner = ["src/algotrade/quant/realized_vol.py"]
 section = "docs/adr/0021-option-pricing-conventions.md#realised-volatility"
-detect = [{ call = "sliding_window_view" }]
+detect = [{ call = "_annualise" }]
 
 [[responsibility]]
 id = "rate-conventions"

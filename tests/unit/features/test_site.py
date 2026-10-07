@@ -527,3 +527,61 @@ def test_the_bear_state_probit_and_its_source(fs: FeatureSet) -> None:
         "fitted": 0,
         "fitted_through": "",
     }
+
+
+BANDS = "rollups/instrument/bands@v1"
+
+
+def test_bands_channels_zscores_and_stretches(fs: FeatureSet) -> None:
+    ids = ["EQ:MID", "EQ:TOP", "EQ:DIP", "EQ:SQZ", "EQ:FLAT", "EQ:NOBAND"]
+    stats = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "close": [100.0, 112.0, 88.0, 100.0, 100.0, 100.0],
+            "sma_20": [100.0] * 6,
+            "sma_50": [95.0] * 6,
+        }
+    )
+    bands = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "close_std_20": [5.0, 5.0, 5.0, 1.0, 0.0, np.nan],
+            "ema_20": [100.0, 100.0, 100.0, 100.0, 100.0, 100.0],
+        }
+    )
+    mom = pd.DataFrame(
+        {
+            "instrument_id": ids,
+            "session_date": END,
+            "atr_14": [2.0, 2.0, 2.0, 2.0, 2.0, 2.0],
+            "high_20d": [110.0] * 6,
+            "low_20d": [90.0] * 6,
+        }
+    )
+    frames = {PRICE_STATS: stats, BANDS: bands, MOMENTUM: mom}
+    names = [
+        "bb_upper", "bb_lower", "bb_width", "bb_pct_b", "kc_upper", "kc_lower", "kc_position",
+        "bb_squeeze", "price_z_20d", "stretch_sma20_atr", "stretch_sma50_atr", "donchian_pos_20d",
+    ]  # fmt: skip
+    out = fs.evaluate(frames, names).set_index("instrument_id")
+    mid, top, dip, sqz, flat = (out.loc[i] for i in ids[:5])
+    assert (mid["bb_upper"], mid["bb_lower"]) == (110.0, 90.0)
+    assert mid["bb_width"] == pytest.approx(0.2) and mid["bb_pct_b"] == pytest.approx(0.5)
+    assert (mid["kc_upper"], mid["kc_lower"]) == (104.0, 96.0)
+    assert mid["kc_position"] == pytest.approx(0.5) and mid["bb_squeeze"] is False
+    assert mid["price_z_20d"] == 0.0 and mid["stretch_sma20_atr"] == 0.0
+    assert mid["stretch_sma50_atr"] == pytest.approx(2.5)  # (100 - 95) / 2
+    assert mid["donchian_pos_20d"] == pytest.approx(0.5)
+    assert top["bb_pct_b"] == pytest.approx(1.1) and top["price_z_20d"] == pytest.approx(2.4)
+    assert top["kc_position"] == pytest.approx(2.0) and top["stretch_sma20_atr"] == 6.0
+    assert dip["bb_pct_b"] == pytest.approx(-0.1) and dip["price_z_20d"] == pytest.approx(-2.4)
+    assert sqz["bb_squeeze"] is True  # bands 98..102 inside the channel 96..104
+    assert sqz["bb_width"] == pytest.approx(0.04)
+    assert pd.isna(flat["bb_pct_b"]) and pd.isna(flat["price_z_20d"])  # zero deviation
+    assert flat["bb_squeeze"] is True and flat["bb_width"] == 0.0
+    nob = out.loc["EQ:NOBAND"]
+    assert all(pd.isna(nob[n]) for n in ("bb_upper", "bb_pct_b", "bb_squeeze", "price_z_20d"))
+    assert nob["kc_position"] == pytest.approx(0.5)  # the channel needs no deviation
+    assert nob["donchian_pos_20d"] == pytest.approx(0.5)
