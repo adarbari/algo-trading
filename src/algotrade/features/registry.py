@@ -61,6 +61,7 @@ from algotrade.features.rollups.price import (
     volume,
 )
 from algotrade.features.rollups.reference import fund_reference
+from algotrade.features.rollups.relative import relative_strength
 
 GROUPS: dict[str, FeatureGroup] = {
     g.key: g
@@ -95,6 +96,7 @@ GROUPS: dict[str, FeatureGroup] = {
             indicators.GROUP,
             regime.GROUP,
             fund_reference.GROUP,
+            relative_strength.GROUP,
         ),
         # iv30@v1 and put_wing@v1 read the materialised div_yield@v1 (FeatureSet orders it)
         stored_ok=True,

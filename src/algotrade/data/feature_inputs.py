@@ -60,6 +60,11 @@ in its owner here in ``algotrade.data``; ``INPUTS`` maps the table to it:
                        session); ``None`` when no reference is stored. A lookup only, never
                        a population: it may come from a later snapshot (``pre_snapshot``), so
                        a group counts names over ``universe``, never over these rows
+- ``instruments/company``
+                       ``reference.company_sectors``: ``instrument_id``, ``sector`` and
+                       ``industry`` from the company snapshot on or before the session (read per
+                       session); ``None`` before the first snapshot (a later one would show
+                       company facts not known then)
 - ``rates/treasury``   ``rates.curve_as_rows``: the curve the session sees (latest on or before;
                        ``curve_date`` and ``pre_snapshot`` added); ``None`` when none is stored
 - ``volatility/ibkr_iv30``
@@ -87,7 +92,7 @@ import numpy as np
 import pandas as pd
 
 from algotrade.core.model.errors import MissingDataError
-from algotrade.core.model.fields import group_of_table
+from algotrade.core.model.fields import COMPANY_TABLE, group_of_table
 from algotrade.core.time.calendar import sessions_between, sessions_ending
 from algotrade.data.chains import chain_status, option_quotes, underlying_quotes
 from algotrade.data.events import events_by_event_date, stored_events
@@ -100,6 +105,7 @@ from algotrade.data.rates import TABLE as TREASURY
 from algotrade.data.rates import curve_as_rows
 from algotrade.data.reference import (
     UNIVERSE_TABLE,
+    company_sectors,
     ids_for_symbols,
     instruments,
     load_universe,
@@ -382,6 +388,7 @@ INPUTS: Mapping[str, Loader] = {
     HOLDINGS: _partition(_leveraged_holdings),
     "instruments/symbol_ids": _partition(symbol_ids),
     UNIVERSE_TABLE: _partition(_universe),
+    COMPANY_TABLE: _partition(company_sectors),
     IBKR_IV30: _ibkr_vols,
 }
 

@@ -10,6 +10,7 @@ from algotrade.data import StoreReader
 from algotrade.data.reference import (
     IBKR_CONTRACTS,
     companies,
+    company_sectors,
     descriptions,
     ibkr_contracts,
     instrument_terms,
@@ -107,6 +108,22 @@ def test_companies_follow_the_snapshot_rule() -> None:
     assert found is not None and list(found["name"]) == ["A Inc"]
     every = companies(reader, D2 + timedelta(days=3))
     assert every is not None and len(every) == 2
+
+
+def test_company_sectors_are_the_snapshot_on_or_before_with_three_columns() -> None:
+    writer, reader = store()
+    company = "instruments/company"
+    assert company_sectors(reader, D2) is None  # no company snapshot at all
+    rows = [
+        {"instrument_id": f"EQ:{s}", "symbol": s, "cik": "1", "name": f"{s} Inc", "sic": "3571",
+         "sector": sector, "industry": "Software", "fetched_on": D2}
+        for s, sector in (("A", "Technology"), ("B", None))
+    ]  # fmt: skip
+    writer.write_table(company, D2, "c2", stamped(rows, D2, "c2"))
+    assert company_sectors(reader, D1) is None  # taken after the session: not known then
+    found = company_sectors(reader, D2 + timedelta(days=3))
+    assert found is not None and list(found.columns) == ["instrument_id", "sector", "industry"]
+    assert found["sector"].iloc[0] == "Technology" and pd.isna(found["sector"].iloc[1])
 
 
 def test_instrument_view_joins_reference_and_session_rollups() -> None:

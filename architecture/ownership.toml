@@ -192,7 +192,7 @@ detect = [{ attr = "tables.drop" }, { call = "drop_table" }]
 
 [[responsibility]]
 id = "feature-input-loading"
-description = "What a feature group reads, by table name: each input table's point-in-time read for features (from its data owner), slicing per session and lookback, other groups' stored rows (rollups/instrument/ and rollups/market/) with this run's rows winning, the session's universe snapshot (the population; none before the first) and the symbol -> id map of its reference snapshot (instruments/symbol_ids, a lookup only; ADR 0047), the leveraged and inverse funds' latest holdings (holdings/etf, ADR 0050), bars narrowed to the ids of a group's tickers (Input.symbols); features never read storage or a domain reader"
+description = "What a feature group reads, by table name: each input table's point-in-time read for features (from its data owner), slicing per session and lookback, other groups' stored rows (rollups/instrument/ and rollups/market/) with this run's rows winning, the session's universe snapshot (the population; none before the first) and the symbol -> id map of its reference snapshot (instruments/symbol_ids, a lookup only; ADR 0047), the sector and industry of the company snapshot on or before the session (instruments/company; none before the first), the leveraged and inverse funds' latest holdings (holdings/etf, ADR 0050), bars narrowed to the ids of a group's tickers (Input.symbols); features never read storage or a domain reader"
 owner = ["src/algotrade/data/feature_inputs.py"]
 allowed = [
     # ADR 0024 / 0037: the API shows stored group rows (a feature's series in the read

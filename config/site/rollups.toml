@@ -129,5 +129,10 @@ w_runup = 50.0
 credit_boom_above = 0.10     # bank credit up more than 10% on the year
 runup_above = 0.30           # SPY up more than 30% on the year
 
+["relative_strength@v1"]  # relative strength, percentiles and the sector (docs/data/technical.md)
+min_members = 200        # universe stocks with a known return a percentile needs, else it is null
+min_coverage = 0.9       # share of member stocks with a bar on the session, else every percentile is null
+min_sector_etfs = 6      # sector ETFs (of 11) with a known 63-session return a sector rank needs
+
 ["trend_stats@v1"]        # streaks and the base length (docs/data/technical.md)
 tight_range_pct = 0.15   # a 20-session high-low range at most this share of the close is tight

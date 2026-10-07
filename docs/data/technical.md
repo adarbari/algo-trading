@@ -37,7 +37,7 @@ left out with the field that covers it. Screener presets come last (section "Pre
 | | distance from moving averages | `feature.pct_vs_sma_20/50/200`, `feature.pct_vs_ema_20/50/200`, `feature.stretch_sma20_atr`, `feature.stretch_sma50_atr` |
 | Momentum | returns 1 / 3 / 5 / 10 / 20 / 60 / 120 / 252 | `trend_stats` `ret_1d`, `ret_3d`, `ret_10d`; `momentum.ret_5d`; `price_stats.ret_20d/60d`; `trend_stats` `ret_120d`, `ret_252d`, `mom_12_1` |
 | | momentum acceleration | `trend_stats` `mom_accel_5d` (ret_5d today minus ret_5d five sessions earlier; negative = deteriorating) |
-| | relative strength vs SPY / sector, percentile ranks | `relative_strength@v1` (planned): `rs_spy_63d`, `rs_sector_63d`, `rs_spy_trend_20d` (improving / deteriorating), `ret_5d_pctile`, `mom_pctile_63d`, `mom_pctile_252d` |
+| | relative strength vs SPY / sector, percentile ranks | `relative_strength@v1`: `rs_spy_63d`, `rs_spy_252d`, `rs_line_high_252d`, `rs_sector_63d`, `rs_spy_trend_20d` (improving / deteriorating), `ret_5d_pctile`, `mom_pctile_63d`, `mom_pctile_252d`; `feature.rs_spy_positive`, `feature.rs_improving` |
 | Price structure | 20 / 50 / 100 / 200-session highs and lows | `momentum.high_20d/low_20d/high_50d/low_50d`; `trend_stats` `high_100d`, `low_100d`, `high_200d`, `low_200d` |
 | | 52-week high / low | `price_stats.high_52w/low_52w`; `feature.pct_52w_range` (where the close sits in the range) |
 | | swing highs / lows, support / resistance | `swing_levels` |
@@ -57,14 +57,14 @@ left out with the field that covers it. Screener presets come last (section "Pre
 | | retracement % | `feature.donchian_pos_20d` (1 - retracement of the 20-session range) |
 | | volume contraction | `volume.volume_ratio_5d_20d`, `feature.volume_dry_up` |
 | | higher-low formation | `pivot_strength.pivot_structure` (planned) |
-| | momentum deterioration / recovery | `trend_stats.mom_accel_5d`; `relative_strength.rs_spy_trend_20d` (planned) |
+| | momentum deterioration / recovery | `trend_stats.mom_accel_5d`; `relative_strength.rs_spy_trend_20d` |
 | Breakout quality | above the 20 / 50-session high, magnitude, volume | `feature.breakout_20d`, `feature.breakout_50d`, `feature.breakout_magnitude_20d`, `momentum.rel_volume`, `trend_stats.close_range_pos` |
 | | ATR expansion | `feature.atr_ratio_5_20` |
 | | follow-through, failed-breakout history | `retest@v1` (planned): `sessions_since_breakout`, `retest_state`, `failed_breakouts_252d` |
 | Volume / liquidity | dollar volume, relative volume | `volume.dollar_volume`, `price_stats.adv_usd_20d`, `momentum.rel_volume`, `volume.volume_z_20d` |
 | | volume trend / acceleration / percentile, turnover | `vol_stats` (planned) `adv_shares_60d`, `volume_pctile_252d`; `feature.volume_trend_20_60`; `feature.turnover_20d` (adv_shares_20d / shares_outstanding) |
 | Market / sector regime | SPY / QQQ trend, market volatility, breadth | `market_trend@v2`, `market_breadth@v1`, `regime@v3` (`market.*`); IWM through `cross_asset.iwm_vs_spy` |
-| | sector momentum, sector relative strength | `relative_strength@v1` (planned): `sector_etf`, `sector_ret_63d`, `sector_rank_63d`, `rs_sector_63d` |
+| | sector momentum, sector relative strength | `relative_strength@v1`: `sector_etf`, `sector_ret_63d`, `sector_rank_63d`, `rs_sector_63d`; `feature.sector_leader` |
 | Options | IV, IV rank, IV percentile, IV / HV, IV - HV spread | `iv30`, `iv_rank`, `iv_percentile`, `iv_hv_ratio`, `iv_hv_spread`, the `vrp_*` set |
 | | OI, option volume, spread, delta, DTE | `option_liquidity`, `put_wing`, `oi_walls`, `nearest_expiry` |
 | | skew, expected move | `skew@v1`, `implied_move@v1` (planned, positioning.md) |
@@ -82,7 +82,7 @@ needs a field this table marks planned waits for that field.
 
 ## Where the columns live
 
-`features/rollups/price/` is at its module cap, so the new kinds get their own folders (one
+`features/rollups/price/` is at its module cap, so the new kinds get their own folders (`relative/` holds the groups that compare an instrument with the market, its sector and the universe) (one
 folder per kind of thing; `architecture/layout.toml`):
 
 | Group | Folder | Columns | Status |
@@ -95,7 +95,7 @@ folder per kind of thing; `architecture/layout.toml`):
 | `gaps@v1` | `levels/` | `gap_open_pct`, `gap_above`, `gap_above_date`, `gap_below`, `gap_below_date` | planned |
 | `volume_profile@v1` | `levels/` | `poc_252d`, `value_area_high`, `value_area_low`, `hvn_above`, `hvn_below`, `lvn_above`, `lvn_below`, `volume_near_close_share`, `profile_status` | planned |
 | `anchored_vwap@v2` | `price/` | v1 + `avwap_swing_low`, `avwap_swing_high` | planned |
-| `relative_strength@v1` | `relative/` | `rs_spy_63d`, `rs_spy_252d`, `rs_line_high_252d`, `mom_pctile_63d`, `mom_pctile_252d`, `sector_etf`, `sector_ret_63d`, `rs_sector_63d`, `sector_rank_63d` | planned |
+| `relative_strength@v1` | `relative/` | `rs_spy_63d`, `rs_spy_252d`, `rs_line_high_252d`, `rs_spy_trend_20d`, `ret_5d_pctile`, `mom_pctile_63d`, `mom_pctile_252d`, `sector_etf`, `sector_ret_63d`, `rs_sector_63d`, `sector_rank_63d` | built |
 | `chain_flow@v1`, `flow_history@v1`, `skew@v1`, `skew_history@v1`, `implied_move@v1`, `iv_term@v1` | `positioning/` | [positioning.md](positioning.md) | planned |
 | `call_wing@v1` | `options/` | the covered-call mirror of `put_wing@v1` | planned |
 | `dividend_schedule@v1` | `corporate/` | `next_ex_date`, `next_div_amount`, `days_to_ex_date` | planned |
@@ -103,7 +103,8 @@ folder per kind of thing; `architecture/layout.toml`):
 Formulas over stored columns are expression features (computed on read):
 `config/site/features/bands.toml` (bands, channels, z-scores, stretches),
 `swing.toml` (level distances, the pullback in ATRs, the 52-week position, the 50-session breakout and
-20-session breakdown, the short put's cushion above support), `price.toml` (relative strength),
+20-session breakdown, the short put's cushion above support), `price.toml` (`rs_spy_positive`,
+`rs_improving`, `sector_leader`),
 `positioning.toml` (flow ratios, skew, term structure, implied move, wing yields).
 
 ## Shared rules
@@ -169,7 +170,55 @@ Worked examples: 60 closes rising every day give `close_streak` 59 and `sma20_st
 sessions ago gives `tight_range_sessions` 10 (the spike left the 20-session window 10
 sessions ago).
 
-## Levels (`levels/`), volume at price, relative strength, options
+## `relative_strength@v1` (relative/)
+
+Inputs: `bars/1d` (every instrument, the session plus 252 earlier sessions), `instruments/symbol_ids`
+(finds SPY and the eleven sector ETFs by ticker: a lookup, never a population), `universe`
+(the population of the percentiles) and `instruments/company` (the SEC sector). Params
+`min_members` (200), `min_coverage` (0.9) and `min_sector_etfs` (6). One row per instrument with a bar on the session,
+the ETFs and SPY included.
+
+An n-session return is close / close n sessions earlier - 1 and is known only when all n + 1
+closes exist: a gap makes it null (UNKNOWN), never a shorter window. The sector -> ETF map is
+`SECTOR_ETFS` (the sector names are the SIC heuristic's, `vendors/sec/sic.py`): Technology XLK,
+Health Care XLV, Financials XLF, Consumer Discretionary XLY, Consumer Staples XLP, Energy XLE,
+Industrials XLI, Materials XLB, Utilities XLU, Real Estate XLRE, Communication Services XLC.
+
+| Column | Definition | Null when |
+|---|---|---|
+| `rs_spy_63d`, `rs_spy_252d` (>= -1) | (1 + the instrument's n-session return) / (1 + SPY's) - 1 | either return is unknown, or SPY is not in the symbol map |
+| `rs_line_high_252d` (flag) | the line close / SPY close is at its highest of the last 252 sessions, today included (a tie counts) | the line is unknown on a session among the 252, or SPY is not in the symbol map |
+| `rs_spy_trend_20d` | `rs_spy_63d` today - `rs_spy_63d` 20 sessions earlier (above 0: relative strength improving) | either is unknown (84 closes of the instrument and SPY must be whole) |
+| `ret_5d_pctile`, `mom_pctile_63d`, `mom_pctile_252d` (0..1) | the share of universe members with a known n-session return strictly below the instrument's, among members with a known one | no universe snapshot on or before the session, fewer than `min_coverage` of its members have a bar on the session (a partial day), fewer than `min_members` members have the return, or the instrument's return is unknown |
+| `sector_etf` | `SECTOR_ETFS[sector]` | the company snapshot on or before the session has no sector for the instrument, the universe lists it as an ETF (a fund's SIC code is not a sector), or the sector has no ETF |
+| `sector_ret_63d` (>= -1) | the sector ETF's 63-session return | `sector_etf` is null, or the ETF is not in the symbol map or has no complete window |
+| `rs_sector_63d` (>= -1) | (1 + the instrument's 63-session return) / (1 + `sector_ret_63d`) - 1 | `sector_ret_63d` is null, or the instrument's return is unknown |
+| `sector_rank_63d` (1..11) | the rank of the instrument's ETF among the 11 by 63-session return: 1 the strongest; ties share the better rank | `sector_ret_63d` is null, or fewer than `min_sector_etfs` of the 11 ETFs have a complete window |
+
+The population rule is `market_breadth@v1`'s: the members are the STOCK rows (common stocks
+and ADRs) of the universe snapshot the session sees; with none on or before the session (a
+later list would count today's survivors) every percentile is null. An instrument's own row is
+ranked whether or not it is a member (an ETF, or a stock outside the universe, is placed
+among the members); a member is counted only with a complete window for that column, so a
+name without one is neither below nor above anything. "Strictly below" makes the best member
+read (n - 1) / n, never 1, and ties share the lower rank. The sector comes from the company
+snapshot on or before the session (`data.reference.companies`' rule: none before the first,
+never a later one). `ret_5d_pctile` uses the 5-session return, 63 sessions is a quarter (as the
+relative-strength columns; `price_stats` has 60).
+
+Expression features (`price.toml`): `rs_spy_positive` (`rs_spy_63d` > 0), `rs_improving`
+(`rs_spy_trend_20d` > 0) and `sector_leader` (`sector_rank_63d` <= 3).
+
+Worked example: SPY 100 -> 110 over 63 sessions (+10%), a stock 100 -> 121 (+21%):
+`rs_spy_63d` = 1.21 / 1.10 - 1 = 0.10. A month earlier the stock stood +10% against SPY's +5%
+over its own 63 sessions: 1.10 / 1.05 - 1 = 0.0476, so `rs_spy_trend_20d` = 0.10 - 0.0476 =
+0.0524 (improving). With five members whose 63-session returns are -10%, 0%, 0%, 5% and 21%,
+the stock's `mom_pctile_63d` is 4 / 5 = 0.8, a member at 0% reads 1 / 5 (its tie is not below
+it) and a non-member at +100% reads 5 / 5. If its sector is Technology and XLK is +10% while
+XLV is -5%: `sector_etf` XLK, `sector_ret_63d` 0.10, `rs_sector_63d` 0.10 and
+`sector_rank_63d` 1 (XLV is 2).
+
+## Levels (`levels/`), volume at price, options
 
 Planned; each lands with its own section here (definitions, null rules, a worked example) in
 the PR that builds it.
