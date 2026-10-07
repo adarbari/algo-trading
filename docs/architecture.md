@@ -207,7 +207,7 @@ handler), `steps.py` (needs, acceptance, status rule), `attempts.py` (resume and
 `sessions.py` (catch-up), `screens.py` (screen jobs), `notify.py` (summary file + notifiers),
 `records.py` / `report.py` / `timing.py` / `render.py` (the summary email).
 
-- **Steps** (`NIGHTLY`): `universe-build`, `company-details`, `shares`, `macro-calendar`, `earnings`, `bars`, `rates`,
+- **Steps** (`NIGHTLY`): `universe-build`, `company-details`, `shares`, `macro-calendar`, `filings`, `earnings`, `bars`, `rates`,
   `corporate-actions`, `chains`, `etf-holdings`, `ibkr-contracts`, `ibkr-iv`, `rollups`,
   `screens`, `descriptions`, `verify`; then `purge-raw` once (`FINALLY`). Each is a registry
   task (or the `screens` job step) run in isolation, declared with the steps it `needs`, whether

@@ -17,7 +17,7 @@ from algotrade_sources.framework.http import HttpError, RetryPolicy
 from algotrade_sources.vendors.nasdaq.earnings import NasdaqEarningsSource, parse_calendar
 from tests.helpers.ingest_fakes import CountingLimiter, http_for, task_ctx
 from tests.helpers.payloads.nasdaq_earnings import calendar
-from tests.helpers.stored_frames import write_reference
+from tests.helpers.stored_frames import stamped, write_reference
 
 DAY = date(2026, 10, 2)  # a Friday
 CLOCK = lambda: datetime(2026, 10, 2, 22, tzinfo=UTC)  # noqa: E731
@@ -259,3 +259,33 @@ def test_a_row_carried_from_a_partition_without_known_from_gets_one() -> None:
     assert stored is not None
     known = dict(zip(stored["instrument_id"], stored["known_from"], strict=True))
     assert known == {"EQ:A": old, "EQ:B": date(2026, 9, 30)}
+
+
+def test_a_failed_day_never_carries_the_8k_results_rows_of_the_previous_snapshot() -> None:
+    """The partition also holds the ``filings`` task's ``sec_8k`` rows: carrying one would
+    re-stamp it with the calendar's source (and replace it on its key), losing its label."""
+    report, failing = date(2026, 10, 6), {"on": False}
+
+    def transport(url: str) -> bytes:
+        if url.endswith(report.isoformat()) and failing["on"]:
+            raise HttpError(500)
+        return calendar([("AAPL", "time-after-hours")])
+
+    backend = MemoryBackend()
+    writer = StoreWriter(backend)
+    write_reference(writer, date(2026, 10, 1), {"AAPL": "EQ:BBG000B9XRY4"})
+    source = NasdaqEarningsSource(http_for(transport, RetryPolicy(tries=1)))
+    ctx = task_ctx(writer, StoreReader(backend), CLOCK)
+    ingest_earnings(ctx, source, date(2026, 10, 1), days=8)
+    results = [
+        {"instrument_id": "EQ:MU", "ts": pd.Timestamp("2026-10-06 20:02", tz="UTC"),
+         "time": "after_hours", "reported": True, "known_from": date(2026, 10, 6)}
+    ]  # fmt: skip
+    eight_k = stamped(results, date(2026, 10, 1), "filings-run")
+    eight_k["source"] = "sec_8k"
+    writer.write_table("events/earnings", date(2026, 10, 1), "filings-run", eight_k)
+    failing["on"] = True
+    second = ingest_earnings(ctx, source, DAY, days=8)
+    assert second.stats["carried_rows"] == 1  # AAPL's forecast only
+    stored = StoreReader(backend).table("events/earnings", DAY)
+    assert stored is not None and "EQ:MU" not in set(stored["instrument_id"])

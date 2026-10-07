@@ -89,6 +89,7 @@ def test_missing_files_fall_back_to_defaults() -> None:
         ({"quality": {"max_chain_stale_share_core": 2}}, "a fraction between 0 and 1"),
         ({"quality": {"min_chain_coverage": 0.95}}, r"\[quality\]: unknown keys"),
         ({"quality": {"min_calendar_future_dates": -1}}, r"min_calendar_future_dates: expected an"),
+        ({"quality": {"max_filings_failed": 2}}, "a fraction between 0 and 1"),
         (
             {"cboe": {"min_interval_s": 2, "max_interval_s": 1}},
             r"\[cboe\] max_interval_s: expected >= min",
@@ -343,6 +344,12 @@ def test_the_macro_calendar_threshold_loads() -> None:
     assert SourcesSettings.from_document(site("sources")).min_calendar_future_dates == 1
     document = {"quality": {"min_calendar_future_dates": 3}}
     assert SourcesSettings.from_document(document).min_calendar_future_dates == 3
+
+
+def test_the_filings_threshold_loads() -> None:
+    assert SourcesSettings.from_document(site("sources")).max_filings_failed == 0.05
+    document = {"quality": {"max_filings_failed": 0.2}}
+    assert SourcesSettings.from_document(document).max_filings_failed == 0.2
 
 
 def test_a_legacy_spy_holdings_section_keeps_its_switch_under_the_new_name() -> None:

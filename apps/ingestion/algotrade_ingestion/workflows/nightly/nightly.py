@@ -43,6 +43,7 @@ from algotrade_ingestion.tasks.maintenance.quality import (
     check_bars_resolved,
     check_chains,
     check_earnings,
+    check_filings,
     check_macro,
     check_macro_calendar,
     check_market_rollups,
@@ -100,6 +101,10 @@ NIGHTLY: tuple[Step, ...] = (
     # it is a weekly-cadence fact kept current nightly until the `reference` workflow exists
     # (WF4: it moves there with the two steps above). Optional; FRED off or no key: SKIPPED.
     Step("macro-calendar", latest_only=True, critical=False, accept_with=(check_macro_calendar,)),
+    # SEC 8-Ks of the event-study names (ADR 0050): one request per CIK from its latest stored
+    # filing, so a night reads the new ones; their Item 2.02 releases are earnings rows. Optional:
+    # a failed night is read again the next (the default start is the latest stored filing).
+    Step("filings", latest_only=True, critical=False, accept_with=(check_filings,)),
     Step("earnings", accept=(check_earnings,), task_complete=True),
     Step("bars", accept=(check_bars, check_bars_resolved)),
     Step("rates", task_complete=True),

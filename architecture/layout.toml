@@ -519,6 +519,11 @@ purpose = "macro-series tasks: the macro task (FRED / ALFRED and published econo
 kind = "task-domain"
 
 [[dir]]
+path = "apps/ingestion/algotrade_ingestion/tasks/events"
+purpose = "event-sensitivity tasks (ADR 0050): the filings task (SEC 8-K filings into events/filing, and the Item 2.02 results releases as events/earnings rows)"
+kind = "task-domain"
+
+[[dir]]
 path = "apps/ingestion/algotrade_ingestion/tasks/derived"
 purpose = "derived-data tasks: the rollups task (every registered rollup, per session or a backfill) and the market-rollups task (the market-entity groups)"
 kind = "task-domain"

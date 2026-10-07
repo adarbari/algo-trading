@@ -23,6 +23,7 @@ from algotrade.config.site.settings import load_macro, load_universe
 from algotrade.core.time.calendar import sessions_between
 from algotrade.storage.runs import RunRecord
 from algotrade_ingestion.tasks.derived import market_rollups, rollups
+from algotrade_ingestion.tasks.events import filings
 from algotrade_ingestion.tasks.framework.run import TaskContext
 from algotrade_ingestion.tasks.macro import calendar as macro_calendar
 from algotrade_ingestion.tasks.macro import series as macro_series
@@ -235,6 +236,15 @@ def _bars_history(ctx: TaskContext, p: Params) -> RunRecord:
         p.get("until") or session_of(p),
         bool(p.get("force")),
         p.get("limit"),
+    )
+
+
+def _filings(ctx: TaskContext, p: Params) -> RunRecord:
+    assert ctx.configs is not None
+    # The event-study scope list (EV0) plus any --symbols; ids come from the reference (ADR 0018).
+    symbols = [*load_event_scope(ctx.configs).symbols, *_symbols(p)]
+    return filings.ingest_filings(
+        ctx, ctx.sources["sec_filings"], session_of(p), symbols, p.get("since"), p.get("limit")
     )
 
 
@@ -557,6 +567,28 @@ TASKS: dict[str, Task] = {
                 Param("symbols", ("--symbols",), str, "tickers on top of the scope list"),
                 Param("limit", ("--limit",), int, "fetch at most N names this run"),
                 Param("force", ("--force",), None, "also names already fetched for the window"),
+            ),
+        ),
+        Task(
+            "filings",
+            "SEC 8-K filings of the event-study names (events/filing) and their Item 2.02 results "
+            "releases as earnings rows (sec_8k); --since backfills, the default reads each CIK "
+            "from its latest stored filing",
+            filings,
+            (filings.TABLE, filings.EARNINGS),
+            _filings,
+            sources=("sec_filings",),
+            settings="sources.toml [sec_edgar] [quality]; events/scope.toml",
+            params=(
+                SESSION,
+                Param(
+                    "since",
+                    ("--since",),
+                    date.fromisoformat,
+                    "first filing date for every CIK (default: its latest stored, else 2018)",
+                ),
+                Param("symbols", ("--symbols",), str, "tickers on top of the scope list"),
+                Param("limit", ("--limit",), int, "fetch at most N CIKs this run"),
             ),
         ),
         Task(

@@ -103,3 +103,28 @@ def test_macro_release_rows_declare_known_from_and_a_known_status() -> None:
         validate_frame(
             "events/macro_release", stamped([{**row, "extra": 1}], date(2026, 10, 6), "r")
         )
+
+
+def test_filing_rows_key_on_the_accession_and_require_known_from() -> None:
+    spec = spec_for("events/filing")
+    assert spec.grain == "event" and spec.runs == "merge" and not spec.open_ended
+    assert spec.key == ("instrument_id", "accession")
+    column = spec.column("known_from")
+    assert "known_from" in spec.required and column is not None and not column.nullable
+    ts = datetime(2026, 9, 30, 20, 2, 22, tzinfo=UTC)
+    row = {
+        "instrument_id": "EQ:MU", "ts": ts, "known_from": date(2026, 9, 30), "cik": "0000723125",
+        "form": "8-K", "accession": "0000723125-26-000018", "filing_date": date(2026, 9, 30),
+        "items": "2.02,9.01", "report_date": None, "primary_document": "mu-20260930.htm",
+    }  # fmt: skip
+    day = date(2026, 10, 5)
+    validate_frame("events/filing", stamped([row], day, "r"))
+    twin = {**row, "ts": ts.replace(second=23)}  # same accession, another instant: one key
+    with pytest.raises(DataValidationError, match="duplicate rows"):
+        validate_frame("events/filing", stamped([row, twin], day, "r"))
+    other = {**row, "instrument_id": "EQ:MUU"}  # another share class of the CIK: its own row
+    validate_frame("events/filing", stamped([row, other], day, "r"))
+    with pytest.raises(DataValidationError, match="missing columns"):
+        validate_frame(
+            "events/filing", stamped([{k: v for k, v in row.items() if k != "items"}], day, "r")
+        )

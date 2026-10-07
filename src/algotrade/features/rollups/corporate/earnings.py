@@ -25,7 +25,8 @@ One row per (instrument, report date): a history row over a forecast, then the l
 snapshot.
 
     next_earnings_date  the first valid report date on or after the session
-    earnings_time       pre / post (after the close) / unknown, for that date
+    earnings_time       pre / post (after the close) / unknown, for that date (a report
+                        stored as ``intraday``, during the session, reads unknown: neither)
     days_to_earnings    sessions after the session up to the report date (0: today;
                         ``core.time.calendar``)
     date_confirmed      whether the source confirmed the date; null (the Nasdaq calendar

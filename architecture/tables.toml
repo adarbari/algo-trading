@@ -77,11 +77,21 @@ owner = "apps/ingestion/algotrade_ingestion/tasks/market/corporate_actions.py"
 [[table]]
 name = "events/earnings"
 owner = "apps/ingestion/algotrade_ingestion/tasks/market/earnings.py"
+also_written_by = [
+    # SEC 8-K Item 2.02 results releases (ADR 0050): rows with source = "sec_8k", `ts` the acceptance instant,
+    # the authoritative report date and time; the per-quarter precedence over the Nasdaq rows is the rollup's.
+    "apps/ingestion/algotrade_ingestion/tasks/events/filings.py",
+]
 
 [[table]]
 name = "events/macro_release"
 owner = "apps/ingestion/algotrade_ingestion/tasks/macro/calendar.py"
 note = "ADR 0050: the macro release calendar (FRED release dates, ISM by rule), past and scheduled; known_from = the first session it was knowable on"
+
+[[table]]
+name = "events/filing"
+owner = "apps/ingestion/algotrade_ingestion/tasks/events/filings.py"
+note = "ADR 0050: SEC 8-K and 8-K/A filings of the scoped companies by acceptance time; known_from = the acceptance's session (New York)"
 
 [[table]]
 name = "events/reference_change"
