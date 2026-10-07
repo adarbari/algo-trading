@@ -101,6 +101,11 @@ def test_a_contract_stored_twice_counts_once() -> None:
     assert out["call_volume"] == 1950 and out["unusual_contracts"] == 2
 
 
+def test_fractional_volumes_round_to_whole_contracts() -> None:
+    out = run([q("EQ:F", E1, "C", 100, 3.25, 1.0), q("EQ:F", E1, "C", 105, 3.25, 1.0)]).loc["EQ:F"]
+    assert out["call_volume"] == 6 and out["next_exp_call_volume"] == 6  # 6.5 rounds to even
+
+
 def test_without_underlying_quotes_and_row_order() -> None:
     inputs = {cf.OPTIONS: pd.DataFrame(CHAIN_A[::-1]), cf.UNDERLYINGS: None}
     out = cf.compute(inputs, END, P).set_index("instrument_id")

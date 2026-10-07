@@ -154,7 +154,7 @@ def flow_columns(options: pd.DataFrame, session: date, p: ChainFlowParams) -> pd
             "unusual_contracts": unusual.astype(int),
         }
     )
-    out = sums.groupby(uid).sum()
+    out = sums.groupby(uid).sum().round()  # counts of contracts: a fractional feed value rounds
     has_next = (next_dte < np.iinfo("int64").max).reindex(out.index)
     for column in ("next_exp_call_volume", "next_exp_put_volume"):
         out[column] = out[column].where(has_next)
