@@ -1,8 +1,8 @@
 # ADR 0031: Options positioning features are daily chain-derived estimates
 
-**Status:** proposed (2026-10-04, parked: the roadmap schedules the SW track first; revisit before any OP code). Each "Proposed" item
-in [docs/data/positioning.md](../data/positioning.md) is confirmed or changed by the owner
-before OP1 code starts; this ADR is then accepted. Extends [0014](0014-cboe-options-source.md)
+**Status:** accepted in part (2026-10-06, owner request): OP2 and OP4 built; OP3 next; OP1 (GEX / DEX) stays parked on the P1 dealer-sign decision. (Proposed 2026-10-04, parked while the SW track went first.) The owner's 2026-10-06 request for the options-strategy parameters settles the "Proposed" items of
+[docs/data/positioning.md](../data/positioning.md) that OP2 and OP4 implement; the others stay
+proposed until their group is built. Extends [0014](0014-cboe-options-source.md)
 (we compute Greeks ourselves), [0021](0021-option-pricing-conventions.md) (pricing
 conventions) and [0023](0023-feature-store.md) (feature groups, expression features).
 
