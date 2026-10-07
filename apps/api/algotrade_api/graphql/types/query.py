@@ -18,6 +18,8 @@ from strawberry.types import Info
 
 from algotrade.services.read.events import event_calendar
 from algotrade.services.read.events.instrument_events import DEFAULT_DAYS
+from algotrade.services.read.guide import field as field_page
+from algotrade.services.read.guide import index as guide_contents
 from algotrade.services.read.instruments import catalogue, distribution, identity
 from algotrade.services.read.instruments import table as tables
 from algotrade.services.read.market import market
@@ -30,6 +32,8 @@ from algotrade_api.graphql.limits import MAX_DAYS, MAX_NAMES, MAX_PAGE, MaxItems
 from algotrade_api.graphql.permissions import AdminOnly
 from algotrade_api.graphql.scalars import FeatureName
 from algotrade_api.graphql.types.events.calendar import EventCalendar
+from algotrade_api.graphql.types.guide.field import GuideField
+from algotrade_api.graphql.types.guide.index import GuideIndex
 from algotrade_api.graphql.types.instruments.distribution import FeatureDistribution
 from algotrade_api.graphql.types.instruments.feature import FeatureInfo
 from algotrade_api.graphql.types.instruments.instrument import Instrument
@@ -237,6 +241,24 @@ class Query:
             else None
         )
         return FeatureDistribution.of(found) if found is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="What the Guide holds, in its order (ADR 0051): sections with entry counts, "
+        "field theme groups, intents, situations, playbooks by family, regime indicators and "
+        "episodes (not session data)"
+    )
+    def guide_index(self, info: Ctx) -> GuideIndex | None:
+        ctx = info.context.stores()
+        return GuideIndex.of(guide_contents.load_guide_index(ctx)) if ctx is not None else None
+
+    @strawberry.field(  # type: ignore[untyped-decorator]
+        description="The Guide page of the catalogue field `name` (ADR 0051): its info and "
+        "guide entry, related fields, the playbooks that use it and the situations that fool "
+        "it; a name outside the caller's catalogue is an UNKNOWN_FEATURE error"
+    )
+    def guide_field(self, info: Ctx, name: FeatureName) -> GuideField | None:
+        ctx = info.context.stores()
+        return GuideField.of(field_page.load_guide_field(ctx, name)) if ctx is not None else None
 
     @strawberry.field(  # type: ignore[untyped-decorator]
         description="Every strategy and screener config the user sees: site presets, then "

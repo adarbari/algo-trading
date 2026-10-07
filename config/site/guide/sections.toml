@@ -1,0 +1,76 @@
+# L3 site setting: the Guide's order and grouping (ADR 0051, docs/ui/guide.md section 3).
+# The Guide's sections in order, from the market down to one number; the field themes
+# grouped in the order a screen uses them; the playbooks (one per site rule-screen preset)
+# by family, ordered within it. Typed by src/algotrade/config/site/guide/sections.py. Fitness
+# tests (tests/unit/config/site/guide/test_sections.py): every field-guide theme is in exactly
+# one group, every site preset in exactly one family, and every listed preset exists.
+
+[[section]]
+id = "start"
+title = "Start here"
+purpose = "How the app thinks about a day, and how to read and build a screen, step by step."
+
+[[section]]
+id = "regime"
+title = "Market regime"
+purpose = "The indicators behind the market's weather and the past market falls they are judged on."
+
+[[section]]
+id = "playbooks"
+title = "Playbooks"
+purpose = "One page per site screen: the setup it looks for, what it checks and what it leaves to you."
+
+[[section]]
+id = "fields"
+title = "Fields"
+purpose = "Every catalogue field: how to read it, the usual criterion per intent and when it lies."
+
+[[section]]
+id = "situations"
+title = "Situations"
+purpose = "States of the world that fool several fields at once, and what a screen does about them."
+
+[[section]]
+id = "glossary"
+title = "Glossary"
+purpose = "The app's own words and the rule grammar, to look up."
+
+[[theme_group]]
+id = "tradeable"
+title = "Who is tradeable"
+themes = ["instrument gates", "liquidity"]
+
+[[theme_group]]
+id = "chart"
+title = "The chart"
+themes = ["momentum and trend", "price levels", "volume", "volatility"]
+
+[[theme_group]]
+id = "options"
+title = "Options"
+themes = ["implied volatility", "option chain and short strikes", "put wing, walls and expiries"]
+
+[[theme_group]]
+id = "company"
+title = "The company and its calendar"
+themes = ["events", "fundamentals", "episode behaviour"]
+
+[[family]]
+id = "trend"
+title = "Trend"
+presets = ["trend_continuation", "pullback"]
+
+[[family]]
+id = "breakouts"
+title = "Breakouts"
+presets = ["range_breakout", "breakout", "failed_breakout"]
+
+[[family]]
+id = "reversals"
+title = "Reversals"
+presets = ["support_reversal", "oversold_reversal", "exhaustion"]
+
+[[family]]
+id = "income"
+title = "Option income"
+presets = ["vrp_scanner"]
