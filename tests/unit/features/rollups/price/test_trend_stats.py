@@ -1,4 +1,4 @@
-"""``trend_stats@v1``: the long returns and the 12-1 momentum by hand, the return z-score,
+"""``trend_stats@v2``: the long returns and the 12-1 momentum by hand, the return z-score,
 the signed close and SMA20 streaks and the tight-range count; gaps and short history are null;
 point in time (a session's row computed on bars up to it equals the backfilled row)."""
 
@@ -159,7 +159,7 @@ def test_point_in_time_a_session_never_sees_later_bars() -> None:
 
 
 def test_registered_with_params_and_lookback() -> None:
-    assert GROUPS["trend_stats@v1"].table == "rollups/instrument/trend_stats@v1"
+    assert GROUPS["trend_stats@v2"].table == "rollups/instrument/trend_stats@v2"
     assert ts.GROUP.inputs[0].sessions_back(None) == ts.LOOKBACK == 252
 
 

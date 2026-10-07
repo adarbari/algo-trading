@@ -167,9 +167,9 @@ Session volume and dollar volume, 20-session average volume, the 5 / 20 volume r
 | `up_volume_share_20d` | window | float32 | decimal | open | 0 .. 1 | Volume traded on sessions closing above the previous close / total volume, over the last 20 sessions: 0.5 is balanced, above is accumulation, below distribution; a session closing unchanged counts in the total only | a session among the last 21 has no bar (a gap), or the history is shorter (the first session needs the close before it); or the last 20 sessions had no volume at all | `bars/1d.close`, `bars/1d.volume` |
 | `cmf_20d` | window | float32 | decimal | open | -1 .. 1 | Chaikin money flow over the last 20 sessions: sum(mfm x volume) / sum(volume), mfm = ((close - low) - (high - close)) / (high - low), 0 when high equals low: above 0 closes sat in the upper half of the day's range on volume | a session among the last 20 has no bar (a gap), or the history is shorter; or the last 20 sessions had no volume at all | `bars/1d.close`, `bars/1d.high`, `bars/1d.low`, `bars/1d.volume` |
 
-## `bands@v1`
+## `bands@v2`
 
-The EMA stack (10, 20, 50, 200) with slopes, the 150-session SMA, the 20-close standard deviation, the bandwidth percentile over 252 sessions (the squeeze) and the band walk. Stored as `rollups/instrument/bands@v1`; reads `bars/1d`.
+The EMA stack (10, 20, 50, 200) with slopes, the 150-session SMA, the 20-close standard deviation, the bandwidth percentile over 252 sessions (the squeeze) and the band walk. Stored as `rollups/instrument/bands@v2`; reads `bars/1d`.
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
@@ -185,9 +185,9 @@ The EMA stack (10, 20, 50, 200) with slopes, the 150-session SMA, the 20-close s
 | `bb_width_pctile_252d` | window | float32 | decimal | open | 0 .. 1 | Share of the 252 sessions before the session whose Bollinger bandwidth (2 x 2 x close_std_20 / sma_20) was strictly below the session's: 0.05 is a squeeze (narrower than 95% of the year), 0.95 an expansion | the session's bandwidth is unknown (a session among the last 20 has no bar (a gap), or the history is shorter), or fewer than 240 of the 252 sessions before it have one | `bars/1d.close` |
 | `band_walk` | window | int | sessions | open | -399 .. 399 | Signed count of consecutive sessions, ending on the session, with the close above the upper Bollinger band (sma_20 + 2 x close_std_20; positive) or below the lower band (negative); 0 when the close is inside the bands; the count stops at the first session whose bands are unknown | the session's bands are unknown (a session among the last 20 has no bar (a gap), or the history is shorter) | `bars/1d.close` |
 
-## `trend_stats@v1`
+## `trend_stats@v2`
 
-Short and long returns, the 12-1 momentum and its acceleration, the return z-score, the 100 / 200-session channels, the prior 20 / 50-session extremes, the pullback's age, the close's place in the day's range, the 90-session regression trend quality and pace, and the close, SMA20 and tight-range streaks. Stored as `rollups/instrument/trend_stats@v1`; reads `bars/1d`.
+Short and long returns, the 12-1 momentum and its acceleration, the return z-score, the 100 / 200-session channels, the prior 20 / 50-session extremes, the pullback's age, the close's place in the day's range, the 90-session regression trend quality and pace, and the close, SMA20 and tight-range streaks. Stored as `rollups/instrument/trend_stats@v2`; reads `bars/1d`.
 
 | Feature | Kind | Type | Unit | Licence | Valid values | Description | Null when | Inputs |
 |---|---|---|---|---|---|---|---|---|
@@ -668,4 +668,6 @@ Readable until retired (`algotrade-ingest retire-features --group <key>`); their
 | `dividends@v1` | `dividends@v2` + expression features |
 | `fundamentals@v1` | `fundamentals@v2` + expression features |
 | `iv_history@v1` | `iv_history@v2` + expression features |
+| `bands@v2` | `bands@v2` + expression features |
+| `trend_stats@v2` | `trend_stats@v2` + expression features |
 | `liquidity_class@v1` | `price_stats@v2` + expression features; `chain_oi` -> `feature.option_chain_oi`, `rule_hash` retired |

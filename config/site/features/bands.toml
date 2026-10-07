@@ -1,5 +1,5 @@
 # Bands, channels, z-scores, stretches, the EMA stack and the regression trend score (the TA track; definitions in
-# docs/data/technical.md). Formulas over bands@v1, price_stats@v2 and momentum@v1, computed
+# docs/data/technical.md). Formulas over bands@v2, price_stats@v2 and momentum@v1, computed
 # on read. The language and the keys: docs/configuration.md "Expression features". Changing a
 # formula or a param: bump its version.
 

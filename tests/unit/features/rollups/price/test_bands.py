@@ -1,4 +1,4 @@
-"""``bands@v1``: the EMA stack and slopes with hand-computed values, the 20-close standard
+"""``bands@v2``: the EMA stack and slopes with hand-computed values, the 20-close standard
 deviation, the bandwidth percentile against the year before, the band walk; gaps and short
 history are null; point in time (a session's row computed on bars up to it equals the
 backfilled row)."""
@@ -134,7 +134,7 @@ def test_point_in_time_a_session_never_sees_later_bars() -> None:
 
 
 def test_registered_with_the_declared_lookback() -> None:
-    assert GROUPS["bands@v1"].table == "rollups/instrument/bands@v1"
+    assert GROUPS["bands@v2"].table == "rollups/instrument/bands@v2"
     assert bd.GROUP.inputs[0].sessions_back(None) == bd.LOOKBACK == 399
     assert len(sessions_ending(END, bd.LOOKBACK + 1)) == 400
 

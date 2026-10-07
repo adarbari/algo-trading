@@ -1,4 +1,4 @@
-"""``trend_stats@v1``: short and long returns, momentum acceleration, the return z-score,
+"""``trend_stats@v2``: short and long returns, momentum acceleration, the return z-score,
 the 100 / 200-session channels and the prior levels a breakout or breakdown must clear, the
 pullback's age, the close's place in the day's range and the streaks, from daily bars
 (``docs/data/technical.md``).
@@ -27,7 +27,7 @@ earlier sessions. One row per instrument with a bar on the session.
 
 A streak counts only while every session in it has a bar (and a known mean or range); it is
 capped by the sessions read. Parameters: ``TrendStatsParams`` (``config/site/rollups.toml``
-``["trend_stats@v1"]``).
+``["trend_stats@v2"]``).
 """
 
 from dataclasses import dataclass
@@ -44,7 +44,7 @@ from algotrade.features.rollups.price.price_stats import Matrix, Panel, panel, t
 from algotrade.quant.rolling import rolling_max, rolling_mean, rolling_min, trailing_run
 
 NAME = "trend_stats"
-VERSION = 1
+VERSION = 2
 BARS = "bars/1d"
 RETURN_WINDOWS = (1, 3, 10, 120, 252)
 SKIP, LONG = 21, 252  # the 12-1 momentum: skip the last month, measure the year before it

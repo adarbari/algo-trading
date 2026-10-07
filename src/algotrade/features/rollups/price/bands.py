@@ -1,4 +1,4 @@
-"""``bands@v1``: the EMA stack with its slopes, the stored inputs of Bollinger Bands and
+"""``bands@v2``: the EMA stack with its slopes, the stored inputs of Bollinger Bands and
 Keltner Channels, the bandwidth percentile (the squeeze) and the band walk, from daily bars
 (``docs/data/technical.md``).
 
@@ -41,7 +41,7 @@ from algotrade.quant.rolling import (
 )
 
 NAME = "bands"
-VERSION = 1
+VERSION = 2
 BARS = "bars/1d"
 WINDOW = 20  # closes in a band
 MULTIPLIER = 2.0  # standard deviations each side (Bollinger's default)

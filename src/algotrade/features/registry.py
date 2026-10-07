@@ -107,6 +107,9 @@ SUPERSEDED: dict[str, Superseded] = {
     "dividends@v1": Superseded("dividends@v2"),
     "fundamentals@v1": Superseded("fundamentals@v2"),
     "iv_history@v1": Superseded("iv_history@v2"),
+    # v2 adds sma_150 and the regression trend quality (one nightly of v1 rows at most)
+    "bands@v2": Superseded("bands@v2"),
+    "trend_stats@v2": Superseded("trend_stats@v2"),
     # Its rows were price_stats rows; the class and option tier are expression features now.
     "liquidity_class@v1": Superseded(
         "price_stats@v2", {"chain_oi": "feature.option_chain_oi", "rule_hash": ""}

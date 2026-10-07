@@ -136,7 +136,7 @@ hint = "volume_climax eq true (3 standard deviations above the 20 sessions befor
 
 [[phrase]]
 say = ["squeeze", "coiling", "volatility contraction", "tight bands", "narrow range", "building a base"]
-fields = ["feature.bb_squeeze", "rollup.bands@v1.bb_width_pctile_252d", "rollup.trend_stats@v1.tight_range_sessions"]
+fields = ["feature.bb_squeeze", "rollup.bands@v2.bb_width_pctile_252d", "rollup.trend_stats@v2.tight_range_sessions"]
 hint = "gate: bb_squeeze eq true, or bb_width_pctile_252d lte 0.10 (narrower than 90% of the year); tight_range_sessions gte 10 for a base at least two weeks old; do not add a momentum gate, a squeeze is a pre-move state"
 
 [[phrase]]
@@ -151,15 +151,15 @@ hint = "bb_pct_b lte 0 (at or under the lower Bollinger band) or price_z_20d lte
 
 [[phrase]]
 say = ["12-month momentum", "one-year momentum", "long-term momentum", "momentum factor"]
-fields = ["rollup.trend_stats@v1.mom_12_1", "rollup.trend_stats@v1.ret_252d"]
+fields = ["rollup.trend_stats@v2.mom_12_1", "rollup.trend_stats@v2.ret_252d"]
 hint = "mom_12_1 gt 0 as the gate (the last month skipped, the factor definition); ret_252d for the plain one-year return"
 
 [[phrase]]
 say = ["winning streak", "up days in a row", "consecutive up days", "down days in a row", "losing streak"]
-fields = ["rollup.trend_stats@v1.close_streak"]
+fields = ["rollup.trend_stats@v2.close_streak"]
 hint = "close_streak gte 5 for five up closes in a row, lte -5 for five down; a long streak is a short-term reversal setup more than a trend signal"
 
 [[phrase]]
 say = ["big move today", "unusual move", "outsized day", "shock day"]
-fields = ["rollup.trend_stats@v1.ret_z_20d", "rollup.volume@v1.volume_z_20d"]
+fields = ["rollup.trend_stats@v2.ret_z_20d", "rollup.volume@v1.volume_z_20d"]
 hint = "ret_z_20d gte 3 for an up shock, lte -3 for a down one (three times the normal daily move); confirm with volume_z_20d gte 2"

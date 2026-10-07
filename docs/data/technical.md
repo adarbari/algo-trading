@@ -87,8 +87,8 @@ folder per kind of thing; `architecture/layout.toml`):
 
 | Group | Folder | Columns | Status |
 |---|---|---|---|
-| `bands@v1` | `price/` | `ema_10/20/50/200`, `sma_150`, `ema20_slope_5d`, `ema50_slope_10d`, `sma200_slope_20d`, `close_std_20`, `bb_width_pctile_252d`, `band_walk` | built |
-| `trend_stats@v1` | `price/` | `ret_1d/3d/10d/120d/252d`, `mom_12_1`, `mom_accel_5d`, `ret_z_20d`, `high_100d`, `low_100d`, `high_200d`, `low_200d`, `prior_high_50d`, `prior_low_20d`, `prior_low_50d`, `sessions_since_high_20d`, `close_range_pos`, `trend_r2_90d`, `reg_slope_90d_ann`, `close_streak`, `sma20_streak`, `tight_range_sessions` | built |
+| `bands@v2` | `price/` | `ema_10/20/50/200`, `sma_150`, `ema20_slope_5d`, `ema50_slope_10d`, `sma200_slope_20d`, `close_std_20`, `bb_width_pctile_252d`, `band_walk` | built |
+| `trend_stats@v2` | `price/` | `ret_1d/3d/10d/120d/252d`, `mom_12_1`, `mom_accel_5d`, `ret_z_20d`, `high_100d`, `low_100d`, `high_200d`, `low_200d`, `prior_high_50d`, `prior_low_20d`, `prior_low_50d`, `sessions_since_high_20d`, `close_range_pos`, `trend_r2_90d`, `reg_slope_90d_ann`, `close_streak`, `sma20_streak`, `tight_range_sessions` | built |
 | `swing_levels@v1` | `levels/` (moved from `price/`) | unchanged | planned |
 | `pivot_strength@v1` | `levels/` | `resistance_touches`, `support_touches`, `resistance_age`, `support_age`, `pivot_structure` | planned |
 | `retest@v1` | `levels/` | `breakout_date`, `breakout_level`, `sessions_since_breakout`, `retest_state` | planned |
@@ -117,7 +117,7 @@ Formulas over stored columns are expression features (computed on read):
 - Point in time (ADR 0007): a row for session S reads bars up to S only; a backfilled row
   equals the row computed on S.
 
-## `bands@v1` (price/)
+## `bands@v2` (price/)
 
 Inputs: `bars/1d`, the session plus 399 earlier sessions (the EMA run, and 252 bandwidths of
 20 closes each).
@@ -143,7 +143,7 @@ Worked example: closes 100, 101, ..., 119 (20 bars): sma_20 109.5, close_std_20 
 bb_upper 121.33, bb_lower 97.67, bb_width 0.2161, bb_pct_b (119 - 97.67) / 23.66 = 0.9014,
 price_z_20d 1.606.
 
-## `trend_stats@v1` (price/)
+## `trend_stats@v2` (price/)
 
 Inputs: `bars/1d`, the session plus 252 earlier sessions. Param `tight_range_pct` (0.15).
 
