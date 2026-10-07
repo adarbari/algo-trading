@@ -78,7 +78,7 @@ def test_a_site_feature_never_sees_user_features(site: FeatureSet) -> None:
     """The site is built without users, so a site formula naming a user feature is unknown
     (and a cycle can only run through user features)."""
     defs = [e.definition for e in site.expressions.values()]
-    reads_user = replace(defs[0], name="site_reads", expr="half * 2")
+    reads_user = replace(defs[0], name="site_reads", expr="half * 2", params={})
     with pytest.raises(ExpressionError, match="unknown name 'half'"):
         FeatureSet.build(GROUPS, [*defs, reads_user], SUPERSEDED)
 
