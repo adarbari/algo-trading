@@ -1,6 +1,7 @@
 /**
  * Explore's state in the URL's search params, so a view is a shareable link: the compare set,
- * the focused ticker, the tab, the table's columns, filters and sort, and each tab's choices.
+ * the focused ticker, the tab, the table's columns, filters and sort, and each tab's choices
+ * (the field guide's theme, field and symbol).
  * Lists are comma-separated; absent keys take the defaults below.
  */
 import type { ChartRange, DataTableSort } from '@algotrade/ui';
@@ -15,6 +16,7 @@ export const EXPLORE_TABS = [
   'features',
   'events',
   'hits',
+  'guide',
 ] as const;
 export type ExploreTab = (typeof EXPLORE_TABS)[number];
 
@@ -44,6 +46,12 @@ export interface ExploreSearch {
   strikes?: 'all';
   /** The feature whose distribution the Features tab shows. */
   feature?: string;
+  /** The field guide's theme (default: the chosen field's, else the first). */
+  theme?: string;
+  /** The catalogue field the field guide shows (default: the theme's first). */
+  field?: string;
+  /** The symbol the field guide draws the field for (default: the focused ticker). */
+  symbol?: string;
 }
 
 /** The mockup's columns: close, our IV30, IV / HV, distance from the 52-week high, earnings. */
@@ -109,6 +117,9 @@ export function parseExploreSearch(raw: Record<string, unknown>): ExploreSearch 
   set('right', oneOf(['P', 'C'] as const, raw['right']));
   set('strikes', oneOf(['all'] as const, raw['strikes']));
   set('feature', text(raw['feature']));
+  set('theme', text(raw['theme']));
+  set('field', text(raw['field']));
+  set('symbol', text(raw['symbol'])?.toUpperCase());
   return out;
 }
 

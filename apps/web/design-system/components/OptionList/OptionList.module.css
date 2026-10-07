@@ -1,0 +1,67 @@
+/* OptionList: rows of a name over a description; the current one in the accent tint. */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list[data-max-height] {
+  overflow-y: auto;
+}
+
+.list[data-max-height='md'] {
+  max-height: calc(var(--space-10) * 9);
+}
+
+.list[data-max-height='lg'] {
+  max-height: calc(var(--space-10) * 14);
+}
+
+.option {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  width: 100%;
+  padding-block: var(--space-2);
+  padding-inline: var(--space-2-5);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  text-align: start;
+}
+
+.option:hover {
+  background: var(--color-row);
+}
+
+.option[aria-current='true'] {
+  background: var(--color-accent-soft);
+}
+
+.title {
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+}
+
+.title[data-mono] {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  overflow-wrap: anywhere;
+}
+
+.option[aria-current='true'] .title {
+  color: var(--color-accent-strong);
+}
+
+.description {
+  color: var(--color-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}

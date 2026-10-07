@@ -17,6 +17,7 @@ import {
   sampleBands,
   sampleLanes,
   sampleReferenceLines,
+  sampleValueBands,
 } from './storyData';
 
 /** The chart with the caller's range control, as screens use it. */
@@ -101,6 +102,14 @@ export const WithBands: Story = { args: { bands: sampleBands, events: aaplEvents
  */
 export const WithReferenceLines: Story = {
   args: { referenceLines: sampleReferenceLines, range: '1Y' },
+};
+
+/**
+ * With a value band: a span of values shaded across the price pane (here everything under the
+ * floor, open below), named in the key and kept inside the axis. Sample data.
+ */
+export const WithValueBand: Story = {
+  args: { valueBands: sampleValueBands, referenceLines: sampleReferenceLines, range: '1Y' },
 };
 
 /**

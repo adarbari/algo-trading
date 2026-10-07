@@ -51,7 +51,24 @@ export {
   unitLabel,
   type CatalogueFeature,
 } from './model/catalogue';
-export { guideTolerance, guideValues, type FieldGuide, type GuideUse } from './model/guide';
+export {
+  guideTolerance,
+  guideValues,
+  ruleText,
+  bandOf,
+  type FieldGuide,
+  type GuideUse,
+} from './model/guide';
+export {
+  guideThemes,
+  OTHER_THEME,
+  resolveSelection,
+  searchFields,
+  shortMeaning,
+  themeFields,
+  themeOf,
+  type GuideTheme,
+} from './model/themes';
 export {
   codeReason,
   isUnknown,

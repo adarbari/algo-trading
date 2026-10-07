@@ -13,6 +13,7 @@ export { useInstrumentFacts } from './api/facts';
 export {
   chunks,
   historyOf,
+  pointsOf,
   type FeatureHistory,
   type FeatureValues,
   type SeriesChunk,

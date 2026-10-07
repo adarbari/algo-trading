@@ -6,7 +6,14 @@ import math
 from hypothesis import given
 from hypothesis import strategies as st
 
-from algotrade.core.model.predicates import Group, Rule, evaluate_group, evaluate_rule, is_missing
+from algotrade.core.model.predicates import (
+    Group,
+    Rule,
+    evaluate_group,
+    evaluate_rule,
+    is_missing,
+    passing,
+)
 
 
 def test_rule_ops() -> None:
@@ -74,3 +81,11 @@ def test_any_group_is_true_with_one_true_child_even_if_others_are_unknown() -> N
     assert evaluate_group(Group("any", rules), {"a": 1}) is True
     assert evaluate_group(Group("any", rules), {"a": 2}) is None
     assert evaluate_group(Group("all", rules), {"a": 2}) is False
+
+
+def test_passing_keeps_only_the_values_that_pass() -> None:
+    values = [0.05, 0.2, None, math.nan, "x", 0.1]
+    assert passing(Rule("f", "lte", 0.1), values) == [0.05, 0.1]
+    assert passing(Rule("f", "between", (0.1, 0.3)), values) == [0.2, 0.1]
+    assert len(passing(Rule("f", "is_null"), values)) == 2  # None and NaN are missing
+    assert passing(Rule("f", "gte", 1), []) == []

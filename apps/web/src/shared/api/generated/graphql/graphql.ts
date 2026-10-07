@@ -105,7 +105,7 @@ export type FeatureDistributionQueryVariables = Exact<{
 }>;
 
 
-export type FeatureDistributionQuery = { distribution: { name: string, session: string, count: number, nulls: number, quantiles: Array<{ q: number, value: number }>, histogram: Array<{ lo: number, hi: number, count: number }>, categories: Array<{ value: string, count: number }>, unknown: { code: UnknownCode, detail: string } | null } | null };
+export type FeatureDistributionQuery = { distribution: { name: string, session: string, count: number, nulls: number, quantiles: Array<{ q: number, value: number }>, histogram: Array<{ lo: number, hi: number, count: number }>, categories: Array<{ value: string, count: number }>, unknown: { code: UnknownCode, detail: string } | null, passing: Array<{ intent: string, count: number, bins: Array<number> }> } | null };
 
 export type FeatureTableQueryVariables = Exact<{
   columns: Array<string> | string;
@@ -587,6 +587,11 @@ export const FeatureDistributionDocument = new TypedDocumentString(`
     unknown {
       code
       detail
+    }
+    passing {
+      intent
+      count
+      bins
     }
   }
 }

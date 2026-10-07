@@ -21,6 +21,25 @@ describe('Distribution', () => {
     ).toBeInTheDocument();
   });
 
+  it('draws the highlighted part of each bin over the bar and says how many in the summary', () => {
+    const lit = bins.map((b, i) =>
+      i === 0 ? { ...b, highlighted: 4 } : { ...b, highlighted: i === 1 ? 5 : 0 },
+    );
+    const { container } = render(
+      <Distribution label="ADV" bins={lit} highlightLabel="pass a squeeze" />,
+    );
+    expect(container.querySelectorAll('rect')).toHaveLength(5); // 3 bars + 2 highlighted parts
+    expect(screen.getByRole('img').getAttribute('aria-label')).toContain('9 pass a squeeze');
+    expect(container.firstElementChild).toHaveAttribute('data-highlight');
+  });
+
+  it('is plain without highlights', () => {
+    const { container } = render(<Distribution label="ADV" bins={bins} highlightLabel="pass" />);
+    expect(container.querySelectorAll('rect')).toHaveLength(3);
+    expect(container.firstElementChild).not.toHaveAttribute('data-highlight');
+    expect(screen.getByRole('img').getAttribute('aria-label')).not.toContain('pass');
+  });
+
   it('draws one bar per bin on a value axis (unequal widths) and labels markers', () => {
     const { container } = render(
       <Distribution

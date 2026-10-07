@@ -9,7 +9,7 @@ the op, or a float NaN, is UNKNOWN too. Selections (``engines/selection``) and r
 
 import math
 import operator
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -80,6 +80,12 @@ def evaluate_rule(rule: Rule, value: FieldValue) -> Truth:
         return bool(_OPS[rule.op](value, rule.value))
     except TypeError:  # data of the wrong type for the rule: not knowable
         return None
+
+
+def passing(rule: Rule, values: Iterable[FieldValue]) -> list[FieldValue]:
+    """The ``values`` that pass ``rule``; a missing, NaN or wrong-typed value never does (the
+    population counts of the field guide's criteria, ADR 0038)."""
+    return [v for v in values if evaluate_rule(rule, v) is True]
 
 
 def evaluate_group(group: Group, row: Mapping[str, FieldValue]) -> Truth:

@@ -46,3 +46,22 @@ export function historyOf(history: FeatureHistory, name: string): (number | null
   }
   return null;
 }
+
+/** One feature's dated values, oldest first (non-numbers are gaps), for a chart; empty when no answered chunk has it. */
+export function pointsOf(
+  history: FeatureHistory,
+  name: string,
+): { time: string; value: number | null }[] {
+  for (const chunk of history.series) {
+    const at = chunk.names.indexOf(name);
+    if (at < 0) continue;
+    return chunk.points.map((p) => {
+      const value = p.values[at];
+      return {
+        time: p.session,
+        value: typeof value === 'number' && Number.isFinite(value) ? value : null,
+      };
+    });
+  }
+  return [];
+}

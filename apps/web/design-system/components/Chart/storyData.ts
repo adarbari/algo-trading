@@ -9,6 +9,7 @@ import type {
   ChartLane,
   ChartPoint,
   ChartReferenceLine,
+  ChartValueBand,
   ChartSeries,
 } from './chartData';
 
@@ -148,6 +149,11 @@ export const aaplWithGap: ChartSeries = {
 export const sampleReferenceLines: ChartReferenceLine[] = [
   { value: 300, label: 'Floor', tone: 'negative', dash: true },
   { value: 340, label: 'Target', tone: 'positive' },
+];
+
+/** A sample value band: the zone under the sample floor, open below. Not market data. */
+export const sampleValueBands: ChartValueBand[] = [
+  { to: 300, tone: 'accent', label: 'Below the floor' },
 ];
 
 /** Sample lanes: a state over time in two rows (labelled and unlabelled spans). Not market data. */

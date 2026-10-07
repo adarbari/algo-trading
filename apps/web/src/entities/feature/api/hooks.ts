@@ -74,6 +74,11 @@ const FeatureDistribution = graphql(`
         code
         detail
       }
+      passing {
+        intent
+        count
+        bins
+      }
     }
   }
 `);

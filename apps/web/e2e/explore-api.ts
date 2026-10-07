@@ -211,12 +211,95 @@ function featureHistory(names: readonly string[]): Json {
   return { names, points };
 }
 
+/**
+ * The recorded catalogue predates the field guide: three fields get a synthetic entry (the
+ * Field guide tab's themes, how to read it, criteria and caveats).
+ */
+const GUIDES: Record<string, Json> = {
+  'rollup.iv30@v1.iv30': {
+    theme: 'Implied volatility',
+    reads:
+      'Our 30-day at-the-money implied volatility, annualised: 0.25 means the options price a one-standard-deviation move of about 7% over the next month. Compare it with the name’s own history, not across sectors.',
+    caveats: [
+      'Earnings inside the 30 days lift it without the stock being rich; check rollup.earnings@v1.days_to_earnings.',
+    ],
+    sources: ['Cboe chains, interpolated in total variance (ADR 0021).'],
+    uses: [
+      {
+        intent: 'Rich premium to sell',
+        op: 'gte',
+        value: 0.4,
+        mode: 'soft',
+        tolerance: 0.05,
+        onMiss: null,
+        note: 'Pair it with iv_hv_ratio above 1.25.',
+      },
+      {
+        intent: 'Cheap options to buy',
+        op: 'lte',
+        value: 0.2,
+        mode: 'hard',
+        tolerance: null,
+        onMiss: null,
+        note: 'A filter for strategies that buy options.',
+      },
+    ],
+  },
+  'feature.iv_hv_ratio': {
+    theme: 'Implied volatility',
+    reads: 'IV30 over HV30: above 1 the options price more movement than the stock has delivered.',
+    caveats: [],
+    sources: [],
+    uses: [],
+  },
+  'rollup.price_stats@v2.hv30': {
+    theme: 'Volatility',
+    reads: 'Realised volatility of the last 30 sessions, annualised.',
+    caveats: ['A single gap day dominates a 30-session window.'],
+    sources: [],
+    uses: [],
+  },
+};
+
+/** The recorded catalogue with the synthetic guide entries. */
+function catalogue(): Json {
+  const recorded = fixture('catalogue.json') as { data: { catalogue: Row[] } };
+  return {
+    data: {
+      catalogue: recorded.data.catalogue.map((f) => ({
+        ...f,
+        guide: GUIDES[String(f['name'])] ?? null,
+      })),
+    },
+  };
+}
+
+interface GuideUse {
+  intent: string;
+  op: string;
+  value: number;
+}
+
+/** What each guide use of the field passes, from the bins whose lower edge passes (a mock of the server's count). */
+function passing(name: string, histogram: { lo: number; count: number }[]): Json[] {
+  const uses = (GUIDES[name]?.['uses'] ?? []) as GuideUse[];
+  return uses.map((use) => {
+    const bins = histogram.map((b) =>
+      (use.op === 'gte' ? b.lo >= use.value : b.lo <= use.value) ? b.count : 0,
+    );
+    return { intent: use.intent, count: bins.reduce((a, b) => a + b, 0), bins };
+  });
+}
+
 /** A feature's distribution: the recorded one for its name, else IV30's renamed. */
 function distribution(name: string): Json {
   const answer = fixture(DISTRIBUTIONS[name] ?? 'dist-iv30.json') as {
-    data: { distribution: Json };
+    data: { distribution: { histogram: { lo: number; count: number }[] } & Json };
   };
-  return { data: { distribution: { ...answer.data.distribution, name } } };
+  const recorded = answer.data.distribution;
+  return {
+    data: { distribution: { ...recorded, name, passing: passing(name, recorded.histogram) } },
+  };
 }
 
 /**
@@ -225,7 +308,7 @@ function distribution(name: string): Json {
  */
 function graphqlAnswer(operation: Operation): Json | null {
   const name = /query\s+(\w+)/.exec(operation.query ?? '')?.[1];
-  if (name === 'FeatureCatalogue') return fixture('catalogue.json');
+  if (name === 'FeatureCatalogue') return catalogue();
   if (name === 'FeatureDistribution') return distribution(String(operation.variables?.['name']));
   if (name === 'FeatureTable') return featureTable(operation.variables ?? {});
   if (name === 'ComparePrices') return comparePrices(operation.variables ?? {});

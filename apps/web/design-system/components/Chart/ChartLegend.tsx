@@ -31,7 +31,10 @@ export function ChartLegend({ chart, bandKey }: { chart: PreparedChart; bandKey:
   );
   const distinct = <T extends { tone: ChartBandTone; label: string }>(items: readonly T[]) =>
     items.filter((b, i) => items.findIndex((o) => o.label === b.label && o.tone === b.tone) === i);
-  const bands = distinct(chart.bands.filter((b) => b.pattern !== 'hatch'));
+  const bands = distinct([
+    ...chart.bands.filter((b) => b.pattern !== 'hatch'),
+    ...chart.valueBands,
+  ]);
   const hatched = distinct(chart.bands.filter((b) => b.pattern === 'hatch'));
   const states = distinct(
     chart.lanes.flatMap((lane) =>

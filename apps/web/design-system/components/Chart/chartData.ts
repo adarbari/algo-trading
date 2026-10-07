@@ -64,6 +64,21 @@ export interface ChartBand {
   pattern?: 'solid' | 'hatch';
 }
 
+/**
+ * A horizontal span of values across the price pane (the criterion's passing zone, a normal
+ * range). An absent `from` runs to the bottom of the pane, an absent `to` to the top.
+ */
+export interface ChartValueBand {
+  /** Lower edge, on the axis' scale; absent: open below. */
+  from?: number;
+  /** Upper edge; absent: open above. */
+  to?: number;
+  /** Tint of the span. */
+  tone: ChartBandTone;
+  /** What the span is ("Squeeze zone"): its name for assistive technology and the key. */
+  label: string;
+}
+
 /** A horizontal line across the price pane at a value: a threshold, a target, a baseline. */
 export interface ChartReferenceLine {
   /** Where the line sits, on the axis' scale (the value as drawn, so rebased when `rebase`). */
@@ -156,6 +171,7 @@ export interface PreparedChart {
   events: ChartEvent[];
   bands: ChartBand[];
   referenceLines: ChartReferenceLine[];
+  valueBands: ChartValueBand[];
   lanes: ChartLane[];
   volume: ChartPoint[];
   start: string | null;
@@ -171,6 +187,7 @@ export function prepare(
     events?: readonly ChartEvent[];
     bands?: readonly ChartBand[];
     referenceLines?: readonly ChartReferenceLine[];
+    valueBands?: readonly ChartValueBand[];
     lanes?: readonly ChartLane[];
     volume?: readonly ChartPoint[];
   },
@@ -193,6 +210,7 @@ export function prepare(
     events: inWindow(options.events ?? [], start).filter((e) => last === null || e.time <= last),
     bands: clampBands(options.bands ?? [], first, end),
     referenceLines: (options.referenceLines ?? []).filter((l) => Number.isFinite(l.value)),
+    valueBands: (options.valueBands ?? []).filter(isValueBand),
     lanes: (options.lanes ?? []).map((lane) => ({
       ...lane,
       segments: clampBands(lane.segments, first, end),
@@ -201,6 +219,15 @@ export function prepare(
     start: first,
     end,
   };
+}
+
+/** A value band with at least one finite edge, the lower not above the upper. */
+function isValueBand(b: ChartValueBand): boolean {
+  const low = b.from === undefined ? -Infinity : b.from;
+  const high = b.to === undefined ? Infinity : b.to;
+  return (
+    !Number.isNaN(low) && !Number.isNaN(high) && low <= high && (low > -Infinity || high < Infinity)
+  );
 }
 
 /** The spans (bands, lane segments) that overlap the window, cut to its first and last day, oldest first. */
@@ -278,10 +305,24 @@ export function describeChart(
     );
     parts.push(`reference lines: ${lines.join(', ')}`);
   }
+  if (chart.valueBands.length > 0) {
+    const zones = chart.valueBands.map((b) => `${b.label} ${describeValueBand(b, value)}`);
+    parts.push(
+      `shaded value ${chart.valueBands.length === 1 ? 'zone' : 'zones'}: ${zones.join(', ')}`,
+    );
+  }
   if (chart.lanes.length > 0) {
     parts.push(`lanes under the axis: ${chart.lanes.map((l) => l.label).join(', ')}`);
   }
   return `${parts.join('; ')}.`;
+}
+
+/** "from 0 to 0.1", "at or above 5" style text of a value band's extent. */
+export function describeValueBand(band: ChartValueBand, value: (v: number) => string): string {
+  if (band.from !== undefined && band.to !== undefined) {
+    return `from ${value(band.from)} to ${value(band.to)}`;
+  }
+  return band.from !== undefined ? `above ${value(band.from)}` : `below ${value(band.to ?? 0)}`;
 }
 
 /** One row of the table fallback: a day with each series' value, volume and events. */

@@ -98,6 +98,7 @@ describe('feature distribution', () => {
     ],
     categories: [],
     unknown: null,
+    passing: [{ intent: 'a squeeze', count: 6, bins: [5, 1] }],
   };
 
   it('maps bins and quartile markers, with the ticker highlighted', () => {
@@ -110,6 +111,13 @@ describe('feature distribution', () => {
       { value: 0.45, label: 'median' },
       { value: 0.7, label: 'p75' },
       { value: 0.24, label: 'AAPL', tone: 'accent' },
+    ]);
+  });
+
+  it("carries each bin's passing count when a criterion is chosen", () => {
+    expect(distributionBins(distribution, distribution.passing[0])).toEqual([
+      { start: 0, end: 0.5, count: 6, highlighted: 5 },
+      { start: 0.5, end: 1, count: 3, highlighted: 1 },
     ]);
   });
 
