@@ -11,12 +11,8 @@ the API runs) and rebuilt only when the definitions changed.
 
 from collections.abc import Sequence
 
-from algotrade.config.site.settings import (
-    FeatureDefinition,
-    SiteDocuments,
-    load_features,
-    load_user_features,
-)
+from algotrade.config.site.features.definitions import FeatureDefinition
+from algotrade.config.site.settings import SiteDocuments, load_features, load_user_features
 from algotrade.features.expressions.feature_set import FeatureSet
 from algotrade.features.registry import GROUPS, SUPERSEDED
 

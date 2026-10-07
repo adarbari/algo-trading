@@ -1,6 +1,7 @@
 """``config/site/events/releases.toml`` (ADR 0050): the shipped registry loads the nine releases
 with their verified FRED ids and the two ISM rules, and every rule names the entry."""
 
+from datetime import date
 from typing import Any
 
 import pytest
@@ -58,6 +59,14 @@ def test_a_release_loads_with_the_keys_its_source_needs() -> None:
     assert found.releases[0].release_id == 10 and found.releases[0].nth_business_day is None
     assert found.releases[1].nth_business_day == 1 and found.releases[1].release_id is None
     assert found.releases[1].clock.hour == 10 and [r.key for r in found.fred] == ["CPI"]
+
+
+def test_ism_exceptions_load_as_month_to_date_and_the_shipped_ones_are_empty() -> None:
+    found = load(changed(ISM, exceptions={"2025-01": date(2025, 1, 3)}))
+    assert found.releases[0].exceptions == {"2025-01": date(2025, 1, 3)}
+    assert load(ISM).releases[0].exceptions == {}
+    shipped = load_macro_releases(FileConfigStore(REPO_ROOT / "config"))
+    assert all(r.exceptions == {} for r in shipped.releases)  # none verified: see releases.toml
 
 
 def changed(base: dict[str, Any], **kw: Any) -> dict[str, Any]:
