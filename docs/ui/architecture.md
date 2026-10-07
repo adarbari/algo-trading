@@ -101,6 +101,7 @@ Every message names its rule (`[ADR 0025 rule n]`), this page and the skill with
 | 6 | Every design-system component: stories for Default / Loading / Empty / Error / Dense (or the reason not), unit test with axe, screenshots light + dark | `npm run ds:check`; `test_layout_web.py`; Playwright visual suite (screenshot diff + axe incl. contrast, every story, both themes) |
 | 7 | No grab-bag module names (`utils.ts`, `helpers.ts`, ...) | `test_layout_web.py` (`[banned_module_names]`) |
 | 8 | Accessible: keyboard and labels for interactive components | `eslint-plugin-jsx-a11y` (strict); axe in unit, visual and e2e tests |
+| 9 | Explanations are Guide content shown through `InfoButton` + `HelpDrawer` (ADR 0051, [guide.md](guide.md)); no explanatory prose or explainer Disclosure in `src/`; a page introduction or microcopy is one sentence under 25 words | `test_layout_web.py::test_web_prose_matches_the_baseline` (shrink-only `architecture/web_prose.toml`); `.claude/skills/add-guide-content` |
 
 Every folder under `apps/web` is declared in `architecture/web_layout.toml` (`[[web_dir]]`, with
 `kind` = layer / slice / segment / component / screenshots); an undeclared folder fails
