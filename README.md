@@ -235,7 +235,7 @@ that have no Tiingo history for the window (optionable names first, then `iv_his
 come along) and fetches them within `[tiingo] monthly_symbol_budget` (450 of the free tier's 500
 distinct symbols a calendar month), counted from the task's own earlier run records. A launchd agent
 (`algotrade-ingest schedule` writes it; hosting.md installs it) runs `bars-history --fill 450 --wait`
-on the 2nd of each month at 09:00 until the optionable universe is covered. Check a run:
+on the 2nd of each month at 19:00 until the optionable universe is covered. Check a run:
 
 ```bash
 tail var/logs/bars-history-monthly.log   # the run record: month_budget, month_used, month_remaining, filled, pending

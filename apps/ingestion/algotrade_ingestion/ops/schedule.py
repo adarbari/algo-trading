@@ -66,16 +66,18 @@ MONTHLY_LABEL = "com.algotrade.bars-history-monthly"
 MONTHLY_FILL = (
     450  # = [tiingo] monthly_symbol_budget (free tier: 500 symbols a month, with a buffer)
 )
-MONTHLY_DAY, MONTHLY_TIME = 2, "09:00"  # the 2nd of each month, local time
+MONTHLY_DAY, MONTHLY_TIME = 2, "19:00"  # the 2nd of each month, local time
 
 
 def monthly_fill_plist(
-    repo: Path, fill: int = MONTHLY_FILL, day: int = MONTHLY_DAY, hour: int = 9, minute: int = 0
+    repo: Path, fill: int = MONTHLY_FILL, day: int = MONTHLY_DAY, hour: int = 19, minute: int = 0
 ) -> bytes:
     """The agent that runs ``algotrade-ingest bars-history --fill N --wait`` once a month: the
     next N names without Tiingo history (``services.events.fill``), within the month's symbol
-    budget. ``--wait`` queues it behind a running ingest. A month the Mac is off through its time
-    is skipped by launchd (the next month's run covers more: the budget is per month, not per
+    budget. 450 names at 72 s each hold the ingest lock about 9 hours, so it starts at 19:00,
+    after the 15:00 nightly, and ends about 04:00 before the next one. ``--wait`` queues it
+    behind a running ingest. A month the Mac is off through its time is skipped by launchd (the
+    next month's run covers more: the budget is per month, not per
     run), or run it by hand (README "Long runs")."""
     if fill < 1:
         raise ValueError(f"invalid fill {fill}")

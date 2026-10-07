@@ -299,7 +299,11 @@ def test_monthly_fill_plist() -> None:
         "450",
         "--wait",
     ]
-    assert plist["StartCalendarInterval"] == {"Day": 2, "Hour": 9, "Minute": 0}
+    assert plist["StartCalendarInterval"] == {
+        "Day": 2,
+        "Hour": 19,
+        "Minute": 0,
+    }  # after the 15:00 nightly
     assert "RunAtLoad" not in plist and "StartInterval" not in plist  # monthly only
     assert plist["WorkingDirectory"] == "/repo"
     assert plist["StandardOutPath"] == "/repo/var/logs/bars-history-monthly.log"

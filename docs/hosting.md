@@ -59,7 +59,7 @@ The agent binds `127.0.0.1` only; Funnel is the one way in from outside. Without
 ### The monthly Tiingo history fill (launchd)
 
 The third agent runs `algotrade-ingest bars-history --fill 450 --wait` on the 2nd of each month
-at 09:00 local time: the next names without 2018 daily bars (optionable first, by IV30 then dollar
+at 19:00 local time: the next names without 2018 daily bars (optionable first, by IV30 then dollar
 volume), within Tiingo's free limit of 500 distinct tickers a month (`[tiingo]
 monthly_symbol_budget = 450` in `config/site/sources.toml`), until the optionable universe is
 covered. `algotrade-ingest schedule` writes it next to the nightly's; it is written, never
@@ -72,7 +72,8 @@ cp var/com.algotrade.bars-history-monthly.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/com.algotrade.bars-history-monthly.plist
 ```
 
-Logs are `var/logs/bars-history-monthly.log` and `.err.log`. `--wait` queues it behind a running
+Logs are `var/logs/bars-history-monthly.log` and `.err.log`. It starts after the 15:00 nightly because 450 names at 72 s hold the ingest lock about 9 hours
+(it ends about 04:00); `--wait` queues it behind a running
 ingest; a month the Mac is off at that time is skipped (the next run covers the same names).
 README "Long runs" says how to check a run.
 

@@ -211,7 +211,7 @@ def _job_parsers(sub: "argparse._SubParsersAction[argparse.ArgumentParser]") -> 
     sc.add_argument("--out", type=Path, default=Path("var") / f"{LABEL}.plist")
     sc.add_argument(
         "--monthly-out", type=Path, default=Path("var") / f"{MONTHLY_LABEL}.plist",
-        help="where to write the monthly `bars-history --fill` agent (2nd of the month, 09:00)",
+        help="where to write the monthly `bars-history --fill` agent (2nd of the month, 19:00)",
     )  # fmt: skip
     r = sub.add_parser(
         "report", help="render (and --send) the nightly summary email for a past session"

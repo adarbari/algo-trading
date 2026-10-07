@@ -348,3 +348,35 @@ def test_the_monthly_budget_counts_every_run_of_the_month_and_resets_in_the_next
     february = fill_run(writer, vendor, 5, FEB, budget=3)  # a new month: the budget is whole
     assert vendor.asked == ["CCC", "EEE", "BBB", "AAA", "DDD"]
     assert (february.stats["month_used"], february.stats["month_remaining"]) == (2, 1)
+
+
+def spent(
+    writer: StoreWriter, started: datetime, finished: datetime | None, status: RunStatus, n: int
+) -> None:
+    """An earlier run of the task, with ``n`` ``hist:`` items (one of them a FETCH_ERROR)."""
+    record = RunRecord(f"bars_history-x{n}-{started:%Y%m%dT%H%M}", "bars_history", UNTIL, started)
+    record.status, record.finished_at = status, finished
+    record.items = {f"hist:EQ:OLD{i}": "OK: w" for i in range(n - 1)} | {
+        f"hist:EQ:ERR{n}": "FETCH_ERROR: HTTP 500"
+    }
+    writer._backend.runs.save(record)  # type: ignore[attr-defined]
+
+
+def test_a_failed_run_this_month_has_spent_its_requests() -> None:
+    """A run that crashed after its fetches (FAILED, FETCH_ERROR items included) counts."""
+    writer, vendor = fill_world()
+    spent(writer, JAN - timedelta(days=3), None, RunStatus.FAILED, 3)
+    record = fill_run(writer, vendor, 5, JAN, budget=5)
+    assert record.stats["fetched"] == 2 and vendor.asked == ["CCC", "EEE"]
+    assert (record.stats["month_used"], record.stats["month_remaining"]) == (5, 0)
+
+
+def test_a_run_spanning_a_month_end_counts_in_both_months() -> None:
+    writer, vendor = fill_world()
+    start, end = datetime(2020, 1, 31, 20, tzinfo=UTC), datetime(2020, 2, 1, 5, tzinfo=UTC)
+    spent(writer, start, end, RunStatus.COMPLETE, 3)
+    spent(writer, start, None, RunStatus.RUNNING, 1)  # crashed mid-run: still open: counts too
+    in_feb = fill_run(writer, vendor, 5, FEB, budget=5)
+    assert in_feb.stats["fetched"] == 1  # 3 + 1 of the 5 spent
+    in_mar = fill_run(writer, vendor, 5, datetime(2020, 3, 5, tzinfo=UTC), budget=5)
+    assert in_mar.stats["month_used"] == in_mar.stats["fetched"] + 1  # only the open run spills
