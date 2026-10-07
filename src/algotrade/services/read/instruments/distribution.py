@@ -23,7 +23,7 @@ import numpy as np
 from algotrade.config.site.field_guide import GuideUse
 from algotrade.config.site.settings import load_field_guide
 from algotrade.core.model.fields import NUMERIC_TYPES, REFERENCE_TABLE
-from algotrade.core.model.predicates import Rule, evaluate_rule
+from algotrade.core.model.predicates import Rule, passing
 from algotrade.services.read.context import ReadContext
 from algotrade.services.read.instruments.catalogue import FeatureInfo, feature_infos
 from algotrade.services.read.instruments.features import FeatureValue, load_feature_values
@@ -111,7 +111,7 @@ def _rule(name: str, use: GuideUse) -> Rule:
     return Rule(name, use.op, tuple(value) if isinstance(value, list) else value)
 
 
-def _passing(
+def _use_passes(
     name: str, uses: Sequence[GuideUse], rows: Sequence[FeatureValue], bins: tuple[Bin, ...]
 ) -> tuple[UsePass, ...]:
     """Per use: the values (a stored null is a missing value) that pass its rule, in total and
@@ -119,7 +119,7 @@ def _passing(
     out: list[UsePass] = []
     for use in uses:
         rule = _rule(name, use)
-        passed = [v.value for v in rows if evaluate_rule(rule, v.value) is True]
+        passed = passing(rule, [v.value for v in rows])
         per_bin: tuple[int, ...] = ()
         if bins:
             edges = [bins[0].lo, *(b.hi for b in bins)]
@@ -158,7 +158,7 @@ def load_distribution(ctx: ReadContext, name: str) -> FeatureDistribution:
         categories = _categories(present)
     nulls = len(rows) - len(present)
     entry = load_field_guide(ctx.configs).entry(name)
-    passing = _passing(name, entry.uses, rows, bins) if entry is not None else ()
+    by_use = _use_passes(name, entry.uses, rows, bins) if entry is not None else ()
     return FeatureDistribution(
-        name, ctx.session.date, info, len(rows), nulls, quantiles, bins, categories, None, passing
+        name, ctx.session.date, info, len(rows), nulls, quantiles, bins, categories, None, by_use
     )
